@@ -1,0 +1,109 @@
+generator client {
+  provider = "prisma-client-js"
+  // output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              String          @id @default(auto()) @map("_id") @db.ObjectId
+  firstName       String
+  lastName        String
+  email           String
+  emailNormalized String          @unique
+  passwordHash    String?
+  phoneNumber     String?
+  phoneE164       String?         @unique
+  gender          Gender
+  birthDate       DateTime?
+  roles           Role[]          @default([SHIPPER])
+  sellerStatus    CarriersStatus  @default(NONE)
+  sellerProfile   CarrierProfile?
+  avatar          Image?          @relation("UserAvatar")
+  addresses       Address[]
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@index([sellerStatus])
+  @@index([roles])
+}
+
+model Image {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  fileId    String
+  url       String
+  userId    String   @unique @db.ObjectId
+  user      User     @relation("UserAvatar", fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Address {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId        String   @db.ObjectId
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  label         String? // ex: "Maison", "Bureau"
+  recipientName String? // utile si différent du user
+  phoneE164     String? // si le destinataire a un autre numéro
+  streetLine1   String
+  streetLine2   String?
+  city          String
+  region        String? // état/province
+  postalCode    String
+  country       String
+  isArchived    Boolean  @default(false) // optionnel : pour ne pas vraiment supprimer
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([userId])
+  @@index([userId, isArchived])
+}
+
+model CarrierProfile {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String   @unique @db.ObjectId
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  shopName  String?
+  country   String
+  phoneE164 String?
+  kycStatus String? // ou enum si vous voulez
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([country])
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum Role {
+  SHIPPER
+  CARRIER
+  ADMIN
+}
+
+enum CarriersStatus {
+  NONE
+  PENDING
+  APPROVED
+  SUSPENDED
+}
+
+// model Follow {
+//   id          String   @id @default(auto()) @map("_id") @db.ObjectId
+//
+//   followerId  String   @db.ObjectId
+//   followingId String   @db.ObjectId
+//   follower  User @relation("UserFollowing", fields: [followerId], references: [id], onDelete: Cascade)
+//   following User @relation("UserFollowers", fields: [followingId], references: [id], onDelete: Cascade)
+//   createdAt DateTime @default(now())
+//   @@unique([followerId, followingId])
+//   @@index([followingId])
+//   @@index([followerId])
+// }
