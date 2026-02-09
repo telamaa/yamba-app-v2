@@ -1,10 +1,10 @@
 {
-  "name": "@yamba-app/auth-service-e2e",
+  "name": "@yamba-app/api-gateway-e2e",
   "version": "0.0.1",
   "private": true,
   "nx": {
     "implicitDependencies": [
-      "auth-service"
+      "@yamba-app/api-gateway"
     ],
     "targets": {
       "e2e": {
@@ -13,12 +13,12 @@
           "{projectRoot}/test-output/jest/coverage"
         ],
         "options": {
-          "jestConfig": "apps/auth-service-e2e/jest.config.cts",
+          "jestConfig": "apps/api-gateway-e2e/jest.config.cts",
           "passWithNoTests": true
         },
         "dependsOn": [
-          "auth-service:build",
-          "auth-service:serve"
+          "@yamba-app/api-gateway:build",
+          "@yamba-app/api-gateway:serve"
         ]
       }
     }

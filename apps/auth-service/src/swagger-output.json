@@ -1,0 +1,413 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "Yamba-app : Auth Service API",
+    "description": "Automatically generated Swagger docs",
+    "version": "1.0.0"
+  },
+  "host": "localhost:6001",
+  "basePath": "/api",
+  "schemes": ["http"],
+  "consumes": ["application/json"],
+  "produces": ["application/json"],
+
+  "securityDefinitions": {
+    "accessTokenCookie": {
+      "type": "apiKey",
+      "in": "cookie",
+      "name": "access_token",
+      "description": "JWT access token stored as httpOnly cookie (set by /auth/login or /auth/refresh)."
+    },
+    "refreshTokenCookie": {
+      "type": "apiKey",
+      "in": "cookie",
+      "name": "refresh_token",
+      "description": "JWT refresh token stored as httpOnly cookie (set by /auth/login; rotated by /auth/refresh)."
+    },
+    "accessTokenBearer": {
+      "type": "apiKey",
+      "in": "header",
+      "name": "Authorization",
+      "description": "Optional fallback: Authorization: Bearer <access_token>."
+    },
+    "refreshTokenBearer": {
+      "type": "apiKey",
+      "in": "header",
+      "name": "Authorization",
+      "description": "Optional fallback for refresh: Authorization: Bearer <refresh_token>."
+    }
+  },
+
+  "paths": {
+    "/auth/register": {
+      "post": {
+        "description": "Register a new user (send OTP). Stores pending registration in Redis and returns verificationToken.",
+        "parameters": [
+          {
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": { "$ref": "#/definitions/RegistrationInput" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OTP sent to email. Please verify your account.",
+            "schema": { "$ref": "#/definitions/UserRegistrationResponse" }
+          },
+          "400": {
+            "description": "Validation error / missing required fields / OTP restrictions",
+            "schema": { "$ref": "#/definitions/ErrorResponse" }
+          },
+          "500": {
+            "description": "Unhandled server error",
+            "schema": { "$ref": "#/definitions/ErrorResponse" }
+          }
+        }
+      }
+    },
+
+    "/auth/register/verify": {
+      "post": {
+        "description": "Verify OTP using verificationToken and create user from pending registration stored in Redis.",
+        "parameters": [
+          {
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": { "$ref": "#/definitions/VerifyUserTokenInput" }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "User registered successfully",
+            "schema": { "$ref": "#/definitions/VerifyUserSuccess" }
+          },
+          "400": {
+            "description": "Invalid/expired OTP, invalid/expired token, locked, session expired, missing fields",
+            "schema": { "$ref": "#/definitions/ErrorResponse" }
+          },
+          "500": {
+            "description": "Unhandled server error",
+            "schema": { "$ref": "#/definitions/ErrorResponse" }
+          }
+        }
+      }
+    },
+
+    "/auth/login": {
+      "post": {
+        "description": "Login user with email + password. Sets httpOnly cookies: access_token (15m) and refresh_token (7d).",
+        "parameters": [
+          {
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": { "$ref": "#/definitions/LoginInput" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Login successful",
+            "schema": { "$ref": "#/definitions/LoginSuccess" }
+          },
+          "400": {
+            "description": "Bad Request (missing/invalid fields)",
+            "schema": { "$ref": "#/definitions/ErrorResponse" }
+          },
+          "401": {
+            "description": "Unauthorized (invalid email or password)",
+            "schema": { "$ref": "#/definitions/ErrorResponse" }
+          },
+          "500": {
+            "description": "Unhandled server error",
+            "schema": { "$ref": "#/definitions/ErrorResponse" }
+          }
+        }
+      }
+    },
+
+    "/auth/refresh": {
+      "post": {
+        "description": "Refresh access token using refresh_token cookie (or Authorization Bearer). Rotates refresh token when enabled.",
+        "security": [
+          { "refreshTokenCookie": [] },
+          { "refreshTokenBearer": [] }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Refreshed successfully",
+            "schema": { "$ref": "#/definitions/RefreshSuccess" }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid refresh token)",
+            "schema": { "$ref": "#/definitions/ErrorResponse" }
+          },
+          "500": {
+            "description": "Unhandled server error",
+            "schema": { "$ref": "#/definitions/ErrorResponse" }
+          }
+        }
+      }
+    },
+
+    "/auth/password/forgot": {
+      "post": {
+        "description": "Request password reset OTP. For security, response is generic (does not reveal if email exists).",
+        "parameters": [
+          {
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": { "$ref": "#/definitions/ForgotPasswordInput" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "If an account exists, an OTP has been sent to the email.",
+            "schema": { "$ref": "#/definitions/ForgotPasswordResponse" }
+          },
+          "400": {
+            "description": "Bad Request (missing/invalid fields / OTP restrictions)",
+            "schema": { "$ref": "#/definitions/ErrorResponse" }
+          },
+          "500": {
+            "description": "Unhandled server error",
+            "schema": { "$ref": "#/definitions/ErrorResponse" }
+          }
+        }
+      }
+    },
+
+    "/auth/password/verify": {
+      "post": {
+        "description": "Verify forgot-password OTP and returns passwordResetToken used for resetting password.",
+        "parameters": [
+          {
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": { "$ref": "#/definitions/VerifyForgotPasswordInput" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OTP verified, passwordResetToken returned.",
+            "schema": { "$ref": "#/definitions/VerifyForgotPasswordResponse" }
+          },
+          "400": {
+            "description": "Invalid/expired OTP, locked, missing fields",
+            "schema": { "$ref": "#/definitions/ErrorResponse" }
+          },
+          "500": {
+            "description": "Unhandled server error",
+            "schema": { "$ref": "#/definitions/ErrorResponse" }
+          }
+        }
+      }
+    },
+
+    "/auth/password/reset": {
+      "post": {
+        "description": "Reset password using passwordResetToken and newPassword.",
+        "parameters": [
+          {
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": { "$ref": "#/definitions/ResetPasswordInput" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Password reset successfully",
+            "schema": { "$ref": "#/definitions/ResetPasswordResponse" }
+          },
+          "400": {
+            "description": "Invalid/expired reset token, missing fields, password rules, same password",
+            "schema": { "$ref": "#/definitions/ErrorResponse" }
+          },
+          "500": {
+            "description": "Unhandled server error",
+            "schema": { "$ref": "#/definitions/ErrorResponse" }
+          }
+        }
+      }
+    }
+  },
+
+  "definitions": {
+    "GenderInput": {
+      "type": "string",
+      "enum": ["MALE", "FEMALE", "OTHER"]
+    },
+
+    "RegistrationInput": {
+      "type": "object",
+      "required": ["firstName", "lastName", "email", "password", "gender"],
+      "properties": {
+        "firstName": { "type": "string", "example": "Dadi" },
+        "lastName": { "type": "string", "example": "GOIO" },
+        "email": { "type": "string", "example": "enrique0goio@gmail.com" },
+        "password": { "type": "string", "example": "123Admin!" },
+        "gender": { "$ref": "#/definitions/GenderInput" }
+      },
+      "additionalProperties": false
+    },
+
+    "UserRegistrationResponse": {
+      "type": "object",
+      "properties": {
+        "message": {
+          "type": "string",
+          "example": "OTP sent to email. Please verify your account."
+        },
+        "verificationToken": {
+          "type": "string",
+          "example": "f2a1c9b83fbe4b1aa6c7b6a8b4cbb1d8d4a0c0b4d68b56c6e29a36c5b2c8a0ef"
+        }
+      }
+    },
+
+    "VerifyUserTokenInput": {
+      "type": "object",
+      "required": ["verificationToken", "otp"],
+      "properties": {
+        "verificationToken": {
+          "type": "string",
+          "example": "f2a1c9b83fbe4b1aa6c7b6a8b4cbb1d8d4a0c0b4d68b56c6e29a36c5b2c8a0ef"
+        },
+        "otp": {
+          "type": "string",
+          "example": "1234",
+          "description": "4-digit OTP code"
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "VerifyUserSuccess": {
+      "type": "object",
+      "properties": {
+        "success": { "type": "boolean", "example": true },
+        "message": { "type": "string", "example": "User registered successfully!" }
+      }
+    },
+
+    "LoginInput": {
+      "type": "object",
+      "required": ["email", "password"],
+      "properties": {
+        "email": { "type": "string", "example": "enrique0goio@gmail.com" },
+        "password": { "type": "string", "example": "123Admin!" }
+      },
+      "additionalProperties": false
+    },
+
+    "LoginUserInfo": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "example": "65c9f4c2b1d2e3f4a5b6c7d8" },
+        "email": { "type": "string", "example": "enrique0goio@gmail.com" },
+        "firstName": { "type": "string", "example": "Dadi" },
+        "lastName": { "type": "string", "example": "GOIO" },
+        "roles": {
+          "type": "array",
+          "items": { "type": "string" },
+          "example": ["SHIPPER"]
+        }
+      }
+    },
+
+    "LoginSuccess": {
+      "type": "object",
+      "properties": {
+        "message": { "type": "string", "example": "Login successful!" },
+        "user": { "$ref": "#/definitions/LoginUserInfo" }
+      }
+    },
+
+    "RefreshSuccess": {
+      "type": "object",
+      "properties": {
+        "success": { "type": "boolean", "example": true }
+      }
+    },
+
+    "ForgotPasswordInput": {
+      "type": "object",
+      "required": ["email"],
+      "properties": {
+        "email": { "type": "string", "example": "enrique0goio@gmail.com" }
+      },
+      "additionalProperties": false
+    },
+
+    "ForgotPasswordResponse": {
+      "type": "object",
+      "properties": {
+        "message": {
+          "type": "string",
+          "example": "If an account exists, an OTP has been sent to the email."
+        }
+      }
+    },
+
+    "VerifyForgotPasswordInput": {
+      "type": "object",
+      "required": ["email", "otp"],
+      "properties": {
+        "email": { "type": "string", "example": "enrique0goio@gmail.com" },
+        "otp": { "type": "string", "example": "1234", "description": "4-digit OTP code" }
+      },
+      "additionalProperties": false
+    },
+
+    "VerifyForgotPasswordResponse": {
+      "type": "object",
+      "properties": {
+        "message": {
+          "type": "string",
+          "example": "OTP verified. You can now reset your password."
+        },
+        "passwordResetToken": {
+          "type": "string",
+          "example": "8f2b1c9b83fbe4b1aa6c7b6a8b4cbb1d8d4a0c0b4d68b56c6e29a36c5b2c8a0ef"
+        }
+      }
+    },
+
+    "ResetPasswordInput": {
+      "type": "object",
+      "required": ["passwordResetToken", "newPassword"],
+      "properties": {
+        "passwordResetToken": {
+          "type": "string",
+          "example": "8f2b1c9b83fbe4b1aa6c7b6a8b4cbb1d8d4a0c0b4d68b56c6e29a36c5b2c8a0ef"
+        },
+        "newPassword": { "type": "string", "example": "NewStrongPass123!" }
+      },
+      "additionalProperties": false
+    },
+
+    "ResetPasswordResponse": {
+      "type": "object",
+      "properties": {
+        "message": { "type": "string", "example": "Password reset successfully!" }
+      }
+    },
+
+    "ErrorResponse": {
+      "type": "object",
+      "properties": {
+        "status": { "type": "string", "example": "error" },
+        "message": { "type": "string", "example": "Invalid email or password" },
+        "details": {
+          "type": "object",
+          "description": "Only returned in non-production when AppError includes details"
+        }
+      }
+    }
+  }
+}
