@@ -16,19 +16,20 @@ model User {
   emailNormalized String          @unique
   passwordHash    String?
   phoneNumber     String?
-  phoneE164       String?         @unique
+  phoneE164       String?
   gender          Gender
   birthDate       DateTime?
   roles           Role[]          @default([SHIPPER])
-  sellerStatus    CarriersStatus  @default(NONE)
-  sellerProfile   CarrierProfile?
+  carrierStatus   CarriersStatus  @default(NONE)
+  carrierProfile  CarrierProfile?
   avatar          Image?          @relation("UserAvatar")
   addresses       Address[]
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
 
-  @@index([sellerStatus])
+  @@index([carrierStatus])
   @@index([roles])
+  @@index([phoneE164])
 }
 
 model Image {

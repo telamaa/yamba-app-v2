@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta http-equiv="x-ua-compatible" content="ie=edge" />
+    <title>Bienvenue sur Yamba</title>
+    <style>
+      @media (max-width: 620px) {
+        .container { width: 100% !important; }
+        .px { padding-left: 16px !important; padding-right: 16px !important; }
+        .hero { padding: 22px 16px !important; }
+        .btn { display:block !important; width:100% !important; }
+      }
+    </style>
+</head>
+
+<body style="margin:0;padding:0;background:#f4f6fb;color:#111827;font-family:Arial,Helvetica,sans-serif;">
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">
+    Votre compte Yamba est créé. Bienvenue !
+</div>
+
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#f4f6fb;">
+    <tr>
+        <td align="center" style="padding:24px 12px;">
+            <table role="presentation" class="container" width="600" cellspacing="0" cellpadding="0" border="0"
+                   style="width:600px;max-width:600px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 6px 24px rgba(17,24,39,0.08);">
+
+                <tr>
+                    <td class="hero" style="padding:28px 24px;background:linear-gradient(135deg,#0ea5e9 0%, #2563eb 55%, #7c3aed 100%);">
+                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                            <tr>
+                                <td style="vertical-align:middle;">
+                                    <div style="font-size:18px;font-weight:700;letter-spacing:0.3px;color:#ffffff;">Yamba</div>
+                                    <div style="margin-top:6px;font-size:14px;opacity:0.95;color:#e0f2fe;">Bienvenue</div>
+                                </td>
+                                <td align="right" style="vertical-align:middle;">
+                                    <img
+                                            src="https://via.placeholder.com/96x40.png?text=Yamba"
+                                            width="96" height="40" alt="Yamba"
+                                            style="display:block;border:0;outline:none;text-decoration:none;border-radius:8px;background:#ffffff;"
+                                    />
+                                </td>
+                            </tr>
+                        </table>
+
+                        <div style="margin-top:18px;">
+                            <img
+                                    src="https://via.placeholder.com/552x180.png?text=Welcome+to+Yamba"
+                                    width="552" alt="Welcome"
+                                    style="display:block;width:100%;max-width:552px;height:auto;border-radius:12px;border:0;outline:none;text-decoration:none;"
+                            />
+                        </div>
+                    </td>
+                </tr>
+
+                <tr>
+                    <td class="px" style="padding:24px 24px 8px 24px;">
+                        <h1 style="margin:0 0 10px 0;font-size:22px;line-height:1.25;color:#111827;">
+                            Votre compte est créé 🎉
+                        </h1>
+
+                        <p style="margin:0 0 16px 0;font-size:15px;line-height:1.6;color:#374151;">
+                            Bonjour <strong><%= firstName ?? "" %></strong>,<br/>
+                            Bienvenue sur Yamba ! Votre compte a bien été créé et vous pouvez dès à présent vous connecter.
+                        </p>
+
+                        <% if (typeof loginUrl !== 'undefined' && loginUrl) { %>
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 18px 0;">
+                                <tr>
+                                    <td align="center">
+                                        <a class="btn" href="<%= loginUrl %>"
+                                           style="display:inline-block;background:#2563eb;color:#ffffff;text-decoration:none;font-weight:700;
+                      padding:12px 18px;border-radius:10px;font-size:14px;">
+                                            Se connecter
+                                        </a>
+                                    </td>
+                                </tr>
+                            </table>
+                        <% } %>
+
+                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 16px 0;">
+                            <tr>
+                                <td style="padding:14px;border-radius:12px;background:#f3f4f6;border:1px solid #e5e7eb;">
+                                    <div style="font-size:13px;color:#1f2937;">
+                                        <strong>Astuce :</strong> Pensez à compléter votre profil (coordonnées, adresses…) pour gagner du temps lors de vos prochaines étapes.
+                                    </div>
+                                </td>
+                            </tr>
+                        </table>
+
+                        <p style="margin:0 0 16px 0;font-size:14px;line-height:1.6;color:#374151;">
+                            Si vous n’êtes pas à l’origine de cette création de compte, contactez-nous rapidement.
+                        </p>
+                    </td>
+                </tr>
+
+                <tr>
+                    <td class="px" style="padding:14px 24px 24px 24px;background:#fafafa;border-top:1px solid #f1f5f9;">
+                        <p style="margin:0 0 8px 0;font-size:12px;line-height:1.6;color:#6b7280;">
+                            Besoin d’aide ? Contactez-nous : <a href="mailto:<%= supportEmail ?? 'support@yamba.com' %>"
+                                                                style="color:#2563eb;text-decoration:none;"><%= supportEmail ?? 'support@yamba.com' %></a>
+                        </p>
+                        <p style="margin:0;font-size:12px;line-height:1.6;color:#9ca3af;">
+                            © <%= new Date().getFullYear() %> Yamba. Tous droits réservés.
+                        </p>
+                    </td>
+                </tr>
+
+            </table>
+        </td>
+    </tr>
+</table>
+</body>
+</html>
