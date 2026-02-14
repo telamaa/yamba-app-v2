@@ -352,3 +352,28 @@ export const sendPasswordChangedEmail = async (
     }
   );
 };
+
+
+// send account created email
+type AccountCreatedEmailPayload = {
+  firstName?: string;
+  loginUrl?: string;
+  supportEmail?: string;
+};
+
+export const sendAccountCreatedEmail = async (
+  firstName: string | undefined,
+  emailKey: string,
+  payload?: Omit<AccountCreatedEmailPayload, "firstName">
+) => {
+  return sendEmail(
+    emailKey,
+    "Bienvenue sur Yamba 🎉",
+    "account-created-mail", // <-- ton fichier EJS: account-created-mail.ejs
+    {
+      firstName,
+      loginUrl: payload?.loginUrl,
+      supportEmail: payload?.supportEmail ?? "support@yamba.com",
+    }
+  );
+};
