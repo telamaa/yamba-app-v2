@@ -11,7 +11,8 @@ import {
   deletePendingRegistration,
   deleteVerificationToken,
   getEmailKeyFromToken,
-  getPendingRegistration, getRefreshJti, normalizeEmail, revokeRefreshJti, sendForgotPasswordOtp,
+  getPendingRegistration, getRefreshJti, normalizeEmail, revokeRefreshJti,
+  sendAccountCreatedEmail, sendForgotPasswordOtp,
   sendOtp, sendPasswordChangedEmail, storePasswordResetToken,
   storePendingRegistration, storeRefreshJti,
   storeVerificationToken, trackForgotPasswordOtpRequests,
@@ -92,6 +93,14 @@ export const verifyRegistrationOtp = async (req: Request, res: Response, next: N
         gender: pending.gender,
         passwordHash: pending.passwordHash,
       },
+    });
+
+    // Email de bienvenue (je te conseille de ne pas bloquer l'inscription si l’email échoue)
+    sendAccountCreatedEmail(pending.firstName, pending.emailNormalized, {
+      loginUrl: process.env.USER_APP_URL ? `${process.env.USER_APP_URL}/login` : undefined,
+      supportEmail: "support@yamba.com",
+    }).catch((err) => {
+      console.error("Welcome email failed:", err);
     });
 
     // Cleanup after success
