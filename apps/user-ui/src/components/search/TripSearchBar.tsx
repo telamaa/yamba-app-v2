@@ -10,7 +10,11 @@ import Calendar from "@/components/ui/Calendar";
 const capitalizeFirst = (s: string, localeTag: string) =>
   s ? s.charAt(0).toLocaleUpperCase(localeTag) + s.slice(1) : s;
 
-export default function TripSearchBar() {
+type Props = {
+  overlap?: boolean;
+};
+
+export default function TripSearchBar({ overlap = true }: Props) {
   const { t, lang } = useUiPreferences();
 
   const [from, setFrom] = useState("");
@@ -31,22 +35,20 @@ export default function TripSearchBar() {
       month: "short",
     }).format(date);
 
-    // ex: "Sam. 14 mars" -> "Sam. 14 mars" / EN -> "Sat, Feb 14"
     return capitalizeFirst(raw, localeTag);
   }, [date, t, lang]);
 
   const onSearch = () => {
-    // UI only
     console.log({ from, to, date });
   };
 
   return (
-    <section className="mx-auto max-w-6xl px-4">
-      <div className="relative -mt-10">
-        <div className="relative z-30 overflow-visible rounded-2xl border border-slate-200 bg-white shadow-lg dark:border-slate-800 dark:bg-slate-950">
+    <section className="mx-auto max-w-6xl px-4 overflow-visible">
+      <div className={["relative overflow-visible", overlap ? "-mt-10" : ""].join(" ")}>
+        <div className="relative z-[80] overflow-visible rounded-[20px] border border-slate-200 bg-white shadow-lg dark:border-slate-800 dark:bg-slate-950">
           <div className="grid gap-3 p-3 md:grid-cols-[1.2fr_1.2fr_0.9fr_auto] md:gap-0 md:p-0">
             {/* FROM */}
-            <div className="rounded-xl bg-white px-4 py-3 dark:bg-slate-950 md:rounded-none md:py-4">
+            <div className="relative z-[90] px-4 py-3 md:py-4">
               <div className="text-xs font-semibold text-slate-500 dark:text-slate-400">
                 {t("from")}
               </div>
@@ -61,7 +63,7 @@ export default function TripSearchBar() {
             </div>
 
             {/* TO */}
-            <div className="rounded-xl bg-white px-4 py-3 dark:bg-slate-950 md:rounded-none md:py-4">
+            <div className="relative z-[90] px-4 py-3 md:py-4">
               <div className="text-xs font-semibold text-slate-500 dark:text-slate-400">
                 {t("to")}
               </div>
@@ -76,10 +78,7 @@ export default function TripSearchBar() {
             </div>
 
             {/* DATE */}
-            <div
-              ref={dateRef}
-              className="relative rounded-xl bg-white px-4 py-3 dark:bg-slate-950 md:rounded-none md:py-4"
-            >
+            <div ref={dateRef} className="relative z-[95] px-4 py-3 md:py-4">
               <div className="text-xs font-semibold text-slate-500 dark:text-slate-400">
                 {t("date")}
               </div>
@@ -95,7 +94,7 @@ export default function TripSearchBar() {
               </button>
 
               {dateOpen && (
-                <div className="absolute left-0 top-20 z-[200] mt-2">
+                <div className="absolute left-0 top-full z-[120] mt-2">
                   <Calendar
                     lang={lang === "fr" ? "fr" : "en"}
                     mode="single"
@@ -106,21 +105,20 @@ export default function TripSearchBar() {
                     }}
                   />
                 </div>
-
               )}
             </div>
 
             {/* SEARCH */}
-            <div className="flex items-center justify-end md:px-3 md:py-3">
+            <div className="relative z-[90] flex items-center justify-end md:px-3 md:py-3">
               <button
                 type="button"
                 onClick={onSearch}
                 className={[
                   "inline-flex items-center justify-center gap-2",
-                  "rounded-xl bg-blue-600 text-white shadow-sm transition-colors hover:bg-blue-700",
+                  "rounded-xl bg-[#FF9900] text-slate-900 shadow-sm transition-colors hover:bg-[#F08700] active:bg-[#E07A00]",
                   "h-10 px-6 text-sm font-semibold",
                   "w-full md:w-auto",
-                  "focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-950",
+                  "focus:outline-none focus-visible:ring-2 focus-visible:ring-[#FF9900]/40 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-950",
                 ].join(" ")}
               >
                 <Search size={18} />

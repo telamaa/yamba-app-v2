@@ -77,14 +77,18 @@ export default function VerifyResetOtpForm() {
   // Email initial depuis query (?email=)
   const initialEmail = sp.get("email") ?? "";
   const [email, setEmail] = useState(initialEmail);
+
   const emailRef = useRef<HTMLInputElement | null>(null);
 
   // OTP
   const [digits, setDigits] = useState<string[]>(["", "", "", ""]);
   const otp = digits.join("");
 
-  // ✅ Ready state (bouton actif seulement si tout est saisi)
+  // Ready state
   const isReady = email.trim().length > 0 && otp.length === 4;
+
+  // auto-submit guard
+  const lastAutoSubmitOtpRef = useRef<string>("");
 
   // states
   const [busy, setBusy] = useState(false);
@@ -119,6 +123,11 @@ export default function VerifyResetOtpForm() {
   const handleChange = (i: number, raw: string) => {
     setError(null);
     setResentMsg(null);
+
+    // UX: si email vide, on attire l’attention
+    if (!email.trim()) {
+      emailRef.current?.focus();
+    }
 
     const v = onlyDigits(raw);
 
@@ -160,6 +169,10 @@ export default function VerifyResetOtpForm() {
     setError(null);
     setResentMsg(null);
 
+    if (!email.trim()) {
+      emailRef.current?.focus();
+    }
+
     const text = onlyDigits(e.clipboardData.getData("text")).slice(0, 4);
     if (!text) return;
 
@@ -169,8 +182,7 @@ export default function VerifyResetOtpForm() {
     focusIndex(Math.min(text.length - 1, 3));
   };
 
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const verifyOtp = async (otpValue: string) => {
     setError(null);
     setResentMsg(null);
 
@@ -179,18 +191,19 @@ export default function VerifyResetOtpForm() {
       emailRef.current?.focus();
       return;
     }
-    if (otp.length !== 4) {
+    if (otpValue.length !== 4) {
       setError(copy.incomplete);
       return;
     }
+    if (busy) return;
 
     setBusy(true);
     try {
       // UI only pour l’instant
-      console.log("[password/verify]", { email, otp });
+      console.log("[password/verify]", { email, otp: otpValue });
 
       // Quand tu branches le back :
-      // const res = await authApi.resetVerifyOtp({ email, otp });
+      // const res = await authApi.resetVerifyOtp({ email, otp: otpValue });
       // sessionStorage.setItem("pwd_reset_token", res.passwordResetToken);
       // router.push(`/auth/password/reset?token=${encodeURIComponent(res.passwordResetToken)}`);
 
@@ -200,6 +213,21 @@ export default function VerifyResetOtpForm() {
     } finally {
       setBusy(false);
     }
+  };
+
+  // ✅ Auto-submit seulement si Email + OTP complet
+  useEffect(() => {
+    if (!isReady) return;
+    if (otp !== lastAutoSubmitOtpRef.current) {
+      lastAutoSubmitOtpRef.current = otp;
+      void verifyOtp(otp);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [otp, isReady]);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await verifyOtp(otp);
   };
 
   const resend = async () => {
@@ -272,7 +300,7 @@ export default function VerifyResetOtpForm() {
               </div>
             )}
 
-            {/* ✅ bouton actif seulement si tout est saisi */}
+            {/* ✅ Valider : mêmes dimensions/largeur que l’input Email */}
             <button type="submit" disabled={busy || !isReady} className={UI.btnPrimary}>
               {busy ? "…" : copy.cta}
             </button>
