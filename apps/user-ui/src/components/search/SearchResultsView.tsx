@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { X } from "lucide-react";
 import TripSearchBar from "./TripSearchBar";
 import YambaTripResultCard from "./YambaTripResultCard";
 import TransportModeTabs from "./TransportModeTabs";
 import SearchFiltersSidebar from "./SearchFiltersSidebar";
 import { MOCK_YAMBA_TRIPS } from "./search-results.mock";
 import TripSearchBarSkeleton from "./TripSearchBarSkeleton";
+import MobileSearchExperience from "./MobileSearchExperience";
 import { useUiPreferences } from "@/components/providers/UiPreferencesProvider";
 import { ParcelCategory, SortOption, TransportMode } from "./search-results.types";
 
@@ -80,14 +82,14 @@ function ShimmerBlock({ className = "" }: { className?: string }) {
 function TransportModeTabsSkeleton() {
   return (
     <div className="overflow-hidden rounded-[22px] border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950">
-      <div className="grid grid-cols-2 md:grid-cols-4">
+      <div className="grid grid-cols-4">
         {Array.from({ length: 4 }).map((_, index) => (
-          <div key={index} className="px-4 py-4">
-            <div className="flex items-center justify-center gap-2">
-              <ShimmerBlock className="h-4 w-4 rounded-md" />
-              <ShimmerBlock className="h-4 w-20 rounded-md" />
-              <ShimmerBlock className="h-4 w-8 rounded-md" />
-            </div>
+          <div
+            key={index}
+            className="flex min-w-0 flex-col items-center justify-center gap-1 px-1.5 py-2.5 md:flex-row md:gap-2 md:px-4 md:py-3"
+          >
+            <ShimmerBlock className="h-4 w-10 rounded-md" />
+            <ShimmerBlock className="h-3 w-5 rounded-md" />
           </div>
         ))}
       </div>
@@ -229,6 +231,18 @@ export default function SearchResultsView() {
   const [visibleCount, setVisibleCount] = useState(BATCH_SIZE);
   const [isPageLoading, setIsPageLoading] = useState(true);
 
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+
+  const [searchDraft, setSearchDraft] = useState<{
+    from: string;
+    to: string;
+    date?: Date;
+  }>({
+    from: "Paris, France",
+    to: "Caen, France",
+    date: new Date(),
+  });
+
   useEffect(() => {
     const timer = setTimeout(() => {
       setIsPageLoading(false);
@@ -354,6 +368,10 @@ export default function SearchResultsView() {
         ? "Aucun résultat ne correspond à vos filtres."
         : "No results match your filters.",
       loadMore: isFr ? "Charger plus de résultats" : "Load more results",
+      close: isFr ? "Fermer" : "Close",
+      clear: isFr ? "Tout effacer" : "Clear all",
+      filter: isFr ? "Filtrer" : "Filter",
+      viewTrips: isFr ? "Voir les trajets" : "View trips",
     };
   }, [lang]);
 
@@ -375,11 +393,35 @@ export default function SearchResultsView() {
       `}</style>
 
       <main className="pb-14">
-        <section className="sticky top-[78px] z-[70] overflow-visible bg-white/95 pt-4 pb-4 backdrop-blur dark:bg-slate-950/95">
+        <section className="sticky top-[78px] z-[70] hidden overflow-visible bg-white/95 pb-4 pt-4 backdrop-blur dark:bg-slate-950/95 md:block">
           {isPageLoading ? (
             <TripSearchBarSkeleton overlap={false} />
           ) : (
             <TripSearchBar overlap={false} />
+          )}
+        </section>
+
+        <section className="sticky top-[78px] z-[100] border-b border-slate-200 bg-white/95 px-4 py-4 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95 md:hidden">
+          {isPageLoading ? (
+            <div className="h-14 animate-pulse rounded-[22px] bg-slate-200/80 dark:bg-slate-800/80" />
+          ) : (
+            <MobileSearchExperience
+              mode="summary"
+              from={searchDraft.from}
+              to={searchDraft.to}
+              date={searchDraft.date}
+              onFromChange={(value) =>
+                setSearchDraft((prev) => ({ ...prev, from: value }))
+              }
+              onToChange={(value) =>
+                setSearchDraft((prev) => ({ ...prev, to: value }))
+              }
+              onDateChange={(value) =>
+                setSearchDraft((prev) => ({ ...prev, date: value }))
+              }
+              onSearch={() => {}}
+              onOpenFilters={() => setMobileFiltersOpen(true)}
+            />
           )}
         </section>
 
@@ -402,7 +444,7 @@ export default function SearchResultsView() {
               </div>
 
               <div className="grid gap-6 lg:grid-cols-[minmax(0,0.3fr)_minmax(0,0.7fr)]">
-                <div className="min-w-0 lg:pr-2">
+                <div className="hidden min-w-0 lg:block lg:pr-2">
                   <div className="lg:sticky lg:top-[168px]">
                     <SearchFiltersSidebarSkeleton />
                   </div>
@@ -426,7 +468,7 @@ export default function SearchResultsView() {
               </div>
 
               <div className="grid gap-6 lg:grid-cols-[minmax(0,0.3fr)_minmax(0,0.7fr)]">
-                <div className="min-w-0 lg:pr-2">
+                <div className="hidden min-w-0 lg:block lg:pr-2">
                   <div className="lg:sticky lg:top-[200px]">
                     <SearchFiltersSidebar
                       sort={sort}
@@ -479,6 +521,71 @@ export default function SearchResultsView() {
             </>
           )}
         </section>
+
+        {mobileFiltersOpen && (
+          <div className="fixed inset-0 z-[150] bg-white dark:bg-slate-950 md:hidden">
+            <div className="flex h-full flex-col">
+              <div className="flex items-center justify-between px-4 pb-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setMobileFiltersOpen(false)}
+                  className="inline-flex h-11 w-11 items-center justify-center rounded-full text-slate-500 dark:text-slate-400"
+                  aria-label={copy.close}
+                >
+                  <X size={28} />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={clearAll}
+                  className="text-sm font-semibold text-slate-400 dark:text-slate-500"
+                >
+                  {copy.clear}
+                </button>
+              </div>
+
+              <div className="px-4 pb-28">
+                <h2 className="mb-5 text-3xl font-black tracking-tight text-slate-900 dark:text-white">
+                  {copy.filter}
+                </h2>
+
+                <div className="h-[calc(100dvh-180px)] overflow-y-auto">
+                  <SearchFiltersSidebar
+                    hideHeader
+                    className="rounded-none border-0 bg-transparent p-0 shadow-none dark:bg-transparent"
+                    sort={sort}
+                    onSortChange={setSort}
+                    superTripperOnly={superTripperOnly}
+                    onSuperTripperChange={setSuperTripperOnly}
+                    profileVerifiedOnly={profileVerifiedOnly}
+                    onProfileVerifiedChange={setProfileVerifiedOnly}
+                    instantBookingOnly={instantBookingOnly}
+                    onInstantBookingChange={setInstantBookingOnly}
+                    verifiedTicketOnly={verifiedTicketOnly}
+                    onVerifiedTicketChange={setVerifiedTicketOnly}
+                    superTripperCount={superTripperCount}
+                    profileVerifiedCount={profileVerifiedCount}
+                    instantBookingCount={instantBookingCount}
+                    verifiedTicketCount={verifiedTicketCount}
+                    selectedCategories={selectedCategories}
+                    onToggleCategory={toggleCategory}
+                    onClear={clearAll}
+                  />
+                </div>
+              </div>
+
+              <div className="fixed inset-x-0 bottom-0 border-t border-slate-200 bg-white px-4 py-4 shadow-[0_-8px_30px_rgba(15,23,42,0.08)] dark:border-slate-800 dark:bg-slate-950">
+                <button
+                  type="button"
+                  onClick={() => setMobileFiltersOpen(false)}
+                  className="inline-flex h-12 w-full items-center justify-center rounded-2xl bg-[#FF9900] px-6 text-base font-semibold text-slate-900"
+                >
+                  {copy.viewTrips} ({filteredTrips.length})
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     </>
   );
