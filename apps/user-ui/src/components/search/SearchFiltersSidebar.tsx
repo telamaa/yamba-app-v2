@@ -49,6 +49,9 @@ type Props = {
   selectedCategories: ParcelCategory[];
   onToggleCategory: (value: ParcelCategory) => void;
   onClear: () => void;
+
+  hideHeader?: boolean;
+  className?: string;
 };
 
 function getCategoryMeta(category: ParcelCategory, isFr: boolean) {
@@ -138,6 +141,8 @@ export default function SearchFiltersSidebar({
                                                selectedCategories,
                                                onToggleCategory,
                                                onClear,
+                                               hideHeader = false,
+                                               className = "",
                                              }: Props) {
   const { lang } = useUiPreferences();
 
@@ -204,22 +209,28 @@ export default function SearchFiltersSidebar({
   ];
 
   return (
-    <aside className="h-fit rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-950">
-      <div className="mb-5 flex items-center justify-between">
-        <h2 className="text-lg font-bold tracking-tight text-slate-900 dark:text-white">
-          {copy.title}
-        </h2>
-        <button
-          type="button"
-          onClick={onClear}
-          className="text-sm font-medium text-slate-400 transition-colors hover:text-slate-600 dark:hover:text-slate-200"
-        >
-          {copy.clear}
-        </button>
-      </div>
+    <aside
+      className={[
+        "h-fit rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-950",
+        className,
+      ].join(" ")}
+    >
+      {!hideHeader && (
+        <div className="mb-5 flex items-center justify-between">
+          <h2 className="text-lg font-bold tracking-tight text-slate-900 dark:text-white">
+            {copy.title}
+          </h2>
+          <button
+            type="button"
+            onClick={onClear}
+            className="text-sm font-medium text-slate-400 transition-colors hover:text-slate-600 dark:hover:text-slate-200"
+          >
+            {copy.clear}
+          </button>
+        </div>
+      )}
 
       <div className="space-y-6">
-        {/* Sort */}
         <div>
           <div className="space-y-3">
             <label className="flex cursor-pointer items-center justify-between gap-3">
@@ -260,7 +271,6 @@ export default function SearchFiltersSidebar({
 
         <div className="h-px bg-slate-200 dark:bg-slate-800" />
 
-        {/* Trust */}
         <div>
           <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">
             {copy.trust}
@@ -307,7 +317,6 @@ export default function SearchFiltersSidebar({
 
         <div className="h-px bg-slate-200 dark:bg-slate-800" />
 
-        {/* Services */}
         <div>
           <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">
             {copy.services}
