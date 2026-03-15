@@ -24,6 +24,7 @@ model User {
   carrierProfile  CarrierProfile?
   avatar          Image?          @relation("UserAvatar")
   addresses       Address[]
+  trips           Trip[]          @relation("UserTrips")
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
 
@@ -46,16 +47,16 @@ model Address {
   id            String   @id @default(auto()) @map("_id") @db.ObjectId
   userId        String   @db.ObjectId
   user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  label         String? // ex: "Maison", "Bureau"
-  recipientName String? // utile si différent du user
-  phoneE164     String? // si le destinataire a un autre numéro
+  label         String?
+  recipientName String?
+  phoneE164     String?
   streetLine1   String
   streetLine2   String?
   city          String
-  region        String? // état/province
+  region        String?
   postalCode    String
   country       String
-  isArchived    Boolean  @default(false) // optionnel : pour ne pas vraiment supprimer
+  isArchived    Boolean  @default(false)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
@@ -70,12 +71,165 @@ model CarrierProfile {
   shopName  String?
   country   String
   phoneE164 String?
-  kycStatus String? // ou enum si vous voulez
+  kycStatus String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([country])
 }
+
+/**
+ * Conditions définies par catégorie sélectionnée
+ */
+type TripCategoryCondition {
+  category         ParcelCategory
+  priceAmountCents Int
+  handoffMoments   CategoryHandoffMoment[]
+  pickupMoments    PickupMoment[]
+}
+
+model Trip {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  userId String @db.ObjectId
+  user   User   @relation("UserTrips", fields: [userId], references: [id], onDelete: Cascade)
+
+  // Workflow
+  status      TripStatus @default(DRAFT)
+  currentStep Int        @default(1)
+
+  // Base annonce
+  transportMode TransportMode?
+  tripType      TripType       @default(ONE_WAY)
+
+  // Itinéraire saisi (raw / front)
+  originLabel      String?
+  destinationLabel String?
+
+  // Données enrichies système / géocodage plus tard
+  originPlaceId String?
+  originCity    String?
+  originRegion  String?
+  originCountry String?
+  originLat     Float?
+  originLng     Float?
+
+  destinationPlaceId String?
+  destinationCity    String?
+  destinationRegion  String?
+  destinationCountry String?
+  destinationLat     Float?
+  destinationLng     Float?
+
+  // Saisie actuelle du front
+  departureDateLocal String?
+  arrivalDateLocal   String?
+  departureTimeLocal String?
+  arrivalTimeLocal   String?
+
+  // Champs normalisés calculés / système
+  departureAt DateTime?
+  arrivalAt   DateTime?
+
+  // Aller-retour éventuel pour plus tard
+  returnDepartureAt DateTime?
+  returnArrivalAt   DateTime?
+
+  // Détails selon mode de transport
+  flightType         FlightType?
+  trainTripType      TrainTripType?
+  carTripFlexibility CarTripFlexibility?
+
+  // Escales / correspondances
+  flightLayoverCities String[] @default([])
+  trainStopCities     String[] @default([])
+
+  // Référence voyage
+  travelReference String?
+
+  // Catégories acceptées
+  acceptedCategories ParcelCategory[]        @default([])
+  categoryConditions TripCategoryCondition[]
+
+  // Options complémentaires réellement pilotées par le front actuel
+  handDeliveryOnly Boolean @default(false)
+  instantBooking   Boolean @default(false)
+
+  // Vérification document / billet / justificatif
+  ticketVerificationStatus TicketVerificationStatus @default(NOT_SUBMITTED)
+
+  // Devise
+  currencyCode String @default("EUR")
+
+  // Notes libres
+  notes String?
+
+  // Relations
+  documents TripDocument[]
+
+  // Cycle de vie
+  publishedAt DateTime?
+  cancelledAt DateTime?
+  archivedAt  DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@index([transportMode])
+  @@index([departureAt])
+  @@index([publishedAt])
+  @@index([userId, status])
+  @@index([transportMode, status, departureAt])
+  @@index([originPlaceId])
+  @@index([destinationPlaceId])
+}
+
+model TripDocument {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  tripId String @db.ObjectId
+  trip   Trip   @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  uploadedByUserId String? @db.ObjectId
+
+  type   TripDocumentType
+  status TripDocumentStatus @default(PENDING)
+
+  fileId       String
+  url          String
+  originalName String?
+  mimeType     String?
+  sizeBytes    Int?
+
+  title       String?
+  description String?
+
+  verifiedAt      DateTime?
+  rejectedAt      DateTime?
+  rejectionReason String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tripId])
+  @@index([tripId, type])
+  @@index([status])
+}
+
+// model Follow {
+//   id          String   @id @default(auto()) @map("_id") @db.ObjectId
+//
+//   followerId  String   @db.ObjectId
+//   followingId String   @db.ObjectId
+//   follower  User @relation("UserFollowing", fields: [followerId], references: [id], onDelete: Cascade)
+//   following User @relation("UserFollowers", fields: [followingId], references: [id], onDelete: Cascade)
+//   createdAt DateTime @default(now())
+//   @@unique([followerId, followingId])
+//   @@index([followingId])
+//   @@index([followerId])
+// }
 
 enum Gender {
   MALE
@@ -96,15 +250,84 @@ enum CarriersStatus {
   SUSPENDED
 }
 
-// model Follow {
-//   id          String   @id @default(auto()) @map("_id") @db.ObjectId
-//
-//   followerId  String   @db.ObjectId
-//   followingId String   @db.ObjectId
-//   follower  User @relation("UserFollowing", fields: [followerId], references: [id], onDelete: Cascade)
-//   following User @relation("UserFollowers", fields: [followingId], references: [id], onDelete: Cascade)
-//   createdAt DateTime @default(now())
-//   @@unique([followerId, followingId])
-//   @@index([followingId])
-//   @@index([followerId])
-// }
+enum TripStatus {
+  DRAFT
+  PUBLISHED
+  PAUSED
+  COMPLETED
+  CANCELLED
+  ARCHIVED
+}
+
+enum TripType {
+  ONE_WAY
+  ROUND_TRIP
+}
+
+enum TransportMode {
+  PLANE
+  TRAIN
+  CAR
+}
+
+enum FlightType {
+  DIRECT
+  WITH_LAYOVER
+}
+
+enum TrainTripType {
+  DIRECT
+  WITH_CONNECTION
+  WITH_INTERMEDIATE_STOPS
+}
+
+enum CarTripFlexibility {
+  DIRECT
+  DETOUR_BY_AGREEMENT
+}
+
+enum ParcelCategory {
+  CLOTHES
+  SHOES
+  FASHION_ACCESSORIES
+  OTHER_ACCESSORIES
+  BOOKS
+  DOCUMENTS
+  SMALL_TOYS
+  PHONE
+  COMPUTER
+  OTHER_ELECTRONICS
+  CHECKED_BAG_23KG
+  CABIN_BAG_12KG
+}
+
+enum CategoryHandoffMoment {
+  BEFORE_DEPARTURE
+  AT_DEPARTURE
+}
+
+enum PickupMoment {
+  ON_ARRIVAL
+  LATER_AT_ADDRESS
+}
+
+enum TicketVerificationStatus {
+  NOT_SUBMITTED
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+enum TripDocumentType {
+  TICKET_PROOF
+  ITINERARY_PROOF
+  VEHICLE_PROOF
+  IDENTITY_PROOF
+  OTHER
+}
+
+enum TripDocumentStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+}
