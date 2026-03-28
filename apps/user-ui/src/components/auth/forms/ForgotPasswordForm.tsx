@@ -4,12 +4,25 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useUiPreferences } from "@/components/providers/UiPreferencesProvider";
+import { useForm } from "react-hook-form";
+import { useMutation } from "@tanstack/react-query";
+import {
+  getApiErrorMessage,
+  hasApiBaseUrl,
+  requestPasswordResetOtp,
+} from "@/services/auth.api";
 
 type Lang = "fr" | "en";
+
+type FormData = {
+  email: string;
+};
 
 export default function ForgotPasswordForm() {
   const router = useRouter();
   const { lang } = useUiPreferences();
+  const [serverError, setServerError] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
 
   const copy = useMemo(() => {
     const fr = (lang as Lang) === "fr";
@@ -27,10 +40,17 @@ export default function ForgotPasswordForm() {
       sent: fr
         ? "Si un compte existe, un code a été envoyé."
         : "If an account exists, a code has been sent.",
+      requiredEmail: fr ? "L’e-mail est requis." : "Email is required.",
+      invalidEmail: fr ? "Veuillez saisir un e-mail valide." : "Please enter a valid email.",
+      genericError: fr
+        ? "Envoi du code impossible pour le moment."
+        : "Unable to send the code right now.",
+      configError: fr
+        ? "La configuration de l’application est incomplète."
+        : "Application configuration is incomplete.",
     };
   }, [lang]);
 
-  // Palette Mango (#FF9900)
   const UI = {
     label: "text-sm font-semibold text-slate-800 dark:text-slate-100",
     input:
@@ -52,34 +72,45 @@ export default function ForgotPasswordForm() {
       "dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-200",
   };
 
-  const [email, setEmail] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [info, setInfo] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<FormData>({
+    mode: "onSubmit",
+  });
 
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    setInfo(null);
-    setBusy(true);
+  const requestOtpMutation = useMutation({
+    mutationFn: requestPasswordResetOtp,
+    onSuccess: (_, variables) => {
+      const normalizedEmail = variables.email.trim().toLowerCase();
 
-    try {
-      // UI only pour l’instant
-      console.log("[password/forgot]", { email });
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem("pwd_reset_email", normalizedEmail);
+      }
 
+      setServerError(null);
       setInfo(copy.sent);
+      router.push(`/password/verify?email=${encodeURIComponent(normalizedEmail)}`);
+    },
+    onError: (error) => {
+      setInfo(null);
+      setServerError(getApiErrorMessage(error, copy.genericError));
+    },
+  });
 
-      // Quand tu branches le back :
-      // await authApi.forgot({ email });
-      // router.push(`/auth/password/verify?email=${encodeURIComponent(email)}`);
+  const onSubmitEmail = ({ email }: FormData) => {
+    setServerError(null);
+    setInfo(null);
 
-      // UI: redirige vers la page verify pour garder le flow
-      router.push(`/auth/password/verify?email=${encodeURIComponent(email)}`);
-    } catch (err: any) {
-      setError(err?.message ?? "Error");
-    } finally {
-      setBusy(false);
+    if (!hasApiBaseUrl()) {
+      setServerError(copy.configError);
+      return;
     }
+
+    requestOtpMutation.mutate({
+      email: email.trim().toLowerCase(),
+    });
   };
 
   return (
@@ -91,34 +122,48 @@ export default function ForgotPasswordForm() {
           </h1>
           <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">{copy.subtitle}</p>
 
-          <form onSubmit={submit} className="mt-8 space-y-5">
+          <form onSubmit={handleSubmit(onSubmitEmail)} className="mt-8 space-y-5" noValidate>
             <div>
               <label className={UI.label}>{copy.email}</label>
               <input
                 type="email"
                 autoComplete="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
                 className={UI.input}
+                {...register("email", {
+                  required: copy.requiredEmail,
+                  pattern: {
+                    value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+                    message: copy.invalidEmail,
+                  },
+                })}
               />
+              {errors.email && (
+                <p className="mt-2 text-xs text-red-600 dark:text-red-400">
+                  {String(errors.email.message)}
+                </p>
+              )}
             </div>
 
             <p className={UI.help}>{copy.hint}</p>
 
             {info && <div className={UI.notice}>{info}</div>}
 
-            {error && (
+            {serverError && (
               <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-200">
-                {error}
+                {serverError}
               </div>
             )}
 
-            <button type="submit" disabled={busy || !email} className={UI.btnPrimary}>
-              {busy ? "…" : copy.cta}
+            <button
+              type="submit"
+              disabled={requestOtpMutation.isPending}
+              className={UI.btnPrimary}
+            >
+              {requestOtpMutation.isPending ? "…" : copy.cta}
             </button>
 
             <div className="pt-2 text-center text-sm text-slate-600 dark:text-slate-400">
-              <Link href="/auth/login" className={UI.link}>
+              <Link href="/login" className={UI.link}>
                 {copy.back}
               </Link>
             </div>
