@@ -15,15 +15,27 @@ export default function CommandPalette({ actions }: { actions: CommandAction[] }
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
 
+  // useEffect(() => {
+  //   const onKeyDown = (e: KeyboardEvent) => {
+  //     const isK = e.key.toLowerCase() === "k";
+  //     if ((e.metaKey || e.ctrlKey) && isK) {
+  //       e.preventDefault();
+  //       setOpen(true);
+  //     }
+  //     if (e.key === "Escape") setOpen(false);
+  //   };
+  //   window.addEventListener("keydown", onKeyDown);
+  //   return () => window.removeEventListener("keydown", onKeyDown);
+  // }, []);
+
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      const isK = e.key.toLowerCase() === "k";
-      if ((e.metaKey || e.ctrlKey) && isK) {
+      if ((e.metaKey || e.ctrlKey) && e.code === "KeyK") {
         e.preventDefault();
         setOpen(true);
       }
-      if (e.key === "Escape") setOpen(false);
     };
+
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
