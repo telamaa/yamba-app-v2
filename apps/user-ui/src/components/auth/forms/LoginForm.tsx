@@ -3,6 +3,24 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useUiPreferences } from "@/components/providers/UiPreferencesProvider";
+import { useForm } from "react-hook-form";
+import { useRouter } from "next/navigation";
+import { Eye, EyeOff } from "lucide-react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  getApiErrorData,
+  getApiErrorMessage,
+  hasApiBaseUrl,
+  loginUser,
+  type LoginPayload,
+  type LoginResponse,
+} from "@/services/auth.api";
+
+type FormData = {
+  email: string;
+  password: string;
+  remember: boolean;
+};
 
 function GoogleIcon() {
   return (
@@ -42,30 +60,145 @@ function FacebookIcon() {
   );
 }
 
+function buildCopy(lang: string) {
+  const fr = lang === "fr";
+
+  return {
+    title: fr ? "Bon retour sur Yamba" : "Welcome back to Yamba",
+    subtitle: fr
+      ? "Saisissez votre e-mail et votre mot de passe."
+      : "Enter your email and password.",
+    email: fr ? "E-mail" : "Email",
+    password: fr ? "Mot de passe" : "Password",
+    forgot: fr ? "Mot de passe oublié ?" : "Forgot password?",
+    remember: fr
+      ? "Se souvenir de moi sur cet appareil"
+      : "Remember me on this device",
+    cta: fr ? "Connexion" : "Sign in",
+    or: fr ? "OU" : "OR",
+    google: fr ? "Me connecter avec Google" : "Continue with Google",
+    facebook: fr ? "Me connecter avec Facebook" : "Continue with Facebook",
+    foot: fr ? "Vous découvrez Yamba ?" : "New to Yamba?",
+    create: fr ? "Créez un compte" : "Create an account",
+    show: fr ? "Afficher" : "Show",
+    hide: fr ? "Masquer" : "Hide",
+    showPasswordAria: fr
+      ? "Afficher le mot de passe"
+      : "Show password",
+    hidePasswordAria: fr
+      ? "Masquer le mot de passe"
+      : "Hide password",
+    requiredEmail: fr ? "L'e-mail est requis." : "Email is required.",
+    invalidEmail: fr
+      ? "Veuillez saisir un e-mail valide."
+      : "Please enter a valid email.",
+    requiredPassword: fr
+      ? "Le mot de passe est requis."
+      : "Password is required.",
+    minPassword: fr
+      ? "Le mot de passe doit contenir au moins 8 caractères."
+      : "Password must be at least 8 characters.",
+    genericError: fr
+      ? "Connexion impossible pour le moment."
+      : "Unable to sign in right now.",
+    invalidCredentials: fr
+      ? "E-mail ou mot de passe incorrect."
+      : "Invalid email or password.",
+    configError: fr
+      ? "La configuration de l'application est incomplète."
+      : "Application configuration is incomplete.",
+    networkError: fr
+      ? "Impossible de joindre le serveur. Vérifiez votre connexion."
+      : "Unable to reach the server. Please check your connection.",
+    rateLimitError: fr
+      ? "Trop de tentatives. Réessayez dans quelques instants."
+      : "Too many attempts. Please try again in a moment.",
+    secureHint: fr
+      ? "Vérifiez l'URL pour vous assurer de vous connecter au bon site."
+      : "Check the URL to make sure you are signing in to the correct site.",
+  };
+}
+
+type Copy = ReturnType<typeof buildCopy>;
+
+function normalizeMessage(message?: string | null) {
+  return String(message ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+}
+
+function localizeLoginError(message: string | undefined, copy: Copy) {
+  const normalized = normalizeMessage(message);
+
+  if (!normalized) return copy.genericError;
+
+  if (
+    normalized === "invalid email or password" ||
+    normalized === "invalid credentials" ||
+    normalized === "unauthorized" ||
+    normalized === "email or password incorrect" ||
+    normalized === "incorrect email or password" ||
+    normalized === "request failed with status code 401"
+  ) {
+    return copy.invalidCredentials;
+  }
+
+  if (
+    normalized === "email is required" ||
+    normalized === "e-mail is required"
+  ) {
+    return copy.requiredEmail;
+  }
+
+  if (
+    normalized === "please enter a valid email." ||
+    normalized === "please enter a valid email" ||
+    normalized === "invalid email" ||
+    normalized === "invalid email format"
+  ) {
+    return copy.invalidEmail;
+  }
+
+  if (normalized === "password is required") {
+    return copy.requiredPassword;
+  }
+
+  if (
+    normalized === "password must be at least 8 characters." ||
+    normalized === "password must be at least 8 characters" ||
+    normalized === "password must be at least 8 characters long"
+  ) {
+    return copy.minPassword;
+  }
+
+  if (
+    normalized.includes("network error") ||
+    normalized.includes("failed to fetch") ||
+    normalized.includes("load failed")
+  ) {
+    return copy.networkError;
+  }
+
+  if (
+    normalized.includes("too many requests") ||
+    normalized.includes("rate limit") ||
+    normalized.includes("too many attempts")
+  ) {
+    return copy.rateLimitError;
+  }
+
+  return copy.genericError;
+}
+
 export default function LoginForm() {
+  const router = useRouter();
+  const queryClient = useQueryClient();
   const { lang } = useUiPreferences();
+  const [passwordVisible, setPasswordVisible] = useState(false);
 
-  const copy = useMemo(() => {
-    const fr = lang === "fr";
-    return {
-      title: fr ? "Bon retour sur Yamba" : "Welcome back to Yamba",
-      subtitle: fr
-        ? "Saisissez votre e-mail et votre mot de passe."
-        : "Enter your email and password.",
-      email: fr ? "E-mail" : "Email",
-      password: fr ? "Mot de passe" : "Password",
-      forgot: fr ? "Mot de passe oublié ?" : "Forgot password?",
-      remember: fr ? "Se souvenir de moi sur cet appareil" : "Remember me on this device",
-      cta: fr ? "Connexion" : "Sign in",
-      or: fr ? "OU" : "OR",
-      google: fr ? "Me connecter avec Google" : "Continue with Google",
-      facebook: fr ? "Me connecter avec Facebook" : "Continue with Facebook",
-      foot: fr ? "Vous découvrez Yamba ?" : "New to Yamba?",
-      create: fr ? "Créez un compte" : "Create an account",
-    };
-  }, [lang]);
+  const copy = useMemo(() => buildCopy(lang), [lang]);
 
-  // Palette Mango (#FF9900) + accent Teal pour les liens
   const UI = {
     label: "text-sm font-semibold text-slate-800 dark:text-slate-100",
     input:
@@ -73,6 +206,8 @@ export default function LoginForm() {
       "focus:border-[#FF9900]/80 focus:ring-4 focus:ring-[#FF9900]/25 " +
       "dark:border-slate-800 dark:bg-slate-950 dark:text-white " +
       "dark:focus:border-[#FFAE33]/70 dark:focus:ring-[#FF9900]/18",
+    inputError:
+      "border-red-300 focus:border-red-400 focus:ring-red-200 dark:border-red-800 dark:focus:border-red-700 dark:focus:ring-red-900/40",
     link:
       "text-sm font-semibold text-[#0F766E] hover:text-[#115E59] hover:underline " +
       "dark:text-[#2DD4BF] dark:hover:text-[#5EEAD4]",
@@ -88,31 +223,78 @@ export default function LoginForm() {
     footerLink:
       "font-semibold text-[#0F766E] hover:text-[#115E59] hover:underline " +
       "dark:text-[#2DD4BF] dark:hover:text-[#5EEAD4]",
+    helperError: "mt-2 text-xs text-red-600 dark:text-red-400",
   };
 
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [remember, setRemember] = useState(true);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const {
+    register,
+    handleSubmit,
+    setError,
+    clearErrors,
+    formState: { errors, isValid },
+  } = useForm<FormData>({
+    mode: "onChange",
+    defaultValues: {
+      email: "",
+      password: "",
+      remember: false,
+    },
+  });
 
-  // ✅ bouton actif seulement si email + password saisis
-  const isReady = email.trim().length > 0 && password.trim().length > 0;
+  const loginMutation = useMutation<LoginResponse, unknown, LoginPayload>({
+    mutationFn: loginUser,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["user"] });
+      router.push("/");
+      router.refresh();
+    },
+    onError: (error) => {
+      const data = getApiErrorData(error);
 
-  const onSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
+      if (data?.errors?.email) {
+        setError("email", {
+          type: "server",
+          message: localizeLoginError(String(data.errors.email), copy),
+        });
+      }
 
-    if (!isReady) return;
+      if (data?.errors?.password) {
+        setError("password", {
+          type: "server",
+          message: localizeLoginError(String(data.errors.password), copy),
+        });
+      }
 
-    setBusy(true);
+      if (!data?.errors?.email && !data?.errors?.password) {
+        const rawMessage = getApiErrorMessage(error, copy.invalidCredentials);
+
+        setError("root.serverError", {
+          type: "server",
+          message: localizeLoginError(rawMessage, copy),
+        });
+      }
+    },
+  });
+
+  const onSubmit = async (values: FormData) => {
+    clearErrors("root.serverError");
+
+    if (!hasApiBaseUrl()) {
+      setError("root.serverError", {
+        type: "config",
+        message: copy.configError,
+      });
+      return;
+    }
+
     try {
-      // UI only pour l’instant
-      console.log("[login]", { email, password, remember });
-    } catch (err: any) {
-      setError(err?.message ?? "Error");
-    } finally {
-      setBusy(false);
+      await loginMutation.mutateAsync({
+        email: values.email.trim().toLowerCase(),
+        password: values.password,
+        rememberMe: values.remember,
+      });
+    } catch {
+      // géré par onError
     }
   };
 
@@ -123,74 +305,136 @@ export default function LoginForm() {
           <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">
             {copy.title}
           </h1>
-          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">{copy.subtitle}</p>
 
-          <form onSubmit={onSubmit} className="mt-8 space-y-5">
-            {/* Email */}
+          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+            {copy.subtitle}
+          </p>
+
+          <form
+            onSubmit={handleSubmit(onSubmit)}
+            className="mt-8 space-y-5"
+            noValidate
+          >
             <div>
-              <label className={UI.label}>{copy.email}</label>
+              <label htmlFor="email" className={UI.label}>
+                {copy.email}
+              </label>
+
               <input
+                id="email"
                 type="email"
                 autoComplete="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className={UI.input}
+                className={`${UI.input} ${errors.email ? UI.inputError : ""}`}
+                {...register("email", {
+                  required: copy.requiredEmail,
+                  pattern: {
+                    value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+                    message: copy.invalidEmail,
+                  },
+                  setValueAs: (value) =>
+                    typeof value === "string"
+                      ? value.trim().toLowerCase()
+                      : value,
+                  onChange: () => {
+                    clearErrors("email");
+                    clearErrors("root.serverError");
+                  },
+                })}
               />
+
+              {errors.email?.message && (
+                <p className={UI.helperError}>{errors.email.message}</p>
+              )}
             </div>
 
-            {/* Password + forgot */}
             <div>
               <div className="flex items-center justify-between gap-3">
-                <label className={UI.label}>{copy.password}</label>
-                <Link href="/auth/password/forgot" className={UI.link}>
+                <label htmlFor="password" className={UI.label}>
+                  {copy.password}
+                </label>
+
+                <Link href="/password/forgot" className={UI.link}>
                   {copy.forgot}
                 </Link>
               </div>
 
-              <input
-                type="password"
-                autoComplete="current-password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className={UI.input}
-              />
+              <div className="relative">
+                <input
+                  id="password"
+                  type={passwordVisible ? "text" : "password"}
+                  autoComplete="current-password"
+                  className={`${UI.input} pr-12 ${
+                    errors.password ? UI.inputError : ""
+                  }`}
+                  {...register("password", {
+                    required: copy.requiredPassword,
+                    minLength: {
+                      value: 8,
+                      message: copy.minPassword,
+                    },
+                    onChange: () => {
+                      clearErrors("password");
+                      clearErrors("root.serverError");
+                    },
+                  })}
+                />
+
+                <button
+                  type="button"
+                  onClick={() => setPasswordVisible((v) => !v)}
+                  aria-label={
+                    passwordVisible
+                      ? copy.hidePasswordAria
+                      : copy.showPasswordAria
+                  }
+                  aria-pressed={passwordVisible}
+                  className="absolute right-2 top-1/2 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-lg text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                >
+                  {passwordVisible ? <EyeOff size={15} /> : <Eye size={15} />}
+                </button>
+              </div>
+
+              {errors.password?.message && (
+                <p className={UI.helperError}>{errors.password.message}</p>
+              )}
             </div>
 
-            {/* Remember */}
             <label className="flex items-center gap-3 text-sm text-slate-700 dark:text-slate-300">
               <input
                 type="checkbox"
-                checked={remember}
-                onChange={(e) => setRemember(e.target.checked)}
                 className={[
                   "h-4 w-4 rounded border-slate-300",
                   "accent-[#FF9900]",
                   "focus:ring-4 focus:ring-[#FF9900]/25 focus:ring-offset-2",
                   "focus:ring-offset-white dark:focus:ring-offset-slate-950",
                 ].join(" ")}
+                {...register("remember")}
               />
               <span>{copy.remember}</span>
             </label>
 
-            {error && (
+            {errors.root?.serverError?.message && (
               <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-200">
-                {error}
+                {errors.root.serverError.message}
               </div>
             )}
 
-            {/* CTA */}
-            <button type="submit" disabled={busy || !isReady} className={UI.btnPrimary}>
-              {busy ? "…" : copy.cta}
+            <button
+              type="submit"
+              disabled={loginMutation.isPending || !isValid}
+              className={UI.btnPrimary}
+            >
+              {loginMutation.isPending ? "…" : copy.cta}
             </button>
 
-            {/* Divider */}
             <div className="flex items-center gap-4 pt-1">
               <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
-              <span className="text-xs font-semibold text-slate-400">{copy.or}</span>
+              <span className="text-xs font-semibold text-slate-400">
+                {copy.or}
+              </span>
               <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
             </div>
 
-            {/* Social */}
             <div className="space-y-3">
               <button
                 type="button"
@@ -215,17 +459,16 @@ export default function LoginForm() {
               </button>
             </div>
 
-            {/* Footer */}
             <div className="pt-5 text-center text-sm text-slate-600 dark:text-slate-400">
               {copy.foot}{" "}
-              <Link href="/auth/register" className={UI.footerLink}>
+              <Link href="/register" className={UI.footerLink}>
                 {copy.create}
               </Link>
             </div>
           </form>
 
           <p className="mt-6 text-xs text-slate-500 dark:text-slate-500">
-            Vérifiez l’URL pour vous assurer de vous connecter au bon site.
+            {copy.secureHint}
           </p>
         </div>
       </div>

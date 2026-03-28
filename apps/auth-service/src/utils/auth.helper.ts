@@ -94,6 +94,110 @@ const isValidGender = (g: unknown): g is GenderInput =>
 export const normalizeEmail = (email: string) => email.trim().toLowerCase();
 
 /** ---------- Validation ---------- */
+function normalizeForComparison(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
+function looksLikeSimpleDate(password: string) {
+  const digits = password.replace(/\D/g, "");
+  return /^\d{6}$/.test(digits) || /^\d{8}$/.test(digits);
+}
+
+function hasSequentialPattern(password: string) {
+  const lower = password.toLowerCase();
+  const patterns = [
+    "1234",
+    "2345",
+    "3456",
+    "4567",
+    "5678",
+    "6789",
+    "abcd",
+    "azerty",
+    "qwerty",
+    "password",
+    "motdepasse",
+  ];
+
+  return patterns.some((pattern) => lower.includes(pattern));
+}
+
+function hasTooManyRepeatedChars(password: string) {
+  return /(.)\1{2,}/.test(password);
+}
+
+type PasswordValidationContext = {
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+};
+
+export const validatePasswordStrength = (
+  password: string,
+  context?: PasswordValidationContext
+) => {
+  if (!password) {
+    throw new ValidationError("Password is required!");
+  }
+
+  const commonRuleMessage =
+    "Choose a stronger password with at least 8 characters, including an uppercase letter, a lowercase letter, a number and a special character.";
+
+  if (password.length < 8) {
+    throw new ValidationError(commonRuleMessage);
+  }
+
+  if (!/[a-z]/.test(password)) {
+    throw new ValidationError(commonRuleMessage);
+  }
+
+  if (!/[A-Z]/.test(password)) {
+    throw new ValidationError(commonRuleMessage);
+  }
+
+  if (!/\d/.test(password)) {
+    throw new ValidationError(commonRuleMessage);
+  }
+
+  if (!/[^A-Za-z0-9]/.test(password)) {
+    throw new ValidationError(commonRuleMessage);
+  }
+
+  if (looksLikeSimpleDate(password)) {
+    throw new ValidationError(
+      "For your security, avoid passwords that look like an easy-to-guess date."
+    );
+  }
+
+  if (hasSequentialPattern(password) || hasTooManyRepeatedChars(password)) {
+    throw new ValidationError(
+      "For your security, avoid simple sequences, repeated characters, or overly predictable passwords."
+    );
+  }
+
+  const firstName = normalizeForComparison(context?.firstName ?? "");
+  const lastName = normalizeForComparison(context?.lastName ?? "");
+  const emailLocalPart = normalizeForComparison(context?.email ?? "").split("@")[0] ?? "";
+  const normalizedPassword = normalizeForComparison(password);
+
+  const forbiddenParts = [firstName, lastName, emailLocalPart].filter(
+    (value) => value.length >= 3
+  );
+
+  for (const item of forbiddenParts) {
+    if (normalizedPassword.includes(item)) {
+      throw new ValidationError(
+        "For your security, do not use your first name, last name, or email address in your password."
+      );
+    }
+  }
+};
+
+
 export const validateRegistrationData = (data: RegistrationInput): ValidatedRegistrationData => {
   const firstName = data.firstName?.trim();
   const lastName = data.lastName?.trim();
@@ -111,9 +215,11 @@ export const validateRegistrationData = (data: RegistrationInput): ValidatedRegi
     throw new ValidationError("Invalid email format!");
   }
 
-  if (password.length < 8) {
-    throw new ValidationError("Password must be at least 8 characters long!");
-  }
+  validatePasswordStrength(password, {
+    firstName,
+    lastName,
+    email: emailNormalized,
+  });
 
   if (!isValidGender(gender)) {
     throw new ValidationError("Invalid gender value!");
@@ -311,19 +417,35 @@ export const consumePasswordResetToken = async (token: string) => {
   return emailKey;
 };
 
-/** ---------- Refresh token rotation (single active session) ---------- */
+/** ---------- Refresh token rotation (multi-session) ---------- */
 export const createRefreshJti = () => crypto.randomBytes(16).toString("hex");
 
-export const storeRefreshJti = async (userId: string, jti: string) => {
-  await redis.set(keys.refreshJti(userId), jti, "EX", REFRESH_JTI_TTL_SECONDS);
+export const storeRefreshJti = async (userId: string, jti: string, rememberMe = false) => {
+  const ttl = rememberMe ? 30 * 24 * 60 * 60 : REFRESH_JTI_TTL_SECONDS; // 30d or 7d
+  await redis.set(`refresh_jti:${userId}:${jti}`, "1", "EX", ttl);
 };
 
-export const getRefreshJti = async (userId: string) => {
-  return redis.get(keys.refreshJti(userId));
+export const hasRefreshJti = async (userId: string, jti: string): Promise<boolean> => {
+  const exists = await redis.get(`refresh_jti:${userId}:${jti}`);
+  return exists !== null;
 };
 
-export const revokeRefreshJti = async (userId: string) => {
-  await redis.del(keys.refreshJti(userId));
+export const revokeRefreshJti = async (userId: string, jti?: string) => {
+  if (jti) {
+    // Révoquer une session spécifique
+    await redis.del(`refresh_jti:${userId}:${jti}`);
+  } else {
+    // Révoquer TOUTES les sessions (logout global / sécurité)
+    const pattern = `refresh_jti:${userId}:*`;
+    let cursor = "0";
+    do {
+      const [nextCursor, matchedKeys] = await redis.scan(cursor, "MATCH", pattern, "COUNT", 100);
+      cursor = nextCursor;
+      if (matchedKeys.length > 0) {
+        await redis.del(...matchedKeys);
+      }
+    } while (cursor !== "0");
+  }
 };
 
 
