@@ -4,3 +4,13 @@
 
 /* optionnel mais utile */
 html, body { height: 100%; }
+
+
+@keyframes yambaShimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
