@@ -10,11 +10,12 @@ const app = express();
 
 app.use(
   cors({
-    origin: ["http://localhost:3000"],
+    origin: ["http://localhost:3000", "http://192.168.1.155:3000"],
     allowedHeaders: ["Authorization", "Content-Type"],
     credentials: true,
   })
 );
+
 app.use(express.json());
 app.use(cookieParser());
 
@@ -42,3 +43,4 @@ const server = app.listen(port, () => {
 server.on("error", (err) => {
   console.log("Server Error:", err);
 });
+
