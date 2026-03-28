@@ -41,7 +41,7 @@
   "paths": {
     "/auth/register": {
       "post": {
-        "description": "Register a new user (send OTP). Stores pending registration in Redis and returns verificationToken.",
+        "description": "Register a new user (send OTP). Stores pending registration in Redis and returns verificationToken. Password must contain at least 8 characters, including uppercase, lowercase, number and special character. Additional server-side checks reject predictable passwords and personal information.",
         "parameters": [
           {
             "in": "body",
@@ -210,7 +210,7 @@
 
     "/auth/password/reset": {
       "post": {
-        "description": "Reset password using passwordResetToken and newPassword.",
+        "description": "Reset password using passwordResetToken and newPassword. Password must contain at least 8 characters, including uppercase, lowercase, number and special character. Additional server-side checks reject predictable passwords and personal information.",
         "parameters": [
           {
             "in": "body",
@@ -250,7 +250,14 @@
         "firstName": { "type": "string", "example": "Dadi" },
         "lastName": { "type": "string", "example": "GOIO" },
         "email": { "type": "string", "example": "enrique0goio@gmail.com" },
-        "password": { "type": "string", "example": "123Admin!" },
+        "password": {
+          "type": "string",
+          "format": "password",
+          "minLength": 8,
+          "pattern": "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[^A-Za-z0-9]).{8,}$",
+          "description": "At least 8 characters, including one uppercase letter, one lowercase letter, one number and one special character. Additional server-side checks reject personal information, easy dates, simple sequences and repeated characters.",
+          "example": "Mango@742"
+        },
         "gender": { "$ref": "#/definitions/GenderInput" }
       },
       "additionalProperties": false
@@ -300,7 +307,12 @@
       "required": ["email", "password"],
       "properties": {
         "email": { "type": "string", "example": "enrique0goio@gmail.com" },
-        "password": { "type": "string", "example": "123Admin!" }
+        "password": {
+          "type": "string",
+          "format": "password",
+          "description": "User password.",
+          "example": "Mango@742"
+        }
       },
       "additionalProperties": false
     },
@@ -386,7 +398,14 @@
           "type": "string",
           "example": "8f2b1c9b83fbe4b1aa6c7b6a8b4cbb1d8d4a0c0b4d68b56c6e29a36c5b2c8a0ef"
         },
-        "newPassword": { "type": "string", "example": "NewStrongPass123!" }
+        "newPassword": {
+          "type": "string",
+          "format": "password",
+          "minLength": 8,
+          "pattern": "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[^A-Za-z0-9]).{8,}$",
+          "description": "At least 8 characters, including one uppercase letter, one lowercase letter, one number and one special character. Additional server-side checks reject personal information, easy dates, simple sequences and repeated characters.",
+          "example": "River@482"
+        }
       },
       "additionalProperties": false
     },

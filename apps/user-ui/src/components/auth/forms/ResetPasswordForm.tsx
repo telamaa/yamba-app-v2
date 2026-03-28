@@ -4,13 +4,106 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useUiPreferences } from "@/components/providers/UiPreferencesProvider";
+import { useForm } from "react-hook-form";
+import { useMutation } from "@tanstack/react-query";
+import {
+  getApiErrorMessage,
+  hasApiBaseUrl,
+  resetPassword,
+} from "@/services/auth.api";
 
 type Lang = "fr" | "en";
+
+type FormData = {
+  password: string;
+  confirmPassword: string;
+};
+
+function normalizeForComparison(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
+function looksLikeSimpleDate(password: string) {
+  const digits = password.replace(/\D/g, "");
+  return /^\d{6}$/.test(digits) || /^\d{8}$/.test(digits);
+}
+
+function hasSequentialPattern(password: string) {
+  const lower = password.toLowerCase();
+  const patterns = [
+    "1234",
+    "2345",
+    "3456",
+    "4567",
+    "5678",
+    "6789",
+    "abcd",
+    "azerty",
+    "qwerty",
+    "password",
+    "motdepasse",
+  ];
+
+  return patterns.some((pattern) => lower.includes(pattern));
+}
+
+function hasTooManyRepeatedChars(password: string) {
+  return /(.)\1{2,}/.test(password);
+}
+
+function validateStrongPassword(password: string, email: string): true | string {
+  const normalizedPassword = normalizeForComparison(password);
+  const emailLocalPart = normalizeForComparison(email).split("@")[0] ?? "";
+
+  const includesPersonalInfo =
+    emailLocalPart.length >= 3 && normalizedPassword.includes(emailLocalPart);
+
+  const baseChecksOk =
+    password.length >= 8 &&
+    /[a-z]/.test(password) &&
+    /[A-Z]/.test(password) &&
+    /\d/.test(password) &&
+    /[^A-Za-z0-9]/.test(password);
+
+  if (!baseChecksOk) {
+    return "Choisissez un mot de passe d’au moins 8 caractères avec une majuscule, une minuscule, un chiffre et un caractère spécial.";
+  }
+
+  if (includesPersonalInfo) {
+    return "Pour votre sécurité, évitez d’utiliser votre e-mail dans le mot de passe.";
+  }
+
+  if (looksLikeSimpleDate(password)) {
+    return "Pour votre sécurité, évitez un mot de passe qui ressemble à une date facile à deviner.";
+  }
+
+  if (hasSequentialPattern(password) || hasTooManyRepeatedChars(password)) {
+    return "Pour votre sécurité, évitez les suites simples, répétitions ou mots de passe trop prévisibles.";
+  }
+
+  return true;
+}
 
 export default function ResetPasswordForm() {
   const router = useRouter();
   const sp = useSearchParams();
   const { lang } = useUiPreferences();
+  const [serverError, setServerError] = useState<string | null>(null);
+
+  const token =
+    sp.get("token") ??
+    (typeof window !== "undefined"
+      ? sessionStorage.getItem("pwd_reset_token") ?? ""
+      : "");
+
+  const resetEmail =
+    typeof window !== "undefined"
+      ? sessionStorage.getItem("pwd_reset_email") ?? ""
+      : "";
 
   const copy = useMemo(() => {
     const fr = (lang as Lang) === "fr";
@@ -21,19 +114,26 @@ export default function ResetPasswordForm() {
         : "Choose a strong password to secure your account.",
       newPwd: fr ? "Nouveau mot de passe" : "New password",
       confirmPwd: fr ? "Confirmer le mot de passe" : "Confirm password",
-      hint: fr ? "8 caractères minimum." : "At least 8 characters.",
+      hint: fr
+        ? "Utilisez au moins 8 caractères avec une majuscule, une minuscule, un chiffre et un caractère spécial."
+        : "Use at least 8 characters with an uppercase letter, a lowercase letter, a number and a special character.",
       cta: fr ? "Réinitialiser" : "Reset password",
       back: fr ? "Retour à la connexion" : "Back to login",
       mismatch: fr ? "Les mots de passe ne correspondent pas." : "Passwords do not match.",
-      tooShort: fr ? "Le mot de passe doit faire au moins 8 caractères." : "Password must be at least 8 characters.",
+      requiredPassword: fr ? "Le mot de passe est requis." : "Password is required.",
       success: fr ? "Mot de passe mis à jour. Redirection…" : "Password updated. Redirecting…",
       missingToken: fr
         ? "Session expirée. Veuillez recommencer la procédure."
         : "Session expired. Please restart the process.",
+      genericError: fr
+        ? "Réinitialisation impossible pour le moment."
+        : "Unable to reset password right now.",
+      configError: fr
+        ? "La configuration de l’application est incomplète."
+        : "Application configuration is incomplete.",
     };
   }, [lang]);
 
-  // Palette Mango (#FF9900)
   const UI = {
     label: "text-sm font-semibold text-slate-800 dark:text-slate-100",
     help: "text-xs text-slate-500 dark:text-slate-500",
@@ -55,58 +155,51 @@ export default function ResetPasswordForm() {
       "dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-200",
   };
 
-  // token possible: ?token=... (plus tard via backend). Pour l’UI on accepte vide, mais on affiche warning.
-  const token = sp.get("token") ?? (typeof window !== "undefined" ? sessionStorage.getItem("pwd_reset_token") ?? "" : "");
+  const {
+    register,
+    handleSubmit,
+    watch,
+    formState: { errors },
+  } = useForm<FormData>({
+    mode: "onSubmit",
+  });
 
-  const [newPassword, setNewPassword] = useState("");
-  const [confirm, setConfirm] = useState("");
-  const [busy, setBusy] = useState(false);
+  const password = watch("password") ?? "";
 
-  const [error, setError] = useState<string | null>(null);
-  const [info, setInfo] = useState<string | null>(null);
+  const resetPasswordMutation = useMutation({
+    mutationFn: resetPassword,
+    onSuccess: () => {
+      setServerError(null);
 
-  const minLenOk = newPassword.length >= 8;
-  const matchOk = newPassword.length > 0 && newPassword === confirm;
-  const isReady = minLenOk && matchOk;
+      if (typeof window !== "undefined") {
+        sessionStorage.removeItem("pwd_reset_token");
+        sessionStorage.removeItem("pwd_reset_email");
+      }
 
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    setInfo(null);
+      router.push("/login");
+    },
+    onError: (error) => {
+      setServerError(getApiErrorMessage(error, copy.genericError));
+    },
+  });
+
+  const onSubmitPassword = ({ password }: FormData) => {
+    setServerError(null);
+
+    if (!hasApiBaseUrl()) {
+      setServerError(copy.configError);
+      return;
+    }
 
     if (!token) {
-      // UI : on avertit, mais tu peux choisir de bloquer totalement
-      setError(copy.missingToken);
+      setServerError(copy.missingToken);
       return;
     }
 
-    if (!minLenOk) {
-      setError(copy.tooShort);
-      return;
-    }
-    if (!matchOk) {
-      setError(copy.mismatch);
-      return;
-    }
-
-    setBusy(true);
-    try {
-      // UI only pour l’instant
-      console.log("[password/reset]", { passwordResetToken: token, newPassword });
-
-      // Quand tu branches le back :
-      // await authApi.resetPassword({ passwordResetToken: token, newPassword });
-
-      setInfo(copy.success);
-      // nettoyage token (optionnel)
-      if (typeof window !== "undefined") sessionStorage.removeItem("pwd_reset_token");
-
-      window.setTimeout(() => router.push("/auth/login"), 1200);
-    } catch (err: any) {
-      setError(err?.message ?? "Error");
-    } finally {
-      setBusy(false);
-    }
+    resetPasswordMutation.mutate({
+      passwordResetToken: token,
+      newPassword: password,
+    });
   };
 
   return (
@@ -118,17 +211,24 @@ export default function ResetPasswordForm() {
           </h1>
           <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">{copy.subtitle}</p>
 
-          <form onSubmit={submit} className="mt-8 space-y-5">
+          <form onSubmit={handleSubmit(onSubmitPassword)} className="mt-8 space-y-5" noValidate>
             <div>
               <label className={UI.label}>{copy.newPwd}</label>
               <input
                 type="password"
                 autoComplete="new-password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
                 className={UI.input}
+                {...register("password", {
+                  required: copy.requiredPassword,
+                  validate: (value) => validateStrongPassword(value, resetEmail),
+                })}
               />
               <p className={UI.help}>{copy.hint}</p>
+              {errors.password && (
+                <p className="mt-2 text-xs text-red-600 dark:text-red-400">
+                  {String(errors.password.message)}
+                </p>
+              )}
             </div>
 
             <div>
@@ -136,29 +236,38 @@ export default function ResetPasswordForm() {
               <input
                 type="password"
                 autoComplete="new-password"
-                value={confirm}
-                onChange={(e) => setConfirm(e.target.value)}
                 className={UI.input}
+                {...register("confirmPassword", {
+                  validate: (value) => value === password || copy.mismatch,
+                })}
               />
-              {confirm.length > 0 && !matchOk && (
-                <p className="mt-2 text-xs text-red-600 dark:text-red-300">{copy.mismatch}</p>
+              {errors.confirmPassword && (
+                <p className="mt-2 text-xs text-red-600 dark:text-red-400">
+                  {String(errors.confirmPassword.message)}
+                </p>
               )}
             </div>
 
-            {info && <div className={UI.notice}>{info}</div>}
+            {resetPasswordMutation.isSuccess && (
+              <div className={UI.notice}>{copy.success}</div>
+            )}
 
-            {error && (
+            {serverError && (
               <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-200">
-                {error}
+                {serverError}
               </div>
             )}
 
-            <button type="submit" disabled={busy || !isReady} className={UI.btnPrimary}>
-              {busy ? "…" : copy.cta}
+            <button
+              type="submit"
+              disabled={resetPasswordMutation.isPending}
+              className={UI.btnPrimary}
+            >
+              {resetPasswordMutation.isPending ? "…" : copy.cta}
             </button>
 
             <div className="pt-2 text-center text-sm text-slate-600 dark:text-slate-400">
-              <Link href="/auth/login" className={UI.link}>
+              <Link href="/login" className={UI.link}>
                 {copy.back}
               </Link>
             </div>

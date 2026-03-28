@@ -1,26 +1,48 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+} from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useUiPreferences } from "@/components/providers/UiPreferencesProvider";
+import { useMutation } from "@tanstack/react-query";
+import { useForm } from "react-hook-form";
+import {
+  getApiErrorMessage,
+  hasApiBaseUrl,
+  requestPasswordResetOtp,
+  verifyPasswordResetOtp,
+} from "@/services/auth.api";
 
 type Lang = "fr" | "en";
 
-function onlyDigits(s: string) {
-  return s.replace(/\D/g, "");
-}
-
-function formatMMSS(totalSeconds: number) {
-  const m = Math.floor(totalSeconds / 60);
-  const s = totalSeconds % 60;
-  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
-}
+type FormData = {
+  email: string;
+};
 
 export default function VerifyResetOtpForm() {
   const router = useRouter();
   const sp = useSearchParams();
   const { lang } = useUiPreferences();
+
+  const initialEmail =
+    sp.get("email") ??
+    (typeof window !== "undefined"
+      ? sessionStorage.getItem("pwd_reset_email") ?? ""
+      : "");
+
+  const [otp, setOtp] = useState(["", "", "", ""]);
+  const [serverError, setServerError] = useState<string | null>(null);
+  const [canResend, setCanResend] = useState(false);
+  const [timer, setTimer] = useState(300);
+
+  const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const timerRef = useRef<number | null>(null);
 
   const copy = useMemo(() => {
     const fr = (lang as Lang) === "fr";
@@ -37,16 +59,22 @@ export default function VerifyResetOtpForm() {
       resendIn: fr ? "Renvoyer dans" : "Resend in",
       changeEmail: fr ? "Changer d’e-mail" : "Change email",
       help: fr ? "Vous pouvez coller le code complet." : "You can paste the full code.",
-      incomplete: fr ? "Veuillez saisir le code complet." : "Please enter the full code.",
-      needEmail: fr ? "Veuillez saisir votre e-mail." : "Please enter your email.",
-      resentOk: fr ? "Code renvoyé." : "Code resent.",
       nextHint: fr
         ? "Après validation, vous pourrez définir un nouveau mot de passe."
         : "After verification, you’ll be able to set a new password.",
+      requiredEmail: fr ? "L’e-mail est requis." : "Email is required.",
+      invalidEmail: fr ? "Veuillez saisir un e-mail valide." : "Please enter a valid email.",
+      invalidOtp: fr ? "Veuillez saisir le code complet." : "Please enter the full code.",
+      resentOk: fr ? "Code renvoyé." : "Code resent.",
+      genericError: fr
+        ? "Validation impossible pour le moment."
+        : "Unable to verify right now.",
+      configError: fr
+        ? "La configuration de l’application est incomplète."
+        : "Application configuration is incomplete.",
     };
   }, [lang]);
 
-  // Palette Mango (#FF9900)
   const UI = {
     label: "text-sm font-semibold text-slate-800 dark:text-slate-100",
     help: "text-xs text-slate-500 dark:text-slate-500",
@@ -74,171 +102,163 @@ export default function VerifyResetOtpForm() {
       "dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-200",
   };
 
-  // Email initial depuis query (?email=)
-  const initialEmail = sp.get("email") ?? "";
-  const [email, setEmail] = useState(initialEmail);
+  const { register, handleSubmit, watch } = useForm<FormData>({
+    defaultValues: {
+      email: initialEmail,
+    },
+  });
 
-  const emailRef = useRef<HTMLInputElement | null>(null);
+  const userEmail = watch("email") ?? "";
 
-  // OTP
-  const [digits, setDigits] = useState<string[]>(["", "", "", ""]);
-  const otp = digits.join("");
+  const clearTimer = () => {
+    if (timerRef.current) {
+      window.clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+  };
 
-  // Ready state
-  const isReady = email.trim().length > 0 && otp.length === 4;
+  const startResendTimer = () => {
+    clearTimer();
+    setCanResend(false);
+    setTimer(300);
 
-  // auto-submit guard
-  const lastAutoSubmitOtpRef = useRef<string>("");
+    timerRef.current = window.setInterval(() => {
+      setTimer((prev) => {
+        if (prev <= 1) {
+          clearTimer();
+          setCanResend(true);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
 
-  // states
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  // Resend timer (5 min)
-  const RESEND_SECONDS = 5 * 60;
-  const [resendLeft, setResendLeft] = useState<number>(RESEND_SECONDS);
-  const [resentMsg, setResentMsg] = useState<string | null>(null);
-
-  const inputsRef = useRef<Array<HTMLInputElement | null>>([]);
-
-  // Countdown
   useEffect(() => {
-    if (resendLeft <= 0) return;
-    const t = setInterval(() => setResendLeft((s) => Math.max(0, s - 1)), 1000);
-    return () => clearInterval(t);
-  }, [resendLeft]);
+    startResendTimer();
+    return () => clearTimer();
+  }, []);
 
-  const focusIndex = (i: number) => {
-    const el = inputsRef.current[i];
-    el?.focus();
-    el?.select();
-  };
+  const requestOtpMutation = useMutation({
+    mutationFn: requestPasswordResetOtp,
+    onSuccess: (_, variables) => {
+      const normalizedEmail = variables.email.trim().toLowerCase();
 
-  const setAt = (i: number, v: string) => {
-    const next = [...digits];
-    next[i] = v;
-    setDigits(next);
-  };
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem("pwd_reset_email", normalizedEmail);
+      }
 
-  const handleChange = (i: number, raw: string) => {
-    setError(null);
-    setResentMsg(null);
+      setServerError(null);
+      setOtp(["", "", "", ""]);
+      startResendTimer();
+    },
+    onError: (error) => {
+      setServerError(getApiErrorMessage(error, copy.genericError));
+    },
+  });
 
-    // UX: si email vide, on attire l’attention
-    if (!email.trim()) {
-      emailRef.current?.focus();
+  const verifyOtpMutation = useMutation({
+    mutationFn: verifyPasswordResetOtp,
+    onSuccess: (data, variables) => {
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem("pwd_reset_email", variables.email.trim().toLowerCase());
+        if (data.passwordResetToken) {
+          sessionStorage.setItem("pwd_reset_token", data.passwordResetToken);
+        }
+      }
+
+      setServerError(null);
+      router.push("/password/reset");
+    },
+    onError: (error) => {
+      setServerError(getApiErrorMessage(error, copy.genericError));
+    },
+  });
+
+  const handleOtpChange = (index: number, value: string) => {
+    if (!/^[0-9]?$/.test(value)) return;
+
+    setServerError(null);
+
+    const newOtp = [...otp];
+    newOtp[index] = value;
+    setOtp(newOtp);
+
+    if (value && index < inputRefs.current.length - 1) {
+      inputRefs.current[index + 1]?.focus();
     }
+  };
 
-    const v = onlyDigits(raw);
+  const handleOtpKeyDown = (
+    index: number,
+    e: KeyboardEvent<HTMLInputElement>
+  ) => {
+    if (e.key === "Backspace" && !otp[index] && index > 0) {
+      inputRefs.current[index - 1]?.focus();
+    }
+  };
 
-    // Collage "1234"
-    if (v.length >= 2) {
-      const all = v.slice(0, 4).split("");
-      const next = ["", "", "", ""];
-      for (let k = 0; k < 4; k++) next[k] = all[k] ?? "";
-      setDigits(next);
-      focusIndex(Math.min(all.length - 1, 3));
+  const handleVerifyOtp = () => {
+    setServerError(null);
+
+    if (!hasApiBaseUrl()) {
+      setServerError(copy.configError);
       return;
     }
 
-    const one = v.slice(0, 1);
-    setAt(i, one);
-    if (one && i < 3) focusIndex(i + 1);
-  };
+    const normalizedEmail = userEmail.trim().toLowerCase();
 
-  const handleKeyDown = (i: number, e: React.KeyboardEvent<HTMLInputElement>) => {
-    setError(null);
-
-    if (e.key === "Backspace") {
-      if (digits[i]) {
-        setAt(i, "");
-        return;
-      }
-      if (i > 0) {
-        focusIndex(i - 1);
-        setAt(i - 1, "");
-      }
-    }
-
-    if (e.key === "ArrowLeft" && i > 0) focusIndex(i - 1);
-    if (e.key === "ArrowRight" && i < 3) focusIndex(i + 1);
-  };
-
-  const handlePaste = (e: React.ClipboardEvent) => {
-    e.preventDefault();
-    setError(null);
-    setResentMsg(null);
-
-    if (!email.trim()) {
-      emailRef.current?.focus();
-    }
-
-    const text = onlyDigits(e.clipboardData.getData("text")).slice(0, 4);
-    if (!text) return;
-
-    const next = ["", "", "", ""];
-    text.split("").forEach((c, idx) => (next[idx] = c));
-    setDigits(next);
-    focusIndex(Math.min(text.length - 1, 3));
-  };
-
-  const verifyOtp = async (otpValue: string) => {
-    setError(null);
-    setResentMsg(null);
-
-    if (!email.trim()) {
-      setError(copy.needEmail);
-      emailRef.current?.focus();
+    if (!normalizedEmail) {
+      setServerError(copy.requiredEmail);
       return;
     }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      setServerError(copy.invalidEmail);
+      return;
+    }
+
+    const otpValue = otp.join("");
     if (otpValue.length !== 4) {
-      setError(copy.incomplete);
+      setServerError(copy.invalidOtp);
       return;
     }
-    if (busy) return;
 
-    setBusy(true);
-    try {
-      // UI only pour l’instant
-      console.log("[password/verify]", { email, otp: otpValue });
-
-      // Quand tu branches le back :
-      // const res = await authApi.resetVerifyOtp({ email, otp: otpValue });
-      // sessionStorage.setItem("pwd_reset_token", res.passwordResetToken);
-      // router.push(`/auth/password/reset?token=${encodeURIComponent(res.passwordResetToken)}`);
-
-      router.push("/auth/password/reset"); // placeholder UI
-    } catch (err: any) {
-      setError(err?.message ?? "Error");
-    } finally {
-      setBusy(false);
-    }
+    verifyOtpMutation.mutate({
+      email: normalizedEmail,
+      otp: otpValue,
+    });
   };
 
-  // ✅ Auto-submit seulement si Email + OTP complet
-  useEffect(() => {
-    if (!isReady) return;
-    if (otp !== lastAutoSubmitOtpRef.current) {
-      lastAutoSubmitOtpRef.current = otp;
-      void verifyOtp(otp);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [otp, isReady]);
+  const handleResendOtp = () => {
+    setServerError(null);
 
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    await verifyOtp(otp);
+    if (!hasApiBaseUrl()) {
+      setServerError(copy.configError);
+      return;
+    }
+
+    const normalizedEmail = userEmail.trim().toLowerCase();
+
+    if (!normalizedEmail) {
+      setServerError(copy.requiredEmail);
+      return;
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      setServerError(copy.invalidEmail);
+      return;
+    }
+
+    requestOtpMutation.mutate({
+      email: normalizedEmail,
+    });
   };
 
-  const resend = async () => {
-    if (resendLeft > 0) return;
-
-    // UI only
-    console.log("[password/resend] ui only", { email });
-
-    setResentMsg(copy.resentOk);
-    setResendLeft(RESEND_SECONDS);
-    window.setTimeout(() => setResentMsg(null), 3500);
+  const formatMMSS = (totalSeconds: number) => {
+    const m = Math.floor(totalSeconds / 60);
+    const s = totalSeconds % 60;
+    return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
   };
 
   return (
@@ -252,39 +272,33 @@ export default function VerifyResetOtpForm() {
             {copy.subtitle}
           </p>
 
-          <form onSubmit={submit} className="mt-8 space-y-5">
-            {/* Email */}
+          <form onSubmit={handleSubmit(() => handleVerifyOtp())} className="mt-8 space-y-5" noValidate>
             <div>
               <label className={UI.label}>{copy.email}</label>
               <input
-                ref={emailRef}
                 type="email"
                 autoComplete="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
                 className={UI.input}
+                {...register("email")}
               />
             </div>
 
-            {/* OTP */}
             <div className="text-center">
               <label className={UI.label}>{copy.otpLabel}</label>
-              <div className="mt-3 flex items-center justify-center gap-3" onPaste={handlePaste}>
-                {[0, 1, 2, 3].map((i) => (
+              <div className="mt-3 flex items-center justify-center gap-3">
+                {otp.map((digit, index) => (
                   <input
-                    key={i}
+                    key={index}
                     ref={(el) => {
-                      inputsRef.current[i] = el;
+                      if (el) inputRefs.current[index] = el;
                     }}
+                    type="text"
                     inputMode="numeric"
-                    autoComplete="one-time-code"
-                    pattern="\d*"
                     maxLength={1}
-                    value={digits[i]}
-                    onChange={(e) => handleChange(i, e.target.value)}
-                    onKeyDown={(e) => handleKeyDown(i, e)}
                     className={UI.otpBox}
-                    aria-label={`OTP digit ${i + 1}`}
+                    value={digit}
+                    onChange={(e) => handleOtpChange(index, e.target.value)}
+                    onKeyDown={(e) => handleOtpKeyDown(index, e)}
                   />
                 ))}
               </div>
@@ -292,45 +306,48 @@ export default function VerifyResetOtpForm() {
               <p className={`mt-1 ${UI.help}`}>{copy.nextHint}</p>
             </div>
 
-            {resentMsg && <div className={UI.notice}>{resentMsg}</div>}
+            {requestOtpMutation.isSuccess && !serverError && (
+              <div className={UI.notice}>{copy.resentOk}</div>
+            )}
 
-            {error && (
+            {serverError && (
               <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-200">
-                {error}
+                {serverError}
               </div>
             )}
 
-            {/* ✅ Valider : mêmes dimensions/largeur que l’input Email */}
-            <button type="submit" disabled={busy || !isReady} className={UI.btnPrimary}>
-              {busy ? "…" : copy.cta}
+            <button
+              type="submit"
+              disabled={verifyOtpMutation.isPending}
+              className={UI.btnPrimary}
+            >
+              {verifyOtpMutation.isPending ? "…" : copy.cta}
             </button>
 
-            {/* Back + Resend + Change email */}
             <div className="pt-1">
               <div className="flex flex-col items-center justify-center gap-3 sm:flex-row sm:gap-8 text-sm">
                 <button type="button" onClick={() => router.back()} className={UI.link}>
                   {copy.back}
                 </button>
 
-                <button
-                  type="button"
-                  onClick={resend}
-                  disabled={resendLeft > 0}
-                  className={[
-                    "font-semibold",
-                    resendLeft > 0
-                      ? "text-slate-400 cursor-not-allowed dark:text-slate-600"
-                      : UI.link,
-                  ].join(" ")}
-                >
-                  {resendLeft > 0
-                    ? `${copy.resendIn} ${formatMMSS(resendLeft)}`
-                    : copy.resend}
-                </button>
+                {canResend ? (
+                  <button
+                    type="button"
+                    onClick={handleResendOtp}
+                    className={UI.link}
+                    disabled={requestOtpMutation.isPending}
+                  >
+                    {requestOtpMutation.isPending ? "…" : copy.resend}
+                  </button>
+                ) : (
+                  <p className="font-semibold text-slate-400 dark:text-slate-600">
+                    {copy.resendIn} {formatMMSS(timer)}
+                  </p>
+                )}
               </div>
 
               <div className="pt-3 text-center text-sm text-slate-600 dark:text-slate-400">
-                <Link href="/auth/password/forgot" className={UI.link}>
+                <Link href="/password/forgot" className={UI.link}>
                   {copy.changeEmail}
                 </Link>
               </div>
