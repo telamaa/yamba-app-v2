@@ -1,6 +1,5 @@
 generator client {
   provider = "prisma-client-js"
-  // output   = "../generated/prisma"
 }
 
 datasource db {
@@ -8,40 +7,147 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ─────────────────────────────────────────────
+// USER
+// ─────────────────────────────────────────────
+
 model User {
-  id              String          @id @default(auto()) @map("_id") @db.ObjectId
+  id              String    @id @default(auto()) @map("_id") @db.ObjectId
   firstName       String
   lastName        String
   email           String
-  emailNormalized String          @unique
+  emailNormalized String    @unique
   passwordHash    String?
   phoneNumber     String?
+  country         String
   phoneE164       String?
   gender          Gender
   birthDate       DateTime?
-  roles           Role[]          @default([SHIPPER])
-  carrierStatus   CarriersStatus  @default(NONE)
-  carrierProfile  CarrierProfile?
-  avatar          Image?          @relation("UserAvatar")
-  addresses       Address[]
-  trips           Trip[]          @relation("UserTrips")
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
+  roles           Role[]    @default([SHIPPER])
+
+  // Carrier onboarding
+  carrierStatus CarrierStatus @default(NONE)
+
+  // Relations
+  avatar         Image?          @relation("UserAvatar")
+  carrierPage    CarrierPage?
+  addresses      Address[]
+  trips          Trip[]          @relation("UserTrips")
+  carrierReviews CarrierReview[]
+
+  // Lifecycle
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  isDeleted Boolean   @default(false)
+  deletedAt DateTime?
 
   @@index([carrierStatus])
   @@index([roles])
   @@index([phoneE164])
 }
 
+// ─────────────────────────────────────────────
+// CARRIER PAGE (affiché "Espace Tripper" en UI)
+// ─────────────────────────────────────────────
+
+model CarrierPage {
+  id     String @id @default(auto()) @map("_id") @db.ObjectId
+  userId String @unique @db.ObjectId
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Profil public
+  name        String
+  bio         String?
+  address     String?
+  phoneE164   String?
+  avatar      Image?  @relation("CarrierAvatar")
+  coverUrl    String?
+  socialLinks Json[]  @default([])
+
+  // Onboarding tracking
+  onboardingStep OnboardingStep @default(PROFILE)
+
+  // Stripe Connect
+  stripeAccountId          String?
+  stripeOnboardingComplete Boolean @default(false)
+  stripeChargesEnabled     Boolean @default(false)
+  stripePayoutsEnabled     Boolean @default(false)
+
+  // Badges
+  isVerified     Boolean @default(false)
+  isSuperCarrier Boolean @default(false)
+
+  // Stats (mis à jour via triggers/cron)
+  totalTripsPublished Int   @default(0)
+  totalParcelsCarried Int   @default(0)
+  totalTripsCancelled Int   @default(0)
+  ratingsAvg          Float @default(0)
+  ratingsCount        Int   @default(0)
+
+  // Relations
+  reviews CarrierReview[]
+  trips   Trip[]
+
+  // Rappels onboarding
+  lastReminderSentAt DateTime?
+  reminderCount      Int       @default(0)
+
+  // Lifecycle
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([stripeAccountId])
+  @@index([isVerified])
+  @@index([isSuperCarrier])
+  @@index([ratingsAvg])
+}
+
+// ─────────────────────────────────────────────
+// CARRIER REVIEWS
+// ─────────────────────────────────────────────
+
+model CarrierReview {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  carrierPageId String      @db.ObjectId
+  carrierPage   CarrierPage @relation(fields: [carrierPageId], references: [id], onDelete: Cascade)
+
+  userId String @db.ObjectId
+  user   User   @relation(fields: [userId], references: [id])
+
+  rating  Float
+  comment String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([carrierPageId])
+  @@index([userId])
+  @@index([carrierPageId, rating])
+}
+
+// ─────────────────────────────────────────────
+// IMAGE
+// ─────────────────────────────────────────────
+
 model Image {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  fileId    String
-  url       String
-  userId    String   @unique @db.ObjectId
-  user      User     @relation("UserAvatar", fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @default(auto()) @map("_id") @db.ObjectId
+  fileId String
+  url    String
+
+  userId String? @unique @db.ObjectId
+  user   User?   @relation("UserAvatar", fields: [userId], references: [id], onDelete: Cascade)
+
+  carrierPageId String?      @unique @db.ObjectId
+  carrierPage   CarrierPage? @relation("CarrierAvatar", fields: [carrierPageId], references: [id], onDelete: Cascade)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
+
+// ─────────────────────────────────────────────
+// ADDRESS
+// ─────────────────────────────────────────────
 
 model Address {
   id            String   @id @default(auto()) @map("_id") @db.ObjectId
@@ -64,23 +170,10 @@ model Address {
   @@index([userId, isArchived])
 }
 
-model CarrierProfile {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  userId    String   @unique @db.ObjectId
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  shopName  String?
-  country   String
-  phoneE164 String?
-  kycStatus String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+// ─────────────────────────────────────────────
+// TRIP
+// ─────────────────────────────────────────────
 
-  @@index([country])
-}
-
-/**
- * Conditions définies par catégorie sélectionnée
- */
 type TripCategoryCondition {
   category         ParcelCategory
   priceAmountCents Int
@@ -94,19 +187,18 @@ model Trip {
   userId String @db.ObjectId
   user   User   @relation("UserTrips", fields: [userId], references: [id], onDelete: Cascade)
 
-  // Workflow
+  carrierPageId String?      @db.ObjectId
+  carrierPage   CarrierPage? @relation(fields: [carrierPageId], references: [id])
+
   status      TripStatus @default(DRAFT)
   currentStep Int        @default(1)
 
-  // Base annonce
   transportMode TransportMode?
   tripType      TripType       @default(ONE_WAY)
 
-  // Itinéraire saisi (raw / front)
   originLabel      String?
   destinationLabel String?
 
-  // Données enrichies système / géocodage plus tard
   originPlaceId String?
   originCity    String?
   originRegion  String?
@@ -121,53 +213,40 @@ model Trip {
   destinationLat     Float?
   destinationLng     Float?
 
-  // Saisie actuelle du front
   departureDateLocal String?
   arrivalDateLocal   String?
   departureTimeLocal String?
   arrivalTimeLocal   String?
 
-  // Champs normalisés calculés / système
   departureAt DateTime?
   arrivalAt   DateTime?
 
-  // Aller-retour éventuel pour plus tard
   returnDepartureAt DateTime?
   returnArrivalAt   DateTime?
 
-  // Détails selon mode de transport
   flightType         FlightType?
   trainTripType      TrainTripType?
   carTripFlexibility CarTripFlexibility?
 
-  // Escales / correspondances
   flightLayoverCities String[] @default([])
   trainStopCities     String[] @default([])
 
-  // Référence voyage
   travelReference String?
 
-  // Catégories acceptées
   acceptedCategories ParcelCategory[]        @default([])
   categoryConditions TripCategoryCondition[]
 
-  // Options complémentaires réellement pilotées par le front actuel
   handDeliveryOnly Boolean @default(false)
   instantBooking   Boolean @default(false)
 
-  // Vérification document / billet / justificatif
   ticketVerificationStatus TicketVerificationStatus @default(NOT_SUBMITTED)
 
-  // Devise
   currencyCode String @default("EUR")
 
-  // Notes libres
   notes String?
 
-  // Relations
   documents TripDocument[]
 
-  // Cycle de vie
   publishedAt DateTime?
   cancelledAt DateTime?
   archivedAt  DateTime?
@@ -176,6 +255,7 @@ model Trip {
   updatedAt DateTime @updatedAt
 
   @@index([userId])
+  @@index([carrierPageId])
   @@index([status])
   @@index([transportMode])
   @@index([departureAt])
@@ -218,18 +298,9 @@ model TripDocument {
   @@index([status])
 }
 
-// model Follow {
-//   id          String   @id @default(auto()) @map("_id") @db.ObjectId
-//
-//   followerId  String   @db.ObjectId
-//   followingId String   @db.ObjectId
-//   follower  User @relation("UserFollowing", fields: [followerId], references: [id], onDelete: Cascade)
-//   following User @relation("UserFollowers", fields: [followingId], references: [id], onDelete: Cascade)
-//   createdAt DateTime @default(now())
-//   @@unique([followerId, followingId])
-//   @@index([followingId])
-//   @@index([followerId])
-// }
+// ─────────────────────────────────────────────
+// ENUMS
+// ─────────────────────────────────────────────
 
 enum Gender {
   MALE
@@ -243,11 +314,17 @@ enum Role {
   ADMIN
 }
 
-enum CarriersStatus {
+enum CarrierStatus {
   NONE
-  PENDING
-  APPROVED
+  ONBOARDING
+  ACTIVE
   SUSPENDED
+}
+
+enum OnboardingStep {
+  PROFILE
+  STRIPE
+  COMPLETE
 }
 
 enum TripStatus {

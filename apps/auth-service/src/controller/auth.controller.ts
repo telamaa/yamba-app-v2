@@ -1,28 +1,40 @@
-// auth.controller.ts
 import type { Request, Response, NextFunction } from "express";
 import bcrypt from "bcryptjs";
 import prisma from "@packages/libs/prisma";
-import {AuthError, ValidationError} from "@packages/error-handler";
+import { AuthError, ValidationError } from "@packages/error-handler";
 
 import {
   checkForgotPasswordOtpRestrictions,
-  checkOtpRestrictions, consumePasswordResetToken, createPasswordResetToken, createRefreshJti,
+  checkOtpRestrictions,
+  consumePasswordResetToken,
+  createPasswordResetToken,
+  createRefreshJti,
   createVerificationToken,
   deletePendingRegistration,
   deleteVerificationToken,
   getEmailKeyFromToken,
-  getPendingRegistration, getRefreshJti, normalizeEmail, revokeRefreshJti,
-  sendAccountCreatedEmail, sendForgotPasswordOtp,
-  sendOtp, sendPasswordChangedEmail, storePasswordResetToken,
-  storePendingRegistration, storeRefreshJti,
-  storeVerificationToken, trackForgotPasswordOtpRequests,
+  getPendingRegistration,
+  hasRefreshJti,
+  normalizeEmail,
+  revokeRefreshJti,
+  sendAccountCreatedEmail,
+  sendForgotPasswordOtp,
+  sendOtp,
+  sendPasswordChangedEmail,
+  storePasswordResetToken,
+  storePendingRegistration,
+  storeRefreshJti,
+  storeVerificationToken,
+  trackForgotPasswordOtpRequests,
   trackOtpRequests,
-  validateRegistrationData, verifyForgotPasswordOtpCode,
+  validatePasswordStrength,
+  validateRegistrationData,
+  verifyForgotPasswordOtpCode,
   verifyOtp,
 } from "../utils/auth.helper";
-import {clearAuthCookies, setCookie} from "../utils/cookies/setCookie";
+import { clearAuthCookies, setCookie } from "../utils/cookies/setCookie";
 import jwt from "jsonwebtoken";
-
+import {AuthenticatedRequest} from "@packages/middleware/isAuthenticated";
 
 // Register a new user (send OTP, do not create user yet)
 export const registerUser = async (req: Request, res: Response, next: NextFunction) => {
@@ -30,8 +42,12 @@ export const registerUser = async (req: Request, res: Response, next: NextFuncti
     const data = validateRegistrationData(req.body);
     const emailKey = data.emailNormalized;
 
-    const existingUser = await prisma.user.findUnique({ where: { emailNormalized: emailKey } });
-    if (existingUser) return next(new ValidationError("User already exists with this email!"));
+    const existingUser = await prisma.user.findUnique({
+      where: { emailNormalized: emailKey },
+    });
+    if (existingUser) {
+      return next(new ValidationError("User already exists with this email!"));
+    }
 
     await checkOtpRestrictions(emailKey);
     await trackOtpRequests(emailKey);
@@ -49,7 +65,6 @@ export const registerUser = async (req: Request, res: Response, next: NextFuncti
 
     await sendOtp(data.firstName, emailKey, "register-activation-mail");
 
-    // Create and store opaque verification token -> used by client during OTP verification
     const verificationToken = createVerificationToken();
     await storeVerificationToken(verificationToken, emailKey);
 
@@ -62,8 +77,56 @@ export const registerUser = async (req: Request, res: Response, next: NextFuncti
   }
 };
 
+// Resend registration OTP using the existing verificationToken
+export const resendRegistrationOtp = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { verificationToken } = req.body as { verificationToken?: string };
+
+    if (!verificationToken) {
+      return next(new ValidationError("verificationToken is required!"));
+    }
+
+    const token = String(verificationToken);
+    const emailKey = await getEmailKeyFromToken(token);
+
+    const pending = await getPendingRegistration(emailKey);
+    if (!pending) {
+      return next(
+        new ValidationError("Registration session expired. Please register again.")
+      );
+    }
+
+    const existingUser = await prisma.user.findUnique({
+      where: { emailNormalized: emailKey },
+    });
+    if (existingUser) {
+      return next(new ValidationError("User already exists with this email!"));
+    }
+
+    await checkOtpRestrictions(emailKey);
+    await trackOtpRequests(emailKey);
+
+    await sendOtp(pending.firstName, emailKey, "register-activation-mail");
+
+    return res.status(200).json({
+      message: "OTP sent again.",
+      verificationToken: token,
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
 // Verify user with OTP + verificationToken, then create user
-export const verifyRegistrationOtp = async (req: Request, res: Response, next: NextFunction) => {
+export const verifyRegistrationOtp = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
   try {
     const { verificationToken, otp } = req.body;
 
@@ -78,11 +141,17 @@ export const verifyRegistrationOtp = async (req: Request, res: Response, next: N
 
     const pending = await getPendingRegistration(emailKey);
     if (!pending) {
-      return next(new ValidationError("Registration session expired. Please register again."));
+      return next(
+        new ValidationError("Registration session expired. Please register again.")
+      );
     }
 
-    const existingUser = await prisma.user.findUnique({ where: { emailNormalized: emailKey } });
-    if (existingUser) return next(new ValidationError("User already exists with this email!"));
+    const existingUser = await prisma.user.findUnique({
+      where: { emailNormalized: emailKey },
+    });
+    if (existingUser) {
+      return next(new ValidationError("User already exists with this email!"));
+    }
 
     await prisma.user.create({
       data: {
@@ -95,15 +164,15 @@ export const verifyRegistrationOtp = async (req: Request, res: Response, next: N
       },
     });
 
-    // Email de bienvenue (je te conseille de ne pas bloquer l'inscription si l’email échoue)
     sendAccountCreatedEmail(pending.firstName, pending.emailNormalized, {
-      loginUrl: process.env.USER_APP_URL ? `${process.env.USER_APP_URL}/login` : undefined,
+      loginUrl: process.env.USER_APP_URL
+        ? `${process.env.USER_APP_URL}/login`
+        : undefined,
       supportEmail: "support@yamba.com",
     }).catch((err) => {
       console.error("Welcome email failed:", err);
     });
 
-    // Cleanup after success
     await deletePendingRegistration(emailKey);
     await deleteVerificationToken(token);
 
@@ -116,11 +185,18 @@ export const verifyRegistrationOtp = async (req: Request, res: Response, next: N
   }
 };
 
-
 // Login user
 export const loginUser = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { email, password } = req.body as { email?: string; password?: string };
+    const {
+      email,
+      password,
+      rememberMe,
+    } = req.body as {
+      email?: string;
+      password?: string;
+      rememberMe?: boolean;
+    };
 
     if (!email || !password) {
       return next(new ValidationError("Email and password are required!"));
@@ -137,6 +213,8 @@ export const loginUser = async (req: Request, res: Response, next: NextFunction)
     const isMatch = await bcrypt.compare(String(password), user.passwordHash ?? "");
     if (!isMatch) return next(new AuthError("Invalid email or password"));
 
+    const shouldRemember = Boolean(rememberMe);
+
     clearAuthCookies(res);
 
     const accessToken = jwt.sign(
@@ -145,18 +223,19 @@ export const loginUser = async (req: Request, res: Response, next: NextFunction)
       { expiresIn: "15m" }
     );
 
-    //  refresh rotation: store jti in Redis
     const jti = createRefreshJti();
-    await storeRefreshJti(user.id, jti);
+    await storeRefreshJti(user.id, jti, shouldRemember);
 
     const refreshToken = jwt.sign(
-      { id: user.id, jti },
+      { id: user.id, jti, rememberMe: shouldRemember },
       process.env.REFRESH_TOKEN_SECRET as string,
-      { expiresIn: "7d" }
+      { expiresIn: shouldRemember ? "30d" : "7d" }
     );
 
     setCookie(res, "access_token", accessToken);
-    setCookie(res, "refresh_token", refreshToken);
+    setCookie(res, "refresh_token", refreshToken, {
+      rememberMe: shouldRemember,
+    });
 
     return res.status(200).json({
       message: "Login successful!",
@@ -173,11 +252,20 @@ export const loginUser = async (req: Request, res: Response, next: NextFunction)
   }
 };
 
+// Refresh token User
+type RefreshPayload = {
+  id: string;
+  jti: string;
+  rememberMe?: boolean;
+  iat?: number;
+  exp?: number;
+};
 
-//Refresh token User
-type RefreshPayload = { id: string; jti: string; iat?: number; exp?: number };
-
-export const refreshAuthTokens = async (req: Request, res: Response, next: NextFunction) => {
+export const refreshAuthTokens = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
   try {
     const cookieToken = req.cookies?.["refresh_token"];
     const headerToken =
@@ -191,7 +279,10 @@ export const refreshAuthTokens = async (req: Request, res: Response, next: NextF
 
     let decoded: RefreshPayload;
     try {
-      decoded = jwt.verify(token, process.env.REFRESH_TOKEN_SECRET as string) as RefreshPayload;
+      decoded = jwt.verify(
+        token,
+        process.env.REFRESH_TOKEN_SECRET as string
+      ) as RefreshPayload;
     } catch {
       clearAuthCookies(res);
       return next(new AuthError("Unauthorized! Invalid refresh token."));
@@ -208,13 +299,16 @@ export const refreshAuthTokens = async (req: Request, res: Response, next: NextF
       return next(new AuthError("Unauthorized! User not found."));
     }
 
-    const expectedJti = await getRefreshJti(user.id);
-    if (!expectedJti || expectedJti !== decoded.jti) {
-      // token volé / ancien token / reuse
-      await revokeRefreshJti(user.id);
+    const jtiValid = await hasRefreshJti(user.id, decoded.jti);
+    if (!jtiValid) {
       clearAuthCookies(res);
       return next(new AuthError("Unauthorized! Refresh token reuse detected."));
     }
+
+    // Révoquer l'ancien jti de CETTE session uniquement (rotation)
+    await revokeRefreshJti(user.id, decoded.jti);
+
+    const shouldRemember = Boolean(decoded.rememberMe);
 
     const newAccessToken = jwt.sign(
       { id: user.id, roles: user.roles },
@@ -223,16 +317,18 @@ export const refreshAuthTokens = async (req: Request, res: Response, next: NextF
     );
 
     const newJti = createRefreshJti();
-    await storeRefreshJti(user.id, newJti);
+    await storeRefreshJti(user.id, newJti, shouldRemember);
 
     const newRefreshToken = jwt.sign(
-      { id: user.id, jti: newJti },
+      { id: user.id, jti: newJti, rememberMe: shouldRemember },
       process.env.REFRESH_TOKEN_SECRET as string,
-      { expiresIn: "7d" }
+      { expiresIn: shouldRemember ? "30d" : "7d" }
     );
 
     setCookie(res, "access_token", newAccessToken);
-    setCookie(res, "refresh_token", newRefreshToken);
+    setCookie(res, "refresh_token", newRefreshToken, {
+      rememberMe: shouldRemember,
+    });
 
     return res.status(200).json({ success: true });
   } catch (error) {
@@ -240,18 +336,22 @@ export const refreshAuthTokens = async (req: Request, res: Response, next: NextF
   }
 };
 
-
-// Reset user password
-export const requestPasswordResetOtp = async (req: Request, res: Response, next: NextFunction) => {
+// Request password reset OTP
+export const requestPasswordResetOtp = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
   try {
     const { email } = req.body as { email?: string };
     if (!email) return next(new ValidationError("Email is required!"));
 
     const emailKey = normalizeEmail(String(email));
 
-    const user = await prisma.user.findUnique({ where: { emailNormalized: emailKey } });
+    const user = await prisma.user.findUnique({
+      where: { emailNormalized: emailKey },
+    });
 
-    //  version "propre" anti-enumeration : réponse identique même si user absent
     if (user) {
       await checkForgotPasswordOtpRestrictions(emailKey);
       await trackForgotPasswordOtpRequests(emailKey);
@@ -267,10 +367,16 @@ export const requestPasswordResetOtp = async (req: Request, res: Response, next:
 };
 
 // Verify forgot password OTP
-export const verifyPasswordResetOtp = async (req: Request, res: Response, next: NextFunction) => {
+export const verifyPasswordResetOtp = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
   try {
     const { email, otp } = req.body as { email?: string; otp?: string };
-    if (!email || !otp) return next(new ValidationError("Email and OTP are required!"));
+    if (!email || !otp) {
+      return next(new ValidationError("Email and OTP are required!"));
+    }
 
     const emailKey = normalizeEmail(String(email));
 
@@ -288,6 +394,30 @@ export const verifyPasswordResetOtp = async (req: Request, res: Response, next: 
   }
 };
 
+
+// GET /auth/me
+export const getMe = async (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    if (!req.user) {
+      return next(new AuthError("Unauthorized"));
+    }
+
+    const { passwordHash, ...safeUser } = req.user;
+
+    return res.status(200).json({
+      success: true,
+      user: safeUser,
+      roles: req.roles ?? safeUser.roles ?? [],
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
 // Reset user password
 export const resetPassword = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -297,21 +427,32 @@ export const resetPassword = async (req: Request, res: Response, next: NextFunct
     };
 
     if (!passwordResetToken || !newPassword) {
-      return next(new ValidationError("passwordResetToken and newPassword are required!"));
-    }
-
-    if (String(newPassword).length < 8) {
-      return next(new ValidationError("Password must be at least 8 characters long!"));
+      return next(
+        new ValidationError("passwordResetToken and newPassword are required!")
+      );
     }
 
     const emailKey = await consumePasswordResetToken(String(passwordResetToken));
 
-    const user = await prisma.user.findUnique({ where: { emailNormalized: emailKey } });
+    const user = await prisma.user.findUnique({
+      where: { emailNormalized: emailKey },
+    });
     if (!user) return next(new ValidationError("User not found!"));
 
-    const isSamePassword = await bcrypt.compare(String(newPassword), user.passwordHash ?? "");
+    validatePasswordStrength(String(newPassword), {
+      firstName: user.firstName ?? "",
+      lastName: user.lastName ?? "",
+      email: user.emailNormalized,
+    });
+
+    const isSamePassword = await bcrypt.compare(
+      String(newPassword),
+      user.passwordHash ?? ""
+    );
     if (isSamePassword) {
-      return next(new ValidationError("New password cannot be the same as the old password!"));
+      return next(
+        new ValidationError("New password cannot be the same as the old password!")
+      );
     }
 
     const passwordHash = await bcrypt.hash(String(newPassword), 10);
@@ -321,16 +462,41 @@ export const resetPassword = async (req: Request, res: Response, next: NextFunct
       data: { passwordHash },
     });
 
-    //mail
     await sendPasswordChangedEmail(user.firstName, emailKey, {
       changedAt: new Date().toLocaleString("fr-FR"),
       ip: req.ip,
       userAgent: req.headers["user-agent"] as string,
-      // securityUrl: "https://yamba.com/account/security" // optionnel
     });
 
-
     return res.status(200).json({ message: "Password reset successfully!" });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+// Logout user
+export const logoutUser = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const cookieToken = req.cookies?.["refresh_token"];
+
+    if (cookieToken) {
+      try {
+        const decoded = jwt.verify(
+          cookieToken,
+          process.env.REFRESH_TOKEN_SECRET as string
+        ) as RefreshPayload;
+
+        if (decoded?.id && decoded?.jti) {
+          await revokeRefreshJti(decoded.id, decoded.jti);
+        }
+      } catch {
+        // Token invalide ou expiré — on nettoie quand même les cookies
+      }
+    }
+
+    clearAuthCookies(res);
+
+    return res.status(200).json({ success: true, message: "Logged out successfully." });
   } catch (error) {
     return next(error);
   }

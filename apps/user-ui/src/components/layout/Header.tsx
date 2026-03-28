@@ -1,13 +1,32 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTheme } from "next-themes";
-import { Globe, Sun, Moon, ChevronDown, Menu, X } from "lucide-react";
+import {
+  Globe,
+  Sun,
+  Moon,
+  Menu,
+  X,
+  User,
+  Settings,
+  HelpCircle,
+  LogOut,
+  Truck,
+  Store,
+  Bell,
+  Shield,
+  CreditCard,
+  MessageSquare,
+} from "lucide-react";
 import { useOnClickOutside } from "@/hooks/useOnClickOutside";
 import CommandPalette, { CommandAction } from "./CommandPalette";
 import { useUiPreferences } from "@/components/providers/UiPreferencesProvider";
+import useUser from "@/hooks/useUser";
+import { useQueryClient } from "@tanstack/react-query";
+import { logoutUser as logoutApi } from "@/services/auth.api";
 
 type Lang = "fr" | "en";
 const LANGS: Record<Lang, { label: string; code: string }> = {
@@ -15,7 +34,6 @@ const LANGS: Record<Lang, { label: string; code: string }> = {
   en: { label: "Anglais", code: "EN" },
 };
 
-// Palette Mango (#FF9900) + accent Teal (optionnel)
 const COLORS = {
   mango: "#FF9900",
   mangoTint: "#FFF6E8",
@@ -24,25 +42,34 @@ const COLORS = {
 
 export default function Header() {
   const pathname = usePathname();
+  const router = useRouter();
+  const queryClient = useQueryClient();
   const { resolvedTheme, setTheme } = useTheme();
 
-  const isDark = resolvedTheme === "dark";
+  const [mounted, setMounted] = useState(false);
   const [isCompact, setIsCompact] = useState(false);
+
+  const { user, isLoading } = useUser();
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const isDark = resolvedTheme === "dark";
 
   const [mobileOpen, setMobileOpen] = useState(false);
   const [langOpen, setLangOpen] = useState(false);
-  const [quickOpen, setQuickOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
 
-  // Global preferences
   const ui = useUiPreferences();
   const lang = (ui.lang ?? "en") as Lang;
   const setLang = ui.setLang;
 
   const langRef = useRef<HTMLDivElement | null>(null);
-  const quickRef = useRef<HTMLDivElement | null>(null);
+  const userMenuRef = useRef<HTMLDivElement | null>(null);
 
   useOnClickOutside(langRef, () => setLangOpen(false), langOpen);
-  useOnClickOutside(quickRef, () => setQuickOpen(false), quickOpen);
+  useOnClickOutside(userMenuRef, () => setUserMenuOpen(false), userMenuOpen);
 
   useEffect(() => {
     const onScroll = () => setIsCompact(window.scrollY > 8);
@@ -52,7 +79,6 @@ export default function Header() {
   }, []);
 
   const currentLang = LANGS[lang] ?? LANGS.en;
-
   const toggleTheme = () => setTheme(isDark ? "light" : "dark");
 
   const selectLang = (next: Lang) => {
@@ -61,31 +87,60 @@ export default function Header() {
     setMobileOpen(false);
   };
 
-  // ✅ Textes FR/EN (robuste, ne dépend pas de t())
+  // Logout handler
+  const handleLogout = async () => {
+    try {
+      await logoutApi();
+    } catch {
+      // Même si l'appel échoue, on nettoie côté client
+    }
+    queryClient.setQueryData(["user"], null);
+    setUserMenuOpen(false);
+    setMobileOpen(false);
+    router.push("/");
+    router.refresh();
+  };
+
   const L = useMemo(() => {
     if (lang === "fr") {
       return {
         login: "Connexion",
         share: "Partager un trajet",
-        quickActions: "Actions rapides",
-        newTrip: "Nouveau trajet",
-        carrier: "Devenir transporteur",
-        seller: "Devenir vendeur",
         help: "Aide",
         carrierShort: "Transporteur",
         sellerShort: "Vendeur",
+        // User menu
+        myAccount: "Mon compte",
+        myTrips: "Mes trajets",
+        myParcels: "Mes colis",
+        becomeCarrier: "Devenir transporteur",
+        becomeSeller: "Devenir vendeur",
+        notifications: "Notifications",
+        messages: "Messages",
+        payments: "Paiements",
+        security: "Sécurité & confidentialité",
+        settings: "Paramètres",
+        logout: "Déconnexion",
       };
     }
     return {
       login: "Log in",
       share: "Share your trip",
-      quickActions: "Quick actions",
-      newTrip: "New trip",
-      carrier: "Become a carrier",
-      seller: "Become a seller",
       help: "Help",
       carrierShort: "Carrier",
       sellerShort: "Seller",
+      // User menu
+      myAccount: "My account",
+      myTrips: "My trips",
+      myParcels: "My parcels",
+      becomeCarrier: "Become a carrier",
+      becomeSeller: "Become a seller",
+      notifications: "Notifications",
+      messages: "Messages",
+      payments: "Payments",
+      security: "Security & privacy",
+      settings: "Settings",
+      logout: "Sign out",
     };
   }, [lang]);
 
@@ -94,27 +149,89 @@ export default function Header() {
 
   const actions: CommandAction[] = useMemo(
     () => [
-      { label: L.login, href: "/auth/login", keywords: ["login", "connexion"] },
+      { label: L.login, href: "/login", keywords: ["login", "connexion"] },
       { label: L.share, href: "/share", keywords: ["trip", "trajet"] },
-      { label: L.carrier, href: "/become/carrier", keywords: ["carrier", "transporteur"] },
-      { label: L.seller, href: "/become/seller", keywords: ["seller", "vendeur"] },
+      { label: L.becomeCarrier, href: "/become/carrier", keywords: ["carrier", "transporteur"] },
+      { label: L.becomeSeller, href: "/become/seller", keywords: ["seller", "vendeur"] },
       { label: L.help, href: "/help", keywords: ["support", "aide"] },
     ],
     [L]
   );
 
-  // ✅ CTA outline Mango : bordure orange, fond blanc, texte = même “noir” que bouton langue
-  const ctaLeft =
-    "inline-flex items-center rounded-l-lg px-4 py-2 text-sm font-semibold shadow-sm transition-colors " +
+  // Initiale du prénom
+  const userInitial = user?.firstName?.charAt(0)?.toUpperCase() ?? "U";
+  const userAvatar = user?.avatar ?? user?.profileImage ?? null;
+
+  // CTA simple
+  const ctaClass =
+    "inline-flex items-center rounded-lg px-4 py-2 text-sm font-semibold shadow-sm transition-colors " +
     "border border-[#FF9900] bg-white text-slate-700 hover:bg-[#FFF6E8] " +
     "dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-900/60 " +
     "focus:outline-none focus-visible:ring-4 focus-visible:ring-[#FF9900]/25";
 
-  const ctaRight =
-    "inline-flex h-[40px] items-center justify-center rounded-r-lg px-2 shadow-sm transition-colors " +
-    "border border-l-0 border-[#FF9900] bg-white text-slate-700 hover:bg-[#FFF6E8] " +
-    "dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-900/60 " +
-    "focus:outline-none focus-visible:ring-4 focus-visible:ring-[#FF9900]/25";
+  // Items du menu utilisateur
+  const userMenuItems = [
+    { label: L.myAccount, href: "/account", icon: User },
+    { label: L.myTrips, href: "/my-trips", icon: Truck },
+    { label: L.myParcels, href: "/my-parcels", icon: Store },
+    { type: "separator" as const },
+    { label: L.notifications, href: "/notifications", icon: Bell },
+    { label: L.messages, href: "/messages", icon: MessageSquare },
+    { label: L.payments, href: "/payments", icon: CreditCard },
+    { type: "separator" as const },
+    { label: L.becomeCarrier, href: "/become/carrier", icon: Truck },
+    { label: L.becomeSeller, href: "/become/seller", icon: Store },
+    { type: "separator" as const },
+    { label: L.security, href: "/security", icon: Shield },
+    { label: L.settings, href: "/settings", icon: Settings },
+    { label: L.help, href: "/help", icon: HelpCircle },
+    { type: "separator" as const },
+    { label: L.logout, icon: LogOut, danger: true },
+  ];
+
+  // Rendu d'un item du menu (partagé desktop + mobile)
+  const renderMenuItem = (item: (typeof userMenuItems)[number], i: number, keyPrefix: string) => {
+    if ("type" in item && item.type === "separator") {
+      return (
+        <div
+          key={`${keyPrefix}sep-${i}`}
+          className="my-1 h-px bg-slate-200 dark:bg-slate-800"
+        />
+      );
+    }
+
+    const Icon = "icon" in item ? item.icon : null;
+    const isDanger = "danger" in item && item.danger;
+
+    if (isDanger) {
+      return (
+        <button
+          key={`${keyPrefix}item-${i}`}
+          type="button"
+          onClick={handleLogout}
+          className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-red-600 transition-colors hover:bg-slate-50 dark:text-red-400 dark:hover:bg-slate-900"
+        >
+          {Icon && <Icon size={18} className="flex-shrink-0" />}
+          <span>{"label" in item ? item.label : ""}</span>
+        </button>
+      );
+    }
+
+    return (
+      <Link
+        key={`${keyPrefix}item-${i}`}
+        href={"href" in item ? item.href! : "#"}
+        className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 transition-colors hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-900"
+        onClick={() => {
+          setUserMenuOpen(false);
+          setMobileOpen(false);
+        }}
+      >
+        {Icon && <Icon size={18} className="flex-shrink-0" />}
+        <span>{"label" in item ? item.label : ""}</span>
+      </Link>
+    );
+  };
 
   return (
     <>
@@ -192,101 +309,152 @@ export default function Header() {
               aria-label="Toggle theme"
               title="Toggle theme"
             >
-              {isDark ? <Sun size={18} /> : <Moon size={18} />}
+              {!mounted ? (
+                <span className="inline-block h-[18px] w-[18px]" />
+              ) : isDark ? (
+                <Sun size={18} />
+              ) : (
+                <Moon size={18} />
+              )}
             </button>
 
-            {/* Log in */}
+            {/* CTA simple */}
             <Link
-              href="/auth/login"
-              className={[
-                "text-sm font-medium transition-colors",
-                isLogin ? "underline underline-offset-4" : "hover:underline hover:underline-offset-4",
-                "text-slate-700 dark:text-slate-200 dark:hover:text-white",
-              ].join(" ")}
-              style={isLogin ? { color: COLORS.teal } : undefined}
+              href="/share"
+              className={ctaClass}
+              style={isShare ? { backgroundColor: COLORS.mangoTint } : undefined}
             >
-              {L.login}
+              {L.share}
             </Link>
 
-            {/* CTA outline split */}
-            <div className="relative flex items-center" ref={quickRef}>
-              <Link href="/share" className={ctaLeft} style={isShare ? { backgroundColor: COLORS.mangoTint } : undefined}>
-                {L.share}
-              </Link>
-
-              <button
-                type="button"
-                onClick={() => setQuickOpen((v) => !v)}
-                className={ctaRight}
-                aria-label="Quick actions"
-                title="Quick actions"
-                style={isShare ? { backgroundColor: COLORS.mangoTint } : undefined}
+            {/* Connexion / Avatar utilisateur */}
+            {!isLoading && !user && (
+              <Link
+                href="/login"
+                className={[
+                  "text-sm font-medium transition-colors",
+                  isLogin
+                    ? "underline underline-offset-4"
+                    : "hover:underline hover:underline-offset-4",
+                  "text-slate-700 dark:text-slate-200 dark:hover:text-white",
+                ].join(" ")}
+                style={isLogin ? { color: COLORS.teal } : undefined}
               >
-                <ChevronDown size={16} />
-              </button>
+                {L.login}
+              </Link>
+            )}
 
-              {quickOpen && (
-                <div className="absolute right-0 top-12 w-56 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg dark:border-slate-800 dark:bg-slate-950">
-                  <div className="px-3 py-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
-                    {L.quickActions}
-                    <span className="ml-2 rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] dark:bg-slate-900">
-                      ⌘K
-                    </span>
+            {!isLoading && user && (
+              <div className="relative" ref={userMenuRef}>
+                <button
+                  type="button"
+                  onClick={() => setUserMenuOpen((v) => !v)}
+                  className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full text-sm font-bold text-slate-950 transition-shadow hover:ring-2 hover:ring-[#FF9900]/40 focus:outline-none focus-visible:ring-4 focus-visible:ring-[#FF9900]/25"
+                  style={!userAvatar ? { backgroundColor: COLORS.mango } : undefined}
+                  aria-label="User menu"
+                >
+                  {userAvatar ? (
+                    <img src={userAvatar} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    userInitial
+                  )}
+                </button>
+
+                {userMenuOpen && (
+                  <div className="absolute right-0 mt-2 w-72 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-950">
+                    {/* En-tête utilisateur */}
+                    <div className="flex items-center gap-3 px-4 py-4">
+                      <div
+                        className="flex h-10 w-10 flex-shrink-0 items-center justify-center overflow-hidden rounded-full text-sm font-bold text-slate-950"
+                        style={!userAvatar ? { backgroundColor: COLORS.mango } : undefined}
+                      >
+                        {userAvatar ? (
+                          <img src={userAvatar} alt="" className="h-full w-full object-cover" />
+                        ) : (
+                          userInitial
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-slate-900 dark:text-white">
+                          {/*{user.firstName} {user.lastName ?? ""}*/}
+                          {user?.firstName.split(" ")[0]}
+                        </p>
+                        {user.email && (
+                          <p className="truncate text-xs text-slate-500 dark:text-slate-400">
+                            {user.email}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="h-px bg-slate-200 dark:bg-slate-800" />
+
+                    {/* Items du menu */}
+                    <div className="max-h-[60vh] overflow-y-auto py-1">
+                      {userMenuItems.map((item, i) => renderMenuItem(item, i, "d-"))}
+                    </div>
                   </div>
-                  <div className="h-px bg-slate-200 dark:bg-slate-800" />
-
-                  <Link
-                    href="/share"
-                    className="block px-3 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-900"
-                    onClick={() => setQuickOpen(false)}
-                  >
-                    {L.newTrip}
-                  </Link>
-                  <Link
-                    href="/become/carrier"
-                    className="block px-3 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-900"
-                    onClick={() => setQuickOpen(false)}
-                  >
-                    {L.carrier}
-                  </Link>
-                  <Link
-                    href="/become/seller"
-                    className="block px-3 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-900"
-                    onClick={() => setQuickOpen(false)}
-                  >
-                    {L.seller}
-                  </Link>
-                  <Link
-                    href="/help"
-                    className="block px-3 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-900"
-                    onClick={() => setQuickOpen(false)}
-                  >
-                    {L.help}
-                  </Link>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Mobile right */}
           <div className="flex items-center gap-2 md:hidden">
+            {/* Compact lang toggle */}
+            <button
+              type="button"
+              onClick={() => selectLang(lang === "fr" ? "en" : "fr")}
+              className="inline-flex h-10 items-center justify-center rounded-xl px-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-900 focus:outline-none focus-visible:ring-4 focus-visible:ring-[#FF9900]/20"
+              aria-label="Toggle language"
+            >
+              {lang === "fr" ? "FR" : "EN"}
+            </button>
+
             <button
               type="button"
               onClick={toggleTheme}
               className="inline-flex h-10 w-10 items-center justify-center rounded-xl hover:bg-slate-100 dark:hover:bg-slate-900 focus:outline-none focus-visible:ring-4 focus-visible:ring-[#FF9900]/20"
               aria-label="Toggle theme"
+              title="Toggle theme"
             >
-              {isDark ? <Sun size={18} /> : <Moon size={18} />}
+              {!mounted ? (
+                <span className="inline-block h-[18px] w-[18px]" />
+              ) : isDark ? (
+                <Sun size={18} />
+              ) : (
+                <Moon size={18} />
+              )}
             </button>
 
-            <button
-              type="button"
-              onClick={() => setMobileOpen((v) => !v)}
-              className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:hover:bg-slate-900 focus:outline-none focus-visible:ring-4 focus-visible:ring-[#FF9900]/20"
-              aria-label="Open menu"
-            >
-              {mobileOpen ? <X size={18} /> : <Menu size={18} />}
-            </button>
+            {/* Avatar mobile (si connecté) */}
+            {!isLoading && user && (
+              <button
+                type="button"
+                onClick={() => setMobileOpen((v) => !v)}
+                className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full text-sm font-bold text-slate-950 transition-shadow hover:ring-2 hover:ring-[#FF9900]/40 focus:outline-none focus-visible:ring-4 focus-visible:ring-[#FF9900]/25"
+                style={!userAvatar ? { backgroundColor: COLORS.mango } : undefined}
+                aria-label="User menu"
+              >
+                {userAvatar ? (
+                  <img src={userAvatar} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  userInitial
+                )}
+              </button>
+            )}
+
+            {/* Burger menu (si non connecté) */}
+            {!isLoading && !user && (
+              <button
+                type="button"
+                onClick={() => setMobileOpen((v) => !v)}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:hover:bg-slate-900 focus:outline-none focus-visible:ring-4 focus-visible:ring-[#FF9900]/20"
+                aria-label="Open menu"
+              >
+                {mobileOpen ? <X size={18} /> : <Menu size={18} />}
+              </button>
+            )}
           </div>
         </div>
 
@@ -294,79 +462,50 @@ export default function Header() {
         {mobileOpen && (
           <div className="border-t border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950 md:hidden">
             <div className="mx-auto max-w-6xl space-y-3 px-4 py-4">
-              {/* Language */}
-              <div className="flex items-center justify-between rounded-xl border border-slate-200 p-3 dark:border-slate-800">
-                <div className="flex items-center gap-2">
-                  <Globe size={18} />
-                  <span className="text-sm font-medium">{currentLang.label}</span>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    className={`rounded-lg px-3 py-1 text-sm ${
-                      lang === "fr"
-                        ? "bg-slate-900 text-white dark:bg-white dark:text-slate-950"
-                        : "bg-slate-100 dark:bg-slate-900"
-                    }`}
-                    onClick={() => selectLang("fr")}
+              {/* Utilisateur connecté : en-tête profil */}
+              {user && (
+                <div className="flex items-center gap-3 rounded-xl border border-slate-200 p-3 dark:border-slate-800">
+                  <div
+                    className="flex h-10 w-10 flex-shrink-0 items-center justify-center overflow-hidden rounded-full text-sm font-bold text-slate-950"
+                    style={!userAvatar ? { backgroundColor: COLORS.mango } : undefined}
                   >
-                    FR
-                  </button>
-                  <button
-                    className={`rounded-lg px-3 py-1 text-sm ${
-                      lang === "en"
-                        ? "bg-slate-900 text-white dark:bg-white dark:text-slate-950"
-                        : "bg-slate-100 dark:bg-slate-900"
-                    }`}
-                    onClick={() => selectLang("en")}
-                  >
-                    EN
-                  </button>
+                    {userAvatar ? (
+                      <img src={userAvatar} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      userInitial
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-slate-900 dark:text-white">
+                      {user?.firstName.split(" ")[0]}
+                    </p>
+                    {user.email && (
+                      <p className="truncate text-xs text-slate-500 dark:text-slate-400">
+                        {user.email}
+                      </p>
+                    )}
+                  </div>
                 </div>
-              </div>
+              )}
 
-              {/* Login */}
-              <Link
-                href="/auth/login"
-                className="block rounded-xl border border-slate-200 px-4 py-3 text-center text-sm font-medium hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-900"
-                onClick={() => setMobileOpen(false)}
-                style={isLogin ? { borderColor: COLORS.teal, color: COLORS.teal } : undefined}
-              >
-                {L.login}
-              </Link>
+              {/* Login (si non connecté) */}
+              {!user && (
+                <Link
+                  href="/login"
+                  className="block rounded-xl border border-slate-200 px-4 py-3 text-center text-sm font-medium hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-900"
+                  onClick={() => setMobileOpen(false)}
+                  style={isLogin ? { borderColor: COLORS.teal, color: COLORS.teal } : undefined}
+                >
+                  {L.login}
+                </Link>
+              )}
 
-              {/* CTA outline (mobile) */}
-              <Link
-                href="/share"
-                className="inline-flex w-full items-center justify-center rounded-lg border border-[#FF9900] bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:bg-[#FFF6E8] dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-900/60"
-                onClick={() => setMobileOpen(false)}
-              >
-                {L.share}
-              </Link>
-
-              {/* Quick actions mobile */}
-              <div className="grid grid-cols-2 gap-2">
-                <Link
-                  href="/become/carrier"
-                  className="rounded-xl border border-slate-200 px-3 py-2 text-center text-sm dark:border-slate-800"
-                  onClick={() => setMobileOpen(false)}
-                >
-                  {L.carrierShort}
-                </Link>
-                <Link
-                  href="/become/seller"
-                  className="rounded-xl border border-slate-200 px-3 py-2 text-center text-sm dark:border-slate-800"
-                  onClick={() => setMobileOpen(false)}
-                >
-                  {L.sellerShort}
-                </Link>
-                <Link
-                  href="/help"
-                  className="col-span-2 rounded-xl border border-slate-200 px-3 py-2 text-center text-sm dark:border-slate-800"
-                  onClick={() => setMobileOpen(false)}
-                >
-                  {L.help}
-                </Link>
-              </div>
+              {/* Menu items utilisateur (si connecté) */}
+              {user && (
+                <div className="space-y-1 rounded-xl border border-slate-200 py-1 dark:border-slate-800">
+                  {userMenuItems.map((item, i) => renderMenuItem(item, i, "m-"))}
+                </div>
+              )}
             </div>
           </div>
         )}
