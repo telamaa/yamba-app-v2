@@ -394,7 +394,6 @@ export const verifyPasswordResetOtp = async (
   }
 };
 
-
 // GET /auth/me
 export const getMe = async (
   req: AuthenticatedRequest,
@@ -406,13 +405,82 @@ export const getMe = async (
       return next(new AuthError("Unauthorized"));
     }
 
-    const { passwordHash, ...safeUser } = req.user;
+    // Re-fetch avec la relation carrierPage pour le flow onboarding
+    const fullUser = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      include: {
+        carrierPage: {
+          select: {
+            id: true,
+            name: true,
+            bio: true,
+            phoneE164: true,
+            onboardingStep: true,
+            stripeOnboardingComplete: true,
+            stripeChargesEnabled: true,
+            primaryAddress: {
+              select: {
+                formattedAddress: true,
+                placeId: true,
+                lat: true,
+                lng: true,
+                streetLine1: true,
+                city: true,
+                region: true,
+                postalCode: true,
+                country: true,
+                countryCode: true,
+              },
+            },
+          },
+        },
+        avatar: {
+          select: {
+            url: true,
+          },
+        },
+      },
+    });
+
+    if (!fullUser) {
+      return next(new AuthError("Unauthorized"));
+    }
+
+    const { passwordHash, ...safeUser } = fullUser;
 
     return res.status(200).json({
       success: true,
       user: safeUser,
       roles: req.roles ?? safeUser.roles ?? [],
     });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+// Logout user
+export const logoutUser = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const cookieToken = req.cookies?.["refresh_token"];
+
+    if (cookieToken) {
+      try {
+        const decoded = jwt.verify(
+          cookieToken,
+          process.env.REFRESH_TOKEN_SECRET as string
+        ) as RefreshPayload;
+
+        if (decoded?.id && decoded?.jti) {
+          await revokeRefreshJti(decoded.id, decoded.jti);
+        }
+      } catch {
+        // Token invalide ou expiré — on nettoie quand même les cookies
+      }
+    }
+
+    clearAuthCookies(res);
+
+    return res.status(200).json({ success: true, message: "Logged out successfully." });
   } catch (error) {
     return next(error);
   }
@@ -469,34 +537,6 @@ export const resetPassword = async (req: Request, res: Response, next: NextFunct
     });
 
     return res.status(200).json({ message: "Password reset successfully!" });
-  } catch (error) {
-    return next(error);
-  }
-};
-
-// Logout user
-export const logoutUser = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const cookieToken = req.cookies?.["refresh_token"];
-
-    if (cookieToken) {
-      try {
-        const decoded = jwt.verify(
-          cookieToken,
-          process.env.REFRESH_TOKEN_SECRET as string
-        ) as RefreshPayload;
-
-        if (decoded?.id && decoded?.jti) {
-          await revokeRefreshJti(decoded.id, decoded.jti);
-        }
-      } catch {
-        // Token invalide ou expiré — on nettoie quand même les cookies
-      }
-    }
-
-    clearAuthCookies(res);
-
-    return res.status(200).json({ success: true, message: "Logged out successfully." });
   } catch (error) {
     return next(error);
   }

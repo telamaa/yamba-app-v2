@@ -5,6 +5,61 @@ import { ChevronRight, Loader2, MapPin } from "lucide-react";
 import { useOnClickOutside } from "@/hooks/useOnClickOutside";
 import { loadPlacesLibrary } from "@/lib/googlePlaces";
 
+/**
+ * Données structurées extraites de Google Places
+ */
+export type PlaceDetails = {
+  formattedAddress: string;
+  placeId: string;
+  lat: number | null;
+  lng: number | null;
+  streetLine1: string | null;
+  city: string | null;
+  region: string | null;
+  postalCode: string | null;
+  country: string | null;
+  countryCode: string | null;
+};
+
+/**
+ * Extrait les composants structurés d'un objet Place Google
+ */
+function extractPlaceDetails(place: google.maps.places.Place): PlaceDetails {
+  const components = place.addressComponents ?? [];
+
+  const get = (type: string): string | null => {
+    const comp = components.find((c) => c.types.includes(type));
+    return comp?.longText ?? null;
+  };
+
+  const getShort = (type: string): string | null => {
+    const comp = components.find((c) => c.types.includes(type));
+    return comp?.shortText ?? null;
+  };
+
+  const streetNumber = get("street_number");
+  const route = get("route");
+  let streetLine1: string | null = null;
+  if (streetNumber && route) {
+    streetLine1 = `${streetNumber} ${route}`;
+  } else if (route) {
+    streetLine1 = route;
+  }
+
+  return {
+    formattedAddress: place.formattedAddress ?? "",
+    placeId: place.id ?? "",
+    lat: place.location?.lat() ?? null,
+    lng: place.location?.lng() ?? null,
+    streetLine1,
+    city: get("locality") ?? get("administrative_area_level_2"),
+    region: get("administrative_area_level_1"),
+    postalCode: get("postal_code"),
+    country: get("country"),
+    countryCode: getShort("country"),
+  };
+}
+
 type Props = {
   value: string;
   action: (v: string) => void;
@@ -12,6 +67,7 @@ type Props = {
   language?: "fr" | "en";
   regionBias?: string;
   onSelect?: (v: string) => void;
+  onPlaceSelect?: (details: PlaceDetails) => void;
   autoFocus?: boolean;
   inputClassName?: string;
   dropdownInline?: boolean;
@@ -24,6 +80,7 @@ export default function CityAutocomplete({
                                            language = "fr",
                                            regionBias,
                                            onSelect,
+                                           onPlaceSelect,
                                            autoFocus = false,
                                            inputClassName = "",
                                            dropdownInline = false,
@@ -31,6 +88,8 @@ export default function CityAutocomplete({
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<google.maps.places.PlacePrediction[]>([]);
   const [loading, setLoading] = useState(false);
+  // Track si l'utilisateur a sélectionné une suggestion (empêche réouverture)
+  const hasSelectedRef = useRef(false);
 
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const outsideClickEnabled = open && !dropdownInline;
@@ -47,10 +106,14 @@ export default function CityAutocomplete({
       setItems([]);
       setLoading(false);
       setOpen(false);
+      hasSelectedRef.current = false;
       return () => {
         alive = false;
       };
     }
+
+    // Ne pas relancer de recherche si on vient de sélectionner
+    if (hasSelectedRef.current) return;
 
     const timer = setTimeout(() => {
       (async () => {
@@ -101,16 +164,47 @@ export default function CityAutocomplete({
     };
   }, [value, canQuery, language, regionBias]);
 
-  const select = (p: google.maps.places.PlacePrediction) => {
+  const select = async (p: google.maps.places.PlacePrediction) => {
     const label = p.text?.text ?? "";
+
+    // Marquer comme sélectionné AVANT de mettre à jour la valeur
+    hasSelectedRef.current = true;
+
     action(label);
     onSelect?.(label);
     setOpen(false);
+    setItems([]);
+
+    if (onPlaceSelect) {
+      try {
+        const place = p.toPlace();
+        await place.fetchFields({
+          fields: ["formattedAddress", "location", "addressComponents"],
+        });
+
+        const details = extractPlaceDetails(place);
+        onPlaceSelect(details);
+      } catch {
+        onPlaceSelect({
+          formattedAddress: label,
+          placeId: p.placeId ?? "",
+          lat: null,
+          lng: null,
+          streetLine1: null,
+          city: null,
+          region: null,
+          postalCode: null,
+          country: null,
+          countryCode: null,
+        });
+      }
+    }
+
     sessionTokenRef.current = null;
   };
 
-  const shouldShowDropdown =
-    dropdownInline ? items.length > 0 : open && items.length > 0;
+  // Unifié : toujours vérifier `open`
+  const shouldShowDropdown = open && items.length > 0;
 
   const dropdown = shouldShowDropdown && (
     <div
@@ -118,8 +212,8 @@ export default function CityAutocomplete({
         dropdownInline
           ? "relative z-[400] mt-3 w-full"
           : "absolute left-0 right-0 top-full z-[400] mt-3",
-        "max-h-72 overflow-auto rounded-2xl border border-slate-200 bg-white shadow-xl",
-        "dark:border-slate-800 dark:bg-slate-950",
+        "max-h-72 overflow-auto rounded-2xl bg-white shadow-xl",
+        "dark:bg-slate-950",
       ].join(" ")}
     >
       {items.map((p, idx) => {
@@ -133,8 +227,10 @@ export default function CityAutocomplete({
             onClick={() => select(p)}
             className={[
               "flex w-full items-center justify-between gap-4 px-4 py-3 text-left transition-colors",
-              idx === 0 ? "bg-slate-50 dark:bg-slate-900/50" : "",
               "hover:bg-slate-50 dark:hover:bg-slate-900",
+              // Arrondir le premier et dernier item
+              idx === 0 ? "rounded-t-2xl" : "",
+              idx === items.length - 1 ? "rounded-b-2xl" : "",
             ].join(" ")}
           >
             <div className="min-w-0">
@@ -161,9 +257,12 @@ export default function CityAutocomplete({
         <input
           value={value}
           autoFocus={autoFocus}
-          onChange={(e) => action(e.target.value)}
+          onChange={(e) => {
+            hasSelectedRef.current = false;
+            action(e.target.value);
+          }}
           onFocus={() => {
-            if (!dropdownInline && canQuery && items.length > 0) {
+            if (canQuery && items.length > 0 && !hasSelectedRef.current) {
               setOpen(true);
             }
           }}
