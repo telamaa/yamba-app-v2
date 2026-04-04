@@ -19,7 +19,6 @@ model User {
   emailNormalized String    @unique
   passwordHash    String?
   phoneNumber     String?
-  country         String
   phoneE164       String?
   gender          Gender
   birthDate       DateTime?
@@ -58,11 +57,14 @@ model CarrierPage {
   // Profil public
   name        String
   bio         String?
-  address     String?
   phoneE164   String?
   avatar      Image?  @relation("CarrierAvatar")
   coverUrl    String?
   socialLinks Json[]  @default([])
+
+  // Localisation publique (via Address — affiche city + country sur le profil)
+  primaryAddressId String?  @unique @db.ObjectId
+  primaryAddress   Address? @relation("CarrierPrimaryAddress", fields: [primaryAddressId], references: [id])
 
   // Onboarding tracking
   onboardingStep OnboardingStep @default(PROFILE)
@@ -113,7 +115,7 @@ model CarrierReview {
   carrierPage   CarrierPage @relation(fields: [carrierPageId], references: [id], onDelete: Cascade)
 
   userId String @db.ObjectId
-  user   User   @relation(fields: [userId], references: [id])
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   rating  Float
   comment String?
@@ -150,24 +152,46 @@ model Image {
 // ─────────────────────────────────────────────
 
 model Address {
-  id            String   @id @default(auto()) @map("_id") @db.ObjectId
-  userId        String   @db.ObjectId
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  label         String?
+  id     String @id @default(auto()) @map("_id") @db.ObjectId
+  userId String @db.ObjectId
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Libellé interne (ex: "Paris, France" ou "Domicile")
+  label String?
+
+  // Données Google Places
+  formattedAddress String? // texte complet retourné par Google
+  placeId          String? // ID Google Places (pour re-fetch)
+  lat              Float? // latitude
+  lng              Float? // longitude
+
+  // Composants structurés (extraits de address_components)
+  streetLine1 String? // street_number + route
+  streetLine2 String? // complément (apt, bât, etc.)
+  city        String? // locality
+  region      String? // administrative_area_level_1
+  postalCode  String? // postal_code
+  country     String? // country
+  countryCode String? // country short (ex: "FR", "US")
+
+  // Livraison
   recipientName String?
   phoneE164     String?
-  streetLine1   String
-  streetLine2   String?
-  city          String
-  region        String?
-  postalCode    String
-  country       String
-  isArchived    Boolean  @default(false)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+
+  // Lifecycle
+  isArchived Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Relation inverse : peut être l'adresse principale d'un CarrierPage
+  carrierPage CarrierPage? @relation("CarrierPrimaryAddress")
 
   @@index([userId])
   @@index([userId, isArchived])
+  @@index([placeId])
+  @@index([city])
+  @@index([country])
+  @@index([countryCode])
 }
 
 // ─────────────────────────────────────────────

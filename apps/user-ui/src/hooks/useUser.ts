@@ -2,12 +2,40 @@ import { useQuery } from "@tanstack/react-query";
 import apiClient from "@/lib/api-client";
 import { AxiosError } from "axios";
 
+type OnboardingStep = "PROFILE" | "STRIPE" | "COMPLETE";
+type CarrierStatus = "NONE" | "ONBOARDING" | "ACTIVE" | "SUSPENDED";
+
+type CarrierPage = {
+  id: string;
+  name: string;
+  bio?: string | null;
+  phoneE164?: string | null;
+  onboardingStep: OnboardingStep;
+  stripeOnboardingComplete: boolean;
+  stripeChargesEnabled: boolean;
+  primaryAddress?: {
+    formattedAddress?: string | null;
+    placeId?: string | null;
+    lat?: number | null;
+    lng?: number | null;
+    streetLine1?: string | null;
+    city?: string | null;
+    region?: string | null;
+    postalCode?: string | null;
+    country?: string | null;
+    countryCode?: string | null;
+  } | null;
+};
+
 type User = {
   id: string;
   email: string;
   firstName: string;
   lastName: string;
   roles: string[];
+  carrierStatus: CarrierStatus;
+  carrierPage?: CarrierPage | null;
+  avatar?: { url: string } | null;
 };
 
 type GetMeResponse = {
