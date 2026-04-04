@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+</head>
+<body style="margin:0;padding:0;background-color:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f5;padding:40px 20px;">
+    <tr>
+        <td align="center">
+            <table width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
+
+                <!-- Header — tone changes per reminder step -->
+                <tr>
+                    <td style="background: linear-gradient(135deg, <%= step === 1 ? '#2563eb, #7c3aed' : step === 2 ? '#f59e0b, #ef4444' : '#6b7280, #374151' %>); padding: 32px 40px; text-align: center;">
+                        <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:700;">
+                            <% if (step === 1) { %>
+                                📦 Plus qu'une étape pour devenir Tripper !
+                            <% } else if (step === 2) { %>
+                                ⏳ Ton profil Tripper t'attend…
+                            <% } else { %>
+                                👋 Dernière chance de finaliser ton profil
+                            <% } %>
+                        </h1>
+                    </td>
+                </tr>
+
+                <!-- Body -->
+                <tr>
+                    <td style="padding:40px;">
+                        <p style="margin:0 0 20px;font-size:16px;color:#18181b;line-height:1.6;">
+                            Salut <strong><%= name %></strong>,
+                        </p>
+
+                        <!-- Step 1 — Friendly reminder (24h) -->
+                        <% if (step === 1) { %>
+                            <p style="margin:0 0 20px;font-size:16px;color:#3f3f46;line-height:1.6;">
+                                Tu as commencé à créer ton profil Tripper sur Yamba, mais tu n'as pas encore terminé. Ça ne prend que 2 minutes !
+                            </p>
+
+                            <% if (currentStep === 'PROFILE') { %>
+                                <p style="margin:0 0 16px;font-size:15px;color:#3f3f46;line-height:1.6;">
+                                    Il te reste à <strong>remplir ton profil</strong> (bio, adresse, téléphone) pour être visible des expéditeurs.
+                                </p>
+                            <% } else if (currentStep === 'STRIPE') { %>
+                                <p style="margin:0 0 16px;font-size:15px;color:#3f3f46;line-height:1.6;">
+                                    Ton profil est prêt ! Il ne reste plus qu'à <strong>connecter Stripe</strong> pour pouvoir recevoir tes paiements.
+                                </p>
+                            <% } %>
+
+                            <!-- Step 2 — Value proposition (72h) -->
+                        <% } else if (step === 2) { %>
+                            <p style="margin:0 0 20px;font-size:16px;color:#3f3f46;line-height:1.6;">
+                                Tu as commencé ton inscription comme Tripper il y a quelques jours. Voici ce que tu rates :
+                            </p>
+
+                            <table width="100%" cellpadding="0" cellspacing="0" style="margin:16px 0 24px;">
+                                <tr>
+                                    <td style="padding:12px 16px;background-color:#eff6ff;border-radius:8px 8px 0 0;border-bottom:1px solid #dbeafe;">
+                                        <span style="font-size:20px;vertical-align:middle;">💰</span>
+                                        <span style="font-size:15px;color:#1e40af;font-weight:500;margin-left:8px;">Gagne de l'argent sur tes trajets quotidiens</span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="padding:12px 16px;background-color:#eff6ff;border-bottom:1px solid #dbeafe;">
+                                        <span style="font-size:20px;vertical-align:middle;">🤝</span>
+                                        <span style="font-size:15px;color:#1e40af;font-weight:500;margin-left:8px;">Rends service à ta communauté</span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="padding:12px 16px;background-color:#eff6ff;border-radius:0 0 8px 8px;">
+                                        <span style="font-size:20px;vertical-align:middle;">🌱</span>
+                                        <span style="font-size:15px;color:#1e40af;font-weight:500;margin-left:8px;">Participe à un transport plus durable</span>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <!-- Step 3 — Last chance (7 days) -->
+                        <% } else { %>
+                            <p style="margin:0 0 20px;font-size:16px;color:#3f3f46;line-height:1.6;">
+                                C'est notre dernier rappel. Ton profil Tripper est toujours en attente de finalisation.
+                            </p>
+
+                            <p style="margin:0 0 20px;font-size:15px;color:#3f3f46;line-height:1.6;">
+                                Si tu changes d'avis, tu pourras toujours reprendre ton inscription depuis ton espace Yamba. On ne t'enverra plus de rappels à ce sujet.
+                            </p>
+                        <% } %>
+
+                        <!-- CTA -->
+                        <table width="100%" cellpadding="0" cellspacing="0" style="margin:24px 0 0;">
+                            <tr>
+                                <td align="center">
+                                    <a href="<%= appUrl %>/carrier/onboarding"
+                                       style="display:inline-block;background:linear-gradient(135deg,<%= step === 3 ? '#6b7280,#374151' : '#2563eb,#7c3aed' %>);color:#ffffff;text-decoration:none;padding:14px 32px;border-radius:8px;font-size:16px;font-weight:600;">
+                                        <% if (step === 3) { %>
+                                            Reprendre mon inscription
+                                        <% } else { %>
+                                            Terminer mon profil →
+                                        <% } %>
+                                    </a>
+                                </td>
+                            </tr>
+                        </table>
+
+                        <!-- Progress indicator -->
+                        <% if (step < 3) { %>
+                            <table width="100%" cellpadding="0" cellspacing="0" style="margin:32px 0 0;">
+                                <tr>
+                                    <td align="center" style="font-size:13px;color:#a1a1aa;">
+                                        <% if (currentStep === 'PROFILE') { %>
+                                            Progression : étape 1/2 — Profil
+                                        <% } else { %>
+                                            Progression : étape 2/2 — Paiement
+                                        <% } %>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="padding:8px 60px 0;">
+                                        <table width="100%" cellpadding="0" cellspacing="0" style="height:6px;background-color:#e4e4e7;border-radius:3px;overflow:hidden;">
+                                            <tr>
+                                                <td style="width:<%= currentStep === 'PROFILE' ? '25%' : '75%' %>;background:linear-gradient(90deg,#2563eb,#7c3aed);border-radius:3px;"></td>
+                                                <td></td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
+                        <% } %>
+                    </td>
+                </tr>
+
+                <!-- Footer -->
+                <tr>
+                    <td style="padding:24px 40px;background-color:#fafafa;border-top:1px solid #e4e4e7;text-align:center;">
+                        <p style="margin:0;font-size:13px;color:#a1a1aa;line-height:1.5;">
+                            Tu reçois cet email car tu as commencé l'inscription Tripper sur Yamba.<br/>
+                            <% if (step === 3) { %>
+                                Ceci est notre dernier rappel — tu ne recevras plus d'emails à ce sujet.
+                            <% } %>
+                            <br/>
+                            <a href="<%= appUrl %>/settings/notifications" style="color:#7c3aed;text-decoration:none;">Se désabonner</a>
+                        </p>
+                    </td>
+                </tr>
+
+            </table>
+        </td>
+    </tr>
+</table>
+</body>
+</html>
