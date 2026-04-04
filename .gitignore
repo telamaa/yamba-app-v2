@@ -47,7 +47,7 @@ test-output
 
 .env
 .env.*
-
+.env.local
 # Next.js
 .next
 out
