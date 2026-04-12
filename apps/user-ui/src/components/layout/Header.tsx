@@ -240,7 +240,7 @@ export default function Header() {
       <header className="fixed inset-x-0 top-0 z-[100] border-b border-slate-200 bg-white/90 backdrop-blur dark:border-slate-800 dark:bg-slate-950/85">
         <div
           className={[
-            "mx-auto flex h-[78px] max-w-6xl items-center justify-between px-4 transition-all",
+            "mx-auto flex h-[78px] max-w-7xl items-center justify-between px-4 transition-all",
             isCompact ? "py-2" : "py-3",
           ].join(" ")}
         >
