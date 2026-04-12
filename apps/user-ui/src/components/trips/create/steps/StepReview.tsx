@@ -1,7 +1,8 @@
 import { FileText, ShieldCheck } from "lucide-react";
 import type { CreateTripCopy, Draft, Step } from "../create-trip.types";
 import { getCategoryOptions } from "../create-trip.copy";
-import { ReviewCard, SectionLabel } from "../TripFormUI";
+import {ReviewCard, SectionLabel} from "@/components/trips/create/TripFormUi";
+
 
 const MANGO = "#FF9900";
 
