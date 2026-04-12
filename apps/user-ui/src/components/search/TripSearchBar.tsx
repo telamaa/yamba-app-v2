@@ -44,7 +44,7 @@ export default function TripSearchBar({ overlap = true }: Props) {
   };
 
   return (
-    <section className="mx-auto max-w-6xl overflow-visible px-4">
+    <section className="mx-auto max-w-7xl overflow-visible px-4">
       <div className="md:hidden">
         <MobileSearchExperience
           mode="card"
@@ -60,7 +60,7 @@ export default function TripSearchBar({ overlap = true }: Props) {
 
       <div className="hidden md:block">
         <div className={["relative overflow-visible", overlap ? "-mt-10" : ""].join(" ")}>
-          <div className="relative z-[80] overflow-visible rounded-[20px] border border-slate-200 bg-white shadow-lg dark:border-slate-800 dark:bg-slate-950">
+          <div className="relative z-[80] overflow-visible rounded-[12px] border border-slate-200 bg-white shadow-lg dark:border-slate-800 dark:bg-slate-950">
             <div className="grid gap-3 p-3 md:grid-cols-[1.2fr_1.2fr_0.9fr_auto] md:gap-0 md:p-0">
               <div className="relative z-[90] px-4 py-3 md:py-4">
                 <div className="text-xs font-semibold text-slate-500 dark:text-slate-400">
