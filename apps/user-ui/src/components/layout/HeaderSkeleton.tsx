@@ -16,7 +16,7 @@ function ShimmerBlock({ className = "" }: { className?: string }) {
 export default function HeaderSkeleton() {
   return (
     <header className="fixed inset-x-0 top-0 z-[100] border-b border-slate-200 bg-white/90 backdrop-blur dark:border-slate-800 dark:bg-slate-950/85">
-      <div className="mx-auto flex h-[78px] max-w-6xl items-center justify-between px-4">
+      <div className="mx-auto flex h-[78px] max-w-7xl items-center justify-between px-4">
         {/* Left */}
         <div className="flex items-center gap-3">
           <ShimmerBlock className="h-9 w-9 rounded-xl" />

@@ -432,3 +432,24 @@ enum TripDocumentStatus {
   VERIFIED
   REJECTED
 }
+
+model SiteConfig {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  // Catégories de colis acceptées sur la plateforme
+  // parcelCategories Json     // [{ key: "clothes", labelFr: "Vêtements", labelEn: "Clothes", group: "fashion" }]
+
+  // Branding
+  logo   String?
+  banner String?
+
+  // Commission Yamba (pourcentage prélevé sur chaque transaction)
+  commissionRate Float @default(0.10)
+
+  // Limites
+  maxDocSizeMb   Int @default(5)
+  maxDocsPerTrip Int @default(5)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
