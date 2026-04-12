@@ -9,7 +9,7 @@ import {
   SectionLabel,
   SegmentedControl,
   SwapButton,
-} from "../TripFormUI";
+} from "../TripFormUi";
 import DocumentUpload from "../DocumentUpload";
 
 function toDateInputValue(date?: Date) {

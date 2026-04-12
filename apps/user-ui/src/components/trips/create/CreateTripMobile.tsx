@@ -17,7 +17,7 @@ import {
   clearDraftStorage,
   type ValidationErrors,
 } from "./create-trip.config";
-import { ErrorSummary } from "./TripFormUI";
+import { ErrorSummary } from "./TripFormUi";
 import TripLiveSummary from "./TripLiveSummary";
 import StepTrip from "./steps/StepTrip";
 import StepConditions from "./steps/StepConditions";
