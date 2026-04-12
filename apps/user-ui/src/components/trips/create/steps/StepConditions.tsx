@@ -1,17 +1,17 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import type { CreateTripCopy, Draft, ParcelCategory, HandoffMoment, PickupMoment } from "../create-trip.types";
 import type { ValidationErrors } from "../create-trip.config";
 import { getCategoryOptions } from "../create-trip.copy";
-import { CATEGORY_GROUPS, createDefaultCategoryCondition, estimateRevenue } from "../create-trip.config";
+import { CATEGORY_GROUPS, estimateRevenue } from "../create-trip.config";
 import {
   CategoryChip,
   ConditionCard,
   FieldError,
   PriceInput,
   RevenueBadge,
-  SectionLabel,
-  Toggle,
-} from "../TripFormUI";
+  SectionLabel, Toggle
+} from "@/components/trips/create/TripFormUi";
+
 
 export default function StepConditions({
                                          copy,
