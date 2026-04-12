@@ -1,21 +1,23 @@
-"use client";
-
-import { CalendarDays, MapPin, Search } from "lucide-react";
+import { useState } from "react";
 import CityAutocomplete from "@/components/search/CityAutocomplete";
-import { CreateTripCopy, Draft, MobileScreen } from "../create-trip.types";
+import type { CreateTripCopy, Draft, TripDocumentDraft } from "../create-trip.types";
+import type { ValidationErrors } from "../create-trip.config";
 import {
-  CompactSegmentedControl,
-  FieldCard,
-  InputField,
-  SectionTitle,
+  FieldError,
+  FormField,
+  FormInput,
+  SectionLabel,
+  SegmentedControl,
+  SwapButton,
 } from "../TripFormUi";
+import DocumentUpload from "../DocumentUpload";
 
 function toDateInputValue(date?: Date) {
   if (!date) return "";
-  const year = date.getFullYear();
-  const month = `${date.getMonth() + 1}`.padStart(2, "0");
-  const day = `${date.getDate()}`.padStart(2, "0");
-  return `${year}-${month}-${day}`;
+  const y = date.getFullYear();
+  const m = `${date.getMonth() + 1}`.padStart(2, "0");
+  const d = `${date.getDate()}`.padStart(2, "0");
+  return `${y}-${m}-${d}`;
 }
 
 function fromDateInputValue(value: string) {
@@ -23,297 +25,325 @@ function fromDateInputValue(value: string) {
   return new Date(`${value}T12:00:00`);
 }
 
+/* ── City field: static when filled, autocomplete on click ── */
+
+function CityField({
+                     label,
+                     value,
+                     onChangeAction,
+                     onSelectAction,
+                     placeholder,
+                     isFr,
+                     error,
+                   }: {
+  label: string;
+  value: string;
+  onChangeAction: (v: string) => void;
+  onSelectAction: (v: string) => void;
+  placeholder: string;
+  isFr: boolean;
+  error?: string;
+}) {
+  const [editing, setEditing] = useState(false);
+  const hasFilled = value.length > 0 && !editing;
+
+  if (hasFilled) {
+    return (
+      <div>
+        <label className="mb-1.5 block text-[12px] text-slate-500 dark:text-slate-400">{label}</label>
+        <button
+          type="button"
+          onClick={() => setEditing(true)}
+          className="flex w-full items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-left text-[13px] text-slate-900 transition-colors hover:border-slate-300 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:hover:border-slate-600"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="flex-shrink-0 text-slate-400">
+            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+            <circle cx="12" cy="10" r="3" />
+          </svg>
+          <span className="flex-1 truncate">{value}</span>
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <label className="mb-1.5 block text-[12px] text-slate-500 dark:text-slate-400">{label}</label>
+      <CityAutocomplete
+        value={value}
+        action={(v: string) => onChangeAction(v)}
+        onSelect={(v: string) => {
+          onSelectAction(v);
+          setEditing(false);
+        }}
+        placeholder={placeholder}
+        language={isFr ? "fr" : "en"}
+        autoFocus={editing}
+        inputClassName="text-[13px]"
+      />
+      <FieldError error={error} />
+    </div>
+  );
+}
+
 export default function StepTrip({
                                    copy,
                                    isFr,
                                    draft,
                                    setDraft,
-                                   pathTypeLabel,
-                                   setMobileScreen,
+                                   errors,
                                  }: {
   copy: CreateTripCopy;
   isFr: boolean;
   draft: Draft;
   setDraft: React.Dispatch<React.SetStateAction<Draft>>;
-  pathTypeLabel: string;
-  setMobileScreen: (value: MobileScreen) => void;
+  errors: ValidationErrors;
 }) {
-  const showFlightLayoverCities =
-    draft.transportMode === "plane" && draft.flightType === "withLayover";
+  const swapFromTo = () => {
+    setDraft((prev) => ({ ...prev, from: prev.to, to: prev.from }));
+  };
 
+  const showFlightSub = draft.transportMode === "plane";
+  const showTrainSub = draft.transportMode === "train";
+  const showCarSub = draft.transportMode === "car";
+  const showLayoverCities = draft.transportMode === "plane" && draft.flightType === "withLayover";
   const showTrainStopCities =
     draft.transportMode === "train" &&
-    (draft.trainTripType === "withConnection" ||
-      draft.trainTripType === "withIntermediateStops");
+    (draft.trainTripType === "withConnection" || draft.trainTripType === "withIntermediateStops");
 
-  const travelReferencePlaceholder =
+  const refPlaceholder =
     draft.transportMode === "plane"
-      ? isFr
-        ? "Ex. AF1234"
-        : "E.g. AF1234"
+      ? "Ex. AF1234"
       : draft.transportMode === "train"
-        ? isFr
-          ? "Ex. TGV 1234"
-          : "E.g. TGV 1234"
-        : isFr
-          ? "Ex. Paris → Lyon"
-          : "E.g. Paris → Lyon";
+        ? "Ex. TGV 6231"
+        : "Ex. BL-7890";
+
+  const handleAddDocs = (docs: TripDocumentDraft[]) => {
+    setDraft((prev) => ({ ...prev, tripDocuments: [...prev.tripDocuments, ...docs] }));
+  };
+
+  const handleRemoveDoc = (id: string) => {
+    setDraft((prev) => ({ ...prev, tripDocuments: prev.tripDocuments.filter((d) => d.id !== id) }));
+  };
 
   return (
-    <>
-      <SectionTitle title={copy.step1Title} subtitle={copy.step1Sub} />
-
-      <div className="space-y-4">
-        <CompactSegmentedControl
-          label={isFr ? "Mode de transport" : "Transport mode"}
-          value={draft.transportMode}
-          columns={3}
-          options={[
-            { value: "plane", label: copy.plane },
-            { value: "train", label: copy.train },
-            { value: "car", label: copy.car },
-          ]}
-          onChange={(value) =>
-            setDraft((prev) => ({
-              ...prev,
-              transportMode: value,
-              flightType: value === "plane" ? prev.flightType : null,
-              trainTripType: value === "train" ? prev.trainTripType : null,
-              carTripFlexibility: value === "car" ? prev.carTripFlexibility : null,
-              flightLayoverCities: value === "plane" ? prev.flightLayoverCities : "",
-              trainStopCities: value === "train" ? prev.trainStopCities : "",
-            }))
-          }
-        />
-
-        <CompactSegmentedControl
-          label={isFr ? "Type d’annonce" : "Trip format"}
-          value={draft.tripType}
-          columns={2}
-          options={[
-            { value: "oneWay", label: copy.oneWay },
-            { value: "roundTrip", label: copy.roundTrip },
-          ]}
-          onChange={(value) =>
-            setDraft((prev) => ({
-              ...prev,
-              tripType: value,
-            }))
-          }
-        />
-      </div>
-
-      <div className="mt-6 hidden gap-4 md:grid md:grid-cols-2">
-        <label className="block">
-          <div className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
-            {copy.from}
-          </div>
-          <div className="rounded-[16px] border border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-950">
-            <CityAutocomplete
-              value={draft.from}
-              action={(value) => setDraft((prev) => ({ ...prev, from: value }))}
-              placeholder={copy.from}
-              language={isFr ? "fr" : "en"}
-            />
-          </div>
-        </label>
-
-        <label className="block">
-          <div className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
-            {copy.to}
-          </div>
-          <div className="rounded-[16px] border border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-950">
-            <CityAutocomplete
-              value={draft.to}
-              action={(value) => setDraft((prev) => ({ ...prev, to: value }))}
-              placeholder={copy.to}
-              language={isFr ? "fr" : "en"}
-            />
-          </div>
-        </label>
-
-        <InputField
-          label={copy.date}
-          type="date"
-          value={toDateInputValue(draft.departureDate)}
-          onChange={(value) =>
-            setDraft((prev) => ({
-              ...prev,
-              departureDate: fromDateInputValue(value),
-            }))
-          }
-        />
-
-        <InputField
-          label={copy.arrivalDate}
-          type="date"
-          value={toDateInputValue(draft.arrivalDate)}
-          onChange={(value) =>
-            setDraft((prev) => ({
-              ...prev,
-              arrivalDate: fromDateInputValue(value),
-            }))
-          }
-        />
-
-        <InputField
-          label={copy.departureTime}
-          type="time"
-          value={draft.departureTime}
-          onChange={(value) => setDraft((prev) => ({ ...prev, departureTime: value }))}
-        />
-
-        <InputField
-          label={copy.arrivalTime}
-          type="time"
-          value={draft.arrivalTime}
-          onChange={(value) => setDraft((prev) => ({ ...prev, arrivalTime: value }))}
-        />
-      </div>
-
-      <div className="mt-6 grid gap-4 md:hidden">
-        <FieldCard
-          label={copy.from}
-          value={draft.from || copy.emptyValue}
-          icon={<MapPin size={18} />}
-          onClick={() => setMobileScreen("from")}
-        />
-        <FieldCard
-          label={copy.to}
-          value={draft.to || copy.emptyValue}
-          icon={<MapPin size={18} />}
-          onClick={() => setMobileScreen("to")}
-        />
-        <FieldCard
-          label={copy.date}
-          value={
-            draft.departureDate
-              ? draft.departureDate.toLocaleDateString(isFr ? "fr-FR" : "en-US")
-              : copy.emptyValue
-          }
-          icon={<CalendarDays size={18} />}
-          onClick={() => setMobileScreen("date")}
-        />
-        <FieldCard
-          label={copy.arrivalDate}
-          value={
-            draft.arrivalDate
-              ? draft.arrivalDate.toLocaleDateString(isFr ? "fr-FR" : "en-US")
-              : copy.emptyValue
-          }
-          icon={<CalendarDays size={18} />}
-          onClick={() => setMobileScreen("arrivalDate")}
-        />
-        <div className="grid gap-4 sm:grid-cols-2">
-          <InputField
-            label={copy.departureTime}
-            type="time"
-            value={draft.departureTime}
-            onChange={(value) => setDraft((prev) => ({ ...prev, departureTime: value }))}
+    <div>
+      {/* Transport + Type — separate labels, grid 50/50 */}
+      <div className="grid grid-cols-2 gap-x-6">
+        <div>
+          <SectionLabel first>{isFr ? "Transport" : "Transport"}</SectionLabel>
+          <SegmentedControl
+            value={draft.transportMode}
+            options={[
+              { value: "plane", label: copy.plane },
+              { value: "train", label: copy.train },
+              { value: "car", label: copy.car },
+            ]}
+            onChange={(value) =>
+              setDraft((prev) => ({
+                ...prev,
+                transportMode: value as Draft["transportMode"],
+                flightType: value === "plane" ? prev.flightType : null,
+                trainTripType: value === "train" ? prev.trainTripType : null,
+                carTripFlexibility: value === "car" ? prev.carTripFlexibility : null,
+              }))
+            }
+            error={errors.transportMode}
           />
-          <InputField
-            label={copy.arrivalTime}
-            type="time"
-            value={draft.arrivalTime}
-            onChange={(value) => setDraft((prev) => ({ ...prev, arrivalTime: value }))}
+        </div>
+        <div>
+          <SectionLabel first>{isFr ? "Type d'annonce" : "Trip type"}</SectionLabel>
+          <SegmentedControl
+            value={draft.tripType}
+            options={[
+              { value: "oneWay", label: copy.oneWay },
+              { value: "roundTrip", label: copy.roundTrip },
+            ]}
+            onChange={(value) =>
+              setDraft((prev) => ({ ...prev, tripType: value as Draft["tripType"] }))
+            }
           />
         </div>
       </div>
 
-      <div className="mt-6 md:hidden">
-        <FieldCard
-          label={copy.tripPathType}
-          value={pathTypeLabel}
-          icon={<Search size={18} />}
-          onClick={() => setMobileScreen("pathType")}
-        />
-      </div>
+      {/* Conditional: flight type + layover cities */}
+      {showFlightSub && (
+        <div className="animate-[fadeSlide_0.2s_ease]">
+          <SectionLabel>{copy.tripPathType}</SectionLabel>
+          <div className="grid grid-cols-2 items-start gap-x-6">
+            <SegmentedControl
+              value={draft.flightType}
+              options={[
+                { value: "direct", label: copy.directFlight },
+                { value: "withLayover", label: copy.withLayover },
+              ]}
+              onChange={(value) =>
+                setDraft((prev) => ({ ...prev, flightType: value as Draft["flightType"] }))
+              }
+              error={errors.flightType}
+            />
+            {showLayoverCities && (
+              <div className="animate-[fadeSlide_0.15s_ease]">
+                <FormInput
+                  value={draft.flightLayoverCities}
+                  onChange={(v) => setDraft((prev) => ({ ...prev, flightLayoverCities: v }))}
+                  placeholder={isFr ? "Ville d'escale" : "Layover city"}
+                  error={errors.flightLayoverCities}
+                />
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
-      <div className="mt-6 hidden md:block">
-        {draft.transportMode === "plane" && (
-          <CompactSegmentedControl
-            label={copy.tripPathType}
-            value={draft.flightType}
-            columns={2}
-            options={[
-              { value: "direct", label: copy.directFlight },
-              { value: "withLayover", label: copy.withLayover },
-            ]}
-            onChange={(value) =>
-              setDraft((prev) => ({
-                ...prev,
-                flightType: value,
-                ...(value === "direct" ? { flightLayoverCities: "" } : {}),
-              }))
-            }
-          />
-        )}
+      {/* Conditional: train type + stop cities */}
+      {showTrainSub && (
+        <div className="animate-[fadeSlide_0.2s_ease]">
+          <SectionLabel>{copy.tripPathType}</SectionLabel>
+          <div className="grid grid-cols-2 items-start gap-x-6">
+            <SegmentedControl
+              value={draft.trainTripType}
+              options={[
+                { value: "direct", label: copy.directTrain },
+                { value: "withConnection", label: copy.withConnection },
+                { value: "withIntermediateStops", label: copy.withIntermediateStops },
+              ]}
+              onChange={(value) =>
+                setDraft((prev) => ({ ...prev, trainTripType: value as Draft["trainTripType"] }))
+              }
+              error={errors.trainTripType}
+            />
+            {showTrainStopCities && (
+              <div className="animate-[fadeSlide_0.15s_ease]">
+                <FormInput
+                  value={draft.trainStopCities}
+                  onChange={(v) => setDraft((prev) => ({ ...prev, trainStopCities: v }))}
+                  placeholder={isFr ? "Ville de correspondance" : "Connection city"}
+                  error={errors.trainStopCities}
+                />
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
-        {draft.transportMode === "train" && (
-          <CompactSegmentedControl
-            label={copy.tripPathType}
-            value={draft.trainTripType}
-            columns={3}
-            options={[
-              { value: "direct", label: copy.directTrain },
-              { value: "withConnection", label: copy.withConnection },
-              { value: "withIntermediateStops", label: copy.withIntermediateStops },
-            ]}
-            onChange={(value) =>
-              setDraft((prev) => ({
-                ...prev,
-                trainTripType: value,
-                ...(value === "direct" ? { trainStopCities: "" } : {}),
-              }))
-            }
-          />
-        )}
-
-        {draft.transportMode === "car" && (
-          <CompactSegmentedControl
-            label={copy.tripPathType}
+      {/* Conditional: car flexibility */}
+      {showCarSub && (
+        <div className="animate-[fadeSlide_0.2s_ease]">
+          <SectionLabel>{copy.tripPathType}</SectionLabel>
+          <SegmentedControl
             value={draft.carTripFlexibility}
-            columns={2}
             options={[
               { value: "direct", label: copy.directTrip },
               { value: "detourByAgreement", label: copy.detourByAgreement },
             ]}
             onChange={(value) =>
-              setDraft((prev) => ({
-                ...prev,
-                carTripFlexibility: value,
-              }))
+              setDraft((prev) => ({ ...prev, carTripFlexibility: value as Draft["carTripFlexibility"] }))
             }
+            error={errors.carTripFlexibility}
           />
-        )}
-      </div>
+        </div>
+      )}
 
-      <div className="mt-6 grid gap-4 md:grid-cols-2">
-        {showFlightLayoverCities ? (
-          <InputField
-            label={copy.flightLayoverCities}
-            value={draft.flightLayoverCities}
-            onChange={(value) => setDraft((prev) => ({ ...prev, flightLayoverCities: value }))}
-            placeholder={isFr ? "Ex. Casablanca, Madrid" : "E.g. Casablanca, Madrid"}
-          />
-        ) : null}
-
-        {showTrainStopCities ? (
-          <InputField
-            label={copy.trainStopCities}
-            value={draft.trainStopCities}
-            onChange={(value) => setDraft((prev) => ({ ...prev, trainStopCities: value }))}
-            placeholder={isFr ? "Ex. Lyon, Valence, Marseille" : "E.g. Lyon, Valence, Marseille"}
-          />
-        ) : null}
-
-        <InputField
-          label={copy.travelReference}
-          value={draft.travelReference}
-          onChange={(value) => setDraft((prev) => ({ ...prev, travelReference: value }))}
-          placeholder={travelReferencePlaceholder}
+      {/* Route: From / Swap / To */}
+      <SectionLabel>{isFr ? "Itinéraire" : "Route"}</SectionLabel>
+      <div className="grid grid-cols-[1fr_auto_1fr] items-end gap-2">
+        <CityField
+          label={copy.from}
+          value={draft.from}
+          onChangeAction={(v) => setDraft((prev) => ({ ...prev, from: v }))}
+          onSelectAction={(v) => setDraft((prev) => ({ ...prev, from: v }))}
+          placeholder={isFr ? "Ville de départ" : "Departure city"}
+          isFr={isFr}
+          error={errors.from}
+        />
+        <SwapButton onClick={swapFromTo} />
+        <CityField
+          label={copy.to}
+          value={draft.to}
+          onChangeAction={(v) => setDraft((prev) => ({ ...prev, to: v }))}
+          onSelectAction={(v) => setDraft((prev) => ({ ...prev, to: v }))}
+          placeholder={isFr ? "Ville d'arrivée" : "Arrival city"}
+          isFr={isFr}
+          error={errors.to}
         />
       </div>
-    </>
+
+      {/* Dates & times */}
+      <SectionLabel>{isFr ? "Dates & horaires" : "Dates & times"}</SectionLabel>
+      <div className="grid grid-cols-2 gap-3">
+        <FormField label={copy.date} error={errors.departureDate}>
+          <input
+            type="date"
+            value={toDateInputValue(draft.departureDate)}
+            onChange={(e) =>
+              setDraft((prev) => ({ ...prev, departureDate: fromDateInputValue(e.target.value) }))
+            }
+            className={[
+              "w-full rounded-lg border bg-white px-3 py-2.5 text-[13px] text-slate-900 focus:outline-none dark:bg-slate-900 dark:text-white",
+              errors.departureDate ? "border-[#FF9900]" : "border-slate-200 focus:border-[#FF9900] dark:border-slate-700",
+            ].join(" ")}
+          />
+        </FormField>
+
+        <FormField label={copy.arrivalDate} error={errors.arrivalDate}>
+          <input
+            type="date"
+            value={toDateInputValue(draft.arrivalDate)}
+            onChange={(e) =>
+              setDraft((prev) => ({ ...prev, arrivalDate: fromDateInputValue(e.target.value) }))
+            }
+            className={[
+              "w-full rounded-lg border bg-white px-3 py-2.5 text-[13px] text-slate-900 focus:outline-none dark:bg-slate-900 dark:text-white",
+              errors.arrivalDate ? "border-[#FF9900]" : "border-slate-200 focus:border-[#FF9900] dark:border-slate-700",
+            ].join(" ")}
+          />
+        </FormField>
+
+        <FormField label={copy.departureTime} error={errors.departureTime}>
+          <input
+            type="time"
+            value={draft.departureTime}
+            onChange={(e) => setDraft((prev) => ({ ...prev, departureTime: e.target.value }))}
+            className={[
+              "w-full rounded-lg border bg-white px-3 py-2.5 text-[13px] text-slate-900 focus:outline-none dark:bg-slate-900 dark:text-white",
+              errors.departureTime ? "border-[#FF9900]" : "border-slate-200 focus:border-[#FF9900] dark:border-slate-700",
+            ].join(" ")}
+          />
+        </FormField>
+
+        <FormField label={copy.arrivalTime} error={errors.arrivalTime}>
+          <input
+            type="time"
+            value={draft.arrivalTime}
+            onChange={(e) => setDraft((prev) => ({ ...prev, arrivalTime: e.target.value }))}
+            className={[
+              "w-full rounded-lg border bg-white px-3 py-2.5 text-[13px] text-slate-900 focus:outline-none dark:bg-slate-900 dark:text-white",
+              errors.arrivalTime ? "border-[#FF9900]" : "border-slate-200 focus:border-[#FF9900] dark:border-slate-700",
+            ].join(" ")}
+          />
+        </FormField>
+      </div>
+
+      {/* Travel reference + Document upload — same line */}
+      <SectionLabel>{isFr ? "Référence & justificatif" : "Reference & proof"}</SectionLabel>
+      <div className="grid grid-cols-2 gap-3">
+        <FormField label={copy.travelReference}>
+          <FormInput
+            value={draft.travelReference}
+            onChange={(v) => setDraft((prev) => ({ ...prev, travelReference: v }))}
+            placeholder={refPlaceholder}
+          />
+        </FormField>
+
+        <DocumentUpload
+          documents={draft.tripDocuments}
+          onAddAction={handleAddDocs}
+          onRemoveAction={handleRemoveDoc}
+          label={copy.docUpload}
+          hint={copy.docUploadSub}
+        />
+      </div>
+    </div>
   );
 }

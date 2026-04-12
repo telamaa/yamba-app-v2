@@ -15,23 +15,23 @@ function ShimmerBlock({ className = "" }: { className?: string }) {
 
 export default function TripSearchBarSkeleton({ overlap = false }: { overlap?: boolean }) {
   return (
-    <section className="mx-auto max-w-6xl px-4 overflow-visible">
+    <section className="mx-auto max-w-7xl px-4 overflow-visible">
       <div className={["relative overflow-visible", overlap ? "-mt-10" : ""].join(" ")}>
         <div className="relative z-[80] overflow-visible rounded-[28px] border border-slate-200 bg-white shadow-lg dark:border-slate-800 dark:bg-slate-950">
           <div className="grid gap-3 p-3 md:grid-cols-[1.2fr_1.2fr_0.9fr_auto] md:gap-0 md:p-0">
             <div className="px-4 py-3 md:py-4">
-              <ShimmerBlock className="h-4 w-16 rounded-md" />
-              <ShimmerBlock className="mt-3 h-6 w-32 rounded-md" />
+              <ShimmerBlock className="h-4 w-16 rounded-sm" />
+              <ShimmerBlock className="mt-3 h-6 w-32 rounded-sm" />
             </div>
 
             <div className="px-4 py-3 md:py-4">
-              <ShimmerBlock className="h-4 w-24 rounded-md" />
-              <ShimmerBlock className="mt-3 h-6 w-36 rounded-md" />
+              <ShimmerBlock className="h-4 w-24 rounded-sm" />
+              <ShimmerBlock className="mt-3 h-6 w-36 rounded-sm" />
             </div>
 
             <div className="px-4 py-3 md:py-4">
-              <ShimmerBlock className="h-4 w-12 rounded-md" />
-              <ShimmerBlock className="mt-3 h-6 w-28 rounded-md" />
+              <ShimmerBlock className="h-4 w-12 rounded-sm" />
+              <ShimmerBlock className="mt-3 h-6 w-28 rounded-sm" />
             </div>
 
             <div className="flex items-center justify-end md:px-3 md:py-3">

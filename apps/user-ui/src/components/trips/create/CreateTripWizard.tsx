@@ -1,272 +1,243 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useUiPreferences } from "@/components/providers/UiPreferencesProvider";
-import { Draft, MobileScreen, Step } from "./create-trip.types";
+import type { Draft, ParcelCategory, Step } from "./create-trip.types";
 import { initialDraft } from "./create-trip.state";
-import { getCategoryOptions, getCreateTripCopy } from "./create-trip.copy";
-import { createDefaultCategoryCondition } from "./create-trip.config";
-import CreateTripWizardSkeleton from "./CreateTripWizardSkeleton";
-import TripProgressBar from "./TripProgressBar";
-import TripSummarySidebar from "./TripSummarySidebar";
+import { getCreateTripCopy } from "./create-trip.copy";
+import {
+  canContinueStep,
+  createDefaultCategoryCondition,
+  validateStep1,
+  validateStep2,
+  saveDraftToStorage,
+  loadDraftFromStorage,
+  clearDraftStorage,
+  type ValidationErrors,
+} from "./create-trip.config";
+import TripStepper from "./TripStepper";
+import TripLiveSummary from "./TripLiveSummary";
 import StepTrip from "./steps/StepTrip";
-import StepConditionsSimple from "./steps/StepConditionsSimple";
-import StepPublish from "./steps/StepPublish";
-import TripMobileHeader from "./mobile/TripMobileHeader";
-import TripMobileBottomBar from "./mobile/TripMobileBottomBar";
-import TripMobileOverlay from "./mobile/TripMobileOverlay";
+import StepConditions from "./steps/StepConditions";
+import StepReview from "./steps/StepReview";
+import { ErrorSummary } from "./TripFormUi";
+
+
+
+
+const MANGO = "#FF9900";
+const TEAL = "#0F766E";
+const EMPTY_ERRORS: ValidationErrors = {};
 
 export default function CreateTripWizard() {
   const { lang } = useUiPreferences();
+  const router = useRouter();
   const isFr = lang === "fr";
-
   const copy = useMemo(() => getCreateTripCopy(isFr), [isFr]);
-  const categoryOptions = useMemo(() => getCategoryOptions(isFr), [isFr]);
 
   const [step, setStep] = useState<Step>(1);
   const [draft, setDraft] = useState<Draft>(initialDraft);
-  const [mobileScreen, setMobileScreen] = useState<MobileScreen>(null);
-  const [mounted, setMounted] = useState(false);
-  const [isPageLoading, setIsPageLoading] = useState(true);
+  const [direction, setDirection] = useState<"forward" | "backward">("forward");
+  const [showResumeBanner, setShowResumeBanner] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
+  const [shakeFields, setShakeFields] = useState(false);
+  const [showErrors, setShowErrors] = useState(false);
 
+  const autoSaveRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  // Compute errors only when showErrors is true
+  const errors = useMemo<ValidationErrors>(() => {
+    if (!showErrors) return EMPTY_ERRORS;
+    if (step === 1) return validateStep1(draft, isFr);
+    if (step === 2) return validateStep2(draft, isFr);
+    return EMPTY_ERRORS;
+  }, [showErrors, step, draft, isFr]);
+
+  // Clear errors when user changes step
   useEffect(() => {
-    setMounted(true);
-    const t = setTimeout(() => setIsPageLoading(false), 700);
-    return () => clearTimeout(t);
+    setShowErrors(false);
+  }, [step]);
+
+  // Load saved draft on mount
+  useEffect(() => {
+    const saved = loadDraftFromStorage();
+    if (saved && typeof saved === "object" && "transportMode" in (saved as Draft)) {
+      setShowResumeBanner(true);
+    }
   }, []);
 
-  const pathTypeLabel = useMemo(() => {
-    if (draft.transportMode === "plane") {
-      if (draft.flightType === "direct") return copy.directFlight;
-      if (draft.flightType === "withLayover") return copy.withLayover;
+  const resumeDraft = () => {
+    const saved = loadDraftFromStorage() as Draft | null;
+    if (saved) {
+      if (saved.departureDate) saved.departureDate = new Date(saved.departureDate);
+      if (saved.arrivalDate) saved.arrivalDate = new Date(saved.arrivalDate);
+      setDraft(saved);
     }
+    setShowResumeBanner(false);
+  };
 
-    if (draft.transportMode === "train") {
-      if (draft.trainTripType === "direct") return copy.directTrain;
-      if (draft.trainTripType === "withConnection") return copy.withConnection;
-      if (draft.trainTripType === "withIntermediateStops") return copy.withIntermediateStops;
-    }
+  const startFresh = () => {
+    clearDraftStorage();
+    setShowResumeBanner(false);
+  };
 
-    if (draft.transportMode === "car") {
-      if (draft.carTripFlexibility === "direct") return copy.directTrip;
-      if (draft.carTripFlexibility === "detourByAgreement") return copy.detourByAgreement;
-    }
+  // Auto-save every 10s
+  useEffect(() => {
+    autoSaveRef.current = setInterval(() => saveDraftToStorage(draft), 10000);
+    return () => { if (autoSaveRef.current) clearInterval(autoSaveRef.current); };
+  }, [draft]);
 
-    return copy.emptyValue;
-  }, [copy, draft]);
-
-  const canContinue = useMemo(() => {
-    if (step === 1) {
-      const hasBase =
-        !!draft.transportMode &&
-        !!draft.from &&
-        !!draft.to &&
-        !!draft.departureDate &&
-        !!draft.arrivalDate;
-
-      if (!hasBase) return false;
-
-      if (draft.transportMode === "plane") return !!draft.flightType;
-      if (draft.transportMode === "train") return !!draft.trainTripType;
-      if (draft.transportMode === "car") return !!draft.carTripFlexibility;
-
-      return true;
-    }
-
-    if (step === 2) {
-      if (draft.acceptedCategories.length === 0) return false;
-
-      return draft.acceptedCategories.every((categoryKey) => {
-        const condition = draft.categoryConditions[categoryKey];
-
-        return (
-          !!condition &&
-          condition.priceAmount !== "" &&
-          condition.handoffMoments.length > 0 &&
-          condition.pickupMoments.length > 0
-        );
-      });
-    }
-
-    return true;
-  }, [draft, step]);
-
-  const toggleCategory = (value: Draft["acceptedCategories"][number]) => {
+  // Category toggle
+  const toggleCategory = useCallback((value: ParcelCategory) => {
     setDraft((prev) => {
-      const alreadySelected = prev.acceptedCategories.includes(value);
-
-      if (alreadySelected) {
-        const nextAcceptedCategories = prev.acceptedCategories.filter((item) => item !== value);
-        const nextCategoryConditions = { ...prev.categoryConditions };
-        delete nextCategoryConditions[value];
-
-        return {
-          ...prev,
-          acceptedCategories: nextAcceptedCategories,
-          categoryConditions: nextCategoryConditions,
-        };
+      const has = prev.acceptedCategories.includes(value);
+      if (has) {
+        const nextCats = prev.acceptedCategories.filter((c) => c !== value);
+        const nextConds = { ...prev.categoryConditions };
+        delete nextConds[value];
+        return { ...prev, acceptedCategories: nextCats, categoryConditions: nextConds };
       }
-
       return {
         ...prev,
         acceptedCategories: [...prev.acceptedCategories, value],
         categoryConditions: {
           ...prev.categoryConditions,
-          [value]:
-            prev.categoryConditions[value] ?? createDefaultCategoryCondition(value),
+          [value]: prev.categoryConditions[value] ?? createDefaultCategoryCondition(value),
         },
       };
     });
+  }, []);
+
+  // Navigation
+  const goTo = (target: Step) => {
+    setDirection(target > step ? "forward" : "backward");
+    setStep(target);
   };
 
   const nextStep = () => {
-    if (!canContinue) return;
+    if (!canContinueStep(step, draft, isFr)) {
+      setShowErrors(true);
+      setShakeFields(true);
+      setTimeout(() => setShakeFields(false), 600);
+      // Scroll to first error
+      setTimeout(() => {
+        const firstError = contentRef.current?.querySelector("[style*='color: rgb(255, 153, 0)']");
+        firstError?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 100);
+      return;
+    }
+    setShowErrors(false);
+    setDirection("forward");
     setStep((prev) => (prev < 3 ? ((prev + 1) as Step) : prev));
   };
 
   const prevStep = () => {
+    setDirection("backward");
     setStep((prev) => (prev > 1 ? ((prev - 1) as Step) : prev));
   };
 
-  const saveDraft = () => {
-    console.log("save draft", draft);
+  // Publish
+  const publishTrip = async () => {
+    setIsPublishing(true);
+    saveDraftToStorage(draft);
+    console.log("Publishing trip:", draft);
+    await new Promise((r) => setTimeout(r, 1200));
+    clearDraftStorage();
+    setIsPublishing(false);
+    triggerConfetti();
+    setTimeout(() => router.push("/dashboard/trips"), 1500);
   };
-
-  const publishTrip = () => {
-    console.log("publish trip", draft);
-  };
-
-  if (isPageLoading) {
-    return <CreateTripWizardSkeleton step={step} />;
-  }
 
   return (
-    <>
-      <div className="md:hidden">
-        <TripMobileHeader
-          copy={copy}
-          draft={draft}
-          isFr={isFr}
-          step={step}
-          pathTypeLabel={pathTypeLabel}
-        />
+    <main className="mx-auto max-w-7xl px-4 py-6">
+      <div className="mx-auto max-w-2xl">
+        {/* Resume draft banner */}
+        {showResumeBanner && (
+          <div className="mb-6 flex items-center justify-between rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
+            <div>
+              <div className="text-[14px] font-medium text-slate-900 dark:text-white">{copy.resumeDraft}</div>
+              <div className="mt-0.5 text-[12px] text-slate-500 dark:text-slate-400">{copy.resumeDraftSub}</div>
+            </div>
+            <div className="flex gap-2">
+              <button type="button" onClick={startFresh} className="rounded-lg border border-slate-200 px-3 py-1.5 text-[12px] text-slate-600 dark:border-slate-700 dark:text-slate-400">{copy.startFresh}</button>
+              <button type="button" onClick={resumeDraft} className="rounded-lg px-3 py-1.5 text-[12px] font-medium text-slate-900" style={{ backgroundColor: MANGO }}>{copy.continue}</button>
+            </div>
+          </div>
+        )}
+
+        {/* Header */}
+        <div className="mb-2">
+          <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-white">{copy.title}</h1>
+          <p className="mt-0.5 text-[13px] text-slate-500 dark:text-slate-400">{copy.subtitle}</p>
+        </div>
+
+        {/* Stepper */}
+        <TripStepper step={step} labels={copy.steps} onGoTo={goTo} />
+
+        {/* Error summary */}
+        {showErrors && <ErrorSummary errors={errors} isFr={isFr} />}
+
+        {/* Live summary */}
+        <TripLiveSummary draft={draft} />
+
+        {/* Step content */}
+        <div
+          ref={contentRef}
+          className={shakeFields ? "animate-[shake_0.4s_ease]" : ""}
+          key={step}
+          style={{ animation: `${direction === "forward" ? "slideInRight" : "slideInLeft"} 0.25s ease` }}
+        >
+          {step === 1 && <StepTrip copy={copy} isFr={isFr} draft={draft} setDraft={setDraft} errors={errors} />}
+          {step === 2 && <StepConditions copy={copy} isFr={isFr} draft={draft} setDraft={setDraft} toggleCategory={toggleCategory} errors={errors} />}
+          {step === 3 && <StepReview copy={copy} isFr={isFr} draft={draft} onGoTo={goTo} />}
+        </div>
+
+        {/* Bottom bar */}
+        <div className="mt-6 flex items-center justify-between border-t border-slate-200 pt-5 dark:border-slate-800">
+          <div className="flex gap-2.5">
+            {step > 1 && (
+              <button type="button" onClick={prevStep} className="rounded-lg border border-slate-200 px-5 py-2.5 text-[13px] text-slate-600 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800">{copy.back}</button>
+            )}
+            <button type="button" onClick={() => saveDraftToStorage(draft)} className="rounded-lg border border-slate-200 px-4 py-2.5 text-[13px] text-slate-500 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800">{copy.saveDraft}</button>
+          </div>
+          {step < 3 ? (
+            <button type="button" onClick={nextStep} className="rounded-lg px-6 py-2.5 text-[13px] font-medium text-slate-900 transition-colors" style={{ backgroundColor: MANGO }}>{copy.continue}</button>
+          ) : (
+            <button type="button" onClick={publishTrip} disabled={isPublishing} className="rounded-lg px-6 py-2.5 text-[13px] font-medium text-white transition-colors disabled:opacity-50" style={{ backgroundColor: TEAL }}>{isPublishing ? "..." : copy.publish}</button>
+          )}
+        </div>
       </div>
 
-      <main className="mx-auto max-w-7xl px-4 py-6 pt-[154px] pb-[104px] md:py-6 md:pt-6 md:pb-6">
-        <header className="mb-6 hidden md:block">
-          <h1 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white">
-            {copy.title}
-          </h1>
-          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{copy.subtitle}</p>
-          <TripProgressBar step={step} steps={copy.steps} />
-        </header>
-
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
-          <section className="p-0">
-            {step === 1 && (
-              <StepTrip
-                copy={copy}
-                isFr={isFr}
-                draft={draft}
-                setDraft={setDraft}
-                pathTypeLabel={pathTypeLabel}
-                setMobileScreen={setMobileScreen}
-              />
-            )}
-
-            {step === 2 && (
-              <StepConditionsSimple
-                copy={copy}
-                draft={draft}
-                setDraft={setDraft}
-                categoryOptions={categoryOptions}
-                toggleCategory={toggleCategory}
-                setMobileScreen={setMobileScreen}
-              />
-            )}
-
-            {step === 3 && (
-              <StepPublish
-                copy={copy}
-                draft={draft}
-                isFr={isFr}
-                pathTypeLabel={pathTypeLabel}
-                categoryOptions={categoryOptions}
-              />
-            )}
-
-            <div className="mt-8 hidden items-center justify-between gap-3 md:flex">
-              <div className="flex gap-3">
-                <button
-                  type="button"
-                  onClick={prevStep}
-                  disabled={step === 1}
-                  className="inline-flex h-12 items-center justify-center rounded-2xl border border-slate-200 bg-white px-5 text-sm font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200"
-                >
-                  {copy.back}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={saveDraft}
-                  className="inline-flex h-12 items-center justify-center rounded-2xl border border-slate-200 bg-white px-5 text-sm font-semibold text-slate-700 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200"
-                >
-                  {copy.saveDraft}
-                </button>
-              </div>
-
-              {step < 3 ? (
-                <button
-                  type="button"
-                  onClick={nextStep}
-                  disabled={!canContinue}
-                  className="inline-flex h-12 items-center justify-center rounded-2xl bg-[#FF9900] px-6 text-sm font-semibold text-slate-900 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {copy.continue}
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={publishTrip}
-                  className="inline-flex h-12 items-center justify-center rounded-2xl bg-[#FF9900] px-6 text-sm font-semibold text-slate-900"
-                >
-                  {copy.publish}
-                </button>
-              )}
-            </div>
-          </section>
-
-          <div className="hidden lg:block">
-            <TripSummarySidebar
-              copy={copy}
-              draft={draft}
-              isFr={isFr}
-              pathTypeLabel={pathTypeLabel}
-            />
-          </div>
-        </div>
-      </main>
-
-      <TripMobileBottomBar
-        copy={copy}
-        step={step}
-        canContinue={canContinue}
-        onBack={prevStep}
-        onNext={nextStep}
-        onPublish={publishTrip}
-      />
-
-      <TripMobileOverlay
-        mounted={mounted}
-        mobileScreen={mobileScreen}
-        onClose={() => setMobileScreen(null)}
-        copy={copy}
-        isFr={isFr}
-        draft={draft}
-        setDraft={setDraft}
-        categoryOptions={categoryOptions}
-        toggleCategory={toggleCategory}
-      />
-    </>
+      <style jsx global>{`
+        @keyframes slideInRight { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+        @keyframes slideInLeft { from { opacity: 0; transform: translateX(-20px); } to { opacity: 1; transform: translateX(0); } }
+        @keyframes fadeSlide { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 20% { transform: translateX(-4px); } 40% { transform: translateX(4px); } 60% { transform: translateX(-3px); } 80% { transform: translateX(2px); } }
+      `}</style>
+    </main>
   );
+}
+
+function triggerConfetti() {
+  const colors = ["#FF9900", "#0F766E", "#FFB84D", "#5DCAA5", "#FF9900"];
+  if (!document.getElementById("confetti-style")) {
+    const style = document.createElement("style");
+    style.id = "confetti-style";
+    style.textContent = `@keyframes confetti-fall { 0% { transform: translateY(-10px) rotate(0deg); opacity: 1; } 100% { transform: translateY(100vh) rotate(720deg); opacity: 0; } }`;
+    document.head.appendChild(style);
+  }
+  for (let i = 0; i < 40; i++) {
+    const piece = document.createElement("div");
+    Object.assign(piece.style, {
+      position: "fixed", top: "0", left: `${Math.random() * 100}vw`,
+      width: "8px", height: "8px", borderRadius: "2px",
+      backgroundColor: colors[Math.floor(Math.random() * colors.length)],
+      animation: `confetti-fall ${1 + Math.random()}s ease-out forwards`,
+      animationDelay: `${Math.random() * 0.5}s`, zIndex: "9999", pointerEvents: "none",
+    });
+    document.body.appendChild(piece);
+    setTimeout(() => piece.remove(), 2500);
+  }
 }

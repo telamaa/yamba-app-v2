@@ -37,7 +37,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <Header />
             {/*<AppHeader />*/}
             <div className="pt-[78px]">
-              {children}
+              <div className="mx-auto max-w-7xl px-4">
+                {children}
+              </div>
             </div>
 
           </UiPreferencesProvider>
