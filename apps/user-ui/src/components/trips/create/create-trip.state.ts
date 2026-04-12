@@ -1,4 +1,5 @@
 import type { Draft } from "./create-trip.types";
+import { getSmartDefaultDepartureDate, getSmartDefaultTime } from "./create-trip.config";
 
 export const initialDraft: Draft = {
   transportMode: null,
@@ -6,9 +7,9 @@ export const initialDraft: Draft = {
 
   from: "",
   to: "",
-  departureDate: undefined,
+  departureDate: getSmartDefaultDepartureDate(),
   arrivalDate: undefined,
-  departureTime: "",
+  departureTime: getSmartDefaultTime(),
   arrivalTime: "",
 
   flightType: null,
@@ -19,8 +20,13 @@ export const initialDraft: Draft = {
   trainStopCities: "",
   travelReference: "",
 
+  tripDocuments: [],
+
   acceptedCategories: [],
   categoryConditions: {},
+
+  globalPrice: "",
+  useGlobalPrice: true,
 
   handDeliveryOnly: false,
   instantBooking: false,
@@ -28,18 +34,4 @@ export const initialDraft: Draft = {
 
   currencyCode: "EUR",
   notes: "",
-
-  /**
-   * Legacy
-   */
-  stopoverCount: 0,
-  detourRadiusKm: undefined,
-  transportReference: "",
-  maxParcelCount: "",
-  maxWeightKg: "",
-  volumeSize: null,
-  fragileItemsAllowed: false,
-  urgentDocumentsAllowed: false,
-  handoffFlexibility: null,
-  priceAmount: "",
 };
