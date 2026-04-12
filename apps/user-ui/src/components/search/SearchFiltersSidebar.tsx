@@ -211,7 +211,7 @@ export default function SearchFiltersSidebar({
   return (
     <aside
       className={[
-        "h-fit rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-950",
+        "h-fit rounded-Axl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-950",
         className,
       ].join(" ")}
     >

@@ -4,6 +4,7 @@ import cookieParser from "cookie-parser";
 import {errorMiddleware} from "@packages/error-handler/error-middleware";
 import router from "./routes/auth.router";
 import swaggerUi from "swagger-ui-express";
+import carrierRouter from "./routes/carrier.router";
 const swaggerDocument = require("./swagger-output.json");
 
 const app = express();
@@ -31,6 +32,7 @@ app.get("/docs-json", (req, res) => {
 
 // Routes
 app.use("/api", router);
+app.use("/api", carrierRouter);
 
 app.use(errorMiddleware);
 

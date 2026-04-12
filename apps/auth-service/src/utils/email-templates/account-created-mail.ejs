@@ -1,107 +1,95 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="fr">
 <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <meta http-equiv="x-ua-compatible" content="ie=edge" />
-    <title>Bienvenue sur Yamba</title>
-    <style>
-      @media (max-width: 620px) {
-        .container { width: 100% !important; }
-        .px { padding-left: 16px !important; padding-right: 16px !important; }
-        .hero { padding: 22px 16px !important; }
-        .btn { display:block !important; width:100% !important; }
-      }
-    </style>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 </head>
-
-<body style="margin:0;padding:0;background:#f4f6fb;color:#111827;font-family:Arial,Helvetica,sans-serif;">
+<body style="margin:0;padding:0;background-color:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
 <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">
     Votre compte Yamba est créé. Bienvenue !
 </div>
 
-<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#f4f6fb;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f5;padding:40px 20px;">
     <tr>
-        <td align="center" style="padding:24px 12px;">
-            <table role="presentation" class="container" width="600" cellspacing="0" cellpadding="0" border="0"
-                   style="width:600px;max-width:600px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 6px 24px rgba(17,24,39,0.08);">
+        <td align="center">
+            <table width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
 
+                <!-- Header -->
                 <tr>
-                    <td class="hero" style="padding:28px 24px;background:linear-gradient(135deg,#0ea5e9 0%, #2563eb 55%, #7c3aed 100%);">
-                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                    <td style="background:linear-gradient(135deg,#2563eb,#7c3aed);padding:32px 40px;text-align:center;">
+                        <h1 style="margin:0;color:#ffffff;font-size:24px;font-weight:700;">🎉 Bienvenue sur Yamba !</h1>
+                    </td>
+                </tr>
+
+                <!-- Body -->
+                <tr>
+                    <td style="padding:40px;">
+                        <p style="margin:0 0 20px;font-size:16px;color:#18181b;line-height:1.6;">
+                            Bonjour <strong><%= firstName ?? "" %></strong>,
+                        </p>
+
+                        <p style="margin:0 0 24px;font-size:16px;color:#3f3f46;line-height:1.6;">
+                            Ton compte Yamba a bien été créé. Tu fais maintenant partie d'une communauté qui rend le transport de colis plus simple et plus humain.
+                        </p>
+
+                        <!-- What you can do -->
+                        <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;margin:0 0 24px;">
                             <tr>
-                                <td style="vertical-align:middle;">
-                                    <div style="font-size:18px;font-weight:700;letter-spacing:0.3px;color:#ffffff;">Yamba</div>
-                                    <div style="margin-top:6px;font-size:14px;opacity:0.95;color:#e0f2fe;">Bienvenue</div>
-                                </td>
-                                <td align="right" style="vertical-align:middle;">
-                                    <img
-                                            src="https://via.placeholder.com/96x40.png?text=Yamba"
-                                            width="96" height="40" alt="Yamba"
-                                            style="display:block;border:0;outline:none;text-decoration:none;border-radius:8px;background:#ffffff;"
-                                    />
+                                <td style="padding:20px;">
+                                    <p style="margin:0 0 12px;font-size:14px;color:#1e40af;font-weight:600;">
+                                        Ce que tu peux faire :
+                                    </p>
+                                    <p style="margin:0 0 8px;font-size:14px;color:#1e40af;line-height:1.6;">
+                                        📦 <strong>Envoyer un colis</strong> — trouve un transporteur sur un trajet qui te convient
+                                    </p>
+                                    <p style="margin:0 0 8px;font-size:14px;color:#1e40af;line-height:1.6;">
+                                        🚗 <strong>Devenir Tripper</strong> — publie tes trajets et gagne de l'argent en transportant des colis
+                                    </p>
+                                    <p style="margin:0;font-size:14px;color:#1e40af;line-height:1.6;">
+                                        🔍 <strong>Explorer</strong> — découvre les trajets disponibles près de chez toi
+                                    </p>
                                 </td>
                             </tr>
                         </table>
 
-                        <div style="margin-top:18px;">
-                            <img
-                                    src="https://via.placeholder.com/552x180.png?text=Welcome+to+Yamba"
-                                    width="552" alt="Welcome"
-                                    style="display:block;width:100%;max-width:552px;height:auto;border-radius:12px;border:0;outline:none;text-decoration:none;"
-                            />
-                        </div>
-                    </td>
-                </tr>
+                        <!-- Tip -->
+                        <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;margin:0 0 24px;">
+                            <tr>
+                                <td style="padding:16px;">
+                                    <p style="margin:0;font-size:13px;color:#334155;line-height:1.5;">
+                                        💡 <strong>Astuce :</strong> complète ton profil (coordonnées, adresses…) pour gagner du temps lors de tes prochaines étapes.
+                                    </p>
+                                </td>
+                            </tr>
+                        </table>
 
-                <tr>
-                    <td class="px" style="padding:24px 24px 8px 24px;">
-                        <h1 style="margin:0 0 10px 0;font-size:22px;line-height:1.25;color:#111827;">
-                            Votre compte est créé 🎉
-                        </h1>
-
-                        <p style="margin:0 0 16px 0;font-size:15px;line-height:1.6;color:#374151;">
-                            Bonjour <strong><%= firstName ?? "" %></strong>,<br/>
-                            Bienvenue sur Yamba ! Votre compte a bien été créé et vous pouvez dès à présent vous connecter.
-                        </p>
-
+                        <!-- CTA -->
                         <% if (typeof loginUrl !== 'undefined' && loginUrl) { %>
-                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 18px 0;">
+                            <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
                                 <tr>
                                     <td align="center">
-                                        <a class="btn" href="<%= loginUrl %>"
-                                           style="display:inline-block;background:#2563eb;color:#ffffff;text-decoration:none;font-weight:700;
-                      padding:12px 18px;border-radius:10px;font-size:14px;">
-                                            Se connecter
+                                        <a href="<%= loginUrl %>"
+                                           style="display:inline-block;background:linear-gradient(135deg,#2563eb,#7c3aed);color:#ffffff;text-decoration:none;padding:14px 32px;border-radius:8px;font-size:16px;font-weight:600;">
+                                            Se connecter →
                                         </a>
                                     </td>
                                 </tr>
                             </table>
                         <% } %>
 
-                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 16px 0;">
-                            <tr>
-                                <td style="padding:14px;border-radius:12px;background:#f3f4f6;border:1px solid #e5e7eb;">
-                                    <div style="font-size:13px;color:#1f2937;">
-                                        <strong>Astuce :</strong> Pensez à compléter votre profil (coordonnées, adresses…) pour gagner du temps lors de vos prochaines étapes.
-                                    </div>
-                                </td>
-                            </tr>
-                        </table>
-
-                        <p style="margin:0 0 16px 0;font-size:14px;line-height:1.6;color:#374151;">
-                            Si vous n’êtes pas à l’origine de cette création de compte, contactez-nous rapidement.
+                        <p style="margin:0;font-size:14px;color:#71717a;line-height:1.6;">
+                            Si tu n'es pas à l'origine de cette création de compte, contacte-nous rapidement.
                         </p>
                     </td>
                 </tr>
 
+                <!-- Footer -->
                 <tr>
-                    <td class="px" style="padding:14px 24px 24px 24px;background:#fafafa;border-top:1px solid #f1f5f9;">
-                        <p style="margin:0 0 8px 0;font-size:12px;line-height:1.6;color:#6b7280;">
-                            Besoin d’aide ? Contactez-nous : <a href="mailto:<%= supportEmail ?? 'support@yamba.com' %>"
-                                                                style="color:#2563eb;text-decoration:none;"><%= supportEmail ?? 'support@yamba.com' %></a>
+                    <td style="padding:24px 40px;background-color:#fafafa;border-top:1px solid #e4e4e7;text-align:center;">
+                        <p style="margin:0 0 8px;font-size:13px;color:#a1a1aa;line-height:1.5;">
+                            Besoin d'aide ? <a href="mailto:<%= supportEmail ?? 'support@yamba.com' %>" style="color:#7c3aed;text-decoration:none;"><%= supportEmail ?? 'support@yamba.com' %></a>
                         </p>
-                        <p style="margin:0;font-size:12px;line-height:1.6;color:#9ca3af;">
+                        <p style="margin:0;font-size:12px;color:#d4d4d8;">
                             © <%= new Date().getFullYear() %> Yamba. Tous droits réservés.
                         </p>
                     </td>

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useUiPreferences } from "@/components/providers/UiPreferencesProvider";
 import { useForm } from "react-hook-form";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Eye, EyeOff } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -193,6 +193,7 @@ function localizeLoginError(message: string | undefined, copy: Copy) {
 
 export default function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const { lang } = useUiPreferences();
   const [passwordVisible, setPasswordVisible] = useState(false);
@@ -245,7 +246,8 @@ export default function LoginForm() {
     mutationFn: loginUser,
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["user"] });
-      router.push("/");
+      const redirect = searchParams.get("redirect");
+      router.push(redirect || "/");
       router.refresh();
     },
     onError: (error) => {

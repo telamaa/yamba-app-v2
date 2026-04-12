@@ -25,6 +25,7 @@ import { useOnClickOutside } from "@/hooks/useOnClickOutside";
 import CommandPalette, { CommandAction } from "./CommandPalette";
 import { useUiPreferences } from "@/components/providers/UiPreferencesProvider";
 import useUser from "@/hooks/useUser";
+import useShareTrip from "@/hooks/useShareTrip";
 import { useQueryClient } from "@tanstack/react-query";
 import { logoutUser as logoutApi } from "@/services/auth.api";
 
@@ -45,6 +46,7 @@ export default function Header() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { resolvedTheme, setTheme } = useTheme();
+  const { handleShareTrip } = useShareTrip();
 
   const [mounted, setMounted] = useState(false);
   const [isCompact, setIsCompact] = useState(false);
@@ -113,7 +115,7 @@ export default function Header() {
         myAccount: "Mon compte",
         myTrips: "Mes trajets",
         myParcels: "Mes colis",
-        becomeCarrier: "Devenir transporteur",
+        becomeCarrier: "Espace transporteur",
         becomeSeller: "Devenir vendeur",
         notifications: "Notifications",
         messages: "Messages",
@@ -133,7 +135,7 @@ export default function Header() {
       myAccount: "My account",
       myTrips: "My trips",
       myParcels: "My parcels",
-      becomeCarrier: "Become a carrier",
+      becomeCarrier: "Carrier space",
       becomeSeller: "Become a seller",
       notifications: "Notifications",
       messages: "Messages",
@@ -145,7 +147,6 @@ export default function Header() {
   }, [lang]);
 
   const isLogin = pathname?.startsWith("/auth/login");
-  const isShare = pathname === "/share";
 
   const actions: CommandAction[] = useMemo(
     () => [
@@ -160,7 +161,7 @@ export default function Header() {
 
   // Initiale du prénom
   const userInitial = user?.firstName?.charAt(0)?.toUpperCase() ?? "U";
-  const userAvatar = user?.avatar ?? user?.profileImage ?? null;
+  const userAvatar = user?.avatar?.url ?? null;
 
   // CTA simple
   const ctaClass =
@@ -179,8 +180,7 @@ export default function Header() {
     { label: L.messages, href: "/messages", icon: MessageSquare },
     { label: L.payments, href: "/payments", icon: CreditCard },
     { type: "separator" as const },
-    { label: L.becomeCarrier, href: "/become/carrier", icon: Truck },
-    { label: L.becomeSeller, href: "/become/seller", icon: Store },
+    { label: L.becomeCarrier, href: "/carrier/onboarding", icon: Truck },
     { type: "separator" as const },
     { label: L.security, href: "/security", icon: Shield },
     { label: L.settings, href: "/settings", icon: Settings },
@@ -240,7 +240,7 @@ export default function Header() {
       <header className="fixed inset-x-0 top-0 z-[100] border-b border-slate-200 bg-white/90 backdrop-blur dark:border-slate-800 dark:bg-slate-950/85">
         <div
           className={[
-            "mx-auto flex h-[78px] max-w-6xl items-center justify-between px-4 transition-all",
+            "mx-auto flex h-[78px] max-w-7xl items-center justify-between px-4 transition-all",
             isCompact ? "py-2" : "py-3",
           ].join(" ")}
         >
@@ -319,16 +319,16 @@ export default function Header() {
             </button>
 
             {/* CTA simple */}
-            <Link
-              href="/share"
+            <button
+              type="button"
+              onClick={handleShareTrip}
               className={ctaClass}
-              style={isShare ? { backgroundColor: COLORS.mangoTint } : undefined}
             >
               {L.share}
-            </Link>
+            </button>
 
-            {/* Connexion / Avatar utilisateur */}
-            {!isLoading && !user && (
+            {/* Connexion (visible par défaut, disparaît quand user confirmé) */}
+            {!user && (
               <Link
                 href="/login"
                 className={[
@@ -344,6 +344,7 @@ export default function Header() {
               </Link>
             )}
 
+            {/* Avatar utilisateur (apparaît quand user confirmé) */}
             {!isLoading && user && (
               <div className="relative" ref={userMenuRef}>
                 <button
@@ -376,8 +377,9 @@ export default function Header() {
                       </div>
                       <div className="min-w-0">
                         <p className="truncate text-sm font-semibold text-slate-900 dark:text-white">
-                          {/*{user.firstName} {user.lastName ?? ""}*/}
-                          {user?.firstName.split(" ")[0]}
+                          {/*{user?.firstName.split(" ")[0]}*/}
+                          {/*{user?.firstName?.split(" ")[0]?.replace(/^./, c => c.toUpperCase())}*/}
+                          {user?.firstName?.toLowerCase().replace(/\b\w/g, c => c.toUpperCase())}
                         </p>
                         {user.email && (
                           <p className="truncate text-xs text-slate-500 dark:text-slate-400">
@@ -427,7 +429,7 @@ export default function Header() {
               )}
             </button>
 
-            {/* Avatar mobile (si connecté) */}
+            {/* Avatar mobile (apparaît quand user confirmé) */}
             {!isLoading && user && (
               <button
                 type="button"
@@ -444,8 +446,8 @@ export default function Header() {
               </button>
             )}
 
-            {/* Burger menu (si non connecté) */}
-            {!isLoading && !user && (
+            {/* Burger menu (visible par défaut, disparaît quand user confirmé) */}
+            {!user && (
               <button
                 type="button"
                 onClick={() => setMobileOpen((v) => !v)}
