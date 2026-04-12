@@ -1,11 +1,15 @@
-import { CategoryOption, CreateTripCopy } from "./create-trip.types";
+import type { CategoryOption, CreateTripCopy } from "./create-trip.types";
 
 export function getCreateTripCopy(isFr: boolean): CreateTripCopy {
   return {
     title: isFr ? "Créer un trajet" : "Create a trip",
     subtitle: isFr
-      ? "Un parcours simple, clair et rapide pour publier votre trajet."
-      : "A simple, clear and fast flow to publish your trip.",
+      ? "Publiez votre trajet en quelques instants."
+      : "Publish your trip in moments.",
+    firstTripTitle: isFr ? "Publiez votre premier trajet" : "Publish your first trip",
+    firstTripSub: isFr
+      ? "Ça prend 2 minutes, c'est gratuit."
+      : "It takes 2 minutes, it's free.",
     steps: [
       isFr ? "Trajet" : "Trip",
       isFr ? "Conditions" : "Conditions",
@@ -13,24 +17,24 @@ export function getCreateTripCopy(isFr: boolean): CreateTripCopy {
     ],
     back: isFr ? "Retour" : "Back",
     continue: isFr ? "Continuer" : "Continue",
-    saveDraft: isFr ? "Enregistrer le brouillon" : "Save draft",
+    saveDraft: isFr ? "Brouillon" : "Draft",
     publish: isFr ? "Publier le trajet" : "Publish trip",
-    summary: isFr ? "Résumé du trajet" : "Trip summary",
+    summary: isFr ? "Résumé" : "Summary",
     close: isFr ? "Fermer" : "Close",
     emptyValue: isFr ? "À compléter" : "To complete",
 
-    step1Title: isFr ? "Trajet" : "Trip",
+    step1Title: isFr ? "Votre trajet" : "Your trip",
     step1Sub: isFr
-      ? "Choisissez le mode de transport et renseignez l’itinéraire."
-      : "Choose the transport mode and fill in the route.",
-    step2Title: isFr ? "Conditions" : "Conditions",
+      ? "Mode de transport, itinéraire et dates."
+      : "Transport mode, route and dates.",
+    step2Title: isFr ? "Vos conditions" : "Your conditions",
     step2Sub: isFr
-      ? "Définissez un prix, la remise et le retrait pour chaque catégorie sélectionnée."
-      : "Set pricing, handoff and pickup for each selected category.",
-    step3Title: isFr ? "Publication" : "Publish",
+      ? "Catégories acceptées, prix et modalités."
+      : "Accepted categories, pricing and terms.",
+    step3Title: isFr ? "Vérification" : "Review",
     step3Sub: isFr
-      ? "Vérifiez les informations avant publication."
-      : "Review the details before publishing.",
+      ? "Vérifiez et publiez votre trajet."
+      : "Review and publish your trip.",
 
     plane: isFr ? "Avion" : "Plane",
     train: isFr ? "Train" : "Train",
@@ -41,87 +45,81 @@ export function getCreateTripCopy(isFr: boolean): CreateTripCopy {
     from: isFr ? "Départ" : "From",
     to: isFr ? "Destination" : "To",
     date: isFr ? "Date de départ" : "Departure date",
-    arrivalDate: isFr ? "Date d’arrivée" : "Arrival date",
+    arrivalDate: isFr ? "Date d'arrivée" : "Arrival date",
     departureTime: isFr ? "Heure de départ" : "Departure time",
     arrivalTime: isFr ? "Heure d'arrivée" : "Arrival time",
+    swap: isFr ? "Inverser" : "Swap",
 
     tripPathType: isFr ? "Type de parcours" : "Trip type",
     directFlight: isFr ? "Vol direct" : "Direct flight",
-    withLayover: isFr ? "Vol avec escale" : "Flight with layover",
-    directTrain: isFr ? "Train direct" : "Direct train",
-    withConnection: isFr ? "Train avec correspondance" : "Train with connection",
-    withIntermediateStops: isFr ? "Avec arrêts intermédiaires" : "With intermediate stops",
-    directTrip: isFr ? "Trajet direct" : "Direct trip",
-    detourByAgreement: isFr ? "Détour possible selon accord" : "Detour possible by agreement",
+    withLayover: isFr ? "Avec escale" : "With layover",
+    directTrain: isFr ? "Direct" : "Direct",
+    withConnection: isFr ? "Correspondance" : "Connection",
+    withIntermediateStops: isFr ? "Arrêts" : "Stops",
+    directTrip: isFr ? "Direct" : "Direct",
+    detourByAgreement: isFr ? "Détour possible" : "Detour possible",
 
-    flightLayoverCities: isFr ? "Ville(s) d’escale" : "Layover city/cities",
-    trainStopCities: isFr
-      ? "Ville(s) de correspondance / arrêt(s)"
-      : "Connection / stop city/cities",
-    travelReference: isFr ? "Référence voyage" : "Travel reference",
+    flightLayoverCities: isFr ? "Ville(s) d'escale" : "Layover city/cities",
+    trainStopCities: isFr ? "Ville(s) de correspondance" : "Connection city/cities",
+    travelReference: isFr ? "Réf. voyage" : "Travel ref.",
+
+    docUpload: isFr ? "Justificatif" : "Proof",
+    docUploadSub: isFr ? "Billet, itinéraire..." : "Ticket, itinerary...",
+    docUploadHint: isFr
+      ? "Badge « Voyage vérifié » après validation"
+      : "'Verified trip' badge after review",
+    docPending: isFr ? "En attente de vérification" : "Pending verification",
+    docVerified: isFr ? "Vérifié" : "Verified",
+    docCount: isFr ? "fichier(s)" : "file(s)",
 
     categories: isFr ? "Catégories acceptées" : "Accepted categories",
-    openCategories: isFr ? "Choisir les catégories" : "Choose categories",
+    globalPrice: isFr ? "Prix par défaut" : "Default price",
+    globalPriceSub: isFr
+      ? "Appliqué à toutes les catégories"
+      : "Applied to all categories",
+    adjustPrices: isFr ? "Ajuster par catégorie" : "Adjust per category",
+    pricePerCategory: isFr ? "Prix par catégorie" : "Price per category",
 
     price: isFr ? "Prix" : "Price",
-    handoffMoments: isFr
-      ? "Remise du colis au voyageur"
-      : "Parcel handoff to the traveler",
-    pickupMoments: isFr
-      ? "Retrait du colis par le destinataire"
-      : "Parcel pickup by the recipient",
-    beforeDeparture: isFr ? "Avant le départ" : "Before departure",
+    handoffMoments: isFr ? "Remise" : "Handoff",
+    pickupMoments: isFr ? "Retrait" : "Pickup",
+    beforeDeparture: isFr ? "Avant départ" : "Before departure",
     atDeparture: isFr ? "Au départ" : "At departure",
-    onArrival: isFr ? "À l'arrivée du voyageur" : "At traveler arrival",
-    laterAtAddress: isFr
-      ? "Après l'arrivée, à une adresse convenue"
-      : "Later after arrival, at an agreed address",
+    onArrival: isFr ? "À l'arrivée" : "At arrival",
+    laterAtAddress: isFr ? "Adresse convenue" : "Agreed address",
     pickupInfo: isFr
-      ? "Indique quand le destinataire peut récupérer le colis : soit dès l’arrivée du voyageur au point d’arrivée, soit plus tard à une adresse précisée par le voyageur."
-      : "Specify when the recipient can collect the parcel: either upon the traveler’s arrival at the arrival point, or later at an address provided by the traveler.",
+      ? "Quand le destinataire peut récupérer le colis."
+      : "When the recipient can collect the parcel.",
 
-    options: isFr ? "Options complémentaires" : "Additional options",
-    handOnly: isFr ? "Remise en main propre uniquement" : "Hand delivery only",
+    options: isFr ? "Options" : "Options",
+    handOnly: isFr ? "Main propre uniquement" : "Hand delivery only",
     instantBooking: isFr ? "Réservation instantanée" : "Instant booking",
 
-    notes: isFr ? "Message complémentaire" : "Additional notes",
+    notes: isFr ? "Message (optionnel)" : "Note (optional)",
     notesPlaceholder: isFr
-      ? "Ex. remise possible à l’arrivée ou plus tard à une adresse convenue."
-      : "E.g. pickup possible upon arrival or later at an agreed address.",
-    uploadTitle: isFr ? "Justificatif" : "Proof document",
-    uploadSub: isFr
-      ? "Zone prête pour brancher l'upload billet / itinéraire."
-      : "Area ready to plug ticket / itinerary upload.",
+      ? "Détails supplémentaires pour les expéditeurs..."
+      : "Additional details for senders...",
 
-    reviewMode: isFr ? "Mode de transport" : "Transport mode",
+    reviewMode: isFr ? "Transport" : "Transport",
     reviewRoute: isFr ? "Itinéraire" : "Route",
-    reviewSchedule: isFr ? "Calendrier" : "Schedule",
-    reviewCategoryConditions: isFr ? "Catégories et conditions" : "Categories and conditions",
+    reviewSchedule: isFr ? "Dates" : "Dates",
+    reviewCategoryConditions: isFr ? "Catégories & prix" : "Categories & pricing",
+    reviewDocuments: isFr ? "Justificatifs" : "Documents",
+    edit: isFr ? "Modifier" : "Edit",
 
-    /**
-     * Legacy
-     */
-    smallDetourPossible: isFr ? "Petit détour possible" : "Small detour possible",
-    stopoverCount: isFr ? "Nombre d'escales" : "Number of layovers",
-    detourRadius: isFr ? "Rayon de détour accepté" : "Accepted detour radius",
-    transportReference: isFr ? "Référence transport" : "Transport reference",
-    maxParcelCount: isFr ? "Nombre maximum de colis" : "Maximum parcel count",
-    maxWeight: isFr ? "Poids maximum" : "Maximum weight",
-    volume: isFr ? "Volume disponible" : "Available volume",
-    small: isFr ? "Petit" : "Small",
-    medium: isFr ? "Moyen" : "Medium",
-    large: isFr ? "Grand" : "Large",
-    constraints: isFr ? "Contraintes" : "Constraints",
-    fragile: isFr ? "Objets fragiles acceptés" : "Fragile items allowed",
-    urgentDocs: isFr ? "Documents urgents acceptés" : "Urgent documents allowed",
-    handoffFlexibility: isFr ? "Souplesse de remise" : "Handoff flexibility",
-    duringTrip: isFr ? "Pendant trajet" : "During trip",
-    reviewCapacity: isFr ? "Capacité" : "Capacity",
-    reviewConditions: isFr ? "Conditions & prix" : "Conditions & pricing",
-    flexible: isFr ? "Flexible" : "Flexible",
-    fixedTime: isFr ? "Horaire précis" : "Fixed time",
-    byAppointment: isFr ? "Sur rendez-vous" : "By appointment",
-    ticketVerified: isFr ? "Billet vérifié" : "Verified ticket",
+    revenueEstimate: isFr ? "Revenu estimé" : "Estimated revenue",
+    resumeDraft: isFr ? "Reprendre votre brouillon ?" : "Resume your draft?",
+    resumeDraftSub: isFr
+      ? "Vous aviez commencé un trajet."
+      : "You had started a trip.",
+    startFresh: isFr ? "Recommencer" : "Start fresh",
+    popularRoute: isFr ? "Route populaire" : "Popular route",
+    almostDone: isFr ? "Vous êtes presque au bout !" : "You're almost done!",
+    almostDoneSub: isFr
+      ? "Votre trajet est presque prêt à être publié."
+      : "Your trip is almost ready to publish.",
+    stayAndFinish: isFr ? "Terminer" : "Finish",
+    leave: isFr ? "Quitter" : "Leave",
   };
 }
 

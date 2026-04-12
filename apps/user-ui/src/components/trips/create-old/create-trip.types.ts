@@ -7,6 +7,12 @@ export type FlightType = "direct" | "withLayover";
 export type TrainTripType = "direct" | "withConnection" | "withIntermediateStops";
 export type CarTripFlexibility = "direct" | "detourByAgreement";
 
+/**
+ * Legacy conservé temporairement pour éviter de casser d'autres composants
+ * non encore patchés.
+ */
+export type ParcelVolume = "small" | "medium" | "large";
+
 export type HandoffMoment = "beforeDeparture" | "atDeparture";
 export type PickupMoment = "onArrival" | "laterAtAddress";
 
@@ -15,6 +21,11 @@ export type TicketVerificationStatus =
   | "pending"
   | "verified"
   | "rejected";
+
+/**
+ * Legacy conservé temporairement pour compatibilité partielle.
+ */
+export type HandoffFlexibility = "flexible" | "fixedTime" | "byAppointment";
 
 export type ParcelCategory =
   | "clothes"
@@ -30,21 +41,20 @@ export type ParcelCategory =
   | "checkedBag23kg"
   | "cabinBag12kg";
 
+export type MobileScreen =
+  | null
+  | "from"
+  | "to"
+  | "date"
+  | "arrivalDate"
+  | "pathType"
+  | "categories";
+
 export type CategoryCondition = {
   categoryKey: ParcelCategory;
   priceAmount: number | "";
   handoffMoments: HandoffMoment[];
   pickupMoments: PickupMoment[];
-};
-
-/** Local file before upload — stored in state, sent to backend on publish */
-export type TripDocumentDraft = {
-  id: string;
-  file: File;
-  name: string;
-  size: number;
-  mimeType: string;
-  previewUrl?: string;
 };
 
 export type Draft = {
@@ -66,43 +76,46 @@ export type Draft = {
   trainStopCities: string;
   travelReference: string;
 
-  /** Attached documents (local files before upload) */
-  tripDocuments: TripDocumentDraft[];
-
   acceptedCategories: ParcelCategory[];
   categoryConditions: Partial<Record<ParcelCategory, CategoryCondition>>;
-
-  globalPrice: number | "";
-  useGlobalPrice: boolean;
 
   handDeliveryOnly: boolean;
   instantBooking: boolean;
 
+  /**
+   * Statut système, non saisi par l'utilisateur.
+   */
   ticketVerificationStatus: TicketVerificationStatus;
 
   currencyCode: "EUR";
   notes: string;
-};
 
-export type MobileScreen =
-  | null
-  | "from"
-  | "to"
-  | "date"
-  | "arrivalDate"
-  | "pathType"
-  | "categories";
+  /**
+   * Legacy conservé temporairement pour compatibilité avec d'autres composants.
+   */
+  stopoverCount?: number;
+  detourRadiusKm?: number;
+  transportReference?: string;
 
-export type CategoryOption = {
-  key: ParcelCategory;
-  label: string;
+  maxParcelCount?: number | "";
+  maxWeightKg?: number | "";
+  volumeSize?: ParcelVolume | null;
+
+  fragileItemsAllowed?: boolean;
+  urgentDocumentsAllowed?: boolean;
+
+  handoffFlexibility?: HandoffFlexibility | null;
+  priceAmount?: number | "";
+
+  /**
+   * Legacy éventuel
+   */
+  ticketVerified?: boolean;
 };
 
 export type CreateTripCopy = {
   title: string;
   subtitle: string;
-  firstTripTitle: string;
-  firstTripSub: string;
   steps: string[];
   back: string;
   continue: string;
@@ -131,7 +144,6 @@ export type CreateTripCopy = {
   arrivalDate: string;
   departureTime: string;
   arrivalTime: string;
-  swap: string;
 
   tripPathType: string;
   directFlight: string;
@@ -146,18 +158,8 @@ export type CreateTripCopy = {
   trainStopCities: string;
   travelReference: string;
 
-  docUpload: string;
-  docUploadSub: string;
-  docUploadHint: string;
-  docPending: string;
-  docVerified: string;
-  docCount: string;
-
   categories: string;
-  globalPrice: string;
-  globalPriceSub: string;
-  adjustPrices: string;
-  pricePerCategory: string;
+  openCategories: string;
 
   price: string;
   handoffMoments: string;
@@ -174,21 +176,41 @@ export type CreateTripCopy = {
 
   notes: string;
   notesPlaceholder: string;
+  uploadTitle: string;
+  uploadSub: string;
 
   reviewMode: string;
   reviewRoute: string;
   reviewSchedule: string;
   reviewCategoryConditions: string;
-  reviewDocuments: string;
-  edit: string;
 
-  revenueEstimate: string;
-  resumeDraft: string;
-  resumeDraftSub: string;
-  startFresh: string;
-  popularRoute: string;
-  almostDone: string;
-  almostDoneSub: string;
-  stayAndFinish: string;
-  leave: string;
+  /**
+   * Legacy conservé temporairement.
+   */
+  smallDetourPossible?: string;
+  stopoverCount?: string;
+  detourRadius?: string;
+  transportReference?: string;
+  maxParcelCount?: string;
+  maxWeight?: string;
+  volume?: string;
+  small?: string;
+  medium?: string;
+  large?: string;
+  constraints?: string;
+  fragile?: string;
+  urgentDocs?: string;
+  handoffFlexibility?: string;
+  duringTrip?: string;
+  flexible?: string;
+  fixedTime?: string;
+  byAppointment?: string;
+  reviewCapacity?: string;
+  reviewConditions?: string;
+  ticketVerified?: string;
+};
+
+export type CategoryOption = {
+  key: ParcelCategory;
+  label: string;
 };
