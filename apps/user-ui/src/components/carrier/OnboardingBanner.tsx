@@ -60,7 +60,7 @@ export function OnboardingBanner() {
           {/* Actions */}
           <div className="flex items-center gap-3">
             <Link
-              href="/carrier/onboarding"
+              href="/apps/user-ui/src/app/%5Blocale%5D/carrier/onboarding"
               className="inline-flex items-center rounded-full bg-white px-4 py-1.5 text-sm font-semibold text-blue-600 shadow-sm transition-colors hover:bg-blue-50 dark:bg-white dark:text-blue-700 dark:hover:bg-gray-100"
             >
               Reprendre

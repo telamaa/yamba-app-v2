@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
+import { useRouter } from "@/i18n/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { useUiPreferences } from "@/components/providers/UiPreferencesProvider";
+import { usePersistedFormState } from "@/hooks/usePersistedFormState";
 import useUser from "@/hooks/useUser";
 import apiClient from "@/lib/api-client";
 import CityAutocomplete, { type PlaceDetails } from "@/components/search/CityAutocomplete";
@@ -20,12 +22,32 @@ import {
 } from "lucide-react";
 
 type OnboardingStepKey = "profile" | "stripe";
+
 type FieldErrors = {
   name?: string;
   bio?: string;
   address?: string;
   phone?: string;
 };
+
+type ProfileDraft = {
+  name: string;
+  bio: string;
+  addressText: string;
+  addressDetails: PlaceDetails | null;
+  phone: string;
+};
+
+const initialProfileDraft: ProfileDraft = {
+  name: "",
+  bio: "",
+  addressText: "",
+  addressDetails: null,
+  phone: "",
+};
+
+// Bump si la structure de ProfileDraft change
+const ONBOARDING_VERSION = 1;
 
 function buildCopy(isFr: boolean) {
   return {
@@ -84,8 +106,6 @@ function buildCopy(isFr: boolean) {
   };
 }
 
-/* ── Inline field error ── */
-
 function FieldError({ message }: { message?: string }) {
   if (!message) return null;
   return (
@@ -112,11 +132,12 @@ export default function CarrierOnboardingWizard() {
   const [currentStep, setCurrentStep] = useState<OnboardingStepKey>(initialStep);
   const [isComplete, setIsComplete] = useState(false);
 
-  const [name, setName] = useState("");
-  const [bio, setBio] = useState("");
-  const [addressText, setAddressText] = useState("");
-  const [addressDetails, setAddressDetails] = useState<PlaceDetails | null>(null);
-  const [phone, setPhone] = useState("");
+  // ── Persistance automatique du formulaire profil ──
+  const [profile, setProfile, clearProfile] = usePersistedFormState<ProfileDraft>(
+    "carrier-onboarding",
+    initialProfileDraft,
+    { version: ONBOARDING_VERSION }
+  );
 
   const [errors, setErrors] = useState<FieldErrors>({});
   const [showErrors, setShowErrors] = useState(false);
@@ -125,26 +146,46 @@ export default function CarrierOnboardingWizard() {
   const [isStripeLoading, setIsStripeLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // ── Pré-remplissage depuis l'API utilisateur (uniquement si le form est vide) ──
   useEffect(() => {
     if (!user) return;
     const cp = (user as any).carrierPage;
+
     if (cp) {
-      setName(cp.name ?? "");
-      setBio(cp.bio ?? "");
-      setPhone(cp.phoneE164 ?? (user as any).phoneE164 ?? "");
-      if (cp.primaryAddress) {
-        const pa = cp.primaryAddress;
-        const display = pa.formattedAddress || [pa.city, pa.country].filter(Boolean).join(", ") || "";
-        setAddressText(display);
-        setAddressDetails({
-          formattedAddress: pa.formattedAddress ?? display,
-          placeId: pa.placeId ?? "",
-          lat: pa.lat ?? null, lng: pa.lng ?? null,
-          streetLine1: pa.streetLine1 ?? null, city: pa.city ?? null,
-          region: pa.region ?? null, postalCode: pa.postalCode ?? null,
-          country: pa.country ?? null, countryCode: pa.countryCode ?? null,
-        });
-      }
+      // Si on a déjà des données en sessionStorage, on ne les écrase pas
+      // (sauf si les champs sont vides)
+      setProfile((prev) => {
+        const shouldPrefillName = !prev.name;
+        const shouldPrefillBio = !prev.bio;
+        const shouldPrefillPhone = !prev.phone;
+        const shouldPrefillAddress = !prev.addressDetails;
+
+        let nextAddressText = prev.addressText;
+        let nextAddressDetails = prev.addressDetails;
+
+        if (shouldPrefillAddress && cp.primaryAddress) {
+          const pa = cp.primaryAddress;
+          const display = pa.formattedAddress || [pa.city, pa.country].filter(Boolean).join(", ") || "";
+          nextAddressText = display;
+          nextAddressDetails = {
+            formattedAddress: pa.formattedAddress ?? display,
+            placeId: pa.placeId ?? "",
+            lat: pa.lat ?? null, lng: pa.lng ?? null,
+            streetLine1: pa.streetLine1 ?? null, city: pa.city ?? null,
+            region: pa.region ?? null, postalCode: pa.postalCode ?? null,
+            country: pa.country ?? null, countryCode: pa.countryCode ?? null,
+          };
+        }
+
+        return {
+          name: shouldPrefillName ? (cp.name ?? prev.name) : prev.name,
+          bio: shouldPrefillBio ? (cp.bio ?? prev.bio) : prev.bio,
+          phone: shouldPrefillPhone ? (cp.phoneE164 ?? (user as any).phoneE164 ?? prev.phone) : prev.phone,
+          addressText: nextAddressText,
+          addressDetails: nextAddressDetails,
+        };
+      });
+
       const stripeReady = cp.stripeOnboardingComplete && cp.stripeChargesEnabled;
       if (isStripeOnlyMode) {
         setCurrentStep("stripe");
@@ -154,10 +195,14 @@ export default function CarrierOnboardingWizard() {
         if (cp.onboardingStep === "COMPLETE" && stripeReady) setIsComplete(true);
       }
     } else {
-      const initial = `${user.firstName} ${user.lastName?.charAt(0) ?? ""}.`.trim();
-      setName(initial);
-      setPhone((user as any).phoneE164 ?? "");
+      // Pré-remplir nom/phone uniquement si vides
+      setProfile((prev) => ({
+        ...prev,
+        name: prev.name || `${user.firstName} ${user.lastName?.charAt(0) ?? ""}.`.trim(),
+        phone: prev.phone || ((user as any).phoneE164 ?? ""),
+      }));
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, isStripeOnlyMode]);
 
   useEffect(() => {
@@ -172,34 +217,31 @@ export default function CarrierOnboardingWizard() {
     if ((user as any).carrierStatus === "ACTIVE" && stripeReady) setIsComplete(true);
   }, [user, isStripeOnlyMode]);
 
-  /* ── Field validation ── */
+  // ── Field validation ──
   const validateFields = (): FieldErrors => {
     const errs: FieldErrors = {};
 
-    const trimmedName = name.trim();
+    const trimmedName = profile.name.trim();
     if (!trimmedName) errs.name = copy.nameRequired;
     else if (trimmedName.length < 2) errs.name = copy.nameTooShort;
 
-    const trimmedBio = bio.trim();
+    const trimmedBio = profile.bio.trim();
     if (!trimmedBio) errs.bio = copy.bioRequired;
     else if (trimmedBio.length < copy.bioMinLength) errs.bio = copy.bioTooShort;
 
-    if (!addressDetails || !addressDetails.city) errs.address = copy.addressRequired;
+    if (!profile.addressDetails || !profile.addressDetails.city) errs.address = copy.addressRequired;
 
-    const trimmedPhone = phone.trim();
+    const trimmedPhone = profile.phone.trim();
     if (!trimmedPhone) errs.phone = copy.phoneRequired;
     else if (!trimmedPhone.startsWith("+") || trimmedPhone.length < 8) errs.phone = copy.phoneInvalid;
 
     return errs;
   };
 
-  // Re-validate on change if errors are shown
   useEffect(() => {
     if (showErrors) setErrors(validateFields());
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [name, bio, addressDetails, phone, showErrors]);
-
-  // const isFormValid = Object.keys(validateFields()).length === 0;
+  }, [profile, showErrors]);
 
   const handleSaveProfile = async () => {
     const validationErrors = validateFields();
@@ -207,7 +249,6 @@ export default function CarrierOnboardingWizard() {
     setShowErrors(true);
 
     if (Object.keys(validationErrors).length > 0) {
-      // Scroll to first error
       setTimeout(() => {
         const firstError = document.querySelector("[data-field-error='true']");
         firstError?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -220,24 +261,25 @@ export default function CarrierOnboardingWizard() {
 
     try {
       await apiClient.post("/carrier/onboarding/profile", {
-        name: name.trim(),
-        bio: bio.trim(),
+        name: profile.name.trim(),
+        bio: profile.bio.trim(),
         address: {
-          formattedAddress: addressDetails!.formattedAddress,
-          placeId: addressDetails!.placeId || undefined,
-          lat: addressDetails!.lat ?? undefined,
-          lng: addressDetails!.lng ?? undefined,
-          streetLine1: addressDetails!.streetLine1 || undefined,
-          city: addressDetails!.city || undefined,
-          region: addressDetails!.region || undefined,
-          postalCode: addressDetails!.postalCode || undefined,
-          country: addressDetails!.country || undefined,
-          countryCode: addressDetails!.countryCode || undefined,
+          formattedAddress: profile.addressDetails!.formattedAddress,
+          placeId: profile.addressDetails!.placeId || undefined,
+          lat: profile.addressDetails!.lat ?? undefined,
+          lng: profile.addressDetails!.lng ?? undefined,
+          streetLine1: profile.addressDetails!.streetLine1 || undefined,
+          city: profile.addressDetails!.city || undefined,
+          region: profile.addressDetails!.region || undefined,
+          postalCode: profile.addressDetails!.postalCode || undefined,
+          country: profile.addressDetails!.country || undefined,
+          countryCode: profile.addressDetails!.countryCode || undefined,
         },
-        phoneE164: phone.trim(),
+        phoneE164: profile.phone.trim(),
       }, { requireAuth: true });
 
       await queryClient.invalidateQueries({ queryKey: ["user"] });
+      // Ne pas clear le formulaire, l'utilisateur peut vouloir revenir en arrière
       setCurrentStep("stripe");
       setShowErrors(false);
     } catch (err: any) {
@@ -263,12 +305,16 @@ export default function CarrierOnboardingWizard() {
   };
 
   const handleSkipStripe = async () => {
-    if (isStripeOnlyMode) { router.push("/dashboard/yamber"); return; }
+    if (isStripeOnlyMode) {
+      router.push("/dashboard/yamber");
+      return;
+    }
     setError(null);
     setIsSaving(true);
     try {
       await apiClient.post("/carrier/onboarding/complete", {}, { requireAuth: true });
       await queryClient.invalidateQueries({ queryKey: ["user"] });
+      clearProfile();
       setIsComplete(true);
     } catch (err: any) {
       setError(err?.response?.data?.message || copy.genericError);
@@ -306,7 +352,6 @@ export default function CarrierOnboardingWizard() {
   ];
   const currentIndex = steps.findIndex((s) => s.key === currentStep);
 
-  // Field style helper
   const fieldCls = (hasError: boolean) =>
     `mt-2 w-full rounded-lg border px-4 py-2.5 text-sm text-slate-900 outline-none transition-colors focus:ring-4 dark:bg-slate-950 dark:text-white ${
       hasError
@@ -363,8 +408,8 @@ export default function CarrierOnboardingWizard() {
                 {copy.nameLabel} <span className="text-[#FF9900]">*</span>
               </label>
               <input
-                id="carrier-name" type="text" value={name}
-                onChange={(e) => setName(e.target.value)}
+                id="carrier-name" type="text" value={profile.name}
+                onChange={(e) => setProfile((p) => ({ ...p, name: e.target.value }))}
                 placeholder={copy.namePlaceholder}
                 className={fieldCls(!!errors.name)}
               />
@@ -380,8 +425,8 @@ export default function CarrierOnboardingWizard() {
               </label>
               <div className="relative mt-2">
                 <textarea
-                  id="carrier-bio" value={bio}
-                  onChange={(e) => { if (e.target.value.length <= copy.bioLimit) setBio(e.target.value); }}
+                  id="carrier-bio" value={profile.bio}
+                  onChange={(e) => { if (e.target.value.length <= copy.bioLimit) setProfile((p) => ({ ...p, bio: e.target.value })); }}
                   placeholder={copy.bioPlaceholder}
                   rows={4}
                   maxLength={copy.bioLimit}
@@ -391,8 +436,8 @@ export default function CarrierOnboardingWizard() {
                       : "border-slate-200 focus:border-[#FF9900]/80 focus:ring-[#FF9900]/25 dark:border-slate-800 dark:focus:border-[#FFAE33]/70"
                   }`}
                 />
-                <span className={["absolute bottom-2.5 right-3 text-xs", bio.length > copy.bioLimit * 0.9 ? "text-red-500 dark:text-red-400" : bio.length > copy.bioLimit * 0.75 ? "text-amber-500 dark:text-amber-400" : "text-slate-400 dark:text-slate-500"].join(" ")}>
-                  {bio.length}/{copy.bioLimit}
+                <span className={["absolute bottom-2.5 right-3 text-xs", profile.bio.length > copy.bioLimit * 0.9 ? "text-red-500 dark:text-red-400" : profile.bio.length > copy.bioLimit * 0.75 ? "text-amber-500 dark:text-amber-400" : "text-slate-400 dark:text-slate-500"].join(" ")}>
+                  {profile.bio.length}/{copy.bioLimit}
                 </span>
               </div>
               <FieldError message={errors.bio} />
@@ -407,9 +452,21 @@ export default function CarrierOnboardingWizard() {
                 errors.address ? "border-[#FF9900]" : "border-slate-200 dark:border-slate-800 bg-white"
               }`}>
                 <CityAutocomplete
-                  value={addressText}
-                  action={(v) => { setAddressText(v); if (!v.trim()) setAddressDetails(null); }}
-                  onPlaceSelect={(details) => { setAddressText(details.formattedAddress); setAddressDetails(details); }}
+                  value={profile.addressText}
+                  action={(v) => {
+                    setProfile((p) => ({
+                      ...p,
+                      addressText: v,
+                      addressDetails: v.trim() ? p.addressDetails : null,
+                    }));
+                  }}
+                  onPlaceSelect={(details) => {
+                    setProfile((p) => ({
+                      ...p,
+                      addressText: details.formattedAddress,
+                      addressDetails: details,
+                    }));
+                  }}
                   placeholder={copy.addressPlaceholder}
                   language={isFr ? "fr" : "en"}
                   inputClassName="text-sm"
@@ -424,9 +481,9 @@ export default function CarrierOnboardingWizard() {
             {/* Phone */}
             <div data-field-error={!!errors.phone}>
               <PhoneInput
-                value={phone}
-                action={setPhone}
-                defaultCountry={addressDetails?.countryCode ?? "FR"}
+                value={profile.phone}
+                action={(v) => setProfile((p) => ({ ...p, phone: v }))}
+                defaultCountry={profile.addressDetails?.countryCode ?? "FR"}
                 label={`${copy.phoneLabel} *`}
                 hint={errors.phone ? undefined : copy.phoneHint}
               />

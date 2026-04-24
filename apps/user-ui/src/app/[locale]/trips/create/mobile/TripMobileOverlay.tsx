@@ -9,8 +9,8 @@ import {
   CreateTripCopy,
   Draft,
   MobileScreen,
-} from "../../../../components/trips/create/create-trip.types";
-import { CategoryChip, ChoiceCard } from "../../../../components/trips/create/TripFormUi";
+} from "../../../../../components/trips/create/create-trip.types";
+import { CategoryChip, ChoiceCard } from "../../../../../components/trips/create/TripFormUi";
 
 export default function TripMobileOverlay({
                                             mounted,

@@ -1,0 +1,25 @@
+{
+  "hero": {
+    "line1": "A trip already exists,",
+    "line2": "Make the most of it:",
+    "line3": "Send your lightweight parcels differently.",
+    "alt": "Traveler in transport, illustration of collaborative shipping with Yamba"
+  },
+  "cards": {
+    "savings": {
+      "tag": "Savings",
+      "title": "More affordable",
+      "text": "Lower the cost of sending small parcels by using trips that are already planned."
+    },
+    "trust": {
+      "tag": "Trust",
+      "title": "More transparent",
+      "text": "Clear parcel tracking, easier communication, and direct contact with the traveler."
+    },
+    "impact": {
+      "tag": "Impact",
+      "title": "More responsible",
+      "text": "Yamba optimizes existing trips to reduce unnecessary dedicated transport."
+    }
+  }
+}

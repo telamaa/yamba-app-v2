@@ -3,7 +3,7 @@
 
 
 import SectionHeader from "@/components/dashboard/SectionHeader";
-import {DashboardCopy} from "@/app/dashboard/dashboard.copy";
+import {DashboardCopy} from "@/app/[locale]/dashboard/dashboard.copy";
 import {ListRow} from "@/components/dashboard/DashboardUI";
 
 export default function Messages({ copy }: { copy: DashboardCopy }) {

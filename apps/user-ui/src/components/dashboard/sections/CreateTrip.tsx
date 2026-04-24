@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
-import {DashboardCopy} from "@/app/dashboard/dashboard.copy";
+import {DashboardCopy} from "@/app/[locale]/dashboard/dashboard.copy";
 import SectionHeader from "@/components/dashboard/SectionHeader";
 import {EmptyState} from "@/components/dashboard/DashboardUI";
 
