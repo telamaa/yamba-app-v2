@@ -73,6 +73,22 @@ export function estimateRevenue(
   return { min, max };
 }
 
+/* ── Date helpers ─────────────────────────── */
+
+/** Strip time from a Date to compare dates only */
+function toDateOnly(d: Date): Date {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+function isDateInPast(date: Date): boolean {
+  const today = toDateOnly(new Date());
+  return toDateOnly(date) < today;
+}
+
+function isArrivalBeforeDeparture(departure: Date, arrival: Date): boolean {
+  return toDateOnly(arrival) < toDateOnly(departure);
+}
+
 /* ── Validation ──────────────────────────── */
 
 export type ValidationErrors = Record<string, string>;
@@ -85,8 +101,20 @@ export function getValidationErrorsFr(isFr: boolean) {
     carTripFlexibility: isFr ? "Précisez le type" : "Specify the type",
     from: isFr ? "Ville de départ requise" : "Departure city required",
     to: isFr ? "Ville d'arrivée requise" : "Arrival city required",
+    fromPlace: isFr
+      ? "Sélectionnez une ville dans la liste"
+      : "Select a city from the list",
+    toPlace: isFr
+      ? "Sélectionnez une ville dans la liste"
+      : "Select a city from the list",
     departureDate: isFr ? "Date requise" : "Date required",
+    departureDatePast: isFr
+      ? "La date de départ ne peut pas être dans le passé"
+      : "Departure date cannot be in the past",
     arrivalDate: isFr ? "Date requise" : "Date required",
+    arrivalDateBeforeDeparture: isFr
+      ? "La date d'arrivée doit être après le départ"
+      : "Arrival date must be after departure",
     departureTime: isFr ? "Heure requise" : "Time required",
     arrivalTime: isFr ? "Heure requise" : "Time required",
     flightLayoverCities: isFr ? "Précisez la ville d'escale" : "Specify layover city",
@@ -104,23 +132,54 @@ export function validateStep1(draft: Draft, isFr: boolean): ValidationErrors {
   const errors: ValidationErrors = {};
 
   if (!draft.transportMode) errors.transportMode = msgs.transportMode;
-  if (!draft.from) errors.from = msgs.from;
-  if (!draft.to) errors.to = msgs.to;
-  if (!draft.departureDate) errors.departureDate = msgs.departureDate;
-  if (!draft.arrivalDate) errors.arrivalDate = msgs.arrivalDate;
+
+  if (!draft.from) {
+    errors.from = msgs.from;
+  } else if (!draft.fromPlace) {
+    errors.from = msgs.fromPlace;
+  }
+
+  if (!draft.to) {
+    errors.to = msgs.to;
+  } else if (!draft.toPlace) {
+    errors.to = msgs.toPlace;
+  }
+
+  // Departure date
+  if (!draft.departureDate) {
+    errors.departureDate = msgs.departureDate;
+  } else if (isDateInPast(draft.departureDate)) {
+    errors.departureDate = msgs.departureDatePast;
+  }
+
+  // Arrival date
+  if (!draft.arrivalDate) {
+    errors.arrivalDate = msgs.arrivalDate;
+  } else if (draft.departureDate && isArrivalBeforeDeparture(draft.departureDate, draft.arrivalDate)) {
+    errors.arrivalDate = msgs.arrivalDateBeforeDeparture;
+  }
+
   if (!draft.departureTime) errors.departureTime = msgs.departureTime;
   if (!draft.arrivalTime) errors.arrivalTime = msgs.arrivalTime;
 
-  if (draft.transportMode === "plane" && !draft.flightType) errors.flightType = msgs.flightType;
-  if (draft.transportMode === "train" && !draft.trainTripType) errors.trainTripType = msgs.trainTripType;
-  if (draft.transportMode === "car" && !draft.carTripFlexibility) errors.carTripFlexibility = msgs.carTripFlexibility;
+  if (draft.transportMode === "plane" && !draft.flightType)
+    errors.flightType = msgs.flightType;
+  if (draft.transportMode === "train" && !draft.trainTripType)
+    errors.trainTripType = msgs.trainTripType;
+  if (draft.transportMode === "car" && !draft.carTripFlexibility)
+    errors.carTripFlexibility = msgs.carTripFlexibility;
 
-  if (draft.transportMode === "plane" && draft.flightType === "withLayover" && !draft.flightLayoverCities.trim()) {
+  if (
+    draft.transportMode === "plane" &&
+    draft.flightType === "withLayover" &&
+    !draft.flightLayoverCities.trim()
+  ) {
     errors.flightLayoverCities = msgs.flightLayoverCities;
   }
   if (
     draft.transportMode === "train" &&
-    (draft.trainTripType === "withConnection" || draft.trainTripType === "withIntermediateStops") &&
+    (draft.trainTripType === "withConnection" ||
+      draft.trainTripType === "withIntermediateStops") &&
     !draft.trainStopCities.trim()
   ) {
     errors.trainStopCities = msgs.trainStopCities;
@@ -168,7 +227,9 @@ const DRAFT_STORAGE_KEY = "yamba_trip_draft";
 export function saveDraftToStorage(draft: unknown) {
   try {
     localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draft));
-  } catch { /* silent */ }
+  } catch {
+    /* silent */
+  }
 }
 
 export function loadDraftFromStorage(): unknown | null {
@@ -184,5 +245,7 @@ export function loadDraftFromStorage(): unknown | null {
 export function clearDraftStorage() {
   try {
     localStorage.removeItem(DRAFT_STORAGE_KEY);
-  } catch { /* silent */ }
+  } catch {
+    /* silent */
+  }
 }

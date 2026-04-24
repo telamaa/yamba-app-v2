@@ -1,27 +1,26 @@
 import express from 'express';
 import cors from "cors";
-import cookieParser from "cookie-parser";
-import {errorMiddleware} from "@packages/error-handler/error-middleware";
-import router from "./routes/auth.router";
+import cookieParser = require("cookie-parser");
 import swaggerUi from "swagger-ui-express";
-import carrierRouter from "./routes/carrier.router";
+import { errorMiddleware } from "@packages/error-handler/error-middleware";
+import tripRouter from "./routes/trip.router";
+import uploadRouter from "./routes/upload.routes";
 const swaggerDocument = require("./swagger-output.json");
 
 const app = express();
 
 app.use(
   cors({
-    origin: ["http://localhost:3000", "http://192.168.1.155:3000"],
+    origin: ["http://localhost:3000"],
     allowedHeaders: ["Authorization", "Content-Type"],
     credentials: true,
   })
 );
-
-app.use(express.json());
+app.use(express.json({ limit: "100mb" }));
 app.use(cookieParser());
 
-app.get('/', (req, res) => {
-    res.send({ 'message': 'Hello Auth API'});
+app.get("/", (req, res) => {
+  res.send({ message: "Hello Trip API" });
 });
 
 // Swagger
@@ -31,18 +30,17 @@ app.get("/docs-json", (req, res) => {
 });
 
 // Routes
-app.use("/api", router);
-app.use("/api", carrierRouter);
+app.use("/trips", tripRouter);
+app.use("/uploads", uploadRouter);
 
 app.use(errorMiddleware);
 
-const port = process.env.PORT || 6001;
+const port = process.env.PORT || 6002;
 const server = app.listen(port, () => {
-  console.log(`Auth service is running at http://localhost:${port}/api`);
-  console.log(`Swagger Docs available at http://localhost:${port}/docs`);
+  console.log(`Trip service running at http://localhost:${port}`);
+  console.log(`Swagger Docs at http://localhost:${port}/api-docs`);
 });
 
 server.on("error", (err) => {
   console.log("Server Error:", err);
 });
-

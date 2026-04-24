@@ -11,15 +11,10 @@ import {
   Menu,
   X,
   User,
-  Settings,
   HelpCircle,
   LogOut,
-  Truck,
-  Store,
+  Zap,
   Bell,
-  Shield,
-  CreditCard,
-  MessageSquare,
 } from "lucide-react";
 import { useOnClickOutside } from "@/hooks/useOnClickOutside";
 import CommandPalette, { CommandAction } from "./CommandPalette";
@@ -28,6 +23,7 @@ import useUser from "@/hooks/useUser";
 import useShareTrip from "@/hooks/useShareTrip";
 import { useQueryClient } from "@tanstack/react-query";
 import { logoutUser as logoutApi } from "@/services/auth.api";
+import { getUserInitials, formatDisplayName } from "@/lib/format-user";
 
 type Lang = "fr" | "en";
 const LANGS: Record<Lang, { label: string; code: string }> = {
@@ -109,19 +105,11 @@ export default function Header() {
         login: "Connexion",
         share: "Partager un trajet",
         help: "Aide",
-        carrierShort: "Transporteur",
-        sellerShort: "Vendeur",
-        // User menu
+        // User menu (simplified — raccourcis rapides)
         myAccount: "Mon compte",
         myTrips: "Mes trajets",
-        myParcels: "Mes colis",
-        becomeCarrier: "Espace transporteur",
-        becomeSeller: "Devenir vendeur",
         notifications: "Notifications",
-        messages: "Messages",
-        payments: "Paiements",
-        security: "Sécurité & confidentialité",
-        settings: "Paramètres",
+        help2: "Aide",
         logout: "Déconnexion",
       };
     }
@@ -129,19 +117,11 @@ export default function Header() {
       login: "Log in",
       share: "Share your trip",
       help: "Help",
-      carrierShort: "Carrier",
-      sellerShort: "Seller",
-      // User menu
+      // User menu (simplified)
       myAccount: "My account",
       myTrips: "My trips",
-      myParcels: "My parcels",
-      becomeCarrier: "Carrier space",
-      becomeSeller: "Become a seller",
       notifications: "Notifications",
-      messages: "Messages",
-      payments: "Payments",
-      security: "Security & privacy",
-      settings: "Settings",
+      help2: "Help",
       logout: "Sign out",
     };
   }, [lang]);
@@ -151,16 +131,15 @@ export default function Header() {
   const actions: CommandAction[] = useMemo(
     () => [
       { label: L.login, href: "/login", keywords: ["login", "connexion"] },
-      { label: L.share, href: "/share", keywords: ["trip", "trajet"] },
-      { label: L.becomeCarrier, href: "/become/carrier", keywords: ["carrier", "transporteur"] },
-      { label: L.becomeSeller, href: "/become/seller", keywords: ["seller", "vendeur"] },
-      { label: L.help, href: "/help", keywords: ["support", "aide"] },
+      { label: L.share, href: "/trips/create", keywords: ["trip", "trajet"] },
+      { label: L.help, href: "/dashboard/help", keywords: ["support", "aide"] },
     ],
     [L]
   );
 
-  // Initiale du prénom
-  const userInitial = user?.firstName?.charAt(0)?.toUpperCase() ?? "U";
+  // Initiales (ex: "EG" pour Enrique Goio)
+  const userInitials = getUserInitials(user?.firstName, user?.lastName);
+  const userDisplayName = formatDisplayName(user?.firstName, user?.lastName);
   const userAvatar = user?.avatar?.url ?? null;
 
   // CTA simple
@@ -170,21 +149,12 @@ export default function Header() {
     "dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-900/60 " +
     "focus:outline-none focus-visible:ring-4 focus-visible:ring-[#FF9900]/25";
 
-  // Items du menu utilisateur
+  // Items du menu utilisateur — simplifié, pointe vers /dashboard/*
   const userMenuItems = [
-    { label: L.myAccount, href: "/account", icon: User },
-    { label: L.myTrips, href: "/my-trips", icon: Truck },
-    { label: L.myParcels, href: "/my-parcels", icon: Store },
-    { type: "separator" as const },
-    { label: L.notifications, href: "/notifications", icon: Bell },
-    { label: L.messages, href: "/messages", icon: MessageSquare },
-    { label: L.payments, href: "/payments", icon: CreditCard },
-    { type: "separator" as const },
-    { label: L.becomeCarrier, href: "/carrier/onboarding", icon: Truck },
-    { type: "separator" as const },
-    { label: L.security, href: "/security", icon: Shield },
-    { label: L.settings, href: "/settings", icon: Settings },
-    { label: L.help, href: "/help", icon: HelpCircle },
+    { label: L.myAccount, href: "/dashboard/home", icon: User },
+    { label: L.myTrips, href: "/dashboard/trips", icon: Zap },
+    { label: L.notifications, href: "/dashboard/notifications", icon: Bell },
+    { label: L.help2, href: "/dashboard/help", icon: HelpCircle },
     { type: "separator" as const },
     { label: L.logout, icon: LogOut, danger: true },
   ];
@@ -232,6 +202,20 @@ export default function Header() {
       </Link>
     );
   };
+
+  // Rendu avatar (partagé)
+  const renderAvatar = (size: string) => (
+    <div
+      className={`flex ${size} flex-shrink-0 items-center justify-center overflow-hidden rounded-full text-sm font-bold text-slate-950`}
+      style={!userAvatar ? { backgroundColor: COLORS.mango } : undefined}
+    >
+      {userAvatar ? (
+        <img src={userAvatar} alt="" className="h-full w-full object-cover" />
+      ) : (
+        userInitials
+      )}
+    </div>
+  );
 
   return (
     <>
@@ -295,7 +279,7 @@ export default function Header() {
                     className="w-full px-4 py-2 text-left text-sm hover:bg-slate-50 dark:hover:bg-slate-900"
                     onClick={() => selectLang("en")}
                   >
-                    Anglais <span className="text-slate-400">(EN)</span>
+                    English <span className="text-slate-400">(EN)</span>
                   </button>
                 </div>
               )}
@@ -357,7 +341,7 @@ export default function Header() {
                   {userAvatar ? (
                     <img src={userAvatar} alt="" className="h-full w-full object-cover" />
                   ) : (
-                    userInitial
+                    userInitials
                   )}
                 </button>
 
@@ -365,21 +349,10 @@ export default function Header() {
                   <div className="absolute right-0 mt-2 w-72 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-950">
                     {/* En-tête utilisateur */}
                     <div className="flex items-center gap-3 px-4 py-4">
-                      <div
-                        className="flex h-10 w-10 flex-shrink-0 items-center justify-center overflow-hidden rounded-full text-sm font-bold text-slate-950"
-                        style={!userAvatar ? { backgroundColor: COLORS.mango } : undefined}
-                      >
-                        {userAvatar ? (
-                          <img src={userAvatar} alt="" className="h-full w-full object-cover" />
-                        ) : (
-                          userInitial
-                        )}
-                      </div>
+                      {renderAvatar("h-10 w-10")}
                       <div className="min-w-0">
                         <p className="truncate text-sm font-semibold text-slate-900 dark:text-white">
-                          {/*{user?.firstName.split(" ")[0]}*/}
-                          {/*{user?.firstName?.split(" ")[0]?.replace(/^./, c => c.toUpperCase())}*/}
-                          {user?.firstName?.toLowerCase().replace(/\b\w/g, c => c.toUpperCase())}
+                          {userDisplayName}
                         </p>
                         {user.email && (
                           <p className="truncate text-xs text-slate-500 dark:text-slate-400">
@@ -441,7 +414,7 @@ export default function Header() {
                 {userAvatar ? (
                   <img src={userAvatar} alt="" className="h-full w-full object-cover" />
                 ) : (
-                  userInitial
+                  userInitials
                 )}
               </button>
             )}
@@ -467,19 +440,10 @@ export default function Header() {
               {/* Utilisateur connecté : en-tête profil */}
               {user && (
                 <div className="flex items-center gap-3 rounded-xl border border-slate-200 p-3 dark:border-slate-800">
-                  <div
-                    className="flex h-10 w-10 flex-shrink-0 items-center justify-center overflow-hidden rounded-full text-sm font-bold text-slate-950"
-                    style={!userAvatar ? { backgroundColor: COLORS.mango } : undefined}
-                  >
-                    {userAvatar ? (
-                      <img src={userAvatar} alt="" className="h-full w-full object-cover" />
-                    ) : (
-                      userInitial
-                    )}
-                  </div>
+                  {renderAvatar("h-10 w-10")}
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-slate-900 dark:text-white">
-                      {user?.firstName.split(" ")[0]}
+                      {userDisplayName}
                     </p>
                     {user.email && (
                       <p className="truncate text-xs text-slate-500 dark:text-slate-400">

@@ -49,7 +49,7 @@ export default function DashboardSidebar({ isFr }: Props) {
   };
 
   return (
-    <aside className="hidden md:flex w-[200px] flex-col flex-shrink-0 pt-1">
+    <aside className="hidden md:flex w-[200px] flex-col flex-shrink-0 pt-1 sticky top-[98spx] h-[calc(100vh-104px)] overflow-y-auto">
       {/* Home — standalone */}
       <div className="mb-3">
         {renderItem(HOME_ITEM, activeSection === "home")}

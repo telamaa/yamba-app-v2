@@ -12,8 +12,8 @@ import {
   HelpCircle,
 } from "lucide-react";
 import useUser from "@/hooks/useUser";
-import {DashboardCopy} from "@/app/dashboard/dashboard.copy";
-
+import { DashboardCopy } from "@/app/dashboard/dashboard.copy";
+import { getUserInitials, formatDisplayName } from "@/lib/format-user";
 
 const MANGO = "#FF9900";
 
@@ -31,23 +31,28 @@ const QUICK_ACTIONS = (copy: DashboardCopy) => [
 export default function HomeSection({ copy }: { copy: DashboardCopy }) {
   const { user } = useUser();
 
-  const initial = user?.firstName?.charAt(0)?.toUpperCase() ?? "U";
-  const name = user ? `${user.firstName} ${user.lastName}` : "—";
+  const initials = getUserInitials(user?.firstName, user?.lastName);
+  const displayName = formatDisplayName(user?.firstName, user?.lastName);
   const email = user?.email ?? "";
+  const avatarUrl = user?.avatar?.url ?? null;
 
   return (
     <div className="flex flex-col items-center pt-4 pb-8">
       {/* Avatar */}
       <div
-        className="grid h-20 w-20 place-items-center rounded-full text-2xl font-semibold text-slate-900"
-        style={{ backgroundColor: MANGO }}
+        className="grid h-20 w-20 place-items-center overflow-hidden rounded-full text-2xl font-semibold text-slate-900"
+        style={!avatarUrl ? { backgroundColor: MANGO } : undefined}
       >
-        {initial}
+        {avatarUrl ? (
+          <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
+        ) : (
+          initials
+        )}
       </div>
 
       {/* Name & email */}
       <h1 className="mt-4 text-2xl font-semibold text-slate-900 dark:text-white">
-        {name}
+        {displayName}
       </h1>
       <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
         {email}

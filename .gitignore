@@ -4,6 +4,7 @@
 dist
 tmp
 out-tsc
+build
 
 # dependencies
 node_modules
@@ -31,6 +32,8 @@ node_modules
 /libpeerconnection.log
 npm-debug.log
 yarn-error.log
+yarn-debug.log*
+pnpm-debug.log*
 testem.log
 /typings
 
@@ -38,16 +41,29 @@ testem.log
 .DS_Store
 Thumbs.db
 
+# Nx
 .nx/cache
 .nx/workspace-data
 
+# Test
 test-output
 
+# Prisma
 /generated/prisma
 
+# ─── SECRETS — CRITICAL ─────────────────────────
 .env
 .env.*
 .env.local
+!.env.example
+!.env.*.example
+
 # Next.js
 .next
 out
+.turbo
+.vercel
+next-env.d.ts
+
+# TypeScript
+*.tsbuildinfo
