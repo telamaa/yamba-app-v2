@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "npx nx run-many --target=serve --all",
     "auth-docs": "node apps/auth-service/src/swagger.js",
+    "trip-docs": "node apps/trip-service/src/swagger.js",
     "user-ui": "npx nx run-many --target=dev --all --projects=user-ui"
   },
   "private": true,
@@ -41,8 +42,8 @@
     "react-day-picker": "^9.13.2",
     "react-dom": "^19.0.0",
     "react-hook-form": "^7.71.2",
-    "react-hot-toast": "^2.6.0",
     "react-icons": "^5.5.0",
+    "sonner": "^2.0.7",
     "stripe": "^21.0.1",
     "swagger-autogen": "^2.23.7",
     "swagger-ui-express": "^5.0.1",

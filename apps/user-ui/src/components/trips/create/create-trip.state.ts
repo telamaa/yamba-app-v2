@@ -7,6 +7,8 @@ export const initialDraft: Draft = {
 
   from: "",
   to: "",
+  fromPlace: null,
+  toPlace: null,
   departureDate: getSmartDefaultDepartureDate(),
   arrivalDate: undefined,
   departureTime: getSmartDefaultTime(),
