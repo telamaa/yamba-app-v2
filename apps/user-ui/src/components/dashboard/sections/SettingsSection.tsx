@@ -2,7 +2,7 @@
 
 
 import { useUiPreferences } from "@/components/providers/UiPreferencesProvider";
-import {DashboardCopy} from "@/app/dashboard/dashboard.copy";
+import {DashboardCopy} from "@/app/[locale]/dashboard/dashboard.copy";
 import SectionHeader from "@/components/dashboard/SectionHeader";
 import {CardSection, SettingRow, ToggleRow} from "@/components/dashboard/DashboardUI";
 

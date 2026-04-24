@@ -2,8 +2,8 @@
 
 
 
-import {SectionKey} from "@/app/dashboard/dashboard.config";
-import {DashboardCopy} from "@/app/dashboard/dashboard.copy";
+import {SectionKey} from "@/app/[locale]/dashboard/dashboard.config";
+import {DashboardCopy} from "@/app/[locale]/dashboard/dashboard.copy";
 import MyTrips from "@/components/dashboard/sections/MyTrips";
 import MyShipments from "@/components/dashboard/sections/MyShipments";
 import CreateTrip from "@/components/dashboard/sections/CreateTrip";

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {MOBILE_TAB_SECTIONS, MOBILE_TABS, MobileTab} from "@/app/dashboard/dashboard.config";
+import {MOBILE_TAB_SECTIONS, MOBILE_TABS, MobileTab} from "@/app/[locale]/dashboard/dashboard.config";
 
 
 const MANGO_DARK = "#CC7A00";
@@ -36,7 +36,7 @@ export default function DashboardMobileNav({ isFr }: Props) {
         return (
           <Link
             key={tab.key}
-            href={`/dashboard/${firstSection}`}
+            href={`/apps/user-ui/src/app/%5Blocale%5D/dashboard/${firstSection}`}
             className={[
               "flex flex-col items-center gap-0.5 px-2 py-1 text-[10px]",
               isActive ? "font-medium" : "",

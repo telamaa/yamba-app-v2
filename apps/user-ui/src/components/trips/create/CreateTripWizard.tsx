@@ -1,9 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { useRouter } from "@/i18n/navigation";
 import { useUiPreferences } from "@/components/providers/UiPreferencesProvider";
+import { usePersistedFormState } from "@/hooks/usePersistedFormState";
 import { useCreateTrip, useUpdateTrip } from "@/hooks/useTrip";
 import { useEditTrip } from "@/hooks/useEditTrip";
 import { setFlashToast } from "@/lib/flash-toast";
@@ -16,9 +17,6 @@ import {
   createDefaultCategoryCondition,
   validateStep1,
   validateStep2,
-  saveDraftToStorage,
-  loadDraftFromStorage,
-  clearDraftStorage,
   type ValidationErrors,
 } from "./create-trip.config";
 import TripStepper from "./TripStepper";
@@ -32,6 +30,9 @@ const MANGO = "#FF9900";
 const TEAL = "#0F766E";
 const EMPTY_ERRORS: ValidationErrors = {};
 
+// Bump ce numéro si tu changes la structure de Draft
+const DRAFT_VERSION = 1;
+
 export default function CreateTripWizard() {
   const { lang } = useUiPreferences();
   const router = useRouter();
@@ -39,13 +40,22 @@ export default function CreateTripWizard() {
   const copy = useMemo(() => getCreateTripCopy(isFr), [isFr]);
 
   const [step, setStep] = useState<Step>(1);
-  const [draft, setDraft] = useState<Draft>(initialDraft);
+
+  // ── Persistance automatique du draft (remplace le localStorage manuel) ──
+  // On exclut tripDocuments car les File[] ne sont pas sérialisables en JSON
+  const [draft, setDraft, clearDraft] = usePersistedFormState<Draft>(
+    "create-trip-wizard",
+    initialDraft,
+    {
+      exclude: ["tripDocuments"] as (keyof Draft)[],
+      version: DRAFT_VERSION,
+    }
+  );
+
   const [direction, setDirection] = useState<"forward" | "backward">("forward");
-  const [showResumeBanner, setShowResumeBanner] = useState(false);
   const [shakeFields, setShakeFields] = useState(false);
   const [showErrors, setShowErrors] = useState(false);
 
-  const autoSaveRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
 
   // ── API ──
@@ -60,8 +70,8 @@ export default function CreateTripWizard() {
   useEffect(() => {
     if (editDraft) {
       setDraft(editDraft);
-      setShowResumeBanner(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editDraft]);
 
   // ── Validation ──
@@ -76,58 +86,29 @@ export default function CreateTripWizard() {
     setShowErrors(false);
   }, [step]);
 
-  // ── Draft persistence (localStorage) — only in create mode ──
-  useEffect(() => {
-    if (isEditMode) return;
-    const saved = loadDraftFromStorage();
-    if (saved && typeof saved === "object" && "transportMode" in (saved as Draft)) {
-      setShowResumeBanner(true);
-    }
-  }, [isEditMode]);
-
-  const resumeDraft = () => {
-    const saved = loadDraftFromStorage() as Draft | null;
-    if (saved) {
-      if (saved.departureDate) saved.departureDate = new Date(saved.departureDate);
-      if (saved.arrivalDate) saved.arrivalDate = new Date(saved.arrivalDate);
-      setDraft(saved);
-    }
-    setShowResumeBanner(false);
-  };
-
-  const startFresh = () => {
-    clearDraftStorage();
-    setShowResumeBanner(false);
-  };
-
-  useEffect(() => {
-    if (isEditMode) return;
-    autoSaveRef.current = setInterval(() => saveDraftToStorage(draft), 10000);
-    return () => {
-      if (autoSaveRef.current) clearInterval(autoSaveRef.current);
-    };
-  }, [draft, isEditMode]);
-
   // ── Category toggle ──
-  const toggleCategory = useCallback((value: ParcelCategory) => {
-    setDraft((prev) => {
-      const has = prev.acceptedCategories.includes(value);
-      if (has) {
-        const nextCats = prev.acceptedCategories.filter((c) => c !== value);
-        const nextConds = { ...prev.categoryConditions };
-        delete nextConds[value];
-        return { ...prev, acceptedCategories: nextCats, categoryConditions: nextConds };
-      }
-      return {
-        ...prev,
-        acceptedCategories: [...prev.acceptedCategories, value],
-        categoryConditions: {
-          ...prev.categoryConditions,
-          [value]: prev.categoryConditions[value] ?? createDefaultCategoryCondition(value),
-        },
-      };
-    });
-  }, []);
+  const toggleCategory = useCallback(
+    (value: ParcelCategory) => {
+      setDraft((prev) => {
+        const has = prev.acceptedCategories.includes(value);
+        if (has) {
+          const nextCats = prev.acceptedCategories.filter((c) => c !== value);
+          const nextConds = { ...prev.categoryConditions };
+          delete nextConds[value];
+          return { ...prev, acceptedCategories: nextCats, categoryConditions: nextConds };
+        }
+        return {
+          ...prev,
+          acceptedCategories: [...prev.acceptedCategories, value],
+          categoryConditions: {
+            ...prev.categoryConditions,
+            [value]: prev.categoryConditions[value] ?? createDefaultCategoryCondition(value),
+          },
+        };
+      });
+    },
+    [setDraft]
+  );
 
   // ── Navigation ──
   const goTo = (target: Step) => {
@@ -156,15 +137,13 @@ export default function CreateTripWizard() {
     setStep((prev) => (prev > 1 ? ((prev - 1) as Step) : prev));
   };
 
-  // ── Save draft (localStorage) ──
+  // ── Save draft (toast only — data already persisted in sessionStorage) ──
   const handleSaveDraft = () => {
-    saveDraftToStorage(draft);
     toast.success(isFr ? "Brouillon sauvegardé" : "Draft saved", { closeButton: true });
   };
 
   // ── Publish / Update trip (API) ──
   const handlePublish = async () => {
-    // ── Gate: save as draft if onboarding OR Stripe not done ──
     const carrierPage = (user as any)?.carrierPage;
     const hasOnboarding =
       carrierPage?.onboardingStep === "STRIPE" ||
@@ -172,22 +151,9 @@ export default function CreateTripWizard() {
     const stripeReady =
       carrierPage?.stripeOnboardingComplete && carrierPage?.stripeChargesEnabled;
 
-    // Cas 1 : pas d'onboarding → brouillon + toast onboarding
-    // Cas 2 : onboarding OK mais Stripe manquant → brouillon + toast Stripe
     if (!hasOnboarding || !stripeReady) {
-      const mutationFn =
-        isEditMode && editTripId
-          ? () => updateTrip.mutate(
-            { tripId: editTripId, draft, publish: false },
-            { onSuccess, onError }
-          )
-          : () => createTrip.mutate(
-            { draft, publish: false },
-            { onSuccess, onError }
-          );
-
       const onSuccess = () => {
-        clearDraftStorage();
+        clearDraft();
         setFlashToast({
           type: "onboarding_required",
           message: !hasOnboarding
@@ -209,17 +175,26 @@ export default function CreateTripWizard() {
         toast.error(message, { duration: Infinity, closeButton: true });
       };
 
-      mutationFn();
+      if (isEditMode && editTripId) {
+        updateTrip.mutate(
+          { tripId: editTripId, draft, publish: false },
+          { onSuccess, onError }
+        );
+      } else {
+        createTrip.mutate(
+          { draft, publish: false },
+          { onSuccess, onError }
+        );
+      }
       return;
     }
-    // ── Fin du gate ──
 
     if (isEditMode && editTripId) {
       updateTrip.mutate(
         { tripId: editTripId, draft, publish: true },
         {
           onSuccess: () => {
-            clearDraftStorage();
+            clearDraft();
             setFlashToast({
               type: "success",
               message: isFr ? "Trajet mis à jour avec succès !" : "Trip updated successfully!",
@@ -239,7 +214,7 @@ export default function CreateTripWizard() {
         { draft, publish: true },
         {
           onSuccess: () => {
-            clearDraftStorage();
+            clearDraft();
             setFlashToast({
               type: "success",
               message: isFr ? "Trajet publié avec succès !" : "Trip published successfully!",
@@ -270,37 +245,6 @@ export default function CreateTripWizard() {
   return (
     <main className="mx-auto max-w-7xl px-4 py-6">
       <div className="mx-auto max-w-2xl">
-        {/* Resume draft banner — only in create mode */}
-        {!isEditMode && showResumeBanner && (
-          <div className="mb-6 flex items-center justify-between rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
-            <div>
-              <div className="text-[14px] font-medium text-slate-900 dark:text-white">
-                {copy.resumeDraft}
-              </div>
-              <div className="mt-0.5 text-[12px] text-slate-500 dark:text-slate-400">
-                {copy.resumeDraftSub}
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={startFresh}
-                className="rounded-lg border border-slate-200 px-3 py-1.5 text-[12px] text-slate-600 dark:border-slate-700 dark:text-slate-400"
-              >
-                {copy.startFresh}
-              </button>
-              <button
-                type="button"
-                onClick={resumeDraft}
-                className="rounded-lg px-3 py-1.5 text-[12px] font-medium text-slate-900"
-                style={{ backgroundColor: MANGO }}
-              >
-                {copy.continue}
-              </button>
-            </div>
-          </div>
-        )}
-
         {/* Header */}
         <div className="mb-2">
           <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-white">
