@@ -3,8 +3,6 @@ import cors from 'cors';
 import proxy from "express-http-proxy";
 import morgan from "morgan";
 import rateLimit from "express-rate-limit";
-// import swaggerUi from "swagger-ui-express";
-// import axios from "axios";
 import cookieParser from "cookie-parser";
 
 const app = express();
@@ -35,15 +33,34 @@ const limiter = rateLimit({
 
 app.use(limiter);
 
-
 app.get('/gateway-health', (req, res) => {
   res.send({ message: 'Welcome to api-gateway!' });
 });
 
+// ─── Trip Service (port 6002) ────────────────
+// /api/trips/* → trip-service reçoit /trips/*
+app.use(
+  "/api/trips",
+  proxy("http://localhost:6002", {
+    proxyReqPathResolver: (req) => `/trips${req.url}`,
+  })
+);
+
+// ─── Upload Service (port 6002) ──────────────
+// /api/uploads/* → trip-service reçoit /uploads/*
+app.use(
+  "/api/uploads",
+  proxy("http://localhost:6002", {
+    proxyReqPathResolver: (req) => `/uploads${req.url}`,
+  })
+);
+
+// ─── Auth Service (port 6001) — catch-all ────
+// /api/auth/*, /api/carrier/* → auth-service
 app.use("/", proxy("http://localhost:6001"));
 
 const port = process.env.PORT || 8080;
 const server = app.listen(port, () => {
-  console.log(`Listening at http://localhost:${port}/api`);
+  console.log(`API Gateway listening at http://localhost:${port}`);
 });
 server.on('error', console.error);
