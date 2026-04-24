@@ -1,66 +1,88 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
+import React, { createContext, useContext, useMemo } from "react";
+import { useLocale, useTranslations } from "next-intl";
+
+/**
+ * UiPreferences — provider de compatibilité pendant la migration vers next-intl.
+ *
+ * Ce provider permet à tes composants NON migrés de continuer à fonctionner
+ * pendant que tu migres progressivement.
+ *
+ * ⚠️ DEPRECATED — À utiliser uniquement pendant la migration.
+ * Une fois tous les composants migrés vers useTranslations() de next-intl,
+ * tu pourras supprimer ce provider.
+ *
+ * Ce que ça expose:
+ * - `lang` → équivalent à useLocale() (lecture seule)
+ * - `t(key)` → utilise useTranslations('common') sous le capot
+ *
+ * Pour les NOUVEAUX composants, utilise directement:
+ *   import { useTranslations, useLocale } from 'next-intl';
+ *   const t = useTranslations('namespace');  // 'common', 'home', 'search', etc.
+ *   const locale = useLocale();
+ */
 
 export type UiLang = "fr" | "en";
 
 type UiPrefs = {
+  /** Locale actuelle (depuis next-intl) */
   lang: UiLang;
-  setLang: (l: UiLang) => void;
+  /** Fonction de traduction bridge vers le namespace "common" */
   t: (key: string) => string;
-};
-
-const dict: Record<UiLang, Record<string, string>> = {
-  fr: {
-    from: "Départ",
-    to: "Destination",
-    date: "Date",
-    today: "Aujourd’hui",
-    search: "Rechercher",
-    login: "Log in",
-    quickActions: "Actions rapides",
-    share: "Share Your Trip",
-  },
-  en: {
-    from: "From",
-    to: "To",
-    date: "Date",
-    today: "Today",
-    search: "Search",
-    login: "Log in",
-    quickActions: "Quick actions",
-    share: "Share Your Trip",
-  },
 };
 
 const UiPreferencesContext = createContext<UiPrefs | null>(null);
 
 export function UiPreferencesProvider({ children }: { children: React.ReactNode }) {
-  const [lang, setLangState] = useState<UiLang>("en");
+  const locale = useLocale() as UiLang;
 
-  useEffect(() => {
-    const saved = (localStorage.getItem("ui_lang") as UiLang | null) ?? "en";
-    setLangState(saved);
-  }, []);
+  // Charger le namespace "common" avec un fallback safe
+  // Les composants legacy faisaient `t("today")`, `t("login")`, etc.
+  // On les mappe sur les nouvelles clés organisées (fields.today, nav.login, etc.)
+  const tCommon = useTranslations("common");
 
-  const setLang = (l: UiLang) => {
-    setLangState(l);
-    localStorage.setItem("ui_lang", l);
+  // Mapping des anciennes clés plates vers les nouvelles clés imbriquées
+  const legacyKeyMap: Record<string, string> = {
+    // Anciennes clés → nouvelles clés dans common.json
+    from: "fields.from",
+    to: "fields.to",
+    date: "fields.date",
+    today: "fields.today",
+    tomorrow: "fields.tomorrow",
+    search: "actions.search",
+    login: "header.login",
+    share: "header.shareTrip",
+    quickActions: "nav.quickActions",
   };
 
-  const value = useMemo<UiPrefs>(() => {
-    return {
-      lang,
-      setLang,
-      t: (key: string) => dict[lang][key] ?? key,
-    };
-  }, [lang]);
+  const value = useMemo<UiPrefs>(
+    () => ({
+      lang: locale,
+      t: (key: string) => {
+        const mappedKey = legacyKeyMap[key] ?? key;
+        try {
+          return tCommon(mappedKey);
+        } catch {
+          // Si la clé n'existe pas, on retourne la clé elle-même (comportement legacy)
+          return key;
+        }
+      },
+    }),
+    [locale, tCommon]
+  );
 
-  return <UiPreferencesContext.Provider value={value}>{children}</UiPreferencesContext.Provider>;
+  return (
+    <UiPreferencesContext.Provider value={value}>
+      {children}
+    </UiPreferencesContext.Provider>
+  );
 }
 
 export function useUiPreferences() {
   const ctx = useContext(UiPreferencesContext);
-  if (!ctx) throw new Error("useUiPreferences must be used within UiPreferencesProvider");
+  if (!ctx) {
+    throw new Error("useUiPreferences must be used within UiPreferencesProvider");
+  }
   return ctx;
 }

@@ -12,7 +12,7 @@ import {
   HelpCircle,
 } from "lucide-react";
 import useUser from "@/hooks/useUser";
-import { DashboardCopy } from "@/app/dashboard/dashboard.copy";
+import { DashboardCopy } from "@/app/[locale]/dashboard/dashboard.copy";
 import { getUserInitials, formatDisplayName } from "@/lib/format-user";
 
 const MANGO = "#FF9900";

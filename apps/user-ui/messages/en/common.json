@@ -1,0 +1,87 @@
+{
+  "nav": {
+    "home": "Home",
+    "search": "Find a trip",
+    "shareTrip": "Share a trip",
+    "dashboard": "My space",
+    "help": "Help",
+    "login": "Log in",
+    "signup": "Sign up",
+    "logout": "Log out"
+  },
+  "header": {
+    "shareTrip": "Share your trip",
+    "login": "Log in",
+    "help": "Help",
+    "toggleTheme": "Toggle theme",
+    "toggleLanguage": "Toggle language",
+    "openMenu": "Open menu",
+    "userMenu": "User menu"
+  },
+  "userMenu": {
+    "myAccount": "My account",
+    "myTrips": "My trips",
+    "notifications": "Notifications",
+    "help": "Help",
+    "logout": "Sign out"
+  },
+  "actions": {
+    "search": "Search",
+    "save": "Save",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "delete": "Delete",
+    "edit": "Edit",
+    "continue": "Continue",
+    "back": "Back",
+    "close": "Close",
+    "send": "Send",
+    "submit": "Submit",
+    "retry": "Retry",
+    "loadMore": "Load more",
+    "viewAll": "View all",
+    "seeDetails": "See details"
+  },
+  "fields": {
+    "from": "From",
+    "to": "To",
+    "date": "Date",
+    "today": "Today",
+    "tomorrow": "Tomorrow",
+    "email": "Email",
+    "password": "Password",
+    "firstName": "First name",
+    "lastName": "Last name",
+    "phone": "Phone"
+  },
+  "status": {
+    "loading": "Loading...",
+    "error": "An error occurred",
+    "empty": "No results",
+    "success": "Success"
+  },
+  "datePicker": {
+    "exact": "Exact date",
+    "flexible": "I'm flexible",
+    "aroundMyDate": "Around my date",
+    "flex3days": "± 3 days",
+    "flex7days": "± 7 days",
+    "flexMonth": "Whole month",
+    "shortcuts": {
+      "today": "Today",
+      "tomorrow": "Tomorrow",
+      "weekend": "This weekend"
+    },
+    "apply": "Apply",
+    "clear": "Clear",
+    "selectDate": "Select a date",
+    "flexSuffix": "± {days} days"
+  },
+  "common": {
+    "yes": "Yes",
+    "no": "No",
+    "optional": "optional",
+    "required": "required",
+    "currency": "€"
+  }
+}
