@@ -1,0 +1,14 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "Yamba-app : Trip Service API",
+    "description": "Automatically generated Swagger docs",
+    "version": "1.0.0"
+  },
+  "host": "localhost:6002",
+  "basePath": "/trip/api",
+  "schemes": [
+    "http"
+  ],
+  "paths": {}
+}
