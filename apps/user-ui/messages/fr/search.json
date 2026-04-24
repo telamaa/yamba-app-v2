@@ -1,0 +1,45 @@
+{
+  "title": "Résultats disponibles",
+  "resultsShown": "{shown}/{total} résultats affichés",
+  "empty": "Aucun résultat ne correspond à vos filtres.",
+  "loadMore": "Charger plus de résultats",
+  "close": "Fermer",
+  "clearAll": "Tout effacer",
+  "filter": "Filtrer",
+  "viewTrips": "Voir les trajets",
+  "fromLabel": "Départ",
+  "toLabel": "Arrivée",
+  "startingFrom": "À partir de",
+  "allowedParcels": "Colis autorisés",
+  "transportModes": {
+    "all": "Tout",
+    "plane": "Avion",
+    "train": "Train",
+    "car": "Voiture"
+  },
+  "filters": {
+    "sortBy": "Trier par",
+    "earliest": "Départ le plus tôt",
+    "lowestPrice": "Prix le plus bas",
+    "trust": "Confiance et sécurité",
+    "superTripper": "Super tripper",
+    "verifiedProfile": "Profil vérifié",
+    "instantBooking": "Réservation instantanée",
+    "verifiedTicket": "Billet vérifié",
+    "services": "Services"
+  },
+  "categories": {
+    "clothes": "Vêtements",
+    "shoes": "Chaussures",
+    "fashionAccessories": "Accessoires de mode",
+    "otherAccessories": "Autres Accessoires",
+    "books": "Livres",
+    "documents": "Documents",
+    "smallToys": "Petits jouets",
+    "phone": "Téléphone",
+    "computer": "Ordinateur",
+    "otherElectronics": "Autres électroniques",
+    "checkedBag23kg": "Valise soute 23 Kg",
+    "cabinBag12kg": "Valise cabine 12 Kg"
+  }
+}

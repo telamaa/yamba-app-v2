@@ -1,0 +1,18 @@
+{
+  "create": {
+    "title": "Share a trip",
+    "subtitle": "Make the most of your trip by carrying parcels"
+  },
+  "list": {
+    "title": "My trips",
+    "empty": "No trips yet"
+  },
+  "status": {
+    "draft": "Draft",
+    "published": "Published",
+    "paused": "Paused",
+    "completed": "Completed",
+    "cancelled": "Cancelled",
+    "archived": "Archived"
+  }
+}

@@ -1,10 +1,5 @@
 import "./global.css";
-import { ThemeProvider } from "@/components/theme/ThemeProvider";
-import Header from "@/components/layout/Header";
 import { Plus_Jakarta_Sans } from "next/font/google";
-// import AppHeader from "@/components/layout/AppHeader";
-import { UiPreferencesProvider } from "@/components/providers/UiPreferencesProvider";
-import Providers from "@/app/providers";
 import { Toaster } from "sonner";
 
 const plusJakarta = Plus_Jakarta_Sans({
@@ -15,27 +10,26 @@ const plusJakarta = Plus_Jakarta_Sans({
 
 export const metadata = {
   title: "Yamba",
-  description: "Yamba description"
-}
+  description: "Yamba description",
+};
 
-
-
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+/**
+ * Root layout — MUST contain <html> and <body> tags (Next.js 16 requirement).
+ *
+ * The <html lang="..."> attribute will be updated dynamically by the locale layout
+ * when it's available, but we put a sensible default here.
+ *
+ * All providers and UI chrome are in app/[locale]/layout.tsx.
+ */
+export default function RootLayout({
+                                     children,
+                                   }: {
+  children: React.ReactNode;
+}) {
   return (
     <html lang="fr" className={plusJakarta.variable} suppressHydrationWarning>
     <body className="min-h-screen bg-white font-sans text-slate-900 dark:bg-slate-950 dark:text-slate-50">
-    <Providers>
-      <ThemeProvider>
-        <UiPreferencesProvider>
-          <Header />
-          <div className="pt-[78px]">
-            <div className="mx-auto max-w-7xl px-4">
-              {children}
-            </div>
-          </div>
-        </UiPreferencesProvider>
-      </ThemeProvider>
-    </Providers>
+    {children}
     <Toaster
       position="top-right"
       richColors

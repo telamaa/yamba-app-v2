@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { Globe, CreditCard, AlertCircle, CheckCircle2 } from "lucide-react";
 import useUser from "@/hooks/useUser";
-import { DashboardCopy } from "@/app/dashboard/dashboard.copy";
+import { DashboardCopy } from "@/app/[locale]/dashboard/dashboard.copy";
 import SectionHeader from "@/components/dashboard/SectionHeader";
 import { CardSection, EmptyState, SettingRow } from "@/components/dashboard/DashboardUI";
 

@@ -1,0 +1,18 @@
+{
+  "create": {
+    "title": "Partager un trajet",
+    "subtitle": "Rentabilisez votre voyage en transportant des colis"
+  },
+  "list": {
+    "title": "Mes trajets",
+    "empty": "Aucun trajet pour le moment"
+  },
+  "status": {
+    "draft": "Brouillon",
+    "published": "Publié",
+    "paused": "En pause",
+    "completed": "Terminé",
+    "cancelled": "Annulé",
+    "archived": "Archivé"
+  }
+}

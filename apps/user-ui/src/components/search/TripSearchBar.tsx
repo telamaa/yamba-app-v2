@@ -2,9 +2,10 @@
 
 import { useMemo, useRef, useState } from "react";
 import { CalendarDays, Search } from "lucide-react";
+import { useTranslations, useFormatter, useLocale } from "next-intl";
 import { useOnClickOutside } from "@/hooks/useOnClickOutside";
+import { usePersistedFormState } from "@/hooks/usePersistedFormState";
 import CityAutocomplete from "./CityAutocomplete";
-import { useUiPreferences } from "@/components/providers/UiPreferencesProvider";
 import Calendar from "@/components/ui/Calendar";
 import MobileSearchExperience from "./MobileSearchExperience";
 
@@ -15,32 +16,62 @@ type Props = {
   overlap?: boolean;
 };
 
+type SearchDraft = {
+  from: string;
+  to: string;
+  // Date stockée en ISO string (sérialisable en JSON)
+  dateIso: string | null;
+};
+
+const initialSearchDraft: SearchDraft = {
+  from: "",
+  to: "",
+  dateIso: null,
+};
+
+const SEARCH_VERSION = 1;
+
 export default function TripSearchBar({ overlap = true }: Props) {
-  const { t, lang } = useUiPreferences();
+  const t = useTranslations("common");
+  const format = useFormatter();
+  const locale = useLocale();
 
-  const [from, setFrom] = useState("");
-  const [to, setTo] = useState("");
-  const [date, setDate] = useState<Date | undefined>(undefined);
+  // ── Persistance du draft de recherche ──
+  const [draft, setDraft] = usePersistedFormState<SearchDraft>(
+    "trip-search",
+    initialSearchDraft,
+    { version: SEARCH_VERSION }
+  );
+
+  // Convertir ISO string → Date pour l'UI
+  const date = useMemo(
+    () => (draft.dateIso ? new Date(draft.dateIso) : undefined),
+    [draft.dateIso]
+  );
+
   const [dateOpen, setDateOpen] = useState(false);
-
   const dateRef = useRef<HTMLDivElement | null>(null);
   useOnClickOutside(dateRef, () => setDateOpen(false), dateOpen);
 
-  const dateLabel = useMemo(() => {
-    if (!date) return t("today");
+  // Setters adaptés
+  const setFrom = (v: string) => setDraft((d) => ({ ...d, from: v }));
+  const setTo = (v: string) => setDraft((d) => ({ ...d, to: v }));
+  const setDate = (d: Date | undefined) =>
+    setDraft((prev) => ({ ...prev, dateIso: d ? d.toISOString() : null }));
 
-    const localeTag = lang === "fr" ? "fr-FR" : "en-US";
-    const raw = new Intl.DateTimeFormat(localeTag, {
+  const dateLabel = useMemo(() => {
+    if (!date) return t("fields.today");
+    const localeTag = locale === "fr" ? "fr-FR" : "en-US";
+    const raw = format.dateTime(date, {
       weekday: "short",
       day: "2-digit",
       month: "short",
-    }).format(date);
-
+    });
     return capitalizeFirst(raw, localeTag);
-  }, [date, t, lang]);
+  }, [date, t, format, locale]);
 
   const onSearch = () => {
-    console.log({ from, to, date });
+    console.log({ from: draft.from, to: draft.to, date });
   };
 
   return (
@@ -48,8 +79,8 @@ export default function TripSearchBar({ overlap = true }: Props) {
       <div className="md:hidden">
         <MobileSearchExperience
           mode="card"
-          from={from}
-          to={to}
+          from={draft.from}
+          to={draft.to}
           date={date}
           onFromChange={setFrom}
           onToChange={setTo}
@@ -64,35 +95,35 @@ export default function TripSearchBar({ overlap = true }: Props) {
             <div className="grid gap-3 p-3 md:grid-cols-[1.2fr_1.2fr_0.9fr_auto] md:gap-0 md:p-0">
               <div className="relative z-[90] px-4 py-3 md:py-4">
                 <div className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-                  {t("from")}
+                  {t("fields.from")}
                 </div>
                 <div className="mt-1">
                   <CityAutocomplete
-                    value={from}
+                    value={draft.from}
                     action={setFrom}
-                    placeholder={t("from")}
-                    language={lang === "fr" ? "fr" : "en"}
+                    placeholder={t("fields.from")}
+                    language={locale === "fr" ? "fr" : "en"}
                   />
                 </div>
               </div>
 
               <div className="relative z-[90] px-4 py-3 md:py-4">
                 <div className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-                  {t("to")}
+                  {t("fields.to")}
                 </div>
                 <div className="mt-1">
                   <CityAutocomplete
-                    value={to}
+                    value={draft.to}
                     action={setTo}
-                    placeholder={t("to")}
-                    language={lang === "fr" ? "fr" : "en"}
+                    placeholder={t("fields.to")}
+                    language={locale === "fr" ? "fr" : "en"}
                   />
                 </div>
               </div>
 
               <div ref={dateRef} className="relative z-[95] px-4 py-3 md:py-4">
                 <div className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-                  {t("date")}
+                  {t("fields.date")}
                 </div>
 
                 <button
@@ -108,7 +139,7 @@ export default function TripSearchBar({ overlap = true }: Props) {
                 {dateOpen && (
                   <div className="absolute left-0 top-full z-[120] mt-2">
                     <Calendar
-                      lang={lang === "fr" ? "fr" : "en"}
+                      lang={locale === "fr" ? "fr" : "en"}
                       mode="single"
                       selected={date}
                       onSelect={(d) => {
@@ -133,7 +164,7 @@ export default function TripSearchBar({ overlap = true }: Props) {
                   ].join(" ")}
                 >
                   <Search size={18} />
-                  {t("search")}
+                  {t("actions.search")}
                 </button>
               </div>
             </div>

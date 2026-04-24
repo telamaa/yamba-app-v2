@@ -1,0 +1,32 @@
+{
+  "home": {
+    "welcome": "Bienvenue, {name}",
+    "quickActions": "Actions rapides"
+  },
+  "groups": {
+    "activity": "Activité",
+    "communication": "Communication",
+    "finances": "Finances",
+    "account": "Compte",
+    "settingsGroup": "Réglages"
+  },
+  "sections": {
+    "home": "Accueil",
+    "trips": "Mes trajets",
+    "shipments": "Mes envois",
+    "create": "Créer un trajet",
+    "messages": "Messages",
+    "notifications": "Notifications",
+    "payments": "Paiements",
+    "wallet": "Portefeuille",
+    "profile": "Profil",
+    "yamber": "Devenir Yamber",
+    "security": "Sécurité",
+    "settings": "Paramètres",
+    "help": "Aide",
+    "activity": "Activité",
+    "finances": "Finances",
+    "more": "Plus",
+    "becomeYamber": "Devenir Tripper"
+  }
+}
