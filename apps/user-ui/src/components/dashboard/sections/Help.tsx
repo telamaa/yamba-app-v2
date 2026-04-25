@@ -2,7 +2,7 @@
 
 import { ChevronRight } from "lucide-react";
 import SectionHeader from "@/components/dashboard/SectionHeader";
-import {DashboardCopy} from "@/app/dashboard/dashboard.copy";
+import {DashboardCopy} from "@/app/[locale]/dashboard/dashboard.copy";
 
 
 const HELP_ITEMS_FR = [

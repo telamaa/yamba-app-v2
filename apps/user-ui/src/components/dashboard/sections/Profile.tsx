@@ -2,7 +2,7 @@
 
 
 import useUser from "@/hooks/useUser";
-import {DashboardCopy} from "@/app/dashboard/dashboard.copy";
+import {DashboardCopy} from "@/app/[locale]/dashboard/dashboard.copy";
 import SectionHeader from "@/components/dashboard/SectionHeader";
 import {CardSection, SettingRow} from "@/components/dashboard/DashboardUI";
 
