@@ -40,7 +40,8 @@
     "retry": "Réessayer",
     "loadMore": "Charger plus",
     "viewAll": "Tout voir",
-    "seeDetails": "Voir les détails"
+    "seeDetails": "Voir les détails",
+    "swap": "Intervertir départ et destination"
   },
   "fields": {
     "from": "Départ",
@@ -54,6 +55,10 @@
     "lastName": "Nom",
     "phone": "Téléphone"
   },
+  "placeholders": {
+    "cityFrom": "Ville de départ",
+    "cityTo": "Ville d'arrivée"
+  },
   "status": {
     "loading": "Chargement...",
     "error": "Une erreur est survenue",
@@ -63,19 +68,33 @@
   "datePicker": {
     "exact": "Date précise",
     "flexible": "Je suis flexible",
-    "aroundMyDate": "Autour de ma date",
-    "flex3days": "± 3 jours",
-    "flex7days": "± 7 jours",
-    "flexMonth": "Tout le mois",
-    "shortcuts": {
-      "today": "Aujourd'hui",
-      "tomorrow": "Demain",
-      "weekend": "Ce week-end"
-    },
+    "flexThisWeek": "Cette semaine",
+    "flexThisMonth": "Ce mois",
+    "flexNext3Months": "3 prochains mois",
     "apply": "Appliquer",
     "clear": "Effacer",
-    "selectDate": "Sélectionnez une date",
-    "flexSuffix": "± {days} jours"
+    "selectDate": "Sélectionnez une date"
+  },
+  "transportTabs": {
+    "all": "Tout",
+    "plane": "Avion",
+    "train": "Train",
+    "car": "Voiture",
+    "resultsCount": "résultats"
+  },
+  "categories": {
+    "clothes": "Vêtements",
+    "shoes": "Chaussures",
+    "fashionAccessories": "Accessoires de mode",
+    "otherAccessories": "Autres accessoires",
+    "books": "Livres",
+    "documents": "Documents",
+    "smallToys": "Petits jouets",
+    "phone": "Téléphone",
+    "computer": "Ordinateur",
+    "otherElectronics": "Autres électronique",
+    "checkedBag": "Valise soute 23 Kg",
+    "cabinBag": "Valise cabine 12 Kg"
   },
   "common": {
     "yes": "Oui",
@@ -83,5 +102,8 @@
     "optional": "facultatif",
     "required": "obligatoire",
     "currency": "€"
+  },
+  "dates": {
+    "today": "Aujourd'hui"
   }
 }
