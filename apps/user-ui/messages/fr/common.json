@@ -1,0 +1,109 @@
+{
+  "nav": {
+    "home": "Accueil",
+    "search": "Rechercher un trajet",
+    "shareTrip": "Partager un trajet",
+    "dashboard": "Mon espace",
+    "help": "Aide",
+    "login": "Connexion",
+    "signup": "Inscription",
+    "logout": "Déconnexion"
+  },
+  "header": {
+    "shareTrip": "Partager un trajet",
+    "login": "Connexion",
+    "help": "Aide",
+    "toggleTheme": "Changer de thème",
+    "toggleLanguage": "Changer de langue",
+    "openMenu": "Ouvrir le menu",
+    "userMenu": "Menu utilisateur"
+  },
+  "userMenu": {
+    "myAccount": "Mon compte",
+    "myTrips": "Mes trajets",
+    "notifications": "Notifications",
+    "help": "Aide",
+    "logout": "Déconnexion"
+  },
+  "actions": {
+    "search": "Rechercher",
+    "save": "Enregistrer",
+    "cancel": "Annuler",
+    "confirm": "Confirmer",
+    "delete": "Supprimer",
+    "edit": "Modifier",
+    "continue": "Continuer",
+    "back": "Retour",
+    "close": "Fermer",
+    "send": "Envoyer",
+    "submit": "Valider",
+    "retry": "Réessayer",
+    "loadMore": "Charger plus",
+    "viewAll": "Tout voir",
+    "seeDetails": "Voir les détails",
+    "swap": "Intervertir départ et destination"
+  },
+  "fields": {
+    "from": "Départ",
+    "to": "Destination",
+    "date": "Date",
+    "today": "Aujourd'hui",
+    "tomorrow": "Demain",
+    "email": "Email",
+    "password": "Mot de passe",
+    "firstName": "Prénom",
+    "lastName": "Nom",
+    "phone": "Téléphone"
+  },
+  "placeholders": {
+    "cityFrom": "Ville de départ",
+    "cityTo": "Ville d'arrivée"
+  },
+  "status": {
+    "loading": "Chargement...",
+    "error": "Une erreur est survenue",
+    "empty": "Aucun résultat",
+    "success": "Succès"
+  },
+  "datePicker": {
+    "exact": "Date précise",
+    "flexible": "Je suis flexible",
+    "flexThisWeek": "Cette semaine",
+    "flexThisMonth": "Ce mois",
+    "flexNext3Months": "3 prochains mois",
+    "apply": "Appliquer",
+    "clear": "Effacer",
+    "selectDate": "Sélectionnez une date"
+  },
+  "transportTabs": {
+    "all": "Tout",
+    "plane": "Avion",
+    "train": "Train",
+    "car": "Voiture",
+    "resultsCount": "résultats"
+  },
+  "categories": {
+    "clothes": "Vêtements",
+    "shoes": "Chaussures",
+    "fashionAccessories": "Accessoires de mode",
+    "otherAccessories": "Autres accessoires",
+    "books": "Livres",
+    "documents": "Documents",
+    "smallToys": "Petits jouets",
+    "phone": "Téléphone",
+    "computer": "Ordinateur",
+    "otherElectronics": "Autres électronique",
+    "checkedBag": "Valise soute 23 Kg",
+    "cabinBag": "Valise cabine 12 Kg"
+  },
+  "common": {
+    "yes": "Oui",
+    "no": "Non",
+    "optional": "facultatif",
+    "required": "obligatoire",
+    "currency": "€"
+  },
+  "dates": {
+    "today": "Aujourd'hui"
+  }
+}

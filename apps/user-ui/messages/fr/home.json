@@ -1,0 +1,25 @@
+{
+  "hero": {
+    "line1": "Un trajet existe déjà,",
+    "line2": "Profitez-en :",
+    "line3": "Envoyer vos colis légers autrement.",
+    "alt": "Voyageuse dans un transport, illustration du voyage collaboratif Yamba"
+  },
+  "cards": {
+    "savings": {
+      "tag": "Économie",
+      "title": "Moins cher",
+      "text": "Réduisez le coût d'envoi de vos petits colis grâce à des trajets déjà prévus."
+    },
+    "trust": {
+      "tag": "Confiance",
+      "title": "Plus transparent",
+      "text": "Suivi clair du colis, échanges facilités et relation directe avec le voyageur."
+    },
+    "impact": {
+      "tag": "Impact",
+      "title": "Plus responsable",
+      "text": "Yamba optimise des trajets existants pour limiter les transports dédiés inutiles."
+    }
+  }
+}

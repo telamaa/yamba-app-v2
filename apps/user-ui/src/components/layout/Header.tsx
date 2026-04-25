@@ -1,39 +1,28 @@
 "use client";
 
-import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTheme } from "next-themes";
 import {
-  Globe,
   Sun,
   Moon,
   Menu,
   X,
   User,
-  Settings,
   HelpCircle,
   LogOut,
-  Truck,
-  Store,
+  Zap,
   Bell,
-  Shield,
-  CreditCard,
-  MessageSquare,
 } from "lucide-react";
+import { useTranslations } from "next-intl";
+import { Link, usePathname, useRouter } from "@/i18n/navigation";
 import { useOnClickOutside } from "@/hooks/useOnClickOutside";
 import CommandPalette, { CommandAction } from "./CommandPalette";
-import { useUiPreferences } from "@/components/providers/UiPreferencesProvider";
+import LocaleSwitcher from "@/components/layout/LocaleSwitcher";
 import useUser from "@/hooks/useUser";
 import useShareTrip from "@/hooks/useShareTrip";
 import { useQueryClient } from "@tanstack/react-query";
 import { logoutUser as logoutApi } from "@/services/auth.api";
-
-type Lang = "fr" | "en";
-const LANGS: Record<Lang, { label: string; code: string }> = {
-  fr: { label: "Français", code: "FR" },
-  en: { label: "Anglais", code: "EN" },
-};
+import { getUserInitials, formatDisplayName } from "@/lib/format-user";
 
 const COLORS = {
   mango: "#FF9900",
@@ -48,9 +37,11 @@ export default function Header() {
   const { resolvedTheme, setTheme } = useTheme();
   const { handleShareTrip } = useShareTrip();
 
+  // next-intl: translations
+  const t = useTranslations("common");
+
   const [mounted, setMounted] = useState(false);
   const [isCompact, setIsCompact] = useState(false);
-
   const { user, isLoading } = useUser();
 
   useEffect(() => {
@@ -60,17 +51,9 @@ export default function Header() {
   const isDark = resolvedTheme === "dark";
 
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [langOpen, setLangOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
 
-  const ui = useUiPreferences();
-  const lang = (ui.lang ?? "en") as Lang;
-  const setLang = ui.setLang;
-
-  const langRef = useRef<HTMLDivElement | null>(null);
   const userMenuRef = useRef<HTMLDivElement | null>(null);
-
-  useOnClickOutside(langRef, () => setLangOpen(false), langOpen);
   useOnClickOutside(userMenuRef, () => setUserMenuOpen(false), userMenuOpen);
 
   useEffect(() => {
@@ -80,21 +63,14 @@ export default function Header() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  const currentLang = LANGS[lang] ?? LANGS.en;
   const toggleTheme = () => setTheme(isDark ? "light" : "dark");
-
-  const selectLang = (next: Lang) => {
-    setLang(next);
-    setLangOpen(false);
-    setMobileOpen(false);
-  };
 
   // Logout handler
   const handleLogout = async () => {
     try {
       await logoutApi();
     } catch {
-      // Même si l'appel échoue, on nettoie côté client
+      // ignore
     }
     queryClient.setQueryData(["user"], null);
     setUserMenuOpen(false);
@@ -103,93 +79,36 @@ export default function Header() {
     router.refresh();
   };
 
-  const L = useMemo(() => {
-    if (lang === "fr") {
-      return {
-        login: "Connexion",
-        share: "Partager un trajet",
-        help: "Aide",
-        carrierShort: "Transporteur",
-        sellerShort: "Vendeur",
-        // User menu
-        myAccount: "Mon compte",
-        myTrips: "Mes trajets",
-        myParcels: "Mes colis",
-        becomeCarrier: "Espace transporteur",
-        becomeSeller: "Devenir vendeur",
-        notifications: "Notifications",
-        messages: "Messages",
-        payments: "Paiements",
-        security: "Sécurité & confidentialité",
-        settings: "Paramètres",
-        logout: "Déconnexion",
-      };
-    }
-    return {
-      login: "Log in",
-      share: "Share your trip",
-      help: "Help",
-      carrierShort: "Carrier",
-      sellerShort: "Seller",
-      // User menu
-      myAccount: "My account",
-      myTrips: "My trips",
-      myParcels: "My parcels",
-      becomeCarrier: "Carrier space",
-      becomeSeller: "Become a seller",
-      notifications: "Notifications",
-      messages: "Messages",
-      payments: "Payments",
-      security: "Security & privacy",
-      settings: "Settings",
-      logout: "Sign out",
-    };
-  }, [lang]);
-
-  const isLogin = pathname?.startsWith("/auth/login");
+  const isLogin = pathname?.startsWith("/login");
 
   const actions: CommandAction[] = useMemo(
     () => [
-      { label: L.login, href: "/login", keywords: ["login", "connexion"] },
-      { label: L.share, href: "/share", keywords: ["trip", "trajet"] },
-      { label: L.becomeCarrier, href: "/become/carrier", keywords: ["carrier", "transporteur"] },
-      { label: L.becomeSeller, href: "/become/seller", keywords: ["seller", "vendeur"] },
-      { label: L.help, href: "/help", keywords: ["support", "aide"] },
+      { label: t("header.login"), href: "/login", keywords: ["login", "connexion"] },
+      { label: t("header.shareTrip"), href: "/trips/create", keywords: ["trip", "trajet"] },
+      { label: t("header.help"), href: "/dashboard/help", keywords: ["support", "aide"] },
     ],
-    [L]
+    [t]
   );
 
-  // Initiale du prénom
-  const userInitial = user?.firstName?.charAt(0)?.toUpperCase() ?? "U";
+  const userInitials = getUserInitials(user?.firstName, user?.lastName);
+  const userDisplayName = formatDisplayName(user?.firstName, user?.lastName);
   const userAvatar = user?.avatar?.url ?? null;
 
-  // CTA simple
   const ctaClass =
     "inline-flex items-center rounded-lg px-4 py-2 text-sm font-semibold shadow-sm transition-colors " +
     "border border-[#FF9900] bg-white text-slate-700 hover:bg-[#FFF6E8] " +
     "dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-900/60 " +
     "focus:outline-none focus-visible:ring-4 focus-visible:ring-[#FF9900]/25";
 
-  // Items du menu utilisateur
   const userMenuItems = [
-    { label: L.myAccount, href: "/account", icon: User },
-    { label: L.myTrips, href: "/my-trips", icon: Truck },
-    { label: L.myParcels, href: "/my-parcels", icon: Store },
+    { label: t("userMenu.myAccount"), href: "/dashboard/home", icon: User },
+    { label: t("userMenu.myTrips"), href: "/dashboard/trips", icon: Zap },
+    { label: t("userMenu.notifications"), href: "/dashboard/notifications", icon: Bell },
+    { label: t("userMenu.help"), href: "/dashboard/help", icon: HelpCircle },
     { type: "separator" as const },
-    { label: L.notifications, href: "/notifications", icon: Bell },
-    { label: L.messages, href: "/messages", icon: MessageSquare },
-    { label: L.payments, href: "/payments", icon: CreditCard },
-    { type: "separator" as const },
-    { label: L.becomeCarrier, href: "/carrier/onboarding", icon: Truck },
-    { type: "separator" as const },
-    { label: L.security, href: "/security", icon: Shield },
-    { label: L.settings, href: "/settings", icon: Settings },
-    { label: L.help, href: "/help", icon: HelpCircle },
-    { type: "separator" as const },
-    { label: L.logout, icon: LogOut, danger: true },
+    { label: t("userMenu.logout"), icon: LogOut, danger: true },
   ];
 
-  // Rendu d'un item du menu (partagé desktop + mobile)
   const renderMenuItem = (item: (typeof userMenuItems)[number], i: number, keyPrefix: string) => {
     if ("type" in item && item.type === "separator") {
       return (
@@ -233,6 +152,20 @@ export default function Header() {
     );
   };
 
+  const renderAvatar = (size: string) => (
+    <div
+      className={`flex ${size} flex-shrink-0 items-center justify-center overflow-hidden rounded-full text-sm font-bold text-slate-950`}
+      style={!userAvatar ? { backgroundColor: COLORS.mango } : undefined}
+    >
+      {userAvatar ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={userAvatar} alt="" className="h-full w-full object-cover" />
+      ) : (
+        userInitials
+      )}
+    </div>
+  );
+
   return (
     <>
       <CommandPalette actions={actions} />
@@ -268,46 +201,16 @@ export default function Header() {
 
           {/* Desktop actions */}
           <div className="hidden items-center gap-4 md:flex">
-            {/* Language */}
-            <div className="relative" ref={langRef}>
-              <button
-                type="button"
-                onClick={() => setLangOpen((v) => !v)}
-                className="inline-flex items-center gap-2 rounded-xl px-2 py-2 text-sm text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-900 focus:outline-none focus-visible:ring-4 focus-visible:ring-[#FF9900]/20"
-                aria-label="Language"
-              >
-                <Globe size={18} />
-                <span className="font-medium">{currentLang.label}</span>
-                <span className="rounded-lg bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700 dark:bg-slate-900 dark:text-slate-200">
-                  {currentLang.code}
-                </span>
-              </button>
-
-              {langOpen && (
-                <div className="absolute right-0 mt-2 w-44 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg dark:border-slate-800 dark:bg-slate-950">
-                  <button
-                    className="w-full px-4 py-2 text-left text-sm hover:bg-slate-50 dark:hover:bg-slate-900"
-                    onClick={() => selectLang("fr")}
-                  >
-                    Français <span className="text-slate-400">(FR)</span>
-                  </button>
-                  <button
-                    className="w-full px-4 py-2 text-left text-sm hover:bg-slate-50 dark:hover:bg-slate-900"
-                    onClick={() => selectLang("en")}
-                  >
-                    Anglais <span className="text-slate-400">(EN)</span>
-                  </button>
-                </div>
-              )}
-            </div>
+            {/* Language switcher (nouveau) */}
+            <LocaleSwitcher />
 
             {/* Theme toggle */}
             <button
               type="button"
               onClick={toggleTheme}
               className="inline-flex h-10 w-10 items-center justify-center rounded-xl hover:bg-slate-100 dark:hover:bg-slate-900 focus:outline-none focus-visible:ring-4 focus-visible:ring-[#FF9900]/20"
-              aria-label="Toggle theme"
-              title="Toggle theme"
+              aria-label={t("header.toggleTheme")}
+              title={t("header.toggleTheme")}
             >
               {!mounted ? (
                 <span className="inline-block h-[18px] w-[18px]" />
@@ -318,16 +221,16 @@ export default function Header() {
               )}
             </button>
 
-            {/* CTA simple */}
+            {/* CTA Share trip */}
             <button
               type="button"
               onClick={handleShareTrip}
               className={ctaClass}
             >
-              {L.share}
+              {t("header.shareTrip")}
             </button>
 
-            {/* Connexion (visible par défaut, disparaît quand user confirmé) */}
+            {/* Login (si non connecté) */}
             {!user && (
               <Link
                 href="/login"
@@ -340,11 +243,11 @@ export default function Header() {
                 ].join(" ")}
                 style={isLogin ? { color: COLORS.teal } : undefined}
               >
-                {L.login}
+                {t("header.login")}
               </Link>
             )}
 
-            {/* Avatar utilisateur (apparaît quand user confirmé) */}
+            {/* Avatar utilisateur */}
             {!isLoading && user && (
               <div className="relative" ref={userMenuRef}>
                 <button
@@ -352,34 +255,23 @@ export default function Header() {
                   onClick={() => setUserMenuOpen((v) => !v)}
                   className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full text-sm font-bold text-slate-950 transition-shadow hover:ring-2 hover:ring-[#FF9900]/40 focus:outline-none focus-visible:ring-4 focus-visible:ring-[#FF9900]/25"
                   style={!userAvatar ? { backgroundColor: COLORS.mango } : undefined}
-                  aria-label="User menu"
+                  aria-label={t("header.userMenu")}
                 >
                   {userAvatar ? (
+                    // eslint-disable-next-line @next/next/no-img-element
                     <img src={userAvatar} alt="" className="h-full w-full object-cover" />
                   ) : (
-                    userInitial
+                    userInitials
                   )}
                 </button>
 
                 {userMenuOpen && (
                   <div className="absolute right-0 mt-2 w-72 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-950">
-                    {/* En-tête utilisateur */}
                     <div className="flex items-center gap-3 px-4 py-4">
-                      <div
-                        className="flex h-10 w-10 flex-shrink-0 items-center justify-center overflow-hidden rounded-full text-sm font-bold text-slate-950"
-                        style={!userAvatar ? { backgroundColor: COLORS.mango } : undefined}
-                      >
-                        {userAvatar ? (
-                          <img src={userAvatar} alt="" className="h-full w-full object-cover" />
-                        ) : (
-                          userInitial
-                        )}
-                      </div>
+                      {renderAvatar("h-10 w-10")}
                       <div className="min-w-0">
                         <p className="truncate text-sm font-semibold text-slate-900 dark:text-white">
-                          {/*{user?.firstName.split(" ")[0]}*/}
-                          {/*{user?.firstName?.split(" ")[0]?.replace(/^./, c => c.toUpperCase())}*/}
-                          {user?.firstName?.toLowerCase().replace(/\b\w/g, c => c.toUpperCase())}
+                          {userDisplayName}
                         </p>
                         {user.email && (
                           <p className="truncate text-xs text-slate-500 dark:text-slate-400">
@@ -391,7 +283,6 @@ export default function Header() {
 
                     <div className="h-px bg-slate-200 dark:bg-slate-800" />
 
-                    {/* Items du menu */}
                     <div className="max-h-[60vh] overflow-y-auto py-1">
                       {userMenuItems.map((item, i) => renderMenuItem(item, i, "d-"))}
                     </div>
@@ -403,22 +294,15 @@ export default function Header() {
 
           {/* Mobile right */}
           <div className="flex items-center gap-2 md:hidden">
-            {/* Compact lang toggle */}
-            <button
-              type="button"
-              onClick={() => selectLang(lang === "fr" ? "en" : "fr")}
-              className="inline-flex h-10 items-center justify-center rounded-xl px-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-900 focus:outline-none focus-visible:ring-4 focus-visible:ring-[#FF9900]/20"
-              aria-label="Toggle language"
-            >
-              {lang === "fr" ? "FR" : "EN"}
-            </button>
+            {/* Language switcher compact */}
+            <LocaleSwitcher />
 
             <button
               type="button"
               onClick={toggleTheme}
               className="inline-flex h-10 w-10 items-center justify-center rounded-xl hover:bg-slate-100 dark:hover:bg-slate-900 focus:outline-none focus-visible:ring-4 focus-visible:ring-[#FF9900]/20"
-              aria-label="Toggle theme"
-              title="Toggle theme"
+              aria-label={t("header.toggleTheme")}
+              title={t("header.toggleTheme")}
             >
               {!mounted ? (
                 <span className="inline-block h-[18px] w-[18px]" />
@@ -429,30 +313,29 @@ export default function Header() {
               )}
             </button>
 
-            {/* Avatar mobile (apparaît quand user confirmé) */}
             {!isLoading && user && (
               <button
                 type="button"
                 onClick={() => setMobileOpen((v) => !v)}
                 className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full text-sm font-bold text-slate-950 transition-shadow hover:ring-2 hover:ring-[#FF9900]/40 focus:outline-none focus-visible:ring-4 focus-visible:ring-[#FF9900]/25"
                 style={!userAvatar ? { backgroundColor: COLORS.mango } : undefined}
-                aria-label="User menu"
+                aria-label={t("header.userMenu")}
               >
                 {userAvatar ? (
+                  // eslint-disable-next-line @next/next/no-img-element
                   <img src={userAvatar} alt="" className="h-full w-full object-cover" />
                 ) : (
-                  userInitial
+                  userInitials
                 )}
               </button>
             )}
 
-            {/* Burger menu (visible par défaut, disparaît quand user confirmé) */}
             {!user && (
               <button
                 type="button"
                 onClick={() => setMobileOpen((v) => !v)}
                 className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:hover:bg-slate-900 focus:outline-none focus-visible:ring-4 focus-visible:ring-[#FF9900]/20"
-                aria-label="Open menu"
+                aria-label={t("header.openMenu")}
               >
                 {mobileOpen ? <X size={18} /> : <Menu size={18} />}
               </button>
@@ -464,22 +347,12 @@ export default function Header() {
         {mobileOpen && (
           <div className="border-t border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950 md:hidden">
             <div className="mx-auto max-w-6xl space-y-3 px-4 py-4">
-              {/* Utilisateur connecté : en-tête profil */}
               {user && (
                 <div className="flex items-center gap-3 rounded-xl border border-slate-200 p-3 dark:border-slate-800">
-                  <div
-                    className="flex h-10 w-10 flex-shrink-0 items-center justify-center overflow-hidden rounded-full text-sm font-bold text-slate-950"
-                    style={!userAvatar ? { backgroundColor: COLORS.mango } : undefined}
-                  >
-                    {userAvatar ? (
-                      <img src={userAvatar} alt="" className="h-full w-full object-cover" />
-                    ) : (
-                      userInitial
-                    )}
-                  </div>
+                  {renderAvatar("h-10 w-10")}
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-slate-900 dark:text-white">
-                      {user?.firstName.split(" ")[0]}
+                      {userDisplayName}
                     </p>
                     {user.email && (
                       <p className="truncate text-xs text-slate-500 dark:text-slate-400">
@@ -490,7 +363,6 @@ export default function Header() {
                 </div>
               )}
 
-              {/* Login (si non connecté) */}
               {!user && (
                 <Link
                   href="/login"
@@ -498,11 +370,10 @@ export default function Header() {
                   onClick={() => setMobileOpen(false)}
                   style={isLogin ? { borderColor: COLORS.teal, color: COLORS.teal } : undefined}
                 >
-                  {L.login}
+                  {t("header.login")}
                 </Link>
               )}
 
-              {/* Menu items utilisateur (si connecté) */}
               {user && (
                 <div className="space-y-1 rounded-xl border border-slate-200 py-1 dark:border-slate-800">
                   {userMenuItems.map((item, i) => renderMenuItem(item, i, "m-"))}

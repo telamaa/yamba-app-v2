@@ -1,0 +1,84 @@
+{
+  "title": "Available results",
+  "resultsShown": "{shown}/{total} results shown",
+  "loadMore": "Load more results",
+  "viewTrips": "{count, plural, =1 {View 1 trip} other {View # trips}}",
+  "startingFrom": "Starting from",
+  "direct": "Direct",
+  "oneStopIn": "1 stop · {city}",
+  "stopsCount": "{count, plural, =1 {# stop} other {# stops}}",
+  "remainingSlots": "{count, plural, =1 {# slot left} other {# slots left}}",
+  "newTripper": "New tripper",
+  "moreCategoriesTooltip": "{count, plural, =1 {# more category} other {# more categories}}",
+
+  "transportTabs": {
+    "all": "All",
+    "plane": "Plane",
+    "train": "Train",
+    "car": "Car"
+  },
+
+  "badges": {
+    "superTripper": "Super tripper",
+    "instant": "Instant",
+    "instantBooking": "Instant booking",
+    "verifiedTicket": "Verified ticket",
+    "profileVerified": "Verified profile"
+  },
+  "filters": {
+    "title": "Filters",
+    "sortBy": "Sort by",
+    "clearAll": "Clear all",
+    "earliest": "Earliest departure",
+    "lowestPrice": "Lowest price",
+    "bestRated": "Best rated",
+    "trustSafety": "Trust and safety",
+    "departureTimes": "Departure times",
+    "categories": "Categories",
+    "showAll": "Show all ({count})",
+    "showLess": "Show less"
+  },
+  "departureTimes": {
+    "morning": "Morning",
+    "afternoon": "Afternoon",
+    "evening": "Evening",
+    "night": "Night"
+  },
+  "emptyState": {
+    "title": "No trips found",
+    "noResults": "No trips are available for this search. Try changing your date or destination.",
+    "withFilters": "No results match your filters. Try removing some to see more trips."
+  },
+  "card": {
+    "fromPrice": "from",
+    "viewPricesByCategory": "View prices by category",
+    "remainingSlots": "{count, plural, one {# slot} other {# slots}}",
+    "direct": "Direct",
+    "stopovers": "{count, plural, one {# stop} other {# stops}}",
+    "newTripper": "New tripper"
+  },
+  "pricingSheet": {
+    "title": "Prices by category",
+    "disclaimer": "The exact price depends on the item's weight and specifications. All prices are starting from the indicated value.",
+    "viewTrip": "View complete trip",
+    "noPrices": "No prices available for this trip"
+  },
+  "categories": {
+    "clothes": "Clothes",
+    "shoes": "Shoes",
+    "fashion-accessories": "Fashion accessories",
+    "other-accessories": "Other accessories",
+    "books": "Books",
+    "documents": "Documents",
+    "small-toys": "Small toys",
+    "phone": "Phone",
+    "computer": "Computer",
+    "other-electronics": "Other electronics",
+    "checked-bag-23kg": "Checked bag 23kg",
+    "cabin-bag-12kg": "Cabin bag 12kg"
+  },
+  "mobile": {
+    "editSearch": "Edit search",
+    "whenLeaving": "When are you leaving?"
+  }
+}

@@ -1,21 +1,20 @@
 "use client";
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-import {HOME_ITEM, NAV_GROUPS, SectionKey} from "@/app/dashboard/dashboard.config";
-
+import { Link, usePathname } from "@/i18n/navigation";
+import { useTranslations } from "next-intl";
+import { HOME_ITEM, NAV_GROUPS, type NavItem, type SectionKey } from "@/app/[locale]/dashboard/dashboard.config";
 
 const MANGO = "#FF9900";
 
-type Props = {
-  isFr: boolean;
-};
-
-export default function DashboardSidebar({ isFr }: Props) {
+export default function DashboardSidebar() {
   const pathname = usePathname();
+  const t = useTranslations("dashboard");
+
+  // usePathname de @/i18n/navigation renvoie le path SANS la locale
+  // Exemple: /dashboard/trips (pas /fr/dashboard/trips)
   const activeSection = (pathname?.split("/").pop() ?? "home") as SectionKey;
 
-  const renderItem = (item: typeof HOME_ITEM, isActive: boolean) => {
+  const renderItem = (item: NavItem, isActive: boolean) => {
     const Icon = item.icon;
     return (
       <Link
@@ -34,7 +33,7 @@ export default function DashboardSidebar({ isFr }: Props) {
           style={isActive ? { color: MANGO } : undefined}
         />
         <span className="flex-1 truncate">
-          {isFr ? item.labelFr : item.labelEn}
+          {t(`sections.${item.labelKey}`)}
         </span>
         {item.badge && (
           <span
@@ -49,7 +48,7 @@ export default function DashboardSidebar({ isFr }: Props) {
   };
 
   return (
-    <aside className="hidden md:flex w-[200px] flex-col flex-shrink-0 pt-1">
+    <aside className="hidden md:flex w-[200px] flex-col flex-shrink-0 pt-1 sticky top-[98px] h-[calc(100vh-104px)] overflow-y-auto">
       {/* Home — standalone */}
       <div className="mb-3">
         {renderItem(HOME_ITEM, activeSection === "home")}
@@ -58,9 +57,9 @@ export default function DashboardSidebar({ isFr }: Props) {
       {/* Nav groups */}
       <nav className="flex-1">
         {NAV_GROUPS.map((group) => (
-          <div key={group.labelEn} className="mb-1">
+          <div key={group.labelKey} className="mb-1">
             <div className="pb-1 pt-3 text-[11px] font-medium uppercase tracking-wider text-slate-400 dark:text-slate-500">
-              {isFr ? group.labelFr : group.labelEn}
+              {t(`groups.${group.labelKey}`)}
             </div>
 
             {group.items.map((item) => renderItem(item, activeSection === item.key))}

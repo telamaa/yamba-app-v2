@@ -37,14 +37,33 @@ export type CategoryCondition = {
   pickupMoments: PickupMoment[];
 };
 
-/** Local file before upload — stored in state, sent to backend on publish */
+/**
+ * A trip document — uploaded directly to ImageKit.
+ * `fileId` and `url` are set by ImageKit after upload.
+ * `verificationStatus` comes from the backend.
+ */
 export type TripDocumentDraft = {
-  id: string;
-  file: File;
+  id: string;                // local/temporary id (uuid or fileId)
+  fileId: string;            // ImageKit fileId (after upload)
+  url: string;               // ImageKit file url (after upload)
   name: string;
   size: number;
   mimeType: string;
-  previewUrl?: string;
+  thumbnailUrl?: string;
+  verificationStatus?: TicketVerificationStatus;
+};
+
+export type PlaceInfo = {
+  formattedAddress: string;
+  placeId: string;
+  lat: number | null;
+  lng: number | null;
+  streetLine1: string | null;
+  city: string | null;
+  region: string | null;
+  postalCode: string | null;
+  country: string | null;
+  countryCode: string | null;
 };
 
 export type Draft = {
@@ -53,6 +72,8 @@ export type Draft = {
 
   from: string;
   to: string;
+  fromPlace: PlaceInfo | null;
+  toPlace: PlaceInfo | null;
   departureDate?: Date;
   arrivalDate?: Date;
   departureTime: string;
@@ -66,7 +87,6 @@ export type Draft = {
   trainStopCities: string;
   travelReference: string;
 
-  /** Attached documents (local files before upload) */
   tripDocuments: TripDocumentDraft[];
 
   acceptedCategories: ParcelCategory[];
