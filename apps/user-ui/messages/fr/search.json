@@ -1,45 +1,84 @@
 {
   "title": "Résultats disponibles",
   "resultsShown": "{shown}/{total} résultats affichés",
-  "empty": "Aucun résultat ne correspond à vos filtres.",
   "loadMore": "Charger plus de résultats",
-  "close": "Fermer",
-  "clearAll": "Tout effacer",
-  "filter": "Filtrer",
-  "viewTrips": "Voir les trajets",
-  "fromLabel": "Départ",
-  "toLabel": "Arrivée",
+  "viewTrips": "{count, plural, =1 {Voir 1 trajet} other {Voir # trajets}}",
   "startingFrom": "À partir de",
-  "allowedParcels": "Colis autorisés",
-  "transportModes": {
+  "direct": "Direct",
+  "oneStopIn": "1 escale · {city}",
+  "stopsCount": "{count, plural, =1 {# escale} other {# escales}}",
+  "remainingSlots": "{count, plural, =1 {# place restante} other {# places restantes}}",
+  "newTripper": "Nouveau tripper",
+  "moreCategoriesTooltip": "{count, plural, =1 {# autre catégorie} other {# autres catégories}}",
+
+  "transportTabs": {
     "all": "Tout",
     "plane": "Avion",
     "train": "Train",
     "car": "Voiture"
   },
-  "filters": {
-    "sortBy": "Trier par",
-    "earliest": "Départ le plus tôt",
-    "lowestPrice": "Prix le plus bas",
-    "trust": "Confiance et sécurité",
+
+  "badges": {
     "superTripper": "Super tripper",
-    "verifiedProfile": "Profil vérifié",
+    "instant": "Instant",
     "instantBooking": "Réservation instantanée",
     "verifiedTicket": "Billet vérifié",
-    "services": "Services"
+    "profileVerified": "Profil vérifié"
+  },
+  "filters": {
+    "title": "Filtres",
+    "sortBy": "Trier par",
+    "clearAll": "Tout effacer",
+    "earliest": "Départ le plus tôt",
+    "lowestPrice": "Prix le plus bas",
+    "bestRated": "Mieux notés",
+    "trustSafety": "Confiance et sécurité",
+    "departureTimes": "Horaires de départ",
+    "categories": "Catégories",
+    "showAll": "Voir tout ({count})",
+    "showLess": "Voir moins"
+  },
+  "departureTimes": {
+    "morning": "Matin",
+    "afternoon": "Après-midi",
+    "evening": "Soir",
+    "night": "Nuit"
+  },
+  "emptyState": {
+    "title": "Aucun trajet trouvé",
+    "noResults": "Aucun trajet n'est disponible pour cette recherche. Essayez de modifier votre date ou destination.",
+    "withFilters": "Aucun résultat ne correspond à vos filtres. Essayez d'en retirer pour voir plus de trajets."
+  },
+  "card": {
+    "fromPrice": "dès",
+    "viewPricesByCategory": "Voir les tarifs par catégorie",
+    "remainingSlots": "{count, plural, one {# place} other {# places}}",
+    "direct": "Direct",
+    "stopovers": "{count, plural, one {# escale} other {# escales}}",
+    "newTripper": "Nouveau tripper"
+  },
+  "pricingSheet": {
+    "title": "Tarifs par catégorie",
+    "disclaimer": "Le prix exact dépend du poids et des spécifications de l'objet. Tous les prix sont à partir de la valeur indiquée.",
+    "viewTrip": "Voir le trajet complet",
+    "noPrices": "Tarifs non disponibles pour ce trajet"
   },
   "categories": {
     "clothes": "Vêtements",
     "shoes": "Chaussures",
-    "fashionAccessories": "Accessoires de mode",
-    "otherAccessories": "Autres Accessoires",
+    "fashion-accessories": "Accessoires de mode",
+    "other-accessories": "Autres accessoires",
     "books": "Livres",
     "documents": "Documents",
-    "smallToys": "Petits jouets",
+    "small-toys": "Petits jouets",
     "phone": "Téléphone",
     "computer": "Ordinateur",
-    "otherElectronics": "Autres électroniques",
-    "checkedBag23kg": "Valise soute 23 Kg",
-    "cabinBag12kg": "Valise cabine 12 Kg"
+    "other-electronics": "Autres électroniques",
+    "checked-bag-23kg": "Bagage 23kg",
+    "cabin-bag-12kg": "Bagage cabine 12kg"
+  },
+  "mobile": {
+    "editSearch": "Modifier la recherche",
+    "whenLeaving": "Quand partez-vous ?"
   }
 }
