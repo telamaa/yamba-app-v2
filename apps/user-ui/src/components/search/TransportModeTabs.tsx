@@ -1,8 +1,8 @@
 "use client";
 
-import { Car, Plane, Train } from "lucide-react";
 import { useMemo } from "react";
-import { useUiPreferences } from "@/components/providers/UiPreferencesProvider";
+import { Car, Plane, Train } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { TransportMode, YambaTripResult } from "./search-results.types";
 
 type FilterMode = "all" | TransportMode;
@@ -13,29 +13,18 @@ type Props = {
   onChange: (value: FilterMode) => void;
 };
 
-type Lang = "fr" | "en";
-
 export default function TransportModeTabs({ active, items, onChange }: Props) {
-  const { lang } = useUiPreferences();
+  const t = useTranslations("common");
 
-  const copy = useMemo(() => {
-    const isFr = (lang as Lang) === "fr";
-    return {
-      all: isFr ? "Tout" : "All",
-      plane: isFr ? "Avion" : "Plane",
-      train: isFr ? "Train" : "Train",
-      car: isFr ? "Voiture" : "Car",
-    };
-  }, [lang]);
-
-  const counts = useMemo(() => {
-    return {
+  const counts = useMemo(
+    () => ({
       all: items.length,
-      plane: items.filter((item) => item.transportMode === "plane").length,
-      train: items.filter((item) => item.transportMode === "train").length,
-      car: items.filter((item) => item.transportMode === "car").length,
-    };
-  }, [items]);
+      plane: items.filter((i) => i.transportMode === "plane").length,
+      train: items.filter((i) => i.transportMode === "train").length,
+      car: items.filter((i) => i.transportMode === "car").length,
+    }),
+    [items]
+  );
 
   const tabs: Array<{
     key: FilterMode;
@@ -43,15 +32,31 @@ export default function TransportModeTabs({ active, items, onChange }: Props) {
     icon?: React.ReactNode;
     count: number;
   }> = [
-    { key: "all", label: copy.all, count: counts.all },
-    { key: "plane", label: copy.plane, icon: <Plane size={16} />, count: counts.plane },
-    { key: "train", label: copy.train, icon: <Train size={16} />, count: counts.train },
-    { key: "car", label: copy.car, icon: <Car size={16} />, count: counts.car },
+    { key: "all", label: t("transportTabs.all"), count: counts.all },
+    {
+      key: "plane",
+      label: t("transportTabs.plane"),
+      icon: <Plane size={13} strokeWidth={2} />,
+      count: counts.plane,
+    },
+    {
+      key: "train",
+      label: t("transportTabs.train"),
+      icon: <Train size={13} strokeWidth={2} />,
+      count: counts.train,
+    },
+    {
+      key: "car",
+      label: t("transportTabs.car"),
+      icon: <Car size={13} strokeWidth={2} />,
+      count: counts.car,
+    },
   ];
 
   return (
-    <div className="overflow-hidden rounded-[12px] border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950">
-      <div className="grid grid-cols-4">
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      {/* Pills — scrollables sur mobile */}
+      <div className="flex min-w-0 gap-1.5 overflow-x-auto pb-1 scrollbar-hide">
         {tabs.map((tab) => {
           const isActive = active === tab.key;
 
@@ -61,26 +66,20 @@ export default function TransportModeTabs({ active, items, onChange }: Props) {
               type="button"
               onClick={() => onChange(tab.key)}
               className={[
-                "flex min-w-0 flex-col items-center justify-center gap-1 px-1.5 py-2.5 text-center transition-colors md:flex-row md:gap-2 md:px-4 md:py-3",
-                "border-b-2 md:border-b-0",
+                "inline-flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-2 text-[13px] font-semibold transition-colors",
                 isActive
-                  ? "border-slate-900 bg-[#FFF6E8] text-slate-950 dark:border-white dark:bg-slate-900 dark:text-white"
-                  : "border-transparent text-slate-500 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-900/60 dark:hover:text-white",
+                  ? "bg-white text-slate-950 shadow-sm dark:bg-white dark:text-slate-950"
+                  : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300 dark:hover:bg-slate-900",
               ].join(" ")}
             >
-              <span className="flex items-center gap-1.5">
-                {tab.icon}
-                <span className="truncate text-[11px] font-semibold leading-tight md:text-sm">
-                  {tab.label}
-                </span>
-              </span>
-
+              {tab.icon && <span className="shrink-0">{tab.icon}</span>}
+              <span>{tab.label}</span>
               <span
                 className={[
-                  "text-[10px] leading-tight md:text-sm",
+                  "inline-flex h-[18px] min-w-[20px] items-center justify-center rounded-full px-1.5 text-[11px] font-bold tabular-nums",
                   isActive
-                    ? "text-slate-700 dark:text-slate-200"
-                    : "text-slate-400 dark:text-slate-500",
+                    ? "bg-slate-950/10 text-slate-950"
+                    : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400",
                 ].join(" ")}
               >
                 {tab.count}
@@ -88,6 +87,14 @@ export default function TransportModeTabs({ active, items, onChange }: Props) {
             </button>
           );
         })}
+      </div>
+
+      {/* Compteur total (caché si trop peu de place) */}
+      <div className="hidden text-[12px] text-slate-500 dark:text-slate-400 md:block">
+        <span className="font-semibold text-slate-900 dark:text-white">
+          {counts.all}
+        </span>{" "}
+        {t("transportTabs.resultsCount")}
       </div>
     </div>
   );
