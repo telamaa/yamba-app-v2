@@ -14,17 +14,17 @@ import { useForm } from "react-hook-form";
 import { useMutation } from "@tanstack/react-query";
 import { AlertTriangle, Clock, Loader2, ShieldCheck } from "lucide-react";
 import {
-  cancelRegistration,
   getApiErrorData,
   getApiErrorMessage,
   hasApiBaseUrl,
-  resendRegistrationOtp,
-  verifyRegistrationOtp,
+  resendPasswordResetOtp,
+  verifyPasswordResetOtp,
 } from "@/services/auth.api";
-import type { HeroVisual } from "@/lib/auth/hero-visuals";
-import { maskEmail } from "@/lib/auth/email-mask";
+
 import { useToast } from "@/components/ui/Toast";
 import AuthHeroVisual from "@/components/auth/visual/AuthHeroVisual";
+import {HeroVisual} from "@/lib/auth/hero-visuals";
+import {maskEmail} from "@/lib/auth/email-mask";
 
 const OTP_LENGTH = 6;
 const OTP_EXPIRY_SECONDS = 600;
@@ -78,7 +78,7 @@ function buildCopy(lang: string) {
   const fr = (lang as Lang) === "fr";
   return {
     trust: fr ? "Vérification sécurisée" : "Secure verification",
-    title: fr ? "Plus qu'une étape !" : "Almost there!",
+    title: fr ? "Vérification du code" : "Verify the code",
     subtitle: fr
       ? "Nous avons envoyé un code à 6 chiffres à :"
       : "We've sent a 6-digit code to:",
@@ -97,16 +97,14 @@ function buildCopy(lang: string) {
     resendCooldown: fr ? "Renvoyer dans" : "Resend in",
     resentToastTitle: fr ? "Code renvoyé" : "Code resent",
     resentToastMessage: fr
-      ? "Un nouveau code a été envoyé. Vérifiez votre boîte mail."
-      : "A new code has been sent. Check your inbox.",
+      ? "Si un compte existe, un nouveau code a été envoyé."
+      : "If an account exists, a new code has been sent.",
+    // Wrong email — pattern Stripe
     wrongEmailQuestion: fr ? "Trompé d'adresse e-mail ?" : "Wrong email?",
     startOver: fr ? "Recommencer" : "Start over",
-    startOverConfirm: fr
-      ? "Êtes-vous sûr ? Vous devrez recommencer toute l'inscription depuis le début."
-      : "Are you sure? You will need to restart the entire registration from scratch.",
-    missingToken: fr
-      ? "Session expirée. Merci de recommencer l'inscription."
-      : "Session expired. Please register again.",
+    missingEmail: fr
+      ? "Session expirée. Merci de recommencer la procédure."
+      : "Session expired. Please restart the recovery flow.",
     incomplete: fr ? "Veuillez saisir le code complet." : "Please enter the full code.",
     invalidOtp: fr ? "Code invalide ou expiré." : "Invalid or expired code.",
     genericError: fr
@@ -115,6 +113,7 @@ function buildCopy(lang: string) {
     configError: fr
       ? "La configuration de l'application est incomplète."
       : "Application configuration is incomplete.",
+    // Exponential backoff
     attemptsLeftSingular: fr
       ? "tentative restante avant verrouillage temporaire"
       : "attempt left before temporary lock",
@@ -130,7 +129,7 @@ function buildCopy(lang: string) {
   };
 }
 
-export default function RegisterVerifyForm({ heroVisual }: Props) {
+export default function ResetVerifyForm({ heroVisual }: Props) {
   const router = useRouter();
   const sp = useSearchParams();
   const { lang } = useUiPreferences();
@@ -139,10 +138,8 @@ export default function RegisterVerifyForm({ heroVisual }: Props) {
 
   const copy = useMemo(() => buildCopy(lang), [lang]);
 
-  const tokenFromQuery = sp.get("token") ?? "";
   const emailFromQuery = sp.get("email") ?? "";
 
-  const [token, setToken] = useState<string>("");
   const [email, setEmail] = useState<string>("");
   const [digits, setDigits] = useState<string[]>(Array(OTP_LENGTH).fill(""));
   const [resendTimer, setResendTimer] = useState(RESEND_COOLDOWN_SECONDS);
@@ -156,40 +153,19 @@ export default function RegisterVerifyForm({ heroVisual }: Props) {
   const expiryIntervalRef = useRef<number | null>(null);
   const lockIntervalRef = useRef<number | null>(null);
 
-  // 🔒 Init from URL or sessionStorage (double fallback robuste)
-  // - URL : utile pour les liens magiques email envoyés par le backend
-  // - sessionStorage : flow normal après /register (sans email en URL)
   useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const t =
-      tokenFromQuery ||
-      sessionStorage.getItem("register_verification_token") ||
-      "";
     const e =
       emailFromQuery ||
-      sessionStorage.getItem("register_verification_email") ||
-      "";
+      (typeof window !== "undefined"
+        ? sessionStorage.getItem("pwd_reset_email") ?? ""
+        : "");
 
-    setToken(t);
     setEmail(e);
 
-    // Si l'email/token vient de l'URL, on les sauvegarde en sessionStorage
-    // pour que la suite du flow soit indépendante de l'URL
-    if (tokenFromQuery) {
-      sessionStorage.setItem("register_verification_token", tokenFromQuery);
-    }
     if (emailFromQuery) {
-      sessionStorage.setItem("register_verification_email", emailFromQuery);
+      sessionStorage.setItem("pwd_reset_email", emailFromQuery);
     }
-
-    // 🔒 Protection défensive : si l'utilisateur arrive ici sans token/email
-    // (ex: il a tapé l'URL directement, ou la session a expiré), on le
-    // redirige vers /register pour qu'il recommence proprement
-    if (!t && !e) {
-      router.push("/register");
-    }
-  }, [tokenFromQuery, emailFromQuery, router]);
+  }, [emailFromQuery]);
 
   const {
     handleSubmit,
@@ -273,7 +249,7 @@ export default function RegisterVerifyForm({ heroVisual }: Props) {
   };
 
   useEffect(() => {
-    if (token) {
+    if (email) {
       startResendTimer();
       startExpiryTimer();
     }
@@ -283,15 +259,16 @@ export default function RegisterVerifyForm({ heroVisual }: Props) {
       clearLockTimer();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
+  }, [email]);
 
   const verifyOtpMutation = useMutation({
-    mutationFn: verifyRegistrationOtp,
-    onSuccess: () => {
-      sessionStorage.removeItem("register_verification_token");
-      sessionStorage.removeItem("register_verification_email");
-      router.push("/login");
-      router.refresh();
+    mutationFn: verifyPasswordResetOtp,
+    onSuccess: (data) => {
+      if (data.passwordResetToken && typeof window !== "undefined") {
+        sessionStorage.setItem("pwd_reset_token", data.passwordResetToken);
+      }
+      sessionStorage.removeItem("pwd_reset_email");
+      router.push("/password/reset");
     },
     onError: (error) => {
       const data = getApiErrorData(error);
@@ -328,11 +305,8 @@ export default function RegisterVerifyForm({ heroVisual }: Props) {
   });
 
   const resendOtpMutation = useMutation({
-    mutationFn: resendRegistrationOtp,
-    onSuccess: (data, variables) => {
-      const nextToken = data?.verificationToken || variables.verificationToken;
-      sessionStorage.setItem("register_verification_token", nextToken);
-      setToken(nextToken);
+    mutationFn: resendPasswordResetOtp,
+    onSuccess: () => {
       setDigits(Array(OTP_LENGTH).fill(""));
       setErrorContext(null);
       startResendTimer();
@@ -349,20 +323,6 @@ export default function RegisterVerifyForm({ heroVisual }: Props) {
         type: "server",
         message: getApiErrorMessage(error, copy.genericError),
       });
-    },
-  });
-
-  const cancelMutation = useMutation({
-    mutationFn: cancelRegistration,
-    onSuccess: () => {
-      sessionStorage.removeItem("register_verification_token");
-      sessionStorage.removeItem("register_verification_email");
-      router.push("/register");
-    },
-    onError: () => {
-      sessionStorage.removeItem("register_verification_token");
-      sessionStorage.removeItem("register_verification_email");
-      router.push("/register");
     },
   });
 
@@ -449,8 +409,8 @@ export default function RegisterVerifyForm({ heroVisual }: Props) {
       setError("root.serverError", { type: "config", message: copy.configError });
       return;
     }
-    if (!token) {
-      setError("root.serverError", { type: "session", message: copy.missingToken });
+    if (!email) {
+      setError("root.serverError", { type: "session", message: copy.missingEmail });
       return;
     }
     if (otpValue.length !== OTP_LENGTH) {
@@ -460,7 +420,7 @@ export default function RegisterVerifyForm({ heroVisual }: Props) {
 
     try {
       await verifyOtpMutation.mutateAsync({
-        verificationToken: token,
+        email,
         otp: otpValue,
       });
     } catch {
@@ -475,23 +435,21 @@ export default function RegisterVerifyForm({ heroVisual }: Props) {
   const canResend = resendTimer === 0 && !errorContext?.locked;
 
   const resendOtp = async () => {
-    if (!canResend || !token) return;
+    if (!canResend || !email) return;
     clearErrors("root.serverError");
     try {
-      await resendOtpMutation.mutateAsync({ verificationToken: token });
+      await resendOtpMutation.mutateAsync({ email });
     } catch {
       // géré dans onError
     }
   };
 
+  // Start over : pas de cleanup backend nécessaire (pas de pending Redis)
+  // On supprime juste le sessionStorage local et on redirige
   const handleStartOver = () => {
-    if (window.confirm(copy.startOverConfirm)) {
-      if (!token) {
-        router.push("/register");
-        return;
-      }
-      cancelMutation.mutate({ verificationToken: token });
-    }
+    sessionStorage.removeItem("pwd_reset_email");
+    sessionStorage.removeItem("pwd_reset_token");
+    router.push("/password/forgot");
   };
 
   const maskedEmail = useMemo(() => maskEmail(email), [email]);
@@ -505,15 +463,12 @@ export default function RegisterVerifyForm({ heroVisual }: Props) {
 
   return (
     <main className="lg:grid lg:grid-cols-2 lg:min-h-[calc(100vh-64px)]">
-      {/* LEFT — visuel desktop */}
       <div className="hidden lg:block">
         <AuthHeroVisual visual={heroVisual} />
       </div>
 
-      {/* RIGHT — formulaire */}
       <div className="flex items-center justify-center px-4 py-8 lg:px-8 lg:py-10">
         <div className="w-full max-w-[400px]">
-          {/* Trust pill */}
           <div className="inline-flex items-center gap-1.5 rounded-full border border-[#0F766E] bg-white px-2.5 py-1 text-[11px] font-medium text-[#0F766E] dark:border-[#2DD4BF] dark:bg-slate-950 dark:text-[#2DD4BF]">
             <ShieldCheck size={12} />
             <span>{copy.trust}</span>
@@ -526,7 +481,7 @@ export default function RegisterVerifyForm({ heroVisual }: Props) {
             {copy.subtitle}
           </p>
 
-          {/* Email line (read-only, no change action) */}
+          {/* Email read-only (no change action) */}
           {email && (
             <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 dark:border-slate-800 dark:bg-slate-900/40">
               <span className="font-mono text-sm text-slate-900 dark:text-white">
@@ -535,7 +490,6 @@ export default function RegisterVerifyForm({ heroVisual }: Props) {
             </div>
           )}
 
-          {/* Timer */}
           {isLocked ? (
             <div className="mt-4 inline-flex items-center gap-1.5 rounded-full border border-red-300 bg-red-50 px-3 py-1.5 text-xs text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300">
               <AlertTriangle size={12} />
@@ -566,7 +520,6 @@ export default function RegisterVerifyForm({ heroVisual }: Props) {
             </div>
           )}
 
-          {/* OTP form */}
           <form onSubmit={handleSubmit(onSubmit)} noValidate className="mt-6 space-y-4">
             <div>
               <label className="block text-center text-xs font-semibold text-slate-700 dark:text-slate-200 mb-3">
@@ -689,7 +642,6 @@ export default function RegisterVerifyForm({ heroVisual }: Props) {
             </button>
           </form>
 
-          {/* Resend section */}
           <div className="mt-5 border-t border-slate-200 pt-4 text-center dark:border-slate-800">
             <p className="text-xs text-slate-500 dark:text-slate-400">{copy.resendText}</p>
             <button
@@ -719,10 +671,9 @@ export default function RegisterVerifyForm({ heroVisual }: Props) {
             <button
               type="button"
               onClick={handleStartOver}
-              disabled={cancelMutation.isPending}
-              className="text-[11px] font-semibold text-[#0D9488] underline underline-offset-2 decoration-[#0D9488]/40 hover:decoration-[#0D9488] disabled:opacity-50 dark:text-[#2DD4BF] dark:decoration-[#2DD4BF]/40 dark:hover:decoration-[#2DD4BF]"
+              className="text-[11px] font-semibold text-[#0D9488] underline underline-offset-2 decoration-[#0D9488]/40 hover:decoration-[#0D9488] dark:text-[#2DD4BF] dark:decoration-[#2DD4BF]/40 dark:hover:decoration-[#2DD4BF]"
             >
-              {cancelMutation.isPending ? "…" : copy.startOver}
+              {copy.startOver}
             </button>
           </div>
         </div>
