@@ -20,7 +20,7 @@ model User {
   passwordHash    String?
   phoneNumber     String?
   phoneE164       String?
-  gender          Gender
+  gender          Gender? // ← MODIFIÉ : optionnel maintenant
   birthDate       DateTime?
   roles           Role[]    @default([SHIPPER])
 
@@ -33,6 +33,7 @@ model User {
   addresses      Address[]
   trips          Trip[]          @relation("UserTrips")
   carrierReviews CarrierReview[]
+  consentLogs    ConsentLog[] // ← NOUVEAU
 
   // Lifecycle
   createdAt DateTime  @default(now())
@@ -43,6 +44,36 @@ model User {
   @@index([carrierStatus])
   @@index([roles])
   @@index([phoneE164])
+}
+
+// ─────────────────────────────────────────────
+// CONSENT LOG (RGPD - traçabilité du consentement)
+// ─────────────────────────────────────────────
+
+model ConsentLog {
+  id     String @id @default(auto()) @map("_id") @db.ObjectId
+  userId String @db.ObjectId
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  type       ConsentType
+  version    String // ex: "2026-04-26" ou "v1.2"
+  acceptedAt DateTime    @default(now())
+
+  // Métadonnées d'audit RGPD
+  ipAddress String?
+  userAgent String?
+  locale    String? // "fr" | "en"
+
+  // Si l'utilisateur retire son consentement (ex: désinscription marketing)
+  revokedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([userId, type])
+  @@index([userId, type, acceptedAt])
+  @@index([type, version])
 }
 
 // ─────────────────────────────────────────────
@@ -62,7 +93,7 @@ model CarrierPage {
   coverUrl    String?
   socialLinks Json[]  @default([])
 
-  // Localisation publique (via Address — affiche city + country sur le profil)
+  // Localisation publique
   primaryAddressId String?  @unique @db.ObjectId
   primaryAddress   Address? @relation("CarrierPrimaryAddress", fields: [primaryAddressId], references: [id])
 
@@ -79,7 +110,7 @@ model CarrierPage {
   isVerified     Boolean @default(false)
   isSuperCarrier Boolean @default(false)
 
-  // Stats (mis à jour via triggers/cron)
+  // Stats
   totalTripsPublished Int   @default(0)
   totalParcelsCarried Int   @default(0)
   totalTripsCancelled Int   @default(0)
@@ -156,34 +187,28 @@ model Address {
   userId String @db.ObjectId
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // Libellé interne (ex: "Paris, France" ou "Domicile")
   label String?
 
-  // Données Google Places
-  formattedAddress String? // texte complet retourné par Google
-  placeId          String? // ID Google Places (pour re-fetch)
-  lat              Float? // latitude
-  lng              Float? // longitude
+  formattedAddress String?
+  placeId          String?
+  lat              Float?
+  lng              Float?
 
-  // Composants structurés (extraits de address_components)
-  streetLine1 String? // street_number + route
-  streetLine2 String? // complément (apt, bât, etc.)
-  city        String? // locality
-  region      String? // administrative_area_level_1
-  postalCode  String? // postal_code
-  country     String? // country
-  countryCode String? // country short (ex: "FR", "US")
+  streetLine1 String?
+  streetLine2 String?
+  city        String?
+  region      String?
+  postalCode  String?
+  country     String?
+  countryCode String?
 
-  // Livraison
   recipientName String?
   phoneE164     String?
 
-  // Lifecycle
   isArchived Boolean  @default(false)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  // Relation inverse : peut être l'adresse principale d'un CarrierPage
   carrierPage CarrierPage? @relation("CarrierPrimaryAddress")
 
   @@index([userId])
@@ -332,6 +357,13 @@ enum Gender {
   OTHER
 }
 
+enum ConsentType {
+  TERMS
+  PRIVACY
+  COOKIES
+  MARKETING
+}
+
 enum Role {
   SHIPPER
   CARRIER
@@ -436,17 +468,11 @@ enum TripDocumentStatus {
 model SiteConfig {
   id String @id @default(auto()) @map("_id") @db.ObjectId
 
-  // Catégories de colis acceptées sur la plateforme
-  // parcelCategories Json     // [{ key: "clothes", labelFr: "Vêtements", labelEn: "Clothes", group: "fashion" }]
-
-  // Branding
   logo   String?
   banner String?
 
-  // Commission Yamba (pourcentage prélevé sur chaque transaction)
   commissionRate Float @default(0.10)
 
-  // Limites
   maxDocSizeMb   Int @default(5)
   maxDocsPerTrip Int @default(5)
 

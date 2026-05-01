@@ -31,7 +31,7 @@ export default function AuthCard({ title, subtitle, children, footer }: Props) {
         {footer ? <div className="mt-5">{footer}</div> : null}
 
         <div className="mt-6 text-center text-xs text-slate-500 dark:text-slate-500">
-          <Link className="hover:underline" href="/">
+          <Link className="hover:underline" href="/apps/user-ui/public">
             Yamba
           </Link>
           {" · "}© {new Date().getFullYear()}
