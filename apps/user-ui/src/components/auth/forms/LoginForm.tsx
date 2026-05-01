@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 import { useUiPreferences } from "@/components/providers/UiPreferencesProvider";
 import { useForm } from "react-hook-form";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, Loader2, ShieldCheck } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   getApiErrorData,
@@ -15,6 +15,9 @@ import {
   type LoginPayload,
   type LoginResponse,
 } from "@/services/auth.api";
+import type { HeroVisual } from "@/lib/auth/hero-visuals";
+import AuthHeroVisual from "@/components/auth/visual/AuthHeroVisual";
+
 
 type FormData = {
   email: string;
@@ -22,72 +25,52 @@ type FormData = {
   remember: boolean;
 };
 
+type Props = {
+  heroVisual: HeroVisual;
+};
+
 function GoogleIcon() {
   return (
-    <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
-      <path
-        fill="#FFC107"
-        d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.2 6.2 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.1-.1-2.3-.4-3.5z"
-      />
-      <path
-        fill="#FF3D00"
-        d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.2 6.2 29.3 4 24 4c-7.7 0-14.4 4.3-17.7 10.7z"
-      />
-      <path
-        fill="#4CAF50"
-        d="M24 44c5.2 0 10-2 13.6-5.2l-6.3-5.2C29.3 35.4 26.8 36 24 36c-5.3 0-9.7-3.3-11.3-8l-6.6 5.1C9.4 39.7 16.2 44 24 44z"
-      />
-      <path
-        fill="#1976D2"
-        d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.3 4.3-4.2 5.6l6.3 5.2C40.9 35.6 44 30.3 44 24c0-1.1-.1-2.3-.4-3.5z"
-      />
+    <svg width="16" height="16" viewBox="0 0 48 48" aria-hidden="true">
+      <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.2 6.2 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.1-.1-2.3-.4-3.5z" />
+      <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.2 6.2 29.3 4 24 4c-7.7 0-14.4 4.3-17.7 10.7z" />
+      <path fill="#4CAF50" d="M24 44c5.2 0 10-2 13.6-5.2l-6.3-5.2C29.3 35.4 26.8 36 24 36c-5.3 0-9.7-3.3-11.3-8l-6.6 5.1C9.4 39.7 16.2 44 24 44z" />
+      <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.3 4.3-4.2 5.6l6.3 5.2C40.9 35.6 44 30.3 44 24c0-1.1-.1-2.3-.4-3.5z" />
     </svg>
   );
 }
 
 function FacebookIcon() {
   return (
-    <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
-      <path
-        fill="#1877F2"
-        d="M24 4C13 4 4 13 4 24s9 20 20 20 20-9 20-20S35 4 24 4z"
-      />
-      <path
-        fill="#fff"
-        d="M26.6 38V26.8h3.7l.6-4.4h-4.3v-2.8c0-1.3.4-2.2 2.2-2.2h2.3V13.5c-.4-.1-1.8-.2-3.4-.2-3.4 0-5.7 2.1-5.7 6v3.1h-3.8v4.4H24V38h2.6z"
-      />
+    <svg width="16" height="16" viewBox="0 0 48 48" aria-hidden="true">
+      <path fill="#1877F2" d="M24 4C13 4 4 13 4 24s9 20 20 20 20-9 20-20S35 4 24 4z" />
+      <path fill="#fff" d="M26.6 38V26.8h3.7l.6-4.4h-4.3v-2.8c0-1.3.4-2.2 2.2-2.2h2.3V13.5c-.4-.1-1.8-.2-3.4-.2-3.4 0-5.7 2.1-5.7 6v3.1h-3.8v4.4H24V38h2.6z" />
     </svg>
   );
 }
 
 function buildCopy(lang: string) {
   const fr = lang === "fr";
-
   return {
-    title: fr ? "Bon retour sur Yamba" : "Welcome back to Yamba",
+    trust: fr ? "Connexion sécurisée" : "Secure connection",
+    title: fr ? "Connectez-vous" : "Sign in to Yamba",
     subtitle: fr
-      ? "Saisissez votre e-mail et votre mot de passe."
-      : "Enter your email and password.",
+      ? "Reprenez là où vous vous êtes arrêté."
+      : "Pick up where you left off.",
+    google: fr ? "Continuer avec Google" : "Continue with Google",
+    facebook: fr ? "Continuer avec Facebook" : "Continue with Facebook",
+    orMail: fr ? "ou par e-mail" : "or with email",
     email: fr ? "E-mail" : "Email",
+    emailPh: fr ? "vous@email.com" : "you@email.com",
     password: fr ? "Mot de passe" : "Password",
-    forgot: fr ? "Mot de passe oublié ?" : "Forgot password?",
-    remember: fr
-      ? "Se souvenir de moi sur cet appareil"
-      : "Remember me on this device",
-    cta: fr ? "Connexion" : "Sign in",
-    or: fr ? "OU" : "OR",
-    google: fr ? "Me connecter avec Google" : "Continue with Google",
-    facebook: fr ? "Me connecter avec Facebook" : "Continue with Facebook",
-    foot: fr ? "Vous découvrez Yamba ?" : "New to Yamba?",
-    create: fr ? "Créez un compte" : "Create an account",
-    show: fr ? "Afficher" : "Show",
-    hide: fr ? "Masquer" : "Hide",
-    showPasswordAria: fr
-      ? "Afficher le mot de passe"
-      : "Show password",
-    hidePasswordAria: fr
-      ? "Masquer le mot de passe"
-      : "Hide password",
+    forgot: fr ? "Oublié ?" : "Forgot?",
+    remember: fr ? "Rester connecté" : "Stay signed in",
+    cta: fr ? "Se connecter" : "Sign in",
+    ctaLoading: fr ? "Connexion…" : "Signing in…",
+    notMemberYet: fr ? "Pas encore membre ?" : "Not a member yet?",
+    signup: fr ? "Inscrivez-vous" : "Sign up",
+    showPasswordAria: fr ? "Afficher le mot de passe" : "Show password",
+    hidePasswordAria: fr ? "Masquer le mot de passe" : "Hide password",
     requiredEmail: fr ? "L'e-mail est requis." : "Email is required.",
     invalidEmail: fr
       ? "Veuillez saisir un e-mail valide."
@@ -113,9 +96,6 @@ function buildCopy(lang: string) {
     rateLimitError: fr
       ? "Trop de tentatives. Réessayez dans quelques instants."
       : "Too many attempts. Please try again in a moment.",
-    secureHint: fr
-      ? "Vérifiez l'URL pour vous assurer de vous connecter au bon site."
-      : "Check the URL to make sure you are signing in to the correct site.",
   };
 }
 
@@ -130,7 +110,6 @@ function normalizeMessage(message?: string | null) {
 
 function localizeLoginError(message: string | undefined, copy: Copy) {
   const normalized = normalizeMessage(message);
-
   if (!normalized) return copy.genericError;
 
   if (
@@ -144,10 +123,7 @@ function localizeLoginError(message: string | undefined, copy: Copy) {
     return copy.invalidCredentials;
   }
 
-  if (
-    normalized === "email is required" ||
-    normalized === "e-mail is required"
-  ) {
+  if (normalized === "email is required" || normalized === "e-mail is required") {
     return copy.requiredEmail;
   }
 
@@ -191,7 +167,7 @@ function localizeLoginError(message: string | undefined, copy: Copy) {
   return copy.genericError;
 }
 
-export default function LoginForm() {
+export default function LoginForm({ heroVisual }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
@@ -200,45 +176,19 @@ export default function LoginForm() {
 
   const copy = useMemo(() => buildCopy(lang), [lang]);
 
-  const UI = {
-    label: "text-sm font-semibold text-slate-800 dark:text-slate-100",
-    input:
-      "mt-2 w-full rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none " +
-      "focus:border-[#FF9900]/80 focus:ring-4 focus:ring-[#FF9900]/25 " +
-      "dark:border-slate-800 dark:bg-slate-950 dark:text-white " +
-      "dark:focus:border-[#FFAE33]/70 dark:focus:ring-[#FF9900]/18",
-    inputError:
-      "border-red-300 focus:border-red-400 focus:ring-red-200 dark:border-red-800 dark:focus:border-red-700 dark:focus:ring-red-900/40",
-    link:
-      "text-sm font-semibold text-[#0F766E] hover:text-[#115E59] hover:underline " +
-      "dark:text-[#2DD4BF] dark:hover:text-[#5EEAD4]",
-    btnPrimary:
-      "w-full rounded-lg bg-[#FF9900] px-4 py-2.5 text-sm font-semibold text-slate-900 " +
-      "shadow-sm transition-colors hover:bg-[#F08700] active:bg-[#E07A00] disabled:opacity-60 " +
-      "focus:outline-none focus-visible:ring-4 focus-visible:ring-[#FF9900]/30 " +
-      "dark:focus-visible:ring-[#FF9900]/18",
-    btnSecondary:
-      "w-full rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 " +
-      "shadow-sm transition-colors hover:bg-slate-50 " +
-      "dark:border-slate-800 dark:bg-slate-950 dark:text-white dark:hover:bg-slate-900/50",
-    footerLink:
-      "font-semibold text-[#0F766E] hover:text-[#115E59] hover:underline " +
-      "dark:text-[#2DD4BF] dark:hover:text-[#5EEAD4]",
-    helperError: "mt-2 text-xs text-red-600 dark:text-red-400",
-  };
-
   const {
     register,
     handleSubmit,
     setError,
     clearErrors,
-    formState: { errors, isValid },
+    formState: { errors },
   } = useForm<FormData>({
-    mode: "onChange",
+    mode: "onBlur",
+    reValidateMode: "onChange",
     defaultValues: {
       email: "",
       password: "",
-      remember: false,
+      remember: true, // ✅ coché par défaut (UX friendly)
     },
   });
 
@@ -269,7 +219,6 @@ export default function LoginForm() {
 
       if (!data?.errors?.email && !data?.errors?.password) {
         const rawMessage = getApiErrorMessage(error, copy.invalidCredentials);
-
         setError("root.serverError", {
           type: "server",
           message: localizeLoginError(rawMessage, copy),
@@ -300,33 +249,93 @@ export default function LoginForm() {
     }
   };
 
+  // ====== Styles centralisés ======
+  const inputBase =
+    "mt-1.5 w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none " +
+    "transition-colors placeholder:text-slate-400 " +
+    "focus:border-[#FF9900] focus:ring-4 focus:ring-[#FF9900]/20 " +
+    "dark:border-slate-800 dark:bg-slate-950 dark:text-white dark:placeholder:text-slate-600 " +
+    "dark:focus:border-[#FFAE33] dark:focus:ring-[#FF9900]/15";
+  const inputError =
+    "border-red-300 focus:border-red-400 focus:ring-red-200 dark:border-red-800 dark:focus:border-red-700 dark:focus:ring-red-900/40";
+  const labelBase = "text-xs font-semibold text-slate-800 dark:text-slate-100";
+  const linkSubtle =
+    "text-xs font-semibold text-[#0F766E] hover:text-[#115E59] hover:underline " +
+    "dark:text-[#2DD4BF] dark:hover:text-[#5EEAD4]";
+  const oauthBtn =
+    "flex w-full items-center justify-center gap-2.5 rounded-lg border border-slate-200 bg-white px-4 py-2.5 " +
+    "text-sm font-semibold text-slate-900 transition-colors hover:bg-slate-50 " +
+    "dark:border-slate-800 dark:bg-slate-950 dark:text-white dark:hover:bg-slate-900/50";
+
   return (
-    <main className="px-4">
-      <div className="mx-auto flex min-h-[85vh] max-w-6xl items-center justify-center py-10">
-        <div className="w-full max-w-[420px]">
-          <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">
+    <main className="lg:grid lg:grid-cols-2 lg:min-h-[calc(100vh-64px)]">
+      {/* LEFT — visuel desktop only */}
+      <div className="hidden lg:block">
+        <AuthHeroVisual visual={heroVisual} />
+      </div>
+
+      {/* RIGHT — formulaire */}
+      <div className="flex items-center justify-center px-4 py-8 lg:px-8 lg:py-10">
+        <div className="w-full max-w-[360px]">
+          {/* Trust pill */}
+          <div className="inline-flex items-center gap-1.5 rounded-full border border-[#0F766E] bg-white px-2.5 py-1 text-[11px] font-medium text-[#0F766E] dark:border-[#2DD4BF] dark:bg-slate-950 dark:text-[#2DD4BF]">
+            <ShieldCheck size={12} />
+            <span>{copy.trust}</span>
+          </div>
+
+          {/* Titre + sous-titre */}
+          <h1 className="mt-3 text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white lg:text-3xl">
             {copy.title}
           </h1>
-
-          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+          <p className="mt-1.5 text-sm text-slate-500 dark:text-slate-400">
             {copy.subtitle}
           </p>
 
-          <form
-            onSubmit={handleSubmit(onSubmit)}
-            className="mt-8 space-y-5"
-            noValidate
-          >
+          {/* OAuth — en haut */}
+          <div className="mt-6 space-y-2">
+            <button
+              type="button"
+              onClick={() => console.log("google oauth (ui only)")}
+              className={oauthBtn}
+            >
+              <GoogleIcon />
+              {copy.google}
+            </button>
+            <button
+              type="button"
+              onClick={() => console.log("facebook oauth (ui only)")}
+              className={oauthBtn}
+            >
+              <FacebookIcon />
+              {copy.facebook}
+            </button>
+          </div>
+
+          {/* Séparateur */}
+          <div className="my-4 flex items-center gap-3">
+            <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+              {copy.orMail}
+            </span>
+            <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
+          </div>
+
+          {/* Form e-mail/password */}
+          <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-3">
             <div>
-              <label htmlFor="email" className={UI.label}>
+              <label htmlFor="email" className={labelBase}>
                 {copy.email}
               </label>
-
               <input
                 id="email"
                 type="email"
+                inputMode="email"
+                enterKeyHint="next"
                 autoComplete="email"
-                className={`${UI.input} ${errors.email ? UI.inputError : ""}`}
+                placeholder={copy.emailPh}
+                aria-invalid={!!errors.email}
+                aria-describedby={errors.email ? "email-error" : undefined}
+                className={`${inputBase} ${errors.email ? inputError : ""}`}
                 {...register("email", {
                   required: copy.requiredEmail,
                   pattern: {
@@ -334,40 +343,41 @@ export default function LoginForm() {
                     message: copy.invalidEmail,
                   },
                   setValueAs: (value) =>
-                    typeof value === "string"
-                      ? value.trim().toLowerCase()
-                      : value,
+                    typeof value === "string" ? value.trim().toLowerCase() : value,
                   onChange: () => {
                     clearErrors("email");
                     clearErrors("root.serverError");
                   },
                 })}
               />
-
               {errors.email?.message && (
-                <p className={UI.helperError}>{errors.email.message}</p>
+                <p
+                  id="email-error"
+                  className="mt-1.5 text-xs text-red-600 dark:text-red-400"
+                >
+                  {errors.email.message}
+                </p>
               )}
             </div>
 
             <div>
               <div className="flex items-center justify-between gap-3">
-                <label htmlFor="password" className={UI.label}>
+                <label htmlFor="password" className={labelBase}>
                   {copy.password}
                 </label>
-
-                <Link href="/password/forgot" className={UI.link}>
+                <Link href="/password/forgot" className={linkSubtle}>
                   {copy.forgot}
                 </Link>
               </div>
-
               <div className="relative">
                 <input
                   id="password"
                   type={passwordVisible ? "text" : "password"}
+                  enterKeyHint="go"
                   autoComplete="current-password"
-                  className={`${UI.input} pr-12 ${
-                    errors.password ? UI.inputError : ""
-                  }`}
+                  aria-invalid={!!errors.password}
+                  aria-describedby={errors.password ? "password-error" : undefined}
+                  className={`${inputBase} pr-11 ${errors.password ? inputError : ""}`}
                   {...register("password", {
                     required: copy.requiredPassword,
                     minLength: {
@@ -380,97 +390,72 @@ export default function LoginForm() {
                     },
                   })}
                 />
-
+                {/* Bouton œil — centrage robuste avec inset-y-0 + my-auto */}
                 <button
                   type="button"
                   onClick={() => setPasswordVisible((v) => !v)}
                   aria-label={
-                    passwordVisible
-                      ? copy.hidePasswordAria
-                      : copy.showPasswordAria
+                    passwordVisible ? copy.hidePasswordAria : copy.showPasswordAria
                   }
                   aria-pressed={passwordVisible}
-                  className="absolute right-2 top-1/2 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-lg text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                  className="absolute inset-y-0 right-1.5 my-auto inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
                 >
                   {passwordVisible ? <EyeOff size={15} /> : <Eye size={15} />}
                 </button>
               </div>
-
               {errors.password?.message && (
-                <p className={UI.helperError}>{errors.password.message}</p>
+                <p
+                  id="password-error"
+                  className="mt-1.5 text-xs text-red-600 dark:text-red-400"
+                >
+                  {errors.password.message}
+                </p>
               )}
             </div>
 
-            <label className="flex items-center gap-3 text-sm text-slate-700 dark:text-slate-300">
+            <label className="flex cursor-pointer items-center gap-2.5 text-sm text-slate-700 dark:text-slate-300">
               <input
                 type="checkbox"
-                className={[
-                  "h-4 w-4 rounded border-slate-300",
-                  "accent-[#FF9900]",
-                  "focus:ring-4 focus:ring-[#FF9900]/25 focus:ring-offset-2",
-                  "focus:ring-offset-white dark:focus:ring-offset-slate-950",
-                ].join(" ")}
+                className="h-4 w-4 rounded border-slate-300 accent-[#FF9900] focus:ring-2 focus:ring-[#FF9900]/30 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-slate-950"
                 {...register("remember")}
               />
               <span>{copy.remember}</span>
             </label>
 
             {errors.root?.serverError?.message && (
-              <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-200">
+              <div
+                role="alert"
+                className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-200"
+              >
                 {errors.root.serverError.message}
               </div>
             )}
 
             <button
               type="submit"
-              disabled={loginMutation.isPending || !isValid}
-              className={UI.btnPrimary}
+              disabled={loginMutation.isPending}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#FF9900] px-4 py-2.5 text-sm font-bold text-slate-900 shadow-sm transition-colors hover:bg-[#F08700] active:bg-[#E07A00] disabled:opacity-60 focus:outline-none focus-visible:ring-4 focus-visible:ring-[#FF9900]/30 dark:focus-visible:ring-[#FF9900]/20"
             >
-              {loginMutation.isPending ? "…" : copy.cta}
+              {loginMutation.isPending ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  {copy.ctaLoading}
+                </>
+              ) : (
+                copy.cta
+              )}
             </button>
-
-            <div className="flex items-center gap-4 pt-1">
-              <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
-              <span className="text-xs font-semibold text-slate-400">
-                {copy.or}
-              </span>
-              <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
-            </div>
-
-            <div className="space-y-3">
-              <button
-                type="button"
-                onClick={() => console.log("google oauth (ui only)")}
-                className={UI.btnSecondary}
-              >
-                <span className="inline-flex items-center justify-center gap-3">
-                  <GoogleIcon />
-                  {copy.google}
-                </span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => console.log("facebook oauth (ui only)")}
-                className={UI.btnSecondary}
-              >
-                <span className="inline-flex items-center justify-center gap-3">
-                  <FacebookIcon />
-                  {copy.facebook}
-                </span>
-              </button>
-            </div>
-
-            <div className="pt-5 text-center text-sm text-slate-600 dark:text-slate-400">
-              {copy.foot}{" "}
-              <Link href="/register" className={UI.footerLink}>
-                {copy.create}
-              </Link>
-            </div>
           </form>
 
-          <p className="mt-6 text-xs text-slate-500 dark:text-slate-500">
-            {copy.secureHint}
+          {/* Footer signup — texte simple sur une ligne, lien orange */}
+          <p className="mt-5 text-center text-sm text-slate-500 dark:text-slate-400">
+            {copy.notMemberYet}{" "}
+            <Link
+              href="/register"
+              className="font-bold text-[#FF9900] hover:underline hover:underline-offset-[3px] dark:text-[#FFB347]"
+            >
+              {copy.signup}
+            </Link>
           </p>
         </div>
       </div>
