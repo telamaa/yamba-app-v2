@@ -4,6 +4,7 @@ import { setRequestLocale } from "next-intl/server";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import Header from "@/components/layout/Header";
 import { UiPreferencesProvider } from "@/components/providers/UiPreferencesProvider";
+import { ToastProvider } from "@/components/ui/Toast";
 import { routing } from "@/i18n/routing";
 import Providers from "@/app/[locale]/providers";
 
@@ -47,10 +48,12 @@ export default async function LocaleLayout({
       <Providers>
         <ThemeProvider>
           <UiPreferencesProvider>
-            <Header />
-            {/* pt-[78px] réserve la place du Header fixed, sans imposer de container.
-                Chaque page gère son container via <AppContainer> ou équivalent. */}
-            <div className="pt-[78px]">{children}</div>
+            <ToastProvider>
+              <Header />
+              {/* pt-[78px] réserve la place du Header fixed, sans imposer de container.
+                  Chaque page gère son container via <AppContainer> ou équivalent. */}
+              <div className="pt-[78px]">{children}</div>
+            </ToastProvider>
           </UiPreferencesProvider>
         </ThemeProvider>
       </Providers>
