@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+</head>
+<body style="margin:0;padding:0;background-color:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">
+    Activité suspecte détectée sur votre compte Yamba.
+</div>
+
+<table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f5;padding:40px 20px;">
+    <tr>
+        <td align="center">
+            <table width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
+
+                <!-- Header alerte (rouge) -->
+                <tr>
+                    <td style="background:linear-gradient(135deg,#dc2626,#991b1b);padding:32px 40px;text-align:center;">
+                        <div style="font-size:36px;margin-bottom:8px;">⚠️</div>
+                        <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:700;">Activité suspecte détectée</h1>
+                    </td>
+                </tr>
+
+                <!-- Body -->
+                <tr>
+                    <td style="padding:40px;">
+                        <p style="margin:0 0 20px;font-size:16px;color:#18181b;line-height:1.6;">
+                            Bonjour,
+                        </p>
+
+                        <p style="margin:0 0 20px;font-size:15px;color:#3f3f46;line-height:1.6;">
+                            Nous avons détecté <strong><%= attemptCount %> tentatives de saisie</strong> incorrectes du code de vérification sur votre <%= scopeLabel %> Yamba.
+                        </p>
+
+                        <p style="margin:0 0 24px;font-size:15px;color:#3f3f46;line-height:1.6;">
+                            Par mesure de sécurité, votre compte est temporairement verrouillé pendant <strong><%= lockDuration %></strong>.
+                        </p>
+
+                        <!-- Action card si ce n'était pas l'utilisateur -->
+                        <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#fef2f2;border:1px solid #fecaca;border-radius:8px;margin:0 0 24px;">
+                            <tr>
+                                <td style="padding:18px 20px;">
+                                    <p style="margin:0 0 8px;font-size:14px;color:#991b1b;font-weight:700;">
+                                        🛡️ Si ce n'était pas vous :
+                                    </p>
+                                    <p style="margin:0;font-size:13px;color:#7f1d1d;line-height:1.5;">
+                                        Quelqu'un a peut-être tenté d'accéder à votre compte. Nous vous recommandons de :
+                                    </p>
+                                    <ul style="margin:8px 0 0;padding-left:20px;font-size:13px;color:#7f1d1d;line-height:1.7;">
+                                        <li>Vérifier la sécurité de votre boîte e-mail</li>
+                                        <li>Choisir un mot de passe unique et complexe</li>
+                                        <li>Nous contacter si vous avez des doutes</li>
+                                    </ul>
+                                </td>
+                            </tr>
+                        </table>
+
+                        <!-- Action card si c'était l'utilisateur -->
+                        <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;margin:0 0 24px;">
+                            <tr>
+                                <td style="padding:18px 20px;">
+                                    <p style="margin:0 0 6px;font-size:14px;color:#1e40af;font-weight:700;">
+                                        ✅ Si c'était bien vous :
+                                    </p>
+                                    <p style="margin:0;font-size:13px;color:#1e3a8a;line-height:1.5;">
+                                        Aucune action n'est requise. Vous pourrez à nouveau saisir un code après la fin du verrouillage. Si vous avez perdu accès à votre compte, contactez notre support.
+                                    </p>
+                                </td>
+                            </tr>
+                        </table>
+
+                        <!-- Contact -->
+                        <p style="margin:0;font-size:14px;color:#3f3f46;line-height:1.6;text-align:center;">
+                            Une question ? Contactez-nous à
+                            <a href="mailto:<%= supportEmail %>" style="color:#0d9488;text-decoration:none;font-weight:600;">
+                                <%= supportEmail %>
+                            </a>
+                        </p>
+                    </td>
+                </tr>
+
+                <!-- Footer -->
+                <tr>
+                    <td style="padding:24px 40px;background-color:#fafafa;border-top:1px solid #e4e4e7;text-align:center;">
+                        <p style="margin:0 0 8px;font-size:13px;color:#a1a1aa;line-height:1.5;">
+                            Cet e-mail vous est envoyé automatiquement pour assurer la sécurité de votre compte Yamba.
+                        </p>
+                        <p style="margin:0;font-size:12px;color:#d4d4d8;">
+                            © <%= new Date().getFullYear() %> Yamba. Tous droits réservés.
+                        </p>
+                    </td>
+                </tr>
+
+            </table>
+        </td>
+    </tr>
+</table>
+</body>
+</html>

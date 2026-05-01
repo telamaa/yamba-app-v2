@@ -1,4 +1,4 @@
-import RefreshGate from "@/components/auth/forms/RefreshGate";
+import RefreshGate from "@/components/auth/shared/RefreshGate";
 
 export default function Page() {
   return <RefreshGate />;
