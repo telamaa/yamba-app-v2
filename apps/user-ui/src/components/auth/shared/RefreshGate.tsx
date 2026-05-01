@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import AuthCard from "../AuthCard";
+import AuthCard from "./AuthCard";
 import { authApi } from "@/lib/api/auth";
 import { useUiPreferences } from "@/components/providers/UiPreferencesProvider";
 

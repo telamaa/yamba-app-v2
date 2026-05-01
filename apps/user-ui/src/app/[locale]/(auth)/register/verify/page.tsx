@@ -1,10 +1,10 @@
-import { Suspense } from "react";
 import RegisterVerifyForm from "@/components/auth/forms/RegisterVerifyForm";
+import { pickRandomHeroVisual } from "@/lib/auth/hero-visuals";
 
-export default function Page() {
-  return (
-    <Suspense fallback={null}>
-      <RegisterVerifyForm />
-    </Suspense>
-  );
+
+export const dynamic = "force-dynamic";
+
+export default function RegisterVerifyPage() {
+  const heroVisual = pickRandomHeroVisual();
+  return <RegisterVerifyForm heroVisual={heroVisual} />;
 }

@@ -1,6 +1,5 @@
 "use client";
 
-// import Link from "next/link";
 import {
   useEffect,
   useMemo,
@@ -13,13 +12,23 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useUiPreferences } from "@/components/providers/UiPreferencesProvider";
 import { useForm } from "react-hook-form";
 import { useMutation } from "@tanstack/react-query";
+import { AlertTriangle, Clock, Loader2, ShieldCheck } from "lucide-react";
 import {
+  cancelRegistration,
   getApiErrorData,
   getApiErrorMessage,
   hasApiBaseUrl,
   resendRegistrationOtp,
   verifyRegistrationOtp,
 } from "@/services/auth.api";
+import type { HeroVisual } from "@/lib/auth/hero-visuals";
+import { maskEmail } from "@/lib/auth/email-mask";
+import { useToast } from "@/components/ui/Toast";
+import AuthHeroVisual from "@/components/auth/visual/AuthHeroVisual";
+
+const OTP_LENGTH = 6;
+const OTP_EXPIRY_SECONDS = 600;
+const RESEND_COOLDOWN_SECONDS = 60;
 
 type Lang = "fr" | "en";
 
@@ -27,117 +36,177 @@ type VerifyFormData = {
   otp: string;
 };
 
-function onlyDigits(s: string) {
+type OtpErrorDetails = {
+  type?: string;
+  attemptsLeft?: number;
+  locked?: boolean;
+  lockUntilSeconds?: number;
+};
+
+type ErrorContext = {
+  attemptsLeft?: number;
+  locked: boolean;
+  lockUntilSeconds?: number;
+};
+
+type Props = {
+  heroVisual: HeroVisual;
+};
+
+function onlyDigits(s: string): string {
   return s.replace(/\D/g, "");
 }
 
-function formatMMSS(totalSeconds: number) {
-  const m = Math.floor(totalSeconds / 60);
-  const s = totalSeconds % 60;
+function formatMMSS(totalSeconds: number): string {
+  const safe = Math.max(0, totalSeconds);
+  const m = Math.floor(safe / 60);
+  const s = safe % 60;
   return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
-export default function RegisterVerifyForm() {
+function formatLockDuration(seconds: number, fr: boolean): string {
+  if (seconds < 60) return fr ? `${seconds} secondes` : `${seconds} seconds`;
+  if (seconds < 3600) {
+    const min = Math.ceil(seconds / 60);
+    return fr ? `${min} minute${min > 1 ? "s" : ""}` : `${min} minute${min > 1 ? "s" : ""}`;
+  }
+  const hrs = Math.ceil(seconds / 3600);
+  return fr ? `${hrs} heure${hrs > 1 ? "s" : ""}` : `${hrs} hour${hrs > 1 ? "s" : ""}`;
+}
+
+function buildCopy(lang: string) {
+  const fr = (lang as Lang) === "fr";
+  return {
+    trust: fr ? "Vérification sécurisée" : "Secure verification",
+    title: fr ? "Plus qu'une étape !" : "Almost there!",
+    subtitle: fr
+      ? "Nous avons envoyé un code à 6 chiffres à :"
+      : "We've sent a 6-digit code to:",
+    timerLabel: fr ? "Code valable" : "Code valid for",
+    timerExpired: fr ? "Code expiré" : "Code expired",
+    otpLabel: fr ? "Saisissez votre code" : "Enter your code",
+    otpHelp: fr
+      ? "Astuce : vous pouvez coller le code directement."
+      : "Tip: you can paste the full code at once.",
+    cta: fr ? "Valider mon code" : "Verify my code",
+    ctaLoading: fr ? "Vérification…" : "Verifying…",
+    resendText: fr
+      ? "Pas reçu le code ? Vérifiez vos spams ou"
+      : "Didn't get the code? Check your spam or",
+    resendCta: fr ? "Renvoyer le code" : "Resend code",
+    resendCooldown: fr ? "Renvoyer dans" : "Resend in",
+    resentToastTitle: fr ? "Code renvoyé" : "Code resent",
+    resentToastMessage: fr
+      ? "Un nouveau code a été envoyé. Vérifiez votre boîte mail."
+      : "A new code has been sent. Check your inbox.",
+    wrongEmailQuestion: fr ? "Trompé d'adresse e-mail ?" : "Wrong email?",
+    startOver: fr ? "Recommencer" : "Start over",
+    startOverConfirm: fr
+      ? "Êtes-vous sûr ? Vous devrez recommencer toute l'inscription depuis le début."
+      : "Are you sure? You will need to restart the entire registration from scratch.",
+    missingToken: fr
+      ? "Session expirée. Merci de recommencer l'inscription."
+      : "Session expired. Please register again.",
+    incomplete: fr ? "Veuillez saisir le code complet." : "Please enter the full code.",
+    invalidOtp: fr ? "Code invalide ou expiré." : "Invalid or expired code.",
+    genericError: fr
+      ? "Validation impossible pour le moment."
+      : "Unable to verify right now.",
+    configError: fr
+      ? "La configuration de l'application est incomplète."
+      : "Application configuration is incomplete.",
+    attemptsLeftSingular: fr
+      ? "tentative restante avant verrouillage temporaire"
+      : "attempt left before temporary lock",
+    attemptsLeftPlural: fr
+      ? "tentatives restantes avant verrouillage temporaire"
+      : "attempts left before temporary lock",
+    incorrectCode: fr ? "Code incorrect." : "Incorrect code.",
+    locked: fr ? "Compte verrouillé temporairement." : "Account temporarily locked.",
+    lockedRetryIn: fr ? "Réessayez dans" : "Try again in",
+    lockedTip: fr
+      ? "Pour votre sécurité, votre compte est verrouillé suite à plusieurs tentatives incorrectes."
+      : "For your security, your account has been locked due to multiple incorrect attempts.",
+  };
+}
+
+export default function RegisterVerifyForm({ heroVisual }: Props) {
   const router = useRouter();
   const sp = useSearchParams();
   const { lang } = useUiPreferences();
+  const { toast } = useToast();
+  const fr = lang === "fr";
 
-  const copy = useMemo(() => {
-    const fr = (lang as Lang) === "fr";
-    return {
-      title: fr ? "Vérifiez votre e-mail" : "Verify your email",
-      subtitle: fr
-        ? "Saisissez le code à 4 chiffres reçu par e-mail."
-        : "Enter the 4-digit code sent to your email.",
-      otpLabel: fr ? "Code OTP" : "OTP code",
-      cta: fr ? "Valider" : "Verify",
-      back: fr ? "Retour" : "Back",
-      resend: fr ? "Renvoyer le code" : "Resend code",
-      resendIn: fr ? "Renvoyer dans" : "Resend in",
-      // changeEmail: fr ? "Changer d’e-mail" : "Change email",
-      help: fr ? "Vous pouvez coller le code complet." : "You can paste the full code.",
-      missingToken: fr
-        ? "Session expirée. Merci de recommencer l’inscription."
-        : "Session expired. Please register again.",
-      incomplete: fr ? "Veuillez saisir le code complet." : "Please enter the full code.",
-      invalidOtp: fr ? "Code invalide ou expiré." : "Invalid or expired code.",
-      resentOk: fr ? "Code renvoyé." : "Code resent.",
-      genericError: fr
-        ? "Validation impossible pour le moment."
-        : "Unable to verify right now.",
-      resendUnavailable: fr
-        ? "Le renvoi de code n’est pas disponible. Merci de recommencer l’inscription."
-        : "Code resend is not available. Please restart registration.",
-      configError: fr
-        ? "La configuration de l’application est incomplète."
-        : "Application configuration is incomplete.",
-    };
-  }, [lang]);
-
-  const UI = {
-    label: "text-sm font-semibold text-slate-800 dark:text-slate-100",
-    help: "text-xs text-slate-500 dark:text-slate-500",
-    link:
-      "font-semibold text-[#0F766E] hover:text-[#115E59] hover:underline " +
-      "dark:text-[#2DD4BF] dark:hover:text-[#5EEAD4]",
-    btnPrimaryBase:
-      "rounded-lg bg-[#FF9900] px-4 py-2.5 text-sm font-semibold text-slate-900 " +
-      "shadow-sm transition-colors hover:bg-[#F08700] active:bg-[#E07A00] disabled:opacity-60 " +
-      "focus:outline-none focus-visible:ring-4 focus-visible:ring-[#FF9900]/30 " +
-      "dark:focus-visible:ring-[#FF9900]/18",
-    otpBox:
-      "h-12 w-12 rounded-lg border border-slate-200 bg-white text-center text-lg font-semibold " +
-      "text-slate-900 outline-none " +
-      "focus:border-[#FF9900]/80 focus:ring-4 focus:ring-[#FF9900]/25 " +
-      "dark:border-slate-800 dark:bg-slate-950 dark:text-white " +
-      "dark:focus:border-[#FFAE33]/70 dark:focus:ring-[#FF9900]/18",
-    otpBoxError:
-      "border-red-300 focus:border-red-400 focus:ring-red-200 " +
-      "dark:border-red-800 dark:focus:border-red-700 dark:focus:ring-red-900/40",
-    notice:
-      "rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800 " +
-      "dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-200",
-    helperError: "mt-2 text-xs text-red-600 dark:text-red-400 text-center",
-  };
+  const copy = useMemo(() => buildCopy(lang), [lang]);
 
   const tokenFromQuery = sp.get("token") ?? "";
   const emailFromQuery = sp.get("email") ?? "";
 
-  const token =
-    tokenFromQuery ||
-    (typeof window !== "undefined"
-      ? sessionStorage.getItem("register_verification_token") ?? ""
-      : "");
+  const [token, setToken] = useState<string>("");
+  const [email, setEmail] = useState<string>("");
+  const [digits, setDigits] = useState<string[]>(Array(OTP_LENGTH).fill(""));
+  const [resendTimer, setResendTimer] = useState(RESEND_COOLDOWN_SECONDS);
+  const [expiryTimer, setExpiryTimer] = useState(OTP_EXPIRY_SECONDS);
 
-  const email =
-    emailFromQuery ||
-    (typeof window !== "undefined"
-      ? sessionStorage.getItem("register_verification_email") ?? ""
-      : "");
-
-  const [digits, setDigits] = useState<string[]>(["", "", "", ""]);
-  const [canResend, setCanResend] = useState(false);
-  const [timer, setTimer] = useState(60);
-  const [resentMsg, setResentMsg] = useState<string | null>(null);
+  const [errorContext, setErrorContext] = useState<ErrorContext | null>(null);
+  const [lockTimer, setLockTimer] = useState(0);
 
   const inputsRef = useRef<Array<HTMLInputElement | null>>([]);
-  const lastAutoSubmitOtpRef = useRef<string>("");
-  // const resendIntervalRef = useRef<ReturnType<typeof window.setInterval> | null>(null);
   const resendIntervalRef = useRef<number | null>(null);
+  const expiryIntervalRef = useRef<number | null>(null);
+  const lockIntervalRef = useRef<number | null>(null);
+
+  // 🔒 Init from URL or sessionStorage (double fallback robuste)
+  // - URL : utile pour les liens magiques email envoyés par le backend
+  // - sessionStorage : flow normal après /register (sans email en URL)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const t =
+      tokenFromQuery ||
+      sessionStorage.getItem("register_verification_token") ||
+      "";
+    const e =
+      emailFromQuery ||
+      sessionStorage.getItem("register_verification_email") ||
+      "";
+
+    setToken(t);
+    setEmail(e);
+
+    // Si l'email/token vient de l'URL, on les sauvegarde en sessionStorage
+    // pour que la suite du flow soit indépendante de l'URL
+    if (tokenFromQuery) {
+      sessionStorage.setItem("register_verification_token", tokenFromQuery);
+    }
+    if (emailFromQuery) {
+      sessionStorage.setItem("register_verification_email", emailFromQuery);
+    }
+
+    // 🔒 Protection défensive : si l'utilisateur arrive ici sans token/email
+    // (ex: il a tapé l'URL directement, ou la session a expiré), on le
+    // redirige vers /register pour qu'il recommence proprement
+    if (!t && !e) {
+      router.push("/register");
+    }
+  }, [tokenFromQuery, emailFromQuery, router]);
 
   const {
-    register,
     handleSubmit,
     setValue,
     setError,
     clearErrors,
-    formState: { errors, isValid },
+    formState: { errors },
   } = useForm<VerifyFormData>({
-    mode: "onChange",
-    defaultValues: {
-      otp: "",
-    },
+    mode: "onSubmit",
+    defaultValues: { otp: "" },
   });
+
+  const otp = digits.join("");
+
+  useEffect(() => {
+    setValue("otp", otp);
+  }, [otp, setValue]);
 
   const clearResendTimer = () => {
     if (resendIntervalRef.current) {
@@ -146,22 +215,75 @@ export default function RegisterVerifyForm() {
     }
   };
 
+  const clearExpiryTimer = () => {
+    if (expiryIntervalRef.current) {
+      window.clearInterval(expiryIntervalRef.current);
+      expiryIntervalRef.current = null;
+    }
+  };
+
+  const clearLockTimer = () => {
+    if (lockIntervalRef.current) {
+      window.clearInterval(lockIntervalRef.current);
+      lockIntervalRef.current = null;
+    }
+  };
+
   const startResendTimer = () => {
     clearResendTimer();
-    setCanResend(false);
-    setTimer(60);
-
+    setResendTimer(RESEND_COOLDOWN_SECONDS);
     resendIntervalRef.current = window.setInterval(() => {
-      setTimer((prev) => {
+      setResendTimer((prev) => {
         if (prev <= 1) {
           clearResendTimer();
-          setCanResend(true);
           return 0;
         }
         return prev - 1;
       });
     }, 1000);
   };
+
+  const startExpiryTimer = () => {
+    clearExpiryTimer();
+    setExpiryTimer(OTP_EXPIRY_SECONDS);
+    expiryIntervalRef.current = window.setInterval(() => {
+      setExpiryTimer((prev) => {
+        if (prev <= 1) {
+          clearExpiryTimer();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
+  const startLockTimer = (durationSeconds: number) => {
+    clearLockTimer();
+    setLockTimer(durationSeconds);
+    lockIntervalRef.current = window.setInterval(() => {
+      setLockTimer((prev) => {
+        if (prev <= 1) {
+          clearLockTimer();
+          setErrorContext(null);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
+  useEffect(() => {
+    if (token) {
+      startResendTimer();
+      startExpiryTimer();
+    }
+    return () => {
+      clearResendTimer();
+      clearExpiryTimer();
+      clearLockTimer();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
 
   const verifyOtpMutation = useMutation({
     mutationFn: verifyRegistrationOtp,
@@ -174,11 +296,27 @@ export default function RegisterVerifyForm() {
     onError: (error) => {
       const data = getApiErrorData(error);
 
-      if (data?.errors?.otp) {
-        setError("otp", {
-          type: "server",
-          message: String(data.errors.otp),
+      const details = (data as { details?: OtpErrorDetails })?.details;
+
+      if (details?.type === "otp") {
+        setErrorContext({
+          attemptsLeft: details.attemptsLeft,
+          locked: details.locked ?? false,
+          lockUntilSeconds: details.lockUntilSeconds,
         });
+
+        if (details.locked && details.lockUntilSeconds) {
+          startLockTimer(details.lockUntilSeconds);
+        }
+
+        if (data?.message) {
+          setError("otp", { type: "server", message: data.message });
+          return;
+        }
+      }
+
+      if (data?.errors?.otp) {
+        setError("otp", { type: "server", message: String(data.errors.otp) });
         return;
       }
 
@@ -193,14 +331,18 @@ export default function RegisterVerifyForm() {
     mutationFn: resendRegistrationOtp,
     onSuccess: (data, variables) => {
       const nextToken = data?.verificationToken || variables.verificationToken;
-
       sessionStorage.setItem("register_verification_token", nextToken);
-
-      setDigits(["", "", "", ""]);
-      lastAutoSubmitOtpRef.current = "";
-      setResentMsg(copy.resentOk);
+      setToken(nextToken);
+      setDigits(Array(OTP_LENGTH).fill(""));
+      setErrorContext(null);
       startResendTimer();
+      startExpiryTimer();
       inputsRef.current[0]?.focus();
+      toast({
+        type: "success",
+        title: copy.resentToastTitle,
+        message: copy.resentToastMessage,
+      });
     },
     onError: (error) => {
       setError("root.serverError", {
@@ -210,38 +352,19 @@ export default function RegisterVerifyForm() {
     },
   });
 
-  const otp = digits.join("");
-
-  useEffect(() => {
-    if (tokenFromQuery) {
-      sessionStorage.setItem("register_verification_token", tokenFromQuery);
-    }
-  }, [tokenFromQuery]);
-
-  useEffect(() => {
-    if (emailFromQuery) {
-      sessionStorage.setItem("register_verification_email", emailFromQuery);
-    }
-  }, [emailFromQuery]);
-
-  useEffect(() => {
-    setValue("otp", otp, {
-      shouldValidate: true,
-      shouldDirty: true,
-      shouldTouch: true,
-    });
-  }, [otp, setValue]);
-
-  useEffect(() => {
-    if (token) {
-      startResendTimer();
-    }
-
-    return () => {
-      clearResendTimer();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const cancelMutation = useMutation({
+    mutationFn: cancelRegistration,
+    onSuccess: () => {
+      sessionStorage.removeItem("register_verification_token");
+      sessionStorage.removeItem("register_verification_email");
+      router.push("/register");
+    },
+    onError: () => {
+      sessionStorage.removeItem("register_verification_token");
+      sessionStorage.removeItem("register_verification_email");
+      router.push("/register");
+    },
+  });
 
   const focusIndex = (i: number) => {
     const el = inputsRef.current[i];
@@ -258,8 +381,8 @@ export default function RegisterVerifyForm() {
   };
 
   const fillDigits = (value: string) => {
-    const clean = onlyDigits(value).slice(0, 4);
-    const next = ["", "", "", ""];
+    const clean = onlyDigits(value).slice(0, OTP_LENGTH);
+    const next = Array(OTP_LENGTH).fill("");
     clean.split("").forEach((char, idx) => {
       next[idx] = char;
     });
@@ -270,28 +393,25 @@ export default function RegisterVerifyForm() {
   const handleChange = (index: number, raw: string) => {
     clearErrors("otp");
     clearErrors("root.serverError");
-    setResentMsg(null);
+    setErrorContext(null);
 
     const value = onlyDigits(raw);
 
     if (value.length >= 2) {
       const pasted = fillDigits(value);
-      focusIndex(Math.min(pasted.length - 1, 3));
+      focusIndex(Math.min(pasted.length - 1, OTP_LENGTH - 1));
       return;
     }
 
     const one = value.slice(0, 1);
     updateDigitAt(index, one);
 
-    if (one && index < 3) {
+    if (one && index < OTP_LENGTH - 1) {
       focusIndex(index + 1);
     }
   };
 
-  const handleKeyDown = (
-    index: number,
-    e: KeyboardEvent<HTMLInputElement>
-  ) => {
+  const handleKeyDown = (index: number, e: KeyboardEvent<HTMLInputElement>) => {
     clearErrors("otp");
     clearErrors("root.serverError");
 
@@ -300,7 +420,6 @@ export default function RegisterVerifyForm() {
         updateDigitAt(index, "");
         return;
       }
-
       if (index > 0) {
         updateDigitAt(index - 1, "");
         focusIndex(index - 1);
@@ -308,54 +427,34 @@ export default function RegisterVerifyForm() {
       return;
     }
 
-    if (e.key === "ArrowLeft" && index > 0) {
-      focusIndex(index - 1);
-    }
-
-    if (e.key === "ArrowRight" && index < 3) {
-      focusIndex(index + 1);
-    }
+    if (e.key === "ArrowLeft" && index > 0) focusIndex(index - 1);
+    if (e.key === "ArrowRight" && index < OTP_LENGTH - 1) focusIndex(index + 1);
   };
 
   const handlePaste = (e: ClipboardEvent<HTMLDivElement>) => {
     e.preventDefault();
     clearErrors("otp");
     clearErrors("root.serverError");
-    setResentMsg(null);
-
-    const text = onlyDigits(e.clipboardData.getData("text")).slice(0, 4);
+    const text = onlyDigits(e.clipboardData.getData("text")).slice(0, OTP_LENGTH);
     if (!text) return;
-
     fillDigits(text);
-    focusIndex(Math.min(text.length - 1, 3));
+    focusIndex(Math.min(text.length - 1, OTP_LENGTH - 1));
   };
 
   const verifyOtp = async (otpValue: string) => {
     clearErrors("otp");
     clearErrors("root.serverError");
-    setResentMsg(null);
 
     if (!hasApiBaseUrl()) {
-      setError("root.serverError", {
-        type: "config",
-        message: copy.configError,
-      });
+      setError("root.serverError", { type: "config", message: copy.configError });
       return;
     }
-
     if (!token) {
-      setError("root.serverError", {
-        type: "session",
-        message: copy.missingToken,
-      });
+      setError("root.serverError", { type: "session", message: copy.missingToken });
       return;
     }
-
-    if (otpValue.length !== 4) {
-      setError("otp", {
-        type: "manual",
-        message: copy.incomplete,
-      });
+    if (otpValue.length !== OTP_LENGTH) {
+      setError("otp", { type: "manual", message: copy.incomplete });
       return;
     }
 
@@ -365,90 +464,120 @@ export default function RegisterVerifyForm() {
         otp: otpValue,
       });
     } catch {
-      // géré par onError
+      // géré dans onError
     }
   };
-
-  useEffect(() => {
-    if (
-      otp.length === 4 &&
-      otp !== lastAutoSubmitOtpRef.current &&
-      !verifyOtpMutation.isPending
-    ) {
-      lastAutoSubmitOtpRef.current = otp;
-      void verifyOtp(otp);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [otp, verifyOtpMutation.isPending]);
 
   const onSubmit = async (values: VerifyFormData) => {
     await verifyOtp(values.otp);
   };
 
+  const canResend = resendTimer === 0 && !errorContext?.locked;
+
   const resendOtp = async () => {
-    if (!canResend) return;
-
-    clearErrors("otp");
+    if (!canResend || !token) return;
     clearErrors("root.serverError");
-    setResentMsg(null);
-
-    if (!hasApiBaseUrl()) {
-      setError("root.serverError", {
-        type: "config",
-        message: copy.configError,
-      });
-      return;
-    }
-
-    if (!token) {
-      setError("root.serverError", {
-        type: "session",
-        message: copy.missingToken,
-      });
-      return;
-    }
-
     try {
-      await resendOtpMutation.mutateAsync({
-        verificationToken: token,
-      });
+      await resendOtpMutation.mutateAsync({ verificationToken: token });
     } catch {
-      // géré par onError
+      // géré dans onError
     }
   };
 
+  const handleStartOver = () => {
+    if (window.confirm(copy.startOverConfirm)) {
+      if (!token) {
+        router.push("/register");
+        return;
+      }
+      cancelMutation.mutate({ verificationToken: token });
+    }
+  };
+
+  const maskedEmail = useMemo(() => maskEmail(email), [email]);
+  const expiryWarning = expiryTimer > 0 && expiryTimer <= 60;
+  const expired = expiryTimer === 0;
+  const isLocked = errorContext?.locked === true && lockTimer > 0;
+
+  const attemptsLeft = errorContext?.attemptsLeft;
+  const showAttemptsWarning =
+    typeof attemptsLeft === "number" && attemptsLeft >= 0 && !isLocked;
+
   return (
-    <main className="px-4">
-      <div className="mx-auto flex min-h-[85vh] max-w-6xl items-center justify-center py-10">
-        <div className="w-full max-w-[420px]">
-          <h1 className="text-center text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">
+    <main className="lg:grid lg:grid-cols-2 lg:min-h-[calc(100vh-64px)]">
+      {/* LEFT — visuel desktop */}
+      <div className="hidden lg:block">
+        <AuthHeroVisual visual={heroVisual} />
+      </div>
+
+      {/* RIGHT — formulaire */}
+      <div className="flex items-center justify-center px-4 py-8 lg:px-8 lg:py-10">
+        <div className="w-full max-w-[400px]">
+          {/* Trust pill */}
+          <div className="inline-flex items-center gap-1.5 rounded-full border border-[#0F766E] bg-white px-2.5 py-1 text-[11px] font-medium text-[#0F766E] dark:border-[#2DD4BF] dark:bg-slate-950 dark:text-[#2DD4BF]">
+            <ShieldCheck size={12} />
+            <span>{copy.trust}</span>
+          </div>
+
+          <h1 className="mt-3 text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white lg:text-3xl">
             {copy.title}
           </h1>
-
-          <p className="mt-2 text-center text-sm text-slate-500 dark:text-slate-400">
+          <p className="mt-1.5 text-sm text-slate-500 dark:text-slate-400">
             {copy.subtitle}
           </p>
 
-          {email ? (
-            <p className="mt-2 text-center text-sm text-slate-500 dark:text-slate-400">
-              {email}
-            </p>
-          ) : null}
+          {/* Email line (read-only, no change action) */}
+          {email && (
+            <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 dark:border-slate-800 dark:bg-slate-900/40">
+              <span className="font-mono text-sm text-slate-900 dark:text-white">
+                {maskedEmail}
+              </span>
+            </div>
+          )}
 
-          <form onSubmit={handleSubmit(onSubmit)} className="mt-8 space-y-5" noValidate>
-            <input
-              type="hidden"
-              {...register("otp", {
-                required: copy.incomplete,
-                validate: (value) => /^\d{4}$/.test(value) || copy.incomplete,
-              })}
-            />
+          {/* Timer */}
+          {isLocked ? (
+            <div className="mt-4 inline-flex items-center gap-1.5 rounded-full border border-red-300 bg-red-50 px-3 py-1.5 text-xs text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300">
+              <AlertTriangle size={12} />
+              <span>{copy.lockedRetryIn}</span>
+              <span className="font-mono font-bold">
+                {formatLockDuration(lockTimer, fr)}
+              </span>
+            </div>
+          ) : (
+            <div
+              className={`mt-4 inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs ${
+                expired
+                  ? "border-red-300 bg-red-50 text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300"
+                  : expiryWarning
+                    ? "border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300"
+                    : "border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-800 dark:bg-slate-900/40 dark:text-slate-400"
+              }`}
+            >
+              <Clock size={12} />
+              {expired ? (
+                <span className="font-semibold">{copy.timerExpired}</span>
+              ) : (
+                <>
+                  <span>{copy.timerLabel}</span>
+                  <span className="font-mono font-bold">{formatMMSS(expiryTimer)}</span>
+                </>
+              )}
+            </div>
+          )}
 
-            <div className="text-center">
-              <label className={UI.label}>{copy.otpLabel}</label>
+          {/* OTP form */}
+          <form onSubmit={handleSubmit(onSubmit)} noValidate className="mt-6 space-y-4">
+            <div>
+              <label className="block text-center text-xs font-semibold text-slate-700 dark:text-slate-200 mb-3">
+                {copy.otpLabel}
+              </label>
 
-              <div className="mt-3 flex items-center justify-center gap-3" onPaste={handlePaste}>
-                {[0, 1, 2, 3].map((i) => (
+              <div
+                className="flex items-center justify-center gap-2 sm:gap-2.5"
+                onPaste={handlePaste}
+              >
+                {Array.from({ length: OTP_LENGTH }).map((_, i) => (
                   <input
                     key={i}
                     ref={(el) => {
@@ -461,75 +590,141 @@ export default function RegisterVerifyForm() {
                     value={digits[i]}
                     onChange={(e) => handleChange(i, e.target.value)}
                     onKeyDown={(e) => handleKeyDown(i, e)}
-                    className={`${UI.otpBox} ${errors.otp ? UI.otpBoxError : ""}`}
+                    disabled={expired || isLocked || verifyOtpMutation.isPending}
+                    className={`h-12 w-10 rounded-lg border bg-white text-center font-mono text-lg font-bold text-slate-900 outline-none transition-all sm:h-13 sm:w-11 dark:bg-slate-950 dark:text-white ${
+                      errors.otp || isLocked
+                        ? "border-red-300 focus:border-red-400 focus:ring-4 focus:ring-red-200 dark:border-red-800 dark:focus:border-red-700 dark:focus:ring-red-900/40"
+                        : digits[i]
+                          ? "border-emerald-500 bg-emerald-50/30 focus:ring-4 focus:ring-emerald-200 dark:border-emerald-700 dark:bg-emerald-950/20 dark:focus:ring-emerald-900/40"
+                          : "border-slate-200 focus:border-[#FF9900] focus:ring-4 focus:ring-[#FF9900]/20 dark:border-slate-800 dark:focus:border-[#FFAE33]"
+                    } disabled:opacity-50 disabled:cursor-not-allowed`}
                     aria-label={`OTP digit ${i + 1}`}
                   />
                 ))}
               </div>
 
-              <p className={`mt-2 ${UI.help}`}>{copy.help}</p>
+              <p className="mt-2 text-center text-[11px] text-slate-500 dark:text-slate-400">
+                {copy.otpHelp}
+              </p>
 
-              {errors.otp?.message ? (
-                <p className={UI.helperError}>{errors.otp.message}</p>
-              ) : null}
+              {showAttemptsWarning && attemptsLeft !== undefined && attemptsLeft > 0 && (
+                <div
+                  role="alert"
+                  className={`mt-3 flex items-start gap-2 rounded-lg border px-3 py-2.5 text-xs ${
+                    attemptsLeft === 1
+                      ? "border-red-300 bg-red-50 text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300"
+                      : attemptsLeft <= 2
+                        ? "border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300"
+                        : "border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-800 dark:bg-slate-900/40 dark:text-slate-300"
+                  }`}
+                >
+                  <AlertTriangle size={14} className="mt-0.5 flex-shrink-0" />
+                  <div>
+                    <span className="font-semibold">{copy.incorrectCode}</span>{" "}
+                    <span>
+                      {attemptsLeft}{" "}
+                      {attemptsLeft === 1
+                        ? copy.attemptsLeftSingular
+                        : copy.attemptsLeftPlural}
+                      .
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {isLocked && (
+                <div
+                  role="alert"
+                  className="mt-3 rounded-lg border border-red-300 bg-red-50 p-3 dark:border-red-900/50 dark:bg-red-950/30"
+                >
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle
+                      size={16}
+                      className="mt-0.5 flex-shrink-0 text-red-600 dark:text-red-400"
+                    />
+                    <div className="text-xs">
+                      <p className="font-bold text-red-800 dark:text-red-300">
+                        {copy.locked}
+                      </p>
+                      <p className="mt-1 text-red-700 dark:text-red-400">
+                        {copy.lockedTip}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {errors.otp?.message && !showAttemptsWarning && !isLocked && (
+                <div
+                  role="alert"
+                  className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-center text-xs text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300"
+                >
+                  {errors.otp.message}
+                </div>
+              )}
             </div>
 
-            {resentMsg ? <div className={UI.notice}>{resentMsg}</div> : null}
-
-            {errors.root?.serverError?.message ? (
-              <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-200">
+            {errors.root?.serverError?.message && !isLocked && (
+              <div
+                role="alert"
+                className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-200"
+              >
                 {errors.root.serverError.message}
               </div>
-            ) : null}
+            )}
 
             <button
               type="submit"
-              disabled={verifyOtpMutation.isPending || !isValid}
-              className={[UI.btnPrimaryBase, "block w-full sm:mx-auto sm:w-[320px]"].join(" ")}
+              disabled={verifyOtpMutation.isPending || expired || isLocked}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#FF9900] px-4 py-2.5 text-sm font-bold text-slate-900 shadow-sm transition-colors hover:bg-[#F08700] active:bg-[#E07A00] disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-4 focus-visible:ring-[#FF9900]/30"
             >
-              {verifyOtpMutation.isPending ? "…" : copy.cta}
+              {verifyOtpMutation.isPending ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  {copy.ctaLoading}
+                </>
+              ) : (
+                copy.cta
+              )}
             </button>
-
-            <div className="pt-1">
-              <div className="flex flex-col items-center justify-center gap-3 text-sm sm:flex-row sm:gap-8">
-                <button
-                  type="button"
-                  onClick={() => router.push("/register")}
-                  className={UI.link}
-                >
-                  {copy.back}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={resendOtp}
-                  disabled={!canResend || resendOtpMutation.isPending}
-                  className={[
-                    "font-semibold",
-                    !canResend || resendOtpMutation.isPending
-                      ? "cursor-not-allowed text-slate-400 dark:text-slate-600"
-                      : UI.link,
-                  ].join(" ")}
-                >
-                  {!canResend
-                    ? `${copy.resendIn} ${formatMMSS(timer)}`
-                    : resendOtpMutation.isPending
-                      ? "…"
-                      : copy.resend}
-                </button>
-              </div>
-
-              {/*<div className="pt-3 text-center text-sm text-slate-600 dark:text-slate-400">*/}
-              {/*  <Link href="/auth/register" className={UI.link}>*/}
-              {/*    {copy.changeEmail}*/}
-              {/*  </Link>*/}
-              {/*</div>*/}
-            </div>
           </form>
 
-          <p className="mt-6 text-center text-xs text-slate-500 dark:text-slate-500">
-            Vérifiez l’URL pour vous assurer de vous connecter au bon site.
-          </p>
+          {/* Resend section */}
+          <div className="mt-5 border-t border-slate-200 pt-4 text-center dark:border-slate-800">
+            <p className="text-xs text-slate-500 dark:text-slate-400">{copy.resendText}</p>
+            <button
+              type="button"
+              onClick={resendOtp}
+              disabled={!canResend || resendOtpMutation.isPending}
+              className={`mt-1 inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-semibold transition-colors ${
+                !canResend || resendOtpMutation.isPending
+                  ? "cursor-not-allowed text-slate-400 dark:text-slate-600"
+                  : "text-[#0D9488] hover:bg-slate-50 dark:text-[#2DD4BF] dark:hover:bg-slate-900/40"
+              }`}
+            >
+              {resendOtpMutation.isPending ? (
+                <Loader2 size={11} className="animate-spin" />
+              ) : null}
+              {!canResend && resendTimer > 0
+                ? `${copy.resendCooldown} ${formatMMSS(resendTimer)}`
+                : copy.resendCta}
+            </button>
+          </div>
+
+          {/* Wrong email — Start over (pattern Stripe/Linear) */}
+          <div className="mt-4 text-center">
+            <span className="text-[11px] text-slate-500 dark:text-slate-500">
+              {copy.wrongEmailQuestion}{" "}
+            </span>
+            <button
+              type="button"
+              onClick={handleStartOver}
+              disabled={cancelMutation.isPending}
+              className="text-[11px] font-semibold text-[#0D9488] underline underline-offset-2 decoration-[#0D9488]/40 hover:decoration-[#0D9488] disabled:opacity-50 dark:text-[#2DD4BF] dark:decoration-[#2DD4BF]/40 dark:hover:decoration-[#2DD4BF]"
+            >
+              {cancelMutation.isPending ? "…" : copy.startOver}
+            </button>
+          </div>
         </div>
       </div>
     </main>

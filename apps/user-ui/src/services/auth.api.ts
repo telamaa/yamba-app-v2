@@ -16,14 +16,19 @@ export type Gender = "MALE" | "FEMALE" | "OTHER";
 export type ApiErrorResponse = {
   message?: string;
   errors?: Record<string, string>;
+  details?: unknown;
+  status?: string;
 };
 
+// ─── Register types ────────────────────────────────────
 export type RegisterPayload = {
   firstName: string;
   lastName: string;
-  gender: Gender;
   email: string;
   password: string;
+  termsAccepted: boolean;
+  termsVersion: string;
+  privacyVersion: string;
 };
 
 export type RegisterResponse = {
@@ -49,6 +54,17 @@ export type ResendRegistrationOtpResponse = {
   verificationToken?: string;
 };
 
+// 🆕 Cancel registration
+export type CancelRegistrationPayload = {
+  verificationToken: string;
+};
+
+export type CancelRegistrationResponse = {
+  success?: boolean;
+  message?: string;
+};
+
+// ─── Login types ───────────────────────────────────────
 export type LoginPayload = {
   email: string;
   password: string;
@@ -60,6 +76,7 @@ export type LoginResponse = {
   accessToken?: string;
 };
 
+// ─── Forgot password types ─────────────────────────────
 export type ForgotPasswordPayload = {
   email: string;
 };
@@ -78,6 +95,15 @@ export type VerifyPasswordResetOtpResponse = {
   passwordResetToken?: string;
 };
 
+// 🆕 Resend forgot password OTP
+export type ResendPasswordResetOtpPayload = {
+  email: string;
+};
+
+export type ResendPasswordResetOtpResponse = {
+  message?: string;
+};
+
 export type ResetPasswordPayload = {
   passwordResetToken: string;
   newPassword: string;
@@ -87,6 +113,7 @@ export type ResetPasswordResponse = {
   message?: string;
 };
 
+// ─── Register API calls ────────────────────────────────
 export async function registerUser(payload: RegisterPayload) {
   const response = await authApi.post<RegisterResponse>("/auth/register", payload);
   return response.data;
@@ -100,9 +127,7 @@ export async function verifyRegistrationOtp(payload: VerifyRegisterPayload) {
   return response.data;
 }
 
-export async function resendRegistrationOtp(
-  payload: ResendRegistrationOtpPayload
-) {
+export async function resendRegistrationOtp(payload: ResendRegistrationOtpPayload) {
   const response = await authApi.post<ResendRegistrationOtpResponse>(
     "/auth/register/resend",
     payload
@@ -110,11 +135,22 @@ export async function resendRegistrationOtp(
   return response.data;
 }
 
+// 🆕
+export async function cancelRegistration(payload: CancelRegistrationPayload) {
+  const response = await authApi.post<CancelRegistrationResponse>(
+    "/auth/register/cancel",
+    payload
+  );
+  return response.data;
+}
+
+// ─── Login API calls ───────────────────────────────────
 export async function loginUser(payload: LoginPayload) {
   const response = await authApi.post<LoginResponse>("/auth/login", payload);
   return response.data;
 }
 
+// ─── Forgot password API calls ─────────────────────────
 export async function requestPasswordResetOtp(payload: ForgotPasswordPayload) {
   const response = await authApi.post<ForgotPasswordResponse>(
     "/auth/password/forgot",
@@ -123,11 +159,18 @@ export async function requestPasswordResetOtp(payload: ForgotPasswordPayload) {
   return response.data;
 }
 
-export async function verifyPasswordResetOtp(
-  payload: VerifyPasswordResetOtpPayload
-) {
+export async function verifyPasswordResetOtp(payload: VerifyPasswordResetOtpPayload) {
   const response = await authApi.post<VerifyPasswordResetOtpResponse>(
     "/auth/password/verify",
+    payload
+  );
+  return response.data;
+}
+
+// 🆕
+export async function resendPasswordResetOtp(payload: ResendPasswordResetOtpPayload) {
+  const response = await authApi.post<ResendPasswordResetOtpResponse>(
+    "/auth/password/resend",
     payload
   );
   return response.data;
@@ -141,6 +184,7 @@ export async function resetPassword(payload: ResetPasswordPayload) {
   return response.data;
 }
 
+// ─── Helpers ───────────────────────────────────────────
 export function getApiErrorData(error: unknown): ApiErrorResponse {
   if (axios.isAxiosError(error)) {
     return (error.response?.data as ApiErrorResponse | undefined) ?? {};
@@ -157,7 +201,6 @@ export function hasApiBaseUrl() {
   return Boolean(apiBaseUrl);
 }
 
-// Logout
 export const logoutUser = async () => {
   const response = await apiClient.post("/auth/logout", {}, {
     withCredentials: true,

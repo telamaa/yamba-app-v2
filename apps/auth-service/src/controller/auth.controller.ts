@@ -32,11 +32,38 @@ import {
   verifyForgotPasswordOtpCode,
   verifyOtp,
 } from "../utils/auth.helper";
+import { recordRegistrationConsents } from "../utils/consent/consent.helper";
 import { clearAuthCookies, setCookie } from "../utils/cookies/setCookie";
 import jwt from "jsonwebtoken";
-import {AuthenticatedRequest} from "@packages/middleware/isAuthenticated";
+import { AuthenticatedRequest } from "@packages/middleware/isAuthenticated";
 
-// Register a new user (send OTP, do not create user yet)
+// ───────────────────────────────────────────────────────
+// Helpers
+// ───────────────────────────────────────────────────────
+
+function getClientIp(req: Request): string | undefined {
+  const xForwardedFor = req.headers["x-forwarded-for"];
+  if (typeof xForwardedFor === "string") {
+    return xForwardedFor.split(",")[0]?.trim();
+  }
+  return req.ip;
+}
+
+function getClientLocale(req: Request): string | undefined {
+  const headerLocale = req.headers["x-locale"];
+  if (typeof headerLocale === "string") return headerLocale;
+
+  const acceptLang = req.headers["accept-language"];
+  if (typeof acceptLang === "string") {
+    return acceptLang.split(",")[0]?.split("-")[0]?.toLowerCase();
+  }
+  return undefined;
+}
+
+// ───────────────────────────────────────────────────────
+// REGISTER
+// ───────────────────────────────────────────────────────
+
 export const registerUser = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = validateRegistrationData(req.body);
@@ -54,13 +81,21 @@ export const registerUser = async (req: Request, res: Response, next: NextFuncti
 
     const passwordHash = await bcrypt.hash(data.password, 10);
 
+    const consentIp = getClientIp(req);
+    const consentUserAgent = req.headers["user-agent"];
+    const consentLocale = getClientLocale(req);
+
     await storePendingRegistration(emailKey, {
       firstName: data.firstName,
       lastName: data.lastName,
       email: data.email,
       emailNormalized: data.emailNormalized,
-      gender: data.gender,
       passwordHash,
+      termsVersion: data.termsVersion,
+      privacyVersion: data.privacyVersion,
+      consentIp,
+      consentUserAgent: typeof consentUserAgent === "string" ? consentUserAgent : undefined,
+      consentLocale,
     });
 
     await sendOtp(data.firstName, emailKey, "register-activation-mail");
@@ -77,7 +112,6 @@ export const registerUser = async (req: Request, res: Response, next: NextFuncti
   }
 };
 
-// Resend registration OTP using the existing verificationToken
 export const resendRegistrationOtp = async (
   req: Request,
   res: Response,
@@ -121,7 +155,58 @@ export const resendRegistrationOtp = async (
   }
 };
 
-// Verify user with OTP + verificationToken, then create user
+// ───────────────────────────────────────────────────────
+// 🆕 CANCEL REGISTRATION
+// ───────────────────────────────────────────────────────
+// Permet à l'utilisateur d'annuler sa session pending et de
+// recommencer proprement (ex: trompé d'email).
+//
+// Cleanup complet :
+// 1. Supprime le pending Redis
+// 2. Invalide le verificationToken
+//
+// Note : le compteur d'échecs OTP (otp_attempts) n'est PAS reset
+// pour empêcher un attaquant de "réinitialiser" sa session après
+// avoir épuisé les tentatives.
+
+export const cancelRegistration = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { verificationToken } = req.body as { verificationToken?: string };
+
+    if (!verificationToken) {
+      return next(new ValidationError("verificationToken is required!"));
+    }
+
+    const token = String(verificationToken);
+
+    // Tenter de retrouver l'email associé pour le cleanup
+    try {
+      const emailKey = await getEmailKeyFromToken(token);
+      await deletePendingRegistration(emailKey);
+    } catch {
+      // Token déjà expiré : on continue, c'est OK
+    }
+
+    // Toujours supprimer le verificationToken
+    await deleteVerificationToken(token);
+
+    return res.status(200).json({
+      success: true,
+      message: "Registration cancelled.",
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+// ───────────────────────────────────────────────────────
+// VERIFY REGISTRATION OTP
+// ───────────────────────────────────────────────────────
+
 export const verifyRegistrationOtp = async (
   req: Request,
   res: Response,
@@ -153,15 +238,24 @@ export const verifyRegistrationOtp = async (
       return next(new ValidationError("User already exists with this email!"));
     }
 
-    await prisma.user.create({
-      data: {
-        firstName: pending.firstName,
-        lastName: pending.lastName,
-        email: pending.email,
-        emailNormalized: pending.emailNormalized,
-        gender: pending.gender,
-        passwordHash: pending.passwordHash,
-      },
+    await prisma.$transaction(async (tx) => {
+      const user = await tx.user.create({
+        data: {
+          firstName: pending.firstName,
+          lastName: pending.lastName,
+          email: pending.email,
+          emailNormalized: pending.emailNormalized,
+          passwordHash: pending.passwordHash,
+        },
+      });
+
+      await recordRegistrationConsents(tx, user.id, {
+        termsVersion: pending.termsVersion,
+        privacyVersion: pending.privacyVersion,
+        ipAddress: pending.consentIp,
+        userAgent: pending.consentUserAgent,
+        locale: pending.consentLocale,
+      });
     });
 
     sendAccountCreatedEmail(pending.firstName, pending.emailNormalized, {
@@ -185,14 +279,13 @@ export const verifyRegistrationOtp = async (
   }
 };
 
-// Login user
+// ───────────────────────────────────────────────────────
+// LOGIN, REFRESH, etc. — INCHANGÉS
+// ───────────────────────────────────────────────────────
+
 export const loginUser = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const {
-      email,
-      password,
-      rememberMe,
-    } = req.body as {
+    const { email, password, rememberMe } = req.body as {
       email?: string;
       password?: string;
       rememberMe?: boolean;
@@ -203,7 +296,6 @@ export const loginUser = async (req: Request, res: Response, next: NextFunction)
     }
 
     const emailKey = normalizeEmail(String(email));
-
     const user = await prisma.user.findUnique({
       where: { emailNormalized: emailKey },
     });
@@ -233,9 +325,7 @@ export const loginUser = async (req: Request, res: Response, next: NextFunction)
     );
 
     setCookie(res, "access_token", accessToken);
-    setCookie(res, "refresh_token", refreshToken, {
-      rememberMe: shouldRemember,
-    });
+    setCookie(res, "refresh_token", refreshToken, { rememberMe: shouldRemember });
 
     return res.status(200).json({
       message: "Login successful!",
@@ -252,7 +342,6 @@ export const loginUser = async (req: Request, res: Response, next: NextFunction)
   }
 };
 
-// Refresh token User
 type RefreshPayload = {
   id: string;
   jti: string;
@@ -274,15 +363,11 @@ export const refreshAuthTokens = async (
         : undefined;
 
     const token = cookieToken || headerToken;
-
     if (!token) return next(new AuthError("Unauthorized! No refresh token."));
 
     let decoded: RefreshPayload;
     try {
-      decoded = jwt.verify(
-        token,
-        process.env.REFRESH_TOKEN_SECRET as string
-      ) as RefreshPayload;
+      decoded = jwt.verify(token, process.env.REFRESH_TOKEN_SECRET as string) as RefreshPayload;
     } catch {
       clearAuthCookies(res);
       return next(new AuthError("Unauthorized! Invalid refresh token."));
@@ -305,7 +390,6 @@ export const refreshAuthTokens = async (
       return next(new AuthError("Unauthorized! Refresh token reuse detected."));
     }
 
-    // Révoquer l'ancien jti de CETTE session uniquement (rotation)
     await revokeRefreshJti(user.id, decoded.jti);
 
     const shouldRemember = Boolean(decoded.rememberMe);
@@ -326,9 +410,7 @@ export const refreshAuthTokens = async (
     );
 
     setCookie(res, "access_token", newAccessToken);
-    setCookie(res, "refresh_token", newRefreshToken, {
-      rememberMe: shouldRemember,
-    });
+    setCookie(res, "refresh_token", newRefreshToken, { rememberMe: shouldRemember });
 
     return res.status(200).json({ success: true });
   } catch (error) {
@@ -336,7 +418,10 @@ export const refreshAuthTokens = async (
   }
 };
 
-// Request password reset OTP
+// ───────────────────────────────────────────────────────
+// FORGOT PASSWORD
+// ───────────────────────────────────────────────────────
+
 export const requestPasswordResetOtp = async (
   req: Request,
   res: Response,
@@ -347,10 +432,7 @@ export const requestPasswordResetOtp = async (
     if (!email) return next(new ValidationError("Email is required!"));
 
     const emailKey = normalizeEmail(String(email));
-
-    const user = await prisma.user.findUnique({
-      where: { emailNormalized: emailKey },
-    });
+    const user = await prisma.user.findUnique({ where: { emailNormalized: emailKey } });
 
     if (user) {
       await checkForgotPasswordOtpRestrictions(emailKey);
@@ -366,7 +448,38 @@ export const requestPasswordResetOtp = async (
   }
 };
 
-// Verify forgot password OTP
+// 🆕 RESEND PASSWORD RESET OTP
+// Permet de renvoyer un OTP au même email pendant le flow forgot.
+// Réutilise rate limiting + exponential backoff existants.
+export const resendPasswordResetOtp = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { email } = req.body as { email?: string };
+    if (!email) return next(new ValidationError("Email is required!"));
+
+    const emailKey = normalizeEmail(String(email));
+    const user = await prisma.user.findUnique({
+      where: { emailNormalized: emailKey },
+    });
+
+    // Anti-énumération : même réponse que le compte existe ou non
+    if (user) {
+      await checkForgotPasswordOtpRestrictions(emailKey);
+      await trackForgotPasswordOtpRequests(emailKey);
+      await sendForgotPasswordOtp(user.firstName, emailKey, "forgot-password-mail");
+    }
+
+    return res.status(200).json({
+      message: "If an account exists, a new OTP has been sent.",
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
 export const verifyPasswordResetOtp = async (
   req: Request,
   res: Response,
@@ -379,7 +492,6 @@ export const verifyPasswordResetOtp = async (
     }
 
     const emailKey = normalizeEmail(String(email));
-
     await verifyForgotPasswordOtpCode(emailKey, String(otp));
 
     const passwordResetToken = createPasswordResetToken();
@@ -394,18 +506,18 @@ export const verifyPasswordResetOtp = async (
   }
 };
 
-// GET /auth/me
+// ───────────────────────────────────────────────────────
+// SESSION & PROFILE
+// ───────────────────────────────────────────────────────
+
 export const getMe = async (
   req: AuthenticatedRequest,
   res: Response,
   next: NextFunction
 ) => {
   try {
-    if (!req.user) {
-      return next(new AuthError("Unauthorized"));
-    }
+    if (!req.user) return next(new AuthError("Unauthorized"));
 
-    // Re-fetch avec la relation carrierPage pour le flow onboarding
     const fullUser = await prisma.user.findUnique({
       where: { id: req.user.id },
       include: {
@@ -434,17 +546,11 @@ export const getMe = async (
             },
           },
         },
-        avatar: {
-          select: {
-            url: true,
-          },
-        },
+        avatar: { select: { url: true } },
       },
     });
 
-    if (!fullUser) {
-      return next(new AuthError("Unauthorized"));
-    }
+    if (!fullUser) return next(new AuthError("Unauthorized"));
 
     const { passwordHash, ...safeUser } = fullUser;
 
@@ -458,7 +564,6 @@ export const getMe = async (
   }
 };
 
-// Logout user
 export const logoutUser = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const cookieToken = req.cookies?.["refresh_token"];
@@ -474,19 +579,17 @@ export const logoutUser = async (req: Request, res: Response, next: NextFunction
           await revokeRefreshJti(decoded.id, decoded.jti);
         }
       } catch {
-        // Token invalide ou expiré — on nettoie quand même les cookies
+        // Token invalide ou expiré
       }
     }
 
     clearAuthCookies(res);
-
     return res.status(200).json({ success: true, message: "Logged out successfully." });
   } catch (error) {
     return next(error);
   }
 };
 
-// Reset user password
 export const resetPassword = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { passwordResetToken, newPassword } = req.body as {
@@ -495,16 +598,12 @@ export const resetPassword = async (req: Request, res: Response, next: NextFunct
     };
 
     if (!passwordResetToken || !newPassword) {
-      return next(
-        new ValidationError("passwordResetToken and newPassword are required!")
-      );
+      return next(new ValidationError("passwordResetToken and newPassword are required!"));
     }
 
     const emailKey = await consumePasswordResetToken(String(passwordResetToken));
 
-    const user = await prisma.user.findUnique({
-      where: { emailNormalized: emailKey },
-    });
+    const user = await prisma.user.findUnique({ where: { emailNormalized: emailKey } });
     if (!user) return next(new ValidationError("User not found!"));
 
     validatePasswordStrength(String(newPassword), {
@@ -513,14 +612,9 @@ export const resetPassword = async (req: Request, res: Response, next: NextFunct
       email: user.emailNormalized,
     });
 
-    const isSamePassword = await bcrypt.compare(
-      String(newPassword),
-      user.passwordHash ?? ""
-    );
+    const isSamePassword = await bcrypt.compare(String(newPassword), user.passwordHash ?? "");
     if (isSamePassword) {
-      return next(
-        new ValidationError("New password cannot be the same as the old password!")
-      );
+      return next(new ValidationError("New password cannot be the same as the old password!"));
     }
 
     const passwordHash = await bcrypt.hash(String(newPassword), 10);

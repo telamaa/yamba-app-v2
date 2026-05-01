@@ -28,7 +28,7 @@ const renderEmailTemplate = async (
     "src",
     "utils",
     "email-templates",
-    `${templateName}.ejs`,
+    `${templateName}.ejs`
   );
 
   return ejs.renderFile(templatePath, data);
@@ -36,20 +36,27 @@ const renderEmailTemplate = async (
 
 // Send an email using nodemailer
 export const sendEmail = async (
-  to: string, subject: string,
+  to: string,
+  subject: string,
   templateName: string,
-  data: Record<string, any> ) => {
+  data: Record<string, any>
+) => {
   try {
     const html = await renderEmailTemplate(templateName, data);
 
+    // 🔧 Fix: nom d'expéditeur explicite + chevrons fermés correctement
+    // Améliore la délivrabilité (évite les filtres anti-spam pour from mal formé)
+    const fromName = process.env.SMTP_FROM_NAME || "Yamba";
+    const fromAddress = process.env.SMTP_USER;
+
     await transporter.sendMail({
-      from: `<${process.env.SMTP_USER}`,
+      from: `${fromName} <${fromAddress}>`,
       to,
       subject,
       html,
     });
     return true;
-  } catch (error){
+  } catch (error) {
     console.log("Error sending email", error);
     return false;
   }
