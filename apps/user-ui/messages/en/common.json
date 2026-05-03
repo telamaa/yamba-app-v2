@@ -16,14 +16,77 @@
     "toggleTheme": "Toggle theme",
     "toggleLanguage": "Toggle language",
     "openMenu": "Open menu",
-    "userMenu": "User menu"
+    "userMenu": "User menu",
+    "shareTripShort": "Share",
+    "themeLight": "Light mode",
+    "themeDark": "Dark mode",
+    "closeMenu": "Close menu",
+    "notifications": "Notifications",
+    "messages": "Messages",
+    "welcomeTitle": "Welcome to Yamba",
+    "welcomeSubtitle": "Send your light parcels differently.",
+    "createAccount": "Create an account"
   },
   "userMenu": {
     "myAccount": "My account",
     "myTrips": "My trips",
     "notifications": "Notifications",
     "help": "Help",
-    "logout": "Sign out"
+    "logout": "Sign out",
+    "myShipments": "My shipments",
+    "messages": "Messages",
+    "helpCenter": "Help center",
+    "sections": {
+      "account": "Account",
+      "preferences": "Preferences",
+      "support": "Support"
+    },
+    "preferences": {
+      "language": "Language",
+      "theme": "Appearance"
+    },
+    "badges": {
+      "yamberActive": "Active Yamber",
+      "yamberVerified": "Verified Yamber",
+      "yamberPending": "Profile incomplete"
+    }
+  },
+  "discover": {
+    "sectionLabel": "Discover Yamba",
+    "howItWorks": "How it works",
+    "becomeYamber": "Become a Yamber",
+    "helpFaq": "Help & FAQ"
+  },
+  "footer": {
+    "tagline": "The P2P marketplace rethinking light parcel delivery between individuals.",
+    "rightsReserved": "All rights reserved.",
+    "sections": {
+      "discover": "Discover",
+      "company": "Company",
+      "legal": "Legal"
+    },
+    "discover": {
+      "howItWorks": "How it works",
+      "becomeYamber": "Become a Yamber",
+      "helpFaq": "Help & FAQ"
+    },
+    "company": {
+      "about": "About",
+      "contact": "Contact us",
+      "blog": "Blog"
+    },
+    "legal": {
+      "terms": "Terms of service",
+      "privacy": "Privacy policy",
+      "cookies": "Cookies",
+      "legalNotice": "Legal notice"
+    },
+    "social": {
+      "instagram": "Instagram",
+      "x": "X (Twitter)",
+      "facebook": "Facebook",
+      "comingSoon": "Coming soon"
+    }
   },
   "actions": {
     "search": "Search",

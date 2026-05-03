@@ -1,6 +1,7 @@
 import "./global.css";
 import { Plus_Jakarta_Sans } from "next/font/google";
 import { Toaster } from "sonner";
+import React from "react";
 
 const plusJakarta = Plus_Jakarta_Sans({
   subsets: ["latin"],
