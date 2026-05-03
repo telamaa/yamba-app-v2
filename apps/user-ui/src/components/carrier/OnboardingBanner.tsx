@@ -15,7 +15,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { useUser } from "@/hooks/useUser";
+import useUser from "@/hooks/useUser";
 import Link from "next/link";
 import { X } from "lucide-react"; // or use your icon library
 

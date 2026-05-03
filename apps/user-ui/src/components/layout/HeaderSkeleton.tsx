@@ -1,4 +1,11 @@
+// apps/user-ui/src/components/layout/HeaderSkeleton.tsx
 "use client";
+
+import { HEADER_Z_INDEX } from "./header/header.constants";
+
+type Props = {
+  isCompact?: boolean;
+};
 
 function ShimmerBlock({ className = "" }: { className?: string }) {
   return (
@@ -13,34 +20,48 @@ function ShimmerBlock({ className = "" }: { className?: string }) {
   );
 }
 
-export default function HeaderSkeleton() {
+/**
+ * Skeleton du Header affiché pendant le chargement initial de l'auth.
+ *
+ * Reflète la nouvelle structure (cloche, bulle, avatar plus gros) pour éviter
+ * un saut visuel quand `useUser` se résout. La hauteur (78px) est identique
+ * à celle du vrai Header.
+ */
+export default function HeaderSkeleton({ isCompact = false }: Props) {
   return (
-    <header className="fixed inset-x-0 top-0 z-[100] border-b border-slate-200 bg-white/90 backdrop-blur dark:border-slate-800 dark:bg-slate-950/85">
-      <div className="mx-auto flex h-[78px] max-w-7xl items-center justify-between px-4">
+    <header
+      className="fixed inset-x-0 top-0 border-b border-slate-200 bg-white/90 backdrop-blur dark:border-slate-800 dark:bg-slate-950/85"
+      style={{ zIndex: HEADER_Z_INDEX }}
+    >
+      <div
+        className={`mx-auto flex h-[78px] max-w-7xl items-center justify-between px-4 transition-all ${
+          isCompact ? "py-2" : "py-3"
+        }`}
+      >
         {/* Left */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 md:gap-3">
           <ShimmerBlock className="h-9 w-9 rounded-xl" />
           <div className="flex items-center gap-2">
-            <ShimmerBlock className="h-7 w-28 rounded-md" />
-            <ShimmerBlock className="h-5 w-12 rounded-full" />
+            <ShimmerBlock className="h-7 w-24 rounded-md" />
+            <ShimmerBlock className="hidden h-5 w-12 rounded-full md:block" />
           </div>
         </div>
 
         {/* Desktop right */}
-        <div className="hidden items-center gap-4 md:flex">
-          <ShimmerBlock className="h-10 w-32 rounded-xl" />
+        <div className="hidden items-center gap-3 md:flex">
+          <ShimmerBlock className="h-7 w-16 rounded-full" />
           <ShimmerBlock className="h-10 w-10 rounded-xl" />
-          <ShimmerBlock className="h-5 w-20 rounded-md" />
-          <div className="flex items-center">
-            <ShimmerBlock className="h-10 w-40 rounded-l-lg" />
-            <ShimmerBlock className="h-10 w-11 rounded-r-lg" />
-          </div>
+          <ShimmerBlock className="h-9 w-36 rounded-full" />
+          <ShimmerBlock className="h-9 w-9 rounded-full" />
+          <ShimmerBlock className="h-9 w-9 rounded-full" />
+          <ShimmerBlock className="h-9 w-9 rounded-full" />
         </div>
 
         {/* Mobile right */}
         <div className="flex items-center gap-2 md:hidden">
-          <ShimmerBlock className="h-10 w-10 rounded-xl" />
-          <ShimmerBlock className="h-10 w-10 rounded-xl" />
+          <ShimmerBlock className="h-7 w-7 rounded-full" />
+          <ShimmerBlock className="h-7 w-7 rounded-full" />
+          <ShimmerBlock className="h-9 w-9 rounded-full" />
         </div>
       </div>
     </header>

@@ -20,11 +20,16 @@ export function generateStaticParams() {
  * - <html> and <body> tags are in the ROOT layout (app/layout.tsx).
  * - This layout only wraps children with providers and adds Header.
  *
+ * Footer policy:
+ * - Le Footer n'est PAS rendu ici (il polluerait les pages d'action user :
+ *   search, dashboard, trips/create, auth, carrier onboarding, etc.).
+ * - Il est rendu uniquement par le layout `(marketing)/layout.tsx` qui
+ *   couvre les pages marketing/contenu : home, help, legal, about, etc.
+ *
  * Layout guidelines:
- * - The outer wrapper ONLY handles pt-[78px] to reserve space for the fixed Header.
- * - Each page is responsible for its own container (via AppContainer or direct
- *   max-w/px classes). This allows some pages to be full-width (e.g. hero sections)
- *   while others stay constrained.
+ * - Le wrapper extérieur gère uniquement `pt-[78px]` pour réserver la place
+ *   du Header fixed, sans imposer de container.
+ * - Chaque page gère son propre container via <AppContainer> ou équivalent.
  */
 export default async function LocaleLayout({
                                              children,
@@ -50,8 +55,6 @@ export default async function LocaleLayout({
           <UiPreferencesProvider>
             <ToastProvider>
               <Header />
-              {/* pt-[78px] réserve la place du Header fixed, sans imposer de container.
-                  Chaque page gère son container via <AppContainer> ou équivalent. */}
               <div className="pt-[78px]">{children}</div>
             </ToastProvider>
           </UiPreferencesProvider>
