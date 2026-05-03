@@ -1,15 +1,15 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {MOBILE_TAB_SECTIONS, MOBILE_TABS, MobileTab} from "@/app/[locale]/dashboard/dashboard.config";
-
+import { useTranslations } from "next-intl";
+import { Link } from "@/i18n/navigation";
+import {
+  MOBILE_TAB_SECTIONS,
+  MOBILE_TABS,
+  MobileTab,
+} from "@/app/[locale]/dashboard/dashboard.config";
 
 const MANGO_DARK = "#CC7A00";
-
-type Props = {
-  isFr: boolean;
-};
 
 function getActiveMobileTab(pathname: string): MobileTab {
   const segment = pathname.split("/").pop() ?? "";
@@ -22,8 +22,9 @@ function getActiveMobileTab(pathname: string): MobileTab {
   return "home";
 }
 
-export default function DashboardMobileNav({ isFr }: Props) {
+export default function DashboardMobileNav() {
   const pathname = usePathname();
+  const t = useTranslations();
   const activeTab = getActiveMobileTab(pathname ?? "");
 
   return (
@@ -36,16 +37,21 @@ export default function DashboardMobileNav({ isFr }: Props) {
         return (
           <Link
             key={tab.key}
-            href={`/apps/user-ui/src/app/%5Blocale%5D/dashboard/${firstSection}`}
+            href={`/dashboard/${firstSection}`}
             className={[
               "flex flex-col items-center gap-0.5 px-2 py-1 text-[10px]",
               isActive ? "font-medium" : "",
             ].join(" ")}
             style={{ color: isActive ? MANGO_DARK : undefined }}
           >
-            <Icon size={22} className={isActive ? "" : "text-slate-400 dark:text-slate-500"} />
-            <span className={isActive ? "" : "text-slate-400 dark:text-slate-500"}>
-              {isFr ? tab.labelFr : tab.labelEn}
+            <Icon
+              size={22}
+              className={isActive ? "" : "text-slate-400 dark:text-slate-500"}
+            />
+            <span
+              className={isActive ? "" : "text-slate-400 dark:text-slate-500"}
+            >
+              {t(tab.labelKey)}
             </span>
           </Link>
         );
