@@ -11,19 +11,82 @@
   },
   "header": {
     "shareTrip": "Partager un trajet",
+    "shareTripShort": "Partager",
     "login": "Connexion",
     "help": "Aide",
     "toggleTheme": "Changer de thème",
     "toggleLanguage": "Changer de langue",
     "openMenu": "Ouvrir le menu",
-    "userMenu": "Menu utilisateur"
+    "userMenu": "Menu utilisateur",
+    "themeLight": "Mode clair",
+    "themeDark": "Mode sombre",
+    "closeMenu": "Fermer le menu",
+    "notifications": "Notifications",
+    "messages": "Messages",
+    "welcomeTitle": "Bienvenue sur Yamba",
+    "welcomeSubtitle": "Envoyez vos colis légers autrement.",
+    "createAccount": "Créer un compte"
   },
   "userMenu": {
     "myAccount": "Mon compte",
     "myTrips": "Mes trajets",
     "notifications": "Notifications",
     "help": "Aide",
-    "logout": "Déconnexion"
+    "logout": "Déconnexion",
+    "myShipments": "Mes envois",
+    "messages": "Messages",
+    "helpCenter": "Centre d'aide",
+    "sections": {
+      "account": "Compte",
+      "preferences": "Préférences",
+      "support": "Support"
+    },
+    "preferences": {
+      "language": "Langue",
+      "theme": "Apparence"
+    },
+    "badges": {
+      "yamberActive": "Yamber actif",
+      "yamberVerified": "Yamber vérifié",
+      "yamberPending": "Profil à compléter"
+    }
+},
+  "discover": {
+    "sectionLabel": "Découvrir Yamba",
+    "howItWorks": "Comment ça marche",
+    "becomeYamber": "Devenir Yamber",
+    "helpFaq": "Aide & FAQ"
+  },
+  "footer": {
+    "tagline": "La marketplace P2P qui repense l'envoi de colis légers entre particuliers.",
+    "rightsReserved": "Tous droits réservés.",
+    "sections": {
+      "discover": "Découvrir",
+      "company": "Entreprise",
+      "legal": "Légal"
+    },
+    "discover": {
+      "howItWorks": "Comment ça marche",
+      "becomeYamber": "Devenir Yamber",
+      "helpFaq": "Aide & FAQ"
+    },
+    "company": {
+      "about": "À propos",
+      "contact": "Nous contacter",
+      "blog": "Blog"
+    },
+    "legal": {
+      "terms": "Conditions générales",
+      "privacy": "Confidentialité",
+      "cookies": "Cookies",
+      "legalNotice": "Mentions légales"
+    },
+    "social": {
+      "instagram": "Instagram",
+      "x": "X (Twitter)",
+      "facebook": "Facebook",
+      "comingSoon": "Bientôt disponible"
+    }
   },
   "actions": {
     "search": "Rechercher",
