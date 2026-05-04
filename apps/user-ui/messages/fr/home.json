@@ -1,25 +1,210 @@
 {
   "hero": {
-    "line1": "Un trajet existe déjà,",
-    "line2": "Profitez-en :",
-    "line3": "Envoyer vos colis légers autrement.",
-    "alt": "Voyageuse dans un transport, illustration du voyage collaboratif Yamba"
+    "metric": "{count}+ colis livrés depuis 2024",
+    "titleLine1": "Et si vos colis voyageaient",
+    "titleLine2": "avec",
+    "titleHighlight": "quelqu'un qui part déjà",
+    "titleEnd": "?",
+    "subtitle": "Yamba connecte les expéditeurs aux voyageurs partout dans le monde.",
+    "search": {
+      "from": "Départ",
+      "fromPlaceholder": "Paris",
+      "to": "Arrivée",
+      "toPlaceholder": "Bruxelles",
+      "date": "Date",
+      "datePlaceholder": "Aujourd'hui",
+      "button": "Chercher"
+    },
+    "stats": {
+      "rating": "⭐ 4,8/5",
+      "ratingLabel": "1 200+ avis",
+      "users": "12k+",
+      "usersLabel": "utilisateurs",
+      "cities": "80+",
+      "citiesLabel": "villes",
+      "co2": "2,4T",
+      "co2Label": "CO₂ évités"
+    }
   },
-  "cards": {
+  "pillars": {
+    "speed": {
+      "tag": "Vitesse",
+      "value": "24h",
+      "valueUnit": "max",
+      "title": "Livraison éclair",
+      "description": "Au lieu de 3 à 5 jours avec un transporteur classique. Votre colis voyage à la vitesse d'un voyageur."
+    },
+    "ecology": {
+      "tag": "Écologie",
+      "value": "0",
+      "valueUnit": "km en plus",
+      "title": "Zéro CO₂ supplémentaire",
+      "description": "Le voyageur partait de toute façon. Yamba ne crée pas de transport, il optimise l'existant."
+    },
     "savings": {
       "tag": "Économie",
-      "title": "Moins cher",
-      "text": "Réduisez le coût d'envoi de vos petits colis grâce à des trajets déjà prévus."
+      "value": "-73",
+      "valueUnit": "%",
+      "title": "Jusqu'à 73% moins cher",
+      "description": "Vous partagez les frais d'un trajet déjà payé. Pas de marge sur du transport dédié."
+    }
+  },
+  "liveMap": {
+    "badge": "En direct",
+    "titleLine1": "Yamba bouge",
+    "titleHighlight": "en ce moment",
+    "titleEnd": ".",
+    "subtitle": "Chaque trajet sur la carte = un colis qui voyagera sans CO₂ supplémentaire.",
+    "stats": {
+      "activeTrips": "Trajets actifs",
+      "inTransit": "En transit"
     },
-    "trust": {
-      "tag": "Confiance",
-      "title": "Plus transparent",
-      "text": "Suivi clair du colis, échanges facilités et relation directe avec le voyageur."
+    "mobileStats": {
+      "activeTripsLabel": "dans 23 pays",
+      "inTransitLabel": "colis en ce moment",
+      "globalTitle": "Yamba est mondial",
+      "globalSubtitle": "De Paris à Brazzaville, de Tokyo à New York"
     },
-    "impact": {
-      "tag": "Impact",
-      "title": "Plus responsable",
-      "text": "Yamba optimise des trajets existants pour limiter les transports dédiés inutiles."
+    "viewAll": "Voir tous les trajets disponibles",
+    "tripStatus": {
+      "active": "En cours",
+      "pending": "À venir"
+    }
+  },
+  "journey": {
+    "label": "Le parcours Yamba",
+    "titleStart": "Un envoi en",
+    "titleHighlight": "5 étapes",
+    "titleEnd": ".",
+    "subtitle": "Conçu pour vous protéger à chaque étape, du paiement à la livraison.",
+    "swipeHint": "← Glissez pour découvrir les 5 étapes →",
+    "exclusivityBadge": "🔐 Exclusivité",
+    "stepLabel": "ÉTAPE",
+    "steps": {
+      "find": {
+        "title": "Trouvez",
+        "description": "Un Yamber qui se rend à votre destination."
+      },
+      "book": {
+        "title": "Réservez",
+        "description": "Paiement sécurisé via Stripe, bloqué jusqu'à la livraison."
+      },
+      "sign": {
+        "title": "Signez",
+        "description": "Contrat de confiance avec engagements mutuels."
+      },
+      "track": {
+        "title": "Suivez",
+        "description": "Tracking temps réel et messagerie directe."
+      },
+      "receive": {
+        "title": "Récupérez",
+        "description": "Code confidentiel pour la personne autorisée."
+      }
+    }
+  },
+  "pricing": {
+    "label": "Tarification",
+    "titleStart": "100%",
+    "titleHighlight": "transparent",
+    "titleEnd": ".",
+    "subtitle": "Aucun frais caché. Aucun abonnement.",
+    "breakdown": {
+      "title": "Sur chaque transaction",
+      "yamberLabel": "Yamber",
+      "yambaLabel": "Commission Yamba",
+      "yambaSubtitle": "Sécurité, support, garanties",
+      "insuranceLabel": "Assurance optionnelle",
+      "insuranceSubtitle": "Couverture jusqu'à 500€"
+    },
+    "timeline": {
+      "label": "Protection mutuelle",
+      "titleStart": "Yamber payé",
+      "titleHighlight": "3 jours",
+      "titleEnd": "après livraison",
+      "subtitle": "Période de sécurité pour signaler tout problème avant déblocage des fonds.",
+      "steps": {
+        "day0": {
+          "label": "J0",
+          "title": "Réservation",
+          "subtitle": "Paiement bloqué"
+        },
+        "day1": {
+          "label": "J1",
+          "title": "Livraison",
+          "subtitle": "Code confidentiel"
+        },
+        "day23": {
+          "label": "J2-3",
+          "title": "Vérification",
+          "subtitle": "Filet sécurité"
+        },
+        "day4": {
+          "label": "J4",
+          "title": "Paiement",
+          "subtitle": "Yamber payé"
+        }
+      },
+      "shipperBenefit": "3 jours pour vérifier",
+      "yamberBenefit": "Paiement automatique garanti"
+    }
+  },
+  "reviews": {
+    "ratingValue": "4,8/5",
+    "ratingCount": "1 200+ avis",
+    "title": "Ils ont adopté",
+    "titleHighlight": "Yamba",
+    "titleEnd": ".",
+    "items": {
+      "r1": {
+        "quote": "Colis envoyé à Brazzaville pour 3 fois moins cher. La voyageuse m'a tenue au courant tout du long.",
+        "name": "Aminata L.",
+        "role": "Paris → Brazzaville"
+      },
+      "r2": {
+        "quote": "Yamber depuis 6 mois sur Lyon-Paris. Mes billets de train sont financés. Vraiment au top.",
+        "name": "Thomas F.",
+        "role": "Yamber · Lyon"
+      },
+      "r3": {
+        "quote": "Service nickel. Le système de notation et les paiements sécurisés m'ont rassurée dès le début.",
+        "name": "Marie S.",
+        "role": "Bordeaux → Madrid"
+      },
+      "r4": {
+        "quote": "Reçu mon colis en moins de 24h, livré en main propre par un voyageur sympa. Bluffant.",
+        "name": "David K.",
+        "role": "Bruxelles → Paris"
+      },
+      "r5": {
+        "quote": "Le code confidentiel à la livraison rassure énormément. C'est ça qui fait la différence.",
+        "name": "Sarah E.",
+        "role": "Casablanca → Lyon"
+      }
+    }
+  },
+  "finalCta": {
+    "trustSignals": {
+      "stripe": "✅ Paiement sécurisé Stripe",
+      "insurance": "🛡️ Assurance jusqu'à 500€",
+      "speed": "⚡ Livraison 24h max",
+      "ecology": "🌱 Zéro CO₂ supplémentaire"
+    },
+    "titleStart": "Et vous, vous",
+    "titleHighlight": "attendez quoi",
+    "titleEnd": "?",
+    "subtitle": "Rejoignez 12 000+ personnes qui envoient et transportent autrement.",
+    "shipper": {
+      "tag": "Pour envoyer",
+      "title": "Shipper",
+      "description": "Envoyez votre colis en 24h pour 73% moins cher qu'un transporteur classique.",
+      "cta": "Trouver un trajet"
+    },
+    "yamber": {
+      "tag": "Pour transporter",
+      "title": "Yamber",
+      "description": "Vous voyagez déjà ? Gagnez en moyenne 120€/mois sur vos trajets prévus.",
+      "cta": "Devenir Yamber"
     }
   }
 }

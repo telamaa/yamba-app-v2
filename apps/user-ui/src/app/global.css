@@ -1,9 +1,14 @@
+@import "leaflet/dist/leaflet.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 /* optionnel mais utile */
-html, body { height: 100%; }
+html, body {
+  height: 100%;
+  overflow-x: hidden;
+}
 
 
 @keyframes yambaShimmer {
@@ -13,4 +18,136 @@ html, body { height: 100%; }
   100% {
     transform: translateX(100%);
   }
+}
+
+/* ─────────────────────────────────────────────────────────── */
+/* HOME PAGE — Animations & utilities                          */
+/* ─────────────────────────────────────────────────────────── */
+
+/* Gradient signature Yamba (orange → red → teal) */
+.yamba-grad-text {
+  background: linear-gradient(135deg, #FF9900 0%, #FF6B35 50%, #2DD4BF 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.yamba-grad-bg {
+  background: linear-gradient(135deg, #FF9900 0%, #FF6B35 50%, #2DD4BF 100%);
+}
+
+/* Hero mesh background (sombre avec halos) */
+.yamba-hero-mesh {
+  background:
+    radial-gradient(at 20% 10%, rgba(255, 153, 0, 0.18) 0px, transparent 50%),
+    radial-gradient(at 90% 30%, rgba(45, 212, 191, 0.12) 0px, transparent 50%),
+    radial-gradient(at 50% 90%, rgba(255, 107, 53, 0.10) 0px, transparent 50%),
+    #020617;
+}
+
+/* Pulse dot (live indicator) */
+@keyframes yamba-pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(1.4); }
+}
+.yamba-pulse-dot {
+  animation: yamba-pulse-dot 2s ease-in-out infinite;
+}
+
+/* Marker pulse (map markers) */
+@keyframes yamba-marker-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(255, 153, 0, 0.6); }
+  70% { box-shadow: 0 0 0 10px rgba(255, 153, 0, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(255, 153, 0, 0); }
+}
+.yamba-marker-pulse {
+  border-radius: 50%;
+  animation: yamba-marker-pulse 2s infinite;
+}
+
+/* Animated dashed path (parcours connector) */
+@keyframes yamba-dash {
+  to { stroke-dashoffset: -20; }
+}
+.yamba-animated-path {
+  stroke-dasharray: 6 6;
+  animation: yamba-dash 1.5s linear infinite;
+}
+
+/* Reviews ticker (defile horizontal) */
+@keyframes yamba-scroll-reviews {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+.yamba-reviews-track {
+  animation: yamba-scroll-reviews 60s linear infinite;
+  width: max-content;
+}
+.yamba-reviews-container:hover .yamba-reviews-track {
+  animation-play-state: paused;
+}
+
+/* Mobile swipe horizontal pour parcours */
+.yamba-scroll-snap-x {
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.yamba-scroll-snap-x::-webkit-scrollbar {
+  display: none;
+}
+.yamba-scroll-snap-item {
+  scroll-snap-align: center;
+}
+
+/* Leaflet customizations pour Yamba */
+.leaflet-container {
+  background: #0f172a !important;
+  font-family: var(--font-sans), 'Plus Jakarta Sans', sans-serif !important;
+}
+.leaflet-tile {
+  filter: invert(1) hue-rotate(180deg) brightness(0.95) contrast(0.85) saturate(0.5);
+}
+.leaflet-control-attribution {
+  background: rgba(2, 6, 23, 0.7) !important;
+  color: #94a3b8 !important;
+  font-size: 10px !important;
+}
+.leaflet-control-attribution a {
+  color: #FF9900 !important;
+}
+.leaflet-popup-content-wrapper {
+  background: #0f172a;
+  color: white;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 153, 0, 0.3);
+}
+.leaflet-popup-tip {
+  background: #0f172a;
+}
+
+/* Extension du fond mesh hero pour la search bar */
+/* Reproduit le bas du gradient hero pour continuité visuelle */
+.yamba-hero-mesh-extension {
+  background-color: #020617;
+  background-image:
+    radial-gradient(at 20% 30%, rgba(255, 153, 0, 0.05) 0%, transparent 60%),
+    radial-gradient(at 80% 70%, rgba(45, 212, 191, 0.04) 0%, transparent 60%);
+}
+
+/* Wrapper qui englobe hero + search bar pour fond mesh continu */
+.yamba-hero-zone {
+  background:
+    radial-gradient(at 20% 10%, rgba(255, 153, 0, 0.18) 0px, transparent 50%),
+    radial-gradient(at 90% 30%, rgba(45, 212, 191, 0.12) 0px, transparent 50%),
+    radial-gradient(at 50% 90%, rgba(255, 107, 53, 0.10) 0px, transparent 50%),
+    #020617;
+}
+
+/* Bas du mesh hero — utilisé pour la zone de la search bar */
+/* Reproduit le bas du gradient (halo orange en bas) pour continuité visuelle */
+.yamba-hero-mesh-bottom {
+  background:
+    radial-gradient(at 50% 30%, rgba(255, 107, 53, 0.10) 0px, transparent 70%),
+    #020617;
 }

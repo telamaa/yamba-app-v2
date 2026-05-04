@@ -27,6 +27,41 @@ const flushRefreshQueue = (error?: unknown) => {
   refreshQueue = [];
 };
 
+// ─────────────────────────────────────────────────────────────────────
+// Circuit breaker pour les tentatives de refresh
+//
+// Sans ce mécanisme, quand l'utilisateur n'est pas connecté (ou que son
+// refresh token est expiré), chaque requête vers une route `requireAuth`
+// déclenche son propre cycle "401 → tentative de refresh → 401". Sur une
+// page qui mount plusieurs composants utilisant `useUser` ou faisant des
+// appels API authentifiés, cela peut générer des dizaines d'appels en
+// quelques secondes.
+//
+// Le circuit breaker fonctionne ainsi :
+//   - Quand un refresh échoue, on enregistre le timestamp de l'échec
+//   - Pendant les 30 secondes suivantes, on rejette directement les 401
+//     sur les requêtes `requireAuth` sans tenter de nouveau refresh
+//   - Si un refresh réussit (utilisateur se reconnecte), on reset le breaker
+//
+// Cela permet à l'app de gérer proprement l'état "déconnecté" sans
+// bombarder le serveur ni boucler dans les composants.
+// ─────────────────────────────────────────────────────────────────────
+let refreshFailedAt = 0;
+const REFRESH_COOLDOWN_MS = 30_000;
+
+const isInRefreshCooldown = () => {
+  return Date.now() - refreshFailedAt < REFRESH_COOLDOWN_MS;
+};
+
+/**
+ * Reset manuel du circuit breaker.
+ * À appeler après un login réussi pour que les requêtes ultérieures
+ * puissent à nouveau tenter un refresh si besoin.
+ */
+export const resetAuthRefreshCircuitBreaker = () => {
+  refreshFailedAt = 0;
+};
+
 apiClient.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
@@ -45,6 +80,12 @@ apiClient.interceptors.response.use(
       is401 && requireAuth && !isRetry && !skipAuthRefresh;
 
     if (!shouldTryRefresh) {
+      return Promise.reject(error);
+    }
+
+    // Circuit breaker : si un refresh a échoué récemment, ne tente pas
+    // un nouveau refresh. L'utilisateur est probablement déconnecté.
+    if (isInRefreshCooldown()) {
       return Promise.reject(error);
     }
 
@@ -71,9 +112,13 @@ apiClient.interceptors.response.use(
         }
       );
 
+      // Refresh réussi : reset du circuit breaker
+      refreshFailedAt = 0;
       flushRefreshQueue();
       return apiClient(originalRequest);
     } catch (refreshError) {
+      // Refresh échoué : enclenchement du circuit breaker
+      refreshFailedAt = Date.now();
       flushRefreshQueue(refreshError);
       // Pas de redirection ici — on laisse le composant gérer
       // (useUser retournera user: undefined, le header affichera "Connexion")
