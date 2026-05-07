@@ -1,12 +1,10 @@
 "use client";
 
-import { useMemo } from "react";
-import { useTranslations, useLocale } from "next-intl";
+import { useTranslations } from "next-intl";
 import { ChevronRight, AlertCircle, HelpCircle } from "lucide-react";
 import { useBottomSheet } from "@/hooks/useBottomSheet";
 import TripPricingBottomSheet from "./TripPricingBottomSheet";
 import { ParcelCategory, YambaTripResult } from "./search-results.types";
-import { formatTripDate } from "./formatTripTimes";
 
 type Props = {
   item: YambaTripResult;
@@ -21,23 +19,20 @@ type Props = {
  * - Footer : avatar + tripper + catégories acceptées
  *
  * Tap sur le `(?)` à côté du prix → ouvre TripPricingBottomSheet
+ *
+ * Note : item.travelDate, item.departureTime et item.arrivalTime sont déjà
+ * formatés en locale-aware par le backend (mapTripToYambaResult).
+ * Aucun reformatting nécessaire côté frontend.
  */
 export default function YambaTripResultCardMobile({
                                                     item,
                                                     highlightedCategories = [],
                                                   }: Props) {
   const t = useTranslations("search");
-  const locale = useLocale();
   const { isOpen, open, close } = useBottomSheet();
 
   const transportLabel = t(`transportTabs.${item.transportMode}`);
   const TransportIcon = getTransportIcon(item.transportMode);
-
-  // Date formatée selon la locale active
-  const formattedDate = useMemo(
-    () => formatTripDate(item.travelDate, locale),
-    [item.travelDate, locale]
-  );
 
   const showRemainingAlert =
     typeof item.remainingSlots === "number" && item.remainingSlots <= 3;
@@ -53,7 +48,7 @@ export default function YambaTripResultCardMobile({
               {transportLabel}
             </span>
             <span className="truncate text-[12px] text-slate-500 dark:text-slate-400">
-              {formattedDate}
+              {item.travelDate}
             </span>
           </div>
           {showRemainingAlert && (
