@@ -11,10 +11,10 @@ import {
 } from "lucide-react";
 import { useTranslations, useFormatter, useLocale } from "next-intl";
 import { useBottomSheet } from "@/hooks/useBottomSheet";
-import CityAutocomplete from "./CityAutocomplete";
-import MobileFieldFullScreen from "./MobileFieldFullScreen";
-import MobileSmartDatePicker from "./MobileSmartDatePicker";
 import type { DateValue } from "@/components/ui/SmartDatePicker";
+import CityAutocomplete from "@/components/search/CityAutocomplete";
+import MobileFieldFullScreen from "@/components/search/MobileFieldFullScreen";
+import MobileSmartDatePicker from "@/components/search/MobileSmartDatePicker";
 
 type Props = {
   from: string;

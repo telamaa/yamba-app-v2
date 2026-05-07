@@ -1,6 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
 import apiClient from "@/lib/api-client";
-import { AxiosError } from "axios";
 
 export type CarrierPage = {
   id: string;
@@ -54,6 +53,22 @@ const fetchUser = async (): Promise<User> => {
   return response.data.user;
 };
 
+/**
+ * Hook centralisé pour l'utilisateur connecté.
+ *
+ * Stratégie de cache :
+ *  - Un seul fetch /auth/me par session (pas de refetch automatique)
+ *  - Cache valide 5 minutes (les données user changent rarement)
+ *  - Cache mort gardé 10 minutes pour éviter les refetch lors des re-mount
+ *  - Pas de retry sur erreur (un 401 = "non connecté", c'est définitif jusqu'au login)
+ *
+ * Pour invalider après un login/logout/profile update :
+ *   queryClient.invalidateQueries({ queryKey: ["user"] })
+ *
+ * Pour forcer un refetch manuel :
+ *   const { refetch } = useUser();
+ *   await refetch();
+ */
 const useUser = () => {
   const {
     data: user,
@@ -63,13 +78,18 @@ const useUser = () => {
   } = useQuery({
     queryKey: ["user"],
     queryFn: fetchUser,
+    // Données stables pendant 5 minutes
     staleTime: 1000 * 60 * 5,
-    retry: (failureCount, error) => {
-      if (error instanceof AxiosError && error.response?.status === 401) {
-        return false;
-      }
-      return failureCount < 1;
-    },
+    // Garde le cache mort pendant 10 minutes (évite refetch au re-mount des composants)
+    gcTime: 1000 * 60 * 10,
+    // Pas de retry : un 401 signifie "non connecté", pas une erreur transitoire
+    retry: false,
+    // Pas de refetch quand un nouveau composant utilisant useUser se mount
+    refetchOnMount: false,
+    // Pas de refetch quand l'utilisateur revient sur l'onglet
+    refetchOnWindowFocus: false,
+    // Pas de refetch après une perte/reprise de connexion réseau
+    refetchOnReconnect: false,
   });
 
   return { user, isLoading, isError, refetch };
