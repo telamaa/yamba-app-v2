@@ -12,42 +12,37 @@ import SmartDatePicker, { type DateValue } from "@/components/ui/SmartDatePicker
 
 type Mode = "expanded" | "compact" | "auto";
 
-type Props = {
-  /**
-   * Mode d'affichage de la search bar :
-   *  - "expanded" : version large avec labels (utilisé dans le hero au repos)
-   *  - "compact" : version compacte sans labels (utilisé dans le header au scroll)
-   *  - "auto" : ancien comportement basé sur le scroll (legacy, page search)
-   *
-   * Par défaut "expanded".
-   */
-  mode?: Mode;
-  /**
-   * [Mode "auto" uniquement] Si true, la barre s'ajuste au scroll
-   * (sticky positionné + mode compact).
-   */
-  stickyOnScroll?: boolean;
-  /**
-   * [Mode "auto" uniquement] Active uniquement le mode compact au scroll
-   * sans activer le sticky.
-   */
-  forceCompactOnScroll?: boolean;
-  /**
-   * [Mode "auto" uniquement] Désactive le mode compact même quand sticky
-   * est activé.
-   */
-  disableCompact?: boolean;
-};
-
-type SearchDraft = {
+export type TripSearchValue = {
   from: string;
   to: string;
   dateValue: DateValue | null;
 };
 
+type Props = {
+  /**
+   * Mode d'affichage de la search bar.
+   *  - "expanded" : version large avec labels (hero au repos)
+   *  - "compact" : version compacte sans labels (header au scroll)
+   *  - "auto" : ancien comportement basé sur le scroll (page search legacy)
+   */
+  mode?: Mode;
+  /** [Mode "auto"] Si true, la barre s'ajuste au scroll (sticky + compact). */
+  stickyOnScroll?: boolean;
+  /** [Mode "auto"] Active uniquement le mode compact au scroll sans sticky. */
+  forceCompactOnScroll?: boolean;
+  /** [Mode "auto"] Désactive le mode compact même quand sticky est activé. */
+  disableCompact?: boolean;
+  /**
+   * Callback appelé au clic sur le bouton Search.
+   * Reçoit le snapshot des valeurs actuelles (from, to, dateValue).
+   * Si non fourni, le bouton se contente de logger en console.
+   */
+  onSearchAction?: (value: TripSearchValue) => void;
+};
+
 type FocusedField = "from" | "to" | "date" | null;
 
-const initialSearchDraft: SearchDraft = {
+const initialSearchDraft: TripSearchValue = {
   from: "",
   to: "",
   dateValue: null,
@@ -67,11 +62,12 @@ export default function TripSearchBar({
                                         stickyOnScroll = false,
                                         forceCompactOnScroll = false,
                                         disableCompact = false,
+                                        onSearchAction,
                                       }: Props) {
   const t = useTranslations("common");
   const locale = useLocale();
 
-  const [draft, setDraft] = usePersistedFormState<SearchDraft>(
+  const [draft, setDraft] = usePersistedFormState<TripSearchValue>(
     "trip-search",
     initialSearchDraft,
     { version: SEARCH_VERSION }
@@ -81,18 +77,15 @@ export default function TripSearchBar({
   const [swapRotation, setSwapRotation] = useState(0);
   const isScrolled = useScrollThreshold(SCROLL_THRESHOLD);
 
-  // Détermine si on est en mode compact selon le mode choisi
   const isCompact =
     mode === "compact"
       ? true
       : mode === "expanded"
         ? false
-        : // mode "auto" : ancien comportement basé sur le scroll
-        !disableCompact &&
+        : !disableCompact &&
         (stickyOnScroll || forceCompactOnScroll) &&
         isScrolled;
 
-  // Le sticky n'est actif qu'en mode "auto"
   const useSticky = mode === "auto" && stickyOnScroll;
 
   // ── Handlers ──
@@ -125,12 +118,19 @@ export default function TripSearchBar({
   }, [setDraft]);
 
   const onSearch = useCallback(() => {
-    console.log({
+    const snapshot: TripSearchValue = {
       from: draft.from,
       to: draft.to,
       dateValue: draft.dateValue,
-    });
-  }, [draft]);
+    };
+
+    if (onSearchAction) {
+      onSearchAction(snapshot);
+    } else {
+      // Comportement par défaut : log (utilisé en standalone, ex: homepage)
+      console.log("[TripSearchBar] Search:", snapshot);
+    }
+  }, [draft, onSearchAction]);
 
   const cityAutocompleteWrapperClasses = isCompact
     ? CITY_AUTOCOMPLETE_COMPACT_CLASSES
@@ -174,7 +174,6 @@ export default function TripSearchBar({
             ].join(" ")}
           >
             <div className="relative grid items-stretch overflow-visible grid-cols-[1fr_36px_1fr_1fr_auto]">
-              {/* ── Champ From ── */}
               <FieldWrapper
                 isFocused={focused === "from"}
                 position="first"
@@ -206,7 +205,6 @@ export default function TripSearchBar({
                 </div>
               </FieldWrapper>
 
-              {/* ── Bouton Swap ── */}
               <div className="flex items-center justify-center">
                 <button
                   type="button"
@@ -227,7 +225,6 @@ export default function TripSearchBar({
                 </button>
               </div>
 
-              {/* ── Champ To ── */}
               <FieldWrapper
                 isFocused={focused === "to"}
                 position="middle"
@@ -260,7 +257,6 @@ export default function TripSearchBar({
                 </div>
               </FieldWrapper>
 
-              {/* ── Champ Date (SmartDatePicker) ── */}
               <FieldWrapper
                 isFocused={focused === "date"}
                 position="middle"
@@ -277,7 +273,6 @@ export default function TripSearchBar({
                 />
               </FieldWrapper>
 
-              {/* ── Bouton Rechercher ── */}
               <div
                 className={[
                   "flex items-center transition-all duration-300 ease-out",

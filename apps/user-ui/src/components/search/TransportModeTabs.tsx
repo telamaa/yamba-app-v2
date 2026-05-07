@@ -1,30 +1,35 @@
 "use client";
 
-import { useMemo } from "react";
 import { Car, Plane, Train } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { TransportMode, YambaTripResult } from "./search-results.types";
+import { TransportMode } from "./search-results.types";
 
 type FilterMode = "all" | TransportMode;
 
 type Props = {
   active: FilterMode;
-  items: YambaTripResult[];
   onChange: (value: FilterMode) => void;
+  /**
+   * Counts venant de useSearchFacets. Si undefined (loading initial),
+   * les badges affichent "0" en fallback. Le composant ne calcule plus
+   * lui-même les counts depuis une liste — c'est le serveur qui les fournit.
+   */
+  counts?: {
+    all: number;
+    plane: number;
+    train: number;
+    car: number;
+  };
 };
 
-export default function TransportModeTabs({ active, items, onChange }: Props) {
+export default function TransportModeTabs({
+                                            active,
+                                            onChange,
+                                            counts,
+                                          }: Props) {
   const t = useTranslations("common");
 
-  const counts = useMemo(
-    () => ({
-      all: items.length,
-      plane: items.filter((i) => i.transportMode === "plane").length,
-      train: items.filter((i) => i.transportMode === "train").length,
-      car: items.filter((i) => i.transportMode === "car").length,
-    }),
-    [items]
-  );
+  const safeCounts = counts ?? { all: 0, plane: 0, train: 0, car: 0 };
 
   const tabs: Array<{
     key: FilterMode;
@@ -32,24 +37,24 @@ export default function TransportModeTabs({ active, items, onChange }: Props) {
     icon?: React.ReactNode;
     count: number;
   }> = [
-    { key: "all", label: t("transportTabs.all"), count: counts.all },
+    { key: "all", label: t("transportTabs.all"), count: safeCounts.all },
     {
       key: "plane",
       label: t("transportTabs.plane"),
       icon: <Plane size={13} strokeWidth={2} />,
-      count: counts.plane,
+      count: safeCounts.plane,
     },
     {
       key: "train",
       label: t("transportTabs.train"),
       icon: <Train size={13} strokeWidth={2} />,
-      count: counts.train,
+      count: safeCounts.train,
     },
     {
       key: "car",
       label: t("transportTabs.car"),
       icon: <Car size={13} strokeWidth={2} />,
-      count: counts.car,
+      count: safeCounts.car,
     },
   ];
 
@@ -92,7 +97,7 @@ export default function TransportModeTabs({ active, items, onChange }: Props) {
       {/* Compteur total (caché si trop peu de place) */}
       <div className="hidden text-[12px] text-slate-500 dark:text-slate-400 md:block">
         <span className="font-semibold text-slate-900 dark:text-white">
-          {counts.all}
+          {safeCounts.all}
         </span>{" "}
         {t("transportTabs.resultsCount")}
       </div>
