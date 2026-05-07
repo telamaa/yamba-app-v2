@@ -80,5 +80,18 @@
   "mobile": {
     "editSearch": "Edit search",
     "whenLeaving": "When are you leaving?"
-  }
+  },
+  "errorState": {
+    "title": "Something went wrong",
+    "description": "Unable to load trips. Check your connection and try again.",
+    "retry": "Retry"
+  },
+  "dynamicTitle": {
+    "noFilter": "All available trips",
+    "fromTo": "Trips for {from} → {to}",
+    "fromOnly": "Trips departing from {from}",
+    "toOnly": "Trips to {to}",
+    "dateOnly": "Trips on {date}"
+  },
+  "subtitleHint": "Refine with origin and destination, or browse current offers"
 }
