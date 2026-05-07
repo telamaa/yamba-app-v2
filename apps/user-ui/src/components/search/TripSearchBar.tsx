@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import React, { useCallback, useState } from "react";
 import { ArrowLeftRight, MapPin, Search } from "lucide-react";
 import { useTranslations, useLocale } from "next-intl";
 import { usePersistedFormState } from "@/hooks/usePersistedFormState";
@@ -10,19 +10,33 @@ import CityAutocomplete from "./CityAutocomplete";
 import MobileSearchExperience from "./MobileSearchExperience";
 import SmartDatePicker, { type DateValue } from "@/components/ui/SmartDatePicker";
 
+type Mode = "expanded" | "compact" | "auto";
+
 type Props = {
   /**
-   * Si true, la barre s'ajuste au scroll (sticky positionné + mode compact).
-   * Utilisé sur la homepage où la barre gère elle-même son sticky.
+   * Mode d'affichage de la search bar :
+   *  - "expanded" : version large avec labels (utilisé dans le hero au repos)
+   *  - "compact" : version compacte sans labels (utilisé dans le header au scroll)
+   *  - "auto" : ancien comportement basé sur le scroll (legacy, page search)
+   *
+   * Par défaut "expanded".
+   */
+  mode?: Mode;
+  /**
+   * [Mode "auto" uniquement] Si true, la barre s'ajuste au scroll
+   * (sticky positionné + mode compact).
    */
   stickyOnScroll?: boolean;
   /**
-   * Si true, active uniquement le MODE COMPACT au scroll (sans sticky interne).
-   * Utile quand un wrapper externe gère la position (ex: position:fixed dans
-   * la page search). Permet de garder l'effet "barre qui rétrécit au scroll"
-   * sans activer le sticky qui ferait double avec le wrapper.
+   * [Mode "auto" uniquement] Active uniquement le mode compact au scroll
+   * sans activer le sticky.
    */
   forceCompactOnScroll?: boolean;
+  /**
+   * [Mode "auto" uniquement] Désactive le mode compact même quand sticky
+   * est activé.
+   */
+  disableCompact?: boolean;
 };
 
 type SearchDraft = {
@@ -41,23 +55,18 @@ const initialSearchDraft: SearchDraft = {
 
 const SEARCH_VERSION = 2;
 const SCROLL_THRESHOLD = 120;
-
 const HEADER_HEIGHT = 78;
 
-// ⚠️ Classes appliquées à un wrapper pour aligner la hauteur de l'input
-// du CityAutocomplete avec celle du SmartDatePicker (en mode normal et compact).
-//
-// IMPORTANT: on cible UNIQUEMENT l'input (`[&_input]`), pas les boutons.
-// Cibler `[&_button]` écraserait aussi les boutons des items du dropdown
-// qui contiennent les noms des villes, les rendant invisibles.
 const CITY_AUTOCOMPLETE_NORMAL_CLASSES =
   "[&_input]:h-6 [&_input]:text-[14px] [&_input]:leading-6";
 const CITY_AUTOCOMPLETE_COMPACT_CLASSES =
   "[&_input]:h-5 [&_input]:text-[13px] [&_input]:leading-5";
 
 export default function TripSearchBar({
-                                        stickyOnScroll = true,
+                                        mode = "expanded",
+                                        stickyOnScroll = false,
                                         forceCompactOnScroll = false,
+                                        disableCompact = false,
                                       }: Props) {
   const t = useTranslations("common");
   const locale = useLocale();
@@ -72,7 +81,19 @@ export default function TripSearchBar({
   const [swapRotation, setSwapRotation] = useState(0);
   const isScrolled = useScrollThreshold(SCROLL_THRESHOLD);
 
-  const isCompact = (stickyOnScroll || forceCompactOnScroll) && isScrolled;
+  // Détermine si on est en mode compact selon le mode choisi
+  const isCompact =
+    mode === "compact"
+      ? true
+      : mode === "expanded"
+        ? false
+        : // mode "auto" : ancien comportement basé sur le scroll
+        !disableCompact &&
+        (stickyOnScroll || forceCompactOnScroll) &&
+        isScrolled;
+
+  // Le sticky n'est actif qu'en mode "auto"
+  const useSticky = mode === "auto" && stickyOnScroll;
 
   // ── Handlers ──
 
@@ -135,20 +156,20 @@ export default function TripSearchBar({
       <div
         className={[
           "hidden md:block",
-          stickyOnScroll ? "sticky z-[90]" : "",
-          stickyOnScroll && isCompact
-            ? "bg-white/70 backdrop-blur-xl backdrop-saturate-150 dark:bg-slate-950/70"
+          useSticky ? "sticky z-[90]" : "",
+          useSticky && isScrolled
+            ? "border-b border-slate-200/60 bg-white/95 py-3 shadow-sm backdrop-blur-xl backdrop-saturate-150 dark:border-slate-800/60 dark:bg-slate-950/95"
             : "",
           "transition-all duration-200",
         ].join(" ")}
-        style={stickyOnScroll ? { top: HEADER_HEIGHT } : undefined}
+        style={useSticky ? { top: HEADER_HEIGHT } : undefined}
       >
-        <AppContainer className={isCompact ? "py-2" : "py-0"}>
+        <AppContainer className={isCompact ? "py-1" : "py-0"}>
           <div
             className={[
               "relative overflow-visible rounded-2xl",
               "border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950",
-              isCompact ? "shadow-md" : "shadow-sm",
+              isCompact ? "shadow-sm" : "shadow-sm",
               "transition-all duration-300 ease-out",
             ].join(" ")}
           >
@@ -273,10 +294,10 @@ export default function TripSearchBar({
                     "hover:bg-[#F08700] active:bg-[#E07A00]",
                     "transition-all duration-300 ease-out",
                     "focus:outline-none focus-visible:ring-2 focus-visible:ring-[#FF9900]/40 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-950",
-                    isCompact ? "h-9 px-3 text-[13px]" : "h-11 px-4 text-[13px]",
+                    isCompact ? "h-8 px-3 text-[12px]" : "h-11 px-4 text-[13px]",
                   ].join(" ")}
                 >
-                  <Search size={isCompact ? 14 : 16} strokeWidth={2.5} />
+                  <Search size={isCompact ? 13 : 16} strokeWidth={2.5} />
                   <span className="hidden lg:inline">{t("actions.search")}</span>
                 </button>
               </div>
@@ -313,7 +334,7 @@ function FieldWrapper({
       onBlurCapture={onBlurCapture}
       className={[
         "relative transition-all duration-300 ease-out",
-        isCompact ? "flex items-center px-3 py-2" : "px-4 py-3",
+        isCompact ? "flex items-center px-3 py-1.5" : "px-4 py-3",
         isFocused
           ? "bg-[#FF9900]/[0.04] dark:bg-[#FF9900]/[0.05]"
           : "hover:bg-slate-50/60 dark:hover:bg-slate-900/40",
