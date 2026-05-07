@@ -32,11 +32,7 @@ import {
   TransportMode,
   YambaTripResult,
 } from "./search-results.types";
-import {
-  formatLocation,
-  formatTripDate,
-  formatTripTimes,
-} from "./formatTripTimes";
+import { formatLocation } from "./formatTripTimes";
 import TripPricingPopover from "./TripPricingPopover";
 
 type Props = {
@@ -51,6 +47,18 @@ function TransportIcon({ mode, size = 13 }: { mode: TransportMode; size?: number
   if (mode === "plane") return <Plane size={size} strokeWidth={2} />;
   if (mode === "train") return <Train size={size} strokeWidth={2} />;
   return <Car size={size} strokeWidth={2} />;
+}
+
+/**
+ * Convertit une durée en minutes en string "8H 30" / "9H".
+ * Utilisé localement parce que le backend nous donne durationMinutes
+ * (number) et qu'on veut un affichage compact dans la card.
+ */
+function formatDuration(minutes: number): string {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  if (m === 0) return `${h}H`;
+  return `${h}H ${m.toString().padStart(2, "0")}`;
 }
 
 function getCategoryMeta(
@@ -105,7 +113,7 @@ export default function TripResultCard({
   const [pricingOpen, setPricingOpen] = useState(false);
   const showAvatarImage = !!item.travelerAvatarUrl && !avatarError;
 
-  // ⚠️ Ref vers le bouton "Starting from ?" pour positionner le popover
+  // Ref vers le bouton "Starting from ?" pour positionner le popover
   // qui sera rendu via createPortal dans document.body (pour éviter d'être
   // clippé par le overflow:hidden de la card).
   const pricingTriggerRef = useRef<HTMLButtonElement>(null);
@@ -123,23 +131,29 @@ export default function TripResultCard({
     }`
     : "—";
 
+  // Le backend nous fournit déjà departureTime, arrivalTime (déjà formatés
+  // en HH:mm en heure locale du fuseau d'origine), durationMinutes (number)
+  // et nextDay (boolean). On compose juste un objet pratique à utiliser
+  // dans le JSX, en gardant le formatting de duration côté front (compact UI).
   const times = useMemo(
-    () =>
-      formatTripTimes({
-        departureTime: item.departureTime,
-        arrivalTime: item.arrivalTime,
-        durationMinutes: item.durationMinutes,
-      }),
-    [item.departureTime, item.arrivalTime, item.durationMinutes]
+    () => ({
+      departure: item.departureTime,
+      arrival: item.arrivalTime,
+      duration:
+        typeof item.durationMinutes === "number"
+          ? formatDuration(item.durationMinutes)
+          : null,
+      nextDay: item.nextDay ?? false,
+    }),
+    [item.departureTime, item.arrivalTime, item.durationMinutes, item.nextDay]
   );
 
   const fromLocation = formatLocation(item.fromCityCode, item.fromCountry);
   const toLocation = formatLocation(item.toCityCode, item.toCountry);
 
-  const formattedDate = useMemo(
-    () => formatTripDate(item.travelDate, locale),
-    [item.travelDate, locale]
-  );
+  // item.travelDate est déjà formaté par le backend selon la locale.
+  // Pas besoin de re-formater côté frontend.
+  const formattedDate = item.travelDate;
 
   const transportLabel =
     item.transportMode === "plane"
