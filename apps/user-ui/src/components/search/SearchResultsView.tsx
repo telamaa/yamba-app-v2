@@ -1,94 +1,40 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Search, SlidersHorizontal, X } from "lucide-react";
-import { useTranslations } from "next-intl";
-import TripSearchBar from "./TripSearchBar";
+import { useTranslations, useLocale } from "next-intl";
+import TripSearchBar, { type TripSearchValue } from "./TripSearchBar";
 import TripResultCard from "./TripResultCard";
 import TripResultCardMobile from "./TripResultCardMobile";
 import TransportModeTabs from "./TransportModeTabs";
 import SearchFiltersSidebar from "./SearchFiltersSidebar";
-import { MOCK_YAMBA_TRIPS } from "./search-results.mock";
 import MobileSearchExperience from "./MobileSearchExperience";
 import TripSearchBarSkeleton from "./TripSearchBarSkeleton";
 import MobileSearchExperienceSkeleton from "./MobileSearchExperienceSkeleton";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { useFixedSidebarPosition } from "@/hooks/useFixedSidebarPosition";
-import {
+import { useTripsSearch } from "@/hooks/useTripsSearch";
+import { useSearchFacets } from "@/hooks/useSearchFacets";
+import type {
   DepartureTimeBucket,
   ParcelCategory,
   SortOption,
   TransportMode,
 } from "./search-results.types";
-import { matchesDepartureBuckets } from "./getDepartureTimeBucket";
 import type { DateValue } from "@/components/ui/SmartDatePicker";
 
 type FilterMode = "all" | TransportMode;
 
-const BATCH_SIZE = 10;
-const LOAD_MORE_DELAY = 600;
-
-// ⚠️ Hauteurs des éléments fixed
 const HEADER_HEIGHT = 78;
 const SEARCH_BAR_FIXED_HEIGHT = 96;
-const SIDEBAR_TOP = HEADER_HEIGHT + SEARCH_BAR_FIXED_HEIGHT + 16; // 190
+const SIDEBAR_TOP = HEADER_HEIGHT + SEARCH_BAR_FIXED_HEIGHT + 16;
 
-// ⚠️ Animation sidebar
 const SIDEBAR_TRANSITION_MS = 500;
 const SIDEBAR_SLIDE_DISTANCE = 12;
 
-// ── Helpers de tri ──
+const PAGE_SIZE = 10;
 
-const MONTHS_FR: Record<string, number> = {
-  janvier: 0,
-  fevrier: 1,
-  février: 1,
-  mars: 2,
-  avril: 3,
-  mai: 4,
-  juin: 5,
-  juillet: 6,
-  aout: 7,
-  août: 7,
-  septembre: 8,
-  octobre: 9,
-  novembre: 10,
-  decembre: 11,
-  décembre: 11,
-};
-
-function toSortableTimestamp(travelDate: string, departureTime?: string) {
-  if (!travelDate) return Number.MAX_SAFE_INTEGER;
-
-  const normalized = travelDate
-    .trim()
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
-
-  const match = normalized.match(/^(\d{1,2})\s+([a-z]+)\s+(\d{4})$/);
-  if (!match) return Number.MAX_SAFE_INTEGER;
-
-  const [, dayStr, monthStr, yearStr] = match;
-  const monthIndex = MONTHS_FR[monthStr];
-  if (monthIndex === undefined) return Number.MAX_SAFE_INTEGER;
-
-  const [hourStr = "23", minuteStr = "59"] = (departureTime ?? "23:59").split(":");
-  const hour = Number(hourStr);
-  const minute = Number(minuteStr);
-
-  return new Date(
-    Number(yearStr),
-    monthIndex,
-    Number(dayStr),
-    Number.isFinite(hour) ? hour : 23,
-    Number.isFinite(minute) ? minute : 59
-  ).getTime();
-}
-
-// ── Skeletons inline (spécifiques à search) ──
-// Ces skeletons utilisent la primitive `Skeleton` extraite dans `ui/`.
-// Ils restent inline ici car spécifiques à la page search.
+// ─── Skeletons inline ────────────────────────────────
 
 function TransportModeTabsSkeleton() {
   return (
@@ -112,10 +58,7 @@ function SearchFiltersSidebarSkeleton() {
       <div className="space-y-5 px-5 py-4">
         <div className="space-y-2">
           {Array.from({ length: 3 }).map((_, index) => (
-            <div
-              key={index}
-              className="flex items-center justify-between gap-3 px-2 py-2"
-            >
+            <div key={index} className="flex items-center justify-between gap-3 px-2 py-2">
               <div className="flex items-center gap-3">
                 <Skeleton className="h-3.5 w-3.5 rounded-full" />
                 <Skeleton className="h-4 w-32 rounded-md" />
@@ -127,10 +70,7 @@ function SearchFiltersSidebarSkeleton() {
         <div className="space-y-2 border-t border-slate-100 pt-4 dark:border-slate-800/60">
           <Skeleton className="h-3 w-24 rounded-md" />
           {Array.from({ length: 4 }).map((_, index) => (
-            <div
-              key={index}
-              className="flex items-center justify-between gap-3 px-2 py-1.5"
-            >
+            <div key={index} className="flex items-center justify-between gap-3 px-2 py-1.5">
               <div className="flex items-center gap-3">
                 <Skeleton className="h-3.5 w-3.5 rounded-sm" />
                 <Skeleton className="h-4 w-28 rounded-md" />
@@ -148,9 +88,7 @@ function SearchFiltersSidebarSkeleton() {
             {Array.from({ length: 6 }).map((_, index) => (
               <Skeleton
                 key={index}
-                className={`h-7 rounded-full ${
-                  index % 3 === 0 ? "w-24" : "w-20"
-                }`}
+                className={`h-7 rounded-full ${index % 3 === 0 ? "w-24" : "w-20"}`}
               />
             ))}
           </div>
@@ -251,7 +189,7 @@ function TripResultCardSkeleton() {
   );
 }
 
-// ── Empty state ──
+// ─── Empty / Error states ────────────────────────────
 
 function EmptyState({
                       onClearFilters,
@@ -286,11 +224,34 @@ function EmptyState({
   );
 }
 
-// ── Main view ──
+function ErrorState({ onRetry }: { onRetry: () => void }) {
+  const t = useTranslations("search");
+
+  return (
+    <div className="flex flex-col items-center justify-center rounded-2xl border border-red-200 bg-red-50 px-6 py-12 text-center dark:border-red-900/40 dark:bg-red-950/20">
+      <h3 className="text-[16px] font-semibold text-red-900 dark:text-red-200">
+        {t("errorState.title")}
+      </h3>
+      <p className="mt-1 max-w-md text-[13px] text-red-700 dark:text-red-300">
+        {t("errorState.description")}
+      </p>
+      <button
+        type="button"
+        onClick={onRetry}
+        className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-red-600 px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-red-700"
+      >
+        {t("errorState.retry")}
+      </button>
+    </div>
+  );
+}
+
+// ─── Main view ───────────────────────────────────────
 
 export default function SearchResultsView() {
   const t = useTranslations("search");
   const tCommon = useTranslations("common");
+  const locale = useLocale() as "fr" | "en";
 
   const [activeMode, setActiveMode] = useState<FilterMode>("all");
   const [sort, setSort] = useState<SortOption>("earliest");
@@ -300,56 +261,139 @@ export default function SearchResultsView() {
   const [instantBookingOnly, setInstantBookingOnly] = useState(false);
   const [verifiedTicketOnly, setVerifiedTicketOnly] = useState(false);
 
-  const [selectedDepartureBuckets, setSelectedDepartureBuckets] = useState<
-    DepartureTimeBucket[]
-  >([]);
-
-  const [selectedCategories, setSelectedCategories] = useState<ParcelCategory[]>(
-    []
-  );
-
-  const [visibleCount, setVisibleCount] = useState(BATCH_SIZE);
-  const [isPageLoading, setIsPageLoading] = useState(true);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [selectedDepartureBuckets, setSelectedDepartureBuckets] = useState<DepartureTimeBucket[]>([]);
+  const [selectedCategories, setSelectedCategories] = useState<ParcelCategory[]>([]);
 
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
   const { placeholderRef: sidebarPlaceholderRef, fixedRect } =
     useFixedSidebarPosition(SIDEBAR_TOP);
 
-  // ⚠️ State migrated to use DateValue (not just Date) so the mobile bottom
-  // sheet preserves the Exact/Flex mode chosen by the user.
   const [searchDraft, setSearchDraft] = useState<{
     from: string;
     to: string;
     dateValue: DateValue | null;
   }>({
-    from: "Paris, France",
-    to: "Caen, France",
-    dateValue: { mode: "exact", date: new Date() },
+    from: "",
+    to: "",
+    dateValue: null,
   });
 
-  // ── Effects ──
+  // ─── Construction des params API ──
 
-  useEffect(() => {
-    const timer = setTimeout(() => setIsPageLoading(false), 1200);
-    return () => clearTimeout(timer);
-  }, []);
+  const tripsParams = useMemo(
+    () => ({
+      mode: activeMode,
+      from: searchDraft.from || undefined,
+      to: searchDraft.to || undefined,
+      dateFrom:
+        searchDraft.dateValue?.mode === "exact" && searchDraft.dateValue.date
+          ? searchDraft.dateValue.date.toISOString()
+          : undefined,
+      sort,
+      superTripper: superTripperOnly,
+      profileVerified: profileVerifiedOnly,
+      instantBooking: instantBookingOnly,
+      verifiedTicket: verifiedTicketOnly,
+      categories: selectedCategories,
+      departureBuckets: selectedDepartureBuckets,
+      limit: PAGE_SIZE,
+      locale,
+    }),
+    [
+      activeMode,
+      searchDraft.from,
+      searchDraft.to,
+      searchDraft.dateValue,
+      sort,
+      superTripperOnly,
+      profileVerifiedOnly,
+      instantBookingOnly,
+      verifiedTicketOnly,
+      selectedCategories,
+      selectedDepartureBuckets,
+      locale,
+    ]
+  );
 
-  useEffect(() => {
-    setVisibleCount(BATCH_SIZE);
-  }, [
-    activeMode,
-    sort,
-    superTripperOnly,
-    profileVerifiedOnly,
-    instantBookingOnly,
-    verifiedTicketOnly,
-    selectedCategories,
-    selectedDepartureBuckets,
-  ]);
+  const facetsParams = useMemo(
+    () => ({
+      mode: activeMode,
+      from: searchDraft.from || undefined,
+      to: searchDraft.to || undefined,
+      dateFrom:
+        searchDraft.dateValue?.mode === "exact" && searchDraft.dateValue.date
+          ? searchDraft.dateValue.date.toISOString()
+          : undefined,
+      categories: selectedCategories,
+      departureBuckets: selectedDepartureBuckets,
+      locale,
+    }),
+    [
+      activeMode,
+      searchDraft.from,
+      searchDraft.to,
+      searchDraft.dateValue,
+      selectedCategories,
+      selectedDepartureBuckets,
+      locale,
+    ]
+  );
 
-  // ── Handlers ──
+  // ─── Hooks de fetch ──
+
+  const tripsQuery = useTripsSearch(tripsParams);
+  const facetsQuery = useSearchFacets(facetsParams);
+
+  const trips = useMemo(
+    () => tripsQuery.data?.pages.flatMap((p) => p.trips) ?? [],
+    [tripsQuery.data]
+  );
+  const totalCount = tripsQuery.data?.pages[0]?.totalCount ?? 0;
+
+  const isPageLoading = tripsQuery.isLoading;
+  const isLoadingMore = tripsQuery.isFetchingNextPage;
+  const isError = tripsQuery.isError;
+  const hasMore = tripsQuery.hasNextPage;
+
+  // ─── Titre dynamique ──
+
+  const dynamicTitle = useMemo(() => {
+    const hasFrom = !!searchDraft.from;
+    const hasTo = !!searchDraft.to;
+    const hasExactDate =
+      searchDraft.dateValue?.mode === "exact" &&
+      !!searchDraft.dateValue.date;
+
+    const dateStr = hasExactDate && searchDraft.dateValue?.date
+      ? new Intl.DateTimeFormat(locale, {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      }).format(searchDraft.dateValue.date)
+      : "";
+
+    if (hasFrom && hasTo) {
+      return t("dynamicTitle.fromTo", {
+        from: searchDraft.from,
+        to: searchDraft.to,
+      });
+    }
+    if (hasFrom) {
+      return t("dynamicTitle.fromOnly", { from: searchDraft.from });
+    }
+    if (hasTo) {
+      return t("dynamicTitle.toOnly", { to: searchDraft.to });
+    }
+    if (dateStr) {
+      return t("dynamicTitle.dateOnly", { date: dateStr });
+    }
+    return t("dynamicTitle.noFilter");
+  }, [searchDraft, t, locale]);
+
+  const showHint = !searchDraft.from && !searchDraft.to;
+
+  // ─── Handlers ──
 
   const toggleCategory = (category: ParcelCategory) => {
     setSelectedCategories((prev) =>
@@ -361,9 +405,7 @@ export default function SearchResultsView() {
 
   const toggleDepartureBucket = (bucket: DepartureTimeBucket) => {
     setSelectedDepartureBuckets((prev) =>
-      prev.includes(bucket)
-        ? prev.filter((b) => b !== bucket)
-        : [...prev, bucket]
+      prev.includes(bucket) ? prev.filter((b) => b !== bucket) : [...prev, bucket]
     );
   };
 
@@ -376,90 +418,22 @@ export default function SearchResultsView() {
     setSelectedCategories([]);
     setSelectedDepartureBuckets([]);
     setActiveMode("all");
+    // Vide aussi la searchbar parent pour repartir from scratch
+    setSearchDraft({ from: "", to: "", dateValue: null });
   };
 
   const handleLoadMore = () => {
-    setIsLoadingMore(true);
-    setTimeout(() => {
-      setVisibleCount((prev) => prev + BATCH_SIZE);
-      setIsLoadingMore(false);
-    }, LOAD_MORE_DELAY);
+    if (!isLoadingMore && hasMore) tripsQuery.fetchNextPage();
   };
 
-  // ── Filtering ──
-
-  const baseFilteredTrips = useMemo(() => {
-    let data =
-      activeMode === "all"
-        ? [...MOCK_YAMBA_TRIPS]
-        : MOCK_YAMBA_TRIPS.filter((item) => item.transportMode === activeMode);
-
-    if (selectedCategories.length > 0) {
-      data = data.filter((item) =>
-        selectedCategories.some((category) =>
-          item.allowedCategories.includes(category)
-        )
-      );
-    }
-
-    if (selectedDepartureBuckets.length > 0) {
-      data = data.filter((item) =>
-        matchesDepartureBuckets(item.departureTime, selectedDepartureBuckets)
-      );
-    }
-
-    return data;
-  }, [activeMode, selectedCategories, selectedDepartureBuckets]);
-
-  const superTripperCount = useMemo(
-    () => baseFilteredTrips.filter((item) => item.superTripper).length,
-    [baseFilteredTrips]
-  );
-  const profileVerifiedCount = useMemo(
-    () => baseFilteredTrips.filter((item) => item.profileVerified).length,
-    [baseFilteredTrips]
-  );
-  const instantBookingCount = useMemo(
-    () => baseFilteredTrips.filter((item) => item.instantBooking).length,
-    [baseFilteredTrips]
-  );
-  const verifiedTicketCount = useMemo(
-    () => baseFilteredTrips.filter((item) => item.verifiedTicket).length,
-    [baseFilteredTrips]
-  );
-
-  const filteredTrips = useMemo(() => {
-    let data = [...baseFilteredTrips];
-
-    if (superTripperOnly) data = data.filter((item) => item.superTripper);
-    if (profileVerifiedOnly) data = data.filter((item) => item.profileVerified);
-    if (instantBookingOnly) data = data.filter((item) => item.instantBooking);
-    if (verifiedTicketOnly) data = data.filter((item) => item.verifiedTicket);
-
-    if (sort === "lowestPrice") {
-      data.sort((a, b) => a.minPrice - b.minPrice);
-    } else if (sort === "bestRated") {
-      data.sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
-    } else {
-      data.sort(
-        (a, b) =>
-          toSortableTimestamp(a.travelDate, a.departureTime) -
-          toSortableTimestamp(b.travelDate, b.departureTime)
-      );
-    }
-
-    return data;
-  }, [
-    baseFilteredTrips,
-    superTripperOnly,
-    profileVerifiedOnly,
-    instantBookingOnly,
-    verifiedTicketOnly,
-    sort,
-  ]);
-
-  const visibleTrips = filteredTrips.slice(0, visibleCount);
-  const remainingCount = Math.max(filteredTrips.length - visibleTrips.length, 0);
+  // Branche TripSearchBar desktop : appelé au clic Search
+  const handleSearchBarSubmit = (value: TripSearchValue) => {
+    setSearchDraft({
+      from: value.from,
+      to: value.to,
+      dateValue: value.dateValue,
+    });
+  };
 
   const hasActiveFilters =
     sort !== "earliest" ||
@@ -469,9 +443,10 @@ export default function SearchResultsView() {
     instantBookingOnly ||
     verifiedTicketOnly ||
     selectedCategories.length > 0 ||
-    selectedDepartureBuckets.length > 0;
+    selectedDepartureBuckets.length > 0 ||
+    !!searchDraft.from ||
+    !!searchDraft.to;
 
-  // ⚠️ Props sidebar partagées (utilisées par les 2 instances : flow + fixed)
   const sidebarProps = {
     sort,
     onSortChange: setSort,
@@ -483,10 +458,10 @@ export default function SearchResultsView() {
     onInstantBookingChange: setInstantBookingOnly,
     verifiedTicketOnly,
     onVerifiedTicketChange: setVerifiedTicketOnly,
-    superTripperCount,
-    profileVerifiedCount,
-    instantBookingCount,
-    verifiedTicketCount,
+    superTripperCount: facetsQuery.data?.superTripperCount ?? 0,
+    profileVerifiedCount: facetsQuery.data?.profileVerifiedCount ?? 0,
+    instantBookingCount: facetsQuery.data?.instantBookingCount ?? 0,
+    verifiedTicketCount: facetsQuery.data?.verifiedTicketCount ?? 0,
     selectedDepartureBuckets,
     onToggleDepartureBucket: toggleDepartureBucket,
     selectedCategories,
@@ -506,7 +481,6 @@ export default function SearchResultsView() {
           }
         }
 
-        /* Scrollbar custom pour la sidebar */
         .yamba-sidebar-scroll::-webkit-scrollbar {
           width: 6px;
         }
@@ -527,7 +501,6 @@ export default function SearchResultsView() {
       `}</style>
 
       <main className="pb-14">
-        {/* DESKTOP : TripSearchBar wrapper en position:fixed sous le Header */}
         <div
           className="fixed inset-x-0 z-[80] hidden bg-white/70 backdrop-blur-xl backdrop-saturate-150 dark:bg-slate-950/65 md:block"
           style={{ top: HEADER_HEIGHT }}
@@ -541,12 +514,12 @@ export default function SearchResultsView() {
               <TripSearchBar
                 stickyOnScroll={false}
                 forceCompactOnScroll={true}
+                onSearchAction={handleSearchBarSubmit}
               />
             )}
           </div>
         </div>
 
-        {/* ── Mobile: search bar summary sticky ── */}
         <section className="sticky top-[78px] z-[100] border-b border-slate-200 bg-white/95 px-4 py-4 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95 md:hidden">
           {isPageLoading ? (
             <MobileSearchExperienceSkeleton />
@@ -556,7 +529,7 @@ export default function SearchResultsView() {
               from={searchDraft.from}
               to={searchDraft.to}
               dateValue={searchDraft.dateValue}
-              resultsCount={filteredTrips.length}
+              resultsCount={totalCount}
               onFromChange={(value) =>
                 setSearchDraft((prev) => ({ ...prev, from: value }))
               }
@@ -572,7 +545,6 @@ export default function SearchResultsView() {
           )}
         </section>
 
-        {/* ── Main content ── */}
         <section className="mx-auto max-w-7xl px-3 pb-14">
           <div className="md:hidden" style={{ paddingTop: 16 }} />
           <div
@@ -582,8 +554,13 @@ export default function SearchResultsView() {
 
           <div className="mb-5">
             <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
-              {t("title")}
+              {dynamicTitle}
             </h1>
+            {showHint && (
+              <p className="mt-1.5 text-[13px] text-slate-500 dark:text-slate-400">
+                {t("subtitleHint")}
+              </p>
+            )}
           </div>
 
           {isPageLoading ? (
@@ -591,14 +568,11 @@ export default function SearchResultsView() {
               <div className="mb-6">
                 <TransportModeTabsSkeleton />
               </div>
-              {/* ⚠️ Sidebar visible dès md (768px) — était lg avant, créait un trou UX
-                  entre 768-1023px (TripSearchBar desktop visible mais pas de filtres). */}
               <div className="grid gap-6 md:grid-cols-[280px_1fr] md:items-start">
                 <div className="hidden md:block">
                   <SearchFiltersSidebarSkeleton />
                 </div>
                 <div className="space-y-3">
-                  {/* ⚠️ Skeletons mobile-friendly < md, desktop full sinon */}
                   <div className="md:hidden space-y-3">
                     {Array.from({ length: 5 }).map((_, index) => (
                       <TripResultCardSkeletonMobile key={index} />
@@ -617,20 +591,16 @@ export default function SearchResultsView() {
               <div className="mb-6">
                 <TransportModeTabs
                   active={activeMode}
-                  items={MOCK_YAMBA_TRIPS}
                   onChange={setActiveMode}
+                  counts={facetsQuery.data?.modeCount}
                 />
               </div>
 
-              {/* ⚠️ Grid desktop : sidebar + cards dès md (768px) au lieu de lg (1024px)
-                  pour combler le trou UX entre tablet et desktop. */}
               <div className="grid gap-6 md:grid-cols-[280px_1fr] md:items-start">
-                {/* Sidebar desktop avec animation fluide (fade + slide 500ms) */}
                 <div
                   ref={sidebarPlaceholderRef}
                   className="relative hidden md:block"
                 >
-                  {/* Sidebar dans le flow normal */}
                   <div
                     style={{
                       opacity: fixedRect.isFixed ? 0 : 1,
@@ -641,7 +611,6 @@ export default function SearchResultsView() {
                     <SearchFiltersSidebar {...sidebarProps} />
                   </div>
 
-                  {/* Sidebar fixed avec fade + slide */}
                   <div
                     className="yamba-sidebar-scroll overflow-y-auto rounded-2xl"
                     style={{
@@ -664,18 +633,18 @@ export default function SearchResultsView() {
                   </div>
                 </div>
 
-                {/* Liste de résultats */}
                 <div className="space-y-3">
-                  {visibleTrips.length === 0 ? (
+                  {isError ? (
+                    <ErrorState onRetry={() => tripsQuery.refetch()} />
+                  ) : trips.length === 0 ? (
                     <EmptyState
                       onClearFilters={clearAll}
                       hasFilters={hasActiveFilters}
                     />
                   ) : (
                     <>
-                      {/* ⚠️ Mobile : utilise TripResultCardMobile */}
                       <div className="md:hidden space-y-3">
-                        {visibleTrips.map((item) => (
+                        {trips.map((item) => (
                           <TripResultCardMobile
                             key={item.id}
                             item={item}
@@ -684,9 +653,8 @@ export default function SearchResultsView() {
                         ))}
                       </div>
 
-                      {/* ⚠️ Desktop : utilise TripResultCard */}
                       <div className="hidden md:block space-y-3">
-                        {visibleTrips.map((item) => (
+                        {trips.map((item) => (
                           <TripResultCard
                             key={item.id}
                             item={item}
@@ -695,7 +663,7 @@ export default function SearchResultsView() {
                         ))}
                       </div>
 
-                      {remainingCount > 0 && (
+                      {hasMore && (
                         <div className="pt-2 text-center">
                           <button
                             type="button"
@@ -706,8 +674,7 @@ export default function SearchResultsView() {
                             {isLoadingMore && (
                               <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
                             )}
-                            {t("loadMore")} (+
-                            {Math.min(BATCH_SIZE, remainingCount)})
+                            {t("loadMore")}
                           </button>
                         </div>
                       )}
@@ -719,7 +686,6 @@ export default function SearchResultsView() {
           )}
         </section>
 
-        {/* ── Mobile filters drawer ── */}
         {mobileFiltersOpen && (
           <div className="fixed inset-0 z-[150] bg-white dark:bg-slate-950 md:hidden">
             <div className="flex h-full flex-col">
@@ -763,7 +729,7 @@ export default function SearchResultsView() {
                   onClick={() => setMobileFiltersOpen(false)}
                   className="inline-flex h-12 w-full items-center justify-center rounded-2xl bg-[#FF9900] px-6 text-base font-semibold text-slate-950"
                 >
-                  {t("viewTrips", { count: filteredTrips.length })}
+                  {t("viewTrips", { count: totalCount })}
                 </button>
               </div>
             </div>
