@@ -13,9 +13,20 @@ import {
   resumeTrip,
   unpublishTrip,
 } from "../controllers/trip.controller";
+// ⭐ NEW : controllers de la search publique
+import {
+  searchTrips,
+  searchTripsFacets,
+} from "../controllers/trip-search.controller";
 import isAuthenticated from "@packages/middleware/isAuthenticated";
 
 const router = Router();
+
+// ─── ⭐ PUBLIC SEARCH (PAS d'authent) ────────
+// IMPORTANT : ces routes DOIVENT être déclarées AVANT /:id, sinon Express
+// match "search" comme un id et appelle getTrip avec un faux id.
+router.get("/search", searchTrips);
+router.get("/search/facets", searchTripsFacets);
 
 // ─── Trip CRUD ───────────────────────────────
 router.post("/", isAuthenticated, createTrip);                             // Créer un trip
@@ -28,8 +39,8 @@ router.delete("/:id", isAuthenticated, cancelTrip);                        // An
 router.post("/:id/publish", isAuthenticated, publishTrip);                 // Publier un brouillon
 router.post("/:id/pause", isAuthenticated, pauseTrip);                     // Mettre en pause
 router.post("/:id/resume", isAuthenticated, resumeTrip);                   // Reprendre après pause
-router.post("/:id/restore", isAuthenticated, restoreTrip);
-router.post("/:id/unpublish", isAuthenticated, unpublishTrip);  // Repasser en brouillon// Restaurer un trip annulé
+router.post("/:id/restore", isAuthenticated, restoreTrip);                 // Restaurer un trip annulé
+router.post("/:id/unpublish", isAuthenticated, unpublishTrip);             // Repasser en brouillon
 
 // ─── Documents ───────────────────────────────
 router.post("/:id/documents", isAuthenticated, addTripDocuments);          // Ajouter des documents

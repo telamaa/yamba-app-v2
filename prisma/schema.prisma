@@ -245,23 +245,29 @@ model Trip {
   transportMode TransportMode?
   tripType      TripType       @default(ONE_WAY)
 
-  originLabel      String?
-  destinationLabel String?
+  // ─── Origin ──────────────────────────────────────
+  originLabel    String?
+  originPlaceId  String?
+  originCity     String?
+  originCityCode String? // ← NOUVEAU : "CDG", "Gare du Nord", etc.
+  originRegion   String?
+  originCountry  String?
+  originLat      Float?
+  originLng      Float?
+  originTimezone String? // ← NOUVEAU : "Europe/Paris" (IANA TZ)
 
-  originPlaceId String?
-  originCity    String?
-  originRegion  String?
-  originCountry String?
-  originLat     Float?
-  originLng     Float?
+  // ─── Destination ─────────────────────────────────
+  destinationLabel    String?
+  destinationPlaceId  String?
+  destinationCity     String?
+  destinationCityCode String? // ← NOUVEAU
+  destinationRegion   String?
+  destinationCountry  String?
+  destinationLat      Float?
+  destinationLng      Float?
+  destinationTimezone String? // ← NOUVEAU
 
-  destinationPlaceId String?
-  destinationCity    String?
-  destinationRegion  String?
-  destinationCountry String?
-  destinationLat     Float?
-  destinationLng     Float?
-
+  // ─── Dates ───────────────────────────────────────
   departureDateLocal String?
   arrivalDateLocal   String?
   departureTimeLocal String?
@@ -273,6 +279,11 @@ model Trip {
   returnDepartureAt DateTime?
   returnArrivalAt   DateTime?
 
+  // ← NOUVEAU : heure locale 0-23 dans la TZ d'origine, calculée au create
+  // Permet le filtre "matin/aprem/soir" sans recalculer la TZ à chaque query.
+  departureHourLocal Int?
+
+  // ─── Mode-specific ───────────────────────────────
   flightType         FlightType?
   trainTripType      TrainTripType?
   carTripFlexibility CarTripFlexibility?
@@ -282,15 +293,29 @@ model Trip {
 
   travelReference String?
 
+  // ─── Conditions / pricing ────────────────────────
   acceptedCategories ParcelCategory[]        @default([])
   categoryConditions TripCategoryCondition[]
 
   handDeliveryOnly Boolean @default(false)
   instantBooking   Boolean @default(false)
 
+  // ← NOUVEAU : min(categoryConditions[].priceAmountCents), dénormalisé pour tri serveur
+  minPriceCents Int?
+
+  // ← NOUVEAU : snapshot de carrierPage.ratingsAvg au moment du publish.
+  // Permet de trier par "best rated" via orderBy direct (Prisma+Mongo ne supporte
+  // pas orderBy sur un champ de relation).
+  carrierRatingSnapshot Float?
+
   ticketVerificationStatus TicketVerificationStatus @default(NOT_SUBMITTED)
 
   currencyCode String @default("EUR")
+
+  // ─── Capacité ────────────────────────────────────
+  maxSlots    Int? // ← NOUVEAU : limite de colis acceptés (null = illimité)
+  bookedSlots Int  @default(0) // ← NOUVEAU : incrémenté quand un deal est accepté
+  // remainingSlots = maxSlots - bookedSlots (computed dans le DTO de sortie)
 
   notes String?
 
@@ -303,6 +328,7 @@ model Trip {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // ─── Indexes ─────────────────────────────────────
   @@index([userId])
   @@index([carrierPageId])
   @@index([status])
@@ -310,9 +336,15 @@ model Trip {
   @@index([departureAt])
   @@index([publishedAt])
   @@index([userId, status])
-  @@index([transportMode, status, departureAt])
   @@index([originPlaceId])
   @@index([destinationPlaceId])
+  // ← NOUVEAUX index pour la search publique
+  @@index([status, departureAt, transportMode]) // composite : query principale de search
+  @@index([minPriceCents])
+  @@index([carrierRatingSnapshot])
+  @@index([departureHourLocal])
+  @@index([originCity])
+  @@index([destinationCity])
 }
 
 model TripDocument {

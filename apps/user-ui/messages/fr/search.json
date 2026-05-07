@@ -80,5 +80,18 @@
   "mobile": {
     "editSearch": "Modifier la recherche",
     "whenLeaving": "Quand partez-vous ?"
-  }
+  },
+  "errorState": {
+    "title": "Une erreur est survenue",
+    "description": "Impossible de charger les trajets. Vérifie ta connexion et réessaie.",
+    "retry": "Réessayer"
+  },
+  "dynamicTitle": {
+    "noFilter": "Tous les trajets disponibles",
+    "fromTo": "Trajets pour {from} → {to}",
+    "fromOnly": "Trajets au départ de {from}",
+    "toOnly": "Trajets à destination de {to}",
+    "dateOnly": "Trajets le {date}"
+  },
+  "subtitleHint": "Affinez avec un départ et une destination, ou parcourez l'offre actuelle"
 }
