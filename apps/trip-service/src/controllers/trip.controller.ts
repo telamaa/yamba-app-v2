@@ -3,6 +3,33 @@ import prisma from "@packages/libs/prisma";
 import { ValidationError } from "@packages/error-handler";
 import { AuthenticatedRequest } from "@packages/middleware/isAuthenticated";
 import imagekit from "../lib/imagekit";
+// ⭐ NEW : helpers pour auto-populer les champs dénormalisés
+import {
+  computeMinPriceCents,
+  computeHourLocal,
+} from "../lib/trip-mappers";
+
+// ─────────────────────────────────────────────
+// Helper interne : recalcule les champs dénormalisés
+// (minPriceCents, departureHourLocal) depuis le payload courant
+// ─────────────────────────────────────────────
+
+function computeDenormalizedFields(input: {
+  categoryConditions?: Array<{ priceAmountCents: number }>;
+  departureAt?: Date | null;
+  originTimezone?: string | null;
+}): { minPriceCents: number | null; departureHourLocal: number | null } {
+  const minPriceCents = computeMinPriceCents(
+    (input.categoryConditions ?? []) as any
+  );
+  const departureHourLocal =
+    input.departureAt && input.originTimezone
+      ? computeHourLocal(input.departureAt, input.originTimezone)
+      : input.departureAt
+        ? computeHourLocal(input.departureAt, "Europe/Paris") // fallback
+        : null;
+  return { minPriceCents, departureHourLocal };
+}
 
 // ─────────────────────────────────────────────
 // POST /api/trips
@@ -25,17 +52,21 @@ export const createTrip = async (
       originLabel,
       originPlaceId,
       originCity,
+      originCityCode,         // ⭐ NEW
       originRegion,
       originCountry,
       originLat,
       originLng,
+      originTimezone,         // ⭐ NEW
       destinationLabel,
       destinationPlaceId,
       destinationCity,
+      destinationCityCode,    // ⭐ NEW
       destinationRegion,
       destinationCountry,
       destinationLat,
       destinationLng,
+      destinationTimezone,    // ⭐ NEW
       // Dates
       departureDateLocal,
       arrivalDateLocal,
@@ -58,25 +89,22 @@ export const createTrip = async (
       handDeliveryOnly,
       instantBooking,
       currencyCode,
+      maxSlots,               // ⭐ NEW
       notes,
       // Publication
       publish,
     } = req.body;
 
-    // Validation minimale
     if (!transportMode) {
       return next(new ValidationError("Transport mode is required."));
     }
     if (!originCity || !destinationCity) {
       return next(new ValidationError("Origin and destination are required."));
     }
-
-    // Vérifier que la date de départ est dans le futur
     if (departureAt && new Date(departureAt) < new Date()) {
       return next(new ValidationError("Departure date must be in the future."));
     }
 
-    // Récupérer le carrierPage si l'utilisateur est carrier
     const carrierPage = await prisma.carrierPage.findUnique({
       where: { userId },
       select: {
@@ -84,12 +112,13 @@ export const createTrip = async (
         onboardingStep: true,
         stripeOnboardingComplete: true,
         stripeChargesEnabled: true,
+        ratingsAvg: true,    // ⭐ NEW : pour le snapshot au publish
+        ratingsCount: true,
       },
     });
 
     const shouldPublish = publish === true;
 
-    // Gate: onboarding + Stripe required to publish
     if (shouldPublish) {
       if (!carrierPage || carrierPage.onboardingStep === "PROFILE") {
         return next(
@@ -103,6 +132,20 @@ export const createTrip = async (
       }
     }
 
+    // ⭐ NEW : calcul des champs dénormalisés
+    const departureAtDate = departureAt ? new Date(departureAt) : null;
+    const { minPriceCents, departureHourLocal } = computeDenormalizedFields({
+      categoryConditions,
+      departureAt: departureAtDate,
+      originTimezone,
+    });
+
+    // ⭐ NEW : snapshot rating SEULEMENT si publication immédiate
+    const carrierRatingSnapshot =
+      shouldPublish && carrierPage && carrierPage.ratingsCount > 0
+        ? carrierPage.ratingsAvg
+        : null;
+
     const trip = await prisma.trip.create({
       data: {
         userId,
@@ -115,23 +158,27 @@ export const createTrip = async (
         originLabel: originLabel?.trim() ?? null,
         originPlaceId: originPlaceId ?? null,
         originCity: originCity?.trim() ?? null,
+        originCityCode: originCityCode?.trim() ?? null,           // ⭐ NEW
         originRegion: originRegion?.trim() ?? null,
         originCountry: originCountry?.trim() ?? null,
         originLat: originLat ?? null,
         originLng: originLng ?? null,
+        originTimezone: originTimezone?.trim() ?? null,           // ⭐ NEW
         destinationLabel: destinationLabel?.trim() ?? null,
         destinationPlaceId: destinationPlaceId ?? null,
         destinationCity: destinationCity?.trim() ?? null,
+        destinationCityCode: destinationCityCode?.trim() ?? null, // ⭐ NEW
         destinationRegion: destinationRegion?.trim() ?? null,
         destinationCountry: destinationCountry?.trim() ?? null,
         destinationLat: destinationLat ?? null,
         destinationLng: destinationLng ?? null,
+        destinationTimezone: destinationTimezone?.trim() ?? null, // ⭐ NEW
         // Dates
         departureDateLocal: departureDateLocal ?? null,
         arrivalDateLocal: arrivalDateLocal ?? null,
         departureTimeLocal: departureTimeLocal ?? null,
         arrivalTimeLocal: arrivalTimeLocal ?? null,
-        departureAt: departureAt ? new Date(departureAt) : null,
+        departureAt: departureAtDate,
         arrivalAt: arrivalAt ? new Date(arrivalAt) : null,
         returnDepartureAt: returnDepartureAt ? new Date(returnDepartureAt) : null,
         returnArrivalAt: returnArrivalAt ? new Date(returnArrivalAt) : null,
@@ -148,7 +195,12 @@ export const createTrip = async (
         handDeliveryOnly: handDeliveryOnly ?? false,
         instantBooking: instantBooking ?? false,
         currencyCode: currencyCode ?? "EUR",
+        maxSlots: maxSlots ?? null,                               // ⭐ NEW
         notes: notes?.trim() ?? null,
+        // ⭐ NEW : champs dénormalisés
+        minPriceCents,
+        departureHourLocal,
+        carrierRatingSnapshot,
         // Publication
         publishedAt: shouldPublish ? new Date() : null,
       },
@@ -157,7 +209,6 @@ export const createTrip = async (
       },
     });
 
-    // Mettre à jour les stats carrier si publié
     if (shouldPublish && carrierPage) {
       await prisma.carrierPage.update({
         where: { id: carrierPage.id },
@@ -199,18 +250,37 @@ export const updateTrip = async (
       return next(new ValidationError("Cannot edit a cancelled trip."));
     }
 
-    // Extraire publish du body, le reste = champs à mettre à jour
     const { publish, ...updateData } = req.body;
 
-    // Convertir les dates si présentes
+    // Conversion des dates si présentes
     if (updateData.departureAt) updateData.departureAt = new Date(updateData.departureAt);
     if (updateData.arrivalAt) updateData.arrivalAt = new Date(updateData.arrivalAt);
     if (updateData.returnDepartureAt) updateData.returnDepartureAt = new Date(updateData.returnDepartureAt);
     if (updateData.returnArrivalAt) updateData.returnArrivalAt = new Date(updateData.returnArrivalAt);
 
+    // ⭐ NEW : recalcul des champs dénormalisés si les sources changent
+    // (categoryConditions, departureAt, originTimezone)
+    const willRecomputePrice = "categoryConditions" in updateData;
+    const willRecomputeHour =
+      "departureAt" in updateData || "originTimezone" in updateData;
+
+    if (willRecomputePrice || willRecomputeHour) {
+      const recomputed = computeDenormalizedFields({
+        categoryConditions:
+          updateData.categoryConditions ?? (trip.categoryConditions as any),
+        departureAt: updateData.departureAt ?? trip.departureAt,
+        originTimezone: updateData.originTimezone ?? trip.originTimezone,
+      });
+      if (willRecomputePrice) {
+        updateData.minPriceCents = recomputed.minPriceCents;
+      }
+      if (willRecomputeHour) {
+        updateData.departureHourLocal = recomputed.departureHourLocal;
+      }
+    }
+
     // Si on publie pour la première fois
     if (publish === true && trip.status === "DRAFT") {
-      // Gate: onboarding + Stripe required to publish
       const carrierPage = await prisma.carrierPage.findUnique({
         where: { userId },
         select: {
@@ -218,6 +288,8 @@ export const updateTrip = async (
           onboardingStep: true,
           stripeOnboardingComplete: true,
           stripeChargesEnabled: true,
+          ratingsAvg: true,    // ⭐ NEW
+          ratingsCount: true,
         },
       });
 
@@ -236,7 +308,10 @@ export const updateTrip = async (
       updateData.publishedAt = new Date();
       updateData.currentStep = 3;
 
-      // Incrémenter les stats carrier
+      // ⭐ NEW : snapshot du rating au moment du publish
+      updateData.carrierRatingSnapshot =
+        carrierPage.ratingsCount > 0 ? carrierPage.ratingsAvg : null;
+
       await prisma.carrierPage.update({
         where: { id: carrierPage.id },
         data: { totalTripsPublished: { increment: 1 } },
@@ -261,8 +336,7 @@ export const updateTrip = async (
 
 // ─────────────────────────────────────────────
 // POST /api/trips/:id/documents
-// Ajouter un ou plusieurs documents à un trip
-// (Appelé après upload direct vers ImageKit)
+// (inchangé)
 // ─────────────────────────────────────────────
 
 export const addTripDocuments = async (
@@ -301,12 +375,10 @@ export const addTripDocuments = async (
       return next(new ValidationError("At least one document is required."));
     }
 
-    // Déduplication par fileId — évite les doublons en mode édition
     const existingFileIds = new Set(trip.documents.map((d) => d.fileId));
     const newDocuments = documents.filter((d) => !existingFileIds.has(d.fileId));
 
     if (newDocuments.length === 0) {
-      // Rien à ajouter, renvoyer l'état actuel
       const updatedTrip = await prisma.trip.findUnique({
         where: { id },
         include: { documents: true },
@@ -318,7 +390,6 @@ export const addTripDocuments = async (
       });
     }
 
-    // Vérifier la limite de documents par trip
     const siteConfig = await prisma.siteConfig.findFirst();
     const maxDocs = siteConfig?.maxDocsPerTrip ?? 5;
     const currentCount = trip.documents.length;
@@ -331,7 +402,6 @@ export const addTripDocuments = async (
       );
     }
 
-    // Valider chaque document
     const maxSizeMb = siteConfig?.maxDocSizeMb ?? 5;
     for (const doc of newDocuments) {
       if (!doc.type || !doc.fileId || !doc.url) {
@@ -348,7 +418,6 @@ export const addTripDocuments = async (
       }
     }
 
-    // NOTE: Prisma field is `status` (not `verificationStatus`)
     const created = await prisma.tripDocument.createMany({
       data: newDocuments.map((doc) => ({
         tripId: id,
@@ -365,7 +434,6 @@ export const addTripDocuments = async (
       })),
     });
 
-    // Mettre à jour le statut de vérification du trip si besoin
     const hasTicket = newDocuments.some((d) => d.type === "TICKET_PROOF");
     if (hasTicket && trip.ticketVerificationStatus === "NOT_SUBMITTED") {
       await prisma.trip.update({
@@ -391,7 +459,7 @@ export const addTripDocuments = async (
 
 // ─────────────────────────────────────────────
 // DELETE /api/trips/:id/documents/:documentId
-// Supprimer un document d'un trip + fichier ImageKit
+// (inchangé)
 // ─────────────────────────────────────────────
 
 export const removeTripDocument = async (
@@ -419,7 +487,6 @@ export const removeTripDocument = async (
       return next(new ValidationError("Document not found."));
     }
 
-    // Supprimer le fichier d'ImageKit (best effort)
     if (doc.fileId) {
       try {
         await imagekit.deleteFile(doc.fileId);
@@ -433,7 +500,6 @@ export const removeTripDocument = async (
 
     await prisma.tripDocument.delete({ where: { id: documentId } });
 
-    // Si on supprime le dernier ticket, remettre le statut à NOT_SUBMITTED
     const remainingTickets = trip.documents.filter(
       (d) => d.id !== documentId && d.type === "TICKET_PROOF"
     );
@@ -455,7 +521,7 @@ export const removeTripDocument = async (
 
 // ─────────────────────────────────────────────
 // DELETE /api/trips/:id (soft delete → CANCELLED)
-// Annuler un trip (soft delete)
+// (inchangé)
 // ─────────────────────────────────────────────
 
 export const cancelTrip = async (
@@ -492,7 +558,6 @@ export const cancelTrip = async (
       },
     });
 
-    // Mettre à jour les stats carrier si le trip était publié
     if (wasPublished) {
       const carrierPage = await prisma.carrierPage.findUnique({
         where: { userId },
@@ -520,7 +585,7 @@ export const cancelTrip = async (
 
 // ─────────────────────────────────────────────
 // POST /api/trips/:id/restore
-// Restaurer un trip annulé (toujours en brouillon)
+// (inchangé)
 // ─────────────────────────────────────────────
 
 export const restoreTrip = async (
@@ -543,14 +608,12 @@ export const restoreTrip = async (
       return next(new ValidationError("Only cancelled trips can be restored."));
     }
 
-    // Vérifier que le trip est encore valide (date de départ pas passée)
     if (trip.departureAt && new Date(trip.departureAt) < new Date()) {
       return next(
         new ValidationError("Cannot restore a trip whose departure date has passed.")
       );
     }
 
-    // Toujours restaurer en brouillon
     await prisma.trip.update({
       where: { id },
       data: {
@@ -570,7 +633,7 @@ export const restoreTrip = async (
 
 // ─────────────────────────────────────────────
 // GET /api/trips/:id
-// Récupérer un trip par ID
+// (inchangé)
 // ─────────────────────────────────────────────
 
 export const getTrip = async (
@@ -620,7 +683,7 @@ export const getTrip = async (
 
 // ─────────────────────────────────────────────
 // GET /api/trips/my
-// Récupérer tous les trips de l'utilisateur connecté
+// (inchangé)
 // ─────────────────────────────────────────────
 
 export const getMyTrips = async (
@@ -661,7 +724,6 @@ export const getMyTrips = async (
 
 // ─────────────────────────────────────────────
 // POST /api/trips/:id/publish
-// Publier un brouillon (avec gate onboarding + Stripe)
 // ─────────────────────────────────────────────
 
 export const publishTrip = async (
@@ -684,7 +746,6 @@ export const publishTrip = async (
       return next(new ValidationError("Only drafts can be published."));
     }
 
-    // Gate: onboarding + Stripe required to publish
     const carrierPage = await prisma.carrierPage.findUnique({
       where: { userId },
       select: {
@@ -692,6 +753,8 @@ export const publishTrip = async (
         onboardingStep: true,
         stripeOnboardingComplete: true,
         stripeChargesEnabled: true,
+        ratingsAvg: true,    // ⭐ NEW
+        ratingsCount: true,
       },
     });
 
@@ -706,7 +769,6 @@ export const publishTrip = async (
       );
     }
 
-    // Validation avant publication
     if (!trip.transportMode) {
       return next(new ValidationError("Transport mode is required to publish."));
     }
@@ -723,16 +785,20 @@ export const publishTrip = async (
       return next(new ValidationError("At least one parcel category must be accepted."));
     }
 
+    // ⭐ NEW : snapshot du rating
+    const carrierRatingSnapshot =
+      carrierPage.ratingsCount > 0 ? carrierPage.ratingsAvg : null;
+
     await prisma.trip.update({
       where: { id },
       data: {
         status: "PUBLISHED",
         publishedAt: new Date(),
         currentStep: 3,
+        carrierRatingSnapshot,    // ⭐ NEW
       },
     });
 
-    // Stats carrier
     await prisma.carrierPage.update({
       where: { id: carrierPage.id },
       data: { totalTripsPublished: { increment: 1 } },
@@ -748,8 +814,7 @@ export const publishTrip = async (
 };
 
 // ─────────────────────────────────────────────
-// POST /api/trips/:id/unpublish
-// Repasser un trip publié ou en pause en brouillon
+// POST /api/trips/:id/unpublish (inchangé)
 // ─────────────────────────────────────────────
 
 export const unpublishTrip = async (
@@ -785,7 +850,6 @@ export const unpublishTrip = async (
       },
     });
 
-    // Décrémenter le compteur carrier seulement si le trip était publié
     if (wasPublished) {
       const carrierPage = await prisma.carrierPage.findUnique({
         where: { userId },
@@ -809,8 +873,7 @@ export const unpublishTrip = async (
 };
 
 // ─────────────────────────────────────────────
-// POST /api/trips/:id/pause
-// Mettre en pause un trip publié
+// POST /api/trips/:id/pause (inchangé)
 // ─────────────────────────────────────────────
 
 export const pauseTrip = async (
@@ -848,8 +911,7 @@ export const pauseTrip = async (
 };
 
 // ─────────────────────────────────────────────
-// POST /api/trips/:id/resume
-// Reprendre un trip en pause
+// POST /api/trips/:id/resume (inchangé)
 // ─────────────────────────────────────────────
 
 export const resumeTrip = async (
@@ -872,7 +934,6 @@ export const resumeTrip = async (
       return next(new ValidationError("Only paused trips can be resumed."));
     }
 
-    // Vérifier que la date de départ n'est pas passée
     if (trip.departureAt && new Date(trip.departureAt) < new Date()) {
       return next(new ValidationError("Cannot resume a trip whose departure date has passed."));
     }
