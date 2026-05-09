@@ -1,4 +1,4 @@
-import type { Response, NextFunction } from "express";
+import type {Response, NextFunction, RequestHandler} from "express";
 import prisma from "@packages/libs/prisma";
 import { ValidationError } from "@packages/error-handler";
 import { AuthenticatedRequest } from "@packages/middleware/isAuthenticated";
@@ -8,6 +8,7 @@ import {
   computeMinPriceCents,
   computeHourLocal,
 } from "../lib/trip-mappers";
+
 
 // ─────────────────────────────────────────────
 // Helper interne : recalcule les champs dénormalisés
@@ -949,5 +950,163 @@ export const resumeTrip = async (
     });
   } catch (error) {
     return next(error);
+  }
+};
+
+
+/**
+ * GET /trips/:id/public
+ * Récupérer un trip publié pour la page détail (accessible aux anonymes)
+ *
+ * Comportement :
+ *   - 404 si le trip n'existe pas
+ *   - 404 si le trip n'est pas en statut PUBLISHED
+ *   - Retourne un DTO épuré (sans email/phone, sans IDs Stripe)
+ *
+ * Ne pas confondre avec getTrip() qui est protégé et retourne tout.
+ */
+
+
+export const getPublicTrip: RequestHandler = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    if (!id || !/^[a-f0-9]{24}$/i.test(id)) {
+      next(new ValidationError("Invalid trip id."));
+      return;
+    }
+
+    const trip = await prisma.trip.findUnique({
+      where: { id },
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            createdAt: true,
+            avatar: { select: { url: true } },
+            carrierPage: {
+              select: {
+                id: true,
+                name: true,
+                bio: true,
+                isVerified: true,
+                isSuperCarrier: true,
+                ratingsAvg: true,
+                ratingsCount: true,
+                totalTripsPublished: true,
+                totalParcelsCarried: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!trip) {
+      res.status(404).json({ success: false, message: "Trip not found." });
+      return;
+    }
+
+    if (trip.status !== "PUBLISHED") {
+      res.status(404).json({ success: false, message: "Trip not found." });
+      return;
+    }
+
+    const carrierPage = trip.user.carrierPage;
+
+    const publicDto = {
+      id: trip.id,
+      status: trip.status,
+      transportMode: trip.transportMode,
+      tripType: trip.tripType,
+
+      origin: {
+        label: trip.originLabel,
+        city: trip.originCity,
+        cityCode: trip.originCityCode,
+        region: trip.originRegion,
+        country: trip.originCountry,
+        lat: trip.originLat,
+        lng: trip.originLng,
+        timezone: trip.originTimezone,
+      },
+      destination: {
+        label: trip.destinationLabel,
+        city: trip.destinationCity,
+        cityCode: trip.destinationCityCode,
+        region: trip.destinationRegion,
+        country: trip.destinationCountry,
+        lat: trip.destinationLat,
+        lng: trip.destinationLng,
+        timezone: trip.destinationTimezone,
+      },
+
+      dates: {
+        departureAt: trip.departureAt,
+        arrivalAt: trip.arrivalAt,
+        returnDepartureAt: trip.returnDepartureAt,
+        returnArrivalAt: trip.returnArrivalAt,
+        departureDateLocal: trip.departureDateLocal,
+        arrivalDateLocal: trip.arrivalDateLocal,
+        departureTimeLocal: trip.departureTimeLocal,
+        arrivalTimeLocal: trip.arrivalTimeLocal,
+      },
+
+      flightType: trip.flightType,
+      trainTripType: trip.trainTripType,
+      carTripFlexibility: trip.carTripFlexibility,
+      flightLayoverCities: trip.flightLayoverCities,
+      trainStopCities: trip.trainStopCities,
+      travelReference: trip.travelReference,
+
+      acceptedCategories: trip.acceptedCategories,
+      categoryConditions: trip.categoryConditions,
+      handDeliveryOnly: trip.handDeliveryOnly,
+      instantBooking: trip.instantBooking,
+      currencyCode: trip.currencyCode,
+      notes: trip.notes,
+
+      maxSlots: trip.maxSlots,
+      bookedSlots: trip.bookedSlots,
+      remainingSlots:
+        trip.maxSlots != null
+          ? Math.max(0, trip.maxSlots - trip.bookedSlots)
+          : null,
+
+      minPriceCents: trip.minPriceCents,
+
+      ticketVerified: trip.ticketVerificationStatus === "VERIFIED",
+
+      tripper: {
+        id: trip.user.id,
+        firstName: trip.user.firstName,
+        lastInitial: trip.user.lastName
+          ? trip.user.lastName.charAt(0).toUpperCase()
+          : "",
+        avatarUrl: trip.user.avatar?.url ?? null,
+        memberSince: trip.user.createdAt,
+        carrier: carrierPage
+          ? {
+            id: carrierPage.id,
+            name: carrierPage.name,
+            bio: carrierPage.bio,
+            isVerified: carrierPage.isVerified,
+            isSuperCarrier: carrierPage.isSuperCarrier,
+            ratingsAvg: carrierPage.ratingsAvg,
+            ratingsCount: carrierPage.ratingsCount,
+            totalTripsPublished: carrierPage.totalTripsPublished,
+            totalParcelsCarried: carrierPage.totalParcelsCarried,
+          }
+          : null,
+      },
+
+      publishedAt: trip.publishedAt,
+    };
+
+    res.status(200).json({ success: true, trip: publicDto });
+  } catch (error) {
+    next(error);
   }
 };
