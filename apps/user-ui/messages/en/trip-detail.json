@@ -1,0 +1,102 @@
+{
+  "back": "Back to results",
+  "trippedBy": "Trip offered by {firstName} {lastInitial}.",
+  "travelReference": "Ref.",
+  "reviewsCount": "{count, plural, =0 {no reviews} =1 {# review} other {# reviews}}",
+  "chatWith": "Chat with {firstName}",
+  "comingSoon": "Coming soon",
+  "newTripper": "New Tripper",
+  "memberSince": "Member since {date}",
+  "close": "Close",
+  "reportListing": "Report this listing",
+
+  "flight": {
+    "label": "Plane",
+    "direct": "Direct flight",
+    "withLayover": "With layover"
+  },
+  "train": {
+    "label": "Train",
+    "direct": "Direct train",
+    "withConnection": "With connection",
+    "withIntermediateStops": "With intermediate stops"
+  },
+  "car": {
+    "label": "Car"
+  },
+
+  "badges": {
+    "profileVerified": "Verified profile",
+    "superTripper": "Super Tripper",
+    "verifiedTicket": "Verified ticket"
+  },
+
+  "categories": {
+    "title": "What {firstName} offers",
+    "hint": "One booking = one parcel from a single category. To send multiple parcels, make a booking per parcel.",
+    "modalTitle": "Categories offered by {firstName}",
+    "viewAll": "View all {count} categories",
+    "CLOTHES": "Clothes",
+    "SHOES": "Shoes",
+    "FASHION_ACCESSORIES": "Fashion accessories",
+    "OTHER_ACCESSORIES": "Other accessories",
+    "BOOKS": "Books",
+    "DOCUMENTS": "Documents",
+    "SMALL_TOYS": "Small toys",
+    "PHONE": "Phone",
+    "COMPUTER": "Computer",
+    "OTHER_ELECTRONICS": "Other electronics",
+    "CHECKED_BAG_23KG": "Checked bag 23 kg",
+    "CABIN_BAG_12KG": "Cabin bag 12 kg"
+  },
+
+  "co2": {
+    "label": "Shipment with no extra footprint ·",
+    "saved": "{kg} kg of CO₂ saved",
+    "versus": "vs express freight"
+  },
+
+  "reviews": {
+    "title": "What people say about {firstName}",
+    "empty": "{firstName} has received {count, plural, =1 {# review} other {# reviews}} on Yamba. Visit their profile to read them in detail.",
+    "viewAll": "View all {count, plural, =1 {# review} other {# reviews}}"
+  },
+
+  "conditions": {
+    "title": "Conditions",
+    "cancellation": {
+      "title": "Cancellation policy",
+      "full": "Full refund up to 48h before the trip",
+      "half": "50% refund between 48h and 24h before",
+      "none": "No refund within 24h of departure"
+    },
+    "prohibited": {
+      "title": "Prohibited items",
+      "description": "Illicit substances, weapons, cash, live animals, hazardous or flammable materials, counterfeits."
+    }
+  },
+
+  "booking": {
+    "startingFrom": "Starting from",
+    "priceHint": "Depending on category",
+    "reserve": "Book",
+    "comingSoon": "Booking coming soon",
+    "comingSoonDescription": "The booking system will launch very soon.",
+    "trust": {
+      "noCharge": "You won't be charged before accept request",
+      "protection": "Yamba Protection available",
+      "co2": "~{kg} kg of CO₂ saved"
+    }
+  },
+
+  "notFound": {
+    "title": "Trip not found",
+    "description": "This trip doesn''t exist or is no longer available.",
+    "backToSearch": "Back to search"
+  },
+
+  "error": {
+    "title": "Something went wrong",
+    "description": "We couldn''t load this trip right now."
+  }
+}
