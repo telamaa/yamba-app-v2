@@ -2,6 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import { ChevronRight, AlertCircle, HelpCircle } from "lucide-react";
+import { Link } from "@/i18n/navigation";
 import { useBottomSheet } from "@/hooks/useBottomSheet";
 import TripPricingBottomSheet from "./TripPricingBottomSheet";
 import { ParcelCategory, YambaTripResult } from "./search-results.types";
@@ -18,11 +19,8 @@ type Props = {
  * - Body : heures gros + villes + ligne de durée + prix avec "dès" discret
  * - Footer : avatar + tripper + catégories acceptées
  *
- * Tap sur le `(?)` à côté du prix → ouvre TripPricingBottomSheet
- *
- * Note : item.travelDate, item.departureTime et item.arrivalTime sont déjà
- * formatés en locale-aware par le backend (mapTripToYambaResult).
- * Aucun reformatting nécessaire côté frontend.
+ * Tap sur la card → navigation vers /trips/{id}
+ * Tap sur le `(?)` à côté du prix → ouvre TripPricingBottomSheet (sans naviguer)
  */
 export default function YambaTripResultCardMobile({
                                                     item,
@@ -39,7 +37,10 @@ export default function YambaTripResultCardMobile({
 
   return (
     <>
-      <article className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
+      <Link
+        href={`/trips/${item.id}`}
+        className="block overflow-hidden rounded-2xl border border-slate-200 bg-white transition-colors hover:border-[#FF9900]/40 dark:border-slate-800 dark:bg-slate-950 dark:hover:border-[#FF9900]/30"
+      >
         {/* ── Header : transport + date + alerte ── */}
         <div className="flex items-center justify-between gap-2 border-b border-slate-100 px-3.5 py-2 dark:border-slate-800/60">
           <div className="flex min-w-0 items-center gap-2">
@@ -121,7 +122,11 @@ export default function YambaTripResultCardMobile({
             <div className="min-w-[50px] text-right">
               <button
                 type="button"
-                onClick={open}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  open();
+                }}
                 className="inline-flex items-center justify-end gap-0.5 text-[9px] leading-none text-slate-400 transition-colors hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300"
                 aria-label={t("card.viewPricesByCategory")}
               >
@@ -172,9 +177,9 @@ export default function YambaTripResultCardMobile({
             />
           </div>
         </div>
-      </article>
+      </Link>
 
-      {/* ── Bottom Sheet Tarifs par catégorie ── */}
+      {/* ── Bottom Sheet Tarifs par catégorie (rendu hors Link) ── */}
       <TripPricingBottomSheet
         isOpen={isOpen}
         onClose={close}

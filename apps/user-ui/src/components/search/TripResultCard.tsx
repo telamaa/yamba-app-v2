@@ -27,6 +27,7 @@ import {
   Ticket,
 } from "lucide-react";
 import { useTranslations, useLocale } from "next-intl";
+import { Link } from "@/i18n/navigation";
 import {
   ParcelCategory,
   TransportMode,
@@ -49,11 +50,6 @@ function TransportIcon({ mode, size = 13 }: { mode: TransportMode; size?: number
   return <Car size={size} strokeWidth={2} />;
 }
 
-/**
- * Convertit une durée en minutes en string "8H 30" / "9H".
- * Utilisé localement parce que le backend nous donne durationMinutes
- * (number) et qu'on veut un affichage compact dans la card.
- */
 function formatDuration(minutes: number): string {
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
@@ -113,9 +109,6 @@ export default function TripResultCard({
   const [pricingOpen, setPricingOpen] = useState(false);
   const showAvatarImage = !!item.travelerAvatarUrl && !avatarError;
 
-  // Ref vers le bouton "Starting from ?" pour positionner le popover
-  // qui sera rendu via createPortal dans document.body (pour éviter d'être
-  // clippé par le overflow:hidden de la card).
   const pricingTriggerRef = useRef<HTMLButtonElement>(null);
 
   const travelerInitials =
@@ -131,10 +124,6 @@ export default function TripResultCard({
     }`
     : "—";
 
-  // Le backend nous fournit déjà departureTime, arrivalTime (déjà formatés
-  // en HH:mm en heure locale du fuseau d'origine), durationMinutes (number)
-  // et nextDay (boolean). On compose juste un objet pratique à utiliser
-  // dans le JSX, en gardant le formatting de duration côté front (compact UI).
   const times = useMemo(
     () => ({
       departure: item.departureTime,
@@ -151,8 +140,6 @@ export default function TripResultCard({
   const fromLocation = formatLocation(item.fromCityCode, item.fromCountry);
   const toLocation = formatLocation(item.toCityCode, item.toCountry);
 
-  // item.travelDate est déjà formaté par le backend selon la locale.
-  // Pas besoin de re-formater côté frontend.
   const formattedDate = item.travelDate;
 
   const transportLabel =
@@ -193,7 +180,10 @@ export default function TripResultCard({
     item.pricesByCategory && Object.keys(item.pricesByCategory).length > 0;
 
   return (
-    <article className="group overflow-hidden rounded-2xl border border-slate-200 bg-white transition-all duration-200 hover:border-[#FF9900]/40 hover:shadow-[0_8px_24px_rgba(255,153,0,0.08)] dark:border-slate-800 dark:bg-slate-950 dark:hover:border-[#FF9900]/30">
+    <Link
+      href={`/trips/${item.id}`}
+      className="group block overflow-hidden rounded-2xl border border-slate-200 bg-white transition-all duration-200 hover:border-[#FF9900]/40 hover:shadow-[0_8px_24px_rgba(255,153,0,0.08)] dark:border-slate-800 dark:bg-slate-950 dark:hover:border-[#FF9900]/30"
+    >
       {/* ── Header: transport + date + capacité ── */}
       <div className="flex items-center gap-3 border-b border-slate-100 px-4 py-2.5 dark:border-slate-800/60">
         <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-300">
@@ -287,6 +277,7 @@ export default function TripResultCard({
               ref={pricingTriggerRef}
               type="button"
               onClick={(e) => {
+                e.preventDefault();
                 e.stopPropagation();
                 setPricingOpen((v) => !v);
               }}
@@ -454,6 +445,6 @@ export default function TripResultCard({
           />
         </div>
       </div>
-    </article>
+    </Link>
   );
 }
