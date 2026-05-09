@@ -12,6 +12,7 @@ import {
   pauseTrip,
   resumeTrip,
   unpublishTrip,
+  getPublicTrip,             // ⭐ NEW (PR 1.a)
 } from "../controllers/trip.controller";
 // ⭐ NEW : controllers de la search publique
 import {
@@ -27,6 +28,10 @@ const router = Router();
 // match "search" comme un id et appelle getTrip avec un faux id.
 router.get("/search", searchTrips);
 router.get("/search/facets", searchTripsFacets);
+
+// ─── ⭐ PUBLIC TRIP DETAIL (PAS d'authent) — PR 1.a ───
+// Idem : doit être déclaré avant /:id pour ne pas être matché comme route privée.
+router.get("/:id/public", getPublicTrip);
 
 // ─── Trip CRUD ───────────────────────────────
 router.post("/", isAuthenticated, createTrip);                             // Créer un trip
