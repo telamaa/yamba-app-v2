@@ -1,22 +1,14 @@
 import { getRequestConfig } from "next-intl/server";
 import { routing } from "./routing";
 
-/**
- * Chargement des messages côté serveur pour chaque requête.
- * On charge TOUS les domaines en un seul objet et on les expose
- * sous leur nom pour pouvoir faire useTranslations('search'), etc.
- */
 export default getRequestConfig(async ({ requestLocale }) => {
-  // requestLocale est une Promise qui résout la locale détectée via URL
   let locale = await requestLocale;
 
-  // Fallback si la locale n'est pas supportée
   if (!locale || !routing.locales.includes(locale as any)) {
     locale = routing.defaultLocale;
   }
 
-  // Charger tous les fichiers de messages en parallèle
-  const [common, home, auth, dashboard, trips, carrier, search] =
+  const [common, home, auth, dashboard, trips, carrier, search, tripDetail] =
     await Promise.all([
       import(`../../messages/${locale}/common.json`),
       import(`../../messages/${locale}/home.json`),
@@ -25,6 +17,7 @@ export default getRequestConfig(async ({ requestLocale }) => {
       import(`../../messages/${locale}/trips.json`),
       import(`../../messages/${locale}/carrier.json`),
       import(`../../messages/${locale}/search.json`),
+      import(`../../messages/${locale}/trip-detail.json`),
     ]);
 
   return {
@@ -37,6 +30,7 @@ export default getRequestConfig(async ({ requestLocale }) => {
       trips: trips.default,
       carrier: carrier.default,
       search: search.default,
+      tripDetail: tripDetail.default,
     },
   };
 });

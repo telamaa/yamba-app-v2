@@ -1,0 +1,102 @@
+{
+  "back": "Retour aux résultats",
+  "trippedBy": "Trajet proposé par {firstName} {lastInitial}.",
+  "travelReference": "Réf.",
+  "reviewsCount": "{count, plural, =0 {aucun avis} =1 {# avis} other {# avis}}",
+  "chatWith": "Discuter avec {firstName}",
+  "comingSoon": "Bientôt disponible",
+  "newTripper": "Nouveau Tripper",
+  "memberSince": "Membre depuis {date}",
+  "close": "Fermer",
+  "reportListing": "Signaler cette annonce",
+
+  "flight": {
+    "label": "Avion",
+    "direct": "Vol direct",
+    "withLayover": "Avec escale"
+  },
+  "train": {
+    "label": "Train",
+    "direct": "Train direct",
+    "withConnection": "Avec correspondance",
+    "withIntermediateStops": "Avec arrêts intermédiaires"
+  },
+  "car": {
+    "label": "Voiture"
+  },
+
+  "badges": {
+    "profileVerified": "Profil vérifié",
+    "superTripper": "Super Tripper",
+    "verifiedTicket": "Billet vérifié"
+  },
+
+  "categories": {
+    "title": "Ce que propose {firstName}",
+    "hint": "Une réservation = un colis d'une seule catégorie. Pour envoyer plusieurs colis, faites une réservation par colis.",
+    "modalTitle": "Catégories proposées par {firstName}",
+    "viewAll": "Voir les {count} catégories",
+    "CLOTHES": "Vêtements",
+    "SHOES": "Chaussures",
+    "FASHION_ACCESSORIES": "Accessoires de mode",
+    "OTHER_ACCESSORIES": "Autres accessoires",
+    "BOOKS": "Livres",
+    "DOCUMENTS": "Documents",
+    "SMALL_TOYS": "Petits jouets",
+    "PHONE": "Téléphone",
+    "COMPUTER": "Ordinateur",
+    "OTHER_ELECTRONICS": "Autre électronique",
+    "CHECKED_BAG_23KG": "Bagage en soute 23 kg",
+    "CABIN_BAG_12KG": "Bagage cabine 12 kg"
+  },
+
+  "co2": {
+    "label": "Envoi sans empreinte additionnelle ·",
+    "saved": "{kg} kg de CO₂ évités",
+    "versus": "vs fret express"
+  },
+
+  "reviews": {
+    "title": "Ce qu'on dit de {firstName}",
+    "empty": "{firstName} a reçu {count, plural, =1 {# avis} other {# avis}} sur Yamba. Consultez son profil pour les lire en détail.",
+    "viewAll": "Voir les {count, plural, =1 {# avis} other {# avis}}"
+  },
+
+  "conditions": {
+    "title": "Conditions",
+    "cancellation": {
+      "title": "Politique d'annulation",
+      "full": "Remboursement intégral jusqu'à 48h avant le voyage",
+      "half": "Remboursement à 50 % entre 48h et 24h",
+      "none": "Aucun remboursement à moins de 24h"
+    },
+    "prohibited": {
+      "title": "Objets interdits",
+      "description": "Substances illicites, armes, espèces, animaux vivants, matières dangereuses ou inflammables, contrefaçons."
+    }
+  },
+
+  "booking": {
+    "startingFrom": "À partir de",
+    "priceHint": "Selon la catégorie choisie",
+    "reserve": "Réserver",
+    "comingSoon": "Réservation bientôt disponible",
+    "comingSoonDescription": "Le système de réservation sera lancé très prochainement.",
+    "trust": {
+      "noCharge": "Aucun montant ne vous sera débité avant l''accord",
+      "protection": "Protection Yamba disponible",
+      "co2": "~{kg} kg de CO₂ évités"
+    }
+  },
+
+  "notFound": {
+    "title": "Trajet introuvable",
+    "description": "Ce trajet n'existe pas ou n'est plus disponible.",
+    "backToSearch": "Retour à la recherche"
+  },
+
+  "error": {
+    "title": "Une erreur est survenue",
+    "description": "Impossible de charger ce trajet pour le moment."
+  }
+}
