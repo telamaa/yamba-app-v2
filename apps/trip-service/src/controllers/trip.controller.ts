@@ -982,6 +982,7 @@ export const getPublicTrip: RequestHandler = async (req, res, next) => {
         user: {
           select: {
             id: true,
+            publicSlug: true,
             firstName: true,
             lastName: true,
             createdAt: true,
@@ -1081,6 +1082,7 @@ export const getPublicTrip: RequestHandler = async (req, res, next) => {
 
       tripper: {
         id: trip.user.id,
+        publicSlug: trip.user.publicSlug,
         firstName: trip.user.firstName,
         lastInitial: trip.user.lastName
           ? trip.user.lastName.charAt(0).toUpperCase()
