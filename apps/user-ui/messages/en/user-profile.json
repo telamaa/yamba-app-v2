@@ -1,0 +1,63 @@
+{
+  "memberSince": "Member since {date}",
+
+  "badges": {
+    "verified": "Verified",
+    "superTripper": "Super Tripper"
+  },
+
+  "stats": {
+    "trips": "Trips",
+    "parcelsCarried": "Parcels delivered",
+    "globalRating": "Global rating",
+    "notRatedYet": "Not rated yet"
+  },
+
+  "tripperBlock": {
+    "title": "As a Tripper",
+    "frequentRoutes": "Frequent routes",
+    "routeCount": "{count, plural, one {1 trip} other {# trips}}",
+    "availableTrips": "{count, plural, =0 {No available trips} one {# available trip} other {# available trips}}",
+    "viewAllTrips": "View all",
+    "noAvailableTrips": "{firstName} has no available trips at the moment.",
+    "noAvailableTripsCta": "Follow to get notified",
+    "reviewsHeader": "{count, plural, =0 {No reviews} one {# review · {average}} other {# reviews · {average}}}",
+    "viewAllReviews": "View all",
+    "noReviews": "{firstName} has not received any reviews as a Tripper yet. Be the first to travel with them."
+  },
+
+  "shipperBlock": {
+    "title": "As a sender",
+    "parcelsSent": "Parcels sent",
+    "rating": "Rating",
+    "reviewsHeader": "{count, plural, =0 {No reviews} one {# review} other {# reviews}}",
+    "noReviews": "{firstName} has not received any reviews as a sender yet.",
+    "compactNoActivity": "No activity yet"
+  },
+
+  "sidebar": {
+    "editProfile": "Edit my profile",
+    "follow": "Follow",
+    "following": "Following",
+    "chatWith": "Chat with {firstName}",
+    "comingSoon": "Soon",
+    "notifyNextTrip": "Notify me of next trip",
+    "notifyNextTripHint": "Receive an email when {firstName} publishes a new trip.",
+    "network": "Network",
+    "followersLabel": "{count, plural, one { follower} other { followers}}",
+    "followingLabel": "following",
+    "followersCount": "{count, plural, one {# person follows {firstName}} other {# people follow {firstName}}}",
+    "reportProfile": "Report this profile"
+  },
+
+  "error": {
+    "title": "Something went wrong",
+    "message": "Unable to load this profile right now. Please try again in a moment."
+  },
+
+  "notFound": {
+    "title": "Profile not found",
+    "message": "This profile does not exist or has been removed.",
+    "goHome": "Back to home"
+  }
+}
