@@ -37,6 +37,9 @@ import { clearAuthCookies, setCookie } from "../utils/cookies/setCookie";
 import jwt from "jsonwebtoken";
 import { AuthenticatedRequest } from "@packages/middleware/isAuthenticated";
 
+// ✨ NEW — Helper pour la génération du slug public à l'inscription
+import { generateUniquePublicSlug } from "../utils/slug.helper";
+
 // ───────────────────────────────────────────────────────
 // Helpers
 // ───────────────────────────────────────────────────────
@@ -238,6 +241,14 @@ export const verifyRegistrationOtp = async (
       return next(new ValidationError("User already exists with this email!"));
     }
 
+    // ✨ NEW — Génération du slug public AVANT la transaction.
+    // La vérif d'unicité est hors transaction pour ne pas allonger le lock,
+    // et le slug est immuable une fois généré (pas de race condition possible).
+    const publicSlug = await generateUniquePublicSlug(
+      pending.firstName,
+      pending.lastName
+    );
+
     await prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
         data: {
@@ -246,6 +257,7 @@ export const verifyRegistrationOtp = async (
           email: pending.email,
           emailNormalized: pending.emailNormalized,
           passwordHash: pending.passwordHash,
+          publicSlug, // ✨ NEW — Slug public unique pour /u/[slug]
         },
       });
 

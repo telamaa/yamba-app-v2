@@ -14,7 +14,7 @@ import {
   Info,
   MessageCircle,
   Route,
-  type LucideIcon,
+  type LucideIcon, Sparkles,
 } from "lucide-react";
 import { Link } from "@/i18n/navigation";
 import type { PublicTrip, TransportMode } from "@/lib/public-trip.types";
@@ -378,7 +378,7 @@ export default function ItineraryCard({ trip }: Props) {
 
       {/* Tripper avec ligne horizontale au-dessus */}
       <Link
-        href={`/tripper/${trip.tripper.id}`}
+        href={`/u/${trip.tripper.publicSlug}`}
         className="-mx-5 mt-6 flex items-center gap-3 border-t border-slate-100 px-5 pt-5 pb-2 text-left transition-colors hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-900/50"
       >
         <div className="relative shrink-0">
@@ -473,15 +473,20 @@ export default function ItineraryCard({ trip }: Props) {
 
       {/* CTA discuter */}
       <div className="mt-4">
-        <button
-          type="button"
-          disabled
-          title={t("comingSoon")}
-          className="inline-flex cursor-not-allowed items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-500"
-        >
-          <MessageCircle size={14} />
-          {t("chatWith", { firstName: trip.tripper.firstName })}
-        </button>
+        <div className="relative inline-block">
+          <button
+            type="button"
+            disabled
+            className="inline-flex cursor-not-allowed items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-500"
+          >
+            <MessageCircle size={14} />
+            {t("chatWith", { firstName: trip.tripper.firstName })}
+          </button>
+          <span className="absolute -right-1 -top-1.5 inline-flex items-center gap-0.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-amber-900 dark:bg-amber-500/20 dark:text-amber-300">
+            <Sparkles size={8} />
+            {t("comingSoon")}
+          </span>
+        </div>
       </div>
     </section>
   );
