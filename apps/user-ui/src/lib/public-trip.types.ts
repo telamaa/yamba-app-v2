@@ -84,6 +84,7 @@ export type PublicCarrier = {
 
 export type PublicTripper = {
   id: string;
+  publicSlug: string;
   firstName: string;
   lastInitial: string;
   avatarUrl: string | null;
