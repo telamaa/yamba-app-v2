@@ -24,10 +24,10 @@ model User {
   birthDate       DateTime?
   roles           Role[]    @default([SHIPPER])
 
-  // ✨ NEW — Slug public unique pour la page profil /u/[slug]
+  // Slug public unique pour la page profil /u/[slug]
   publicSlug String? @unique
 
-  // ✨ NEW — Stats shipper (notes reçues en tant qu'expéditeur)
+  // Stats shipper (notes reçues en tant qu'expéditeur)
   shipperRatingsAvg   Float @default(0)
   shipperRatingsCount Int   @default(0)
   parcelsSentCount    Int   @default(0)
@@ -41,13 +41,16 @@ model User {
   addresses   Address[]
   trips       Trip[]       @relation("UserTrips")
 
-  // ✨ MODIFIÉ — Reviews unifiées (remplace carrierReviews CarrierReview[])
+  // MODIFIÉ — Reviews unifiées (remplace carrierReviews CarrierReview[])
   reviewsReceived Review[] @relation("ReviewSubject")
   reviewsGiven    Review[] @relation("ReviewAuthor")
 
-  // ✨ NEW — Système de follow
+  // Système de follow
   following UserFollow[] @relation("UserFollowing") // les users que je suis
   followers UserFollow[] @relation("UserFollowers") // les users qui me suivent
+
+  // Alertes de route (Wishlist routes)
+  savedRoutes SavedRoute[]
 
   consentLogs ConsentLog[]
 
@@ -132,7 +135,7 @@ model CarrierPage {
   ratingsCount        Int   @default(0)
 
   // Relations
-  // ✨ SUPPRIMÉ — reviews CarrierReview[] (accessible via user.reviewsReceived avec kind=AS_CARRIER)
+  // SUPPRIMÉ — reviews CarrierReview[] (accessible via user.reviewsReceived avec kind=AS_CARRIER)
   trips Trip[]
 
   // Rappels onboarding
@@ -150,7 +153,7 @@ model CarrierPage {
 }
 
 // ─────────────────────────────────────────────
-// REVIEW (✨ NEW — anciennement CarrierReview, unifié)
+// REVIEW (anciennement CarrierReview, unifié)
 // ─────────────────────────────────────────────
 
 model Review {
@@ -183,7 +186,7 @@ model Review {
 }
 
 // ─────────────────────────────────────────────
-// USER FOLLOW (✨ NEW — système de suivi)
+// USER FOLLOW (système de suivi)
 // ─────────────────────────────────────────────
 
 model UserFollow {
@@ -205,6 +208,70 @@ model UserFollow {
   @@unique([followerId, followedId]) // empêche les doublons
   @@index([followerId])
   @@index([followedId])
+}
+
+// ─────────────────────────────────────────────
+// SAVED ROUTE (alertes de route)
+// ─────────────────────────────────────────────
+// L'utilisateur sauvegarde une intention de voyage ("Paris → Brazzaville en
+// juin"). Quand un Tripper publie un trajet qui match, on lui envoie un email.
+//
+// Matching intelligent :
+//   - Score 100 : nom de ville identique (case-insensitive) OU placeId identique
+//   - Score 70  : même pays + distance < 50km (haversine) — "trajet proche"
+//   - Score < 70 : pas notifié
+//
+// Cycle de vie :
+//   - expiresAt = latestDate + 1j  (si dates fournies)
+//   - expiresAt = createdAt + 6 mois (sinon)
+//   - Cron quotidien : warn à J-7, désactive à J
+// ─────────────────────────────────────────────
+
+model SavedRoute {
+  id     String @id @default(auto()) @map("_id") @db.ObjectId
+  userId String @db.ObjectId
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // ─── Origine (snapshot Google Places) ───
+  originCity        String
+  originCountry     String
+  originCountryCode String // ISO 2 letters (ex: "FR")
+  originPlaceId     String?
+  originLat         Float?
+  originLng         Float?
+
+  // ─── Destination (snapshot Google Places) ───
+  destinationCity        String
+  destinationCountry     String
+  destinationCountryCode String
+  destinationPlaceId     String?
+  destinationLat         Float?
+  destinationLng         Float?
+
+  // ─── Période (optionnelle) ───
+  earliestDate DateTime?
+  latestDate   DateTime?
+
+  // ─── Préférences notif ───
+  emailEnabled  Boolean @default(true)
+  inAppEnabled  Boolean @default(false) // pour V2
+  includeNearby Boolean @default(true) // toggle "trajets proches" (score 70)
+
+  // ─── Cycle de vie ───
+  expiresAt           DateTime // calculé à create/update
+  expiryWarningSentAt DateTime? // anti-spam relance
+  isActive            Boolean   @default(true)
+
+  // ─── Anti-spam runtime ───
+  lastNotifiedAt DateTime? // dernière notif émise
+
+  // ─── Métadonnées ───
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, isActive])
+  @@index([originCountryCode, destinationCountryCode, isActive])
+  @@index([expiresAt, isActive])
 }
 
 // ─────────────────────────────────────────────
@@ -537,7 +604,7 @@ enum TripDocumentStatus {
   REJECTED
 }
 
-// ✨ NEW — Type de review
+//  Type de review
 enum ReviewKind {
   AS_CARRIER // Le subject a été noté en tant que tripper
   AS_SHIPPER // Le subject a été noté en tant qu'expéditeur
