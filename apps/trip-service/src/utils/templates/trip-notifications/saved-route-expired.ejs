@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="<%= locale %>">
+<head><meta charset="UTF-8" /><title><%= subject %></title></head>
+<body style="margin:0;padding:0;background-color:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#0f172a;">
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color:#f8fafc;">
+    <tr>
+        <td align="center" style="padding:32px 16px;">
+            <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="max-width:560px;background-color:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px -4px rgba(0,0,0,0.06);">
+                <tr>
+                    <td style="background:linear-gradient(135deg,#64748b 0%,#94a3b8 100%);padding:32px 24px;text-align:center;">
+                        <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:800;letter-spacing:-0.5px;">
+                            <%= locale === "fr" ? "Votre alerte a expiré" : "Your alert has expired" %>
+                        </h1>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding:32px 24px;">
+                        <p style="margin:0 0 16px 0;font-size:16px;line-height:1.6;">
+                            <%= locale === "fr" ? `Bonjour ${recipient.firstName},` : `Hi ${recipient.firstName},` %>
+                        </p>
+                        <p style="margin:0 0 24px 0;font-size:15px;line-height:1.6;color:#334155;">
+                            <%= locale === "fr"
+                                    ? `Votre alerte pour la route <strong>${savedRoute.originCity} → ${savedRoute.destinationCity}</strong> a expiré et a été désactivée.`
+                                    : `Your alert for the route <strong>${savedRoute.originCity} → ${savedRoute.destinationCity}</strong> has expired and been disabled.` %>
+                        </p>
+                        <p style="margin:0 0 24px 0;font-size:14px;line-height:1.6;color:#64748b;">
+                            <%= locale === "fr"
+                                    ? "Vous pouvez en créer une nouvelle à tout moment."
+                                    : "You can create a new one anytime." %>
+                        </p>
+                        <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
+                            <tr>
+                                <td align="center">
+                                    <a href="<%= createAlertUrl %>"
+                                       style="display:inline-block;background-color:#FF9900;color:#0f172a;font-weight:700;font-size:15px;padding:14px 32px;border-radius:9999px;text-decoration:none;">
+                                        <%= locale === "fr" ? "Créer une nouvelle alerte" : "Create a new alert" %>
+                                    </a>
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding:24px;background-color:#f8fafc;border-top:1px solid #e2e8f0;text-align:center;">
+                        <p style="margin:0;font-size:11px;color:#94a3b8;">
+                            Yamba — <%= locale === "fr" ? "Transport de colis entre particuliers" : "Peer-to-peer parcel delivery" %>
+                        </p>
+                    </td>
+                </tr>
+            </table>
+        </td>
+    </tr>
+</table>
+</body>
+</html>
