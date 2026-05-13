@@ -5,9 +5,6 @@ import { ChevronRight, Loader2, MapPin, X } from "lucide-react";
 import { useOnClickOutside } from "@/hooks/useOnClickOutside";
 import { loadPlacesLibrary } from "@/lib/googlePlaces";
 
-/**
- * Données structurées extraites de Google Places
- */
 export type PlaceDetails = {
   formattedAddress: string;
   placeId: string;
@@ -16,35 +13,42 @@ export type PlaceDetails = {
   streetLine1: string | null;
   city: string | null;
   region: string | null;
-  postalCode: string | null;
   country: string | null;
+  cityCode: string | null;
+  regionCode: string | null;
   countryCode: string | null;
+  postalCode: string | null;
 };
 
-/**
- * Extrait les composants structurés d'un objet Place Google
- */
 function extractPlaceDetails(place: google.maps.places.Place): PlaceDetails {
   const components = place.addressComponents ?? [];
-
-  const get = (type: string): string | null => {
+  const getLong = (type: string): string | null => {
     const comp = components.find((c) => c.types.includes(type));
     return comp?.longText ?? null;
   };
-
   const getShort = (type: string): string | null => {
     const comp = components.find((c) => c.types.includes(type));
     return comp?.shortText ?? null;
   };
 
-  const streetNumber = get("street_number");
-  const route = get("route");
+  const streetNumber = getLong("street_number");
+  const route = getLong("route");
   let streetLine1: string | null = null;
-  if (streetNumber && route) {
-    streetLine1 = `${streetNumber} ${route}`;
-  } else if (route) {
-    streetLine1 = route;
+  if (streetNumber && route) streetLine1 = `${streetNumber} ${route}`;
+  else if (route) streetLine1 = route;
+
+  const countryLong = getLong("country");
+  const countryCode = getShort("country");
+  const regionLong = getLong("administrative_area_level_1");
+  const regionShortRaw = getShort("administrative_area_level_1");
+  let regionCode: string | null = null;
+  if (regionShortRaw && countryCode) {
+    regionCode = regionShortRaw.includes("-")
+      ? regionShortRaw.toUpperCase()
+      : `${countryCode}-${regionShortRaw}`.toUpperCase();
   }
+
+  const cityLong = getLong("locality") ?? getLong("administrative_area_level_2");
 
   return {
     formattedAddress: place.formattedAddress ?? "",
@@ -52,47 +56,37 @@ function extractPlaceDetails(place: google.maps.places.Place): PlaceDetails {
     lat: place.location?.lat() ?? null,
     lng: place.location?.lng() ?? null,
     streetLine1,
-    city: get("locality") ?? get("administrative_area_level_2"),
-    region: get("administrative_area_level_1"),
-    postalCode: get("postal_code"),
-    country: get("country"),
-    countryCode: getShort("country"),
+    city: cityLong,
+    region: regionLong,
+    country: countryLong,
+    cityCode: null,
+    regionCode,
+    countryCode,
+    postalCode: getLong("postal_code"),
   };
 }
 
 type Props = {
-  /** Valeur courante du champ */
   value: string;
-  /** Callback déclenché à chaque changement de valeur (frappe ou sélection) */
   action: (v: string) => void;
-  /** Texte affiché quand le champ est vide */
   placeholder: string;
-  /** Langue pour les suggestions Google Places */
   language?: "fr" | "en";
-  /** Biais régional optionnel (ex. "fr") */
   regionBias?: string;
-  /** Callback au moment de la sélection d'une suggestion (texte uniquement) */
   onSelect?: (v: string) => void;
-  /** Callback avec les détails structurés de Google Places */
   onPlaceSelect?: (details: PlaceDetails) => void;
-  /**
-   * Callback au clear (bouton × cliqué).
-   * Si fourni, le bouton × appelle uniquement `onClear` (le parent gère).
-   * Si omis, le bouton × vide la valeur via `action("")`.
-   */
   onClear?: () => void;
-  /** Si true, affiche le bouton × quand value est non-vide. Par défaut: true */
   showClearButton?: boolean;
-  /** Si true, masque l'icône MapPin interne (utile quand le parent gère l'icône) */
   hideIcon?: boolean;
-  /** Focus automatique au montage */
   autoFocus?: boolean;
-  /** Classes CSS additionnelles pour l'input */
   inputClassName?: string;
-  /** Si true, le dropdown est inline (dans le flux) au lieu d'être absolute */
   dropdownInline?: boolean;
-  /** aria-label pour l'input (par défaut: placeholder) */
   ariaLabel?: string;
+  /**
+   * Si défini, le composant fait un fetch silencieux au mount et auto-sélectionne
+   * la première suggestion qui matche exactement (case-insensitive).
+   * Si pas de match exact, la dropdown s'ouvre normalement pour laisser choisir.
+   */
+  autoSelectIfPrefilled?: string | null;
 };
 
 export default function CityAutocomplete({
@@ -110,14 +104,17 @@ export default function CityAutocomplete({
                                            inputClassName = "",
                                            dropdownInline = false,
                                            ariaLabel,
+                                           autoSelectIfPrefilled = null,
                                          }: Props) {
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<google.maps.places.PlacePrediction[]>([]);
   const [loading, setLoading] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
 
-  // Track si l'utilisateur a sélectionné une suggestion (empêche réouverture)
   const hasSelectedRef = useRef(false);
+  const hasInteractedRef = useRef(false);
+  const hasAutoSelectedRef = useRef(false);
+
   const inputRef = useRef<HTMLInputElement>(null);
   const wrapRef = useRef<HTMLDivElement | null>(null);
 
@@ -125,10 +122,51 @@ export default function CityAutocomplete({
   useOnClickOutside(wrapRef, () => setOpen(false), outsideClickEnabled);
 
   const canQuery = useMemo(() => value.trim().length >= 2, [value]);
-
   const sessionTokenRef = useRef<google.maps.places.AutocompleteSessionToken | null>(null);
 
-  // ── Autocomplete fetch effect ──
+  const select = useCallback(
+    async (p: google.maps.places.PlacePrediction) => {
+      const label = p.text?.text ?? "";
+      hasSelectedRef.current = true;
+
+      action(label);
+      onSelect?.(label);
+      setOpen(false);
+      setItems([]);
+      setHighlightedIndex(-1);
+
+      if (onPlaceSelect) {
+        try {
+          const place = p.toPlace();
+          await place.fetchFields({
+            fields: ["formattedAddress", "location", "addressComponents"],
+          });
+          const details = extractPlaceDetails(place);
+          onPlaceSelect(details);
+        } catch (err) {
+          console.error("[CityAutocomplete] fetchFields failed:", err);
+          onPlaceSelect({
+            formattedAddress: label,
+            placeId: p.placeId ?? "",
+            lat: null,
+            lng: null,
+            streetLine1: null,
+            city: null,
+            region: null,
+            country: null,
+            cityCode: null,
+            regionCode: null,
+            countryCode: null,
+            postalCode: null,
+          });
+        }
+      }
+
+      sessionTokenRef.current = null;
+    },
+    [action, onSelect, onPlaceSelect]
+  );
+
   useEffect(() => {
     let alive = true;
 
@@ -149,12 +187,10 @@ export default function CityAutocomplete({
       (async () => {
         try {
           setLoading(true);
-
           const places = await loadPlacesLibrary({
             language,
             ...(regionBias ? { region: regionBias } : {}),
           });
-
           const { AutocompleteSuggestion, AutocompleteSessionToken } = places;
 
           if (!sessionTokenRef.current) {
@@ -176,8 +212,30 @@ export default function CityAutocomplete({
 
           const top = preds.slice(0, 8);
           setItems(top);
-          setOpen(top.length > 0);
           setHighlightedIndex(-1);
+
+          // ✨ AUTO-SELECT au mount si match exact avec valeur préremplie
+          if (
+            autoSelectIfPrefilled &&
+            !hasAutoSelectedRef.current &&
+            !hasInteractedRef.current &&
+            top.length > 0
+          ) {
+            const target = autoSelectIfPrefilled.toLowerCase().trim();
+            const exactMatch = top.find(
+              (p) => (p.mainText?.text ?? "").toLowerCase().trim() === target
+            );
+            if (exactMatch) {
+              hasAutoSelectedRef.current = true;
+              select(exactMatch).catch(() => {});
+              return; // Ne pas ouvrir la dropdown
+            }
+          }
+
+          // Sinon : ouvre la dropdown si l'utilisateur a interagi ou pas d'autoSelect
+          if (!autoSelectIfPrefilled || hasInteractedRef.current) {
+            setOpen(top.length > 0);
+          }
         } catch {
           if (!alive) return;
           setItems([]);
@@ -193,88 +251,33 @@ export default function CityAutocomplete({
       alive = false;
       clearTimeout(timer);
     };
-  }, [value, canQuery, language, regionBias]);
+  }, [value, canQuery, language, regionBias, autoSelectIfPrefilled, select]);
 
-  // ── Select a suggestion ──
-  const select = useCallback(
-    async (p: google.maps.places.PlacePrediction) => {
-      const label = p.text?.text ?? "";
-
-      hasSelectedRef.current = true;
-
-      action(label);
-      onSelect?.(label);
-      setOpen(false);
-      setItems([]);
-      setHighlightedIndex(-1);
-
-      if (onPlaceSelect) {
-        try {
-          const place = p.toPlace();
-          await place.fetchFields({
-            fields: ["formattedAddress", "location", "addressComponents"],
-          });
-
-          const details = extractPlaceDetails(place);
-          onPlaceSelect(details);
-        } catch {
-          onPlaceSelect({
-            formattedAddress: label,
-            placeId: p.placeId ?? "",
-            lat: null,
-            lng: null,
-            streetLine1: null,
-            city: null,
-            region: null,
-            postalCode: null,
-            country: null,
-            countryCode: null,
-          });
-        }
-      }
-
-      sessionTokenRef.current = null;
-    },
-    [action, onSelect, onPlaceSelect]
-  );
-
-  // ── Clear the field ──
   const handleClear = useCallback(
     (e: React.MouseEvent) => {
       e.stopPropagation();
       e.preventDefault();
-
-      // Reset interne
       setItems([]);
       setOpen(false);
       setHighlightedIndex(-1);
       hasSelectedRef.current = false;
+      hasInteractedRef.current = false;
+      hasAutoSelectedRef.current = false;
       sessionTokenRef.current = null;
 
-      if (onClear) {
-        // Le parent gère le reset complet (ex: reset from + fromPlace)
-        onClear();
-      } else {
-        // Comportement par défaut: on vide juste la valeur texte
-        action("");
-      }
-
-      // Refocus pour que l'utilisateur puisse retaper immédiatement
+      if (onClear) onClear();
+      else action("");
       inputRef.current?.focus();
     },
     [action, onClear]
   );
 
-  // ── Keyboard navigation ──
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
       if (!open || items.length === 0) {
-        if (e.key === "Escape") {
-          inputRef.current?.blur();
-        }
+        if (e.key === "Escape") inputRef.current?.blur();
         return;
       }
-
       if (e.key === "ArrowDown") {
         e.preventDefault();
         setHighlightedIndex((i) => (i < items.length - 1 ? i + 1 : 0));
@@ -293,6 +296,13 @@ export default function CityAutocomplete({
     [open, items, highlightedIndex, select]
   );
 
+  const handleFocus = useCallback(() => {
+    hasInteractedRef.current = true;
+    if (canQuery && items.length > 0 && !hasSelectedRef.current) {
+      setOpen(true);
+    }
+  }, [canQuery, items.length]);
+
   const shouldShowDropdown = open && items.length > 0;
 
   const dropdown = shouldShowDropdown && (
@@ -300,7 +310,7 @@ export default function CityAutocomplete({
       role="listbox"
       className={[
         dropdownInline
-          ? "relative z-[400] mt-3 w-full"
+          ? "relative z-[400] mt-2 w-full"
           : "absolute left-0 right-0 top-full z-[400] mt-3",
         "max-h-72 overflow-auto rounded-2xl bg-white shadow-xl",
         "dark:bg-slate-950 dark:ring-1 dark:ring-slate-800",
@@ -310,7 +320,6 @@ export default function CityAutocomplete({
         const title = p.mainText?.text ?? p.text?.text ?? "";
         const subtitle = p.secondaryText?.text ?? "";
         const isHighlighted = idx === highlightedIndex;
-
         return (
           <button
             key={p.placeId ?? `${title}-${idx}`}
@@ -321,21 +330,15 @@ export default function CityAutocomplete({
             onMouseEnter={() => setHighlightedIndex(idx)}
             className={[
               "flex w-full items-center justify-between gap-4 px-4 py-3 text-left transition-colors",
-              isHighlighted
-                ? "bg-slate-50 dark:bg-slate-900"
-                : "hover:bg-slate-50 dark:hover:bg-slate-900",
+              isHighlighted ? "bg-slate-50 dark:bg-slate-900" : "hover:bg-slate-50 dark:hover:bg-slate-900",
               idx === 0 ? "rounded-t-2xl" : "",
               idx === items.length - 1 ? "rounded-b-2xl" : "",
             ].join(" ")}
           >
             <div className="min-w-0">
-              <div className="truncate text-sm font-semibold text-slate-900 dark:text-white">
-                {title}
-              </div>
+              <div className="truncate text-sm font-semibold text-slate-900 dark:text-white">{title}</div>
               {subtitle && (
-                <div className="truncate text-sm text-slate-500 dark:text-slate-400">
-                  {subtitle}
-                </div>
+                <div className="truncate text-sm text-slate-500 dark:text-slate-400">{subtitle}</div>
               )}
             </div>
             <ChevronRight className="shrink-0 text-slate-300 dark:text-slate-600" size={18} />
@@ -351,26 +354,18 @@ export default function CityAutocomplete({
     <div ref={wrapRef} className="relative z-[20]">
       <div className="flex items-center gap-3">
         {!hideIcon && (
-          <MapPin
-            className="shrink-0 text-slate-400 dark:text-slate-500"
-            size={18}
-            aria-hidden
-          />
+          <MapPin className="shrink-0 text-slate-400 dark:text-slate-500" size={18} aria-hidden />
         )}
-
         <input
           ref={inputRef}
           value={value}
           autoFocus={autoFocus}
           onChange={(e) => {
             hasSelectedRef.current = false;
+            hasInteractedRef.current = true;
             action(e.target.value);
           }}
-          onFocus={() => {
-            if (canQuery && items.length > 0 && !hasSelectedRef.current) {
-              setOpen(true);
-            }
-          }}
+          onFocus={handleFocus}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
           aria-label={ariaLabel ?? placeholder}
@@ -383,15 +378,9 @@ export default function CityAutocomplete({
             inputClassName,
           ].join(" ")}
         />
-
         {loading && (
-          <Loader2
-            className="shrink-0 animate-spin text-slate-400 dark:text-slate-500"
-            size={16}
-            aria-hidden
-          />
+          <Loader2 className="shrink-0 animate-spin text-slate-400 dark:text-slate-500" size={16} aria-hidden />
         )}
-
         {showClear && !loading && (
           <button
             type="button"
@@ -404,7 +393,6 @@ export default function CityAutocomplete({
           </button>
         )}
       </div>
-
       {dropdown}
     </div>
   );

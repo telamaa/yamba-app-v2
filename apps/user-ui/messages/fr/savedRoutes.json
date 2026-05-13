@@ -1,0 +1,71 @@
+{
+  "page": {
+    "title": "Mes alertes route",
+    "description": "Sois prévenu·e dès qu'un trajet correspondant à tes critères est publié."
+  },
+  "create": {
+    "title": "Nouvelle alerte",
+    "subtitle": "Reçois un email dès qu'un trajet correspond",
+    "close": "Fermer",
+    "routeLabel": "Trajet",
+    "originPlaceholder": "Ville de départ",
+    "destinationPlaceholder": "Ville d'arrivée",
+    "periodLabel": "Période d'intérêt",
+    "presets": {
+      "3months": "3 mois",
+      "6months": "6 mois",
+      "unlimited": "Sans limite",
+      "custom": "Personnalisé"
+    },
+    "earliestDate": "À partir du",
+    "latestDate": "Jusqu'au",
+    "notificationsLabel": "Notifications",
+    "emailToggle": {
+      "title": "Recevoir un email",
+      "description": "Tu seras notifié·e par email dès qu'un trajet correspond"
+    },
+    "nearbyToggle": {
+      "title": "Inclure les trajets proches",
+      "description": "Les villes situées à moins de 50 km déclenchent aussi une alerte"
+    },
+    "cancel": "Annuler",
+    "submit": "Créer l'alerte",
+    "successToast": "Alerte créée !",
+    "errors": {
+      "missingCities": "Sélectionne les deux villes",
+      "sameOriginDestination": "Le départ et l'arrivée doivent être différents",
+      "unknown": "Une erreur est survenue"
+    }
+  },
+  "card": {
+    "expired": "Expirée",
+    "expiringSoon": "Expire bientôt",
+    "emailOn": "Email activé",
+    "emailOff": "Email désactivé",
+    "nearbyOn": "Villes proches incluses",
+    "extend": "Prolonger",
+    "delete": "Supprimer",
+    "confirmDelete": "Confirmer",
+    "deleteSuccess": "Alerte supprimée",
+    "deleteError": "Erreur lors de la suppression",
+    "extendSuccess": "Alerte prolongée de 6 mois",
+    "extendError": "Erreur lors du prolongement",
+    "updateError": "Erreur lors de la mise à jour"
+  },
+  "list": {
+    "emptyTitle": "Aucune alerte pour l'instant",
+    "emptyDescription": "Crée ta première alerte et reçois un email dès qu'un trajet correspond à tes critères.",
+    "emptyCta": "Créer ma première alerte",
+    "count": "{count, plural, one {1 alerte active} other {# alertes actives}}",
+    "newAlert": "Nouvelle alerte",
+    "errorMessage": "Erreur lors du chargement des alertes"
+  },
+  "cta": {
+    "noResultsTitle": "Aucun trajet ne correspond ?",
+    "noResultsDescription": "Crée une alerte et reçois un email dès qu'un tripper publie ce trajet.",
+    "noResultsCta": "Créer une alerte pour ce trajet",
+    "bannerTitle": "Reste informé·e des futurs trajets",
+    "bannerDescription": "Crée une alerte pour être prévenu·e dès qu'un nouveau trajet correspondant est publié.",
+    "bannerCta": "Créer une alerte"
+  }
+}
