@@ -2,7 +2,13 @@
 
 import { Link, usePathname } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
-import { HOME_ITEM, NAV_GROUPS, type NavItem, type SectionKey } from "@/app/[locale]/dashboard/dashboard.config";
+import {
+  HOME_ITEM,
+  NAV_GROUPS,
+  getNavItemPath,
+  resolveSectionKey,
+  type NavItem,
+} from "@/app/[locale]/dashboard/dashboard.config";
 
 const MANGO = "#FF9900";
 
@@ -11,15 +17,16 @@ export default function DashboardSidebar() {
   const t = useTranslations("dashboard");
 
   // usePathname de @/i18n/navigation renvoie le path SANS la locale
-  // Exemple: /dashboard/trips (pas /fr/dashboard/trips)
-  const activeSection = (pathname?.split("/").pop() ?? "home") as SectionKey;
+  // Exemple: /dashboard/saved-routes (pas /fr/dashboard/saved-routes)
+  const lastSegment = pathname?.split("/").pop() ?? "home";
+  const activeSection = resolveSectionKey(lastSegment);
 
   const renderItem = (item: NavItem, isActive: boolean) => {
     const Icon = item.icon;
     return (
       <Link
         key={item.key}
-        href={`/dashboard/${item.key}`}
+        href={`/dashboard/${getNavItemPath(item)}`}
         className={[
           "relative flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13.5px] transition-colors",
           isActive
@@ -62,7 +69,9 @@ export default function DashboardSidebar() {
               {t(`groups.${group.labelKey}`)}
             </div>
 
-            {group.items.map((item) => renderItem(item, activeSection === item.key))}
+            {group.items.map((item) =>
+              renderItem(item, activeSection === item.key)
+            )}
           </div>
         ))}
       </nav>

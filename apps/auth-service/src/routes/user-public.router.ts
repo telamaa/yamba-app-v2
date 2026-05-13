@@ -5,7 +5,7 @@ import {
   listUserPublicTrips,
   followUser,
   unfollowUser,
-  updateFollowPreferences,
+  updateFollowPreferences, listMyFollowing,
 } from "../controller/user-public.controller";
 import isAuthenticated from "@packages/middleware/isAuthenticated";
 import isOptionallyAuthenticated from "@packages/middleware/isOptionallyAuthenticated";
@@ -31,5 +31,6 @@ router.get(
 router.post("/users/:slug/follow", isAuthenticated, followUser);
 router.delete("/users/:slug/follow", isAuthenticated, unfollowUser);
 router.patch("/users/:slug/follow", isAuthenticated, updateFollowPreferences);
+router.get("/me/following", isAuthenticated, listMyFollowing);
 
 export default router;
