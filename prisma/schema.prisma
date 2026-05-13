@@ -41,15 +41,15 @@ model User {
   addresses   Address[]
   trips       Trip[]       @relation("UserTrips")
 
-  // MODIFIÉ — Reviews unifiées (remplace carrierReviews CarrierReview[])
+  // Reviews unifiées
   reviewsReceived Review[] @relation("ReviewSubject")
   reviewsGiven    Review[] @relation("ReviewAuthor")
 
   // Système de follow
-  following UserFollow[] @relation("UserFollowing") // les users que je suis
-  followers UserFollow[] @relation("UserFollowers") // les users qui me suivent
+  following UserFollow[] @relation("UserFollowing")
+  followers UserFollow[] @relation("UserFollowers")
 
-  // Alertes de route (Wishlist routes)
+  // Alertes de route
   savedRoutes SavedRoute[]
 
   consentLogs ConsentLog[]
@@ -66,7 +66,7 @@ model User {
 }
 
 // ─────────────────────────────────────────────
-// CONSENT LOG (RGPD - traçabilité du consentement)
+// CONSENT LOG (RGPD)
 // ─────────────────────────────────────────────
 
 model ConsentLog {
@@ -94,7 +94,7 @@ model ConsentLog {
 }
 
 // ─────────────────────────────────────────────
-// CARRIER PAGE (affiché "Espace Tripper" en UI)
+// CARRIER PAGE
 // ─────────────────────────────────────────────
 
 model CarrierPage {
@@ -104,7 +104,7 @@ model CarrierPage {
 
   // Profil public
   name        String
-  bio         String? // ← Inchangé : bio spécifique tripper
+  bio         String?
   phoneE164   String?
   avatar      Image?  @relation("CarrierAvatar")
   coverUrl    String?
@@ -127,7 +127,7 @@ model CarrierPage {
   isVerified     Boolean @default(false)
   isSuperCarrier Boolean @default(false)
 
-  // Stats carrier
+  // Stats
   totalTripsPublished Int   @default(0)
   totalParcelsCarried Int   @default(0)
   totalTripsCancelled Int   @default(0)
@@ -135,7 +135,6 @@ model CarrierPage {
   ratingsCount        Int   @default(0)
 
   // Relations
-  // SUPPRIMÉ — reviews CarrierReview[] (accessible via user.reviewsReceived avec kind=AS_CARRIER)
   trips Trip[]
 
   // Rappels onboarding
@@ -153,24 +152,20 @@ model CarrierPage {
 }
 
 // ─────────────────────────────────────────────
-// REVIEW (anciennement CarrierReview, unifié)
+// REVIEW
 // ─────────────────────────────────────────────
 
 model Review {
   id String @id @default(auto()) @map("_id") @db.ObjectId
 
-  // Qui est noté
   subjectUserId String @db.ObjectId
   subjectUser   User   @relation("ReviewSubject", fields: [subjectUserId], references: [id], onDelete: Cascade)
 
-  // Qui note
   authorUserId String @db.ObjectId
   authorUser   User   @relation("ReviewAuthor", fields: [authorUserId], references: [id], onDelete: Cascade)
 
-  // Le subject est noté en tant que tripper ou shipper
   kind ReviewKind
 
-  // Lien vers la booking (futur, pour empêcher les fake reviews)
   bookingId String? @db.ObjectId
 
   rating  Float
@@ -186,26 +181,23 @@ model Review {
 }
 
 // ─────────────────────────────────────────────
-// USER FOLLOW (système de suivi)
+// USER FOLLOW
 // ─────────────────────────────────────────────
 
 model UserFollow {
   id String @id @default(auto()) @map("_id") @db.ObjectId
 
-  // Qui suit
   followerId String @db.ObjectId
   follower   User   @relation("UserFollowing", fields: [followerId], references: [id], onDelete: Cascade)
 
-  // Qui est suivi
   followedId String @db.ObjectId
   followed   User   @relation("UserFollowers", fields: [followedId], references: [id], onDelete: Cascade)
 
-  // Préférences de notification pour ce suivi
   notifyNextTrip Boolean @default(true)
 
   createdAt DateTime @default(now())
 
-  @@unique([followerId, followedId]) // empêche les doublons
+  @@unique([followerId, followedId])
   @@index([followerId])
   @@index([followedId])
 }
@@ -213,13 +205,12 @@ model UserFollow {
 // ─────────────────────────────────────────────
 // SAVED ROUTE (alertes de route)
 // ─────────────────────────────────────────────
-// L'utilisateur sauvegarde une intention de voyage ("Paris → Brazzaville en
-// juin"). Quand un Tripper publie un trajet qui match, on lui envoie un email.
+// L'utilisateur sauvegarde une intention de voyage. Quand un Tripper publie
+// un trajet qui match, on lui envoie un email.
 //
-// Matching intelligent :
-//   - Score 100 : nom de ville identique (case-insensitive) OU placeId identique
-//   - Score 70  : même pays + distance < 50km (haversine) — "trajet proche"
-//   - Score < 70 : pas notifié
+// Matching intelligent (cross-locale safe via codes ISO et placeId) :
+//   - Score 100 : placeId identique OU (countryCode + city normalisée identique)
+//   - Score 70  : countryCode identique + distance < 50km (haversine)
 //
 // Cycle de vie :
 //   - expiresAt = latestDate + 1j  (si dates fournies)
@@ -234,16 +225,22 @@ model SavedRoute {
 
   // ─── Origine (snapshot Google Places) ───
   originCity        String
-  originCountry     String
-  originCountryCode String // ISO 2 letters (ex: "FR")
+  originCityCode    String? // ✨ NEW — IATA si dispo
+  originCountry     String // Affichage (locale-dependent)
+  originCountryCode String // ISO 3166-1 alpha-2 (ex: "FR")
+  originRegion      String? // ✨ NEW — affichable
+  originRegionCode  String? // ✨ NEW — ISO 3166-2 (ex: "FR-75")
   originPlaceId     String?
   originLat         Float?
   originLng         Float?
 
   // ─── Destination (snapshot Google Places) ───
   destinationCity        String
+  destinationCityCode    String? // ✨ NEW
   destinationCountry     String
   destinationCountryCode String
+  destinationRegion      String? // ✨ NEW
+  destinationRegionCode  String? // ✨ NEW
   destinationPlaceId     String?
   destinationLat         Float?
   destinationLng         Float?
@@ -254,16 +251,16 @@ model SavedRoute {
 
   // ─── Préférences notif ───
   emailEnabled  Boolean @default(true)
-  inAppEnabled  Boolean @default(false) // pour V2
-  includeNearby Boolean @default(true) // toggle "trajets proches" (score 70)
+  inAppEnabled  Boolean @default(false)
+  includeNearby Boolean @default(true)
 
   // ─── Cycle de vie ───
-  expiresAt           DateTime // calculé à create/update
-  expiryWarningSentAt DateTime? // anti-spam relance
+  expiresAt           DateTime
+  expiryWarningSentAt DateTime?
   isActive            Boolean   @default(true)
 
   // ─── Anti-spam runtime ───
-  lastNotifiedAt DateTime? // dernière notif émise
+  lastNotifiedAt DateTime?
 
   // ─── Métadonnées ───
   createdAt DateTime @default(now())
@@ -361,26 +358,30 @@ model Trip {
   tripType      TripType       @default(ONE_WAY)
 
   // ─── Origin ──────────────────────────────────────
-  originLabel    String?
-  originPlaceId  String?
-  originCity     String?
-  originCityCode String?
-  originRegion   String?
-  originCountry  String?
-  originLat      Float?
-  originLng      Float?
-  originTimezone String?
+  originLabel       String?
+  originPlaceId     String?
+  originCity        String?
+  originCityCode    String? // IATA (CDG, JFK) si dispo
+  originRegion      String? // Texte affichable (locale-dependent)
+  originRegionCode  String? // ✨ NEW — ISO 3166-2 (ex: "FR-75", "CZ-PR")
+  originCountry     String? // Texte affichable (locale-dependent)
+  originCountryCode String? // ✨ NEW — ISO 3166-1 alpha-2 ("FR", "CZ")
+  originLat         Float?
+  originLng         Float?
+  originTimezone    String?
 
   // ─── Destination ─────────────────────────────────
-  destinationLabel    String?
-  destinationPlaceId  String?
-  destinationCity     String?
-  destinationCityCode String?
-  destinationRegion   String?
-  destinationCountry  String?
-  destinationLat      Float?
-  destinationLng      Float?
-  destinationTimezone String?
+  destinationLabel       String?
+  destinationPlaceId     String?
+  destinationCity        String?
+  destinationCityCode    String?
+  destinationRegion      String?
+  destinationRegionCode  String? // ✨ NEW
+  destinationCountry     String?
+  destinationCountryCode String? // ✨ NEW
+  destinationLat         Float?
+  destinationLng         Float?
+  destinationTimezone    String?
 
   // ─── Dates ───────────────────────────────────────
   departureDateLocal String?
@@ -452,6 +453,9 @@ model Trip {
   @@index([departureHourLocal])
   @@index([originCity])
   @@index([destinationCity])
+  @@index([originCountryCode, destinationCountryCode, status]) // ✨ NEW — matching SavedRoute
+  @@index([originCountryCode]) // ✨ NEW
+  @@index([destinationCountryCode]) // ✨ NEW
 }
 
 model TripDocument {
@@ -604,10 +608,9 @@ enum TripDocumentStatus {
   REJECTED
 }
 
-//  Type de review
 enum ReviewKind {
-  AS_CARRIER // Le subject a été noté en tant que tripper
-  AS_SHIPPER // Le subject a été noté en tant qu'expéditeur
+  AS_CARRIER
+  AS_SHIPPER
 }
 
 model SiteConfig {

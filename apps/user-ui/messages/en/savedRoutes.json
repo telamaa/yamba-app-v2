@@ -1,0 +1,71 @@
+{
+  "page": {
+    "title": "My route alerts",
+    "description": "Get notified as soon as a trip matching your criteria is published."
+  },
+  "create": {
+    "title": "New alert",
+    "subtitle": "Get an email when a matching trip is published",
+    "close": "Close",
+    "routeLabel": "Route",
+    "originPlaceholder": "Departure city",
+    "destinationPlaceholder": "Arrival city",
+    "periodLabel": "Time window",
+    "presets": {
+      "3months": "3 months",
+      "6months": "6 months",
+      "unlimited": "No limit",
+      "custom": "Custom"
+    },
+    "earliestDate": "From",
+    "latestDate": "Until",
+    "notificationsLabel": "Notifications",
+    "emailToggle": {
+      "title": "Receive email",
+      "description": "You'll get notified by email when a trip matches"
+    },
+    "nearbyToggle": {
+      "title": "Include nearby trips",
+      "description": "Cities within 50 km will also trigger an alert"
+    },
+    "cancel": "Cancel",
+    "submit": "Create alert",
+    "successToast": "Alert created!",
+    "errors": {
+      "missingCities": "Please select both cities",
+      "sameOriginDestination": "Departure and arrival must be different",
+      "unknown": "An error occurred"
+    }
+  },
+  "card": {
+    "expired": "Expired",
+    "expiringSoon": "Expiring soon",
+    "emailOn": "Email on",
+    "emailOff": "Email off",
+    "nearbyOn": "Nearby cities included",
+    "extend": "Extend",
+    "delete": "Delete",
+    "confirmDelete": "Confirm",
+    "deleteSuccess": "Alert deleted",
+    "deleteError": "Error while deleting",
+    "extendSuccess": "Alert extended by 6 months",
+    "extendError": "Error while extending",
+    "updateError": "Error while updating"
+  },
+  "list": {
+    "emptyTitle": "No alerts yet",
+    "emptyDescription": "Create your first alert and get notified by email when a matching trip is published.",
+    "emptyCta": "Create my first alert",
+    "count": "{count, plural, one {1 active alert} other {# active alerts}}",
+    "newAlert": "New alert",
+    "errorMessage": "Error loading alerts"
+  },
+  "cta": {
+    "noResultsTitle": "No trip matches?",
+    "noResultsDescription": "Create an alert and get an email as soon as a tripper publishes this trip.",
+    "noResultsCta": "Create an alert for this trip",
+    "bannerTitle": "Stay informed about future trips",
+    "bannerDescription": "Create an alert to get notified as soon as a matching trip is published.",
+    "bannerCta": "Create an alert"
+  }
+}

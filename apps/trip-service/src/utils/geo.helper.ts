@@ -46,3 +46,41 @@ export function isWithinRadius(
 ): boolean {
   return haversineKm(lat1, lng1, lat2, lng2) <= maxKm;
 }
+
+/**
+ * Normalise un nom de ville pour comparaison case-insensitive et accent-insensitive.
+ *
+ *   normalizeCityName("São Paulo")  → "sao paulo"
+ *   normalizeCityName("PRAGUE")     → "prague"
+ *   normalizeCityName("  Lyon  ")   → "lyon"
+ *
+ * Cas limite : ne gère pas les transliterations (ex: "Praha" ≠ "Prague").
+ * Pour ça, utiliser le placeId qui est universel.
+ */
+export function normalizeCityName(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim();
+}
+
+/**
+ * Type guard : vérifie qu'une paire (lat, lng) est valide.
+ * Empêche les bugs si la BDD contient des coords null/invalides.
+ */
+export function hasValidCoords(
+  lat: number | null | undefined,
+  lng: number | null | undefined
+): lat is number {
+  return (
+    typeof lat === "number" &&
+    typeof lng === "number" &&
+    Number.isFinite(lat) &&
+    Number.isFinite(lng) &&
+    lat >= -90 &&
+    lat <= 90 &&
+    lng >= -180 &&
+    lng <= 180
+  );
+}

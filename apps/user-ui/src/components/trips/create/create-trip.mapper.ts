@@ -1,35 +1,26 @@
-// /**
-//  * create-trip.mapper.ts
-//  * =====================
-//  * Converts the frontend Draft object into the backend API payload.
-//  *
-//  * Key transformations:
-//  *  - camelCase enums → SCREAMING_SNAKE_CASE (plane → PLANE, oneWay → ONE_WAY)
-//  // *  - from/to labels + PlaceInfo → origin*/destination* flat fields
-// // *  - priceAmount (€) → priceAmountCents (centimes)
-// // *  - Date + time string → ISO departureAt / departureDateLocal
-// // *  - categoryConditions Record → Array
-// // *
-// // * 📁 Place in: apps/user-ui/src/components/trips/create/create-trip.mapper.ts
-// // */
+/**
+ * create-trip.mapper.ts
+ * =====================
+ * Convertit le Draft frontend en payload backend.
+ *
+ * Transformations :
+ *  - camelCase → SCREAMING_SNAKE_CASE (plane → PLANE)
+ - from/to labels + PlaceInfo → origin*/
+// destination* (avec codes ISO)
+  // - priceAmount (€) → priceAmountCents
+  // - Date + time string → ISO departureAt
+  // - categoryConditions Record → Array
+
 
 import type { Draft, CategoryCondition } from "./create-trip.types";
 
 // ─── Enum conversion ─────────────────────────
 
-/**
- * Generic camelCase → SCREAMING_SNAKE_CASE.
- * Works for: plane→PLANE, oneWay→ONE_WAY, withLayover→WITH_LAYOVER, etc.
- */
 function toSnakeEnum(val: string | null | undefined): string | null {
   if (!val) return null;
   return val.replace(/([a-z])([A-Z])/g, "$1_$2").toUpperCase();
 }
 
-/**
- * ParcelCategory explicit map — handles number-containing keys
- * (checkedBag23kg → CHECKED_BAG_23KG) that the generic regex can't solve.
- */
 const CATEGORY_ENUM: Record<string, string> = {
   clothes: "CLOTHES",
   shoes: "SHOES",
@@ -51,7 +42,6 @@ function mapCategory(key: string): string {
 
 // ─── Date helpers ────────────────────────────
 
-/** Date → "YYYY-MM-DD" */
 function toDateLocal(date?: Date): string | null {
   if (!date) return null;
   const d = new Date(date);
@@ -61,7 +51,6 @@ function toDateLocal(date?: Date): string | null {
   return `${yyyy}-${mm}-${dd}`;
 }
 
-/** Combine Date + "HH:MM" → ISO string */
 function toDateTimeIso(date?: Date, time?: string): string | null {
   if (!date) return null;
   const d = new Date(date);
@@ -77,20 +66,32 @@ function toDateTimeIso(date?: Date, time?: string): string | null {
 export type CreateTripPayload = {
   transportMode: string | null;
   tripType: string;
+
+  // Origin
   originLabel: string | null;
   originPlaceId: string | null;
   originCity: string | null;
+  originCityCode: string | null;       // ✨ NEW
   originRegion: string | null;
+  originRegionCode: string | null;     // ✨ NEW
   originCountry: string | null;
+  originCountryCode: string | null;    // ✨ NEW
   originLat: number | null;
   originLng: number | null;
+
+  // Destination
   destinationLabel: string | null;
   destinationPlaceId: string | null;
   destinationCity: string | null;
+  destinationCityCode: string | null;       // ✨ NEW
   destinationRegion: string | null;
+  destinationRegionCode: string | null;     // ✨ NEW
   destinationCountry: string | null;
+  destinationCountryCode: string | null;    // ✨ NEW
   destinationLat: number | null;
   destinationLng: number | null;
+
+  // Dates
   departureDateLocal: string | null;
   arrivalDateLocal: string | null;
   departureTimeLocal: string | null;
@@ -99,12 +100,16 @@ export type CreateTripPayload = {
   arrivalAt: string | null;
   returnDepartureAt: string | null;
   returnArrivalAt: string | null;
+
+  // Mode-specific
   flightType: string | null;
   trainTripType: string | null;
   carTripFlexibility: string | null;
   flightLayoverCities: string[];
   trainStopCities: string[];
   travelReference: string | null;
+
+  // Conditions
   acceptedCategories: string[];
   categoryConditions: Array<{
     category: string;
@@ -116,6 +121,7 @@ export type CreateTripPayload = {
   instantBooking: boolean;
   currencyCode: string;
   notes: string | null;
+
   publish: boolean;
 };
 
@@ -124,7 +130,6 @@ export type CreateTripPayload = {
 export function mapDraftToPayload(draft: Draft, publish: boolean): CreateTripPayload {
   const { fromPlace, toPlace } = draft;
 
-  // Price: si useGlobalPrice, on applique le globalPrice à toutes les catégories
   const resolvePrice = (condition: CategoryCondition): number => {
     if (draft.useGlobalPrice && typeof draft.globalPrice === "number") {
       return draft.globalPrice;
@@ -132,12 +137,8 @@ export function mapDraftToPayload(draft: Draft, publish: boolean): CreateTripPay
     return typeof condition.priceAmount === "number" ? condition.priceAmount : 0;
   };
 
-  // Layover/stop cities: "Paris, Lyon" → ["Paris", "Lyon"]
   const splitCities = (raw: string): string[] =>
-    raw
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean);
+    raw.split(",").map((s) => s.trim()).filter(Boolean);
 
   return {
     // ── Trajet ──
@@ -148,8 +149,11 @@ export function mapDraftToPayload(draft: Draft, publish: boolean): CreateTripPay
     originLabel: draft.from || null,
     originPlaceId: fromPlace?.placeId ?? null,
     originCity: fromPlace?.city ?? null,
+    originCityCode: fromPlace?.cityCode ?? null,         // ✨ NEW
     originRegion: fromPlace?.region ?? null,
+    originRegionCode: fromPlace?.regionCode ?? null,     // ✨ NEW
     originCountry: fromPlace?.country ?? null,
+    originCountryCode: fromPlace?.countryCode ?? null,   // ✨ NEW
     originLat: fromPlace?.lat ?? null,
     originLng: fromPlace?.lng ?? null,
 
@@ -157,8 +161,11 @@ export function mapDraftToPayload(draft: Draft, publish: boolean): CreateTripPay
     destinationLabel: draft.to || null,
     destinationPlaceId: toPlace?.placeId ?? null,
     destinationCity: toPlace?.city ?? null,
+    destinationCityCode: toPlace?.cityCode ?? null,           // ✨ NEW
     destinationRegion: toPlace?.region ?? null,
+    destinationRegionCode: toPlace?.regionCode ?? null,       // ✨ NEW
     destinationCountry: toPlace?.country ?? null,
+    destinationCountryCode: toPlace?.countryCode ?? null,     // ✨ NEW
     destinationLat: toPlace?.lat ?? null,
     destinationLng: toPlace?.lng ?? null,
 
@@ -169,7 +176,7 @@ export function mapDraftToPayload(draft: Draft, publish: boolean): CreateTripPay
     arrivalTimeLocal: draft.arrivalTime || null,
     departureAt: toDateTimeIso(draft.departureDate, draft.departureTime),
     arrivalAt: toDateTimeIso(draft.arrivalDate, draft.arrivalTime),
-    returnDepartureAt: null, // TODO: aller-retour
+    returnDepartureAt: null,
     returnArrivalAt: null,
 
     // ── Mode-specific ──
@@ -197,7 +204,7 @@ export function mapDraftToPayload(draft: Draft, publish: boolean): CreateTripPay
     currencyCode: draft.currencyCode,
     notes: draft.notes?.trim() || null,
 
-    // ── Publish flag ──
+    // ── Publish ──
     publish,
   };
 }

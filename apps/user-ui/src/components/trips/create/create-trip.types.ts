@@ -37,15 +37,10 @@ export type CategoryCondition = {
   pickupMoments: PickupMoment[];
 };
 
-/**
- * A trip document — uploaded directly to ImageKit.
- * `fileId` and `url` are set by ImageKit after upload.
- * `verificationStatus` comes from the backend.
- */
 export type TripDocumentDraft = {
-  id: string;                // local/temporary id (uuid or fileId)
-  fileId: string;            // ImageKit fileId (after upload)
-  url: string;               // ImageKit file url (after upload)
+  id: string;
+  fileId: string;
+  url: string;
   name: string;
   size: number;
   mimeType: string;
@@ -53,17 +48,34 @@ export type TripDocumentDraft = {
   verificationStatus?: TicketVerificationStatus;
 };
 
+/**
+ * Snapshot Google Places — données structurées pour un lieu.
+ *
+ * IMPORTANT: doit rester compatible avec `PlaceDetails` exporté par
+ * `@/components/search/CityAutocomplete`. C'est la même structure.
+ *
+ *   - `placeId`, `lat/lng` : IDs universels (logique métier)
+ *   - `countryCode`, `regionCode`, `cityCode` : codes ISO universels
+ *   - `city`, `region`, `country` : texte affichable (locale-dependent, UI uniquement)
+ */
 export type PlaceInfo = {
   formattedAddress: string;
   placeId: string;
   lat: number | null;
   lng: number | null;
   streetLine1: string | null;
+
+  // Display text (locale-dependent) — UI uniquement
   city: string | null;
   region: string | null;
-  postalCode: string | null;
   country: string | null;
-  countryCode: string | null;
+
+  // ISO codes (universal) — pour la logique métier
+  cityCode: string | null;       // IATA (CDG, JFK) si dispo
+  regionCode: string | null;     // ISO 3166-2 (ex: "FR-IDF")
+  countryCode: string | null;    // ISO 3166-1 alpha-2 (ex: "FR")
+
+  postalCode: string | null;
 };
 
 export type Draft = {
