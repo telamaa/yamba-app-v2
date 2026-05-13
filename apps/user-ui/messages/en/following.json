@@ -1,0 +1,27 @@
+{
+  "page": {
+    "title": "Followed trippers",
+    "description": "Stay tuned for posts from your favorite trippers."
+  },
+  "card": {
+    "tripperBadge": "Tripper",
+    "tripsPublished": "{count, plural, =0 {No trips published} one {1 trip published} other {# trips published}}",
+    "nextTripLabel": "Next upcoming trip",
+    "noUpcomingTrip": "No upcoming trip for now",
+    "notifyOn": "Notifications on",
+    "notifyOff": "Notifications off",
+    "unfollow": "Unfollow",
+    "confirmUnfollow": "Confirm",
+    "unfollowSuccess": "You no longer follow this tripper",
+    "unfollowError": "Error while unfollowing",
+    "updateError": "Error while updating"
+  },
+  "list": {
+    "emptyTitle": "No tripper followed yet",
+    "emptyDescription": "Discover trippers in the community and follow the ones who match your needs to get notified as soon as they publish a new trip.",
+    "emptyCta": "Discover trippers",
+    "count": "{count, plural, one {1 followed tripper} other {# followed trippers}}",
+    "discoverMore": "Discover more",
+    "errorMessage": "Error while loading"
+  }
+}

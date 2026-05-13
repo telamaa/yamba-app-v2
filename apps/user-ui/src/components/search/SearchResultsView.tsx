@@ -11,6 +11,7 @@ import SearchFiltersSidebar from "./SearchFiltersSidebar";
 import MobileSearchExperience from "./MobileSearchExperience";
 import TripSearchBarSkeleton from "./TripSearchBarSkeleton";
 import MobileSearchExperienceSkeleton from "./MobileSearchExperienceSkeleton";
+import SavedRouteCTA from "@/components/saved-routes/SavedRouteCTA";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { useFixedSidebarPosition } from "@/hooks/useFixedSidebarPosition";
 import { useTripsSearch } from "@/hooks/useTripsSearch";
@@ -279,8 +280,6 @@ export default function SearchResultsView() {
     dateValue: null,
   });
 
-  // ─── Construction des params API ──
-
   const tripsParams = useMemo(
     () => ({
       mode: activeMode,
@@ -340,8 +339,6 @@ export default function SearchResultsView() {
     ]
   );
 
-  // ─── Hooks de fetch ──
-
   const tripsQuery = useTripsSearch(tripsParams);
   const facetsQuery = useSearchFacets(facetsParams);
 
@@ -356,7 +353,7 @@ export default function SearchResultsView() {
   const isError = tripsQuery.isError;
   const hasMore = tripsQuery.hasNextPage;
 
-  // ─── Titre dynamique ──
+  const hasSearchedRoute = !!(searchDraft.from || searchDraft.to);
 
   const dynamicTitle = useMemo(() => {
     const hasFrom = !!searchDraft.from;
@@ -374,32 +371,19 @@ export default function SearchResultsView() {
       : "";
 
     if (hasFrom && hasTo) {
-      return t("dynamicTitle.fromTo", {
-        from: searchDraft.from,
-        to: searchDraft.to,
-      });
+      return t("dynamicTitle.fromTo", { from: searchDraft.from, to: searchDraft.to });
     }
-    if (hasFrom) {
-      return t("dynamicTitle.fromOnly", { from: searchDraft.from });
-    }
-    if (hasTo) {
-      return t("dynamicTitle.toOnly", { to: searchDraft.to });
-    }
-    if (dateStr) {
-      return t("dynamicTitle.dateOnly", { date: dateStr });
-    }
+    if (hasFrom) return t("dynamicTitle.fromOnly", { from: searchDraft.from });
+    if (hasTo) return t("dynamicTitle.toOnly", { to: searchDraft.to });
+    if (dateStr) return t("dynamicTitle.dateOnly", { date: dateStr });
     return t("dynamicTitle.noFilter");
   }, [searchDraft, t, locale]);
 
   const showHint = !searchDraft.from && !searchDraft.to;
 
-  // ─── Handlers ──
-
   const toggleCategory = (category: ParcelCategory) => {
     setSelectedCategories((prev) =>
-      prev.includes(category)
-        ? prev.filter((item) => item !== category)
-        : [...prev, category]
+      prev.includes(category) ? prev.filter((item) => item !== category) : [...prev, category]
     );
   };
 
@@ -418,7 +402,6 @@ export default function SearchResultsView() {
     setSelectedCategories([]);
     setSelectedDepartureBuckets([]);
     setActiveMode("all");
-    // Vide aussi la searchbar parent pour repartir from scratch
     setSearchDraft({ from: "", to: "", dateValue: null });
   };
 
@@ -426,13 +409,8 @@ export default function SearchResultsView() {
     if (!isLoadingMore && hasMore) tripsQuery.fetchNextPage();
   };
 
-  // Branche TripSearchBar desktop : appelé au clic Search
   const handleSearchBarSubmit = (value: TripSearchValue) => {
-    setSearchDraft({
-      from: value.from,
-      to: value.to,
-      dateValue: value.dateValue,
-    });
+    setSearchDraft({ from: value.from, to: value.to, dateValue: value.dateValue });
   };
 
   const hasActiveFilters =
@@ -473,20 +451,11 @@ export default function SearchResultsView() {
     <>
       <style jsx global>{`
         @keyframes yambaShimmer {
-          0% {
-            transform: translateX(-100%);
-          }
-          100% {
-            transform: translateX(100%);
-          }
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(100%); }
         }
-
-        .yamba-sidebar-scroll::-webkit-scrollbar {
-          width: 6px;
-        }
-        .yamba-sidebar-scroll::-webkit-scrollbar-track {
-          background: transparent;
-        }
+        .yamba-sidebar-scroll::-webkit-scrollbar { width: 6px; }
+        .yamba-sidebar-scroll::-webkit-scrollbar-track { background: transparent; }
         .yamba-sidebar-scroll::-webkit-scrollbar-thumb {
           background-color: rgba(148, 163, 184, 0.3);
           border-radius: 999px;
@@ -530,15 +499,9 @@ export default function SearchResultsView() {
               to={searchDraft.to}
               dateValue={searchDraft.dateValue}
               resultsCount={totalCount}
-              onFromChange={(value) =>
-                setSearchDraft((prev) => ({ ...prev, from: value }))
-              }
-              onToChange={(value) =>
-                setSearchDraft((prev) => ({ ...prev, to: value }))
-              }
-              onDateValueChange={(value) =>
-                setSearchDraft((prev) => ({ ...prev, dateValue: value }))
-              }
+              onFromChange={(value) => setSearchDraft((prev) => ({ ...prev, from: value }))}
+              onToChange={(value) => setSearchDraft((prev) => ({ ...prev, to: value }))}
+              onDateValueChange={(value) => setSearchDraft((prev) => ({ ...prev, dateValue: value }))}
               onSearch={() => {}}
               onOpenFilters={() => setMobileFiltersOpen(true)}
             />
@@ -547,10 +510,7 @@ export default function SearchResultsView() {
 
         <section className="mx-auto max-w-7xl px-3 pb-14">
           <div className="md:hidden" style={{ paddingTop: 16 }} />
-          <div
-            className="hidden md:block"
-            style={{ paddingTop: SEARCH_BAR_FIXED_HEIGHT + 24 }}
-          />
+          <div className="hidden md:block" style={{ paddingTop: SEARCH_BAR_FIXED_HEIGHT + 24 }} />
 
           <div className="mb-5">
             <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
@@ -565,13 +525,9 @@ export default function SearchResultsView() {
 
           {isPageLoading ? (
             <>
-              <div className="mb-6">
-                <TransportModeTabsSkeleton />
-              </div>
+              <div className="mb-6"><TransportModeTabsSkeleton /></div>
               <div className="grid gap-6 md:grid-cols-[280px_1fr] md:items-start">
-                <div className="hidden md:block">
-                  <SearchFiltersSidebarSkeleton />
-                </div>
+                <div className="hidden md:block"><SearchFiltersSidebarSkeleton /></div>
                 <div className="space-y-3">
                   <div className="md:hidden space-y-3">
                     {Array.from({ length: 5 }).map((_, index) => (
@@ -597,10 +553,7 @@ export default function SearchResultsView() {
               </div>
 
               <div className="grid gap-6 md:grid-cols-[280px_1fr] md:items-start">
-                <div
-                  ref={sidebarPlaceholderRef}
-                  className="relative hidden md:block"
-                >
+                <div ref={sidebarPlaceholderRef} className="relative hidden md:block">
                   <div
                     style={{
                       opacity: fixedRect.isFixed ? 0 : 1,
@@ -637,10 +590,15 @@ export default function SearchResultsView() {
                   {isError ? (
                     <ErrorState onRetry={() => tripsQuery.refetch()} />
                   ) : trips.length === 0 ? (
-                    <EmptyState
-                      onClearFilters={clearAll}
-                      hasFilters={hasActiveFilters}
-                    />
+                    hasSearchedRoute ? (
+                      <SavedRouteCTA
+                        variant="noResults"
+                        originCity={searchDraft.from || undefined}
+                        destinationCity={searchDraft.to || undefined}
+                      />
+                    ) : (
+                      <EmptyState onClearFilters={clearAll} hasFilters={hasActiveFilters} />
+                    )
                   ) : (
                     <>
                       <div className="md:hidden space-y-3">
@@ -678,6 +636,16 @@ export default function SearchResultsView() {
                           </button>
                         </div>
                       )}
+
+                      {!hasMore && hasSearchedRoute && (
+                        <div className="pt-4">
+                          <SavedRouteCTA
+                            variant="banner"
+                            originCity={searchDraft.from || undefined}
+                            destinationCity={searchDraft.to || undefined}
+                          />
+                        </div>
+                      )}
                     </>
                   )}
                 </div>
@@ -698,7 +666,6 @@ export default function SearchResultsView() {
                 >
                   <X size={28} />
                 </button>
-
                 <button
                   type="button"
                   onClick={clearAll}

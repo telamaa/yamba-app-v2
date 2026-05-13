@@ -4,9 +4,38 @@ import { sendEmail } from "./send-email";
 const APP_URL = process.env.USER_APP_URL ?? "http://localhost:3000";
 const DEFAULT_LOCALE: "fr" | "en" = "fr"; // Plus tard : depuis user.preferredLocale
 
-/**
- * Payload pour l'email "Un nouveau trajet correspond".
- */
+// ───────────────────────────────────────────────────────
+// Constantes i18n légères pour les emails
+// ───────────────────────────────────────────────────────
+
+const TRANSPORT_LABELS_FR: Record<string, string> = {
+  AIRPLANE: "Avion",
+  TRAIN: "Train",
+  CAR: "Voiture",
+  BUS: "Bus",
+  BOAT: "Bateau",
+};
+
+const TRANSPORT_LABELS_EN: Record<string, string> = {
+  AIRPLANE: "Plane",
+  TRAIN: "Train",
+  CAR: "Car",
+  BUS: "Bus",
+  BOAT: "Boat",
+};
+
+const TRANSPORT_EMOJIS: Record<string, string> = {
+  AIRPLANE: "✈️",
+  TRAIN: "🚆",
+  CAR: "🚗",
+  BUS: "🚌",
+  BOAT: "🚢",
+};
+
+// ───────────────────────────────────────────────────────
+// Types
+// ───────────────────────────────────────────────────────
+
 export type TripPublishedEmailPayload = {
   recipient: {
     userId: string;
@@ -30,6 +59,10 @@ export type TripPublishedEmailPayload = {
   trip: Trip;
 };
 
+// ───────────────────────────────────────────────────────
+// Helpers formatage
+// ───────────────────────────────────────────────────────
+
 function formatDate(date: Date | null, locale: "fr" | "en"): string {
   if (!date) return "";
   const d = new Date(date);
@@ -41,15 +74,48 @@ function formatDate(date: Date | null, locale: "fr" | "en"): string {
   });
 }
 
-/**
- * Envoie l'email "trip published" avec contexte enrichi (follow / saved route / les 2).
- */
+function formatPrice(
+  cents: number | null,
+  currency: string | null,
+  locale: "fr" | "en"
+): string {
+  if (cents == null || !currency) return "";
+  const amount = cents / 100;
+  try {
+    return new Intl.NumberFormat(locale === "fr" ? "fr-FR" : "en-US", {
+      style: "currency",
+      currency,
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount);
+  } catch {
+    return `${amount} ${currency}`;
+  }
+}
+
+function getTransportLabel(mode: string | null, locale: "fr" | "en"): string {
+  if (!mode) return "";
+  const dict = locale === "fr" ? TRANSPORT_LABELS_FR : TRANSPORT_LABELS_EN;
+  return dict[mode] ?? "";
+}
+
+function getTransportEmoji(mode: string | null): string {
+  if (!mode) return "📦";
+  return TRANSPORT_EMOJIS[mode] ?? "📦";
+}
+
+// ───────────────────────────────────────────────────────
+// Email principal : trip publié (follow / saved route / both)
+// ───────────────────────────────────────────────────────
+
 export async function sendTripPublishedEmail(
   payload: TripPublishedEmailPayload
 ): Promise<void> {
   const { recipient, tripper, trip } = payload;
   const locale = DEFAULT_LOCALE;
+  const firstInitial = tripper.firstName.charAt(0).toUpperCase();
   const lastInitial = tripper.lastName.charAt(0).toUpperCase();
+  const initials = `${firstInitial}${lastInitial}`;
 
   // Sujet adapté au contexte
   let subject: string;
@@ -82,8 +148,12 @@ export async function sendTripPublishedEmail(
       firstName: tripper.firstName,
       lastInitial,
     },
+    initials,
     trip,
     formattedDepartureDate: formatDate(trip.departureAt, locale),
+    formattedPrice: formatPrice(trip.minPriceCents, trip.currencyCode, locale),
+    transportLabel: getTransportLabel(trip.transportMode, locale),
+    transportEmoji: getTransportEmoji(trip.transportMode),
     tripUrl: `${APP_URL}/${locale}/trips/${trip.id}`,
     tripperUrl: tripper.publicSlug
       ? `${APP_URL}/${locale}/u/${tripper.publicSlug}`
@@ -104,10 +174,6 @@ export async function sendTripPublishedEmail(
 // (utilisés en Phase 7 par le cron d'expiration)
 // ─────────────────────────────────────────────────────────
 
-/**
- * Email de relance envoyé 7 jours avant l'expiration d'une SavedRoute.
- * Propose à l'utilisateur de prolonger l'alerte.
- */
 export async function sendSavedRouteExpiryWarningEmail(payload: {
   recipient: { email: string; firstName: string };
   savedRoute: { id: string; originCity: string; destinationCity: string };
@@ -133,10 +199,6 @@ export async function sendSavedRouteExpiryWarningEmail(payload: {
   );
 }
 
-/**
- * Email de notification d'expiration définitive.
- * Envoyé au moment où la SavedRoute est désactivée par le cron.
- */
 export async function sendSavedRouteExpiredEmail(payload: {
   recipient: { email: string; firstName: string };
   savedRoute: { originCity: string; destinationCity: string };

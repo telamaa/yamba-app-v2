@@ -10,9 +10,15 @@ import {
 
 const MAX_SAVED_ROUTES_PER_USER = 20;
 
+// Helper : normalise un code ISO (uppercase, trim, null si vide)
+function normalizeIso(v: unknown): string | null {
+  return typeof v === "string" && v.trim().length > 0
+    ? v.trim().toUpperCase()
+    : null;
+}
+
 // ───────────────────────────────────────────────────────
 // POST /api/saved-routes
-// Créer une nouvelle alerte de route.
 // ───────────────────────────────────────────────────────
 
 export const createSavedRoute = async (
@@ -25,32 +31,47 @@ export const createSavedRoute = async (
 
     const userId = req.user.id;
     const {
+      // Origin
       originCity,
+      originCityCode,
       originCountry,
       originCountryCode,
+      originRegion,
+      originRegionCode,
       originPlaceId,
       originLat,
       originLng,
+      // Destination
       destinationCity,
+      destinationCityCode,
       destinationCountry,
       destinationCountryCode,
+      destinationRegion,
+      destinationRegionCode,
       destinationPlaceId,
       destinationLat,
       destinationLng,
+      // Period & prefs
       earliestDate,
       latestDate,
       emailEnabled = true,
       includeNearby = true,
     } = req.body as {
       originCity?: string;
+      originCityCode?: string | null;
       originCountry?: string;
       originCountryCode?: string;
+      originRegion?: string | null;
+      originRegionCode?: string | null;
       originPlaceId?: string | null;
       originLat?: number | null;
       originLng?: number | null;
       destinationCity?: string;
+      destinationCityCode?: string | null;
       destinationCountry?: string;
       destinationCountryCode?: string;
+      destinationRegion?: string | null;
+      destinationRegionCode?: string | null;
       destinationPlaceId?: string | null;
       destinationLat?: number | null;
       destinationLng?: number | null;
@@ -60,7 +81,7 @@ export const createSavedRoute = async (
       includeNearby?: boolean;
     };
 
-    // Validation
+    // Validation (les champs ISO optionnels ne sont pas required)
     const error = validateSavedRoutePayload({
       originCity,
       originCountry,
@@ -73,7 +94,10 @@ export const createSavedRoute = async (
     });
     if (error) return next(new ValidationError(error));
 
-    // Limite anti-spam : max 20 alertes actives par user
+    const normalizedOriginCountryCode = normalizeIso(originCountryCode)!;
+    const normalizedDestinationCountryCode = normalizeIso(destinationCountryCode)!;
+
+    // Limite : max 20 alertes actives par user
     const activeCount = await prisma.savedRoute.count({
       where: { userId, isActive: true },
     });
@@ -85,24 +109,19 @@ export const createSavedRoute = async (
       );
     }
 
-    // Détecter les doublons (même route + même userId déjà actifs)
+    // Détecter doublons (même route active)
     const duplicate = await prisma.savedRoute.findFirst({
       where: {
         userId,
         isActive: true,
         originCity: { equals: originCity!.trim(), mode: "insensitive" },
-        destinationCity: {
-          equals: destinationCity!.trim(),
-          mode: "insensitive",
-        },
-        originCountryCode: originCountryCode!.toUpperCase(),
-        destinationCountryCode: destinationCountryCode!.toUpperCase(),
+        destinationCity: { equals: destinationCity!.trim(), mode: "insensitive" },
+        originCountryCode: normalizedOriginCountryCode,
+        destinationCountryCode: normalizedDestinationCountryCode,
       },
     });
     if (duplicate) {
-      return next(
-        new ValidationError("You already have an active alert for this route.")
-      );
+      return next(new ValidationError("You already have an active alert for this route."));
     }
 
     const latestDateParsed = latestDate ? new Date(latestDate) : null;
@@ -111,18 +130,27 @@ export const createSavedRoute = async (
     const savedRoute = await prisma.savedRoute.create({
       data: {
         userId,
+        // Origin
         originCity: originCity!.trim(),
+        originCityCode: normalizeIso(originCityCode),
         originCountry: originCountry!.trim(),
-        originCountryCode: originCountryCode!.toUpperCase(),
+        originCountryCode: normalizedOriginCountryCode,
+        originRegion: originRegion?.trim() ?? null,
+        originRegionCode: normalizeIso(originRegionCode),
         originPlaceId: originPlaceId ?? null,
         originLat: originLat ?? null,
         originLng: originLng ?? null,
+        // Destination
         destinationCity: destinationCity!.trim(),
+        destinationCityCode: normalizeIso(destinationCityCode),
         destinationCountry: destinationCountry!.trim(),
-        destinationCountryCode: destinationCountryCode!.toUpperCase(),
+        destinationCountryCode: normalizedDestinationCountryCode,
+        destinationRegion: destinationRegion?.trim() ?? null,
+        destinationRegionCode: normalizeIso(destinationRegionCode),
         destinationPlaceId: destinationPlaceId ?? null,
         destinationLat: destinationLat ?? null,
         destinationLng: destinationLng ?? null,
+        // Period & prefs
         earliestDate: earliestDate ? new Date(earliestDate) : null,
         latestDate: latestDateParsed,
         emailEnabled,
@@ -144,7 +172,6 @@ export const createSavedRoute = async (
 
 // ───────────────────────────────────────────────────────
 // GET /api/saved-routes
-// Liste des alertes actives du user connecté.
 // ───────────────────────────────────────────────────────
 
 export const listSavedRoutes = async (
@@ -178,8 +205,6 @@ export const listSavedRoutes = async (
 
 // ───────────────────────────────────────────────────────
 // PATCH /api/saved-routes/:id
-// Mettre à jour une alerte (dates, prefs notif).
-// On ne touche pas aux origines/destinations (le user doit en créer une nouvelle).
 // ───────────────────────────────────────────────────────
 
 export const updateSavedRoute = async (
@@ -195,56 +220,37 @@ export const updateSavedRoute = async (
 
     const savedRoute = await prisma.savedRoute.findUnique({ where: { id } });
     if (!savedRoute) return next(new ValidationError("Route alert not found."));
-    if (savedRoute.userId !== userId) {
-      return next(new ValidationError("Unauthorized."));
-    }
+    if (savedRoute.userId !== userId) return next(new ValidationError("Unauthorized."));
 
-    const {
-      earliestDate,
-      latestDate,
-      emailEnabled,
-      includeNearby,
-    } = req.body as {
+    const { earliestDate, latestDate, emailEnabled, includeNearby } = req.body as {
       earliestDate?: string | null;
       latestDate?: string | null;
       emailEnabled?: boolean;
       includeNearby?: boolean;
     };
 
-    // Validation des dates si fournies
     if (earliestDate !== undefined && latestDate !== undefined) {
       if (earliestDate && latestDate) {
         const earliest = new Date(earliestDate);
         const latest = new Date(latestDate);
         if (earliest > latest) {
-          return next(
-            new ValidationError("Earliest date must be before latest date.")
-          );
+          return next(new ValidationError("Earliest date must be before latest date."));
         }
       }
     }
 
     const updateData: any = {};
-
     if (earliestDate !== undefined) {
       updateData.earliestDate = earliestDate ? new Date(earliestDate) : null;
     }
-
     if (latestDate !== undefined) {
       const latestDateParsed = latestDate ? new Date(latestDate) : null;
       updateData.latestDate = latestDateParsed;
-      // Recalculer expiresAt si latestDate change
       updateData.expiresAt = computeExpiresAt(latestDateParsed);
-      // Reset le flag de warning car nouvelle date
       updateData.expiryWarningSentAt = null;
     }
-
-    if (typeof emailEnabled === "boolean") {
-      updateData.emailEnabled = emailEnabled;
-    }
-    if (typeof includeNearby === "boolean") {
-      updateData.includeNearby = includeNearby;
-    }
+    if (typeof emailEnabled === "boolean") updateData.emailEnabled = emailEnabled;
+    if (typeof includeNearby === "boolean") updateData.includeNearby = includeNearby;
 
     const updated = await prisma.savedRoute.update({
       where: { id },
@@ -263,7 +269,6 @@ export const updateSavedRoute = async (
 
 // ───────────────────────────────────────────────────────
 // DELETE /api/saved-routes/:id
-// Suppression définitive (hard delete).
 // ───────────────────────────────────────────────────────
 
 export const deleteSavedRoute = async (
@@ -279,21 +284,13 @@ export const deleteSavedRoute = async (
 
     const savedRoute = await prisma.savedRoute.findUnique({ where: { id } });
     if (!savedRoute) {
-      // Idempotent : pas d'erreur si déjà supprimée
-      return res
-        .status(200)
-        .json({ success: true, message: "Route alert removed." });
+      return res.status(200).json({ success: true, message: "Route alert removed." });
     }
-    if (savedRoute.userId !== userId) {
-      return next(new ValidationError("Unauthorized."));
-    }
+    if (savedRoute.userId !== userId) return next(new ValidationError("Unauthorized."));
 
     await prisma.savedRoute.delete({ where: { id } });
 
-    return res.status(200).json({
-      success: true,
-      message: "Route alert removed.",
-    });
+    return res.status(200).json({ success: true, message: "Route alert removed." });
   } catch (error) {
     return next(error);
   }
@@ -301,8 +298,6 @@ export const deleteSavedRoute = async (
 
 // ───────────────────────────────────────────────────────
 // POST /api/saved-routes/:id/extend
-// Prolonge une alerte de 6 mois supplémentaires.
-// Utilisé depuis l'email de relance pré-expiration.
 // ───────────────────────────────────────────────────────
 
 export const extendSavedRoute = async (
@@ -318,9 +313,7 @@ export const extendSavedRoute = async (
 
     const savedRoute = await prisma.savedRoute.findUnique({ where: { id } });
     if (!savedRoute) return next(new ValidationError("Route alert not found."));
-    if (savedRoute.userId !== userId) {
-      return next(new ValidationError("Unauthorized."));
-    }
+    if (savedRoute.userId !== userId) return next(new ValidationError("Unauthorized."));
 
     const newExpiresAt = computeExtendedExpiresAt();
 
@@ -328,8 +321,8 @@ export const extendSavedRoute = async (
       where: { id },
       data: {
         expiresAt: newExpiresAt,
-        expiryWarningSentAt: null, // reset pour pouvoir relancer plus tard
-        isActive: true, // au cas où elle était inactive
+        expiryWarningSentAt: null,
+        isActive: true,
       },
     });
 

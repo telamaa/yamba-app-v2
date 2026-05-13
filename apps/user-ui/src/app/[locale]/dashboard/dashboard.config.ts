@@ -5,9 +5,11 @@ import {
   Plus,
   MessageSquare,
   Bell,
+  BellRing,
   CreditCard,
   Wallet,
   User,
+  UserPlus,
   Globe,
   Shield,
   Settings,
@@ -22,6 +24,8 @@ export type SectionKey =
   | "create"
   | "messages"
   | "notifications"
+  | "savedRoutes"
+  | "following"
   | "payments"
   | "wallet"
   | "profile"
@@ -31,7 +35,6 @@ export type SectionKey =
   | "help";
 
 export type NavGroup = {
-  /** Clé de traduction dans messages/{locale}/dashboard.json sous "groups" */
   labelKey: string;
   items: NavItem[];
 };
@@ -39,10 +42,15 @@ export type NavGroup = {
 export type NavItem = {
   key: SectionKey;
   icon: LucideIcon;
-  /** Clé de traduction dans messages/{locale}/dashboard.json sous "sections" */
   labelKey: string;
   badge?: number;
   standalone?: boolean;
+  /**
+   * Slug URL optionnel (override le segment de path par défaut).
+   * Utile pour les sections multi-mots : key "savedRoutes" → slug "saved-routes".
+   * Si non défini, le path utilisé est /dashboard/{key}.
+   */
+  slug?: string;
 };
 
 export const HOME_ITEM: NavItem = {
@@ -66,6 +74,22 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { key: "messages", icon: MessageSquare, labelKey: "messages", badge: 2 },
       { key: "notifications", icon: Bell, labelKey: "notifications", badge: 5 },
+    ],
+  },
+  {
+    labelKey: "alerts",
+    items: [
+      {
+        key: "savedRoutes",
+        icon: BellRing,
+        labelKey: "savedRoutes",
+        slug: "saved-routes",
+      },
+      {
+        key: "following",
+        icon: UserPlus,
+        labelKey: "following",
+      },
     ],
   },
   {
@@ -108,10 +132,47 @@ export const MOBILE_TABS: {
 
 export const MOBILE_TAB_SECTIONS: Record<MobileTab, SectionKey[]> = {
   home: ["home"],
-  activity: ["trips", "shipments"],
+  activity: ["trips", "shipments", "savedRoutes", "following"],
   messages: ["messages"],
   payments: ["payments"],
-  more: ["security", "settings", "help", "notifications", "profile", "yamber", "wallet", "create"],
+  more: [
+    "security",
+    "settings",
+    "help",
+    "notifications",
+    "profile",
+    "yamber",
+    "wallet",
+    "create",
+  ],
 };
 
 export const DEFAULT_SECTION: SectionKey = "home";
+
+/**
+ * Construit le segment d'URL pour un NavItem (utilise slug si défini, sinon key).
+ * Permet de centraliser la logique slug-or-key pour tous les composants nav.
+ */
+export function getNavItemPath(item: NavItem): string {
+  return item.slug ?? item.key;
+}
+
+/**
+ * Résout un segment d'URL (ex: "saved-routes") vers sa SectionKey (ex: "savedRoutes").
+ * Si le segment matche un slug, retourne le key correspondant.
+ * Sinon, si le segment matche déjà un key, le retourne tel quel.
+ * Sinon, retourne DEFAULT_SECTION.
+ */
+export function resolveSectionKey(segment: string): SectionKey {
+  if (HOME_ITEM.slug === segment || HOME_ITEM.key === segment) {
+    return HOME_ITEM.key;
+  }
+  for (const group of NAV_GROUPS) {
+    for (const item of group.items) {
+      if (item.slug === segment || item.key === segment) {
+        return item.key;
+      }
+    }
+  }
+  return DEFAULT_SECTION;
+}

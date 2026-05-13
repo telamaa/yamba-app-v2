@@ -114,6 +114,7 @@ export default function FollowSidebar({ user }: Props) {
               <NotifyToggle
                 checked={user.follow.notifyNextTrip ?? false}
                 onChange={handleToggleNotify}
+                firstName={user.firstName}
               />
             )}
           </>
@@ -172,9 +173,11 @@ export default function FollowSidebar({ user }: Props) {
 function NotifyToggle({
                         checked,
                         onChange,
+                        firstName,
                       }: {
   checked: boolean;
   onChange: (next: boolean) => void;
+  firstName: string;
 }) {
   const t = useTranslations("userProfile.sidebar");
 
@@ -200,7 +203,7 @@ function NotifyToggle({
           {t("notifyNextTrip")}
         </p>
         <p className="mt-0.5 text-[10px] leading-relaxed text-slate-500 dark:text-slate-400">
-          {t("notifyNextTripHint")}
+          {t("notifyNextTripHint", { firstName })}
         </p>
       </div>
     </label>
