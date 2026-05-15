@@ -338,8 +338,16 @@ model Address {
 type TripCategoryCondition {
   category         ParcelCategory
   priceAmountCents Int
-  handoffMoments   CategoryHandoffMoment[]
-  pickupMoments    PickupMoment[]
+}
+
+// Lieu de remise ou livraison défini par le Voyageur pour CE trajet.
+// Le Voyageur définit, l'Expéditeur s'adapte ou ne réserve pas.
+// Seuls les lieux activés côté Draft (enabled=true) sont persistés.
+type TripLocationPoint {
+  kind        LocationKind
+  details     String?
+  flexibility LocationFlexibility
+  radiusKm    Int? // uniquement défini quand flexibility = RADIUS (5, 10, 15, 20)
 }
 
 model Trip {
@@ -410,6 +418,12 @@ model Trip {
   // ─── Conditions / pricing ────────────────────────
   acceptedCategories ParcelCategory[]        @default([])
   categoryConditions TripCategoryCondition[]
+
+  // ─── Lieux de remise / livraison ─────────────────
+  // Le Voyageur définit où l'Expéditeur dépose le colis (pickup)
+  // et où il le récupère (delivery), pour CE trajet précis.
+  pickupLocations   TripLocationPoint[]
+  deliveryLocations TripLocationPoint[]
 
   handDeliveryOnly Boolean @default(false)
   instantBooking   Boolean @default(false)
@@ -554,12 +568,23 @@ enum FlightType {
 enum TrainTripType {
   DIRECT
   WITH_CONNECTION
-  WITH_INTERMEDIATE_STOPS
 }
 
 enum CarTripFlexibility {
   DIRECT
   DETOUR_BY_AGREEMENT
+}
+
+enum LocationKind {
+  AIRPORT
+  TRAIN_STATION
+  CITY_AREA
+}
+
+enum LocationFlexibility {
+  EXACT
+  RADIUS
+  CITY_WIDE
 }
 
 enum ParcelCategory {
@@ -575,16 +600,6 @@ enum ParcelCategory {
   OTHER_ELECTRONICS
   CHECKED_BAG_23KG
   CABIN_BAG_12KG
-}
-
-enum CategoryHandoffMoment {
-  BEFORE_DEPARTURE
-  AT_DEPARTURE
-}
-
-enum PickupMoment {
-  ON_ARRIVAL
-  LATER_AT_ADDRESS
 }
 
 enum TicketVerificationStatus {

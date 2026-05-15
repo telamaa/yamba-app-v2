@@ -9,19 +9,9 @@ import { ParcelCategory, YambaTripResult } from "./search-results.types";
 
 type Props = {
   item: YambaTripResult;
-  /** Catégories filtrées dans la sidebar (pour highlight dans le bottom sheet) */
   highlightedCategories?: ParcelCategory[];
 };
 
-/**
- * Card mobile (Variante D+ finale) :
- * - Header : pill transport + date + alerte places restantes
- * - Body : heures gros + villes + ligne de durée + prix avec "dès" discret
- * - Footer : avatar + tripper + catégories acceptées
- *
- * Tap sur la card → navigation vers /trips/{id}
- * Tap sur le `(?)` à côté du prix → ouvre TripPricingBottomSheet (sans naviguer)
- */
 export default function YambaTripResultCardMobile({
                                                     item,
                                                     highlightedCategories = [],
@@ -39,7 +29,18 @@ export default function YambaTripResultCardMobile({
     <>
       <Link
         href={`/trips/${item.id}`}
-        className="block overflow-hidden rounded-2xl border border-slate-200 bg-white transition-colors hover:border-[#FF9900]/40 dark:border-slate-800 dark:bg-slate-950 dark:hover:border-[#FF9900]/30"
+        className="
+          block overflow-hidden rounded-2xl
+          border border-slate-200 bg-white
+          shadow-[0_1px_2px_rgba(0,0,0,0.04),0_4px_16px_rgba(0,0,0,0.04)]
+          transition-all duration-200
+          hover:border-[#FF9900]/40
+          hover:shadow-[0_4px_24px_rgba(255,153,0,0.1)]
+          dark:border-slate-800/80 dark:bg-slate-900
+          dark:shadow-[0_1px_2px_rgba(0,0,0,0.3),0_4px_16px_rgba(0,0,0,0.2)]
+          dark:hover:border-[#FF9900]/30
+          dark:hover:shadow-[0_4px_24px_rgba(255,153,0,0.15)]
+        "
       >
         {/* ── Header : transport + date + alerte ── */}
         <div className="flex items-center justify-between gap-2 border-b border-slate-100 px-3.5 py-2 dark:border-slate-800/60">
@@ -142,7 +143,7 @@ export default function YambaTripResultCardMobile({
         </div>
 
         {/* ── Footer : tripper + catégories ── */}
-        <div className="flex items-center justify-between gap-2 border-t border-slate-100 px-3.5 py-2 dark:border-slate-800/60">
+        <div className="flex items-center justify-between gap-2 border-t border-slate-100 bg-slate-50/40 px-3.5 py-2 dark:border-slate-800/60 dark:bg-slate-950/40">
           <div className="flex min-w-0 flex-1 items-center gap-2">
             <Avatar item={item} />
             <div className="min-w-0 flex-1">
@@ -179,7 +180,6 @@ export default function YambaTripResultCardMobile({
         </div>
       </Link>
 
-      {/* ── Bottom Sheet Tarifs par catégorie (rendu hors Link) ── */}
       <TripPricingBottomSheet
         isOpen={isOpen}
         onClose={close}
@@ -272,32 +272,14 @@ function getTransportIcon(mode: string) {
   }) {
     if (mode === "plane") {
       return (
-        <svg
-          width={size}
-          height={size}
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={strokeWidth}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
           <path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z" />
         </svg>
       );
     }
     if (mode === "train") {
       return (
-        <svg
-          width={size}
-          height={size}
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={strokeWidth}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
           <rect x="4" y="3" width="16" height="16" rx="2" />
           <path d="M4 11h16" />
           <circle cx="8" cy="15" r="1" />
@@ -306,16 +288,7 @@ function getTransportIcon(mode: string) {
       );
     }
     return (
-      <svg
-        width={size}
-        height={size}
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={strokeWidth}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
         <path d="M5 17h14M5 17l1-7h12l1 7M5 17v3M19 17v3M7 13h10" />
         <circle cx="7" cy="14.5" r="1" />
         <circle cx="17" cy="14.5" r="1" />
