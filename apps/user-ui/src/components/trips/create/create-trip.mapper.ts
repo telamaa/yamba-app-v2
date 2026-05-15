@@ -5,14 +5,18 @@
  *
  * Transformations :
  *  - camelCase → SCREAMING_SNAKE_CASE (plane → PLANE)
- - from/to labels + PlaceInfo → origin*/
-// destination* (avec codes ISO)
-  // - priceAmount (€) → priceAmountCents
-  // - Date + time string → ISO departureAt
-  // - categoryConditions Record → Array
+ *  - from/to labels + PlaceInfo → origin* / destination* (avec codes ISO)
+ *  - priceAmount (€) → priceAmountCents
+ *  - Date + time string → ISO departureAt
+ *  - categoryConditions Record → Array
+ *  - pickupLocations / deliveryLocations : filtre enabled, strip id, normalise
+ */
 
-
-import type { Draft, CategoryCondition } from "./create-trip.types";
+import type {
+  Draft,
+  CategoryCondition,
+  TripLocationPoint,
+} from "./create-trip.types";
 
 // ─── Enum conversion ─────────────────────────
 
@@ -61,6 +65,37 @@ function toDateTimeIso(date?: Date, time?: string): string | null {
   return d.toISOString();
 }
 
+// ─── Location mapping ────────────────────────
+//
+// Le Draft stocke les TripLocationPoint avec des champs UI-only (`id`, `enabled`).
+// Le backend attend juste { kind, details, flexibility, radiusKm }.
+// On filtre les lieux activés et on strip le reste.
+//
+// Note: kind et flexibility sont déjà en SCREAMING_SNAKE_CASE côté frontend
+// (AIRPORT, CITY_AREA, EXACT, RADIUS, CITY_WIDE) — pas de mapping à faire.
+
+type ApiLocationPoint = {
+  kind: string;
+  details: string | null;
+  flexibility: string;
+  radiusKm: number | null;
+};
+
+function mapLocationsForApi(
+  locations: TripLocationPoint[]
+): ApiLocationPoint[] {
+  return locations
+    .filter((l) => l.enabled)
+    .map((l) => ({
+      kind: l.kind,
+      details:
+        l.details && l.details.trim().length > 0 ? l.details.trim() : null,
+      flexibility: l.flexibility,
+      // Defensive: only carry radiusKm when actually needed
+      radiusKm: l.flexibility === "RADIUS" ? l.radiusKm ?? null : null,
+    }));
+}
+
 // ─── Payload type ────────────────────────────
 
 export type CreateTripPayload = {
@@ -71,11 +106,11 @@ export type CreateTripPayload = {
   originLabel: string | null;
   originPlaceId: string | null;
   originCity: string | null;
-  originCityCode: string | null;       // ✨ NEW
+  originCityCode: string | null;
   originRegion: string | null;
-  originRegionCode: string | null;     // ✨ NEW
+  originRegionCode: string | null;
   originCountry: string | null;
-  originCountryCode: string | null;    // ✨ NEW
+  originCountryCode: string | null;
   originLat: number | null;
   originLng: number | null;
 
@@ -83,11 +118,11 @@ export type CreateTripPayload = {
   destinationLabel: string | null;
   destinationPlaceId: string | null;
   destinationCity: string | null;
-  destinationCityCode: string | null;       // ✨ NEW
+  destinationCityCode: string | null;
   destinationRegion: string | null;
-  destinationRegionCode: string | null;     // ✨ NEW
+  destinationRegionCode: string | null;
   destinationCountry: string | null;
-  destinationCountryCode: string | null;    // ✨ NEW
+  destinationCountryCode: string | null;
   destinationLat: number | null;
   destinationLng: number | null;
 
@@ -114,9 +149,12 @@ export type CreateTripPayload = {
   categoryConditions: Array<{
     category: string;
     priceAmountCents: number;
-    handoffMoments: string[];
-    pickupMoments: string[];
   }>;
+
+  // ⭐ Lieux de remise / livraison
+  pickupLocations: ApiLocationPoint[];
+  deliveryLocations: ApiLocationPoint[];
+
   handDeliveryOnly: boolean;
   instantBooking: boolean;
   currencyCode: string;
@@ -127,18 +165,26 @@ export type CreateTripPayload = {
 
 // ─── Mapper ──────────────────────────────────
 
-export function mapDraftToPayload(draft: Draft, publish: boolean): CreateTripPayload {
+export function mapDraftToPayload(
+  draft: Draft,
+  publish: boolean
+): CreateTripPayload {
   const { fromPlace, toPlace } = draft;
 
   const resolvePrice = (condition: CategoryCondition): number => {
     if (draft.useGlobalPrice && typeof draft.globalPrice === "number") {
       return draft.globalPrice;
     }
-    return typeof condition.priceAmount === "number" ? condition.priceAmount : 0;
+    return typeof condition.priceAmount === "number"
+      ? condition.priceAmount
+      : 0;
   };
 
   const splitCities = (raw: string): string[] =>
-    raw.split(",").map((s) => s.trim()).filter(Boolean);
+    raw
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
 
   return {
     // ── Trajet ──
@@ -149,11 +195,11 @@ export function mapDraftToPayload(draft: Draft, publish: boolean): CreateTripPay
     originLabel: draft.from || null,
     originPlaceId: fromPlace?.placeId ?? null,
     originCity: fromPlace?.city ?? null,
-    originCityCode: fromPlace?.cityCode ?? null,         // ✨ NEW
+    originCityCode: fromPlace?.cityCode ?? null,
     originRegion: fromPlace?.region ?? null,
-    originRegionCode: fromPlace?.regionCode ?? null,     // ✨ NEW
+    originRegionCode: fromPlace?.regionCode ?? null,
     originCountry: fromPlace?.country ?? null,
-    originCountryCode: fromPlace?.countryCode ?? null,   // ✨ NEW
+    originCountryCode: fromPlace?.countryCode ?? null,
     originLat: fromPlace?.lat ?? null,
     originLng: fromPlace?.lng ?? null,
 
@@ -161,11 +207,11 @@ export function mapDraftToPayload(draft: Draft, publish: boolean): CreateTripPay
     destinationLabel: draft.to || null,
     destinationPlaceId: toPlace?.placeId ?? null,
     destinationCity: toPlace?.city ?? null,
-    destinationCityCode: toPlace?.cityCode ?? null,           // ✨ NEW
+    destinationCityCode: toPlace?.cityCode ?? null,
     destinationRegion: toPlace?.region ?? null,
-    destinationRegionCode: toPlace?.regionCode ?? null,       // ✨ NEW
+    destinationRegionCode: toPlace?.regionCode ?? null,
     destinationCountry: toPlace?.country ?? null,
-    destinationCountryCode: toPlace?.countryCode ?? null,     // ✨ NEW
+    destinationCountryCode: toPlace?.countryCode ?? null,
     destinationLat: toPlace?.lat ?? null,
     destinationLng: toPlace?.lng ?? null,
 
@@ -187,16 +233,18 @@ export function mapDraftToPayload(draft: Draft, publish: boolean): CreateTripPay
     trainStopCities: splitCities(draft.trainStopCities),
     travelReference: draft.travelReference?.trim() || null,
 
-    // ── Conditions ──
+    // ── Conditions (simplified: just category + price) ──
     acceptedCategories: draft.acceptedCategories.map(mapCategory),
     categoryConditions: Object.values(draft.categoryConditions)
       .filter((c): c is CategoryCondition => !!c)
       .map((c) => ({
         category: mapCategory(c.categoryKey),
         priceAmountCents: Math.round(resolvePrice(c) * 100),
-        handoffMoments: c.handoffMoments.map((m) => toSnakeEnum(m)!),
-        pickupMoments: c.pickupMoments.map((m) => toSnakeEnum(m)!),
       })),
+
+    // ── Lieux de remise / livraison ──
+    pickupLocations: mapLocationsForApi(draft.pickupLocations),
+    deliveryLocations: mapLocationsForApi(draft.deliveryLocations),
 
     // ── Options ──
     handDeliveryOnly: draft.handDeliveryOnly,

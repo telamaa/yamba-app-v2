@@ -30,8 +30,11 @@ const MANGO = "#FF9900";
 const TEAL = "#0F766E";
 const EMPTY_ERRORS: ValidationErrors = {};
 
-// Bump ce numéro si tu changes la structure de Draft
-const DRAFT_VERSION = 1;
+// Bump ce numéro si tu changes la structure de Draft.
+// IMPORTANT: doit rester identique à CreateTripMobile.tsx (même clé sessionStorage).
+//   v1 → initial
+//   v2 → ajout pickupLocations/deliveryLocations, suppression handoff/pickup moments
+const DRAFT_VERSION = 2;
 
 export default function CreateTripWizard() {
   const { lang } = useUiPreferences();
@@ -243,98 +246,111 @@ export default function CreateTripWizard() {
   }
 
   return (
-    <main className="mx-auto max-w-7xl px-4 py-6">
+    <main className="mx-auto max-w-7xl px-4 py-8 sm:py-10">
       <div className="mx-auto max-w-2xl">
-        {/* Header */}
-        <div className="mb-2">
-          <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-white">
-            {isEditMode ? (isFr ? "Modifier le trajet" : "Edit trip") : copy.title}
-          </h1>
-          <p className="mt-0.5 text-[13px] text-slate-500 dark:text-slate-400">
-            {isEditMode
-              ? (isFr ? "Modifiez les informations de votre trajet" : "Update your trip information")
-              : copy.subtitle}
-          </p>
-        </div>
+        {/* ⭐ Card containment : border subtil + shadow double couche + filet gradient en tête */}
+        <div className="overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04),0_4px_16px_rgba(0,0,0,0.04)] dark:border-slate-800 dark:bg-slate-900 dark:shadow-[0_1px_2px_rgba(0,0,0,0.3),0_4px_16px_rgba(0,0,0,0.2)]">
+          {/* Filet gradient mango → teal — signature visuelle de Yamba */}
+          <div
+            className="h-[3px]"
+            style={{
+              background: `linear-gradient(90deg, ${MANGO} 0%, ${MANGO} 50%, ${TEAL} 100%)`,
+            }}
+          />
 
-        {/* Stepper */}
-        <TripStepper step={step} labels={copy.steps} onGoTo={goTo} />
+          <div className="p-6 sm:p-8">
+            {/* Header */}
+            <div className="mb-2">
+              <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-white">
+                {isEditMode ? (isFr ? "Modifier le trajet" : "Edit trip") : copy.title}
+              </h1>
+              <p className="mt-0.5 text-[13px] text-slate-500 dark:text-slate-400">
+                {isEditMode
+                  ? (isFr ? "Modifiez les informations de votre trajet" : "Update your trip information")
+                  : copy.subtitle}
+              </p>
+            </div>
 
-        {/* Error summary */}
-        {showErrors && <ErrorSummary errors={errors} isFr={isFr} />}
+            {/* Stepper */}
+            <TripStepper step={step} labels={copy.steps} onGoTo={goTo} />
 
-        {/* Live summary */}
-        <TripLiveSummary draft={draft} />
+            {/* Error summary */}
+            {showErrors && <ErrorSummary errors={errors} isFr={isFr} />}
 
-        {/* Step content */}
-        <div
-          ref={contentRef}
-          className={shakeFields ? "animate-[shake_0.4s_ease]" : ""}
-          key={step}
-          style={{
-            animation: `${direction === "forward" ? "slideInRight" : "slideInLeft"} 0.25s ease`,
-          }}
-        >
-          {step === 1 && (
-            <StepTrip copy={copy} isFr={isFr} draft={draft} setDraft={setDraft} errors={errors} />
-          )}
-          {step === 2 && (
-            <StepConditions
-              copy={copy}
-              isFr={isFr}
-              draft={draft}
-              setDraft={setDraft}
-              toggleCategory={toggleCategory}
-              errors={errors}
-            />
-          )}
-          {step === 3 && <StepReview copy={copy} isFr={isFr} draft={draft} onGoTo={goTo} />}
-        </div>
+            {/* Live summary */}
+            <TripLiveSummary draft={draft} />
 
-        {/* Bottom bar */}
-        <div className="mt-6 flex items-center justify-between border-t border-slate-200 pt-5 dark:border-slate-800">
-          <div className="flex gap-2.5">
-            {step > 1 && (
-              <button
-                type="button"
-                onClick={prevStep}
-                className="rounded-lg border border-slate-200 px-5 py-2.5 text-[13px] text-slate-600 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800"
-              >
-                {copy.back}
-              </button>
-            )}
-            {!isEditMode && (
-              <button
-                type="button"
-                onClick={handleSaveDraft}
-                className="rounded-lg border border-slate-200 px-4 py-2.5 text-[13px] text-slate-500 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800"
-              >
-                {copy.saveDraft}
-              </button>
-            )}
+            {/* Step content */}
+            <div
+              ref={contentRef}
+              className={shakeFields ? "animate-[shake_0.4s_ease]" : ""}
+              key={step}
+              style={{
+                animation: `${direction === "forward" ? "slideInRight" : "slideInLeft"} 0.25s ease`,
+              }}
+            >
+              {step === 1 && (
+                <StepTrip copy={copy} isFr={isFr} draft={draft} setDraft={setDraft} errors={errors} />
+              )}
+              {step === 2 && (
+                <StepConditions
+                  copy={copy}
+                  isFr={isFr}
+                  draft={draft}
+                  setDraft={setDraft}
+                  toggleCategory={toggleCategory}
+                  errors={errors}
+                />
+              )}
+              {step === 3 && <StepReview copy={copy} isFr={isFr} draft={draft} onGoTo={goTo} />}
+            </div>
+
+            {/* Bottom bar — à l'intérieur de la card, border interne plus subtil */}
+            <div className="mt-6 flex items-center justify-between border-t border-slate-200/70 pt-5 dark:border-slate-800">
+              <div className="flex gap-2.5">
+                {step > 1 && (
+                  <button
+                    type="button"
+                    onClick={prevStep}
+                    className="rounded-lg border border-slate-200 px-5 py-2.5 text-[13px] text-slate-600 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800"
+                  >
+                    {copy.back}
+                  </button>
+                )}
+                {!isEditMode && (
+                  <button
+                    type="button"
+                    onClick={handleSaveDraft}
+                    className="rounded-lg border border-slate-200 px-4 py-2.5 text-[13px] text-slate-500 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800"
+                  >
+                    {copy.saveDraft}
+                  </button>
+                )}
+              </div>
+              {step < 3 ? (
+                <button
+                  type="button"
+                  onClick={nextStep}
+                  className="rounded-lg px-6 py-2.5 text-[13px] font-medium text-slate-900 transition-colors"
+                  style={{ backgroundColor: MANGO }}
+                >
+                  {copy.continue}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handlePublish}
+                  disabled={isPublishing}
+                  className="rounded-lg px-6 py-2.5 text-[13px] font-medium text-white transition-colors disabled:opacity-50"
+                  style={{ backgroundColor: TEAL }}
+                >
+                  {isPublishing
+                    ? (isFr ? (isEditMode ? "Mise à jour..." : "Publication...") : (isEditMode ? "Updating..." : "Publishing..."))
+                    : (isEditMode ? (isFr ? "Mettre à jour" : "Update") : copy.publish)}
+                </button>
+              )}
+            </div>
           </div>
-          {step < 3 ? (
-            <button
-              type="button"
-              onClick={nextStep}
-              className="rounded-lg px-6 py-2.5 text-[13px] font-medium text-slate-900 transition-colors"
-              style={{ backgroundColor: MANGO }}
-            >
-              {copy.continue}
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={handlePublish}
-              disabled={isPublishing}
-              className="rounded-lg px-6 py-2.5 text-[13px] font-medium text-white transition-colors disabled:opacity-50"
-              style={{ backgroundColor: TEAL }}
-            >
-              {isPublishing
-                ? (isFr ? (isEditMode ? "Mise à jour..." : "Publication...") : (isEditMode ? "Updating..." : "Publishing..."))
-                : (isEditMode ? (isFr ? "Mettre à jour" : "Update") : copy.publish)}
-            </button>
-          )}
         </div>
       </div>
 

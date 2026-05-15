@@ -13,7 +13,7 @@ export function getCreateTripCopy(isFr: boolean): CreateTripCopy {
     steps: [
       isFr ? "Trajet" : "Trip",
       isFr ? "Conditions" : "Conditions",
-      isFr ? "Publication" : "Publish",
+      isFr ? "Vérification" : "Review",
     ],
     back: isFr ? "Retour" : "Back",
     continue: isFr ? "Continuer" : "Continue",
@@ -29,8 +29,8 @@ export function getCreateTripCopy(isFr: boolean): CreateTripCopy {
       : "Transport mode, route and dates.",
     step2Title: isFr ? "Vos conditions" : "Your conditions",
     step2Sub: isFr
-      ? "Catégories acceptées, prix et modalités."
-      : "Accepted categories, pricing and terms.",
+      ? "Catégories, prix et lieux de rendez-vous."
+      : "Categories, pricing and meeting points.",
     step3Title: isFr ? "Vérification" : "Review",
     step3Sub: isFr
       ? "Vérifiez et publiez votre trajet."
@@ -54,13 +54,12 @@ export function getCreateTripCopy(isFr: boolean): CreateTripCopy {
     directFlight: isFr ? "Vol direct" : "Direct flight",
     withLayover: isFr ? "Avec escale" : "With layover",
     directTrain: isFr ? "Direct" : "Direct",
-    withConnection: isFr ? "Correspondance" : "Connection",
-    withIntermediateStops: isFr ? "Arrêts" : "Stops",
+    withConnection: isFr ? "Avec correspondance" : "With connection",
     directTrip: isFr ? "Direct" : "Direct",
     detourByAgreement: isFr ? "Détour possible" : "Detour possible",
 
-    flightLayoverCities: isFr ? "Ville(s) d'escale" : "Layover city/cities",
-    trainStopCities: isFr ? "Ville(s) de correspondance" : "Connection city/cities",
+    flightLayoverCities: isFr ? "Ville d'escale" : "Layover city",
+    trainStopCities: isFr ? "Ville de correspondance" : "Connection city",
     travelReference: isFr ? "Réf. voyage" : "Travel ref.",
 
     docUpload: isFr ? "Justificatif" : "Proof",
@@ -79,17 +78,32 @@ export function getCreateTripCopy(isFr: boolean): CreateTripCopy {
       : "Applied to all categories",
     adjustPrices: isFr ? "Ajuster par catégorie" : "Adjust per category",
     pricePerCategory: isFr ? "Prix par catégorie" : "Price per category",
-
     price: isFr ? "Prix" : "Price",
-    handoffMoments: isFr ? "Remise" : "Handoff",
-    pickupMoments: isFr ? "Retrait" : "Pickup",
-    beforeDeparture: isFr ? "Avant départ" : "Before departure",
-    atDeparture: isFr ? "Au départ" : "At departure",
-    onArrival: isFr ? "À l'arrivée" : "At arrival",
-    laterAtAddress: isFr ? "Adresse convenue" : "Agreed address",
-    pickupInfo: isFr
-      ? "Quand le destinataire peut récupérer le colis."
-      : "When the recipient can collect the parcel.",
+
+    // ── Locations ─────────────────────────
+    pickupLocations: isFr ? "Lieux de remise" : "Pickup locations",
+    pickupLocationsSub: isFr
+      ? "Où l'expéditeur dépose le colis"
+      : "Where the sender drops off the parcel",
+    deliveryLocations: isFr ? "Lieux de livraison" : "Delivery locations",
+    deliveryLocationsSub: isFr
+      ? "Où l'expéditeur récupère le colis"
+      : "Where the sender collects the parcel",
+    atAirport: isFr ? "À l'aéroport" : "At the airport",
+    atTrainStation: isFr ? "À la gare" : "At the train station",
+    inTheCity: isFr ? "Dans la ville" : "In the city",
+    locationDetailsPlaceholder: isFr
+      ? "Précisions (ex. T2E hall départ, café de la gare…)"
+      : "Details (e.g. T2E departures hall, café at the station…)",
+    flexibility: isFr ? "Flexibilité" : "Flexibility",
+    flexExact: isFr ? "Exact" : "Exact",
+    flexRadius5: isFr ? "Rayon 5 km" : "5 km radius",
+    flexRadius10: isFr ? "Rayon 10 km" : "10 km radius",
+    flexRadius15: isFr ? "Rayon 15 km" : "15 km radius",
+    flexRadius20: isFr ? "Rayon 20 km" : "20 km radius",
+    flexCityWide: isFr ? "Ville entière" : "Whole city",
+    locationsCount: (n: number) =>
+      isFr ? `${n} lieu${n > 1 ? "x" : ""}` : `${n} location${n > 1 ? "s" : ""}`,
 
     options: isFr ? "Options" : "Options",
     handOnly: isFr ? "Main propre uniquement" : "Hand delivery only",
@@ -104,8 +118,14 @@ export function getCreateTripCopy(isFr: boolean): CreateTripCopy {
     reviewRoute: isFr ? "Itinéraire" : "Route",
     reviewSchedule: isFr ? "Dates" : "Dates",
     reviewCategoryConditions: isFr ? "Catégories & prix" : "Categories & pricing",
+    reviewLocations: isFr ? "Lieux de remise & livraison" : "Pickup & delivery",
     reviewDocuments: isFr ? "Justificatifs" : "Documents",
     edit: isFr ? "Modifier" : "Edit",
+
+    publicPreview: isFr ? "Aperçu public" : "Public preview",
+    asSeenByShippers: isFr
+      ? "Tel que vu par les expéditeurs"
+      : "As seen by senders",
 
     revenueEstimate: isFr ? "Revenu estimé" : "Estimated revenue",
     resumeDraft: isFr ? "Reprendre votre brouillon ?" : "Resume your draft?",
