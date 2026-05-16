@@ -6,7 +6,8 @@ import { toast } from "sonner";
 import {
   ArrowLeft, Plane, Train, Car, MapPin, Calendar, Tag, FileText,
   StickyNote, ExternalLink, Pencil, Pause, Zap, Copy, Archive, RotateCcw,
-  XCircle, Trash2, AlertTriangle, Loader2, Package, Info,
+  XCircle, Trash2, AlertTriangle, Loader2, Package, Info, Building2,
+  PackagePlus, PackageCheck,
 } from "lucide-react";
 import { useUiPreferences } from "@/components/providers/UiPreferencesProvider";
 import useUser from "@/hooks/useUser";
@@ -32,12 +33,7 @@ const CATEGORY_LABELS: Record<string, { fr: string; en: string }> = {
   CHECKED_BAG_23KG: { fr: "Bagage soute 23kg", en: "Checked bag 23kg" },
   CABIN_BAG_12KG: { fr: "Bagage cabine 12kg", en: "Cabin bag 12kg" },
 };
-const HANDOFF_LABELS: Record<string, { fr: string; en: string }> = {
-  BEFORE_DEPARTURE: { fr: "Avant le départ", en: "Before departure" }, AT_DEPARTURE: { fr: "Au départ", en: "At departure" },
-};
-const PICKUP_LABELS: Record<string, { fr: string; en: string }> = {
-  ON_ARRIVAL: { fr: "À l'arrivée", en: "On arrival" }, LATER_AT_ADDRESS: { fr: "Plus tard à une adresse", en: "Later at address" },
-};
+
 const TRANSPORT_ICON: Record<string, React.ElementType> = { PLANE: Plane, TRAIN: Train, CAR: Car };
 const TRIP_TYPE_LABELS: Record<string, { fr: string; en: string }> = {
   ONE_WAY: { fr: "Aller simple", en: "One way" }, ROUND_TRIP: { fr: "Aller-retour", en: "Round trip" },
@@ -45,9 +41,10 @@ const TRIP_TYPE_LABELS: Record<string, { fr: string; en: string }> = {
 const FLIGHT_TYPE_LABELS: Record<string, { fr: string; en: string }> = {
   DIRECT: { fr: "Vol direct", en: "Direct flight" }, WITH_LAYOVER: { fr: "Avec escale", en: "With layover" },
 };
+// ⚠️ WITH_INTERMEDIATE_STOPS supprimé — l'option n'existe plus dans le produit.
 const TRAIN_TYPE_LABELS: Record<string, { fr: string; en: string }> = {
-  DIRECT: { fr: "Direct", en: "Direct" }, WITH_CONNECTION: { fr: "Avec correspondance", en: "With connection" },
-  WITH_INTERMEDIATE_STOPS: { fr: "Avec arrêts intermédiaires", en: "With intermediate stops" },
+  DIRECT: { fr: "Direct", en: "Direct" },
+  WITH_CONNECTION: { fr: "Avec correspondance", en: "With connection" },
 };
 const CAR_TYPE_LABELS: Record<string, { fr: string; en: string }> = {
   DIRECT: { fr: "Trajet direct", en: "Direct trip" }, DETOUR_BY_AGREEMENT: { fr: "Détour possible", en: "Detour by agreement" },
@@ -58,6 +55,33 @@ const TICKET_STATUS_LABELS: Record<string, { fr: string; en: string; color: stri
   VERIFIED: { fr: "Vérifié", en: "Verified", color: "#10b981" },
   REJECTED: { fr: "Rejeté", en: "Rejected", color: "#ef4444" },
 };
+
+/* ── Location labels & helpers ──────────── */
+
+const LOCATION_KIND_LABELS: Record<string, { fr: string; en: string }> = {
+  AIRPORT: { fr: "À l'aéroport", en: "At the airport" },
+  TRAIN_STATION: { fr: "À la gare", en: "At the train station" },
+  CITY_AREA: { fr: "Dans la ville", en: "In the city" },
+};
+
+const LOCATION_KIND_ICON: Record<string, React.ElementType> = {
+  AIRPORT: Plane,
+  TRAIN_STATION: Train,
+  CITY_AREA: Building2,
+};
+
+function getFlexibilityLabel(
+  flexibility: string,
+  radiusKm: number | null | undefined,
+  isFr: boolean
+): string {
+  if (flexibility === "EXACT") return isFr ? "Lieu exact" : "Exact spot";
+  if (flexibility === "CITY_WIDE") return isFr ? "Ville entière" : "Whole city";
+  if (flexibility === "RADIUS" && radiusKm) {
+    return isFr ? `Rayon ${radiusKm} km` : `Within ${radiusKm} km`;
+  }
+  return "";
+}
 
 /* ── Inline mutations ─────────────────────── */
 
@@ -78,14 +102,16 @@ function useDuplicateTrip() {
         transportMode: o.transportMode, tripType: o.tripType,
         originLabel: o.originLabel, originPlaceId: o.originPlaceId, originCity: o.originCity, originRegion: o.originRegion, originCountry: o.originCountry, originLat: o.originLat, originLng: o.originLng,
         destinationLabel: o.destinationLabel, destinationPlaceId: o.destinationPlaceId, destinationCity: o.destinationCity, destinationRegion: o.destinationRegion, destinationCountry: o.destinationCountry, destinationLat: o.destinationLat, destinationLng: o.destinationLng,
-        acceptedCategories: o.acceptedCategories, categoryConditions: o.categoryConditions, handDeliveryOnly: o.handDeliveryOnly, instantBooking: o.instantBooking, currencyCode: o.currencyCode, notes: o.notes, publish: false,
+        acceptedCategories: o.acceptedCategories, categoryConditions: o.categoryConditions,
+        // ⭐ Locations dupliquées aussi
+        pickupLocations: o.pickupLocations, deliveryLocations: o.deliveryLocations,
+        handDeliveryOnly: o.handDeliveryOnly, instantBooking: o.instantBooking, currencyCode: o.currencyCode, notes: o.notes, publish: false,
       }, { requireAuth: true });
     },
     onSuccess: () => { void qc.invalidateQueries({ queryKey: ["my-trips"] }); },
   });
 }
 
-// NEW: Activate trip (DRAFT → PUBLISHED)
 function useActivateTrip() {
   const qc = useQueryClient();
   return useMutation({
@@ -99,7 +125,6 @@ function useActivateTrip() {
   });
 }
 
-// NEW: Revert to draft (PUBLISHED/PAUSED → DRAFT)
 function useRevertToDraft() {
   const qc = useQueryClient();
   return useMutation({
@@ -163,6 +188,51 @@ function ConfirmModal({ open, title, message, confirmLabel, isLoading, onConfirm
         <div className="flex gap-3 border-t border-slate-100 px-6 py-4 dark:border-slate-800">
           <button type="button" onClick={onCancel} disabled={isLoading} className="flex-1 rounded-lg border border-slate-200 py-2.5 text-[13px] font-medium text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">{isFr ? "Retour" : "Go back"}</button>
           <button type="button" onClick={onConfirm} disabled={isLoading} className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-red-600 py-2.5 text-[13px] font-medium text-white transition-colors hover:bg-red-700 disabled:opacity-50">{isLoading && <Loader2 size={14} className="animate-spin" />}{confirmLabel}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Location row (single location card) ─── */
+
+function LocationRow({
+                       location,
+                       isFr,
+                     }: {
+  location: {
+    kind: string;
+    details?: string | null;
+    flexibility: string;
+    radiusKm?: number | null;
+  };
+  isFr: boolean;
+}) {
+  const KindIcon = LOCATION_KIND_ICON[location.kind] ?? MapPin;
+  const kindLabel = LOCATION_KIND_LABELS[location.kind]?.[isFr ? "fr" : "en"] ?? location.kind;
+  const flexLabel = getFlexibilityLabel(location.flexibility, location.radiusKm, isFr);
+
+  return (
+    <div className="rounded-lg border border-slate-100 p-3 dark:border-slate-800">
+      <div className="flex items-start gap-2.5">
+        <KindIcon size={14} className="mt-0.5 flex-shrink-0 text-[#FF9900]" />
+        <div className="min-w-0 flex-1">
+          <div className="text-[13px] font-medium text-slate-900 dark:text-white">
+            {kindLabel}
+          </div>
+          {location.details && (
+            <div className="mt-0.5 text-[12px] text-slate-500 dark:text-slate-400">
+              {location.details}
+            </div>
+          )}
+          {flexLabel && (
+            <div
+              className="mt-1.5 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium"
+              style={{ backgroundColor: "rgba(15,118,110,0.1)", color: TEAL }}
+            >
+              {flexLabel}
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -233,7 +303,6 @@ export default function TripDetails({ tripId }: { tripId: string }) {
       );
       return;
     }
-    // All good — activate
     if (trip?.status === "DRAFT") {
       activateTrip.mutate(tripId, {
         onSuccess: () => ok(isFr ? "Trajet activé" : "Trip activated"),
@@ -288,8 +357,10 @@ export default function TripDetails({ tripId }: { tripId: string }) {
   const destCity = trip.destinationCity ?? trip.destinationLabel ?? "—";
   const categories: any[] = trip.categoryConditions ?? [];
   const documents: any[] = trip.documents ?? [];
+  const pickupLocations: any[] = trip.pickupLocations ?? [];
+  const deliveryLocations: any[] = trip.deliveryLocations ?? [];
+  const hasLocations = pickupLocations.length > 0 || deliveryLocations.length > 0;
 
-  // Can edit documents only if trip is in an editable state
   const canEditDocuments = !["CANCELLED", "COMPLETED", "ARCHIVED"].includes(status);
 
   const getSubType = () => {
@@ -300,7 +371,6 @@ export default function TripDetails({ tripId }: { tripId: string }) {
   };
   const subType = getSubType();
 
-  // Modal config
   const modalConfig = modal ? (() => {
     if (modal === "delete") return {
       title: isFr ? "Supprimer ce brouillon ?" : "Delete this draft?",
@@ -363,17 +433,14 @@ export default function TripDetails({ tripId }: { tripId: string }) {
 
           {categories.length > 0 && (
             <Section icon={Tag} title={isFr ? "Catégories & tarifs" : "Categories & pricing"}>
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {categories.map((c: any, i: number) => {
                   const catLabel = CATEGORY_LABELS[c.category] ?? { fr: c.category, en: c.category };
                   const price = typeof c.priceAmountCents === "number" ? (c.priceAmountCents / 100).toFixed(2) : "—";
                   return (
-                    <div key={i} className="rounded-lg border border-slate-100 p-3 dark:border-slate-800">
-                      <div className="flex items-center justify-between"><span className="text-[13px] font-medium text-slate-900 dark:text-white">{isFr ? catLabel.fr : catLabel.en}</span><span className="text-[13px] font-semibold" style={{ color: MANGO }}>{price} €</span></div>
-                      <div className="mt-2 flex flex-wrap gap-1.5">
-                        {(c.handoffMoments ?? []).map((m: string) => <span key={m} className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-500 dark:bg-slate-800 dark:text-slate-400">{HANDOFF_LABELS[m] ? (isFr ? HANDOFF_LABELS[m].fr : HANDOFF_LABELS[m].en) : m}</span>)}
-                        {(c.pickupMoments ?? []).map((m: string) => <span key={m} className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-500 dark:bg-slate-800 dark:text-slate-400">{PICKUP_LABELS[m] ? (isFr ? PICKUP_LABELS[m].fr : PICKUP_LABELS[m].en) : m}</span>)}
-                      </div>
+                    <div key={i} className="flex items-center justify-between rounded-lg border border-slate-100 px-3 py-2.5 dark:border-slate-800">
+                      <span className="text-[13px] font-medium text-slate-900 dark:text-white">{isFr ? catLabel.fr : catLabel.en}</span>
+                      <span className="text-[13px] font-semibold" style={{ color: MANGO }}>{price} €</span>
                     </div>
                   );
                 })}
@@ -381,7 +448,48 @@ export default function TripDetails({ tripId }: { tripId: string }) {
             </Section>
           )}
 
-          {/* Documents — always show so carrier can add/remove from detail page */}
+          {/* ⭐ NOUVELLE SECTION : Lieux de remise & livraison */}
+          {hasLocations && (
+            <Section
+              icon={MapPin}
+              title={isFr ? "Lieux de remise & livraison" : "Pickup & delivery locations"}
+            >
+              <div className="space-y-5">
+                {pickupLocations.length > 0 && (
+                  <div>
+                    <div className="mb-2 flex items-center gap-1.5">
+                      <PackagePlus size={12} className="text-[#FF9900]" />
+                      <span className="text-[10px] font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">
+                        {isFr ? "Remise" : "Pickup"}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                      {pickupLocations.map((loc: any, i: number) => (
+                        <LocationRow key={`pickup-${i}`} location={loc} isFr={isFr} />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {deliveryLocations.length > 0 && (
+                  <div>
+                    <div className="mb-2 flex items-center gap-1.5">
+                      <PackageCheck size={12} className="text-[#FF9900]" />
+                      <span className="text-[10px] font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">
+                        {isFr ? "Livraison" : "Delivery"}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                      {deliveryLocations.map((loc: any, i: number) => (
+                        <LocationRow key={`delivery-${i}`} location={loc} isFr={isFr} />
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </Section>
+          )}
+
           <Section icon={FileText} title={isFr ? "Documents" : "Documents"}>
             <TripDocumentsManager
               tripId={tripId}
@@ -400,50 +508,31 @@ export default function TripDetails({ tripId }: { tripId: string }) {
           <div className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900/50">
             <div className="mb-4 text-[13px] font-semibold text-slate-900 dark:text-white">Actions</div>
             <div className="flex flex-col gap-2">
-              {/* Activer pour DRAFT */}
               {status === "DRAFT" && !pastDeparture && (
                 <ActionButton icon={Zap} label={isFr ? "Activer" : "Activate"} variant="activate" loading={activateTrip.isPending} onClick={handleActivate} />
               )}
-
-              {/* Reprendre pour PAUSED */}
               {status === "PAUSED" && !pastDeparture && (
                 <ActionButton icon={Zap} label={isFr ? "Reprendre" : "Resume"} variant="activate" loading={resumeTrip.isPending} onClick={handleActivate} />
               )}
-
-              {/* Mettre en pause */}
               {status === "PUBLISHED" && (
                 <ActionButton icon={Pause} label={isFr ? "Mettre en pause" : "Pause"} loading={pauseTrip.isPending} onClick={() => pauseTrip.mutate(tripId, { onSuccess: () => ok(isFr ? "Trajet mis en pause" : "Trip paused"), onError: ko })} />
               )}
-
-              {/* Repasser en brouillon */}
               {["PUBLISHED", "PAUSED"].includes(status) && (
                 <ActionButton icon={FileText} label={isFr ? "Repasser en brouillon" : "Revert to draft"} onClick={() => setModal("revertToDraft")} />
               )}
-
-              {/* Modifier */}
               {["DRAFT", "PUBLISHED", "PAUSED"].includes(status) && (
                 <ActionButton icon={Pencil} label={isFr ? "Modifier" : "Edit"} variant="primary" onClick={() => router.push(`/trips/create?edit=${tripId}`)} />
               )}
-
-              {/* Dupliquer */}
               <ActionButton icon={Copy} label={isFr ? "Dupliquer" : "Duplicate"} loading={duplicateTrip.isPending} onClick={() => duplicateTrip.mutate(tripId, { onSuccess: () => { setFlashToast({ type: "success", message: isFr ? "Brouillon créé par duplication" : "Draft created from duplicate" }); router.push("/dashboard/trips"); }, onError: ko })} />
-
-              {/* Restaurer en brouillon */}
               {status === "CANCELLED" && !pastDeparture && (
                 <ActionButton icon={RotateCcw} label={isFr ? "Restaurer en brouillon" : "Restore as draft"} loading={restoreTrip.isPending} onClick={() => restoreTrip.mutate(tripId, { onSuccess: () => ok(isFr ? "Trajet restauré en brouillon" : "Trip restored as draft"), onError: ko })} />
               )}
-
-              {/* Archiver */}
               {["COMPLETED", "CANCELLED"].includes(status) && (
                 <ActionButton icon={Archive} label={isFr ? "Archiver" : "Archive"} onClick={() => ok(isFr ? "Trajet archivé" : "Trip archived")} />
               )}
-
-              {/* Annuler */}
               {["PUBLISHED", "PAUSED"].includes(status) && (
                 <ActionButton icon={XCircle} label={isFr ? "Annuler le trajet" : "Cancel trip"} variant="danger" onClick={() => setModal("cancel")} />
               )}
-
-              {/* Supprimer */}
               {status === "DRAFT" && (
                 <ActionButton icon={Trash2} label={isFr ? "Supprimer le brouillon" : "Delete draft"} variant="danger" onClick={() => setModal("delete")} />
               )}

@@ -1,18 +1,21 @@
-import type {Response, NextFunction, RequestHandler} from "express";
+import type { Response, NextFunction, RequestHandler } from "express";
 import prisma from "@packages/libs/prisma";
 import { ValidationError } from "@packages/error-handler";
 import { AuthenticatedRequest } from "@packages/middleware/isAuthenticated";
 import imagekit from "../lib/imagekit";
-// ⭐ NEW : helpers pour auto-populer les champs dénormalisés
 import {
   computeMinPriceCents,
   computeHourLocal,
 } from "../lib/trip-mappers";
-
+import { triggerTripPublishedNotifications } from "../services/trigger-trip-notifications";
+import {
+  createTripSchema,
+  updateTripSchema,
+  formatZodError,
+} from "../schemas/trip.schema";
 
 // ─────────────────────────────────────────────
 // Helper interne : recalcule les champs dénormalisés
-// (minPriceCents, departureHourLocal) depuis le payload courant
 // ─────────────────────────────────────────────
 
 function computeDenormalizedFields(input: {
@@ -27,14 +30,13 @@ function computeDenormalizedFields(input: {
     input.departureAt && input.originTimezone
       ? computeHourLocal(input.departureAt, input.originTimezone)
       : input.departureAt
-        ? computeHourLocal(input.departureAt, "Europe/Paris") // fallback
+        ? computeHourLocal(input.departureAt, "Europe/Paris")
         : null;
   return { minPriceCents, departureHourLocal };
 }
 
 // ─────────────────────────────────────────────
 // POST /api/trips
-// Créer un nouveau trip (brouillon ou publié)
 // ─────────────────────────────────────────────
 
 export const createTrip = async (
@@ -45,67 +47,16 @@ export const createTrip = async (
   try {
     if (!req.user) return next(new ValidationError("Unauthorized"));
 
+    // ── Zod validation (shape + intra-payload rules) ──
+    const parsed = createTripSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return next(new ValidationError(formatZodError(parsed.error)));
+    }
+    const data = parsed.data;
     const userId = req.user.id;
-    const {
-      // Trajet
-      transportMode,
-      tripType,
-      originLabel,
-      originPlaceId,
-      originCity,
-      originCityCode,         // ⭐ NEW
-      originRegion,
-      originCountry,
-      originLat,
-      originLng,
-      originTimezone,         // ⭐ NEW
-      destinationLabel,
-      destinationPlaceId,
-      destinationCity,
-      destinationCityCode,    // ⭐ NEW
-      destinationRegion,
-      destinationCountry,
-      destinationLat,
-      destinationLng,
-      destinationTimezone,    // ⭐ NEW
-      // Dates
-      departureDateLocal,
-      arrivalDateLocal,
-      departureTimeLocal,
-      arrivalTimeLocal,
-      departureAt,
-      arrivalAt,
-      returnDepartureAt,
-      returnArrivalAt,
-      // Mode-specific
-      flightType,
-      trainTripType,
-      carTripFlexibility,
-      flightLayoverCities,
-      trainStopCities,
-      travelReference,
-      // Conditions
-      acceptedCategories,
-      categoryConditions,
-      handDeliveryOnly,
-      instantBooking,
-      currencyCode,
-      maxSlots,               // ⭐ NEW
-      notes,
-      // Publication
-      publish,
-    } = req.body;
+    const shouldPublish = data.publish === true;
 
-    if (!transportMode) {
-      return next(new ValidationError("Transport mode is required."));
-    }
-    if (!originCity || !destinationCity) {
-      return next(new ValidationError("Origin and destination are required."));
-    }
-    if (departureAt && new Date(departureAt) < new Date()) {
-      return next(new ValidationError("Departure date must be in the future."));
-    }
-
+    // ── DB-dependent publish gate ──
     const carrierPage = await prisma.carrierPage.findUnique({
       where: { userId },
       select: {
@@ -113,35 +64,26 @@ export const createTrip = async (
         onboardingStep: true,
         stripeOnboardingComplete: true,
         stripeChargesEnabled: true,
-        ratingsAvg: true,    // ⭐ NEW : pour le snapshot au publish
+        ratingsAvg: true,
         ratingsCount: true,
       },
     });
 
-    const shouldPublish = publish === true;
-
     if (shouldPublish) {
       if (!carrierPage || carrierPage.onboardingStep === "PROFILE") {
-        return next(
-          new ValidationError("Carrier profile must be completed to publish a trip.")
-        );
+        return next(new ValidationError("Carrier profile must be completed to publish a trip."));
       }
       if (!carrierPage.stripeOnboardingComplete || !carrierPage.stripeChargesEnabled) {
-        return next(
-          new ValidationError("Stripe must be configured to publish a trip.")
-        );
+        return next(new ValidationError("Stripe must be configured to publish a trip."));
       }
     }
 
-    // ⭐ NEW : calcul des champs dénormalisés
-    const departureAtDate = departureAt ? new Date(departureAt) : null;
     const { minPriceCents, departureHourLocal } = computeDenormalizedFields({
-      categoryConditions,
-      departureAt: departureAtDate,
-      originTimezone,
+      categoryConditions: data.categoryConditions,
+      departureAt: data.departureAt ?? null,
+      originTimezone: data.originTimezone ?? null,
     });
 
-    // ⭐ NEW : snapshot rating SEULEMENT si publication immédiate
     const carrierRatingSnapshot =
       shouldPublish && carrierPage && carrierPage.ratingsCount > 0
         ? carrierPage.ratingsAvg
@@ -153,61 +95,73 @@ export const createTrip = async (
         carrierPageId: carrierPage?.id ?? null,
         status: shouldPublish ? "PUBLISHED" : "DRAFT",
         currentStep: shouldPublish ? 3 : 1,
-        // Trajet
-        transportMode,
-        tripType: tripType ?? "ONE_WAY",
-        originLabel: originLabel?.trim() ?? null,
-        originPlaceId: originPlaceId ?? null,
-        originCity: originCity?.trim() ?? null,
-        originCityCode: originCityCode?.trim() ?? null,           // ⭐ NEW
-        originRegion: originRegion?.trim() ?? null,
-        originCountry: originCountry?.trim() ?? null,
-        originLat: originLat ?? null,
-        originLng: originLng ?? null,
-        originTimezone: originTimezone?.trim() ?? null,           // ⭐ NEW
-        destinationLabel: destinationLabel?.trim() ?? null,
-        destinationPlaceId: destinationPlaceId ?? null,
-        destinationCity: destinationCity?.trim() ?? null,
-        destinationCityCode: destinationCityCode?.trim() ?? null, // ⭐ NEW
-        destinationRegion: destinationRegion?.trim() ?? null,
-        destinationCountry: destinationCountry?.trim() ?? null,
-        destinationLat: destinationLat ?? null,
-        destinationLng: destinationLng ?? null,
-        destinationTimezone: destinationTimezone?.trim() ?? null, // ⭐ NEW
-        // Dates
-        departureDateLocal: departureDateLocal ?? null,
-        arrivalDateLocal: arrivalDateLocal ?? null,
-        departureTimeLocal: departureTimeLocal ?? null,
-        arrivalTimeLocal: arrivalTimeLocal ?? null,
-        departureAt: departureAtDate,
-        arrivalAt: arrivalAt ? new Date(arrivalAt) : null,
-        returnDepartureAt: returnDepartureAt ? new Date(returnDepartureAt) : null,
-        returnArrivalAt: returnArrivalAt ? new Date(returnArrivalAt) : null,
-        // Mode-specific
-        flightType: flightType ?? null,
-        trainTripType: trainTripType ?? null,
-        carTripFlexibility: carTripFlexibility ?? null,
-        flightLayoverCities: flightLayoverCities ?? [],
-        trainStopCities: trainStopCities ?? [],
-        travelReference: travelReference?.trim() ?? null,
-        // Conditions
-        acceptedCategories: acceptedCategories ?? [],
-        categoryConditions: categoryConditions ?? [],
-        handDeliveryOnly: handDeliveryOnly ?? false,
-        instantBooking: instantBooking ?? false,
-        currencyCode: currencyCode ?? "EUR",
-        maxSlots: maxSlots ?? null,                               // ⭐ NEW
-        notes: notes?.trim() ?? null,
-        // ⭐ NEW : champs dénormalisés
+        transportMode: data.transportMode,
+        tripType: data.tripType ?? "ONE_WAY",
+
+        // ── Origin (Zod already trimmed + ISO uppercased) ──
+        originLabel: data.originLabel ?? null,
+        originPlaceId: data.originPlaceId ?? null,
+        originCity: data.originCity,
+        originCityCode: data.originCityCode ?? null,
+        originRegion: data.originRegion ?? null,
+        originRegionCode: data.originRegionCode ?? null,
+        originCountry: data.originCountry ?? null,
+        originCountryCode: data.originCountryCode ?? null,
+        originLat: data.originLat ?? null,
+        originLng: data.originLng ?? null,
+        originTimezone: data.originTimezone ?? null,
+
+        // ── Destination ──
+        destinationLabel: data.destinationLabel ?? null,
+        destinationPlaceId: data.destinationPlaceId ?? null,
+        destinationCity: data.destinationCity,
+        destinationCityCode: data.destinationCityCode ?? null,
+        destinationRegion: data.destinationRegion ?? null,
+        destinationRegionCode: data.destinationRegionCode ?? null,
+        destinationCountry: data.destinationCountry ?? null,
+        destinationCountryCode: data.destinationCountryCode ?? null,
+        destinationLat: data.destinationLat ?? null,
+        destinationLng: data.destinationLng ?? null,
+        destinationTimezone: data.destinationTimezone ?? null,
+
+        // ── Dates ──
+        departureDateLocal: data.departureDateLocal ?? null,
+        arrivalDateLocal: data.arrivalDateLocal ?? null,
+        departureTimeLocal: data.departureTimeLocal ?? null,
+        arrivalTimeLocal: data.arrivalTimeLocal ?? null,
+        departureAt: data.departureAt ?? null,
+        arrivalAt: data.arrivalAt ?? null,
+        returnDepartureAt: data.returnDepartureAt ?? null,
+        returnArrivalAt: data.returnArrivalAt ?? null,
+
+        // ── Mode-specific ──
+        flightType: data.flightType ?? null,
+        trainTripType: data.trainTripType ?? null,
+        carTripFlexibility: data.carTripFlexibility ?? null,
+        flightLayoverCities: data.flightLayoverCities ?? [],
+        trainStopCities: data.trainStopCities ?? [],
+        travelReference: data.travelReference ?? null,
+
+        // ── Conditions ──
+        acceptedCategories: data.acceptedCategories ?? [],
+        categoryConditions: data.categoryConditions ?? [],
+
+        // ⭐ Lieux de remise / livraison
+        pickupLocations: data.pickupLocations ?? [],
+        deliveryLocations: data.deliveryLocations ?? [],
+
+        handDeliveryOnly: data.handDeliveryOnly ?? false,
+        instantBooking: data.instantBooking ?? false,
+        currencyCode: data.currencyCode ?? "EUR",
+        maxSlots: data.maxSlots ?? null,
+        notes: data.notes ?? null,
+
         minPriceCents,
         departureHourLocal,
         carrierRatingSnapshot,
-        // Publication
         publishedAt: shouldPublish ? new Date() : null,
       },
-      include: {
-        documents: true,
-      },
+      include: { documents: true },
     });
 
     if (shouldPublish && carrierPage) {
@@ -215,6 +169,10 @@ export const createTrip = async (
         where: { id: carrierPage.id },
         data: { totalTripsPublished: { increment: 1 } },
       });
+    }
+
+    if (shouldPublish) {
+      triggerTripPublishedNotifications(trip);
     }
 
     return res.status(201).json({
@@ -229,7 +187,6 @@ export const createTrip = async (
 
 // ─────────────────────────────────────────────
 // PUT /api/trips/:id
-// Mettre à jour un trip (brouillon ou publié)
 // ─────────────────────────────────────────────
 
 export const updateTrip = async (
@@ -243,44 +200,40 @@ export const updateTrip = async (
     const { id } = req.params;
     const userId = req.user.id;
 
-    const trip = await prisma.trip.findUnique({ where: { id } });
+    // ── Zod validation (shape only — DB rules below) ──
+    const parsed = updateTripSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return next(new ValidationError(formatZodError(parsed.error)));
+    }
+    const { publish, ...data } = parsed.data;
 
+    const trip = await prisma.trip.findUnique({ where: { id } });
     if (!trip) return next(new ValidationError("Trip not found."));
     if (trip.userId !== userId) return next(new ValidationError("Unauthorized."));
     if (trip.status === "CANCELLED") {
       return next(new ValidationError("Cannot edit a cancelled trip."));
     }
 
-    const { publish, ...updateData } = req.body;
+    // Build update payload: only include fields that were actually sent
+    // (Zod has already trimmed strings and uppercased ISO codes).
+    const updateData: Record<string, any> = {};
+    for (const [key, value] of Object.entries(data)) {
+      if (value !== undefined) updateData[key] = value;
+    }
 
-    // Conversion des dates si présentes
-    if (updateData.departureAt) updateData.departureAt = new Date(updateData.departureAt);
-    if (updateData.arrivalAt) updateData.arrivalAt = new Date(updateData.arrivalAt);
-    if (updateData.returnDepartureAt) updateData.returnDepartureAt = new Date(updateData.returnDepartureAt);
-    if (updateData.returnArrivalAt) updateData.returnArrivalAt = new Date(updateData.returnArrivalAt);
-
-    // ⭐ NEW : recalcul des champs dénormalisés si les sources changent
-    // (categoryConditions, departureAt, originTimezone)
     const willRecomputePrice = "categoryConditions" in updateData;
-    const willRecomputeHour =
-      "departureAt" in updateData || "originTimezone" in updateData;
+    const willRecomputeHour = "departureAt" in updateData || "originTimezone" in updateData;
 
     if (willRecomputePrice || willRecomputeHour) {
       const recomputed = computeDenormalizedFields({
-        categoryConditions:
-          updateData.categoryConditions ?? (trip.categoryConditions as any),
+        categoryConditions: updateData.categoryConditions ?? (trip.categoryConditions as any),
         departureAt: updateData.departureAt ?? trip.departureAt,
         originTimezone: updateData.originTimezone ?? trip.originTimezone,
       });
-      if (willRecomputePrice) {
-        updateData.minPriceCents = recomputed.minPriceCents;
-      }
-      if (willRecomputeHour) {
-        updateData.departureHourLocal = recomputed.departureHourLocal;
-      }
+      if (willRecomputePrice) updateData.minPriceCents = recomputed.minPriceCents;
+      if (willRecomputeHour) updateData.departureHourLocal = recomputed.departureHourLocal;
     }
 
-    // Si on publie pour la première fois
     if (publish === true && trip.status === "DRAFT") {
       const carrierPage = await prisma.carrierPage.findUnique({
         where: { userId },
@@ -289,29 +242,32 @@ export const updateTrip = async (
           onboardingStep: true,
           stripeOnboardingComplete: true,
           stripeChargesEnabled: true,
-          ratingsAvg: true,    // ⭐ NEW
+          ratingsAvg: true,
           ratingsCount: true,
         },
       });
 
       if (!carrierPage || carrierPage.onboardingStep === "PROFILE") {
-        return next(
-          new ValidationError("Carrier profile must be completed to publish a trip.")
-        );
+        return next(new ValidationError("Carrier profile must be completed to publish a trip."));
       }
       if (!carrierPage.stripeOnboardingComplete || !carrierPage.stripeChargesEnabled) {
-        return next(
-          new ValidationError("Stripe must be configured to publish a trip.")
-        );
+        return next(new ValidationError("Stripe must be configured to publish a trip."));
+      }
+
+      // Locations gate: at least 1 pickup + 1 delivery
+      const effectivePickup = updateData.pickupLocations ?? trip.pickupLocations ?? [];
+      const effectiveDelivery = updateData.deliveryLocations ?? trip.deliveryLocations ?? [];
+      if (effectivePickup.length === 0) {
+        return next(new ValidationError("At least one pickup location is required to publish."));
+      }
+      if (effectiveDelivery.length === 0) {
+        return next(new ValidationError("At least one delivery location is required to publish."));
       }
 
       updateData.status = "PUBLISHED";
       updateData.publishedAt = new Date();
       updateData.currentStep = 3;
-
-      // ⭐ NEW : snapshot du rating au moment du publish
-      updateData.carrierRatingSnapshot =
-        carrierPage.ratingsCount > 0 ? carrierPage.ratingsAvg : null;
+      updateData.carrierRatingSnapshot = carrierPage.ratingsCount > 0 ? carrierPage.ratingsAvg : null;
 
       await prisma.carrierPage.update({
         where: { id: carrierPage.id },
@@ -325,6 +281,10 @@ export const updateTrip = async (
       include: { documents: true },
     });
 
+    if (publish === true && trip.status === "DRAFT") {
+      triggerTripPublishedNotifications(updated);
+    }
+
     return res.status(200).json({
       success: true,
       message: "Trip updated.",
@@ -337,7 +297,6 @@ export const updateTrip = async (
 
 // ─────────────────────────────────────────────
 // POST /api/trips/:id/documents
-// (inchangé)
 // ─────────────────────────────────────────────
 
 export const addTripDocuments = async (
@@ -396,26 +355,16 @@ export const addTripDocuments = async (
     const currentCount = trip.documents.length;
 
     if (currentCount + newDocuments.length > maxDocs) {
-      return next(
-        new ValidationError(
-          `Maximum ${maxDocs} documents per trip. Currently ${currentCount}.`
-        )
-      );
+      return next(new ValidationError(`Maximum ${maxDocs} documents per trip. Currently ${currentCount}.`));
     }
 
     const maxSizeMb = siteConfig?.maxDocSizeMb ?? 5;
     for (const doc of newDocuments) {
       if (!doc.type || !doc.fileId || !doc.url) {
-        return next(
-          new ValidationError("Each document must have type, fileId, and url.")
-        );
+        return next(new ValidationError("Each document must have type, fileId, and url."));
       }
       if (doc.sizeBytes && doc.sizeBytes > maxSizeMb * 1024 * 1024) {
-        return next(
-          new ValidationError(
-            `Document "${doc.originalName}" exceeds ${maxSizeMb}MB limit.`
-          )
-        );
+        return next(new ValidationError(`Document "${doc.originalName}" exceeds ${maxSizeMb}MB limit.`));
       }
     }
 
@@ -460,7 +409,6 @@ export const addTripDocuments = async (
 
 // ─────────────────────────────────────────────
 // DELETE /api/trips/:id/documents/:documentId
-// (inchangé)
 // ─────────────────────────────────────────────
 
 export const removeTripDocument = async (
@@ -481,9 +429,7 @@ export const removeTripDocument = async (
     if (!trip) return next(new ValidationError("Trip not found."));
     if (trip.userId !== userId) return next(new ValidationError("Unauthorized."));
 
-    const doc = await prisma.tripDocument.findUnique({
-      where: { id: documentId },
-    });
+    const doc = await prisma.tripDocument.findUnique({ where: { id: documentId } });
     if (!doc || doc.tripId !== id) {
       return next(new ValidationError("Document not found."));
     }
@@ -492,10 +438,7 @@ export const removeTripDocument = async (
       try {
         await imagekit.deleteFile(doc.fileId);
       } catch (err: any) {
-        console.warn(
-          `[ImageKit] Failed to delete file ${doc.fileId}:`,
-          err?.message
-        );
+        console.warn(`[ImageKit] Failed to delete file ${doc.fileId}:`, err?.message);
       }
     }
 
@@ -511,18 +454,14 @@ export const removeTripDocument = async (
       });
     }
 
-    return res.status(200).json({
-      success: true,
-      message: "Document removed.",
-    });
+    return res.status(200).json({ success: true, message: "Document removed." });
   } catch (error) {
     return next(error);
   }
 };
 
 // ─────────────────────────────────────────────
-// DELETE /api/trips/:id (soft delete → CANCELLED)
-// (inchangé)
+// DELETE /api/trips/:id
 // ─────────────────────────────────────────────
 
 export const cancelTrip = async (
@@ -537,14 +476,11 @@ export const cancelTrip = async (
     const userId = req.user.id;
 
     const trip = await prisma.trip.findUnique({ where: { id } });
-
     if (!trip) return next(new ValidationError("Trip not found."));
     if (trip.userId !== userId) return next(new ValidationError("Unauthorized."));
-
     if (trip.status === "CANCELLED") {
       return next(new ValidationError("Trip is already cancelled."));
     }
-
     if (trip.status === "COMPLETED") {
       return next(new ValidationError("Cannot cancel a completed trip."));
     }
@@ -553,10 +489,7 @@ export const cancelTrip = async (
 
     await prisma.trip.update({
       where: { id },
-      data: {
-        status: "CANCELLED",
-        cancelledAt: new Date(),
-      },
+      data: { status: "CANCELLED", cancelledAt: new Date() },
     });
 
     if (wasPublished) {
@@ -575,10 +508,7 @@ export const cancelTrip = async (
       }
     }
 
-    return res.status(200).json({
-      success: true,
-      message: "Trip cancelled.",
-    });
+    return res.status(200).json({ success: true, message: "Trip cancelled." });
   } catch (error) {
     return next(error);
   }
@@ -586,7 +516,6 @@ export const cancelTrip = async (
 
 // ─────────────────────────────────────────────
 // POST /api/trips/:id/restore
-// (inchangé)
 // ─────────────────────────────────────────────
 
 export const restoreTrip = async (
@@ -601,32 +530,21 @@ export const restoreTrip = async (
     const userId = req.user.id;
 
     const trip = await prisma.trip.findUnique({ where: { id } });
-
     if (!trip) return next(new ValidationError("Trip not found."));
     if (trip.userId !== userId) return next(new ValidationError("Unauthorized."));
-
     if (trip.status !== "CANCELLED") {
       return next(new ValidationError("Only cancelled trips can be restored."));
     }
-
     if (trip.departureAt && new Date(trip.departureAt) < new Date()) {
-      return next(
-        new ValidationError("Cannot restore a trip whose departure date has passed.")
-      );
+      return next(new ValidationError("Cannot restore a trip whose departure date has passed."));
     }
 
     await prisma.trip.update({
       where: { id },
-      data: {
-        status: "DRAFT",
-        cancelledAt: null,
-      },
+      data: { status: "DRAFT", cancelledAt: null },
     });
 
-    return res.status(200).json({
-      success: true,
-      message: "Trip restored as draft.",
-    });
+    return res.status(200).json({ success: true, message: "Trip restored as draft." });
   } catch (error) {
     return next(error);
   }
@@ -634,7 +552,6 @@ export const restoreTrip = async (
 
 // ─────────────────────────────────────────────
 // GET /api/trips/:id
-// (inchangé)
 // ─────────────────────────────────────────────
 
 export const getTrip = async (
@@ -673,10 +590,7 @@ export const getTrip = async (
 
     if (!trip) return next(new ValidationError("Trip not found."));
 
-    return res.status(200).json({
-      success: true,
-      trip,
-    });
+    return res.status(200).json({ success: true, trip });
   } catch (error) {
     return next(error);
   }
@@ -684,7 +598,6 @@ export const getTrip = async (
 
 // ─────────────────────────────────────────────
 // GET /api/trips/my
-// (inchangé)
 // ─────────────────────────────────────────────
 
 export const getMyTrips = async (
@@ -707,17 +620,11 @@ export const getMyTrips = async (
       where,
       orderBy: { createdAt: "desc" },
       include: {
-        documents: {
-          select: { id: true, type: true, status: true, url: true },
-        },
+        documents: { select: { id: true, type: true, status: true, url: true } },
       },
     });
 
-    return res.status(200).json({
-      success: true,
-      trips,
-      count: trips.length,
-    });
+    return res.status(200).json({ success: true, trips, count: trips.length });
   } catch (error) {
     return next(error);
   }
@@ -739,10 +646,8 @@ export const publishTrip = async (
     const userId = req.user.id;
 
     const trip = await prisma.trip.findUnique({ where: { id } });
-
     if (!trip) return next(new ValidationError("Trip not found."));
     if (trip.userId !== userId) return next(new ValidationError("Unauthorized."));
-
     if (trip.status !== "DRAFT") {
       return next(new ValidationError("Only drafts can be published."));
     }
@@ -754,22 +659,17 @@ export const publishTrip = async (
         onboardingStep: true,
         stripeOnboardingComplete: true,
         stripeChargesEnabled: true,
-        ratingsAvg: true,    // ⭐ NEW
+        ratingsAvg: true,
         ratingsCount: true,
       },
     });
 
     if (!carrierPage || carrierPage.onboardingStep === "PROFILE") {
-      return next(
-        new ValidationError("Carrier profile must be completed to publish a trip.")
-      );
+      return next(new ValidationError("Carrier profile must be completed to publish a trip."));
     }
     if (!carrierPage.stripeOnboardingComplete || !carrierPage.stripeChargesEnabled) {
-      return next(
-        new ValidationError("Stripe must be configured to publish a trip.")
-      );
+      return next(new ValidationError("Stripe must be configured to publish a trip."));
     }
-
     if (!trip.transportMode) {
       return next(new ValidationError("Transport mode is required to publish."));
     }
@@ -786,17 +686,24 @@ export const publishTrip = async (
       return next(new ValidationError("At least one parcel category must be accepted."));
     }
 
-    // ⭐ NEW : snapshot du rating
+    // ⭐ Locations gate
+    if (!trip.pickupLocations || trip.pickupLocations.length === 0) {
+      return next(new ValidationError("At least one pickup location is required to publish."));
+    }
+    if (!trip.deliveryLocations || trip.deliveryLocations.length === 0) {
+      return next(new ValidationError("At least one delivery location is required to publish."));
+    }
+
     const carrierRatingSnapshot =
       carrierPage.ratingsCount > 0 ? carrierPage.ratingsAvg : null;
 
-    await prisma.trip.update({
+    const publishedTrip = await prisma.trip.update({
       where: { id },
       data: {
         status: "PUBLISHED",
         publishedAt: new Date(),
         currentStep: 3,
-        carrierRatingSnapshot,    // ⭐ NEW
+        carrierRatingSnapshot,
       },
     });
 
@@ -805,17 +712,16 @@ export const publishTrip = async (
       data: { totalTripsPublished: { increment: 1 } },
     });
 
-    return res.status(200).json({
-      success: true,
-      message: "Trip published!",
-    });
+    triggerTripPublishedNotifications(publishedTrip);
+
+    return res.status(200).json({ success: true, message: "Trip published!" });
   } catch (error) {
     return next(error);
   }
 };
 
 // ─────────────────────────────────────────────
-// POST /api/trips/:id/unpublish (inchangé)
+// POST /api/trips/:id/unpublish
 // ─────────────────────────────────────────────
 
 export const unpublishTrip = async (
@@ -830,25 +736,17 @@ export const unpublishTrip = async (
     const userId = req.user.id;
 
     const trip = await prisma.trip.findUnique({ where: { id } });
-
     if (!trip) return next(new ValidationError("Trip not found."));
     if (trip.userId !== userId) return next(new ValidationError("Unauthorized."));
-
     if (trip.status !== "PUBLISHED" && trip.status !== "PAUSED") {
-      return next(
-        new ValidationError("Only published or paused trips can be reverted to draft.")
-      );
+      return next(new ValidationError("Only published or paused trips can be reverted to draft."));
     }
 
     const wasPublished = trip.status === "PUBLISHED";
 
     await prisma.trip.update({
       where: { id },
-      data: {
-        status: "DRAFT",
-        publishedAt: null,
-        currentStep: 1,
-      },
+      data: { status: "DRAFT", publishedAt: null, currentStep: 1 },
     });
 
     if (wasPublished) {
@@ -864,17 +762,14 @@ export const unpublishTrip = async (
       }
     }
 
-    return res.status(200).json({
-      success: true,
-      message: "Trip reverted to draft.",
-    });
+    return res.status(200).json({ success: true, message: "Trip reverted to draft." });
   } catch (error) {
     return next(error);
   }
 };
 
 // ─────────────────────────────────────────────
-// POST /api/trips/:id/pause (inchangé)
+// POST /api/trips/:id/pause
 // ─────────────────────────────────────────────
 
 export const pauseTrip = async (
@@ -889,10 +784,8 @@ export const pauseTrip = async (
     const userId = req.user.id;
 
     const trip = await prisma.trip.findUnique({ where: { id } });
-
     if (!trip) return next(new ValidationError("Trip not found."));
     if (trip.userId !== userId) return next(new ValidationError("Unauthorized."));
-
     if (trip.status !== "PUBLISHED") {
       return next(new ValidationError("Only published trips can be paused."));
     }
@@ -902,17 +795,14 @@ export const pauseTrip = async (
       data: { status: "PAUSED" },
     });
 
-    return res.status(200).json({
-      success: true,
-      message: "Trip paused.",
-    });
+    return res.status(200).json({ success: true, message: "Trip paused." });
   } catch (error) {
     return next(error);
   }
 };
 
 // ─────────────────────────────────────────────
-// POST /api/trips/:id/resume (inchangé)
+// POST /api/trips/:id/resume
 // ─────────────────────────────────────────────
 
 export const resumeTrip = async (
@@ -927,14 +817,11 @@ export const resumeTrip = async (
     const userId = req.user.id;
 
     const trip = await prisma.trip.findUnique({ where: { id } });
-
     if (!trip) return next(new ValidationError("Trip not found."));
     if (trip.userId !== userId) return next(new ValidationError("Unauthorized."));
-
     if (trip.status !== "PAUSED") {
       return next(new ValidationError("Only paused trips can be resumed."));
     }
-
     if (trip.departureAt && new Date(trip.departureAt) < new Date()) {
       return next(new ValidationError("Cannot resume a trip whose departure date has passed."));
     }
@@ -944,29 +831,15 @@ export const resumeTrip = async (
       data: { status: "PUBLISHED" },
     });
 
-    return res.status(200).json({
-      success: true,
-      message: "Trip resumed.",
-    });
+    return res.status(200).json({ success: true, message: "Trip resumed." });
   } catch (error) {
     return next(error);
   }
 };
 
-
 /**
  * GET /trips/:id/public
- * Récupérer un trip publié pour la page détail (accessible aux anonymes)
- *
- * Comportement :
- *   - 404 si le trip n'existe pas
- *   - 404 si le trip n'est pas en statut PUBLISHED
- *   - Retourne un DTO épuré (sans email/phone, sans IDs Stripe)
- *
- * Ne pas confondre avec getTrip() qui est protégé et retourne tout.
  */
-
-
 export const getPublicTrip: RequestHandler = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -1009,7 +882,6 @@ export const getPublicTrip: RequestHandler = async (req, res, next) => {
       res.status(404).json({ success: false, message: "Trip not found." });
       return;
     }
-
     if (trip.status !== "PUBLISHED") {
       res.status(404).json({ success: false, message: "Trip not found." });
       return;
@@ -1025,20 +897,26 @@ export const getPublicTrip: RequestHandler = async (req, res, next) => {
 
       origin: {
         label: trip.originLabel,
+        placeId: trip.originPlaceId,
         city: trip.originCity,
         cityCode: trip.originCityCode,
         region: trip.originRegion,
+        regionCode: trip.originRegionCode,
         country: trip.originCountry,
+        countryCode: trip.originCountryCode,
         lat: trip.originLat,
         lng: trip.originLng,
         timezone: trip.originTimezone,
       },
       destination: {
         label: trip.destinationLabel,
+        placeId: trip.destinationPlaceId,
         city: trip.destinationCity,
         cityCode: trip.destinationCityCode,
         region: trip.destinationRegion,
+        regionCode: trip.destinationRegionCode,
         country: trip.destinationCountry,
+        countryCode: trip.destinationCountryCode,
         lat: trip.destinationLat,
         lng: trip.destinationLng,
         timezone: trip.destinationTimezone,
@@ -1064,6 +942,11 @@ export const getPublicTrip: RequestHandler = async (req, res, next) => {
 
       acceptedCategories: trip.acceptedCategories,
       categoryConditions: trip.categoryConditions,
+
+      // ⭐ Lieux de remise / livraison
+      pickupLocations: trip.pickupLocations,
+      deliveryLocations: trip.deliveryLocations,
+
       handDeliveryOnly: trip.handDeliveryOnly,
       instantBooking: trip.instantBooking,
       currencyCode: trip.currencyCode,
@@ -1084,9 +967,7 @@ export const getPublicTrip: RequestHandler = async (req, res, next) => {
         id: trip.user.id,
         publicSlug: trip.user.publicSlug,
         firstName: trip.user.firstName,
-        lastInitial: trip.user.lastName
-          ? trip.user.lastName.charAt(0).toUpperCase()
-          : "",
+        lastInitial: trip.user.lastName ? trip.user.lastName.charAt(0).toUpperCase() : "",
         avatarUrl: trip.user.avatar?.url ?? null,
         memberSince: trip.user.createdAt,
         carrier: carrierPage

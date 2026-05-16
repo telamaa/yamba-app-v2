@@ -37,20 +37,29 @@ export function ErrorSummary({
   );
 }
 
-/* ── Section label ─────────────────────────── */
+/* ── Section label ─────────────────────────── *
+ * Non-first labels render with a subtle top divider for visual rhythm.
+ * The "first" prop suppresses the divider for the topmost section
+ * AND for side-by-side sections inside a 2-col grid.
+ */
 
 export function SectionLabel({ children, first }: { children: React.ReactNode; first?: boolean }) {
   return (
     <div className={[
       "mb-2.5 text-[11px] font-medium uppercase tracking-wider text-slate-400 dark:text-slate-500",
-      first ? "mt-0" : "mt-7",
+      first
+        ? "mt-0"
+        : "mt-6 border-t border-slate-200/60 pt-6 dark:border-slate-800/60",
     ].join(" ")}>
       {children}
     </div>
   );
 }
 
-/* ── Compact segmented control — no border ─── */
+/* ── Compact segmented control — no border ─── *
+ * `whitespace-nowrap` on buttons prevents multi-line text wrap.
+ * Convention UI: les segmented controls doivent toujours être sur une ligne.
+ */
 
 export function SegmentedControl({
                                    value,
@@ -77,7 +86,7 @@ export function SegmentedControl({
               type="button"
               onClick={() => onChange(opt.value)}
               className={[
-                "rounded-md px-4 py-2 text-[13px] transition-all",
+                "whitespace-nowrap rounded-md px-4 py-2 text-[13px] transition-all",
                 isActive
                   ? "font-medium text-slate-900 shadow-sm dark:text-white"
                   : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200",
@@ -218,7 +227,7 @@ export function CategoryChip({
   );
 }
 
-/* ── Mini chip ─────────────────────────────── */
+/* ── Mini chip (generic, reusable) ─────────── */
 
 export function MiniChip({
                            label,
@@ -306,81 +315,6 @@ export function SwapButton({ onClick }: { onClick: () => void }) {
         <path d="M7 16V4m0 12l-3-3m3 3l3-3M17 8v12m0-12l3 3m-3-3l-3 3" />
       </svg>
     </button>
-  );
-}
-
-/* ── Condition card ────────────────────────── */
-
-export function ConditionCard({
-                                title,
-                                price,
-                                onPriceChange,
-                                handoffMoments,
-                                pickupMoments,
-                                handoffLabels,
-                                pickupLabels,
-                                onToggleHandoff,
-                                onTogglePickup,
-                                priceError,
-                                handoffError,
-                                pickupError,
-                              }: {
-  title: string;
-  price: number | "";
-  onPriceChange: (value: number | "") => void;
-  handoffMoments: string[];
-  pickupMoments: string[];
-  handoffLabels: { key: string; label: string }[];
-  pickupLabels: { key: string; label: string }[];
-  onToggleHandoff: (key: string) => void;
-  onTogglePickup: (key: string) => void;
-  priceError?: string;
-  handoffError?: string;
-  pickupError?: string;
-}) {
-  return (
-    <div className="rounded-xl bg-slate-50 p-4 dark:bg-slate-800/50">
-      <div className="mb-3 flex items-center justify-between">
-        <span className="text-[13px] font-medium text-slate-900 dark:text-white">{title}</span>
-        <PriceInput value={price} onChange={onPriceChange} error={priceError} />
-      </div>
-
-      <div className="mb-2.5 flex items-center gap-3">
-        <span className="w-12 text-[11px] text-slate-400 dark:text-slate-500">Remise</span>
-        <div>
-          <div className="flex flex-wrap gap-1.5">
-            {handoffLabels.map((h) => (
-              <MiniChip
-                key={h.key}
-                label={h.label}
-                active={handoffMoments.includes(h.key)}
-                onClick={() => onToggleHandoff(h.key)}
-                hasError={!!handoffError}
-              />
-            ))}
-          </div>
-          <FieldError error={handoffError} />
-        </div>
-      </div>
-
-      <div className="flex items-center gap-3">
-        <span className="w-12 text-[11px] text-slate-400 dark:text-slate-500">Retrait</span>
-        <div>
-          <div className="flex flex-wrap gap-1.5">
-            {pickupLabels.map((p) => (
-              <MiniChip
-                key={p.key}
-                label={p.label}
-                active={pickupMoments.includes(p.key)}
-                onClick={() => onTogglePickup(p.key)}
-                hasError={!!pickupError}
-              />
-            ))}
-          </div>
-          <FieldError error={pickupError} />
-        </div>
-      </div>
-    </div>
   );
 }
 

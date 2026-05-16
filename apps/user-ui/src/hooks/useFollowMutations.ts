@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
 import type { PublicUser } from "@/lib/public-user.types";
+import type { FollowingItem } from "@/lib/following.types";
 
 export function useFollowUser() {
   const queryClient = useQueryClient();
@@ -49,6 +50,8 @@ export function useFollowUser() {
     },
     onSettled: (_data, _err, { slug }) => {
       queryClient.invalidateQueries({ queryKey: ["public-user", slug] });
+      // ✨ NEW : refetch la liste following pour faire apparaître le nouveau follow
+      queryClient.invalidateQueries({ queryKey: ["following"] });
     },
   });
 }
@@ -64,10 +67,15 @@ export function useUnfollowUser() {
     },
     onMutate: async (slug) => {
       await queryClient.cancelQueries({ queryKey: ["public-user", slug] });
+      await queryClient.cancelQueries({ queryKey: ["following"] }); // ✨ NEW
 
       const previous = queryClient.getQueryData<PublicUser>([
         "public-user",
         slug,
+      ]);
+      // ✨ NEW : snapshot du cache following
+      const previousFollowing = queryClient.getQueryData<FollowingItem[]>([
+        "following",
       ]);
 
       if (previous) {
@@ -84,15 +92,29 @@ export function useUnfollowUser() {
         });
       }
 
-      return { previous };
+      // ✨ NEW : retire l'item de la liste following immédiatement
+      if (previousFollowing) {
+        queryClient.setQueryData<FollowingItem[]>(
+          ["following"],
+          previousFollowing.filter((item) => item.user.publicSlug !== slug)
+        );
+      }
+
+      return { previous, previousFollowing };
     },
     onError: (_err, slug, context) => {
       if (context?.previous) {
         queryClient.setQueryData(["public-user", slug], context.previous);
       }
+      // ✨ NEW : rollback du cache following
+      if (context?.previousFollowing) {
+        queryClient.setQueryData(["following"], context.previousFollowing);
+      }
     },
     onSettled: (_data, _err, slug) => {
       queryClient.invalidateQueries({ queryKey: ["public-user", slug] });
+      // ✨ NEW
+      queryClient.invalidateQueries({ queryKey: ["following"] });
     },
   });
 }
@@ -115,10 +137,15 @@ export function useUpdateFollowPreferences() {
     },
     onMutate: async ({ slug, notifyNextTrip }) => {
       await queryClient.cancelQueries({ queryKey: ["public-user", slug] });
+      await queryClient.cancelQueries({ queryKey: ["following"] }); // ✨ NEW
 
       const previous = queryClient.getQueryData<PublicUser>([
         "public-user",
         slug,
+      ]);
+      // ✨ NEW
+      const previousFollowing = queryClient.getQueryData<FollowingItem[]>([
+        "following",
       ]);
 
       if (previous) {
@@ -128,15 +155,33 @@ export function useUpdateFollowPreferences() {
         });
       }
 
-      return { previous };
+      // ✨ NEW : flip notifyNextTrip dans la liste following
+      if (previousFollowing) {
+        queryClient.setQueryData<FollowingItem[]>(
+          ["following"],
+          previousFollowing.map((item) =>
+            item.user.publicSlug === slug
+              ? { ...item, notifyNextTrip }
+              : item
+          )
+        );
+      }
+
+      return { previous, previousFollowing };
     },
     onError: (_err, { slug }, context) => {
       if (context?.previous) {
         queryClient.setQueryData(["public-user", slug], context.previous);
       }
+      // ✨ NEW
+      if (context?.previousFollowing) {
+        queryClient.setQueryData(["following"], context.previousFollowing);
+      }
     },
     onSettled: (_data, _err, { slug }) => {
       queryClient.invalidateQueries({ queryKey: ["public-user", slug] });
+      // ✨ NEW
+      queryClient.invalidateQueries({ queryKey: ["following"] });
     },
   });
 }

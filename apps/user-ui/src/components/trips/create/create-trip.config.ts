@@ -1,4 +1,10 @@
-import type { CategoryCondition, Draft, HandoffMoment, ParcelCategory, PickupMoment } from "./create-trip.types";
+import type {
+  CategoryCondition,
+  Draft,
+  ParcelCategory,
+  TransportMode,
+  TripLocationPoint,
+} from "./create-trip.types";
 
 /* ── Category groups ─────────────────────── */
 
@@ -43,18 +49,77 @@ export function getSmartDefaultTime(): string {
 
 /* ── Default conditions per category ─────── */
 
-const DEFAULT_HANDOFF: HandoffMoment[] = ["beforeDeparture", "atDeparture"];
-const DEFAULT_PICKUP: PickupMoment[] = ["onArrival"];
-
 export function createDefaultCategoryCondition(
   categoryKey: ParcelCategory
 ): CategoryCondition {
   return {
     categoryKey,
     priceAmount: "",
-    handoffMoments: [...DEFAULT_HANDOFF],
-    pickupMoments: [...DEFAULT_PICKUP],
   };
+}
+
+/* ── Default locations per transport mode ─
+ *
+ * Generates the initial set of pickup/delivery cards when the user picks
+ * a transport mode. Disabled cards stay in the array (greyed out in UI)
+ * so the user can quickly enable them.
+ *
+ * Strategy:
+ *   - Plane → Airport (enabled, EXACT) + City (disabled, RADIUS 10km)
+ *   - Train → Train station (enabled, EXACT) + City (disabled, RADIUS 10km)
+ *   - Car   → City only (enabled, RADIUS 10km)
+ *
+ * The Expéditeur sees only enabled cards in the final trip listing.
+ * ──────────────────────────────────────── */
+
+function makeLocId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return Math.random().toString(36).slice(2) + Date.now().toString(36);
+}
+
+export function getDefaultLocationsForMode(
+  mode: TransportMode | null
+): { pickupLocations: TripLocationPoint[]; deliveryLocations: TripLocationPoint[] } {
+  if (mode === "plane") {
+    return {
+      pickupLocations: [
+        { id: makeLocId(), context: "PICKUP", kind: "AIRPORT", enabled: true, details: "", flexibility: "EXACT", radiusKm: null },
+        { id: makeLocId(), context: "PICKUP", kind: "CITY_AREA", enabled: false, details: "", flexibility: "RADIUS", radiusKm: 10 },
+      ],
+      deliveryLocations: [
+        { id: makeLocId(), context: "DELIVERY", kind: "AIRPORT", enabled: true, details: "", flexibility: "EXACT", radiusKm: null },
+        { id: makeLocId(), context: "DELIVERY", kind: "CITY_AREA", enabled: false, details: "", flexibility: "RADIUS", radiusKm: 10 },
+      ],
+    };
+  }
+
+  if (mode === "train") {
+    return {
+      pickupLocations: [
+        { id: makeLocId(), context: "PICKUP", kind: "TRAIN_STATION", enabled: true, details: "", flexibility: "EXACT", radiusKm: null },
+        { id: makeLocId(), context: "PICKUP", kind: "CITY_AREA", enabled: false, details: "", flexibility: "RADIUS", radiusKm: 10 },
+      ],
+      deliveryLocations: [
+        { id: makeLocId(), context: "DELIVERY", kind: "TRAIN_STATION", enabled: true, details: "", flexibility: "EXACT", radiusKm: null },
+        { id: makeLocId(), context: "DELIVERY", kind: "CITY_AREA", enabled: false, details: "", flexibility: "RADIUS", radiusKm: 10 },
+      ],
+    };
+  }
+
+  if (mode === "car") {
+    return {
+      pickupLocations: [
+        { id: makeLocId(), context: "PICKUP", kind: "CITY_AREA", enabled: true, details: "", flexibility: "RADIUS", radiusKm: 10 },
+      ],
+      deliveryLocations: [
+        { id: makeLocId(), context: "DELIVERY", kind: "CITY_AREA", enabled: true, details: "", flexibility: "RADIUS", radiusKm: 10 },
+      ],
+    };
+  }
+
+  return { pickupLocations: [], deliveryLocations: [] };
 }
 
 /* ── Revenue estimation ──────────────────── */
@@ -75,7 +140,6 @@ export function estimateRevenue(
 
 /* ── Date helpers ─────────────────────────── */
 
-/** Strip time from a Date to compare dates only */
 function toDateOnly(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate());
 }
@@ -122,8 +186,15 @@ export function getValidationErrorsFr(isFr: boolean) {
     categories: isFr ? "Sélectionnez au moins 1 catégorie" : "Select at least 1 category",
     priceZero: isFr ? "Le prix doit être supérieur à 0" : "Price must be greater than 0",
     priceEmpty: isFr ? "Prix requis" : "Price required",
-    handoff: isFr ? "Sélectionnez au moins 1 moment" : "Select at least 1 option",
-    pickup: isFr ? "Sélectionnez au moins 1 moment" : "Select at least 1 option",
+    pickupLocationRequired: isFr
+      ? "Activez au moins 1 lieu de remise"
+      : "Enable at least 1 pickup location",
+    deliveryLocationRequired: isFr
+      ? "Activez au moins 1 lieu de livraison"
+      : "Enable at least 1 delivery location",
+    locationDetailsEmpty: isFr
+      ? "Précisez le lieu"
+      : "Specify the location",
   };
 }
 
@@ -145,17 +216,18 @@ export function validateStep1(draft: Draft, isFr: boolean): ValidationErrors {
     errors.to = msgs.toPlace;
   }
 
-  // Departure date
   if (!draft.departureDate) {
     errors.departureDate = msgs.departureDate;
   } else if (isDateInPast(draft.departureDate)) {
     errors.departureDate = msgs.departureDatePast;
   }
 
-  // Arrival date
   if (!draft.arrivalDate) {
     errors.arrivalDate = msgs.arrivalDate;
-  } else if (draft.departureDate && isArrivalBeforeDeparture(draft.departureDate, draft.arrivalDate)) {
+  } else if (
+    draft.departureDate &&
+    isArrivalBeforeDeparture(draft.departureDate, draft.arrivalDate)
+  ) {
     errors.arrivalDate = msgs.arrivalDateBeforeDeparture;
   }
 
@@ -178,8 +250,7 @@ export function validateStep1(draft: Draft, isFr: boolean): ValidationErrors {
   }
   if (
     draft.transportMode === "train" &&
-    (draft.trainTripType === "withConnection" ||
-      draft.trainTripType === "withIntermediateStops") &&
+    draft.trainTripType === "withConnection" &&
     !draft.trainStopCities.trim()
   ) {
     errors.trainStopCities = msgs.trainStopCities;
@@ -192,6 +263,7 @@ export function validateStep2(draft: Draft, isFr: boolean): ValidationErrors {
   const msgs = getValidationErrorsFr(isFr);
   const errors: ValidationErrors = {};
 
+  // Categories
   if (draft.acceptedCategories.length === 0) {
     errors.categories = msgs.categories;
   }
@@ -203,13 +275,18 @@ export function validateStep2(draft: Draft, isFr: boolean): ValidationErrors {
     } else if (Number(c.priceAmount) <= 0) {
       errors[`price_${key}`] = msgs.priceZero;
     }
-    if (c && c.handoffMoments.length === 0) {
-      errors[`handoff_${key}`] = msgs.handoff;
-    }
-    if (c && c.pickupMoments.length === 0) {
-      errors[`pickup_${key}`] = msgs.pickup;
-    }
   });
+
+  // Locations — at least 1 enabled per context
+  const enabledPickup = draft.pickupLocations.filter((l) => l.enabled);
+  const enabledDelivery = draft.deliveryLocations.filter((l) => l.enabled);
+
+  if (enabledPickup.length === 0) {
+    errors.pickupLocations = msgs.pickupLocationRequired;
+  }
+  if (enabledDelivery.length === 0) {
+    errors.deliveryLocations = msgs.deliveryLocationRequired;
+  }
 
   return errors;
 }
@@ -218,34 +295,4 @@ export function canContinueStep(step: number, draft: Draft, isFr: boolean): bool
   if (step === 1) return Object.keys(validateStep1(draft, isFr)).length === 0;
   if (step === 2) return Object.keys(validateStep2(draft, isFr)).length === 0;
   return true;
-}
-
-/* ── Auto-save ───────────────────────────── */
-
-const DRAFT_STORAGE_KEY = "yamba_trip_draft";
-
-export function saveDraftToStorage(draft: unknown) {
-  try {
-    localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draft));
-  } catch {
-    /* silent */
-  }
-}
-
-export function loadDraftFromStorage(): unknown | null {
-  try {
-    const raw = localStorage.getItem(DRAFT_STORAGE_KEY);
-    if (!raw) return null;
-    return JSON.parse(raw);
-  } catch {
-    return null;
-  }
-}
-
-export function clearDraftStorage() {
-  try {
-    localStorage.removeItem(DRAFT_STORAGE_KEY);
-  } catch {
-    /* silent */
-  }
 }

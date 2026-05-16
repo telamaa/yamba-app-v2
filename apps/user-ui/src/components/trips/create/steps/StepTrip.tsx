@@ -25,8 +25,20 @@ function fromDateInputValue(value: string) {
   return new Date(`${value}T12:00:00`);
 }
 
-/* ── City field: static when filled, autocomplete on click ── */
-
+/* ── City field: static when filled, autocomplete on click ──
+ *
+ * State machine:
+ *  - editing=false, value=""        → input (initial empty state)
+ *  - editing=false, value non-empty → static button (value restored from draft)
+ *  - editing=true,  anything        → input (user is actively typing/editing)
+ *
+ * The `editing` flag is the source of truth: it tells us whether the user
+ * is currently interacting with the field. It flips to true on first keystroke
+ * (via `action` callback) and back to false on selection or external blur.
+ *
+ * Without flipping `editing=true` on typing, the component would swap to
+ * static button mode mid-typing → input unmounts → focus is lost.
+ */
 function CityField({
                      label,
                      value,
@@ -85,7 +97,13 @@ function CityField({
       </label>
       <CityAutocomplete
         value={value}
-        action={(v: string) => onChangeAction(v)}
+        action={(v: string) => {
+          // ✨ Restons en mode édition tant que l'utilisateur tape.
+          // Sans ce flag, hasFilled bascule à true dès la 1ʳᵉ lettre
+          // et l'input est démonté (perte du focus).
+          if (!editing) setEditing(true);
+          onChangeAction(v);
+        }}
         onSelect={(v: string) => {
           onSelectAction(v);
           setEditing(false);
@@ -132,9 +150,7 @@ export default function StepTrip({
   const showLayoverCities =
     draft.transportMode === "plane" && draft.flightType === "withLayover";
   const showTrainStopCities =
-    draft.transportMode === "train" &&
-    (draft.trainTripType === "withConnection" ||
-      draft.trainTripType === "withIntermediateStops");
+    draft.transportMode === "train" && draft.trainTripType === "withConnection";
 
   const refPlaceholder =
     draft.transportMode === "plane"
@@ -159,8 +175,8 @@ export default function StepTrip({
 
   return (
     <div>
-      {/* Transport + Type — separate labels, grid 50/50 */}
-      <div className="grid grid-cols-2 gap-x-6">
+      {/* Transport + Type — stack on mobile, 2-col on tablet+ */}
+      <div className="grid grid-cols-1 gap-y-4 sm:grid-cols-2 sm:gap-x-6 sm:gap-y-0">
         <div>
           <SectionLabel first>{isFr ? "Transport" : "Transport"}</SectionLabel>
           <SegmentedControl
@@ -203,11 +219,11 @@ export default function StepTrip({
         </div>
       </div>
 
-      {/* Conditional: flight type + layover cities */}
+      {/* Conditional: flight type + layover cities — stack on mobile */}
       {showFlightSub && (
         <div className="animate-[fadeSlide_0.2s_ease]">
           <SectionLabel>{copy.tripPathType}</SectionLabel>
-          <div className="grid grid-cols-2 items-start gap-x-6">
+          <div className="grid grid-cols-1 items-start gap-y-3 sm:grid-cols-2 sm:gap-x-6 sm:gap-y-0">
             <SegmentedControl
               value={draft.flightType}
               options={[
@@ -241,20 +257,16 @@ export default function StepTrip({
         </div>
       )}
 
-      {/* Conditional: train type + stop cities */}
+      {/* Conditional: train type + connection city — stack on mobile */}
       {showTrainSub && (
         <div className="animate-[fadeSlide_0.2s_ease]">
           <SectionLabel>{copy.tripPathType}</SectionLabel>
-          <div className="grid grid-cols-2 items-start gap-x-6">
+          <div className="grid grid-cols-1 items-start gap-y-3 sm:grid-cols-2 sm:gap-x-6 sm:gap-y-0">
             <SegmentedControl
               value={draft.trainTripType}
               options={[
                 { value: "direct", label: copy.directTrain },
                 { value: "withConnection", label: copy.withConnection },
-                {
-                  value: "withIntermediateStops",
-                  label: copy.withIntermediateStops,
-                },
               ]}
               onChange={(value) =>
                 setDraft((prev) => ({
@@ -344,7 +356,7 @@ export default function StepTrip({
         />
       </div>
 
-      {/* Dates & times */}
+      {/* Dates & times — stays 2-col always (date/time inputs are short) */}
       <SectionLabel>
         {isFr ? "Dates & horaires" : "Dates & times"}
       </SectionLabel>
@@ -426,11 +438,11 @@ export default function StepTrip({
         </FormField>
       </div>
 
-      {/* Travel reference + Document upload */}
+      {/* Travel reference + Document upload — stack on mobile (upload needs room) */}
       <SectionLabel>
         {isFr ? "Référence & justificatif" : "Reference & proof"}
       </SectionLabel>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-y-3 sm:grid-cols-2 sm:gap-x-3 sm:gap-y-0">
         <FormField label={copy.travelReference}>
           <FormInput
             value={draft.travelReference}

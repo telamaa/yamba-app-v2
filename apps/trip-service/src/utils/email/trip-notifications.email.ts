@@ -1,0 +1,224 @@
+import type { Trip } from "@prisma/client";
+import { sendEmail } from "./send-email";
+
+const APP_URL = process.env.USER_APP_URL ?? "http://localhost:3000";
+const DEFAULT_LOCALE: "fr" | "en" = "fr"; // Plus tard : depuis user.preferredLocale
+
+// ───────────────────────────────────────────────────────
+// Constantes i18n légères pour les emails
+// ───────────────────────────────────────────────────────
+
+const TRANSPORT_LABELS_FR: Record<string, string> = {
+  AIRPLANE: "Avion",
+  TRAIN: "Train",
+  CAR: "Voiture",
+  BUS: "Bus",
+  BOAT: "Bateau",
+};
+
+const TRANSPORT_LABELS_EN: Record<string, string> = {
+  AIRPLANE: "Plane",
+  TRAIN: "Train",
+  CAR: "Car",
+  BUS: "Bus",
+  BOAT: "Boat",
+};
+
+const TRANSPORT_EMOJIS: Record<string, string> = {
+  AIRPLANE: "✈️",
+  TRAIN: "🚆",
+  CAR: "🚗",
+  BUS: "🚌",
+  BOAT: "🚢",
+};
+
+// ───────────────────────────────────────────────────────
+// Types
+// ───────────────────────────────────────────────────────
+
+export type TripPublishedEmailPayload = {
+  recipient: {
+    userId: string;
+    email: string;
+    firstName: string;
+    // Pourquoi cette personne reçoit cet email
+    followsTripper: boolean;
+    matchingSavedRoute: {
+      id: string;
+      matchScore: number; // 100 = exact, 70 = nearby
+      originCity: string;
+      destinationCity: string;
+    } | null;
+  };
+  tripper: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    publicSlug: string | null;
+  };
+  trip: Trip;
+};
+
+// ───────────────────────────────────────────────────────
+// Helpers formatage
+// ───────────────────────────────────────────────────────
+
+function formatDate(date: Date | null, locale: "fr" | "en"): string {
+  if (!date) return "";
+  const d = new Date(date);
+  return d.toLocaleDateString(locale === "fr" ? "fr-FR" : "en-US", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+}
+
+function formatPrice(
+  cents: number | null,
+  currency: string | null,
+  locale: "fr" | "en"
+): string {
+  if (cents == null || !currency) return "";
+  const amount = cents / 100;
+  try {
+    return new Intl.NumberFormat(locale === "fr" ? "fr-FR" : "en-US", {
+      style: "currency",
+      currency,
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount);
+  } catch {
+    return `${amount} ${currency}`;
+  }
+}
+
+function getTransportLabel(mode: string | null, locale: "fr" | "en"): string {
+  if (!mode) return "";
+  const dict = locale === "fr" ? TRANSPORT_LABELS_FR : TRANSPORT_LABELS_EN;
+  return dict[mode] ?? "";
+}
+
+function getTransportEmoji(mode: string | null): string {
+  if (!mode) return "📦";
+  return TRANSPORT_EMOJIS[mode] ?? "📦";
+}
+
+// ───────────────────────────────────────────────────────
+// Email principal : trip publié (follow / saved route / both)
+// ───────────────────────────────────────────────────────
+
+export async function sendTripPublishedEmail(
+  payload: TripPublishedEmailPayload
+): Promise<void> {
+  const { recipient, tripper, trip } = payload;
+  const locale = DEFAULT_LOCALE;
+  const firstInitial = tripper.firstName.charAt(0).toUpperCase();
+  const lastInitial = tripper.lastName.charAt(0).toUpperCase();
+  const initials = `${firstInitial}${lastInitial}`;
+
+  // Sujet adapté au contexte
+  let subject: string;
+  if (recipient.followsTripper && recipient.matchingSavedRoute) {
+    subject =
+      locale === "fr"
+        ? `${tripper.firstName} ${lastInitial}. a publié un trajet ${trip.originCity} → ${trip.destinationCity}`
+        : `${tripper.firstName} ${lastInitial}. published a trip ${trip.originCity} → ${trip.destinationCity}`;
+  } else if (recipient.followsTripper) {
+    subject =
+      locale === "fr"
+        ? `${tripper.firstName} ${lastInitial}. vient de publier un nouveau trajet`
+        : `${tripper.firstName} ${lastInitial}. just published a new trip`;
+  } else {
+    subject =
+      locale === "fr"
+        ? `Nouveau trajet ${trip.originCity} → ${trip.destinationCity}`
+        : `New trip ${trip.originCity} → ${trip.destinationCity}`;
+  }
+
+  const data = {
+    locale,
+    subject,
+    recipient: {
+      firstName: recipient.firstName,
+      followsTripper: recipient.followsTripper,
+      matchingSavedRoute: recipient.matchingSavedRoute,
+    },
+    tripper: {
+      firstName: tripper.firstName,
+      lastInitial,
+    },
+    initials,
+    trip,
+    formattedDepartureDate: formatDate(trip.departureAt, locale),
+    formattedPrice: formatPrice(trip.minPriceCents, trip.currencyCode, locale),
+    transportLabel: getTransportLabel(trip.transportMode, locale),
+    transportEmoji: getTransportEmoji(trip.transportMode),
+    tripUrl: `${APP_URL}/${locale}/trips/${trip.id}`,
+    tripperUrl: tripper.publicSlug
+      ? `${APP_URL}/${locale}/u/${tripper.publicSlug}`
+      : null,
+    manageAlertsUrl: `${APP_URL}/${locale}/dashboard/saved-routes`,
+  };
+
+  await sendEmail(
+    recipient.email,
+    subject,
+    "trip-notifications/trip-published",
+    data
+  );
+}
+
+// ─────────────────────────────────────────────────────────
+// Helpers pour les emails de cycle de vie des SavedRoute
+// (utilisés en Phase 7 par le cron d'expiration)
+// ─────────────────────────────────────────────────────────
+
+export async function sendSavedRouteExpiryWarningEmail(payload: {
+  recipient: { email: string; firstName: string };
+  savedRoute: { id: string; originCity: string; destinationCity: string };
+}): Promise<void> {
+  const locale = DEFAULT_LOCALE;
+  const subject =
+    locale === "fr"
+      ? `Votre alerte ${payload.savedRoute.originCity} → ${payload.savedRoute.destinationCity} expire bientôt`
+      : `Your alert ${payload.savedRoute.originCity} → ${payload.savedRoute.destinationCity} expires soon`;
+
+  await sendEmail(
+    payload.recipient.email,
+    subject,
+    "trip-notifications/saved-route-expiry-warning",
+    {
+      locale,
+      subject,
+      recipient: payload.recipient,
+      savedRoute: payload.savedRoute,
+      extendUrl: `${APP_URL}/${locale}/dashboard/saved-routes?extend=${payload.savedRoute.id}`,
+      manageAlertsUrl: `${APP_URL}/${locale}/dashboard/saved-routes`,
+    }
+  );
+}
+
+export async function sendSavedRouteExpiredEmail(payload: {
+  recipient: { email: string; firstName: string };
+  savedRoute: { originCity: string; destinationCity: string };
+}): Promise<void> {
+  const locale = DEFAULT_LOCALE;
+  const subject =
+    locale === "fr"
+      ? `Votre alerte ${payload.savedRoute.originCity} → ${payload.savedRoute.destinationCity} a expiré`
+      : `Your alert ${payload.savedRoute.originCity} → ${payload.savedRoute.destinationCity} has expired`;
+
+  await sendEmail(
+    payload.recipient.email,
+    subject,
+    "trip-notifications/saved-route-expired",
+    {
+      locale,
+      subject,
+      recipient: payload.recipient,
+      savedRoute: payload.savedRoute,
+      createAlertUrl: `${APP_URL}/${locale}/dashboard/saved-routes`,
+    }
+  );
+}

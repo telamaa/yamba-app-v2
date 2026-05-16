@@ -6,10 +6,13 @@ import { useRouter } from "@/i18n/navigation";
 import type { PublicTrip } from "@/lib/public-trip.types";
 import ItineraryCard from "./ItineraryCard";
 import CategoriesCard from "./CategoriesCard";
+
 import ReviewsCard from "./ReviewsCard";
 import ConditionsCard from "./ConditionsCard";
 import BookingSummaryCard from "./BookingSummaryCard";
 import BookingMobileBar from "./BookingMobileBar";
+import LocationsCard from "@/components/trips/detail/LocationsCard";
+
 
 type Props = {
   trip: PublicTrip;
@@ -55,6 +58,7 @@ export default function TripDetailView({ trip }: Props) {
         <div className="divide-y divide-slate-100 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_4px_24px_-4px_rgba(0,0,0,0.06),0_2px_8px_-2px_rgba(0,0,0,0.04)] dark:divide-slate-800 dark:border-slate-800 dark:bg-slate-950 dark:shadow-[0_4px_24px_-4px_rgba(0,0,0,0.3),0_2px_8px_-2px_rgba(0,0,0,0.2)]">
           <ItineraryCard trip={trip} />
           <CategoriesCard trip={trip} />
+          <LocationsCard trip={trip} />
           {showReviews && <ReviewsCard tripper={trip.tripper} />}
           <ConditionsCard />
         </div>

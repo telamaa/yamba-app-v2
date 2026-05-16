@@ -6,6 +6,7 @@
   "groups": {
     "activity": "Activité",
     "communication": "Communication",
+    "alerts": "Alertes",
     "finances": "Finances",
     "account": "Compte",
     "settingsGroup": "Réglages"
@@ -17,6 +18,8 @@
     "create": "Créer un trajet",
     "messages": "Messages",
     "notifications": "Notifications",
+    "savedRoutes": "Alertes route",
+    "following": "Trippers suivis",
     "payments": "Paiements",
     "wallet": "Portefeuille",
     "profile": "Profil",

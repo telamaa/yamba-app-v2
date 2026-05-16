@@ -38,9 +38,7 @@ import TripPricingPopover from "./TripPricingPopover";
 
 type Props = {
   item: YambaTripResult;
-  /** Max number of categories to show in icons (default: 3). The rest is shown as "+N". */
   maxVisibleCategories?: number;
-  /** Catégories filtrées dans la sidebar (highlight orange dans le popover prix) */
   highlightedCategories?: ParcelCategory[];
 };
 
@@ -64,31 +62,16 @@ function getCategoryMeta(
   const map: Record<ParcelCategory, { label: string; icon: React.ReactNode }> = {
     clothes: { label: t("clothes"), icon: <Shirt size={12} /> },
     shoes: { label: t("shoes"), icon: <Footprints size={12} /> },
-    "fashion-accessories": {
-      label: t("fashion-accessories"),
-      icon: <ShoppingBag size={12} />,
-    },
-    "other-accessories": {
-      label: t("other-accessories"),
-      icon: <Package size={12} />,
-    },
+    "fashion-accessories": { label: t("fashion-accessories"), icon: <ShoppingBag size={12} /> },
+    "other-accessories": { label: t("other-accessories"), icon: <Package size={12} /> },
     books: { label: t("books"), icon: <BookOpen size={12} /> },
     documents: { label: t("documents"), icon: <FileText size={12} /> },
     "small-toys": { label: t("small-toys"), icon: <ToyBrick size={12} /> },
     phone: { label: t("phone"), icon: <Phone size={12} /> },
     computer: { label: t("computer"), icon: <Laptop size={12} /> },
-    "other-electronics": {
-      label: t("other-electronics"),
-      icon: <Cpu size={12} />,
-    },
-    "checked-bag-23kg": {
-      label: t("checked-bag-23kg"),
-      icon: <Briefcase size={12} />,
-    },
-    "cabin-bag-12kg": {
-      label: t("cabin-bag-12kg"),
-      icon: <Briefcase size={12} />,
-    },
+    "other-electronics": { label: t("other-electronics"), icon: <Cpu size={12} /> },
+    "checked-bag-23kg": { label: t("checked-bag-23kg"), icon: <Briefcase size={12} /> },
+    "cabin-bag-12kg": { label: t("cabin-bag-12kg"), icon: <Briefcase size={12} /> },
   };
 
   return map[category] ?? { label: category, icon: <Package size={12} /> };
@@ -182,7 +165,18 @@ export default function TripResultCard({
   return (
     <Link
       href={`/trips/${item.id}`}
-      className="group block overflow-hidden rounded-2xl border border-slate-200 bg-white transition-all duration-200 hover:border-[#FF9900]/40 hover:shadow-[0_8px_24px_rgba(255,153,0,0.08)] dark:border-slate-800 dark:bg-slate-950 dark:hover:border-[#FF9900]/30"
+      className="
+        group block overflow-hidden rounded-2xl
+        border border-slate-200 bg-white
+        shadow-[0_1px_2px_rgba(0,0,0,0.04),0_4px_16px_rgba(0,0,0,0.04)]
+        transition-all duration-200
+        hover:border-[#FF9900]/40
+        hover:shadow-[0_4px_24px_rgba(255,153,0,0.1),0_2px_8px_rgba(255,153,0,0.06)]
+        dark:border-slate-800/80 dark:bg-slate-900
+        dark:shadow-[0_1px_2px_rgba(0,0,0,0.3),0_4px_16px_rgba(0,0,0,0.2)]
+        dark:hover:border-[#FF9900]/30
+        dark:hover:shadow-[0_4px_24px_rgba(255,153,0,0.15)]
+      "
     >
       {/* ── Header: transport + date + capacité ── */}
       <div className="flex items-center gap-3 border-b border-slate-100 px-4 py-2.5 dark:border-slate-800/60">
@@ -233,7 +227,7 @@ export default function TripResultCard({
           <div className="relative flex w-full items-center gap-1.5">
             <div className="h-1.5 w-1.5 shrink-0 rounded-full bg-slate-300 dark:bg-slate-600" />
             <div className="relative h-px flex-1 bg-slate-200 dark:bg-slate-800">
-              <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white p-0.5 text-[#FF9900] dark:bg-slate-950">
+              <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white p-0.5 text-[#FF9900] dark:bg-slate-900">
                 <TransportIcon mode={item.transportMode} size={12} />
               </div>
             </div>
@@ -320,14 +314,14 @@ export default function TripResultCard({
       </div>
 
       {/* ── Footer: tripper + catégories + chevron ── */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/50 px-4 py-2.5 dark:border-slate-800/60 dark:bg-slate-900/30">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/50 px-4 py-2.5 dark:border-slate-800/60 dark:bg-slate-950/40">
         {/* Tripper info */}
         <div className="flex min-w-0 items-center gap-2.5">
           <div className="relative h-8 w-8 shrink-0">
             {item.superTripper && (
               <>
                 <span className="absolute inset-0 rounded-full bg-[repeating-conic-gradient(#FF9900_0deg_14deg,transparent_14deg_28deg)] opacity-90" />
-                <span className="absolute inset-[2px] rounded-full bg-white dark:bg-slate-950" />
+                <span className="absolute inset-[2px] rounded-full bg-white dark:bg-slate-900" />
               </>
             )}
             <div
