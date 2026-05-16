@@ -30,6 +30,14 @@ export function generateStaticParams() {
  * - Le wrapper extérieur gère uniquement `pt-[78px]` pour réserver la place
  *   du Header fixed, sans imposer de container.
  * - Chaque page gère son propre container via <AppContainer> ou équivalent.
+ *
+ * Background system (palette canvas vs. card):
+ * - Light mode: canvas `bg-slate-50` (#F8FAFC, très subtil), cards `bg-white`
+ *   → les cards ressortent par contraste de luminosité.
+ * - Dark mode: canvas `bg-slate-950` (inherit du body), cards `bg-slate-900`
+ *   → mêmes mécaniques, inversées (les cards sont plus claires que le canvas).
+ * - `min-h-screen` garantit que la teinte couvre le viewport même sur pages
+ *   courtes.
  */
 export default async function LocaleLayout({
                                              children,
@@ -55,7 +63,9 @@ export default async function LocaleLayout({
           <UiPreferencesProvider>
             <ToastProvider>
               <Header />
-              <div className="pt-[78px]">{children}</div>
+              <div className="min-h-screen bg-slate-50 pt-[78px] dark:bg-slate-950">
+                {children}
+              </div>
             </ToastProvider>
           </UiPreferencesProvider>
         </ThemeProvider>

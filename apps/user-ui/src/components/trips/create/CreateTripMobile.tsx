@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { X, ChevronLeft } from "lucide-react";
 import { toast } from "sonner";
 import { useUiPreferences } from "@/components/providers/UiPreferencesProvider";
+import { usePersistedFormState } from "@/hooks/usePersistedFormState";
 import { useCreateTrip, useUpdateTrip } from "@/hooks/useTrip";
 import { useEditTrip } from "@/hooks/useEditTrip";
 import { setFlashToast } from "@/lib/flash-toast";
@@ -16,9 +17,6 @@ import {
   createDefaultCategoryCondition,
   validateStep1,
   validateStep2,
-  saveDraftToStorage,
-  loadDraftFromStorage,
-  clearDraftStorage,
   type ValidationErrors,
 } from "./create-trip.config";
 import { ErrorSummary } from "./TripFormUi";
@@ -32,6 +30,11 @@ import useUser from "@/hooks/useUser";
 const MANGO = "#FF9900";
 const EMPTY_ERRORS: ValidationErrors = {};
 
+// IMPORTANT: doit rester identique à CreateTripWizard.tsx (même clé sessionStorage).
+//   v1 → initial
+//   v2 → ajout pickupLocations/deliveryLocations, suppression handoff/pickup moments
+const DRAFT_VERSION = 2;
+
 export default function CreateTripMobile() {
   const { lang } = useUiPreferences();
   const router = useRouter();
@@ -39,7 +42,18 @@ export default function CreateTripMobile() {
   const copy = useMemo(() => getCreateTripCopy(isFr), [isFr]);
 
   const [step, setStep] = useState<Step>(1);
-  const [draft, setDraft] = useState<Draft>(initialDraft);
+
+  // ── Persistance automatique du draft (partagée avec le desktop via la même clé) ──
+  // Résout le bug du reset au changement de viewport desktop↔mobile.
+  const [draft, setDraft, clearDraft] = usePersistedFormState<Draft>(
+    "create-trip-wizard",
+    initialDraft,
+    {
+      exclude: ["tripDocuments"] as (keyof Draft)[],
+      version: DRAFT_VERSION,
+    }
+  );
+
   const [direction, setDirection] = useState<"forward" | "backward">("forward");
   const [showExitGuard, setShowExitGuard] = useState(false);
   const [shakeFields, setShakeFields] = useState(false);
@@ -57,6 +71,7 @@ export default function CreateTripMobile() {
 
   useEffect(() => {
     if (editDraft) setDraft(editDraft);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editDraft]);
 
   // ── Validation ──
@@ -70,24 +85,6 @@ export default function CreateTripMobile() {
   useEffect(() => {
     setShowErrors(false);
   }, [step]);
-
-  // ── Auto-save (localStorage) — only in create mode ──
-  useEffect(() => {
-    if (isEditMode) return;
-    const interval = setInterval(() => saveDraftToStorage(draft), 10000);
-    return () => clearInterval(interval);
-  }, [draft, isEditMode]);
-
-  // ── Load saved draft — only in create mode ──
-  useEffect(() => {
-    if (isEditMode) return;
-    const saved = loadDraftFromStorage() as Draft | null;
-    if (saved) {
-      if (saved.departureDate) saved.departureDate = new Date(saved.departureDate);
-      if (saved.arrivalDate) saved.arrivalDate = new Date(saved.arrivalDate);
-      setDraft(saved);
-    }
-  }, [isEditMode]);
 
   // ── Scroll to top on step change ──
   useEffect(() => {
@@ -110,17 +107,16 @@ export default function CreateTripMobile() {
       return Math.round((filled / total) * 100);
     }
     if (step === 2) {
-      const total = 1 + draft.acceptedCategories.length * 3;
+      // Categories filled + each category has a price + at least 1 pickup + at least 1 delivery
+      const total = 1 + draft.acceptedCategories.length + 2;
       let filled = 0;
       if (draft.acceptedCategories.length > 0) filled++;
       draft.acceptedCategories.forEach((key) => {
         const c = draft.categoryConditions[key];
-        if (c) {
-          if (c.priceAmount !== "") filled++;
-          if (c.handoffMoments.length > 0) filled++;
-          if (c.pickupMoments.length > 0) filled++;
-        }
+        if (c && c.priceAmount !== "") filled++;
       });
+      if (draft.pickupLocations.some((l) => l.enabled)) filled++;
+      if (draft.deliveryLocations.some((l) => l.enabled)) filled++;
       return total > 0 ? Math.round((filled / total) * 100) : 0;
     }
     return 100;
@@ -145,7 +141,7 @@ export default function CreateTripMobile() {
         },
       };
     });
-  }, []);
+  }, [setDraft]);
 
   // ── Navigation ──
   const goTo = (target: Step) => {
@@ -179,9 +175,8 @@ export default function CreateTripMobile() {
     }
   };
 
-  // ── Save draft (localStorage) ──
+  // ── Save draft (toast only — data already persisted in sessionStorage) ──
   const handleSaveDraft = () => {
-    saveDraftToStorage(draft);
     toast.success(isFr ? "Brouillon sauvegardé" : "Draft saved", { closeButton: true });
   };
 
@@ -197,7 +192,7 @@ export default function CreateTripMobile() {
 
     if (!hasOnboarding || !stripeReady) {
       const onSuccess = () => {
-        clearDraftStorage();
+        clearDraft();
         setFlashToast({
           type: "onboarding_required",
           message: !hasOnboarding
@@ -233,7 +228,7 @@ export default function CreateTripMobile() {
         { tripId: editTripId, draft, publish: true },
         {
           onSuccess: () => {
-            clearDraftStorage();
+            clearDraft();
             setFlashToast({ type: "success", message: isFr ? "Trajet mis à jour avec succès !" : "Trip updated successfully!" });
             router.push("/dashboard/trips");
           },
@@ -248,7 +243,7 @@ export default function CreateTripMobile() {
         { draft, publish: true },
         {
           onSuccess: () => {
-            clearDraftStorage();
+            clearDraft();
             setFlashToast({ type: "success", message: isFr ? "Trajet publié avec succès !" : "Trip published successfully!" });
             router.push("/dashboard/trips");
           },
@@ -325,7 +320,7 @@ export default function CreateTripMobile() {
             <h3 className="text-[16px] font-medium text-slate-900 dark:text-white">{copy.almostDone}</h3>
             <p className="mt-1 text-[13px] text-slate-500 dark:text-slate-400">{copy.almostDoneSub}</p>
             <div className="mt-5 flex gap-3">
-              <button type="button" onClick={() => { setShowExitGuard(false); if (!isEditMode) saveDraftToStorage(draft); router.back(); }} className="flex-1 rounded-lg border border-slate-200 py-3 text-[13px] text-slate-600 dark:border-slate-700 dark:text-slate-400">{copy.leave}</button>
+              <button type="button" onClick={() => { setShowExitGuard(false); router.back(); }} className="flex-1 rounded-lg border border-slate-200 py-3 text-[13px] text-slate-600 dark:border-slate-700 dark:text-slate-400">{copy.leave}</button>
               <button type="button" onClick={() => setShowExitGuard(false)} className="flex-1 rounded-lg py-3 text-[13px] font-medium text-slate-900" style={{ backgroundColor: MANGO }}>{copy.stayAndFinish}</button>
             </div>
           </div>
