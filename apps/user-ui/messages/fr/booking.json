@@ -1,0 +1,202 @@
+{
+  "title": "Réservation",
+  "back": "Retour",
+  "backToTrip": "Retour au trajet",
+  "continue": "Continuer",
+  "goToPayment": "Passer au paiement",
+  "pay": "Payer {amount}",
+  "cancel": "Annuler",
+  "close": "Fermer",
+
+  "steps": {
+    "parcel": "Colis",
+    "recipient": "Destinataire",
+    "charter": "Engagement",
+    "payment": "Paiement",
+    "indicator": "étape {current} sur {total}"
+  },
+
+  "step1": {
+    "title": "Décris ton colis",
+    "subtitle": "Précision et photos garantissent un envoi sans accroc",
+    "locationsTitle": "Lieux de rendez-vous",
+    "pickupBlockTitle": "Tu remets le colis à {carrierFirstName}",
+    "deliveryBlockTitle": "Le destinataire récupère le colis",
+    "locationSingleHint": "Lieu convenu avec le voyageur",
+
+    "goldenRules": {
+      "title": "Les règles d''or pour un envoi qui se passe bien",
+      "pack": "**Emballe soigneusement.** Sac ou boîte solide, papier bulle pour le fragile, scotche correctement.",
+      "weigh": "**Pèse précisément.** Le poids déclaré doit correspondre au poids réel à la remise.",
+      "describe": "**Décris fidèlement.** {carrierFirstName} vérifiera le contenu avant d''accepter ton colis.",
+      "prohibited": "**Aucun produit interdit.**",
+      "linkProhibited": "Voir la liste complète"
+    },
+
+    "parcelDetails": {
+      "categoryLabel": "Catégorie",
+      "categoryOption": "{label} — {price}",
+      "weightLabel": "Poids (kg)",
+      "valueLabel": "Valeur déclarée (€)",
+      "declaredValueTooltip": "La valeur déclarée détermine le plafond d''indemnisation en cas de litige. Indique le prix d''achat du contenu.",
+      "descriptionLabel": "Description courte",
+      "descriptionPlaceholder": "Ex : 3 t-shirts, 1 pull, du chocolat"
+    },
+
+    "photos": {
+      "label": "Photos du colis",
+      "requiredBadge": "Obligatoire avec l''assurance",
+      "hint": "Idéalement : une photo du contenu déballé + une du colis emballé. JPEG ou PNG, max 10 Mo par photo.",
+      "add": "Ajouter",
+      "tagContent": "Contenu",
+      "tagPackaged": "Emballé",
+      "remove": "Supprimer cette photo"
+    }
+  },
+
+  "insurance": {
+    "title": "Assurance optionnelle",
+    "basic": {
+      "title": "Protection de base",
+      "price": "Inclus",
+      "description": "Tu es protégé contre la non-livraison. Le paiement est bloqué jusqu''à la remise au destinataire."
+    },
+    "extended": {
+      "title": "Assurance jusqu''à 500 €",
+      "price": "+ 6 €",
+      "description": "Perte, vol, casse pendant le transport. Vol partiel du contenu couvert.",
+      "ipidLink": "Voir la fiche IPID"
+    }
+  },
+
+  "categories": {
+    "CLOTHES": "Vêtements",
+    "SHOES": "Chaussures",
+    "FASHION_ACCESSORIES": "Accessoires de mode",
+    "OTHER_ACCESSORIES": "Autres accessoires",
+    "BOOKS": "Livres",
+    "DOCUMENTS": "Documents",
+    "SMALL_TOYS": "Petits jouets",
+    "PHONE": "Téléphone",
+    "COMPUTER": "Ordinateur",
+    "OTHER_ELECTRONICS": "Autre électronique",
+    "CHECKED_BAG_23KG": "Bagage en soute 23 kg",
+    "CABIN_BAG_12KG": "Bagage cabine 12 kg"
+  },
+
+  "step2": {
+    "title": "À qui livrer ?",
+    "subtitle": "Pas besoin de compte Yamba pour le destinataire. Tu lui transmettras le code.",
+
+    "deliveryFlow": {
+      "title": "Comment se passera la livraison",
+      "codeGiven": "**Un code à 6 chiffres** te sera donné après le paiement.",
+      "shareIt": "**Tu le transmets** au destinataire par SMS, WhatsApp ou oralement.",
+      "handToTraveler": "**Il le donne au voyageur** à la livraison. Sans ce code, le colis ne peut pas être remis."
+    },
+
+    "form": {
+      "firstName": "Prénom",
+      "lastName": "Nom",
+      "phone": "Téléphone",
+      "phoneHint": "Pour transmettre le code par SMS / WhatsApp",
+      "email": "Email",
+      "emailOptional": "(optionnel)",
+      "emailHint": "Pour notifier le destinataire de l''arrivée du colis"
+    }
+  },
+
+  "step3": {
+    "title": "Ton engagement",
+    "subtitle": "Tu certifies sur l''honneur le contenu du colis",
+
+    "handoverFlow": {
+      "title": "À la remise du colis, voici ce qui se passera",
+      "visualInspection": "**Vérification visuelle obligatoire.** Le voyageur examinera ton colis avant d''accepter — ne sois pas surpris.",
+      "refusalPossible": "**Refus possible si non-conforme.** Si le contenu diffère de ta déclaration, le voyageur peut refuser. Tu seras remboursé mais le trajet sera perdu.",
+      "crossPhotos": "**Photos croisées.** Le voyageur prendra ses propres photos qui feront foi en cas de litige."
+    },
+
+    "charter": {
+      "title": "Charte Expéditeur",
+      "subtitle": "Engagement juridique — à lire attentivement",
+      "intro": "En validant ce deal, je déclare et garantis sur l''honneur que mon colis :",
+      "noIllicit": "ne contient **aucun produit illicite**, dangereux ou interdit",
+      "matchDeclared": "correspond exactement à la **catégorie, au poids et au contenu déclarés**",
+      "customsCompliant": "respecte les **obligations douanières** du pays de destination",
+      "disclaimer": "Toute déclaration mensongère engage ma seule responsabilité civile et pénale, à l''exclusion de celle du voyageur et de Yamba.",
+      "fullLink": "Voir la charte complète et les produits interdits"
+    },
+
+    "accept": {
+      "title": "J''accepte la Charte Expéditeur",
+      "cgvLabel": "CGV",
+      "contractLabel": "Contrat de transport",
+      "descPrefix": "J''ai lu et j''accepte également les ",
+      "descJoin": " et le ",
+      "descSuffix": "."
+    }
+  },
+
+  "step4": {
+    "title": "Paiement",
+    "subtitle": "Tu n''es débité qu''à acceptation par le voyageur (sous 24h max)",
+    "methodTitle": "Moyen de paiement",
+
+    "card": {
+      "title": "Carte bancaire",
+      "description": "Visa, Mastercard, Amex · Cartes internationales acceptées"
+    },
+    "applePay": {
+      "title": "Apple Pay",
+      "description": "Touch ID ou Face ID · pas de saisie de carte"
+    },
+    "googlePay": {
+      "title": "Google Pay",
+      "description": "Paiement en un clic depuis ton compte Google"
+    },
+
+    "afterPayment": {
+      "title": "Après ton paiement",
+      "step1": "Le voyageur reçoit ta demande et a **24h pour accepter**. Tu n''es débité qu''à acceptation.",
+      "step2": "Tu reçois ton **code à 6 chiffres**, à transmettre au destinataire.",
+      "step3": "Rendez-vous avec le voyageur pour la **remise du colis**, qu''il vérifiera et photographiera.",
+      "step4": "Le destinataire communique le code au voyageur à l''arrivée, qui le saisit pour valider la livraison.",
+      "step5": "**3 jours après** la livraison validée, le voyageur reçoit son paiement."
+    },
+
+    "trustStripe": "Paiement sécurisé par Stripe. Yamba ne stocke jamais tes données bancaires.",
+    "loadingMessage": "Préparation du paiement…"
+  },
+
+  "summary": {
+    "tripSelectedTitle": "Trajet sélectionné",
+    "compactTitle": "Récap",
+    "toPayTitle": "Tu paies",
+    "transport": "Transport",
+    "serviceYamba": "Service Yamba",
+    "insurance": "Assurance",
+    "insurance500": "Assurance 500 €",
+    "total": "Total",
+    "totalNote": "Débité à acceptation par le voyageur",
+    "totalNoteLong": "Le montant est autorisé maintenant et débité uniquement quand le voyageur accepte.",
+    "totalLabel": "Total à payer",
+    "ctaHint": "Tu n''es débité qu''à acceptation par le voyageur",
+    "detail": "Détail",
+    "hide": "Masquer",
+
+    "parcel": "Colis",
+    "photos": "Photos",
+    "photosCount": "{count, plural, =1 {# ajoutée} other {# ajoutées}}",
+    "pickup": "Remise",
+    "delivery": "Retrait",
+    "recipient": "Destinataire",
+    "charter": "Engagement",
+    "insuranceLabel": "Assurance",
+    "date": "Date",
+    "route": "Trajet",
+    "directFlight": "Direct",
+    "duration": "{hours}h de vol",
+    "deals": "{count, plural, =1 {# deal} other {# deals}}"
+  }
+}
