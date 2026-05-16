@@ -2,6 +2,7 @@
   "back": "Back to results",
   "trippedBy": "Trip offered by {firstName} {lastInitial}.",
   "travelReference": "Ref.",
+  "detourPossible": "Detour possible",
   "reviewsCount": "{count, plural, =0 {no reviews} =1 {# review} other {# reviews}}",
   "chatWith": "Chat with {firstName}",
   "comingSoon": "Coming soon",
@@ -91,8 +92,7 @@
 
   "notFound": {
     "title": "Trip not found",
-    "description": "This trip doesn''t exist or is no longer available.",
-    "backToSearch": "Back to search"
+    "description": "This trip doesn''t exist or is no longer available."
   },
 
   "error": {

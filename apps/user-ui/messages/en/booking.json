@@ -1,0 +1,202 @@
+{
+  "title": "Booking",
+  "back": "Back",
+  "backToTrip": "Back to trip",
+  "continue": "Continue",
+  "goToPayment": "Continue to payment",
+  "pay": "Pay {amount}",
+  "cancel": "Cancel",
+  "close": "Close",
+
+  "steps": {
+    "parcel": "Parcel",
+    "recipient": "Recipient",
+    "charter": "Commitment",
+    "payment": "Payment",
+    "indicator": "step {current} of {total}"
+  },
+
+  "step1": {
+    "title": "Describe your parcel",
+    "subtitle": "Accuracy and photos protect everyone",
+    "locationsTitle": "Meeting locations",
+    "pickupBlockTitle": "You hand the parcel to {carrierFirstName}",
+    "deliveryBlockTitle": "The recipient picks up the parcel",
+    "locationSingleHint": "Set by the tripper",
+
+    "goldenRules": {
+      "title": "Golden rules for a smooth shipment",
+      "pack": "**Pack carefully.** Sturdy bag or box, bubble wrap if fragile, properly taped.",
+      "weigh": "**Weigh precisely.** Declared weight must match actual weight at handover.",
+      "describe": "**Describe accurately.** {carrierFirstName} will inspect the content before accepting.",
+      "prohibited": "**No prohibited items.**",
+      "linkProhibited": "See the full list"
+    },
+
+    "parcelDetails": {
+      "categoryLabel": "Category",
+      "categoryOption": "{label} — {price}",
+      "weightLabel": "Weight (kg)",
+      "valueLabel": "Declared value (€)",
+      "declaredValueTooltip": "The declared value sets the compensation ceiling in case of dispute. Enter the purchase price of the content.",
+      "descriptionLabel": "Short description",
+      "descriptionPlaceholder": "Ex: 3 t-shirts, 1 jumper, chocolate"
+    },
+
+    "photos": {
+      "label": "Parcel photos",
+      "requiredBadge": "Required with insurance",
+      "hint": "Ideally: one photo of unpacked content + one of the packed parcel. JPEG or PNG, max 10 MB per photo.",
+      "add": "Add",
+      "tagContent": "Content",
+      "tagPackaged": "Packed",
+      "remove": "Remove this photo"
+    }
+  },
+
+  "insurance": {
+    "title": "Optional insurance",
+    "basic": {
+      "title": "Basic protection",
+      "price": "Included",
+      "description": "You''re covered against non-delivery. Payment is held until the parcel reaches the recipient."
+    },
+    "extended": {
+      "title": "Insurance up to €500",
+      "price": "+ €6",
+      "description": "Loss, theft, damage during transport. Partial theft of content covered.",
+      "ipidLink": "See the IPID sheet"
+    }
+  },
+
+  "categories": {
+    "CLOTHES": "Clothes",
+    "SHOES": "Shoes",
+    "FASHION_ACCESSORIES": "Fashion accessories",
+    "OTHER_ACCESSORIES": "Other accessories",
+    "BOOKS": "Books",
+    "DOCUMENTS": "Documents",
+    "SMALL_TOYS": "Small toys",
+    "PHONE": "Phone",
+    "COMPUTER": "Computer",
+    "OTHER_ELECTRONICS": "Other electronics",
+    "CHECKED_BAG_23KG": "Checked bag 23 kg",
+    "CABIN_BAG_12KG": "Cabin bag 12 kg"
+  },
+
+  "step2": {
+    "title": "Who is the recipient?",
+    "subtitle": "The recipient doesn''t need a Yamba account. You''ll share the code with them.",
+
+    "deliveryFlow": {
+      "title": "How the delivery will work",
+      "codeGiven": "**A 6-digit code** will be given to you after payment.",
+      "shareIt": "**You share it** with the recipient by SMS, WhatsApp or in person.",
+      "handToTraveler": "**They give it to the tripper** at delivery. Without this code, the parcel cannot be released."
+    },
+
+    "form": {
+      "firstName": "First name",
+      "lastName": "Last name",
+      "phone": "Phone",
+      "phoneHint": "Used to send the code via SMS / WhatsApp",
+      "email": "Email",
+      "emailOptional": "(optional)",
+      "emailHint": "To notify the recipient when the parcel arrives"
+    }
+  },
+
+  "step3": {
+    "title": "Your commitment",
+    "subtitle": "You certify on your honor the content of the parcel",
+
+    "handoverFlow": {
+      "title": "What will happen when you hand over the parcel",
+      "visualInspection": "**Mandatory visual inspection.** The tripper will examine your parcel before accepting — don''t be surprised.",
+      "refusalPossible": "**Refusal possible if non-compliant.** If the content differs from your declaration, the tripper can refuse. You''ll be refunded but the trip is lost.",
+      "crossPhotos": "**Cross-referenced photos.** The tripper will take their own photos as evidence in case of dispute."
+    },
+
+    "charter": {
+      "title": "Shipper Charter",
+      "subtitle": "Legal commitment — read carefully",
+      "intro": "By confirming this deal, I declare and guarantee on my honor that my parcel:",
+      "noIllicit": "contains **no illicit**, dangerous or prohibited products",
+      "matchDeclared": "matches exactly the **declared category, weight and content**",
+      "customsCompliant": "complies with the **customs regulations** of the destination country",
+      "disclaimer": "Any false declaration engages my sole civil and criminal liability, to the exclusion of the tripper and Yamba.",
+      "fullLink": "See the full charter and prohibited items"
+    },
+
+    "accept": {
+      "title": "I accept the Shipper Charter",
+      "cgvLabel": "Terms",
+      "contractLabel": "Transport Contract",
+      "descPrefix": "I have also read and accept the ",
+      "descJoin": " and the ",
+      "descSuffix": "."
+    }
+  },
+
+  "step4": {
+    "title": "Payment",
+    "subtitle": "You''re only charged when the tripper accepts (within 24h max)",
+    "methodTitle": "Payment method",
+
+    "card": {
+      "title": "Card",
+      "description": "Visa, Mastercard, Amex · International cards accepted"
+    },
+    "applePay": {
+      "title": "Apple Pay",
+      "description": "Touch ID or Face ID · no card entry"
+    },
+    "googlePay": {
+      "title": "Google Pay",
+      "description": "One-click payment from your Google account"
+    },
+
+    "afterPayment": {
+      "title": "After your payment",
+      "step1": "The tripper receives your request and has **24h to accept**. You''re only charged on acceptance.",
+      "step2": "You receive your **6-digit code**, to share with the recipient.",
+      "step3": "Meet the tripper for the **handover**, where they''ll inspect and photograph the parcel.",
+      "step4": "The recipient gives the code to the tripper at arrival, who enters it to confirm delivery.",
+      "step5": "**3 days after** confirmed delivery, the tripper receives their payment."
+    },
+
+    "trustStripe": "Payment secured by Stripe. Yamba never stores your card details.",
+    "loadingMessage": "Preparing payment…"
+  },
+
+  "summary": {
+    "tripSelectedTitle": "Selected trip",
+    "compactTitle": "Summary",
+    "toPayTitle": "You pay",
+    "transport": "Transport",
+    "serviceYamba": "Yamba service",
+    "insurance": "Insurance",
+    "insurance500": "Insurance €500",
+    "total": "Total",
+    "totalNote": "Charged when the tripper accepts",
+    "totalNoteLong": "The amount is authorized now and only charged when the tripper accepts.",
+    "totalLabel": "Total to pay",
+    "ctaHint": "You''re only charged when the tripper accepts",
+    "detail": "Detail",
+    "hide": "Hide",
+
+    "parcel": "Parcel",
+    "photos": "Photos",
+    "photosCount": "{count, plural, =1 {# added} other {# added}}",
+    "pickup": "Handover",
+    "delivery": "Pickup",
+    "recipient": "Recipient",
+    "charter": "Commitment",
+    "insuranceLabel": "Insurance",
+    "date": "Date",
+    "route": "Route",
+    "directFlight": "Direct",
+    "duration": "{hours}h flight",
+    "deals": "{count, plural, =1 {# deal} other {# deals}}"
+  }
+}
