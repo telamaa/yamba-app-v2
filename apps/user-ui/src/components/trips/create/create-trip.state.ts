@@ -30,6 +30,10 @@ export const initialDraft: Draft = {
   globalPrice: "",
   useGlobalPrice: true,
 
+  // Populated by getDefaultLocationsForMode() when transportMode is selected.
+  pickupLocations: [],
+  deliveryLocations: [],
+
   handDeliveryOnly: false,
   instantBooking: false,
   ticketVerificationStatus: "not_submitted",

@@ -1,4 +1,4 @@
-import type {Response, NextFunction, RequestHandler} from "express";
+import type { Response, NextFunction, RequestHandler } from "express";
 import prisma from "@packages/libs/prisma";
 import { ValidationError } from "@packages/error-handler";
 import { AuthenticatedRequest } from "@packages/middleware/isAuthenticated";
@@ -8,6 +8,11 @@ import {
   computeHourLocal,
 } from "../lib/trip-mappers";
 import { triggerTripPublishedNotifications } from "../services/trigger-trip-notifications";
+import {
+  createTripSchema,
+  updateTripSchema,
+  formatZodError,
+} from "../schemas/trip.schema";
 
 // ─────────────────────────────────────────────
 // Helper interne : recalcule les champs dénormalisés
@@ -42,71 +47,16 @@ export const createTrip = async (
   try {
     if (!req.user) return next(new ValidationError("Unauthorized"));
 
+    // ── Zod validation (shape + intra-payload rules) ──
+    const parsed = createTripSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return next(new ValidationError(formatZodError(parsed.error)));
+    }
+    const data = parsed.data;
     const userId = req.user.id;
-    const {
-      transportMode,
-      tripType,
-      // Origin
-      originLabel,
-      originPlaceId,
-      originCity,
-      originCityCode,
-      originRegion,
-      originRegionCode,         // ✨ NEW
-      originCountry,
-      originCountryCode,        // ✨ NEW
-      originLat,
-      originLng,
-      originTimezone,
-      // Destination
-      destinationLabel,
-      destinationPlaceId,
-      destinationCity,
-      destinationCityCode,
-      destinationRegion,
-      destinationRegionCode,    // ✨ NEW
-      destinationCountry,
-      destinationCountryCode,   // ✨ NEW
-      destinationLat,
-      destinationLng,
-      destinationTimezone,
-      // Dates
-      departureDateLocal,
-      arrivalDateLocal,
-      departureTimeLocal,
-      arrivalTimeLocal,
-      departureAt,
-      arrivalAt,
-      returnDepartureAt,
-      returnArrivalAt,
-      // Mode-specific
-      flightType,
-      trainTripType,
-      carTripFlexibility,
-      flightLayoverCities,
-      trainStopCities,
-      travelReference,
-      // Conditions
-      acceptedCategories,
-      categoryConditions,
-      handDeliveryOnly,
-      instantBooking,
-      currencyCode,
-      maxSlots,
-      notes,
-      publish,
-    } = req.body;
+    const shouldPublish = data.publish === true;
 
-    if (!transportMode) {
-      return next(new ValidationError("Transport mode is required."));
-    }
-    if (!originCity || !destinationCity) {
-      return next(new ValidationError("Origin and destination are required."));
-    }
-    if (departureAt && new Date(departureAt) < new Date()) {
-      return next(new ValidationError("Departure date must be in the future."));
-    }
-
+    // ── DB-dependent publish gate ──
     const carrierPage = await prisma.carrierPage.findUnique({
       where: { userId },
       select: {
@@ -119,8 +69,6 @@ export const createTrip = async (
       },
     });
 
-    const shouldPublish = publish === true;
-
     if (shouldPublish) {
       if (!carrierPage || carrierPage.onboardingStep === "PROFILE") {
         return next(new ValidationError("Carrier profile must be completed to publish a trip."));
@@ -130,11 +78,10 @@ export const createTrip = async (
       }
     }
 
-    const departureAtDate = departureAt ? new Date(departureAt) : null;
     const { minPriceCents, departureHourLocal } = computeDenormalizedFields({
-      categoryConditions,
-      departureAt: departureAtDate,
-      originTimezone,
+      categoryConditions: data.categoryConditions,
+      departureAt: data.departureAt ?? null,
+      originTimezone: data.originTimezone ?? null,
     });
 
     const carrierRatingSnapshot =
@@ -142,66 +89,73 @@ export const createTrip = async (
         ? carrierPage.ratingsAvg
         : null;
 
-    // Normalisation des codes ISO en uppercase pour cohérence stockage
-    const normalizeIso = (v: unknown): string | null =>
-      typeof v === "string" && v.trim().length > 0 ? v.trim().toUpperCase() : null;
-
     const trip = await prisma.trip.create({
       data: {
         userId,
         carrierPageId: carrierPage?.id ?? null,
         status: shouldPublish ? "PUBLISHED" : "DRAFT",
         currentStep: shouldPublish ? 3 : 1,
-        transportMode,
-        tripType: tripType ?? "ONE_WAY",
-        // ── Origin (avec codes ISO) ──
-        originLabel: originLabel?.trim() ?? null,
-        originPlaceId: originPlaceId ?? null,
-        originCity: originCity?.trim() ?? null,
-        originCityCode: normalizeIso(originCityCode),
-        originRegion: originRegion?.trim() ?? null,
-        originRegionCode: normalizeIso(originRegionCode),       // ✨ NEW
-        originCountry: originCountry?.trim() ?? null,
-        originCountryCode: normalizeIso(originCountryCode),     // ✨ NEW
-        originLat: originLat ?? null,
-        originLng: originLng ?? null,
-        originTimezone: originTimezone?.trim() ?? null,
+        transportMode: data.transportMode,
+        tripType: data.tripType ?? "ONE_WAY",
+
+        // ── Origin (Zod already trimmed + ISO uppercased) ──
+        originLabel: data.originLabel ?? null,
+        originPlaceId: data.originPlaceId ?? null,
+        originCity: data.originCity,
+        originCityCode: data.originCityCode ?? null,
+        originRegion: data.originRegion ?? null,
+        originRegionCode: data.originRegionCode ?? null,
+        originCountry: data.originCountry ?? null,
+        originCountryCode: data.originCountryCode ?? null,
+        originLat: data.originLat ?? null,
+        originLng: data.originLng ?? null,
+        originTimezone: data.originTimezone ?? null,
+
         // ── Destination ──
-        destinationLabel: destinationLabel?.trim() ?? null,
-        destinationPlaceId: destinationPlaceId ?? null,
-        destinationCity: destinationCity?.trim() ?? null,
-        destinationCityCode: normalizeIso(destinationCityCode),
-        destinationRegion: destinationRegion?.trim() ?? null,
-        destinationRegionCode: normalizeIso(destinationRegionCode),    // ✨ NEW
-        destinationCountry: destinationCountry?.trim() ?? null,
-        destinationCountryCode: normalizeIso(destinationCountryCode),  // ✨ NEW
-        destinationLat: destinationLat ?? null,
-        destinationLng: destinationLng ?? null,
-        destinationTimezone: destinationTimezone?.trim() ?? null,
+        destinationLabel: data.destinationLabel ?? null,
+        destinationPlaceId: data.destinationPlaceId ?? null,
+        destinationCity: data.destinationCity,
+        destinationCityCode: data.destinationCityCode ?? null,
+        destinationRegion: data.destinationRegion ?? null,
+        destinationRegionCode: data.destinationRegionCode ?? null,
+        destinationCountry: data.destinationCountry ?? null,
+        destinationCountryCode: data.destinationCountryCode ?? null,
+        destinationLat: data.destinationLat ?? null,
+        destinationLng: data.destinationLng ?? null,
+        destinationTimezone: data.destinationTimezone ?? null,
+
         // ── Dates ──
-        departureDateLocal: departureDateLocal ?? null,
-        arrivalDateLocal: arrivalDateLocal ?? null,
-        departureTimeLocal: departureTimeLocal ?? null,
-        arrivalTimeLocal: arrivalTimeLocal ?? null,
-        departureAt: departureAtDate,
-        arrivalAt: arrivalAt ? new Date(arrivalAt) : null,
-        returnDepartureAt: returnDepartureAt ? new Date(returnDepartureAt) : null,
-        returnArrivalAt: returnArrivalAt ? new Date(returnArrivalAt) : null,
+        departureDateLocal: data.departureDateLocal ?? null,
+        arrivalDateLocal: data.arrivalDateLocal ?? null,
+        departureTimeLocal: data.departureTimeLocal ?? null,
+        arrivalTimeLocal: data.arrivalTimeLocal ?? null,
+        departureAt: data.departureAt ?? null,
+        arrivalAt: data.arrivalAt ?? null,
+        returnDepartureAt: data.returnDepartureAt ?? null,
+        returnArrivalAt: data.returnArrivalAt ?? null,
+
         // ── Mode-specific ──
-        flightType: flightType ?? null,
-        trainTripType: trainTripType ?? null,
-        carTripFlexibility: carTripFlexibility ?? null,
-        flightLayoverCities: flightLayoverCities ?? [],
-        trainStopCities: trainStopCities ?? [],
-        travelReference: travelReference?.trim() ?? null,
+        flightType: data.flightType ?? null,
+        trainTripType: data.trainTripType ?? null,
+        carTripFlexibility: data.carTripFlexibility ?? null,
+        flightLayoverCities: data.flightLayoverCities ?? [],
+        trainStopCities: data.trainStopCities ?? [],
+        travelReference: data.travelReference ?? null,
+
         // ── Conditions ──
-        acceptedCategories: acceptedCategories ?? [],
-        categoryConditions: categoryConditions ?? [],
-        handDeliveryOnly: handDeliveryOnly ?? false,
-        instantBooking: instantBooking ?? false,
-        currencyCode: currencyCode ?? "EUR",
-        maxSlots: maxSlots ?? null,
-        notes: notes?.trim() ?? null,
+        acceptedCategories: data.acceptedCategories ?? [],
+        categoryConditions: data.categoryConditions ?? [],
+
+        // ⭐ Lieux de remise / livraison
+        pickupLocations: data.pickupLocations ?? [],
+        deliveryLocations: data.deliveryLocations ?? [],
+
+        handDeliveryOnly: data.handDeliveryOnly ?? false,
+        instantBooking: data.instantBooking ?? false,
+        currencyCode: data.currencyCode ?? "EUR",
+        maxSlots: data.maxSlots ?? null,
+        notes: data.notes ?? null,
+
         minPriceCents,
         departureHourLocal,
         carrierRatingSnapshot,
@@ -246,6 +200,13 @@ export const updateTrip = async (
     const { id } = req.params;
     const userId = req.user.id;
 
+    // ── Zod validation (shape only — DB rules below) ──
+    const parsed = updateTripSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return next(new ValidationError(formatZodError(parsed.error)));
+    }
+    const { publish, ...data } = parsed.data;
+
     const trip = await prisma.trip.findUnique({ where: { id } });
     if (!trip) return next(new ValidationError("Trip not found."));
     if (trip.userId !== userId) return next(new ValidationError("Unauthorized."));
@@ -253,26 +214,12 @@ export const updateTrip = async (
       return next(new ValidationError("Cannot edit a cancelled trip."));
     }
 
-    const { publish, ...updateData } = req.body;
-
-    // Normaliser codes ISO si présents dans updateData
-    const isoFields = [
-      "originCityCode", "originRegionCode", "originCountryCode",
-      "destinationCityCode", "destinationRegionCode", "destinationCountryCode",
-    ];
-    for (const field of isoFields) {
-      if (field in updateData) {
-        const val = updateData[field];
-        updateData[field] = typeof val === "string" && val.trim().length > 0
-          ? val.trim().toUpperCase()
-          : null;
-      }
+    // Build update payload: only include fields that were actually sent
+    // (Zod has already trimmed strings and uppercased ISO codes).
+    const updateData: Record<string, any> = {};
+    for (const [key, value] of Object.entries(data)) {
+      if (value !== undefined) updateData[key] = value;
     }
-
-    if (updateData.departureAt) updateData.departureAt = new Date(updateData.departureAt);
-    if (updateData.arrivalAt) updateData.arrivalAt = new Date(updateData.arrivalAt);
-    if (updateData.returnDepartureAt) updateData.returnDepartureAt = new Date(updateData.returnDepartureAt);
-    if (updateData.returnArrivalAt) updateData.returnArrivalAt = new Date(updateData.returnArrivalAt);
 
     const willRecomputePrice = "categoryConditions" in updateData;
     const willRecomputeHour = "departureAt" in updateData || "originTimezone" in updateData;
@@ -305,6 +252,16 @@ export const updateTrip = async (
       }
       if (!carrierPage.stripeOnboardingComplete || !carrierPage.stripeChargesEnabled) {
         return next(new ValidationError("Stripe must be configured to publish a trip."));
+      }
+
+      // Locations gate: at least 1 pickup + 1 delivery
+      const effectivePickup = updateData.pickupLocations ?? trip.pickupLocations ?? [];
+      const effectiveDelivery = updateData.deliveryLocations ?? trip.deliveryLocations ?? [];
+      if (effectivePickup.length === 0) {
+        return next(new ValidationError("At least one pickup location is required to publish."));
+      }
+      if (effectiveDelivery.length === 0) {
+        return next(new ValidationError("At least one delivery location is required to publish."));
       }
 
       updateData.status = "PUBLISHED";
@@ -729,6 +686,14 @@ export const publishTrip = async (
       return next(new ValidationError("At least one parcel category must be accepted."));
     }
 
+    // ⭐ Locations gate
+    if (!trip.pickupLocations || trip.pickupLocations.length === 0) {
+      return next(new ValidationError("At least one pickup location is required to publish."));
+    }
+    if (!trip.deliveryLocations || trip.deliveryLocations.length === 0) {
+      return next(new ValidationError("At least one delivery location is required to publish."));
+    }
+
     const carrierRatingSnapshot =
       carrierPage.ratingsCount > 0 ? carrierPage.ratingsAvg : null;
 
@@ -936,9 +901,9 @@ export const getPublicTrip: RequestHandler = async (req, res, next) => {
         city: trip.originCity,
         cityCode: trip.originCityCode,
         region: trip.originRegion,
-        regionCode: trip.originRegionCode,       // ✨ NEW
+        regionCode: trip.originRegionCode,
         country: trip.originCountry,
-        countryCode: trip.originCountryCode,     // ✨ NEW
+        countryCode: trip.originCountryCode,
         lat: trip.originLat,
         lng: trip.originLng,
         timezone: trip.originTimezone,
@@ -949,9 +914,9 @@ export const getPublicTrip: RequestHandler = async (req, res, next) => {
         city: trip.destinationCity,
         cityCode: trip.destinationCityCode,
         region: trip.destinationRegion,
-        regionCode: trip.destinationRegionCode,         // ✨ NEW
+        regionCode: trip.destinationRegionCode,
         country: trip.destinationCountry,
-        countryCode: trip.destinationCountryCode,       // ✨ NEW
+        countryCode: trip.destinationCountryCode,
         lat: trip.destinationLat,
         lng: trip.destinationLng,
         timezone: trip.destinationTimezone,
@@ -977,6 +942,11 @@ export const getPublicTrip: RequestHandler = async (req, res, next) => {
 
       acceptedCategories: trip.acceptedCategories,
       categoryConditions: trip.categoryConditions,
+
+      // ⭐ Lieux de remise / livraison
+      pickupLocations: trip.pickupLocations,
+      deliveryLocations: trip.deliveryLocations,
+
       handDeliveryOnly: trip.handDeliveryOnly,
       instantBooking: trip.instantBooking,
       currencyCode: trip.currencyCode,
