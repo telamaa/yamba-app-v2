@@ -4,6 +4,14 @@ import { ValidationError } from "@packages/error-handler";
 import { AuthenticatedRequest } from "@packages/middleware/isAuthenticated";
 import { ReviewKind } from "@prisma/client";
 
+// 🚀 Confirme la version chargée
+console.log("🚀🚀🚀 user-public.controller.ts LOADED — VERSION DEBUG-V3", new Date().toISOString());
+
+// Helper pour les logs avec timestamp précis
+function ts(): string {
+  return new Date().toISOString().split("T")[1].slice(0, 12);
+}
+
 // ───────────────────────────────────────────────────────
 // Constants
 // ───────────────────────────────────────────────────────
@@ -72,15 +80,6 @@ function parseLimit(raw: unknown): number {
   return clamp(parsed, 1, PAGINATION_MAX_LIMIT);
 }
 
-/**
- * Calcule les top routes depuis une liste de trips.
- * Group by (originCity, destinationCity), count desc, limit 3.
- *
- * On le fait en mémoire JS plutôt qu'avec un aggregate Mongo car :
- *   1. Le volume par user est faible (< 100 trips typiquement)
- *   2. C'est plus simple à maintenir
- *   3. Si la perf devient critique, on dénormalisera sur CarrierPage
- */
 function calculateTopRoutes(
   trips: Array<{ originCity: string | null; destinationCity: string | null }>
 ): TopRouteDto[] {
@@ -176,7 +175,8 @@ export const getUserPublic: RequestHandler = async (
 
     const currentUserId: string | null = req.user?.id ?? null;
 
-    // Fetch user principal avec relations
+    console.log(`[${ts()}] [getUserPublic] 👀 slug=${slug} currentUserId=${currentUserId}`);
+
     const user = await prisma.user.findUnique({
       where: { publicSlug: slug },
       include: {
@@ -203,7 +203,6 @@ export const getUserPublic: RequestHandler = async (
     const isOwnProfile = currentUserId === user.id;
     const isCarrier = isCarrierActive(user);
 
-    // ─── Toutes les data en parallèle pour optimiser ─────
     const [
       tripsForRoutes,
       availableTripsPreview,
@@ -216,21 +215,16 @@ export const getUserPublic: RequestHandler = async (
       followingCount,
       myFollow,
     ] = await Promise.all([
-      // Trips pour topRoutes — tous statuts qui comptent comme activité
       isCarrier
         ? prisma.trip.findMany({
           where: {
             userId: user.id,
             status: { in: ["PUBLISHED", "COMPLETED", "PAUSED", "ARCHIVED"] },
           },
-          select: {
-            originCity: true,
-            destinationCity: true,
-          },
+          select: { originCity: true, destinationCity: true },
         })
         : Promise.resolve([]),
 
-      // Available trips preview (futur uniquement)
       isCarrier
         ? prisma.trip.findMany({
           where: {
@@ -265,12 +259,8 @@ export const getUserPublic: RequestHandler = async (
         })
         : Promise.resolve(0),
 
-      // Reviews carrier preview
       prisma.review.findMany({
-        where: {
-          subjectUserId: user.id,
-          kind: ReviewKind.AS_CARRIER,
-        },
+        where: { subjectUserId: user.id, kind: ReviewKind.AS_CARRIER },
         orderBy: { createdAt: "desc" },
         take: PREVIEW_REVIEWS_LIMIT,
         include: {
@@ -285,18 +275,11 @@ export const getUserPublic: RequestHandler = async (
       }),
 
       prisma.review.count({
-        where: {
-          subjectUserId: user.id,
-          kind: ReviewKind.AS_CARRIER,
-        },
+        where: { subjectUserId: user.id, kind: ReviewKind.AS_CARRIER },
       }),
 
-      // Reviews shipper preview
       prisma.review.findMany({
-        where: {
-          subjectUserId: user.id,
-          kind: ReviewKind.AS_SHIPPER,
-        },
+        where: { subjectUserId: user.id, kind: ReviewKind.AS_SHIPPER },
         orderBy: { createdAt: "desc" },
         take: PREVIEW_REVIEWS_LIMIT,
         include: {
@@ -311,17 +294,12 @@ export const getUserPublic: RequestHandler = async (
       }),
 
       prisma.review.count({
-        where: {
-          subjectUserId: user.id,
-          kind: ReviewKind.AS_SHIPPER,
-        },
+        where: { subjectUserId: user.id, kind: ReviewKind.AS_SHIPPER },
       }),
 
-      // Follow stats
       prisma.userFollow.count({ where: { followedId: user.id } }),
       prisma.userFollow.count({ where: { followerId: user.id } }),
 
-      // Current user's follow row (si connecté ET pas son propre profil)
       currentUserId && currentUserId !== user.id
         ? prisma.userFollow.findUnique({
           where: {
@@ -335,7 +313,8 @@ export const getUserPublic: RequestHandler = async (
         : Promise.resolve(null),
     ]);
 
-    // ─── Build DTO ──────────────────────────────────────
+    console.log(`[${ts()}] [getUserPublic] 📊 myFollow=${myFollow ? "EXISTS" : "null"} followersCount=${followersCount}`);
+
     const carrierPage = user.carrierPage;
     const primaryAddress = carrierPage?.primaryAddress;
 
@@ -360,10 +339,7 @@ export const getUserPublic: RequestHandler = async (
 
       tripperRating:
         isCarrier && carrierPage
-          ? {
-            average: carrierPage.ratingsAvg,
-            count: carrierPage.ratingsCount,
-          }
+          ? { average: carrierPage.ratingsAvg, count: carrierPage.ratingsCount }
           : null,
 
       shipperRating: {
@@ -395,8 +371,6 @@ export const getUserPublic: RequestHandler = async (
       follow: {
         followersCount,
         followingCount,
-        // null si non connecté → permet au front de différencier "non connecté"
-        // de "connecté mais ne suit pas"
         isFollowedByMe: currentUserId ? myFollow !== null : null,
         notifyNextTrip: myFollow?.notifyNextTrip ?? null,
       },
@@ -412,7 +386,6 @@ export const getUserPublic: RequestHandler = async (
 
 // ───────────────────────────────────────────────────────
 // GET /users/:slug/public/reviews
-// Pagination des reviews (?kind=AS_CARRIER|AS_SHIPPER&limit&cursor)
 // ───────────────────────────────────────────────────────
 
 export const listUserPublicReviews: RequestHandler = async (req, res, next) => {
@@ -444,18 +417,11 @@ export const listUserPublicReviews: RequestHandler = async (req, res, next) => {
       return;
     }
 
-    // Cursor pagination : take limit+1 pour détecter la page suivante
     const items = await prisma.review.findMany({
-      where: {
-        subjectUserId: user.id,
-        kind,
-      },
+      where: { subjectUserId: user.id, kind },
       orderBy: { createdAt: "desc" },
       take: limit + 1,
-      ...(cursor && {
-        cursor: { id: cursor },
-        skip: 1,
-      }),
+      ...(cursor && { cursor: { id: cursor }, skip: 1 }),
       include: {
         authorUser: {
           select: {
@@ -483,7 +449,6 @@ export const listUserPublicReviews: RequestHandler = async (req, res, next) => {
 
 // ───────────────────────────────────────────────────────
 // GET /users/:slug/public/trips
-// Pagination des trajets disponibles (futur, status=PUBLISHED)
 // ───────────────────────────────────────────────────────
 
 export const listUserPublicTrips: RequestHandler = async (req, res, next) => {
@@ -511,7 +476,6 @@ export const listUserPublicTrips: RequestHandler = async (req, res, next) => {
       return;
     }
 
-    // User non-tripper : pas de trips à exposer
     if (user.carrierStatus !== "ACTIVE") {
       res.status(200).json({ success: true, trips: [], nextCursor: null });
       return;
@@ -525,10 +489,7 @@ export const listUserPublicTrips: RequestHandler = async (req, res, next) => {
       },
       orderBy: { departureAt: "asc" },
       take: limit + 1,
-      ...(cursor && {
-        cursor: { id: cursor },
-        skip: 1,
-      }),
+      ...(cursor && { cursor: { id: cursor }, skip: 1 }),
       select: {
         id: true,
         transportMode: true,
@@ -559,7 +520,6 @@ export const listUserPublicTrips: RequestHandler = async (req, res, next) => {
 
 // ───────────────────────────────────────────────────────
 // POST /users/:slug/follow
-// Suivre un user. Idempotent (re-follow met à jour notifyNextTrip).
 // ───────────────────────────────────────────────────────
 
 export const followUser = async (
@@ -568,28 +528,43 @@ export const followUser = async (
   next: NextFunction
 ) => {
   try {
-    if (!req.user) return next(new ValidationError("Unauthorized"));
+    console.log(`\n[${ts()}] [followUser] 🎬 START - slug=${req.params.slug} userId=${req.user?.id}`);
+    console.log(`[${ts()}] [followUser] 📍 Referer:`, req.headers.referer);
+    console.log(`[${ts()}] [followUser] 📍 User-Agent:`, req.headers["user-agent"]?.slice(0, 60));
+
+    if (!req.user) {
+      console.log(`[${ts()}] [followUser] ❌ No req.user`);
+      return next(new ValidationError("Unauthorized"));
+    }
 
     const { slug } = req.params;
     const followerId = req.user.id;
 
     const { notifyNextTrip = true } = req.body as { notifyNextTrip?: boolean };
+    console.log(`[${ts()}] [followUser] 📦 body:`, req.body);
 
     const followed = await prisma.user.findUnique({
       where: { publicSlug: slug },
       select: { id: true, isDeleted: true },
     });
+    console.log(`[${ts()}] [followUser] 👤 followed user:`, followed);
 
     if (!followed || followed.isDeleted) {
+      console.log(`[${ts()}] [followUser] ❌ Followed user not found or deleted`);
       return next(new ValidationError("User not found."));
     }
 
     if (followed.id === followerId) {
+      console.log(`[${ts()}] [followUser] ❌ Cannot follow yourself`);
       return next(new ValidationError("You cannot follow yourself."));
     }
 
-    // Upsert pour idempotence : POST follow déjà existant met juste à jour
-    // notifyNextTrip plutôt que d'erreur
+    // Count BEFORE upsert
+    const countBefore = await prisma.userFollow.count();
+    console.log(`[${ts()}] [followUser] 🔢 BEFORE upsert: count=${countBefore}`);
+
+    console.log(`[${ts()}] [followUser] 🔄 calling upsert followerId=${followerId} followedId=${followed.id}`);
+
     const follow = await prisma.userFollow.upsert({
       where: {
         followerId_followedId: {
@@ -605,6 +580,12 @@ export const followUser = async (
       },
     });
 
+    console.log(`[${ts()}] [followUser] ✅ upsert result:`, JSON.stringify(follow));
+
+    // Count AFTER upsert
+    const countAfter = await prisma.userFollow.count();
+    console.log(`[${ts()}] [followUser] 🔢 AFTER upsert: count=${countAfter}`);
+
     return res.status(200).json({
       success: true,
       message: "User followed.",
@@ -613,13 +594,13 @@ export const followUser = async (
       },
     });
   } catch (error) {
+    console.error(`[${ts()}] [followUser] 💥 ERROR:`, error);
     return next(error);
   }
 };
 
 // ───────────────────────────────────────────────────────
 // DELETE /users/:slug/follow
-// Idempotent : pas d'erreur si le follow n'existait pas.
 // ───────────────────────────────────────────────────────
 
 export const unfollowUser = async (
@@ -628,7 +609,14 @@ export const unfollowUser = async (
   next: NextFunction
 ) => {
   try {
-    if (!req.user) return next(new ValidationError("Unauthorized"));
+    console.log(`\n[${ts()}] [unfollowUser] 🎬 START - slug=${req.params.slug} userId=${req.user?.id}`);
+    console.log(`[${ts()}] [unfollowUser] 📍 Referer:`, req.headers.referer);
+    console.log(`[${ts()}] [unfollowUser] 📍 User-Agent:`, req.headers["user-agent"]?.slice(0, 60));
+
+    if (!req.user) {
+      console.log(`[${ts()}] [unfollowUser] ❌ No req.user`);
+      return next(new ValidationError("Unauthorized"));
+    }
 
     const { slug } = req.params;
     const followerId = req.user.id;
@@ -639,29 +627,41 @@ export const unfollowUser = async (
     });
 
     if (!followed) {
+      console.log(`[${ts()}] [unfollowUser] ❌ Followed user not found`);
       return next(new ValidationError("User not found."));
     }
 
-    // deleteMany ne throw pas si aucun match → idempotent
-    await prisma.userFollow.deleteMany({
+    // Count BEFORE delete
+    const countBefore = await prisma.userFollow.count();
+    console.log(`[${ts()}] [unfollowUser] 🔢 BEFORE delete: count=${countBefore}`);
+
+    console.log(`[${ts()}] [unfollowUser] 🔄 calling deleteMany followerId=${followerId} followedId=${followed.id}`);
+
+    const result = await prisma.userFollow.deleteMany({
       where: {
         followerId,
         followedId: followed.id,
       },
     });
 
+    console.log(`[${ts()}] [unfollowUser] 🗑️ deleteMany result:`, JSON.stringify(result));
+
+    // Count AFTER delete
+    const countAfter = await prisma.userFollow.count();
+    console.log(`[${ts()}] [unfollowUser] 🔢 AFTER delete: count=${countAfter}`);
+
     return res.status(200).json({
       success: true,
       message: "User unfollowed.",
     });
   } catch (error) {
+    console.error(`[${ts()}] [unfollowUser] 💥 ERROR:`, error);
     return next(error);
   }
 };
 
 // ───────────────────────────────────────────────────────
 // PATCH /users/:slug/follow
-// Toggle des préférences de notification (notifyNextTrip).
 // ───────────────────────────────────────────────────────
 
 export const updateFollowPreferences = async (
@@ -670,6 +670,8 @@ export const updateFollowPreferences = async (
   next: NextFunction
 ) => {
   try {
+    console.log(`\n[${ts()}] [updateFollowPreferences] 🎬 START - slug=${req.params.slug} userId=${req.user?.id}`);
+
     if (!req.user) return next(new ValidationError("Unauthorized"));
 
     const { slug } = req.params;
@@ -713,6 +715,8 @@ export const updateFollowPreferences = async (
       data: { notifyNextTrip },
     });
 
+    console.log(`[${ts()}] [updateFollowPreferences] ✅ updated:`, JSON.stringify(updated));
+
     return res.status(200).json({
       success: true,
       follow: {
@@ -721,5 +725,140 @@ export const updateFollowPreferences = async (
     });
   } catch (error) {
     return next(error);
+  }
+};
+
+// ───────────────────────────────────────────────────────
+// GET /me/following
+// ───────────────────────────────────────────────────────
+
+type FollowingUserDto = {
+  id: string;
+  publicSlug: string | null;
+  firstName: string;
+  lastInitial: string;
+  avatarUrl: string | null;
+  isCarrier: boolean;
+  carrierRatingAvg: number | null;
+  carrierRatingCount: number;
+  totalTripsPublished: number;
+  nextUpcomingTrip: {
+    id: string;
+    originCity: string;
+    destinationCity: string;
+    departureAt: Date;
+  } | null;
+};
+
+type FollowingItemDto = {
+  user: FollowingUserDto;
+  followedAt: Date;
+  notifyNextTrip: boolean;
+};
+
+export const listMyFollowing: RequestHandler = async (
+  req: AuthenticatedRequest,
+  res,
+  next
+) => {
+  try {
+    if (!req.user) {
+      next(new ValidationError("Unauthorized"));
+      return;
+    }
+
+    const followerId = req.user.id;
+
+    const follows = await prisma.userFollow.findMany({
+      where: { followerId },
+      include: {
+        followed: {
+          include: {
+            avatar: { select: { url: true } },
+            carrierPage: {
+              select: {
+                ratingsAvg: true,
+                ratingsCount: true,
+                totalTripsPublished: true,
+              },
+            },
+            trips: {
+              where: {
+                status: "PUBLISHED",
+                departureAt: { gt: new Date() },
+              },
+              orderBy: { departureAt: "asc" },
+              take: 1,
+              select: {
+                id: true,
+                originCity: true,
+                destinationCity: true,
+                departureAt: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    const validFollows = follows.filter((f) => !f.followed.isDeleted);
+
+    const items: FollowingItemDto[] = validFollows.map((f) => {
+      const u = f.followed;
+      const isCarrier = isCarrierActive(u);
+      const tripCandidate = u.trips[0];
+
+      const nextUpcomingTrip =
+        tripCandidate &&
+        tripCandidate.originCity &&
+        tripCandidate.destinationCity &&
+        tripCandidate.departureAt
+          ? {
+            id: tripCandidate.id,
+            originCity: tripCandidate.originCity,
+            destinationCity: tripCandidate.destinationCity,
+            departureAt: tripCandidate.departureAt,
+          }
+          : null;
+
+      return {
+        user: {
+          id: u.id,
+          publicSlug: u.publicSlug,
+          firstName: u.firstName,
+          lastInitial: getLastInitial(u.lastName),
+          avatarUrl: u.avatar?.url ?? null,
+          isCarrier,
+          carrierRatingAvg: u.carrierPage?.ratingsAvg ?? null,
+          carrierRatingCount: u.carrierPage?.ratingsCount ?? 0,
+          totalTripsPublished: u.carrierPage?.totalTripsPublished ?? 0,
+          nextUpcomingTrip,
+        },
+        followedAt: f.createdAt,
+        notifyNextTrip: f.notifyNextTrip,
+      };
+    });
+
+    items.sort((a, b) => {
+      const aHasTrip = a.user.nextUpcomingTrip !== null;
+      const bHasTrip = b.user.nextUpcomingTrip !== null;
+      if (aHasTrip !== bHasTrip) return aHasTrip ? -1 : 1;
+      if (aHasTrip && bHasTrip) {
+        return (
+          new Date(a.user.nextUpcomingTrip!.departureAt).getTime() -
+          new Date(b.user.nextUpcomingTrip!.departureAt).getTime()
+        );
+      }
+      return new Date(b.followedAt).getTime() - new Date(a.followedAt).getTime();
+    });
+
+    res.status(200).json({
+      success: true,
+      count: items.length,
+      following: items,
+    });
+  } catch (error) {
+    next(error);
   }
 };

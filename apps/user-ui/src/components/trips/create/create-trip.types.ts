@@ -4,11 +4,8 @@ export type TransportMode = "plane" | "train" | "car";
 export type TripType = "oneWay" | "roundTrip";
 
 export type FlightType = "direct" | "withLayover";
-export type TrainTripType = "direct" | "withConnection" | "withIntermediateStops";
+export type TrainTripType = "direct" | "withConnection";
 export type CarTripFlexibility = "direct" | "detourByAgreement";
-
-export type HandoffMoment = "beforeDeparture" | "atDeparture";
-export type PickupMoment = "onArrival" | "laterAtAddress";
 
 export type TicketVerificationStatus =
   | "not_submitted"
@@ -30,22 +27,19 @@ export type ParcelCategory =
   | "checkedBag23kg"
   | "cabinBag12kg";
 
+/**
+ * Simplified: no more handoff/pickup moments at category level.
+ * Logistics flexibility is now defined at trip level via TripLocationPoint.
+ */
 export type CategoryCondition = {
   categoryKey: ParcelCategory;
   priceAmount: number | "";
-  handoffMoments: HandoffMoment[];
-  pickupMoments: PickupMoment[];
 };
 
-/**
- * A trip document — uploaded directly to ImageKit.
- * `fileId` and `url` are set by ImageKit after upload.
- * `verificationStatus` comes from the backend.
- */
 export type TripDocumentDraft = {
-  id: string;                // local/temporary id (uuid or fileId)
-  fileId: string;            // ImageKit fileId (after upload)
-  url: string;               // ImageKit file url (after upload)
+  id: string;
+  fileId: string;
+  url: string;
   name: string;
   size: number;
   mimeType: string;
@@ -53,17 +47,54 @@ export type TripDocumentDraft = {
   verificationStatus?: TicketVerificationStatus;
 };
 
+/**
+ * Snapshot Google Places — données structurées pour un lieu.
+ *
+ * IMPORTANT: doit rester compatible avec `PlaceDetails` exporté par
+ * `@/components/search/CityAutocomplete`. C'est la même structure.
+ */
 export type PlaceInfo = {
   formattedAddress: string;
   placeId: string;
   lat: number | null;
   lng: number | null;
   streetLine1: string | null;
+
+  // Display text (locale-dependent) — UI uniquement
   city: string | null;
   region: string | null;
-  postalCode: string | null;
   country: string | null;
-  countryCode: string | null;
+
+  // ISO codes (universal) — pour la logique métier
+  cityCode: string | null;       // IATA (CDG, JFK) si dispo
+  regionCode: string | null;     // ISO 3166-2 (ex: "FR-IDF")
+  countryCode: string | null;    // ISO 3166-1 alpha-2 (ex: "FR")
+
+  postalCode: string | null;
+};
+
+/* ── Trip location points ─────────────────────────────────────────────
+ * The Voyageur defines where the Expéditeur can drop off (PICKUP) and
+ * where they can recover the parcel (DELIVERY) for THIS trip.
+ *
+ * Stored as arrays at Draft level to allow future expansion
+ * (multi-city, multi-airport, etc.). The UI presents them as fixed
+ * cards (Airport + CityArea, or just CityArea for cars) — disabled
+ * cards stay in the array with `enabled: false` for state stability.
+ * ──────────────────────────────────────────────────────────────────── */
+
+export type LocationContext = "PICKUP" | "DELIVERY";
+export type LocationKind = "AIRPORT" | "TRAIN_STATION" | "CITY_AREA";
+export type LocationFlexibility = "EXACT" | "RADIUS" | "CITY_WIDE";
+
+export type TripLocationPoint = {
+  id: string;                       // local React key; backend assigns ObjectId
+  context: LocationContext;
+  kind: LocationKind;
+  enabled: boolean;                 // UX state — only enabled ones sent to API
+  details: string;                  // free text ("T2E hall départ", "Café de la gare")
+  flexibility: LocationFlexibility;
+  radiusKm: number | null;          // only set when flexibility === "RADIUS"
 };
 
 export type Draft = {
@@ -94,6 +125,10 @@ export type Draft = {
 
   globalPrice: number | "";
   useGlobalPrice: boolean;
+
+  // NEW — locations per context (Voyageur defines, Expéditeur adapts)
+  pickupLocations: TripLocationPoint[];
+  deliveryLocations: TripLocationPoint[];
 
   handDeliveryOnly: boolean;
   instantBooking: boolean;
@@ -158,7 +193,6 @@ export type CreateTripCopy = {
   withLayover: string;
   directTrain: string;
   withConnection: string;
-  withIntermediateStops: string;
   directTrip: string;
   detourByAgreement: string;
 
@@ -178,15 +212,25 @@ export type CreateTripCopy = {
   globalPriceSub: string;
   adjustPrices: string;
   pricePerCategory: string;
-
   price: string;
-  handoffMoments: string;
-  pickupMoments: string;
-  beforeDeparture: string;
-  atDeparture: string;
-  onArrival: string;
-  laterAtAddress: string;
-  pickupInfo: string;
+
+  // Locations
+  pickupLocations: string;
+  pickupLocationsSub: string;
+  deliveryLocations: string;
+  deliveryLocationsSub: string;
+  atAirport: string;
+  atTrainStation: string;
+  inTheCity: string;
+  locationDetailsPlaceholder: string;
+  flexibility: string;
+  flexExact: string;
+  flexRadius5: string;
+  flexRadius10: string;
+  flexRadius15: string;
+  flexRadius20: string;
+  flexCityWide: string;
+  locationsCount: (n: number) => string;
 
   options: string;
   handOnly: string;
@@ -199,8 +243,12 @@ export type CreateTripCopy = {
   reviewRoute: string;
   reviewSchedule: string;
   reviewCategoryConditions: string;
+  reviewLocations: string;
   reviewDocuments: string;
   edit: string;
+
+  publicPreview: string;
+  asSeenByShippers: string;
 
   revenueEstimate: string;
   resumeDraft: string;

@@ -1,35 +1,44 @@
 import { FileText, ShieldCheck } from "lucide-react";
 import type { CreateTripCopy, Draft, Step } from "../create-trip.types";
 import { getCategoryOptions } from "../create-trip.copy";
-import {ReviewCard, SectionLabel} from "@/components/trips/create/TripFormUi";
-
+import { ReviewCard, SectionLabel } from "@/components/trips/create/TripFormUi";
+import TripPublicPreview, { summarizeLocations } from "../TripPublicPreview";
 
 const MANGO = "#FF9900";
 
 function formatDate(d?: Date): string {
   if (!d) return "—";
-  return d.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
+  return d.toLocaleDateString("fr-FR", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
 }
 
 function getTransportLabel(draft: Draft, copy: CreateTripCopy): string {
   const mode =
-    draft.transportMode === "plane" ? copy.plane
-      : draft.transportMode === "train" ? copy.train
-        : draft.transportMode === "car" ? copy.car
+    draft.transportMode === "plane"
+      ? copy.plane
+      : draft.transportMode === "train"
+        ? copy.train
+        : draft.transportMode === "car"
+          ? copy.car
           : "—";
 
   let subType = "";
   if (draft.transportMode === "plane" && draft.flightType) {
-    subType = draft.flightType === "direct" ? copy.directFlight : copy.withLayover;
+    subType =
+      draft.flightType === "direct" ? copy.directFlight : copy.withLayover;
   }
   if (draft.transportMode === "train" && draft.trainTripType) {
     subType =
-      draft.trainTripType === "direct" ? copy.directTrain
-        : draft.trainTripType === "withConnection" ? copy.withConnection
-          : copy.withIntermediateStops;
+      draft.trainTripType === "direct" ? copy.directTrain : copy.withConnection;
   }
   if (draft.transportMode === "car" && draft.carTripFlexibility) {
-    subType = draft.carTripFlexibility === "direct" ? copy.directTrip : copy.detourByAgreement;
+    subType =
+      draft.carTripFlexibility === "direct"
+        ? copy.directTrip
+        : copy.detourByAgreement;
   }
 
   return subType ? `${mode} · ${subType}` : mode;
@@ -52,10 +61,28 @@ export default function StepReview({
   if (draft.handDeliveryOnly) optionsList.push(copy.handOnly);
   if (draft.instantBooking) optionsList.push(copy.instantBooking);
 
+  const pickupSummary = summarizeLocations(draft.pickupLocations, copy, isFr);
+  const deliverySummary = summarizeLocations(draft.deliveryLocations, copy, isFr);
+
   return (
     <div>
       <SectionLabel first>{copy.step3Title}</SectionLabel>
-      <p className="mb-5 text-[13px] text-slate-500 dark:text-slate-400">{copy.step3Sub}</p>
+      <p className="mb-5 text-[13px] text-slate-500 dark:text-slate-400">
+        {copy.step3Sub}
+      </p>
+
+      {/* ⭐ Public preview */}
+      <div className="mb-2 text-[11px] font-medium uppercase tracking-wider text-slate-400 dark:text-slate-500">
+        {copy.publicPreview}
+      </div>
+      <div className="mb-6">
+        <TripPublicPreview draft={draft} copy={copy} isFr={isFr} />
+      </div>
+
+      {/* Edit-a-section header */}
+      <div className="mb-2 text-[11px] font-medium uppercase tracking-wider text-slate-400 dark:text-slate-500">
+        {isFr ? "Modifier une section" : "Edit a section"}
+      </div>
 
       {/* Transport */}
       <ReviewCard
@@ -69,12 +96,23 @@ export default function StepReview({
       {/* Route */}
       <ReviewCard
         label={copy.reviewRoute}
-        value={draft.from && draft.to ? `${draft.from} → ${draft.to}` : "—"}
+        value={
+          draft.from && draft.to ? `${draft.from} → ${draft.to}` : "—"
+        }
         sub={
           [
-            draft.flightLayoverCities && `Escale : ${draft.flightLayoverCities}`,
-            draft.trainStopCities && `Correspondance : ${draft.trainStopCities}`,
-            draft.travelReference && `Réf. ${draft.travelReference}`,
+            draft.flightLayoverCities &&
+            (isFr
+              ? `Escale : ${draft.flightLayoverCities}`
+              : `Layover: ${draft.flightLayoverCities}`),
+            draft.trainStopCities &&
+            (isFr
+              ? `Correspondance : ${draft.trainStopCities}`
+              : `Connection: ${draft.trainStopCities}`),
+            draft.travelReference &&
+            (isFr
+              ? `Réf. ${draft.travelReference}`
+              : `Ref. ${draft.travelReference}`),
           ]
             .filter(Boolean)
             .join(" · ") || undefined
@@ -86,9 +124,12 @@ export default function StepReview({
       {/* Dates */}
       <ReviewCard
         label={copy.reviewSchedule}
-        value={`${formatDate(draft.departureDate)}${draft.arrivalDate ? ` → ${formatDate(draft.arrivalDate)}` : ""}`}
+        value={`${formatDate(draft.departureDate)}${
+          draft.arrivalDate ? ` → ${formatDate(draft.arrivalDate)}` : ""
+        }`}
         sub={
-          [draft.departureTime, draft.arrivalTime].filter(Boolean).join(" → ") || undefined
+          [draft.departureTime, draft.arrivalTime].filter(Boolean).join(" → ") ||
+          undefined
         }
         onEdit={() => onGoTo(1)}
         editLabel={copy.edit}
@@ -107,12 +148,18 @@ export default function StepReview({
                 key={doc.id}
                 className="flex items-center gap-2 text-[12px] text-slate-600 dark:text-slate-400"
               >
-                <FileText size={13} className="flex-shrink-0 text-slate-400" />
+                <FileText
+                  size={13}
+                  className="flex-shrink-0 text-slate-400"
+                />
                 <span className="truncate">{doc.name}</span>
               </div>
             ))}
             <div className="flex items-center gap-1.5 pt-1">
-              <ShieldCheck size={12} className="text-emerald-600 dark:text-emerald-400" />
+              <ShieldCheck
+                size={12}
+                className="text-emerald-600 dark:text-emerald-400"
+              />
               <span className="text-[11px] text-emerald-600 dark:text-emerald-400">
                 {copy.docPending}
               </span>
@@ -142,13 +189,42 @@ export default function StepReview({
                   {opt.label}
                 </span>
                 {condition && condition.priceAmount !== "" && (
-                  <span className="text-[13px] font-medium" style={{ color: MANGO }}>
+                  <span
+                    className="text-[13px] font-medium"
+                    style={{ color: MANGO }}
+                  >
                     {condition.priceAmount}€
                   </span>
                 )}
               </div>
             );
           })}
+        </div>
+      </ReviewCard>
+
+      {/* ⭐ Locations */}
+      <ReviewCard
+        label={copy.reviewLocations}
+        onEdit={() => onGoTo(2)}
+        editLabel={copy.edit}
+      >
+        <div className="space-y-2">
+          <div>
+            <div className="text-[10px] uppercase tracking-wide text-slate-400 dark:text-slate-500">
+              {copy.pickupLocations}
+            </div>
+            <div className="mt-0.5 text-[12px] text-slate-600 dark:text-slate-400">
+              {pickupSummary}
+            </div>
+          </div>
+          <div>
+            <div className="text-[10px] uppercase tracking-wide text-slate-400 dark:text-slate-500">
+              {copy.deliveryLocations}
+            </div>
+            <div className="mt-0.5 text-[12px] text-slate-600 dark:text-slate-400">
+              {deliverySummary}
+            </div>
+          </div>
         </div>
       </ReviewCard>
 

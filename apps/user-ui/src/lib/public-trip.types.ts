@@ -32,10 +32,10 @@ export type ParcelCategory =
   | "CHECKED_BAG_23KG"
   | "CABIN_BAG_12KG";
 
-// Quand l'expéditeur DONNE le colis
+/** @deprecated remplacé par les lieux de remise (`pickupLocations`) */
 export type CategoryHandoffMoment = "BEFORE_DEPARTURE" | "AT_DEPARTURE";
 
-// Quand le destinataire RÉCUPÈRE le colis
+/** @deprecated remplacé par les lieux de livraison (`deliveryLocations`) */
 export type PickupMoment = "ON_ARRIVAL" | "LATER_AT_ADDRESS";
 
 /**
@@ -44,9 +44,29 @@ export type PickupMoment = "ON_ARRIVAL" | "LATER_AT_ADDRESS";
 export type TripCategoryCondition = {
   category: ParcelCategory;
   priceAmountCents: number;
-  handoffMoments: CategoryHandoffMoment[];
-  pickupMoments: PickupMoment[];
+  /** @deprecated remplacé par `pickupLocations` au niveau du trajet */
+  handoffMoments?: CategoryHandoffMoment[];
+  /** @deprecated remplacé par `deliveryLocations` au niveau du trajet */
+  pickupMoments?: PickupMoment[];
 };
+
+/* ── Lieux de remise & livraison ─────────────────── */
+
+export type LocationKind = "AIRPORT" | "TRAIN_STATION" | "CITY_AREA";
+export type LocationFlexibility = "EXACT" | "RADIUS" | "CITY_WIDE";
+
+/**
+ * Un lieu de remise ou de livraison configuré sur un trajet.
+ * Le serveur ne retourne que les lieux activés par le carrier.
+ */
+export type TripLocationPoint = {
+  kind: LocationKind;
+  details: string | null;
+  flexibility: LocationFlexibility;
+  radiusKm: number | null;
+};
+
+/* ── Reste des types ──────────────────────────────── */
 
 export type TripLocation = {
   label: string | null;
@@ -111,6 +131,11 @@ export type PublicTrip = {
 
   acceptedCategories: ParcelCategory[];
   categoryConditions: TripCategoryCondition[];
+
+  // ⭐ Lieux de remise & livraison
+  pickupLocations: TripLocationPoint[];
+  deliveryLocations: TripLocationPoint[];
+
   handDeliveryOnly: boolean;
   instantBooking: boolean;
   currencyCode: string;

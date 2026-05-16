@@ -27,6 +27,18 @@ export function getDashboardCopy(isFr: boolean) {
       title: "Notifications",
       sub: isFr ? "Alertes et mises à jour" : "Alerts and updates",
     },
+    savedRoutes: {
+      title: isFr ? "Mes alertes route" : "My route alerts",
+      sub: isFr
+        ? "Soyez prévenu·e dès qu'un trajet correspondant est publié"
+        : "Get notified when a matching trip is published",
+    },
+    following: {
+      title: isFr ? "Trippers suivis" : "Followed trippers",
+      sub: isFr
+        ? "Restez à l'affût des publications de vos trippers favoris"
+        : "Stay tuned for posts from your favorite trippers",
+    },
     payments: {
       title: isFr ? "Paiements" : "Payments",
       sub: isFr ? "Historique de toutes vos transactions" : "All your transaction history",
@@ -77,6 +89,7 @@ export function getDashboardCopy(isFr: boolean) {
     inProgress: isFr ? "En cours" : "In progress",
     revenue: isFr ? "Revenus" : "Revenue",
     spent: isFr ? "Dépensés" : "Spent",
+    qaSavedRoutes: isFr ? "Créer une alerte" : "Create alert",
     edit: isFr ? "Modifier" : "Edit",
     manage: isFr ? "Gérer" : "Manage",
     change: isFr ? "Changer" : "Change",

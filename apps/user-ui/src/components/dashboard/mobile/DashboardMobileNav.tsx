@@ -6,16 +6,32 @@ import { Link } from "@/i18n/navigation";
 import {
   MOBILE_TAB_SECTIONS,
   MOBILE_TABS,
+  NAV_GROUPS,
+  HOME_ITEM,
+  resolveSectionKey,
   MobileTab,
+  type SectionKey,
 } from "@/app/[locale]/dashboard/dashboard.config";
 
 const MANGO_DARK = "#CC7A00";
 
+// Helper local : résout une SectionKey vers son path URL (slug ou key)
+function getPathForSection(key: SectionKey): string {
+  if (HOME_ITEM.key === key) return HOME_ITEM.slug ?? HOME_ITEM.key;
+  for (const group of NAV_GROUPS) {
+    for (const item of group.items) {
+      if (item.key === key) return item.slug ?? item.key;
+    }
+  }
+  return key;
+}
+
 function getActiveMobileTab(pathname: string): MobileTab {
   const segment = pathname.split("/").pop() ?? "";
+  const resolvedKey = resolveSectionKey(segment);
 
   for (const [tab, sections] of Object.entries(MOBILE_TAB_SECTIONS)) {
-    if ((sections as string[]).includes(segment)) {
+    if ((sections as string[]).includes(resolvedKey)) {
       return tab as MobileTab;
     }
   }
@@ -24,7 +40,7 @@ function getActiveMobileTab(pathname: string): MobileTab {
 
 export default function DashboardMobileNav() {
   const pathname = usePathname();
-  const t = useTranslations();
+  const t = useTranslations("dashboard.sections"); // ← FIXED: namespace ajouté
   const activeTab = getActiveMobileTab(pathname ?? "");
 
   return (
@@ -33,11 +49,12 @@ export default function DashboardMobileNav() {
         const isActive = activeTab === tab.key;
         const Icon = tab.icon;
         const firstSection = MOBILE_TAB_SECTIONS[tab.key][0];
+        const firstSectionPath = getPathForSection(firstSection);
 
         return (
           <Link
             key={tab.key}
-            href={`/dashboard/${firstSection}`}
+            href={`/dashboard/${firstSectionPath}`}
             className={[
               "flex flex-col items-center gap-0.5 px-2 py-1 text-[10px]",
               isActive ? "font-medium" : "",

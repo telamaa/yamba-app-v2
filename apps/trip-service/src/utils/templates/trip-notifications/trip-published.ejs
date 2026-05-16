@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="<%= locale %>">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title><%= subject %></title>
+</head>
+<body style="margin:0;padding:0;background-color:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#0f172a;">
+
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color:#f8fafc;">
+    <tr>
+        <td align="center" style="padding:40px 16px;">
+            <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="max-width:600px;background-color:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 1px 3px rgba(15,23,42,0.06);">
+
+                <!-- ─── HEADER GRADIENT MANGO → TEAL ─── -->
+                <tr>
+                    <td style="background:linear-gradient(135deg,#FF9900 0%,#0F766E 100%);padding:28px 32px;">
+                        <table role="presentation" cellspacing="0" cellpadding="0" border="0">
+                            <tr>
+                                <td style="width:36px;height:36px;background-color:#ffffff;border-radius:10px;text-align:center;vertical-align:middle;font-size:18px;font-weight:900;color:#FF9900;line-height:36px;">Y</td>
+                                <td style="padding-left:12px;font-size:22px;font-weight:800;color:#ffffff;letter-spacing:-0.02em;vertical-align:middle;">Yamba</td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+
+                <!-- ─── TITRE DE L'EMAIL ─── -->
+                <tr>
+                    <td style="padding:36px 32px 8px;">
+                        <h1 style="margin:0;font-size:22px;line-height:1.3;font-weight:800;color:#0f172a;">
+                            <% if (recipient.followsTripper && recipient.matchingSavedRoute) { %>
+                                <% if (locale === "fr") { %>
+                                    Un trajet de <%= tripper.firstName %> correspond à votre alerte
+                                <% } else { %>
+                                    A trip by <%= tripper.firstName %> matches your alert
+                                <% } %>
+                            <% } else if (recipient.followsTripper) { %>
+                                <% if (locale === "fr") { %>
+                                    <%= tripper.firstName %> vient de publier un nouveau trajet
+                                <% } else { %>
+                                    <%= tripper.firstName %> just published a new trip
+                                <% } %>
+                            <% } else if (recipient.matchingSavedRoute && recipient.matchingSavedRoute.matchScore >= 100) { %>
+                                <% if (locale === "fr") { %>
+                                    Un nouveau trajet correspond à votre alerte
+                                <% } else { %>
+                                    A new trip matches your alert
+                                <% } %>
+                            <% } else { %>
+                                <% if (locale === "fr") { %>
+                                    Un trajet proche de votre alerte a été publié
+                                <% } else { %>
+                                    A trip near your alert has been published
+                                <% } %>
+                            <% } %>
+                        </h1>
+                    </td>
+                </tr>
+
+                <!-- ─── LIGNE TRIPPER (avatar initiales + nom) ─── -->
+                <tr>
+                    <td style="padding:16px 32px 24px;">
+                        <table role="presentation" cellspacing="0" cellpadding="0" border="0">
+                            <tr>
+                                <td style="width:44px;height:44px;background-color:#FF9900;border-radius:50%;text-align:center;vertical-align:middle;font-size:15px;font-weight:800;color:#ffffff;line-height:44px;letter-spacing:0.5px;">
+                                    <%= initials %>
+                                </td>
+                                <td style="padding-left:12px;vertical-align:middle;">
+                                    <p style="margin:0;font-size:15px;font-weight:700;color:#0f172a;line-height:1.3;">
+                                        <%= tripper.firstName %> <%= tripper.lastInitial %>.
+                                    </p>
+                                    <% if (tripperUrl) { %>
+                                        <a href="<%= tripperUrl %>" style="font-size:12px;color:#64748b;text-decoration:none;line-height:1.3;">
+                                            <% if (locale === "fr") { %>Voir le profil<% } else { %>View profile<% } %> →
+                                        </a>
+                                    <% } %>
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+
+                <!-- ─── BANNIÈRE CONTEXTE (pourquoi cet email) ─── -->
+                <tr>
+                    <td style="padding:0 32px 24px;">
+                        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color:#fff7ed;border-left:4px solid #FF9900;border-radius:6px;">
+                            <tr>
+                                <td style="padding:14px 18px;font-size:14px;line-height:1.55;color:#334155;">
+                                    <% if (recipient.followsTripper && recipient.matchingSavedRoute) { %>
+                                        <% if (locale === "fr") { %>
+                                            <strong><%= tripper.firstName %> <%= tripper.lastInitial %>.</strong>, que vous suivez, a publié un trajet qui correspond à votre alerte <strong><%= recipient.matchingSavedRoute.originCity %> → <%= recipient.matchingSavedRoute.destinationCity %></strong>.
+                                        <% } else { %>
+                                            <strong><%= tripper.firstName %> <%= tripper.lastInitial %>.</strong>, who you follow, published a trip matching your alert <strong><%= recipient.matchingSavedRoute.originCity %> → <%= recipient.matchingSavedRoute.destinationCity %></strong>.
+                                        <% } %>
+                                    <% } else if (recipient.followsTripper) { %>
+                                        <% if (locale === "fr") { %>
+                                            <strong><%= tripper.firstName %> <%= tripper.lastInitial %>.</strong>, que vous suivez, vient de publier un nouveau trajet.
+                                        <% } else { %>
+                                            <strong><%= tripper.firstName %> <%= tripper.lastInitial %>.</strong>, who you follow, just published a new trip.
+                                        <% } %>
+                                    <% } else if (recipient.matchingSavedRoute) { %>
+                                        <% if (recipient.matchingSavedRoute.matchScore >= 100) { %>
+                                            <% if (locale === "fr") { %>
+                                                Ce trajet correspond <strong>exactement</strong> à votre alerte <strong><%= recipient.matchingSavedRoute.originCity %> → <%= recipient.matchingSavedRoute.destinationCity %></strong>.
+                                            <% } else { %>
+                                                This trip <strong>exactly matches</strong> your alert <strong><%= recipient.matchingSavedRoute.originCity %> → <%= recipient.matchingSavedRoute.destinationCity %></strong>.
+                                            <% } %>
+                                        <% } else { %>
+                                            <% if (locale === "fr") { %>
+                                                Ce trajet est <strong>proche</strong> de votre alerte <strong><%= recipient.matchingSavedRoute.originCity %> → <%= recipient.matchingSavedRoute.destinationCity %></strong>.
+                                            <% } else { %>
+                                                This trip is <strong>near</strong> your alert <strong><%= recipient.matchingSavedRoute.originCity %> → <%= recipient.matchingSavedRoute.destinationCity %></strong>.
+                                            <% } %>
+                                        <% } %>
+                                    <% } %>
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+
+                <!-- ─── CARD TRAJET (détails) ─── -->
+                <tr>
+                    <td style="padding:0 32px 32px;">
+                        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;">
+                            <tr>
+                                <td style="padding:24px;">
+                                    <p style="margin:0 0 18px 0;font-size:20px;font-weight:800;color:#0f172a;line-height:1.3;">
+                                        <%= trip.originCity %>
+                                        <span style="color:#FF9900;">→</span>
+                                        <%= trip.destinationCity %>
+                                    </p>
+
+                                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                        <% if (formattedDepartureDate) { %>
+                                            <tr>
+                                                <td style="padding:4px 0;font-size:14px;color:#475569;line-height:1.5;">
+                                                    📅 <span style="text-transform:capitalize;"><%= formattedDepartureDate %></span>
+                                                </td>
+                                            </tr>
+                                        <% } %>
+                                        <% if (transportLabel) { %>
+                                            <tr>
+                                                <td style="padding:4px 0;font-size:14px;color:#475569;line-height:1.5;">
+                                                    <%- transportEmoji %> <%= transportLabel %>
+                                                </td>
+                                            </tr>
+                                        <% } %>
+                                        <% if (formattedPrice) { %>
+                                            <tr>
+                                                <td style="padding:4px 0;font-size:14px;color:#475569;line-height:1.5;">
+                                                    💰 <% if (locale === "fr") { %>À partir de<% } else { %>From<% } %> <strong style="color:#0f172a;"><%= formattedPrice %></strong>
+                                                </td>
+                                            </tr>
+                                        <% } %>
+                                    </table>
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+
+                <!-- ─── CTA "VOIR LE TRAJET" ─── -->
+                <tr>
+                    <td align="center" style="padding:0 32px 40px;">
+                        <table role="presentation" cellspacing="0" cellpadding="0" border="0">
+                            <tr>
+                                <td style="background-color:#FF9900;border-radius:999px;">
+                                    <a href="<%= tripUrl %>" style="display:inline-block;padding:14px 32px;font-size:15px;font-weight:700;color:#0f172a;text-decoration:none;">
+                                        <% if (locale === "fr") { %>Voir le trajet<% } else { %>View the trip<% } %> →
+                                    </a>
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+
+                <!-- ─── POURQUOI JE REÇOIS CET EMAIL ? ─── -->
+                <tr>
+                    <td style="padding:24px 32px;border-top:1px solid #e2e8f0;background-color:#fafafa;">
+                        <p style="margin:0 0 6px 0;font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;">
+                            <% if (locale === "fr") { %>Pourquoi je reçois cet email ?<% } else { %>Why did I get this email?<% } %>
+                        </p>
+                        <p style="margin:0;font-size:13px;line-height:1.55;color:#475569;">
+                            <% if (recipient.followsTripper && recipient.matchingSavedRoute) { %>
+                                <% if (locale === "fr") { %>
+                                    Vous suivez <strong><%= tripper.firstName %> <%= tripper.lastInitial %>.</strong> et ce trajet correspond à votre alerte <strong><%= recipient.matchingSavedRoute.originCity %> → <%= recipient.matchingSavedRoute.destinationCity %></strong>.
+                                <% } else { %>
+                                    You follow <strong><%= tripper.firstName %> <%= tripper.lastInitial %>.</strong> and this trip matches your alert <strong><%= recipient.matchingSavedRoute.originCity %> → <%= recipient.matchingSavedRoute.destinationCity %></strong>.
+                                <% } %>
+                                <br />
+                                <a href="<%= manageAlertsUrl %>" style="color:#0F766E;text-decoration:underline;font-weight:500;">
+                                    <% if (locale === "fr") { %>Gérer mes alertes<% } else { %>Manage my alerts<% } %>
+                                </a>
+                            <% } else if (recipient.followsTripper) { %>
+                                <% if (locale === "fr") { %>
+                                    Vous suivez <strong><%= tripper.firstName %> <%= tripper.lastInitial %>.</strong> avec les notifications activées.
+                                <% } else { %>
+                                    You follow <strong><%= tripper.firstName %> <%= tripper.lastInitial %>.</strong> with notifications enabled.
+                                <% } %>
+                                <% if (tripperUrl) { %>
+                                    <br />
+                                    <a href="<%= tripperUrl %>" style="color:#0F766E;text-decoration:underline;font-weight:500;">
+                                        <% if (locale === "fr") { %>Gérer ce suivi<% } else { %>Manage this follow<% } %>
+                                    </a>
+                                <% } %>
+                            <% } else if (recipient.matchingSavedRoute) { %>
+                                <% if (locale === "fr") { %>
+                                    Vous avez une alerte active pour la route <strong><%= recipient.matchingSavedRoute.originCity %> → <%= recipient.matchingSavedRoute.destinationCity %></strong>.
+                                <% } else { %>
+                                    You have an active alert for <strong><%= recipient.matchingSavedRoute.originCity %> → <%= recipient.matchingSavedRoute.destinationCity %></strong>.
+                                <% } %>
+                                <br />
+                                <a href="<%= manageAlertsUrl %>" style="color:#0F766E;text-decoration:underline;font-weight:500;">
+                                    <% if (locale === "fr") { %>Gérer mes alertes<% } else { %>Manage my alerts<% } %>
+                                </a>
+                            <% } %>
+                        </p>
+                    </td>
+                </tr>
+
+                <!-- ─── FOOTER ─── -->
+                <tr>
+                    <td align="center" style="padding:24px 32px;background-color:#0f172a;">
+                        <p style="margin:0 0 4px 0;font-size:14px;font-weight:700;color:#ffffff;letter-spacing:-0.01em;">Yamba</p>
+                        <p style="margin:0;font-size:12px;color:#94a3b8;line-height:1.5;">
+                            <% if (locale === "fr") { %>
+                                Marketplace de transport entre particuliers
+                            <% } else { %>
+                                Peer-to-peer parcel transport marketplace
+                            <% } %>
+                        </p>
+                    </td>
+                </tr>
+
+            </table>
+        </td>
+    </tr>
+</table>
+
+</body>
+</html>

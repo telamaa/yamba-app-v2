@@ -4,13 +4,24 @@
 @tailwind components;
 @tailwind utilities;
 
-/* optionnel mais utile */
+/* ─── HTML/Body : masquer la scrollbar globale ─── */
 html, body {
   height: 100%;
-  overflow-x: hidden;
-  scrollbar-gutter: stable;
+  overflow-x: clip; /* clip au lieu de hidden — n'affecte PAS position: sticky */
 }
 
+html {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+html::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+body::-webkit-scrollbar {
+  display: none;
+}
 
 @keyframes yambaShimmer {
   0% {

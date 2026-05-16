@@ -1,0 +1,27 @@
+{
+  "page": {
+    "title": "Trippers suivis",
+    "description": "Reste à l'affût des publications de tes trippers favoris."
+  },
+  "card": {
+    "tripperBadge": "Tripper",
+    "tripsPublished": "{count, plural, =0 {Aucun trajet publié} one {1 trajet publié} other {# trajets publiés}}",
+    "nextTripLabel": "Prochain trajet à venir",
+    "noUpcomingTrip": "Aucun trajet à venir pour l'instant",
+    "notifyOn": "Notifications activées",
+    "notifyOff": "Notifications désactivées",
+    "unfollow": "Ne plus suivre",
+    "confirmUnfollow": "Confirmer",
+    "unfollowSuccess": "Tu ne suis plus ce tripper",
+    "unfollowError": "Erreur lors du désabonnement",
+    "updateError": "Erreur lors de la mise à jour"
+  },
+  "list": {
+    "emptyTitle": "Aucun tripper suivi",
+    "emptyDescription": "Découvre les trippers de la communauté et suis ceux qui correspondent à tes besoins pour être prévenu·e dès qu'ils publient un nouveau trajet.",
+    "emptyCta": "Découvrir des Trippers",
+    "count": "{count, plural, one {1 tripper suivi} other {# trippers suivis}}",
+    "discoverMore": "Découvrir plus",
+    "errorMessage": "Erreur lors du chargement"
+  }
+}
