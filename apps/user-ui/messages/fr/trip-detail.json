@@ -2,6 +2,7 @@
   "back": "Retour aux résultats",
   "trippedBy": "Trajet proposé par {firstName} {lastInitial}.",
   "travelReference": "Réf.",
+  "detourPossible": "Détour possible",
   "reviewsCount": "{count, plural, =0 {aucun avis} =1 {# avis} other {# avis}}",
   "chatWith": "Discuter avec {firstName}",
   "comingSoon": "Bientôt disponible",

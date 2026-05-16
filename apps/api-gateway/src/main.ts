@@ -8,10 +8,27 @@ import cookieParser from "cookie-parser";
 const app = express();
 
 app.use(
+  // cors({
+  //   // origin: ["http://localhost:3000"],
+  //   origin: ["http://localhost:3000", "http://192.168.1.155:3000"],
+  //   allowedHeaders: ["Authorization", "Content-Type"],
+  //   credentials: true,
+  // })
+
   cors({
-    origin: ["http://localhost:3000"],
-    allowedHeaders: ["Authorization", "Content-Type"],
+    origin: (origin, callback) => {
+      // Requêtes sans origin (curl, server-side) : autoriser
+      if (!origin) return callback(null, true);
+      const allowed = [
+        /^http:\/\/localhost:3000$/,
+        /^http:\/\/192\.168\.\d+\.\d+:3000$/,  // Wi-Fi domestique
+        /^http:\/\/10\.\d+\.\d+\.\d+:3000$/,    // Réseau d'entreprise
+      ];
+      if (allowed.some((re) => re.test(origin))) return callback(null, true);
+      return callback(new Error("Not allowed by CORS: " + origin));
+    },
     credentials: true,
+    // ... reste de ta config
   })
 );
 
