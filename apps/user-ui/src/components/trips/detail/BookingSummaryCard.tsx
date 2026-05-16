@@ -2,7 +2,7 @@
 
 import { useTranslations, useLocale } from "next-intl";
 import { Lock, Shield, Leaf } from "lucide-react";
-import { toast } from "sonner";
+import { useRouter } from "@/i18n/navigation";
 import type { PublicTrip } from "@/lib/public-trip.types";
 import {
   getMinPriceCents,
@@ -17,15 +17,14 @@ type Props = {
 export default function BookingSummaryCard({ trip }: Props) {
   const t = useTranslations("tripDetail");
   const locale = useLocale() as "fr" | "en";
+  const router = useRouter();
 
   const minPriceCents = getMinPriceCents(trip);
   const formattedPrice = formatPrice(minPriceCents, trip.currencyCode, locale);
   const co2Saved = calculateCO2SavedKg(trip);
 
   const handleReserve = () => {
-    toast(t("booking.comingSoon"), {
-      description: t("booking.comingSoonDescription"),
-    });
+    router.push(`/trips/${trip.id}/book`);
   };
 
   return (
