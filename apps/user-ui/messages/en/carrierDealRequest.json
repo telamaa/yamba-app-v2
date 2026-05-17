@@ -1,0 +1,170 @@
+{
+  "title": "New Deal request",
+  "receivedAgo": "Received {time} ago",
+  "back": "Back",
+  "close": "Close",
+  "share": "Share",
+  "stateLabel": "State: request received, awaiting your response",
+
+  "expiry": {
+    "label": "This request expires in",
+    "labelShort": "Expires in",
+    "expired": "This request has expired",
+    "expiredShort": "Expired",
+    "urgent": "Only {time} left to respond",
+    "timeFormatLong": "{hours}h {minutes}min",
+    "timeFormatShort": "{hours}h {minutes}min",
+    "timeFormatMinutesOnly": "{minutes}min"
+  },
+
+  "earnings": {
+    "hero": "YOU EARN",
+    "currency": "€",
+    "heroNote": "Paid out D+{days} after delivery confirmation · to your Stripe account",
+    "heroNoteShort": "Paid out D+{days} after delivery",
+    "breakdownTitle": "WHAT YOU GET",
+    "totalPaid": "Total paid",
+    "yambaCommission": "Yamba commission",
+    "stripeFees": "Stripe fees",
+    "net": "Net for you",
+    "payoutNote": "Paid out {days} days after delivery confirmed via secret code",
+    "detailTitle": "EARNINGS BREAKDOWN"
+  },
+
+  "tripCard": {
+    "title": "YOUR TRIP",
+    "directFlight": "Direct, {hours}h flight",
+    "departure": "{weekday}, {month} {day} · {hour}:00"
+  },
+
+  "shipperCard": {
+    "title": "FROM",
+    "verifiedBadge": "Verified",
+    "viewProfile": "View profile",
+    "shipmentCount": "{count, plural, =1 {# shipment} other {# shipments}}",
+    "memberSince": "Member since {month} {year}"
+  },
+
+  "parcelDetails": {
+    "title": "PARCEL DETAILS",
+    "categoryLabel": "Category",
+    "weightLabel": "Weight",
+    "weightDeclared": "Declared weight",
+    "valueLabel": "Value",
+    "valueDeclared": "Declared value",
+    "descriptionLabel": "Description",
+    "kg": "kg"
+  },
+
+  "photos": {
+    "title": "PHOTOS DECLARED BY {shipperFirstName}",
+    "subtitle": "click to enlarge",
+    "subtitleMobile": "TAP TO ZOOM",
+    "tagContent": "Content",
+    "tagPackaged": "Packaged",
+    "lightbox": {
+      "close": "Close",
+      "previous": "Previous",
+      "next": "Next"
+    }
+  },
+
+  "locations": {
+    "title": "PICKUP AND DELIVERY",
+    "titleShort": "PICKUP & DELIVERY",
+    "pickupLabel": "PARCEL PICKUP",
+    "deliveryLabel": "DELIVERY",
+    "deliveryNotePending": "Phone shared after acceptance"
+  },
+
+  "coverage": {
+    "title": "PARCEL COVERAGE",
+    "extended": "500 € insurance included",
+    "basic": "Basic insurance",
+    "shipperNoteExtended": "{shipperFirstName} purchased insurance — you''re protected in case of value-related dispute.",
+    "shipperNoteExtendedShort": "{shipperFirstName} bought 500 € insurance · you''re protected in case of dispute"
+  },
+
+  "acceptTip": {
+    "title": "Before accepting, read these points carefully",
+    "titleShort": "Before accepting",
+    "checkContent": "**Always check the content** at parcel pickup. You have the right (and duty) to open and inspect.",
+    "refuseIfDiffers": "**Refuse if actual content differs** from the declaration. You''ll be protected, {shipperFirstName} will be refunded.",
+    "takePhotos": "**Take your own photos** at pickup. They count as proof in case of dispute.",
+    "ownRisk": "**You carry at your own risk** until handed to recipient with validated code.",
+    "checkContentShort": "**Check content** at pickup.",
+    "refuseIfDiffersShort": "**Refuse if non-compliant.** You''re protected.",
+    "takePhotosShort": "**Take your photos** before leaving.",
+    "codeShort": "**6-digit code** to validate delivery."
+  },
+
+  "charter": {
+    "blockTitle": "YOUR COMMITMENT",
+    "title": "Tripper Charter",
+    "subtitle": "Legal commitment — read carefully",
+    "subtitleShort": "Legal commitment",
+    "intro": "By accepting this Deal, I commit to:",
+    "verifyContent": "**Visually inspect** the parcel content before pickup",
+    "refuseSuspicious": "**Refuse** any parcel not matching the declaration or appearing suspicious",
+    "transportCarefully": "**Transport diligently** and not alter the content",
+    "deliverWithCode": "**Hand over only** to the recipient after validating the 6-digit code",
+    "respectCustoms": "**Respect customs obligations** applicable to the trip",
+    "reportIncident": "**Report any incident** to Yamba without delay",
+    "disclaimer": "I acknowledge that my sole responsibility would be engaged in case of transport of illicit goods, even without prior verification.",
+    "viewFullLink": "View full Charter and Transport Contract",
+    "acceptTitle": "I accept the Tripper Charter",
+    "acceptDescPrefix": "I have read and accept the ",
+    "acceptContractLabel": "Transport Contract",
+    "acceptDescJoin": " and the ",
+    "acceptCgvLabel": "Yamba T&Cs",
+    "acceptDescSuffix": ".",
+    "acceptError": "You must accept the Charter to confirm this Deal"
+  },
+
+  "actions": {
+    "decline": "Decline",
+    "accept": "Accept",
+    "acceptConfirm": "Accept and confirm",
+    "footerNote": "If you decline, {shipperFirstName} can look for another Tripper with no penalty.",
+    "footerNoteShort": "Declining doesn''t harm your reputation. {shipperFirstName} will find another Tripper.",
+    "charterAcceptedIndicator": "✓ Charter accepted",
+    "charterPendingIndicator": "Tick the Charter to confirm"
+  },
+
+  "decline": {
+    "dialogTitle": "Decline this request?",
+    "dialogIntro": "{shipperFirstName} will be notified and can contact another Tripper. Your acceptance rate stays intact.",
+    "reasonLabel": "Reason (optional)",
+    "reasonPlaceholder": "Choose a reason",
+    "reasonOption": {
+      "CATEGORY_NOT_TRANSPORTED": "Category not transported",
+      "WEIGHT_TOO_HEAVY": "Weight or volume too heavy",
+      "LOCATION_INCOMPATIBLE": "Pickup or delivery location incompatible",
+      "TIMING_TOO_TIGHT": "Timing too tight",
+      "OTHER": "Other reason"
+    },
+    "detailsLabel": "Additional details (optional)",
+    "detailsPlaceholder": "Anything to add for {shipperFirstName}?",
+    "detailsToggleExpand": "Add details",
+    "detailsToggleCollapse": "Hide details",
+    "finalWarning": "This action is final",
+    "cancel": "Cancel",
+    "confirmDecline": "Decline Deal",
+    "submitting": "Sending…",
+    "toastSuccess": "Request declined. {shipperFirstName} has been notified.",
+    "toastError": "Error declining the request. Try again."
+  },
+
+  "accept": {
+    "submitting": "Confirming…",
+    "toastSuccess": "Deal accepted! Delivery code generated.",
+    "toastError": "Error accepting the Deal. Try again."
+  },
+
+  "loading": "Loading request…",
+  "error": {
+    "notFound": "This request doesn''t exist or has already been processed.",
+    "expired": "This request has expired. You can still view it but no longer respond.",
+    "generic": "An error occurred. Try again in a moment."
+  }
+}

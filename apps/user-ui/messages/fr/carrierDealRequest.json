@@ -1,0 +1,170 @@
+{
+  "title": "Nouvelle demande de Deal",
+  "receivedAgo": "Reçue il y a {time}",
+  "back": "Retour",
+  "close": "Fermer",
+  "share": "Partager",
+  "stateLabel": "État : demande reçue, en attente de réponse",
+
+  "expiry": {
+    "label": "Cette demande expire dans",
+    "labelShort": "Expire dans",
+    "expired": "Cette demande a expiré",
+    "expiredShort": "Expirée",
+    "urgent": "Plus que {time} pour répondre",
+    "timeFormatLong": "{hours}h {minutes}min",
+    "timeFormatShort": "{hours}h {minutes}min",
+    "timeFormatMinutesOnly": "{minutes}min"
+  },
+
+  "earnings": {
+    "hero": "TU GAGNES",
+    "currency": "€",
+    "heroNote": "Versement à J+{days} après livraison validée · sur ton compte Stripe",
+    "heroNoteShort": "Versé à J+{days} après livraison validée",
+    "breakdownTitle": "CE QUE TU TOUCHES",
+    "totalPaid": "Prix total payé",
+    "yambaCommission": "Commission Yamba",
+    "stripeFees": "Frais Stripe",
+    "net": "Net pour toi",
+    "payoutNote": "Versé {days} jours après livraison validée par code confidentiel",
+    "detailTitle": "DÉTAIL DE TON GAIN"
+  },
+
+  "tripCard": {
+    "title": "TON TRAJET",
+    "directFlight": "Direct, {hours}h de vol",
+    "departure": "{weekday} {day} {month} · {hour}h"
+  },
+
+  "shipperCard": {
+    "title": "DE LA PART DE",
+    "verifiedBadge": "Vérifié",
+    "viewProfile": "Voir profil",
+    "shipmentCount": "{count, plural, =1 {# envoi} other {# envois}}",
+    "memberSince": "Membre depuis {month} {year}"
+  },
+
+  "parcelDetails": {
+    "title": "DÉTAILS DU COLIS",
+    "categoryLabel": "Catégorie",
+    "weightLabel": "Poids",
+    "weightDeclared": "Poids déclaré",
+    "valueLabel": "Valeur",
+    "valueDeclared": "Valeur déclarée",
+    "descriptionLabel": "Description",
+    "kg": "kg"
+  },
+
+  "photos": {
+    "title": "PHOTOS DÉCLARÉES PAR {shipperFirstName}",
+    "subtitle": "cliquez pour agrandir",
+    "subtitleMobile": "TAPE POUR ZOOMER",
+    "tagContent": "Contenu",
+    "tagPackaged": "Emballé",
+    "lightbox": {
+      "close": "Fermer",
+      "previous": "Précédent",
+      "next": "Suivant"
+    }
+  },
+
+  "locations": {
+    "title": "MODALITÉS DE REMISE ET LIVRAISON",
+    "titleShort": "REMISE ET LIVRAISON",
+    "pickupLabel": "REMISE DU COLIS",
+    "deliveryLabel": "LIVRAISON",
+    "deliveryNotePending": "Téléphone communiqué après acceptation"
+  },
+
+  "coverage": {
+    "title": "COUVERTURE DU COLIS",
+    "extended": "Assurance 500 € incluse",
+    "basic": "Assurance basique",
+    "shipperNoteExtended": "{shipperFirstName} a souscrit une assurance — tu es protégé en cas de litige sur la valeur du colis.",
+    "shipperNoteExtendedShort": "{shipperFirstName} a souscrit l''assurance 500 € · tu es protégé en cas de litige sur la valeur"
+  },
+
+  "acceptTip": {
+    "title": "Avant d''accepter, lis bien ces points",
+    "titleShort": "Avant d''accepter",
+    "checkContent": "**Vérifie systématiquement le contenu** à la remise du colis. Tu as le droit (et le devoir) d''ouvrir et d''examiner.",
+    "refuseIfDiffers": "**Refuse si le contenu réel diffère** de la déclaration. Tu seras protégé, {shipperFirstName} sera remboursée.",
+    "takePhotos": "**Prends tes propres photos** à la prise en charge. Elles font foi en cas de litige.",
+    "ownRisk": "**Tu transportes à tes risques** jusqu''à remise au destinataire avec code validé.",
+    "checkContentShort": "**Vérifie le contenu** à la remise du colis.",
+    "refuseIfDiffersShort": "**Refuse si non-conforme.** Tu es protégé.",
+    "takePhotosShort": "**Prends tes photos** avant de partir.",
+    "codeShort": "**Code à 6 chiffres** pour valider la livraison."
+  },
+
+  "charter": {
+    "blockTitle": "TON ENGAGEMENT",
+    "title": "Charte Voyageur",
+    "subtitle": "Engagement juridique — à lire attentivement",
+    "subtitleShort": "Engagement juridique",
+    "intro": "En acceptant ce Deal, je m''engage à :",
+    "verifyContent": "**Vérifier visuellement** le contenu du colis avant prise en charge",
+    "refuseSuspicious": "**Refuser** tout colis non conforme à la déclaration ou paraissant suspect",
+    "transportCarefully": "**Transporter avec diligence** et ne pas altérer le contenu",
+    "deliverWithCode": "**Remettre uniquement** au destinataire après vérification du code à 6 chiffres",
+    "respectCustoms": "**Respecter les obligations douanières** applicables au trajet",
+    "reportIncident": "**Signaler à Yamba sans délai** tout incident pendant le trajet",
+    "disclaimer": "Je reconnais que ma seule responsabilité serait engagée en cas de transport d''un produit illicite, y compris en l''absence de vérification préalable.",
+    "viewFullLink": "Voir la Charte complète et le Contrat de transport",
+    "acceptTitle": "J''accepte la Charte Voyageur",
+    "acceptDescPrefix": "J''ai lu et j''accepte également le ",
+    "acceptContractLabel": "Contrat de transport",
+    "acceptDescJoin": " et les ",
+    "acceptCgvLabel": "CGV Yamba",
+    "acceptDescSuffix": ".",
+    "acceptError": "Tu dois accepter la Charte pour confirmer ce Deal"
+  },
+
+  "actions": {
+    "decline": "Refuser",
+    "accept": "Accepter",
+    "acceptConfirm": "Accepter et confirmer",
+    "footerNote": "Si tu refuses, {shipperFirstName} pourra chercher un autre Tripper sans pénalité.",
+    "footerNoteShort": "Refuser n''engage pas ta réputation. {shipperFirstName} trouvera un autre Tripper.",
+    "charterAcceptedIndicator": "✓ Charte acceptée",
+    "charterPendingIndicator": "Coche la Charte pour confirmer"
+  },
+
+  "decline": {
+    "dialogTitle": "Refuser cette demande ?",
+    "dialogIntro": "{shipperFirstName} sera notifiée et pourra contacter un autre Tripper. Ton taux d''acceptation reste intact.",
+    "reasonLabel": "Raison (optionnel)",
+    "reasonPlaceholder": "Choisir une raison",
+    "reasonOption": {
+      "CATEGORY_NOT_TRANSPORTED": "Catégorie non transportée",
+      "WEIGHT_TOO_HEAVY": "Poids ou volume trop important",
+      "LOCATION_INCOMPATIBLE": "Lieu de remise ou livraison incompatible",
+      "TIMING_TOO_TIGHT": "Délais trop courts",
+      "OTHER": "Autre raison"
+    },
+    "detailsLabel": "Détails complémentaires (optionnel)",
+    "detailsPlaceholder": "Une précision pour {shipperFirstName} ?",
+    "detailsToggleExpand": "Ajouter des détails",
+    "detailsToggleCollapse": "Masquer les détails",
+    "finalWarning": "Cette action est définitive",
+    "cancel": "Annuler",
+    "confirmDecline": "Refuser le Deal",
+    "submitting": "Envoi…",
+    "toastSuccess": "Demande refusée. {shipperFirstName} a été notifiée.",
+    "toastError": "Erreur lors du refus. Réessaye."
+  },
+
+  "accept": {
+    "submitting": "Confirmation…",
+    "toastSuccess": "Deal accepté ! Code de livraison généré.",
+    "toastError": "Erreur lors de l''acceptation. Réessaye."
+  },
+
+  "loading": "Chargement de la demande…",
+  "error": {
+    "notFound": "Cette demande n''existe pas ou a déjà été traitée.",
+    "expired": "Cette demande a expiré. Tu peux la consulter mais plus y répondre.",
+    "generic": "Une erreur est survenue. Réessaye dans quelques instants."
+  }
+}
