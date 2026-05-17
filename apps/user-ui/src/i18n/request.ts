@@ -18,7 +18,8 @@ export default getRequestConfig(async ({ requestLocale }) => {
     userProfile,
     savedRoutes,
     following,
-    booking, // ✨ NEW
+    booking,
+    carrierDealRequest, // ✨ NEW
   ] = await Promise.all([
     import(`../../messages/${locale}/common.json`),
     import(`../../messages/${locale}/home.json`),
@@ -31,7 +32,8 @@ export default getRequestConfig(async ({ requestLocale }) => {
     import(`../../messages/${locale}/user-profile.json`),
     import(`../../messages/${locale}/savedRoutes.json`),
     import(`../../messages/${locale}/following.json`),
-    import(`../../messages/${locale}/booking.json`), // ✨ NEW
+    import(`../../messages/${locale}/booking.json`),
+    import(`../../messages/${locale}/carrierDealRequest.json`), // ✨ NEW
   ]);
   return {
     locale,
@@ -47,7 +49,8 @@ export default getRequestConfig(async ({ requestLocale }) => {
       userProfile: userProfile.default,
       savedRoutes: savedRoutes.default,
       following: following.default,
-      booking: booking.default, // ✨ NEW
+      booking: booking.default,
+      carrierDealRequest: carrierDealRequest.default, // ✨ NEW
     },
   };
 });
