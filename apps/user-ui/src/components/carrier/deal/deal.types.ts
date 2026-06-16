@@ -1,7 +1,8 @@
 /**
- * deal-request.types.ts
- * =====================
- * Types partagés pour l'écran de réception d'une demande de Deal côté Voyageur.
+ * deal.types.ts
+ * =============
+ * Types partagés pour le module Deal côté Voyageur (toutes vues confondues :
+ * request, accepted, etc.).
  *
  * Le Voyageur ("CARRIER" en interne, "Tripper" en UI) reçoit une demande
  * de transport (Deal) émise par un Expéditeur. Il a 24h pour l'accepter

@@ -1,11 +1,11 @@
 /**
- * deal-request.state.ts
- * =====================
+ * deal.state.ts
+ * =============
  * Mock data pour le développement et les tests visuels.
  * À remplacer par un vrai fetch via le gateway dans la PR backend.
  */
 
-import type { DealRequest } from "./deal-request.types";
+import type { DealRequest } from "./deal.types";
 
 // Date d'expiration mock = 22h dans le futur (pour voir le countdown)
 const expiresInMs = 22 * 60 * 60 * 1000;
@@ -14,7 +14,7 @@ const now = Date.now();
 export const mockDealRequest: DealRequest = {
   id: "deal_mock_001",
   status: "PENDING",
-  createdAt: new Date(now - 2 * 60 * 60 * 1000).toISOString(), // 2h ago
+  createdAt: new Date(now - 2 * 60 * 60 * 1000).toISOString(),
   expiresAt: new Date(now + expiresInMs).toISOString(),
 
   shipper: {
@@ -44,7 +44,7 @@ export const mockDealRequest: DealRequest = {
     photos: [
       {
         id: "photo_1",
-        url: "/mock/parcel-content.jpg", // Placeholder
+        url: "/mock/parcel-content.jpg",
         context: "DECLARED_CONTENT",
         label: "Contenu",
       },

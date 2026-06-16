@@ -2,7 +2,6 @@
  * DealRequestHeader.tsx
  * =====================
  * Header mobile : back + titre + sous-titre temporel.
- * Le bouton "partager" est retiré (inutile à ce stade du parcours).
  */
 
 "use client";

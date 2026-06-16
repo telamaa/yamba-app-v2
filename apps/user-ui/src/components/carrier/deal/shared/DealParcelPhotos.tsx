@@ -8,7 +8,8 @@
  *  - Mobile : 2 cols (photos lisibles ~170px pour juger le contenu)
  *  - Tablet : 3 cols
  *  - Desktop : 4 cols
- * Photos en aspect-square pour cohérence visuelle.
+ *
+ * Partagé entre les views request (PENDING) et accepted (ACCEPTED).
  */
 
 "use client";
@@ -16,7 +17,7 @@
 import { ChevronLeft, ChevronRight, ImageIcon, Package, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useState } from "react";
-import type { DealPhoto } from "./deal-request.types";
+import type { DealPhoto } from "../deal.types";
 
 type Props = {
   photos: DealPhoto[];

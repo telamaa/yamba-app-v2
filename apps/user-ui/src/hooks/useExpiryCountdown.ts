@@ -14,7 +14,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { ExpiryStatus } from "@/components/carrier/deal-request/deal-request.types";
+import type { ExpiryStatus } from "@/components/carrier/deal/deal.types";
 
 const UPDATE_INTERVAL_MS = 30 * 1000; // 30s — assez fin pour passer h→min sans drift
 const URGENT_THRESHOLD_MINUTES = 2 * 60; // < 2h = urgent

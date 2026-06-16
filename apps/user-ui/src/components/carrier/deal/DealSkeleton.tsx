@@ -8,7 +8,7 @@
 
 "use client";
 
-export default function DealRequestSkeleton() {
+export default function DealSkeleton() {
   return (
     <div className="min-h-screen animate-pulse bg-slate-50 dark:bg-slate-950">
       {/* Mobile header (hidden lg+) */}

@@ -2,13 +2,15 @@
  * DealShipperCard.tsx
  * ===================
  * "DE LA PART DE Aminata T. — Vérifié — 4.8 · 12 envois — Membre depuis nov. 2024"
+ *
+ * Partagé entre les views request (PENDING) et accepted (ACCEPTED).
  */
 
 "use client";
 
 import { BadgeCheck, ChevronRight, Star } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
-import type { DealShipper } from "./deal-request.types";
+import type { DealShipper } from "../deal.types";
 
 type Props = {
   shipper: DealShipper;

@@ -2,15 +2,15 @@
  * DealCoverageCard.tsx
  * ====================
  * Affiche l'assurance souscrite par l'expéditeur.
- * - Variant "sidebar" : card compacte pour la sidebar desktop
- * - Variant "inline" : encart vert intégré dans le flow mobile
+ *  - Variant "sidebar" : card compacte pour la sidebar desktop
+ *  - Variant "inline" : encart vert intégré dans le flow mobile
  */
 
 "use client";
 
 import { Shield, ShieldCheck } from "lucide-react";
 import { useTranslations } from "next-intl";
-import type { DealInsurance } from "./deal-request.types";
+import type { DealInsurance } from "@/components/carrier/deal/deal.types";
 
 type Props = {
   insurance: DealInsurance;
@@ -39,7 +39,6 @@ export default function DealCoverageCard({
     );
   }
 
-  // sidebar variant — plus compact (sans gros titre uppercase)
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950">
       <div className="flex items-center gap-2 text-[13px] font-semibold text-emerald-700 dark:text-emerald-400">

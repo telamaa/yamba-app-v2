@@ -3,12 +3,14 @@
  * =====================
  * "DÉTAILS DU COLIS" — catégorie, poids, valeur, description.
  * Layout : 3 colonnes pour catégorie/poids/valeur, puis description en bas.
+ *
+ * Partagé entre les views request (PENDING) et accepted (ACCEPTED).
  */
 
 "use client";
 
 import { useLocale, useTranslations } from "next-intl";
-import type { ParcelCategory } from "./deal-request.types";
+import type { ParcelCategory } from "../deal.types";
 
 type Props = {
   category: ParcelCategory;

@@ -2,14 +2,10 @@
  * DealExpiryBanner.tsx
  * ====================
  * Compteur d'expiration compact.
- *
- * - Variant "inline" : chip rounded-lg (desktop, dans le flow principal)
- * - Variant "banner" : chip rounded-xl pleine largeur du conteneur (mobile,
- *   posé dans le scrollable content avec le même padding que les cards).
+ *  - Variant "inline" : chip rounded-lg (desktop, dans le flow principal)
+ *  - Variant "banner" : chip rounded-xl pleine largeur du conteneur (mobile)
  *
  * Couleurs adaptatives : ambre par défaut, rouge si <2h, slate si expiré.
- * Layout interne compact : icône → label → temps, sans justify-between
- * (les éléments restent rapprochés pour une meilleure lisibilité).
  */
 
 "use client";
@@ -77,7 +73,6 @@ export default function DealExpiryBanner({
     );
   }
 
-  // inline (desktop) — chip plus petit
   return (
     <div
       className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 ${styles.bg} ${styles.border}`}
