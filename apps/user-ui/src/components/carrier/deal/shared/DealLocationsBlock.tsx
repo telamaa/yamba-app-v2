@@ -2,13 +2,15 @@
  * DealLocationsBlock.tsx
  * ======================
  * Affiche le lieu de remise + livraison avec icônes et notes contextuelles.
+ *
+ * Partagé entre les views request (PENDING) et accepted (ACCEPTED).
  */
 
 "use client";
 
 import { Building2, MapPin, Plane, Train } from "lucide-react";
 import { useTranslations } from "next-intl";
-import type { DealLocation } from "./deal-request.types";
+import type { DealLocation } from "../deal.types";
 
 type Props = {
   pickup: DealLocation;

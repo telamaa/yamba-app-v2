@@ -13,7 +13,7 @@
 "use client";
 
 import { useLocale, useTranslations } from "next-intl";
-import type { DealEarningsBreakdown as Earnings } from "./deal-request.types";
+import type { DealEarningsBreakdown as Earnings } from "@/components/carrier/deal/deal.types";
 
 type Props = {
   earnings: Earnings;
@@ -50,10 +50,8 @@ export default function DealEarningsBreakdown({
     );
   }
 
-  // sidebar variant — bloc compact, hero intégré
   return (
     <div className="overflow-hidden rounded-2xl border border-emerald-200 bg-emerald-50 dark:border-emerald-900/40 dark:bg-emerald-950/30">
-      {/* Hero */}
       <div className="px-5 pt-5 pb-4">
         <div className="text-[10px] font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
           {t("earnings.hero")}
@@ -71,7 +69,6 @@ export default function DealEarningsBreakdown({
         </div>
       </div>
 
-      {/* Breakdown */}
       <div className="border-t border-emerald-200/60 bg-white/70 px-5 py-4 dark:border-emerald-900/30 dark:bg-slate-950/50">
         <div className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
           {t("earnings.breakdownTitle")}

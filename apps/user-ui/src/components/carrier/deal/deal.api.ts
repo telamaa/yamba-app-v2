@@ -1,17 +1,17 @@
 /**
- * deal-request.api.ts
- * ===================
- * Wrapper côté client pour les appels backend liés à la réception d'un Deal
- * côté voyageur. Mock pour l'instant — à brancher sur deal-service via le
- * gateway dans la PR backend.
+ * deal.api.ts
+ * ===========
+ * Wrapper côté client pour les appels backend liés au Deal côté Voyageur.
+ * Mock pour l'instant — à brancher sur deal-service via le gateway dans
+ * la PR backend.
  */
 
 import type {
   AcceptPayload,
   DealRequest,
   DeclinePayload,
-} from "./deal-request.types";
-import { mockDealRequest } from "./deal-request.state";
+} from "./deal.types";
+import { mockDealRequest } from "./deal.state";
 
 const MOCK_DELAY_MS = 800;
 
@@ -20,14 +20,14 @@ function sleep(ms: number): Promise<void> {
 }
 
 /**
- * Récupère la demande de Deal pour un voyageur.
+ * Récupère le Deal pour un voyageur.
  * MVP: retourne le mock peu importe le dealId.
  */
 export async function getDealRequest(dealId: string): Promise<DealRequest> {
   await sleep(MOCK_DELAY_MS);
   // Plus tard:
   // const res = await fetch(`${API_BASE}/carrier/deals/${dealId}`, { credentials: "include" });
-  // if (!res.ok) throw new Error("Failed to fetch deal request");
+  // if (!res.ok) throw new Error("Failed to fetch deal");
   // return res.json();
   return { ...mockDealRequest, id: dealId || mockDealRequest.id };
 }
@@ -45,7 +45,7 @@ export async function acceptDeal(
     throw new Error("Charter must be accepted");
   }
   // eslint-disable-next-line no-console
-  console.info("[deal-request] acceptDeal mock:", { dealId, payload });
+  console.info("[deal] acceptDeal mock:", { dealId, payload });
   return {
     dealId,
     deliveryCode: generateMockCode(),
@@ -61,7 +61,7 @@ export async function declineDeal(
 ): Promise<{ dealId: string }> {
   await sleep(MOCK_DELAY_MS);
   // eslint-disable-next-line no-console
-  console.info("[deal-request] declineDeal mock:", { dealId, payload });
+  console.info("[deal] declineDeal mock:", { dealId, payload });
   return { dealId };
 }
 

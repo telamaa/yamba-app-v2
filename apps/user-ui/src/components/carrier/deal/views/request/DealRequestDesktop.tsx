@@ -1,15 +1,17 @@
 /**
  * DealRequestDesktop.tsx
  * ======================
- * Wrapper desktop, aligné sur le pattern du booking shipper :
+ * Vue desktop pour un Deal en statut PENDING (demande à accepter/refuser).
+ *
+ * Layout aligné sur le pattern du booking shipper :
  *  - max-w-7xl direct sur fond slate-50 (pas de card enveloppante)
- *  - Lien retour discret en haut
+ *  - Lien retour discret en haut (un seul)
  *  - H1 noir + sous-titre dynamique (reçue il y a X · trajet · date)
- *  - Banner expiration compact
- *  - Grid 2 cols : contenu principal + sidebar VRAIMENT sticky regroupant
- *    earnings + couverture + CTAs + footer note
- *  - Ordre du contenu : shipper → colis → photos → lieux → tip → charte
- *    (le gain est dans la sidebar pour éviter la duplication)
+ *  - Banner expiration compact (chip)
+ *  - Grid 2 cols : contenu principal + sidebar VRAIMENT sticky
+ *
+ * À l'acceptation : appelle onAcceptedAction (le parent DealClient mute le
+ * status à ACCEPTED et bascule sur DealAcceptedDesktop). L'URL reste stable.
  */
 
 "use client";
@@ -18,8 +20,12 @@ import { ArrowLeft } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useState } from "react";
 import { toast } from "sonner";
-import { acceptDeal, declineDeal } from "./deal-request.api";
-import type { DealRequest, DeclineReason } from "./deal-request.types";
+import { acceptDeal, declineDeal } from "@/components/carrier/deal/deal.api";
+import type { DealRequest, DeclineReason } from "@/components/carrier/deal/deal.types";
+import DealLocationsBlock from "@/components/carrier/deal/shared/DealLocationsBlock";
+import DealParcelDetails from "@/components/carrier/deal/shared/DealParcelDetails";
+import DealParcelPhotos from "@/components/carrier/deal/shared/DealParcelPhotos";
+import DealShipperCard from "@/components/carrier/deal/shared/DealShipperCard";
 import DealAcceptTip from "./DealAcceptTip";
 import DealActionsFooter from "./DealActionsFooter";
 import DealCarrierCharter from "./DealCarrierCharter";
@@ -27,17 +33,18 @@ import DealCoverageCard from "./DealCoverageCard";
 import DealDeclineModal from "./DealDeclineModal";
 import DealEarningsBreakdown from "./DealEarningsBreakdown";
 import DealExpiryBanner from "./DealExpiryBanner";
-import DealLocationsBlock from "./DealLocationsBlock";
-import DealParcelDetails from "./DealParcelDetails";
-import DealParcelPhotos from "./DealParcelPhotos";
-import DealShipperCard from "./DealShipperCard";
 
 type Props = {
   deal: DealRequest;
   onCloseAction: () => void;
+  onAcceptedAction: (deal: DealRequest) => void;
 };
 
-export default function DealRequestDesktop({ deal, onCloseAction }: Props) {
+export default function DealRequestDesktop({
+                                             deal,
+                                             onCloseAction,
+                                             onAcceptedAction,
+                                           }: Props) {
   const t = useTranslations("carrierDealRequest");
   const locale = useLocale();
 
@@ -60,8 +67,8 @@ export default function DealRequestDesktop({ deal, onCloseAction }: Props) {
       const result = await acceptDeal(deal.id, { charterAccepted: true });
       toast.success(t("accept.toastSuccess"), { duration: 4500 });
       // eslint-disable-next-line no-console
-      console.info("[deal-request] accepted, deliveryCode:", result.deliveryCode);
-      onCloseAction();
+      console.info("[deal] accepted, deliveryCode:", result.deliveryCode);
+      onAcceptedAction(deal);
     } catch {
       toast.error(t("accept.toastError"));
     } finally {
@@ -91,7 +98,7 @@ export default function DealRequestDesktop({ deal, onCloseAction }: Props) {
 
   const isSubmitting = isSubmittingAccept || isSubmittingDecline;
 
-  // Construit le sous-titre dynamique : "Reçue il y a 2h · Paris → Brazza · jeu. 28 mai · vol direct 8h"
+  // Sous-titre dynamique : "Reçue il y a 2h · Paris → Brazza · jeu. 28 mai · vol direct 8h"
   const subtitleParts = [
     t("receivedAgo", { time: formatReceivedAgo(deal.createdAt) }),
     `${deal.trip.originCity} → ${deal.trip.destinationCity}`,
@@ -143,7 +150,7 @@ export default function DealRequestDesktop({ deal, onCloseAction }: Props) {
                 shipper={deal.shipper}
                 showMemberSince
                 onViewProfileAction={() =>
-                  console.info("[deal-request] view shipper profile")
+                  console.info("[deal] view shipper profile")
                 }
               />
 
@@ -169,7 +176,7 @@ export default function DealRequestDesktop({ deal, onCloseAction }: Props) {
               <div id="carrier-charter-block">
                 <DealCarrierCharter
                   accepted={charterAccepted}
-                  onChangeAction={(checked) => {
+                  onChangeAction={(checked: boolean) => {
                     setCharterAccepted(checked);
                     if (checked) setCharterError(false);
                   }}

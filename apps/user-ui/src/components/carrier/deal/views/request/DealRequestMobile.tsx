@@ -1,9 +1,8 @@
 /**
  * DealRequestMobile.tsx
  * =====================
- * Wrapper mobile : layout 1 colonne avec bottom-bar sticky.
- * Le banner d'expiration est dans le scrollable content pour hériter
- * du même padding latéral que les autres cards (alignement visuel).
+ * Vue mobile pour un Deal en statut PENDING.
+ * Layout 1 colonne avec bottom-bar sticky.
  */
 
 "use client";
@@ -11,8 +10,12 @@
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { toast } from "sonner";
-import { acceptDeal, declineDeal } from "./deal-request.api";
-import type { DealRequest, DeclineReason } from "./deal-request.types";
+import { acceptDeal, declineDeal } from "@/components/carrier/deal/deal.api";
+import type { DealRequest, DeclineReason } from "@/components/carrier/deal/deal.types";
+import DealLocationsBlock from "@/components/carrier/deal/shared/DealLocationsBlock";
+import DealParcelDetails from "@/components/carrier/deal/shared/DealParcelDetails";
+import DealParcelPhotos from "@/components/carrier/deal/shared/DealParcelPhotos";
+import DealShipperCard from "@/components/carrier/deal/shared/DealShipperCard";
 import DealAcceptTip from "./DealAcceptTip";
 import DealActionsFooter from "./DealActionsFooter";
 import DealCarrierCharter from "./DealCarrierCharter";
@@ -21,18 +24,19 @@ import DealDeclineSheet from "./DealDeclineSheet";
 import DealEarningsBreakdown from "./DealEarningsBreakdown";
 import DealEarningsHero from "./DealEarningsHero";
 import DealExpiryBanner from "./DealExpiryBanner";
-import DealLocationsBlock from "./DealLocationsBlock";
-import DealParcelDetails from "./DealParcelDetails";
-import DealParcelPhotos from "./DealParcelPhotos";
 import DealRequestHeader from "./DealRequestHeader";
-import DealShipperCard from "./DealShipperCard";
 
 type Props = {
   deal: DealRequest;
   onCloseAction: () => void;
+  onAcceptedAction: (deal: DealRequest) => void;
 };
 
-export default function DealRequestMobile({ deal, onCloseAction }: Props) {
+export default function DealRequestMobile({
+                                            deal,
+                                            onCloseAction,
+                                            onAcceptedAction,
+                                          }: Props) {
   const t = useTranslations("carrierDealRequest");
 
   const [charterAccepted, setCharterAccepted] = useState(false);
@@ -54,8 +58,8 @@ export default function DealRequestMobile({ deal, onCloseAction }: Props) {
       const result = await acceptDeal(deal.id, { charterAccepted: true });
       toast.success(t("accept.toastSuccess"), { duration: 4500 });
       // eslint-disable-next-line no-console
-      console.info("[deal-request] accepted, deliveryCode:", result.deliveryCode);
-      onCloseAction();
+      console.info("[deal] accepted, deliveryCode:", result.deliveryCode);
+      onAcceptedAction(deal);
     } catch {
       toast.error(t("accept.toastError"));
     } finally {
@@ -93,8 +97,7 @@ export default function DealRequestMobile({ deal, onCloseAction }: Props) {
           onBackAction={onCloseAction}
         />
 
-        <div className="flex-1 space-y-5 overflow-y-auto px-4 pb-6 pt-4">
-          {/* Banner d'expiration intégré dans le content (hérite du px-4) */}
+        <div className="flex-1 space-y-5 overflow-y-auto px-4 pb-32 pt-4">
           <DealExpiryBanner expiresAtIso={deal.expiresAt} variant="banner" />
 
           <DealEarningsHero
@@ -105,7 +108,7 @@ export default function DealRequestMobile({ deal, onCloseAction }: Props) {
           <DealShipperCard
             shipper={deal.shipper}
             onViewProfileAction={() =>
-              console.info("[deal-request] view shipper profile")
+              console.info("[deal] view shipper profile")
             }
           />
 
@@ -134,15 +137,12 @@ export default function DealRequestMobile({ deal, onCloseAction }: Props) {
             variant="inline"
           />
 
-          <DealAcceptTip
-            shipperFirstName={deal.shipper.firstName}
-            compact
-          />
+          <DealAcceptTip shipperFirstName={deal.shipper.firstName} compact />
 
           <div id="carrier-charter-block-mobile">
             <DealCarrierCharter
               accepted={charterAccepted}
-              onChangeAction={(checked) => {
+              onChangeAction={(checked: boolean) => {
                 setCharterAccepted(checked);
                 if (checked) setCharterError(false);
               }}
