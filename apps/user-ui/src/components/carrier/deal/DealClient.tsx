@@ -4,7 +4,7 @@
  * Orchestrateur principal du module Deal côté Voyageur.
  * Charge le Deal puis switch sur le statut pour rendre la bonne view :
  *   PENDING   → DealRequestDesktop/Mobile
- *   ACCEPTED  → DealAcceptedDesktop/Mobile (Phase 2)
+ *   ACCEPTED  → DealAcceptedDesktop/Mobile
  *
  * L'URL reste stable : /carrier/deals/[dealId]
  */
@@ -19,6 +19,8 @@ import type { DealRequest } from "./deal.types";
 import DealSkeleton from "./DealSkeleton";
 import DealRequestDesktop from "./views/request/DealRequestDesktop";
 import DealRequestMobile from "./views/request/DealRequestMobile";
+import DealAcceptedDesktop from "./views/accepted/DealAcceptedDesktop";
+import DealAcceptedMobile from "./views/accepted/DealAcceptedMobile";
 
 type Props = {
   dealId: string;
@@ -50,8 +52,6 @@ export default function DealClient({ dealId }: Props) {
     router.push("/");
   }, [router]);
 
-  // Après acceptation : on mute localement le status et on switch de view.
-  // Plus tard avec le backend, ce sera un refetch React Query.
   const handleAccepted = useCallback((acceptedDeal: DealRequest) => {
     setDeal({ ...acceptedDeal, status: "ACCEPTED" });
   }, []);
@@ -68,14 +68,16 @@ export default function DealClient({ dealId }: Props) {
     return <DealSkeleton />;
   }
 
-  // TODO Phase 2 : ajouter le switch case "ACCEPTED" → DealAcceptedDesktop/Mobile
-  // Pour l'instant, on log et on reste sur le skeleton si ACCEPTED
+  // Statut ACCEPTED → vues post-acceptation
   if (deal.status === "ACCEPTED") {
-    // eslint-disable-next-line no-console
-    console.info("[deal] Status ACCEPTED — DealAcceptedView pas encore implémentée (Phase 2)");
-    return <DealSkeleton />;
+    return isMobile ? (
+      <DealAcceptedMobile deal={deal} onCloseAction={handleClose} />
+    ) : (
+      <DealAcceptedDesktop deal={deal} onCloseAction={handleClose} />
+    );
   }
 
+  // Statut PENDING par défaut → vues request
   return isMobile ? (
     <DealRequestMobile
       deal={deal}
