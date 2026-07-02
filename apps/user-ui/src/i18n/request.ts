@@ -19,7 +19,10 @@ export default getRequestConfig(async ({ requestLocale }) => {
     savedRoutes,
     following,
     booking,
-    carrierDealRequest, // ✨ NEW
+    carrierDealRequest,
+    carrierDealAccepted, // ✨ Phase 2
+    bookingTracker, // ✨ Phase 3
+    carrierDealPickup, // ✨ NEW pickup
   ] = await Promise.all([
     import(`../../messages/${locale}/common.json`),
     import(`../../messages/${locale}/home.json`),
@@ -33,7 +36,10 @@ export default getRequestConfig(async ({ requestLocale }) => {
     import(`../../messages/${locale}/savedRoutes.json`),
     import(`../../messages/${locale}/following.json`),
     import(`../../messages/${locale}/booking.json`),
-    import(`../../messages/${locale}/carrierDealRequest.json`), // ✨ NEW
+    import(`../../messages/${locale}/carrierDealRequest.json`),
+    import(`../../messages/${locale}/carrierDealAccepted.json`), // ✨ Phase 2
+    import(`../../messages/${locale}/bookingTracker.json`), // ✨ Phase 3
+    import(`../../messages/${locale}/carrierDealPickup.json`), // ✨ NEW pickup
   ]);
   return {
     locale,
@@ -50,7 +56,10 @@ export default getRequestConfig(async ({ requestLocale }) => {
       savedRoutes: savedRoutes.default,
       following: following.default,
       booking: booking.default,
-      carrierDealRequest: carrierDealRequest.default, // ✨ NEW
+      carrierDealRequest: carrierDealRequest.default,
+      carrierDealAccepted: carrierDealAccepted.default, // ✨ Phase 2
+      bookingTracker: bookingTracker.default, // ✨ Phase 3
+      carrierDealPickup: carrierDealPickup.default, // ✨ NEW pickup
     },
   };
 });

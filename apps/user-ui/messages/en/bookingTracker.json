@@ -1,0 +1,189 @@
+{
+  "title": "My shipment",
+  "back": "Back",
+  "subtitle": "{originCity} → {destinationCity} · {date}",
+
+  "banner": {
+    "title": "{carrierFirstName} accepted your Deal",
+    "titleShort": "{carrierFirstName} accepted",
+    "subtitle": "You''ve been charged €{amount} · your parcel will travel on {date}",
+    "subtitleShort": "€{amount} charged · departing {date}"
+  },
+
+  "h1": "What now?",
+  "h1Subtitle": "{carrierFirstName} will contact you to set the meeting. Meanwhile, prepare your parcel.",
+  "h1SubtitleMobile": "{carrierFirstName} will contact you. Prepare your parcel.",
+
+  "timeline": {
+    "title": "YOUR SHIPMENT TRACKING",
+    "titleShort": "TRACKING",
+    "steps": {
+      "accepted": "Accepted",
+      "pickup": "Pickup",
+      "transport": "Transport",
+      "delivery": "Delivery",
+      "verification": "Verification",
+      "verificationShort": "Verif."
+    }
+  },
+
+  "deliveryCode": {
+    "title": "Your delivery code",
+    "pendingBadge": "Pending",
+    "pendingDescription": "You''ll receive your 6-digit code as soon as {carrierFirstName} confirms picking up your parcel. You''ll share it with {recipientFirstName} to validate the delivery.",
+    "pendingDescriptionShort": "You''ll receive it when {carrierFirstName} confirms pickup."
+  },
+
+  "parcelChecklist": {
+    "title": "Prepare your parcel",
+    "subtitle": "To have ready before your meeting with {carrierFirstName}",
+    "subtitleShort": "Before the meeting",
+    "items": {
+      "pack": "Pack the content properly (bubble wrap if fragile)",
+      "packShort": "Pack properly (bubble wrap if fragile)",
+      "weight": "Check the weight matches your declaration ({weight} kg)",
+      "weightShort": "Weight matches declaration ({weight} kg)",
+      "noForbidden": "No prohibited items in the parcel",
+      "noForbiddenShort": "No prohibited items",
+      "photos": "Have your photos available if {carrierFirstName} needs to verify",
+      "photosShort": "Photos available if needed",
+      "confirmMeeting": "Confirm the meeting with {carrierFirstName} once set",
+      "confirmMeetingShort": "Confirm meeting with {carrierFirstName}"
+    }
+  },
+
+  "carrierCard": {
+    "title": "Your Tripper",
+    "subtitle": "{carrierFirstName} will contact you to set the pickup",
+    "subtitleShort": "{carrierFirstName} will contact you",
+    "meta": "⭐ {rating} · {count, plural, =1 {# deal} other {# deals}} · {verified, select, true {Verified} other {}}",
+    "viewProfile": "View profile →",
+    "viewProfileShort": "Profile →",
+    "messageButton": "Send a message to {carrierFirstName}",
+    "messageButtonShort": "Message {carrierFirstName}"
+  },
+
+  "recap": {
+    "title": "Shipment recap",
+    "titleShort": "Recap",
+    "parcelLabel": "YOUR PARCEL",
+    "parcelSummary": "{category} · {weight} kg · €{value}",
+    "pickupLabel": "HANDOVER LOCATION",
+    "pickupLabelShort": "HANDOVER",
+    "pickupSub": "You meet {carrierFirstName} on {date} before their {hour}:00 flight",
+    "pickupSubShort": "{date} before {hour}:00",
+    "recipientLabel": "RECIPIENT",
+    "recipientSub": "You''ll forward them the delivery code you receive",
+    "recipientSubShort": "{city}"
+  },
+
+  "payment": {
+    "title": "YOUR PAYMENT",
+    "debitedLabel": "Charged",
+    "modeLabel": "Method",
+    "modeFormat": "{brand} ••{last4}",
+    "statementLabel": "On your statement",
+    "note": "Funds are secured. {carrierFirstName} is paid only 3 days after delivery validated.",
+    "insuranceLabel": "Insurance",
+    "insuranceCovered": "€{amount} covered"
+  },
+
+  "trip": {
+    "title": "YOUR TRIP",
+    "route": "{originCity} → {destinationCity}",
+    "departureLabel": "Departure",
+    "arrivalLabel": "Arrival",
+    "dateFormat": "{date} · {hour}:00"
+  },
+
+  "nextSteps": {
+    "title": "How will it work?",
+    "items": {
+      "meeting": "**The meeting.** {carrierFirstName} contacts you to set the date and exact location ({pickupLocation}).",
+      "handover": "**The parcel handover.** {carrierFirstName} will inspect the content, take their photos, then confirm pickup in the app.",
+      "codeArrives": "**Your code arrives.** As soon as {carrierFirstName} confirms pickup, you receive your 6-digit code. You forward it to {recipientFirstName} (WhatsApp, SMS, voice).",
+      "delivery": "**The delivery.** {recipientFirstName} shares the code with {carrierFirstName} on arrival. He enters it in the app, delivery is validated.",
+      "verification": "**Verification period.** 3 days during which you can report any issue if needed.",
+      "meetingShort": "**Meeting set** by {carrierFirstName}.",
+      "handoverShort": "**Pickup at {pickupShortName}.** {carrierFirstName} verifies, photographs.",
+      "codeArrivesShort": "**Your code arrives** after pickup confirmed.",
+      "deliveryShort": "**You forward to {recipientFirstName}** via SMS/WhatsApp.",
+      "verificationShort": "**Delivery validated** = payout D+4."
+    }
+  },
+
+  "dashboardLink": "View Deal in my dashboard →",
+
+  "pickedUp": {
+    "banner": {
+      "title": "{carrierFirstName} has picked up your parcel",
+      "subtitle": "Confirmed at {time} · your parcel is now in his hands",
+      "subtitleShort": "Confirmed at {time}"
+    },
+    "h1": "Your delivery code has arrived",
+    "h1Short": "Your code has arrived",
+    "h1Subtitle": "Forward it to {recipientFirstName}. Without this code, {carrierFirstName} can''t hand over the parcel.",
+    "h1SubtitleShort": "Forward it to {recipientFirstName} to validate delivery.",
+
+    "code": {
+      "label": "CODE TO FORWARD TO {recipientFirstName}",
+      "copy": "Copy code",
+      "copied": "Code copied!",
+      "regenerate": "Regenerate code",
+      "confidentialHint": "Keep this code confidential. You can regenerate it if you think it leaked.",
+      "regenerationsLeft": "{count, plural, =0 {No regenerations left} =1 {# regeneration left} other {# regenerations left}}",
+      "confirmTitle": "Regenerate the code?",
+      "confirmText": "The old code will stop working. Remember to send the new one to {recipientFirstName}.",
+      "confirmYes": "Yes, regenerate",
+      "confirmCancel": "Cancel",
+      "regenerating": "Regenerating…",
+      "toastRegenerated": "New code generated! Don''t forget to send it to {recipientFirstName}.",
+      "toastMaxReached": "You''ve reached the regeneration limit. Contact support if needed.",
+      "toastError": "Error regenerating. Try again."
+    },
+
+    "share": {
+      "title": "Share the code with {recipientFirstName}",
+      "subtitle": "The message is pre-filled, just hit send",
+      "whatsapp": "WhatsApp",
+      "sms": "SMS",
+      "email": "Email",
+      "copyMessage": "Copy message",
+      "messageCopied": "Message copied!",
+      "messageTemplate": "Hi {recipientFirstName}! Your parcel is arriving with {carrierFirstName} ({route}). To collect it, give him this code: {code}. Cheers!",
+      "emailSubject": "Pickup code for your Yamba parcel"
+    },
+
+    "pickupPhotos": {
+      "title": "Pickup photos by {carrierFirstName}",
+      "titleShort": "Pickup photos",
+      "subtitle": "Taken on {date} at {time} · {location}",
+      "subtitleShort": "By {carrierFirstName}, {time} at {location}"
+    },
+
+    "tracking": {
+      "label": "PARCEL TRACKING",
+      "pickedUpLabel": "Picked up",
+      "departureLabel": "Flight",
+      "arrivalLabel": "Expected arrival",
+      "estimatedLabel": "Estimated delivery",
+      "estimatedTonight": "Tonight",
+      "estimatedDate": "{date}"
+    },
+
+    "nextSteps": {
+      "title": "What happens now",
+      "items": {
+        "transmit": "**You forward the code** to {recipientFirstName} however you like.",
+        "travel": "**{carrierFirstName} travels** from {originCity} to {destinationCity}. You''ll see updates in the tracking.",
+        "arrival": "**On arrival**, {recipientFirstName} gives the code to {carrierFirstName}. He enters it in the app, delivery is validated.",
+        "verification": "**Then 3 days** of verification period during which you can report any issue."
+      }
+    }
+  },
+
+  "error": {
+    "notFound": "This booking doesn''t exist or has been cancelled.",
+    "generic": "An error occurred. Try again in a moment."
+  }
+}
