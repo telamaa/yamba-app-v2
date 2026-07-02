@@ -114,6 +114,74 @@
 
   "dashboardLink": "Voir le Deal dans mon dashboard →",
 
+  "pickedUp": {
+    "banner": {
+      "title": "{carrierFirstName} a pris ton colis en charge",
+      "subtitle": "Confirmé à {time} · ton colis est maintenant entre ses mains",
+      "subtitleShort": "Confirmé à {time}"
+    },
+    "h1": "Ton code de livraison est arrivé",
+    "h1Short": "Ton code est arrivé",
+    "h1Subtitle": "Transmets-le à {recipientFirstName}. Sans ce code, {carrierFirstName} ne pourra pas lui remettre le colis.",
+    "h1SubtitleShort": "Transmets-le à {recipientFirstName} pour valider la livraison.",
+
+    "code": {
+      "label": "CODE À TRANSMETTRE À {recipientFirstName}",
+      "copy": "Copier le code",
+      "copied": "Code copié !",
+      "regenerate": "Régénérer le code",
+      "confidentialHint": "Garde ce code confidentiel. Tu peux le régénérer si tu penses qu''il a fuité.",
+      "regenerationsLeft": "{count, plural, =0 {Aucune régénération restante} =1 {# régénération restante} other {# régénérations restantes}}",
+      "confirmTitle": "Régénérer le code ?",
+      "confirmText": "L''ancien code ne fonctionnera plus. Pense à renvoyer le nouveau à {recipientFirstName}.",
+      "confirmYes": "Oui, régénérer",
+      "confirmCancel": "Annuler",
+      "regenerating": "Régénération…",
+      "toastRegenerated": "Nouveau code généré ! N''oublie pas de le renvoyer à {recipientFirstName}.",
+      "toastMaxReached": "Tu as atteint la limite de régénérations. Contacte le support si besoin.",
+      "toastError": "Erreur lors de la régénération. Réessaye."
+    },
+
+    "share": {
+      "title": "Partage le code à {recipientFirstName}",
+      "subtitle": "Le message est pré-rempli, tu n''as qu''à envoyer",
+      "whatsapp": "WhatsApp",
+      "sms": "SMS",
+      "email": "Email",
+      "copyMessage": "Copier le message",
+      "messageCopied": "Message copié !",
+      "messageTemplate": "Bonjour {recipientFirstName} ! Ton colis arrive avec {carrierFirstName} ({route}). Pour le récupérer, donne-lui ce code : {code}. Bisous !",
+      "emailSubject": "Code de retrait de ton colis Yamba"
+    },
+
+    "pickupPhotos": {
+      "title": "Photos de la prise en charge par {carrierFirstName}",
+      "titleShort": "Photos du pickup",
+      "subtitle": "Prises le {date} à {time} · {location}",
+      "subtitleShort": "Par {carrierFirstName}, {time} à {location}"
+    },
+
+    "tracking": {
+      "label": "SUIVI DU COLIS",
+      "pickedUpLabel": "Pris en charge",
+      "departureLabel": "Vol prévu",
+      "arrivalLabel": "Arrivée prévue",
+      "estimatedLabel": "Livraison estimée",
+      "estimatedTonight": "Ce soir",
+      "estimatedDate": "{date}"
+    },
+
+    "nextSteps": {
+      "title": "Comment ça va se passer maintenant",
+      "items": {
+        "transmit": "**Tu transmets le code** à {recipientFirstName} via le canal de ton choix.",
+        "travel": "**{carrierFirstName} voyage** de {originCity} à {destinationCity}. Tu verras les mises à jour dans le suivi.",
+        "arrival": "**À l''arrivée**, {recipientFirstName} communique le code à {carrierFirstName}. Il le saisit dans l''app, la livraison est validée.",
+        "verification": "**Puis 3 jours** de période de vérification pendant lesquels tu peux signaler un problème."
+      }
+    }
+  },
+
   "error": {
     "notFound": "Cette réservation n''existe pas ou a été annulée.",
     "generic": "Une erreur est survenue. Réessaye dans un instant."

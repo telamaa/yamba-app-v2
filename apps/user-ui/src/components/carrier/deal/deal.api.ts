@@ -8,8 +8,10 @@
 
 import type {
   AcceptPayload,
+  ConfirmPickupPayload,
   DealRequest,
   DeclinePayload,
+  RefusePickupPayload,
 } from "./deal.types";
 import { mockDealRequest } from "./deal.state";
 
@@ -19,23 +21,11 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-/**
- * Récupère le Deal pour un voyageur.
- * MVP: retourne le mock peu importe le dealId.
- */
 export async function getDealRequest(dealId: string): Promise<DealRequest> {
   await sleep(MOCK_DELAY_MS);
-  // Plus tard:
-  // const res = await fetch(`${API_BASE}/carrier/deals/${dealId}`, { credentials: "include" });
-  // if (!res.ok) throw new Error("Failed to fetch deal");
-  // return res.json();
   return { ...mockDealRequest, id: dealId || mockDealRequest.id };
 }
 
-/**
- * Accepte un Deal. Côté backend, déclenchera la capture Stripe et
- * la génération du code à 6 chiffres.
- */
 export async function acceptDeal(
   dealId: string,
   payload: AcceptPayload
@@ -52,9 +42,6 @@ export async function acceptDeal(
   };
 }
 
-/**
- * Refuse un Deal avec une raison + détails optionnels.
- */
 export async function declineDeal(
   dealId: string,
   payload: DeclinePayload
@@ -62,6 +49,42 @@ export async function declineDeal(
   await sleep(MOCK_DELAY_MS);
   // eslint-disable-next-line no-console
   console.info("[deal] declineDeal mock:", { dealId, payload });
+  return { dealId };
+}
+
+/**
+ * Confirme la prise en charge du colis.
+ * Côté backend (PR future) : passe le Deal en PICKED_UP et révèle
+ * le code de livraison à l'Expéditeur (jamais au Voyageur).
+ */
+export async function confirmPickup(
+  dealId: string,
+  payload: ConfirmPickupPayload
+): Promise<{ dealId: string; status: "PICKED_UP" }> {
+  await sleep(MOCK_DELAY_MS);
+  if (payload.checklist.length < 5) {
+    throw new Error("All checklist items must be checked");
+  }
+  if (payload.photos.length < 1) {
+    throw new Error("At least one photo is required");
+  }
+  // eslint-disable-next-line no-console
+  console.info("[deal] confirmPickup mock:", { dealId, payload });
+  return { dealId, status: "PICKED_UP" };
+}
+
+/**
+ * Refuse le colis au moment du pickup (contenu non conforme, etc.).
+ * Côté backend (PR future) : annule le Deal, rembourse l'Expéditeur,
+ * aucune pénalité pour le Voyageur.
+ */
+export async function refusePickup(
+  dealId: string,
+  payload: RefusePickupPayload
+): Promise<{ dealId: string }> {
+  await sleep(MOCK_DELAY_MS);
+  // eslint-disable-next-line no-console
+  console.info("[deal] refusePickup mock:", { dealId, payload });
   return { dealId };
 }
 
