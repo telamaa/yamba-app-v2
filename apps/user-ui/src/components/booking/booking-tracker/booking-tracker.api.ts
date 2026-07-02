@@ -3,10 +3,13 @@
  * ======================
  * Wrapper côté client pour les appels backend liés au Booking côté Sender.
  * Mock pour l'instant — à brancher sur booking-service via le gateway.
+ *
+ * Astuce mock : un bookingId contenant "picked" renvoie le statut PICKED_UP
+ * (code révélé). Ex : /fr/bookings/picked123
  */
 
-import type { Booking } from "./booking-tracker.types";
-import { mockBookingAccepted } from "./booking-tracker.state";
+import { MAX_CODE_REGENERATIONS, type Booking } from "./booking-tracker.types";
+import { mockBookingAccepted, mockBookingPickedUp } from "./booking-tracker.state";
 
 const MOCK_DELAY_MS = 600;
 
@@ -16,22 +19,30 @@ function sleep(ms: number): Promise<void> {
 
 export async function getBooking(bookingId: string): Promise<Booking> {
   await sleep(MOCK_DELAY_MS);
-  return { ...mockBookingAccepted, id: bookingId || mockBookingAccepted.id };
+  const base = bookingId.includes("picked")
+    ? mockBookingPickedUp
+    : mockBookingAccepted;
+  return { ...base, id: bookingId || base.id };
 }
 
 /**
- * Régénère un nouveau code livraison (max 5 régénérations).
- * Disponible uniquement quand deliveryCode.status === "AVAILABLE" ou plus.
+ * Régénère un nouveau code livraison (max MAX_CODE_REGENERATIONS).
+ * Seul l'Expéditeur peut le faire — le Voyageur ne voit jamais le code.
  */
 export async function regenerateDeliveryCode(
-  bookingId: string
+  bookingId: string,
+  currentRegeneratedCount: number
 ): Promise<{ bookingId: string; newCode: string; regeneratedCount: number }> {
   await sleep(MOCK_DELAY_MS);
+  if (currentRegeneratedCount >= MAX_CODE_REGENERATIONS) {
+    throw new Error("MAX_REGENERATIONS_REACHED");
+  }
+  const newCode = Math.floor(100000 + Math.random() * 900000).toString();
   // eslint-disable-next-line no-console
-  console.info("[booking] regenerateDeliveryCode mock:", bookingId);
+  console.info("[booking] regenerateDeliveryCode mock:", { bookingId, newCode });
   return {
     bookingId,
-    newCode: Math.floor(100000 + Math.random() * 900000).toString(),
-    regeneratedCount: 1,
+    newCode,
+    regeneratedCount: currentRegeneratedCount + 1,
   };
 }

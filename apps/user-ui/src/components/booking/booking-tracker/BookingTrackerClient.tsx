@@ -2,11 +2,13 @@
  * BookingTrackerClient.tsx
  * ========================
  * Orchestrateur principal du module BookingTracker côté Expéditeur.
- * Charge le Booking puis switch sur le statut pour rendre la bonne view :
- *   ACCEPTED  → BookingAcceptedDesktop/Mobile
- *   (futurs)  → PICKED_UP, IN_TRANSIT, DELIVERED, VERIFIED, etc.
- *
+ * Switch sur booking.status :
+ *   ACCEPTED  → BookingAccepted*
+ *   PICKED_UP → BookingPickedUp* (code révélé)
+ *   (futurs)  → IN_TRANSIT, DELIVERED, VERIFIED, etc.
  * L'URL reste stable : /bookings/[bookingId]
+ *
+ * Mock : un bookingId contenant "picked" charge le statut PICKED_UP.
  */
 
 "use client";
@@ -20,6 +22,8 @@ import type { Booking } from "./booking-tracker.types";
 import BookingTrackerSkeleton from "./BookingTrackerSkeleton";
 import BookingAcceptedDesktop from "./views/accepted/BookingAcceptedDesktop";
 import BookingAcceptedMobile from "./views/accepted/BookingAcceptedMobile";
+import BookingPickedUpDesktop from "./views/picked-up/BookingPickedUpDesktop";
+import BookingPickedUpMobile from "./views/picked-up/BookingPickedUpMobile";
 
 type Props = {
   bookingId: string;
@@ -51,6 +55,25 @@ export default function BookingTrackerClient({ bookingId }: Props) {
     router.push("/");
   }, [router]);
 
+  // Mise à jour locale du code après régénération (le mock ne persiste pas)
+  const handleCodeRegenerated = useCallback(
+    (newCode: string, regeneratedCount: number) => {
+      setBooking((prev) =>
+        prev
+          ? {
+            ...prev,
+            deliveryCode: {
+              ...prev.deliveryCode,
+              code: newCode,
+              regeneratedCount,
+            },
+          }
+          : prev
+      );
+    },
+    []
+  );
+
   if (isMobile === null || (!booking && !loadError)) {
     return <BookingTrackerSkeleton />;
   }
@@ -63,7 +86,22 @@ export default function BookingTrackerClient({ bookingId }: Props) {
     return <BookingTrackerSkeleton />;
   }
 
-  // Statut ACCEPTED → vues post-confirmation paiement
+  if (booking.status === "PICKED_UP") {
+    return isMobile ? (
+      <BookingPickedUpMobile
+        booking={booking}
+        onCloseAction={handleClose}
+        onCodeRegeneratedAction={handleCodeRegenerated}
+      />
+    ) : (
+      <BookingPickedUpDesktop
+        booking={booking}
+        onCloseAction={handleClose}
+        onCodeRegeneratedAction={handleCodeRegenerated}
+      />
+    );
+  }
+
   if (booking.status === "ACCEPTED") {
     return isMobile ? (
       <BookingAcceptedMobile booking={booking} onCloseAction={handleClose} />
@@ -72,8 +110,7 @@ export default function BookingTrackerClient({ bookingId }: Props) {
     );
   }
 
-  // Statuts futurs (PICKED_UP, IN_TRANSIT, DELIVERED, VERIFIED, etc.)
-  // À implémenter dans les prochaines PRs
+  // Statuts futurs (IN_TRANSIT, DELIVERED, VERIFIED, etc.) — fallback ACCEPTED
   // eslint-disable-next-line no-console
   console.info(
     "[booking] Status",
