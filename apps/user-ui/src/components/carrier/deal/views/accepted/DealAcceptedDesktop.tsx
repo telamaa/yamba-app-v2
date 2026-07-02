@@ -23,6 +23,8 @@ import DealAcceptedRecap from "./DealAcceptedRecap";
 import DealContactShipperCard from "./DealContactShipperCard";
 import DealPaymentBlock from "./DealPaymentBlock";
 import DealTripSidebar from "./DealTripSidebar";
+import DealPickupCta from "@/components/carrier/deal/views/pickup/DealPickupCta";
+
 
 type Props = {
   deal: DealRequest;
@@ -83,6 +85,8 @@ export default function DealAcceptedDesktop({ deal, onCloseAction }: Props) {
             />
 
             <DealContactShipperCard deal={deal} />
+
+            <DealPickupCta dealId={deal.id} shipperFirstName={deal.shipper.firstName} />
 
             <DealAcceptedRecap deal={deal} />
 

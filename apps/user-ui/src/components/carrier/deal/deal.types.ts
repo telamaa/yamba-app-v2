@@ -132,3 +132,42 @@ export type ExpiryStatus = {
   isUrgent: boolean;          // < 2h restantes
   totalMinutesLeft: number;
 };
+
+// ============================================================
+// Pickup (prise en charge du colis) — feat/pickup-confirmation
+// ============================================================
+
+/** Les 5 points de vérification obligatoires avant confirmation */
+export type PickupChecklistItemId =
+  | "CONTENT_MATCHES"
+  | "WEIGHT_OK"
+  | "NO_FORBIDDEN"
+  | "PACKAGING_OK"
+  | "ITEMS_IDENTIFIED";
+
+/** Photo prise par le Voyageur au pickup (preview locale réelle ; upload R2 en PR backend) */
+export type PickupPhotoDraft = {
+  id: string;
+  context: "PICKUP_CONTENT" | "PICKUP_PACKAGED" | "PICKUP_OTHER";
+  label?: string;
+  previewUrl?: string;
+  file?: File; // le fichier réel, envoyé vers R2 dans la PR backend
+};
+
+export type ConfirmPickupPayload = {
+  checklist: PickupChecklistItemId[];
+  photos: PickupPhotoDraft[];
+  notes?: string;
+};
+
+export type PickupRefuseReason =
+  | "CONTENT_MISMATCH"
+  | "SUSPICIOUS_CONTENT"
+  | "OVERWEIGHT"
+  | "BAD_PACKAGING"
+  | "OTHER";
+
+export type RefusePickupPayload = {
+  reason?: PickupRefuseReason;
+  details?: string;
+};
