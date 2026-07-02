@@ -2,6 +2,7 @@
 
 import { ArrowLeft } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
+import { useRouter } from "@/i18n/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useBookingDraft } from "@/hooks/useBookingDraft";
@@ -33,6 +34,7 @@ export default function BookingWizard({ trip, onCloseAction }: Props) {
   const isFr = locale === "fr";
 
   const { draft, setDraft, step, setStep, clear } = useBookingDraft();
+  const router = useRouter();
   const [showErrors, setShowErrors] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -79,15 +81,15 @@ export default function BookingWizard({ trip, onCloseAction }: Props) {
     try {
       const result = await createDeal(draft, trip);
       toast.success(
-        isFr
-          ? `Demande envoyée (mock — id : ${result.dealId})`
-          : `Request sent (mock — id: ${result.dealId})`,
-        { duration: 4500 }
+        isFr ? "Paiement confirmé !" : "Payment confirmed!",
+        { duration: 3000 }
       );
       clear();
-      onCloseAction();
+      // Phase 4: redirection vers le tracker post-confirmation paiement
+      // En mock, dealId = bookingId. Plus tard, l'API renverra les 2.
+      router.push(`/bookings/${result.dealId}`);
     } catch {
-      toast.error(isFr ? "Erreur lors de l'envoi" : "Submission failed");
+      toast.error(isFr ? "Erreur lors du paiement" : "Payment failed");
     } finally {
       setIsSubmitting(false);
     }
