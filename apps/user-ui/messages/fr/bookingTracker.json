@@ -1,0 +1,189 @@
+{
+  "title": "Mon envoi",
+  "back": "Retour",
+  "subtitle": "{originCity} → {destinationCity} · {date}",
+
+  "banner": {
+    "title": "{carrierFirstName} a accepté ton Deal",
+    "titleShort": "{carrierFirstName} a accepté",
+    "subtitle": "Tu as été débitée de {amount} € · ton colis va voyager le {date}",
+    "subtitleShort": "Débit de {amount} € · départ le {date}"
+  },
+
+  "h1": "Et maintenant ?",
+  "h1Subtitle": "{carrierFirstName} va te contacter pour fixer le rendez-vous. En attendant, prépare ton colis.",
+  "h1SubtitleMobile": "{carrierFirstName} va te contacter. Prépare ton colis.",
+
+  "timeline": {
+    "title": "SUIVI DE TON ENVOI",
+    "titleShort": "SUIVI DE L''ENVOI",
+    "steps": {
+      "accepted": "Accepté",
+      "pickup": "Pickup",
+      "transport": "Transport",
+      "delivery": "Livraison",
+      "verification": "Vérification",
+      "verificationShort": "Vérif."
+    }
+  },
+
+  "deliveryCode": {
+    "title": "Ton code de livraison",
+    "pendingBadge": "En attente",
+    "pendingDescription": "Tu recevras ton code à 6 chiffres dès que {carrierFirstName} confirmera la prise en charge de ton colis. Tu le transmettras à {recipientFirstName} pour valider la livraison.",
+    "pendingDescriptionShort": "Tu le recevras quand {carrierFirstName} confirmera la prise en charge."
+  },
+
+  "parcelChecklist": {
+    "title": "Prépare ton colis",
+    "subtitle": "À avoir prêt avant ton rendez-vous avec {carrierFirstName}",
+    "subtitleShort": "Avant le rendez-vous",
+    "items": {
+      "pack": "Emballer correctement le contenu (papier bulle si fragile)",
+      "packShort": "Emballer correctement (papier bulle si fragile)",
+      "weight": "Vérifier que le poids correspond à ta déclaration ({weight} kg)",
+      "weightShort": "Poids conforme à la déclaration ({weight} kg)",
+      "noForbidden": "Aucun produit interdit dans le colis",
+      "noForbiddenShort": "Aucun produit interdit",
+      "photos": "Avoir tes photos disponibles si {carrierFirstName} a besoin de vérifier",
+      "photosShort": "Photos disponibles si besoin",
+      "confirmMeeting": "Confirmer le rendez-vous avec {carrierFirstName} une fois fixé",
+      "confirmMeetingShort": "Confirmer le rendez-vous avec {carrierFirstName}"
+    }
+  },
+
+  "carrierCard": {
+    "title": "Ton Voyageur",
+    "subtitle": "{carrierFirstName} va te contacter pour fixer le pickup",
+    "subtitleShort": "{carrierFirstName} va te contacter",
+    "meta": "⭐ {rating} · {count, plural, =1 {# deal} other {# deals}} · {verified, select, true {Vérifié} other {}}",
+    "viewProfile": "Voir profil →",
+    "viewProfileShort": "Profil →",
+    "messageButton": "Envoyer un message à {carrierFirstName}",
+    "messageButtonShort": "Message à {carrierFirstName}"
+  },
+
+  "recap": {
+    "title": "Récap de l''envoi",
+    "titleShort": "Récap",
+    "parcelLabel": "TON COLIS",
+    "parcelSummary": "{category} · {weight} kg · {value} €",
+    "pickupLabel": "LIEU DE REMISE",
+    "pickupLabelShort": "REMISE",
+    "pickupSub": "Tu rejoins {carrierFirstName} le {date} avant son vol de {hour}h",
+    "pickupSubShort": "{date} avant {hour}h",
+    "recipientLabel": "DESTINATAIRE",
+    "recipientSub": "Tu lui transmettras le code de livraison à recevoir",
+    "recipientSubShort": "{city}"
+  },
+
+  "payment": {
+    "title": "TON PAIEMENT",
+    "debitedLabel": "Débité",
+    "modeLabel": "Mode",
+    "modeFormat": "CB {brand} ••{last4}",
+    "statementLabel": "Sur ton relevé",
+    "note": "Les fonds sont sécurisés. {carrierFirstName} est payé seulement 3 jours après livraison validée.",
+    "insuranceLabel": "Assurance",
+    "insuranceCovered": "{amount} € couverts"
+  },
+
+  "trip": {
+    "title": "TON TRAJET",
+    "route": "{originCity} → {destinationCity}",
+    "departureLabel": "Date départ",
+    "arrivalLabel": "Date arrivée",
+    "dateFormat": "{date} · {hour}h"
+  },
+
+  "nextSteps": {
+    "title": "Comment ça va se passer ?",
+    "items": {
+      "meeting": "**Le rendez-vous.** {carrierFirstName} te contacte pour fixer date et lieu précis ({pickupLocation}).",
+      "handover": "**La remise du colis.** {carrierFirstName} vérifiera le contenu visuellement, prendra ses photos, puis confirmera la prise en charge dans l''app.",
+      "codeArrives": "**Ton code arrive.** Dès que {carrierFirstName} confirme le pickup, tu reçois ton code à 6 chiffres. Tu le transmets à {recipientFirstName} (WhatsApp, SMS, oral).",
+      "delivery": "**La livraison.** {recipientFirstName} communique le code à {carrierFirstName} à l''arrivée. Il le saisit dans l''app, la livraison est validée.",
+      "verification": "**Période de vérification.** 3 jours pendant lesquels tu peux signaler un problème si nécessaire.",
+      "meetingShort": "**Rendez-vous fixé** par {carrierFirstName}.",
+      "handoverShort": "**Pickup au {pickupShortName}.** {carrierFirstName} vérifie, photographie.",
+      "codeArrivesShort": "**Ton code arrive** après confirmation pickup.",
+      "deliveryShort": "**Tu transmets à {recipientFirstName}** par SMS/WhatsApp.",
+      "verificationShort": "**Livraison validée** = versement à J+4."
+    }
+  },
+
+  "dashboardLink": "Voir le Deal dans mon dashboard →",
+
+  "pickedUp": {
+    "banner": {
+      "title": "{carrierFirstName} a pris ton colis en charge",
+      "subtitle": "Confirmé à {time} · ton colis est maintenant entre ses mains",
+      "subtitleShort": "Confirmé à {time}"
+    },
+    "h1": "Ton code de livraison est arrivé",
+    "h1Short": "Ton code est arrivé",
+    "h1Subtitle": "Transmets-le à {recipientFirstName}. Sans ce code, {carrierFirstName} ne pourra pas lui remettre le colis.",
+    "h1SubtitleShort": "Transmets-le à {recipientFirstName} pour valider la livraison.",
+
+    "code": {
+      "label": "CODE À TRANSMETTRE À {recipientFirstName}",
+      "copy": "Copier le code",
+      "copied": "Code copié !",
+      "regenerate": "Régénérer le code",
+      "confidentialHint": "Garde ce code confidentiel. Tu peux le régénérer si tu penses qu''il a fuité.",
+      "regenerationsLeft": "{count, plural, =0 {Aucune régénération restante} =1 {# régénération restante} other {# régénérations restantes}}",
+      "confirmTitle": "Régénérer le code ?",
+      "confirmText": "L''ancien code ne fonctionnera plus. Pense à renvoyer le nouveau à {recipientFirstName}.",
+      "confirmYes": "Oui, régénérer",
+      "confirmCancel": "Annuler",
+      "regenerating": "Régénération…",
+      "toastRegenerated": "Nouveau code généré ! N''oublie pas de le renvoyer à {recipientFirstName}.",
+      "toastMaxReached": "Tu as atteint la limite de régénérations. Contacte le support si besoin.",
+      "toastError": "Erreur lors de la régénération. Réessaye."
+    },
+
+    "share": {
+      "title": "Partage le code à {recipientFirstName}",
+      "subtitle": "Le message est pré-rempli, tu n''as qu''à envoyer",
+      "whatsapp": "WhatsApp",
+      "sms": "SMS",
+      "email": "Email",
+      "copyMessage": "Copier le message",
+      "messageCopied": "Message copié !",
+      "messageTemplate": "Bonjour {recipientFirstName} ! Ton colis arrive avec {carrierFirstName} ({route}). Pour le récupérer, donne-lui ce code : {code}. Bisous !",
+      "emailSubject": "Code de retrait de ton colis Yamba"
+    },
+
+    "pickupPhotos": {
+      "title": "Photos de la prise en charge par {carrierFirstName}",
+      "titleShort": "Photos du pickup",
+      "subtitle": "Prises le {date} à {time} · {location}",
+      "subtitleShort": "Par {carrierFirstName}, {time} à {location}"
+    },
+
+    "tracking": {
+      "label": "SUIVI DU COLIS",
+      "pickedUpLabel": "Pris en charge",
+      "departureLabel": "Vol prévu",
+      "arrivalLabel": "Arrivée prévue",
+      "estimatedLabel": "Livraison estimée",
+      "estimatedTonight": "Ce soir",
+      "estimatedDate": "{date}"
+    },
+
+    "nextSteps": {
+      "title": "Comment ça va se passer maintenant",
+      "items": {
+        "transmit": "**Tu transmets le code** à {recipientFirstName} via le canal de ton choix.",
+        "travel": "**{carrierFirstName} voyage** de {originCity} à {destinationCity}. Tu verras les mises à jour dans le suivi.",
+        "arrival": "**À l''arrivée**, {recipientFirstName} communique le code à {carrierFirstName}. Il le saisit dans l''app, la livraison est validée.",
+        "verification": "**Puis 3 jours** de période de vérification pendant lesquels tu peux signaler un problème."
+      }
+    }
+  },
+
+  "error": {
+    "notFound": "Cette réservation n''existe pas ou a été annulée.",
+    "generic": "Une erreur est survenue. Réessaye dans un instant."
+  }
+}

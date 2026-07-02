@@ -1,0 +1,82 @@
+{
+  "title": "My accepted Deal",
+  "back": "Back",
+  "subtitle": "{originCity} → {destinationCity} · {date}",
+
+  "banner": {
+    "title": "You''re engaged on this Deal",
+    "subtitle": "{shipperFirstName} has been notified · it''s up to you to set the pickup meeting",
+    "subtitleShort": "{shipperFirstName} has been notified"
+  },
+
+  "h1": "What now?",
+  "h1Subtitle": "Here are the next steps and what to do first.",
+  "h1SubtitleMobile": "Here are the next steps.",
+
+  "timeline": {
+    "title": "YOUR DEAL JOURNEY",
+    "titleShort": "DEAL JOURNEY",
+    "steps": {
+      "accepted": "Deal accepted",
+      "acceptedShort": "Accepted",
+      "pickup": "Parcel pickup",
+      "pickupShort": "Pickup",
+      "transport": "Transport",
+      "delivery": "Delivery",
+      "payout": "Payout"
+    }
+  },
+
+  "contactCard": {
+    "title": "Contact {shipperFirstName} to set the meeting",
+    "titleShort": "Contact {shipperFirstName}",
+    "description": "Before your flight on {flightDate}, you need to agree on a date, time and exact location for the parcel handover. {shipperFirstName} suggests {pickupLocation}.",
+    "descriptionShort": "Set the pickup meeting. {shipperFirstName} suggests {pickupLocation}.",
+    "message": "Send a message",
+    "messageShort": "Message",
+    "call": "Call"
+  },
+
+  "recap": {
+    "title": "DEAL DETAILS",
+    "shipperLabel": "SHIPPER",
+    "shipperMeta": "⭐ {rating} · {count, plural, =1 {# shipment} other {# shipments}} · {verified, select, true {Verified} other {}}",
+    "parcelLabel": "DECLARED CONTENT",
+    "parcelSummary": "{category} · {weight} kg · €{value}",
+    "pickupLabel": "PICKUP — CHOSEN BY {shipperFirstName}",
+    "deliveryLabel": "DELIVERY TO",
+    "deliveryRecipientNote": "Phone shared to set the meeting on arrival"
+  },
+
+  "nextSteps": {
+    "title": "How will it work?",
+    "items": {
+      "beforeFlight": "**Before your flight.** You meet {shipperFirstName} at the agreed time and place. You inspect the content, take your photos, then confirm pickup in the app.",
+      "secretCode": "**The code stays secret.** You don''t see the delivery code. {shipperFirstName} reveals it to {recipientFirstName} when you confirm pickup.",
+      "duringTrip": "**During the trip.** You can notify {shipperFirstName} of your progress (takeoff, landing) to reassure them. It''s optional.",
+      "onArrival": "**On arrival.** You meet {recipientFirstName}, she gives you the 6-digit code, you enter it in the app to validate delivery.",
+      "afterDays": "**{days} days later.** If everything goes well, your €{amount} payment is released to your Stripe account."
+    }
+  },
+
+  "payment": {
+    "title": "YOUR PAYMENT",
+    "netLabel": "Net for you",
+    "payoutAtLabel": "Paid out",
+    "payoutAtValue": "D+{days}",
+    "payoutViaLabel": "Via",
+    "payoutViaValue": "Stripe account",
+    "note": "Delay between validated delivery and actual payout. Standard to ensure smooth completion.",
+    "inlineFormat": "D+{days} on Stripe"
+  },
+
+  "trip": {
+    "title": "YOUR TRIP",
+    "route": "{originCity} → {destinationCity}",
+    "departureLabel": "Departure",
+    "arrivalLabel": "Arrival",
+    "dateFormat": "{date} · {hour}:00"
+  },
+
+  "dashboardLink": "View Deal in my dashboard →"
+}
