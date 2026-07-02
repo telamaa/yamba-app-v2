@@ -2,6 +2,8 @@
  * booking-tracker.state.ts
  * ========================
  * Mock data pour le développement et les tests visuels.
+ * - mockBookingAccepted : statut ACCEPTED (code en attente)
+ * - mockBookingPickedUp : statut PICKED_UP (code révélé)
  * À remplacer par un vrai fetch via le gateway dans la PR backend.
  */
 
@@ -81,5 +83,36 @@ export const mockBookingAccepted: Booking = {
   deliveryCode: {
     status: "PENDING",
     regeneratedCount: 0,
+  },
+};
+
+export const mockBookingPickedUp: Booking = {
+  ...mockBookingAccepted,
+  id: "booking_mock_picked",
+  status: "PICKED_UP",
+
+  deliveryCode: {
+    status: "AVAILABLE",
+    code: "742891",
+    regeneratedCount: 0,
+  },
+
+  pickup: {
+    pickedUpAt: new Date(now - 20 * 60 * 1000).toISOString(),
+    locationName: "CDG Terminal 2E",
+    photos: [
+      {
+        id: "pickup_photo_1",
+        url: "/mock/pickup-content.jpg",
+        context: "PICKUP_CONTENT",
+        label: "Contenu",
+      },
+      {
+        id: "pickup_photo_2",
+        url: "/mock/pickup-packaged.jpg",
+        context: "PICKUP_PACKAGED",
+        label: "Emballé",
+      },
+    ],
   },
 };

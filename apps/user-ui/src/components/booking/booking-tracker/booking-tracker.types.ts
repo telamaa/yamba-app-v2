@@ -48,7 +48,12 @@ export type BookingParcel = {
 export type BookingPhoto = {
   id: string;
   url: string;
-  context: "DECLARED_CONTENT" | "DECLARED_PACKAGED";
+  context:
+    | "DECLARED_CONTENT"
+    | "DECLARED_PACKAGED"
+    | "PICKUP_CONTENT"
+    | "PICKUP_PACKAGED"
+    | "PICKUP_OTHER";
   label?: string;
 };
 
@@ -100,4 +105,21 @@ export type Booking = {
 
   payment: BookingPayment;
   deliveryCode: BookingDeliveryCode;
+
+  pickup?: BookingPickupInfo; // présent dès PICKED_UP
+};
+
+
+// ============================================================
+// Post-pickup — feat/pickup-confirmation
+// ============================================================
+
+/** Nombre max de régénérations du code par l'Expéditeur */
+export const MAX_CODE_REGENERATIONS = 5;
+
+export type BookingPickupInfo = {
+  pickedUpAt: string; // ISO — moment de la confirmation par le Voyageur
+  locationName: string;
+  photos: BookingPhoto[]; // photos prises par le Voyageur (context PICKUP_*)
+  notes?: string;
 };
