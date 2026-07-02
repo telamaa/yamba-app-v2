@@ -1,11 +1,11 @@
 /**
  * /[locale]/carrier/deals/[dealId]
  * =================================
- * Route Next.js App Router pour le détail d'un Deal côté Voyageur.
- * L'URL reste stable peu importe le statut — DealClient orchestre la view.
+ * Route Next.js App Router pour l'écran "Nouvelle demande de Deal"
+ * côté voyageur. Server Component, transmet juste le dealId au client.
  */
 
-import DealClient from "@/components/carrier/deal/DealClient";
+import DealRequestClient from "@/components/carrier/deal-request/DealRequestClient";
 
 type Props = {
   params: Promise<{ locale: string; dealId: string }>;
@@ -13,5 +13,5 @@ type Props = {
 
 export default async function CarrierDealPage({ params }: Props) {
   const { dealId } = await params;
-  return <DealClient dealId={dealId} />;
+  return <DealRequestClient dealId={dealId} />;
 }
