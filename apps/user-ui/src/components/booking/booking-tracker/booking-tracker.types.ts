@@ -107,6 +107,8 @@ export type Booking = {
   deliveryCode: BookingDeliveryCode;
 
   pickup?: BookingPickupInfo; // présent dès PICKED_UP
+
+  delivery?: BookingDeliveryInfo; // présent dès DELIVERED
 };
 
 
@@ -123,3 +125,18 @@ export type BookingPickupInfo = {
   photos: BookingPhoto[]; // photos prises par le Voyageur (context PICKUP_*)
   notes?: string;
 };
+
+// ============================================================
+// Période de vérification (DELIVERED) — feat/verification-period
+// ============================================================
+
+export type BookingDeliveryInfo = {
+  deliveredAt: string; // ISO — moment de la validation du code par le Voyageur
+  validatedBy: "CODE";
+  confirmedEarlyAt?: string; // ISO — si le Sender a confirmé avant J+4
+};
+
+/** Durée de la période de vérification avant versement automatique */
+export const VERIFICATION_PERIOD_DAYS = 3;
+export const PAYOUT_DAY = 4; // J+4
+
