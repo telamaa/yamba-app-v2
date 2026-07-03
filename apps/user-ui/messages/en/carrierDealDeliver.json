@@ -1,0 +1,78 @@
+{
+  "title": "Delivery to {recipientFirstName}",
+  "subtitle": "{city} · validate with the code",
+  "subtitleShort": "{city}",
+  "back": "Back",
+  "help": "Help",
+
+  "banner": {
+    "title": "You''ve arrived in {city}",
+    "subtitle": "Flight landed at {time} · final parcel delivery",
+    "subtitleShort": "Landed at {time}",
+    "titleNoEvent": "Final parcel delivery",
+    "subtitleNoEvent": "Hand over the parcel to {recipientFirstName} for her code"
+  },
+
+  "h1": "Validate the delivery",
+  "h1Subtitle": "{recipientFirstName} will give you a 6-digit code. Type it below to make the handover official.",
+  "h1SubtitleShort": "Ask {recipientFirstName} for her 6-digit code and enter it.",
+
+  "infoBox": "**Is {recipientFirstName} in front of you?** Ask her for the delivery code {shipperFirstName} sent her. Without this code, you can''t hand over the parcel. If she can''t find it, suggest she contacts {shipperFirstName}.",
+  "infoBoxShort": "**Is {recipientFirstName} in front of you?** Ask her for the code {shipperFirstName} sent. No code, no handover.",
+
+  "recipientRole": "Recipient",
+
+  "otp": {
+    "label": "DELIVERY CODE RECEIVED BY {recipientFirstName}",
+    "labelShort": "DELIVERY CODE",
+    "attempt": "Attempt {current} of {max}",
+    "validate": "Validate delivery",
+    "validating": "Checking…",
+    "wrongCode": "That''s not the right code. Check with {recipientFirstName} and try again.",
+    "attemptsLeft": "{count, plural, =1 {Last attempt} other {# attempts left}}",
+    "locked": "Too many attempts. Entry locked for {minutes} min for security reasons.",
+    "lockedCountdown": "Try again in {countdown}"
+  },
+
+  "helpCard": {
+    "title": "{recipientFirstName} can''t remember the code?",
+    "titleShort": "{recipientFirstName} can''t remember the code?",
+    "tip1": "**Check she has {shipperFirstName}.** {recipientFirstName} can search her recent WhatsApp or SMS.",
+    "tip1Short": "Check her **WhatsApp and SMS**.",
+    "tip2": "**Call {shipperFirstName} together.** She can resend the code or generate a new one if needed.",
+    "tip2Short": "**Call {shipperFirstName}** together.",
+    "tip3": "**3 failed attempts** will lock the entry for 15 minutes for security reasons.",
+    "tip3Short": "3 errors = **15 min lock**.",
+    "writeToShipper": "Write to {shipperFirstName}",
+    "writeShort": "Write",
+    "callShipper": "Call {shipperFirstName}",
+    "callShort": "Call"
+  },
+
+  "sidebar": {
+    "parcelLabel": "PARCEL TO HAND OVER",
+    "parcelSummary": "{category} · {weight} kg",
+    "parcelPhotosNote": "Photos taken at pickup at {location}",
+    "payoutLabel": "ONCE VALIDATED",
+    "netLabel": "Net for you",
+    "paidAtLabel": "Paid at",
+    "paidAtValue": "D+4",
+    "payoutNote": "3-day verification period, then automatic Stripe transfer."
+  },
+
+  "report": "Report an issue ({recipientFirstName} absent, refusal, etc.)",
+  "reportShort": "Report an issue",
+
+  "success": {
+    "title": "Delivery validated!",
+    "subtitle": "Well done, you handed the parcel to {recipientFirstName}. {shipperFirstName} has just been notified.",
+    "payoutTitle": "Your payout is coming",
+    "payoutText": "{amount} will be transferred to your Stripe account on {date}, after the 3-day verification period.",
+    "backToDeal": "View Deal recap",
+    "backToDashboard": "Back to home"
+  },
+
+  "error": {
+    "toastGeneric": "Error validating. Try again."
+  }
+}

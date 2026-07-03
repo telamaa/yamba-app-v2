@@ -107,3 +107,54 @@ export async function confirmTrackingEvent(
   console.info("[deal] confirmTrackingEvent mock:", { dealId, eventId });
   return { dealId, eventId, at: new Date().toISOString() };
 }
+
+
+// ============================================================
+// Livraison — saisie du code (feat/delivery-code-entry)
+// ============================================================
+
+/** Code correct du mock (= celui révélé côté Expéditeur : 742 891) */
+const MOCK_VALID_CODE = "742891";
+export const MAX_DELIVERY_ATTEMPTS = 3;
+export const DELIVERY_LOCK_MINUTES = 15;
+
+export type ValidateCodeResult =
+  | { ok: true; dealId: string; deliveredAt: string }
+  | { ok: false; reason: "WRONG_CODE"; attemptsLeft: number }
+  | { ok: false; reason: "LOCKED"; lockedUntil: string };
+
+/**
+ * Valide le code de livraison saisi par le Voyageur.
+ * Backend futur : comparaison bcrypt avec le hash en base, Deal → DELIVERED,
+ * TrackingEvent DELIVERED, démarrage du timer J+1→J+4, notif à l'Expéditeur.
+ * Mock : code correct = 742891, compteur de tentatives géré côté client.
+ */
+export async function validateDeliveryCode(
+  dealId: string,
+  code: string,
+  attemptsSoFar: number
+): Promise<ValidateCodeResult> {
+  await sleep(MOCK_DELAY_MS);
+
+  if (code === MOCK_VALID_CODE) {
+    // eslint-disable-next-line no-console
+    console.info("[deal] validateDeliveryCode mock: SUCCESS", { dealId });
+    return { ok: true, dealId, deliveredAt: new Date().toISOString() };
+  }
+
+  const attemptsLeft = MAX_DELIVERY_ATTEMPTS - attemptsSoFar - 1;
+  // eslint-disable-next-line no-console
+  console.info("[deal] validateDeliveryCode mock: WRONG_CODE", {
+    dealId,
+    attemptsLeft,
+  });
+
+  if (attemptsLeft <= 0) {
+    const lockedUntil = new Date(
+      Date.now() + DELIVERY_LOCK_MINUTES * 60 * 1000
+    ).toISOString();
+    return { ok: false, reason: "LOCKED", lockedUntil };
+  }
+
+  return { ok: false, reason: "WRONG_CODE", attemptsLeft };
+}
