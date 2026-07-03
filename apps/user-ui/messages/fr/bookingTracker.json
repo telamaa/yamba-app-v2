@@ -182,6 +182,92 @@
     }
   },
 
+  "delivered": {
+    "banner": {
+      "title": "Ton colis a été livré à {recipientFirstName}",
+      "subtitle": "Confirmé {when} par {carrierFirstName} avec le code à 6 chiffres",
+      "subtitleShort": "{when} à {time}"
+    },
+    "h1": "Période de vérification",
+    "h1Subtitle": "Tu as 3 jours pour t''assurer que tout va bien avant que {carrierFirstName} reçoive son paiement.",
+    "h1SubtitleShort": "3 jours pour t''assurer que tout va bien.",
+    "when": { "yesterday": "hier", "today": "aujourd''hui", "at": "à" },
+
+    "countdown": {
+      "label": "VERSEMENT AUTOMATIQUE DANS",
+      "labelShort": "VERSEMENT DANS",
+      "value": "{days, plural, =0 {} =1 {1 jour · } other {# jours · }}{hours}h",
+      "delivered": "Livraison",
+      "payout": "versement",
+      "today": "aujourd''hui"
+    },
+
+    "confirmCard": {
+      "title": "Tout s''est bien passé ?",
+      "text": "Confirme que {recipientFirstName} a bien reçu son colis pour libérer {carrierFirstName} plus tôt. Tu n''as pas besoin d''attendre 3 jours si tu sais déjà que tout est OK.",
+      "textShort": "Confirme la livraison pour libérer {carrierFirstName} plus tôt.",
+      "button": "Confirmer la livraison",
+      "warning": "Cette action est définitive. Tu ne pourras plus signaler de problème après confirmation.",
+      "warningShort": "Définitif. Pas de signalement possible après.",
+      "inlineTitle": "Confirmer définitivement ?",
+      "inlineText": "{carrierFirstName} sera payé immédiatement et tu ne pourras plus signaler de problème.",
+      "inlineYes": "Oui, tout est OK",
+      "inlineCancel": "Annuler",
+      "submitting": "Confirmation…",
+      "toastSuccess": "Merci ! {carrierFirstName} va recevoir son paiement. 🎉",
+      "toastError": "Erreur lors de la confirmation. Réessaye."
+    },
+
+    "confirmedCard": {
+      "title": "Paiement libéré",
+      "text": "Tu as confirmé la livraison. {carrierFirstName} recevra son versement très vite. Merci pour lui !"
+    },
+
+    "recap": {
+      "label": "RÉCAP DE LA LIVRAISON",
+      "labelShort": "RÉCAP",
+      "parcelLabel": "COLIS LIVRÉ",
+      "recipientLabel": "REMIS À {name}",
+      "recipientSub": "Code de livraison saisi par {carrierFirstName} et validé",
+      "recipientSubShort": "Code validé par {carrierFirstName}",
+      "photosLabel": "PHOTOS DE TRAÇABILITÉ",
+      "photosLabelShort": "TRAÇABILITÉ",
+      "photosPickup": "À la prise en charge ({location})",
+      "photosPickupShort": "Pickup {location}",
+      "photosDelivery": "À la livraison ({city})",
+      "photosDeliveryShort": "Livraison",
+      "codeValidatedBadge": "Code validé"
+    },
+
+    "howItWorks": {
+      "title": "Comment ça marche",
+      "confirm": "**Si tu confirmes maintenant**, {carrierFirstName} reçoit son paiement immédiatement. Geste apprécié, rapide.",
+      "confirmShort": "**Tu confirmes** = {carrierFirstName} payé immédiatement.",
+      "nothing": "**Si tu ne fais rien**, le paiement est libéré automatiquement à la fin des 3 jours.",
+      "nothingShort": "**Tu ne fais rien** = paiement automatique à J+4.",
+      "report": "**Si tu signales un problème**, le paiement est gelé et nous démarrons une médiation. Tu reçois une réponse de notre équipe sous 48h ouvrées.",
+      "reportShort": "**Tu signales** = paiement gelé, médiation lancée."
+    },
+
+    "rate": {
+      "title": "Pense à noter {carrierFirstName}",
+      "text": "Ton retour aide les autres Expéditeurs à choisir leurs Voyageurs.",
+      "textShort": "Ton retour aide les autres.",
+      "button": "Donner mon avis"
+    },
+
+    "payment": {
+      "stateLabel": "État",
+      "stateBlocked": "Bloqué jusqu''à J+4",
+      "stateReleased": "Libéré",
+      "note": "Les fonds sont en attente chez Yamba. Ils seront versés à {carrierFirstName} après la période de vérification.",
+      "noteReleased": "Tu as confirmé la livraison — les fonds sont en cours de versement à {carrierFirstName}."
+    },
+
+    "report": "Quelque chose ne va pas avec ce colis ?",
+    "reportShort": "Quelque chose ne va pas ?"
+  },
+
   "error": {
     "notFound": "Cette réservation n''existe pas ou a été annulée.",
     "generic": "Une erreur est survenue. Réessaye dans un instant."
