@@ -116,3 +116,26 @@ export const mockBookingPickedUp: Booking = {
     ],
   },
 };
+
+/**
+ * Mock Booking en statut DELIVERED : Thomas a validé le code hier à 22h27.
+ * Période de vérification en cours — versement automatique à J+4.
+ */
+export const mockBookingDelivered: Booking = {
+  ...mockBookingPickedUp,
+  id: "booking_mock_delivered",
+  status: "DELIVERED",
+
+  deliveryCode: {
+    status: "VALIDATED",
+    code: "742891",
+    regeneratedCount: 0,
+  },
+
+  delivery: {
+    deliveredAt: new Date(now - 26 * 60 * 60 * 1000).toISOString(), // hier ~22h
+    validatedBy: "CODE",
+  },
+};
+
+
