@@ -5,6 +5,7 @@
  * Charge le Deal puis switch sur le statut pour rendre la bonne view :
  *   PENDING   → DealRequestDesktop/Mobile
  *   ACCEPTED  → DealAcceptedDesktop/Mobile
+ *   PICKED_UP → DealTrackingClient (suivi du voyage)
  *
  * L'URL reste stable : /carrier/deals/[dealId]
  */
@@ -21,6 +22,7 @@ import DealRequestDesktop from "./views/request/DealRequestDesktop";
 import DealRequestMobile from "./views/request/DealRequestMobile";
 import DealAcceptedDesktop from "./views/accepted/DealAcceptedDesktop";
 import DealAcceptedMobile from "./views/accepted/DealAcceptedMobile";
+import DealTrackingClient from "./views/tracking/DealTrackingClient";
 
 type Props = {
   dealId: string;
@@ -66,6 +68,12 @@ export default function DealClient({ dealId }: Props) {
 
   if (!deal) {
     return <DealSkeleton />;
+  }
+
+  // Statut PICKED_UP → vue tracking (suivi du voyage)
+  // DealTrackingClient gère lui-même le switch desktop/mobile
+  if (deal.status === "PICKED_UP") {
+    return <DealTrackingClient deal={deal} onCloseAction={handleClose} />;
   }
 
   // Statut ACCEPTED → vues post-acceptation

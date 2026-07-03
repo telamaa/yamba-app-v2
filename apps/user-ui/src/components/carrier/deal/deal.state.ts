@@ -85,3 +85,51 @@ export const mockDealRequest: DealRequest = {
     payoutDelayDays: 4,
   },
 };
+
+
+const nowMs = Date.now();
+
+/**
+ * Mock Deal en statut PICKED_UP : Thomas a confirmé le pickup à 12h14,
+ * il est à l'aéroport, son vol décolle à 14h00 (départ dans ~1h15).
+ * Aucun événement optionnel encore confirmé.
+ */
+export const mockDealPickedUp: typeof mockDealRequest = {
+  ...mockDealRequest,
+  id: "deal_mock_picked",
+  status: "PICKED_UP",
+
+  // Vol dans 1h15 pour un état pédagogique stable à chaque chargement
+  trip: {
+    ...mockDealRequest.trip,
+    departureDate: new Date(nowMs + 75 * 60 * 1000).toISOString(),
+  },
+
+  pickup: {
+    pickedUpAt: new Date(nowMs - 30 * 60 * 1000).toISOString(),
+    locationName: "CDG Terminal 2E",
+    photos: [
+      {
+        id: "pickup_photo_1",
+        url: "/mock/pickup-content.jpg",
+        context: "PICKUP_CONTENT",
+        label: "Contenu",
+      },
+      {
+        id: "pickup_photo_2",
+        url: "/mock/pickup-packaged.jpg",
+        context: "PICKUP_PACKAGED",
+        label: "Emballé",
+      },
+    ],
+  },
+
+  recipient: {
+    firstName: "Marie",
+    lastName: "Mboungou",
+    city: "Brazzaville",
+    phone: "+242 06 421 88 12",
+  },
+
+  trackingEvents: [],
+};
