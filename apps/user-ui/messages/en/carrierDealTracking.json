@@ -1,0 +1,103 @@
+{
+  "title": "Parcel tracking",
+  "subtitle": "For {shipperFirstName} · {originCity} → {destinationCity}",
+  "subtitleShort": "For {shipperFirstName}",
+  "back": "Back",
+  "help": "Help",
+
+  "banner": {
+    "title": "In transit to {destinationCity}",
+    "subtitle": "Parcel picked up {ago} ago · flight at {flightHour}",
+    "subtitleShort": "Flight at {flightHour}",
+    "flightIn": "Flight in {countdown}",
+    "flightPast": "Flight ongoing or past"
+  },
+
+  "spotlight": {
+    "optional": "This isn''t mandatory.",
+    "AT_AIRPORT": {
+      "title": "Are you at the airport?",
+      "text": "Confirming your arrival at the airport reassures {shipperFirstName}. She''ll see everything is going as planned.",
+      "textShort": "Confirming reassures {shipperFirstName}. Not mandatory.",
+      "button": "I''m at the airport"
+    },
+    "FLIGHT_DEPARTED": {
+      "title": "Is your flight departing?",
+      "text": "Confirm departure — {shipperFirstName} will know her parcel is in the air.",
+      "textShort": "Confirm departure for {shipperFirstName}.",
+      "button": "The plane is taking off"
+    },
+    "FLIGHT_ARRIVED": {
+      "title": "Have you landed?",
+      "text": "Confirm your arrival in {destinationCity} — {shipperFirstName} will know delivery is getting close.",
+      "textShort": "Confirm your arrival in {destinationCity}.",
+      "button": "I''ve landed"
+    },
+    "DELIVER": {
+      "title": "Did {recipientFirstName} give you the code?",
+      "text": "Meet {recipientFirstName}, hand over the parcel and enter the 6-digit code she gives you to validate the delivery.",
+      "textShort": "Enter the code {recipientFirstName} gives you.",
+      "button": "Validate delivery"
+    },
+    "confirmedToast": "Noted! {shipperFirstName} has been notified.",
+    "undo": "Undo",
+    "undoneToast": "Cancelled, nothing was sent.",
+    "errorToast": "Error, try again."
+  },
+
+  "timeline": {
+    "label": "TRIP STEPS",
+    "optionalBadge": "Optional",
+    "yesterday": "Yesterday",
+    "today": "Today",
+    "steps": {
+      "accepted": "Deal accepted",
+      "pickedUp": "Parcel picked up",
+      "atAirport": "Arrival at the airport",
+      "atAirportSub": "Confirm when you''re ready to board",
+      "departed": "Departure",
+      "departedSub": "When the plane takes off (~{hour})",
+      "arrived": "Landing",
+      "arrivedSub": "In {destinationCity} (~{hour})",
+      "delivery": "Delivery to {recipientFirstName}",
+      "deliverySub": "Enter the 6-digit code to validate"
+    }
+  },
+
+  "recipientCard": {
+    "title": "{recipientFirstName} {recipientLastName} · Recipient",
+    "titleShort": "{recipientFirstName} · recipient",
+    "subtitle": "{city} · contact on arrival to set the meeting",
+    "subtitleShort": "In {city} · reachable on arrival",
+    "call": "Call",
+    "whatsapp": "WhatsApp"
+  },
+
+  "payment": {
+    "label": "YOUR PAYMENT",
+    "netLabel": "Net for you",
+    "paidAtLabel": "Paid at",
+    "paidAtValue": "D+4 after delivery",
+    "note": "The countdown starts when {recipientFirstName} gives you her code and you validate the delivery."
+  },
+
+  "parcelCard": {
+    "label": "THE PARCEL",
+    "summary": "{category} · {weight} kg"
+  },
+
+  "shipperCard": {
+    "label": "SHIPPER",
+    "subtitle": "Write to her if any issue",
+    "message": "Send a message"
+  },
+
+  "report": "Report an issue",
+
+  "confirm": {
+    "title": "Confirm?",
+    "text": "{shipperFirstName} will receive a notification.",
+    "yes": "Confirm",
+    "cancel": "Cancel"
+  }
+}
