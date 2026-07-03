@@ -24,6 +24,8 @@ import BookingAcceptedDesktop from "./views/accepted/BookingAcceptedDesktop";
 import BookingAcceptedMobile from "./views/accepted/BookingAcceptedMobile";
 import BookingPickedUpDesktop from "./views/picked-up/BookingPickedUpDesktop";
 import BookingPickedUpMobile from "./views/picked-up/BookingPickedUpMobile";
+import BookingDeliveredDesktop from "./views/delivered/BookingDeliveredDesktop";
+import BookingDeliveredMobile from "./views/delivered/BookingDeliveredMobile";
 
 type Props = {
   bookingId: string;
@@ -74,6 +76,20 @@ export default function BookingTrackerClient({ bookingId }: Props) {
     []
   );
 
+  const [earlyConfirmedAt, setEarlyConfirmedAt] = useState<string | null>(null);
+
+  const handleEarlyConfirmed = useCallback((confirmedAt: string) => {
+    setEarlyConfirmedAt(confirmedAt);
+    setBooking((prev) =>
+      prev && prev.delivery
+        ? {
+          ...prev,
+          delivery: { ...prev.delivery, confirmedEarlyAt: confirmedAt },
+        }
+        : prev
+    );
+  }, []);
+
   if (isMobile === null || (!booking && !loadError)) {
     return <BookingTrackerSkeleton />;
   }
@@ -84,6 +100,26 @@ export default function BookingTrackerClient({ bookingId }: Props) {
 
   if (!booking) {
     return <BookingTrackerSkeleton />;
+  }
+
+  if (booking.status === "DELIVERED") {
+    const isConfirmed =
+      earlyConfirmedAt !== null || !!booking.delivery?.confirmedEarlyAt;
+    return isMobile ? (
+      <BookingDeliveredMobile
+        booking={booking}
+        isConfirmed={isConfirmed}
+        onCloseAction={handleClose}
+        onConfirmedAction={handleEarlyConfirmed}
+      />
+    ) : (
+      <BookingDeliveredDesktop
+        booking={booking}
+        isConfirmed={isConfirmed}
+        onCloseAction={handleClose}
+        onConfirmedAction={handleEarlyConfirmed}
+      />
+    );
   }
 
   if (booking.status === "PICKED_UP") {

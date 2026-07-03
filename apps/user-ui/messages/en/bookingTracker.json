@@ -182,6 +182,92 @@
     }
   },
 
+  "delivered": {
+    "banner": {
+      "title": "Your parcel was delivered to {recipientFirstName}",
+      "subtitle": "Confirmed {when} by {carrierFirstName} with the 6-digit code",
+      "subtitleShort": "{when} at {time}"
+    },
+    "h1": "Verification period",
+    "h1Subtitle": "You have 3 days to make sure everything is fine before {carrierFirstName} receives his payment.",
+    "h1SubtitleShort": "3 days to make sure everything is fine.",
+    "when": { "yesterday": "yesterday", "today": "today", "at": "at" },
+
+    "countdown": {
+      "label": "AUTOMATIC PAYOUT IN",
+      "labelShort": "PAYOUT IN",
+      "value": "{days, plural, =0 {} =1 {1 day · } other {# days · }}{hours}h",
+      "delivered": "Delivery",
+      "payout": "payout",
+      "today": "today"
+    },
+
+    "confirmCard": {
+      "title": "Did everything go well?",
+      "text": "Confirm that {recipientFirstName} received her parcel to release {carrierFirstName} earlier. No need to wait 3 days if you already know everything is OK.",
+      "textShort": "Confirm the delivery to release {carrierFirstName} earlier.",
+      "button": "Confirm delivery",
+      "warning": "This action is final. You won''t be able to report an issue after confirming.",
+      "warningShort": "Final. No reporting possible afterwards.",
+      "inlineTitle": "Confirm permanently?",
+      "inlineText": "{carrierFirstName} will be paid immediately and you won''t be able to report an issue.",
+      "inlineYes": "Yes, all good",
+      "inlineCancel": "Cancel",
+      "submitting": "Confirming…",
+      "toastSuccess": "Thanks! {carrierFirstName} will receive his payment. 🎉",
+      "toastError": "Error confirming. Try again."
+    },
+
+    "confirmedCard": {
+      "title": "Payment released",
+      "text": "You confirmed the delivery. {carrierFirstName} will receive his payout very soon. Thanks for him!"
+    },
+
+    "recap": {
+      "label": "DELIVERY RECAP",
+      "labelShort": "RECAP",
+      "parcelLabel": "PARCEL DELIVERED",
+      "recipientLabel": "HANDED TO {name}",
+      "recipientSub": "Delivery code entered by {carrierFirstName} and validated",
+      "recipientSubShort": "Code validated by {carrierFirstName}",
+      "photosLabel": "TRACEABILITY PHOTOS",
+      "photosLabelShort": "TRACEABILITY",
+      "photosPickup": "At pickup ({location})",
+      "photosPickupShort": "Pickup {location}",
+      "photosDelivery": "At delivery ({city})",
+      "photosDeliveryShort": "Delivery",
+      "codeValidatedBadge": "Code validated"
+    },
+
+    "howItWorks": {
+      "title": "How it works",
+      "confirm": "**If you confirm now**, {carrierFirstName} receives his payment immediately. Appreciated, quick gesture.",
+      "confirmShort": "**You confirm** = {carrierFirstName} paid immediately.",
+      "nothing": "**If you do nothing**, the payment is released automatically after 3 days.",
+      "nothingShort": "**You do nothing** = automatic payment at D+4.",
+      "report": "**If you report an issue**, the payment is frozen and we start a mediation. Our team replies within 48 business hours.",
+      "reportShort": "**You report** = payment frozen, mediation started."
+    },
+
+    "rate": {
+      "title": "Remember to rate {carrierFirstName}",
+      "text": "Your feedback helps other Shippers choose their Trippers.",
+      "textShort": "Your feedback helps others.",
+      "button": "Leave a review"
+    },
+
+    "payment": {
+      "stateLabel": "Status",
+      "stateBlocked": "Blocked until D+4",
+      "stateReleased": "Released",
+      "note": "The funds are held by Yamba. They will be paid to {carrierFirstName} after the verification period.",
+      "noteReleased": "You confirmed the delivery — the funds are being transferred to {carrierFirstName}."
+    },
+
+    "report": "Something wrong with this parcel?",
+    "reportShort": "Something wrong?"
+  },
+
   "error": {
     "notFound": "This booking doesn''t exist or has been cancelled.",
     "generic": "An error occurred. Try again in a moment."
