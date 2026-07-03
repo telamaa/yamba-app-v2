@@ -163,3 +163,11 @@ body::-webkit-scrollbar {
     radial-gradient(at 50% 30%, rgba(255, 107, 53, 0.10) 0px, transparent 70%),
     #020617;
 }
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-8px); }
+  40% { transform: translateX(8px); }
+  60% { transform: translateX(-5px); }
+  80% { transform: translateX(5px); }
+}
