@@ -1,0 +1,78 @@
+{
+  "title": "Livraison à {recipientFirstName}",
+  "subtitle": "{city} · à valider avec le code",
+  "subtitleShort": "{city}",
+  "back": "Retour",
+  "help": "Aide",
+
+  "banner": {
+    "title": "Tu es arrivé à {city}",
+    "subtitle": "Vol atterri à {time} · livraison finale du colis",
+    "subtitleShort": "Atterri à {time}",
+    "titleNoEvent": "Livraison finale du colis",
+    "subtitleNoEvent": "Remets le colis à {recipientFirstName} contre son code"
+  },
+
+  "h1": "Valide la livraison",
+  "h1Subtitle": "{recipientFirstName} va te donner un code à 6 chiffres. Tape-le ci-dessous pour officialiser la remise du colis.",
+  "h1SubtitleShort": "Demande à {recipientFirstName} son code à 6 chiffres et saisis-le.",
+
+  "infoBox": "**{recipientFirstName} est devant toi ?** Demande-lui le code de livraison qu''{shipperFirstName} lui a communiqué. Sans ce code, tu ne peux pas remettre le colis. Si elle ne le retrouve pas, propose-lui de contacter {shipperFirstName}.",
+  "infoBoxShort": "**{recipientFirstName} est devant toi ?** Demande-lui le code qu''{shipperFirstName} lui a envoyé. Sans ça, pas de remise possible.",
+
+  "recipientRole": "Destinataire",
+
+  "otp": {
+    "label": "CODE DE LIVRAISON REÇU PAR {recipientFirstName}",
+    "labelShort": "CODE DE LIVRAISON",
+    "attempt": "Tentative {current} sur {max}",
+    "validate": "Valider la livraison",
+    "validating": "Vérification…",
+    "wrongCode": "Ce code n''est pas le bon. Vérifie avec {recipientFirstName} et réessaye.",
+    "attemptsLeft": "{count, plural, =1 {Dernière tentative} other {# tentatives restantes}}",
+    "locked": "Trop de tentatives. Saisie bloquée pendant {minutes} min pour des raisons de sécurité.",
+    "lockedCountdown": "Réessaye dans {countdown}"
+  },
+
+  "helpCard": {
+    "title": "{recipientFirstName} ne se souvient plus du code ?",
+    "titleShort": "{recipientFirstName} ne se souvient plus du code ?",
+    "tip1": "**Vérifie qu''elle a bien {shipperFirstName}.** {recipientFirstName} peut chercher dans ses WhatsApp ou SMS récents.",
+    "tip1Short": "Vérifie ses **WhatsApp et SMS**.",
+    "tip2": "**Appelez {shipperFirstName} ensemble.** Elle peut retransmettre le code ou en générer un nouveau si nécessaire.",
+    "tip2Short": "**Appelez {shipperFirstName}** ensemble.",
+    "tip3": "**3 tentatives ratées** bloqueront la saisie pendant 15 minutes pour des raisons de sécurité.",
+    "tip3Short": "3 erreurs = **blocage de 15 min**.",
+    "writeToShipper": "Écrire à {shipperFirstName}",
+    "writeShort": "Écrire",
+    "callShipper": "Appeler {shipperFirstName}",
+    "callShort": "Appeler"
+  },
+
+  "sidebar": {
+    "parcelLabel": "LE COLIS À REMETTRE",
+    "parcelSummary": "{category} · {weight} kg",
+    "parcelPhotosNote": "Photos prises à la prise en charge à {location}",
+    "payoutLabel": "UNE FOIS VALIDÉ",
+    "netLabel": "Net pour toi",
+    "paidAtLabel": "Versé à",
+    "paidAtValue": "J+4",
+    "payoutNote": "3 jours de période de vérification, puis virement Stripe automatique."
+  },
+
+  "report": "Signaler un problème ({recipientFirstName} absente, refus, etc.)",
+  "reportShort": "Signaler un problème",
+
+  "success": {
+    "title": "Livraison validée !",
+    "subtitle": "Bravo, tu as remis le colis à {recipientFirstName}. {shipperFirstName} vient d''être prévenue.",
+    "payoutTitle": "Ton versement arrive",
+    "payoutText": "{amount} seront virés sur ton compte Stripe le {date}, après la période de vérification de 3 jours.",
+    "backToDeal": "Voir le récap du Deal",
+    "backToDashboard": "Retour à l''accueil"
+  },
+
+  "error": {
+    "toastGeneric": "Erreur lors de la validation. Réessaye."
+  }
+}
