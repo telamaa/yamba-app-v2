@@ -22,7 +22,8 @@ export default getRequestConfig(async ({ requestLocale }) => {
     carrierDealRequest,
     carrierDealAccepted, // ✨ Phase 2
     bookingTracker, // ✨ Phase 3
-    carrierDealPickup, // ✨ NEW pickup
+    carrierDealPickup, // ✨ pickup
+    carrierDealTracking, // ✨ NEW tracking
   ] = await Promise.all([
     import(`../../messages/${locale}/common.json`),
     import(`../../messages/${locale}/home.json`),
@@ -39,7 +40,8 @@ export default getRequestConfig(async ({ requestLocale }) => {
     import(`../../messages/${locale}/carrierDealRequest.json`),
     import(`../../messages/${locale}/carrierDealAccepted.json`), // ✨ Phase 2
     import(`../../messages/${locale}/bookingTracker.json`), // ✨ Phase 3
-    import(`../../messages/${locale}/carrierDealPickup.json`), // ✨ NEW pickup
+    import(`../../messages/${locale}/carrierDealPickup.json`), // ✨ pickup
+    import(`../../messages/${locale}/carrierDealTracking.json`), // ✨ NEW tracking
   ]);
   return {
     locale,
@@ -59,7 +61,8 @@ export default getRequestConfig(async ({ requestLocale }) => {
       carrierDealRequest: carrierDealRequest.default,
       carrierDealAccepted: carrierDealAccepted.default, // ✨ Phase 2
       bookingTracker: bookingTracker.default, // ✨ Phase 3
-      carrierDealPickup: carrierDealPickup.default, // ✨ NEW pickup
+      carrierDealPickup: carrierDealPickup.default, // ✨ pickup
+      carrierDealTracking: carrierDealTracking.default, // ✨ NEW tracking
     },
   };
 });
