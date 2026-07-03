@@ -1,0 +1,103 @@
+{
+  "title": "Suivi du colis",
+  "subtitle": "Pour {shipperFirstName} · {originCity} → {destinationCity}",
+  "subtitleShort": "Pour {shipperFirstName}",
+  "back": "Retour",
+  "help": "Aide",
+
+  "banner": {
+    "title": "En transit vers {destinationCity}",
+    "subtitle": "Colis pris en charge il y a {ago} · vol prévu à {flightHour}",
+    "subtitleShort": "Vol prévu à {flightHour}",
+    "flightIn": "Vol dans {countdown}",
+    "flightPast": "Vol en cours ou passé"
+  },
+
+  "spotlight": {
+    "optional": "Ce n''est pas obligatoire.",
+    "AT_AIRPORT": {
+      "title": "Tu es à l''aéroport ?",
+      "text": "Confirmer ton arrivée à l''aéroport rassure {shipperFirstName}. Elle verra que tout se passe comme prévu.",
+      "textShort": "Confirmer rassure {shipperFirstName}. Pas obligatoire.",
+      "button": "Je suis à l''aéroport"
+    },
+    "FLIGHT_DEPARTED": {
+      "title": "Ton vol décolle ?",
+      "text": "Confirme le décollage — {shipperFirstName} saura que son colis est dans les airs.",
+      "textShort": "Confirme le décollage pour {shipperFirstName}.",
+      "button": "L''avion décolle"
+    },
+    "FLIGHT_ARRIVED": {
+      "title": "Tu as atterri ?",
+      "text": "Confirme ton arrivée à {destinationCity} — {shipperFirstName} saura que la livraison approche.",
+      "textShort": "Confirme ton arrivée à {destinationCity}.",
+      "button": "J''ai atterri"
+    },
+    "DELIVER": {
+      "title": "{recipientFirstName} t''a donné le code ?",
+      "text": "Rencontre {recipientFirstName}, remets-lui le colis et saisis le code à 6 chiffres qu''elle te donne pour valider la livraison.",
+      "textShort": "Saisis le code que {recipientFirstName} te donne.",
+      "button": "Valider la livraison"
+    },
+    "confirmedToast": "C''est noté ! {shipperFirstName} a été prévenue.",
+    "undo": "Annuler",
+    "undoneToast": "Annulé, rien n''a été envoyé.",
+    "errorToast": "Erreur, réessaye."
+  },
+
+  "timeline": {
+    "label": "ÉTAPES DU VOYAGE",
+    "optionalBadge": "Optionnel",
+    "yesterday": "Hier",
+    "today": "Aujourd''hui",
+    "steps": {
+      "accepted": "Deal accepté",
+      "pickedUp": "Colis pris en charge",
+      "atAirport": "Arrivée à l''aéroport",
+      "atAirportSub": "Confirme quand tu es prêt à embarquer",
+      "departed": "Décollage",
+      "departedSub": "Quand l''avion décollera (~{hour})",
+      "arrived": "Atterrissage",
+      "arrivedSub": "À {destinationCity} (~{hour})",
+      "delivery": "Livraison à {recipientFirstName}",
+      "deliverySub": "Saisie du code à 6 chiffres pour valider"
+    }
+  },
+
+  "recipientCard": {
+    "title": "{recipientFirstName} {recipientLastName} · Destinataire",
+    "titleShort": "{recipientFirstName} · destinataire",
+    "subtitle": "{city} · à contacter à l''arrivée pour fixer le rendez-vous",
+    "subtitleShort": "À {city} · contactable à l''arrivée",
+    "call": "Appeler",
+    "whatsapp": "WhatsApp"
+  },
+
+  "payment": {
+    "label": "TON PAIEMENT",
+    "netLabel": "Net pour toi",
+    "paidAtLabel": "Versé à",
+    "paidAtValue": "J+4 après livraison",
+    "note": "Le compteur démarre quand {recipientFirstName} te communiquera son code et que tu auras validé la livraison."
+  },
+
+  "parcelCard": {
+    "label": "LE COLIS",
+    "summary": "{category} · {weight} kg"
+  },
+
+  "shipperCard": {
+    "label": "EXPÉDITRICE",
+    "subtitle": "Lui écrire si problème",
+    "message": "Envoyer un message"
+  },
+
+  "report": "Signaler un problème",
+
+  "confirm": {
+    "title": "Confirmer ?",
+    "text": "{shipperFirstName} recevra une notification.",
+    "yes": "Confirmer",
+    "cancel": "Annuler"
+  }
+}

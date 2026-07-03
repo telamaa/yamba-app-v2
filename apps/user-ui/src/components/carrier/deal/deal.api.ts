@@ -13,7 +13,7 @@ import type {
   DeclinePayload,
   RefusePickupPayload,
 } from "./deal.types";
-import { mockDealRequest } from "./deal.state";
+import {mockDealPickedUp, mockDealRequest} from "./deal.state";
 
 const MOCK_DELAY_MS = 800;
 
@@ -23,7 +23,8 @@ function sleep(ms: number): Promise<void> {
 
 export async function getDealRequest(dealId: string): Promise<DealRequest> {
   await sleep(MOCK_DELAY_MS);
-  return { ...mockDealRequest, id: dealId || mockDealRequest.id };
+  const base = dealId.includes("picked") ? mockDealPickedUp : mockDealRequest;
+  return { ...base, id: dealId || base.id };
 }
 
 export async function acceptDeal(
@@ -90,4 +91,19 @@ export async function refusePickup(
 
 function generateMockCode(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
+
+/**
+ * Confirme un événement de suivi optionnel (philosophie A+B).
+ * Backend futur : push notification à l'Expéditeur + timeline mise à jour.
+ */
+export async function confirmTrackingEvent(
+  dealId: string,
+  eventId: import("./deal.types").DealTrackingEventId
+): Promise<{ dealId: string; eventId: string; at: string }> {
+  await sleep(MOCK_DELAY_MS);
+  // eslint-disable-next-line no-console
+  console.info("[deal] confirmTrackingEvent mock:", { dealId, eventId });
+  return { dealId, eventId, at: new Date().toISOString() };
 }
