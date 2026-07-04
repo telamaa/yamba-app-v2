@@ -67,3 +67,31 @@ export async function confirmDeliveryEarly(
   console.info("[booking] confirmDeliveryEarly mock:", bookingId);
   return { bookingId, confirmedAt: new Date().toISOString() };
 }
+
+
+// ============================================================
+// Signalement de litige — feat/dispute-form
+// ============================================================
+
+/**
+ * Envoie un signalement de litige.
+ * Backend futur : Deal → DISPUTED, payout gelé, ticket support ouvert,
+ * notification interne équipe Yamba + accusé de réception au Sender.
+ */
+export async function submitDispute(
+  bookingId: string,
+  payload: import("./booking-tracker.types").SubmitDisputePayload
+): Promise<{ bookingId: string; ticketNumber: string; submittedAt: string }> {
+  await sleep(MOCK_DELAY_MS);
+  if (!payload.pledgeAccepted) {
+    throw new Error("PLEDGE_REQUIRED");
+  }
+  if (payload.description.trim().length < 50) {
+    throw new Error("DESCRIPTION_TOO_SHORT");
+  }
+  const ticketNumber =
+    "YAM-" + Math.floor(1000 + Math.random() * 9000).toString();
+  // eslint-disable-next-line no-console
+  console.info("[booking] submitDispute mock:", { bookingId, payload, ticketNumber });
+  return { bookingId, ticketNumber, submittedAt: new Date().toISOString() };
+}
