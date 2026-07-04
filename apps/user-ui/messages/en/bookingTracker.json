@@ -256,6 +256,12 @@
       "button": "Leave a review"
     },
 
+    "reportCard": {
+      "title": "Something wrong with this parcel?",
+      "text": "Report it before the verification period ends — we'll freeze the payment while we review.",
+      "button": "Report an issue"
+    },
+
     "payment": {
       "stateLabel": "Status",
       "stateBlocked": "Blocked until D+4",
@@ -266,6 +272,137 @@
 
     "report": "Something wrong with this parcel?",
     "reportShort": "Something wrong?"
+  },
+
+  "report": {
+    "title": "Report an issue",
+    "subtitle": "Deal {originCity} → {destinationCity} · delivered on {date}",
+    "subtitleShort": "Deal {originCity} → {destinationCity}",
+    "back": "Back",
+
+    "banner": {
+      "title": "We''re here to help",
+      "text": "Tell us what happened, we''ll take care of the rest. While we review the case, {carrierFirstName}''s payment stays blocked.",
+      "textShort": "Tell us, we''ll handle the rest. {carrierFirstName}''s payment frozen."
+    },
+
+    "h1": "Tell us about the problem",
+    "h1Short": "Describe the problem",
+    "h1Subtitle": "The more details and evidence you give us, the faster we can decide.",
+    "h1SubtitleShort": "The more details you give, the faster we decide.",
+
+    "requiredBadge": "Required",
+    "recommendedBadge": "Recommended",
+    "optionalBadge": "Optional",
+
+    "category": {
+      "title": "What''s the problem?",
+      "titleShort": "What problem?",
+      "sub": "Pick the situation that fits best",
+      "NOT_DELIVERED": "The parcel was never delivered to {recipientFirstName}",
+      "NOT_DELIVERED_short": "Parcel never delivered",
+      "CONTENT_MISSING": "Content missing or different from the declaration",
+      "CONTENT_MISSING_short": "Content missing or different",
+      "DAMAGED": "Parcel or content damaged",
+      "DAMAGED_short": "Parcel or content damaged",
+      "SIGNIFICANT_DELAY": "Significantly late delivery",
+      "SIGNIFICANT_DELAY_short": "Significantly late delivery",
+      "RECIPIENT_ISSUE": "{recipientFirstName} has another issue with the traveller",
+      "RECIPIENT_ISSUE_short": "Another issue with {carrierFirstName}",
+      "OTHER": "Other issue",
+      "OTHER_short": "Other"
+    },
+
+    "description": {
+      "title": "Tell us what happened",
+      "titleShort": "Tell us",
+      "sub": "Be specific: when did you find out, who contacted you, what''s missing or wrong",
+      "subShort": "When you found out, what''s missing or wrong",
+      "placeholder": "E.g.: {recipientFirstName} called me this morning to tell me the navy sweater I declared wasn''t in the parcel. One of the t-shirts is also torn at the collar…",
+      "counterBelow": "{count} / minimum {min} characters",
+      "counterOk": "{count} characters ✓"
+    },
+
+    "photos": {
+      "title": "Add photos",
+      "titleShort": "Photos",
+      "sub": "Photos of the received content, the damage, or anything that helps us understand",
+      "subShort": "Of the received content, the damage",
+      "add": "Add",
+      "remove": "Remove this photo",
+      "tag": "Evidence",
+      "hint": "Ask {recipientFirstName} to send you photos if she can. Up to {max} photos, max 10 MB each."
+    },
+
+    "outcome": {
+      "title": "Your preferred outcome",
+      "titleShort": "Preferred outcome",
+      "sub": "Help us understand what feels fair to you — we''ll review your request",
+      "FULL_REFUND": "Full refund ({amount})",
+      "FULL_REFUND_short": "Full refund",
+      "PARTIAL_REFUND": "Partial refund for the missing/damaged items",
+      "PARTIAL_REFUND_short": "Partial refund",
+      "CONTACT_CARRIER": "Have Yamba contact {carrierFirstName} to understand",
+      "CONTACT_CARRIER_short": "Have Yamba contact {carrierFirstName}",
+      "YAMBA_DECIDES": "I''ll let Yamba decide based on the evidence",
+      "YAMBA_DECIDES_short": "I''ll let Yamba decide"
+    },
+
+    "process": {
+      "title": "What happens after your report",
+      "titleShort": "What''s next?",
+      "step1": "**You receive an acknowledgement within 48 business hours.** Our team takes over your case.",
+      "step1Short": "**Acknowledgement within 48 business hours.**",
+      "step2": "**We contact {carrierFirstName}** to get his side of the story and his evidence (pickup photos, etc).",
+      "step2Short": "**Yamba contacts {carrierFirstName}** for his version.",
+      "step3": "**We decide within 5 business days.** You receive our decision by email with the details. If you disagree, mediation is possible with a certified mediator.",
+      "step3Short": "**Decision within 5 business days**, mediation possible if you disagree.",
+      "step4": "**During the entire review**, {carrierFirstName}''s payment stays frozen. Nothing is paid out before resolution.",
+      "step4Short": "**{carrierFirstName}''s payment frozen** during the review."
+    },
+
+    "pledge": {
+      "text": "I declare on my honour that the information provided is accurate. I understand that an abusive report may lead to contractual consequences.",
+      "textShort": "I declare on my honour that the information provided is accurate.",
+      "whyLink": "Why this commitment?",
+      "whyText": "A report freezes a real person''s payment. This commitment protects honest Trippers — just like the Charter commits them to your parcel."
+    },
+
+    "cta": {
+      "info": "Once sent, your report can no longer be modified. Our team will contact you within 48h.",
+      "infoShort": "Once sent, your report can no longer be modified.",
+      "cancel": "Cancel",
+      "submit": "Send the report",
+      "submitShort": "Send",
+      "submitting": "Sending…",
+      "confirmTitle": "Send the report?",
+      "confirmText": "{carrierFirstName}''s payment will be frozen and our mediation team will take over. This action is irreversible.",
+      "confirmYes": "Yes, send",
+      "confirmCancel": "Cancel",
+      "toastError": "Error sending. Try again."
+    },
+
+    "sidebar": {
+      "dealLabel": "THE DEAL CONCERNED",
+      "deliveredAt": "Delivered on {date} at {time}",
+      "carrierLabel": "Traveller",
+      "recipientLabel": "Recipient",
+      "totalLabel": "Total paid",
+      "proofLabel": "PHOTOS ALREADY ON FILE",
+      "proofDeclared": "You declared these photos at booking",
+      "proofPickup": "{carrierFirstName} took these photos at pickup",
+      "windowLabel": "REPORTING WINDOW",
+      "windowText": "You can report until {date}."
+    },
+
+    "success": {
+      "title": "Report sent",
+      "subtitle": "We''re taking over. You''ll receive an acknowledgement within 48 business hours.",
+      "ticketLabel": "Case number",
+      "frozenNote": "{carrierFirstName}''s payment is frozen. Nothing will be paid out before resolution.",
+      "emailNote": "A confirmation email has just been sent to you.",
+      "backToTracking": "Back to my shipment tracking"
+    }
   },
 
   "error": {

@@ -9,7 +9,6 @@
 
 "use client";
 
-import { AlertTriangle } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import type { Booking } from "@/components/booking/booking-tracker/booking-tracker.types";
 import BookingAcceptedHeader from "../accepted/BookingAcceptedHeader";
@@ -18,7 +17,8 @@ import BookingTipList from "../../shared/BookingTipList";
 import ConfirmAllGoodCard from "./ConfirmAllGoodCard";
 import DeliveryRecapCard from "./DeliveryRecapCard";
 import PayoutCountdownCard from "./PayoutCountdownCard";
-import { DeliveredPaymentCard, RateCarrierPrompt } from "./DeliveredSideCards";
+import { DeliveredPaymentCard, RateCarrierPrompt, ReportIssuePrompt } from "./DeliveredSideCards";
+import { useRouter } from "@/i18n/navigation";
 
 type Props = {
   booking: Booking;
@@ -34,6 +34,9 @@ export default function BookingDeliveredDesktop({
                                                   onConfirmedAction,
                                                 }: Props) {
   const t = useTranslations("bookingTracker");
+
+  const router = useRouter();
+
   const locale = useLocale();
 
   const carrierFirstName = booking.carrier.firstName;
@@ -104,16 +107,16 @@ export default function BookingDeliveredDesktop({
               items={tipItems}
             />
 
-            {!isConfirmed && (
-              <button
-                type="button"
-                onClick={() => console.info("[booking] report issue")}
-                className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-slate-500 transition-colors hover:text-red-700 dark:text-slate-400 dark:hover:text-red-400"
-              >
-                <AlertTriangle size={13} aria-hidden="true" />
-                {t("delivered.report")}
-              </button>
-            )}
+            {/*{!isConfirmed && (*/}
+            {/*  <button*/}
+            {/*    type="button"*/}
+            {/*    onClick={() => router.push("/bookings/" + booking.id + "/report")}*/}
+            {/*    className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-slate-500 transition-colors hover:text-red-700 dark:text-slate-400 dark:hover:text-red-400"*/}
+            {/*  >*/}
+            {/*    <AlertTriangle size={13} aria-hidden="true" />*/}
+            {/*    {t("delivered.report")}*/}
+            {/*  </button>*/}
+            {/*)}*/}
           </div>
 
           {/* Sidebar */}
@@ -122,6 +125,17 @@ export default function BookingDeliveredDesktop({
               <DeliveredPaymentCard booking={booking} isConfirmed={isConfirmed} />
               <BookingCarrierCard booking={booking} compact />
               <RateCarrierPrompt booking={booking} />
+
+
+              {!isConfirmed && (
+                <ReportIssuePrompt
+                  booking={booking}
+                  onReportAction={() =>
+                    router.push("/bookings/" + booking.id + "/report")
+                  }
+                />
+              )}
+
             </div>
           </aside>
         </div>

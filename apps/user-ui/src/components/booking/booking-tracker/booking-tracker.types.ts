@@ -140,3 +140,41 @@ export type BookingDeliveryInfo = {
 export const VERIFICATION_PERIOD_DAYS = 3;
 export const PAYOUT_DAY = 4; // J+4
 
+
+// ============================================================
+// Signalement de litige — feat/dispute-form
+// ============================================================
+
+export type DisputeCategory =
+  | "NOT_DELIVERED"        // Le colis n'a jamais été livré
+  | "CONTENT_MISSING"      // Contenu manquant ou différent de la déclaration
+  | "DAMAGED"              // Colis ou contenu endommagé
+  | "SIGNIFICANT_DELAY"    // Délai dépassé significativement
+  | "RECIPIENT_ISSUE"      // Le destinataire a un autre problème avec le voyageur
+  | "OTHER";
+
+export type DisputeDesiredOutcome =
+  | "FULL_REFUND"          // Remboursement intégral
+  | "PARTIAL_REFUND"       // Remboursement partiel (manque/dommage)
+  | "CONTACT_CARRIER"      // Que Yamba contacte le Voyageur pour comprendre
+  | "YAMBA_DECIDES";       // Je laisse Yamba décider
+
+export type DisputePhotoDraft = {
+  id: string;
+  label?: string;
+  previewUrl?: string;
+  file?: File; // envoyé vers R2 en PR backend
+};
+
+export type SubmitDisputePayload = {
+  category: DisputeCategory;
+  description: string; // min 50 caractères
+  photos: DisputePhotoDraft[];
+  desiredOutcome?: DisputeDesiredOutcome;
+  pledgeAccepted: boolean;
+};
+
+export const DISPUTE_MIN_DESCRIPTION_LENGTH = 50;
+export const DISPUTE_MAX_PHOTOS = 5;
+
+
