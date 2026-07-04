@@ -8,7 +8,7 @@
 
 "use client";
 
-import { Star } from "lucide-react";
+import { AlertTriangle, Star } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import type { Booking } from "@/components/booking/booking-tracker/booking-tracker.types";
 
@@ -129,4 +129,33 @@ function formatEur(amount: number, locale: string): string {
     currency: "EUR",
     minimumFractionDigits: amount % 1 === 0 ? 0 : 2,
   }).format(amount);
+}
+
+export function ReportIssuePrompt({
+                                    booking,
+                                    onReportAction,
+                                  }: {
+  booking: Booking;
+  onReportAction: () => void;
+}) {
+  const t = useTranslations("bookingTracker");
+
+  return (
+    <section className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-center dark:border-slate-800 dark:bg-slate-900 sm:p-5">
+      <h3 className="text-[13.5px] font-bold text-slate-900 dark:text-white">
+        {t("delivered.reportCard.title")}
+      </h3>
+      <p className="mx-auto mt-1 max-w-xs text-[11.5px] leading-snug text-slate-500 dark:text-slate-400">
+        {t("delivered.reportCard.text")}
+      </p>
+      <button
+        type="button"
+        onClick={onReportAction}
+        className="mt-3 inline-flex min-h-[40px] items-center justify-center gap-1.5 rounded-xl border border-slate-300 bg-white px-4 text-[12.5px] font-semibold text-slate-700 transition-colors hover:border-red-300 hover:bg-red-50 hover:text-red-800 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300 dark:hover:border-red-800 dark:hover:bg-red-950/30 dark:hover:text-red-300"
+      >
+        <AlertTriangle size={13} aria-hidden="true" />
+        {t("delivered.reportCard.button")}
+      </button>
+    </section>
+  );
 }

@@ -7,7 +7,6 @@
 
 "use client";
 
-import { AlertTriangle } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import type { Booking } from "@/components/booking/booking-tracker/booking-tracker.types";
 import BookingAcceptedHeader from "../accepted/BookingAcceptedHeader";
@@ -15,7 +14,8 @@ import BookingTipList from "../../shared/BookingTipList";
 import ConfirmAllGoodCard from "./ConfirmAllGoodCard";
 import DeliveryRecapCard from "./DeliveryRecapCard";
 import PayoutCountdownCard from "./PayoutCountdownCard";
-import { DeliveredPaymentCard, RateCarrierPrompt } from "./DeliveredSideCards";
+import { DeliveredPaymentCard, RateCarrierPrompt, ReportIssuePrompt } from "./DeliveredSideCards";
+import { useRouter } from "@/i18n/navigation";
 
 type Props = {
   booking: Booking;
@@ -31,6 +31,9 @@ export default function BookingDeliveredMobile({
                                                  onConfirmedAction,
                                                }: Props) {
   const t = useTranslations("bookingTracker");
+
+  const router = useRouter();
+
   const locale = useLocale();
 
   const carrierFirstName = booking.carrier.firstName;
@@ -117,17 +120,14 @@ export default function BookingDeliveredMobile({
         <DeliveredPaymentCard booking={booking} isConfirmed={isConfirmed} />
 
         {!isConfirmed && (
-          <div className="pt-1 text-center">
-            <button
-              type="button"
-              onClick={() => console.info("[booking] report issue")}
-              className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-slate-500 hover:text-red-700 dark:text-slate-400"
-            >
-              <AlertTriangle size={13} aria-hidden="true" />
-              {t("delivered.reportShort")}
-            </button>
-          </div>
+          <ReportIssuePrompt
+            booking={booking}
+            onReportAction={() =>
+              router.push("/bookings/" + booking.id + "/report")
+            }
+          />
         )}
+
       </div>
     </div>
   );

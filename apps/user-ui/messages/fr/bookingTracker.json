@@ -203,7 +203,7 @@
     },
 
     "confirmCard": {
-      "title": "Tout s''est bien passé ?",
+      "title": "Tout s'est bien passé ?",
       "text": "Confirme que {recipientFirstName} a bien reçu son colis pour libérer {carrierFirstName} plus tôt. Tu n''as pas besoin d''attendre 3 jours si tu sais déjà que tout est OK.",
       "textShort": "Confirme la livraison pour libérer {carrierFirstName} plus tôt.",
       "button": "Confirmer la livraison",
@@ -256,9 +256,15 @@
       "button": "Donner mon avis"
     },
 
+    "reportCard": {
+      "title": "Quelque chose ne va pas avec ce colis ?",
+      "text": "Signale-le avant la fin de la période de vérification — on gèlera le paiement le temps d'examiner.",
+      "button": "Signaler un problème"
+    },
+
     "payment": {
       "stateLabel": "État",
-      "stateBlocked": "Bloqué jusqu''à J+4",
+      "stateBlocked": "Bloqué jusqu'à J+4",
       "stateReleased": "Libéré",
       "note": "Les fonds sont en attente chez Yamba. Ils seront versés à {carrierFirstName} après la période de vérification.",
       "noteReleased": "Tu as confirmé la livraison — les fonds sont en cours de versement à {carrierFirstName}."
@@ -266,6 +272,137 @@
 
     "report": "Quelque chose ne va pas avec ce colis ?",
     "reportShort": "Quelque chose ne va pas ?"
+  },
+
+  "report": {
+    "title": "Signaler un problème",
+    "subtitle": "Deal {originCity} → {destinationCity} · livré le {date}",
+    "subtitleShort": "Deal {originCity} → {destinationCity}",
+    "back": "Retour",
+
+    "banner": {
+      "title": "On est là pour t''aider",
+      "text": "Décris ce qui s''est passé, on s''occupe du reste. Pendant l''examen du dossier, le paiement de {carrierFirstName} reste bloqué.",
+      "textShort": "Décris, on s''occupe du reste. Paiement {carrierFirstName} gelé."
+    },
+
+    "h1": "Décris-nous le problème",
+    "h1Short": "Décris le problème",
+    "h1Subtitle": "Plus tu nous donnes de détails et de preuves, plus rapidement on peut trancher.",
+    "h1SubtitleShort": "Plus tu nous donnes de détails, plus vite on tranche.",
+
+    "requiredBadge": "Requis",
+    "recommendedBadge": "Recommandé",
+    "optionalBadge": "Optionnel",
+
+    "category": {
+      "title": "Quel est le problème ?",
+      "titleShort": "Quel problème ?",
+      "sub": "Choisis la situation qui correspond le mieux",
+      "NOT_DELIVERED": "Le colis n''a jamais été livré à {recipientFirstName}",
+      "NOT_DELIVERED_short": "Colis jamais livré",
+      "CONTENT_MISSING": "Contenu manquant ou différent de la déclaration",
+      "CONTENT_MISSING_short": "Contenu manquant ou différent",
+      "DAMAGED": "Colis ou contenu endommagé",
+      "DAMAGED_short": "Colis ou contenu endommagé",
+      "SIGNIFICANT_DELAY": "Délai significativement dépassé",
+      "SIGNIFICANT_DELAY_short": "Délai significativement dépassé",
+      "RECIPIENT_ISSUE": "{recipientFirstName} a un autre problème avec le voyageur",
+      "RECIPIENT_ISSUE_short": "Autre problème avec {carrierFirstName}",
+      "OTHER": "Autre problème",
+      "OTHER_short": "Autre"
+    },
+
+    "description": {
+      "title": "Raconte-nous ce qui s''est passé",
+      "titleShort": "Raconte",
+      "sub": "Sois précise : quand l''as-tu su, qui t''a contactée, ce qui manque ou ce qui ne va pas",
+      "subShort": "Quand l''as-tu su, ce qui manque ou ne va pas",
+      "placeholder": "Ex : {recipientFirstName} m''a appelée ce matin pour me dire que le pull bleu marine que j''avais déclaré n''était pas dans le colis. Un des t-shirts est aussi déchiré au col…",
+      "counterBelow": "{count} / minimum {min} caractères",
+      "counterOk": "{count} caractères ✓"
+    },
+
+    "photos": {
+      "title": "Ajoute des photos",
+      "titleShort": "Photos",
+      "sub": "Photos du contenu reçu, du dommage, ou tout ce qui peut nous aider à comprendre",
+      "subShort": "Du contenu reçu, du dommage",
+      "add": "Ajouter",
+      "remove": "Retirer cette photo",
+      "tag": "Preuve",
+      "hint": "Demande à {recipientFirstName} de te transmettre des photos si elle peut. Jusqu''à {max} photos, max 10 Mo par photo."
+    },
+
+    "outcome": {
+      "title": "Ta solution souhaitée",
+      "titleShort": "Solution souhaitée",
+      "sub": "Aide-nous à comprendre ce qui te paraît juste — on examinera ta demande",
+      "FULL_REFUND": "Remboursement intégral ({amount})",
+      "FULL_REFUND_short": "Remboursement intégral",
+      "PARTIAL_REFUND": "Remboursement partiel pour le manque/dommage",
+      "PARTIAL_REFUND_short": "Remboursement partiel",
+      "CONTACT_CARRIER": "Que Yamba contacte {carrierFirstName} pour comprendre",
+      "CONTACT_CARRIER_short": "Que Yamba contacte {carrierFirstName}",
+      "YAMBA_DECIDES": "Je laisse Yamba décider en fonction des éléments",
+      "YAMBA_DECIDES_short": "Je laisse Yamba décider"
+    },
+
+    "process": {
+      "title": "Ce qui va se passer après ton signalement",
+      "titleShort": "Et après ?",
+      "step1": "**Tu reçois un accusé sous 48h ouvrées.** Notre équipe prend ton dossier en main.",
+      "step1Short": "**Accusé sous 48h ouvrées.**",
+      "step2": "**On contacte {carrierFirstName}** pour avoir sa version des faits et lui demander ses preuves (photos prises au pickup, etc).",
+      "step2Short": "**Yamba contacte {carrierFirstName}** pour sa version.",
+      "step3": "**On tranche sous 5 jours ouvrés.** Tu reçois notre décision par email avec les détails. Si désaccord, médiation possible auprès d''un médiateur conventionnel.",
+      "step3Short": "**Décision sous 5 jours ouvrés**, médiation possible si désaccord.",
+      "step4": "**Pendant tout l''examen**, le paiement à {carrierFirstName} reste gelé. Aucun versement ne sera fait avant résolution.",
+      "step4Short": "**Paiement {carrierFirstName} gelé** pendant l''examen."
+    },
+
+    "pledge": {
+      "text": "Je déclare sur l''honneur que les informations fournies sont exactes. Je sais qu''un signalement abusif peut entraîner des conséquences contractuelles.",
+      "textShort": "Je déclare sur l''honneur que les informations fournies sont exactes.",
+      "whyLink": "Pourquoi cet engagement ?",
+      "whyText": "Le signalement gèle le paiement d''une vraie personne. Cet engagement protège les Voyageurs honnêtes — comme la Charte les engage envers ton colis."
+    },
+
+    "cta": {
+      "info": "Une fois envoyé, ton signalement ne pourra plus être modifié. Notre équipe te contactera sous 48h.",
+      "infoShort": "Une fois envoyé, ton signalement ne pourra plus être modifié.",
+      "cancel": "Annuler",
+      "submit": "Envoyer le signalement",
+      "submitShort": "Envoyer",
+      "submitting": "Envoi…",
+      "confirmTitle": "Envoyer le signalement ?",
+      "confirmText": "Le paiement de {carrierFirstName} sera gelé et notre équipe médiation prendra le relais. Cette action est irréversible.",
+      "confirmYes": "Oui, envoyer",
+      "confirmCancel": "Annuler",
+      "toastError": "Erreur lors de l''envoi. Réessaye."
+    },
+
+    "sidebar": {
+      "dealLabel": "LE DEAL CONCERNÉ",
+      "deliveredAt": "Livré le {date} à {time}",
+      "carrierLabel": "Voyageur",
+      "recipientLabel": "Destinataire",
+      "totalLabel": "Total payé",
+      "proofLabel": "PHOTOS DÉJÀ AU DOSSIER",
+      "proofDeclared": "Tu as déclaré ces photos à la réservation",
+      "proofPickup": "{carrierFirstName} a pris ces photos à la prise en charge",
+      "windowLabel": "FENÊTRE DE SIGNALEMENT",
+      "windowText": "Tu peux signaler jusqu''au {date}."
+    },
+
+    "success": {
+      "title": "Signalement envoyé",
+      "subtitle": "On prend le relais. Tu recevras un accusé de réception sous 48h ouvrées.",
+      "ticketLabel": "Numéro de dossier",
+      "frozenNote": "Le paiement de {carrierFirstName} est gelé. Aucun versement ne sera fait avant la résolution.",
+      "emailNote": "Un accusé de réception vient de t''être envoyé par email.",
+      "backToTracking": "Retour au suivi de mon envoi"
+    }
   },
 
   "error": {
