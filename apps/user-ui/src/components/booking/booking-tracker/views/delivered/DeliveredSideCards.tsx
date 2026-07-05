@@ -2,14 +2,15 @@
  * DeliveredSideCards.tsx
  * ======================
  * - DeliveredPaymentCard : TON PAIEMENT avec état Bloqué jusqu'à J+4 / Libéré
- * - RateCarrierPrompt : encart amber "Pense à noter Thomas" (teaser notation,
- *   l'écran de notation arrive dans une PR future)
+ * - RateCarrierPrompt : encart amber "Pense à noter Thomas" → /rate
+ * - ReportIssuePrompt : encart sobre "Quelque chose ne va pas ?" → /report
  */
 
 "use client";
 
 import { AlertTriangle, Star } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
+import { useRouter } from "@/i18n/navigation";
 import type { Booking } from "@/components/booking/booking-tracker/booking-tracker.types";
 
 export function DeliveredPaymentCard({
@@ -88,12 +89,11 @@ export function RateCarrierPrompt({
   compact?: boolean;
 }) {
   const t = useTranslations("bookingTracker");
+  const router = useRouter();
   const carrierFirstName = booking.carrier.firstName;
 
   const handleRate = () => {
-    // Écran de notation → PR future
-    // eslint-disable-next-line no-console
-    console.info("[booking] open rating flow for", booking.carrier.id);
+    router.push("/bookings/" + booking.id + "/rate");
   };
 
   const padding = compact ? "p-4" : "p-4 sm:p-5";
@@ -123,14 +123,6 @@ export function RateCarrierPrompt({
   );
 }
 
-function formatEur(amount: number, locale: string): string {
-  return new Intl.NumberFormat(locale === "fr" ? "fr-FR" : "en-US", {
-    style: "currency",
-    currency: "EUR",
-    minimumFractionDigits: amount % 1 === 0 ? 0 : 2,
-  }).format(amount);
-}
-
 export function ReportIssuePrompt({
                                     booking,
                                     onReportAction,
@@ -158,4 +150,12 @@ export function ReportIssuePrompt({
       </button>
     </section>
   );
+}
+
+function formatEur(amount: number, locale: string): string {
+  return new Intl.NumberFormat(locale === "fr" ? "fr-FR" : "en-US", {
+    style: "currency",
+    currency: "EUR",
+    minimumFractionDigits: amount % 1 === 0 ? 0 : 2,
+  }).format(amount);
 }

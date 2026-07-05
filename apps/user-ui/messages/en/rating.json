@@ -1,0 +1,123 @@
+{
+  "title": "Give your review",
+  "subtitle": "Deal {originCity} → {destinationCity} · completed",
+  "subtitleShort": "Deal completed",
+  "back": "Back",
+
+  "banner": {
+    "titleCARRIER": "Your Deal is complete · {amount} paid to {firstName}",
+    "titleSHIPPER": "Your Deal is complete · {amount} received on your Stripe account",
+    "titleShortCARRIER": "Deal complete · {amount} paid",
+    "titleShortSHIPPER": "Deal complete · {amount} received",
+    "subCARRIER": "Your feedback helps the community choose better partners",
+    "subSHIPPER": "Your feedback helps other Trippers choose their Shippers",
+    "subShort": "Your feedback helps the community"
+  },
+
+  "h1": {
+    "CARRIER": "How did {firstName} do?",
+    "SHIPPER": "How did {firstName} do?"
+  },
+  "h1Subtitle": {
+    "CARRIER": "Rate this traveller on what matters to you.",
+    "SHIPPER": "Rate this shipper on what matters to you."
+  },
+
+  "person": {
+    "roleCARRIER": "Tripper",
+    "roleSHIPPER": "Shipper",
+    "dealsCARRIER": "{count} deals",
+    "dealsSHIPPER": "{count} shipments"
+  },
+
+  "stars": {
+    "label": "Your overall rating",
+    "value1": "Disappointing",
+    "value2": "Average",
+    "value3": "Fair",
+    "value4": "Very good",
+    "value5": "Excellent"
+  },
+
+  "criteria": {
+    "label": "ON THESE SPECIFIC POINTS",
+    "labelShort": "SPECIFIC POINTS",
+    "PUNCTUALITY": {
+      "name": "Punctuality at the meeting",
+      "nameShort": "Punctuality",
+      "descCARRIER": "Was {firstName} on time for pickup and delivery?",
+      "descShortCARRIER": "On time at pickup and delivery?",
+      "descSHIPPER": "Was {firstName} on time at the handover point?",
+      "descShortSHIPPER": "On time at the handover point?"
+    },
+    "COMMUNICATION": {
+      "name": "Communication",
+      "nameShort": "Communication",
+      "descCARRIER": "Responsive, clear, professional?",
+      "descShortCARRIER": "Responsive, clear, professional?"
+    },
+    "PARCEL_CARE": {
+      "name": "Parcel care",
+      "nameShort": "Parcel care",
+      "descCARRIER": "Content arrived intact, well handled?",
+      "descShortCARRIER": "Content arrived intact?"
+    },
+    "DECLARATION_CLARITY": {
+      "name": "Declaration clarity",
+      "nameShort": "Declaration clarity",
+      "descSHIPPER": "Did the declared content match reality?",
+      "descShortSHIPPER": "Declaration matched reality?"
+    },
+    "RESPONSIVENESS": {
+      "name": "Responsiveness",
+      "nameShort": "Responsiveness",
+      "descSHIPPER": "Did {firstName} reply quickly to your messages?",
+      "descShortSHIPPER": "Quick replies to your messages?"
+    },
+    "thumbUp": "Good",
+    "thumbDown": "Could improve"
+  },
+
+  "comment": {
+    "label": "YOUR COMMENT",
+    "labelShort": "COMMENT",
+    "optional": "Optional · max {max} characters",
+    "optionalShort": "Optional · max {max}",
+    "placeholderCARRIER": "E.g.: {firstName} was attentive, punctual and the parcel arrived in perfect condition. I recommend!",
+    "placeholderSHIPPER": "E.g.: {firstName} was pleasant and professional, her parcel matched the description exactly.",
+    "counter": "{count} / {max}",
+    "counterWarning": "{count} / {max} — almost at the limit"
+  },
+
+  "visibility": {
+    "text": "**Your rating and comment will be public** on {ratedFirstName}''s profile, attributed to {raterName}. Once published, you can no longer edit your review.",
+    "textShort": "**Public review** on {ratedFirstName}''s profile. Not editable after publishing."
+  },
+
+  "sidebar": {
+    "publishLabel": "PUBLICATION",
+    "completedBadge": "Completed",
+    "amountPaidLabel": "Paid to your Tripper",
+    "amountReceivedLabel": "Received on your account",
+    "starsRequiredHint": "Pick your overall rating first"
+  },
+
+  "cta": {
+    "later": "Later",
+    "publish": "Publish my review",
+    "publishShort": "Publish",
+    "publishing": "Publishing…",
+    "toastError": "Error publishing. Try again."
+  },
+
+  "success": {
+    "title": "Thanks for your feedback!",
+    "subtitle": "Your review helps the whole Yamba community travel with confidence.",
+    "reciprocity": "{firstName} will also be invited to rate you. Your reviews will be revealed once both are published, or within 14 days.",
+    "backHome": "Back to home"
+  },
+
+  "error": {
+    "notFound": "This Deal doesn''t exist or can''t be rated."
+  }
+}
