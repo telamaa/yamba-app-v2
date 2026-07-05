@@ -138,4 +138,35 @@ export const mockBookingDelivered: Booking = {
   },
 };
 
+/**
+ * Mock Booking PICKED_UP en cours de voyage (écran 6) :
+ * Thomas a confirmé son arrivée à l'aéroport puis le décollage.
+ * Le vol atterrit dans ~5h. Aminata suit.
+ */
+export const mockBookingInTransit: Booking = {
+  ...mockBookingPickedUp,
+  id: "booking_mock_transit",
+
+  // Vol parti il y a ~3h, durée 8h → arrivée dans ~5h (stable à chaque reload)
+  trip: {
+    ...mockBookingPickedUp.trip,
+    departureDate: new Date(now - 3 * 60 * 60 * 1000).toISOString(),
+  },
+
+  pickup: {
+    ...mockBookingPickedUp.pickup!,
+    pickedUpAt: new Date(now - 4 * 60 * 60 * 1000).toISOString(),
+  },
+
+  trackingEvents: [
+    {
+      id: "AT_AIRPORT",
+      at: new Date(now - 3.5 * 60 * 60 * 1000).toISOString(),
+    },
+    {
+      id: "FLIGHT_DEPARTED",
+      at: new Date(now - 3 * 60 * 60 * 1000).toISOString(),
+    },
+  ],
+};
 

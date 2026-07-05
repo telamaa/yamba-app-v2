@@ -405,6 +405,86 @@
     }
   },
 
+  "senderTracking": {
+    "banner": {
+      "pickedUpTitle": "Parcel in {carrierFirstName}'s hands",
+      "pickedUpSub": "Picked up at {time} · flight at {flightHour}",
+      "atAirportTitle": "{carrierFirstName} is at the airport",
+      "atAirportSub": "Ready to board · flight at {flightHour}",
+      "inFlightTitle": "In flight to {destinationCity}",
+      "inFlightSub": "{carrierFirstName} took off at {time} · arrival expected at {arrivalHour}",
+      "landedTitle": "{carrierFirstName} has arrived in {destinationCity}",
+      "landedSub": "Landed at {time} · handover to {recipientFirstName} is coming up",
+      "arrivalIn": "In {countdown}",
+      "flightIn": "Flight in {countdown}"
+    },
+
+    "code": {
+      "title": "Your delivery code",
+      "sub": "To forward to {recipientFirstName}",
+      "reshare": "Reshare",
+      "reshareLong": "Share again with {recipientFirstName}",
+      "regenerate": "Regenerate",
+      "hint": "If you think the code leaked, regenerate it and resend it to {recipientFirstName}. The old one will be invalidated."
+    },
+
+    "timeline": {
+      "label": "TRIP STEPS",
+      "accepted": "Deal accepted by {carrierFirstName}",
+      "acceptedShort": "Deal accepted",
+      "yesterday": "Yesterday",
+      "today": "Today",
+      "pickedUp": "Parcel picked up at {location}",
+      "pickedUpShort": "Picked up at {location}",
+      "atAirport": "Arrival at {airport} airport",
+      "atAirportShort": "Arrived at {airport}",
+      "atAirportSub": "{time} · {carrierFirstName} entered the boarding area",
+      "atAirportSubShort": "{time}",
+      "atAirportPending": "Waiting for {carrierFirstName}'s confirmation",
+      "departed": "In flight to {destinationCity}",
+      "departedShort": "In flight",
+      "departedSub": "{time} · departure confirmed · {duration} flight",
+      "departedPending": "Departure expected at {hour}",
+      "arrived": "Landing in {destinationCity}",
+      "arrivedShort": "Landing {destinationCity}",
+      "arrivedSub": "{time} · {carrierFirstName} has arrived",
+      "arrivedPending": "Estimated at {hour} · {destinationCity}",
+      "delivery": "Handover to {recipientFirstName}",
+      "deliverySub": "Code to be entered by {carrierFirstName} to validate",
+      "deliverySubShort": "Code entry by {carrierFirstName}"
+    },
+
+    "communication": {
+      "label": "COMMUNICATION",
+      "carrierRole": "Your Tripper",
+      "carrierInFlight": "currently in flight",
+      "carrierTraveling": "traveling",
+      "message": "Send a message",
+      "messageShort": "Message",
+      "recipientRole": "Recipient · in {city}",
+      "call": "Call",
+      "whatsapp": "WhatsApp"
+    },
+
+    "sidebar": {
+      "parcelLabel": "THE PARCEL",
+      "parcelSummary": "{category} · {weight} kg · {value}",
+      "parcelPhotosNote": "Photos declared at booking",
+      "paymentLabel": "YOUR PAYMENT",
+      "debitedLabel": "Debited",
+      "stateLabel": "Status",
+      "stateBlocked": "Blocked until delivery",
+      "insuranceLabel": "Insurance",
+      "insuranceValue": "{amount} covered",
+      "paymentNote": "{carrierFirstName} will be paid 3 days after the delivery is validated by {recipientFirstName}.",
+      "coverageLabel": "COVERAGE",
+      "coverageTitle": "{amount} insurance active",
+      "coverageNote": "Loss, theft, breakage during transport."
+    },
+
+    "report": "Report an issue"
+  },
+
   "error": {
     "notFound": "This booking doesn''t exist or has been cancelled.",
     "generic": "An error occurred. Try again in a moment."
