@@ -68,6 +68,7 @@
     "subtitle": "Bravo, tu as remis le colis à {recipientFirstName}. {shipperFirstName} vient d''être prévenue.",
     "payoutTitle": "Ton versement arrive",
     "payoutText": "{amount} seront virés sur ton compte Stripe le {date}, après la période de vérification de 3 jours.",
+    "rateShipper": "Noter {shipperFirstName}",
     "backToDeal": "Voir le récap du Deal",
     "backToDashboard": "Retour à l''accueil"
   },

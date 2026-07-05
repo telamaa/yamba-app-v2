@@ -116,11 +116,15 @@ export default function DealDeliverClient({ dealId }: Props) {
   if (isMobile === null || !deal) return <DealSkeleton />;
 
   // Écran de succès 🎉
+  // Écran de succès 🎉
   if (deliveredAt) {
     return (
       <DeliverSuccess
         deal={deal}
         deliveredAt={deliveredAt}
+        onRateShipperAction={() =>
+          router.push("/carrier/deals/" + deal.id + "/rate")
+        }
         onBackToDealAction={handleBack}
         onBackToDashboardAction={() => router.push("/")}
       />
