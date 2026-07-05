@@ -109,6 +109,8 @@ export type Booking = {
   pickup?: BookingPickupInfo; // présent dès PICKED_UP
 
   delivery?: BookingDeliveryInfo; // présent dès DELIVERED
+
+  trackingEvents?: BookingTrackingEvent[]; // miroir des confirmations Voyageur
 };
 
 
@@ -178,3 +180,17 @@ export const DISPUTE_MIN_DESCRIPTION_LENGTH = 50;
 export const DISPUTE_MAX_PHOTOS = 5;
 
 
+// ============================================================
+// Suivi du voyage côté Expéditeur — feat/sender-tracking
+// ============================================================
+
+/** Miroir des événements confirmés par le Voyageur (philosophie A+B) */
+export type BookingTrackingEventId =
+  | "AT_AIRPORT"
+  | "FLIGHT_DEPARTED"
+  | "FLIGHT_ARRIVED";
+
+export type BookingTrackingEvent = {
+  id: BookingTrackingEventId;
+  at: string; // ISO — quand le Voyageur a confirmé
+};

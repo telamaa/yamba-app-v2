@@ -9,7 +9,12 @@
  */
 
 import { MAX_CODE_REGENERATIONS, type Booking } from "./booking-tracker.types";
-import {mockBookingAccepted, mockBookingDelivered, mockBookingPickedUp} from "./booking-tracker.state";
+import {
+  mockBookingAccepted,
+  mockBookingDelivered,
+  mockBookingInTransit,
+  mockBookingPickedUp
+} from "./booking-tracker.state";
 
 const MOCK_DELAY_MS = 600;
 
@@ -17,13 +22,16 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+
 export async function getBooking(bookingId: string): Promise<Booking> {
   await sleep(MOCK_DELAY_MS);
   const base = bookingId.includes("delivered")
     ? mockBookingDelivered
-    : bookingId.includes("picked")
-      ? mockBookingPickedUp
-      : mockBookingAccepted;
+    : bookingId.includes("transit")
+      ? mockBookingInTransit
+      : bookingId.includes("picked")
+        ? mockBookingPickedUp
+        : mockBookingAccepted;
   return { ...base, id: bookingId || base.id };
 }
 
