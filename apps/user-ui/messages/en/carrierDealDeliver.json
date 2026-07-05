@@ -68,6 +68,7 @@
     "subtitle": "Well done, you handed the parcel to {recipientFirstName}. {shipperFirstName} has just been notified.",
     "payoutTitle": "Your payout is coming",
     "payoutText": "{amount} will be transferred to your Stripe account on {date}, after the 3-day verification period.",
+    "rateShipper": "Rate {shipperFirstName}",
     "backToDeal": "View Deal recap",
     "backToDashboard": "Back to home"
   },

@@ -2,18 +2,19 @@
  * DeliverSuccess.tsx
  * ==================
  * Écran de célébration après validation du code 🎉
- * "Livraison validée !" + versement J+4 + CTAs retour.
+ * "Livraison validée !" + versement J+4 + CTA notation (primaire) + retours.
  */
 
 "use client";
 
-import { Check, PartyPopper } from "lucide-react";
+import { Check, PartyPopper, Star } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import type { DealRequest } from "@/components/carrier/deal/deal.types";
 
 type Props = {
   deal: DealRequest;
   deliveredAt: string;
+  onRateShipperAction: () => void;
   onBackToDealAction: () => void;
   onBackToDashboardAction: () => void;
 };
@@ -21,6 +22,7 @@ type Props = {
 export default function DeliverSuccess({
                                          deal,
                                          deliveredAt,
+                                         onRateShipperAction,
                                          onBackToDealAction,
                                          onBackToDashboardAction,
                                        }: Props) {
@@ -74,15 +76,23 @@ export default function DeliverSuccess({
         <div className="mt-6 space-y-2.5">
           <button
             type="button"
+            onClick={onRateShipperAction}
+            className="inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl bg-[#FF9900] px-4 text-[14px] font-bold text-slate-950 transition-colors hover:bg-[#F08700]"
+          >
+            <Star size={14} aria-hidden="true" />
+            {t("success.rateShipper", { shipperFirstName })}
+          </button>
+          <button
+            type="button"
             onClick={onBackToDealAction}
-            className="inline-flex min-h-[48px] w-full items-center justify-center rounded-xl bg-[#FF9900] px-4 text-[14px] font-bold text-slate-950 transition-colors hover:bg-[#F08700]"
+            className="inline-flex min-h-[44px] w-full items-center justify-center rounded-xl border border-slate-300 bg-white px-4 text-[13px] font-semibold text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
           >
             {t("success.backToDeal")}
           </button>
           <button
             type="button"
             onClick={onBackToDashboardAction}
-            className="inline-flex min-h-[44px] w-full items-center justify-center rounded-xl border border-slate-300 bg-white px-4 text-[13px] font-semibold text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+            className="inline-flex min-h-[42px] w-full items-center justify-center px-4 text-[12.5px] font-semibold text-slate-500 transition-colors hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
           >
             {t("success.backToDashboard")}
           </button>

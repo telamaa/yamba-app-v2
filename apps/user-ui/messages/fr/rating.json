@@ -1,0 +1,123 @@
+{
+  "title": "Donne ton avis",
+  "subtitle": "Deal {originCity} → {destinationCity} · terminé",
+  "subtitleShort": "Deal terminé",
+  "back": "Retour",
+
+  "banner": {
+    "titleCARRIER": "Ton Deal est terminé · {amount} versés à {firstName}",
+    "titleSHIPPER": "Ton Deal est terminé · {amount} reçus sur ton compte Stripe",
+    "titleShortCARRIER": "Deal terminé · {amount} versés",
+    "titleShortSHIPPER": "Deal terminé · {amount} reçus",
+    "subCARRIER": "Ton retour aide la communauté à mieux choisir ses partenaires",
+    "subSHIPPER": "Ton retour aide les autres Voyageurs à choisir leurs Expéditeurs",
+    "subShort": "Ton retour aide la communauté"
+  },
+
+  "h1": {
+    "CARRIER": "Comment {firstName} s'est-il comporté ?",
+    "SHIPPER": "Comment {firstName} s'est-elle comportée ?"
+  },
+  "h1Subtitle": {
+    "CARRIER": "Note ce voyageur sur les éléments qui comptent pour toi.",
+    "SHIPPER": "Note cette expéditrice sur les éléments qui comptent pour toi."
+  },
+
+  "person": {
+    "roleCARRIER": "Voyageur",
+    "roleSHIPPER": "Expéditrice",
+    "dealsCARRIER": "{count} deals",
+    "dealsSHIPPER": "{count} envois"
+  },
+
+  "stars": {
+    "label": "Ta note globale",
+    "value1": "Décevant",
+    "value2": "Moyen",
+    "value3": "Correct",
+    "value4": "Très bien",
+    "value5": "Excellent"
+  },
+
+  "criteria": {
+    "label": "SUR CES POINTS PRÉCIS",
+    "labelShort": "POINTS SPÉCIFIQUES",
+    "PUNCTUALITY": {
+      "name": "Ponctualité au rendez-vous",
+      "nameShort": "Ponctualité",
+      "descCARRIER": "{firstName} était-il à l'heure pour le pickup et la livraison ?",
+      "descShortCARRIER": "À l'heure au pickup et livraison ?",
+      "descSHIPPER": "{firstName} était-elle à l'heure au point de remise ?",
+      "descShortSHIPPER": "À l'heure au point de remise ?"
+    },
+    "COMMUNICATION": {
+      "name": "Communication",
+      "nameShort": "Communication",
+      "descCARRIER": "Réactif, clair, professionnel ?",
+      "descShortCARRIER": "Réactif, clair, professionnel ?"
+    },
+    "PARCEL_CARE": {
+      "name": "Soin du colis",
+      "nameShort": "Soin du colis",
+      "descCARRIER": "Contenu arrivé intact, bien manipulé ?",
+      "descShortCARRIER": "Contenu arrivé intact ?"
+    },
+    "DECLARATION_CLARITY": {
+      "name": "Clarté de la déclaration",
+      "nameShort": "Clarté de la déclaration",
+      "descSHIPPER": "Le contenu déclaré correspondait-il à la réalité ?",
+      "descShortSHIPPER": "Déclaration conforme à la réalité ?"
+    },
+    "RESPONSIVENESS": {
+      "name": "Réactivité",
+      "nameShort": "Réactivité",
+      "descSHIPPER": "{firstName} a-t-elle répondu rapidement à tes messages ?",
+      "descShortSHIPPER": "Réponses rapides à tes messages ?"
+    },
+    "thumbUp": "Bien",
+    "thumbDown": "À améliorer"
+  },
+
+  "comment": {
+    "label": "TON COMMENTAIRE",
+    "labelShort": "COMMENTAIRE",
+    "optional": "Optionnel · max {max} caractères",
+    "optionalShort": "Optionnel · max {max}",
+    "placeholderCARRIER": "Ex : {firstName} a été super à l'écoute, ponctuel et le colis est arrivé en parfait état. Je recommande !",
+    "placeholderSHIPPER": "Ex : {firstName} a été agréable et professionnelle, son colis correspondait exactement à la description.",
+    "counter": "{count} / {max}",
+    "counterWarning": "{count} / {max} — bientôt la limite"
+  },
+
+  "visibility": {
+    "text": "**Ta note et ton commentaire seront publics** sur le profil de {ratedFirstName}, attribués à {raterName}. Une fois publié, tu ne pourras plus modifier ton avis.",
+    "textShort": "**Note publique** sur le profil de {ratedFirstName}. Pas modifiable après publication."
+  },
+
+  "sidebar": {
+    "publishLabel": "PUBLICATION",
+    "completedBadge": "Terminé",
+    "amountPaidLabel": "Versé à ton Voyageur",
+    "amountReceivedLabel": "Reçu sur ton compte",
+    "starsRequiredHint": "Choisis d'abord ta note globale"
+  },
+
+  "cta": {
+    "later": "Plus tard",
+    "publish": "Publier mon avis",
+    "publishShort": "Publier",
+    "publishing": "Publication…",
+    "toastError": "Erreur lors de la publication. Réessaye."
+  },
+
+  "success": {
+    "title": "Merci pour ton retour !",
+    "subtitle": "Ton avis aide toute la communauté Yamba à voyager en confiance.",
+    "reciprocity": "{firstName} recevra aussi une invitation à te noter. Vos avis seront révélés une fois les deux publiés, ou sous 14 jours.",
+    "backHome": "Retour à l'accueil"
+  },
+
+  "error": {
+    "notFound": "Ce Deal n'existe pas ou ne peut pas être noté."
+  }
+}
