@@ -405,6 +405,86 @@
     }
   },
 
+  "senderTracking": {
+    "banner": {
+      "pickedUpTitle": "Colis entre les mains de {carrierFirstName}",
+      "pickedUpSub": "Pris en charge à {time} · vol prévu à {flightHour}",
+      "atAirportTitle": "{carrierFirstName} est à l'aéroport",
+      "atAirportSub": "Prêt à embarquer · vol prévu à {flightHour}",
+      "inFlightTitle": "En vol vers {destinationCity}",
+      "inFlightSub": "{carrierFirstName} a décollé à {time} · arrivée prévue à {arrivalHour}",
+      "landedTitle": "{carrierFirstName} est arrivé à {destinationCity}",
+      "landedSub": "Atterri à {time} · la remise à {recipientFirstName} approche",
+      "arrivalIn": "Dans {countdown}",
+      "flightIn": "Vol dans {countdown}"
+    },
+
+    "code": {
+      "title": "Ton code de livraison",
+      "sub": "À transmettre à {recipientFirstName}",
+      "reshare": "Repartager",
+      "reshareLong": "Partager à nouveau avec {recipientFirstName}",
+      "regenerate": "Régénérer",
+      "hint": "Si tu penses que le code a fuité, régénère-le et retransmets-le à {recipientFirstName}. L'ancien sera invalidé."
+    },
+
+    "timeline": {
+      "label": "ÉTAPES DU VOYAGE",
+      "accepted": "Deal accepté par {carrierFirstName}",
+      "acceptedShort": "Deal accepté",
+      "yesterday": "Hier",
+      "today": "Aujourd'hui",
+      "pickedUp": "Colis pris en charge à {location}",
+      "pickedUpShort": "Pris en charge à {location}",
+      "atAirport": "Arrivée à l'aéroport {airport}",
+      "atAirportShort": "Arrivée à {airport}",
+      "atAirportSub": "{time} · {carrierFirstName} est entré dans la zone d'embarquement",
+      "atAirportSubShort": "{time}",
+      "atAirportPending": "En attente de confirmation de {carrierFirstName}",
+      "departed": "En vol vers {destinationCity}",
+      "departedShort": "En vol",
+      "departedSub": "{time} · décollage confirmé · vol de {duration}",
+      "departedPending": "Décollage prévu à {hour}",
+      "arrived": "Atterrissage à {destinationCity}",
+      "arrivedShort": "Atterrissage {destinationCity}",
+      "arrivedSub": "{time} · {carrierFirstName} est arrivé",
+      "arrivedPending": "Estimé à {hour} · {destinationCity}",
+      "delivery": "Remise à {recipientFirstName}",
+      "deliverySub": "Code à saisir par {carrierFirstName} pour valider",
+      "deliverySubShort": "Saisie du code par {carrierFirstName}"
+    },
+
+    "communication": {
+      "label": "COMMUNICATION",
+      "carrierRole": "Ton Voyageur",
+      "carrierInFlight": "en vol actuellement",
+      "carrierTraveling": "en voyage",
+      "message": "Envoyer un message",
+      "messageShort": "Message",
+      "recipientRole": "Destinataire · à {city}",
+      "call": "Appeler",
+      "whatsapp": "WhatsApp"
+    },
+
+    "sidebar": {
+      "parcelLabel": "LE COLIS",
+      "parcelSummary": "{category} · {weight} kg · {value}",
+      "parcelPhotosNote": "Photos déclarées à la réservation",
+      "paymentLabel": "TON PAIEMENT",
+      "debitedLabel": "Débité",
+      "stateLabel": "État",
+      "stateBlocked": "Bloqué jusqu'à livraison",
+      "insuranceLabel": "Assurance",
+      "insuranceValue": "{amount} couverts",
+      "paymentNote": "{carrierFirstName} sera payé 3 jours après la livraison validée par {recipientFirstName}.",
+      "coverageLabel": "COUVERTURE",
+      "coverageTitle": "Assurance {amount} souscrite",
+      "coverageNote": "Perte, vol, casse pendant le transport."
+    },
+
+    "report": "Signaler un problème"
+  },
+
   "error": {
     "notFound": "Cette réservation n''existe pas ou a été annulée.",
     "generic": "Une erreur est survenue. Réessaye dans un instant."

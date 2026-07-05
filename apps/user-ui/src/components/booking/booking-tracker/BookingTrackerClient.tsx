@@ -26,6 +26,8 @@ import BookingPickedUpDesktop from "./views/picked-up/BookingPickedUpDesktop";
 import BookingPickedUpMobile from "./views/picked-up/BookingPickedUpMobile";
 import BookingDeliveredDesktop from "./views/delivered/BookingDeliveredDesktop";
 import BookingDeliveredMobile from "./views/delivered/BookingDeliveredMobile";
+import BookingInTransitDesktop from "./views/in-transit/BookingInTransitDesktop";
+import BookingInTransitMobile from "./views/in-transit/BookingInTransitMobile";
 
 type Props = {
   bookingId: string;
@@ -123,6 +125,26 @@ export default function BookingTrackerClient({ bookingId }: Props) {
   }
 
   if (booking.status === "PICKED_UP") {
+    // Écran 6 (voyage en cours) si le Voyageur a confirmé des événements,
+    // sinon écran 4 (code fraîchement révélé, priorité à la transmission)
+    const hasTrackingEvents = (booking.trackingEvents ?? []).length > 0;
+
+    if (hasTrackingEvents) {
+      return isMobile ? (
+        <BookingInTransitMobile
+          booking={booking}
+          onCloseAction={handleClose}
+          onCodeRegeneratedAction={handleCodeRegenerated}
+        />
+      ) : (
+        <BookingInTransitDesktop
+          booking={booking}
+          onCloseAction={handleClose}
+          onCodeRegeneratedAction={handleCodeRegenerated}
+        />
+      );
+    }
+
     return isMobile ? (
       <BookingPickedUpMobile
         booking={booking}
