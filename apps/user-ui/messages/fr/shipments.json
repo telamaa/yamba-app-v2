@@ -1,0 +1,85 @@
+{
+  "title": "Mes envois",
+  "subtitle": "{ongoing, plural, =0 {Aucun envoi en cours} =1 {1 envoi en cours} other {# envois en cours}} · {done, plural, =1 {1 terminé} other {# terminés}}",
+  "newShipment": "Nouvel envoi",
+  "filters": {
+    "all": "Tous",
+    "action": "À traiter",
+    "ongoing": "En cours",
+    "done": "Terminés"
+  },
+  "groups": {
+    "action": "À traiter",
+    "ongoing": "En cours",
+    "done": "Historique"
+  },
+  "badge": {
+    "pending": "En attente · encore {remaining}",
+    "accepted": "Accepté par {firstName}",
+    "codeToShare": "Code à transmettre",
+    "atAirport": "À l'aéroport",
+    "inFlight": "✈ En vol · atterrit dans ~{remaining}",
+    "landed": "Arrivé à destination",
+    "verification": "Vérification · auto dans {remaining}",
+    "completedUnrated": "Terminé",
+    "completedRated": "Livré ✓",
+    "disputed": "Litige {ticket} · examen en cours",
+    "expired": "Expirée",
+    "declined": "Refusée",
+    "cancelled": "Annulée"
+  },
+  "sub": {
+    "pending": "{category} · {weight} · demande envoyée {when}",
+    "accepted": "{category} · {weight} · pickup {when} · {location}",
+    "codeToShare": "{category} · {weight} · pris en charge {when}",
+    "transit": "{category} · {weight} · {lastStep}",
+    "verification": "Livré à {recipientFirstName} {when} · code validé par {carrierFirstName}",
+    "completedUnrated": "{category} · {weight} · versement effectué à {firstName}",
+    "completedRated": "Livré le {date} · tu as noté {firstName} ★ {stars}",
+    "disputed": "{category} · {weight} · réponse de Yamba sous 48 h ouvrées",
+    "expired": "Expirée le {date} · remboursée intégralement",
+    "declined": "Refusée le {date} · remboursée intégralement",
+    "cancelled": "Annulée le {date}"
+  },
+  "trackingSteps": {
+    "AT_AIRPORT": "arrivé à l'aéroport",
+    "FLIGHT_DEPARTED": "décollage confirmé",
+    "FLIGHT_ARRIVED": "atterrissage confirmé"
+  },
+  "roles": {
+    "yourCarrier": "Ton Voyageur",
+    "requested": "Voyageur sollicité",
+    "inFlight": "En vol actuellement",
+    "noReply": "Sans réponse"
+  },
+  "cta": {
+    "transmitCode": "Transmettre le code",
+    "verify": "Vérifier la livraison",
+    "rate": "Noter {firstName}",
+    "viewRequest": "Voir la demande",
+    "prepare": "Préparer le colis",
+    "follow": "Suivre le colis",
+    "viewCase": "Voir le dossier",
+    "recap": "Récap",
+    "details": "Détails"
+  },
+  "categories": {
+    "CLOTHES": "Vêtements",
+    "SHOES": "Chaussures",
+    "COSMETICS": "Cosmétiques",
+    "BOOKS": "Livres",
+    "ELECTRONICS_SMALL": "Électronique",
+    "DOCUMENTS": "Documents",
+    "FOOD_DRY": "Alimentaire sec",
+    "GIFTS": "Cadeaux",
+    "CHECKED_BAG_23KG": "Bagage soute 23 kg",
+    "CABIN_BAG_12KG": "Bagage cabine 12 kg",
+    "OTHER": "Autre"
+  },
+  "empty": {
+    "title": "Aucun envoi pour l'instant",
+    "subtitle": "Trouve un Voyageur sur ta route et envoie ton premier colis.",
+    "cta": "Chercher un trajet"
+  },
+  "loadError": "Impossible de charger tes envois. Réessaie dans un instant."
+}
