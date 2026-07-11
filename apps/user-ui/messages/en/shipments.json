@@ -1,0 +1,85 @@
+{
+  "title": "My shipments",
+  "subtitle": "{ongoing, plural, =0 {No active shipment} =1 {1 active shipment} other {# active shipments}} · {done, plural, =1 {1 completed} other {# completed}}",
+  "newShipment": "New shipment",
+  "filters": {
+    "all": "All",
+    "action": "To handle",
+    "ongoing": "In progress",
+    "done": "Completed"
+  },
+  "groups": {
+    "action": "To handle",
+    "ongoing": "In progress",
+    "done": "History"
+  },
+  "badge": {
+    "pending": "Awaiting reply · {remaining} left",
+    "accepted": "Accepted by {firstName}",
+    "codeToShare": "Code to share",
+    "atAirport": "At the airport",
+    "inFlight": "✈ In flight · lands in ~{remaining}",
+    "landed": "Arrived at destination",
+    "verification": "Verification · auto in {remaining}",
+    "completedUnrated": "Completed",
+    "completedRated": "Delivered ✓",
+    "disputed": "Dispute {ticket} · under review",
+    "expired": "Expired",
+    "declined": "Declined",
+    "cancelled": "Cancelled"
+  },
+  "sub": {
+    "pending": "{category} · {weight} · request sent {when}",
+    "accepted": "{category} · {weight} · pickup {when} · {location}",
+    "codeToShare": "{category} · {weight} · picked up {when}",
+    "transit": "{category} · {weight} · {lastStep}",
+    "verification": "Delivered to {recipientFirstName} {when} · code validated by {carrierFirstName}",
+    "completedUnrated": "{category} · {weight} · payout sent to {firstName}",
+    "completedRated": "Delivered on {date} · you rated {firstName} ★ {stars}",
+    "disputed": "{category} · {weight} · Yamba will reply within 48 business hours",
+    "expired": "Expired on {date} · fully refunded",
+    "declined": "Declined on {date} · fully refunded",
+    "cancelled": "Cancelled on {date}"
+  },
+  "trackingSteps": {
+    "AT_AIRPORT": "arrived at the airport",
+    "FLIGHT_DEPARTED": "takeoff confirmed",
+    "FLIGHT_ARRIVED": "landing confirmed"
+  },
+  "roles": {
+    "yourCarrier": "Your Tripper",
+    "requested": "Tripper requested",
+    "inFlight": "Currently in flight",
+    "noReply": "No reply"
+  },
+  "cta": {
+    "transmitCode": "Share the code",
+    "verify": "Verify delivery",
+    "rate": "Rate {firstName}",
+    "viewRequest": "View request",
+    "prepare": "Prepare the parcel",
+    "follow": "Track parcel",
+    "viewCase": "View case",
+    "recap": "Recap",
+    "details": "Details"
+  },
+  "categories": {
+    "CLOTHES": "Clothes",
+    "SHOES": "Shoes",
+    "COSMETICS": "Cosmetics",
+    "BOOKS": "Books",
+    "ELECTRONICS_SMALL": "Small electronics",
+    "DOCUMENTS": "Documents",
+    "FOOD_DRY": "Dry food",
+    "GIFTS": "Gifts",
+    "CHECKED_BAG_23KG": "Checked bag 23 kg",
+    "CABIN_BAG_12KG": "Cabin bag 12 kg",
+    "OTHER": "Other"
+  },
+  "empty": {
+    "title": "No shipments yet",
+    "subtitle": "Find a Tripper on your route and send your first parcel.",
+    "cta": "Search trips"
+  },
+  "loadError": "Could not load your shipments. Please try again shortly."
+}
