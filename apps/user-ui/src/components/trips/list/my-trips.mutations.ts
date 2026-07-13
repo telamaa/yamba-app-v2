@@ -1,0 +1,91 @@
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import apiClient from "@/lib/api-client";
+
+/**
+ * Mutations trajets extraites de MyTripsTable (legacy) pour être
+ * partagées avec MyTripsList. Les hooks pause/resume/cancel/restore
+ * vivent déjà dans @/hooks/useTrip.
+ */
+
+export function useDeleteTrip() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (tripId: string) => {
+      await apiClient.delete(`/trips/${tripId}`, {
+        params: { hard: true },
+        requireAuth: true,
+      });
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["my-trips"] });
+    },
+  });
+}
+
+export function useDuplicateTrip() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (tripId: string) => {
+      const res = await apiClient.get(`/trips/${tripId}`, { requireAuth: true });
+      const o = res.data.trip;
+      await apiClient.post(
+        "/trips",
+        {
+          transportMode: o.transportMode,
+          tripType: o.tripType,
+          originLabel: o.originLabel,
+          originPlaceId: o.originPlaceId,
+          originCity: o.originCity,
+          originRegion: o.originRegion,
+          originCountry: o.originCountry,
+          originLat: o.originLat,
+          originLng: o.originLng,
+          destinationLabel: o.destinationLabel,
+          destinationPlaceId: o.destinationPlaceId,
+          destinationCity: o.destinationCity,
+          destinationRegion: o.destinationRegion,
+          destinationCountry: o.destinationCountry,
+          destinationLat: o.destinationLat,
+          destinationLng: o.destinationLng,
+          acceptedCategories: o.acceptedCategories,
+          categoryConditions: o.categoryConditions,
+          handDeliveryOnly: o.handDeliveryOnly,
+          instantBooking: o.instantBooking,
+          currencyCode: o.currencyCode,
+          notes: o.notes,
+          publish: false,
+        },
+        { requireAuth: true }
+      );
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["my-trips"] });
+    },
+  });
+}
+
+/** DRAFT → PUBLISHED */
+export function useActivateTrip() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (tripId: string) => {
+      await apiClient.post(`/trips/${tripId}/publish`, {}, { requireAuth: true });
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["my-trips"] });
+    },
+  });
+}
+
+/** PUBLISHED/PAUSED → DRAFT */
+export function useRevertToDraft() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (tripId: string) => {
+      await apiClient.post(`/trips/${tripId}/unpublish`, {}, { requireAuth: true });
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["my-trips"] });
+    },
+  });
+}

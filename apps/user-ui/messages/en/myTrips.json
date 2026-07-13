@@ -1,0 +1,102 @@
+{
+  "title": "My trips",
+  "subtitle": "{upcoming, plural, =0 {No upcoming trip} =1 {1 upcoming trip} other {# upcoming trips}} · {actions, plural, =0 {nothing to handle} =1 {1 pending action} other {# pending actions}} · {earnings} coming",
+  "publishTrip": "Publish a trip",
+  "groups": {
+    "actions": "To handle",
+    "upcoming": "Upcoming trips",
+    "inProgress": "In progress",
+    "history": "History"
+  },
+  "action": {
+    "respondTitle": "Request from {firstName}",
+    "pickupTitle": "Pickup with {firstName}",
+    "deliverTitle": "Handover to {recipientFirstName}",
+    "rateTitle": "Rate your Shipper {firstName}",
+    "respondSub": "{category} · {weight} · you earn {earnings} · received {when}",
+    "pickupSub": "Meet {when} · {location} · checklist + photos at handover",
+    "deliverSub": "{shipperFirstName}''s parcel · ask {recipientFirstName} for the code · {earnings} paid at D+4",
+    "rateSub": "{category} · {weight} · delivered on {date}",
+    "tripMeta": "{origin} → {destination} · {date}",
+    "tripMetaToday": "{origin} → {destination} · today",
+    "tripMetaPast": "{destination} · trip of {date}"
+  },
+  "actionBadge": {
+    "expiresIn": "Expires in {remaining}",
+    "todayAt": "Today {time}",
+    "meetingAt": "{date}",
+    "readyToDeliver": "Ready to deliver",
+    "toRate": "To rate"
+  },
+  "actionCta": {
+    "respond": "Respond",
+    "pickup": "Do the pickup",
+    "deliver": "Enter the code",
+    "rate": "Rate {firstName}"
+  },
+  "trip": {
+    "statusPublished": "Published",
+    "statusDeparted": "In flight",
+    "statusArrived": "Arrived",
+    "statusCompleted": "Completed",
+    "statusCancelled": "Cancelled",
+    "metaUpcoming": "{date} · {flight} · {remaining} left of {capacity}",
+    "metaArrived": "trip of {date} · landed at {time} · {toDeliver, plural, =1 {1 parcel to deliver} other {# parcels to deliver}}",
+    "flightDirect": "direct flight {hours} h",
+    "flightStops": "{stops, plural, =1 {1 stop} other {# stops}}",
+    "kpiDeals": "deals",
+    "kpiDealsRequest": "deals · request",
+    "kpiDealActive": "active deal",
+    "kpiEarningsConfirmed": "confirmed earnings",
+    "kpiEarningsUpcoming": "coming at D+4",
+    "kpiEarnings": "earnings",
+    "views": "{count, plural, =1 {1 view} other {# views}}",
+    "publishedAgo": "published {when}",
+    "share": "Share",
+    "edit": "Edit",
+    "recap": "Recap",
+    "emptyDeals": "No request yet · {views, plural, =1 {1 view} other {# views}}. Share your trip to make it visible.",
+    "shareTrip": "Share the trip"
+  },
+  "deal": {
+    "pendingSub": "Request awaiting your reply · expires in {remaining}",
+    "acceptedSub": "Accepted · pickup {when} · {location}",
+    "pickedUpSub": "Picked up · in transit",
+    "readySub": "{recipientFirstName} is waiting · ask for the 6-digit code",
+    "deliveredSub": "Delivered · Shipper verification in progress",
+    "completedRatedSub": "Delivered to {recipientFirstName} · {earnings} paid out",
+    "completedUnratedSub": "Delivered to {recipientFirstName} · remember to rate {firstName}",
+    "line": "{firstName} {lastInitial} · {category} · {weight}",
+    "lineWithRecipient": "{firstName} {lastInitial} · {category} · {weight} → {recipientFirstName}",
+    "badgePending": "Request",
+    "badgeAccepted": "Accepted",
+    "badgeInTransit": "In transit",
+    "badgeReady": "Ready to deliver",
+    "badgeDelivered": "Delivered",
+    "badgeCompleted": "Completed",
+    "badgeDisputed": "Dispute"
+  },
+  "historyRow": {
+    "title": "{origin} → {destination} · {date}",
+    "sub": "{delivered, plural, =1 {1 parcel delivered} other {# parcels delivered}} · {earnings} paid out"
+  },
+  "empty": {
+    "title": "No trips published",
+    "subtitle": "Publish your first trip and monetize your spare luggage kilos.",
+    "cta": "Publish a trip"
+  },
+  "categories": {
+    "CLOTHES": "Clothes",
+    "SHOES": "Shoes",
+    "COSMETICS": "Cosmetics",
+    "BOOKS": "Books",
+    "ELECTRONICS_SMALL": "Small electronics",
+    "DOCUMENTS": "Documents",
+    "FOOD_DRY": "Dry food",
+    "GIFTS": "Gifts",
+    "CHECKED_BAG_23KG": "Checked bag 23 kg",
+    "CABIN_BAG_12KG": "Cabin bag 12 kg",
+    "OTHER": "Other"
+  },
+  "loadError": "Could not load your trips. Please try again shortly."
+}

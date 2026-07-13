@@ -8,7 +8,7 @@ import SectionHeader from "@/components/dashboard/SectionHeader";
 import { EmptyState } from "@/components/dashboard/DashboardUI";
 import ShipmentRow from "./ShipmentRow";
 import ShipmentsSkeleton from "./ShipmentsSkeleton";
-import { getMyShipments } from "./shipments.api";
+import { getMyShipments, getMyShipmentsPreview } from "./shipments.api";
 import {
   getShipmentPresentation,
   type ShipmentGroup,
@@ -25,7 +25,11 @@ const GROUP_DOT_CLASSES: Record<ShipmentGroup, string> = {
   done: "bg-slate-300 dark:bg-slate-600",
 };
 
-export default function ShipmentsClient() {
+export default function ShipmentsClient({
+                                          source = "live",
+                                        }: {
+  source?: "live" | "preview";
+}) {
   const t = useTranslations("shipments");
   const router = useRouter();
 
@@ -38,7 +42,7 @@ export default function ShipmentsClient() {
   useEffect(() => {
     let cancelled = false;
     setLoadError(false);
-    getMyShipments()
+    (source === "preview" ? getMyShipmentsPreview() : getMyShipments())
       .then((data) => {
         if (!cancelled) setItems(data);
       })
@@ -48,7 +52,7 @@ export default function ShipmentsClient() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [source]);
 
   /* Tick 60s pour les countdowns (jamais plus fréquent) */
   useEffect(() => {
