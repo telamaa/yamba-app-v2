@@ -1,0 +1,38 @@
+{
+  "greeting": "Bonjour {firstName} 👋",
+  "greetingAnonymous": "Bonjour 👋",
+  "subtitleActions": "{count, plural, =1 {1 action t''attend} other {# actions t''attendent}}",
+  "subtitleEmpty": "Tout est à jour, rien à traiter.",
+  "groups": {
+    "actions": "À traiter",
+    "trips": "Tes trajets"
+  },
+  "liveTrip": {
+    "finalizeDraftTitle": "Finalise ton brouillon",
+    "resumePausedTitle": "Ton trajet est en pause",
+    "demandsTitle": "{count, plural, =1 {1 demande en attente} other {# demandes en attente}}",
+    "finalizeDraftSub": "{origin} → {destination} · active-le pour recevoir des demandes",
+    "resumePausedSub": "{origin} → {destination} · réactive-le pour redevenir visible",
+    "demandsSub": "{origin} → {destination} · réponds avant l''expiration des 24 h",
+    "badgeDraft": "Brouillon",
+    "badgePaused": "En pause",
+    "badgeDemands": "À répondre",
+    "ctaActivate": "Activer",
+    "ctaResume": "Reprendre",
+    "ctaRespond": "Voir les demandes"
+  },
+  "empty": {
+    "title": "Rien à traiter pour l'instant",
+    "subtitle": "Publie un trajet ou envoie un colis — tout ce qui demande ton attention apparaîtra ici."
+  },
+  "quickLinks": {
+    "title": "Raccourcis",
+    "createTrip": "Créer un trajet",
+    "myShipments": "Mes envois",
+    "myTrips": "Mes trajets",
+    "messages": "Messages",
+    "wallet": "Portefeuille",
+    "profile": "Mon profil"
+  },
+  "loadError": "Impossible de charger ton activité. Réessaie dans un instant."
+}

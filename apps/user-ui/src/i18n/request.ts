@@ -28,6 +28,7 @@ export default getRequestConfig(async ({ requestLocale }) => {
     rating, // ✨ NEW rating
     shipments, // ✨ NEW dashboard Mes envois
     myTrips, // ✨ NEW dashboard Mes trajets
+    dashboardHome, // ✨ NEW dashboard home inbox
   ] = await Promise.all([
     import(`../../messages/${locale}/common.json`),
     import(`../../messages/${locale}/home.json`),
@@ -50,6 +51,7 @@ export default getRequestConfig(async ({ requestLocale }) => {
     import(`../../messages/${locale}/rating.json`), // ✨ NEW rating
     import(`../../messages/${locale}/shipments.json`), // ✨ NEW dashboard Mes envois
     import(`../../messages/${locale}/myTrips.json`), // ✨ NEW dashboard Mes trajets
+    import(`../../messages/${locale}/dashboardHome.json`), // ✨ NEW dashboard home inbox
   ]);
   return {
     locale,
@@ -75,6 +77,7 @@ export default getRequestConfig(async ({ requestLocale }) => {
       rating: rating.default, // ✨ NEW rating
       shipments: shipments.default, // ✨ NEW dashboard Mes envois
       myTrips: myTrips.default, // ✨ NEW dashboard Mes trajets
+      dashboardHome: dashboardHome.default, // ✨ NEW dashboard home inbox
     },
   };
 });
