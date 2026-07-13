@@ -27,6 +27,7 @@ export default getRequestConfig(async ({ requestLocale }) => {
     carrierDealDeliver, // ✨ NEW deliver
     rating, // ✨ NEW rating
     shipments, // ✨ NEW dashboard Mes envois
+    myTrips, // ✨ NEW dashboard Mes trajets
   ] = await Promise.all([
     import(`../../messages/${locale}/common.json`),
     import(`../../messages/${locale}/home.json`),
@@ -48,6 +49,7 @@ export default getRequestConfig(async ({ requestLocale }) => {
     import(`../../messages/${locale}/carrierDealDeliver.json`), // ✨ NEW deliver
     import(`../../messages/${locale}/rating.json`), // ✨ NEW rating
     import(`../../messages/${locale}/shipments.json`), // ✨ NEW dashboard Mes envois
+    import(`../../messages/${locale}/myTrips.json`), // ✨ NEW dashboard Mes trajets
   ]);
   return {
     locale,
@@ -72,6 +74,7 @@ export default getRequestConfig(async ({ requestLocale }) => {
       carrierDealDeliver: carrierDealDeliver.default, // ✨ NEW deliver
       rating: rating.default, // ✨ NEW rating
       shipments: shipments.default, // ✨ NEW dashboard Mes envois
+      myTrips: myTrips.default, // ✨ NEW dashboard Mes trajets
     },
   };
 });
