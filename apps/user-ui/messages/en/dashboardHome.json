@@ -1,0 +1,38 @@
+{
+  "greeting": "Hello {firstName} 👋",
+  "greetingAnonymous": "Hello 👋",
+  "subtitleActions": "{count, plural, =1 {1 action awaits you} other {# actions await you}}",
+  "subtitleEmpty": "All caught up, nothing to handle.",
+  "groups": {
+    "actions": "To handle",
+    "trips": "Your trips"
+  },
+  "liveTrip": {
+    "finalizeDraftTitle": "Finish your draft",
+    "resumePausedTitle": "Your trip is paused",
+    "demandsTitle": "{count, plural, =1 {1 pending request} other {# pending requests}}",
+    "finalizeDraftSub": "{origin} → {destination} · activate it to receive requests",
+    "resumePausedSub": "{origin} → {destination} · resume it to become visible again",
+    "demandsSub": "{origin} → {destination} · reply before the 24 h window expires",
+    "badgeDraft": "Draft",
+    "badgePaused": "Paused",
+    "badgeDemands": "To answer",
+    "ctaActivate": "Activate",
+    "ctaResume": "Resume",
+    "ctaRespond": "View requests"
+  },
+  "empty": {
+    "title": "Nothing to handle right now",
+    "subtitle": "Publish a trip or send a parcel — anything needing your attention will show up here."
+  },
+  "quickLinks": {
+    "title": "Shortcuts",
+    "createTrip": "Create a trip",
+    "myShipments": "My shipments",
+    "myTrips": "My trips",
+    "messages": "Messages",
+    "wallet": "Wallet",
+    "profile": "My profile"
+  },
+  "loadError": "Could not load your activity. Please try again shortly."
+}
