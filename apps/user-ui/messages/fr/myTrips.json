@@ -1,0 +1,102 @@
+{
+  "title": "Mes trajets",
+  "subtitle": "{upcoming, plural, =0 {Aucun trajet à venir} =1 {1 trajet à venir} other {# trajets à venir}} · {actions, plural, =0 {rien à traiter} =1 {1 action en attente} other {# actions en attente}} · {earnings} à venir",
+  "publishTrip": "Publier un trajet",
+  "groups": {
+    "actions": "À traiter",
+    "upcoming": "Trajets à venir",
+    "inProgress": "En cours",
+    "history": "Historique"
+  },
+  "action": {
+    "respondTitle": "Demande de {firstName}",
+    "pickupTitle": "Pickup avec {firstName}",
+    "deliverTitle": "Remise à {recipientFirstName}",
+    "rateTitle": "Note ton Expéditrice {firstName}",
+    "respondSub": "{category} · {weight} · tu gagnes {earnings} · reçue {when}",
+    "pickupSub": "RDV {when} · {location} · checklist + photos à la remise",
+    "deliverSub": "Colis de {shipperFirstName} · demande le code à {recipientFirstName} · {earnings} versés à J+4",
+    "rateSub": "{category} · {weight} · livré le {date}",
+    "tripMeta": "{origin} → {destination} · {date}",
+    "tripMetaToday": "{origin} → {destination} · aujourd'hui",
+    "tripMetaPast": "{destination} · trajet du {date}"
+  },
+  "actionBadge": {
+    "expiresIn": "Expire dans {remaining}",
+    "todayAt": "Aujourd'hui {time}",
+    "meetingAt": "{date}",
+    "readyToDeliver": "Prêt à livrer",
+    "toRate": "À noter"
+  },
+  "actionCta": {
+    "respond": "Répondre",
+    "pickup": "Faire le pickup",
+    "deliver": "Saisir le code",
+    "rate": "Noter {firstName}"
+  },
+  "trip": {
+    "statusPublished": "Publié",
+    "statusDeparted": "En vol",
+    "statusArrived": "Arrivé",
+    "statusCompleted": "Terminé",
+    "statusCancelled": "Annulé",
+    "metaUpcoming": "{date} · {flight} · reste {remaining} sur {capacity}",
+    "metaArrived": "trajet du {date} · atterri à {time} · {toDeliver, plural, =1 {1 colis à remettre} other {# colis à remettre}}",
+    "flightDirect": "vol direct {hours} h",
+    "flightStops": "{stops, plural, =1 {1 escale} other {# escales}}",
+    "kpiDeals": "deals",
+    "kpiDealsRequest": "deals · demande",
+    "kpiDealActive": "deal actif",
+    "kpiEarningsConfirmed": "gains confirmés",
+    "kpiEarningsUpcoming": "à venir J+4",
+    "kpiEarnings": "gains",
+    "views": "{count, plural, =1 {1 vue} other {# vues}}",
+    "publishedAgo": "publié {when}",
+    "share": "Partager",
+    "edit": "Modifier",
+    "recap": "Récap",
+    "emptyDeals": "Aucune demande pour l'instant · {views, plural, =1 {1 vue} other {# vues}}. Partage ton trajet pour le rendre visible.",
+    "shareTrip": "Partager le trajet"
+  },
+  "deal": {
+    "pendingSub": "Demande en attente de ta réponse · expire dans {remaining}",
+    "acceptedSub": "Accepté · pickup {when} · {location}",
+    "pickedUpSub": "Pris en charge · en transit",
+    "readySub": "{recipientFirstName} t'attend · demande-lui le code à 6 chiffres",
+    "deliveredSub": "Livré · vérification en cours côté Expéditeur",
+    "completedRatedSub": "Livré à {recipientFirstName} · {earnings} versés",
+    "completedUnratedSub": "Livré à {recipientFirstName} · pense à noter {firstName}",
+    "line": "{firstName} {lastInitial} · {category} · {weight}",
+    "lineWithRecipient": "{firstName} {lastInitial} · {category} · {weight} → {recipientFirstName}",
+    "badgePending": "Demande",
+    "badgeAccepted": "Accepté",
+    "badgeInTransit": "En transit",
+    "badgeReady": "Prêt à livrer",
+    "badgeDelivered": "Livré",
+    "badgeCompleted": "Terminé",
+    "badgeDisputed": "Litige"
+  },
+  "historyRow": {
+    "title": "{origin} → {destination} · {date}",
+    "sub": "{delivered, plural, =1 {1 colis livré} other {# colis livrés}} · {earnings} versés"
+  },
+  "empty": {
+    "title": "Aucun trajet publié",
+    "subtitle": "Publie ton premier trajet et rentabilise tes kilos de bagage.",
+    "cta": "Publier un trajet"
+  },
+  "categories": {
+    "CLOTHES": "Vêtements",
+    "SHOES": "Chaussures",
+    "COSMETICS": "Cosmétiques",
+    "BOOKS": "Livres",
+    "ELECTRONICS_SMALL": "Électronique",
+    "DOCUMENTS": "Documents",
+    "FOOD_DRY": "Alimentaire sec",
+    "GIFTS": "Cadeaux",
+    "CHECKED_BAG_23KG": "Bagage soute 23 kg",
+    "CABIN_BAG_12KG": "Bagage cabine 12 kg",
+    "OTHER": "Autre"
+  },
+  "loadError": "Impossible de charger tes trajets. Réessaie dans un instant."
+}

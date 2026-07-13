@@ -320,8 +320,8 @@ export default function ShipmentRow({ item, nowMs }: Props) {
 
   const rowClass =
     "group relative mb-1.5 flex w-full items-center gap-3 rounded-lg px-4 py-3 " +
-    "bg-white transition-colors hover:bg-slate-50 " +
-    "dark:bg-slate-950 dark:hover:bg-slate-900 " +
+    "bg-white transition-colors hover:bg-slate-100 " +
+    "dark:bg-slate-950 dark:hover:bg-slate-800/60 " +
     (presentation.muted ? "opacity-70 hover:opacity-100" : "");
 
   const thumbClass =
