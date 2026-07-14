@@ -1,16 +1,13 @@
 "use client";
 
-
-
-import {SectionKey} from "@/app/[locale]/dashboard/dashboard.config";
-import {DashboardCopy} from "@/app/[locale]/dashboard/dashboard.copy";
+import { SectionKey } from "@/app/[locale]/dashboard/dashboard.config";
+import { DashboardCopy } from "@/app/[locale]/dashboard/dashboard.copy";
 import MyTrips from "@/components/dashboard/sections/MyTrips";
 import MyShipments from "@/components/dashboard/sections/MyShipments";
 import CreateTrip from "@/components/dashboard/sections/CreateTrip";
 import Messages from "@/components/dashboard/sections/Messages";
 import Notifications from "@/components/dashboard/sections/Notifications";
-import Payments from "@/components/dashboard/sections/Payments";
-import WalletSection from "@/components/dashboard/sections/WalletSection";
+import FinancesSection from "@/components/dashboard/sections/FinancesSection";
 import BecomeYamber from "@/components/dashboard/sections/BecomeYamber";
 import Profile from "@/components/dashboard/sections/Profile";
 import Security from "@/components/dashboard/sections/Security";
@@ -38,10 +35,13 @@ export default function DashboardSectionRenderer({ section, copy, isFr }: Props)
       return <Messages copy={copy} />;
     case "notifications":
       return <Notifications copy={copy} />;
+    // Finances : fusion Paiements + Portefeuille. Les clés payments/wallet
+    // sont aliasées vers "finances" par resolveSectionKey — les cases
+    // restent par sécurité (deep-links, code appelant le renderer direct).
+    case "finances":
     case "payments":
-      return <Payments copy={copy} />;
     case "wallet":
-      return <WalletSection copy={copy} />;
+      return <FinancesSection copy={copy} />;
     case "profile":
       return <Profile copy={copy} />;
     case "yamber":

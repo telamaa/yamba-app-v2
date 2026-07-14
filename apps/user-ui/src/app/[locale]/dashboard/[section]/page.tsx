@@ -1,17 +1,13 @@
 "use client";
-
 import { useEffect, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useUiPreferences } from "@/components/providers/UiPreferencesProvider";
 import { getDashboardCopy } from "../dashboard.copy";
-import { NAV_GROUPS, type SectionKey } from "../dashboard.config";
+import {
+  DEFAULT_SECTION,
+  resolveSectionKey,
+} from "../dashboard.config";
 import DashboardSectionRenderer from "@/components/dashboard/DashboardSectionRenderer";
-
-
-const VALID_SECTIONS = new Set<string>([
-  "home",
-  ...NAV_GROUPS.flatMap((g) => g.items.map((i) => i.key)),
-]);
 
 export default function DashboardSectionPage() {
   const params = useParams<{ section: string }>();
@@ -20,8 +16,11 @@ export default function DashboardSectionPage() {
   const isFr = lang === "fr";
   const copy = useMemo(() => getDashboardCopy(isFr), [isFr]);
 
-  const section = params?.section ?? "home";
-  const isValid = VALID_SECTIONS.has(section);
+  const segment = params?.section ?? "home";
+  // resolveSectionKey gère les aliases (payments/wallet → finances, create)
+  // et retombe sur DEFAULT_SECTION pour un segment inconnu.
+  const resolved = resolveSectionKey(segment);
+  const isValid = segment === "home" || resolved !== DEFAULT_SECTION;
 
   useEffect(() => {
     if (!isValid) {
@@ -32,10 +31,6 @@ export default function DashboardSectionPage() {
   if (!isValid) return null;
 
   return (
-    <DashboardSectionRenderer
-      section={section as SectionKey}
-      copy={copy}
-      isFr={isFr}
-    />
+    <DashboardSectionRenderer section={resolved} copy={copy} isFr={isFr} />
   );
 }

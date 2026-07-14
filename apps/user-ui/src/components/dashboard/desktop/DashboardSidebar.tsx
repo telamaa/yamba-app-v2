@@ -1,13 +1,18 @@
 "use client";
 
+import { useMemo } from "react";
 import { Link, usePathname } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
+import useUser from "@/hooks/useUser";
+import { useMyTrips } from "@/hooks/useTrip";
+import type { TripListItem } from "@/components/trips/list/my-trips.config";
 import {
   HOME_ITEM,
   NAV_GROUPS,
   getNavItemPath,
   resolveSectionKey,
   type NavItem,
+  type SectionKey,
 } from "@/app/[locale]/dashboard/dashboard.config";
 
 const MANGO = "#FF9900";
@@ -17,12 +22,43 @@ export default function DashboardSidebar() {
   const t = useTranslations("dashboard");
 
   // usePathname de @/i18n/navigation renvoie le path SANS la locale
-  // Exemple: /dashboard/saved-routes (pas /fr/dashboard/saved-routes)
   const lastSegment = pathname?.split("/").pop() ?? "home";
   const activeSection = resolveSectionKey(lastSegment);
 
+  /* ── Masquage conditionnel : "Devenir Yamber" si déjà carrier ── */
+  const { user } = useUser();
+  const isCarrier = Boolean((user as any)?.roles?.includes("CARRIER"));
+
+  /* ── Badge "Mes trajets" dérivé des données réelles ──
+     Demandes reçues + brouillons/pauses à finaliser.
+     TODO : "shipments" viendra avec le backend bookings ;
+     "messages"/"notifications" avec leurs chantiers respectifs. */
+  const { data: rawTripsData } = useMyTrips();
+  const tripsBadge = useMemo(() => {
+    const trips: TripListItem[] = !rawTripsData
+      ? []
+      : Array.isArray(rawTripsData)
+        ? rawTripsData
+        : Array.isArray(rawTripsData.trips)
+          ? rawTripsData.trips
+          : [];
+    return trips.reduce(
+      (count, trip) =>
+        count +
+        (trip.pendingDemandsCount ?? 0) +
+        (trip.status === "DRAFT" || trip.status === "PAUSED" ? 1 : 0),
+      0
+    );
+  }, [rawTripsData]);
+
+  const dynamicBadges: Partial<Record<SectionKey, number>> = {
+    trips: tripsBadge,
+  };
+
   const renderItem = (item: NavItem, isActive: boolean) => {
     const Icon = item.icon;
+    const badge =
+      item.key in dynamicBadges ? dynamicBadges[item.key] : item.badge;
     return (
       <Link
         key={item.key}
@@ -42,12 +78,12 @@ export default function DashboardSidebar() {
         <span className="flex-1 truncate">
           {t(`sections.${item.labelKey}`)}
         </span>
-        {item.badge && (
+        {badge !== undefined && badge > 0 && (
           <span
             className="ml-auto min-w-[20px] rounded-full px-1.5 py-px text-center text-[11px] font-medium text-slate-900"
             style={{ backgroundColor: MANGO }}
           >
-            {item.badge}
+            {badge}
           </span>
         )}
       </Link>
@@ -55,7 +91,7 @@ export default function DashboardSidebar() {
   };
 
   return (
-    <aside className="hidden md:flex w-[200px] flex-col flex-shrink-0 pt-1 sticky top-[98px] h-[calc(100vh-104px)] overflow-y-auto">
+    <aside className="flex w-[200px] flex-col">
       {/* Home — standalone */}
       <div className="mb-3">
         {renderItem(HOME_ITEM, activeSection === "home")}
@@ -63,17 +99,22 @@ export default function DashboardSidebar() {
 
       {/* Nav groups */}
       <nav className="flex-1">
-        {NAV_GROUPS.map((group) => (
-          <div key={group.labelKey} className="mb-1">
-            <div className="pb-1 pt-3 text-[11px] font-medium uppercase tracking-wider text-slate-400 dark:text-slate-500">
-              {t(`groups.${group.labelKey}`)}
+        {NAV_GROUPS.map((group) => {
+          const items = group.items.filter(
+            (item) => !(item.key === "yamber" && isCarrier)
+          );
+          if (items.length === 0) return null;
+          return (
+            <div key={group.labelKey} className="mb-1">
+              <div className="pb-1 pt-3 text-[11px] font-medium uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                {t(`groups.${group.labelKey}`)}
+              </div>
+              {items.map((item) =>
+                renderItem(item, activeSection === item.key)
+              )}
             </div>
-
-            {group.items.map((item) =>
-              renderItem(item, activeSection === item.key)
-            )}
-          </div>
-        ))}
+          );
+        })}
       </nav>
     </aside>
   );

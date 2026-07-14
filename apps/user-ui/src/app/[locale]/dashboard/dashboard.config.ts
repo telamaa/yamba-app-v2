@@ -2,11 +2,9 @@ import {
   Home,
   Zap,
   Package,
-  Plus,
   MessageSquare,
   Bell,
   BellRing,
-  CreditCard,
   Wallet,
   User,
   UserPlus,
@@ -21,13 +19,14 @@ export type SectionKey =
   | "home"
   | "trips"
   | "shipments"
-  | "create"
+  | "create" // ⚠️ hors nav (action, pas destination) — segment conservé pour compat
   | "messages"
   | "notifications"
   | "savedRoutes"
   | "following"
-  | "payments"
-  | "wallet"
+  | "finances" // ✨ fusion Paiements + Portefeuille (chantier Stripe backend)
+  | "payments" // ⚠️ deprecated — segment aliasé vers finances
+  | "wallet" // ⚠️ deprecated — segment aliasé vers finances
   | "profile"
   | "yamber"
   | "security"
@@ -60,20 +59,28 @@ export const HOME_ITEM: NavItem = {
   standalone: true,
 };
 
+/**
+ * Nav = destinations uniquement. Les actions (créer un trajet) vivent dans
+ * les CTA contextuels (Mes trajets, header, raccourcis home).
+ *
+ * Badges : "trips" est calculé dynamiquement dans DashboardSidebar
+ * (demandes reçues + brouillons/pauses). "shipments" viendra avec le
+ * backend bookings. "messages"/"notifications" viendront avec leurs
+ * chantiers respectifs (messagerie V2 / événements state machine).
+ */
 export const NAV_GROUPS: NavGroup[] = [
   {
     labelKey: "activity",
     items: [
-      { key: "trips", icon: Zap, labelKey: "trips", badge: 3 },
+      { key: "trips", icon: Zap, labelKey: "trips" },
       { key: "shipments", icon: Package, labelKey: "shipments" },
-      { key: "create", icon: Plus, labelKey: "create" },
     ],
   },
   {
     labelKey: "communication",
     items: [
-      { key: "messages", icon: MessageSquare, labelKey: "messages", badge: 2 },
-      { key: "notifications", icon: Bell, labelKey: "notifications", badge: 5 },
+      { key: "messages", icon: MessageSquare, labelKey: "messages" },
+      { key: "notifications", icon: Bell, labelKey: "notifications" },
     ],
   },
   {
@@ -94,15 +101,13 @@ export const NAV_GROUPS: NavGroup[] = [
   },
   {
     labelKey: "finances",
-    items: [
-      { key: "payments", icon: CreditCard, labelKey: "payments" },
-      { key: "wallet", icon: Wallet, labelKey: "wallet" },
-    ],
+    items: [{ key: "finances", icon: Wallet, labelKey: "finances" }],
   },
   {
     labelKey: "account",
     items: [
       { key: "profile", icon: User, labelKey: "profile" },
+      // "yamber" : masqué dans DashboardSidebar si l'utilisateur est déjà carrier
       { key: "yamber", icon: Globe, labelKey: "yamber" },
     ],
   },
@@ -116,7 +121,19 @@ export const NAV_GROUPS: NavGroup[] = [
   },
 ];
 
-export type MobileTab = "home" | "activity" | "messages" | "payments" | "more";
+/**
+ * Aliases de segments URL → SectionKey.
+ * Compat ascendante : les anciennes URLs /dashboard/payments et
+ * /dashboard/wallet (utilisée par BecomeYamber) rendent la section
+ * finances. /dashboard/create reste résolvable (hors nav).
+ */
+const SEGMENT_ALIASES: Record<string, SectionKey> = {
+  payments: "finances",
+  wallet: "finances",
+  create: "create",
+};
+
+export type MobileTab = "home" | "activity" | "messages" | "finances" | "more";
 
 export const MOBILE_TABS: {
   key: MobileTab;
@@ -126,7 +143,7 @@ export const MOBILE_TABS: {
   { key: "home", icon: Home, labelKey: "home" },
   { key: "activity", icon: Zap, labelKey: "activity" },
   { key: "messages", icon: MessageSquare, labelKey: "messages" },
-  { key: "payments", icon: CreditCard, labelKey: "finances" },
+  { key: "finances", icon: Wallet, labelKey: "finances" },
   { key: "more", icon: Settings, labelKey: "more" },
 ];
 
@@ -134,17 +151,8 @@ export const MOBILE_TAB_SECTIONS: Record<MobileTab, SectionKey[]> = {
   home: ["home"],
   activity: ["trips", "shipments", "savedRoutes", "following"],
   messages: ["messages"],
-  payments: ["payments"],
-  more: [
-    "security",
-    "settings",
-    "help",
-    "notifications",
-    "profile",
-    "yamber",
-    "wallet",
-    "create",
-  ],
+  finances: ["finances", "payments", "wallet"],
+  more: ["security", "settings", "help", "notifications", "profile", "yamber"],
 };
 
 export const DEFAULT_SECTION: SectionKey = "home";
@@ -159,11 +167,12 @@ export function getNavItemPath(item: NavItem): string {
 
 /**
  * Résout un segment d'URL (ex: "saved-routes") vers sa SectionKey (ex: "savedRoutes").
- * Si le segment matche un slug, retourne le key correspondant.
- * Sinon, si le segment matche déjà un key, le retourne tel quel.
- * Sinon, retourne DEFAULT_SECTION.
+ * Ordre : aliases (compat) → home → nav groups → défaut.
  */
 export function resolveSectionKey(segment: string): SectionKey {
+  if (segment in SEGMENT_ALIASES) {
+    return SEGMENT_ALIASES[segment];
+  }
   if (HOME_ITEM.slug === segment || HOME_ITEM.key === segment) {
     return HOME_ITEM.key;
   }
