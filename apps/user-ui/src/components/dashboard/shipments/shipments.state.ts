@@ -50,7 +50,8 @@ export const mockShipments: ShipmentListItem[] = [
     hasRated: false,
     originCity: "Paris",
     destinationCity: "Pointe-Noire",
-    category: "COSMETICS",
+    // ⭐ fix baseline : COSMETICS n'existe pas dans ParcelCategory
+    category: "OTHER_ACCESSORIES",
     weightKg: 1.8,
     carrier: { firstName: "Léa", lastInitial: "K." },
     recipientFirstName: "Grâce",
@@ -79,7 +80,8 @@ export const mockShipments: ShipmentListItem[] = [
     status: "ACCEPTED",
     originCity: "Paris",
     destinationCity: "Brazzaville",
-    category: "ELECTRONICS_SMALL",
+    // ⭐ fix baseline : ELECTRONICS_SMALL n'existe pas dans ParcelCategory
+    category: "OTHER_ELECTRONICS",
     weightKg: 3.1,
     carrier: { firstName: "Thomas", lastInitial: "M." },
     recipientFirstName: "Marie",
@@ -143,7 +145,8 @@ export const mockShipments: ShipmentListItem[] = [
     refunded: true,
     originCity: "Paris",
     destinationCity: "Kinshasa",
-    category: "GIFTS",
+    // ⭐ fix baseline : GIFTS n'existe pas dans ParcelCategory
+    category: "SMALL_TOYS",
     weightKg: 1.2,
     carrier: { firstName: "Jules", lastInitial: "N." },
     requestedAt: new Date(now - 27 * DAY).toISOString(),

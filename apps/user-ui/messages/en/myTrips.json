@@ -88,15 +88,16 @@
   "categories": {
     "CLOTHES": "Clothes",
     "SHOES": "Shoes",
-    "COSMETICS": "Cosmetics",
+    "FASHION_ACCESSORIES": "Fashion accessories",
+    "OTHER_ACCESSORIES": "Other accessories",
     "BOOKS": "Books",
-    "ELECTRONICS_SMALL": "Small electronics",
     "DOCUMENTS": "Documents",
-    "FOOD_DRY": "Dry food",
-    "GIFTS": "Gifts",
+    "SMALL_TOYS": "Small toys",
+    "PHONE": "Phone",
+    "COMPUTER": "Computer",
+    "OTHER_ELECTRONICS": "Other electronics",
     "CHECKED_BAG_23KG": "Checked bag 23 kg",
-    "CABIN_BAG_12KG": "Cabin bag 12 kg",
-    "OTHER": "Other"
+    "CABIN_BAG_12KG": "Cabin bag 12 kg"
   },
   "loadError": "Could not load your trips. Please try again shortly."
 }
