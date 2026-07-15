@@ -299,9 +299,9 @@ export function ConfirmModal({
             onClick={onCancel}
             disabled={isLoading}
             className="flex-1 rounded-lg border border-slate-200 py-2.5 text-[13px] font-medium text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
-          >
+            >
             {isFr ? "Retour" : "Go back"}
-            MyTripsList.tsx          </button>
+          </button>
           <button
             type="button"
             onClick={onConfirm}

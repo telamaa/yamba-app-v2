@@ -13,6 +13,14 @@ import {
   updateTripSchema,
   formatZodError,
 } from "../schemas/trip.schema";
+// ⭐ Lot 2 — State machine : source de vérité des transitions
+import {
+  canPerform,
+  getAllowedActions,
+  getCarrierStatDeltas,
+  hasActiveBookings,
+  type TripStatus,
+} from "../services/trip-state-machine";
 
 // ─────────────────────────────────────────────
 // Helper interne : recalcule les champs dénormalisés
@@ -33,6 +41,60 @@ function computeDenormalizedFields(input: {
         ? computeHourLocal(input.departureAt, "Europe/Paris")
         : null;
   return { minPriceCents, departureHourLocal };
+}
+
+// ─────────────────────────────────────────────
+// ⭐ Lot 2 — Helpers lifecycle
+// ─────────────────────────────────────────────
+
+/**
+ * Charge un trip et vérifie : existence, non-supprimé, ownership.
+ * Un trip soft-deleted est traité comme inexistant (même message,
+ * pour ne pas révéler son existence).
+ */
+async function findOwnedTrip(id: string, userId: string) {
+  const trip = await prisma.trip.findUnique({ where: { id } });
+  if (!trip || trip.isDeleted) {
+    return { trip: null, error: "Trip not found." } as const;
+  }
+  if (trip.userId !== userId) {
+    return { trip: null, error: "Unauthorized." } as const;
+  }
+  return { trip, error: null } as const;
+}
+
+/**
+ * Contexte lifecycle pour la state machine.
+ * `hasActiveBookings` est stubbé à false tant que le Booking model
+ * n'existe pas — le branchement se fera dans trip-state-machine.ts.
+ */
+async function buildLifecycleCtx(tripId: string) {
+  return { hasActiveBookings: await hasActiveBookings(tripId) };
+}
+
+/**
+ * Applique les deltas de stats carrier calculés sur la TRANSITION
+ * (from → to) — jamais sur le statut courant. Corrige le bug du
+ * chemin PAUSED (publish +1 puis pause → cancel qui ne décrémentait pas).
+ */
+async function applyCarrierStatDeltas(
+  userId: string,
+  from: TripStatus,
+  to: TripStatus | null
+) {
+  const deltas = getCarrierStatDeltas(from, to);
+  if (!deltas) return;
+
+  const carrierPage = await prisma.carrierPage.findUnique({
+    where: { userId },
+    select: { id: true },
+  });
+  if (!carrierPage) return;
+
+  await prisma.carrierPage.update({
+    where: { id: carrierPage.id },
+    data: deltas,
+  });
 }
 
 // ─────────────────────────────────────────────
@@ -207,11 +269,16 @@ export const updateTrip = async (
     }
     const { publish, ...data } = parsed.data;
 
-    const trip = await prisma.trip.findUnique({ where: { id } });
-    if (!trip) return next(new ValidationError("Trip not found."));
-    if (trip.userId !== userId) return next(new ValidationError("Unauthorized."));
-    if (trip.status === "CANCELLED") {
-      return next(new ValidationError("Cannot edit a cancelled trip."));
+    const { trip, error } = await findOwnedTrip(id, userId);
+    if (!trip) return next(new ValidationError(error));
+
+    // ⭐ Lot 2 — La machine remplace le check ad hoc "CANCELLED".
+    // Bloque désormais aussi COMPLETED / ARCHIVED, et (à terme) les
+    // trips PUBLISHED/PAUSED avec réservations actives.
+    const ctx = await buildLifecycleCtx(trip.id);
+    const editCheck = canPerform(trip, "edit", ctx);
+    if (!editCheck.allowed) {
+      return next(new ValidationError(editCheck.reason));
     }
 
     // Build update payload: only include fields that were actually sent
@@ -235,6 +302,12 @@ export const updateTrip = async (
     }
 
     if (publish === true && trip.status === "DRAFT") {
+      // ⭐ Lot 2 — Guard machine (statut + date de départ non passée)
+      const publishCheck = canPerform(trip, "publish", ctx);
+      if (!publishCheck.allowed) {
+        return next(new ValidationError(publishCheck.reason));
+      }
+
       const carrierPage = await prisma.carrierPage.findUnique({
         where: { userId },
         select: {
@@ -269,10 +342,8 @@ export const updateTrip = async (
       updateData.currentStep = 3;
       updateData.carrierRatingSnapshot = carrierPage.ratingsCount > 0 ? carrierPage.ratingsAvg : null;
 
-      await prisma.carrierPage.update({
-        where: { id: carrierPage.id },
-        data: { totalTripsPublished: { increment: 1 } },
-      });
+      // ⭐ Lot 2 — Deltas sur la transition DRAFT → PUBLISHED
+      await applyCarrierStatDeltas(userId, trip.status, "PUBLISHED");
     }
 
     const updated = await prisma.trip.update({
@@ -315,7 +386,8 @@ export const addTripDocuments = async (
       include: { documents: { select: { id: true, fileId: true } } },
     });
 
-    if (!trip) return next(new ValidationError("Trip not found."));
+    // ⭐ Lot 2 — soft-deleted = introuvable
+    if (!trip || trip.isDeleted) return next(new ValidationError("Trip not found."));
     if (trip.userId !== userId) return next(new ValidationError("Unauthorized."));
 
     const { documents } = req.body as {
@@ -426,7 +498,8 @@ export const removeTripDocument = async (
       where: { id },
       include: { documents: { select: { id: true, type: true } } },
     });
-    if (!trip) return next(new ValidationError("Trip not found."));
+    // ⭐ Lot 2 — soft-deleted = introuvable
+    if (!trip || trip.isDeleted) return next(new ValidationError("Trip not found."));
     if (trip.userId !== userId) return next(new ValidationError("Unauthorized."));
 
     const doc = await prisma.tripDocument.findUnique({ where: { id: documentId } });
@@ -461,10 +534,115 @@ export const removeTripDocument = async (
 };
 
 // ─────────────────────────────────────────────
+// ⭐ Lot 2 — Internes : cancel et soft delete
+// ─────────────────────────────────────────────
+
+async function performCancel(
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+) {
+  if (!req.user) return next(new ValidationError("Unauthorized"));
+
+  const { id } = req.params;
+  const userId = req.user.id;
+
+  const { trip, error } = await findOwnedTrip(id, userId);
+  if (!trip) return next(new ValidationError(error));
+
+  const ctx = await buildLifecycleCtx(trip.id);
+  const check = canPerform(trip, "cancel", ctx);
+  if (!check.allowed) return next(new ValidationError(check.reason));
+
+  // NOTE chantier Booking : si hasActiveBookings, déclencher ici les
+  // side-effects (remboursements Stripe, notifications expéditeurs).
+
+  await prisma.trip.update({
+    where: { id },
+    data: { status: "CANCELLED", cancelledAt: new Date() },
+  });
+
+  // ⭐ Deltas sur la transition (corrige le chemin PAUSED → cancel)
+  await applyCarrierStatDeltas(userId, trip.status as TripStatus, "CANCELLED");
+
+  return res.status(200).json({ success: true, message: "Trip cancelled." });
+}
+
+async function performSoftDelete(
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+) {
+  if (!req.user) return next(new ValidationError("Unauthorized"));
+
+  const { id } = req.params;
+  const userId = req.user.id;
+
+  const { trip, error } = await findOwnedTrip(id, userId);
+  if (!trip) return next(new ValidationError(error));
+
+  const ctx = await buildLifecycleCtx(trip.id);
+  const check = canPerform(trip, "delete", ctx);
+  if (!check.allowed) return next(new ValidationError(check.reason));
+
+  // ⭐ Soft delete — le statut reste DRAFT, le trip sort de toutes
+  // les listes via le filtre isDeleted. Plus de hard delete : les
+  // documents et références (messages, liens) restent cohérents.
+  await prisma.trip.update({
+    where: { id },
+    data: { isDeleted: true, deletedAt: new Date() },
+  });
+
+  return res.status(200).json({ success: true, message: "Draft deleted." });
+}
+
+// ─────────────────────────────────────────────
 // DELETE /api/trips/:id
+// ⭐ Lot 2 — Dispatch : ?hard=true → soft delete (brouillons),
+// sinon alias backward-compat de cancel (comme resolveSectionKey).
+// AVANT : ?hard était ignoré et "Supprimer le brouillon" produisait
+// en réalité un trajet CANCELLED visible dans l'Historique.
+// ─────────────────────────────────────────────
+
+export const deleteTrip = async (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    if (req.query.hard === "true") {
+      return await performSoftDelete(req, res, next);
+    }
+    return await performCancel(req, res, next);
+  } catch (error) {
+    return next(error);
+  }
+};
+
+// ─────────────────────────────────────────────
+// POST /api/trips/:id/cancel
+// ⭐ Lot 2 — Endpoint explicite (le DELETE reste en alias)
 // ─────────────────────────────────────────────
 
 export const cancelTrip = async (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    return await performCancel(req, res, next);
+  } catch (error) {
+    return next(error);
+  }
+};
+
+// ─────────────────────────────────────────────
+// POST /api/trips/:id/archive
+// ⭐ Lot 2 — NOUVEAU. One-way (pas de désarchivage MVP).
+// Remplace le toast fake côté front.
+// ─────────────────────────────────────────────
+
+export const archiveTrip = async (
   req: AuthenticatedRequest,
   res: Response,
   next: NextFunction
@@ -475,40 +653,21 @@ export const cancelTrip = async (
     const { id } = req.params;
     const userId = req.user.id;
 
-    const trip = await prisma.trip.findUnique({ where: { id } });
-    if (!trip) return next(new ValidationError("Trip not found."));
-    if (trip.userId !== userId) return next(new ValidationError("Unauthorized."));
-    if (trip.status === "CANCELLED") {
-      return next(new ValidationError("Trip is already cancelled."));
-    }
-    if (trip.status === "COMPLETED") {
-      return next(new ValidationError("Cannot cancel a completed trip."));
-    }
+    const { trip, error } = await findOwnedTrip(id, userId);
+    if (!trip) return next(new ValidationError(error));
 
-    const wasPublished = trip.status === "PUBLISHED";
+    const ctx = await buildLifecycleCtx(trip.id);
+    const check = canPerform(trip, "archive", ctx);
+    if (!check.allowed) return next(new ValidationError(check.reason));
 
     await prisma.trip.update({
       where: { id },
-      data: { status: "CANCELLED", cancelledAt: new Date() },
+      data: { status: "ARCHIVED", archivedAt: new Date() },
     });
 
-    if (wasPublished) {
-      const carrierPage = await prisma.carrierPage.findUnique({
-        where: { userId },
-        select: { id: true },
-      });
-      if (carrierPage) {
-        await prisma.carrierPage.update({
-          where: { id: carrierPage.id },
-          data: {
-            totalTripsPublished: { decrement: 1 },
-            totalTripsCancelled: { increment: 1 },
-          },
-        });
-      }
-    }
+    // COMPLETED/CANCELLED → ARCHIVED : hors pool public, aucun delta.
 
-    return res.status(200).json({ success: true, message: "Trip cancelled." });
+    return res.status(200).json({ success: true, message: "Trip archived." });
   } catch (error) {
     return next(error);
   }
@@ -529,15 +688,13 @@ export const restoreTrip = async (
     const { id } = req.params;
     const userId = req.user.id;
 
-    const trip = await prisma.trip.findUnique({ where: { id } });
-    if (!trip) return next(new ValidationError("Trip not found."));
-    if (trip.userId !== userId) return next(new ValidationError("Unauthorized."));
-    if (trip.status !== "CANCELLED") {
-      return next(new ValidationError("Only cancelled trips can be restored."));
-    }
-    if (trip.departureAt && new Date(trip.departureAt) < new Date()) {
-      return next(new ValidationError("Cannot restore a trip whose departure date has passed."));
-    }
+    const { trip, error } = await findOwnedTrip(id, userId);
+    if (!trip) return next(new ValidationError(error));
+
+    // ⭐ Lot 2 — Machine : CANCELLED → DRAFT, date non passée
+    const ctx = await buildLifecycleCtx(trip.id);
+    const check = canPerform(trip, "restore", ctx);
+    if (!check.allowed) return next(new ValidationError(check.reason));
 
     await prisma.trip.update({
       where: { id },
@@ -552,6 +709,9 @@ export const restoreTrip = async (
 
 // ─────────────────────────────────────────────
 // GET /api/trips/:id
+// ⭐ Lot 2 — FIX SÉCURITÉ : ownership check (avant, n'importe quel
+// utilisateur authentifié pouvait lire le DTO privé d'autrui).
+// La route publique filtrée reste GET /trips/:id/public.
 // ─────────────────────────────────────────────
 
 export const getTrip = async (
@@ -563,6 +723,7 @@ export const getTrip = async (
     if (!req.user) return next(new ValidationError("Unauthorized"));
 
     const { id } = req.params;
+    const userId = req.user.id;
 
     const trip = await prisma.trip.findUnique({
       where: { id },
@@ -588,9 +749,14 @@ export const getTrip = async (
       },
     });
 
-    if (!trip) return next(new ValidationError("Trip not found."));
+    if (!trip || trip.isDeleted) return next(new ValidationError("Trip not found."));
+    if (trip.userId !== userId) return next(new ValidationError("Unauthorized."));
 
-    return res.status(200).json({ success: true, trip });
+    // ⭐ Lot 2 — Le front affichera exactement ce que l'API autorise
+    const ctx = await buildLifecycleCtx(trip.id);
+    const allowedActions = getAllowedActions(trip, ctx);
+
+    return res.status(200).json({ success: true, trip: { ...trip, allowedActions } });
   } catch (error) {
     return next(error);
   }
@@ -611,7 +777,8 @@ export const getMyTrips = async (
     const userId = req.user.id;
     const { status } = req.query;
 
-    const where: any = { userId };
+    // ⭐ Lot 2 — les trips soft-deleted n'apparaissent plus jamais
+    const where: any = { userId, isDeleted: false };
     if (status && typeof status === "string") {
       where.status = status.toUpperCase();
     }
@@ -624,7 +791,16 @@ export const getMyTrips = async (
       },
     });
 
-    return res.status(200).json({ success: true, trips, count: trips.length });
+    // ⭐ Lot 2 — allowedActions par trip (stub booking → coût nul ;
+    // au chantier Booking, remplacer par un count groupé par tripId).
+    const withActions = await Promise.all(
+      trips.map(async (t) => ({
+        ...t,
+        allowedActions: getAllowedActions(t, await buildLifecycleCtx(t.id)),
+      }))
+    );
+
+    return res.status(200).json({ success: true, trips: withActions, count: withActions.length });
   } catch (error) {
     return next(error);
   }
@@ -645,12 +821,13 @@ export const publishTrip = async (
     const { id } = req.params;
     const userId = req.user.id;
 
-    const trip = await prisma.trip.findUnique({ where: { id } });
-    if (!trip) return next(new ValidationError("Trip not found."));
-    if (trip.userId !== userId) return next(new ValidationError("Unauthorized."));
-    if (trip.status !== "DRAFT") {
-      return next(new ValidationError("Only drafts can be published."));
-    }
+    const { trip, error } = await findOwnedTrip(id, userId);
+    if (!trip) return next(new ValidationError(error));
+
+    // ⭐ Lot 2 — Machine : DRAFT uniquement + date de départ future
+    const ctx = await buildLifecycleCtx(trip.id);
+    const check = canPerform(trip, "publish", ctx);
+    if (!check.allowed) return next(new ValidationError(check.reason));
 
     const carrierPage = await prisma.carrierPage.findUnique({
       where: { userId },
@@ -679,9 +856,6 @@ export const publishTrip = async (
     if (!trip.departureAt) {
       return next(new ValidationError("Departure date is required to publish."));
     }
-    if (new Date(trip.departureAt) < new Date()) {
-      return next(new ValidationError("Departure date must be in the future."));
-    }
     if (!trip.acceptedCategories || trip.acceptedCategories.length === 0) {
       return next(new ValidationError("At least one parcel category must be accepted."));
     }
@@ -707,10 +881,8 @@ export const publishTrip = async (
       },
     });
 
-    await prisma.carrierPage.update({
-      where: { id: carrierPage.id },
-      data: { totalTripsPublished: { increment: 1 } },
-    });
+    // ⭐ Lot 2 — Deltas sur la transition
+    await applyCarrierStatDeltas(userId, trip.status as TripStatus, "PUBLISHED");
 
     triggerTripPublishedNotifications(publishedTrip);
 
@@ -735,32 +907,22 @@ export const unpublishTrip = async (
     const { id } = req.params;
     const userId = req.user.id;
 
-    const trip = await prisma.trip.findUnique({ where: { id } });
-    if (!trip) return next(new ValidationError("Trip not found."));
-    if (trip.userId !== userId) return next(new ValidationError("Unauthorized."));
-    if (trip.status !== "PUBLISHED" && trip.status !== "PAUSED") {
-      return next(new ValidationError("Only published or paused trips can be reverted to draft."));
-    }
+    const { trip, error } = await findOwnedTrip(id, userId);
+    if (!trip) return next(new ValidationError(error));
 
-    const wasPublished = trip.status === "PUBLISHED";
+    // ⭐ Lot 2 — Machine : PUBLISHED/PAUSED → DRAFT, interdit avec
+    // réservations actives (guard prêt pour le chantier Booking).
+    const ctx = await buildLifecycleCtx(trip.id);
+    const check = canPerform(trip, "unpublish", ctx);
+    if (!check.allowed) return next(new ValidationError(check.reason));
 
     await prisma.trip.update({
       where: { id },
       data: { status: "DRAFT", publishedAt: null, currentStep: 1 },
     });
 
-    if (wasPublished) {
-      const carrierPage = await prisma.carrierPage.findUnique({
-        where: { userId },
-        select: { id: true },
-      });
-      if (carrierPage) {
-        await prisma.carrierPage.update({
-          where: { id: carrierPage.id },
-          data: { totalTripsPublished: { decrement: 1 } },
-        });
-      }
-    }
+    // ⭐ Deltas : décrémente aussi depuis PAUSED (corrige le bug stats)
+    await applyCarrierStatDeltas(userId, trip.status as TripStatus, "DRAFT");
 
     return res.status(200).json({ success: true, message: "Trip reverted to draft." });
   } catch (error) {
@@ -783,17 +945,19 @@ export const pauseTrip = async (
     const { id } = req.params;
     const userId = req.user.id;
 
-    const trip = await prisma.trip.findUnique({ where: { id } });
-    if (!trip) return next(new ValidationError("Trip not found."));
-    if (trip.userId !== userId) return next(new ValidationError("Unauthorized."));
-    if (trip.status !== "PUBLISHED") {
-      return next(new ValidationError("Only published trips can be paused."));
-    }
+    const { trip, error } = await findOwnedTrip(id, userId);
+    if (!trip) return next(new ValidationError(error));
+
+    const ctx = await buildLifecycleCtx(trip.id);
+    const check = canPerform(trip, "pause", ctx);
+    if (!check.allowed) return next(new ValidationError(check.reason));
 
     await prisma.trip.update({
       where: { id },
       data: { status: "PAUSED" },
     });
+
+    // PUBLISHED → PAUSED : reste dans le pool public, aucun delta.
 
     return res.status(200).json({ success: true, message: "Trip paused." });
   } catch (error) {
@@ -816,20 +980,20 @@ export const resumeTrip = async (
     const { id } = req.params;
     const userId = req.user.id;
 
-    const trip = await prisma.trip.findUnique({ where: { id } });
-    if (!trip) return next(new ValidationError("Trip not found."));
-    if (trip.userId !== userId) return next(new ValidationError("Unauthorized."));
-    if (trip.status !== "PAUSED") {
-      return next(new ValidationError("Only paused trips can be resumed."));
-    }
-    if (trip.departureAt && new Date(trip.departureAt) < new Date()) {
-      return next(new ValidationError("Cannot resume a trip whose departure date has passed."));
-    }
+    const { trip, error } = await findOwnedTrip(id, userId);
+    if (!trip) return next(new ValidationError(error));
+
+    // ⭐ Lot 2 — Machine : PAUSED → PUBLISHED, date non passée
+    const ctx = await buildLifecycleCtx(trip.id);
+    const check = canPerform(trip, "resume", ctx);
+    if (!check.allowed) return next(new ValidationError(check.reason));
 
     await prisma.trip.update({
       where: { id },
       data: { status: "PUBLISHED" },
     });
+
+    // PAUSED → PUBLISHED : reste dans le pool public, aucun delta.
 
     return res.status(200).json({ success: true, message: "Trip resumed." });
   } catch (error) {
@@ -882,7 +1046,9 @@ export const getPublicTrip: RequestHandler = async (req, res, next) => {
       res.status(404).json({ success: false, message: "Trip not found." });
       return;
     }
-    if (trip.status !== "PUBLISHED") {
+    // ⭐ Lot 2 — soft-deleted = introuvable (belt & suspenders : un trip
+    // supprimé est forcément DRAFT, donc déjà exclu par le check suivant)
+    if (trip.isDeleted || trip.status !== "PUBLISHED") {
       res.status(404).json({ success: false, message: "Trip not found." });
       return;
     }
