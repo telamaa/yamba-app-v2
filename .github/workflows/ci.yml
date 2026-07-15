@@ -1,9 +1,5 @@
 name: CI
 
-# D10 — Le ritual automatisé : une PR rouge ne se merge pas.
-# Miroir machine du ritual manuel : tsc par projet, JSON parse + miroir
-# FR/EN des messages, grep anti-fuite.
-
 on:
   pull_request:
     branches: [dev, main]
@@ -29,6 +25,9 @@ jobs:
         with:
           node-version: 22
           cache: npm
+
+      - name: Pin npm (meme version que le poste qui genere le lock)
+        run: npm install -g npm@11
 
       - name: Install dependencies
         run: npm ci
@@ -60,10 +59,10 @@ jobs:
 
       - name: No tracked env/secret files
         run: |
-          MATCHES=$(git ls-files | grep -iE '(^|/)\.env($|\.)|secret|\.pem$|\.key$' | grep -vE '\.env\.example$|\.env\.template$' || true)
+          MATCHES=$(git ls-files | grep -iE '(^|/)\.env($|\.)|secret|\.pem$|\.key$' | grep -vE '\.(example|template)$' || true)
           if [ -n "$MATCHES" ]; then
-            echo "::error::Fichiers sensibles trackés dans git :"
+            echo "::error::Fichiers sensibles trackes dans git :"
             echo "$MATCHES"
             exit 1
           fi
-          echo "OK — aucun fichier sensible tracké."
+          echo "OK - aucun fichier sensible tracke."
