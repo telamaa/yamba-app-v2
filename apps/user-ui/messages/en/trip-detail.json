@@ -92,7 +92,8 @@
 
   "notFound": {
     "title": "Trip not found",
-    "description": "This trip doesn''t exist or is no longer available."
+    "description": "This trip doesn''t exist or is no longer available.",
+    "backToSearch": "Back to search"
   },
 
   "error": {
