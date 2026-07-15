@@ -3,9 +3,9 @@
 import React, { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useLocale, useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { Car, Plane, Plus, Train } from "lucide-react";
-import { useUiPreferences } from "@/components/providers/UiPreferencesProvider";
 import { useFlashToast } from "@/hooks/useFlashToast";
 import useUser from "@/hooks/useUser";
 import {
@@ -30,7 +30,7 @@ import {
 } from "./MyTripsShared";
 import {
   MANGO,
-  TRANSPORT_LABELS,
+  TRANSPORT_LABEL_KEYS,
   formatTripDate,
   isTripPastDeparture,
   type TransportMode,
@@ -42,8 +42,9 @@ import MyTripsSkeleton from "@/components/dashboard/trips/list/MyTripsSkeleton";
 /**
  * Mes trajets — vue réelle (trip-service), identité visuelle "Mes envois" :
  * groupes par urgence (À finaliser / À venir / Historique), rows flat,
- * CTA contextuel. Remplace MyTripsTable (legacy, conservé non branché).
- * La vitrine mock des états deals vit sur /dashboard/trips/preview.
+ * CTA contextuel. La vitrine mock des états deals vit sur
+ * /dashboard/trips/preview.
+ * ⭐ i18n : namespace "myTrips" (next-intl) — zéro ternaire isFr.
  */
 
 const TRANSPORT_ICONS: Record<TransportMode, React.ElementType> = {
@@ -60,16 +61,17 @@ type Filter = "all" | Group;
 function TripRow({
                    trip,
                    group,
-                   isFr,
                    needsOnboarding,
                    onAction,
                  }: {
   trip: TripListItem;
   group: Group;
-  isFr: boolean;
   needsOnboarding: boolean;
   onAction: (key: TripActionKey, trip: TripListItem) => void;
 }) {
+  const t = useTranslations("myTrips");
+  const locale = useLocale();
+
   const TransportIcon = trip.transportMode
     ? TRANSPORT_ICONS[trip.transportMode]
     : Plane;
@@ -82,20 +84,18 @@ function TripRow({
   const to = trip.destinationCity ?? trip.destinationLabel ?? "—";
 
   const transportLabel = trip.transportMode
-    ? isFr
-      ? TRANSPORT_LABELS[trip.transportMode].fr
-      : TRANSPORT_LABELS[trip.transportMode].en
+    ? t(TRANSPORT_LABEL_KEYS[trip.transportMode])
     : "";
 
   const subParts = [
-    formatTripDate(trip.departureDateLocal, isFr),
+    formatTripDate(trip.departureDateLocal, locale),
     transportLabel,
   ];
   if (
     trip.arrivalDateLocal &&
     trip.arrivalDateLocal !== trip.departureDateLocal
   ) {
-    subParts.splice(1, 0, "→ " + formatTripDate(trip.arrivalDateLocal, isFr));
+    subParts.splice(1, 0, "→ " + formatTripDate(trip.arrivalDateLocal, locale));
   }
 
   const iconWrapperClass =
@@ -106,7 +106,7 @@ function TripRow({
         ? "bg-amber-50 text-amber-700 dark:bg-amber-900/25 dark:text-amber-300"
         : "bg-teal-50 text-teal-700 dark:bg-teal-900/25 dark:text-teal-300");
 
-  // ⭐ "relative" pour ancrer le lien overlay
+  // "relative" pour ancrer le lien overlay
   const rowClass =
     "group relative flex w-full cursor-pointer items-center gap-3 rounded-lg bg-white px-4 py-3 " +
     "transition-colors hover:bg-slate-100 dark:bg-slate-950 dark:hover:bg-slate-800/60 mb-1.5 " +
@@ -127,13 +127,7 @@ function TripRow({
           className="hidden whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-medium text-slate-900 transition-[filter] hover:brightness-95 sm:inline-flex"
           style={{ backgroundColor: MANGO }}
         >
-          {isDraft
-            ? isFr
-              ? "Activer"
-              : "Activate"
-            : isFr
-              ? "Reprendre"
-              : "Resume"}
+          {isDraft ? t("actionsMenu.activate") : t("actionsMenu.resume")}
         </button>
       );
     }
@@ -143,14 +137,14 @@ function TripRow({
         className="hidden whitespace-nowrap rounded-full px-2.5 py-0.5 text-[12px] font-medium sm:inline-flex"
         style={{ background: "rgba(255,153,0,0.10)", color: MANGO }}
       >
-        {demands} {isFr ? "demande(s)" : "request(s)"}
+        {t("list.demands", { count: demands })}
       </span>
     );
   }
 
   return (
     <div className={rowClass}>
-      {/* ⭐ Lien réel en overlay : toute la row est un <a> natif
+      {/* Lien réel en overlay : toute la row est un <a> natif
           (clic droit → nouvel onglet, clic molette, Enter au clavier),
           sans imbriquer les boutons dans le lien (HTML invalide). */}
       <Link
@@ -174,33 +168,25 @@ function TripRow({
         </div>
         {/* Mobile : badge + demandes sous le texte */}
         <div className="mt-2 flex flex-wrap items-center gap-2 sm:hidden">
-          <StatusBadge
-            status={trip.status}
-            isFr={isFr}
-            needsOnboarding={needsOnboarding}
-          />
+          <StatusBadge status={trip.status} needsOnboarding={needsOnboarding} />
           {demands > 0 && (
             <span
               className="rounded-full px-2 py-0.5 text-[11px] font-medium"
               style={{ background: "rgba(255,153,0,0.10)", color: MANGO }}
             >
-              {demands} {isFr ? "demande(s)" : "request(s)"}
+              {t("list.demands", { count: demands })}
             </span>
           )}
         </div>
       </div>
 
-      {/* ⭐ z-10 : les contrôles restent cliquables AU-DESSUS du lien overlay */}
+      {/* z-10 : les contrôles restent cliquables AU-DESSUS du lien overlay */}
       <div className="relative z-10 flex flex-shrink-0 items-center gap-3">
         <span className="hidden sm:inline-flex">
-          <StatusBadge
-            status={trip.status}
-            isFr={isFr}
-            needsOnboarding={needsOnboarding}
-          />
+          <StatusBadge status={trip.status} needsOnboarding={needsOnboarding} />
         </span>
         {cta}
-        <ActionMenu trip={trip} isFr={isFr} onAction={onAction} />
+        <ActionMenu trip={trip} onAction={onAction} />
       </div>
     </div>
   );
@@ -209,9 +195,8 @@ function TripRow({
 /* ── Composant principal ─────────────────────────────────────────── */
 
 export default function MyTripsList() {
-  const { lang } = useUiPreferences();
+  const t = useTranslations("myTrips");
   const router = useRouter();
-  const isFr = lang === "fr";
 
   useFlashToast();
 
@@ -232,7 +217,6 @@ export default function MyTripsList() {
   const duplicateTrip = useDuplicateTrip();
   const activateTrip = useActivateTrip();
   const revertToDraft = useRevertToDraft();
-  // ⭐ Lot 3 — archive réelle (remplace le toast fake)
   const archiveTrip = useArchiveTrip();
 
   const [filter, setFilter] = useState<Filter>("all");
@@ -258,14 +242,15 @@ export default function MyTripsList() {
       upcoming: [],
       history: [],
     };
-    for (const t of trips) {
-      if (t.status === "DRAFT" || t.status === "PAUSED") map.finalize.push(t);
+    for (const trip of trips) {
+      if (trip.status === "DRAFT" || trip.status === "PAUSED")
+        map.finalize.push(trip);
       else if (
-        t.status === "PUBLISHED" &&
-        !isTripPastDeparture(t.departureDateLocal)
+        trip.status === "PUBLISHED" &&
+        !isTripPastDeparture(trip.departureDateLocal)
       )
-        map.upcoming.push(t);
-      else map.history.push(t); // COMPLETED, CANCELLED, ARCHIVED, PUBLISHED passés
+        map.upcoming.push(trip);
+      else map.history.push(trip); // COMPLETED, CANCELLED, ARCHIVED, PUBLISHED passés
     }
     const byDate = (a: TripListItem, b: TripListItem) =>
       (b.departureDateLocal ?? "").localeCompare(a.departureDateLocal ?? "");
@@ -283,11 +268,11 @@ export default function MyTripsList() {
 
   const toastOpts = { duration: Infinity, closeButton: true } as const;
 
-  /* Actions (logique conservée de MyTripsTable) */
+  /* Actions */
   const handleAction = useCallback(
     (actionKey: TripActionKey, trip: TripListItem) => {
       const ok = (msg: string) => toast.success(msg, toastOpts);
-      const ko = () => toast.error(isFr ? "Erreur" : "Error", toastOpts);
+      const ko = () => toast.error(t("toasts.error"), toastOpts);
 
       switch (actionKey) {
         case "view":
@@ -301,45 +286,35 @@ export default function MyTripsList() {
           break;
         case "activate": {
           if (!hasOnboarding) {
-            toast.info(
-              isFr
-                ? "Complétez votre profil transporteur pour activer ce trajet"
-                : "Complete your carrier profile to activate this trip",
-              {
-                duration: Infinity,
-                closeButton: true,
-                action: {
-                  label: isFr ? "Configurer" : "Configure",
-                  onClick: () => router.push("/carrier/onboarding"),
-                },
-              }
-            );
+            toast.info(t("gates.onboardingToast"), {
+              duration: Infinity,
+              closeButton: true,
+              action: {
+                label: t("gates.onboardingCta"),
+                onClick: () => router.push("/carrier/onboarding"),
+              },
+            });
             return;
           }
           if (!stripeReady) {
-            toast.info(
-              isFr
-                ? "Configurez Stripe pour activer ce trajet et recevoir des paiements"
-                : "Configure Stripe to activate this trip and receive payments",
-              {
-                duration: Infinity,
-                closeButton: true,
-                action: {
-                  label: isFr ? "Configurer Stripe" : "Configure Stripe",
-                  onClick: () => router.push("/carrier/onboarding?step=stripe"),
-                },
-              }
-            );
+            toast.info(t("gates.stripeToast"), {
+              duration: Infinity,
+              closeButton: true,
+              action: {
+                label: t("gates.stripeCta"),
+                onClick: () => router.push("/carrier/onboarding?step=stripe"),
+              },
+            });
             return;
           }
           if (trip.status === "DRAFT") {
             activateTrip.mutate(trip.id, {
-              onSuccess: () => ok(isFr ? "Trajet activé" : "Trip activated"),
+              onSuccess: () => ok(t("toasts.activated")),
               onError: ko,
             });
           } else if (trip.status === "PAUSED") {
             resumeTrip.mutate(trip.id, {
-              onSuccess: () => ok(isFr ? "Trajet republié" : "Trip resumed"),
+              onSuccess: () => ok(t("toasts.resumed")),
               onError: ko,
             });
           }
@@ -347,7 +322,7 @@ export default function MyTripsList() {
         }
         case "pause":
           pauseTrip.mutate(trip.id, {
-            onSuccess: () => ok(isFr ? "Trajet mis en pause" : "Trip paused"),
+            onSuccess: () => ok(t("toasts.paused")),
             onError: ko,
           });
           break;
@@ -356,26 +331,19 @@ export default function MyTripsList() {
           break;
         case "duplicate":
           duplicateTrip.mutate(trip.id, {
-            onSuccess: () =>
-              ok(
-                isFr
-                  ? "Brouillon créé par duplication"
-                  : "Draft created from duplicate"
-              ),
+            onSuccess: () => ok(t("toasts.duplicated")),
             onError: ko,
           });
           break;
         case "restoreDraft":
           restoreTrip.mutate(trip.id, {
-            onSuccess: () =>
-              ok(isFr ? "Trajet restauré en brouillon" : "Trip restored as draft"),
+            onSuccess: () => ok(t("toasts.restored")),
             onError: ko,
           });
           break;
         case "archive":
-          // ⭐ Lot 3 — vraie mutation (POST /trips/:id/archive)
           archiveTrip.mutate(trip.id, {
-            onSuccess: () => ok(isFr ? "Trajet archivé" : "Trip archived"),
+            onSuccess: () => ok(t("toasts.archived")),
             onError: ko,
           });
           break;
@@ -389,7 +357,7 @@ export default function MyTripsList() {
     },
     [
       router,
-      isFr,
+      t,
       hasOnboarding,
       stripeReady,
       pauseTrip,
@@ -407,29 +375,52 @@ export default function MyTripsList() {
       toast.success(msg, toastOpts);
       setModal(null);
     };
-    const ko = () => toast.error(isFr ? "Erreur" : "Error", toastOpts);
+    const ko = () => toast.error(t("toasts.error"), toastOpts);
 
     if (modal.type === "delete") {
       deleteTrip.mutate(modal.trip.id, {
-        onSuccess: () => ok(isFr ? "Brouillon supprimé" : "Draft deleted"),
+        onSuccess: () => ok(t("toasts.deleted")),
         onError: ko,
       });
     } else if (modal.type === "cancel") {
       cancelTrip.mutate(modal.trip.id, {
-        onSuccess: () => ok(isFr ? "Trajet annulé" : "Trip cancelled"),
+        onSuccess: () => ok(t("toasts.cancelled")),
         onError: ko,
       });
     } else if (modal.type === "revertToDraft") {
       revertToDraft.mutate(modal.trip.id, {
-        onSuccess: () =>
-          ok(isFr ? "Trajet repassé en brouillon" : "Trip reverted to draft"),
+        onSuccess: () => ok(t("toasts.reverted")),
         onError: ko,
       });
     }
-  }, [modal, isFr, deleteTrip, cancelTrip, revertToDraft]);
+  }, [modal, t, deleteTrip, cancelTrip, revertToDraft]);
 
   const isConfirming =
     deleteTrip.isPending || cancelTrip.isPending || revertToDraft.isPending;
+
+  /* Modal — libellés dérivés du type */
+  const modalCopy = useMemo(() => {
+    if (!modal) return { title: "", message: "", confirmLabel: "" };
+    const from = modal.trip.originCity ?? modal.trip.originLabel ?? "—";
+    const to = modal.trip.destinationCity ?? modal.trip.destinationLabel ?? "—";
+    if (modal.type === "delete")
+      return {
+        title: t("modals.deleteTitle"),
+        message: t("modals.deleteMessage", { from, to }),
+        confirmLabel: t("modals.deleteConfirm"),
+      };
+    if (modal.type === "cancel")
+      return {
+        title: t("modals.cancelTitle"),
+        message: t("modals.cancelMessage", { from, to }),
+        confirmLabel: t("modals.cancelConfirm"),
+      };
+    return {
+      title: t("modals.revertTitle"),
+      message: t("modals.revertMessage", { from, to }),
+      confirmLabel: t("modals.revertConfirm"),
+    };
+  }, [modal, t]);
 
   /* ── Rendus ─────────────────────────────────────────────────── */
 
@@ -439,9 +430,7 @@ export default function MyTripsList() {
     return (
       <div className="py-20 text-center">
         <p className="text-[14px] text-slate-500 dark:text-slate-400">
-          {isFr
-            ? "Impossible de charger vos trajets."
-            : "Unable to load your trips."}
+          {t("list.errorTitle")}
         </p>
         <button
           type="button"
@@ -449,7 +438,7 @@ export default function MyTripsList() {
           className="mt-3 text-[13px] font-medium"
           style={{ color: MANGO }}
         >
-          {isFr ? "Réessayer" : "Retry"}
+          {t("list.retry")}
         </button>
       </div>
     );
@@ -457,20 +446,20 @@ export default function MyTripsList() {
   const totalCount = trips.length;
 
   const filters: { key: Filter; label: string; count: number }[] = [
-    { key: "all", label: isFr ? "Tous" : "All", count: totalCount },
+    { key: "all", label: t("list.filters.all"), count: totalCount },
     {
       key: "finalize",
-      label: isFr ? "À finaliser" : "To finalize",
+      label: t("list.filters.finalize"),
       count: grouped.finalize.length,
     },
     {
       key: "upcoming",
-      label: isFr ? "À venir" : "Upcoming",
+      label: t("list.filters.upcoming"),
       count: grouped.upcoming.length,
     },
     {
       key: "history",
-      label: isFr ? "Historique" : "History",
+      label: t("list.filters.history"),
       count: grouped.history.length,
     },
   ];
@@ -496,9 +485,9 @@ export default function MyTripsList() {
   );
 
   const groupLabels: Record<Group, string> = {
-    finalize: isFr ? "À finaliser" : "To finalize",
-    upcoming: isFr ? "Trajets à venir" : "Upcoming trips",
-    history: isFr ? "Historique" : "History",
+    finalize: t("list.groups.finalize"),
+    upcoming: t("list.groups.upcoming"),
+    history: t("list.groups.history"),
   };
   const groupDots: Record<Group, string> = {
     finalize: "bg-amber-400",
@@ -515,7 +504,7 @@ export default function MyTripsList() {
       {/* Header + CTA */}
       <div className="mb-5 flex items-center justify-between gap-3">
         <h1 className="text-xl font-medium text-slate-900 dark:text-white">
-          {isFr ? "Mes trajets" : "My trips"}
+          {t("title")}
         </h1>
         <button
           type="button"
@@ -524,16 +513,13 @@ export default function MyTripsList() {
           style={{ backgroundColor: MANGO }}
         >
           <Plus size={15} strokeWidth={2.5} />
-          <span className="hidden sm:inline">
-            {isFr ? "Publier un trajet" : "Publish a trip"}
-          </span>
+          <span className="hidden sm:inline">{t("publishTrip")}</span>
         </button>
       </div>
 
       {showOnboardingBanner && (
         <OnboardingBanner
           draftCount={draftCount}
-          isFr={isFr}
           onAction={() => router.push("/carrier/onboarding")}
           onDismiss={() => setBannerDismissed(true)}
         />
@@ -546,12 +532,10 @@ export default function MyTripsList() {
             className="mx-auto text-slate-300 dark:text-slate-600"
           />
           <p className="mt-3 text-[15px] font-medium text-slate-900 dark:text-white">
-            {isFr ? "Aucun trajet publié" : "No trips published"}
+            {t("empty.title")}
           </p>
           <p className="mx-auto mt-1 max-w-[300px] text-[13px] text-slate-500 dark:text-slate-400">
-            {isFr
-              ? "Publie ton premier trajet et rentabilise tes kilos de bagage."
-              : "Publish your first trip and monetize your spare luggage kilos."}
+            {t("empty.subtitle")}
           </p>
           <button
             type="button"
@@ -559,7 +543,7 @@ export default function MyTripsList() {
             className="mt-4 rounded-lg px-5 py-2 text-[13px] font-medium text-slate-900"
             style={{ backgroundColor: MANGO }}
           >
-            {isFr ? "Publier un trajet" : "Publish a trip"}
+            {t("empty.cta")}
           </button>
         </div>
       ) : (
@@ -589,7 +573,6 @@ export default function MyTripsList() {
                   key={trip.id}
                   trip={trip}
                   group={g}
-                  isFr={isFr}
                   needsOnboarding={needsOnboarding}
                   onAction={handleAction}
                 />
@@ -601,63 +584,12 @@ export default function MyTripsList() {
 
       <ConfirmModal
         open={!!modal}
-        title={
-          modal
-            ? modal.type === "delete"
-              ? isFr
-                ? "Supprimer ce brouillon ?"
-                : "Delete this draft?"
-              : modal.type === "cancel"
-                ? isFr
-                  ? "Annuler ce trajet ?"
-                  : "Cancel this trip?"
-                : isFr
-                  ? "Repasser en brouillon ?"
-                  : "Revert to draft?"
-            : ""
-        }
-        message={
-          modal
-            ? (() => {
-              const from =
-                modal.trip.originCity ?? modal.trip.originLabel ?? "—";
-              const to =
-                modal.trip.destinationCity ??
-                modal.trip.destinationLabel ??
-                "—";
-              if (modal.type === "delete")
-                return isFr
-                  ? `Le brouillon "${from} → ${to}" sera définitivement supprimé.`
-                  : `The draft "${from} → ${to}" will be permanently deleted.`;
-              if (modal.type === "cancel")
-                return isFr
-                  ? `Le trajet "${from} → ${to}" sera annulé. Les demandes en cours seront notifiées.`
-                  : `The trip "${from} → ${to}" will be cancelled. Pending requests will be notified.`;
-              return isFr
-                ? `Le trajet "${from} → ${to}" sera masqué et repassé en brouillon. Vous pourrez le réactiver à tout moment.`
-                : `The trip "${from} → ${to}" will be hidden and reverted to draft. You can reactivate it anytime.`;
-            })()
-            : ""
-        }
-        confirmLabel={
-          modal
-            ? modal.type === "delete"
-              ? isFr
-                ? "Supprimer"
-                : "Delete"
-              : modal.type === "cancel"
-                ? isFr
-                  ? "Annuler le trajet"
-                  : "Cancel trip"
-                : isFr
-                  ? "Repasser en brouillon"
-                  : "Revert to draft"
-            : ""
-        }
+        title={modalCopy.title}
+        message={modalCopy.message}
+        confirmLabel={modalCopy.confirmLabel}
         isLoading={isConfirming}
         onConfirm={confirmModal}
         onCancel={() => setModal(null)}
-        isFr={isFr}
       />
 
       <style jsx global>{`

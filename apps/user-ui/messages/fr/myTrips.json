@@ -99,5 +99,156 @@
     "CHECKED_BAG_23KG": "Bagage soute 23 kg",
     "CABIN_BAG_12KG": "Bagage cabine 12 kg"
   },
-  "loadError": "Impossible de charger tes trajets. Réessaie dans un instant."
+  "loadError": "Impossible de charger tes trajets. Réessaie dans un instant.",
+
+  "status": {
+    "DRAFT": "Brouillon",
+    "PUBLISHED": "Actif",
+    "PAUSED": "En pause",
+    "COMPLETED": "Terminé",
+    "CANCELLED": "Annulé",
+    "ARCHIVED": "Archivé"
+  },
+  "transport": {
+    "PLANE": "Avion",
+    "TRAIN": "Train",
+    "CAR": "Voiture"
+  },
+  "actionsMenu": {
+    "view": "Voir le détail",
+    "viewPublic": "Voir en tant qu'expéditeur",
+    "edit": "Modifier",
+    "activate": "Activer",
+    "resume": "Reprendre",
+    "pause": "Mettre en pause",
+    "revertToDraft": "Repasser en brouillon",
+    "duplicate": "Dupliquer",
+    "archive": "Archiver",
+    "restoreDraft": "Restaurer en brouillon",
+    "cancel": "Annuler",
+    "cancelTrip": "Annuler le trajet",
+    "delete": "Supprimer",
+    "deleteDraft": "Supprimer le brouillon"
+  },
+  "list": {
+    "filters": {
+      "all": "Tous",
+      "finalize": "À finaliser",
+      "upcoming": "À venir",
+      "history": "Historique"
+    },
+    "groups": {
+      "finalize": "À finaliser",
+      "upcoming": "Trajets à venir",
+      "history": "Historique"
+    },
+    "demands": "{count, plural, =1 {1 demande} other {# demandes}}",
+    "setupRequired": "Config. requise",
+    "errorTitle": "Impossible de charger vos trajets.",
+    "retry": "Réessayer"
+  },
+  "gates": {
+    "onboardingToast": "Complétez votre profil transporteur pour activer ce trajet",
+    "onboardingCta": "Configurer",
+    "stripeToast": "Configurez Stripe pour activer ce trajet et recevoir des paiements",
+    "stripeCta": "Configurer Stripe"
+  },
+  "toasts": {
+    "activated": "Trajet activé",
+    "activationFailed": "Erreur lors de l''activation",
+    "resumed": "Trajet republié",
+    "paused": "Trajet mis en pause",
+    "reverted": "Trajet repassé en brouillon",
+    "restored": "Trajet restauré en brouillon",
+    "archived": "Trajet archivé",
+    "duplicated": "Brouillon créé par duplication",
+    "deleted": "Brouillon supprimé",
+    "deletedRedirect": "Brouillon supprimé avec succès",
+    "cancelled": "Trajet annulé",
+    "error": "Erreur"
+  },
+  "modals": {
+    "deleteTitle": "Supprimer ce brouillon ?",
+    "deleteMessage": "Le brouillon \"{from} → {to}\" sera définitivement supprimé.",
+    "deleteConfirm": "Supprimer",
+    "cancelTitle": "Annuler ce trajet ?",
+    "cancelMessage": "Le trajet \"{from} → {to}\" sera annulé. Les demandes en cours seront notifiées.",
+    "cancelConfirm": "Annuler le trajet",
+    "revertTitle": "Repasser en brouillon ?",
+    "revertMessage": "Le trajet \"{from} → {to}\" sera masqué et repassé en brouillon. Vous pourrez le réactiver à tout moment.",
+    "revertConfirm": "Repasser en brouillon",
+    "goBack": "Retour"
+  },
+  "banner": {
+    "title": "Vous avez {count, plural, =1 {1 brouillon en attente} other {# brouillons en attente}} de publication",
+    "subtitle": "Configurez votre espace transporteur pour activer vos trajets et recevoir des demandes.",
+    "cta": "Configurer maintenant"
+  },
+  "detail": {
+    "back": "Mes trajets",
+    "errorTitle": "Impossible de charger ce trajet.",
+    "route": "Itinéraire",
+    "type": "Type",
+    "datesTitle": "Dates & horaires",
+    "departure": "Départ",
+    "arrival": "Arrivée",
+    "transportTitle": "Transport",
+    "mode": "Mode",
+    "tripTypeLabel": "Type de trajet",
+    "layovers": "Escale(s)",
+    "stops": "Arrêt(s)",
+    "reference": "Référence",
+    "pricingTitle": "Catégories & tarifs",
+    "locationsTitle": "Lieux de remise & livraison",
+    "pickup": "Remise",
+    "delivery": "Livraison",
+    "documentsTitle": "Documents",
+    "notesTitle": "Notes",
+    "actionsTitle": "Actions",
+    "requestsTitle": "Demandes",
+    "requestsEmpty": "Aucune demande pour le moment",
+    "viewAsShipper": "Voir en tant qu'expéditeur",
+    "optionsTitle": "Options",
+    "handDelivery": "Remise en main propre",
+    "instantBooking": "Réservation instantanée",
+    "ticketVerified": "Billet vérifié",
+    "yes": "Oui",
+    "no": "Non",
+    "infoTitle": "Informations",
+    "createdAt": "Créé le",
+    "publishedAt": "Publié le",
+    "cancelledAt": "Annulé le",
+    "tripTypes": {
+      "ONE_WAY": "Aller simple",
+      "ROUND_TRIP": "Aller-retour"
+    },
+    "flightTypes": {
+      "DIRECT": "Vol direct",
+      "WITH_LAYOVER": "Avec escale"
+    },
+    "trainTypes": {
+      "DIRECT": "Direct",
+      "WITH_CONNECTION": "Avec correspondance"
+    },
+    "carTypes": {
+      "DIRECT": "Trajet direct",
+      "DETOUR_BY_AGREEMENT": "Détour possible"
+    },
+    "ticketStatus": {
+      "NOT_SUBMITTED": "Non soumis",
+      "PENDING": "En vérification",
+      "VERIFIED": "Vérifié",
+      "REJECTED": "Rejeté"
+    },
+    "locationKinds": {
+      "AIRPORT": "À l'aéroport",
+      "TRAIN_STATION": "À la gare",
+      "CITY_AREA": "Dans la ville"
+    },
+    "flexibility": {
+      "exact": "Lieu exact",
+      "cityWide": "Ville entière",
+      "radius": "Rayon {km} km"
+    }
+  }
 }
