@@ -101,5 +101,6 @@
         "linter": "none"
       }
     }
-  }
+  },
+  "analytics": true
 }
