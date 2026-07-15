@@ -27,7 +27,7 @@ jobs:
           cache: npm
 
       - name: Pin npm (meme version que le poste qui genere le lock)
-        run: npm install -g npm@11
+        run: npm install -g npm@10.9.8
 
       - name: Install dependencies
         run: npm ci
