@@ -40,10 +40,12 @@ export const MANGO = "#FF9900";
 export const TEAL = "#0F766E";
 
 /* ── Status display config ────────────────── */
+// ⭐ i18n : les labels vivent dans messages/{locale}/myTrips.json sous
+// `status.*` — les composants font t(STATUS_CONFIG[status].labelKey).
 
 export type StatusDisplay = {
-  labelFr: string;
-  labelEn: string;
+  /** Clé i18n dans le namespace "myTrips" (ex: "status.DRAFT") */
+  labelKey: string;
   bg: string;
   text: string;
   dot: string;
@@ -51,37 +53,38 @@ export type StatusDisplay = {
 
 export const STATUS_CONFIG: Record<TripStatus, StatusDisplay> = {
   DRAFT: {
-    labelFr: "Brouillon", labelEn: "Draft",
+    labelKey: "status.DRAFT",
     bg: "rgba(100,116,139,0.12)", text: "#94a3b8", dot: "#64748b",
   },
   PUBLISHED: {
-    labelFr: "Actif", labelEn: "Active",
+    labelKey: "status.PUBLISHED",
     bg: "rgba(16,185,129,0.12)", text: "#34d399", dot: "#10b981",
   },
   PAUSED: {
-    labelFr: "En pause", labelEn: "Paused",
+    labelKey: "status.PAUSED",
     bg: "rgba(245,158,11,0.12)", text: "#fbbf24", dot: "#f59e0b",
   },
   COMPLETED: {
-    labelFr: "Terminé", labelEn: "Completed",
+    labelKey: "status.COMPLETED",
     bg: "rgba(15,118,110,0.12)", text: "#5eead4", dot: TEAL,
   },
   CANCELLED: {
-    labelFr: "Annulé", labelEn: "Cancelled",
+    labelKey: "status.CANCELLED",
     bg: "rgba(239,68,68,0.10)", text: "#f87171", dot: "#ef4444",
   },
   ARCHIVED: {
-    labelFr: "Archivé", labelEn: "Archived",
+    labelKey: "status.ARCHIVED",
     bg: "rgba(100,116,139,0.08)", text: "#64748b", dot: "#475569",
   },
 };
 
 /* ── Transport labels ─────────────────────── */
 
-export const TRANSPORT_LABELS: Record<TransportMode, { fr: string; en: string }> = {
-  PLANE: { fr: "Avion", en: "Plane" },
-  TRAIN: { fr: "Train", en: "Train" },
-  CAR: { fr: "Voiture", en: "Car" },
+/** Clés i18n (namespace "myTrips") — t(TRANSPORT_LABEL_KEYS[mode]) */
+export const TRANSPORT_LABEL_KEYS: Record<TransportMode, string> = {
+  PLANE: "transport.PLANE",
+  TRAIN: "transport.TRAIN",
+  CAR: "transport.CAR",
 };
 
 /* ── Action definitions ───────────────────── */
@@ -90,19 +93,19 @@ export type TripActionKey =
   | "view"
   | "viewPublic"
   | "edit"
-  | "activate"        // NEW: DRAFT → PUBLISHED (or PAUSED → PUBLISHED)
+  | "activate"        // DRAFT → PUBLISHED (ou PAUSED → PUBLISHED)
   | "pause"           // PUBLISHED → PAUSED
-  | "revertToDraft"   // NEW: PUBLISHED/PAUSED → DRAFT
+  | "revertToDraft"   // PUBLISHED/PAUSED → DRAFT
   | "duplicate"
   | "archive"
-  | "restoreDraft"    // NEW: CANCELLED → DRAFT
+  | "restoreDraft"    // CANCELLED → DRAFT
   | "cancel"
   | "delete";
 
 export type TripAction = {
   key: TripActionKey;
-  labelFr: string;
-  labelEn: string;
+  /** Clé i18n dans le namespace "myTrips" (ex: "actionsMenu.view") */
+  labelKey: string;
   icon: string;
   danger: boolean;
   needsConfirm: boolean;
@@ -114,63 +117,64 @@ export function getActionsForStatus(
 ): TripAction[] {
   const a = (
     key: TripActionKey,
-    labelFr: string,
-    labelEn: string,
+    labelKey: string,
     icon: string,
     danger = false,
     needsConfirm = false
-  ): TripAction => ({ key, labelFr, labelEn, icon, danger, needsConfirm });
+  ): TripAction => ({ key, labelKey, icon, danger, needsConfirm });
 
   const actions: TripAction[] = [
-    a("view", "Voir le détail", "View details", "eye"),
+    a("view", "actionsMenu.view", "eye"),
   ];
 
   if (["PUBLISHED", "PAUSED", "COMPLETED"].includes(status)) {
-    actions.push(a("viewPublic", "Voir en tant qu'expéditeur", "View as shipper", "external"));
+    actions.push(a("viewPublic", "actionsMenu.viewPublic", "external"));
   }
 
   if (["DRAFT", "PUBLISHED", "PAUSED"].includes(status))
-    actions.push(a("edit", "Modifier", "Edit", "pencil"));
+    actions.push(a("edit", "actionsMenu.edit", "pencil"));
 
-  // NEW: Activate action for DRAFT and PAUSED
+  // Activate pour DRAFT / Resume pour PAUSED (même key, label distinct)
   if (status === "DRAFT" && !isPastDeparture)
-    actions.push(a("activate", "Activer", "Activate", "zap"));
+    actions.push(a("activate", "actionsMenu.activate", "zap"));
 
   if (status === "PAUSED" && !isPastDeparture)
-    actions.push(a("activate", "Reprendre", "Resume", "play"));
+    actions.push(a("activate", "actionsMenu.resume", "play"));
 
-  // Pause for PUBLISHED
   if (status === "PUBLISHED")
-    actions.push(a("pause", "Mettre en pause", "Pause", "pause"));
+    actions.push(a("pause", "actionsMenu.pause", "pause"));
 
-  // NEW: Revert to draft (PUBLISHED/PAUSED → DRAFT)
   if (["PUBLISHED", "PAUSED"].includes(status))
-    actions.push(a("revertToDraft", "Repasser en brouillon", "Revert to draft", "file-text"));
+    actions.push(a("revertToDraft", "actionsMenu.revertToDraft", "file-text"));
 
-  actions.push(a("duplicate", "Dupliquer", "Duplicate", "copy"));
+  actions.push(a("duplicate", "actionsMenu.duplicate", "copy"));
 
   if (["COMPLETED", "CANCELLED"].includes(status))
-    actions.push(a("archive", "Archiver", "Archive", "archive"));
+    actions.push(a("archive", "actionsMenu.archive", "archive"));
 
-  // NEW: Restore cancelled as draft
   if (status === "CANCELLED" && !isPastDeparture)
-    actions.push(a("restoreDraft", "Restaurer en brouillon", "Restore as draft", "rotate"));
+    actions.push(a("restoreDraft", "actionsMenu.restoreDraft", "rotate"));
 
   if (["PUBLISHED", "PAUSED"].includes(status))
-    actions.push(a("cancel", "Annuler", "Cancel", "x-circle", true, true));
+    actions.push(a("cancel", "actionsMenu.cancel", "x-circle", true, true));
 
   if (status === "DRAFT")
-    actions.push(a("delete", "Supprimer", "Delete", "trash", true, true));
+    actions.push(a("delete", "actionsMenu.delete", "trash", true, true));
 
   return actions;
 }
 
 /* ── Helpers ──────────────────────────────── */
 
-export function formatTripDate(dateStr: string | null, isFr: boolean): string {
+/**
+ * Formate une date locale de trajet ("2026-04-26") pour l'affichage.
+ * i18n : accepte n'importe quelle locale ("fr", "en", "pt", ...) —
+ * Intl gère nativement. Passer useLocale() de next-intl.
+ */
+export function formatTripDate(dateStr: string | null, locale: string): string {
   if (!dateStr) return "—";
   const d = new Date(dateStr + "T12:00:00");
-  return d.toLocaleDateString(isFr ? "fr-FR" : "en-US", {
+  return d.toLocaleDateString(locale, {
     day: "numeric", month: "short", year: "numeric",
   });
 }
