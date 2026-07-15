@@ -138,6 +138,20 @@ function useRevertToDraft() {
   });
 }
 
+// ⭐ Lot 3 — Archive trip (COMPLETED/CANCELLED → ARCHIVED), one-way
+function useArchiveTrip() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (tripId: string) => {
+      await apiClient.post(`/trips/${tripId}/archive`, {}, { requireAuth: true });
+    },
+    onSuccess: (_, tripId) => {
+      void qc.invalidateQueries({ queryKey: ["my-trips"] });
+      void qc.invalidateQueries({ queryKey: ["trip", tripId] });
+    },
+  });
+}
+
 /* ── Reusable UI ──────────────────────────── */
 
 function Section({ icon: Icon, title, children }: { icon: React.ElementType; title: string; children: React.ReactNode }) {
@@ -260,6 +274,8 @@ export default function TripDetails({ tripId }: { tripId: string }) {
   const duplicateTrip = useDuplicateTrip();
   const activateTrip = useActivateTrip();
   const revertToDraftMut = useRevertToDraft();
+  // ⭐ Lot 3 — archive réelle (remplace le toast fake)
+  const archiveTrip = useArchiveTrip();
 
   const [modal, setModal] = useState<"cancel" | "delete" | "revertToDraft" | null>(null);
 
@@ -528,7 +544,8 @@ export default function TripDetails({ tripId }: { tripId: string }) {
                 <ActionButton icon={RotateCcw} label={isFr ? "Restaurer en brouillon" : "Restore as draft"} loading={restoreTrip.isPending} onClick={() => restoreTrip.mutate(tripId, { onSuccess: () => ok(isFr ? "Trajet restauré en brouillon" : "Trip restored as draft"), onError: ko })} />
               )}
               {["COMPLETED", "CANCELLED"].includes(status) && (
-                <ActionButton icon={Archive} label={isFr ? "Archiver" : "Archive"} onClick={() => ok(isFr ? "Trajet archivé" : "Trip archived")} />
+                // ⭐ Lot 3 — vraie mutation (POST /trips/:id/archive), plus de toast fake
+                <ActionButton icon={Archive} label={isFr ? "Archiver" : "Archive"} loading={archiveTrip.isPending} onClick={() => archiveTrip.mutate(tripId, { onSuccess: () => ok(isFr ? "Trajet archivé" : "Trip archived"), onError: ko })} />
               )}
               {["PUBLISHED", "PAUSED"].includes(status) && (
                 <ActionButton icon={XCircle} label={isFr ? "Annuler le trajet" : "Cancel trip"} variant="danger" onClick={() => setModal("cancel")} />

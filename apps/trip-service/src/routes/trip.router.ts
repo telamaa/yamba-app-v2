@@ -7,14 +7,16 @@ import {
   addTripDocuments,
   removeTripDocument,
   cancelTrip,
+  deleteTrip,                // ⭐ Lot 2 — dispatch ?hard=true → soft delete, sinon alias cancel
+  archiveTrip,               // ⭐ Lot 2 — NOUVEAU
   restoreTrip,
   publishTrip,
   pauseTrip,
   resumeTrip,
   unpublishTrip,
-  getPublicTrip,             // ⭐ NEW (PR 1.a)
+  getPublicTrip,             // ⭐ (PR 1.a)
 } from "../controllers/trip.controller";
-// ⭐ NEW : controllers de la search publique
+// ⭐ Controllers de la search publique
 import {
   searchTrips,
   searchTripsFacets,
@@ -36,9 +38,13 @@ router.get("/:id/public", getPublicTrip);
 // ─── Trip CRUD ───────────────────────────────
 router.post("/", isAuthenticated, createTrip);                             // Créer un trip
 router.get("/my", isAuthenticated, getMyTrips);                            // Mes trips (avec filtre ?status=)
-router.get("/:id", isAuthenticated, getTrip);                              // Détail d'un trip
+router.get("/:id", isAuthenticated, getTrip);                              // Détail d'un trip (owner only)
 router.put("/:id", isAuthenticated, updateTrip);                           // Modifier un trip
-router.delete("/:id", isAuthenticated, cancelTrip);                        // Annuler (soft delete)
+
+// ⭐ Lot 2 — DELETE conservé en alias backward-compat :
+//   ?hard=true → soft delete d'un brouillon (isDeleted + deletedAt)
+//   sinon      → alias de cancel (même philosophie que resolveSectionKey)
+router.delete("/:id", isAuthenticated, deleteTrip);
 
 // ─── Lifecycle ───────────────────────────────
 router.post("/:id/publish", isAuthenticated, publishTrip);                 // Publier un brouillon
@@ -46,6 +52,8 @@ router.post("/:id/pause", isAuthenticated, pauseTrip);                     // Me
 router.post("/:id/resume", isAuthenticated, resumeTrip);                   // Reprendre après pause
 router.post("/:id/restore", isAuthenticated, restoreTrip);                 // Restaurer un trip annulé
 router.post("/:id/unpublish", isAuthenticated, unpublishTrip);             // Repasser en brouillon
+router.post("/:id/cancel", isAuthenticated, cancelTrip);                   // ⭐ Lot 2 — Annuler (endpoint explicite)
+router.post("/:id/archive", isAuthenticated, archiveTrip);                 // ⭐ Lot 2 — Archiver (one-way)
 
 // ─── Documents ───────────────────────────────
 router.post("/:id/documents", isAuthenticated, addTripDocuments);          // Ajouter des documents

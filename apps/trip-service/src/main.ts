@@ -1,10 +1,13 @@
 import express from 'express';
+// Cron quotidien : PUBLISHED/PAUSED → COMPLETED (arrivée + 24h)
+import { startCompleteTripsCron } from "./cron/complete-trips.cron";
 import cors from "cors";
 import cookieParser = require("cookie-parser");
 import swaggerUi from "swagger-ui-express";
 import { errorMiddleware } from "@packages/error-handler/error-middleware";
 import tripRouter from "./routes/trip.router";
 import uploadRouter from "./routes/upload.routes";
+
 const swaggerDocument = require("./swagger-output.json");
 
 const app = express();
@@ -39,6 +42,9 @@ const port = process.env.PORT || 6002;
 const server = app.listen(port, () => {
   console.log(`Trip service running at http://localhost:${port}`);
   console.log(`Swagger Docs at http://localhost:${port}/api-docs`);
+
+  // ⭐ Lot 3 — Démarre le cron une fois le serveur prêt (idempotent)
+  startCompleteTripsCron();
 });
 
 server.on("error", (err) => {

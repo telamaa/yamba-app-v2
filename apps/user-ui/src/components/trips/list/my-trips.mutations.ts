@@ -11,10 +11,31 @@ export function useDeleteTrip() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (tripId: string) => {
+      // ⭐ Lot 3 — le backend honore désormais réellement ?hard=true :
+      // soft delete du brouillon (isDeleted + deletedAt), plus de
+      // fantôme "Annulé" dans l'Historique.
       await apiClient.delete(`/trips/${tripId}`, {
         params: { hard: true },
         requireAuth: true,
       });
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["my-trips"] });
+    },
+  });
+}
+
+/**
+ * ⭐ Lot 3 — NOUVEAU : archive réelle (COMPLETED/CANCELLED → ARCHIVED).
+ * Remplace le toast fake `case "archive": ok(...)` dans MyTripsList,
+ * MyTripsTable et TripDetails. One-way : pas de désarchivage (MVP),
+ * Dupliquer reste disponible sur un trip archivé.
+ */
+export function useArchiveTrip() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (tripId: string) => {
+      await apiClient.post(`/trips/${tripId}/archive`, {}, { requireAuth: true });
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["my-trips"] });

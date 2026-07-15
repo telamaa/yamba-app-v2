@@ -94,6 +94,17 @@ function useRevertToDraft() {
   });
 }
 
+// ⭐ Lot 3 — Archive trip (COMPLETED/CANCELLED → ARCHIVED), one-way
+function useArchiveTrip() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (tripId: string) => {
+      await apiClient.post(`/trips/${tripId}/archive`, {}, { requireAuth: true });
+    },
+    onSuccess: () => { void qc.invalidateQueries({ queryKey: ["my-trips"] }); },
+  });
+}
+
 /* ── StatusBadge ──────────────────────────── */
 
 function StatusBadge({ status, isFr, needsOnboarding }: { status: TripStatus; isFr: boolean; needsOnboarding?: boolean }) {
@@ -315,6 +326,8 @@ export default function MyTripsTable() {
   const duplicateTrip = useDuplicateTrip();
   const activateTrip = useActivateTrip();
   const revertToDraft = useRevertToDraft();
+  // ⭐ Lot 3 — archive réelle (remplace le toast fake)
+  const archiveTrip = useArchiveTrip();
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
@@ -463,7 +476,11 @@ export default function MyTripsTable() {
         break;
 
       case "archive":
-        ok(isFr ? "Trajet archivé" : "Trip archived");
+        // ⭐ Lot 3 — vraie mutation (POST /trips/:id/archive)
+        archiveTrip.mutate(trip.id, {
+          onSuccess: () => ok(isFr ? "Trajet archivé" : "Trip archived"),
+          onError: ko,
+        });
         break;
 
       case "cancel":
@@ -474,7 +491,7 @@ export default function MyTripsTable() {
         setModal({ type: "delete", trip });
         break;
     }
-  }, [router, isFr, hasOnboarding, stripeReady, pauseTrip, resumeTrip, duplicateTrip, restoreTrip, activateTrip]);
+  }, [router, isFr, hasOnboarding, stripeReady, pauseTrip, resumeTrip, duplicateTrip, restoreTrip, activateTrip, archiveTrip]);
 
   const confirmModal = useCallback(() => {
     if (!modal) return;
