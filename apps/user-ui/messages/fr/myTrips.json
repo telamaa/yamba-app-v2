@@ -88,15 +88,16 @@
   "categories": {
     "CLOTHES": "Vêtements",
     "SHOES": "Chaussures",
-    "COSMETICS": "Cosmétiques",
+    "FASHION_ACCESSORIES": "Accessoires de mode",
+    "OTHER_ACCESSORIES": "Autres accessoires",
     "BOOKS": "Livres",
-    "ELECTRONICS_SMALL": "Électronique",
     "DOCUMENTS": "Documents",
-    "FOOD_DRY": "Alimentaire sec",
-    "GIFTS": "Cadeaux",
+    "SMALL_TOYS": "Petits jouets",
+    "PHONE": "Téléphone",
+    "COMPUTER": "Ordinateur",
+    "OTHER_ELECTRONICS": "Autre électronique",
     "CHECKED_BAG_23KG": "Bagage soute 23 kg",
-    "CABIN_BAG_12KG": "Bagage cabine 12 kg",
-    "OTHER": "Autre"
+    "CABIN_BAG_12KG": "Bagage cabine 12 kg"
   },
   "loadError": "Impossible de charger tes trajets. Réessaie dans un instant."
 }

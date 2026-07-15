@@ -12,6 +12,8 @@ type Params = Promise<{
 }>;
 
 export default async function BookingPage({ params }: { params: Params }) {
-  const { locale, tripId } = await params;
-  return <BookingClient locale={locale} tripId={tripId} />;
+  // ⭐ fix baseline : BookingClient lit désormais la locale via useLocale(),
+  // la prop `locale` n'existe plus dans ses Props.
+  const { tripId } = await params;
+  return <BookingClient tripId={tripId} />;
 }

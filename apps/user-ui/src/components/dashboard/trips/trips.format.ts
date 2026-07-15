@@ -87,23 +87,25 @@ export function categoryLabel(t: Translator, category: ParcelCategory): string {
       return t("categories.CLOTHES");
     case "SHOES":
       return t("categories.SHOES");
-    case "COSMETICS":
-      return t("categories.COSMETICS");
+    case "FASHION_ACCESSORIES":
+      return t("categories.FASHION_ACCESSORIES");
+    case "OTHER_ACCESSORIES":
+      return t("categories.OTHER_ACCESSORIES");
     case "BOOKS":
       return t("categories.BOOKS");
-    case "ELECTRONICS_SMALL":
-      return t("categories.ELECTRONICS_SMALL");
     case "DOCUMENTS":
       return t("categories.DOCUMENTS");
-    case "FOOD_DRY":
-      return t("categories.FOOD_DRY");
-    case "GIFTS":
-      return t("categories.GIFTS");
+    case "SMALL_TOYS":
+      return t("categories.SMALL_TOYS");
+    case "PHONE":
+      return t("categories.PHONE");
+    case "COMPUTER":
+      return t("categories.COMPUTER");
+    case "OTHER_ELECTRONICS":
+      return t("categories.OTHER_ELECTRONICS");
     case "CHECKED_BAG_23KG":
       return t("categories.CHECKED_BAG_23KG");
     case "CABIN_BAG_12KG":
       return t("categories.CABIN_BAG_12KG");
-    case "OTHER":
-      return t("categories.OTHER");
   }
 }
