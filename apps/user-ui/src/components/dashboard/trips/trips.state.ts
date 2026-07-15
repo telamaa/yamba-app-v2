@@ -49,7 +49,8 @@ export const mockCarrierTrips: CarrierTripItem[] = [
         status: "ACCEPTED",
         shipper: { firstName: "Sonia", lastInitial: "R." },
         recipientFirstName: "Clarisse",
-        category: "COSMETICS",
+        // ⭐ fix baseline : COSMETICS n'existe pas dans ParcelCategory
+        category: "OTHER_ACCESSORIES",
         weightKg: 1.5,
         netEarningsEur: 89.3,
         pickupMeetingAt: new Date(now + 4 * HOUR).toISOString(),
@@ -96,7 +97,8 @@ export const mockCarrierTrips: CarrierTripItem[] = [
         lastTrackingStep: "FLIGHT_DEPARTED",
         shipper: { firstName: "Fatou", lastInitial: "D." },
         recipientFirstName: "Aïcha",
-        category: "GIFTS",
+        // ⭐ fix baseline : GIFTS n'existe pas dans ParcelCategory
+        category: "SMALL_TOYS",
         weightKg: 3.2,
         netEarningsEur: 72.4,
       },
@@ -173,7 +175,8 @@ export const mockCarrierTrips: CarrierTripItem[] = [
         status: "COMPLETED",
         shipper: { firstName: "Josué", lastInitial: "M." },
         recipientFirstName: "Prisca",
-        category: "GIFTS",
+        // ⭐ fix baseline : GIFTS n'existe pas dans ParcelCategory
+        category: "SMALL_TOYS",
         weightKg: 1.9,
         netEarningsEur: 89.3,
         deliveredAt: new Date(now - 11 * DAY).toISOString(),

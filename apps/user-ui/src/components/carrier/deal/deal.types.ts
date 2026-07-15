@@ -18,18 +18,12 @@ export type DealStatus =
   | "EXPIRED"          // Délai dépassé sans réponse
   | "CANCELLED";       // Annulé par le shipper
 
-export type ParcelCategory =
-  | "CLOTHES"
-  | "SHOES"
-  | "COSMETICS"
-  | "BOOKS"
-  | "ELECTRONICS_SMALL"
-  | "DOCUMENTS"
-  | "FOOD_DRY"
-  | "GIFTS"
-  | "CHECKED_BAG_23KG"
-  | "CABIN_BAG_12KG"
-  | "OTHER";
+// fix baseline : source de vérité unique — l'union locale dupliquait
+// l'enum avec un vocabulaire fantôme (COSMETICS, ELECTRONICS_SMALL,
+// FOOD_DRY, GIFTS, OTHER) absent du produit et des JSON i18n.
+// trips.types.ts importe déjà depuis booking.types ; on aligne.
+export type { ParcelCategory } from "@/components/booking/booking.types";
+import type { ParcelCategory } from "@/components/booking/booking.types";
 
 export type DealPhotoContext =
   | "DECLARED_CONTENT"   // Tag "Contenu" (déclaration Shipper, violet)

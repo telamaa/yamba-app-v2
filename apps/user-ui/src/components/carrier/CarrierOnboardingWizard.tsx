@@ -172,7 +172,10 @@ export default function CarrierOnboardingWizard() {
             placeId: pa.placeId ?? "",
             lat: pa.lat ?? null, lng: pa.lng ?? null,
             streetLine1: pa.streetLine1 ?? null, city: pa.city ?? null,
-            region: pa.region ?? null, postalCode: pa.postalCode ?? null,
+            // ⭐ fix baseline : PlaceDetails exige cityCode/regionCode (champs ✨ ISO)
+            cityCode: pa.cityCode ?? null,
+            region: pa.region ?? null, regionCode: pa.regionCode ?? null,
+            postalCode: pa.postalCode ?? null,
             country: pa.country ?? null, countryCode: pa.countryCode ?? null,
           };
         }
