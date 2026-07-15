@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useCallback, useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Car, Plane, Plus, Train } from "lucide-react";
@@ -16,6 +17,7 @@ import {
 } from "@/hooks/useTrip";
 import {
   useActivateTrip,
+  useArchiveTrip,
   useDeleteTrip,
   useDuplicateTrip,
   useRevertToDraft,
@@ -68,7 +70,6 @@ function TripRow({
   needsOnboarding: boolean;
   onAction: (key: TripActionKey, trip: TripListItem) => void;
 }) {
-  const router = useRouter();
   const TransportIcon = trip.transportMode
     ? TRANSPORT_ICONS[trip.transportMode]
     : Plane;
@@ -105,8 +106,9 @@ function TripRow({
         ? "bg-amber-50 text-amber-700 dark:bg-amber-900/25 dark:text-amber-300"
         : "bg-teal-50 text-teal-700 dark:bg-teal-900/25 dark:text-teal-300");
 
+  // ⭐ "relative" pour ancrer le lien overlay
   const rowClass =
-    "group flex w-full cursor-pointer items-center gap-3 rounded-lg bg-white px-4 py-3 " +
+    "group relative flex w-full cursor-pointer items-center gap-3 rounded-lg bg-white px-4 py-3 " +
     "transition-colors hover:bg-slate-100 dark:bg-slate-950 dark:hover:bg-slate-800/60 mb-1.5 " +
     (muted ? "opacity-70 hover:opacity-100" : "");
 
@@ -147,15 +149,16 @@ function TripRow({
   }
 
   return (
-    <div
-      className={rowClass}
-      onClick={() => router.push(`/dashboard/trips/${trip.id}`)}
-      role="link"
-      tabIndex={0}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") router.push(`/dashboard/trips/${trip.id}`);
-      }}
-    >
+    <div className={rowClass}>
+      {/* ⭐ Lien réel en overlay : toute la row est un <a> natif
+          (clic droit → nouvel onglet, clic molette, Enter au clavier),
+          sans imbriquer les boutons dans le lien (HTML invalide). */}
+      <Link
+        href={`/dashboard/trips/${trip.id}`}
+        className="absolute inset-0 z-0 rounded-lg"
+        aria-label={`${from} → ${to}`}
+      />
+
       <div className={iconWrapperClass}>
         <TransportIcon size={17} />
       </div>
@@ -187,7 +190,8 @@ function TripRow({
         </div>
       </div>
 
-      <div className="flex flex-shrink-0 items-center gap-3">
+      {/* ⭐ z-10 : les contrôles restent cliquables AU-DESSUS du lien overlay */}
+      <div className="relative z-10 flex flex-shrink-0 items-center gap-3">
         <span className="hidden sm:inline-flex">
           <StatusBadge
             status={trip.status}
@@ -228,6 +232,8 @@ export default function MyTripsList() {
   const duplicateTrip = useDuplicateTrip();
   const activateTrip = useActivateTrip();
   const revertToDraft = useRevertToDraft();
+  // ⭐ Lot 3 — archive réelle (remplace le toast fake)
+  const archiveTrip = useArchiveTrip();
 
   const [filter, setFilter] = useState<Filter>("all");
   const [modal, setModal] = useState<{
@@ -367,7 +373,11 @@ export default function MyTripsList() {
           });
           break;
         case "archive":
-          ok(isFr ? "Trajet archivé" : "Trip archived");
+          // ⭐ Lot 3 — vraie mutation (POST /trips/:id/archive)
+          archiveTrip.mutate(trip.id, {
+            onSuccess: () => ok(isFr ? "Trajet archivé" : "Trip archived"),
+            onError: ko,
+          });
           break;
         case "cancel":
           setModal({ type: "cancel", trip });
@@ -387,6 +397,7 @@ export default function MyTripsList() {
       duplicateTrip,
       restoreTrip,
       activateTrip,
+      archiveTrip,
     ]
   );
 
