@@ -448,6 +448,10 @@ model Trip {
   cancelledAt DateTime?
   archivedAt  DateTime?
 
+  // ⭐ Lifecycle hardening (Lot 1/2) — soft delete des brouillons
+  isDeleted Boolean   @default(false)
+  deletedAt DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -459,6 +463,7 @@ model Trip {
   @@index([departureAt])
   @@index([publishedAt])
   @@index([userId, status])
+  @@index([userId, isDeleted]) // ⭐ Lot 1/2 — requête chaude getMyTrips
   @@index([originPlaceId])
   @@index([destinationPlaceId])
   @@index([status, departureAt, transportMode])
