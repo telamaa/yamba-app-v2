@@ -99,5 +99,156 @@
     "CHECKED_BAG_23KG": "Checked bag 23 kg",
     "CABIN_BAG_12KG": "Cabin bag 12 kg"
   },
-  "loadError": "Could not load your trips. Please try again shortly."
+  "loadError": "Could not load your trips. Please try again shortly.",
+
+  "status": {
+    "DRAFT": "Draft",
+    "PUBLISHED": "Active",
+    "PAUSED": "Paused",
+    "COMPLETED": "Completed",
+    "CANCELLED": "Cancelled",
+    "ARCHIVED": "Archived"
+  },
+  "transport": {
+    "PLANE": "Plane",
+    "TRAIN": "Train",
+    "CAR": "Car"
+  },
+  "actionsMenu": {
+    "view": "View details",
+    "viewPublic": "View as shipper",
+    "edit": "Edit",
+    "activate": "Activate",
+    "resume": "Resume",
+    "pause": "Pause",
+    "revertToDraft": "Revert to draft",
+    "duplicate": "Duplicate",
+    "archive": "Archive",
+    "restoreDraft": "Restore as draft",
+    "cancel": "Cancel",
+    "cancelTrip": "Cancel trip",
+    "delete": "Delete",
+    "deleteDraft": "Delete draft"
+  },
+  "list": {
+    "filters": {
+      "all": "All",
+      "finalize": "To finalize",
+      "upcoming": "Upcoming",
+      "history": "History"
+    },
+    "groups": {
+      "finalize": "To finalize",
+      "upcoming": "Upcoming trips",
+      "history": "History"
+    },
+    "demands": "{count, plural, =1 {1 request} other {# requests}}",
+    "setupRequired": "Setup required",
+    "errorTitle": "Unable to load your trips.",
+    "retry": "Retry"
+  },
+  "gates": {
+    "onboardingToast": "Complete your carrier profile to activate this trip",
+    "onboardingCta": "Configure",
+    "stripeToast": "Configure Stripe to activate this trip and receive payments",
+    "stripeCta": "Configure Stripe"
+  },
+  "toasts": {
+    "activated": "Trip activated",
+    "activationFailed": "Failed to activate",
+    "resumed": "Trip resumed",
+    "paused": "Trip paused",
+    "reverted": "Trip reverted to draft",
+    "restored": "Trip restored as draft",
+    "archived": "Trip archived",
+    "duplicated": "Draft created from duplicate",
+    "deleted": "Draft deleted",
+    "deletedRedirect": "Draft deleted successfully",
+    "cancelled": "Trip cancelled",
+    "error": "Error"
+  },
+  "modals": {
+    "deleteTitle": "Delete this draft?",
+    "deleteMessage": "The draft \"{from} → {to}\" will be permanently deleted.",
+    "deleteConfirm": "Delete",
+    "cancelTitle": "Cancel this trip?",
+    "cancelMessage": "The trip \"{from} → {to}\" will be cancelled. Pending requests will be notified.",
+    "cancelConfirm": "Cancel trip",
+    "revertTitle": "Revert to draft?",
+    "revertMessage": "The trip \"{from} → {to}\" will be hidden and reverted to draft. You can reactivate it anytime.",
+    "revertConfirm": "Revert to draft",
+    "goBack": "Go back"
+  },
+  "banner": {
+    "title": "You have {count, plural, =1 {1 draft pending} other {# drafts pending}} publication",
+    "subtitle": "Set up your carrier profile to activate your trips and receive requests.",
+    "cta": "Configure now"
+  },
+  "detail": {
+    "back": "My trips",
+    "errorTitle": "Unable to load this trip.",
+    "route": "Route",
+    "type": "Type",
+    "datesTitle": "Dates & times",
+    "departure": "Departure",
+    "arrival": "Arrival",
+    "transportTitle": "Transport",
+    "mode": "Mode",
+    "tripTypeLabel": "Trip type",
+    "layovers": "Layover(s)",
+    "stops": "Stop(s)",
+    "reference": "Reference",
+    "pricingTitle": "Categories & pricing",
+    "locationsTitle": "Pickup & delivery locations",
+    "pickup": "Pickup",
+    "delivery": "Delivery",
+    "documentsTitle": "Documents",
+    "notesTitle": "Notes",
+    "actionsTitle": "Actions",
+    "requestsTitle": "Requests",
+    "requestsEmpty": "No requests yet",
+    "viewAsShipper": "View as shipper",
+    "optionsTitle": "Options",
+    "handDelivery": "Hand delivery only",
+    "instantBooking": "Instant booking",
+    "ticketVerified": "Ticket verified",
+    "yes": "Yes",
+    "no": "No",
+    "infoTitle": "Information",
+    "createdAt": "Created",
+    "publishedAt": "Published",
+    "cancelledAt": "Cancelled",
+    "tripTypes": {
+      "ONE_WAY": "One way",
+      "ROUND_TRIP": "Round trip"
+    },
+    "flightTypes": {
+      "DIRECT": "Direct flight",
+      "WITH_LAYOVER": "With layover"
+    },
+    "trainTypes": {
+      "DIRECT": "Direct",
+      "WITH_CONNECTION": "With connection"
+    },
+    "carTypes": {
+      "DIRECT": "Direct trip",
+      "DETOUR_BY_AGREEMENT": "Detour by agreement"
+    },
+    "ticketStatus": {
+      "NOT_SUBMITTED": "Not submitted",
+      "PENDING": "Pending",
+      "VERIFIED": "Verified",
+      "REJECTED": "Rejected"
+    },
+    "locationKinds": {
+      "AIRPORT": "At the airport",
+      "TRAIN_STATION": "At the train station",
+      "CITY_AREA": "In the city"
+    },
+    "flexibility": {
+      "exact": "Exact spot",
+      "cityWide": "Whole city",
+      "radius": "Within {km} km"
+    }
+  }
 }
