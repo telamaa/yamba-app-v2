@@ -4,7 +4,7 @@ import { ValidationError } from "@packages/error-handler";
 import { AuthenticatedRequest } from "@packages/middleware/isAuthenticated";
 import { Role } from "@prisma/client";
 import Stripe from "stripe";
-import {sendOnboardingCompleteEmail} from "../service/onboarding-email.service";
+import {sendOnboardingCompleteEmail} from "../services/onboarding-email.service";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2026-03-25.dahlia",
