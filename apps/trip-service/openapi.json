@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Yamba — Trip Service API",
-    "version": "0.2.0",
-    "description": "Contrats générés depuis @packages/api-contracts (Zod v4, source de vérité unique — D3). Les clients consomment l'API via le gateway (:8080, préfixe /api) ; ce service écoute en direct sur :6002. Les routes marquées « Auth requise » attendent la session (cookie/bearer — securitySchemes formalisés au Lot C)."
+    "version": "0.3.0",
+    "description": "Contrats générés depuis @packages/api-contracts (Zod v4, source de vérité unique — D3). Les clients consomment l'API via le gateway (:8080, préfixe /api) ; ce service écoute en direct sur :6002. Authentification : cookie access_token OU header Authorization: Bearer (le cookie est prioritaire)."
   },
   "servers": [
     {
@@ -457,6 +457,14 @@
         "summary": "Créer un trip (brouillon ou publication directe)",
         "description": "publish=true crée directement en PUBLISHED si les gates onboarding/Stripe passent (sinon 400). Un brouillon peut être incomplet (villes, dates nullish). minPriceCents et departureHourLocal sont recalculés côté serveur. Auth requise.",
         "operationId": "createTrip",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -488,6 +496,16 @@
               }
             }
           },
+          "401": {
+            "description": "Token absent, invalide, expiré, ou compte introuvable (middleware isAuthenticated)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedResponse"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Erreur serveur non gérée",
             "content": {
@@ -509,6 +527,14 @@
         "summary": "Mes trips",
         "description": "Tous les trips de l'utilisateur (hors soft-deleted), triés par createdAt desc. Chaque trip embarque allowedActions (state machine) et un select partiel des documents {id, type, status, url}. Auth requise.",
         "operationId": "getMyTrips",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
         "parameters": [
           {
             "name": "status",
@@ -541,6 +567,16 @@
               }
             }
           },
+          "401": {
+            "description": "Token absent, invalide, expiré, ou compte introuvable (middleware isAuthenticated)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedResponse"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Erreur serveur non gérée",
             "content": {
@@ -562,6 +598,14 @@
         "summary": "Détail owner d'un trip",
         "description": "Vue complète (documents, user, carrierPage) + allowedActions IMBRIQUÉ dans trip. Ownership requis : le trip d'autrui renvoie 400 \"Unauthorized.\" (voir note sémantique). Auth requise.",
         "operationId": "getTrip",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
         "parameters": [
           {
             "name": "id",
@@ -594,6 +638,16 @@
               }
             }
           },
+          "401": {
+            "description": "Token absent, invalide, expiré, ou compte introuvable (middleware isAuthenticated)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedResponse"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Erreur serveur non gérée",
             "content": {
@@ -613,6 +667,14 @@
         "summary": "Modifier un trip",
         "description": "Body partiel (seuls les champs envoyés sont écrits). publish=true sur un DRAFT déclenche les gates de publication (onboarding, Stripe, locations). Édition refusée par la machine (COMPLETED/ARCHIVED/CANCELLED…) → 400. Auth requise.",
         "operationId": "updateTrip",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
         "parameters": [
           {
             "name": "id",
@@ -655,6 +717,16 @@
               }
             }
           },
+          "401": {
+            "description": "Token absent, invalide, expiré, ou compte introuvable (middleware isAuthenticated)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedResponse"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Erreur serveur non gérée",
             "content": {
@@ -674,6 +746,14 @@
         "summary": "Supprimer (brouillon) ou annuler (alias)",
         "description": "?hard=true → soft delete d'un brouillon (isDeleted, invisible partout). Sans ?hard → alias backward-compat de cancel. Auth requise.",
         "operationId": "deleteTrip",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
         "parameters": [
           {
             "name": "id",
@@ -719,6 +799,16 @@
               }
             }
           },
+          "401": {
+            "description": "Token absent, invalide, expiré, ou compte introuvable (middleware isAuthenticated)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedResponse"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Erreur serveur non gérée",
             "content": {
@@ -740,6 +830,14 @@
         "summary": "Publier un brouillon",
         "description": "DRAFT → PUBLISHED. Gates : onboarding carrier, Stripe (charges enabled), champs requis (mode, villes, départ futur, ≥1 catégorie), ≥1 pickup + ≥1 delivery location. Transition refusée → 400 avec le message machine de canPerform. Auth requise (owner uniquement).",
         "operationId": "publishTrip",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
         "parameters": [
           {
             "name": "id",
@@ -772,6 +870,16 @@
               }
             }
           },
+          "401": {
+            "description": "Token absent, invalide, expiré, ou compte introuvable (middleware isAuthenticated)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedResponse"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Erreur serveur non gérée",
             "content": {
@@ -793,6 +901,14 @@
         "summary": "Repasser en brouillon",
         "description": "PUBLISHED/PAUSED → DRAFT. Interdit avec réservations actives (guard prêt pour le chantier Booking). Décrémente les stats carrier. Transition refusée → 400 avec le message machine de canPerform. Auth requise (owner uniquement).",
         "operationId": "unpublishTrip",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
         "parameters": [
           {
             "name": "id",
@@ -825,6 +941,16 @@
               }
             }
           },
+          "401": {
+            "description": "Token absent, invalide, expiré, ou compte introuvable (middleware isAuthenticated)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedResponse"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Erreur serveur non gérée",
             "content": {
@@ -846,6 +972,14 @@
         "summary": "Mettre en pause",
         "description": "PUBLISHED → PAUSED. Le trip reste dans le pool public. Transition refusée → 400 avec le message machine de canPerform. Auth requise (owner uniquement).",
         "operationId": "pauseTrip",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
         "parameters": [
           {
             "name": "id",
@@ -878,6 +1012,16 @@
               }
             }
           },
+          "401": {
+            "description": "Token absent, invalide, expiré, ou compte introuvable (middleware isAuthenticated)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedResponse"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Erreur serveur non gérée",
             "content": {
@@ -899,6 +1043,14 @@
         "summary": "Reprendre",
         "description": "PAUSED → PUBLISHED. Date de départ non passée requise. Transition refusée → 400 avec le message machine de canPerform. Auth requise (owner uniquement).",
         "operationId": "resumeTrip",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
         "parameters": [
           {
             "name": "id",
@@ -931,6 +1083,16 @@
               }
             }
           },
+          "401": {
+            "description": "Token absent, invalide, expiré, ou compte introuvable (middleware isAuthenticated)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedResponse"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Erreur serveur non gérée",
             "content": {
@@ -952,6 +1114,14 @@
         "summary": "Annuler",
         "description": "→ CANCELLED (cancelledAt posé). Décrémente les stats carrier, y compris depuis PAUSED. Transition refusée → 400 avec le message machine de canPerform. Auth requise (owner uniquement).",
         "operationId": "cancelTrip",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
         "parameters": [
           {
             "name": "id",
@@ -984,6 +1154,16 @@
               }
             }
           },
+          "401": {
+            "description": "Token absent, invalide, expiré, ou compte introuvable (middleware isAuthenticated)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedResponse"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Erreur serveur non gérée",
             "content": {
@@ -1005,6 +1185,14 @@
         "summary": "Restaurer en brouillon",
         "description": "CANCELLED → DRAFT (cancelledAt effacé). Date de départ non passée requise. Transition refusée → 400 avec le message machine de canPerform. Auth requise (owner uniquement).",
         "operationId": "restoreTrip",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
         "parameters": [
           {
             "name": "id",
@@ -1037,6 +1225,16 @@
               }
             }
           },
+          "401": {
+            "description": "Token absent, invalide, expiré, ou compte introuvable (middleware isAuthenticated)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedResponse"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Erreur serveur non gérée",
             "content": {
@@ -1058,6 +1256,14 @@
         "summary": "Archiver",
         "description": "COMPLETED/CANCELLED → ARCHIVED (one-way, pas de désarchivage MVP). Transition refusée → 400 avec le message machine de canPerform. Auth requise (owner uniquement).",
         "operationId": "archiveTrip",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
         "parameters": [
           {
             "name": "id",
@@ -1090,6 +1296,16 @@
               }
             }
           },
+          "401": {
+            "description": "Token absent, invalide, expiré, ou compte introuvable (middleware isAuthenticated)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedResponse"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Erreur serveur non gérée",
             "content": {
@@ -1111,6 +1327,14 @@
         "summary": "Ajouter des justificatifs",
         "description": "Déduplication par fileId (les doublons sont ignorés ; si aucun nouveau → 200 \"No new documents to add.\"). Limites serveur : siteConfig.maxDocsPerTrip (défaut 5), maxDocSizeMb (défaut 5 Mo). Un TICKET_PROOF fait passer ticketVerificationStatus NOT_SUBMITTED → PENDING. Auth requise (owner).",
         "operationId": "addTripDocuments",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
         "parameters": [
           {
             "name": "id",
@@ -1163,6 +1387,16 @@
               }
             }
           },
+          "401": {
+            "description": "Token absent, invalide, expiré, ou compte introuvable (middleware isAuthenticated)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedResponse"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Erreur serveur non gérée",
             "content": {
@@ -1184,6 +1418,14 @@
         "summary": "Supprimer un justificatif",
         "description": "Supprime le document (et le fichier ImageKit, best-effort). Si c'était le dernier TICKET_PROOF, ticketVerificationStatus repasse à NOT_SUBMITTED. Auth requise (owner).",
         "operationId": "removeTripDocument",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
         "parameters": [
           {
             "name": "id",
@@ -1225,6 +1467,16 @@
               }
             }
           },
+          "401": {
+            "description": "Token absent, invalide, expiré, ou compte introuvable (middleware isAuthenticated)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedResponse"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Erreur serveur non gérée",
             "content": {
@@ -1246,6 +1498,14 @@
         "summary": "Paramètres d'authentification ImageKit",
         "description": "Pour l'upload direct navigateur → ImageKit (token/expire/signature, ~30 min). publicKey et urlEndpoint absents si l'env n'est pas configuré. Auth requise.",
         "operationId": "getImageKitAuthParams",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Paramètres d'upload",
@@ -1263,6 +1523,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token absent, invalide, expiré, ou compte introuvable (middleware isAuthenticated)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedResponse"
                 }
               }
             }
@@ -1288,6 +1558,14 @@
         "summary": "Supprimer un fichier ImageKit",
         "description": "Idempotent : un fichier déjà supprimé renvoie 200 \"File was already deleted.\". Auth requise.",
         "operationId": "deleteImageKitFile",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
         "parameters": [
           {
             "name": "fileId",
@@ -1317,6 +1595,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token absent, invalide, expiré, ou compte introuvable (middleware isAuthenticated)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedResponse"
                 }
               }
             }
@@ -1393,6 +1681,20 @@
         ],
         "additionalProperties": false,
         "description": "500 non géré (exception hors AppError) — champ `error`, pas `message`"
+      },
+      "UnauthorizedResponse": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "example": "Unauthorized! Token missing."
+          }
+        },
+        "required": [
+          "message"
+        ],
+        "additionalProperties": false,
+        "description": "401 du middleware isAuthenticated (token absent, invalide, expiré, ou compte introuvable) — hors error-middleware"
       },
       "TripStatus": {
         "type": "string",
@@ -5203,6 +5505,20 @@
         ],
         "additionalProperties": false,
         "description": "404 de la route publique (court-circuite le middleware d'erreurs)"
+      }
+    },
+    "securitySchemes": {
+      "cookieAuth": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "access_token",
+        "description": "JWT d'accès en cookie — prioritaire sur le bearer (extractToken)"
+      },
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Fallback : Authorization: Bearer <access_token>"
       }
     }
   }
