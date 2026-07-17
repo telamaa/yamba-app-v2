@@ -4,9 +4,6 @@ import { ValidationError } from "@packages/error-handler";
 import { AuthenticatedRequest } from "@packages/middleware/isAuthenticated";
 import { ReviewKind } from "@prisma/client";
 
-// 🚀 Confirme la version chargée
-console.log("🚀🚀🚀 user-public.controller.ts LOADED — VERSION DEBUG-V3", new Date().toISOString());
-
 // Helper pour les logs avec timestamp précis
 function ts(): string {
   return new Date().toISOString().split("T")[1].slice(0, 12);

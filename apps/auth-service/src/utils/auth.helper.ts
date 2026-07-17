@@ -3,6 +3,10 @@ import { ValidationError } from "@packages/error-handler";
 import crypto from "node:crypto";
 import redis from "@packages/libs/redis";
 import { sendEmail } from "./sendMail";
+import {
+  loadSessionPolicy,
+  computeSessionTtlSeconds,
+} from "./session-policy";
 
 /** ---------- Constants ---------- */
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -24,8 +28,8 @@ const VERIFY_TOKEN_TTL_SECONDS = 900;
 // Forgot password
 const PASSWORD_RESET_TOKEN_TTL_SECONDS = 900;
 
-// Refresh tokens
-const REFRESH_JTI_TTL_SECONDS = 7 * 24 * 60 * 60;
+// Refresh tokens — les TTL sont désormais calculés par session-policy.ts
+// (D27 : min(fenêtre d'inactivité, vie absolue restante)).
 
 /** ---------- Types ---------- */
 export type GenderInput = "MALE" | "FEMALE" | "OTHER";
@@ -581,21 +585,79 @@ export const consumePasswordResetToken = async (token: string) => {
   return emailKey;
 };
 
-/** ---------- Refresh token rotation ---------- */
+/** ---------- Refresh token rotation (D27 — SES-01/SES-02) ---------- */
 export const createRefreshJti = () => crypto.randomBytes(16).toString("hex");
 
-export const storeRefreshJti = async (
-  userId: string,
-  jti: string,
-  rememberMe = false
-) => {
-  const ttl = rememberMe ? 30 * 24 * 60 * 60 : REFRESH_JTI_TTL_SECONDS;
-  await redis.set(`refresh_jti:${userId}:${jti}`, "1", "EX", ttl);
+/**
+ * Record de session stocké en Redis (JSON) — remplace l'ancien "1".
+ * `createdAt` est TRANSPORTÉ de rotation en rotation : c'est lui qui
+ * borne la vie absolue (SES-02). `lastActivityAt` prépare SES-05
+ * (liste des sessions actives dans le dashboard Sécurité).
+ */
+export type SessionRecord = {
+  createdAt: number;      // epoch ms — création de la SESSION (pas du jti)
+  lastActivityAt: number; // epoch ms — dernier refresh/login
+  rememberMe: boolean;
 };
 
-export const hasRefreshJti = async (userId: string, jti: string): Promise<boolean> => {
-  const exists = await redis.get(`refresh_jti:${userId}:${jti}`);
-  return exists !== null;
+/**
+ * Crée/rotate une clé de session. TTL = min(fenêtre d'inactivité,
+ * vie absolue restante depuis createdAt) : l'expiration Redis EST le
+ * timeout d'inactivité, et la rotation ne peut jamais dépasser le
+ * plafond absolu. Retourne le TTL posé (0 = session absolument
+ * expirée, RIEN n'est écrit — l'appelant DOIT refuser).
+ */
+export const storeRefreshSession = async (
+  userId: string,
+  jti: string,
+  rememberMe: boolean,
+  createdAt: number = Date.now()
+): Promise<number> => {
+  const now = Date.now();
+  const policy = loadSessionPolicy();
+  const ttlSeconds = computeSessionTtlSeconds(createdAt, rememberMe, policy, now);
+  if (ttlSeconds <= 0) return 0;
+
+  const record: SessionRecord = { createdAt, lastActivityAt: now, rememberMe };
+  await redis.set(
+    `refresh_jti:${userId}:${jti}`,
+    JSON.stringify(record),
+    "EX",
+    ttlSeconds
+  );
+  return ttlSeconds;
+};
+
+/**
+ * Lit une session. Retours :
+ * - SessionRecord : session au format D27
+ * - "legacy"      : ancienne valeur "1" (pré-D27) — l'appelant migre
+ *   (accepter-et-migrer : createdAt réinitialisé à now, une seule fois ;
+ *   ce chemin sera supprimé dans une PR de cleanup quand les sessions
+ *   pré-déploiement auront toutes expiré)
+ * - null          : inexistante (expirée par inactivité/plafond, ou
+ *   jti réutilisé — indistinguables)
+ */
+export const getRefreshSession = async (
+  userId: string,
+  jti: string
+): Promise<SessionRecord | "legacy" | null> => {
+  const raw = await redis.get(`refresh_jti:${userId}:${jti}`);
+  if (raw === null) return null;
+  if (raw === "1") return "legacy";
+  try {
+    const parsed = JSON.parse(raw) as SessionRecord;
+    if (
+      typeof parsed?.createdAt === "number" &&
+      typeof parsed?.lastActivityAt === "number" &&
+      typeof parsed?.rememberMe === "boolean"
+    ) {
+      return parsed;
+    }
+    return "legacy"; // valeur inattendue : traitée comme legacy (migrée)
+  } catch {
+    return "legacy";
+  }
 };
 
 export const revokeRefreshJti = async (userId: string, jti?: string) => {
