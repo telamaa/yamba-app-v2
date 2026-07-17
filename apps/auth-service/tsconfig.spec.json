@@ -2,21 +2,15 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "outDir": "./out-tsc/jest",
-    "types": [
-      "jest",
-      "node"
-    ]
+    "types": ["jest", "node", "express"],
+    "rootDir": "../../",
+    "module": "commonjs",
+    "moduleResolution": "node10",
+    "esModuleInterop": true
   },
   "include": [
     "jest.config.ts",
-    "jest.config.cts",
-    "src/**/*.test.ts",
-    "src/**/*.spec.ts",
-    "src/**/*.d.ts"
-  ],
-  "references": [
-    {
-      "path": "./tsconfig.app.json"
-    }
+    "src/**/*.ts",
+    "../../packages/**/*.ts"
   ]
 }
