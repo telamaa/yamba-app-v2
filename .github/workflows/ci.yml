@@ -46,6 +46,33 @@ jobs:
       - name: Typecheck
         run: npx tsc --noEmit --project ${{ matrix.tsconfig }}
 
+  contracts:
+    name: Contrats OpenAPI (generate + diff)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Pin npm (meme version que le poste qui genere le lock)
+        run: npm install -g npm@10.9.8
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Regenerate openapi.json
+        run: npm run generate:openapi
+
+      - name: openapi.json est a jour (DoD chantier 0)
+        run: |
+          if ! git diff --exit-code apps/trip-service/openapi.json; then
+            echo "::error::openapi.json n'est pas a jour. Lancer 'npm run generate:openapi' et commiter le resultat."
+            exit 1
+          fi
+
   i18n-messages:
     name: i18n messages (parse + miroir FR/EN)
     runs-on: ubuntu-latest

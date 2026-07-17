@@ -10,16 +10,17 @@ import "@packages/api-contracts";
  * z.toJSONSchema est donc directement embarquable, sans conversion.
  *
  * Lot A ✅ : components.schemas complet + paths minimal.
- * Lot B ✅ : surface trips + uploads, enveloppes alignées sur le RÉEL
- *   du controller (trip.controller.ts, trip-search.controller.ts,
- *   upload.controller.ts). Rien d'inventé.
- * Lot C  → : securitySchemes (cookie+bearer) + retrait swagger-autogen.
+ * Lot B ✅ : surface trips + uploads, enveloppes alignées sur le RÉEL.
+ * Lot C ✅ : securitySchemes (cookie access_token + bearer JWT, miroir
+ *   d'isAuthenticated), 401 sur les routes authentifiées, retrait
+ *   swagger-autogen (main.ts), job CI generate + diff.
  *
  * ⚠️ Sémantique d'erreurs actuelle (fidèle au réel) : le controller lève
  * ValidationError (→ 400) pour TOUT, y compris "Trip not found." et
  * l'ownership. Seul GET /trips/{id}/public renvoie un vrai 404, au
- * format spécial PublicNotFound (hors error-middleware).
- * PR future fix/error-semantics pour basculer sur 401/403/404.
+ * format spécial PublicNotFound (hors error-middleware). Les 401 du
+ * middleware isAuthenticated sont au format { message } (4ᵉ format).
+ * PR future fix/error-semantics pour unifier.
  */
 
 /* ══ Helpers de construction ══════════════════════════════════ */
@@ -42,8 +43,17 @@ const response400 = jsonResponse(
   "Requête invalide, trip introuvable, non-propriétaire, ou transition refusée par la state machine (ValidationError — voir note sémantique)"
 );
 
+/** 401 = middleware isAuthenticated (format { message }, hors error-middleware). */
+const response401 = jsonResponse(
+  "UnauthorizedResponse",
+  "Token absent, invalide, expiré, ou compte introuvable (middleware isAuthenticated)"
+);
+
 /** 500 non géré — champ `error`, pas `message`. */
 const response500 = jsonResponse("UnhandledError", "Erreur serveur non gérée");
+
+/** Cookie OU bearer (sémantique OR d'OpenAPI) — miroir d'extractToken. */
+const authSecurity = [{ cookieAuth: [] }, { bearerAuth: [] }];
 
 const idPathParam = {
   name: "id",
@@ -174,10 +184,12 @@ function transitionPath(action: string, summary: string, detail: string) {
       summary,
       description: `${detail} Transition refusée → 400 avec le message machine de canPerform. Auth requise (owner uniquement).`,
       operationId: `${action}Trip`,
+      security: authSecurity,
       parameters: [idPathParam],
       responses: {
         "200": jsonResponse("ActionResponse", `Transition ${action} effectuée`),
         "400": response400,
+        "401": response401,
         "500": response500,
       },
     },
@@ -209,13 +221,12 @@ export function buildOpenApiDocument() {
     openapi: "3.1.0",
     info: {
       title: "Yamba — Trip Service API",
-      version: "0.2.0",
+      version: "0.3.0",
       description:
         "Contrats générés depuis @packages/api-contracts (Zod v4, source de vérité unique — D3). " +
         "Les clients consomment l'API via le gateway (:8080, préfixe /api) ; " +
         "ce service écoute en direct sur :6002. " +
-        "Les routes marquées « Auth requise » attendent la session (cookie/bearer — " +
-        "securitySchemes formalisés au Lot C).",
+        "Authentification : cookie access_token OU header Authorization: Bearer (le cookie est prioritaire).",
     },
     servers: [
       { url: "http://localhost:8080/api", description: "API Gateway (dev)" },
@@ -311,10 +322,12 @@ export function buildOpenApiDocument() {
             "(sinon 400). Un brouillon peut être incomplet (villes, dates nullish). " +
             "minPriceCents et departureHourLocal sont recalculés côté serveur. Auth requise.",
           operationId: "createTrip",
+          security: authSecurity,
           requestBody: jsonBody("CreateTripBody"),
           responses: {
             "201": jsonResponse("TripMutationResponse", "Trip créé (avec documents, sans allowedActions)"),
             "400": response400,
+            "401": response401,
             "500": response500,
           },
         },
@@ -328,6 +341,7 @@ export function buildOpenApiDocument() {
             "Chaque trip embarque allowedActions (state machine) et un select partiel des " +
             "documents {id, type, status, url}. Auth requise.",
           operationId: "getMyTrips",
+          security: authSecurity,
           parameters: [
             {
               name: "status",
@@ -340,6 +354,7 @@ export function buildOpenApiDocument() {
           responses: {
             "200": jsonResponse("TripsListResponse", "Liste { success, trips, count }"),
             "400": response400,
+            "401": response401,
             "500": response500,
           },
         },
@@ -352,10 +367,12 @@ export function buildOpenApiDocument() {
             "Vue complète (documents, user, carrierPage) + allowedActions IMBRIQUÉ dans trip. " +
             "Ownership requis : le trip d'autrui renvoie 400 \"Unauthorized.\" (voir note sémantique). Auth requise.",
           operationId: "getTrip",
+          security: authSecurity,
           parameters: [idPathParam],
           responses: {
             "200": jsonResponse("TripResponse", "{ success, trip: { ...trip, allowedActions } }"),
             "400": response400,
+            "401": response401,
             "500": response500,
           },
         },
@@ -367,11 +384,13 @@ export function buildOpenApiDocument() {
             "déclenche les gates de publication (onboarding, Stripe, locations). " +
             "Édition refusée par la machine (COMPLETED/ARCHIVED/CANCELLED…) → 400. Auth requise.",
           operationId: "updateTrip",
+          security: authSecurity,
           parameters: [idPathParam],
           requestBody: jsonBody("UpdateTripBody"),
           responses: {
             "200": jsonResponse("TripMutationResponse", "Trip mis à jour (sans allowedActions)"),
             "400": response400,
+            "401": response401,
             "500": response500,
           },
         },
@@ -382,6 +401,7 @@ export function buildOpenApiDocument() {
             "?hard=true → soft delete d'un brouillon (isDeleted, invisible partout). " +
             "Sans ?hard → alias backward-compat de cancel. Auth requise.",
           operationId: "deleteTrip",
+          security: authSecurity,
           parameters: [
             idPathParam,
             {
@@ -395,6 +415,7 @@ export function buildOpenApiDocument() {
           responses: {
             "200": jsonResponse("ActionResponse", "\"Draft deleted.\" ou \"Trip cancelled.\""),
             "400": response400,
+            "401": response401,
             "500": response500,
           },
         },
@@ -414,12 +435,14 @@ export function buildOpenApiDocument() {
             "maxDocSizeMb (défaut 5 Mo). Un TICKET_PROOF fait passer ticketVerificationStatus " +
             "NOT_SUBMITTED → PENDING. Auth requise (owner).",
           operationId: "addTripDocuments",
+          security: authSecurity,
           parameters: [idPathParam],
           requestBody: jsonBody("AddDocumentsBody"),
           responses: {
             "201": jsonResponse("TripMutationResponse", "Documents ajoutés — trip complet renvoyé"),
             "200": jsonResponse("TripMutationResponse", "Aucun nouveau document (tous dédupliqués)"),
             "400": response400,
+            "401": response401,
             "500": response500,
           },
         },
@@ -432,6 +455,7 @@ export function buildOpenApiDocument() {
             "Supprime le document (et le fichier ImageKit, best-effort). Si c'était le dernier " +
             "TICKET_PROOF, ticketVerificationStatus repasse à NOT_SUBMITTED. Auth requise (owner).",
           operationId: "removeTripDocument",
+          security: authSecurity,
           parameters: [
             idPathParam,
             {
@@ -445,6 +469,7 @@ export function buildOpenApiDocument() {
           responses: {
             "200": jsonResponse("ActionResponse", "Document supprimé"),
             "400": response400,
+            "401": response401,
             "500": response500,
           },
         },
@@ -459,9 +484,11 @@ export function buildOpenApiDocument() {
             "Pour l'upload direct navigateur → ImageKit (token/expire/signature, ~30 min). " +
             "publicKey et urlEndpoint absents si l'env n'est pas configuré. Auth requise.",
           operationId: "getImageKitAuthParams",
+          security: authSecurity,
           responses: {
             "200": jsonResponse("ImageKitAuthResponse", "Paramètres d'upload"),
             "400": response400,
+            "401": response401,
             "500": response500,
           },
         },
@@ -473,6 +500,7 @@ export function buildOpenApiDocument() {
           description:
             "Idempotent : un fichier déjà supprimé renvoie 200 \"File was already deleted.\". Auth requise.",
           operationId: "deleteImageKitFile",
+          security: authSecurity,
           parameters: [
             {
               name: "fileId",
@@ -485,11 +513,28 @@ export function buildOpenApiDocument() {
           responses: {
             "200": jsonResponse("ActionResponse", "Fichier supprimé (ou déjà absent)"),
             "400": response400,
+            "401": response401,
             "500": response500,
           },
         },
       },
     },
-    components: { schemas: components },
+    components: {
+      schemas: components,
+      securitySchemes: {
+        cookieAuth: {
+          type: "apiKey",
+          in: "cookie",
+          name: "access_token",
+          description: "JWT d'accès en cookie — prioritaire sur le bearer (extractToken)",
+        },
+        bearerAuth: {
+          type: "http",
+          scheme: "bearer",
+          bearerFormat: "JWT",
+          description: "Fallback : Authorization: Bearer <access_token>",
+        },
+      },
+    },
   };
 }

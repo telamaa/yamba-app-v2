@@ -65,3 +65,19 @@ export const UnhandledErrorSchema = z
     description: "500 non géré (exception hors AppError) — champ `error`, pas `message`",
   });
 export type UnhandledError = z.infer<typeof UnhandledErrorSchema>;
+
+/**
+ * 401 renvoyé DIRECTEMENT par le middleware isAuthenticated
+ * (packages/middleware) : { message } tout court — ni status ni success.
+ * Quatrième format d'erreur de la plateforme, fidèle au réel.
+ */
+export const UnauthorizedResponseSchema = z
+  .object({
+    message: z.string().meta({ example: "Unauthorized! Token missing." }),
+  })
+  .meta({
+    id: "UnauthorizedResponse",
+    description:
+      "401 du middleware isAuthenticated (token absent, invalide, expiré, ou compte introuvable) — hors error-middleware",
+  });
+export type UnauthorizedResponse = z.infer<typeof UnauthorizedResponseSchema>;
