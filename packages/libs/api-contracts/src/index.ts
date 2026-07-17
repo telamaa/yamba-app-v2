@@ -9,3 +9,5 @@
 export * from "./common";
 export * from "./trip/trip.enums";
 export * from "./trip/trip.schema";
+export * from "./trip/trip-search.schema";
+export * from "./trip/trip-public.schema";

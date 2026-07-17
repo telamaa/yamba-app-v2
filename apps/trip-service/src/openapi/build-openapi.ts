@@ -9,10 +9,183 @@ import "@packages/api-contracts";
  * OAS 3.1 = JSON Schema draft 2020-12 : la sortie native de
  * z.toJSONSchema est donc directement embarquable, sans conversion.
  *
- * Lot A : components.schemas complet + paths minimal (self-description).
- * Lot B : surface trips (routes, réponses, erreurs machine 400/403/404).
- * Lot C : uploads + securitySchemes + retrait swagger-autogen.
+ * Lot A ✅ : components.schemas complet + paths minimal.
+ * Lot B ✅ : surface trips + uploads, enveloppes alignées sur le RÉEL
+ *   du controller (trip.controller.ts, trip-search.controller.ts,
+ *   upload.controller.ts). Rien d'inventé.
+ * Lot C  → : securitySchemes (cookie+bearer) + retrait swagger-autogen.
+ *
+ * ⚠️ Sémantique d'erreurs actuelle (fidèle au réel) : le controller lève
+ * ValidationError (→ 400) pour TOUT, y compris "Trip not found." et
+ * l'ownership. Seul GET /trips/{id}/public renvoie un vrai 404, au
+ * format spécial PublicNotFound (hors error-middleware).
+ * PR future fix/error-semantics pour basculer sur 401/403/404.
  */
+
+/* ══ Helpers de construction ══════════════════════════════════ */
+
+const ref = (id: string) => ({ $ref: `#/components/schemas/${id}` });
+
+const jsonResponse = (schemaId: string, description: string) => ({
+  description,
+  content: { "application/json": { schema: ref(schemaId) } },
+});
+
+const jsonBody = (schemaId: string) => ({
+  required: true,
+  content: { "application/json": { schema: ref(schemaId) } },
+});
+
+/** 400 = ValidationError via error-middleware (format ErrorResponse). */
+const response400 = jsonResponse(
+  "ErrorResponse",
+  "Requête invalide, trip introuvable, non-propriétaire, ou transition refusée par la state machine (ValidationError — voir note sémantique)"
+);
+
+/** 500 non géré — champ `error`, pas `message`. */
+const response500 = jsonResponse("UnhandledError", "Erreur serveur non gérée");
+
+const idPathParam = {
+  name: "id",
+  in: "path",
+  required: true,
+  schema: ref("ObjectId"),
+  description: "Identifiant du trip",
+};
+
+/* ── Paramètres de la recherche publique (dto/trip-search.dto.ts) ── */
+
+const boolQueryParam = (name: string, description: string) => ({
+  name,
+  in: "query",
+  required: false,
+  schema: { type: "string", enum: ["true", "false"] },
+  description: `${description} — booléen en query string : tout sauf "true" vaut false`,
+});
+
+const searchBaseParams = [
+  {
+    name: "mode",
+    in: "query",
+    required: false,
+    schema: ref("TransportModeFilter"),
+    description: "Filtre mode de transport (défaut : all)",
+  },
+  {
+    name: "from",
+    in: "query",
+    required: false,
+    schema: { type: "string", minLength: 1, maxLength: 100 },
+    description: "Ville ou pays d'origine (match partiel, insensible à la casse)",
+  },
+  {
+    name: "to",
+    in: "query",
+    required: false,
+    schema: { type: "string", minLength: 1, maxLength: 100 },
+    description: "Ville ou pays de destination (match partiel, insensible à la casse)",
+  },
+  {
+    name: "dateFrom",
+    in: "query",
+    required: false,
+    schema: { type: "string", format: "date-time" },
+    description:
+      "Borne basse ISO 8601. Ignorée si dans le passé : la recherche ne renvoie jamais de trips déjà partis (borne effective = max(now, dateFrom))",
+  },
+  {
+    name: "dateTo",
+    in: "query",
+    required: false,
+    schema: { type: "string", format: "date-time" },
+    description: "Borne haute ISO 8601 sur la date de départ",
+  },
+  {
+    name: "categories",
+    in: "query",
+    required: false,
+    schema: { type: "string" },
+    description:
+      "CSV de UiParcelCategory (ex: \"clothes,shoes,documents\"). Sémantique hasSome : au moins une catégorie acceptée doit matcher. Les valeurs invalides sont filtrées silencieusement",
+  },
+  {
+    name: "departureBuckets",
+    in: "query",
+    required: false,
+    schema: { type: "string" },
+    description:
+      "CSV de DepartureBucket (ex: \"morning,evening\"). OR des tranches horaires (heure locale de départ). Valeurs invalides filtrées silencieusement",
+  },
+  {
+    name: "locale",
+    in: "query",
+    required: false,
+    schema: ref("SearchLocale"),
+    description: "Locale de formatage serveur des dates (défaut : fr)",
+  },
+];
+
+const searchTripsParams = [
+  ...searchBaseParams,
+  {
+    name: "sort",
+    in: "query",
+    required: false,
+    schema: ref("SortOption"),
+    description:
+      "Tri (défaut : earliest). lowestPrice exclut les trips sans minPriceCents",
+  },
+  boolQueryParam("superTripper", "Uniquement les Super Trippers"),
+  boolQueryParam("profileVerified", "Uniquement les profils vérifiés"),
+  boolQueryParam("instantBooking", "Uniquement les trips à réservation instantanée"),
+  boolQueryParam("verifiedTicket", "Uniquement les billets vérifiés"),
+  {
+    name: "cursor",
+    in: "query",
+    required: false,
+    schema: { type: "string" },
+    description: "Curseur de pagination : le nextCursor de la page précédente",
+  },
+  {
+    name: "limit",
+    in: "query",
+    required: false,
+    schema: { type: "integer", minimum: 1, maximum: 50, default: 10 },
+    description: "Taille de page",
+  },
+];
+
+/* ── Fabrique des 7 endpoints de transition (enveloppe identique) ── */
+
+const TRANSITIONS: Array<{ action: string; summary: string; detail: string }> = [
+  { action: "publish", summary: "Publier un brouillon", detail: "DRAFT → PUBLISHED. Gates : onboarding carrier, Stripe (charges enabled), champs requis (mode, villes, départ futur, ≥1 catégorie), ≥1 pickup + ≥1 delivery location." },
+  { action: "unpublish", summary: "Repasser en brouillon", detail: "PUBLISHED/PAUSED → DRAFT. Interdit avec réservations actives (guard prêt pour le chantier Booking). Décrémente les stats carrier." },
+  { action: "pause", summary: "Mettre en pause", detail: "PUBLISHED → PAUSED. Le trip reste dans le pool public." },
+  { action: "resume", summary: "Reprendre", detail: "PAUSED → PUBLISHED. Date de départ non passée requise." },
+  { action: "cancel", summary: "Annuler", detail: "→ CANCELLED (cancelledAt posé). Décrémente les stats carrier, y compris depuis PAUSED." },
+  { action: "restore", summary: "Restaurer en brouillon", detail: "CANCELLED → DRAFT (cancelledAt effacé). Date de départ non passée requise." },
+  { action: "archive", summary: "Archiver", detail: "COMPLETED/CANCELLED → ARCHIVED (one-way, pas de désarchivage MVP)." },
+];
+
+function transitionPath(action: string, summary: string, detail: string) {
+  return {
+    post: {
+      tags: ["trips-lifecycle"],
+      summary,
+      description: `${detail} Transition refusée → 400 avec le message machine de canPerform. Auth requise (owner uniquement).`,
+      operationId: `${action}Trip`,
+      parameters: [idPathParam],
+      responses: {
+        "200": jsonResponse("ActionResponse", `Transition ${action} effectuée`),
+        "400": response400,
+        "500": response500,
+      },
+    },
+  };
+}
+
+/* ══ Document ═════════════════════════════════════════════════ */
+
 export function buildOpenApiDocument() {
   const { schemas } = z.toJSONSchema(z.globalRegistry, {
     uri: (id) => `#/components/schemas/${id}`,
@@ -27,21 +200,37 @@ export function buildOpenApiDocument() {
     components[id] = rest;
   }
 
+  const transitionPaths: Record<string, unknown> = {};
+  for (const t of TRANSITIONS) {
+    transitionPaths[`/trips/{id}/${t.action}`] = transitionPath(t.action, t.summary, t.detail);
+  }
+
   return {
     openapi: "3.1.0",
     info: {
       title: "Yamba — Trip Service API",
-      version: "0.1.0",
+      version: "0.2.0",
       description:
         "Contrats générés depuis @packages/api-contracts (Zod v4, source de vérité unique — D3). " +
         "Les clients consomment l'API via le gateway (:8080, préfixe /api) ; " +
-        "ce service écoute en direct sur :6002.",
+        "ce service écoute en direct sur :6002. " +
+        "Les routes marquées « Auth requise » attendent la session (cookie/bearer — " +
+        "securitySchemes formalisés au Lot C).",
     },
     servers: [
       { url: "http://localhost:8080/api", description: "API Gateway (dev)" },
       { url: "http://localhost:6002", description: "trip-service direct (debug)" },
     ],
+    tags: [
+      { name: "trips-search", description: "Recherche publique (aucune auth)" },
+      { name: "trips-public", description: "Vue publique d'un trip (aucune auth)" },
+      { name: "trips", description: "CRUD owner (auth requise)" },
+      { name: "trips-lifecycle", description: "Transitions de la state machine (auth requise, owner)" },
+      { name: "trips-documents", description: "Justificatifs du trip (auth requise, owner)" },
+      { name: "uploads", description: "Upload direct navigateur → ImageKit (auth requise)" },
+    ],
     paths: {
+      /* ── Meta ─────────────────────────────────────────────── */
       "/openapi.json": {
         get: {
           summary: "Ce document OpenAPI 3.1",
@@ -51,6 +240,252 @@ export function buildOpenApiDocument() {
               description: "Document OpenAPI 3.1 (généré depuis Zod)",
               content: { "application/json": { schema: { type: "object" } } },
             },
+          },
+        },
+      },
+
+      /* ── Recherche publique ───────────────────────────────── */
+      "/trips/search": {
+        get: {
+          tags: ["trips-search"],
+          summary: "Rechercher des trips publiés",
+          description:
+            "Recherche publique paginée (cursor-based). Hard filters non-négociables : " +
+            "status=PUBLISHED et départ futur. Les trips malformés sont exclus silencieusement du mapping. " +
+            "⚠️ Enveloppe SANS champ success (fidèle au réel).",
+          operationId: "searchTrips",
+          parameters: searchTripsParams,
+          responses: {
+            "200": jsonResponse("SearchTripsResponse", "Page de résultats + nextCursor + totalCount"),
+            "400": response400,
+            "500": response500,
+          },
+        },
+      },
+      "/trips/search/facets": {
+        get: {
+          tags: ["trips-search"],
+          summary: "Counts pour les filtres de recherche",
+          description:
+            "9 counts en parallèle. Les counts par mode sont calculés SANS le filtre mode courant ; " +
+            "les counts des soft toggles AVEC. Mêmes hard filters que la recherche. " +
+            "⚠️ Enveloppe SANS champ success (fidèle au réel).",
+          operationId: "searchTripsFacets",
+          parameters: searchBaseParams,
+          responses: {
+            "200": jsonResponse("SearchFacetsResponse", "Counts par mode et par toggle"),
+            "400": response400,
+            "500": response500,
+          },
+        },
+      },
+
+      /* ── Vue publique ─────────────────────────────────────── */
+      "/trips/{id}/public": {
+        get: {
+          tags: ["trips-public"],
+          summary: "Vue publique d'un trip publié",
+          description:
+            "DTO structuré (origin/destination/dates/tripper imbriqués), filtré privacy " +
+            "(initiale du nom). 404 si inexistant, soft-deleted ou non-PUBLISHED — " +
+            "au format PublicNotFound (renvoyé hors error-middleware). " +
+            "400 (ErrorResponse) si l'id n'est pas un ObjectId valide.",
+          operationId: "getPublicTrip",
+          parameters: [idPathParam],
+          responses: {
+            "200": jsonResponse("PublicTripResponse", "Vue publique du trip"),
+            "400": response400,
+            "404": jsonResponse("PublicNotFound", "Trip inexistant, supprimé ou non publié"),
+            "500": response500,
+          },
+        },
+      },
+
+      /* ── CRUD owner ───────────────────────────────────────── */
+      "/trips": {
+        post: {
+          tags: ["trips"],
+          summary: "Créer un trip (brouillon ou publication directe)",
+          description:
+            "publish=true crée directement en PUBLISHED si les gates onboarding/Stripe passent " +
+            "(sinon 400). Un brouillon peut être incomplet (villes, dates nullish). " +
+            "minPriceCents et departureHourLocal sont recalculés côté serveur. Auth requise.",
+          operationId: "createTrip",
+          requestBody: jsonBody("CreateTripBody"),
+          responses: {
+            "201": jsonResponse("TripMutationResponse", "Trip créé (avec documents, sans allowedActions)"),
+            "400": response400,
+            "500": response500,
+          },
+        },
+      },
+      "/trips/my": {
+        get: {
+          tags: ["trips"],
+          summary: "Mes trips",
+          description:
+            "Tous les trips de l'utilisateur (hors soft-deleted), triés par createdAt desc. " +
+            "Chaque trip embarque allowedActions (state machine) et un select partiel des " +
+            "documents {id, type, status, url}. Auth requise.",
+          operationId: "getMyTrips",
+          parameters: [
+            {
+              name: "status",
+              in: "query",
+              required: false,
+              schema: ref("TripStatus"),
+              description: "Filtrer par statut (insensible à la casse : toUpperCase() serveur)",
+            },
+          ],
+          responses: {
+            "200": jsonResponse("TripsListResponse", "Liste { success, trips, count }"),
+            "400": response400,
+            "500": response500,
+          },
+        },
+      },
+      "/trips/{id}": {
+        get: {
+          tags: ["trips"],
+          summary: "Détail owner d'un trip",
+          description:
+            "Vue complète (documents, user, carrierPage) + allowedActions IMBRIQUÉ dans trip. " +
+            "Ownership requis : le trip d'autrui renvoie 400 \"Unauthorized.\" (voir note sémantique). Auth requise.",
+          operationId: "getTrip",
+          parameters: [idPathParam],
+          responses: {
+            "200": jsonResponse("TripResponse", "{ success, trip: { ...trip, allowedActions } }"),
+            "400": response400,
+            "500": response500,
+          },
+        },
+        put: {
+          tags: ["trips"],
+          summary: "Modifier un trip",
+          description:
+            "Body partiel (seuls les champs envoyés sont écrits). publish=true sur un DRAFT " +
+            "déclenche les gates de publication (onboarding, Stripe, locations). " +
+            "Édition refusée par la machine (COMPLETED/ARCHIVED/CANCELLED…) → 400. Auth requise.",
+          operationId: "updateTrip",
+          parameters: [idPathParam],
+          requestBody: jsonBody("UpdateTripBody"),
+          responses: {
+            "200": jsonResponse("TripMutationResponse", "Trip mis à jour (sans allowedActions)"),
+            "400": response400,
+            "500": response500,
+          },
+        },
+        delete: {
+          tags: ["trips"],
+          summary: "Supprimer (brouillon) ou annuler (alias)",
+          description:
+            "?hard=true → soft delete d'un brouillon (isDeleted, invisible partout). " +
+            "Sans ?hard → alias backward-compat de cancel. Auth requise.",
+          operationId: "deleteTrip",
+          parameters: [
+            idPathParam,
+            {
+              name: "hard",
+              in: "query",
+              required: false,
+              schema: { type: "string", enum: ["true", "false"] },
+              description: "true = soft delete du brouillon · absent = alias de cancel",
+            },
+          ],
+          responses: {
+            "200": jsonResponse("ActionResponse", "\"Draft deleted.\" ou \"Trip cancelled.\""),
+            "400": response400,
+            "500": response500,
+          },
+        },
+      },
+
+      /* ── Transitions state machine (7 endpoints) ──────────── */
+      ...transitionPaths,
+
+      /* ── Documents ────────────────────────────────────────── */
+      "/trips/{id}/documents": {
+        post: {
+          tags: ["trips-documents"],
+          summary: "Ajouter des justificatifs",
+          description:
+            "Déduplication par fileId (les doublons sont ignorés ; si aucun nouveau → 200 " +
+            "\"No new documents to add.\"). Limites serveur : siteConfig.maxDocsPerTrip (défaut 5), " +
+            "maxDocSizeMb (défaut 5 Mo). Un TICKET_PROOF fait passer ticketVerificationStatus " +
+            "NOT_SUBMITTED → PENDING. Auth requise (owner).",
+          operationId: "addTripDocuments",
+          parameters: [idPathParam],
+          requestBody: jsonBody("AddDocumentsBody"),
+          responses: {
+            "201": jsonResponse("TripMutationResponse", "Documents ajoutés — trip complet renvoyé"),
+            "200": jsonResponse("TripMutationResponse", "Aucun nouveau document (tous dédupliqués)"),
+            "400": response400,
+            "500": response500,
+          },
+        },
+      },
+      "/trips/{id}/documents/{documentId}": {
+        delete: {
+          tags: ["trips-documents"],
+          summary: "Supprimer un justificatif",
+          description:
+            "Supprime le document (et le fichier ImageKit, best-effort). Si c'était le dernier " +
+            "TICKET_PROOF, ticketVerificationStatus repasse à NOT_SUBMITTED. Auth requise (owner).",
+          operationId: "removeTripDocument",
+          parameters: [
+            idPathParam,
+            {
+              name: "documentId",
+              in: "path",
+              required: true,
+              schema: ref("ObjectId"),
+              description: "Identifiant du document",
+            },
+          ],
+          responses: {
+            "200": jsonResponse("ActionResponse", "Document supprimé"),
+            "400": response400,
+            "500": response500,
+          },
+        },
+      },
+
+      /* ── Uploads ImageKit ─────────────────────────────────── */
+      "/uploads/imagekit-auth": {
+        get: {
+          tags: ["uploads"],
+          summary: "Paramètres d'authentification ImageKit",
+          description:
+            "Pour l'upload direct navigateur → ImageKit (token/expire/signature, ~30 min). " +
+            "publicKey et urlEndpoint absents si l'env n'est pas configuré. Auth requise.",
+          operationId: "getImageKitAuthParams",
+          responses: {
+            "200": jsonResponse("ImageKitAuthResponse", "Paramètres d'upload"),
+            "400": response400,
+            "500": response500,
+          },
+        },
+      },
+      "/uploads/imagekit/{fileId}": {
+        delete: {
+          tags: ["uploads"],
+          summary: "Supprimer un fichier ImageKit",
+          description:
+            "Idempotent : un fichier déjà supprimé renvoie 200 \"File was already deleted.\". Auth requise.",
+          operationId: "deleteImageKitFile",
+          parameters: [
+            {
+              name: "fileId",
+              in: "path",
+              required: true,
+              schema: { type: "string", minLength: 1 },
+              description: "Identifiant ImageKit du fichier",
+            },
+          ],
+          responses: {
+            "200": jsonResponse("ActionResponse", "Fichier supprimé (ou déjà absent)"),
+            "400": response400,
+            "500": response500,
           },
         },
       },
