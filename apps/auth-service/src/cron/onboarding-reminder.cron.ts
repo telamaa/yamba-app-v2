@@ -17,7 +17,7 @@
  */
 
 import cron from "node-cron";
-import prisma from "@repo/prisma/client"; // adjust to your setup
+import prisma from "@packages/libs/prisma";
 import {
   sendOnboardingReminderEmail,
   REMINDER_SCHEDULE,

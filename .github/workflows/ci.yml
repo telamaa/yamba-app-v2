@@ -17,7 +17,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        project: [user-ui, trip-service, auth-service, api-gateway]
+        include:
+          - project: user-ui
+            tsconfig: apps/user-ui
+          - project: trip-service
+            tsconfig: apps/trip-service/tsconfig.app.json
+          - project: auth-service
+            tsconfig: apps/auth-service/tsconfig.app.json
+          - project: api-gateway
+            tsconfig: apps/api-gateway/tsconfig.app.json
     steps:
       - uses: actions/checkout@v4
 
@@ -36,7 +44,7 @@ jobs:
         run: npx prisma generate
 
       - name: Typecheck
-        run: npx tsc --noEmit --project apps/${{ matrix.project }}
+        run: npx tsc --noEmit --project ${{ matrix.tsconfig }}
 
   i18n-messages:
     name: i18n messages (parse + miroir FR/EN)
