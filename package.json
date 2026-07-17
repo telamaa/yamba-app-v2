@@ -6,7 +6,8 @@
     "dev": "npx nx run-many --target=serve --all",
     "auth-docs": "node apps/auth-service/src/swagger.js",
     "trip-docs": "node apps/trip-service/src/swagger.js",
-    "user-ui": "npx nx run-many --target=dev --all --projects=user-ui"
+    "user-ui": "npx nx run-many --target=dev --all --projects=user-ui",
+    "generate:openapi": "tsx scripts/generate-openapi.ts"
   },
   "private": true,
   "dependencies": {
@@ -104,7 +105,7 @@
     "ts-jest": "^29.4.0",
     "ts-node": "10.9.1",
     "tslib": "^2.3.0",
-    "tsx": "^4.21.0",
+    "tsx": "^4.23.1",
     "typescript": "~5.9.2",
     "webpack-cli": "^5.1.4"
   },

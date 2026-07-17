@@ -1,0 +1,1470 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Yamba — Trip Service API",
+    "version": "0.1.0",
+    "description": "Contrats générés depuis @packages/api-contracts (Zod v4, source de vérité unique — D3). Les clients consomment l'API via le gateway (:8080, préfixe /api) ; ce service écoute en direct sur :6002."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8080/api",
+      "description": "API Gateway (dev)"
+    },
+    {
+      "url": "http://localhost:6002",
+      "description": "trip-service direct (debug)"
+    }
+  ],
+  "paths": {
+    "/openapi.json": {
+      "get": {
+        "summary": "Ce document OpenAPI 3.1",
+        "operationId": "getOpenApiDocument",
+        "responses": {
+          "200": {
+            "description": "Document OpenAPI 3.1 (généré depuis Zod)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ObjectId": {
+        "type": "string",
+        "pattern": "^[0-9a-fA-F]{24}$",
+        "description": "Identifiant MongoDB (ObjectId sérialisé en hexadécimal)",
+        "example": "665f1c2ab3d4e5f6a7b8c9d0"
+      },
+      "TripStatus": {
+        "type": "string",
+        "enum": [
+          "DRAFT",
+          "PUBLISHED",
+          "PAUSED",
+          "COMPLETED",
+          "CANCELLED",
+          "ARCHIVED"
+        ]
+      },
+      "TransportMode": {
+        "type": "string",
+        "enum": [
+          "PLANE",
+          "TRAIN",
+          "CAR"
+        ]
+      },
+      "TripType": {
+        "type": "string",
+        "enum": [
+          "ONE_WAY",
+          "ROUND_TRIP"
+        ]
+      },
+      "FlightType": {
+        "type": "string",
+        "enum": [
+          "DIRECT",
+          "WITH_LAYOVER"
+        ]
+      },
+      "TrainTripType": {
+        "type": "string",
+        "enum": [
+          "DIRECT",
+          "WITH_CONNECTION"
+        ]
+      },
+      "CarTripFlexibility": {
+        "type": "string",
+        "enum": [
+          "DIRECT",
+          "DETOUR_BY_AGREEMENT"
+        ]
+      },
+      "TicketVerificationStatus": {
+        "type": "string",
+        "enum": [
+          "NOT_SUBMITTED",
+          "PENDING",
+          "VERIFIED",
+          "REJECTED"
+        ]
+      },
+      "LocationKind": {
+        "type": "string",
+        "enum": [
+          "AIRPORT",
+          "TRAIN_STATION",
+          "CITY_AREA"
+        ]
+      },
+      "LocationFlexibility": {
+        "type": "string",
+        "enum": [
+          "EXACT",
+          "RADIUS",
+          "CITY_WIDE"
+        ]
+      },
+      "ParcelCategory": {
+        "type": "string",
+        "enum": [
+          "CLOTHES",
+          "SHOES",
+          "FASHION_ACCESSORIES",
+          "OTHER_ACCESSORIES",
+          "BOOKS",
+          "DOCUMENTS",
+          "SMALL_TOYS",
+          "PHONE",
+          "COMPUTER",
+          "OTHER_ELECTRONICS",
+          "CHECKED_BAG_23KG",
+          "CABIN_BAG_12KG"
+        ],
+        "description": "Enum actuel (pré-D14). La migration vers les 8 familles de risque CAT-02 fera l'objet d'une PR dédiée (mapping conservé)."
+      },
+      "TripAction": {
+        "type": "string",
+        "enum": [
+          "edit",
+          "publish",
+          "unpublish",
+          "pause",
+          "resume",
+          "cancel",
+          "restore",
+          "archive",
+          "delete"
+        ],
+        "description": "Actions de la state machine trip (canPerform/getAllowedActions). Renvoyées dans allowedActions pour piloter les CTAs front."
+      },
+      "TripDocument": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string",
+            "description": "URL ImageKit du document"
+          },
+          "fileId": {
+            "type": "string",
+            "description": "Identifiant ImageKit (pour suppression)"
+          },
+          "name": {
+            "type": "string"
+          },
+          "mimeType": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "uploadedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "url",
+          "fileId",
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "TripLocationPoint": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/LocationKind"
+          },
+          "details": {
+            "example": "Terminal 2E, devant le Relay",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "flexibility": {
+            "$ref": "#/components/schemas/LocationFlexibility"
+          },
+          "radiusKm": {
+            "description": "Requis si flexibility=RADIUS",
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "flexibility"
+        ],
+        "additionalProperties": false
+      },
+      "CategoryCondition": {
+        "type": "object",
+        "properties": {
+          "category": {
+            "$ref": "#/components/schemas/ParcelCategory"
+          },
+          "priceAmountCents": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991,
+            "description": "Prix en centimes (DEV-01 : jamais de float)",
+            "example": 1500
+          }
+        },
+        "required": [
+          "category",
+          "priceAmountCents"
+        ],
+        "additionalProperties": false
+      },
+      "Trip": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/ObjectId"
+          },
+          "userId": {
+            "$ref": "#/components/schemas/ObjectId"
+          },
+          "status": {
+            "$ref": "#/components/schemas/TripStatus"
+          },
+          "transportMode": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TransportMode"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "tripType": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TripType"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "originLabel": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "originPlaceId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "originCity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "originRegion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "originCountry": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "originLat": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "originLng": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "destinationLabel": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "destinationPlaceId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "destinationCity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "destinationRegion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "destinationCountry": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "destinationLat": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "destinationLng": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "departureDateLocal": {
+            "example": "2026-08-02",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "departureTimeLocal": {
+            "example": "14:00",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "arrivalDateLocal": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "arrivalTimeLocal": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "flightType": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FlightType"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "flightLayoverCities": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "trainTripType": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TrainTripType"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "trainStopCities": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "carTripFlexibility": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CarTripFlexibility"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "travelReference": {
+            "example": "AF 838",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "ticketVerificationStatus": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TicketVerificationStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "acceptedCategories": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ParcelCategory"
+            }
+          },
+          "categoryConditions": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/CategoryCondition"
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "pickupLocations": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/TripLocationPoint"
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "deliveryLocations": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/TripLocationPoint"
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "handDeliveryOnly": {
+            "type": "boolean"
+          },
+          "instantBooking": {
+            "type": "boolean",
+            "description": "D20 : sans effet sur la machine d'états v1 (badge)"
+          },
+          "currencyCode": {
+            "default": "EUR",
+            "type": "string"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "documents": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/TripDocument"
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "publishedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "cancelledAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "isDeleted": {
+            "type": "boolean"
+          },
+          "deletedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "status",
+          "acceptedCategories",
+          "handDeliveryOnly",
+          "instantBooking",
+          "currencyCode",
+          "createdAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      },
+      "AllowedActions": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/TripAction"
+        }
+      },
+      "TripResponse": {
+        "type": "object",
+        "properties": {
+          "trip": {
+            "$ref": "#/components/schemas/Trip"
+          },
+          "allowedActions": {
+            "$ref": "#/components/schemas/AllowedActions"
+          }
+        },
+        "required": [
+          "trip"
+        ],
+        "additionalProperties": false
+      },
+      "TripsListResponse": {
+        "type": "object",
+        "properties": {
+          "trips": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Trip"
+            }
+          }
+        },
+        "required": [
+          "trips"
+        ],
+        "additionalProperties": false
+      },
+      "CreateTripBody": {
+        "type": "object",
+        "properties": {
+          "transportMode": {
+            "$ref": "#/components/schemas/TransportMode"
+          },
+          "tripType": {
+            "$ref": "#/components/schemas/TripType"
+          },
+          "originLabel": {
+            "type": "string",
+            "minLength": 1
+          },
+          "originPlaceId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "originCity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "originRegion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "originCountry": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "originLat": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "originLng": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "destinationLabel": {
+            "type": "string",
+            "minLength": 1
+          },
+          "destinationPlaceId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "destinationCity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "destinationRegion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "destinationCountry": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "destinationLat": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "destinationLng": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "departureDateLocal": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "departureTimeLocal": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "arrivalDateLocal": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "arrivalTimeLocal": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "flightType": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FlightType"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "flightLayoverCities": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "trainTripType": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TrainTripType"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "trainStopCities": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "carTripFlexibility": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CarTripFlexibility"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "travelReference": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "acceptedCategories": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ParcelCategory"
+            }
+          },
+          "categoryConditions": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/CategoryCondition"
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "pickupLocations": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/TripLocationPoint"
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "deliveryLocations": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/TripLocationPoint"
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "handDeliveryOnly": {
+            "default": false,
+            "type": "boolean"
+          },
+          "instantBooking": {
+            "default": false,
+            "type": "boolean"
+          },
+          "currencyCode": {
+            "default": "EUR",
+            "type": "string"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "publish": {
+            "default": false,
+            "description": "true = créer directement en PUBLISHED (si gates onboarding/Stripe OK)",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "transportMode",
+          "tripType",
+          "originLabel",
+          "destinationLabel",
+          "acceptedCategories",
+          "handDeliveryOnly",
+          "instantBooking",
+          "currencyCode",
+          "publish"
+        ],
+        "additionalProperties": false
+      },
+      "UpdateTripBody": {
+        "type": "object",
+        "properties": {
+          "transportMode": {
+            "$ref": "#/components/schemas/TransportMode"
+          },
+          "tripType": {
+            "$ref": "#/components/schemas/TripType"
+          },
+          "originLabel": {
+            "type": "string",
+            "minLength": 1
+          },
+          "originPlaceId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "originCity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "originRegion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "originCountry": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "originLat": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "originLng": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "destinationLabel": {
+            "type": "string",
+            "minLength": 1
+          },
+          "destinationPlaceId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "destinationCity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "destinationRegion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "destinationCountry": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "destinationLat": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "destinationLng": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "departureDateLocal": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "departureTimeLocal": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "arrivalDateLocal": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "arrivalTimeLocal": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "flightType": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FlightType"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "flightLayoverCities": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "trainTripType": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TrainTripType"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "trainStopCities": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "carTripFlexibility": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CarTripFlexibility"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "travelReference": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "acceptedCategories": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ParcelCategory"
+            }
+          },
+          "categoryConditions": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/CategoryCondition"
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "pickupLocations": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/TripLocationPoint"
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "deliveryLocations": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/TripLocationPoint"
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "handDeliveryOnly": {
+            "default": false,
+            "type": "boolean"
+          },
+          "instantBooking": {
+            "default": false,
+            "type": "boolean"
+          },
+          "currencyCode": {
+            "default": "EUR",
+            "type": "string"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "publish": {
+            "default": false,
+            "description": "true = créer directement en PUBLISHED (si gates onboarding/Stripe OK)",
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "MyTripsQuery": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "description": "Filtrer par statut",
+            "$ref": "#/components/schemas/TripStatus"
+          }
+        },
+        "additionalProperties": false
+      },
+      "DeleteTripQuery": {
+        "type": "object",
+        "properties": {
+          "hard": {
+            "description": "true = soft delete d'un brouillon (isDeleted) · absent = alias de cancel (backward-compat)",
+            "type": "string",
+            "enum": [
+              "true",
+              "false"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "AddDocumentsBody": {
+        "type": "object",
+        "properties": {
+          "documents": {
+            "minItems": 1,
+            "maxItems": 5,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "url": {
+                  "type": "string",
+                  "description": "URL ImageKit du document"
+                },
+                "fileId": {
+                  "type": "string",
+                  "description": "Identifiant ImageKit (pour suppression)"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "mimeType": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "url",
+                "fileId",
+                "name"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "documents"
+        ],
+        "additionalProperties": false
+      },
+      "ImageKitAuthResponse": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string"
+          },
+          "expire": {
+            "type": "number",
+            "description": "Timestamp d'expiration"
+          },
+          "signature": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "token",
+          "expire",
+          "signature"
+        ],
+        "additionalProperties": false,
+        "description": "Paramètres d'authentification pour upload direct navigateur → ImageKit"
+      }
+    }
+  }
+}
