@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Yamba — Trip Service API",
-    "version": "0.1.0",
-    "description": "Contrats générés depuis @packages/api-contracts (Zod v4, source de vérité unique — D3). Les clients consomment l'API via le gateway (:8080, préfixe /api) ; ce service écoute en direct sur :6002."
+    "version": "0.2.0",
+    "description": "Contrats générés depuis @packages/api-contracts (Zod v4, source de vérité unique — D3). Les clients consomment l'API via le gateway (:8080, préfixe /api) ; ce service écoute en direct sur :6002. Les routes marquées « Auth requise » attendent la session (cookie/bearer — securitySchemes formalisés au Lot C)."
   },
   "servers": [
     {
@@ -13,6 +13,32 @@
     {
       "url": "http://localhost:6002",
       "description": "trip-service direct (debug)"
+    }
+  ],
+  "tags": [
+    {
+      "name": "trips-search",
+      "description": "Recherche publique (aucune auth)"
+    },
+    {
+      "name": "trips-public",
+      "description": "Vue publique d'un trip (aucune auth)"
+    },
+    {
+      "name": "trips",
+      "description": "CRUD owner (auth requise)"
+    },
+    {
+      "name": "trips-lifecycle",
+      "description": "Transitions de la state machine (auth requise, owner)"
+    },
+    {
+      "name": "trips-documents",
+      "description": "Justificatifs du trip (auth requise, owner)"
+    },
+    {
+      "name": "uploads",
+      "description": "Upload direct navigateur → ImageKit (auth requise)"
     }
   ],
   "paths": {
@@ -33,6 +59,1280 @@
           }
         }
       }
+    },
+    "/trips/search": {
+      "get": {
+        "tags": [
+          "trips-search"
+        ],
+        "summary": "Rechercher des trips publiés",
+        "description": "Recherche publique paginée (cursor-based). Hard filters non-négociables : status=PUBLISHED et départ futur. Les trips malformés sont exclus silencieusement du mapping. ⚠️ Enveloppe SANS champ success (fidèle au réel).",
+        "operationId": "searchTrips",
+        "parameters": [
+          {
+            "name": "mode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/TransportModeFilter"
+            },
+            "description": "Filtre mode de transport (défaut : all)"
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "description": "Ville ou pays d'origine (match partiel, insensible à la casse)"
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "description": "Ville ou pays de destination (match partiel, insensible à la casse)"
+          },
+          {
+            "name": "dateFrom",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "Borne basse ISO 8601. Ignorée si dans le passé : la recherche ne renvoie jamais de trips déjà partis (borne effective = max(now, dateFrom))"
+          },
+          {
+            "name": "dateTo",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "Borne haute ISO 8601 sur la date de départ"
+          },
+          {
+            "name": "categories",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "CSV de UiParcelCategory (ex: \"clothes,shoes,documents\"). Sémantique hasSome : au moins une catégorie acceptée doit matcher. Les valeurs invalides sont filtrées silencieusement"
+          },
+          {
+            "name": "departureBuckets",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "CSV de DepartureBucket (ex: \"morning,evening\"). OR des tranches horaires (heure locale de départ). Valeurs invalides filtrées silencieusement"
+          },
+          {
+            "name": "locale",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/SearchLocale"
+            },
+            "description": "Locale de formatage serveur des dates (défaut : fr)"
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/SortOption"
+            },
+            "description": "Tri (défaut : earliest). lowestPrice exclut les trips sans minPriceCents"
+          },
+          {
+            "name": "superTripper",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ]
+            },
+            "description": "Uniquement les Super Trippers — booléen en query string : tout sauf \"true\" vaut false"
+          },
+          {
+            "name": "profileVerified",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ]
+            },
+            "description": "Uniquement les profils vérifiés — booléen en query string : tout sauf \"true\" vaut false"
+          },
+          {
+            "name": "instantBooking",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ]
+            },
+            "description": "Uniquement les trips à réservation instantanée — booléen en query string : tout sauf \"true\" vaut false"
+          },
+          {
+            "name": "verifiedTicket",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ]
+            },
+            "description": "Uniquement les billets vérifiés — booléen en query string : tout sauf \"true\" vaut false"
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Curseur de pagination : le nextCursor de la page précédente"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 10
+            },
+            "description": "Taille de page"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Page de résultats + nextCursor + totalCount",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchTripsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête invalide, trip introuvable, non-propriétaire, ou transition refusée par la state machine (ValidationError — voir note sémantique)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erreur serveur non gérée",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnhandledError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/trips/search/facets": {
+      "get": {
+        "tags": [
+          "trips-search"
+        ],
+        "summary": "Counts pour les filtres de recherche",
+        "description": "9 counts en parallèle. Les counts par mode sont calculés SANS le filtre mode courant ; les counts des soft toggles AVEC. Mêmes hard filters que la recherche. ⚠️ Enveloppe SANS champ success (fidèle au réel).",
+        "operationId": "searchTripsFacets",
+        "parameters": [
+          {
+            "name": "mode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/TransportModeFilter"
+            },
+            "description": "Filtre mode de transport (défaut : all)"
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "description": "Ville ou pays d'origine (match partiel, insensible à la casse)"
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "description": "Ville ou pays de destination (match partiel, insensible à la casse)"
+          },
+          {
+            "name": "dateFrom",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "Borne basse ISO 8601. Ignorée si dans le passé : la recherche ne renvoie jamais de trips déjà partis (borne effective = max(now, dateFrom))"
+          },
+          {
+            "name": "dateTo",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "Borne haute ISO 8601 sur la date de départ"
+          },
+          {
+            "name": "categories",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "CSV de UiParcelCategory (ex: \"clothes,shoes,documents\"). Sémantique hasSome : au moins une catégorie acceptée doit matcher. Les valeurs invalides sont filtrées silencieusement"
+          },
+          {
+            "name": "departureBuckets",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "CSV de DepartureBucket (ex: \"morning,evening\"). OR des tranches horaires (heure locale de départ). Valeurs invalides filtrées silencieusement"
+          },
+          {
+            "name": "locale",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/SearchLocale"
+            },
+            "description": "Locale de formatage serveur des dates (défaut : fr)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Counts par mode et par toggle",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchFacetsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête invalide, trip introuvable, non-propriétaire, ou transition refusée par la state machine (ValidationError — voir note sémantique)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erreur serveur non gérée",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnhandledError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/trips/{id}/public": {
+      "get": {
+        "tags": [
+          "trips-public"
+        ],
+        "summary": "Vue publique d'un trip publié",
+        "description": "DTO structuré (origin/destination/dates/tripper imbriqués), filtré privacy (initiale du nom). 404 si inexistant, soft-deleted ou non-PUBLISHED — au format PublicNotFound (renvoyé hors error-middleware). 400 (ErrorResponse) si l'id n'est pas un ObjectId valide.",
+        "operationId": "getPublicTrip",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ObjectId"
+            },
+            "description": "Identifiant du trip"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Vue publique du trip",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicTripResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête invalide, trip introuvable, non-propriétaire, ou transition refusée par la state machine (ValidationError — voir note sémantique)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Trip inexistant, supprimé ou non publié",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicNotFound"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erreur serveur non gérée",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnhandledError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/trips": {
+      "post": {
+        "tags": [
+          "trips"
+        ],
+        "summary": "Créer un trip (brouillon ou publication directe)",
+        "description": "publish=true crée directement en PUBLISHED si les gates onboarding/Stripe passent (sinon 400). Un brouillon peut être incomplet (villes, dates nullish). minPriceCents et departureHourLocal sont recalculés côté serveur. Auth requise.",
+        "operationId": "createTrip",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTripBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Trip créé (avec documents, sans allowedActions)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TripMutationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête invalide, trip introuvable, non-propriétaire, ou transition refusée par la state machine (ValidationError — voir note sémantique)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erreur serveur non gérée",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnhandledError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/trips/my": {
+      "get": {
+        "tags": [
+          "trips"
+        ],
+        "summary": "Mes trips",
+        "description": "Tous les trips de l'utilisateur (hors soft-deleted), triés par createdAt desc. Chaque trip embarque allowedActions (state machine) et un select partiel des documents {id, type, status, url}. Auth requise.",
+        "operationId": "getMyTrips",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/TripStatus"
+            },
+            "description": "Filtrer par statut (insensible à la casse : toUpperCase() serveur)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Liste { success, trips, count }",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TripsListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête invalide, trip introuvable, non-propriétaire, ou transition refusée par la state machine (ValidationError — voir note sémantique)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erreur serveur non gérée",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnhandledError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/trips/{id}": {
+      "get": {
+        "tags": [
+          "trips"
+        ],
+        "summary": "Détail owner d'un trip",
+        "description": "Vue complète (documents, user, carrierPage) + allowedActions IMBRIQUÉ dans trip. Ownership requis : le trip d'autrui renvoie 400 \"Unauthorized.\" (voir note sémantique). Auth requise.",
+        "operationId": "getTrip",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ObjectId"
+            },
+            "description": "Identifiant du trip"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "{ success, trip: { ...trip, allowedActions } }",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TripResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête invalide, trip introuvable, non-propriétaire, ou transition refusée par la state machine (ValidationError — voir note sémantique)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erreur serveur non gérée",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnhandledError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "trips"
+        ],
+        "summary": "Modifier un trip",
+        "description": "Body partiel (seuls les champs envoyés sont écrits). publish=true sur un DRAFT déclenche les gates de publication (onboarding, Stripe, locations). Édition refusée par la machine (COMPLETED/ARCHIVED/CANCELLED…) → 400. Auth requise.",
+        "operationId": "updateTrip",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ObjectId"
+            },
+            "description": "Identifiant du trip"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateTripBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Trip mis à jour (sans allowedActions)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TripMutationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête invalide, trip introuvable, non-propriétaire, ou transition refusée par la state machine (ValidationError — voir note sémantique)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erreur serveur non gérée",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnhandledError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "trips"
+        ],
+        "summary": "Supprimer (brouillon) ou annuler (alias)",
+        "description": "?hard=true → soft delete d'un brouillon (isDeleted, invisible partout). Sans ?hard → alias backward-compat de cancel. Auth requise.",
+        "operationId": "deleteTrip",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ObjectId"
+            },
+            "description": "Identifiant du trip"
+          },
+          {
+            "name": "hard",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ]
+            },
+            "description": "true = soft delete du brouillon · absent = alias de cancel"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "\"Draft deleted.\" ou \"Trip cancelled.\"",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête invalide, trip introuvable, non-propriétaire, ou transition refusée par la state machine (ValidationError — voir note sémantique)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erreur serveur non gérée",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnhandledError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/trips/{id}/publish": {
+      "post": {
+        "tags": [
+          "trips-lifecycle"
+        ],
+        "summary": "Publier un brouillon",
+        "description": "DRAFT → PUBLISHED. Gates : onboarding carrier, Stripe (charges enabled), champs requis (mode, villes, départ futur, ≥1 catégorie), ≥1 pickup + ≥1 delivery location. Transition refusée → 400 avec le message machine de canPerform. Auth requise (owner uniquement).",
+        "operationId": "publishTrip",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ObjectId"
+            },
+            "description": "Identifiant du trip"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Transition publish effectuée",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête invalide, trip introuvable, non-propriétaire, ou transition refusée par la state machine (ValidationError — voir note sémantique)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erreur serveur non gérée",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnhandledError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/trips/{id}/unpublish": {
+      "post": {
+        "tags": [
+          "trips-lifecycle"
+        ],
+        "summary": "Repasser en brouillon",
+        "description": "PUBLISHED/PAUSED → DRAFT. Interdit avec réservations actives (guard prêt pour le chantier Booking). Décrémente les stats carrier. Transition refusée → 400 avec le message machine de canPerform. Auth requise (owner uniquement).",
+        "operationId": "unpublishTrip",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ObjectId"
+            },
+            "description": "Identifiant du trip"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Transition unpublish effectuée",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête invalide, trip introuvable, non-propriétaire, ou transition refusée par la state machine (ValidationError — voir note sémantique)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erreur serveur non gérée",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnhandledError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/trips/{id}/pause": {
+      "post": {
+        "tags": [
+          "trips-lifecycle"
+        ],
+        "summary": "Mettre en pause",
+        "description": "PUBLISHED → PAUSED. Le trip reste dans le pool public. Transition refusée → 400 avec le message machine de canPerform. Auth requise (owner uniquement).",
+        "operationId": "pauseTrip",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ObjectId"
+            },
+            "description": "Identifiant du trip"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Transition pause effectuée",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête invalide, trip introuvable, non-propriétaire, ou transition refusée par la state machine (ValidationError — voir note sémantique)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erreur serveur non gérée",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnhandledError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/trips/{id}/resume": {
+      "post": {
+        "tags": [
+          "trips-lifecycle"
+        ],
+        "summary": "Reprendre",
+        "description": "PAUSED → PUBLISHED. Date de départ non passée requise. Transition refusée → 400 avec le message machine de canPerform. Auth requise (owner uniquement).",
+        "operationId": "resumeTrip",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ObjectId"
+            },
+            "description": "Identifiant du trip"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Transition resume effectuée",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête invalide, trip introuvable, non-propriétaire, ou transition refusée par la state machine (ValidationError — voir note sémantique)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erreur serveur non gérée",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnhandledError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/trips/{id}/cancel": {
+      "post": {
+        "tags": [
+          "trips-lifecycle"
+        ],
+        "summary": "Annuler",
+        "description": "→ CANCELLED (cancelledAt posé). Décrémente les stats carrier, y compris depuis PAUSED. Transition refusée → 400 avec le message machine de canPerform. Auth requise (owner uniquement).",
+        "operationId": "cancelTrip",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ObjectId"
+            },
+            "description": "Identifiant du trip"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Transition cancel effectuée",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête invalide, trip introuvable, non-propriétaire, ou transition refusée par la state machine (ValidationError — voir note sémantique)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erreur serveur non gérée",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnhandledError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/trips/{id}/restore": {
+      "post": {
+        "tags": [
+          "trips-lifecycle"
+        ],
+        "summary": "Restaurer en brouillon",
+        "description": "CANCELLED → DRAFT (cancelledAt effacé). Date de départ non passée requise. Transition refusée → 400 avec le message machine de canPerform. Auth requise (owner uniquement).",
+        "operationId": "restoreTrip",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ObjectId"
+            },
+            "description": "Identifiant du trip"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Transition restore effectuée",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête invalide, trip introuvable, non-propriétaire, ou transition refusée par la state machine (ValidationError — voir note sémantique)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erreur serveur non gérée",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnhandledError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/trips/{id}/archive": {
+      "post": {
+        "tags": [
+          "trips-lifecycle"
+        ],
+        "summary": "Archiver",
+        "description": "COMPLETED/CANCELLED → ARCHIVED (one-way, pas de désarchivage MVP). Transition refusée → 400 avec le message machine de canPerform. Auth requise (owner uniquement).",
+        "operationId": "archiveTrip",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ObjectId"
+            },
+            "description": "Identifiant du trip"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Transition archive effectuée",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête invalide, trip introuvable, non-propriétaire, ou transition refusée par la state machine (ValidationError — voir note sémantique)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erreur serveur non gérée",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnhandledError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/trips/{id}/documents": {
+      "post": {
+        "tags": [
+          "trips-documents"
+        ],
+        "summary": "Ajouter des justificatifs",
+        "description": "Déduplication par fileId (les doublons sont ignorés ; si aucun nouveau → 200 \"No new documents to add.\"). Limites serveur : siteConfig.maxDocsPerTrip (défaut 5), maxDocSizeMb (défaut 5 Mo). Un TICKET_PROOF fait passer ticketVerificationStatus NOT_SUBMITTED → PENDING. Auth requise (owner).",
+        "operationId": "addTripDocuments",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ObjectId"
+            },
+            "description": "Identifiant du trip"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddDocumentsBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Aucun nouveau document (tous dédupliqués)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TripMutationResponse"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Documents ajoutés — trip complet renvoyé",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TripMutationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête invalide, trip introuvable, non-propriétaire, ou transition refusée par la state machine (ValidationError — voir note sémantique)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erreur serveur non gérée",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnhandledError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/trips/{id}/documents/{documentId}": {
+      "delete": {
+        "tags": [
+          "trips-documents"
+        ],
+        "summary": "Supprimer un justificatif",
+        "description": "Supprime le document (et le fichier ImageKit, best-effort). Si c'était le dernier TICKET_PROOF, ticketVerificationStatus repasse à NOT_SUBMITTED. Auth requise (owner).",
+        "operationId": "removeTripDocument",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ObjectId"
+            },
+            "description": "Identifiant du trip"
+          },
+          {
+            "name": "documentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ObjectId"
+            },
+            "description": "Identifiant du document"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Document supprimé",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête invalide, trip introuvable, non-propriétaire, ou transition refusée par la state machine (ValidationError — voir note sémantique)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erreur serveur non gérée",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnhandledError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/uploads/imagekit-auth": {
+      "get": {
+        "tags": [
+          "uploads"
+        ],
+        "summary": "Paramètres d'authentification ImageKit",
+        "description": "Pour l'upload direct navigateur → ImageKit (token/expire/signature, ~30 min). publicKey et urlEndpoint absents si l'env n'est pas configuré. Auth requise.",
+        "operationId": "getImageKitAuthParams",
+        "responses": {
+          "200": {
+            "description": "Paramètres d'upload",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImageKitAuthResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête invalide, trip introuvable, non-propriétaire, ou transition refusée par la state machine (ValidationError — voir note sémantique)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erreur serveur non gérée",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnhandledError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/uploads/imagekit/{fileId}": {
+      "delete": {
+        "tags": [
+          "uploads"
+        ],
+        "summary": "Supprimer un fichier ImageKit",
+        "description": "Idempotent : un fichier déjà supprimé renvoie 200 \"File was already deleted.\". Auth requise.",
+        "operationId": "deleteImageKitFile",
+        "parameters": [
+          {
+            "name": "fileId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Identifiant ImageKit du fichier"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Fichier supprimé (ou déjà absent)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête invalide, trip introuvable, non-propriétaire, ou transition refusée par la state machine (ValidationError — voir note sémantique)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erreur serveur non gérée",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnhandledError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -42,6 +1342,57 @@
         "pattern": "^[0-9a-fA-F]{24}$",
         "description": "Identifiant MongoDB (ObjectId sérialisé en hexadécimal)",
         "example": "665f1c2ab3d4e5f6a7b8c9d0"
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "error"
+          },
+          "message": {
+            "type": "string",
+            "example": "Trip not found."
+          },
+          "errors": {
+            "description": "Erreurs par champ (formulaires) — exposé quand details.errors est présent",
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "details": {
+            "description": "Contexte structuré 'safe' (ex: type=otp) — toujours exposé ; le reste hors prod uniquement"
+          }
+        },
+        "required": [
+          "status",
+          "message"
+        ],
+        "additionalProperties": false,
+        "description": "Enveloppe d'erreur standard (error-middleware, toute AppError)"
+      },
+      "UnhandledError": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "error"
+          },
+          "error": {
+            "type": "string",
+            "example": "Something went wrong, please try again!"
+          }
+        },
+        "required": [
+          "status",
+          "error"
+        ],
+        "additionalProperties": false,
+        "description": "500 non géré (exception hors AppError) — champ `error`, pas `message`"
       },
       "TripStatus": {
         "type": "string",
@@ -133,6 +1484,26 @@
         ],
         "description": "Enum actuel (pré-D14). La migration vers les 8 familles de risque CAT-02 fera l'objet d'une PR dédiée (mapping conservé)."
       },
+      "TripDocumentType": {
+        "type": "string",
+        "enum": [
+          "TICKET_PROOF",
+          "ITINERARY_PROOF",
+          "VEHICLE_PROOF",
+          "IDENTITY_PROOF",
+          "OTHER"
+        ],
+        "description": "Type de justificatif. TICKET_PROOF pilote ticketVerificationStatus (NOT_SUBMITTED → PENDING à l'ajout, retour à NOT_SUBMITTED si dernier ticket supprimé)."
+      },
+      "TripDocumentStatus": {
+        "type": "string",
+        "enum": [
+          "PENDING",
+          "VERIFIED",
+          "REJECTED"
+        ],
+        "description": "Statut de modération du document"
+      },
       "TripAction": {
         "type": "string",
         "enum": [
@@ -152,18 +1523,44 @@
         "type": "object",
         "properties": {
           "id": {
-            "type": "string"
+            "$ref": "#/components/schemas/ObjectId"
+          },
+          "type": {
+            "$ref": "#/components/schemas/TripDocumentType"
+          },
+          "status": {
+            "$ref": "#/components/schemas/TripDocumentStatus"
           },
           "url": {
             "type": "string",
             "description": "URL ImageKit du document"
           },
           "fileId": {
-            "type": "string",
-            "description": "Identifiant ImageKit (pour suppression)"
-          },
-          "name": {
+            "description": "Identifiant ImageKit (pour suppression)",
             "type": "string"
+          },
+          "tripId": {
+            "$ref": "#/components/schemas/ObjectId"
+          },
+          "uploadedByUserId": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ObjectId"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "originalName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "mimeType": {
             "anyOf": [
@@ -175,7 +1572,39 @@
               }
             ]
           },
-          "uploadedAt": {
+          "sizeBytes": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "verifiedAt": {
             "anyOf": [
               {
                 "type": "string",
@@ -186,13 +1615,45 @@
                 "type": "null"
               }
             ]
+          },
+          "rejectedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "rejectionReason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
           }
         },
         "required": [
           "id",
-          "url",
-          "fileId",
-          "name"
+          "type",
+          "status",
+          "url"
         ],
         "additionalProperties": false
       },
@@ -255,6 +1716,101 @@
         ],
         "additionalProperties": false
       },
+      "TripUserSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/ObjectId"
+          },
+          "firstName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "lastName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "avatar": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "url": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "url"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "description": "Select partiel du user (vue détail owner)"
+      },
+      "TripCarrierSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/ObjectId"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "ratingsAvg": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "ratingsCount": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "isVerified": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "ratingsCount",
+          "isVerified"
+        ],
+        "additionalProperties": false,
+        "description": "Select partiel de la carrierPage (vue détail owner)"
+      },
       "Trip": {
         "type": "object",
         "properties": {
@@ -264,8 +1820,31 @@
           "userId": {
             "$ref": "#/components/schemas/ObjectId"
           },
+          "carrierPageId": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ObjectId"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "status": {
             "$ref": "#/components/schemas/TripStatus"
+          },
+          "currentStep": {
+            "description": "Étape du wizard (1-3)",
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "transportMode": {
             "anyOf": [
@@ -317,6 +1896,17 @@
               }
             ]
           },
+          "originCityCode": {
+            "example": "CDG",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "originRegion": {
             "anyOf": [
               {
@@ -327,7 +1917,28 @@
               }
             ]
           },
+          "originRegionCode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "originCountry": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "originCountryCode": {
+            "example": "FR",
             "anyOf": [
               {
                 "type": "string"
@@ -351,6 +1962,17 @@
             "anyOf": [
               {
                 "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "originTimezone": {
+            "example": "Europe/Paris",
+            "anyOf": [
+              {
+                "type": "string"
               },
               {
                 "type": "null"
@@ -387,6 +2009,16 @@
               }
             ]
           },
+          "destinationCityCode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "destinationRegion": {
             "anyOf": [
               {
@@ -397,7 +2029,28 @@
               }
             ]
           },
+          "destinationRegionCode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "destinationCountry": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "destinationCountryCode": {
+            "example": "CG",
             "anyOf": [
               {
                 "type": "string"
@@ -421,6 +2074,17 @@
             "anyOf": [
               {
                 "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "destinationTimezone": {
+            "example": "Africa/Brazzaville",
+            "anyOf": [
+              {
+                "type": "string"
               },
               {
                 "type": "null"
@@ -463,6 +2127,54 @@
             "anyOf": [
               {
                 "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "departureAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "arrivalAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "returnDepartureAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "returnArrivalAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
               },
               {
                 "type": "null"
@@ -602,10 +2314,66 @@
             "default": "EUR",
             "type": "string"
           },
+          "maxSlots": {
+            "description": "null = capacité illimitée",
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "bookedSlots": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Slots réservés (chantier Booking)"
+          },
           "notes": {
             "anyOf": [
               {
                 "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "minPriceCents": {
+            "description": "min(categoryConditions.priceAmountCents) — null si aucune condition",
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "departureHourLocal": {
+            "description": "Heure locale de départ (0-23), pour les buckets de recherche",
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "carrierRatingSnapshot": {
+            "description": "Note carrier figée à la publication (tri bestRated)",
+            "anyOf": [
+              {
+                "type": "number"
               },
               {
                 "type": "null"
@@ -625,6 +2393,26 @@
               }
             ]
           },
+          "user": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TripUserSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "carrierPage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TripCarrierSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "publishedAt": {
             "anyOf": [
               {
@@ -638,6 +2426,18 @@
             ]
           },
           "cancelledAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "archivedAt": {
             "anyOf": [
               {
                 "type": "string",
@@ -683,6 +2483,7 @@
           "handDeliveryOnly",
           "instantBooking",
           "currencyCode",
+          "bookedSlots",
           "createdAt",
           "updatedAt"
         ],
@@ -694,17 +2495,702 @@
           "$ref": "#/components/schemas/TripAction"
         }
       },
-      "TripResponse": {
+      "TripWithActions": {
         "type": "object",
         "properties": {
-          "trip": {
-            "$ref": "#/components/schemas/Trip"
+          "id": {
+            "$ref": "#/components/schemas/ObjectId"
+          },
+          "userId": {
+            "$ref": "#/components/schemas/ObjectId"
+          },
+          "carrierPageId": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ObjectId"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/TripStatus"
+          },
+          "currentStep": {
+            "description": "Étape du wizard (1-3)",
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "transportMode": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TransportMode"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "tripType": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TripType"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "originLabel": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "originPlaceId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "originCity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "originCityCode": {
+            "example": "CDG",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "originRegion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "originRegionCode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "originCountry": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "originCountryCode": {
+            "example": "FR",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "originLat": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "originLng": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "originTimezone": {
+            "example": "Europe/Paris",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "destinationLabel": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "destinationPlaceId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "destinationCity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "destinationCityCode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "destinationRegion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "destinationRegionCode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "destinationCountry": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "destinationCountryCode": {
+            "example": "CG",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "destinationLat": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "destinationLng": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "destinationTimezone": {
+            "example": "Africa/Brazzaville",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "departureDateLocal": {
+            "example": "2026-08-02",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "departureTimeLocal": {
+            "example": "14:00",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "arrivalDateLocal": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "arrivalTimeLocal": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "departureAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "arrivalAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "returnDepartureAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "returnArrivalAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "flightType": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FlightType"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "flightLayoverCities": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "trainTripType": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TrainTripType"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "trainStopCities": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "carTripFlexibility": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CarTripFlexibility"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "travelReference": {
+            "example": "AF 838",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "ticketVerificationStatus": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TicketVerificationStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "acceptedCategories": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ParcelCategory"
+            }
+          },
+          "categoryConditions": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/CategoryCondition"
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "pickupLocations": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/TripLocationPoint"
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "deliveryLocations": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/TripLocationPoint"
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "handDeliveryOnly": {
+            "type": "boolean"
+          },
+          "instantBooking": {
+            "type": "boolean",
+            "description": "D20 : sans effet sur la machine d'états v1 (badge)"
+          },
+          "currencyCode": {
+            "default": "EUR",
+            "type": "string"
+          },
+          "maxSlots": {
+            "description": "null = capacité illimitée",
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "bookedSlots": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Slots réservés (chantier Booking)"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "minPriceCents": {
+            "description": "min(categoryConditions.priceAmountCents) — null si aucune condition",
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "departureHourLocal": {
+            "description": "Heure locale de départ (0-23), pour les buckets de recherche",
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "carrierRatingSnapshot": {
+            "description": "Note carrier figée à la publication (tri bestRated)",
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "documents": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/TripDocument"
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "user": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TripUserSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "carrierPage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TripCarrierSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "publishedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "cancelledAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "archivedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "isDeleted": {
+            "type": "boolean"
+          },
+          "deletedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
           },
           "allowedActions": {
             "$ref": "#/components/schemas/AllowedActions"
           }
         },
         "required": [
+          "id",
+          "userId",
+          "status",
+          "acceptedCategories",
+          "handDeliveryOnly",
+          "instantBooking",
+          "currencyCode",
+          "bookedSlots",
+          "createdAt",
+          "updatedAt",
+          "allowedActions"
+        ],
+        "additionalProperties": false,
+        "description": "Trip + allowedActions (getAllowedActions) — pilote les CTAs front"
+      },
+      "TripResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true
+          },
+          "trip": {
+            "$ref": "#/components/schemas/TripWithActions"
+          }
+        },
+        "required": [
+          "success",
           "trip"
         ],
         "additionalProperties": false
@@ -712,17 +3198,70 @@
       "TripsListResponse": {
         "type": "object",
         "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true
+          },
           "trips": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/Trip"
+              "$ref": "#/components/schemas/TripWithActions"
             }
+          },
+          "count": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
           }
         },
         "required": [
-          "trips"
+          "success",
+          "trips",
+          "count"
         ],
         "additionalProperties": false
+      },
+      "TripMutationResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true
+          },
+          "message": {
+            "type": "string",
+            "example": "Trip published!"
+          },
+          "trip": {
+            "$ref": "#/components/schemas/Trip"
+          }
+        },
+        "required": [
+          "success",
+          "message",
+          "trip"
+        ],
+        "additionalProperties": false,
+        "description": "Réponse des mutations renvoyant le trip (sans allowedActions)"
+      },
+      "ActionResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true
+          },
+          "message": {
+            "type": "string",
+            "example": "Trip paused."
+          }
+        },
+        "required": [
+          "success",
+          "message"
+        ],
+        "additionalProperties": false,
+        "description": "Réponse minimale des actions (transitions, deletes) — aucun trip renvoyé"
       },
       "CreateTripBody": {
         "type": "object",
@@ -757,6 +3296,16 @@
               }
             ]
           },
+          "originCityCode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "originRegion": {
             "anyOf": [
               {
@@ -767,7 +3316,27 @@
               }
             ]
           },
+          "originRegionCode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "originCountry": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "originCountryCode": {
             "anyOf": [
               {
                 "type": "string"
@@ -791,6 +3360,16 @@
             "anyOf": [
               {
                 "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "originTimezone": {
+            "anyOf": [
+              {
+                "type": "string"
               },
               {
                 "type": "null"
@@ -821,6 +3400,16 @@
               }
             ]
           },
+          "destinationCityCode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "destinationRegion": {
             "anyOf": [
               {
@@ -831,7 +3420,27 @@
               }
             ]
           },
+          "destinationRegionCode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "destinationCountry": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "destinationCountryCode": {
             "anyOf": [
               {
                 "type": "string"
@@ -855,6 +3464,16 @@
             "anyOf": [
               {
                 "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "destinationTimezone": {
+            "anyOf": [
+              {
+                "type": "string"
               },
               {
                 "type": "null"
@@ -895,6 +3514,54 @@
             "anyOf": [
               {
                 "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "departureAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "arrivalAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "returnDepartureAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "returnArrivalAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
               },
               {
                 "type": "null"
@@ -1025,6 +3692,18 @@
             "default": "EUR",
             "type": "string"
           },
+          "maxSlots": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "notes": {
             "anyOf": [
               {
@@ -1037,7 +3716,7 @@
           },
           "publish": {
             "default": false,
-            "description": "true = créer directement en PUBLISHED (si gates onboarding/Stripe OK)",
+            "description": "true = créer directement en PUBLISHED (si gates onboarding/Stripe/locations OK)",
             "type": "boolean"
           }
         },
@@ -1087,6 +3766,16 @@
               }
             ]
           },
+          "originCityCode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "originRegion": {
             "anyOf": [
               {
@@ -1097,7 +3786,27 @@
               }
             ]
           },
+          "originRegionCode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "originCountry": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "originCountryCode": {
             "anyOf": [
               {
                 "type": "string"
@@ -1121,6 +3830,16 @@
             "anyOf": [
               {
                 "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "originTimezone": {
+            "anyOf": [
+              {
+                "type": "string"
               },
               {
                 "type": "null"
@@ -1151,6 +3870,16 @@
               }
             ]
           },
+          "destinationCityCode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "destinationRegion": {
             "anyOf": [
               {
@@ -1161,7 +3890,27 @@
               }
             ]
           },
+          "destinationRegionCode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "destinationCountry": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "destinationCountryCode": {
             "anyOf": [
               {
                 "type": "string"
@@ -1185,6 +3934,16 @@
             "anyOf": [
               {
                 "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "destinationTimezone": {
+            "anyOf": [
+              {
+                "type": "string"
               },
               {
                 "type": "null"
@@ -1225,6 +3984,54 @@
             "anyOf": [
               {
                 "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "departureAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "arrivalAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "returnDepartureAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "returnArrivalAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
               },
               {
                 "type": "null"
@@ -1355,6 +4162,18 @@
             "default": "EUR",
             "type": "string"
           },
+          "maxSlots": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "notes": {
             "anyOf": [
               {
@@ -1367,7 +4186,7 @@
           },
           "publish": {
             "default": false,
-            "description": "true = créer directement en PUBLISHED (si gates onboarding/Stripe OK)",
+            "description": "true = créer directement en PUBLISHED (si gates onboarding/Stripe/locations OK)",
             "type": "boolean"
           }
         },
@@ -1377,7 +4196,7 @@
         "type": "object",
         "properties": {
           "status": {
-            "description": "Filtrer par statut",
+            "description": "Filtrer par statut (insensible à la casse : le service fait toUpperCase())",
             "$ref": "#/components/schemas/TripStatus"
           }
         },
@@ -1402,40 +4221,47 @@
         "properties": {
           "documents": {
             "minItems": 1,
-            "maxItems": 5,
             "type": "array",
             "items": {
               "type": "object",
               "properties": {
-                "url": {
-                  "type": "string",
-                  "description": "URL ImageKit du document"
+                "type": {
+                  "$ref": "#/components/schemas/TripDocumentType"
                 },
                 "fileId": {
                   "type": "string",
-                  "description": "Identifiant ImageKit (pour suppression)"
+                  "minLength": 1
                 },
-                "name": {
+                "url": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "originalName": {
                   "type": "string"
                 },
                 "mimeType": {
-                  "anyOf": [
-                    {
-                      "type": "string"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
+                  "type": "string"
+                },
+                "sizeBytes": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "title": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
                 }
               },
               "required": [
-                "url",
+                "type",
                 "fileId",
-                "name"
+                "url"
               ],
               "additionalProperties": false
-            }
+            },
+            "description": "Maximum côté serveur : siteConfig.maxDocsPerTrip (défaut 5) · taille max par doc : siteConfig.maxDocSizeMb (défaut 5 Mo)"
           }
         },
         "required": [
@@ -1446,24 +4272,937 @@
       "ImageKitAuthResponse": {
         "type": "object",
         "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true
+          },
           "token": {
             "type": "string"
           },
           "expire": {
             "type": "number",
-            "description": "Timestamp d'expiration"
+            "description": "Timestamp Unix d'expiration (~30 min)"
           },
           "signature": {
+            "type": "string"
+          },
+          "publicKey": {
+            "description": "IMAGEKIT_PUBLIC_KEY (absent si env non configuré)",
+            "type": "string"
+          },
+          "urlEndpoint": {
+            "description": "IMAGEKIT_URL_ENDPOINT (absent si env non configuré)",
             "type": "string"
           }
         },
         "required": [
+          "success",
           "token",
           "expire",
           "signature"
         ],
         "additionalProperties": false,
         "description": "Paramètres d'authentification pour upload direct navigateur → ImageKit"
+      },
+      "UiTransportMode": {
+        "type": "string",
+        "enum": [
+          "plane",
+          "train",
+          "car"
+        ],
+        "description": "Mode de transport en convention UI (≠ enum Prisma)"
+      },
+      "TransportModeFilter": {
+        "type": "string",
+        "enum": [
+          "all",
+          "plane",
+          "train",
+          "car"
+        ],
+        "description": "Filtre mode de la recherche (all = tous)"
+      },
+      "SortOption": {
+        "type": "string",
+        "enum": [
+          "earliest",
+          "lowestPrice",
+          "bestRated"
+        ],
+        "description": "Tri des résultats. lowestPrice exclut les trips sans minPriceCents."
+      },
+      "UiParcelCategory": {
+        "type": "string",
+        "enum": [
+          "clothes",
+          "shoes",
+          "fashion-accessories",
+          "other-accessories",
+          "books",
+          "documents",
+          "small-toys",
+          "phone",
+          "computer",
+          "other-electronics",
+          "checked-bag-23kg",
+          "cabin-bag-12kg"
+        ],
+        "description": "Catégorie colis en convention UI (kebab-case)"
+      },
+      "DepartureBucket": {
+        "type": "string",
+        "enum": [
+          "earlyMorning",
+          "morning",
+          "afternoon",
+          "evening"
+        ],
+        "description": "Tranche horaire de départ (heure locale) : earlyMorning 04-08h59 · morning 09-11h59 · afternoon 12-17h59 · evening 18h-03h59"
+      },
+      "SearchLocale": {
+        "type": "string",
+        "enum": [
+          "fr",
+          "en"
+        ],
+        "description": "Locale de formatage serveur des dates (défaut fr)"
+      },
+      "YambaTripResult": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/ObjectId"
+          },
+          "fromCity": {
+            "type": "string"
+          },
+          "fromCityCode": {
+            "type": "string"
+          },
+          "fromCountry": {
+            "type": "string"
+          },
+          "toCity": {
+            "type": "string"
+          },
+          "toCityCode": {
+            "type": "string"
+          },
+          "toCountry": {
+            "type": "string"
+          },
+          "travelDate": {
+            "type": "string",
+            "example": "12 juin 2026",
+            "description": "Formaté serveur selon locale"
+          },
+          "departureTime": {
+            "type": "string",
+            "example": "08:00"
+          },
+          "arrivalTime": {
+            "type": "string",
+            "example": "14:30"
+          },
+          "nextDay": {
+            "description": "Arrivée le lendemain (absent si false)",
+            "type": "boolean"
+          },
+          "durationMinutes": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "stopovers": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "stopoverCity": {
+            "description": "Présent uniquement si exactement 1 escale",
+            "type": "string"
+          },
+          "minPrice": {
+            "type": "number",
+            "description": "En unités (euros), PAS en centimes — déjà divisé par 100"
+          },
+          "pricesByCategory": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": "number"
+            },
+            "description": "Clés = UiParcelCategory, valeurs en unités (euros)"
+          },
+          "currency": {
+            "type": "string",
+            "example": "€",
+            "description": "Symbole, pas le code ISO"
+          },
+          "transportMode": {
+            "$ref": "#/components/schemas/UiTransportMode"
+          },
+          "allowedCategories": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UiParcelCategory"
+            }
+          },
+          "remainingSlots": {
+            "description": "Absent si capacité illimitée (maxSlots null)",
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "superTripper": {
+            "type": "boolean"
+          },
+          "profileVerified": {
+            "type": "boolean"
+          },
+          "instantBooking": {
+            "type": "boolean"
+          },
+          "verifiedTicket": {
+            "type": "boolean"
+          },
+          "rating": {
+            "description": "Absent si ratingsCount = 0 (jamais de 0,0)",
+            "type": "number"
+          },
+          "reviewCount": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "travelerFirstName": {
+            "type": "string"
+          },
+          "travelerLastName": {
+            "description": "Initiale uniquement (privacy)",
+            "type": "string"
+          },
+          "travelerAvatarUrl": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "fromCity",
+          "toCity",
+          "travelDate",
+          "departureTime",
+          "arrivalTime",
+          "minPrice",
+          "pricesByCategory",
+          "currency",
+          "transportMode",
+          "allowedCategories",
+          "superTripper",
+          "profileVerified",
+          "instantBooking",
+          "verifiedTicket"
+        ],
+        "additionalProperties": false,
+        "description": "Carte résultat de recherche (DTO UI)"
+      },
+      "SearchTripsResponse": {
+        "type": "object",
+        "properties": {
+          "trips": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/YambaTripResult"
+            }
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "id du dernier trip de la page — null si dernière page (pagination cursor-based)"
+          },
+          "totalCount": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "trips",
+          "nextCursor",
+          "totalCount"
+        ],
+        "additionalProperties": false
+      },
+      "SearchFacetsResponse": {
+        "type": "object",
+        "properties": {
+          "totalCount": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Count avec le filtre mode appliqué"
+          },
+          "modeCount": {
+            "type": "object",
+            "properties": {
+              "all": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "plane": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "train": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "car": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "all",
+              "plane",
+              "train",
+              "car"
+            ],
+            "additionalProperties": false,
+            "description": "Counts par mode, calculés SANS le filtre mode courant"
+          },
+          "superTripperCount": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "profileVerifiedCount": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "instantBookingCount": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "verifiedTicketCount": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "totalCount",
+          "modeCount",
+          "superTripperCount",
+          "profileVerifiedCount",
+          "instantBookingCount",
+          "verifiedTicketCount"
+        ],
+        "additionalProperties": false
+      },
+      "PublicPlace": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "placeId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "city": {
+            "type": "string",
+            "description": "Non-null : requis par le gate de publication"
+          },
+          "cityCode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "region": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "regionCode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "country": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "countryCode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "lat": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "lng": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "timezone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "city"
+        ],
+        "additionalProperties": false
+      },
+      "PublicTripDates": {
+        "type": "object",
+        "properties": {
+          "departureAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+            "description": "Non-null : requis par le gate de publication"
+          },
+          "arrivalAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "returnDepartureAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "returnArrivalAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "departureDateLocal": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "arrivalDateLocal": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "departureTimeLocal": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "arrivalTimeLocal": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "departureAt"
+        ],
+        "additionalProperties": false
+      },
+      "PublicCarrier": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/ObjectId"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "bio": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "isVerified": {
+            "type": "boolean"
+          },
+          "isSuperCarrier": {
+            "type": "boolean"
+          },
+          "ratingsAvg": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "ratingsCount": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "totalTripsPublished": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "totalParcelsCarried": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "id",
+          "isVerified",
+          "isSuperCarrier",
+          "ratingsCount",
+          "totalTripsPublished",
+          "totalParcelsCarried"
+        ],
+        "additionalProperties": false
+      },
+      "PublicTripper": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/ObjectId"
+          },
+          "publicSlug": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "firstName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "lastInitial": {
+            "type": "string",
+            "description": "Initiale du nom, '' si absent (privacy)"
+          },
+          "avatarUrl": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "memberSince": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          },
+          "carrier": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PublicCarrier"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "lastInitial",
+          "avatarUrl",
+          "memberSince",
+          "carrier"
+        ],
+        "additionalProperties": false
+      },
+      "PublicTrip": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/ObjectId"
+          },
+          "status": {
+            "type": "string",
+            "const": "PUBLISHED",
+            "description": "Seuls les trips PUBLISHED sont servis (404 sinon)"
+          },
+          "transportMode": {
+            "$ref": "#/components/schemas/TransportMode"
+          },
+          "tripType": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TripType"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "origin": {
+            "$ref": "#/components/schemas/PublicPlace"
+          },
+          "destination": {
+            "$ref": "#/components/schemas/PublicPlace"
+          },
+          "dates": {
+            "$ref": "#/components/schemas/PublicTripDates"
+          },
+          "flightType": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FlightType"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "trainTripType": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TrainTripType"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "carTripFlexibility": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CarTripFlexibility"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "flightLayoverCities": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "trainStopCities": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "travelReference": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "acceptedCategories": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ParcelCategory"
+            }
+          },
+          "categoryConditions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CategoryCondition"
+            }
+          },
+          "pickupLocations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TripLocationPoint"
+            }
+          },
+          "deliveryLocations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TripLocationPoint"
+            }
+          },
+          "handDeliveryOnly": {
+            "type": "boolean"
+          },
+          "instantBooking": {
+            "type": "boolean"
+          },
+          "currencyCode": {
+            "type": "string"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "maxSlots": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "bookedSlots": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "remainingSlots": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "max(0, maxSlots - bookedSlots) — null si capacité illimitée"
+          },
+          "minPriceCents": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "ticketVerified": {
+            "type": "boolean",
+            "description": "true ssi ticketVerificationStatus = VERIFIED"
+          },
+          "tripper": {
+            "$ref": "#/components/schemas/PublicTripper"
+          },
+          "publishedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "transportMode",
+          "origin",
+          "destination",
+          "dates",
+          "flightLayoverCities",
+          "trainStopCities",
+          "acceptedCategories",
+          "categoryConditions",
+          "pickupLocations",
+          "deliveryLocations",
+          "handDeliveryOnly",
+          "instantBooking",
+          "currencyCode",
+          "maxSlots",
+          "bookedSlots",
+          "remainingSlots",
+          "minPriceCents",
+          "ticketVerified",
+          "tripper"
+        ],
+        "additionalProperties": false,
+        "description": "Vue publique filtrée d'un trip PUBLISHED"
+      },
+      "PublicTripResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true
+          },
+          "trip": {
+            "$ref": "#/components/schemas/PublicTrip"
+          }
+        },
+        "required": [
+          "success",
+          "trip"
+        ],
+        "additionalProperties": false
+      },
+      "PublicNotFound": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": false
+          },
+          "message": {
+            "type": "string",
+            "example": "Trip not found."
+          }
+        },
+        "required": [
+          "success",
+          "message"
+        ],
+        "additionalProperties": false,
+        "description": "404 de la route publique (court-circuite le middleware d'erreurs)"
       }
     }
   }

@@ -77,6 +77,20 @@ export const ParcelCategorySchema = z
   });
 export type ParcelCategory = z.infer<typeof ParcelCategorySchema>;
 
+export const TripDocumentTypeSchema = z
+  .enum(["TICKET_PROOF", "ITINERARY_PROOF", "VEHICLE_PROOF", "IDENTITY_PROOF", "OTHER"])
+  .meta({
+    id: "TripDocumentType",
+    description:
+      "Type de justificatif. TICKET_PROOF pilote ticketVerificationStatus (NOT_SUBMITTED → PENDING à l'ajout, retour à NOT_SUBMITTED si dernier ticket supprimé).",
+  });
+export type TripDocumentType = z.infer<typeof TripDocumentTypeSchema>;
+
+export const TripDocumentStatusSchema = z
+  .enum(["PENDING", "VERIFIED", "REJECTED"])
+  .meta({ id: "TripDocumentStatus", description: "Statut de modération du document" });
+export type TripDocumentStatus = z.infer<typeof TripDocumentStatusSchema>;
+
 /* ══ State machine (trip.lifecycle) ═══════════════════════════ */
 
 export const TripActionSchema = z
