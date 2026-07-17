@@ -204,16 +204,24 @@ function isLocationNearbyMatch(
     lng: number | null;
   }
 ): boolean {
-  // Coords nécessaires des 2 côtés
-  if (!hasValidCoords(saved.lat, saved.lng)) return false;
-  if (!hasValidCoords(trip.lat, trip.lng)) return false;
+  // Coords nécessaires des 2 côtés.
+  // Consts locales : TS narrowe les const testées inline, pas les propriétés
+  // re-lues après un appel de fonction (limitation des type guards multi-args).
+  const { lat: savedLat, lng: savedLng } = saved;
+  const { lat: tripLat, lng: tripLng } = trip;
+  if (savedLat === null || savedLng === null || !hasValidCoords(savedLat, savedLng)) {
+    return false;
+  }
+  if (tripLat === null || tripLng === null || !hasValidCoords(tripLat, tripLng)) {
+    return false;
+  }
 
   // countryCode doit matcher si trip en a un
   if (trip.countryCode !== null && saved.countryCode !== trip.countryCode) {
     return false;
   }
 
-  const distanceKm = haversineKm(saved.lat, saved.lng, trip.lat, trip.lng);
+  const distanceKm = haversineKm(savedLat, savedLng, tripLat, tripLng);
   return distanceKm < NEARBY_RADIUS_KM;
 }
 

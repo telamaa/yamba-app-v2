@@ -20,6 +20,9 @@
     "strict": true,
     "target": "es2022",
     "paths": {
+      "@packages/api-contracts": [
+        "packages/libs/api-contracts/src/index.ts"
+      ],
       "@packages/*": [
         "packages/*"
       ]
