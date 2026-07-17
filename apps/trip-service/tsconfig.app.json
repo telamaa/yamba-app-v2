@@ -13,5 +13,8 @@
     "src/**/*.ts",
     "../../packages/**/*.ts"
   ],
-  "exclude": []
+  "exclude": [
+    "src/**/*.spec.ts",
+    "jest.config.ts"
+  ]
 }
