@@ -14,7 +14,7 @@ import {
   deleteVerificationToken,
   getEmailKeyFromToken,
   getPendingRegistration,
-  hasRefreshJti,
+  getRefreshSession,
   normalizeEmail,
   revokeRefreshJti,
   sendAccountCreatedEmail,
@@ -23,7 +23,7 @@ import {
   sendPasswordChangedEmail,
   storePasswordResetToken,
   storePendingRegistration,
-  storeRefreshJti,
+  storeRefreshSession,
   storeVerificationToken,
   trackForgotPasswordOtpRequests,
   trackOtpRequests,
@@ -32,6 +32,12 @@ import {
   verifyForgotPasswordOtpCode,
   verifyOtp,
 } from "../utils/auth.helper";
+// D27 — politique de session (SES-01 inactivité / SES-02 vie absolue)
+import {
+  loadSessionPolicy,
+  isAbsoluteExpired,
+  remainingLifetimeMs,
+} from "../utils/session-policy";
 import { recordRegistrationConsents } from "../utils/consent/consent.helper";
 import { clearAuthCookies, setCookie } from "../utils/cookies/setCookie";
 import jwt from "jsonwebtoken";
@@ -327,13 +333,20 @@ export const loginUser = async (req: Request, res: Response, next: NextFunction)
       { expiresIn: "15m" }
     );
 
+    // D27 — nouvelle session : createdAt = now, TTL = min(inactivité, vie absolue)
+    const sessionCreatedAt = Date.now();
     const jti = createRefreshJti();
-    await storeRefreshJti(user.id, jti, shouldRemember);
+    await storeRefreshSession(user.id, jti, shouldRemember, sessionCreatedAt);
 
+    // Le JWT refresh est borné à la vie absolue de la session (SES-02) —
+    // plus jamais un "30d" plein pot re-signé à chaque rotation.
+    const refreshLifetimeSeconds = Math.ceil(
+      remainingLifetimeMs(sessionCreatedAt, shouldRemember, loadSessionPolicy(), sessionCreatedAt) / 1000
+    );
     const refreshToken = jwt.sign(
-      { id: user.id, jti, rememberMe: shouldRemember },
+      { id: user.id, jti, rememberMe: shouldRemember, sca: sessionCreatedAt },
       process.env.REFRESH_TOKEN_SECRET as string,
-      { expiresIn: shouldRemember ? "30d" : "7d" }
+      { expiresIn: refreshLifetimeSeconds }
     );
 
     setCookie(res, "access_token", accessToken);
@@ -396,15 +409,35 @@ export const refreshAuthTokens = async (
       return next(new AuthError("Unauthorized! User not found."));
     }
 
-    const jtiValid = await hasRefreshJti(user.id, decoded.jti);
-    if (!jtiValid) {
+    // D27 — lecture du record de session.
+    // Clé absente = expirée (inactivité SES-01 / plafond SES-02) OU jti
+    // réutilisé : indistinguables → message neutre.
+    const session = await getRefreshSession(user.id, decoded.jti);
+    if (session === null) {
       clearAuthCookies(res);
-      return next(new AuthError("Unauthorized! Refresh token reuse detected."));
+      return next(new AuthError("Unauthorized! Session expired or invalid. Please log in again."));
+    }
+
+    const shouldRemember =
+      session === "legacy" ? Boolean(decoded.rememberMe) : session.rememberMe;
+
+    // Legacy "1" (pré-D27) : accepter-et-migrer — createdAt réinitialisé
+    // à now (fenêtre absolue repart une seule fois pour ces sessions).
+    // Chemin à supprimer en PR de cleanup une fois les sessions
+    // pré-déploiement toutes expirées (≤ 30 j après mise en prod).
+    const sessionCreatedAt =
+      session === "legacy" ? Date.now() : session.createdAt;
+
+    // SES-02 — plafond absolu (ceinture-bretelles : le TTL Redis le
+    // garantit déjà, mais on revérifie applicativement).
+    const policy = loadSessionPolicy();
+    if (isAbsoluteExpired(sessionCreatedAt, shouldRemember, policy, Date.now())) {
+      await revokeRefreshJti(user.id, decoded.jti);
+      clearAuthCookies(res);
+      return next(new AuthError("Unauthorized! Session expired. Please log in again."));
     }
 
     await revokeRefreshJti(user.id, decoded.jti);
-
-    const shouldRemember = Boolean(decoded.rememberMe);
 
     const newAccessToken = jwt.sign(
       { id: user.id, roles: user.roles },
@@ -412,13 +445,29 @@ export const refreshAuthTokens = async (
       { expiresIn: "15m" }
     );
 
+    // Rotation : nouveau jti, MÊME createdAt (c'est lui qui borne SES-02).
     const newJti = createRefreshJti();
-    await storeRefreshJti(user.id, newJti, shouldRemember);
+    const ttlSet = await storeRefreshSession(
+      user.id,
+      newJti,
+      shouldRemember,
+      sessionCreatedAt
+    );
+    if (ttlSet <= 0) {
+      // La vie absolue s'est éteinte entre le check et l'écriture (course
+      // improbable) : rien n'a été écrit, on refuse proprement.
+      clearAuthCookies(res);
+      return next(new AuthError("Unauthorized! Session expired. Please log in again."));
+    }
 
+    // JWT refresh borné à la vie absolue restante (plus jamais 30d plein pot).
+    const refreshLifetimeSeconds = Math.ceil(
+      remainingLifetimeMs(sessionCreatedAt, shouldRemember, policy, Date.now()) / 1000
+    );
     const newRefreshToken = jwt.sign(
-      { id: user.id, jti: newJti, rememberMe: shouldRemember },
+      { id: user.id, jti: newJti, rememberMe: shouldRemember, sca: sessionCreatedAt },
       process.env.REFRESH_TOKEN_SECRET as string,
-      { expiresIn: shouldRemember ? "30d" : "7d" }
+      { expiresIn: refreshLifetimeSeconds }
     );
 
     setCookie(res, "access_token", newAccessToken);
