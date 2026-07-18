@@ -4,6 +4,7 @@ import proxy from "express-http-proxy";
 import morgan from "morgan";
 import rateLimit from "express-rate-limit";
 import cookieParser from "cookie-parser";
+import { randomUUID } from "crypto";
 
 const app = express();
 
@@ -31,6 +32,18 @@ app.use(
     // ... reste de ta config
   })
 );
+
+// ─── Correlation ID (B1 — template service) ──
+// Posé à l'ENTRÉE du système : si le client n'en fournit pas, on en
+// génère un. express-http-proxy transmet les headers → tous les
+// services en aval (auth, trip, deal) reçoivent le même ID.
+// deal-service (pino-http) le reprend et le renvoie dans sa réponse.
+app.use((req, _res, next) => {
+  if (!req.headers["x-correlation-id"]) {
+    req.headers["x-correlation-id"] = randomUUID();
+  }
+  next();
+});
 
 app.use(morgan("dev"));
 app.use(express.json({ limit: "100mb" }));
@@ -69,6 +82,26 @@ app.use(
   "/api/uploads",
   proxy("http://localhost:6002", {
     proxyReqPathResolver: (req) => `/uploads${req.url}`,
+  })
+);
+
+// ─── Deal Service (port 6003) ────────────────
+// ⚠️ Déclarés AVANT le catch-all auth ("/") — sinon /api/deals
+// partirait vers auth-service.
+// /api/deals/* → deal-service reçoit /deals/*
+app.use(
+  "/api/deals",
+  proxy("http://localhost:6003", {
+    proxyReqPathResolver: (req) => `/deals${req.url}`,
+  })
+);
+
+// /api/me/bookings/* → deal-service reçoit /me/bookings/*
+// (liste "Mes envois" côté Expéditeur — PR3)
+app.use(
+  "/api/me/bookings",
+  proxy("http://localhost:6003", {
+    proxyReqPathResolver: (req) => `/me/bookings${req.url}`,
   })
 );
 
