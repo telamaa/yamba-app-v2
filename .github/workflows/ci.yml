@@ -86,6 +86,8 @@ jobs:
             nx_project: "@yamba-app/trip-service"
           - project: auth-service
             nx_project: "auth-service"
+          - project: deal-service
+            nx_project: "@yamba-app/deal-service"
     steps:
       - uses: actions/checkout@v4
 
