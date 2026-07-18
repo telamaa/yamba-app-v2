@@ -26,6 +26,8 @@ jobs:
             tsconfig: apps/auth-service/tsconfig.app.json
           - project: api-gateway
             tsconfig: apps/api-gateway/tsconfig.app.json
+          - project: deal-service
+            tsconfig: apps/deal-service/tsconfig.app.json
     steps:
       - uses: actions/checkout@v4
 

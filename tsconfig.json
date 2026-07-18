@@ -20,6 +20,9 @@
     },
     {
       "path": "./apps/trip-service"
+    },
+    {
+      "path": "./apps/deal-service"
     }
   ]
 }
