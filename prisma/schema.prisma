@@ -437,6 +437,20 @@ model Trip {
   currencyCode String @default("EUR")
 
   // ─── Capacité ────────────────────────────────────
+  // ⭐ B1 (CAP-01 / D19) — capacité en KG, unité officielle du produit.
+  // capacityKg : déclaration du Voyageur (immuable après publication ;
+  //   nullable pour les trips legacy, requis au gate de publication
+  //   après la refonte du formulaire création).
+  // reservedKg : compteur atomique ($inc dans la transaction de
+  //   création/libération du booking).
+  //   INVARIANT vérifiable : reservedKg === Σ poids des bookings actifs.
+  //   remainingKg = capacityKg − reservedKg, DÉRIVÉ, jamais stocké.
+  capacityKg Float?
+  reservedKg Float  @default(0)
+
+  /// @deprecated — capacité en slots remplacée par capacityKg/reservedKg.
+  /// Conservés pour ne pas casser le wizard création actuel.
+  /// Suppression : PR cleanup post-refonte pricing (D13).
   maxSlots    Int?
   bookedSlots Int  @default(0)
 
@@ -507,6 +521,193 @@ model TripDocument {
   @@index([tripId])
   @@index([tripId, type])
   @@index([status])
+}
+
+// ─────────────────────────────────────────────
+// BOOKING (deal-service — chantier B1)
+// ─────────────────────────────────────────────
+// Le Booking est AUTO-SUFFISANT : snapshots figés à la création
+// (trip, pricing, colis, destinataire) pour que le deal reste lisible
+// même si le Trip est modifié, annulé ou purgé (RGPD). Esprit D17
+// étendu au-delà du prix.
+//
+// Volontairement SANS relations Prisma vers Trip/User (ObjectId
+// indexés uniquement) : pas de cascade accidentelle sur l'historique
+// transactionnel — les jointures sont explicites dans les services.
+// ─────────────────────────────────────────────
+
+// D17 — snapshot pricing IMMUABLE, prime de protection SÉPARÉE (GAR-04).
+// Agnostique au modèle de pricing : PER_CATEGORY (moteur actuel,
+// TripCategoryCondition forfaitaire) ou PER_KG (cible D13 post-refonte).
+// Un changement de moteur ne migre JAMAIS les bookings existants.
+type BookingPricingSnapshot {
+  pricingModel PricingModel
+
+  weightKg Float
+
+  // PER_CATEGORY (présent)
+  categoryPriceCents Int?
+
+  // PER_KG (futur — €/kg × classe S/M/L)
+  pricePerKgCents Int?
+  sizeClass       String? // "S" | "M" | "L"
+
+  // Faits figés, communs aux deux modèles
+  transportCents  Int // = net Voyageur (COM-03)
+  commissionPct   Float // figé à la création (COM-04)
+  commissionCents Int // plancher déjà appliqué (D16)
+
+  // Protection (D22) — flux séparé du transport
+  protectionProvider String? // "YAMBA_GUARANTEE" | assureur embedded
+  protectionTier     String?
+  premiumCents       Int     @default(0)
+
+  totalShipperCents Int
+  currencyCode      String @default("EUR")
+}
+
+// Auto-suffisance : le trip peut changer, le booking garde sa vérité.
+// Deux fuseaux IANA (D24) : le pickup se raisonne côté origine,
+// l'ETA d'arrivée côté destination.
+type BookingTripSnapshot {
+  originCity             String
+  originCountryCode      String?
+  originTimezone         String?
+  destinationCity        String
+  destinationCountryCode String?
+  destinationTimezone    String?
+  departureAt            DateTime // UTC
+  transportMode          String?
+}
+
+type BookingParcelSnapshot {
+  category           ParcelCategory
+  categoryFamily     String? // D14 — mapping 8 familles FIGÉ à la création
+  description        String
+  declaredValueCents Int
+  photoUrls          String[] // R2, horodatées (spec §9)
+}
+
+type BookingRecipientSnapshot {
+  firstName String
+  lastName  String
+  phoneE164 String
+  email     String
+}
+
+type BookingPickupInfo {
+  confirmedAt DateTime
+  photoUrls   String[]
+  notes       String?
+}
+
+// Événements optionnels DANS l'état PICKED_UP — hors machine d'états
+// (validateur séquentiel séparé : canConfirmTrackingStep).
+type BookingTrackingEvent {
+  step        String // AT_AIRPORT | FLIGHT_DEPARTED | FLIGHT_ARRIVED
+  confirmedAt DateTime
+}
+
+model Booking {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  tripId    String @db.ObjectId
+  shipperId String @db.ObjectId // User
+  carrierId String @db.ObjectId // User — dénormalisé (deals de "Mes trajets")
+
+  status BookingStatus @default(PENDING)
+
+  trip      BookingTripSnapshot
+  pricing   BookingPricingSnapshot
+  parcel    BookingParcelSnapshot
+  recipient BookingRecipientSnapshot
+
+  // ─── Jalons (horodatage SERVEUR) + échéances pré-calculées ───
+  requestedAt   DateTime      @default(now())
+  expiresAt     DateTime // requestedAt + 24h (cron B2)
+  acceptedAt    DateTime?
+  pickedUpAt    DateTime?
+  deliveredAt   DateTime?
+  payoutDueAt   DateTime? // deliveredAt + J+4 (cron B4)
+  completedAt   DateTime?
+  closedAt      DateTime? // DECLINED / EXPIRED / CANCELLED
+  closedBy      BookingActor?
+  declineReason String?
+
+  // ─── Code de livraison (spec §9 — le serveur est seul juge) ───
+  deliveryCodeHash    String? // bcrypt — JAMAIS dans un payload carrier
+  codeRegenerations   Int       @default(0) // ≤ MAX_CODE_REGENERATIONS (5)
+  deliveryAttempts    Int       @default(0) // ≤ MAX_DELIVERY_ATTEMPTS (3)
+  deliveryLockedUntil DateTime? // lock DELIVERY_LOCK_MINUTES (15)
+
+  pickup         BookingPickupInfo?
+  trackingEvents BookingTrackingEvent[]
+
+  // ─── Paiement — colonnes prêtes, remplies en B2/B4 ───
+  paymentIntentId   String?
+  capturedAt        DateTime?
+  refundedAt        DateTime?
+  refundAmountCents Int?
+  transferId        String?
+
+  // ─── Litige ───
+  disputeTicket String? // YAM-XXXX
+  disputedAt    DateTime?
+
+  // ─── Lifecycle / RGPD ───
+  isDeleted Boolean   @default(false)
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([tripId, status]) // hasActiveBookings + deals par trajet
+  @@index([shipperId, status]) // Mes envois
+  @@index([carrierId, status]) // deals Mes trajets
+  @@index([status, expiresAt]) // cron expiration 24h (B2)
+  @@index([status, payoutDueAt]) // cron versement J+4 (B4)
+}
+
+// ─────────────────────────────────────────────
+// OUTBOX (D2 — aucun événement perdu, dès B1)
+// ─────────────────────────────────────────────
+// Écrit dans la MÊME transaction Mongo que tout changement d'état.
+// Le relay (PR4) publie vers Redpanda/Kafka puis pose publishedAt.
+
+model OutboxEvent {
+  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+  aggregateType String // "booking"
+  aggregateId   String    @db.ObjectId
+  eventType     String // "booking.requested", "booking.accepted", …
+  payload       Json
+  correlationId String?
+  occurredAt    DateTime  @default(now())
+  publishedAt   DateTime? // null = à publier (relay PR4)
+
+  @@index([publishedAt, occurredAt])
+}
+
+// ─────────────────────────────────────────────
+// REPORT (signalements — scope B1, registre)
+// ─────────────────────────────────────────────
+
+model Report {
+  id             String @id @default(auto()) @map("_id") @db.ObjectId
+  reporterUserId String @db.ObjectId
+
+  targetType ReportTargetType
+  targetId   String           @db.ObjectId
+
+  reason  String
+  details String?
+
+  status ReportStatus @default(OPEN)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([targetType, targetId])
+  @@index([status, createdAt])
+  @@index([reporterUserId])
 }
 
 // ─────────────────────────────────────────────
@@ -631,6 +832,45 @@ enum TripDocumentStatus {
 enum ReviewKind {
   AS_CARRIER
   AS_SHIPPER
+}
+
+// ─── Booking (B1) ────────────────────────────
+// Miroir strict de la machine d'états (spec §2.2 / registre §2.2).
+
+enum BookingStatus {
+  PENDING
+  ACCEPTED
+  PICKED_UP
+  DELIVERED
+  COMPLETED
+  DECLINED
+  EXPIRED
+  CANCELLED
+  DISPUTED
+}
+
+enum BookingActor {
+  SHIPPER
+  CARRIER
+  SYSTEM
+  ADMIN
+}
+
+enum PricingModel {
+  PER_CATEGORY // moteur actuel : prix forfaitaire par catégorie (TripCategoryCondition)
+  PER_KG // cible D13 : €/kg × classe S/M/L (post-refonte pricing)
+}
+
+enum ReportTargetType {
+  TRIP
+  USER
+  BOOKING
+}
+
+enum ReportStatus {
+  OPEN
+  REVIEWED
+  DISMISSED
 }
 
 model SiteConfig {
