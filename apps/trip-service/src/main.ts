@@ -26,11 +26,27 @@ app.get("/", (req, res) => {
 });
 
 // OpenAPI 3.1 (source de vérité : Zod) — construit une fois au démarrage.
-// Le Swagger legacy (swagger-autogen, /api-docs, /docs-json) a été retiré
-// au Lot C du chantier 0.
 const openApiDocument = buildOpenApiDocument();
 app.get("/openapi.json", (req, res) => {
   res.json(openApiDocument);
+});
+
+// Visionneuse de doc (Scalar via CDN, zéro dépendance npm) : lit le
+// document vivant ci-dessus, donc toujours à jour par construction —
+// contrairement au Swagger legacy retiré au Lot C, qui mentait.
+app.get("/docs", (req, res) => {
+  res.type("html").send(`<!doctype html>
+<html>
+<head>
+  <title>Yamba — Trip Service API</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+</head>
+<body>
+  <script id="api-reference" data-url="/openapi.json"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
+</body>
+</html>`);
 });
 
 // Routes
@@ -43,8 +59,7 @@ const port = process.env.PORT || 6002;
 const server = app.listen(port, () => {
   console.log(`Trip service running at http://localhost:${port}`);
   console.log(`OpenAPI 3.1 at http://localhost:${port}/openapi.json`);
-
-  // Lot 3 — Démarre le cron une fois le serveur prêt (idempotent)
+  console.log(`API docs at http://localhost:${port}/docs`);
   startCompleteTripsCron();
 });
 
