@@ -31,9 +31,9 @@ import prisma from "@packages/libs/prisma";
 import {
   canPerform,
   getCarrierStatDeltas,
-  hasActiveBookings,
   type TripStatus,
 } from "../services/trip-state-machine";
+import { hasActiveBookings, hasBookingsInProgress } from "../services/booking-queries";
 
 /** Délai de grâce après l'arrivée avant de terminer le trajet. */
 const GRACE_HOURS = 24;
@@ -82,6 +82,8 @@ export async function runCompleteTripsOnce(now: Date = new Date()): Promise<{
     try {
       const ctx = {
         hasActiveBookings: await hasActiveBookings(trip.id),
+        // A20 : la complétion ignore les DISPUTED (payout gelé, voyage fini)
+        hasBookingsInProgress: await hasBookingsInProgress(trip.id),
         now,
       };
 

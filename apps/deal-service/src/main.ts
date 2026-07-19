@@ -3,17 +3,19 @@
  * ======================
  * Cœur transactionnel de Yamba (chantier B1+). Port 6003 (D1).
  *
- * PR1 (squelette) : boot SANS Prisma, SANS secret, SANS DB — un service
- * qui exige un .env pour démarrer est un service qu'on ne peut ni
- * smoke-tester ni CI-ser (leçon getImageKit, PR #69).
+ * PR1 (squelette) : boot SANS secret ni connexion DB obligatoire — un
+ * service qui exige un .env pour démarrer est un service qu'on ne peut
+ * ni smoke-tester ni CI-ser (leçon getImageKit, PR #69). Le client
+ * Prisma est importé par les controllers mais sa connexion est LAZY :
+ * /health et /docs restent vivants sans base.
+ *
+ * PR3 : l'OAS main-crafted est remplacé par buildOpenApiDocument()
+ * (généré depuis @packages/api-contracts — D3, pattern trip-service)
+ * et les routes de lecture sont montées (deal.routes.ts).
  *
  * Template service (registre B1) : pino + correlation ID dès la
  * naissance — chaque requête porte un id traçable de bout en bout,
  * qui suivra les événements outbox → Kafka (PR4).
- *
- * /openapi.json est un document 3.1 minimal écrit à la main ; la PR3
- * le remplacera par buildOpenApiDocument() généré depuis les schémas
- * Zod de @packages/api-contracts (pattern trip-service, D3).
  */
 import express from "express";
 import cors from "cors";
@@ -22,6 +24,8 @@ import { randomUUID } from "crypto";
 import pino from "pino";
 import { pinoHttp } from "pino-http";
 import { errorMiddleware } from "@packages/error-handler/error-middleware";
+import { buildOpenApiDocument } from "./openapi/build-openapi";
+import dealRouter from "./routes/deal.routes";
 
 const logger = pino({
   name: "deal-service",
@@ -59,50 +63,14 @@ app.get("/", (req, res) => {
 });
 
 // Health check — utilisé par le gateway et les smoke tests CI.
+// Volontairement AVANT les routes authentifiées et sans dépendance DB.
 app.get("/health", (req, res) => {
   res.json({ status: "ok", service: "deal-service" });
 });
 
-// OpenAPI 3.1 minimal (main-crafted) — remplacé en PR3 par la
-// génération Zod → OAS depuis @packages/api-contracts.
-const openApiDocument = {
-  openapi: "3.1.0",
-  info: {
-    title: "Yamba — Deal Service API",
-    version: "0.0.1",
-    description:
-      "Transactional core: deal (Booking) lifecycle. " +
-      "Skeleton (PR1) — business endpoints land in PR3.",
-  },
-  servers: [
-    { url: "http://localhost:8080/api", description: "Through the API gateway" },
-    { url: "http://localhost:6003", description: "Direct (dev)" },
-  ],
-  paths: {
-    "/health": {
-      get: {
-        tags: ["System"],
-        summary: "Health check",
-        responses: {
-          "200": {
-            description: "Service is up",
-            content: {
-              "application/json": {
-                schema: {
-                  type: "object",
-                  properties: {
-                    status: { type: "string" },
-                    service: { type: "string" },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-    },
-  },
-};
+// OpenAPI 3.1 GÉNÉRÉ depuis les schémas Zod (D3) — construit une fois
+// au boot : le document ne peut pas diverger des contrats importés.
+const openApiDocument = buildOpenApiDocument();
 app.get("/openapi.json", (req, res) => {
   res.json(openApiDocument);
 });
@@ -123,6 +91,9 @@ app.get("/docs", (req, res) => {
 </body>
 </html>`);
 });
+
+// Routes métier (lecture seule en PR3) — avant l'error-middleware.
+app.use(dealRouter);
 
 app.use(errorMiddleware);
 

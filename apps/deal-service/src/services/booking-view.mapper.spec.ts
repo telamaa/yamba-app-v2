@@ -1,0 +1,246 @@
+import {
+  toShipperBookingView,
+  toCarrierBookingView,
+  toBookingView,
+  type BookingRecord,
+  type CounterpartRecord,
+} from "./booking-view.mapper";
+
+/**
+ * booking-view.mapper.spec.ts — la frontière de sécurité, prouvée (D30)
+ * =====================================================================
+ * Emplacement : apps/deal-service/src/services/booking-view.mapper.spec.ts
+ *
+ * Le test cardinal (V3) : on INJECTE volontairement des champs secrets
+ * (deliveryCodeHash, deliveryCode en clair) dans le record d'entrée —
+ * comme le ferait un document Prisma complet — et on prouve qu'AUCUN ne
+ * traverse la vue Carrier. C'est la preuve que le mapper est une liste
+ * blanche (résistante au spread), pas un filtre par soustraction.
+ *
+ * Aucun mock Prisma : le mapper est pur (types structurels), on le
+ * teste à nu comme les state machines.
+ */
+
+/* ══ Fixtures ═════════════════════════════════════════════════ */
+
+const FUTURE = new Date("2027-01-01T00:00:00.000Z");
+const T0 = new Date("2026-07-01T10:00:00.000Z");
+
+const SECRET_HASH = "$2b$10$SECRETHASHSECRETHASHSECRETHASH";
+const SECRET_CODE = "482913";
+
+function makeBooking(overrides: Partial<BookingRecord> = {}): BookingRecord {
+  return {
+    id: "665f1c2ab3d4e5f6a7b8c9d0",
+    tripId: "665f1c2ab3d4e5f6a7b8c9d1",
+    shipperId: "665f1c2ab3d4e5f6a7b8c9d2",
+    carrierId: "665f1c2ab3d4e5f6a7b8c9d3",
+    status: "ACCEPTED",
+    isDeleted: false,
+    trip: {
+      originCity: "Paris",
+      originCountryCode: "FR",
+      originTimezone: "Europe/Paris",
+      destinationCity: "Brazzaville",
+      destinationCountryCode: "CG",
+      destinationTimezone: "Africa/Brazzaville",
+      departureAt: new Date("2026-08-02T14:00:00.000Z"),
+      transportMode: "PLANE",
+    },
+    pricing: {
+      pricingModel: "PER_CATEGORY",
+      weightKg: 5,
+      categoryPriceCents: 2500,
+      pricePerKgCents: null,
+      sizeClass: null,
+      transportCents: 2500,
+      commissionPct: 0.15,
+      commissionCents: 500,
+      protectionProvider: null,
+      protectionTier: null,
+      premiumCents: 0,
+      totalShipperCents: 3000,
+      currencyCode: "EUR",
+    },
+    parcel: {
+      category: "DOCUMENTS",
+      categoryFamily: null,
+      description: "Dossier administratif",
+      declaredValueCents: 10000,
+      photoUrls: ["https://r2.example/p1.jpg"],
+    },
+    recipient: {
+      firstName: "Clarisse",
+      lastName: "Mabiala",
+      phoneE164: "+242061234567",
+      email: "clarisse@example.com",
+    },
+    pickup: null,
+    trackingEvents: [],
+    requestedAt: T0,
+    expiresAt: FUTURE,
+    acceptedAt: T0,
+    pickedUpAt: null,
+    deliveredAt: null,
+    payoutDueAt: null,
+    completedAt: null,
+    closedAt: null,
+    closedBy: null,
+    declineReason: null,
+    codeRegenerations: 0,
+    deliveryAttempts: 0,
+    deliveryLockedUntil: null,
+    disputeTicket: null,
+    disputedAt: null,
+    createdAt: T0,
+    updatedAt: T0,
+    ...overrides,
+  };
+}
+
+/** Record "à la Prisma" : AVEC les secrets, comme en base. */
+function makeLeakyBooking(overrides: Partial<BookingRecord> = {}): BookingRecord {
+  return {
+    ...makeBooking(overrides),
+    deliveryCodeHash: SECRET_HASH,
+    deliveryCode: SECRET_CODE,
+  } as unknown as BookingRecord;
+}
+
+const SHIPPER: CounterpartRecord = {
+  id: "665f1c2ab3d4e5f6a7b8c9d2",
+  firstName: "Aminata",
+  lastName: "Diallo",
+  avatarUrl: "https://r2.example/aminata.jpg",
+};
+
+const CARRIER: CounterpartRecord = {
+  id: "665f1c2ab3d4e5f6a7b8c9d3",
+  firstName: "Thomas",
+  lastName: "Nkounkou",
+  avatarUrl: null,
+};
+
+/* ══ V3 — LE test : rien de secret ne traverse ════════════════ */
+
+describe("frontière carrier — liste blanche résistante au spread (A13)", () => {
+  it("le hash et le code injectés dans le record ne traversent JAMAIS la vue Carrier", () => {
+    const view = toCarrierBookingView(makeLeakyBooking({ status: "PICKED_UP", pickedUpAt: T0, codeRegenerations: 2 }), SHIPPER);
+    const json = JSON.stringify(view);
+    expect(json).not.toContain(SECRET_HASH);
+    expect(json).not.toContain(SECRET_CODE);
+    expect(view).not.toHaveProperty("deliveryCode");
+    expect(view).not.toHaveProperty("deliveryCodeHash");
+    expect(view).not.toHaveProperty("codeRegenerationsLeft");
+    expect(view).not.toHaveProperty("codeRegenerations");
+  });
+
+  it("le hash injecté ne traverse pas non plus la vue Shipper (seul le code y a une place, null en B1)", () => {
+    const view = toShipperBookingView(makeLeakyBooking(), CARRIER);
+    expect(JSON.stringify(view)).not.toContain(SECRET_HASH);
+    expect(view.deliveryCode).toBeNull();
+  });
+
+  it("la vue Carrier n'expose ni commission ni total Expéditeur", () => {
+    const view = toCarrierBookingView(makeBooking(), SHIPPER);
+    expect(view.pricing).not.toHaveProperty("commissionPct");
+    expect(view.pricing).not.toHaveProperty("commissionCents");
+    expect(view.pricing).not.toHaveProperty("totalShipperCents");
+    expect(view.pricing).not.toHaveProperty("premiumCents");
+    expect(view.pricing.transportCents).toBe(2500);
+  });
+});
+
+/* ══ Compteurs dérivés (le serveur est seul juge) ═════════════ */
+
+describe("compteurs dérivés", () => {
+  it("codeRegenerationsLeft = MAX(5) − utilisées, côté Shipper", () => {
+    const view = toShipperBookingView(makeBooking({ codeRegenerations: 2 }), CARRIER);
+    expect(view.codeRegenerationsLeft).toBe(3);
+  });
+
+  it("codeRegenerationsLeft est clampé à 0 (jamais négatif)", () => {
+    const view = toShipperBookingView(makeBooking({ codeRegenerations: 9 }), CARRIER);
+    expect(view.codeRegenerationsLeft).toBe(0);
+  });
+
+  it("deliveryAttemptsLeft = MAX(3) − tentatives, côté Carrier, avec lock exposé", () => {
+    const lock = new Date("2026-07-01T10:15:00.000Z");
+    const view = toCarrierBookingView(
+      makeBooking({ deliveryAttempts: 2, deliveryLockedUntil: lock }),
+      SHIPPER
+    );
+    expect(view.deliveryAttemptsLeft).toBe(1);
+    expect(view.deliveryLockedUntil).toBe(lock.toISOString());
+  });
+
+  it("le Shipper ne voit pas les compteurs de livraison du Carrier", () => {
+    const view = toShipperBookingView(makeBooking({ deliveryAttempts: 2 }), CARRIER);
+    expect(view).not.toHaveProperty("deliveryAttemptsLeft");
+    expect(view).not.toHaveProperty("deliveryLockedUntil");
+  });
+});
+
+/* ══ allowedActions = machine, par rôle ═══════════════════════ */
+
+describe("allowedActions — le front reflète, ne décide jamais", () => {
+  it("PENDING : Shipper [cancel], Carrier [accept, decline]", () => {
+    const pending = makeBooking({ status: "PENDING", acceptedAt: null });
+    expect(toShipperBookingView(pending, CARRIER).allowedActions).toEqual(["cancel"]);
+    expect(toCarrierBookingView(pending, SHIPPER).allowedActions.sort()).toEqual(["accept", "decline"]);
+  });
+
+  it("DELIVERED (fenêtre J+4 ouverte) : Shipper [confirmEarly, dispute], Carrier []", () => {
+    const delivered = makeBooking({
+      status: "DELIVERED",
+      pickedUpAt: T0,
+      deliveredAt: T0,
+      payoutDueAt: FUTURE,
+    });
+    expect(toShipperBookingView(delivered, CARRIER).allowedActions.sort()).toEqual(["confirmEarly", "dispute"]);
+    expect(toCarrierBookingView(delivered, SHIPPER).allowedActions).toEqual([]);
+  });
+});
+
+/* ══ Sérialisation & privacy ══════════════════════════════════ */
+
+describe("sérialisation et privacy", () => {
+  it("les Date deviennent des ISO strings, les jalons absents restent null", () => {
+    const view = toShipperBookingView(makeBooking(), CARRIER);
+    expect(view.requestedAt).toBe(T0.toISOString());
+    expect(view.acceptedAt).toBe(T0.toISOString());
+    expect(view.pickedUpAt).toBeNull();
+    expect(view.trip.departureAt).toBe("2026-08-02T14:00:00.000Z");
+  });
+
+  it("contrepartie : initiale du nom seulement (privacy PublicTripper)", () => {
+    const view = toShipperBookingView(makeBooking(), CARRIER);
+    expect(view.carrier).toEqual({
+      id: CARRIER.id,
+      firstName: "Thomas",
+      lastInitial: "N",
+      avatarUrl: null,
+    });
+    expect(JSON.stringify(view.carrier)).not.toContain("Nkounkou");
+  });
+
+  it("contrepartie sans nom : lastInitial = '' (jamais undefined)", () => {
+    const view = toShipperBookingView(makeBooking(), { ...CARRIER, lastName: null });
+    expect(view.carrier.lastInitial).toBe("");
+  });
+
+  it("le destinataire est visible côté Carrier (nécessaire à la livraison)", () => {
+    const view = toCarrierBookingView(makeBooking(), SHIPPER);
+    expect(view.recipient.phoneE164).toBe("+242061234567");
+  });
+});
+
+/* ══ Dispatch par rôle ════════════════════════════════════════ */
+
+describe("toBookingView — dispatch", () => {
+  it("SHIPPER → vue Shipper (deliveryCode présent), CARRIER → vue Carrier (absent)", () => {
+    const b = makeBooking();
+    expect(toBookingView(b, "SHIPPER", CARRIER)).toHaveProperty("deliveryCode");
+    expect(toBookingView(b, "CARRIER", SHIPPER)).not.toHaveProperty("deliveryCode");
+  });
+});
