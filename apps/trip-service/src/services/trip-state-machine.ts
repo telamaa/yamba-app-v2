@@ -13,13 +13,18 @@
  * absent — publishTrip n'exige que departureAt, donc un trip publié sans
  * date d'arrivée ne se serait jamais terminé via le cron complete-trips.
  *
+ * v3 (PR3 deal, A20) : le contexte gagne hasBookingsInProgress
+ * (complétion — DISPUTED non bloquant) et le stub hasActiveBookings est
+ * remplacé par les requêtes réelles de ./booking-queries.ts (A19).
+ *
  * Design :
  * - Zéro dépendance (ni Prisma, ni Express) → testable unitairement.
  * - Les guards retournent un message d'erreur (string) ou null si OK.
  *   Le controller enveloppe le message dans ValidationError.
- * - `ctx.hasActiveBookings` est STUBBÉ à false tant que le Booking model
- *   n'existe pas. Au chantier Deal lifecycle, on branchera la vraie requête
- *   (count des bookings non terminaux) sans toucher à cette machine.
+ * - Le contexte est CALCULÉ par les call sites via ./booking-queries.ts
+ *   (PR3) : hasActiveBookings (DISPUTED inclus — kg, edit/unpublish) et
+ *   hasBookingsInProgress (DISPUTED exclu — complétion, A20). La
+ *   machine reste zéro-dépendance et ne fait aucune requête.
  *
  * Mapping machine → endpoints → clés frontend (TripActionKey) :
  * ┌───────────────┬──────────────────────────────┬──────────────────┐
@@ -86,11 +91,19 @@ export type TripLike = {
 
 export type TripLifecycleContext = {
   /**
-   * ⚠️ STUB — Booking model pas encore implémenté.
-   * À brancher au chantier Deal lifecycle sur :
-   *   prisma.booking.count({ where: { tripId, status: { notIn: TERMINAL } } }) > 0
+   * Bookings "actifs" (kg réservés — CAP-02), DISPUTED INCLUS.
+   * Bloque edit / unpublish. Source : booking-queries.hasActiveBookings.
    */
   hasActiveBookings: boolean;
+  /**
+   * A20 — bookings bloquant la COMPLÉTION (actifs − DISPUTED : le
+   * litige gèle le payout, pas la fin du voyage). Utilisé uniquement
+   * par le guard `complete` (cron). OPTIONNEL avec repli conservateur
+   * sur hasActiveBookings : un call site non recâblé garde l'ancien
+   * comportement (DISPUTED bloquant) plutôt que de compléter à tort.
+   * Source : booking-queries.hasBookingsInProgress.
+   */
+  hasBookingsInProgress?: boolean;
   /** Horloge injectable pour les tests. Défaut : new Date() */
   now?: Date;
 };
@@ -235,15 +248,15 @@ const TRANSITIONS: Record<TripAction, TransitionDef> = {
   complete: {
     // Réservé au cron (jamais exposé en endpoint user).
     // Règle 1 (MVP, sans Booking) : arrivée passée + aucune réservation.
-    // Règle 2 (chantier Booking) : tous les deals en état terminal
-    // logistique — litiges NON bloquants.
+    // Règle 2 (PR3, A20) : plus aucun deal EN COURS — DISPUTED non
+    // bloquant (les kg restent conservés, mais le voyage est fini).
     from: ["PUBLISHED", "PAUSED"],
     to: "COMPLETED",
     guard: (trip, ctx) => {
       if (!isPastArrival(trip, ctx.now)) {
         return "Cannot complete a trip before its arrival date.";
       }
-      if (ctx.hasActiveBookings) {
+      if (ctx.hasBookingsInProgress) {
         return "Cannot complete a trip with bookings still in progress.";
       }
       return null;
@@ -283,6 +296,9 @@ export function canPerform(
 
   const fullCtx: Required<TripLifecycleContext> = {
     hasActiveBookings: ctx.hasActiveBookings,
+    // Repli conservateur (A20) : sans info de complétion, on considère
+    // les DISPUTED bloquants plutôt que de compléter un trip à tort.
+    hasBookingsInProgress: ctx.hasBookingsInProgress ?? ctx.hasActiveBookings,
     now: ctx.now ?? new Date(),
   };
 
@@ -358,20 +374,10 @@ export function getCarrierStatDeltas(
 }
 
 // ─────────────────────────────────────────────
-// Stub booking — point de branchement unique
+// Branchement booking (PR3 — A19/A20)
 // ─────────────────────────────────────────────
-
-/**
- * ⚠️ STUB — retourne toujours false tant que le Booking model n'existe pas.
- * Au chantier Deal lifecycle, remplacer le corps par la vraie requête :
- *
- *   const count = await prisma.booking.count({
- *     where: { tripId, status: { notIn: BOOKING_TERMINAL_STATUSES } },
- *   });
- *   return count > 0;
- *
- * Le reste du code (controller, machine) ne bougera pas.
- */
-export async function hasActiveBookings(_tripId: string): Promise<boolean> {
-  return false;
-}
+// Le stub hasActiveBookings a été remplacé par les requêtes RÉELLES de
+// ./booking-queries.ts : hasActiveBookings (DISPUTED inclus) et
+// hasBookingsInProgress (DISPUTED exclu). La machine reste
+// zéro-dépendance — les call sites (trip.controller, cron
+// complete-trips) calculent le contexte et le passent à canPerform.
