@@ -70,7 +70,7 @@ jobs:
 
       - name: openapi.json est a jour (DoD chantier 0)
         run: |
-          if ! git diff --exit-code apps/trip-service/openapi.json; then
+          if ! git diff --exit-code apps/trip-service/openapi.json apps/deal-service/openapi.json; then
             echo "::error::openapi.json n'est pas a jour. Lancer 'npm run generate:openapi' et commiter le resultat."
             exit 1
           fi
