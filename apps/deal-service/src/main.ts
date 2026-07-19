@@ -13,9 +13,14 @@
  * (généré depuis @packages/api-contracts — D3, pattern trip-service)
  * et les routes de lecture sont montées (deal.routes.ts).
  *
+ * PR4 : l'outbox relay (D2) démarre après le listen — connexion broker
+ * LAZY (l'API vit même sans Redpanda), bail d'exclusivité, arrêt
+ * propre SIGTERM/SIGINT. OUTBOX_RELAY_ENABLED=false désigne une
+ * instance API pure (scaling horizontal).
+ *
  * Template service (registre B1) : pino + correlation ID dès la
  * naissance — chaque requête porte un id traçable de bout en bout,
- * qui suivra les événements outbox → Kafka (PR4).
+ * qui suit les événements outbox → Kafka (relay PR4).
  */
 import express from "express";
 import cors from "cors";
@@ -24,8 +29,10 @@ import { randomUUID } from "crypto";
 import pino from "pino";
 import { pinoHttp } from "pino-http";
 import { errorMiddleware } from "@packages/error-handler/error-middleware";
+import { KafkaEventPublisher } from "@packages/messaging";
 import { buildOpenApiDocument } from "./openapi/build-openapi";
 import dealRouter from "./routes/deal.routes";
+import { OutboxRelay } from "./relay/outbox-relay";
 
 const logger = pino({
   name: "deal-service",
@@ -106,3 +113,47 @@ const server = app.listen(port, () => {
 server.on("error", (err) => {
   logger.error({ err }, "Server error");
 });
+
+// ── Outbox relay (PR4, D2) ──────────────────────────────────────────
+// Le producteur du pattern outbox. Désactivable par env pour des
+// instances API pures — le bail (relay-lease) protège de toute façon
+// contre la double publication si plusieurs relays tournent.
+const relayEnabled = process.env.OUTBOX_RELAY_ENABLED !== "false";
+let relay: OutboxRelay | null = null;
+
+if (relayEnabled) {
+  const publisher = new KafkaEventPublisher({
+    brokers: (process.env.KAFKA_BROKERS || "localhost:9092")
+      .split(",")
+      .map((broker) => broker.trim()),
+    clientId: "deal-service",
+  });
+  relay = new OutboxRelay({
+    publisher,
+    logger: logger.child({ module: "outbox-relay" }),
+  });
+  relay.start();
+} else {
+  logger.info("Outbox relay disabled (OUTBOX_RELAY_ENABLED=false)");
+}
+
+// Arrêt propre : batch en vol terminé, bail libéré, producer déconnecté,
+// serveur HTTP fermé. La ceinture setTimeout garantit la sortie même si
+// une déconnexion traîne (5 s max). Le garde évite qu'un SIGINT répété
+// (utilisateur impatient — observé au smoke PR4, arrêt lent broker down)
+// ne relance N arrêts concurrents.
+let shuttingDown = false;
+function shutdown(signal: string): void {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  logger.info({ signal }, "Shutting down deal-service");
+  void (async () => {
+    if (relay) {
+      await relay.stop().catch((err) => logger.error({ err }, "Relay stop failed"));
+    }
+    server.close(() => process.exit(0));
+    setTimeout(() => process.exit(0), 5_000).unref();
+  })();
+}
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));

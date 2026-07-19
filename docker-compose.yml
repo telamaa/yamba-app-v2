@@ -1,0 +1,39 @@
+# Yamba — infra locale de développement
+# =====================================
+# PR4 (B1) : Redpanda mono-nœud, le broker du pattern outbox (D2).
+# Le relay du deal-service publie ici ; Mongo reste sur Atlas (distant).
+# Démarrage : docker compose up -d
+# Bootstrap topic (une fois) : ./scripts/redpanda-bootstrap.sh
+# Smoke : docker exec yamba-redpanda rpk topic consume booking-events
+#
+# Doctrine A23 (topics créés EXPLICITEMENT, jamais par accident) :
+# auto_create_topics_enabled=false est posé par le bootstrap via
+# `rpk cluster config set` (config persistée) — le flag --set au
+# démarrage n'est pas reconnu par cette image (incident PR4,
+# cli_parser "unrecognised option").
+
+services:
+  redpanda:
+    image: redpandadata/redpanda:v24.2.18
+    container_name: yamba-redpanda
+    command:
+      - redpanda
+      - start
+      - --mode=dev-container
+      - --smp=1
+      - --memory=1G
+      - --kafka-addr=PLAINTEXT://0.0.0.0:9092
+      - --advertise-kafka-addr=PLAINTEXT://localhost:9092
+    ports:
+      - "9092:9092" # Kafka API (kafkajs → KAFKA_BROKERS=localhost:9092)
+      - "9644:9644" # Admin API (health, métriques)
+    volumes:
+      - redpanda-data:/var/lib/redpanda/data
+    healthcheck:
+      test: ["CMD", "rpk", "cluster", "health", "--exit-when-healthy"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  redpanda-data:
