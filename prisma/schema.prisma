@@ -683,7 +683,31 @@ model OutboxEvent {
   occurredAt    DateTime  @default(now())
   publishedAt   DateTime? // null = à publier (relay PR4)
 
-  @@index([publishedAt, occurredAt])
+  // Poison handling (A24, PR4) : échec de validation/publication →
+  // attempts++ ; à MAX_RELAY_ATTEMPTS (10) la row est PARQUÉE (exclue
+  // de la requête du relay, JAMAIS supprimée — audit trail). Trade-off
+  // documenté : parquer libère les événements suivants de l'agrégat.
+  attempts    Int       @default(0)
+  lastError   String? // dernier message d'erreur (validation Zod ou broker)
+  lastErrorAt DateTime?
+
+  @@index([publishedAt, occurredAt]) // requête du relay (batch trié)
+}
+
+// ─────────────────────────────────────────────
+// RELAY LEASE (A24 — un seul relay actif)
+// ─────────────────────────────────────────────
+// L'ordre par aggregateId exige UN SEUL publieur. Lease à expiration :
+// acquisition atomique (updateMany conditionnel), heartbeat à chaque
+// tick, expiration = reprenable par une autre instance. Permet le
+// scaling horizontal du deal-service sans double publication.
+
+model RelayLease {
+  id        String   @id @map("_id") // clé fixe : "outbox-relay" (un doc par relay)
+  owner     String // identité d'instance : hostname#pid#uuid
+  expiresAt DateTime // renouvelé à chaque tick ; passé = lease libre
+
+  @@index([expiresAt])
 }
 
 // ─────────────────────────────────────────────

@@ -14,6 +14,10 @@ module.exports = {
         __dirname,
         "../../packages/libs/api-contracts/src"
       ),
+      "@packages/messaging": resolve(
+        __dirname,
+        "../../packages/libs/messaging/src"
+      ),
       "@packages": resolve(__dirname, "../../packages"),
     },
     extensions: [".ts", ".js"],
