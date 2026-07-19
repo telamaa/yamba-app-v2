@@ -18,9 +18,9 @@ import {
   canPerform,
   getAllowedActions,
   getCarrierStatDeltas,
-  hasActiveBookings,
   type TripStatus,
 } from "../services/trip-state-machine";
+import { hasActiveBookings } from "../services/booking-queries";
 
 // ─────────────────────────────────────────────
 // Helper interne : recalcule les champs dénormalisés
@@ -65,7 +65,8 @@ async function findOwnedTrip(id: string, userId: string) {
 
 /**
  * Contexte lifecycle pour la state machine.
- * `hasActiveBookings` est stubbé à false tant que le Booking model
+ * `hasActiveBookings`
+ * // PR3 : requête réelle (booking-queries) — DISPUTED inclus (A20).)
  * n'existe pas — le branchement se fera dans trip-state-machine.ts.
  */
 async function buildLifecycleCtx(tripId: string) {
