@@ -8,7 +8,9 @@
  * Emplacement : apps/deal-service/src/services/booking-state-machine.ts
  *
  * Design (hérité de trip-state-machine, étendu) :
- * - Zéro dépendance (ni Prisma, ni Express) → testable unitairement.
+ * - Zéro dépendance d'infrastructure (ni Prisma, ni Express) →
+ *   testable unitairement. Seule dépendance : les ensembles de statuts
+ *   partagés de @packages/api-contracts (A19, source unique).
  * - L'ACTEUR fait partie de la transition : `cancel` depuis ACCEPTED
  *   n'a pas les mêmes effets selon SHIPPER (ANN-01) ou CARRIER (ANN-02).
  * - Les EFFETS DE BORD sont déclarés en data, pas codés dans les
@@ -32,6 +34,13 @@
  * transition ne l'utilise encore — la matrice de remboursement
  * médiation n'est pas spécifiée. DISPUTED est terminal dans cette v1.
  */
+
+// A19 — source unique des ensembles de statuts (partagée avec
+// trip-service). Import en tête, re-export plus bas (backward compat).
+import {
+  BOOKING_ACTIVE_STATUSES,
+  BOOKING_TERMINAL_STATUSES,
+} from "@packages/api-contracts";
 
 // ─────────────────────────────────────────────
 // Types
@@ -83,27 +92,15 @@ export const TRACKING_SEQUENCE = [
 export type TrackingStep = (typeof TRACKING_SEQUENCE)[number];
 
 /**
- * Statuts "actifs" : conservent les kg réservés (CAP-02) et bloquent
- * les actions trip incompatibles (hasActiveBookings, branché en PR3).
- * DISPUTED est ACTIF : le litige conserve les kg ; en revanche il ne
- * bloque PAS la complétion du trip (le voyage physique est fini) —
- * distinction appliquée côté trip-service, pas ici.
+ * A19 — les ensembles ACTIF/TERMINAL/BLOQUANT-COMPLÉTION vivent dans
+ * @packages/api-contracts/booking/booking.enums.ts (source UNIQUE,
+ * partagée avec trip-service). Re-exportés ici pour la compatibilité
+ * des imports existants (spec, services du deal-service).
+ * DISPUTED est ACTIF (conserve les kg) mais ne bloque PAS la
+ * complétion du trip — cette nuance vit dans
+ * BOOKING_COMPLETION_BLOCKING_STATUSES (A20), consommée côté trip.
  */
-export const BOOKING_ACTIVE_STATUSES: readonly BookingStatus[] = [
-  "PENDING",
-  "ACCEPTED",
-  "PICKED_UP",
-  "DELIVERED",
-  "DISPUTED",
-];
-
-/** Statuts terminaux : libèrent les kg (CAP-02) */
-export const BOOKING_TERMINAL_STATUSES: readonly BookingStatus[] = [
-  "COMPLETED",
-  "DECLINED",
-  "EXPIRED",
-  "CANCELLED",
-];
+export { BOOKING_ACTIVE_STATUSES, BOOKING_TERMINAL_STATUSES };
 
 // ─────────────────────────────────────────────
 // Effets de bord déclarés (exécutés en B2-B5)

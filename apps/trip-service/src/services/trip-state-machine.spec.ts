@@ -6,7 +6,6 @@ import {
   leavesPublicPool,
   isPastDeparture,
   isPastArrival,
-  hasActiveBookings,
   type TripAction,
   type TripLike,
   type TripStatus,
@@ -468,8 +467,31 @@ describe("isPastDeparture / isPastArrival", () => {
   });
 });
 
-describe("hasActiveBookings (stub chantier Booking)", () => {
-  it("retourne toujours false tant que le Booking model n'existe pas", async () => {
-    await expect(hasActiveBookings("665f1c2ab3d4e5f6a7b8c9d0")).resolves.toBe(false);
+describe("complete — nuance DISPUTED (A20, PR3)", () => {
+  const past = makeTrip({ status: "PUBLISHED", departureAt: "2020-01-01T00:00:00Z", arrivalAt: "2020-01-02T00:00:00Z" });
+
+  it("complète quand il ne reste que des DISPUTED (actifs mais pas en cours)", () => {
+    expect(
+      canPerform(past, "complete", ctx({ hasActiveBookings: true, hasBookingsInProgress: false }))
+    ).toEqual({ allowed: true, to: "COMPLETED" });
+  });
+
+  it("bloque quand des deals sont réellement en cours", () => {
+    expect(
+      canPerform(past, "complete", ctx({ hasActiveBookings: true, hasBookingsInProgress: true }))
+    ).toMatchObject({ allowed: false });
+  });
+
+  it("repli conservateur : sans le flag, hasActiveBookings fait foi", () => {
+    expect(
+      canPerform(past, "complete", ctx({ hasActiveBookings: true }))
+    ).toMatchObject({ allowed: false });
+  });
+
+  it("le repli n'affecte pas edit/unpublish (toujours hasActiveBookings)", () => {
+    const published = makeTrip({ status: "PUBLISHED" });
+    expect(
+      canPerform(published, "edit", ctx({ hasActiveBookings: true, hasBookingsInProgress: false }))
+    ).toMatchObject({ allowed: false });
   });
 });
