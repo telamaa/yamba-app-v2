@@ -23,6 +23,9 @@
       "@packages/api-contracts": [
         "packages/libs/api-contracts/src/index.ts"
       ],
+      "@packages/messaging": [
+        "packages/libs/messaging/src/index.ts"
+      ],
       "@packages/*": [
         "packages/*"
       ]
