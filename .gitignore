@@ -67,3 +67,4 @@ next-env.d.ts
 
 # TypeScript
 *.tsbuildinfo
+packages/libs/prisma/scripts/seed-output.json
