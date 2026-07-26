@@ -3,15 +3,17 @@
  * ==============================
  * Boîte aux lettres de Yamba (chantier B1-PR4bis). Port 6004 (A16).
  *
- * Lot 1 (squelette) : boot SANS secret ni connexion DB obligatoire
- * (template service B1 — leçon getImageKit) : /health vit sans base
- * ni broker. Le consumer booking-events (A25) démarrera après le
- * listen, connexion broker LAZY, aux lots suivants — même pattern
- * que le relay du deal-service (A24).
- *
- * pino + correlation ID dès la naissance : chaque requête porte un
- * id traçable ; le consumer reprendra le correlationId porté par
- * LES ÉVÉNEMENTS pour tracer seed → outbox → Kafka → notification.
+ * Lot 4b : le consumer booking-events démarre APRÈS le listen —
+ * miroir du câblage relay (deal-service, A24) :
+ * - boot SANS secret ni broker : si Redpanda est absent, l'API vit,
+ *   et le consumer retente sa connexion toutes les 5 s (timer unref) ;
+ * - NOTIFICATION_CONSUMER_ENABLED=false désigne une instance API
+ *   pure (scaling horizontal) — le groupId protège de toute façon :
+ *   plusieurs instances du même groupe se PARTAGENT les partitions ;
+ * - arrêt propre SIGTERM/SIGINT gardé : consumer déconnecté (offsets
+ *   commités), serveur fermé, ceinture 5 s.
+ * pino + correlation ID dès la naissance ; le handler trace le
+ * correlationId PORTÉ PAR LES ÉVÉNEMENTS (gateway → outbox → Kafka).
  */
 import express from "express";
 import cors from "cors";
@@ -20,6 +22,12 @@ import { randomUUID } from "crypto";
 import pino from "pino";
 import { pinoHttp } from "pino-http";
 import { errorMiddleware } from "@packages/error-handler/error-middleware";
+import {
+  CONSUMER_GROUPS,
+  KafkaEventConsumer,
+  TOPICS,
+} from "@packages/messaging";
+import { handleBookingEventMessage } from "./consumer/booking-events.consumer";
 
 const logger = pino({
   name: "notification-service",
@@ -73,3 +81,75 @@ const server = app.listen(port, () => {
 server.on("error", (err) => {
   logger.error(err, "server error");
 });
+
+// ── Consumer booking-events (PR4bis, A25) ───────────────────────────
+const consumerEnabled = process.env.NOTIFICATION_CONSUMER_ENABLED !== "false";
+const consumerLogger = logger.child({ module: "booking-events-consumer" });
+
+const consumer = new KafkaEventConsumer({
+  brokers: (process.env.KAFKA_BROKERS || "localhost:9092")
+    .split(",")
+    .map((broker) => broker.trim()),
+  clientId: "notification-service",
+  groupId: CONSUMER_GROUPS.NOTIFICATION_SERVICE,
+});
+
+let consumerRunning = false;
+let retryTimer: NodeJS.Timeout | null = null;
+
+const CONSUMER_RETRY_MS = 5_000;
+
+async function startConsumer(): Promise<void> {
+  try {
+    await consumer.connect();
+    await consumer.subscribe(TOPICS.BOOKING_EVENTS);
+    await consumer.run((message) =>
+      handleBookingEventMessage(message, consumerLogger)
+    );
+    consumerRunning = true;
+    consumerLogger.info(
+      { topic: TOPICS.BOOKING_EVENTS, groupId: CONSUMER_GROUPS.NOTIFICATION_SERVICE },
+      "Consumer running"
+    );
+  } catch (err) {
+    consumerLogger.error(
+      { err, nextRetryMs: CONSUMER_RETRY_MS },
+      "Consumer start failed — retrying"
+    );
+    retryTimer = setTimeout(() => {
+      void startConsumer();
+    }, CONSUMER_RETRY_MS);
+    retryTimer.unref(); // le serveur HTTP porte la vie du process (§6.4)
+  }
+}
+
+if (consumerEnabled) {
+  void startConsumer();
+} else {
+  logger.info("Consumer disabled (NOTIFICATION_CONSUMER_ENABLED=false)");
+}
+
+// ── Arrêt propre — gardé contre les SIGINT répétés (leçon PR4) ──────
+let shuttingDown = false;
+
+async function shutdown(signal: string): Promise<void> {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  logger.info({ signal }, "Shutting down");
+  // Ceinture : sortie garantie même si une déconnexion traîne.
+  const belt = setTimeout(() => process.exit(0), 5_000);
+  belt.unref();
+  if (retryTimer) clearTimeout(retryTimer);
+  if (consumerRunning || consumerEnabled) {
+    try {
+      await consumer.disconnect();
+      logger.info("Consumer disconnected");
+    } catch (err) {
+      logger.error({ err }, "Consumer disconnect failed");
+    }
+  }
+  server.close(() => process.exit(0));
+}
+
+process.on("SIGTERM", () => void shutdown("SIGTERM"));
+process.on("SIGINT", () => void shutdown("SIGINT"));
