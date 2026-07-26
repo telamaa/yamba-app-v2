@@ -105,6 +105,16 @@ app.use(
   })
 );
 
+// ─── Notification Service (port 6004) ───────
+// ⚠️ Déclaré AVANT le catch-all auth ("/") — sinon /api/me/notifications
+// partirait vers auth-service (leçon squelette deal, PR1).
+app.use(
+  "/api/me/notifications",
+  proxy("http://localhost:6004", {
+    proxyReqPathResolver: (req) => `/me/notifications${req.url}`,
+  })
+);
+
 // ─── Auth Service (port 6001) — catch-all ────
 // /api/auth/*, /api/carrier/* → auth-service
 app.use("/", proxy("http://localhost:6001"));

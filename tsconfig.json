@@ -23,6 +23,9 @@
     },
     {
       "path": "./apps/deal-service"
+    },
+    {
+      "path": "./apps/notification-service"
     }
   ]
 }
