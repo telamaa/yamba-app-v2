@@ -911,3 +911,59 @@ model SiteConfig {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
+
+// ─────────────────────────────────────────────────────────────────────
+// PR4bis — notification-service (A25/A27) : matérialisation in-app des
+// événements booking + registre d'idempotence des consumers.
+// ─────────────────────────────────────────────────────────────────────
+
+/// Notification in-app d'un utilisateur, matérialisée depuis un
+/// événement booking-events (matrice A15 — 17 événements).
+model Notification {
+  id        String    @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String    @db.ObjectId
+  /// Event key du contrat (ex. "booking.requested") — String, pas enum :
+  /// la source de vérité est l'union Zod booking-events.schema.ts ; un
+  /// 18e événement ne doit pas exiger de migration.
+  type      String
+  bookingId String?   @db.ObjectId
+  /// Données d'affichage dérivées de l'événement (corridor, montants…).
+  payload   Json
+  /// _id de l'OutboxEvent source (header `event-id`). REQUIS et unique
+  /// PAR utilisateur : la matérialisation devient rejouable sans
+  /// doublon (upsert) — et jamais d'unique nullable sur Mongo (§6.5).
+  eventId   String    @db.ObjectId
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@unique([eventId, userId])
+  @@index([userId, readAt])
+  @@index([userId, createdAt(sort: Desc)])
+}
+
+/// Statut d'un événement consommé (idempotence PR4bis).
+enum ConsumedEventStatus {
+  PENDING
+  PROCESSED
+  FAILED
+}
+
+/// Registre d'idempotence des consumers (A25) — une row par
+/// (consumerGroup, eventId). Pattern claim-first :
+///   1. create PENDING  (P2002 → déjà vu : PROCESSED = skip,
+///      PENDING/FAILED = retraitement autorisé)
+///   2. traitement (upserts idempotents)
+///   3. update PROCESSED — ou FAILED + lastError si erreur DÉFINITIVE
+///      (contrat), sans bloquer la partition.
+model ConsumedEvent {
+  id            String              @id @default(auto()) @map("_id") @db.ObjectId
+  consumerGroup String
+  /// _id de l'OutboxEvent (header `event-id` du message).
+  eventId       String              @db.ObjectId
+  status        ConsumedEventStatus @default(PENDING)
+  lastError     String?
+  processedAt   DateTime?
+  claimedAt     DateTime            @default(now())
+
+  @@unique([consumerGroup, eventId])
+}
