@@ -18,3 +18,4 @@ export * from "./trip/trip-public.schema";
 export * from "./booking/booking.enums";
 export * from "./booking/booking.schema";
 export * from "./booking/booking-events.schema";
+export * from "./notification/notification.schema";

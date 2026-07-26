@@ -5,22 +5,23 @@
  * Sorties versionnées dans git : ce sont les artefacts consommés par
  * les générateurs de clients mobiles (D3). Toute PR qui modifie les
  * contrats doit régénérer ces fichiers (le job CI "Contrats OpenAPI"
- * diffe les deux et échoue s'ils divergent).
+ * diffe les documents et échoue s'ils divergent).
  *
  * PR3 : le deal-service rejoint le trip-service (spec passée de 1 à
- * 6 opérations — moment du gel). Chaque nouveau service ajoute son
- * entrée dans TARGETS.
+ * 6 opérations — moment du gel). PR4bis : le notification-service
+ * rejoint (3 documents, registre commun A22). Chaque nouveau service
+ * ajoute son entrée dans TARGETS.
  */
 import { writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { buildOpenApiDocument as buildTripDocument } from "../apps/trip-service/src/openapi/build-openapi";
 import { buildOpenApiDocument as buildDealDocument } from "../apps/deal-service/src/openapi/build-openapi";
-
+import { buildOpenApiDocument as buildNotificationDocument } from "../apps/notification-service/src/openapi/build-openapi";
 const TARGETS = [
   { name: "trip-service", out: "../apps/trip-service/openapi.json", build: buildTripDocument },
   { name: "deal-service", out: "../apps/deal-service/openapi.json", build: buildDealDocument },
+  { name: "notification-service", out: "../apps/notification-service/openapi.json", build: buildNotificationDocument },
 ];
-
 for (const t of TARGETS) {
   const outPath = resolve(__dirname, t.out);
   const document = t.build();
