@@ -28,6 +28,8 @@ import {
   TOPICS,
 } from "@packages/messaging";
 import { handleBookingEventMessage } from "./consumer/booking-events.consumer";
+import { buildOpenApiDocument } from "./openapi/build-openapi";
+import notificationRouter from "./routes/notification.routes";
 
 const logger = pino({
   name: "notification-service",
@@ -70,6 +72,32 @@ app.get("/", (req, res) => {
 app.get("/health", (req, res) => {
   res.json({ status: "ok", service: "notification-service" });
 });
+
+// OpenAPI 3.1 GÉNÉRÉ depuis les schémas Zod (D3) — pattern deal.
+const openApiDocument = buildOpenApiDocument();
+app.get("/openapi.json", (req, res) => {
+  res.json(openApiDocument);
+});
+
+// Visionneuse Scalar (CDN, zéro dépendance npm) : lit le document
+// vivant ci-dessus, incapable de mentir.
+app.get("/docs", (req, res) => {
+  res.type("html").send(`<!doctype html>
+<html>
+<head>
+  <title>Yamba — Notification Service API</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+</head>
+<body>
+  <script id="api-reference" data-url="/openapi.json"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
+</body>
+</html>`);
+});
+
+// Routes métier — avant l'error-middleware.
+app.use(notificationRouter);
 
 app.use(errorMiddleware);
 
