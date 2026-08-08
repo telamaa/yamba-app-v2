@@ -1,6 +1,15 @@
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import prisma from "../index";
+import bcrypt from "bcryptjs";
+
+/**
+ * Mot de passe DEV commun aux 12 users du seed (PR5) : Yamba-Dev-2026!
+ * Secret de dev ASSUME (le seed ne tourne jamais en prod) — permet le
+ * login front avec n'importe quel user de seed-output.json.
+ * Hash calcule UNE fois par run (bcryptjs, meme lib que loginUser).
+ */
+const SEED_PASSWORD_HASH = bcrypt.hashSync("Yamba-Dev-2026!", 10);
 
 /**
  * seed-deals.ts — jeu de données Deal lifecycle (PR3, A14)
@@ -249,12 +258,13 @@ async function main() {
   for (const u of USERS) {
     const user = await prisma.user.upsert({
       where: { emailNormalized: u.email.toLowerCase() },
-      update: { firstName: u.firstName, lastName: u.lastName, roles: u.roles },
+      update: { firstName: u.firstName, lastName: u.lastName, roles: u.roles, passwordHash: SEED_PASSWORD_HASH },
       create: {
         firstName: u.firstName,
         lastName: u.lastName,
         email: u.email,
         emailNormalized: u.email.toLowerCase(),
+        passwordHash: SEED_PASSWORD_HASH,
         publicSlug: `seed-${u.key}`, // String? @unique — 2 nulls collisionnent sur l'index Mongo
         phoneE164: u.phoneE164 ?? null,
         roles: u.roles,

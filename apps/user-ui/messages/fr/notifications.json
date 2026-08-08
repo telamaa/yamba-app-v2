@@ -1,0 +1,24 @@
+{
+  "subtitleUnread": "{count} non lue(s)",
+  "empty": {
+    "title": "Aucune notification",
+    "description": "Les événements de tes envois et trajets apparaîtront ici : demandes, prises en charge, livraisons, versements."
+  },
+  "items": {
+    "booking_requested": "Nouvelle demande de transport",
+    "booking_accepted": "Ta demande a été acceptée",
+    "booking_declined": "Ta demande a été refusée",
+    "booking_expired": "Ta demande a expiré",
+    "booking_cancelled": "Réservation annulée",
+    "booking_picked_up": "Colis pris en charge",
+    "booking_pickup_refused": "Prise en charge refusée",
+    "booking_tracking_event": "Ton colis est en route",
+    "booking_delivered": "Colis livré",
+    "booking_completed": "Transaction terminée",
+    "booking_payout_sent": "Versement effectué",
+    "booking_disputed": "Signalement enregistré",
+    "booking_rating_reminder": "Pense à laisser une note",
+    "booking_rating_revealed": "Les notes sont révélées",
+    "fallback": "Notification"
+  }
+}
