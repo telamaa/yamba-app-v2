@@ -34,7 +34,14 @@ export async function getMyNotifications(
         orderBy: { createdAt: "desc" },
         take: PAGE_SIZE,
       }),
-      prisma.notification.count({ where: { userId, readAt: null } }),
+      prisma.notification.count({
+        // Prisma/Mongo : un champ ABSENT n'est pas matche par `null` (famille
+        // §6.5) — les rows nees du consumer sans readAt sont non-lues AUSSI.
+        where: {
+          userId,
+          OR: [{ readAt: null }, { readAt: { isSet: false } }],
+        },
+      }),
     ]);
     res.json({
       notifications: rows.map(toNotificationView),

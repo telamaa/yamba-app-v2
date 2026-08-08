@@ -148,6 +148,8 @@ export async function handleBookingEventMessage(
         type: event.eventType,
         bookingId: event.payload.bookingId,
         payload: event.payload as Prisma.InputJsonValue,
+        // null EXPLICITE : sur Mongo, absent != null (cf. controller).
+        readAt: null,
       },
       update: {},
     });
