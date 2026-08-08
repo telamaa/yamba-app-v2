@@ -15,6 +15,7 @@ import HeaderMobileTrigger from "./header/HeaderMobileTrigger";
 import HeaderMobileBottomSheet from "./header/HeaderMobileBottomSheet";
 import HeaderSkeleton from "./HeaderSkeleton";
 import useHeaderUserState from "./header/useHeaderUserState";
+import { useNotifications } from "@/hooks/useNotifications";
 import {
   HEADER_COMPACT_SCROLL_THRESHOLD,
   HEADER_Z_INDEX,
@@ -34,7 +35,14 @@ export default function Header() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  const notificationCount = 16;
+  // PR5 — la cloche dit la vérité : unreadCount du notification-service
+  // (cache partagé avec la section Notifications, marquage lu compris).
+  // enabled : jamais d'appel authentifié depuis une page publique.
+  const { data: notificationsData } = useNotifications({
+    enabled: userState.isAuthenticated,
+  });
+  const notificationCount = notificationsData?.unreadCount ?? 0;
+  // Mock assumé jusqu'au chantier F (message-service :6005).
   const messageCount = 3;
 
   const commandActions: CommandAction[] = useMemo(() => {
