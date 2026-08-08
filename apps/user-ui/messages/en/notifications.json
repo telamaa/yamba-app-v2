@@ -1,0 +1,24 @@
+{
+  "subtitleUnread": "{count} unread",
+  "empty": {
+    "title": "No notifications",
+    "description": "Events from your shipments and trips will appear here: requests, pickups, deliveries, payouts."
+  },
+  "items": {
+    "booking_requested": "New transport request",
+    "booking_accepted": "Your request was accepted",
+    "booking_declined": "Your request was declined",
+    "booking_expired": "Your request expired",
+    "booking_cancelled": "Booking cancelled",
+    "booking_picked_up": "Parcel picked up",
+    "booking_pickup_refused": "Pickup refused",
+    "booking_tracking_event": "Your parcel is on its way",
+    "booking_delivered": "Parcel delivered",
+    "booking_completed": "Transaction completed",
+    "booking_payout_sent": "Payout sent",
+    "booking_disputed": "Report received",
+    "booking_rating_reminder": "Remember to leave a rating",
+    "booking_rating_revealed": "Ratings revealed",
+    "fallback": "Notification"
+  }
+}
