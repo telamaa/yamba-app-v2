@@ -1391,6 +1391,18 @@
               }
             ]
           },
+          "capacityKg": {
+            "description": "CAP-01/D19 — carrier declared capacity in kg (immutable after publication). Required alongside pricePerKgCents to publish PER_KG (gate A28)",
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "familyConditions": {
             "description": "D14 — per-family stance (NEW engine). Null/empty = all families accepted",
             "anyOf": [
@@ -1399,6 +1411,18 @@
                 "items": {
                   "$ref": "#/components/schemas/TripFamilyCondition"
                 }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reservedKg": {
+            "description": "CAP-02 — atomic server counter. remainingKg = capacityKg - reservedKg (derived, never stored)",
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0
               },
               {
                 "type": "null"
@@ -2128,6 +2152,18 @@
               }
             ]
           },
+          "capacityKg": {
+            "description": "CAP-01/D19 — carrier declared capacity in kg (immutable after publication). Required alongside pricePerKgCents to publish PER_KG (gate A28)",
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "familyConditions": {
             "description": "D14 — per-family stance (NEW engine). Null/empty = all families accepted",
             "anyOf": [
@@ -2136,6 +2172,18 @@
                 "items": {
                   "$ref": "#/components/schemas/TripFamilyCondition"
                 }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reservedKg": {
+            "description": "CAP-02 — atomic server counter. remainingKg = capacityKg - reservedKg (derived, never stored)",
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0
               },
               {
                 "type": "null"
@@ -2874,6 +2922,18 @@
               }
             ]
           },
+          "capacityKg": {
+            "description": "CAP-01/D19 — carrier declared capacity in kg (immutable after publication). Required alongside pricePerKgCents to publish PER_KG (gate A28)",
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "familyConditions": {
             "description": "D14 — per-family stance (NEW engine). Null/empty = all families accepted",
             "anyOf": [
@@ -3391,6 +3451,18 @@
                 "type": "integer",
                 "exclusiveMinimum": 0,
                 "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "capacityKg": {
+            "description": "CAP-01/D19 — carrier declared capacity in kg (immutable after publication). Required alongside pricePerKgCents to publish PER_KG (gate A28)",
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0
               },
               {
                 "type": "null"
@@ -4375,6 +4447,18 @@
               }
             ]
           },
+          "capacityKg": {
+            "description": "CAP-01/D19 — carrier declared capacity in kg (immutable after publication). Required alongside pricePerKgCents to publish PER_KG (gate A28)",
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "familyConditions": {
             "description": "D14 — per-family stance (NEW engine). Null/empty = all families accepted",
             "anyOf": [
@@ -4383,6 +4467,18 @@
                 "items": {
                   "$ref": "#/components/schemas/TripFamilyCondition"
                 }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reservedKg": {
+            "description": "CAP-02 — lets shippers derive remaining capacity client-side",
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0
               },
               {
                 "type": "null"

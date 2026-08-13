@@ -99,6 +99,9 @@ export const PublicTripSchema = z
     categoryConditions: z.array(CategoryConditionSchema),
     // A28 — moteur PER_KG (D13/D14) : le public voit l'offre complete.
     ...tripPerKgPricingFields,
+    reservedKg: z.number().nonnegative().nullish().meta({
+      description: "CAP-02 — lets shippers derive remaining capacity client-side",
+    }),
     pickupLocations: z.array(TripLocationPointSchema),
     deliveryLocations: z.array(TripLocationPointSchema),
 

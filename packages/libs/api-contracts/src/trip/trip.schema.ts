@@ -150,6 +150,9 @@ export const TripSchema = z
     categoryConditions: z.array(CategoryConditionSchema).nullish(),
     // A28 — moteur PER_KG (D13/D14), une seule source etalee.
     ...tripPerKgPricingFields,
+    reservedKg: z.number().nonnegative().nullish().meta({
+      description: "CAP-02 — atomic server counter. remainingKg = capacityKg - reservedKg (derived, never stored)",
+    }),
     pickupLocations: z.array(TripLocationPointSchema).nullish(),
     deliveryLocations: z.array(TripLocationPointSchema).nullish(),
     handDeliveryOnly: z.boolean(),

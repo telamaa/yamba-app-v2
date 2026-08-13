@@ -73,6 +73,9 @@ export const tripPerKgPricingFields = {
   cabinBag12PriceCents: z.number().int().positive().nullish().meta({
     description: "PRC-04 — full 12kg cabin bag flat rate. Null = not offered",
   }),
+  capacityKg: z.number().positive().nullish().meta({
+    description: "CAP-01/D19 — carrier declared capacity in kg (immutable after publication). Required alongside pricePerKgCents to publish PER_KG (gate A28)",
+  }),
   familyConditions: z.array(TripFamilyConditionSchema).nullish().meta({
     description: "D14 — per-family stance (NEW engine). Null/empty = all families accepted",
   }),
