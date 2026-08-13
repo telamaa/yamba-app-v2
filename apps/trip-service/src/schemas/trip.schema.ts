@@ -87,6 +87,40 @@ export const tripLocationPointSchema = z
     }
   });
 
+/* ── A28 — moteur PER_KG (D13/D14), miroir des contrats ───── */
+export const ParcelFamilyEnum = z.enum([
+  "DOCUMENTS_PAPERS",
+  "CLOTHES_TEXTILE",
+  "FOOD_DRY_SEALED",
+  "ELECTRONICS_DEVICES",
+  "COSMETICS_CARE",
+  "PARTS_TOOLS",
+  "TOYS_CHILDCARE",
+  "MISC_ACCESSORIES",
+]);
+export const familyConditionSchema = z
+  .object({
+    familyKey: ParcelFamilyEnum,
+    mode: z.enum(["ACCEPT", "SURCHARGE", "REFUSE"]),
+    surchargePct: z.number().int().min(1).max(100).optional().nullable(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.mode === "SURCHARGE" && value.surchargePct == null) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["surchargePct"],
+        message: "surchargePct is required when mode is SURCHARGE.",
+      });
+    }
+  });
+const perKgPricingFields = {
+  pricePerKgCents: z.number().int().positive().optional().nullable(),
+  capacityKg: z.number().positive().optional().nullable(),
+  checkedBag23PriceCents: z.number().int().positive().optional().nullable(),
+  cabinBag12PriceCents: z.number().int().positive().optional().nullable(),
+  familyConditions: z.array(familyConditionSchema).max(8).optional().nullable(),
+};
+
 export const categoryConditionSchema = z.object({
   category: ParcelCategoryEnum,
   priceAmountCents: z.number().int().min(0).max(100_000_000),
@@ -155,6 +189,7 @@ export const createTripSchema = z
     instantBooking: z.boolean().optional(),
     currencyCode: CurrencyCodeEnum.optional(),
     maxSlots: z.number().int().min(1).max(100).optional().nullable(),
+    ...perKgPricingFields,
     notes: optionalTrimmedString(2000),
 
     publish: z.boolean().optional(),
@@ -284,6 +319,7 @@ export const updateTripSchema = z.object({
   instantBooking: z.boolean().optional(),
   currencyCode: CurrencyCodeEnum.optional(),
   maxSlots: z.number().int().min(1).max(100).optional().nullable(),
+  ...perKgPricingFields,
   notes: optionalTrimmedString(2000),
 
   publish: z.boolean().optional(),
