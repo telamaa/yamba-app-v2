@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { tripPerKgPricingFields } from "./trip-pricing.schema";
 import { ObjectIdSchema } from "../common";
 import {
   TransportModeSchema, TripTypeSchema, FlightTypeSchema, TrainTripTypeSchema,
@@ -96,6 +97,8 @@ export const PublicTripSchema = z
 
     acceptedCategories: z.array(ParcelCategorySchema),
     categoryConditions: z.array(CategoryConditionSchema),
+    // A28 — moteur PER_KG (D13/D14) : le public voit l'offre complete.
+    ...tripPerKgPricingFields,
     pickupLocations: z.array(TripLocationPointSchema),
     deliveryLocations: z.array(TripLocationPointSchema),
 
