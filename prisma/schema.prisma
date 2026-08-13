@@ -418,6 +418,16 @@ model Trip {
   // ─── Conditions / pricing ────────────────────────
   acceptedCategories ParcelCategory[]        @default([])
   categoryConditions TripCategoryCondition[]
+  // ⭐ D13/D14 — moteur PER_KG du Trip (PR pricing socle, A28).
+  // Bi-moteur TOLERANT : nullable, les trips PER_CATEGORY existants
+  // restent valides ; le gate de publication exige UN moteur COMPLET.
+  pricePerKgCents Int?
+  // PRC-04 — bagages entiers forfaitaires (null = non propose).
+  checkedBag23PriceCents Int?
+  cabinBag12PriceCents   Int?
+  // CAT-02 — conditions par FAMILLE de risque (nouveau moteur) ;
+  // l'ancien categoryConditions reste INTACT jusqu'au cleanup.
+  familyConditions TripFamilyCondition[]
 
   // ─── Lieux de remise / livraison ─────────────────
   // Le Voyageur définit où l'Expéditeur dépose le colis (pickup)
@@ -966,4 +976,33 @@ model ConsumedEvent {
   claimedAt     DateTime            @default(now())
 
   @@unique([consumerGroup, eventId])
+}
+
+// ─── D14 / CAT-02 — les 8 familles de risque (PR pricing socle, A28) ───
+// La famille repond a « qu'est-ce que c'est ? » (conformite, risque,
+// protection) — plus jamais au prix (D14). Liste FIGEE en CAT-02 v1.2.
+enum ParcelFamily {
+  DOCUMENTS_PAPERS
+  CLOTHES_TEXTILE
+  FOOD_DRY_SEALED
+  ELECTRONICS_DEVICES
+  COSMETICS_CARE
+  PARTS_TOOLS
+  TOYS_CHILDCARE
+  MISC_ACCESSORIES
+}
+
+/// Position du Voyageur sur une famille : accepter, surcharger, refuser.
+enum FamilyConditionMode {
+  ACCEPT
+  SURCHARGE
+  REFUSE
+}
+
+/// Condition par famille du NOUVEAU moteur (D14) — coexiste avec
+/// TripCategoryCondition (ancien) jusqu'a la PR cleanup post-refonte.
+type TripFamilyCondition {
+  familyKey    ParcelFamily
+  mode         FamilyConditionMode @default(ACCEPT)
+  surchargePct Int?
 }
