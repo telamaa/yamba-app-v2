@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { tripPerKgPricingFields } from "./trip-pricing.schema";
 import { ObjectIdSchema } from "../common";
 import {
   TripStatusSchema, TransportModeSchema, TripTypeSchema, FlightTypeSchema,
@@ -147,6 +148,8 @@ export const TripSchema = z
     /* Offre */
     acceptedCategories: z.array(ParcelCategorySchema),
     categoryConditions: z.array(CategoryConditionSchema).nullish(),
+    // A28 — moteur PER_KG (D13/D14), une seule source etalee.
+    ...tripPerKgPricingFields,
     pickupLocations: z.array(TripLocationPointSchema).nullish(),
     deliveryLocations: z.array(TripLocationPointSchema).nullish(),
     handDeliveryOnly: z.boolean(),
@@ -157,7 +160,7 @@ export const TripSchema = z
     notes: z.string().nullish(),
 
     /* Dénormalisés (recalculés par le service) */
-    minPriceCents: z.number().int().nullish().meta({ description: "min(categoryConditions.priceAmountCents) — null si aucune condition" }),
+    minPriceCents: z.number().int().nullish().meta({ description: "min(categoryConditions.priceAmountCents) — null si aucune condition ; les trips PER_KG restent null (moteurs incomparables, exclus du tri lowestPrice — A28)" }),
     departureHourLocal: z.number().int().nullish().meta({ description: "Heure locale de départ (0-23), pour les buckets de recherche" }),
     carrierRatingSnapshot: z.number().nullish().meta({ description: "Note carrier figée à la publication (tri bestRated)" }),
 
@@ -286,6 +289,8 @@ export const CreateTripBodySchema = z
 
     acceptedCategories: z.array(ParcelCategorySchema).min(1),
     categoryConditions: z.array(CategoryConditionSchema).nullish(),
+    // A28 — moteur PER_KG (D13/D14).
+    ...tripPerKgPricingFields,
     pickupLocations: z.array(TripLocationPointSchema).nullish(),
     deliveryLocations: z.array(TripLocationPointSchema).nullish(),
     handDeliveryOnly: z.boolean().default(false),
