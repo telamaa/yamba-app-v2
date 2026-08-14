@@ -92,6 +92,11 @@ type SeedTrip = {
   departureAt: Date;
   transportMode: "PLANE";
   capacityKg: number;
+  // A28 — moteur PER_KG (optionnel : seuls les trips nouvelle formule)
+  pricePerKgCents?: number;
+  checkedBag23PriceCents?: number;
+  cabinBag12PriceCents?: number;
+  familyConditions?: { familyKey: string; mode: string; surchargePct?: number }[];
 };
 
 const TRIPS: SeedTrip[] = [
@@ -103,6 +108,10 @@ const TRIPS: SeedTrip[] = [
   { key: "los", carrierKey: "adebayo", originCity: "Londres", originCountryCode: "GB", originTimezone: "Europe/London", destinationCity: "Lagos", destinationCountryCode: "NG", destinationTimezone: "Africa/Lagos", departureAt: days(-2), transportMode: "PLANE", capacityKg: 23 },
   { key: "sgn", carrierKey: "linh", originCity: "Paris", originCountryCode: "FR", originTimezone: "Europe/Paris", destinationCity: "Hô Chi Minh-Ville", destinationCountryCode: "VN", destinationTimezone: "Asia/Ho_Chi_Minh", departureAt: days(-1), transportMode: "PLANE", capacityKg: 15 },
   { key: "fih", carrierKey: "josephine", originCity: "Bruxelles", originCountryCode: "BE", originTimezone: "Europe/Brussels", destinationCity: "Kinshasa", destinationCountryCode: "CD", destinationTimezone: "Africa/Kinshasa", departureAt: days(7), transportMode: "PLANE", capacityKg: 23 },
+  // ⭐ A28 — LE trip PER_KG de demonstration (QA de la PR-B) :
+  // 11,50 €/kg · 23 kg · electronique +20 % · alimentaire REFUSE ·
+  // bagage soute 23 kg a 230 € forfaitaire.
+  { key: "bzv-perkg", carrierKey: "thomas", originCity: "Paris", originCountryCode: "FR", originTimezone: "Europe/Paris", destinationCity: "Brazzaville", destinationCountryCode: "CG", destinationTimezone: "Africa/Brazzaville", departureAt: days(15), transportMode: "PLANE", capacityKg: 23, pricePerKgCents: 1150, checkedBag23PriceCents: 23000, familyConditions: [{ familyKey: "ELECTRONICS_DEVICES", mode: "SURCHARGE", surchargePct: 20 }, { familyKey: "FOOD_DRY_SEALED", mode: "REFUSE" }] },
 ];
 
 /* ══ Pricing helpers (centimes entiers — A2, commission 15 %) ═ */
@@ -307,6 +316,11 @@ async function main() {
         departureAt: t.departureAt,
         capacityKg: t.capacityKg,
         reservedKg,
+        // A28 — pass-through PER_KG (undefined = champ absent, trips legacy intacts)
+        pricePerKgCents: t.pricePerKgCents,
+        checkedBag23PriceCents: t.checkedBag23PriceCents,
+        cabinBag12PriceCents: t.cabinBag12PriceCents,
+        familyConditions: (t.familyConditions ?? []) as never,
         publishedAt: days(-16),
       },
     });
