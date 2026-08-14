@@ -21,6 +21,11 @@ import {
   type TripStatus,
 } from "../services/trip-state-machine";
 import { hasActiveBookings } from "../services/booking-queries";
+// ⭐ A28 — gate de publication bi-moteur (D13/D14)
+import {
+  resolvePricingEngine,
+  PRICING_GATE_MESSAGE,
+} from "../services/pricing-gate";
 
 // ─────────────────────────────────────────────
 // Helper interne : recalcule les champs dénormalisés
@@ -336,6 +341,18 @@ export const updateTrip = async (
       }
       if (effectiveDelivery.length === 0) {
         return next(new ValidationError("At least one delivery location is required to publish."));
+      }
+
+      // ⭐ A28 — gate bi-moteur sur les valeurs EFFECTIVES (payload ?? trip).
+      if (
+        resolvePricingEngine({
+          pricePerKgCents: updateData.pricePerKgCents ?? trip.pricePerKgCents,
+          capacityKg: updateData.capacityKg ?? trip.capacityKg,
+          categoryConditions: (updateData.categoryConditions ??
+            trip.categoryConditions) as unknown[],
+        }) === null
+      ) {
+        return next(new ValidationError(PRICING_GATE_MESSAGE));
       }
 
       updateData.status = "PUBLISHED";
@@ -859,6 +876,17 @@ export const publishTrip = async (
     }
     if (!trip.acceptedCategories || trip.acceptedCategories.length === 0) {
       return next(new ValidationError("At least one parcel category must be accepted."));
+    }
+
+    // ⭐ A28 — UN moteur de pricing COMPLET est exige pour publier.
+    if (
+      resolvePricingEngine({
+        pricePerKgCents: trip.pricePerKgCents,
+        capacityKg: trip.capacityKg,
+        categoryConditions: trip.categoryConditions as unknown[],
+      }) === null
+    ) {
+      return next(new ValidationError(PRICING_GATE_MESSAGE));
     }
 
     // ⭐ Locations gate

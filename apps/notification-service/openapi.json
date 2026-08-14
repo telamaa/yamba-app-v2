@@ -338,6 +338,59 @@
         ],
         "description": "Actions de la state machine trip (canPerform/getAllowedActions). Renvoyées dans allowedActions pour piloter les CTAs front."
       },
+      "ParcelFamily": {
+        "type": "string",
+        "enum": [
+          "DOCUMENTS_PAPERS",
+          "CLOTHES_TEXTILE",
+          "FOOD_DRY_SEALED",
+          "ELECTRONICS_DEVICES",
+          "COSMETICS_CARE",
+          "PARTS_TOOLS",
+          "TOYS_CHILDCARE",
+          "MISC_ACCESSORIES"
+        ],
+        "description": "D14/CAT-02 — the 8 risk families (conformity/risk/protection, never price)"
+      },
+      "FamilyConditionMode": {
+        "type": "string",
+        "enum": [
+          "ACCEPT",
+          "SURCHARGE",
+          "REFUSE"
+        ],
+        "description": "Carrier stance on a family: accept, surcharge (%), or refuse"
+      },
+      "TripFamilyCondition": {
+        "type": "object",
+        "properties": {
+          "familyKey": {
+            "$ref": "#/components/schemas/ParcelFamily"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/FamilyConditionMode"
+          },
+          "surchargePct": {
+            "description": "Required when mode=SURCHARGE (e.g. electronics +20%)",
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "familyKey",
+          "mode"
+        ],
+        "additionalProperties": false,
+        "description": "NEW engine family condition (D14) — coexists with legacy CategoryCondition until cleanup"
+      },
       "TripDocument": {
         "type": "object",
         "properties": {
@@ -1096,6 +1149,83 @@
               }
             ]
           },
+          "pricePerKgCents": {
+            "description": "D13 — carrier's single price per kg, in cents. Null = legacy PER_CATEGORY trip",
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "checkedBag23PriceCents": {
+            "description": "PRC-04 — full 23kg checked bag flat rate (consumes 23kg of capacity). Null = not offered",
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "cabinBag12PriceCents": {
+            "description": "PRC-04 — full 12kg cabin bag flat rate. Null = not offered",
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "capacityKg": {
+            "description": "CAP-01/D19 — carrier declared capacity in kg (immutable after publication). Required alongside pricePerKgCents to publish PER_KG (gate A28)",
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "familyConditions": {
+            "description": "D14 — per-family stance (NEW engine). Null/empty = all families accepted",
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/TripFamilyCondition"
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reservedKg": {
+            "description": "CAP-02 — atomic server counter. remainingKg = capacityKg - reservedKg (derived, never stored)",
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "pickupLocations": {
             "anyOf": [
               {
@@ -1163,7 +1293,7 @@
             ]
           },
           "minPriceCents": {
-            "description": "min(categoryConditions.priceAmountCents) — null si aucune condition",
+            "description": "min(categoryConditions.priceAmountCents) — null si aucune condition ; les trips PER_KG restent null (moteurs incomparables, exclus du tri lowestPrice — A28)",
             "anyOf": [
               {
                 "type": "integer",
@@ -1780,6 +1910,83 @@
               }
             ]
           },
+          "pricePerKgCents": {
+            "description": "D13 — carrier's single price per kg, in cents. Null = legacy PER_CATEGORY trip",
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "checkedBag23PriceCents": {
+            "description": "PRC-04 — full 23kg checked bag flat rate (consumes 23kg of capacity). Null = not offered",
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "cabinBag12PriceCents": {
+            "description": "PRC-04 — full 12kg cabin bag flat rate. Null = not offered",
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "capacityKg": {
+            "description": "CAP-01/D19 — carrier declared capacity in kg (immutable after publication). Required alongside pricePerKgCents to publish PER_KG (gate A28)",
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "familyConditions": {
+            "description": "D14 — per-family stance (NEW engine). Null/empty = all families accepted",
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/TripFamilyCondition"
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reservedKg": {
+            "description": "CAP-02 — atomic server counter. remainingKg = capacityKg - reservedKg (derived, never stored)",
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "pickupLocations": {
             "anyOf": [
               {
@@ -1847,7 +2054,7 @@
             ]
           },
           "minPriceCents": {
-            "description": "min(categoryConditions.priceAmountCents) — null si aucune condition",
+            "description": "min(categoryConditions.priceAmountCents) — null si aucune condition ; les trips PER_KG restent null (moteurs incomparables, exclus du tri lowestPrice — A28)",
             "anyOf": [
               {
                 "type": "integer",
@@ -2473,6 +2680,71 @@
               }
             ]
           },
+          "pricePerKgCents": {
+            "description": "D13 — carrier's single price per kg, in cents. Null = legacy PER_CATEGORY trip",
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "checkedBag23PriceCents": {
+            "description": "PRC-04 — full 23kg checked bag flat rate (consumes 23kg of capacity). Null = not offered",
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "cabinBag12PriceCents": {
+            "description": "PRC-04 — full 12kg cabin bag flat rate. Null = not offered",
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "capacityKg": {
+            "description": "CAP-01/D19 — carrier declared capacity in kg (immutable after publication). Required alongside pricePerKgCents to publish PER_KG (gate A28)",
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "familyConditions": {
+            "description": "D14 — per-family stance (NEW engine). Null/empty = all families accepted",
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/TripFamilyCondition"
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "pickupLocations": {
             "anyOf": [
               {
@@ -2936,6 +3208,71 @@
                 "type": "array",
                 "items": {
                   "$ref": "#/components/schemas/CategoryCondition"
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "pricePerKgCents": {
+            "description": "D13 — carrier's single price per kg, in cents. Null = legacy PER_CATEGORY trip",
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "checkedBag23PriceCents": {
+            "description": "PRC-04 — full 23kg checked bag flat rate (consumes 23kg of capacity). Null = not offered",
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "cabinBag12PriceCents": {
+            "description": "PRC-04 — full 12kg cabin bag flat rate. Null = not offered",
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "capacityKg": {
+            "description": "CAP-01/D19 — carrier declared capacity in kg (immutable after publication). Required alongside pricePerKgCents to publish PER_KG (gate A28)",
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "familyConditions": {
+            "description": "D14 — per-family stance (NEW engine). Null/empty = all families accepted",
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/TripFamilyCondition"
                 }
               },
               {
@@ -3867,6 +4204,83 @@
             "items": {
               "$ref": "#/components/schemas/CategoryCondition"
             }
+          },
+          "pricePerKgCents": {
+            "description": "D13 — carrier's single price per kg, in cents. Null = legacy PER_CATEGORY trip",
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "checkedBag23PriceCents": {
+            "description": "PRC-04 — full 23kg checked bag flat rate (consumes 23kg of capacity). Null = not offered",
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "cabinBag12PriceCents": {
+            "description": "PRC-04 — full 12kg cabin bag flat rate. Null = not offered",
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "capacityKg": {
+            "description": "CAP-01/D19 — carrier declared capacity in kg (immutable after publication). Required alongside pricePerKgCents to publish PER_KG (gate A28)",
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "familyConditions": {
+            "description": "D14 — per-family stance (NEW engine). Null/empty = all families accepted",
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/TripFamilyCondition"
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reservedKg": {
+            "description": "CAP-02 — lets shippers derive remaining capacity client-side",
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "pickupLocations": {
             "type": "array",
