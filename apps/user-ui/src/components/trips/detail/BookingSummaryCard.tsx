@@ -10,7 +10,7 @@ import {
   formatPrice,
   calculateCO2SavedKg,
 } from "@/lib/public-trip.helpers";
-import { estimateShipperTotalCents } from "@/lib/pricing-example";
+import { MIN_PARCEL_PRICE_EUR, estimateShipperTotalCents } from "@/lib/pricing-example";
 
 type Props = {
   trip: PublicTrip;
@@ -68,6 +68,9 @@ export default function BookingSummaryCard({ trip, weightKg = null }: Props) {
               kg: weightKg ?? 2,
               price: formatPrice(estimateShipperTotalCents(perKgCents, weightKg ?? 2).totalCents, trip.currencyCode, locale),
             })}
+            <div className="mt-0.5 font-normal text-slate-500 dark:text-slate-400">
+              {t("booking.lightParcel", { min: MIN_PARCEL_PRICE_EUR })}
+            </div>
           </div>
         )}
       </div>

@@ -275,6 +275,7 @@ export type CreateTripCopy = {
   factorBase: (v: string) => string;
   factorDirectFlight: string;
   factorDepartureSoon: string;
+  minParcelPrice: (min: number) => string;
   priceHint: string;
   capacityHint: string;
   familiesHint: string;

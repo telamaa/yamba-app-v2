@@ -28,7 +28,7 @@ import {
 } from "lucide-react";
 import type { PublicTrip } from "@/lib/public-trip.types";
 import { formatPrice, getPricePerKgCents } from "@/lib/public-trip.helpers";
-import { estimateShipperTotalCents } from "@/lib/pricing-example";
+import { MIN_PARCEL_PRICE_EUR, estimateShipperTotalCents } from "@/lib/pricing-example";
 
 const FAMILIES: Array<{ key: string; icon: LucideIcon }> = [
   { key: "DOCUMENTS_PAPERS", icon: FileText },
@@ -109,6 +109,10 @@ export default function OfferCard({ trip, weightKg }: Props) {
               <div className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">{t("offer.finalAtBooking")}</div>
             </>
           )}
+          {/* D32 — annoncé, pas seulement appliqué */}
+          <div className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">
+            {t("offer.lightParcel", { min: MIN_PARCEL_PRICE_EUR })}
+          </div>
         </div>
       </div>
 

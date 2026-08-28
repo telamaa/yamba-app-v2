@@ -61,6 +61,7 @@ import {
   formatEur,
 } from "../TripPricingUi";
 import LocationsSection from "../LocationsSection";
+import { MIN_PARCEL_PRICE_EUR } from "@/lib/pricing-example";
 
 export default function StepConditions({
   copy,
@@ -224,6 +225,11 @@ export default function StepConditions({
           </ul>
         </InfoHint>
       </div>
+
+      {/* D32 — le plancher par colis, dit au Voyageur (pas seulement appliqué) */}
+      <p className="mt-1.5 text-[12px] text-slate-500 dark:text-slate-400">
+        {copy.minParcelPrice(MIN_PARCEL_PRICE_EUR)}
+      </p>
 
       <div className="mb-1.5 mt-5 flex items-center gap-1 text-[13px] font-medium text-slate-700 dark:text-slate-300">
         {copy.capacity}
