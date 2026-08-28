@@ -119,6 +119,7 @@ export function getCreateTripCopy(isFr: boolean): CreateTripCopy {
     whyThisPrice: isFr ? "Pourquoi ce prix ?" : "Why this price?",
     factorBase: (v: string, corridor: string) =>
       isFr ? `Base du corridor${corridor ? ` ${corridor}` : ""} : ${v} €/kg` : `Corridor base${corridor ? ` ${corridor}` : ""}: ${v} €/kg`,
+    domesticLabel: isFr ? "trajet intérieur (même pays)" : "domestic trip (same country)",
     zoneLabel: (zone: string) =>
       ((isFr
         ? { EUROPE: "Europe (UE, Royaume-Uni, Suisse…)", RUSSIA: "Russie", MAGHREB: "Maghreb", WEST_AFRICA: "Afrique de l'Ouest", CENTRAL_AFRICA: "Afrique centrale", EAST_SOUTH_AFRICA: "Afrique de l'Est/australe", MIDDLE_EAST: "Moyen-Orient", SOUTH_ASIA: "Asie du Sud", EAST_ASIA: "Asie de l'Est", SOUTHEAST_ASIA: "Asie du Sud-Est", CENTRAL_ASIA: "Asie centrale", NORTH_AMERICA: "Amérique du Nord", LATAM_CARIBBEAN: "Amérique latine/Caraïbes", DOM_TOM: "DOM-TOM", OCEANIA: "Océanie", UNKNOWN: "zone inconnue" }

@@ -88,6 +88,21 @@ const BASE_PAIRS: Array<[Zone, Zone, number]> = [
 export const DEFAULT_BASE_PER_KG = 11;
 
 /**
+ * Trajet DOMESTIQUE (même pays : Paris → Bordeaux, Lagos → Abuja…) : autre
+ * marché — la référence de l'Expéditeur est le colis postal (≈ 7–10 € pour
+ * 2 kg), pas de franchise bagage à valoriser, pas de douane. Base = fraction
+ * de la base de la zone, bornée ; le plancher D32 (8 €) protège les petits
+ * colis. Les DOM-TOM ↔ métropole ne sont PAS domestiques (codes distincts).
+ */
+const DOMESTIC_RATIO = 0.55;
+const DOMESTIC_MIN = 3;
+const DOMESTIC_MAX = 6;
+
+export function isDomestic(fromCountry: string | null | undefined, toCountry: string | null | undefined): boolean {
+  return !!fromCountry && !!toCountry && fromCountry.toUpperCase() === toCountry.toUpperCase();
+}
+
+/**
  * Base €/kg pour un corridor. Même zone (hors Europe) = marché domestique,
  * base basse. Distance : correctif doux ±10 % autour de 5 000 km (log).
  */
@@ -95,12 +110,15 @@ export function corridorBasePerKg(
   fromCountry: string | null | undefined,
   toCountry: string | null | undefined,
   distanceKm?: number | null
-): { base: number; fromZone: Zone; toZone: Zone } {
+): { base: number; fromZone: Zone; toZone: Zone; domestic: boolean } {
   const fromZone = zoneOf(fromCountry);
   const toZone = zoneOf(toCountry);
   let base: number;
 
-  if (fromZone === "UNKNOWN" || toZone === "UNKNOWN") {
+  if (isDomestic(fromCountry, toCountry)) {
+    const zoneBase = fromZone === "UNKNOWN" ? DEFAULT_BASE_PER_KG : BASE_FROM_EUROPE[fromZone];
+    base = Math.min(DOMESTIC_MAX, Math.max(DOMESTIC_MIN, zoneBase * DOMESTIC_RATIO));
+  } else if (fromZone === "UNKNOWN" || toZone === "UNKNOWN") {
     base = DEFAULT_BASE_PER_KG;
   } else if (fromZone === "EUROPE" || toZone === "EUROPE") {
     base = BASE_FROM_EUROPE[fromZone === "EUROPE" ? toZone : fromZone];
@@ -116,7 +134,7 @@ export function corridorBasePerKg(
     const f = Math.max(-0.1, Math.min(0.1, Math.log10(distanceKm / 5000) * 0.1));
     base = base * (1 + f);
   }
-  return { base: Math.round(base * 100) / 100, fromZone, toZone };
+  return { base: Math.round(base * 100) / 100, fromZone, toZone, domestic: isDomestic(fromCountry, toCountry) };
 }
 
 /** Distance orthodromique (km) — null si une coordonnée manque. */
