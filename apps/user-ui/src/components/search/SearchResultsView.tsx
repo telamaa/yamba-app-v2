@@ -50,45 +50,55 @@ function TransportModeTabsSkeleton() {
 
 function SearchFiltersSidebarSkeleton() {
   return (
-    <aside className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950">
-      <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 dark:border-slate-800/60">
-        <Skeleton className="h-5 w-24 rounded-md" />
+    <aside className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800/80 dark:bg-slate-900">
+      {/* En-tête 44 px, bandeau teinté — comme le vrai */}
+      <div className="flex min-h-[44px] items-center justify-between border-b border-slate-100 bg-slate-50/50 px-5 py-2.5 dark:border-slate-800/60 dark:bg-slate-950/40">
+        <Skeleton className="h-4 w-20 rounded-md" />
       </div>
       <div className="space-y-5 px-5 py-4">
+        {/* Tri : 3 options (la 2e a un sous-titre) */}
         <div className="space-y-2">
           {Array.from({ length: 3 }).map((_, index) => (
             <div key={index} className="flex items-center justify-between gap-3 px-2 py-2">
               <div className="flex items-center gap-3">
                 <Skeleton className="h-3.5 w-3.5 rounded-full" />
-                <Skeleton className="h-4 w-32 rounded-md" />
+                <div className="space-y-1">
+                  <Skeleton className="h-4 w-32 rounded-md" />
+                  {index === 1 && <Skeleton className="h-3 w-24 rounded-md" />}
+                </div>
               </div>
               <Skeleton className="h-4 w-4 rounded-md" />
             </div>
           ))}
         </div>
+        {/* Confiance : 2 lignes (les compteurs à 0 sont masqués) */}
         <div className="space-y-2 border-t border-slate-100 pt-4 dark:border-slate-800/60">
-          <Skeleton className="h-3 w-24 rounded-md" />
-          {Array.from({ length: 4 }).map((_, index) => (
+          <Skeleton className="h-3 w-28 rounded-md" />
+          {Array.from({ length: 2 }).map((_, index) => (
             <div key={index} className="flex items-center justify-between gap-3 px-2 py-1.5">
               <div className="flex items-center gap-3">
                 <Skeleton className="h-3.5 w-3.5 rounded-sm" />
                 <Skeleton className="h-4 w-28 rounded-md" />
               </div>
-              <div className="flex items-center gap-2">
-                <Skeleton className="h-3 w-4 rounded-md" />
-                <Skeleton className="h-4 w-4 rounded-md" />
-              </div>
+              <Skeleton className="h-4 w-4 rounded-md" />
             </div>
           ))}
         </div>
-        <div className="space-y-2 border-t border-slate-100 pt-4 dark:border-slate-800/60">
-          <Skeleton className="h-3 w-32 rounded-md" />
+        {/* Votre colis : libellé + poids, curseur, hint */}
+        <div className="space-y-2.5 border-t border-slate-100 pt-4 dark:border-slate-800/60">
+          <div className="flex items-center justify-between">
+            <Skeleton className="h-3 w-20 rounded-md" />
+            <Skeleton className="h-4 w-10 rounded-md" />
+          </div>
+          <Skeleton className="h-1.5 w-full rounded-full" />
+          <Skeleton className="h-3 w-5/6 rounded-md" />
+        </div>
+        {/* Familles : 8 chips */}
+        <div className="space-y-2.5 border-t border-slate-100 pt-4 dark:border-slate-800/60">
+          <Skeleton className="h-3 w-44 rounded-md" />
           <div className="flex flex-wrap gap-1.5">
-            {Array.from({ length: 6 }).map((_, index) => (
-              <Skeleton
-                key={index}
-                className={`h-7 rounded-full ${index % 3 === 0 ? "w-24" : "w-20"}`}
-              />
+            {["w-36", "w-40", "w-44", "w-44", "w-40", "w-36", "w-40", "w-40"].map((w, index) => (
+              <Skeleton key={index} className={`h-9 rounded-full ${w}`} />
             ))}
           </div>
         </div>
@@ -99,7 +109,7 @@ function SearchFiltersSidebarSkeleton() {
 
 function TripResultCardSkeletonMobile() {
   return (
-    <article className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
+    <article className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-800/80 dark:bg-slate-900">
       <div className="flex items-center justify-between border-b border-slate-100 px-3.5 py-2 dark:border-slate-800/60">
         <div className="flex items-center gap-2">
           <Skeleton className="h-5 w-14 rounded-full" />
@@ -121,11 +131,12 @@ function TripResultCardSkeletonMobile() {
           <Skeleton className="h-3 w-16 rounded-md" />
         </div>
         <div className="flex flex-col items-end space-y-1.5">
-          <Skeleton className="h-2 w-6 rounded-md" />
-          <Skeleton className="h-4 w-12 rounded-md" />
+          <Skeleton className="h-2 w-10 rounded-md" />
+          <Skeleton className="h-4 w-16 rounded-md" />
+          <Skeleton className="h-2 w-12 rounded-md" />
         </div>
       </div>
-      <div className="flex items-center justify-between border-t border-slate-100 px-3.5 py-2 dark:border-slate-800/60">
+      <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50/40 px-3.5 py-2 dark:border-slate-800/60 dark:bg-slate-950/60">
         <div className="flex items-center gap-2">
           <Skeleton className="h-7 w-7 rounded-full" />
           <div className="space-y-1">
@@ -144,8 +155,8 @@ function TripResultCardSkeletonMobile() {
 
 function TripResultCardSkeleton() {
   return (
-    <article className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
-      <div className="flex items-center gap-3 border-b border-slate-100 px-4 py-2.5 dark:border-slate-800/60">
+    <article className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-800/80 dark:bg-slate-900">
+      <div className="flex min-h-[44px] items-center gap-3 border-b border-slate-100 bg-slate-50/50 px-4 py-2.5 dark:border-slate-800/60 dark:bg-slate-950/40">
         <Skeleton className="h-6 w-16 rounded-full" />
         <Skeleton className="h-3 w-20 rounded-md" />
       </div>
@@ -165,12 +176,17 @@ function TripResultCardSkeleton() {
           <Skeleton className="h-3.5 w-12 rounded-md" />
           <Skeleton className="h-2.5 w-16 rounded-md" />
         </div>
+        {/* Bloc prix PER_KG : libellé · €/kg · kg dispo · filet · exemple */}
         <div className="flex flex-col items-end space-y-1.5">
-          <Skeleton className="h-2.5 w-12 rounded-md" />
-          <Skeleton className="h-6 w-20 rounded-md" />
+          <Skeleton className="h-2.5 w-14 rounded-md" />
+          <Skeleton className="h-6 w-24 rounded-md" />
+          <Skeleton className="h-3 w-16 rounded-md" />
+          <div className="w-full border-t border-dashed border-slate-200 pt-1.5 dark:border-slate-700">
+            <Skeleton className="ml-auto h-2.5 w-28 rounded-md" />
+          </div>
         </div>
       </div>
-      <div className="flex items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/50 px-4 py-2.5 dark:border-slate-800/60 dark:bg-slate-900/30">
+      <div className="mt-1 flex items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/50 px-4 py-2.5 dark:border-slate-800/60 dark:bg-slate-950/60">
         <div className="flex items-center gap-2.5">
           <Skeleton className="h-8 w-8 rounded-full" />
           <div className="space-y-1">
@@ -178,11 +194,7 @@ function TripResultCardSkeleton() {
             <Skeleton className="h-3 w-32 rounded-md" />
           </div>
         </div>
-        <div className="flex items-center gap-1.5">
-          {Array.from({ length: 4 }).map((_, index) => (
-            <Skeleton key={index} className="h-6 w-6 rounded-full" />
-          ))}
-        </div>
+        <Skeleton className="h-4 w-4 rounded-md" />
       </div>
     </article>
   );
