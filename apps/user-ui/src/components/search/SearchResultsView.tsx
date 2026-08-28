@@ -492,19 +492,6 @@ export default function SearchResultsView() {
           0% { transform: translateX(-100%); }
           100% { transform: translateX(100%); }
         }
-        .yamba-sidebar-scroll::-webkit-scrollbar { width: 6px; }
-        .yamba-sidebar-scroll::-webkit-scrollbar-track { background: transparent; }
-        .yamba-sidebar-scroll::-webkit-scrollbar-thumb {
-          background-color: rgba(148, 163, 184, 0.3);
-          border-radius: 999px;
-        }
-        .yamba-sidebar-scroll::-webkit-scrollbar-thumb:hover {
-          background-color: rgba(148, 163, 184, 0.5);
-        }
-        .yamba-sidebar-scroll {
-          scrollbar-width: thin;
-          scrollbar-color: rgba(148, 163, 184, 0.3) transparent;
-        }
       `}</style>
 
       <main className="pb-14">
