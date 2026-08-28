@@ -322,8 +322,9 @@ export function CharterBlock({
                              }: CharterBlockProps) {
   return (
     <div
-      className="mb-4 rounded-lg border p-5"
-      style={{ backgroundColor: CHARTER_BG, borderColor: CHARTER_BORDER }}
+      // Light : crème/ambre (charte historique) · Dark : mango translucide — un
+      // bloc crème opaque en dark cassait la page (revue captures PR-C)
+      className="mb-4 rounded-lg border p-5 bg-[#FAEEDA] border-[#FAC775] dark:bg-[#FF9900]/10 dark:border-[#FF9900]/30"
     >
       <div className="mb-3 flex items-center gap-2.5">
         <div
@@ -333,15 +334,15 @@ export function CharterBlock({
           <ShieldCheck size={18} />
         </div>
         <div>
-          <div className="text-[15px] font-medium" style={{ color: CHARTER_TITLE }}>
+          <div className="text-[15px] font-medium text-[#633806] dark:text-[#FFB84D]">
             {title}
           </div>
-          <div className="mt-0.5 text-[12px]" style={{ color: CHARTER_TEXT }}>
+          <div className="mt-0.5 text-[12px] text-[#854F0B] dark:text-slate-400">
             {subtitle}
           </div>
         </div>
       </div>
-      <div className="text-[13px] leading-[1.65]" style={{ color: CHARTER_TEXT }}>
+      <div className="text-[13px] leading-[1.65] text-[#854F0B] dark:text-slate-200">
         <p className="mb-2">{intro}</p>
         <ul className="mb-2 list-disc pl-5">
           {items.map((item, i) => (
@@ -355,7 +356,7 @@ export function CharterBlock({
           type="button"
           onClick={onFullLinkClickAction}
           className="font-medium underline-offset-2 hover:underline"
-          style={{ color: CHARTER_TITLE }}
+          className="text-[#633806] dark:text-[#FFB84D]"
         >
           {fullLinkLabel} →
         </button>
