@@ -41,10 +41,7 @@ export default function BookingSummarySidebar({
                                               }: Props) {
   return (
     <div className="space-y-4">
-      {currentStep === 1 && (
-        <InsuranceCard draft={draft} setDraftAction={setDraftAction} />
-      )}
-
+      {/* Le prix et le CTA d'abord (ce que je paie), la protection ensuite */}
       <RecapCard
         trip={trip}
         price={price}
@@ -56,6 +53,9 @@ export default function BookingSummarySidebar({
         showBackButton={showBackButton}
         onBackAction={onBackAction}
       />
+      {currentStep === 1 && (
+        <InsuranceCard draft={draft} setDraftAction={setDraftAction} />
+      )}
     </div>
   );
 }
