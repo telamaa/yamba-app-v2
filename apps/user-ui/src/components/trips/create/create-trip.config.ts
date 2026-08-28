@@ -1,10 +1,117 @@
 import type {
   CategoryCondition,
   Draft,
+  FamilyConditionDraft,
   ParcelCategory,
+  ParcelFamily,
   TransportMode,
   TripLocationPoint,
 } from "./create-trip.types";
+
+/* ── Familles de colis (D14 / CAT-02) ──────
+ * Liste FIGÉE, miroir de ParcelFamilySchema (api-contracts). L'ordre est
+ * celui d'affichage du formulaire (mockup-pricing-yamba.html).
+ * ──────────────────────────────────────── */
+
+export type ParcelFamilyOption = {
+  key: ParcelFamily;
+  icon: string;
+  labelFr: string;
+  labelEn: string;
+};
+
+export const PARCEL_FAMILIES: ParcelFamilyOption[] = [
+  { key: "DOCUMENTS_PAPERS", icon: "📄", labelFr: "Documents & papiers", labelEn: "Documents & papers" },
+  { key: "CLOTHES_TEXTILE", icon: "👕", labelFr: "Vêtements & textile", labelEn: "Clothes & textile" },
+  { key: "FOOD_DRY_SEALED", icon: "🥫", labelFr: "Alimentaire sec & scellé", labelEn: "Dry sealed food" },
+  { key: "ELECTRONICS_DEVICES", icon: "📱", labelFr: "Électronique & appareils", labelEn: "Electronics & devices" },
+  { key: "COSMETICS_CARE", icon: "🧴", labelFr: "Cosmétiques & soins", labelEn: "Cosmetics & care" },
+  { key: "PARTS_TOOLS", icon: "🔧", labelFr: "Pièces & outillage", labelEn: "Parts & tools" },
+  { key: "TOYS_CHILDCARE", icon: "🧸", labelFr: "Jouets & puériculture", labelEn: "Toys & childcare" },
+  { key: "MISC_ACCESSORIES", icon: "👜", labelFr: "Accessoires & divers", labelEn: "Accessories & misc." },
+];
+
+export const DEFAULT_SURCHARGE_PCT = 20;
+
+export function createDefaultFamilyConditions(): Record<ParcelFamily, FamilyConditionDraft> {
+  return Object.fromEntries(
+    PARCEL_FAMILIES.map((f) => [f.key, { mode: "ACCEPT", surchargePct: DEFAULT_SURCHARGE_PCT }])
+  ) as Record<ParcelFamily, FamilyConditionDraft>;
+}
+
+/* ── Bornes des curseurs (mockup) ────────── */
+
+export const PRICE_PER_KG_RANGE = { min: 5, max: 20, step: 0.5 } as const;
+export const CAPACITY_KG_RANGE = { min: 2, max: 30, step: 1 } as const;
+export const SURCHARGE_PCT_RANGE = { min: 5, max: 50, step: 5 } as const;
+
+/** PRC-04 — un bagage entier consomme sa franchise complète de capacité. */
+export const CHECKED_BAG_KG = 23;
+export const CABIN_BAG_KG = 12;
+
+/** D13 — tolérance de poids au pickup (paramètre serveur §13, affiché à titre indicatif). */
+export const PICKUP_WEIGHT_TOLERANCE_PCT = 10;
+
+/* ── Suggestion de prix — D15 V1 déterministe (PRC-05) ──
+ * prixSuggéré(€/kg) = base_corridor × modificateurs.
+ * V1 : valeurs STATIQUES (base unique, pas encore de table base_corridor
+ * seedée ni de signal SavedRoutes) — assumé dans le handoff PR-B. Le
+ * moteur est pur pour être remplacé par un appel serveur sans toucher
+ * l'UI (la jauge ne connaît que { low, median, high }).
+ * ──────────────────────────────────────── */
+
+export const PRICE_SUGGESTION_V1 = {
+  baseCorridorPerKg: 11,
+  lowPct: 10,
+  highPct: 15,
+  directFlightMod: 0.05,
+  departureWithin3DaysMod: 0.08,
+  departureWithin7DaysMod: 0.04,
+} as const;
+
+export type PriceSuggestion = { low: number; median: number; high: number };
+
+export function suggestPricePerKg(draft: Pick<Draft, "transportMode" | "flightType" | "departureDate">): PriceSuggestion {
+  const p = PRICE_SUGGESTION_V1;
+  let median = p.baseCorridorPerKg;
+
+  if (draft.transportMode === "plane" && draft.flightType === "direct") {
+    median *= 1 + p.directFlightMod;
+  }
+
+  if (draft.departureDate) {
+    const days = (toDateOnly(new Date(draft.departureDate)).getTime() - toDateOnly(new Date()).getTime()) / 86_400_000;
+    if (days <= 3) median *= 1 + p.departureWithin3DaysMod;
+    else if (days <= 7) median *= 1 + p.departureWithin7DaysMod;
+  }
+
+  const round = (n: number) => Math.round(n * 100) / 100;
+  return {
+    low: round(median * (1 - p.lowPct / 100)),
+    median: round(median),
+    high: round(median * (1 + p.highPct / 100)),
+  };
+}
+
+export type FairPriceVerdict = "low" | "ok" | "high";
+
+export function getFairPriceVerdict(price: number, s: PriceSuggestion): FairPriceVerdict {
+  if (price < s.low) return "low";
+  if (price > s.high) return "high";
+  return "ok";
+}
+
+/* ── Gain net du Voyageur (D16 : son prix = son net) ──
+ * Capacité entièrement vendue au €/kg — les forfaits bagages sont hors
+ * de cette projection (ils consomment la même capacité).
+ * ──────────────────────────────────────── */
+
+export function estimateNetGain(draft: Pick<Draft, "pricePerKg" | "capacityKg">): number {
+  const price = typeof draft.pricePerKg === "number" ? draft.pricePerKg : 0;
+  const capacity = typeof draft.capacityKg === "number" ? draft.capacityKg : 0;
+  if (price <= 0 || capacity <= 0) return 0;
+  return Math.round(price * capacity * 100) / 100;
+}
 
 /* ── Category groups ─────────────────────── */
 
@@ -122,7 +229,9 @@ export function getDefaultLocationsForMode(
   return { pickupLocations: [], deliveryLocations: [] };
 }
 
-/* ── Revenue estimation ──────────────────── */
+/* ── Revenue estimation (legacy PER_CATEGORY) ──
+ * @deprecated remplacé par estimateNetGain — supprimé à la PR cleanup A28.
+ * ──────────────────────────────────────── */
 
 export function estimateRevenue(
   conditions: Partial<Record<ParcelCategory, CategoryCondition>>
@@ -184,6 +293,12 @@ export function getValidationErrorsFr(isFr: boolean) {
     flightLayoverCities: isFr ? "Précisez la ville d'escale" : "Specify layover city",
     trainStopCities: isFr ? "Précisez la ville" : "Specify the city",
     categories: isFr ? "Sélectionnez au moins 1 catégorie" : "Select at least 1 category",
+    pricePerKgRequired: isFr ? "Fixez votre prix au kilo" : "Set your price per kg",
+    pricePerKgZero: isFr ? "Le prix au kilo doit être supérieur à 0" : "Price per kg must be greater than 0",
+    capacityRequired: isFr ? "Indiquez votre capacité en kg" : "Enter your capacity in kg",
+    capacityZero: isFr ? "La capacité doit être supérieure à 0" : "Capacity must be greater than 0",
+    surchargeInvalid: isFr ? "Surcharge entre 1 et 100 %" : "Surcharge between 1 and 100%",
+    bagPriceZero: isFr ? "Le forfait doit être supérieur à 0" : "Flat rate must be greater than 0",
     priceZero: isFr ? "Le prix doit être supérieur à 0" : "Price must be greater than 0",
     priceEmpty: isFr ? "Prix requis" : "Price required",
     pickupLocationRequired: isFr
@@ -263,19 +378,34 @@ export function validateStep2(draft: Draft, isFr: boolean): ValidationErrors {
   const msgs = getValidationErrorsFr(isFr);
   const errors: ValidationErrors = {};
 
-  // Categories
-  if (draft.acceptedCategories.length === 0) {
-    errors.categories = msgs.categories;
+  // ⭐ Moteur PER_KG (D13) — prix ET capacité (le gate A28 exige les deux)
+  if (draft.pricePerKg === "") {
+    errors.pricePerKg = msgs.pricePerKgRequired;
+  } else if (Number(draft.pricePerKg) <= 0) {
+    errors.pricePerKg = msgs.pricePerKgZero;
   }
 
-  draft.acceptedCategories.forEach((key) => {
-    const c = draft.categoryConditions[key];
-    if (!c || c.priceAmount === "") {
-      errors[`price_${key}`] = msgs.priceEmpty;
-    } else if (Number(c.priceAmount) <= 0) {
-      errors[`price_${key}`] = msgs.priceZero;
+  if (draft.capacityKg === "") {
+    errors.capacityKg = msgs.capacityRequired;
+  } else if (Number(draft.capacityKg) <= 0) {
+    errors.capacityKg = msgs.capacityZero;
+  }
+
+  // Familles (D14) — une surcharge doit être un % valide (miroir superRefine contrat)
+  for (const family of PARCEL_FAMILIES) {
+    const c = draft.familyConditions[family.key];
+    if (c?.mode === "SURCHARGE" && (!Number.isInteger(c.surchargePct) || c.surchargePct < 1 || c.surchargePct > 100)) {
+      errors[`family_${family.key}`] = msgs.surchargeInvalid;
     }
-  });
+  }
+
+  // Bagages entiers (PRC-04) — optionnels, mais > 0 s'ils sont proposés
+  if (draft.checkedBag23Price !== "" && Number(draft.checkedBag23Price) <= 0) {
+    errors.checkedBag23Price = msgs.bagPriceZero;
+  }
+  if (draft.cabinBag12Price !== "" && Number(draft.cabinBag12Price) <= 0) {
+    errors.cabinBag12Price = msgs.bagPriceZero;
+  }
 
   // Locations — at least 1 enabled per context
   const enabledPickup = draft.pickupLocations.filter((l) => l.enabled);
