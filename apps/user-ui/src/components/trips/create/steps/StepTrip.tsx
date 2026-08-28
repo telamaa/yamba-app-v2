@@ -223,7 +223,7 @@ export default function StepTrip({
       {showFlightSub && (
         <div className="animate-[fadeSlide_0.2s_ease]">
           <SectionLabel>{copy.tripPathType}</SectionLabel>
-          <div className="grid grid-cols-1 items-start gap-y-3 sm:grid-cols-2 sm:gap-x-6 sm:gap-y-0">
+          <div className="flex flex-col gap-3">
             <SegmentedControl
               value={draft.flightType}
               options={[

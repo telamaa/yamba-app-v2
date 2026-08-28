@@ -204,13 +204,13 @@ export default function StepReview({
                     className={[
                       "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium",
                       refused
-                        ? "bg-slate-100 text-slate-500 line-through dark:bg-slate-800 dark:text-slate-400"
+                        ? "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
                         : "text-slate-900 dark:text-[#FFB84D]",
                     ].join(" ")}
                     style={refused ? undefined : { backgroundColor: "rgba(255,153,0,0.10)" }}
                   >
-                    {f.icon} {isFr ? f.labelFr : f.labelEn}
-                    {!refused && ` +${c.surchargePct}%`}
+                    {isFr ? f.labelFr : f.labelEn}
+                    {refused ? ` · ${copy.refused.toLowerCase()}` : ` · ${copy.surchargeShort(c.surchargePct)}`}
                   </span>
                 );
               })}
@@ -220,10 +220,10 @@ export default function StepReview({
           {(draft.checkedBag23Price !== "" || draft.cabinBag12Price !== "") && (
             <div className="mt-2 flex flex-wrap gap-1.5 text-[12px] text-slate-600 dark:text-slate-400">
               {draft.checkedBag23Price !== "" && (
-                <span>🧳 {copy.checkedBag23} · {formatEur(Number(draft.checkedBag23Price))} € ({copy.bagConsumes(CHECKED_BAG_KG)})</span>
+                <span>{copy.checkedBag23} · {formatEur(Number(draft.checkedBag23Price))} € ({copy.bagConsumes(CHECKED_BAG_KG)})</span>
               )}
               {draft.cabinBag12Price !== "" && (
-                <span>🎒 {copy.cabinBag12} · {formatEur(Number(draft.cabinBag12Price))} € ({copy.bagConsumes(CABIN_BAG_KG)})</span>
+                <span>{copy.cabinBag12} · {formatEur(Number(draft.cabinBag12Price))} € ({copy.bagConsumes(CABIN_BAG_KG)})</span>
               )}
             </div>
           )}
