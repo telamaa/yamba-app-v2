@@ -264,12 +264,12 @@ export default function SearchFiltersSidebar({
   return (
     <aside
       className={[
-        "h-fit overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950",
+        "h-fit overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800/80 dark:bg-slate-900",
         className,
       ].join(" ")}
     >
       {!hideHeader && (
-        <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-4 dark:border-slate-800/60">
+        <div className="flex items-center justify-between gap-3 border-b border-slate-100 bg-slate-50/50 px-5 py-4 dark:border-slate-800/60 dark:bg-slate-950/40">
           <h2 className="text-[15px] font-bold tracking-tight text-slate-900 dark:text-white">
             {t("filters.sortBy")}
           </h2>
@@ -423,7 +423,7 @@ export default function SearchFiltersSidebar({
                       "inline-flex flex-col items-start gap-0.5 rounded-xl border px-3 py-2 text-left transition-colors",
                       isActive
                         ? "border-[#FF9900]/50 bg-[#FFF6E8] dark:border-[#FF9900]/40 dark:bg-[#FF9900]/10"
-                        : "border-slate-200 bg-white hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:hover:bg-slate-900",
+                        : "border-slate-200 bg-white hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950/60 dark:hover:bg-slate-800",
                     ].join(" ")}
                   >
                     <span className={[
@@ -468,7 +468,7 @@ export default function SearchFiltersSidebar({
                       ? "border-[#FF9900]/40 bg-[#FFF6E8] text-[#B45309] dark:border-[#FF9900]/30 dark:bg-[#FF9900]/10 dark:text-[#FFB84D]"
                       : disabled
                         ? "cursor-not-allowed border-slate-100 text-slate-300 dark:border-slate-800 dark:text-slate-600"
-                        : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300 dark:hover:bg-slate-900",
+                        : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950/60 dark:text-slate-300 dark:hover:bg-slate-800",
                   ].join(" ")}
                 >
                   {FAMILY_ICONS[family]}

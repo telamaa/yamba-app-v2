@@ -168,7 +168,7 @@ export default function YambaTripResultCardMobile({
         </div>
 
         {/* ── Footer : tripper + catégories ── */}
-        <div className="flex items-center justify-between gap-2 border-t border-slate-100 bg-slate-50/40 px-3.5 py-2 dark:border-slate-800/60 dark:bg-slate-950/40">
+        <div className="flex items-center justify-between gap-2 border-t border-slate-100 bg-slate-50/40 px-3.5 py-2 dark:border-slate-800/60 dark:bg-slate-950/60">
           <div className="flex min-w-0 flex-1 items-center gap-2">
             <Avatar item={item} />
             <div className="min-w-0 flex-1">

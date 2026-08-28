@@ -350,7 +350,7 @@ export default function TripResultCard({
       </div>
 
       {/* ── Footer: tripper + catégories + chevron ── */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/50 px-4 py-2.5 dark:border-slate-800/60 dark:bg-slate-950/40">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/50 px-4 py-2.5 dark:border-slate-800/60 dark:bg-slate-950/60">
         {/* Tripper info */}
         <div className="flex min-w-0 items-center gap-2.5">
           <div className="relative h-8 w-8 shrink-0">
