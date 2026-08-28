@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import CreateTripWizard from "@/components/trips/create/CreateTripWizard";
 import CreateTripMobile from "@/components/trips/create/CreateTripMobile";
 
@@ -26,5 +26,6 @@ export default function CreateTripPage() {
     );
   }
 
-  return isMobile ? <CreateTripMobile /> : <CreateTripWizard />;
+  // useEditTrip lit useSearchParams (?edit=) → frontière Suspense (build prod)
+  return <Suspense fallback={null}>{isMobile ? <CreateTripMobile /> : <CreateTripWizard />}</Suspense>;
 }
