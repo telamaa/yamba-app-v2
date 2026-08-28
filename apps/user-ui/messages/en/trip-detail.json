@@ -85,7 +85,7 @@
     "perKg": "Price per kg",
     "perKgHint": "{kg} kg still available · the sender pays weight × price",
     "perKgHintNoCap": "The sender pays weight × price per kg",
-    "example": "Example: a {kg} kg parcel ≈ {price} all-in (transport + Yamba service)"
+    "example": "Estimate: a {kg} kg parcel ≈ {price} all-in (transport + Yamba service)"
   },
   "notFound": {
     "title": "Trip not found",
@@ -104,10 +104,10 @@
   },
   "offer": {
     "title": "What you can send with {firstName}",
-    "hint": "One price per kg, period. Your parcel's family tells whether it's accepted, surcharged, or refused.",
+    "hint": "One price per kg, whatever the content. Check below that your parcel type is accepted: some carry a surcharge, some are refused.",
     "perKg": "Price per kg",
     "available": "Available",
-    "example": "Your {kg} kg parcel ≈ {price} all-in (transport + Yamba service)",
+    "example": "Estimate for a {kg} kg parcel: ≈ {price} all-in · final price at booking",
     "notEnough": "Not enough room left for a {kg} kg parcel",
     "families": "Parcel families",
     "accepted": "Accepted",
@@ -125,6 +125,7 @@
       "PARTS_TOOLS": "Parts & tools",
       "TOYS_CHILDCARE": "Toys & childcare",
       "MISC_ACCESSORIES": "Accessories & misc."
-    }
+    },
+    "exampleFromSearch": "Estimate for a {kg} kg parcel (weight from your search): ≈ {price} all-in · final price at booking"
   }
 }

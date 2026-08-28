@@ -51,6 +51,7 @@ export default function OfferCard({ trip, weightKg }: Props) {
   if (!perKgCents) return null;
 
   const kg = weightKg ?? 2;
+  const kgLabel = kg.toLocaleString(locale === "fr" ? "fr-FR" : "en-US");
   const example = estimateShipperTotalCents(perKgCents, kg).totalCents;
   const conditions = new Map((trip.familyConditions ?? []).map((c) => [c.familyKey, c]));
   const remaining = typeof trip.remainingKg === "number" ? trip.remainingKg : null;
@@ -89,8 +90,10 @@ export default function OfferCard({ trip, weightKg }: Props) {
         )}
         <div className="min-w-[10rem] flex-1 text-[12px] leading-snug text-slate-600 dark:text-slate-300">
           {notEnough
-            ? t("offer.notEnough", { kg })
-            : t("offer.example", { kg, price: formatPrice(example, trip.currencyCode, locale) })}
+            ? t("offer.notEnough", { kg: kgLabel })
+            : weightKg
+              ? t("offer.exampleFromSearch", { kg: kgLabel, price: formatPrice(example, trip.currencyCode, locale) })
+              : t("offer.example", { kg: kgLabel, price: formatPrice(example, trip.currencyCode, locale) })}
         </div>
       </div>
 

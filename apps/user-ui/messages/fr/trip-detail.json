@@ -85,7 +85,7 @@
     "perKg": "Prix au kilo",
     "perKgHint": "{kg} kg encore disponibles · l'Expéditeur paie poids × prix",
     "perKgHintNoCap": "L'Expéditeur paie poids × prix au kilo",
-    "example": "Exemple : un colis de {kg} kg ≈ {price} tout compris (transport + service Yamba)"
+    "example": "Estimation : un colis de {kg} kg ≈ {price} tout compris (transport + service Yamba)"
   },
   "notFound": {
     "title": "Trajet introuvable",
@@ -104,10 +104,10 @@
   },
   "offer": {
     "title": "Ce que vous pouvez envoyer avec {firstName}",
-    "hint": "Un prix au kilo, point. La famille de votre colis dit s'il est accepté, avec supplément, ou refusé.",
+    "hint": "Un seul prix au kilo, quel que soit le contenu. Vérifiez ci-dessous que votre type de colis est accepté : certains ont un supplément, d'autres sont refusés.",
     "perKg": "Prix au kilo",
     "available": "Disponible",
-    "example": "Votre colis de {kg} kg ≈ {price} tout compris (transport + service Yamba)",
+    "example": "Estimation pour un colis de {kg} kg : ≈ {price} tout compris · prix définitif à la réservation",
     "notEnough": "Plus assez de place pour un colis de {kg} kg",
     "families": "Familles de colis",
     "accepted": "Accepté",
@@ -125,6 +125,7 @@
       "PARTS_TOOLS": "Pièces & outillage",
       "TOYS_CHILDCARE": "Jouets & puériculture",
       "MISC_ACCESSORIES": "Accessoires & divers"
-    }
+    },
+    "exampleFromSearch": "Estimation pour un colis de {kg} kg (poids de votre recherche) : ≈ {price} tout compris · prix définitif à la réservation"
   }
 }
