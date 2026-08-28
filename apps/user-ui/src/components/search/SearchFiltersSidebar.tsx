@@ -269,8 +269,9 @@ export default function SearchFiltersSidebar({
       ].join(" ")}
     >
       {!hideHeader && (
-        <div className="flex items-center justify-between gap-3 border-b border-slate-100 bg-slate-50/50 px-5 py-4 dark:border-slate-800/60 dark:bg-slate-950/40">
-          <h2 className="text-[15px] font-bold tracking-tight text-slate-900 dark:text-white">
+        {/* min-h-[44px] : même hauteur que l'en-tête des cartes résultat → alignées */}
+        <div className="flex min-h-[44px] items-center justify-between gap-3 border-b border-slate-100 bg-slate-50/50 px-5 py-2.5 dark:border-slate-800/60 dark:bg-slate-950/40">
+          <h2 className="text-[13px] font-bold tracking-tight text-slate-900 dark:text-white">
             {t("filters.sortBy")}
           </h2>
           {hasActiveFilters && (
