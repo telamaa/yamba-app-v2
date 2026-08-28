@@ -72,9 +72,10 @@ export default function TransportModeTabs({
               onClick={() => onChange(tab.key)}
               className={[
                 "inline-flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-2 text-[13px] font-semibold transition-colors",
+                // Actif = mango (charte) : lisible sur fond clair ET sombre
                 isActive
-                  ? "bg-white text-slate-950 shadow-sm dark:bg-white dark:text-slate-950"
-                  : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300 dark:hover:bg-slate-900",
+                  ? "border border-[#FF9900]/50 bg-[#FFF6E8] text-slate-950 shadow-sm dark:border-[#FF9900]/40 dark:bg-[#FF9900]/15 dark:text-[#FFB84D]"
+                  : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800",
               ].join(" ")}
             >
               {tab.icon && <span className="shrink-0">{tab.icon}</span>}
@@ -83,7 +84,7 @@ export default function TransportModeTabs({
                 className={[
                   "inline-flex h-[18px] min-w-[20px] items-center justify-center rounded-full px-1.5 text-[11px] font-bold tabular-nums",
                   isActive
-                    ? "bg-slate-950/10 text-slate-950"
+                    ? "bg-[#FF9900]/20 text-[#B45309] dark:bg-[#FF9900]/25 dark:text-[#FFB84D]"
                     : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400",
                 ].join(" ")}
               >
