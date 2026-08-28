@@ -272,6 +272,14 @@ Correctif, de l'API au pixel :
 
 Note : la recherche triée par « prix le plus bas » exclut toujours les trajets sans `minPriceCents` (choix 4 de PR-A : moteurs incomparables) — les trajets PER_KG restent visibles dans les autres tris ; la comparabilité est le chantier « PR search ».
 
+## 7quinquies. Revue de la page recherche (lot 1)
+
+- `apps/user-ui/src/lib/pricing-example.ts` — `estimateShipperTotalCents(pricePerKgCents, kg = 2)` : projection pure en **cents** (D13 poids facturable 0,5 kg min, D32 plancher 8 €, D16 commission 12 % min 3 €). Affichée sous le €/kg sur la carte desktop (« ex. colis 2 kg ≈ 27 € ») et sur la carte de réservation. Les paramètres sont ceux du mockup §13 et seront servis par l'API avec le moteur Expéditeur (PR-C) — ne pas les dupliquer ailleurs.
+- **D20** : badge « ⚡ Instant » retiré de `TripResultCard`, entrée « Réservation instantanée » retirée de `SearchFiltersSidebar` (props conservées pour ne pas toucher `SearchResultsView` ; nettoyage complet du champ = PR cleanup).
+- Durée « 2H » → « 2 h » (`formatDuration` ×2, `formatTripTimes.ts`).
+
+Reste pour la **PR search** (registre D33 candidat « comparabilité ») : filtre par **famille** (le filtre catégorie legacy rend invisibles les trajets au kilo), tri « prix au kilo » unifié, filtres à compte 0 masqués, ville de rattachement d'un aéroport.
+
 ## 8. Hors périmètre mais dans la branche : le fix `next.config.js`
 
 Pendant la session, `npm run user-ui` échouait : `Failed to process project graph … Could not find i18n config at ./src/i18n/request.ts`. Cause : `next-intl` résout un chemin relatif depuis `process.cwd()`, mais le plugin `@nx/next` évalue `apps/user-ui/next.config.js` depuis la **racine** du monorepo ; et Turbopack refuse un chemin absolu. Solution : `"./" + path.relative(process.cwd(), path.join(__dirname, "src/i18n/request.ts"))`, valable depuis la racine ET depuis `apps/user-ui`.

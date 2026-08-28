@@ -83,7 +83,8 @@
     },
     "perKg": "Price per kg",
     "perKgHint": "{kg} kg still available · the sender pays weight × price",
-    "perKgHintNoCap": "The sender pays weight × price per kg"
+    "perKgHintNoCap": "The sender pays weight × price per kg",
+    "example": "Example: a {kg} kg parcel ≈ {price} all inclusive"
   },
   "notFound": {
     "title": "Trip not found",

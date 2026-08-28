@@ -83,7 +83,8 @@
     },
     "perKg": "Prix au kilo",
     "perKgHint": "{kg} kg encore disponibles · l'Expéditeur paie poids × prix",
-    "perKgHintNoCap": "L'Expéditeur paie poids × prix au kilo"
+    "perKgHintNoCap": "L'Expéditeur paie poids × prix au kilo",
+    "example": "Exemple : un colis de {kg} kg ≈ {price} tout compris"
   },
   "notFound": {
     "title": "Trajet introuvable",

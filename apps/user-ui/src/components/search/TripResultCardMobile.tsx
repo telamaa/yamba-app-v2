@@ -278,8 +278,8 @@ function CategoryPreview({
 function formatDuration(minutes: number): string {
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
-  if (m === 0) return `${h}H`;
-  return `${h}H ${m.toString().padStart(2, "0")}`;
+  if (m === 0) return `${h} h`;
+  return `${h} h ${m.toString().padStart(2, "0")}`;
 }
 
 function getTransportIcon(mode: string) {
