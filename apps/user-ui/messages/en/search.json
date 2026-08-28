@@ -58,7 +58,7 @@
     "newTripper": "New tripper",
     "perKg": "price per kg",
     "remainingKg": "{kg} kg left",
-    "example": "e.g. {kg} kg parcel ≈ €{price}",
+    "example": "e.g. {kg} kg ≈ €{price} all-in",
     "surcharge": "{family}: +{pct}%"
   },
   "pricingSheet": {

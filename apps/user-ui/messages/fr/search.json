@@ -58,7 +58,7 @@
     "newTripper": "Nouveau tripper",
     "perKg": "prix au kilo",
     "remainingKg": "{kg} kg dispo",
-    "example": "ex. colis {kg} kg ≈ {price} €",
+    "example": "ex. {kg} kg ≈ {price} € tout compris",
     "surcharge": "{family} : +{pct} %"
   },
   "pricingSheet": {

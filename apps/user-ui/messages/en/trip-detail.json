@@ -84,7 +84,7 @@
     "perKg": "Price per kg",
     "perKgHint": "{kg} kg still available · the sender pays weight × price",
     "perKgHintNoCap": "The sender pays weight × price per kg",
-    "example": "Example: a {kg} kg parcel ≈ {price} all inclusive"
+    "example": "Example: a {kg} kg parcel ≈ {price} all-in (transport + Yamba service)"
   },
   "notFound": {
     "title": "Trip not found",

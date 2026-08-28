@@ -322,13 +322,13 @@ export default function TripResultCard({
             )}
           </div>
           {isPerKg && typeof item.remainingKg === "number" && (
-            <div className="mt-0.5 text-[10px] font-medium text-[#0F766E] dark:text-teal-400">
+            <div className="mt-1.5 text-[11px] font-semibold text-[#0F766E] dark:text-teal-400">
               {t("card.remainingKg", { kg: item.remainingKg })}
             </div>
           )}
           <SurchargePills conditions={item.familyConditions} highlightedFamilies={highlightedFamilies} />
           {isPerKg && (
-            <div className="mt-0.5 text-[10px] text-slate-400 dark:text-slate-500">
+            <div className="mt-2 border-t border-dashed border-slate-200 pt-1.5 text-[10px] leading-snug text-slate-400 dark:border-slate-700 dark:text-slate-500">
               {t("card.example", {
                 kg: 2,
                 price: (estimateShipperTotalCents(Math.round((item.pricePerKg as number) * 100)).totalCents / 100).toLocaleString(localeTag, { maximumFractionDigits: 0 }),
@@ -350,7 +350,7 @@ export default function TripResultCard({
       </div>
 
       {/* ── Footer: tripper + catégories + chevron ── */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/50 px-4 py-2.5 dark:border-slate-800/60 dark:bg-slate-950/60">
+      <div className="mt-1 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/50 px-4 py-2.5 dark:border-slate-800/60 dark:bg-slate-950/60">
         {/* Tripper info */}
         <div className="flex min-w-0 items-center gap-2.5">
           <div className="relative h-8 w-8 shrink-0">
