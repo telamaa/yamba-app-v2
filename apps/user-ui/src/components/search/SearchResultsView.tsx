@@ -13,7 +13,6 @@ import TripSearchBarSkeleton from "./TripSearchBarSkeleton";
 import MobileSearchExperienceSkeleton from "./MobileSearchExperienceSkeleton";
 import SavedRouteCTA from "@/components/saved-routes/SavedRouteCTA";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { useFixedSidebarPosition } from "@/hooks/useFixedSidebarPosition";
 import { useTripsSearch } from "@/hooks/useTripsSearch";
 import { useSearchFacets } from "@/hooks/useSearchFacets";
 import type {
@@ -30,8 +29,6 @@ const HEADER_HEIGHT = 78;
 const SEARCH_BAR_FIXED_HEIGHT = 96;
 const SIDEBAR_TOP = HEADER_HEIGHT + SEARCH_BAR_FIXED_HEIGHT + 16;
 
-const SIDEBAR_TRANSITION_MS = 500;
-const SIDEBAR_SLIDE_DISTANCE = 12;
 
 const PAGE_SIZE = 10;
 
@@ -268,8 +265,6 @@ export default function SearchResultsView() {
 
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
-  const { placeholderRef: sidebarPlaceholderRef, fixedRect } =
-    useFixedSidebarPosition(SIDEBAR_TOP);
 
   const [searchDraft, setSearchDraft] = useState<{
     from: string;
@@ -555,38 +550,18 @@ export default function SearchResultsView() {
               </div>
 
               <div className="grid gap-6 md:grid-cols-[280px_1fr] md:items-start">
-                <div ref={sidebarPlaceholderRef} className="relative hidden md:block">
-                  <div
-                    style={{
-                      opacity: fixedRect.isFixed ? 0 : 1,
-                      visibility: fixedRect.isFixed ? "hidden" : "visible",
-                      transition: `opacity ${SIDEBAR_TRANSITION_MS}ms cubic-bezier(0.16, 1, 0.3, 1)`,
-                    }}
-                  >
-                    <SearchFiltersSidebar {...sidebarProps} />
-                  </div>
-
-                  <div
-                    className="yamba-sidebar-scroll overflow-y-auto rounded-2xl"
-                    style={{
-                      position: "fixed",
-                      top: SIDEBAR_TOP,
-                      left: fixedRect.left,
-                      width: fixedRect.width,
-                      maxHeight: `calc(100vh - ${SIDEBAR_TOP}px - 24px)`,
-                      zIndex: 30,
-                      opacity: fixedRect.isFixed ? 1 : 0,
-                      transform: fixedRect.isFixed
-                        ? "translateY(0)"
-                        : `translateY(-${SIDEBAR_SLIDE_DISTANCE}px)`,
-                      pointerEvents: fixedRect.isFixed ? "auto" : "none",
-                      transition: `opacity ${SIDEBAR_TRANSITION_MS}ms cubic-bezier(0.16, 1, 0.3, 1), transform ${SIDEBAR_TRANSITION_MS}ms cubic-bezier(0.16, 1, 0.3, 1)`,
-                    }}
-                    aria-hidden={!fixedRect.isFixed}
-                  >
-                    <SearchFiltersSidebar {...sidebarProps} />
-                  </div>
-                </div>
+                {/* Sidebar collante : CSS natif (pas de JS au scroll → pas de retard).
+                    Le grid a `md:items-start` (indispensable au sticky) et aucun
+                    ancêtre n'a d'overflow hidden — cf. pièges CLAUDE.md. */}
+                <aside
+                  className="yamba-sidebar-scroll hidden overflow-y-auto rounded-2xl md:sticky md:block"
+                  style={{
+                    top: SIDEBAR_TOP,
+                    maxHeight: `calc(100vh - ${SIDEBAR_TOP}px - 24px)`,
+                  }}
+                >
+                  <SearchFiltersSidebar {...sidebarProps} />
+                </aside>
 
                 <div className="space-y-3">
                   {isError ? (
