@@ -165,7 +165,7 @@ Ordre de demarrage : auth -> trip -> gateway.
   AddDocumentsBody en Zod dedie · harmonisation noms projets Nx ·
   idempotence seed-deals · bug seed shipperId === carrierId a trancher ·
   git config user.email.
-- Candidat D32 : provider email transactionnel (Resend/Postmark/SES)
+- Candidat D35 (ex-« D32 » avant que D32 = plancher par colis) : provider email transactionnel (Resend/Postmark/SES)
   derriere @packages/email, avant lancement. MailHog docker-compose local
   candidat.
 - Backlog parametre serveur candidat : prix plancher par colis (note A28).
