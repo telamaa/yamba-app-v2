@@ -355,8 +355,7 @@ export function CharterBlock({
         <button
           type="button"
           onClick={onFullLinkClickAction}
-          className="font-medium underline-offset-2 hover:underline"
-          className="text-[#633806] dark:text-[#FFB84D]"
+          className="font-medium text-[#633806] underline-offset-2 hover:underline dark:text-[#FFB84D]"
         >
           {fullLinkLabel} →
         </button>
