@@ -4,6 +4,7 @@
  * Validation, pricing and step-progression logic. Pure functions.
  */
 
+import { PRICING_PARAMS, QuoteError, quoteShipperPrice } from "@packages/pricing";
 import type {
   Draft,
   ParcelCategory,
@@ -13,22 +14,54 @@ import type {
   ValidationErrors,
 } from "./booking.types";
 
-const INSURANCE_PRICE_EXTENDED_500_EUR = 6;
+/** Poids saisi ("2,5") → nombre, ou null. */
+export function parseWeight(s: string): number | null {
+  const n = Number(String(s).replace(",", "."));
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
 
+/**
+ * D34 — le devis vient de `@packages/pricing` (même code que le snapshot
+ * serveur) ; les euros ne servent qu'à l'affichage. Trajet legacy (sans
+ * €/kg) : on retombe sur le prix par catégorie, sans devis figé.
+ */
 export function computeTotal(draft: Draft, trip: TripContext): PriceBreakdown {
+  const isPerKg = typeof trip.pricePerKgCents === "number" && trip.pricePerKgCents > 0;
+  if (isPerKg || draft.product !== "PARCEL") {
+    try {
+      const quote = quoteShipperPrice({
+        product: draft.product,
+        pricePerKgCents: trip.pricePerKgCents,
+        checkedBag23PriceCents: trip.checkedBag23PriceCents,
+        cabinBag12PriceCents: trip.cabinBag12PriceCents,
+        weightKg: parseWeight(draft.weightKg),
+        sizeClass: draft.sizeClass,
+        familySurchargePct:
+          trip.familyStances[draft.family]?.mode === "SURCHARGE" ? trip.familyStances[draft.family].surchargePct : 0,
+        protection: draft.insurance,
+      });
+      return {
+        transport: quote.transportCents / 100,
+        serviceFee: quote.commissionCents / 100,
+        insurance: quote.premiumCents / 100,
+        total: quote.totalShipperCents / 100,
+        currency: "EUR",
+        quote,
+        quoteError: null,
+      };
+    } catch (e: unknown) {
+      return { transport: 0, serviceFee: 0, insurance: 0, total: 0, currency: "EUR", quote: null, quoteError: e instanceof QuoteError ? e.code : "UNKNOWN" } as PriceBreakdown;
+    }
+  }
+  // legacy PER_CATEGORY
   const transport = trip.categoryPrices[draft.category] ?? 0;
-  const serviceFee = round2(transport * trip.serviceFeePercent);
-  const insurance =
-    draft.insurance === "EXTENDED_500" ? INSURANCE_PRICE_EXTENDED_500_EUR : 0;
-  const total = round2(transport + serviceFee + insurance);
+  const serviceFee = round2(Math.max(transport * (PRICING_PARAMS.commissionPct / 100), PRICING_PARAMS.commissionFloorCents / 100));
+  const insurance = draft.insurance === "EXTENDED_500" ? PRICING_PARAMS.protectionExtendedPremiumCents / 100 : 0;
+  return { transport, serviceFee, insurance, total: round2(transport + serviceFee + insurance), currency: "EUR", quote: null, quoteError: null };
+}
 
-  return {
-    transport,
-    serviceFee,
-    insurance,
-    total,
-    currency: "EUR",
-  };
+export function isPerKgTrip(trip: TripContext): boolean {
+  return typeof trip.pricePerKgCents === "number" && trip.pricePerKgCents > 0;
 }
 
 function round2(n: number): number {
@@ -45,8 +78,7 @@ function isEmailValidOrEmpty(email: string): boolean {
 }
 
 function isPositiveNumber(s: string): boolean {
-  const n = Number(s.replace(",", "."));
-  return Number.isFinite(n) && n > 0;
+  return parseWeight(s) !== null;
 }
 
 export function validateStep1(
@@ -66,13 +98,42 @@ export function validateStep1(
       ? "Choisis un lieu de retrait"
       : "Pick a pickup location for the recipient";
   }
-  if (!trip.acceptedCategories.includes(draft.category)) {
+  if (isPerKgTrip(trip)) {
+    // D14 — famille refusée par le Voyageur
+    if (draft.product === "PARCEL" && trip.familyStances[draft.family]?.mode === "REFUSE") {
+      errors.family = isFr
+        ? "Le voyageur ne prend pas cette famille de colis"
+        : "The tripper does not take this parcel family";
+    }
+    // PRC-04 — bagage entier non proposé
+    if (draft.product === "CHECKED_BAG_23KG" && !trip.checkedBag23PriceCents) {
+      errors.product = isFr ? "Bagage soute non proposé sur ce trajet" : "Checked bag not offered on this trip";
+    }
+    if (draft.product === "CABIN_BAG_12KG" && !trip.cabinBag12PriceCents) {
+      errors.product = isFr ? "Bagage cabine non proposé sur ce trajet" : "Cabin bag not offered on this trip";
+    }
+  } else if (!trip.acceptedCategories.includes(draft.category)) {
     errors.category = isFr
       ? "Catégorie non acceptée par le voyageur"
       : "Category not accepted by the tripper";
   }
-  if (!isPositiveNumber(draft.weightKg)) {
-    errors.weightKg = isFr ? "Poids requis" : "Weight required";
+  if (draft.product === "PARCEL") {
+    const w = parseWeight(draft.weightKg);
+    if (w === null) {
+      errors.weightKg = isFr ? "Poids requis" : "Weight required";
+    } else if (w > 30) {
+      errors.weightKg = isFr ? "30 kg maximum par colis" : "30 kg max per parcel";
+    } else if (typeof trip.remainingKg === "number" && w > trip.remainingKg) {
+      // CAP-01 — vérifié aussi côté serveur à la réservation
+      errors.weightKg = isFr
+        ? `Il ne reste que ${trip.remainingKg} kg disponibles sur ce trajet`
+        : `Only ${trip.remainingKg} kg left on this trip`;
+    }
+  } else if (typeof trip.remainingKg === "number") {
+    const need = draft.product === "CHECKED_BAG_23KG" ? 23 : 12;
+    if (need > trip.remainingKg) {
+      errors.product = isFr ? `Il ne reste que ${trip.remainingKg} kg : pas assez pour ce bagage` : `Only ${trip.remainingKg} kg left: not enough for this bag`;
+    }
   }
   if (!isPositiveNumber(draft.declaredValueEur)) {
     errors.declaredValueEur = isFr
@@ -157,6 +218,11 @@ export function canContinueStep(
 }
 
 /** Pick a valid default category for the trip (first accepted). */
+export function getFirstAcceptedFamily(trip: TripContext): Draft["family"] {
+  const order: Draft["family"][] = ["CLOTHES_TEXTILE", "DOCUMENTS_PAPERS", "MISC_ACCESSORIES", "COSMETICS_CARE", "TOYS_CHILDCARE", "PARTS_TOOLS", "ELECTRONICS_DEVICES", "FOOD_DRY_SEALED"];
+  return order.find((f) => trip.familyStances[f]?.mode !== "REFUSE") ?? "CLOTHES_TEXTILE";
+}
+
 export function getFirstAcceptedCategory(trip: TripContext): ParcelCategory {
   return trip.acceptedCategories[0] ?? "CLOTHES";
 }

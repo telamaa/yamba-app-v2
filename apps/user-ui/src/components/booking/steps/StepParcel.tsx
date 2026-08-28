@@ -3,7 +3,9 @@
 import { Lightbulb } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback } from "react";
-import { MAX_PHOTOS } from "../booking.config";
+import { MAX_PHOTOS, isPerKgTrip } from "../booking.config";
+import { PRICING_PARAMS } from "@packages/pricing";
+import { Backpack, Luggage, ShoppingBag } from "lucide-react";
 import {
   FormField,
   FormInput,
@@ -18,14 +20,54 @@ import {
   SectionTitle,
   TipBlock,
 } from "../BookingFormUi";
-import type {
-  Draft,
-  ParcelCategory,
-  ParcelPhoto,
-  PhotoContext,
-  TripContext,
-  ValidationErrors,
+import {
+  PARCEL_FAMILIES,
+  type Draft,
+  type ParcelCategory,
+  type ParcelPhoto,
+  type ParcelProduct,
+  type PhotoContext,
+  type SizeClass,
+  type TripContext,
+  type ValidationErrors,
 } from "../booking.types";
+
+/** Icônes Lucide des classes de taille (PRC-03) — jamais d'emoji */
+const SIZE_ICONS = { S: ShoppingBag, M: Backpack, L: Luggage } as const;
+
+function ChoiceChip({
+  active,
+  disabled,
+  title,
+  onClickAction,
+  children,
+}: {
+  active: boolean;
+  disabled?: boolean;
+  title?: string;
+  onClickAction: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      disabled={disabled}
+      title={title}
+      onClick={onClickAction}
+      className={[
+        "inline-flex min-h-[40px] items-center rounded-full border px-3 py-1.5 text-[12px] font-medium transition-colors",
+        active
+          ? "border-[#FF9900]/60 bg-[#FFF6E8] text-slate-900 dark:bg-[#FF9900]/10 dark:text-[#FFB84D]"
+          : disabled
+            ? "cursor-not-allowed border-slate-100 text-slate-300 line-through dark:border-slate-800 dark:text-slate-600"
+            : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300",
+      ].join(" ")}
+    >
+      {children}
+    </button>
+  );
+}
 
 type Props = {
   trip: TripContext;
@@ -104,6 +146,7 @@ export default function StepParcel({
   );
 
   const photosRequired = draft.insurance === "EXTENDED_500";
+  const perKg = isPerKgTrip(trip);
 
   const categoryOptions = trip.acceptedCategories.map((cat) => ({
     value: cat,
@@ -199,43 +242,180 @@ export default function StepParcel({
         }}
       />
 
-      {/* Category */}
-      <FormField label={t("step1.parcelDetails.categoryLabel")} error={errors.category}>
-        <FormSelect<ParcelCategory>
-          value={draft.category}
-          onChangeAction={(value) => setDraftAction((prev) => ({ ...prev, category: value }))}
-          options={categoryOptions}
-          hasError={Boolean(errors.category)}
-        />
-      </FormField>
+      {/* ── Moteur PER_KG : produit · famille · poids · taille (D13/D14, PRC-03/04) ── */}
+      {perKg ? (
+        <>
+          {/* Produit : colis au kilo ou bagage entier (si proposé) */}
+          {(trip.checkedBag23PriceCents || trip.cabinBag12PriceCents) && (
+            <FormField label={t("step1.product.label")} error={errors.product}>
+              <div className="flex flex-wrap gap-2">
+                {(
+                  [
+                    ["PARCEL", t("step1.product.parcel"), null],
+                    ["CHECKED_BAG_23KG", t("step1.product.checkedBag"), trip.checkedBag23PriceCents],
+                    ["CABIN_BAG_12KG", t("step1.product.cabinBag"), trip.cabinBag12PriceCents],
+                  ] as Array<[ParcelProduct, string, number | null]>
+                )
+                  .filter(([k, , cents]) => k === "PARCEL" || !!cents)
+                  .map(([k, label, cents]) => (
+                    <ChoiceChip
+                      key={k}
+                      active={draft.product === k}
+                      onClickAction={() => setDraftAction((prev) => ({ ...prev, product: k }))}
+                    >
+                      {label}
+                      {cents ? <span className="ml-1 font-bold">{formatEur(cents / 100)}</span> : null}
+                    </ChoiceChip>
+                  ))}
+              </div>
+            </FormField>
+          )}
 
-      {/* Weight + Declared value */}
-      <div className="grid grid-cols-2 gap-3.5">
-        <FormField label={t("step1.parcelDetails.weightLabel")} error={errors.weightKg}>
-          <FormInput
-            value={draft.weightKg}
-            onChangeAction={(v) => setDraftAction((prev) => ({ ...prev, weightKg: v }))}
-            hasError={Boolean(errors.weightKg)}
-            inputMode="decimal"
-            placeholder="2.5"
-          />
-        </FormField>
-        <FormFieldWithTooltip
-          label={t("step1.parcelDetails.valueLabel")}
-          tooltip={t("step1.parcelDetails.declaredValueTooltip")}
-          error={errors.declaredValueEur}
-        >
-          <FormInput
-            value={draft.declaredValueEur}
-            onChangeAction={(v) =>
-              setDraftAction((prev) => ({ ...prev, declaredValueEur: v }))
-            }
-            hasError={Boolean(errors.declaredValueEur)}
-            inputMode="numeric"
-            placeholder="150"
-          />
-        </FormFieldWithTooltip>
-      </div>
+          {draft.product === "PARCEL" && (
+            <>
+              {/* Famille (D14) : refusée = grisée avec le motif ; supplément affiché */}
+              <FormField label={t("step1.family.label")} hint={t("step1.family.hint")} error={errors.family}>
+                <div className="flex flex-wrap gap-2">
+                  {PARCEL_FAMILIES.map((f) => {
+                    const st = trip.familyStances[f];
+                    const refused = st?.mode === "REFUSE";
+                    const pct = st?.mode === "SURCHARGE" ? st.surchargePct : 0;
+                    return (
+                      <ChoiceChip
+                        key={f}
+                        active={draft.family === f}
+                        disabled={refused}
+                        title={refused ? t("step1.family.refused", { carrierFirstName: trip.carrier.firstName }) : undefined}
+                        onClickAction={() => setDraftAction((prev) => ({ ...prev, family: f }))}
+                      >
+                        {t(`families.${f}`)}
+                        {pct > 0 && <span className="ml-1 font-bold text-[#B45309] dark:text-[#FFB84D]">+{pct} %</span>}
+                        {refused && <span className="ml-1">✕</span>}
+                      </ChoiceChip>
+                    );
+                  })}
+                </div>
+              </FormField>
+
+              {/* Poids + valeur déclarée */}
+              <div className="grid grid-cols-2 gap-3.5">
+                <FormFieldWithTooltip
+                  label={t("step1.parcelDetails.weightLabel")}
+                  tooltip={t("step1.parcelDetails.weightTooltip", { min: 0.5, floor: 8 })}
+                  error={errors.weightKg}
+                >
+                  <FormInput
+                    value={draft.weightKg}
+                    onChangeAction={(v) => setDraftAction((prev) => ({ ...prev, weightKg: v }))}
+                    hasError={Boolean(errors.weightKg)}
+                    inputMode="decimal"
+                    placeholder="2,5"
+                  />
+                  {typeof trip.remainingKg === "number" && (
+                    <div className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                      {t("step1.parcelDetails.remainingKg", { kg: trip.remainingKg })}
+                    </div>
+                  )}
+                </FormFieldWithTooltip>
+                <FormFieldWithTooltip
+                  label={t("step1.parcelDetails.valueLabel")}
+                  tooltip={t("step1.parcelDetails.declaredValueTooltip")}
+                  error={errors.declaredValueEur}
+                >
+                  <FormInput
+                    value={draft.declaredValueEur}
+                    onChangeAction={(v) => setDraftAction((prev) => ({ ...prev, declaredValueEur: v }))}
+                    hasError={Boolean(errors.declaredValueEur)}
+                    inputMode="numeric"
+                    placeholder="150"
+                  />
+                </FormFieldWithTooltip>
+              </div>
+
+              {/* Taille S/M/L (PRC-03) : à l'œil, jamais de dimensions */}
+              <FormField label={t("step1.size.label")} hint={t("step1.size.hint")} error={errors.sizeClass}>
+                <div className="grid grid-cols-3 gap-2">
+                  {(["S", "M", "L"] as SizeClass[]).map((sz) => {
+                    const Icon = SIZE_ICONS[sz];
+                    const active = draft.sizeClass === sz;
+                    return (
+                      <button
+                        key={sz}
+                        type="button"
+                        aria-pressed={active}
+                        onClick={() => setDraftAction((prev) => ({ ...prev, sizeClass: sz }))}
+                        className={[
+                          "flex min-h-[76px] flex-col items-center justify-center gap-1 rounded-xl border px-2 py-2.5 text-center transition-colors",
+                          active
+                            ? "border-[#FF9900] bg-[#FFF6E8] dark:bg-[#FF9900]/10"
+                            : "border-slate-200 bg-white hover:border-slate-300 dark:border-slate-700 dark:bg-slate-900",
+                        ].join(" ")}
+                      >
+                        <Icon size={18} strokeWidth={1.75} className={active ? "text-[#B45309] dark:text-[#FFB84D]" : "text-slate-500"} />
+                        <span className="text-[13px] font-bold text-slate-900 dark:text-white">{sz}</span>
+                        <span className="text-[10px] leading-tight text-slate-500 dark:text-slate-400">{t(`step1.size.${sz}`)}</span>
+                        <span className="text-[10px] text-slate-400 dark:text-slate-500">×{PRICING_PARAMS.sizeCoef[sz].toLocaleString("fr-FR")}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </FormField>
+            </>
+          )}
+
+          {draft.product !== "PARCEL" && (
+            <FormFieldWithTooltip
+              label={t("step1.parcelDetails.valueLabel")}
+              tooltip={t("step1.parcelDetails.declaredValueTooltip")}
+              error={errors.declaredValueEur}
+            >
+              <FormInput
+                value={draft.declaredValueEur}
+                onChangeAction={(v) => setDraftAction((prev) => ({ ...prev, declaredValueEur: v }))}
+                hasError={Boolean(errors.declaredValueEur)}
+                inputMode="numeric"
+                placeholder="150"
+              />
+            </FormFieldWithTooltip>
+          )}
+        </>
+      ) : (
+        <>
+          {/* Legacy PER_CATEGORY (anciens trajets) */}
+          <FormField label={t("step1.parcelDetails.categoryLabel")} error={errors.category}>
+            <FormSelect<ParcelCategory>
+              value={draft.category}
+              onChangeAction={(value) => setDraftAction((prev) => ({ ...prev, category: value }))}
+              options={categoryOptions}
+              hasError={Boolean(errors.category)}
+            />
+          </FormField>
+          <div className="grid grid-cols-2 gap-3.5">
+            <FormField label={t("step1.parcelDetails.weightLabel")} error={errors.weightKg}>
+              <FormInput
+                value={draft.weightKg}
+                onChangeAction={(v) => setDraftAction((prev) => ({ ...prev, weightKg: v }))}
+                hasError={Boolean(errors.weightKg)}
+                inputMode="decimal"
+                placeholder="2.5"
+              />
+            </FormField>
+            <FormFieldWithTooltip
+              label={t("step1.parcelDetails.valueLabel")}
+              tooltip={t("step1.parcelDetails.declaredValueTooltip")}
+              error={errors.declaredValueEur}
+            >
+              <FormInput
+                value={draft.declaredValueEur}
+                onChangeAction={(v) => setDraftAction((prev) => ({ ...prev, declaredValueEur: v }))}
+                hasError={Boolean(errors.declaredValueEur)}
+                inputMode="numeric"
+                placeholder="150"
+              />
+            </FormFieldWithTooltip>
+          </div>
+        </>
+      )}
 
       {/* Description */}
       <FormField label={t("step1.parcelDetails.descriptionLabel")} error={errors.description}>

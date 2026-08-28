@@ -7,7 +7,6 @@
   "pay": "Payer {amount}",
   "cancel": "Annuler",
   "close": "Fermer",
-
   "steps": {
     "parcel": "Colis",
     "recipient": "Destinataire",
@@ -15,7 +14,6 @@
     "payment": "Paiement",
     "indicator": "étape {current} sur {total}"
   },
-
   "step1": {
     "title": "Décris ton colis",
     "subtitle": "Précision et photos garantissent un envoi sans accroc",
@@ -23,7 +21,6 @@
     "pickupBlockTitle": "Tu remets le colis à {carrierFirstName}",
     "deliveryBlockTitle": "Le destinataire récupère le colis",
     "locationSingleHint": "Lieu convenu avec le voyageur",
-
     "goldenRules": {
       "title": "Les règles d''or pour un envoi qui se passe bien",
       "pack": "**Emballe soigneusement.** Sac ou boîte solide, papier bulle pour le fragile, scotche correctement.",
@@ -32,7 +29,6 @@
       "prohibited": "**Aucun produit interdit.**",
       "linkProhibited": "Voir la liste complète"
     },
-
     "parcelDetails": {
       "categoryLabel": "Catégorie",
       "categoryOption": "{label} — {price}",
@@ -40,9 +36,10 @@
       "valueLabel": "Valeur déclarée (€)",
       "declaredValueTooltip": "La valeur déclarée détermine le plafond d''indemnisation en cas de litige. Indique le prix d''achat du contenu.",
       "descriptionLabel": "Description courte",
-      "descriptionPlaceholder": "Ex : 3 t-shirts, 1 pull, du chocolat"
+      "descriptionPlaceholder": "Ex : 3 t-shirts, 1 pull, du chocolat",
+      "weightTooltip": "Poids déclaré. Un colis léger (enveloppe, passeport, lunettes…) est facturé {min} kg minimum et jamais moins de {floor} €. Au pickup, un écart ≤ 10 % est toléré.",
+      "remainingKg": "{kg} kg encore disponibles sur ce trajet"
     },
-
     "photos": {
       "label": "Photos du colis",
       "requiredBadge": "Obligatoire avec l''assurance",
@@ -51,24 +48,40 @@
       "tagContent": "Contenu",
       "tagPackaged": "Emballé",
       "remove": "Supprimer cette photo"
+    },
+    "product": {
+      "label": "Que voulez-vous envoyer ?",
+      "parcel": "Un colis (au kilo)",
+      "checkedBag": "Un bagage soute 23 kg",
+      "cabinBag": "Un bagage cabine 12 kg"
+    },
+    "family": {
+      "label": "Famille du colis",
+      "hint": "La famille dit si le voyageur l'accepte — elle ne change pas le prix au kilo, sauf supplément affiché.",
+      "refused": "{carrierFirstName} ne prend pas cette famille sur ce trajet"
+    },
+    "size": {
+      "label": "Taille — pas besoin de mesurer",
+      "hint": "À l'œil : le coefficient s'applique au prix au kilo.",
+      "S": "de l'enveloppe à la boîte à chaussures",
+      "M": "tient dans un sac cabine",
+      "L": "occupe une demi-valise"
     }
   },
-
   "insurance": {
-    "title": "Assurance optionnelle",
+    "title": "Protection du colis",
     "basic": {
       "title": "Protection de base",
       "price": "Inclus",
       "description": "Tu es protégé contre la non-livraison. Le paiement est bloqué jusqu''à la remise au destinataire."
     },
     "extended": {
-      "title": "Assurance jusqu''à 500 €",
+      "title": "Garantie Yamba — jusqu'à 500 €",
       "price": "+ 6 €",
-      "description": "Perte, vol, casse pendant le transport. Vol partiel du contenu couvert.",
-      "ipidLink": "Voir la fiche IPID"
+      "description": "Perte, vol, casse pendant le transport. Exclusions affichées avant validation (dont saisie douanière d'un colis non conforme).",
+      "ipidLink": "Voir les conditions"
     }
   },
-
   "categories": {
     "CLOTHES": "Vêtements",
     "SHOES": "Chaussures",
@@ -83,18 +96,15 @@
     "CHECKED_BAG_23KG": "Bagage en soute 23 kg",
     "CABIN_BAG_12KG": "Bagage cabine 12 kg"
   },
-
   "step2": {
     "title": "À qui livrer ?",
     "subtitle": "Pas besoin de compte Yamba pour le destinataire. Tu lui transmettras le code.",
-
     "deliveryFlow": {
       "title": "Comment se passera la livraison",
       "codeGiven": "**Un code à 6 chiffres** te sera donné après le paiement.",
       "shareIt": "**Tu le transmets** au destinataire par SMS, WhatsApp ou oralement.",
       "handToTraveler": "**Il le donne au voyageur** à la livraison. Sans ce code, le colis ne peut pas être remis."
     },
-
     "form": {
       "firstName": "Prénom",
       "lastName": "Nom",
@@ -105,18 +115,15 @@
       "emailHint": "Pour notifier le destinataire de l''arrivée du colis"
     }
   },
-
   "step3": {
     "title": "Ton engagement",
     "subtitle": "Tu certifies sur l''honneur le contenu du colis",
-
     "handoverFlow": {
       "title": "À la remise du colis, voici ce qui se passera",
       "visualInspection": "**Vérification visuelle obligatoire.** Le voyageur examinera ton colis avant d''accepter — ne sois pas surpris.",
       "refusalPossible": "**Refus possible si non-conforme.** Si le contenu diffère de ta déclaration, le voyageur peut refuser. Tu seras remboursé mais le trajet sera perdu.",
       "crossPhotos": "**Photos croisées.** Le voyageur prendra ses propres photos qui feront foi en cas de litige."
     },
-
     "charter": {
       "title": "Charte Expéditeur",
       "subtitle": "Engagement juridique — à lire attentivement",
@@ -127,7 +134,6 @@
       "disclaimer": "Toute déclaration mensongère engage ma seule responsabilité civile et pénale, à l''exclusion de celle du voyageur et de Yamba.",
       "fullLink": "Voir la charte complète et les produits interdits"
     },
-
     "accept": {
       "title": "J''accepte la Charte Expéditeur",
       "cgvLabel": "CGV",
@@ -137,12 +143,10 @@
       "descSuffix": "."
     }
   },
-
   "step4": {
     "title": "Paiement",
     "subtitle": "Tu n''es débité qu''à acceptation par le voyageur (sous 24h max)",
     "methodTitle": "Moyen de paiement",
-
     "card": {
       "title": "Carte bancaire",
       "description": "Visa, Mastercard, Amex · Cartes internationales acceptées"
@@ -155,7 +159,6 @@
       "title": "Google Pay",
       "description": "Paiement en un clic depuis ton compte Google"
     },
-
     "afterPayment": {
       "title": "Après ton paiement",
       "step1": "Le voyageur reçoit ta demande et a **24h pour accepter**. Tu n''es débité qu''à acceptation.",
@@ -164,19 +167,17 @@
       "step4": "Le destinataire communique le code au voyageur à l''arrivée, qui le saisit pour valider la livraison.",
       "step5": "**3 jours après** la livraison validée, le voyageur reçoit son paiement."
     },
-
     "trustStripe": "Paiement sécurisé par Stripe. Yamba ne stocke jamais tes données bancaires.",
     "loadingMessage": "Préparation du paiement…"
   },
-
   "summary": {
     "tripSelectedTitle": "Trajet sélectionné",
     "compactTitle": "Récap",
     "toPayTitle": "Tu paies",
     "transport": "Transport",
-    "serviceYamba": "Service Yamba",
-    "insurance": "Assurance",
-    "insurance500": "Assurance 500 €",
+    "serviceYamba": "Service & protection",
+    "insurance": "Garantie Yamba",
+    "insurance500": "Garantie Yamba 500 €",
     "total": "Total",
     "totalNote": "Débité à acceptation par le voyageur",
     "totalNoteLong": "Le montant est autorisé maintenant et débité uniquement quand le voyageur accepte.",
@@ -184,7 +185,6 @@
     "ctaHint": "Tu n''es débité qu''à acceptation par le voyageur",
     "detail": "Détail",
     "hide": "Masquer",
-
     "parcel": "Colis",
     "photos": "Photos",
     "photosCount": "{count, plural, =1 {# ajoutée} other {# ajoutées}}",
@@ -192,11 +192,31 @@
     "delivery": "Retrait",
     "recipient": "Destinataire",
     "charter": "Engagement",
-    "insuranceLabel": "Assurance",
+    "insuranceLabel": "Protection",
     "date": "Date",
     "route": "Trajet",
     "directFlight": "Direct",
     "duration": "{hours}h de vol",
-    "deals": "{count, plural, =1 {# deal} other {# deals}}"
+    "deals": "{count, plural, =1 {# deal} other {# deals}}",
+    "transportDetail": "Transport · {kg} kg × {rate}/kg × {size}",
+    "minimumApplied": "Minimum par colis appliqué : {min}"
+  },
+  "families": {
+    "DOCUMENTS_PAPERS": "Documents & papiers",
+    "CLOTHES_TEXTILE": "Vêtements & textile",
+    "FOOD_DRY_SEALED": "Alimentaire sec & scellé",
+    "ELECTRONICS_DEVICES": "Électronique & appareils",
+    "COSMETICS_CARE": "Cosmétiques & soins",
+    "PARTS_TOOLS": "Pièces & outillage",
+    "TOYS_CHILDCARE": "Jouets & puériculture",
+    "MISC_ACCESSORIES": "Accessoires & divers"
+  },
+  "locationKinds": {
+    "atAirport": "À l'aéroport",
+    "atTrainStation": "À la gare",
+    "inTheCity": "Dans la ville",
+    "radiusKm": "Rayon {km} km",
+    "cityWide": "Ville entière",
+    "exact": "Lieu exact"
   }
 }

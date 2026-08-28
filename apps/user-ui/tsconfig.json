@@ -27,13 +27,15 @@
       "@scss/*": ["assets/style/scss/*"],
       "@/*": [
         "src/*"
-      ]
+      ],
+      "@packages/pricing": ["../../packages/libs/pricing/src/index.ts"]
     },
     "outDir": "dist",
     "rootDir": "../../",
     "tsBuildInfoFile": "dist/tsconfig.tsbuildinfo"
   },
   "include": [
+    "../../packages/libs/pricing/src/index.ts",
     "../../apps/user-ui/.next/types/**/*.ts",
     "../../packages/**/*.tsx",
     "../../dist/apps/user-ui/.next/types/**/*.ts",
