@@ -18,7 +18,17 @@ import BookingStepperDesktop from "./BookingStepperDesktop";
 import BookingSummarySidebar from "./BookingSummarySidebar";
 import StepCharter from "./steps/StepCharter";
 import StepParcel from "./steps/StepParcel";
-import StepPayment from "./steps/StepPayment";
+import dynamic from "next/dynamic";
+// Stripe (react-stripe-js + stripe-js) ne sert qu'à l'étape 4 : chargé à la
+// demande → le bundle de l'étape 1 n'embarque pas Stripe.
+const StepPayment = dynamic(() => import("./steps/StepPayment"), {
+  ssr: false,
+  loading: () => (
+    <div className="flex min-h-[240px] items-center justify-center">
+      <div className="h-6 w-6 animate-spin rounded-full border-2 border-slate-200 border-t-[#FF9900]" />
+    </div>
+  ),
+});
 import StepRecipient from "./steps/StepRecipient";
 
 const EMPTY_ERRORS: ValidationErrors = {};
