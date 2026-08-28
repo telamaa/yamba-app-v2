@@ -55,7 +55,8 @@
     "stopovers": "{count, plural, one {# escale} other {# escales}}",
     "newTripper": "Nouveau tripper",
     "perKg": "prix au kilo",
-    "remainingKg": "{kg} kg dispo"
+    "remainingKg": "{kg} kg dispo",
+    "example": "ex. colis {kg} kg ≈ {price} €"
   },
   "pricingSheet": {
     "title": "Tarifs par catégorie",

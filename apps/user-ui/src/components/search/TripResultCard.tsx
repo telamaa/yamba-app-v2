@@ -1,4 +1,5 @@
 "use client";
+import { estimateShipperTotalCents } from "@/lib/pricing-example";
 
 import Image from "next/image";
 import { useMemo, useRef, useState } from "react";
@@ -21,7 +22,6 @@ import {
   ToyBrick,
   Train,
   Car,
-  Zap,
   BadgeCheck,
   Award,
   Ticket,
@@ -51,8 +51,8 @@ function TransportIcon({ mode, size = 13 }: { mode: TransportMode; size?: number
 function formatDuration(minutes: number): string {
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
-  if (m === 0) return `${h}H`;
-  return `${h}H ${m.toString().padStart(2, "0")}`;
+  if (m === 0) return `${h} h`;
+  return `${h} h ${m.toString().padStart(2, "0")}`;
 }
 
 function getCategoryMeta(
@@ -321,6 +321,14 @@ export default function TripResultCard({
               {t("card.remainingKg", { kg: item.remainingKg })}
             </div>
           )}
+          {isPerKg && (
+            <div className="mt-0.5 text-[10px] text-slate-400 dark:text-slate-500">
+              {t("card.example", {
+                kg: 2,
+                price: (estimateShipperTotalCents(Math.round((item.pricePerKg as number) * 100)).totalCents / 100).toLocaleString(localeTag, { maximumFractionDigits: 0 }),
+              })}
+            </div>
+          )}
 
           {hasPricesByCategory && (
             <TripPricingPopover
@@ -405,18 +413,12 @@ export default function TripResultCard({
               )}
             </div>
 
-            {(item.superTripper || item.instantBooking || item.verifiedTicket) && (
+            {(item.superTripper || item.verifiedTicket) && (
               <div className="mt-1 flex flex-wrap items-center gap-1">
                 {item.superTripper && (
                   <span className="inline-flex items-center gap-0.5 rounded-md bg-[#FFF6E8] px-1.5 py-0.5 text-[10px] font-semibold text-[#B45309] dark:bg-[#FF9900]/15 dark:text-[#FFB84D]">
                     <Award size={9} strokeWidth={2.5} />
                     {t("badges.superTripper")}
-                  </span>
-                )}
-                {item.instantBooking && (
-                  <span className="inline-flex items-center gap-0.5 rounded-md bg-green-50 px-1.5 py-0.5 text-[10px] font-semibold text-green-700 dark:bg-green-950/40 dark:text-green-400">
-                    <Zap size={9} strokeWidth={2.5} />
-                    {t("badges.instant")}
                   </span>
                 )}
                 {item.verifiedTicket && (

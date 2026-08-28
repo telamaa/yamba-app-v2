@@ -55,7 +55,8 @@
     "stopovers": "{count, plural, one {# stop} other {# stops}}",
     "newTripper": "New tripper",
     "perKg": "price per kg",
-    "remainingKg": "{kg} kg left"
+    "remainingKg": "{kg} kg left",
+    "example": "e.g. {kg} kg parcel ≈ €{price}"
   },
   "pricingSheet": {
     "title": "Prices by category",

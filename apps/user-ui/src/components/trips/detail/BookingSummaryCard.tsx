@@ -10,6 +10,7 @@ import {
   formatPrice,
   calculateCO2SavedKg,
 } from "@/lib/public-trip.helpers";
+import { estimateShipperTotalCents } from "@/lib/pricing-example";
 
 type Props = {
   trip: PublicTrip;
@@ -60,6 +61,14 @@ export default function BookingSummaryCard({ trip }: Props) {
               : t("booking.perKgHintNoCap")
             : t("booking.priceHint")}
         </div>
+        {perKgCents && (
+          <div className="mt-1 text-[11px] font-medium text-slate-600 dark:text-slate-300">
+            {t("booking.example", {
+              kg: 2,
+              price: formatPrice(estimateShipperTotalCents(perKgCents).totalCents, trip.currencyCode, locale),
+            })}
+          </div>
+        )}
       </div>
 
       {/* CTA */}
