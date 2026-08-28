@@ -110,10 +110,11 @@
       "firstName": "First name",
       "lastName": "Last name",
       "phone": "Phone",
-      "phoneHint": "Used to send the code via SMS / WhatsApp",
+      "phoneHint": "The delivery code will be sent by SMS / WhatsApp — pick their country code.",
       "email": "Email",
       "emailOptional": "(optional)",
-      "emailHint": "To notify the recipient when the parcel arrives"
+      "emailHint": "To notify the recipient when the parcel arrives",
+      "phonePrefix": "Country code"
     }
   },
   "step3": {
@@ -233,5 +234,6 @@
     "subtitle": "A booking commits a tripper: Yamba needs to know who is sending. Your parcel and this trip will be waiting after sign-in.",
     "login": "Sign in",
     "register": "Create an account"
-  }
+  },
+  "previousStep": "Previous step"
 }

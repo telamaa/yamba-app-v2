@@ -68,8 +68,48 @@ function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
-function isPhoneValid(phone: string): boolean {
-  return phone.replace(/\D/g, "").length >= 8;
+/** Indicatifs proposés (marchés de lancement + diasporas) — ordre = fréquence attendue. */
+export const PHONE_PREFIXES: Array<{ prefix: string; code: string; labelFr: string; labelEn: string }> = [
+  { prefix: "+33", code: "FR", labelFr: "France", labelEn: "France" },
+  { prefix: "+32", code: "BE", labelFr: "Belgique", labelEn: "Belgium" },
+  { prefix: "+41", code: "CH", labelFr: "Suisse", labelEn: "Switzerland" },
+  { prefix: "+44", code: "GB", labelFr: "Royaume-Uni", labelEn: "United Kingdom" },
+  { prefix: "+31", code: "NL", labelFr: "Pays-Bas", labelEn: "Netherlands" },
+  { prefix: "+49", code: "DE", labelFr: "Allemagne", labelEn: "Germany" },
+  { prefix: "+242", code: "CG", labelFr: "Congo", labelEn: "Congo" },
+  { prefix: "+243", code: "CD", labelFr: "RD Congo", labelEn: "DR Congo" },
+  { prefix: "+237", code: "CM", labelFr: "Cameroun", labelEn: "Cameroon" },
+  { prefix: "+241", code: "GA", labelFr: "Gabon", labelEn: "Gabon" },
+  { prefix: "+221", code: "SN", labelFr: "Sénégal", labelEn: "Senegal" },
+  { prefix: "+225", code: "CI", labelFr: "Côte d'Ivoire", labelEn: "Ivory Coast" },
+  { prefix: "+223", code: "ML", labelFr: "Mali", labelEn: "Mali" },
+  { prefix: "+212", code: "MA", labelFr: "Maroc", labelEn: "Morocco" },
+  { prefix: "+213", code: "DZ", labelFr: "Algérie", labelEn: "Algeria" },
+  { prefix: "+216", code: "TN", labelFr: "Tunisie", labelEn: "Tunisia" },
+  { prefix: "+1", code: "US", labelFr: "États-Unis / Canada", labelEn: "United States / Canada" },
+  { prefix: "+91", code: "IN", labelFr: "Inde", labelEn: "India" },
+  { prefix: "+86", code: "CN", labelFr: "Chine", labelEn: "China" },
+  { prefix: "+84", code: "VN", labelFr: "Viêt Nam", labelEn: "Vietnam" },
+];
+
+/** « +33 » + « 06 42 18 81 12 » → « +33642188112 » (E.164). Null si invalide. */
+export function toE164(prefix: string, national: string): string | null {
+  const p = prefix.replace(/\D/g, "");
+  let n = national.replace(/\D/g, "");
+  if (!p || !n) return null;
+  if (n.startsWith("00")) n = n.slice(2);
+  if (n.startsWith(p)) n = n.slice(p.length); // l'utilisateur a retapé l'indicatif
+  n = n.replace(/^0+/, ""); // zéro national
+  const e164 = `+${p}${n}`;
+  return /^\+[1-9]\d{6,14}$/.test(e164) ? e164 : null;
+}
+
+export function recipientPhoneE164(draft: Draft): string | null {
+  return toE164(draft.recipient.phonePrefix, draft.recipient.phoneE164);
+}
+
+function isPhoneValid(phone: string, prefix = "+33"): boolean {
+  return toE164(prefix, phone) !== null;
 }
 
 function isEmailValidOrEmpty(email: string): boolean {
@@ -163,7 +203,7 @@ export function validateStep2(draft: Draft, isFr: boolean): ValidationErrors {
   if (draft.recipient.lastName.trim() === "") {
     errors.recipientLastName = isFr ? "Nom requis" : "Last name required";
   }
-  if (!isPhoneValid(draft.recipient.phoneE164)) {
+  if (!isPhoneValid(draft.recipient.phoneE164, draft.recipient.phonePrefix)) {
     errors.recipientPhoneE164 = isFr ? "Téléphone invalide" : "Invalid phone number";
   }
   if (!isEmailValidOrEmpty(draft.recipient.email)) {

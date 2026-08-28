@@ -9,7 +9,7 @@
  * a one-line change in each function rather than a refactor of the UI.
  */
 
-import { computeTotal } from "@/components/booking/booking.config";
+import { computeTotal, recipientPhoneE164 } from "@/components/booking/booking.config";
 import type {
   CreateDealResponse,
   Draft,
@@ -33,8 +33,9 @@ export async function createDeal(
   // D17/D34 — le devis calculé par @packages/pricing part avec la demande ;
   // le serveur (B2) recalcule avec le même moteur et refuse toute divergence.
   const quote = computeTotal(draft, trip).quote;
+  const recipientPhone = recipientPhoneE164(draft); // E.164 — ce que le serveur recevra
   // eslint-disable-next-line no-console
-  console.info("[booking.api.stub] createDeal", { draft, trip, quote });
+  console.info("[booking.api.stub] createDeal", { draft, trip, quote, recipientPhone });
   await wait(SIMULATED_LATENCY_MS);
 
   return {

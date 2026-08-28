@@ -9,6 +9,8 @@
 import { Lightbulb } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { FormField, FormInput, TipBlock } from "../BookingFormUi";
+import { PHONE_PREFIXES } from "../booking.config";
+import { useLocale } from "next-intl";
 import type { Draft, ValidationErrors } from "../booking.types";
 
 type Props = {
@@ -25,6 +27,7 @@ export default function StepRecipient({
                                         errors,
                                       }: Props) {
   const t = useTranslations("booking");
+  const locale = useLocale();
 
   const setRecipient = (patch: Partial<Draft["recipient"]>) =>
     setDraftAction((prev) => ({
@@ -51,6 +54,39 @@ export default function StepRecipient({
         items={deliveryFlow}
       />
 
+      {/* Téléphone D'ABORD : c'est le canal du code de livraison (indicatif pays + numéro) */}
+      <FormField
+        label={t("step2.form.phone")}
+        hint={t("step2.form.phoneHint")}
+        error={errors.recipientPhoneE164}
+      >
+        <div className="flex gap-2">
+          <select
+            value={draft.recipient.phonePrefix}
+            onChange={(e) => setRecipient({ phonePrefix: e.target.value })}
+            aria-label={t("step2.form.phonePrefix")}
+            className="h-11 w-[9.5rem] shrink-0 rounded-lg border border-slate-200 bg-white px-2 text-[13px] text-slate-900 focus:border-[#FF9900] focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+          >
+            {PHONE_PREFIXES.map((c) => (
+              <option key={c.code} value={c.prefix}>
+                {c.prefix} · {locale === "fr" ? c.labelFr : c.labelEn}
+              </option>
+            ))}
+          </select>
+          <div className="min-w-0 flex-1">
+            <FormInput
+              value={draft.recipient.phoneE164}
+              onChangeAction={(v) => setRecipient({ phoneE164: v })}
+              placeholder="6 42 18 81 12"
+              type="tel"
+              inputMode="tel"
+              hasError={Boolean(errors.recipientPhoneE164)}
+              autoComplete="tel-national"
+            />
+          </div>
+        </div>
+      </FormField>
+
       {/* First + Last name */}
       <div className="grid grid-cols-2 gap-3.5">
         <FormField label={t("step2.form.firstName")} error={errors.recipientFirstName}>
@@ -73,24 +109,6 @@ export default function StepRecipient({
         </FormField>
       </div>
 
-      {/* Phone */}
-      <FormField
-        label={t("step2.form.phone")}
-        hint={t("step2.form.phoneHint")}
-        error={errors.recipientPhoneE164}
-      >
-        <FormInput
-          value={draft.recipient.phoneE164}
-          onChangeAction={(v) => setRecipient({ phoneE164: v })}
-          placeholder="+242 06 421 88 12"
-          type="tel"
-          inputMode="tel"
-          hasError={Boolean(errors.recipientPhoneE164)}
-          autoComplete="tel"
-        />
-      </FormField>
-
-      {/* Email (optional) */}
       <FormField
         label={`${t("step2.form.email")} ${t("step2.form.emailOptional")}`}
         hint={t("step2.form.emailHint")}

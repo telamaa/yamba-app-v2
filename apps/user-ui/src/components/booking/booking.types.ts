@@ -134,6 +134,9 @@ export type TripContext = {
 export type RecipientInfo = {
   firstName: string;
   lastName: string;
+  /** indicatif pays (E.164), ex. "+33" — défaut France, pays de lancement */
+  phonePrefix: string;
+  /** numéro national tel que saisi ("06 42 18 81 2") — normalisé en E.164 à la validation/soumission */
   phoneE164: string;
   email: string;
 };
