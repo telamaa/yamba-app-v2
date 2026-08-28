@@ -8,13 +8,17 @@
  *  - from/to labels + PlaceInfo → origin* / destination* (avec codes ISO)
  *  - priceAmount (€) → priceAmountCents
  *  - Date + time string → ISO departureAt
- *  - categoryConditions Record → Array
+ *  - categoryConditions Record → Array (legacy PER_CATEGORY)
+ *  - pricePerKg / bagages (€) → *Cents ; familyConditions Record → Array
+ *    (seules les familles ≠ ACCEPT voyagent : null/vide = tout accepté)
  *  - pickupLocations / deliveryLocations : filtre enabled, strip id, normalise
  */
 
 import type {
   Draft,
   CategoryCondition,
+  FamilyConditionMode,
+  ParcelFamily,
   TripLocationPoint,
 } from "./create-trip.types";
 
@@ -63,6 +67,32 @@ function toDateTimeIso(date?: Date, time?: string): string | null {
     d.setHours(h ?? 0, m ?? 0, 0, 0);
   }
   return d.toISOString();
+}
+
+// ─── Pricing PER_KG (D13/D14) ────────────────
+
+function toCentsOrNull(value: number | ""): number | null {
+  if (typeof value !== "number" || value <= 0) return null;
+  return Math.round(value * 100);
+}
+
+export type ApiFamilyCondition = {
+  familyKey: ParcelFamily;
+  mode: FamilyConditionMode;
+  surchargePct?: number;
+};
+
+export function mapFamilyConditionsForApi(
+  conditions: Draft["familyConditions"]
+): ApiFamilyCondition[] {
+  return (Object.keys(conditions) as ParcelFamily[])
+    .filter((key) => conditions[key].mode !== "ACCEPT")
+    .map((key) => {
+      const c = conditions[key];
+      return c.mode === "SURCHARGE"
+        ? { familyKey: key, mode: c.mode, surchargePct: c.surchargePct }
+        : { familyKey: key, mode: c.mode };
+    });
 }
 
 // ─── Location mapping ────────────────────────
@@ -144,12 +174,19 @@ export type CreateTripPayload = {
   trainStopCities: string[];
   travelReference: string | null;
 
-  // Conditions
+  // Conditions (legacy PER_CATEGORY — vide pour un trajet PER_KG neuf)
   acceptedCategories: string[];
   categoryConditions: Array<{
     category: string;
     priceAmountCents: number;
   }>;
+
+  // ⭐ Moteur PER_KG (D13/D14/D19) — cents Int, jamais de float monétaire
+  pricePerKgCents: number | null;
+  capacityKg: number | null;
+  checkedBag23PriceCents: number | null;
+  cabinBag12PriceCents: number | null;
+  familyConditions: ApiFamilyCondition[];
 
   // ⭐ Lieux de remise / livraison
   pickupLocations: ApiLocationPoint[];
@@ -241,6 +278,16 @@ export function mapDraftToPayload(
         category: mapCategory(c.categoryKey),
         priceAmountCents: Math.round(resolvePrice(c) * 100),
       })),
+
+    // ── Moteur PER_KG ──
+    pricePerKgCents: toCentsOrNull(draft.pricePerKg),
+    capacityKg:
+      typeof draft.capacityKg === "number" && draft.capacityKg > 0
+        ? draft.capacityKg
+        : null,
+    checkedBag23PriceCents: toCentsOrNull(draft.checkedBag23Price),
+    cabinBag12PriceCents: toCentsOrNull(draft.cabinBag12Price),
+    familyConditions: mapFamilyConditionsForApi(draft.familyConditions),
 
     // ── Lieux de remise / livraison ──
     pickupLocations: mapLocationsForApi(draft.pickupLocations),
