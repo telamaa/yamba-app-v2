@@ -78,11 +78,11 @@ Ordre de demarrage : auth -> trip -> gateway.
   hypotheses dans lib/pricing-corridors.ts), D32 annoncee a l'ecran.
 - Chores : #78 next-intl/Nx, #79 context/ versionne + CLAUDE.md, #80
   ThemeProvider root, #81 build prod repare (Suspense).
-- Plateforme de tests : 426 (trip 187, deal 218, notification 21) — post-#83.
+- Plateforme de tests : 433 (trip 187, deal 225, notification 21) — post-#85.
 
 ## Ce qui RESTE — Jalon 1
 
-- PR-C (EN PR, feat/pricing-front-3) : FAIT cote front — D34
+- PR-C (#85) : FAIT cote front — D34
   @packages/pricing (moteur unique, 7 specs), wizard sur le vrai trajet,
   etape 1 PER_KG (produit/famille/poids/S-M-L), recap COM-03, Garantie
   Yamba (GAR-02). RESTE pour B2 : POST /deals + snapshot D17 via le meme

@@ -1,6 +1,6 @@
 # Fiche technique — PR-C « le wizard de réservation parle le moteur au kilo »
 
-> Branche `feat/pricing-front-3` · base `dev` (post-#84) · PR #__ (noté au merge)
+> Branche `feat/pricing-front-3` · base `dev` (post-#84) · **PR #85** (mergée dans `dev`)
 > Public : développeur junior.
 
 ## 0. Le contexte
