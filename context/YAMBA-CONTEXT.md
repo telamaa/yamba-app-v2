@@ -48,8 +48,9 @@ Ordre de demarrage : auth -> trip -> gateway.
 
 ## Ce qui est FAIT (aout 2026)
 
-- CI GitHub Actions : 12 required checks sur dev (TypeScript x6, Tests
-  unitaires x3, i18n, Anti-fuite, Contrats OpenAPI).
+- CI GitHub Actions : 13 required checks sur dev (TypeScript x6, Tests
+  unitaires x3, i18n, Anti-fuite, Contrats OpenAPI, build). A AJOUTER :
+  `next build` user-ui (le build prod a casse sans que la CI le voie, #81).
 - Session auth (D27) : inactivite serveur + duree absolue (solde au jalon 2).
 - Chantier 0 OpenAPI : @packages/api-contracts (Zod), OAS trip-service
   99 paths x3, job CI de diff. (Conversion auth-service : au backlog.)
@@ -61,17 +62,39 @@ Ordre de demarrage : auth -> trip -> gateway.
   capacityKg, checkedBag23PriceCents, cabinBag12PriceCents,
   familyConditions), contrats etendus, gate A28 bi-moteur (8 specs, branche
   sur publishTrip + updateTrip), seed trip bzv-perkg (matiere de QA).
-- Plateforme de tests : 396 (trip 157, deal 218, notification 21).
+- Refonte pricing PR-B (#82) : StepConditions « depot en 90 s » (prix +
+  capacite pre-remplis par la suggestion D15, familles Accepte/Refuse +
+  supplement, bagages suspendus si capacite insuffisante RG-B-29,
+  accordeons, popovers), autocompletion villes/aeroports « Ville, Pays »,
+  page trajet proprietaire (Modifier), prix au kilo affiche en recherche
+  et detail ; serveur : POST /trips ecrivait 0 champ PER_KG (corrige, gate
+  A28 sur les 3 chemins), checkBagCapacity, updates par paquets (limite
+  Atlas 50 etapes). D31 et D32 (plancher 0,5 kg / 8 EUR) au registre.
+- Recherche + page trajet PER_KG (#83) : D33 comparablePriceCents (colis
+  de reference 2 kg, backfill), filtre par FAMILLE (le filtre categorie ne
+  cache plus les PER_KG), poids du colis (prix par carte, tri, capacite),
+  OfferCard sur la page trajet, CO2 pour le poids, annulation alignee
+  ANN-01, suggestion de prix PAR CORRIDOR (15 zones + domestique, valeurs =
+  hypotheses dans lib/pricing-corridors.ts), D32 annoncee a l'ecran.
+- Chores : #78 next-intl/Nx, #79 context/ versionne + CLAUDE.md, #80
+  ThemeProvider root, #81 build prod repare (Suspense).
+- Plateforme de tests : 426 (trip 187, deal 218, notification 21) — post-#83.
 
 ## Ce qui RESTE — Jalon 1
 
-- PR-B (EN COURS, feat/pricing-front-2) : refonte StepConditions
-  (create-trip) selon le mockup — 4 sections : suggestion + jauge prix juste
-  (D15 V1 deterministe) · euro/kg + capacite (curseurs) · 8 familles
-  OK/surcharge/refus · bagages forfaitaires — + TripLiveSummary (gain net),
-  mappers state->payload (5 champs PER_KG), i18n FR/EN, libelle S enrichi.
-- PR-C : wizard Expediteur (recalcul prix au contrat, classes S/M/L,
-  protection) + migration enums deprecies (maxSlots/bookedSlots).
+- PR-C (PROCHAINE) : wizard Expediteur sur le moteur PER_KG — poids
+  (pre-rempli depuis la recherche), taille S/M/L « sans mesurer » (libelle S
+  enrichi), famille filtree par les positions du Voyageur, total 2 lignes
+  (transport + service) avec plancher D32 explicite, ancre express,
+  protection D22, snapshot de prix immuable deal-service (D17) ; migration
+  enums deprecies (maxSlots/bookedSlots).
+- PR « parametres serveur » : GET /pricing/params (commission, plancher,
+  poids de reference, table corridors) — aujourd'hui dupliques en
+  constantes front/serveur (pricing-example, comparable-price,
+  price-for-weight, pricing-corridors).
+- UX restantes : step 1 (aeroport -> ville de rattachement + lieu de
+  pickup, arrivee repliee, justificatif en step 3), lieux en chips + apercu
+  sticky (create-trip), cleanup legacy PER_CATEGORY + instantBooking.
 - Micro-PR D31 : gate Stripe/profil deplace de la publication vers
   l'acceptation + carrierPage/Stripe factices au seed.
 - B2 argent entrant : creation deal depuis le wizard, PaymentIntent

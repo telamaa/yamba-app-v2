@@ -1,6 +1,6 @@
 # Fiche technique — chore « versionner `context/` et enrichir `CLAUDE.md` »
 
-> Branche `chore/docs-context` · base `dev` · documentation uniquement · PR #__ (noté au merge)
+> Branche `chore/docs-context` · base `dev` · documentation uniquement · **PR #79** (mergée dans `dev`)
 
 ## 1. Ce que la PR ajoute
 
