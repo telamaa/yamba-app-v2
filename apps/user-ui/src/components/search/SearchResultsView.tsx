@@ -563,7 +563,10 @@ export default function SearchResultsView() {
                   <SearchFiltersSidebar {...sidebarProps} />
                 </aside>
 
-                <div className="space-y-3">
+                {/* Pas de `space-y-3` ici : la liste mobile (md:hidden) est le 1er
+                    enfant et Tailwind ne l'exclut pas → marge fantôme de 12 px sur
+                    la liste desktop, qui désalignait la 1re carte avec « Trier par ». */}
+                <div>
                   {isError ? (
                     <ErrorState onRetry={() => tripsQuery.refetch()} />
                   ) : trips.length === 0 ? (
