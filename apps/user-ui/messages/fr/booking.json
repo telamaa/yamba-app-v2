@@ -27,7 +27,8 @@
       "weigh": "**Pèse précisément.** Le poids déclaré doit correspondre au poids réel à la remise.",
       "describe": "**Décris fidèlement.** {carrierFirstName} vérifiera le contenu avant d''accepter ton colis.",
       "prohibited": "**Aucun produit interdit.**",
-      "linkProhibited": "Voir la liste complète"
+      "linkProhibited": "Voir la liste complète",
+      "open": "Voir"
     },
     "parcelDetails": {
       "categoryLabel": "Catégorie",
@@ -76,8 +77,8 @@
       "description": "Tu es protégé contre la non-livraison. Le paiement est bloqué jusqu''à la remise au destinataire."
     },
     "extended": {
-      "title": "Garantie Yamba — jusqu'à 500 €",
-      "price": "+ 6 €",
+      "title": "Garantie Yamba 500 €",
+      "price": "+6 €",
       "description": "Perte, vol, casse pendant le transport. Exclusions affichées avant validation (dont saisie douanière d'un colis non conforme).",
       "ipidLink": "Voir les conditions"
     }
@@ -199,7 +200,15 @@
     "duration": "{hours}h de vol",
     "deals": "{count, plural, =1 {# deal} other {# deals}}",
     "transportDetail": "Transport · {kg} kg × {rate}/kg × {size}",
-    "minimumApplied": "Minimum par colis appliqué : {min}"
+    "minimumApplied": "Minimum par colis appliqué : {min}",
+    "newTripper": "Nouveau Tripper",
+    "quoteHint": {
+      "MISSING_WEIGHT": "Indique le poids du colis pour voir le prix.",
+      "MISSING_SIZE": "Choisis une taille (S, M ou L).",
+      "MISSING_PRICE_PER_KG": "Ce trajet n'a pas de prix au kilo.",
+      "BAG_NOT_OFFERED": "Ce bagage n'est pas proposé sur ce trajet.",
+      "UNKNOWN": "Prix indisponible."
+    }
   },
   "families": {
     "DOCUMENTS_PAPERS": "Documents & papiers",
@@ -218,5 +227,11 @@
     "radiusKm": "Rayon {km} km",
     "cityWide": "Ville entière",
     "exact": "Lieu exact"
+  },
+  "authGate": {
+    "title": "Connecte-toi pour réserver",
+    "subtitle": "Une réservation engage un Voyageur : Yamba a besoin de savoir qui envoie. Ton colis et ce trajet t'attendent après connexion.",
+    "login": "Se connecter",
+    "register": "Créer un compte"
   }
 }

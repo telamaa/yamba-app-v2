@@ -96,8 +96,9 @@ export default function BookingBottomSheet({
               <div className="mt-0.5 flex items-center gap-1 text-[10px] text-slate-400 dark:text-slate-500">
                 <Star size={10} fill="#BA7517" stroke="#BA7517" />
                 <span>
-                  {trip.carrier.rating.toFixed(1)} ·{" "}
-                  {t("summary.deals", { count: trip.carrier.dealCount })} ·{" "}
+                  {trip.carrier.dealCount > 0
+                    ? `${trip.carrier.rating.toFixed(1)} · ${t("summary.deals", { count: trip.carrier.dealCount })}`
+                    : t("summary.newTripper")} ·{" "}
                   {trip.originCity} → {trip.destinationCity}
                 </span>
               </div>
@@ -116,6 +117,11 @@ export default function BookingBottomSheet({
             amount={price.transport}
             locale={locale}
           />
+          {price.quote === null && price.quoteError && (
+            <div className="mb-1 rounded-md bg-[#FFF6E8] px-2.5 py-1.5 text-[11px] text-[#B45309] dark:bg-[#FF9900]/10 dark:text-[#FFB84D]">
+              {t(`summary.quoteHint.${price.quoteError}`)}
+            </div>
+          )}
           {price.quote?.minimumApplied && (
             <div className="-mt-0.5 mb-1 text-[11px] text-slate-500 dark:text-slate-400">
               {t("summary.minimumApplied", { min: formatPrice(price.quote.transportCents / 100, locale) })}

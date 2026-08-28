@@ -232,7 +232,14 @@ export default function StepParcel({
       </div>
 
       {/* Golden rules tip */}
-      <TipBlock
+      {/* Règles d'or : repliées — l'essentiel d'abord, le conseil à la demande */}
+      <details className="group mb-5 rounded-lg border border-slate-200 dark:border-slate-700">
+        <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3 text-[13px] font-medium text-slate-700 dark:text-slate-200">
+          <span className="flex items-center gap-2"><Lightbulb size={15} className="text-[#0F766E]" />{t("step1.goldenRules.title")}</span>
+          <span className="text-[11px] text-slate-400 group-open:hidden">{t("step1.goldenRules.open")}</span>
+        </summary>
+        <div className="px-4 pb-1">
+          <TipBlock
         icon={<Lightbulb size={16} />}
         title={t("step1.goldenRules.title")}
         items={goldenRules}
@@ -240,7 +247,9 @@ export default function StepParcel({
           label: t("step1.goldenRules.linkProhibited"),
           onClickAction: () => console.info("[booking] open prohibited items list"),
         }}
-      />
+          />
+        </div>
+      </details>
 
       {/* ── Moteur PER_KG : produit · famille · poids · taille (D13/D14, PRC-03/04) ── */}
       {perKg ? (
@@ -439,7 +448,7 @@ export default function StepParcel({
       >
         <PhotoGrid
           photos={draft.photos}
-          maxSlots={MAX_PHOTOS}
+          maxSlots={Math.min(draft.photos.length + 1, MAX_PHOTOS)}
           onAddAction={handleAddPhotos}
           onRemoveAction={handleRemovePhoto}
           addLabel={t("step1.photos.add")}

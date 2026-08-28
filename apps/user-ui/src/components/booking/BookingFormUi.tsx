@@ -37,9 +37,10 @@ export const MANGO = "#FF9900";
 export const MANGO_HOVER = "#E68A00";
 export const TEAL = "#0F766E";
 export const TEAL_DONE = "#0F6E56";
-export const TIP_BG = "#E6F1FB";
-export const TIP_TEXT = "#185FA5";
-export const TIP_TITLE = "#0C447C";
+// Charte §3.4 : teal/slate — plus de bleu « info » hors palette
+export const TIP_BG = "rgba(15,118,110,0.07)";
+export const TIP_TEXT = "#334155";
+export const TIP_TITLE = "#0F766E";
 export const CHARTER_BG = "#FAEEDA";
 export const CHARTER_BORDER = "#FAC775";
 export const CHARTER_ICON_BG = "#BA7517";
@@ -488,10 +489,10 @@ export function InsuranceOption({
           </span>
           <span
             className={[
-              "text-[13px] font-medium",
+              "shrink-0 whitespace-nowrap text-[13px] font-semibold",
               priceVariant === "free"
                 ? "text-slate-500 dark:text-slate-400"
-                : "text-emerald-700 dark:text-emerald-400",
+                : "text-[#0F766E] dark:text-teal-400",
             ].join(" ")}
           >
             {price}
