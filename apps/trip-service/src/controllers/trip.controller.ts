@@ -28,6 +28,7 @@ import {
   checkBagCapacity,
   pickPerKgFields,
 } from "../services/pricing-gate";
+import { chunkUpdateData } from "../lib/mongo-update-chunks";
 
 // ─────────────────────────────────────────────
 // Helper interne : recalcule les champs dénormalisés
@@ -395,11 +396,18 @@ export const updateTrip = async (
       await applyCarrierStatDeltas(userId, trip.status, "PUBLISHED");
     }
 
-    const updated = await prisma.trip.update({
-      where: { id },
-      data: updateData,
-      include: { documents: true },
-    });
+    // ⭐ Atlas (tiers partagés) : « Pipeline length greater than 50 » — Prisma
+    // émet une étape $set par champ quand des types composites sont présents.
+    // On écrit par paquets ; la transition d'état part dans le dernier.
+    const chunks = chunkUpdateData(updateData);
+    let updated = trip as typeof trip & { documents: unknown[] };
+    for (let i = 0; i < chunks.length; i++) {
+      updated = (await prisma.trip.update({
+        where: { id },
+        data: chunks[i],
+        include: { documents: true },
+      })) as typeof updated;
+    }
 
     if (publish === true && trip.status === "DRAFT") {
       triggerTripPublishedNotifications(updated);

@@ -106,6 +106,7 @@ JWT `access_token` + `refresh_token` set as cookies by auth-service. Frontend `a
 
 - Prisma+Mongo: `readAt: null` in a `where` misses absent fields → `OR: [{readAt: null}, {readAt: {isSet: false}}]`.
 - Nullable unique fields on Mongo collide on null (P2002).
+- Atlas shared tiers cap aggregation pipelines at 50 stages; Prisma emits one `$set` stage per field on updates touching composite types → `P2010 Pipeline length greater than 50`. Chunk wide updates with `apps/trip-service/src/lib/mongo-update-chunks.ts` (transition fields last).
 - macOS FS is case-insensitive, CI Linux is not → exact-case imports.
 - `overflow-x: clip` (not `hidden`) to preserve `position: sticky`.
 - Seeds live in `packages/libs/prisma/scripts/`, relative imports, run via `npx tsx`.
