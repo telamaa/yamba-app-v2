@@ -1,5 +1,9 @@
 import type { Draft } from "./create-trip.types";
-import { getSmartDefaultDepartureDate, getSmartDefaultTime } from "./create-trip.config";
+import {
+  createDefaultFamilyConditions,
+  getSmartDefaultDepartureDate,
+  getSmartDefaultTime,
+} from "./create-trip.config";
 
 export const initialDraft: Draft = {
   transportMode: null,
@@ -29,6 +33,13 @@ export const initialDraft: Draft = {
 
   globalPrice: "",
   useGlobalPrice: true,
+
+  // ⭐ Moteur PER_KG — vide tant que le Voyageur n'a pas fixé son prix
+  pricePerKg: "",
+  capacityKg: "",
+  checkedBag23Price: "",
+  cabinBag12Price: "",
+  familyConditions: createDefaultFamilyConditions(),
 
   // Populated by getDefaultLocationsForMode() when transportMode is selected.
   pickupLocations: [],

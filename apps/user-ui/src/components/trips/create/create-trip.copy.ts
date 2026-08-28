@@ -71,6 +71,55 @@ export function getCreateTripCopy(isFr: boolean): CreateTripCopy {
     docVerified: isFr ? "Vérifié" : "Verified",
     docCount: isFr ? "fichier(s)" : "file(s)",
 
+    // ── Pricing PER_KG (D13/D14/D15/D19) ──
+    pricePerKg: isFr ? "Ton prix au kilo" : "Your price per kg",
+    pricePerKgSub: isFr
+      ? "Un seul nombre à fixer — la famille du colis ne change pas le prix"
+      : "One number to set — the parcel family never changes the price",
+    capacity: isFr ? "Ta capacité" : "Your capacity",
+    capacitySub: isFr
+      ? "Kilos que tu peux transporter — réservés dès qu'une demande arrive"
+      : "Kilos you can carry — reserved as soon as a request comes in",
+    capacityTolerance: isFr
+      ? "Au pickup, un écart de poids ≤ 10 % est toléré. Au-delà : renégociation ou refus sans pénalité."
+      : "At pickup, a weight gap ≤ 10% is tolerated. Beyond: renegotiation or refusal without penalty.",
+    fairPriceOk: isFr ? "✓ Prix juste" : "✓ Fair price",
+    fairPriceLow: isFr ? "↓ Sous le marché — tu laisses de l'argent" : "↓ Below market — you're leaving money",
+    fairPriceHigh: isFr ? "↑ Au-dessus — moins de demandes probables" : "↑ Above — fewer requests likely",
+    priceAnchor: (median: string, low: string, high: string) =>
+      isFr
+        ? `Les trajets similaires partent à ${median} €/kg en médiane (fourchette ${low}–${high}).`
+        : `Similar trips go for ${median} €/kg on median (range ${low}–${high}).`,
+    gaugeLow: isFr ? "basse" : "low",
+    gaugeMedian: isFr ? "médiane" : "median",
+    gaugeHigh: isFr ? "haute" : "high",
+    families: isFr ? "Familles de colis" : "Parcel families",
+    familiesSub: isFr
+      ? "Accepter, surcharger (risque) ou refuser — jamais un prix par famille"
+      : "Accept, surcharge (risk) or refuse — never a price per family",
+    familyAccept: "OK",
+    familySurcharge: "+%",
+    familyRefuse: isFr ? "Non" : "No",
+    bags: isFr ? "Bagages entiers — forfait" : "Whole bags — flat rate",
+    bagsSub: isFr
+      ? "Optionnel : tu loues ta franchise complète, hors logique €/kg"
+      : "Optional: rent your full allowance, outside the €/kg logic",
+    checkedBag23: isFr ? "Bagage soute 23 kg" : "Checked bag 23 kg",
+    cabinBag12: isFr ? "Bagage cabine 12 kg" : "Cabin bag 12 kg",
+    bagConsumes: (kg: number) =>
+      isFr ? `consomme ${kg} kg de ta capacité` : `uses ${kg} kg of your capacity`,
+    netGain: isFr ? "Tu gagnes" : "You earn",
+    netGainIfFull: (kg: number) =>
+      isFr ? `Si tes ${kg} kg sont réservés` : `If your ${kg} kg get booked`,
+    netGainSub: isFr
+      ? "Versé à J+4 après livraison confirmée · la commission est côté Expéditeur, ton prix = ton net"
+      : "Paid at D+4 after confirmed delivery · commission is on the sender's side, your price = your net",
+    reviewPricing: isFr ? "Prix & capacité" : "Price & capacity",
+    perKgUnit: "€/kg",
+    kgUnit: "kg",
+    availableKg: (kg: number) => (isFr ? `${kg} kg dispo` : `${kg} kg available`),
+    refusedFamilies: isFr ? "Refusé" : "Refused",
+
     categories: isFr ? "Catégories acceptées" : "Accepted categories",
     globalPrice: isFr ? "Prix par défaut" : "Default price",
     globalPriceSub: isFr
