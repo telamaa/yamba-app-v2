@@ -252,6 +252,12 @@ Correctif : helper pur `pickPerKgFields(data)` dans `pricing-gate.ts` (typé pou
 
 Réparation du trajet de test : le rouvrir (« Modifier ») et enregistrer — `updateTrip` copie tous les champs.
 
+## 7quater. Régression n° 2 en QA : `PUT /trips/:id` → 500 « Pipeline length greater than 50 »
+
+Symptôme : impossible d'enregistrer une modification (500 gateway ; trip-service : `P2010 … AtlasError: Pipeline length greater than 50 not supported`). Cause : MongoDB Atlas en **tier partagé** (M0/M2/M5) limite un pipeline d'agrégation à 50 étapes ; **Prisma + Mongo traduit un `update` contenant des types composites** (listes embarquées `pickupLocations`, `familyConditions`…) **en une étape `$set` par champ**. Le PUT du wizard envoie ~60 champs — les 5 champs PER_KG ont fait franchir la limite.
+
+Correctif : `apps/trip-service/src/lib/mongo-update-chunks.ts` — `chunkUpdateData(data, 40)` (pur, **+4 specs**) découpe l'écriture en paquets ≤ 40 champs appliqués séquentiellement ; les champs de **transition** (`status`, `publishedAt`, `currentStep`, `carrierRatingSnapshot`) vont **toujours dans le dernier paquet** : un trajet ne devient PUBLISHED qu'une fois toutes ses données écrites. Non atomique entre paquets (assumé : pas de transaction multi-documents nécessaire pour un seul document ; le pire cas est un brouillon partiellement mis à jour, jamais un publié incomplet). Ajouté aux pièges connus de `CLAUDE.md`.
+
 ## 7bis. Recherche et page détail : afficher le prix au kilo (retour QA)
 
 Symptôme : un trajet PER_KG fraîchement créé affichait **« 0 € »** dans les résultats de recherche et sur sa page détail. Cause : ces écrans lisent `minPriceCents` (dénormalisé depuis les prix par catégorie), qui est `null` pour un trajet au kilo → `0`.
@@ -281,7 +287,7 @@ Ce fix a sa propre PR (`chore/next-intl-config-path`). Il est cherry-pické ici 
 npx tsc --noEmit --project apps/user-ui/tsconfig.json
 # typecheck + tests trip-service
 npx tsc --noEmit --project apps/trip-service/tsconfig.app.json
-npx nx test trip-service            # attendu : 170 (157 avant + 5 catégories/PER_KG + 4 bagage + 2 schéma bagage + 2 pickPerKgFields)
+npx nx test trip-service            # attendu : 174 (157 avant + 5 catégories/PER_KG + 4 bagage + 2 schéma bagage + 2 pickPerKgFields + 4 chunks Atlas)
 # lancer et ouvrir
 npm run dev  →  http://localhost:3000/fr/trips/create  (compte Voyageur)
 ```
