@@ -11,6 +11,8 @@ import type {
   TripLocationPoint,
 } from "./create-trip.types";
 import { getCategoryOptions } from "./create-trip.copy";
+import { PARCEL_FAMILIES } from "./create-trip.config";
+import { formatEur } from "./TripPricingUi";
 
 const MANGO = "#FF9900";
 const TEAL = "#0F766E";
@@ -239,8 +241,47 @@ export default function TripPublicPreview({
           </div>
         </div>
 
-        {/* Row 2: category pills with prices */}
-        {draft.acceptedCategories.length > 0 && (
+        {/* Row 2 (PER_KG) : prix au kilo + capacité + familles refusées */}
+        {typeof draft.pricePerKg === "number" && draft.pricePerKg > 0 && (
+          <div className="mt-3 flex flex-wrap items-center gap-1.5">
+            <span
+              className="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-bold"
+              style={{ backgroundColor: "rgba(255,153,0,0.12)", color: MANGO }}
+            >
+              {formatEur(draft.pricePerKg)} €/kg
+            </span>
+            {typeof draft.capacityKg === "number" && draft.capacityKg > 0 && (
+              <span
+                className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium"
+                style={{ backgroundColor: "rgba(15,118,110,0.1)", color: TEAL }}
+              >
+                {copy.availableKg(draft.capacityKg)}
+              </span>
+            )}
+            {PARCEL_FAMILIES.filter((f) => draft.familyConditions[f.key].mode !== "ACCEPT").map((f) => {
+              const c = draft.familyConditions[f.key];
+              const refused = c.mode === "REFUSE";
+              return (
+                <span
+                  key={f.key}
+                  className={[
+                    "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium",
+                    refused
+                      ? "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
+                      : "text-slate-900 dark:text-[#FFB84D]",
+                  ].join(" ")}
+                  style={refused ? undefined : { backgroundColor: "rgba(255,153,0,0.12)" }}
+                >
+                  {isFr ? f.labelFr : f.labelEn}
+                  {refused ? ` · ${copy.refused.toLowerCase()}` : ` · ${copy.surchargeShort(c.surchargePct)}`}
+                </span>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Row 2 (legacy PER_CATEGORY) : category pills with prices */}
+        {draft.acceptedCategories.length > 0 && !(typeof draft.pricePerKg === "number" && draft.pricePerKg > 0) && (
           <div className="mt-3 flex flex-wrap gap-1.5">
             {draft.acceptedCategories.map((catKey) => {
               const opt = categoryOptions.find((o) => o.key === catKey);

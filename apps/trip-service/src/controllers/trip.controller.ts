@@ -25,7 +25,10 @@ import { hasActiveBookings } from "../services/booking-queries";
 import {
   resolvePricingEngine,
   PRICING_GATE_MESSAGE,
+  checkBagCapacity,
+  pickPerKgFields,
 } from "../services/pricing-gate";
+import { chunkUpdateData } from "../lib/mongo-update-chunks";
 
 // ─────────────────────────────────────────────
 // Helper interne : recalcule les champs dénormalisés
@@ -144,6 +147,23 @@ export const createTrip = async (
       if (!carrierPage.stripeOnboardingComplete || !carrierPage.stripeChargesEnabled) {
         return next(new ValidationError("Stripe must be configured to publish a trip."));
       }
+
+      // ⭐ A28 — UN moteur de pricing COMPLET est exigé pour publier, sur ce
+      // chemin aussi (POST /trips + publish: true) — même vérité que
+      // publishTrip et updateTrip.
+      if (
+        resolvePricingEngine({
+          pricePerKgCents: data.pricePerKgCents,
+          capacityKg: data.capacityKg,
+          categoryConditions: data.categoryConditions as unknown[] | undefined,
+        }) === null
+      ) {
+        return next(new ValidationError(PRICING_GATE_MESSAGE));
+      }
+      const bagIssue = checkBagCapacity(data);
+      if (bagIssue) {
+        return next(new ValidationError(bagIssue));
+      }
     }
 
     const { minPriceCents, departureHourLocal } = computeDenormalizedFields({
@@ -210,9 +230,13 @@ export const createTrip = async (
         trainStopCities: data.trainStopCities ?? [],
         travelReference: data.travelReference ?? null,
 
-        // ── Conditions ──
+        // ── Conditions (legacy PER_CATEGORY) ──
         acceptedCategories: data.acceptedCategories ?? [],
         categoryConditions: data.categoryConditions ?? [],
+
+        // ⭐ Moteur PER_KG (D13/D14/D19) — helper pur, testé : ces champs
+        // avaient été oubliés ici en PR-B (trip publié à 0 €)
+        ...pickPerKgFields(data),
 
         // ⭐ Lieux de remise / livraison
         pickupLocations: data.pickupLocations ?? [],
@@ -354,6 +378,14 @@ export const updateTrip = async (
       ) {
         return next(new ValidationError(PRICING_GATE_MESSAGE));
       }
+      const bagIssue = checkBagCapacity({
+        capacityKg: updateData.capacityKg ?? trip.capacityKg,
+        checkedBag23PriceCents: updateData.checkedBag23PriceCents ?? trip.checkedBag23PriceCents,
+        cabinBag12PriceCents: updateData.cabinBag12PriceCents ?? trip.cabinBag12PriceCents,
+      });
+      if (bagIssue) {
+        return next(new ValidationError(bagIssue));
+      }
 
       updateData.status = "PUBLISHED";
       updateData.publishedAt = new Date();
@@ -364,11 +396,18 @@ export const updateTrip = async (
       await applyCarrierStatDeltas(userId, trip.status, "PUBLISHED");
     }
 
-    const updated = await prisma.trip.update({
-      where: { id },
-      data: updateData,
-      include: { documents: true },
-    });
+    // ⭐ Atlas (tiers partagés) : « Pipeline length greater than 50 » — Prisma
+    // émet une étape $set par champ quand des types composites sont présents.
+    // On écrit par paquets ; la transition d'état part dans le dernier.
+    const chunks = chunkUpdateData(updateData);
+    let updated = trip as typeof trip & { documents: unknown[] };
+    for (let i = 0; i < chunks.length; i++) {
+      updated = (await prisma.trip.update({
+        where: { id },
+        data: chunks[i],
+        include: { documents: true },
+      })) as typeof updated;
+    }
 
     if (publish === true && trip.status === "DRAFT") {
       triggerTripPublishedNotifications(updated);
@@ -874,19 +913,25 @@ export const publishTrip = async (
     if (!trip.departureAt) {
       return next(new ValidationError("Departure date is required to publish."));
     }
-    if (!trip.acceptedCategories || trip.acceptedCategories.length === 0) {
-      return next(new ValidationError("At least one parcel category must be accepted."));
-    }
-
     // ⭐ A28 — UN moteur de pricing COMPLET est exige pour publier.
-    if (
-      resolvePricingEngine({
-        pricePerKgCents: trip.pricePerKgCents,
-        capacityKg: trip.capacityKg,
-        categoryConditions: trip.categoryConditions as unknown[],
-      }) === null
-    ) {
+    const pricingEngine = resolvePricingEngine({
+      pricePerKgCents: trip.pricePerKgCents,
+      capacityKg: trip.capacityKg,
+      categoryConditions: trip.categoryConditions as unknown[],
+    });
+    if (pricingEngine === null) {
       return next(new ValidationError(PRICING_GATE_MESSAGE));
+    }
+    const bagIssue = checkBagCapacity(trip);
+    if (bagIssue) {
+      return next(new ValidationError(bagIssue));
+    }
+    // Les categories n'existent que pour le moteur legacy (la famille D14 les remplace)
+    if (
+      pricingEngine === "PER_CATEGORY" &&
+      (!trip.acceptedCategories || trip.acceptedCategories.length === 0)
+    ) {
+      return next(new ValidationError("At least one parcel category must be accepted."));
     }
 
     // ⭐ Locations gate
@@ -1155,6 +1200,16 @@ export const getPublicTrip: RequestHandler = async (req, res, next) => {
           : null,
 
       minPriceCents: trip.minPriceCents,
+
+      // ⭐ Moteur PER_KG (D13/D14/D19) — contrat trip-public.schema.ts
+      pricePerKgCents: trip.pricePerKgCents,
+      capacityKg: trip.capacityKg,
+      reservedKg: trip.reservedKg,
+      remainingKg:
+        trip.capacityKg != null ? Math.max(0, trip.capacityKg - (trip.reservedKg ?? 0)) : null,
+      checkedBag23PriceCents: trip.checkedBag23PriceCents,
+      cabinBag12PriceCents: trip.cabinBag12PriceCents,
+      familyConditions: trip.familyConditions,
 
       ticketVerified: trip.ticketVerificationStatus === "VERIFIED",
 

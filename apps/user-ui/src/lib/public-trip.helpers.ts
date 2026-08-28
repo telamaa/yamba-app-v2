@@ -137,6 +137,11 @@ export function formatPriceShort(
  * Priorité au champ dénormalisé `minPriceCents` du DTO (calculé côté backend
  * au moment du publish). Fallback sur un calcul côté client si absent.
  */
+/** D13 — prix au kilo (cents) si le trip est PER_KG, sinon null. */
+export function getPricePerKgCents(trip: PublicTrip): number | null {
+  return trip.pricePerKgCents != null && trip.pricePerKgCents > 0 ? trip.pricePerKgCents : null;
+}
+
 export function getMinPriceCents(trip: PublicTrip): number | null {
   if (trip.minPriceCents != null && trip.minPriceCents > 0) {
     return trip.minPriceCents;

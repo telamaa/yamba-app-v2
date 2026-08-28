@@ -8,15 +8,20 @@
  *  - from/to labels + PlaceInfo → origin* / destination* (avec codes ISO)
  *  - priceAmount (€) → priceAmountCents
  *  - Date + time string → ISO departureAt
- *  - categoryConditions Record → Array
+ *  - categoryConditions Record → Array (legacy PER_CATEGORY)
+ *  - pricePerKg / bagages (€) → *Cents ; familyConditions Record → Array
+ *    (seules les familles ≠ ACCEPT voyagent : null/vide = tout accepté)
  *  - pickupLocations / deliveryLocations : filtre enabled, strip id, normalise
  */
 
 import type {
   Draft,
   CategoryCondition,
+  FamilyConditionMode,
+  ParcelFamily,
   TripLocationPoint,
 } from "./create-trip.types";
+import { CABIN_BAG_KG, CHECKED_BAG_KG, isBagActive } from "./create-trip.config";
 
 // ─── Enum conversion ─────────────────────────
 
@@ -63,6 +68,32 @@ function toDateTimeIso(date?: Date, time?: string): string | null {
     d.setHours(h ?? 0, m ?? 0, 0, 0);
   }
   return d.toISOString();
+}
+
+// ─── Pricing PER_KG (D13/D14) ────────────────
+
+function toCentsOrNull(value: number | ""): number | null {
+  if (typeof value !== "number" || value <= 0) return null;
+  return Math.round(value * 100);
+}
+
+export type ApiFamilyCondition = {
+  familyKey: ParcelFamily;
+  mode: FamilyConditionMode;
+  surchargePct?: number;
+};
+
+export function mapFamilyConditionsForApi(
+  conditions: Draft["familyConditions"]
+): ApiFamilyCondition[] {
+  return (Object.keys(conditions) as ParcelFamily[])
+    .filter((key) => conditions[key].mode !== "ACCEPT")
+    .map((key) => {
+      const c = conditions[key];
+      return c.mode === "SURCHARGE"
+        ? { familyKey: key, mode: c.mode, surchargePct: c.surchargePct }
+        : { familyKey: key, mode: c.mode };
+    });
 }
 
 // ─── Location mapping ────────────────────────
@@ -144,12 +175,19 @@ export type CreateTripPayload = {
   trainStopCities: string[];
   travelReference: string | null;
 
-  // Conditions
+  // Conditions (legacy PER_CATEGORY — vide pour un trajet PER_KG neuf)
   acceptedCategories: string[];
   categoryConditions: Array<{
     category: string;
     priceAmountCents: number;
   }>;
+
+  // ⭐ Moteur PER_KG (D13/D14/D19) — cents Int, jamais de float monétaire
+  pricePerKgCents: number | null;
+  capacityKg: number | null;
+  checkedBag23PriceCents: number | null;
+  cabinBag12PriceCents: number | null;
+  familyConditions: ApiFamilyCondition[];
 
   // ⭐ Lieux de remise / livraison
   pickupLocations: ApiLocationPoint[];
@@ -170,6 +208,9 @@ export function mapDraftToPayload(
   publish: boolean
 ): CreateTripPayload {
   const { fromPlace, toPlace } = draft;
+  const perKgComplete =
+    typeof draft.pricePerKg === "number" && draft.pricePerKg > 0 &&
+    typeof draft.capacityKg === "number" && draft.capacityKg > 0;
 
   const resolvePrice = (condition: CategoryCondition): number => {
     if (draft.useGlobalPrice && typeof draft.globalPrice === "number") {
@@ -233,14 +274,33 @@ export function mapDraftToPayload(
     trainStopCities: splitCities(draft.trainStopCities),
     travelReference: draft.travelReference?.trim() || null,
 
-    // ── Conditions (simplified: just category + price) ──
-    acceptedCategories: draft.acceptedCategories.map(mapCategory),
-    categoryConditions: Object.values(draft.categoryConditions)
-      .filter((c): c is CategoryCondition => !!c)
-      .map((c) => ({
-        category: mapCategory(c.categoryKey),
-        priceAmountCents: Math.round(resolvePrice(c) * 100),
-      })),
+    // ── Conditions legacy — vidées dès que l'offre PER_KG est complète
+    //    (A28 : PER_KG prime ; on n'envoie plus l'ancien moteur, l'annonce
+    //    publiée est pure PER_KG) ──
+    acceptedCategories: perKgComplete ? [] : draft.acceptedCategories.map(mapCategory),
+    categoryConditions: perKgComplete
+      ? []
+      : Object.values(draft.categoryConditions)
+          .filter((c): c is CategoryCondition => !!c)
+          .map((c) => ({
+            category: mapCategory(c.categoryKey),
+            priceAmountCents: Math.round(resolvePrice(c) * 100),
+          })),
+
+    // ── Moteur PER_KG ──
+    pricePerKgCents: toCentsOrNull(draft.pricePerKg),
+    capacityKg:
+      typeof draft.capacityKg === "number" && draft.capacityKg > 0
+        ? draft.capacityKg
+        : null,
+    // RG-B-29 : un forfait suspendu (capacité < franchise) ne part jamais
+    checkedBag23PriceCents: isBagActive(draft.checkedBag23Price, CHECKED_BAG_KG, draft.capacityKg)
+      ? toCentsOrNull(draft.checkedBag23Price)
+      : null,
+    cabinBag12PriceCents: isBagActive(draft.cabinBag12Price, CABIN_BAG_KG, draft.capacityKg)
+      ? toCentsOrNull(draft.cabinBag12Price)
+      : null,
+    familyConditions: mapFamilyConditionsForApi(draft.familyConditions),
 
     // ── Lieux de remise / livraison ──
     pickupLocations: mapLocationsForApi(draft.pickupLocations),

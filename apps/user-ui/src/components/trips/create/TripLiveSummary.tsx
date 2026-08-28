@@ -1,8 +1,10 @@
 "use client";
 
 import React from "react";
-import { Plane, Train, Car, MapPin, CalendarDays, Package } from "lucide-react";
+import { Plane, Train, Car, MapPin, CalendarDays, Package, Weight, Coins } from "lucide-react";
 import type { Draft } from "./create-trip.types";
+import { estimateNetGain } from "./create-trip.config";
+import { formatEur } from "./TripPricingUi";
 
 const MANGO = "#FF9900";
 
@@ -22,6 +24,9 @@ export default function TripLiveSummary({ draft }: { draft: Draft }) {
   const hasRoute = draft.from && draft.to;
   const hasDate = !!draft.departureDate;
   const catCount = draft.acceptedCategories.length;
+  const hasPricePerKg = typeof draft.pricePerKg === "number" && draft.pricePerKg > 0;
+  const hasCapacity = typeof draft.capacityKg === "number" && draft.capacityKg > 0;
+  const netGain = estimateNetGain(draft);
 
   /* ── Build items array ──
    * Each item is rendered with a separator only IF it's not the first.
@@ -78,7 +83,39 @@ export default function TripLiveSummary({ draft }: { draft: Draft }) {
     });
   }
 
-  if (catCount > 0) {
+  // ⭐ Moteur PER_KG (D13/D19) : prix · capacité · gain net (D16)
+  if (hasPricePerKg || hasCapacity) {
+    items.push({
+      key: "pricing",
+      node: (
+        <div className="flex items-center gap-1">
+          <Weight size={13} className="text-slate-400" />
+          <span className="text-[12px] text-slate-600 dark:text-slate-400">
+            {hasPricePerKg && `${formatEur(draft.pricePerKg as number)} €/kg`}
+            {hasPricePerKg && hasCapacity && " · "}
+            {hasCapacity && `${draft.capacityKg} kg`}
+          </span>
+        </div>
+      ),
+    });
+  }
+
+  if (netGain > 0) {
+    items.push({
+      key: "gain",
+      node: (
+        <div className="flex items-center gap-1">
+          <Coins size={13} style={{ color: "#0F766E" }} />
+          <span className="text-[12px] font-semibold text-[#0F766E] dark:text-teal-400">
+            {formatEur(netGain)} €
+          </span>
+        </div>
+      ),
+    });
+  }
+
+  // Legacy PER_CATEGORY (édition d'un trajet existant)
+  if (catCount > 0 && !hasPricePerKg) {
     items.push({
       key: "cats",
       node: (

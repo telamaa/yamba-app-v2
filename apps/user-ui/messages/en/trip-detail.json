@@ -10,7 +10,6 @@
   "memberSince": "Member since {date}",
   "close": "Close",
   "reportListing": "Report this listing",
-
   "flight": {
     "label": "Plane",
     "direct": "Direct flight",
@@ -25,13 +24,11 @@
   "car": {
     "label": "Car"
   },
-
   "badges": {
     "profileVerified": "Verified profile",
     "superTripper": "Super Tripper",
     "verifiedTicket": "Verified ticket"
   },
-
   "categories": {
     "title": "What {firstName} offers",
     "hint": "One booking = one parcel from a single category. To send multiple parcels, make a booking per parcel.",
@@ -50,19 +47,16 @@
     "CHECKED_BAG_23KG": "Checked bag 23 kg",
     "CABIN_BAG_12KG": "Cabin bag 12 kg"
   },
-
   "co2": {
     "label": "Shipment with no extra footprint ·",
     "saved": "{kg} kg of CO₂ saved",
     "versus": "vs express freight"
   },
-
   "reviews": {
     "title": "What people say about {firstName}",
     "empty": "{firstName} has received {count, plural, =1 {# review} other {# reviews}} on Yamba. Visit their profile to read them in detail.",
     "viewAll": "View all {count, plural, =1 {# review} other {# reviews}}"
   },
-
   "conditions": {
     "title": "Conditions",
     "cancellation": {
@@ -76,7 +70,6 @@
       "description": "Illicit substances, weapons, cash, live animals, hazardous or flammable materials, counterfeits."
     }
   },
-
   "booking": {
     "startingFrom": "Starting from",
     "priceHint": "Depending on category",
@@ -87,17 +80,25 @@
       "noCharge": "You won't be charged before accept request",
       "protection": "Yamba Protection available",
       "co2": "~{kg} kg of CO₂ saved"
-    }
+    },
+    "perKg": "Price per kg",
+    "perKgHint": "{kg} kg still available · the sender pays weight × price",
+    "perKgHintNoCap": "The sender pays weight × price per kg",
+    "example": "Example: a {kg} kg parcel ≈ {price} all inclusive"
   },
-
   "notFound": {
     "title": "Trip not found",
     "description": "This trip doesn''t exist or is no longer available.",
     "backToSearch": "Back to search"
   },
-
   "error": {
     "title": "Something went wrong",
     "description": "We couldn''t load this trip right now."
+  },
+  "owner": {
+    "title": "This is your trip",
+    "subtitle": "Senders see this page exactly like this.",
+    "edit": "Edit trip",
+    "dashboard": "Manage in my dashboard"
   }
 }

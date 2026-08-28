@@ -27,7 +27,34 @@ export type ParcelCategory =
   | "checkedBag23kg"
   | "cabinBag12kg";
 
+/* ── Moteur PER_KG (D13/D14, A28) ─────────────────────────────────────
+ * Miroir front de `@packages/api-contracts` trip-pricing.schema.ts :
+ * 8 familles de risque FIGÉES (CAT-02) + position du Voyageur par famille.
+ * La famille répond à « qu'est-ce que c'est ? » — plus jamais au prix.
+ * ──────────────────────────────────────────────────────────────────── */
+
+export type ParcelFamily =
+  | "DOCUMENTS_PAPERS"
+  | "CLOTHES_TEXTILE"
+  | "FOOD_DRY_SEALED"
+  | "ELECTRONICS_DEVICES"
+  | "COSMETICS_CARE"
+  | "PARTS_TOOLS"
+  | "TOYS_CHILDCARE"
+  | "MISC_ACCESSORIES";
+
+export type FamilyConditionMode = "ACCEPT" | "SURCHARGE" | "REFUSE";
+
+/** État UI d'une famille : le % est conservé même hors mode SURCHARGE
+ *  (mémoire du curseur) — seul le mapper décide de l'envoyer. */
+export type FamilyConditionDraft = {
+  mode: FamilyConditionMode;
+  surchargePct: number;
+};
+
 /**
+ * @deprecated moteur PER_CATEGORY (legacy) — conservé pour l'édition des
+ * trajets existants jusqu'à la PR cleanup post-refonte (A28).
  * Simplified: no more handoff/pickup moments at category level.
  * Logistics flexibility is now defined at trip level via TripLocationPoint.
  */
@@ -120,11 +147,21 @@ export type Draft = {
 
   tripDocuments: TripDocumentDraft[];
 
+  /** @deprecated legacy PER_CATEGORY — plus saisi par le formulaire, relu en édition */
   acceptedCategories: ParcelCategory[];
+  /** @deprecated legacy PER_CATEGORY */
   categoryConditions: Partial<Record<ParcelCategory, CategoryCondition>>;
-
+  /** @deprecated legacy PER_CATEGORY */
   globalPrice: number | "";
+  /** @deprecated legacy PER_CATEGORY */
   useGlobalPrice: boolean;
+
+  // ⭐ Moteur PER_KG (D13) — montants en EUROS côté Draft, cents dans le payload
+  pricePerKg: number | "";
+  capacityKg: number | "";
+  checkedBag23Price: number | "";
+  cabinBag12Price: number | "";
+  familyConditions: Record<ParcelFamily, FamilyConditionDraft>;
 
   // NEW — locations per context (Voyageur defines, Expéditeur adapts)
   pickupLocations: TripLocationPoint[];
@@ -207,6 +244,65 @@ export type CreateTripCopy = {
   docVerified: string;
   docCount: string;
 
+  // ── Pricing PER_KG (D13/D14/D15/D19) ──
+  pricePerKg: string;
+  pricePerKgSub: string;
+  capacity: string;
+  capacitySub: string;
+  capacityTolerance: string;
+  fairPriceOk: string;
+  fairPriceLow: string;
+  fairPriceHigh: string;
+  priceAnchor: (median: string, low: string, high: string) => string;
+  gaugeLow: string;
+  gaugeMedian: string;
+  gaugeHigh: string;
+  families: string;
+  familiesSub: string;
+  familyAccept: string;
+  familySurcharge: string;
+  familyRefuse: string;
+  bags: string;
+  bagsSub: string;
+  checkedBag23: string;
+  cabinBag12: string;
+  bagConsumes: (kg: number) => string;
+  netGain: string;
+  netGainIfFull: (kg: number) => string;
+  netGainSub: string;
+  yourOffer: string;
+  whyThisPrice: string;
+  factorBase: (v: string) => string;
+  factorDirectFlight: string;
+  factorDepartureSoon: string;
+  priceHint: string;
+  capacityHint: string;
+  familiesHint: string;
+  bagsHint: string;
+  familiesAllAccepted: string;
+  accepted: string;
+  refused: string;
+  addSurcharge: string;
+  surchargeLabel: string;
+  removeSurcharge: string;
+  adjust: string;
+  add: string;
+  bagsNone: string;
+  bagsSummary: (n: number) => string;
+  bagNeedsCapacity: (kg: number) => string;
+  bagEquivalent: (v: string) => string;
+  netGainTitle: (kg: number) => string;
+  netGainPaid: string;
+  optionsAndMessage: string;
+  responseWithin24h: string;
+  surchargeShort: (pct: number) => string;
+  reviewPricing: string;
+  perKgUnit: string;
+  kgUnit: string;
+  availableKg: (kg: number) => string;
+  refusedFamilies: string;
+
+  /** @deprecated legacy */
   categories: string;
   globalPrice: string;
   globalPriceSub: string;
@@ -242,6 +338,7 @@ export type CreateTripCopy = {
   reviewMode: string;
   reviewRoute: string;
   reviewSchedule: string;
+  /** @deprecated legacy */
   reviewCategoryConditions: string;
   reviewLocations: string;
   reviewDocuments: string;

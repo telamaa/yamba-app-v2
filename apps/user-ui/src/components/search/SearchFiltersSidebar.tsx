@@ -25,7 +25,6 @@ import {
   // Sunset, // ⚠️ Commenté
   Ticket,
   ToyBrick,
-  Zap,
   Package,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -273,13 +272,8 @@ export default function SearchFiltersSidebar({
       icon: <ShieldCheck size={18} className="text-[#FF9900]" />,
       count: profileVerifiedCount,
     },
-    {
-      checked: instantBookingOnly,
-      onChange: onInstantBookingChange,
-      label: t("badges.instantBooking"),
-      icon: <Zap size={18} className="text-[#FF9900]" />,
-      count: instantBookingCount,
-    },
+    // D20 v1 — « Réservation instantanée » n'existe plus : toute demande passe
+    // par l'accord du Voyageur. Props conservées (API du composant), entrée retirée.
     {
       checked: verifiedTicketOnly,
       onChange: onVerifiedTicketChange,

@@ -38,3 +38,67 @@ export function resolvePricingEngine(
   }
   return null;
 }
+
+/** PRC-04 / RG-B-29 — un bagage entier consomme sa franchise : le forfait
+ *  n'est proposable que si la capacité déclarée peut le contenir. */
+export const CHECKED_BAG_KG = 23;
+export const CABIN_BAG_KG = 12;
+
+export type BagCapacityInput = {
+  capacityKg?: number | null;
+  checkedBag23PriceCents?: number | null;
+  cabinBag12PriceCents?: number | null;
+};
+
+/** Renvoie le message d'erreur, ou null si cohérent. */
+export function checkBagCapacity(input: BagCapacityInput): string | null {
+  const capacity = typeof input.capacityKg === "number" ? input.capacityKg : 0;
+  if (input.checkedBag23PriceCents != null && capacity < CHECKED_BAG_KG) {
+    return `A ${CHECKED_BAG_KG}kg checked bag flat rate requires a capacity of at least ${CHECKED_BAG_KG}kg.`;
+  }
+  if (input.cabinBag12PriceCents != null && capacity < CABIN_BAG_KG) {
+    return `A ${CABIN_BAG_KG}kg cabin bag flat rate requires a capacity of at least ${CABIN_BAG_KG}kg.`;
+  }
+  return null;
+}
+
+/** Les 5 champs du moteur PER_KG, tels qu'ils doivent être ÉCRITS en base
+ *  (create ET update). Helper pur pour qu'aucun chemin d'écriture ne les
+ *  oublie (le create de PR-B les avait perdus : trip publié à 0 €). */
+export const PER_KG_FIELDS = [
+  "pricePerKgCents",
+  "capacityKg",
+  "checkedBag23PriceCents",
+  "cabinBag12PriceCents",
+  "familyConditions",
+] as const;
+
+export type FamilyConditionInput = {
+  familyKey: "DOCUMENTS_PAPERS" | "CLOTHES_TEXTILE" | "FOOD_DRY_SEALED" | "ELECTRONICS_DEVICES" | "COSMETICS_CARE" | "PARTS_TOOLS" | "TOYS_CHILDCARE" | "MISC_ACCESSORIES";
+  mode: "ACCEPT" | "SURCHARGE" | "REFUSE";
+  surchargePct?: number | null;
+};
+
+export type PerKgFields = {
+  pricePerKgCents: number | null;
+  capacityKg: number | null;
+  checkedBag23PriceCents: number | null;
+  cabinBag12PriceCents: number | null;
+  familyConditions: FamilyConditionInput[];
+};
+
+export function pickPerKgFields(data: {
+  pricePerKgCents?: number | null;
+  capacityKg?: number | null;
+  checkedBag23PriceCents?: number | null;
+  cabinBag12PriceCents?: number | null;
+  familyConditions?: FamilyConditionInput[] | null;
+}): PerKgFields {
+  return {
+    pricePerKgCents: data.pricePerKgCents ?? null,
+    capacityKg: data.capacityKg ?? null,
+    checkedBag23PriceCents: data.checkedBag23PriceCents ?? null,
+    cabinBag12PriceCents: data.cabinBag12PriceCents ?? null,
+    familyConditions: data.familyConditions ?? [],
+  };
+}

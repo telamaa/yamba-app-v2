@@ -1,8 +1,9 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { ArrowLeft, Flag } from "lucide-react";
+import { ArrowLeft, Flag, LayoutDashboard, Pencil } from "lucide-react";
 import { useRouter } from "@/i18n/navigation";
+import useUser from "@/hooks/useUser";
 import type { PublicTrip } from "@/lib/public-trip.types";
 import ItineraryCard from "./ItineraryCard";
 import CategoriesCard from "./CategoriesCard";
@@ -21,6 +22,9 @@ type Props = {
 export default function TripDetailView({ trip }: Props) {
   const t = useTranslations("tripDetail");
   const router = useRouter();
+  const { user } = useUser();
+  // Le créateur ne se réserve pas lui-même : il édite (même écran que le dashboard)
+  const isOwner = !!user && user.id === trip.tripper.id;
 
   const showReviews =
     !!trip.tripper.carrier && trip.tripper.carrier.ratingsCount > 0;
@@ -66,7 +70,7 @@ export default function TripDetailView({ trip }: Props) {
         {/* COLONNE DROITE — sticky desktop */}
         <aside className="hidden lg:block">
           <div className="sticky top-[88px]">
-            <BookingSummaryCard trip={trip} />
+            {isOwner ? <OwnerCard tripId={trip.id} /> : <BookingSummaryCard trip={trip} />}
 
             {/* Signaler cette annonce — desktop, sous la card sticky */}
             <div className="mt-5 flex justify-center">
@@ -95,7 +99,64 @@ export default function TripDetailView({ trip }: Props) {
         </button>
       </div>
 
-      <BookingMobileBar trip={trip} />
+      {isOwner ? (
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-950 lg:hidden">
+          <div className="mx-auto max-w-md">
+            <OwnerCard tripId={trip.id} compact />
+          </div>
+        </div>
+      ) : (
+        <BookingMobileBar trip={trip} />
+      )}
+    </div>
+  );
+}
+
+/* ── Carte propriétaire : remplace la carte de réservation pour le créateur ── */
+function OwnerCard({ tripId, compact }: { tripId: string; compact?: boolean }) {
+  const t = useTranslations("tripDetail");
+  const router = useRouter();
+  const edit = () => router.push(`/trips/create?edit=${tripId}`);
+  const dashboard = () => router.push("/dashboard/trips");
+
+  if (compact) {
+    return (
+      <div className="flex items-center gap-3">
+        <div className="min-w-0 flex-1 text-[13px] font-semibold text-slate-900 dark:text-white">
+          {t("owner.title")}
+        </div>
+        <button
+          type="button"
+          onClick={edit}
+          className="inline-flex min-h-[44px] items-center gap-1.5 rounded-full bg-[#FF9900] px-4 text-sm font-bold text-slate-950 transition-all active:scale-[0.99]"
+        >
+          <Pencil size={14} />
+          {t("owner.edit")}
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="overflow-hidden rounded-2xl border border-[#FF9900]/30 bg-white p-5 shadow-[0_4px_24px_-4px_rgba(0,0,0,0.06)] dark:border-[#FF9900]/25 dark:bg-slate-950">
+      <div className="text-[13px] font-semibold text-slate-900 dark:text-white">{t("owner.title")}</div>
+      <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">{t("owner.subtitle")}</p>
+      <button
+        type="button"
+        onClick={edit}
+        className="mt-4 inline-flex w-full min-h-[44px] items-center justify-center gap-2 rounded-full bg-[#FF9900] px-4 text-sm font-bold text-slate-950 transition-all hover:bg-[#F08700] active:scale-[0.99]"
+      >
+        <Pencil size={15} />
+        {t("owner.edit")}
+      </button>
+      <button
+        type="button"
+        onClick={dashboard}
+        className="mt-2 inline-flex w-full min-h-[44px] items-center justify-center gap-2 rounded-full border border-slate-200 px-4 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-900"
+      >
+        <LayoutDashboard size={15} />
+        {t("owner.dashboard")}
+      </button>
     </div>
   );
 }

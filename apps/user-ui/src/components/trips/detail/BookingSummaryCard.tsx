@@ -6,9 +6,11 @@ import { useRouter } from "@/i18n/navigation";
 import type { PublicTrip } from "@/lib/public-trip.types";
 import {
   getMinPriceCents,
+  getPricePerKgCents,
   formatPrice,
   calculateCO2SavedKg,
 } from "@/lib/public-trip.helpers";
+import { estimateShipperTotalCents } from "@/lib/pricing-example";
 
 type Props = {
   trip: PublicTrip;
@@ -19,8 +21,10 @@ export default function BookingSummaryCard({ trip }: Props) {
   const locale = useLocale() as "fr" | "en";
   const router = useRouter();
 
+  // D13 — PER_KG prime sur le legacy
+  const perKgCents = getPricePerKgCents(trip);
   const minPriceCents = getMinPriceCents(trip);
-  const formattedPrice = formatPrice(minPriceCents, trip.currencyCode, locale);
+  const formattedPrice = formatPrice(perKgCents ?? minPriceCents, trip.currencyCode, locale);
   const co2Saved = calculateCO2SavedKg(trip);
 
   const handleReserve = () => {
@@ -42,14 +46,29 @@ export default function BookingSummaryCard({ trip }: Props) {
       {/* Prix */}
       <div className="px-5 pt-5 pb-3">
         <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-          {t("booking.startingFrom")}
+          {perKgCents ? t("booking.perKg") : t("booking.startingFrom")}
         </div>
         <div className="mt-1 text-2xl font-black tabular-nums leading-none text-slate-900 dark:text-white">
           {formattedPrice}
+          {perKgCents && (
+            <span className="text-base font-semibold text-slate-500 dark:text-slate-400">/kg</span>
+          )}
         </div>
         <div className="mt-1.5 text-[11px] text-slate-500 dark:text-slate-400">
-          {t("booking.priceHint")}
+          {perKgCents
+            ? typeof trip.remainingKg === "number"
+              ? t("booking.perKgHint", { kg: trip.remainingKg })
+              : t("booking.perKgHintNoCap")
+            : t("booking.priceHint")}
         </div>
+        {perKgCents && (
+          <div className="mt-1 text-[11px] font-medium text-slate-600 dark:text-slate-300">
+            {t("booking.example", {
+              kg: 2,
+              price: formatPrice(estimateShipperTotalCents(perKgCents).totalCents, trip.currencyCode, locale),
+            })}
+          </div>
+        )}
       </div>
 
       {/* CTA */}

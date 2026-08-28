@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useRouter } from "@/i18n/navigation";
 import { useUiPreferences } from "@/components/providers/UiPreferencesProvider";
@@ -8,13 +8,12 @@ import { usePersistedFormState } from "@/hooks/usePersistedFormState";
 import { useCreateTrip, useUpdateTrip } from "@/hooks/useTrip";
 import { useEditTrip } from "@/hooks/useEditTrip";
 import { setFlashToast } from "@/lib/flash-toast";
-import type { Draft, ParcelCategory, Step } from "./create-trip.types";
+import type { Draft, Step } from "./create-trip.types";
 import { initialDraft } from "./create-trip.state";
 import { getCreateTripCopy } from "./create-trip.copy";
 import useUser from "@/hooks/useUser";
 import {
   canContinueStep,
-  createDefaultCategoryCondition,
   validateStep1,
   validateStep2,
   type ValidationErrors,
@@ -34,7 +33,8 @@ const EMPTY_ERRORS: ValidationErrors = {};
 // IMPORTANT: doit rester identique à CreateTripMobile.tsx (même clé sessionStorage).
 //   v1 → initial
 //   v2 → ajout pickupLocations/deliveryLocations, suppression handoff/pickup moments
-const DRAFT_VERSION = 2;
+// v3 : moteur PER_KG (PR-B) — les brouillons v2 (catégories legacy) sont abandonnés
+const DRAFT_VERSION = 3;
 
 export default function CreateTripWizard() {
   const { lang } = useUiPreferences();
@@ -88,30 +88,6 @@ export default function CreateTripWizard() {
   useEffect(() => {
     setShowErrors(false);
   }, [step]);
-
-  // ── Category toggle ──
-  const toggleCategory = useCallback(
-    (value: ParcelCategory) => {
-      setDraft((prev) => {
-        const has = prev.acceptedCategories.includes(value);
-        if (has) {
-          const nextCats = prev.acceptedCategories.filter((c) => c !== value);
-          const nextConds = { ...prev.categoryConditions };
-          delete nextConds[value];
-          return { ...prev, acceptedCategories: nextCats, categoryConditions: nextConds };
-        }
-        return {
-          ...prev,
-          acceptedCategories: [...prev.acceptedCategories, value],
-          categoryConditions: {
-            ...prev.categoryConditions,
-            [value]: prev.categoryConditions[value] ?? createDefaultCategoryCondition(value),
-          },
-        };
-      });
-    },
-    [setDraft]
-  );
 
   // ── Navigation ──
   const goTo = (target: Step) => {
@@ -247,7 +223,7 @@ export default function CreateTripWizard() {
 
   return (
     <main className="mx-auto max-w-7xl px-4 py-8 sm:py-10">
-      <div className="mx-auto max-w-2xl">
+      <div className="mx-auto max-w-3xl">
         {/* ⭐ Card containment : border subtil + shadow double couche + filet gradient en tête */}
         <div className="overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04),0_4px_16px_rgba(0,0,0,0.04)] dark:border-slate-800 dark:bg-slate-900 dark:shadow-[0_1px_2px_rgba(0,0,0,0.3),0_4px_16px_rgba(0,0,0,0.2)]">
           {/* Filet gradient mango → teal — signature visuelle de Yamba */}
@@ -298,7 +274,6 @@ export default function CreateTripWizard() {
                   isFr={isFr}
                   draft={draft}
                   setDraft={setDraft}
-                  toggleCategory={toggleCategory}
                   errors={errors}
                 />
               )}

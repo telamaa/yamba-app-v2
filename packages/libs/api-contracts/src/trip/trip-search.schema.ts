@@ -77,7 +77,9 @@ export const YambaTripResultSchema = z
     durationMinutes: z.number().int().optional(),
     stopovers: z.number().int().optional(),
     stopoverCity: z.string().optional().meta({ description: "Présent uniquement si exactement 1 escale" }),
-    minPrice: z.number().meta({ description: "En unités (euros), PAS en centimes — déjà divisé par 100" }),
+    minPrice: z.number().meta({ description: "En unités (euros), PAS en centimes — déjà divisé par 100. 0 pour un trip PER_KG (voir pricePerKg)" }),
+    pricePerKg: z.number().nullish().meta({ description: "D13 — moteur PER_KG : prix au kilo en unités (euros). Null = trip legacy PER_CATEGORY" }),
+    remainingKg: z.number().nullish().meta({ description: "CAP-02 — capacityKg − reservedKg, dérivé. Null si legacy" }),
     pricesByCategory: z.record(z.string(), z.number()).meta({
       description: "Clés = UiParcelCategory, valeurs en unités (euros)",
     }),

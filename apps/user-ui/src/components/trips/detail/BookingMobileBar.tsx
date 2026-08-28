@@ -3,7 +3,7 @@
 import { useTranslations, useLocale } from "next-intl";
 import { useRouter } from "@/i18n/navigation";
 import type { PublicTrip } from "@/lib/public-trip.types";
-import { getMinPriceCents, formatPrice } from "@/lib/public-trip.helpers";
+import { getMinPriceCents, getPricePerKgCents, formatPrice } from "@/lib/public-trip.helpers";
 
 type Props = {
   trip: PublicTrip;
@@ -14,8 +14,9 @@ export default function BookingMobileBar({ trip }: Props) {
   const locale = useLocale() as "fr" | "en";
   const router = useRouter();
 
+  const perKgCents = getPricePerKgCents(trip);
   const minPriceCents = getMinPriceCents(trip);
-  const formattedPrice = formatPrice(minPriceCents, trip.currencyCode, locale);
+  const formattedPrice = formatPrice(perKgCents ?? minPriceCents, trip.currencyCode, locale);
 
   const handleReserve = () => {
     router.push(`/trips/${trip.id}/book`);
@@ -26,10 +27,11 @@ export default function BookingMobileBar({ trip }: Props) {
       <div className="mx-auto flex max-w-md items-center gap-3">
         <div className="min-w-0 flex-1">
           <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-            {t("booking.startingFrom")}
+            {perKgCents ? t("booking.perKg") : t("booking.startingFrom")}
           </div>
           <div className="text-xl font-black tabular-nums text-slate-900 dark:text-white">
             {formattedPrice}
+            {perKgCents && <span className="text-sm font-semibold text-slate-500 dark:text-slate-400">/kg</span>}
           </div>
         </div>
         <button

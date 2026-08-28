@@ -13,7 +13,7 @@ Before any non-trivial task, read in this order:
 1. `context/YAMBA-CONTEXT.md` — done / remaining / non-negotiable rules.
 2. `context/YAMBA-SPECIFICATION-COMPLETE.md` — end-to-end spec (domain, state machines, pricing, events, security, roadmap).
 3. The latest `context/YAMBA-CONTEXT-HANDOFF-*.md` — exact state of the current worksite.
-4. Per task: `context/YAMBA-REGISTRE-DECISIONS-ROADMAP-v1.3.md` (**the master document** — decisions D1–D31; architecture decisions are recorded there BEFORE code, never after), `context/YAMBA-REGLES-METIER-V2.md` (~50 business rules), `context/mockup-pricing-yamba.html` (pricing form spec).
+4. Per task: `context/YAMBA-REGISTRE-DECISIONS-ROADMAP-v1.3.md` (**the master document** — decisions D1–D32; architecture decisions are recorded there BEFORE code, never after), `context/YAMBA-REGLES-METIER-V2.md` (~50 business rules), `context/mockup-pricing-yamba.html` (pricing form spec).
 
 Precedence on divergence: code + its tests > registre > business rules > syntheses in `context/`. `docs/` also contains detailed French functional + technical specs (booking shipper wizard, carrier deal request) — read the relevant `YAMBA-DOC-TECHNIQUE-*.md` before evolving those features.
 
@@ -106,6 +106,7 @@ JWT `access_token` + `refresh_token` set as cookies by auth-service. Frontend `a
 
 - Prisma+Mongo: `readAt: null` in a `where` misses absent fields → `OR: [{readAt: null}, {readAt: {isSet: false}}]`.
 - Nullable unique fields on Mongo collide on null (P2002).
+- Atlas shared tiers cap aggregation pipelines at 50 stages; Prisma emits one `$set` stage per field on updates touching composite types → `P2010 Pipeline length greater than 50`. Chunk wide updates with `apps/trip-service/src/lib/mongo-update-chunks.ts` (transition fields last).
 - macOS FS is case-insensitive, CI Linux is not → exact-case imports.
 - `overflow-x: clip` (not `hidden`) to preserve `position: sticky`.
 - Seeds live in `packages/libs/prisma/scripts/`, relative imports, run via `npx tsx`.
