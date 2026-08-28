@@ -209,7 +209,14 @@ export default function StepConditions({
               <li key={f.key} className="flex justify-between gap-3">
                 <span>
                   {f.key === "base"
-                    ? copy.factorBase(formatEur(f.value ?? 0), f.corridor ? copy.zoneLabel(f.corridor.fromZone) + " → " + copy.zoneLabel(f.corridor.toZone) : "")
+                    ? copy.factorBase(
+                        formatEur(f.value ?? 0),
+                        f.corridor
+                          ? f.corridor.domestic
+                            ? copy.domesticLabel
+                            : copy.zoneLabel(f.corridor.fromZone) + " → " + copy.zoneLabel(f.corridor.toZone)
+                          : ""
+                      )
                     : f.key === "directFlight"
                       ? copy.factorDirectFlight
                       : copy.factorDepartureSoon}

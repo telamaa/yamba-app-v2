@@ -87,7 +87,7 @@ export const PRICE_SUGGESTION_V1 = {
 export type PriceFactor = {
   key: "base" | "directFlight" | "departureSoon";
   /** zones du corridor (key = base) */
-  corridor?: { fromZone: Zone; toZone: Zone };
+  corridor?: { fromZone: Zone; toZone: Zone; domestic: boolean };
   /** variation en % appliquée (0 pour la base) */
   pct: number;
   /** valeur de base en €/kg (key = base) */
@@ -117,7 +117,7 @@ export function suggestPricePerKg(
   );
   const corridor = corridorBasePerKg(draft.fromPlace?.countryCode, draft.toPlace?.countryCode, distanceKm);
   const factors: PriceFactor[] = [
-    { key: "base", pct: 0, value: corridor.base, corridor: { fromZone: corridor.fromZone, toZone: corridor.toZone } },
+    { key: "base", pct: 0, value: corridor.base, corridor: { fromZone: corridor.fromZone, toZone: corridor.toZone, domestic: corridor.domestic } },
   ];
   let median = corridor.base;
 
