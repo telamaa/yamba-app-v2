@@ -13,12 +13,15 @@ type Props = {
   highlightedCategories?: ParcelCategory[];
   /** D33 — familles filtrées : on affiche le supplément éventuel du Voyageur */
   highlightedFamilies?: SearchFamily[];
+  /** D33 V2 — poids saisi : exemple pour CE poids et alerte capacité */
+  weightKg?: number | null;
 };
 
 export default function YambaTripResultCardMobile({
                                                     item,
                                                     highlightedCategories = [],
                                          highlightedFamilies = [],
+                                         weightKg = null,
                                                   }: Props) {
   const t = useTranslations("search");
   const { isOpen, open, close } = useBottomSheet();
@@ -141,6 +144,11 @@ export default function YambaTripResultCardMobile({
                     </div>
                   )}
                   <SurchargePills conditions={item.familyConditions} highlightedFamilies={highlightedFamilies} size="[9px]" />
+                  {weightKg && typeof item.totalForWeight === "number" && (
+                    <div className="mt-0.5 text-[9px] text-slate-600 dark:text-slate-300">
+                      {t("card.exampleForWeight", { kg: weightKg, price: item.totalForWeight.toLocaleString("fr-FR", { maximumFractionDigits: 0 }) })}
+                    </div>
+                  )}
                 </>
               ) : (
                 <>

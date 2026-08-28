@@ -24,6 +24,8 @@ export type SearchTripsParams = {
   categories?: ParcelCategory[];
   /** D33 — familles demandées : exclut les trajets qui en refusent une */
   families?: SearchFamily[];
+  /** D33 V2 — poids du colis (kg) : prix par carte, tri pour ce poids, capacité */
+  weightKg?: number;
   departureBuckets?: DepartureTimeBucket[];
   cursor?: string | null;
   limit?: number;
@@ -44,6 +46,7 @@ export type SearchFacetsParams = {
   dateTo?: SearchTripsParams["dateTo"];
   categories?: SearchTripsParams["categories"];
   families?: SearchTripsParams["families"];
+  weightKg?: SearchTripsParams["weightKg"];
   departureBuckets?: SearchTripsParams["departureBuckets"];
   locale?: SearchTripsParams["locale"];
 };
@@ -82,6 +85,7 @@ function buildQueryString(params: SearchTripsParams): string {
 
   if (params.categories?.length) qs.set("categories", params.categories.join(","));
   if (params.families?.length) qs.set("families", params.families.join(","));
+  if (params.weightKg) qs.set("weightKg", String(params.weightKg));
   if (params.departureBuckets?.length)
     qs.set("departureBuckets", params.departureBuckets.join(","));
 

@@ -57,6 +57,10 @@ type Props = {
   onToggleFamily: (value: SearchFamily) => void;
   familyCounts: Partial<Record<SearchFamily, number>>;
 
+  // ── Poids du colis (D33 V2) — null = référence 2 kg ──
+  weightKg: number | null;
+  onWeightChange: (value: number | null) => void;
+
   // ── Actions ──
   onClear: () => void;
 
@@ -172,6 +176,8 @@ export default function SearchFiltersSidebar({
                                                selectedFamilies,
                                                onToggleFamily,
                                                familyCounts,
+                                               weightKg,
+                                               onWeightChange,
                                                onClear,
                                                hideHeader = false,
                                                className = "",
@@ -194,7 +200,7 @@ export default function SearchFiltersSidebar({
     {
       value: "lowestPrice",
       label: t("filters.lowestPrice"),
-      hint: t("filters.lowestPriceHint"),
+      hint: weightKg ? t("filters.lowestPriceHintWeight", { kg: weightKg }) : t("filters.lowestPriceHint"),
       icon: <Banknote size={18} />,
     },
     {
@@ -257,7 +263,8 @@ export default function SearchFiltersSidebar({
     profileVerifiedOnly ||
     instantBookingOnly ||
     verifiedTicketOnly ||
-    selectedFamilies.length > 0;
+    selectedFamilies.length > 0 ||
+    weightKg !== null;
   // ⚠️ Réactiver pour "Horaires de départ" :
   // || selectedDepartureBuckets.length > 0;
 
@@ -444,6 +451,32 @@ export default function SearchFiltersSidebar({
           </div>
         )}
         */}
+
+        {/* ── Votre colis (D33 V2) : le poids pilote prix, tri et capacité ── */}
+        <div className="space-y-2.5 border-t border-slate-100 pt-4 dark:border-slate-800/60">
+          <div className="flex items-center justify-between">
+            <h3 className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+              {t("filters.yourParcel")}
+            </h3>
+            <span className="text-[13px] font-bold tabular-nums text-slate-900 dark:text-white">
+              {(weightKg ?? 2).toLocaleString("fr-FR")} kg
+            </span>
+          </div>
+          <input
+            type="range"
+            min={0.5}
+            max={30}
+            step={0.5}
+            value={weightKg ?? 2}
+            aria-label={t("filters.weight")}
+            onChange={(e) => onWeightChange(Number(e.target.value))}
+            className="h-11 w-full cursor-pointer touch-pan-x"
+            style={{ accentColor: "#FF9900" }}
+          />
+          <p className="text-[11px] leading-snug text-slate-400 dark:text-slate-500">
+            {weightKg ? t("filters.weightHintActive", { kg: weightKg }) : t("filters.weightHint")}
+          </p>
+        </div>
 
         {/* ── Familles (D14/D33) : « Que voulez-vous envoyer ? » ── */}
         <div className="space-y-2.5 border-t border-slate-100 pt-4 dark:border-slate-800/60">

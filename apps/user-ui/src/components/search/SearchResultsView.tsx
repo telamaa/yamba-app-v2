@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Search, SlidersHorizontal, X } from "lucide-react";
 import { useTranslations, useLocale } from "next-intl";
 import TripSearchBar, { type TripSearchValue } from "./TripSearchBar";
@@ -28,6 +28,7 @@ type FilterMode = "all" | TransportMode;
 const HEADER_HEIGHT = 78;
 const SEARCH_BAR_FIXED_HEIGHT = 96;
 const SIDEBAR_TOP = HEADER_HEIGHT + SEARCH_BAR_FIXED_HEIGHT + 16;
+const WEIGHT_STORAGE_KEY = "yamba.search.weightKg";
 
 
 const PAGE_SIZE = 10;
@@ -262,6 +263,26 @@ export default function SearchResultsView() {
   const [selectedDepartureBuckets, setSelectedDepartureBuckets] = useState<DepartureTimeBucket[]>([]);
   // D33 — le filtre « catégorie » legacy est remplacé par le filtre FAMILLE
   const [selectedFamilies, setSelectedFamilies] = useState<SearchFamily[]>([]);
+  // D33 V2 — poids du colis (null = référence 2 kg). Mémorisé par navigateur.
+  const [weightKg, setWeightKgState] = useState<number | null>(null);
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(WEIGHT_STORAGE_KEY);
+      const v = raw ? Number(raw) : NaN;
+      if (Number.isFinite(v) && v >= 0.5 && v <= 30) setWeightKgState(v);
+    } catch {
+      /* stockage indisponible : on reste sur la référence */
+    }
+  }, []);
+  const setWeightKg = (v: number | null) => {
+    setWeightKgState(v);
+    try {
+      if (v === null) window.localStorage.removeItem(WEIGHT_STORAGE_KEY);
+      else window.localStorage.setItem(WEIGHT_STORAGE_KEY, String(v));
+    } catch {
+      /* ignore */
+    }
+  };
 
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
@@ -291,6 +312,7 @@ export default function SearchResultsView() {
       instantBooking: instantBookingOnly,
       verifiedTicket: verifiedTicketOnly,
       families: selectedFamilies,
+      weightKg: weightKg ?? undefined,
       departureBuckets: selectedDepartureBuckets,
       limit: PAGE_SIZE,
       locale,
@@ -306,6 +328,7 @@ export default function SearchResultsView() {
       instantBookingOnly,
       verifiedTicketOnly,
       selectedFamilies,
+      weightKg,
       selectedDepartureBuckets,
       locale,
     ]
@@ -321,6 +344,7 @@ export default function SearchResultsView() {
           ? searchDraft.dateValue.date.toISOString()
           : undefined,
       families: selectedFamilies,
+      weightKg: weightKg ?? undefined,
       departureBuckets: selectedDepartureBuckets,
       locale,
     }),
@@ -330,6 +354,7 @@ export default function SearchResultsView() {
       searchDraft.to,
       searchDraft.dateValue,
       selectedFamilies,
+      weightKg,
       selectedDepartureBuckets,
       locale,
     ]
@@ -396,6 +421,7 @@ export default function SearchResultsView() {
     setInstantBookingOnly(false);
     setVerifiedTicketOnly(false);
     setSelectedFamilies([]);
+    setWeightKg(null);
     setSelectedDepartureBuckets([]);
     setActiveMode("all");
     setSearchDraft({ from: "", to: "", dateValue: null });
@@ -417,6 +443,7 @@ export default function SearchResultsView() {
     instantBookingOnly ||
     verifiedTicketOnly ||
     selectedFamilies.length > 0 ||
+    weightKg !== null ||
     selectedDepartureBuckets.length > 0 ||
     !!searchDraft.from ||
     !!searchDraft.to;
@@ -441,6 +468,8 @@ export default function SearchResultsView() {
     selectedFamilies,
     onToggleFamily: toggleFamily,
     familyCounts: facetsQuery.data?.familyCounts ?? {},
+    weightKg,
+    onWeightChange: setWeightKg,
     onClear: clearAll,
   };
 
@@ -587,6 +616,7 @@ export default function SearchResultsView() {
                             key={item.id}
                             item={item}
                             highlightedFamilies={selectedFamilies}
+                            weightKg={weightKg}
                           />
                         ))}
                       </div>
@@ -597,6 +627,7 @@ export default function SearchResultsView() {
                             key={item.id}
                             item={item}
                             highlightedFamilies={selectedFamilies}
+                            weightKg={weightKg}
                           />
                         ))}
                       </div>

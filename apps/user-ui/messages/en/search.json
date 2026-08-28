@@ -36,7 +36,12 @@
     "showAll": "Show all ({count})",
     "showLess": "Show less",
     "families": "What do you want to send?",
-    "lowestPriceHint": "for a 2 kg parcel"
+    "lowestPriceHint": "for a 2 kg parcel",
+    "yourParcel": "Your parcel",
+    "weight": "Parcel weight",
+    "weightHint": "Set the weight: every trip will show its price for your parcel.",
+    "weightHintActive": "Price and sort computed for {kg} kg · trips without enough room excluded",
+    "lowestPriceHintWeight": "for your {kg} kg parcel"
   },
   "departureTimes": {
     "morning": "Morning",
@@ -59,7 +64,9 @@
     "perKg": "price per kg",
     "remainingKg": "{kg} kg left",
     "example": "e.g. {kg} kg ≈ €{price} all-in",
-    "surcharge": "{family}: +{pct}%"
+    "surcharge": "{family}: +{pct}%",
+    "exampleForWeight": "≈ €{price} all-in for {kg} kg",
+    "notEnoughKg": "Not enough room"
   },
   "pricingSheet": {
     "title": "Prices by category",

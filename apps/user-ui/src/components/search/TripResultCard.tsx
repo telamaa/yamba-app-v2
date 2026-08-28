@@ -44,6 +44,8 @@ type Props = {
   highlightedCategories?: ParcelCategory[];
   /** D33 — familles filtrées : on affiche le supplément éventuel du Voyageur */
   highlightedFamilies?: SearchFamily[];
+  /** D33 V2 — poids saisi : exemple pour CE poids et alerte capacité */
+  weightKg?: number | null;
 };
 
 function TransportIcon({ mode, size = 13 }: { mode: TransportMode; size?: number }) {
@@ -86,6 +88,7 @@ export default function TripResultCard({
                                          maxVisibleCategories = 3,
                                          highlightedCategories = [],
                                          highlightedFamilies = [],
+                                         weightKg = null,
                                        }: Props) {
   const t = useTranslations("search");
   const tCategories = useTranslations("search.categories");
@@ -327,7 +330,19 @@ export default function TripResultCard({
             </div>
           )}
           <SurchargePills conditions={item.familyConditions} highlightedFamilies={highlightedFamilies} />
-          {isPerKg && (
+          {isPerKg && weightKg && typeof item.remainingKg === "number" && item.remainingKg < weightKg && (
+            <div className="mt-1 inline-flex rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+              {t("card.notEnoughKg")}
+            </div>
+          )}
+          {weightKg && typeof item.totalForWeight === "number" ? (
+            <div className="mt-2 border-t border-dashed border-slate-200 pt-1.5 text-[10px] leading-snug text-slate-600 dark:border-slate-700 dark:text-slate-300">
+              {t("card.exampleForWeight", {
+                kg: weightKg,
+                price: item.totalForWeight.toLocaleString(localeTag, { maximumFractionDigits: 0 }),
+              })}
+            </div>
+          ) : isPerKg && (
             <div className="mt-2 border-t border-dashed border-slate-200 pt-1.5 text-[10px] leading-snug text-slate-400 dark:border-slate-700 dark:text-slate-500">
               {t("card.example", {
                 kg: 2,

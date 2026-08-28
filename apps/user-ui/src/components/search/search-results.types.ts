@@ -78,6 +78,10 @@ export type YambaTripResult = {
   remainingKg?: number | null;
   /** D14 — positions ≠ ACCEPT du Voyageur (compact) */
   familyConditions?: SearchFamilyCondition[];
+  /** D33 V2 — présents si un poids a été saisi (euros) */
+  weightKg?: number;
+  transportForWeight?: number | null;
+  totalForWeight?: number | null;
   currency?: string;
   transportMode: TransportMode;
   allowedCategories: ParcelCategory[];

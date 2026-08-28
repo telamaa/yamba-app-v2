@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
 import { Prisma } from "@prisma/client";
+import { sortByPriceForWeight, totalForWeightCents, transportForWeightCents } from "../lib/price-for-weight";
 import prisma from "@packages/libs/prisma";
 import { ValidationError } from "@packages/error-handler";
 import {
@@ -36,6 +37,7 @@ type BaseFilterParams = {
   dateTo?: Date;
   categories: UiParcelCategory[];
   families: ParcelFamily[];
+  weightKg?: number;
   departureBuckets: DepartureBucket[];
 };
 
@@ -106,6 +108,20 @@ function buildBaseWhere(
     });
   }
 
+  // Poids du colis (D33 V2) : un trajet au kilo doit pouvoir le contenir.
+  // Approximation par la CAPACITÉ déclarée (Prisma/Mongo ne compare pas deux
+  // champs entre eux) ; le front grise ceux dont remainingKg < poids, et la
+  // réservation (CAP-01) fait la vérification exacte.
+  if (params.weightKg) {
+    andClauses.push({
+      OR: [
+        { pricePerKgCents: null },
+        { pricePerKgCents: { lte: 0 } },
+        { capacityKg: { gte: params.weightKg } },
+      ],
+    });
+  }
+
   // Familles (D14/D33) : exclure les trajets qui REFUSENT une famille demandée.
   // Un trajet sans familyConditions accepte tout (legacy compris).
   for (const family of params.families) {
@@ -125,6 +141,22 @@ function buildBaseWhere(
   if (andClauses.length > 0) where.AND = andClauses;
 
   return where;
+}
+
+/** D33 V2 — prix de CE colis sur cette carte (euros, tout compris). */
+function enrichForWeight(
+  dto: YambaTripResultDto,
+  trip: { pricePerKgCents?: number | null; minPriceCents?: number | null },
+  weightKg: number
+): YambaTripResultDto {
+  const transport = transportForWeightCents(trip, weightKg);
+  const total = totalForWeightCents(trip, weightKg);
+  return {
+    ...dto,
+    weightKg,
+    transportForWeight: transport === null ? null : transport / 100,
+    totalForWeight: total === null ? null : total / 100,
+  };
 }
 
 /**
@@ -180,6 +212,7 @@ export const searchTrips = async (
       dateTo: params.dateTo,
       categories: params.categories,
       families: params.families,
+      weightKg: params.weightKg,
       departureBuckets: params.departureBuckets,
     });
 
@@ -203,6 +236,31 @@ export const searchTrips = async (
     // (sinon Mongo les remonte en premier en mode asc).
     if (params.sort === "lowestPrice") {
       where.comparablePriceCents = { not: null };
+    }
+
+    // ⭐ D33 V2 — tri par prix POUR LE POIDS SAISI : la clé dépend du poids
+    // (crossover legacy/PER_KG), donc pas d'index possible → tri en mémoire
+    // sur une fenêtre bornée (WEIGHT_SORT_WINDOW) avec un curseur-offset
+    // « o:<n> ». Assumé v1 (volumes faibles) ; documenté dans la fiche.
+    if (params.sort === "lowestPrice" && params.weightKg) {
+      const WEIGHT_SORT_WINDOW = 200;
+      const offset = params.cursor?.startsWith("o:") ? Number(params.cursor.slice(2)) || 0 : 0;
+      const [all, totalCount] = await Promise.all([
+        prisma.trip.findMany({ where, take: WEIGHT_SORT_WINDOW, include: TRIP_SEARCH_INCLUDE }),
+        prisma.trip.count({ where }),
+      ]);
+      const sorted = sortByPriceForWeight(all, params.weightKg);
+      const page = sorted.slice(offset, offset + params.limit);
+      const nextCursor = offset + params.limit < sorted.length ? `o:${offset + params.limit}` : null;
+      const mapped: YambaTripResultDto[] = [];
+      for (const t of page) {
+        try {
+          mapped.push(enrichForWeight(mapTripToYambaResult(t as any, params.locale), t, params.weightKg));
+        } catch (err) {
+          console.warn(`[search] Skipping invalid trip ${t.id}: ${(err as Error).message}`);
+        }
+      }
+      return res.status(200).json({ trips: mapped, nextCursor, totalCount: Math.min(totalCount, sorted.length) });
     }
 
     const orderBy = buildOrderBy(params.sort);
@@ -232,7 +290,8 @@ export const searchTrips = async (
     const mapped: YambaTripResultDto[] = [];
     for (const t of trips) {
       try {
-        mapped.push(mapTripToYambaResult(t as any, params.locale));
+        const dto = mapTripToYambaResult(t as any, params.locale);
+        mapped.push(params.weightKg ? enrichForWeight(dto, t, params.weightKg) : dto);
       } catch (err) {
         console.warn(
           `[search] Skipping invalid trip ${t.id}: ${(err as Error).message}`
@@ -285,6 +344,7 @@ export const searchTripsFacets = async (
       dateTo: params.dateTo,
       categories: params.categories,
       families: params.families,
+      weightKg: params.weightKg,
       departureBuckets: params.departureBuckets,
     });
 
@@ -297,6 +357,7 @@ export const searchTripsFacets = async (
         dateTo: params.dateTo,
         categories: params.categories,
         families: params.families,
+        weightKg: params.weightKg,
         departureBuckets: params.departureBuckets,
       },
       { ignoreMode: true }
@@ -362,6 +423,7 @@ export const searchTripsFacets = async (
       dateTo: params.dateTo,
       categories: params.categories,
       families: [],
+      weightKg: params.weightKg,
       departureBuckets: params.departureBuckets,
     });
     const familyCountValues = await Promise.all(

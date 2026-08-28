@@ -57,6 +57,10 @@ export type YambaTripResultDto = {
   pricesByCategory: Record<string, number>;
   pricePerKg?: number | null;    // D13 — euros/kg, null = legacy
   remainingKg?: number | null;   // CAP-02 — capacityKg − reservedKg
+  /** D33 V2 — présents seulement si l'Expéditeur a saisi un poids (euros) */
+  weightKg?: number;
+  transportForWeight?: number | null;
+  totalForWeight?: number | null;
   /** D14 — positions ≠ ACCEPT seulement (compact) */
   familyConditions?: Array<{ familyKey: string; mode: "SURCHARGE" | "REFUSE"; surchargePct?: number | null }>;
   currency: string;              // "€", "$", etc.
