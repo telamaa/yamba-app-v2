@@ -129,20 +129,18 @@ export default function BookingWizard({ trip, onCloseAction }: Props) {
         {t("backToTrip")}
       </button>
 
-      {/* Page title */}
-      <header className="mb-6">
-        <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white sm:text-3xl">
-          {t("title")}
-        </h1>
-        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-          {subtitle}
-        </p>
+      {/* Titre + stepper sur UNE ligne (gain vertical : le formulaire remonte) */}
+      <header className="mb-5 flex flex-wrap items-center justify-between gap-x-8 gap-y-3 border-b border-slate-200 pb-4 dark:border-slate-800">
+        <div className="min-w-0">
+          <h1 className="text-xl font-black tracking-tight text-slate-900 dark:text-white sm:text-2xl">
+            {t("title")}
+          </h1>
+          <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">{subtitle}</p>
+        </div>
+        <div className="min-w-0 flex-1 lg:max-w-2xl">
+          <BookingStepperDesktop current={step} onStepClickAction={goToStep} />
+        </div>
       </header>
-
-      {/* Stepper */}
-      <div className="mb-6">
-        <BookingStepperDesktop current={step} onStepClickAction={goToStep} />
-      </div>
 
       {/* Body: 2 cols */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
