@@ -1,8 +1,8 @@
-# YAMBA — CONTEXT HANDOFF · PR-C « le wizard de réservation parle le moteur au kilo » — POUSSÉE, PR À OUVRIR
-### Août 2026 · branche `feat/pricing-front-3` (base `dev` post-#84) · PR #__
+# YAMBA — CONTEXT HANDOFF · PR-C « le wizard de réservation parle le moteur au kilo » — MERGÉE (#85)
+### Août 2026 · branche `feat/pricing-front-3` (base `dev` post-#84) · **PR #85 — MERGÉE** (`37bf983`)
 
 ## §1 — Vérifications d'ouverture
-- [ ] Ouvrir la PR (base `dev`), COMPTER 13 checks · plateforme attendue : **433** (trip 187 · deal **225** = 218 + 7 · notification 21)
+- [x] PR #85 mergée · plateforme **433** (trip 187 · deal **225** = 218 + 7 · notification 21)
 - [ ] QA : fiche métier R1–R12 (desktop + mobile ; dark/light)
 - [ ] `context/` présent sur la branche (règle) ✓
 

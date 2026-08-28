@@ -41,7 +41,7 @@ npx prisma db push                 # sync schema to MongoDB (no migrations — M
 npm run auth-docs                  # regenerate auth swagger-output.json (swagger-autogen — legacy, conversion to Zod-OpenAPI is backlog)
 ```
 
-Test platform baseline: **426 tests** (trip-service 187, deal-service 218, notification-service 21) — any deviation must be explained.
+Test platform baseline: **433 tests** (trip-service 187, deal-service 225, notification-service 21) — any deviation must be explained.
 
 Manual `tsc` (when Nx typecheck target is not what you want): `npx tsc --noEmit --project apps/<service>/tsconfig.app.json` — NEVER `--project apps/<service>` (resolves the solution-style tsconfig: 0 files checked).
 
