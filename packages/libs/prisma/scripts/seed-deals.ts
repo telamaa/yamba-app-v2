@@ -118,14 +118,14 @@ const TRIPS: SeedTrip[] = [
 
 function perCategory(categoryPriceCents: number) {
   const transportCents = categoryPriceCents;
-  const commissionCents = Math.max(200, Math.round(transportCents * 0.15)); // plancher D16
+  const commissionCents = Math.max(300, Math.round(transportCents * 0.12)); // D16 acté : 12 %, plancher 3 €
   return {
     pricingModel: "PER_CATEGORY" as const,
     categoryPriceCents,
     pricePerKgCents: null,
     sizeClass: null,
     transportCents,
-    commissionPct: 0.15,
+    commissionPct: 0.12,
     commissionCents,
     protectionProvider: null,
     protectionTier: null,
@@ -137,14 +137,14 @@ function perCategory(categoryPriceCents: number) {
 
 function perKg(pricePerKgCents: number, weightKg: number, sizeClass: "S" | "M" | "L") {
   const transportCents = Math.round(pricePerKgCents * weightKg);
-  const commissionCents = Math.max(200, Math.round(transportCents * 0.15));
+  const commissionCents = Math.max(300, Math.round(transportCents * 0.12));
   return {
     pricingModel: "PER_KG" as const,
     categoryPriceCents: null,
     pricePerKgCents,
     sizeClass,
     transportCents,
-    commissionPct: 0.15,
+    commissionPct: 0.12,
     commissionCents,
     protectionProvider: null,
     protectionTier: null,

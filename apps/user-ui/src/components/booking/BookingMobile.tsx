@@ -13,7 +13,17 @@ import BookingHeader from "./BookingHeader";
 import BookingStepperMobile from "./BookingStepperMobile";
 import StepCharter from "./steps/StepCharter";
 import StepParcel from "./steps/StepParcel";
-import StepPayment from "./steps/StepPayment";
+import dynamic from "next/dynamic";
+// Stripe (react-stripe-js + stripe-js) ne sert qu'à l'étape 4 : chargé à la
+// demande → le bundle de l'étape 1 n'embarque pas Stripe.
+const StepPayment = dynamic(() => import("./steps/StepPayment"), {
+  ssr: false,
+  loading: () => (
+    <div className="flex min-h-[240px] items-center justify-center">
+      <div className="h-6 w-6 animate-spin rounded-full border-2 border-slate-200 border-t-[#FF9900]" />
+    </div>
+  ),
+});
 import StepRecipient from "./steps/StepRecipient";
 
 const EMPTY_ERRORS: ValidationErrors = {};
@@ -94,7 +104,7 @@ export default function BookingMobile({ trip, onCloseAction }: Props) {
 
       <BookingStepperMobile current={step} />
 
-      <div className="flex-1 overflow-y-auto pb-4">
+      <div className="flex-1 overflow-y-auto pb-40">{/* pb-40 : la barre basse (total + CTA) recouvre ~150 px — le dernier bloc doit rester atteignable */}
         {step === 1 && (
           <StepParcel
             trip={trip}

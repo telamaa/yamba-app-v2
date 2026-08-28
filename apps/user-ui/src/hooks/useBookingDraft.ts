@@ -20,10 +20,12 @@ import type { Draft, Step } from "@/components/booking/booking.types";
 const DRAFT_KEY = "booking-wizard";
 const STEP_KEY = "booking-wizard-step";
 
-export function useBookingDraft() {
+/** `initial` : brouillon de départ pour CE trajet (famille acceptée, poids
+ *  mémorisé) — voir `buildInitialDraft`. Défaut : le brouillon vierge. */
+export function useBookingDraft(initial: Draft = initialDraft) {
   const [draft, setDraft, clearDraftRaw] = usePersistedFormState<Draft>(
     DRAFT_KEY,
-    initialDraft,
+    initial,
     {
       exclude: ["photos"] as (keyof Draft)[],
       version: DRAFT_VERSION,

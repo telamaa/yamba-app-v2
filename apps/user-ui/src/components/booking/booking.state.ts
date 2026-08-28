@@ -4,12 +4,37 @@
  * Initial state + mock TripContext for frontend-only development.
  */
 
+import { getFirstAcceptedFamily } from "./booking.config";
 import type { Draft, LocationPoint, TripContext } from "./booking.types";
+
+/** Draft de départ pour un trajet donné : première famille acceptée, poids
+ *  mémorisé en recherche (`yamba.search.weightKg`), taille S par défaut. */
+export function buildInitialDraft(trip: TripContext): Draft {
+  let weightKg = "";
+  try {
+    const v = Number(window.localStorage.getItem("yamba.search.weightKg"));
+    if (Number.isFinite(v) && v >= 0.5 && v <= 30) weightKg = String(v).replace(".", ",");
+  } catch {
+    /* SSR ou stockage indisponible */
+  }
+  return {
+    ...initialDraft,
+    family: getFirstAcceptedFamily(trip),
+    // D33 : sans poids mémorisé, on part du colis de référence (2 kg) — jamais un 0 € muet
+    weightKg: weightKg || "2",
+    // un seul lieu = pré-sélectionné ; plusieurs = le premier, modifiable
+    pickupLocationId: trip.pickupOptions[0]?.id ?? null,
+    deliveryLocationId: trip.deliveryOptions[0]?.id ?? null,
+  };
+}
 
 export const initialDraft: Draft = {
   pickupLocationId: null,
   deliveryLocationId: null,
   category: "CLOTHES",
+  product: "PARCEL",
+  family: "CLOTHES_TEXTILE",
+  sizeClass: "S",
   weightKg: "",
   declaredValueEur: "",
   description: "",
@@ -19,6 +44,7 @@ export const initialDraft: Draft = {
   recipient: {
     firstName: "",
     lastName: "",
+    phonePrefix: "+33",
     phoneE164: "",
     email: "",
   },
@@ -29,7 +55,7 @@ export const initialDraft: Draft = {
   paymentMethod: "CARD",
 };
 
-export const DRAFT_VERSION = 2; // bumped because the trip shape changed
+export const DRAFT_VERSION = 4; // v3 : moteur PER_KG (product / family / sizeClass) — les brouillons v2 sont abandonnés
 
 // ============================================================
 // MOCK TRIP
@@ -117,5 +143,19 @@ export const mockTrip: TripContext = {
     CHECKED_BAG_23KG: 85,
   },
 
-  serviceFeePercent: 0.15,
+  serviceFeePercent: 0.12,
+  pricePerKgCents: 1150,
+  remainingKg: 18,
+  familyStances: {
+    DOCUMENTS_PAPERS: { mode: "ACCEPT", surchargePct: 0 },
+    CLOTHES_TEXTILE: { mode: "ACCEPT", surchargePct: 0 },
+    FOOD_DRY_SEALED: { mode: "REFUSE", surchargePct: 0 },
+    ELECTRONICS_DEVICES: { mode: "SURCHARGE", surchargePct: 20 },
+    COSMETICS_CARE: { mode: "ACCEPT", surchargePct: 0 },
+    PARTS_TOOLS: { mode: "ACCEPT", surchargePct: 0 },
+    TOYS_CHILDCARE: { mode: "ACCEPT", surchargePct: 0 },
+    MISC_ACCESSORIES: { mode: "ACCEPT", surchargePct: 0 },
+  },
+  checkedBag23PriceCents: 23000,
+  cabinBag12PriceCents: null,
 };

@@ -96,14 +96,37 @@ export default function BookingBottomSheet({
               <div className="mt-0.5 flex items-center gap-1 text-[10px] text-slate-400 dark:text-slate-500">
                 <Star size={10} fill="#BA7517" stroke="#BA7517" />
                 <span>
-                  {trip.carrier.rating.toFixed(1)} ·{" "}
-                  {t("summary.deals", { count: trip.carrier.dealCount })} ·{" "}
+                  {trip.carrier.dealCount > 0
+                    ? `${trip.carrier.rating.toFixed(1)} · ${t("summary.deals", { count: trip.carrier.dealCount })}`
+                    : t("summary.newTripper")} ·{" "}
                   {trip.originCity} → {trip.destinationCity}
                 </span>
               </div>
             </div>
           </div>
-          <PriceRow label={t("summary.transport")} amount={price.transport} locale={locale} />
+          <PriceRow
+            label={
+              price.quote?.pricingModel === "PER_KG"
+                ? t("summary.transportDetail", {
+                    kg: (price.quote.billableWeightKg ?? 0).toLocaleString(locale === "fr" ? "fr-FR" : "en-US"),
+                    rate: formatPrice((price.quote.pricePerKgCents ?? 0) / 100, locale),
+                    size: price.quote.sizeClass ?? "",
+                  }) + (price.quote.familySurchargePct > 0 ? ` · +${price.quote.familySurchargePct} %` : "")
+                : t("summary.transport")
+            }
+            amount={price.transport}
+            locale={locale}
+          />
+          {price.quote === null && price.quoteError && (
+            <div className="mb-1 rounded-md bg-[#FFF6E8] px-2.5 py-1.5 text-[11px] text-[#B45309] dark:bg-[#FF9900]/10 dark:text-[#FFB84D]">
+              {t(`summary.quoteHint.${price.quoteError}`)}
+            </div>
+          )}
+          {price.quote?.minimumApplied && (
+            <div className="-mt-0.5 mb-1 text-[11px] text-slate-500 dark:text-slate-400">
+              {t("summary.minimumApplied", { min: formatPrice(price.quote.transportCents / 100, locale) })}
+            </div>
+          )}
           <PriceRow
             label={t("summary.serviceYamba")}
             amount={price.serviceFee}
@@ -145,7 +168,7 @@ export default function BookingBottomSheet({
             onClick={onBackAction}
             className="mt-1 w-full p-2 text-center text-[13px] text-slate-500 dark:text-slate-400"
           >
-            {t("back")}
+            {t("previousStep")}
           </button>
         )}
       </div>

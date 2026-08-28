@@ -4,6 +4,7 @@
  * Validation, pricing and step-progression logic. Pure functions.
  */
 
+import { PRICING_PARAMS, QuoteError, quoteShipperPrice } from "@packages/pricing";
 import type {
   Draft,
   ParcelCategory,
@@ -13,30 +14,102 @@ import type {
   ValidationErrors,
 } from "./booking.types";
 
-const INSURANCE_PRICE_EXTENDED_500_EUR = 6;
+/** Poids saisi ("2,5") → nombre, ou null. */
+export function parseWeight(s: string): number | null {
+  const n = Number(String(s).replace(",", "."));
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
 
+/**
+ * D34 — le devis vient de `@packages/pricing` (même code que le snapshot
+ * serveur) ; les euros ne servent qu'à l'affichage. Trajet legacy (sans
+ * €/kg) : on retombe sur le prix par catégorie, sans devis figé.
+ */
 export function computeTotal(draft: Draft, trip: TripContext): PriceBreakdown {
+  const isPerKg = typeof trip.pricePerKgCents === "number" && trip.pricePerKgCents > 0;
+  if (isPerKg || draft.product !== "PARCEL") {
+    try {
+      const quote = quoteShipperPrice({
+        product: draft.product,
+        pricePerKgCents: trip.pricePerKgCents,
+        checkedBag23PriceCents: trip.checkedBag23PriceCents,
+        cabinBag12PriceCents: trip.cabinBag12PriceCents,
+        weightKg: parseWeight(draft.weightKg),
+        sizeClass: draft.sizeClass,
+        familySurchargePct:
+          trip.familyStances[draft.family]?.mode === "SURCHARGE" ? trip.familyStances[draft.family].surchargePct : 0,
+        protection: draft.insurance,
+      });
+      return {
+        transport: quote.transportCents / 100,
+        serviceFee: quote.commissionCents / 100,
+        insurance: quote.premiumCents / 100,
+        total: quote.totalShipperCents / 100,
+        currency: "EUR",
+        quote,
+        quoteError: null,
+      };
+    } catch (e: unknown) {
+      return { transport: 0, serviceFee: 0, insurance: 0, total: 0, currency: "EUR", quote: null, quoteError: e instanceof QuoteError ? e.code : "UNKNOWN" } as PriceBreakdown;
+    }
+  }
+  // legacy PER_CATEGORY
   const transport = trip.categoryPrices[draft.category] ?? 0;
-  const serviceFee = round2(transport * trip.serviceFeePercent);
-  const insurance =
-    draft.insurance === "EXTENDED_500" ? INSURANCE_PRICE_EXTENDED_500_EUR : 0;
-  const total = round2(transport + serviceFee + insurance);
+  const serviceFee = round2(Math.max(transport * (PRICING_PARAMS.commissionPct / 100), PRICING_PARAMS.commissionFloorCents / 100));
+  const insurance = draft.insurance === "EXTENDED_500" ? PRICING_PARAMS.protectionExtendedPremiumCents / 100 : 0;
+  return { transport, serviceFee, insurance, total: round2(transport + serviceFee + insurance), currency: "EUR", quote: null, quoteError: null };
+}
 
-  return {
-    transport,
-    serviceFee,
-    insurance,
-    total,
-    currency: "EUR",
-  };
+export function isPerKgTrip(trip: TripContext): boolean {
+  return typeof trip.pricePerKgCents === "number" && trip.pricePerKgCents > 0;
 }
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
-function isPhoneValid(phone: string): boolean {
-  return phone.replace(/\D/g, "").length >= 8;
+/** Indicatifs proposés (marchés de lancement + diasporas) — ordre = fréquence attendue. */
+export const PHONE_PREFIXES: Array<{ prefix: string; code: string; labelFr: string; labelEn: string }> = [
+  { prefix: "+33", code: "FR", labelFr: "France", labelEn: "France" },
+  { prefix: "+32", code: "BE", labelFr: "Belgique", labelEn: "Belgium" },
+  { prefix: "+41", code: "CH", labelFr: "Suisse", labelEn: "Switzerland" },
+  { prefix: "+44", code: "GB", labelFr: "Royaume-Uni", labelEn: "United Kingdom" },
+  { prefix: "+31", code: "NL", labelFr: "Pays-Bas", labelEn: "Netherlands" },
+  { prefix: "+49", code: "DE", labelFr: "Allemagne", labelEn: "Germany" },
+  { prefix: "+242", code: "CG", labelFr: "Congo", labelEn: "Congo" },
+  { prefix: "+243", code: "CD", labelFr: "RD Congo", labelEn: "DR Congo" },
+  { prefix: "+237", code: "CM", labelFr: "Cameroun", labelEn: "Cameroon" },
+  { prefix: "+241", code: "GA", labelFr: "Gabon", labelEn: "Gabon" },
+  { prefix: "+221", code: "SN", labelFr: "Sénégal", labelEn: "Senegal" },
+  { prefix: "+225", code: "CI", labelFr: "Côte d'Ivoire", labelEn: "Ivory Coast" },
+  { prefix: "+223", code: "ML", labelFr: "Mali", labelEn: "Mali" },
+  { prefix: "+212", code: "MA", labelFr: "Maroc", labelEn: "Morocco" },
+  { prefix: "+213", code: "DZ", labelFr: "Algérie", labelEn: "Algeria" },
+  { prefix: "+216", code: "TN", labelFr: "Tunisie", labelEn: "Tunisia" },
+  { prefix: "+1", code: "US", labelFr: "États-Unis / Canada", labelEn: "United States / Canada" },
+  { prefix: "+91", code: "IN", labelFr: "Inde", labelEn: "India" },
+  { prefix: "+86", code: "CN", labelFr: "Chine", labelEn: "China" },
+  { prefix: "+84", code: "VN", labelFr: "Viêt Nam", labelEn: "Vietnam" },
+];
+
+/** « +33 » + « 06 42 18 81 12 » → « +33642188112 » (E.164). Null si invalide. */
+export function toE164(prefix: string, national: string): string | null {
+  const p = prefix.replace(/\D/g, "");
+  let n = national.replace(/\D/g, "");
+  if (!p || !n) return null;
+  if (n.startsWith("00")) n = n.slice(2);
+  if (n.startsWith(p)) n = n.slice(p.length); // l'utilisateur a retapé l'indicatif
+  n = n.replace(/^0+/, ""); // zéro national
+  const e164 = `+${p}${n}`;
+  return /^\+[1-9]\d{6,14}$/.test(e164) ? e164 : null;
+}
+
+export function recipientPhoneE164(draft: Draft): string | null {
+  return toE164(draft.recipient.phonePrefix, draft.recipient.phoneE164);
+}
+
+function isPhoneValid(phone: string, prefix = "+33"): boolean {
+  return toE164(prefix, phone) !== null;
 }
 
 function isEmailValidOrEmpty(email: string): boolean {
@@ -45,8 +118,7 @@ function isEmailValidOrEmpty(email: string): boolean {
 }
 
 function isPositiveNumber(s: string): boolean {
-  const n = Number(s.replace(",", "."));
-  return Number.isFinite(n) && n > 0;
+  return parseWeight(s) !== null;
 }
 
 export function validateStep1(
@@ -66,13 +138,42 @@ export function validateStep1(
       ? "Choisis un lieu de retrait"
       : "Pick a pickup location for the recipient";
   }
-  if (!trip.acceptedCategories.includes(draft.category)) {
+  if (isPerKgTrip(trip)) {
+    // D14 — famille refusée par le Voyageur
+    if (draft.product === "PARCEL" && trip.familyStances[draft.family]?.mode === "REFUSE") {
+      errors.family = isFr
+        ? "Le voyageur ne prend pas cette famille de colis"
+        : "The tripper does not take this parcel family";
+    }
+    // PRC-04 — bagage entier non proposé
+    if (draft.product === "CHECKED_BAG_23KG" && !trip.checkedBag23PriceCents) {
+      errors.product = isFr ? "Bagage soute non proposé sur ce trajet" : "Checked bag not offered on this trip";
+    }
+    if (draft.product === "CABIN_BAG_12KG" && !trip.cabinBag12PriceCents) {
+      errors.product = isFr ? "Bagage cabine non proposé sur ce trajet" : "Cabin bag not offered on this trip";
+    }
+  } else if (!trip.acceptedCategories.includes(draft.category)) {
     errors.category = isFr
       ? "Catégorie non acceptée par le voyageur"
       : "Category not accepted by the tripper";
   }
-  if (!isPositiveNumber(draft.weightKg)) {
-    errors.weightKg = isFr ? "Poids requis" : "Weight required";
+  if (draft.product === "PARCEL") {
+    const w = parseWeight(draft.weightKg);
+    if (w === null) {
+      errors.weightKg = isFr ? "Poids requis" : "Weight required";
+    } else if (w > 30) {
+      errors.weightKg = isFr ? "30 kg maximum par colis" : "30 kg max per parcel";
+    } else if (typeof trip.remainingKg === "number" && w > trip.remainingKg) {
+      // CAP-01 — vérifié aussi côté serveur à la réservation
+      errors.weightKg = isFr
+        ? `Il ne reste que ${trip.remainingKg} kg disponibles sur ce trajet`
+        : `Only ${trip.remainingKg} kg left on this trip`;
+    }
+  } else if (typeof trip.remainingKg === "number") {
+    const need = draft.product === "CHECKED_BAG_23KG" ? 23 : 12;
+    if (need > trip.remainingKg) {
+      errors.product = isFr ? `Il ne reste que ${trip.remainingKg} kg : pas assez pour ce bagage` : `Only ${trip.remainingKg} kg left: not enough for this bag`;
+    }
   }
   if (!isPositiveNumber(draft.declaredValueEur)) {
     errors.declaredValueEur = isFr
@@ -102,7 +203,7 @@ export function validateStep2(draft: Draft, isFr: boolean): ValidationErrors {
   if (draft.recipient.lastName.trim() === "") {
     errors.recipientLastName = isFr ? "Nom requis" : "Last name required";
   }
-  if (!isPhoneValid(draft.recipient.phoneE164)) {
+  if (!isPhoneValid(draft.recipient.phoneE164, draft.recipient.phonePrefix)) {
     errors.recipientPhoneE164 = isFr ? "Téléphone invalide" : "Invalid phone number";
   }
   if (!isEmailValidOrEmpty(draft.recipient.email)) {
@@ -157,6 +258,11 @@ export function canContinueStep(
 }
 
 /** Pick a valid default category for the trip (first accepted). */
+export function getFirstAcceptedFamily(trip: TripContext): Draft["family"] {
+  const order: Draft["family"][] = ["CLOTHES_TEXTILE", "DOCUMENTS_PAPERS", "MISC_ACCESSORIES", "COSMETICS_CARE", "TOYS_CHILDCARE", "PARTS_TOOLS", "ELECTRONICS_DEVICES", "FOOD_DRY_SEALED"];
+  return order.find((f) => trip.familyStances[f]?.mode !== "REFUSE") ?? "CLOTHES_TEXTILE";
+}
+
 export function getFirstAcceptedCategory(trip: TripContext): ParcelCategory {
   return trip.acceptedCategories[0] ?? "CLOTHES";
 }
