@@ -319,7 +319,7 @@ export default function SearchFiltersSidebar({
                   <CustomRadio checked={isActive} />
                   <span
                     className={[
-                      "truncate text-[13px]",
+                      "min-w-0 text-[13px]",
                       isActive
                         ? "font-semibold text-slate-900 dark:text-white"
                         : "font-medium text-slate-700 dark:text-slate-300",
@@ -327,7 +327,7 @@ export default function SearchFiltersSidebar({
                   >
                     {opt.label}
                     {opt.hint && (
-                      <span className="ml-1 text-[11px] font-normal text-slate-400 dark:text-slate-500">
+                      <span className="block text-[11px] font-normal leading-tight text-slate-400 dark:text-slate-500">
                         {opt.hint}
                       </span>
                     )}
