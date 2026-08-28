@@ -28,6 +28,8 @@ Revue d'expert sur 11 captures (desktop dark/light) → refonte de l'étape 2 : 
 
 ## §3 — DÉCISIONS / points registre
 
+- **D31 et D32 GRAVÉES au registre (§2, après D30)** : D31 = gate Stripe à l'acceptation (reporté depuis PR-A) ; **D32 = plancher par colis : 0,5 kg facturable minimum ET 8 € minimum, le plus élevé** — à implémenter en PR-C (calcul Expéditeur + snapshot D17). Commit `8b8397c`+ : retours utilisateur appliqués (autocomplétion villes/aéroports + « Ville, Pays », brouillon v3, review sans legacy ni instantanée, payload pur PER_KG, popover ⓘ anti-débordement, référence & justificatif repliés).
+
 - **Complément A28 (à entériner, D-next ou note sous A28)** : *la catégorie n'existe que pour le moteur legacy* ; un trajet PER_KG complet publie sans `acceptedCategories`. Angle mort de PR-A découvert à l'inventaire (deux verrous : schéma l.217 + controller l.877). Sans ce complément, PR-B était inpubliable.
 - **D15 V1 statique assumé** : une base unique 11 €/kg (pas de table `base_corridor` seedée, pas de signal SavedRoutes) — le moteur est pur et isolé (`suggestPricePerKg`), remplaçable par un appel serveur sans toucher la jauge (elle ne connaît que `{low, median, high}`).
 - **Migration douce** : le formulaire ne saisit plus le legacy ; un trajet PER_CATEGORY rouvert en édition doit fixer €/kg + capacité pour republier (l'existant publié n'est PAS invalidé — bi-moteur tolérant). Le legacy reste lisible (review/preview) tant que `pricePerKg` est vide.
