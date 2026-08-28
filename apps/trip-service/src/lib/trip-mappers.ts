@@ -57,6 +57,12 @@ export type YambaTripResultDto = {
   pricesByCategory: Record<string, number>;
   pricePerKg?: number | null;    // D13 — euros/kg, null = legacy
   remainingKg?: number | null;   // CAP-02 — capacityKg − reservedKg
+  /** D33 V2 — présents seulement si l'Expéditeur a saisi un poids (euros) */
+  weightKg?: number;
+  transportForWeight?: number | null;
+  totalForWeight?: number | null;
+  /** D14 — positions ≠ ACCEPT seulement (compact) */
+  familyConditions?: Array<{ familyKey: string; mode: "SURCHARGE" | "REFUSE"; surchargePct?: number | null }>;
   currency: string;              // "€", "$", etc.
   transportMode: UiTransportMode;
   allowedCategories: UiParcelCategory[];
@@ -238,9 +244,13 @@ export function mapTripToYambaResult(
   trip: TripWithRelations,
   locale: SupportedLocale = "fr"
 ): YambaTripResultDto {
-  if (!trip.departureAt || !trip.arrivalAt) {
+  // Seul departureAt est indispensable (c'est le critère de la recherche).
+  // arrivalAt peut manquer (trajets seed / anciens brouillons) : on affiche
+  // « — » plutôt que d'ÉCARTER le trajet — sinon les facettes le comptent
+  // et la liste ne le montre pas (« 5 comptés, 4 affichés »).
+  if (!trip.departureAt) {
     throw new Error(
-      `Trip ${trip.id} has no departureAt/arrivalAt — should not be in search results`
+      `Trip ${trip.id} has no departureAt — should not be in search results`
     );
   }
   if (!trip.transportMode) {
@@ -283,25 +293,22 @@ export function mapTripToYambaResult(
     trip.departureTimeLocal ||
     formatTripTime(trip.departureAt, trip.originTimezone);
 
-  const arrivalTime =
-    trip.arrivalTimeLocal ||
-    formatTripTime(trip.arrivalAt, trip.destinationTimezone);
+  const arrivalTime = trip.arrivalAt
+    ? trip.arrivalTimeLocal || formatTripTime(trip.arrivalAt, trip.destinationTimezone)
+    : "—";
 
   // ─── Date affichage ────────────────────────────────
   const travelDate = formatTripDate(trip.departureAt, trip.originTimezone, locale);
 
   // ─── Next day ──────────────────────────────────────
-  const nextDay = isNextDay(
-    trip.departureAt,
-    trip.arrivalAt,
-    trip.originTimezone,
-    trip.destinationTimezone
-  );
+  const nextDay = trip.arrivalAt
+    ? isNextDay(trip.departureAt, trip.arrivalAt, trip.originTimezone, trip.destinationTimezone)
+    : false;
 
-  // ─── Durée ─────────────────────────────────────────
-  const durationMinutes = Math.round(
-    (trip.arrivalAt.getTime() - trip.departureAt.getTime()) / 60000
-  );
+  // ─── Durée (inconnue sans arrivée) ─────────────────
+  const durationMinutes = trip.arrivalAt
+    ? Math.round((trip.arrivalAt.getTime() - trip.departureAt.getTime()) / 60000)
+    : undefined;
 
   // ─── Capacité résiduelle ───────────────────────────
   const remainingSlots =
@@ -347,6 +354,9 @@ export function mapTripToYambaResult(
     pricesByCategory,
     pricePerKg,
     remainingKg,
+    familyConditions: ((trip.familyConditions ?? []) as Array<{ familyKey: string; mode: string; surchargePct?: number | null }>)
+      .filter((c) => c.mode !== "ACCEPT")
+      .map((c) => ({ familyKey: c.familyKey, mode: c.mode as "SURCHARGE" | "REFUSE", surchargePct: c.surchargePct ?? null })),
     currency: symbolFor(trip.currencyCode),
     transportMode: transportModeDbToUi(trip.transportMode),
     allowedCategories: trip.acceptedCategories.map(parcelCategoryDbToUi),

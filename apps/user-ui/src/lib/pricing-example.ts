@@ -37,3 +37,7 @@ export function estimateShipperTotalCents(
   const serviceCents = Math.max(Math.round((transportCents * p.commissionPct) / 100), p.commissionFloorCents);
   return { transportCents, serviceCents, totalCents: transportCents + serviceCents };
 }
+
+/** D32 — plancher par colis, en euros (pour les libellés « Colis léger… »). */
+export const MIN_PARCEL_PRICE_EUR = PRICING_EXAMPLE_PARAMS.minTransportCents / 100;
+export const MIN_BILLABLE_KG = PRICING_EXAMPLE_PARAMS.minBillableKg;

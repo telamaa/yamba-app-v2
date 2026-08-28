@@ -27,7 +27,7 @@ export const SortOptionSchema = z
   .enum(["earliest", "lowestPrice", "bestRated"])
   .meta({
     id: "SortOption",
-    description: "Tri des résultats. lowestPrice exclut les trips sans minPriceCents.",
+    description: "Tri des résultats. lowestPrice trie sur comparablePriceCents (D33 : colis de référence 2 kg) et exclut les trips sans valeur.",
   });
 
 export const UiParcelCategorySchema = z
@@ -80,6 +80,19 @@ export const YambaTripResultSchema = z
     minPrice: z.number().meta({ description: "En unités (euros), PAS en centimes — déjà divisé par 100. 0 pour un trip PER_KG (voir pricePerKg)" }),
     pricePerKg: z.number().nullish().meta({ description: "D13 — moteur PER_KG : prix au kilo en unités (euros). Null = trip legacy PER_CATEGORY" }),
     remainingKg: z.number().nullish().meta({ description: "CAP-02 — capacityKg − reservedKg, dérivé. Null si legacy" }),
+    weightKg: z.number().optional().meta({ description: "D33 V2 — écho du poids saisi par l'Expéditeur (kg) ; absent sinon" }),
+    transportForWeight: z.number().nullish().meta({ description: "D33 V2 — transport (net Voyageur) pour ce poids, en euros. Null = aucun moteur" }),
+    totalForWeight: z.number().nullish().meta({ description: "D33 V2 — total Expéditeur (transport + service D16) pour ce poids, en euros" }),
+    familyConditions: z
+      .array(
+        z.object({
+          familyKey: z.string(),
+          mode: z.enum(["SURCHARGE", "REFUSE"]),
+          surchargePct: z.number().int().nullish(),
+        })
+      )
+      .optional()
+      .meta({ description: "D14 — positions ≠ ACCEPT du Voyageur (compact). Absent/vide = tout accepté" }),
     pricesByCategory: z.record(z.string(), z.number()).meta({
       description: "Clés = UiParcelCategory, valeurs en unités (euros)",
     }),
@@ -127,5 +140,9 @@ export const SearchFacetsResponseSchema = z
     profileVerifiedCount: z.number().int(),
     instantBookingCount: z.number().int(),
     verifiedTicketCount: z.number().int(),
+    familyCounts: z
+      .record(z.string(), z.number().int())
+      .optional()
+      .meta({ description: "D33 — par ParcelFamily : trips qui NE refusent PAS la famille (base sans filtre famille)" }),
   })
   .meta({ id: "SearchFacetsResponse" });

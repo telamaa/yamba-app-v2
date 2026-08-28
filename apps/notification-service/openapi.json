@@ -3486,7 +3486,7 @@
           "lowestPrice",
           "bestRated"
         ],
-        "description": "Tri des résultats. lowestPrice exclut les trips sans minPriceCents."
+        "description": "Tri des résultats. lowestPrice trie sur comparablePriceCents (D33 : colis de référence 2 kg) et exclut les trips sans valeur."
       },
       "UiParcelCategory": {
         "type": "string",
@@ -3604,6 +3604,68 @@
                 "type": "null"
               }
             ]
+          },
+          "weightKg": {
+            "description": "D33 V2 — écho du poids saisi par l'Expéditeur (kg) ; absent sinon",
+            "type": "number"
+          },
+          "transportForWeight": {
+            "description": "D33 V2 — transport (net Voyageur) pour ce poids, en euros. Null = aucun moteur",
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "totalForWeight": {
+            "description": "D33 V2 — total Expéditeur (transport + service D16) pour ce poids, en euros",
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "familyConditions": {
+            "description": "D14 — positions ≠ ACCEPT du Voyageur (compact). Absent/vide = tout accepté",
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "familyKey": {
+                  "type": "string"
+                },
+                "mode": {
+                  "type": "string",
+                  "enum": [
+                    "SURCHARGE",
+                    "REFUSE"
+                  ]
+                },
+                "surchargePct": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "familyKey",
+                "mode"
+              ],
+              "additionalProperties": false
+            }
           },
           "pricesByCategory": {
             "type": "object",
@@ -3781,6 +3843,18 @@
             "type": "integer",
             "minimum": -9007199254740991,
             "maximum": 9007199254740991
+          },
+          "familyCounts": {
+            "description": "D33 — par ParcelFamily : trips qui NE refusent PAS la famille (base sans filtre famille)",
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            }
           }
         },
         "required": [

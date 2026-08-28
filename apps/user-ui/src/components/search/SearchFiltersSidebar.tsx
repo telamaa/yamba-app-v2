@@ -1,37 +1,29 @@
 "use client";
 
-import { useMemo, useState } from "react";
 import {
+  Baby,
   Banknote,
-  BookOpen,
-  Briefcase,
   Check,
-  ChevronDown,
-  ChevronUp,
   Clock3,
-  Cpu,
   FileText,
-  Footprints,
-  Laptop,
   Medal,
-  // Moon, // ⚠️ Commenté — utilisé par "Horaires de départ" (réactivable plus bas)
+  Package,
   ShieldCheck,
   Shirt,
   ShoppingBag,
   Smartphone,
+  Sparkles,
   Star,
-  // Sun,    // ⚠️ Commenté
-  // Sunrise, // ⚠️ Commenté
-  // Sunset, // ⚠️ Commenté
   Ticket,
-  ToyBrick,
-  Package,
+  Wrench,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { MIN_PARCEL_PRICE_EUR } from "@/lib/pricing-example";
 import {
-  DepartureTimeBucket,
-  ParcelCategory,
-  SortOption,
+  SEARCH_FAMILIES,
+  type DepartureTimeBucket,
+  type SearchFamily,
+  type SortOption,
 } from "./search-results.types";
 
 type Props = {
@@ -61,9 +53,14 @@ type Props = {
   selectedDepartureBuckets?: DepartureTimeBucket[];
   onToggleDepartureBucket?: (bucket: DepartureTimeBucket) => void;
 
-  // ── Categories ──
-  selectedCategories: ParcelCategory[];
-  onToggleCategory: (value: ParcelCategory) => void;
+  // ── Familles (D14/D33) ──
+  selectedFamilies: SearchFamily[];
+  onToggleFamily: (value: SearchFamily) => void;
+  familyCounts: Partial<Record<SearchFamily, number>>;
+
+  // ── Poids du colis (D33 V2) — null = référence 2 kg ──
+  weightKg: number | null;
+  onWeightChange: (value: number | null) => void;
 
   // ── Actions ──
   onClear: () => void;
@@ -73,63 +70,18 @@ type Props = {
   className?: string;
 };
 
-const ALL_CATEGORIES: ParcelCategory[] = [
-  "clothes",
-  "shoes",
-  "fashion-accessories",
-  "other-accessories",
-  "books",
-  "documents",
-  "small-toys",
-  "phone",
-  "computer",
-  "other-electronics",
-  "checked-bag-23kg",
-  "cabin-bag-12kg",
-];
+/** D14 — icônes Lucide des 8 familles (mêmes clés que l'API) */
+const FAMILY_ICONS: Record<SearchFamily, React.ReactNode> = {
+  DOCUMENTS_PAPERS: <FileText size={14} />,
+  CLOTHES_TEXTILE: <Shirt size={14} />,
+  FOOD_DRY_SEALED: <Package size={14} />,
+  ELECTRONICS_DEVICES: <Smartphone size={14} />,
+  COSMETICS_CARE: <Sparkles size={14} />,
+  PARTS_TOOLS: <Wrench size={14} />,
+  TOYS_CHILDCARE: <Baby size={14} />,
+  MISC_ACCESSORIES: <ShoppingBag size={14} />,
+};
 
-const TOP_CATEGORIES_COUNT = 6;
-
-function getCategoryMeta(
-  category: ParcelCategory,
-  t: (k: string) => string
-): { label: string; icon: React.ReactNode } {
-  const map: Record<ParcelCategory, { label: string; icon: React.ReactNode }> = {
-    clothes: { label: t("categories.clothes"), icon: <Shirt size={14} /> },
-    shoes: { label: t("categories.shoes"), icon: <Footprints size={14} /> },
-    "fashion-accessories": {
-      label: t("categories.fashionAccessories"),
-      icon: <ShoppingBag size={14} />,
-    },
-    "other-accessories": {
-      label: t("categories.otherAccessories"),
-      icon: <Package size={14} />,
-    },
-    books: { label: t("categories.books"), icon: <BookOpen size={14} /> },
-    documents: { label: t("categories.documents"), icon: <FileText size={14} /> },
-    "small-toys": { label: t("categories.smallToys"), icon: <ToyBrick size={14} /> },
-    phone: { label: t("categories.phone"), icon: <Smartphone size={14} /> },
-    computer: { label: t("categories.computer"), icon: <Laptop size={14} /> },
-    "other-electronics": {
-      label: t("categories.otherElectronics"),
-      icon: <Cpu size={14} />,
-    },
-    "checked-bag-23kg": {
-      label: t("categories.checkedBag"),
-      icon: <Briefcase size={14} />,
-    },
-    "cabin-bag-12kg": {
-      label: t("categories.cabinBag"),
-      icon: <Briefcase size={14} />,
-    },
-  };
-
-  return map[category] ?? { label: category, icon: <Package size={14} /> };
-}
-
-// ── Custom radio button ──
-// Remplace <input type="radio"> natif pour garantir visibilité en dark mode
-// et éviter les bugs d'association label-input.
 function CustomRadio({ checked }: { checked: boolean }) {
   return (
     <span
@@ -222,21 +174,23 @@ export default function SearchFiltersSidebar({
                                                verifiedTicketCount,
                                                // selectedDepartureBuckets = [],   // ⚠️ Commenté — section désactivée
                                                // onToggleDepartureBucket,         // ⚠️ Commenté — section désactivée
-                                               selectedCategories,
-                                               onToggleCategory,
+                                               selectedFamilies,
+                                               onToggleFamily,
+                                               familyCounts,
+                                               weightKg,
+                                               onWeightChange,
                                                onClear,
                                                hideHeader = false,
                                                className = "",
                                              }: Props) {
   const t = useTranslations("search");
-  const tCommon = useTranslations("common");
 
-  const [showAllCategories, setShowAllCategories] = useState(false);
 
   // ── Sort options ──
   const sortOptions: Array<{
     value: SortOption;
     label: string;
+    hint?: string;
     icon: React.ReactNode;
   }> = [
     {
@@ -247,6 +201,7 @@ export default function SearchFiltersSidebar({
     {
       value: "lowestPrice",
       label: t("filters.lowestPrice"),
+      hint: weightKg ? t("filters.lowestPriceHintWeight", { kg: weightKg }) : t("filters.lowestPriceHint"),
       icon: <Banknote size={18} />,
     },
     {
@@ -302,17 +257,6 @@ export default function SearchFiltersSidebar({
   //   { value: "night",     label: t("departureTimes.night"),     range: "22h–06h", icon: <Moon size={14} /> },
   // ];
 
-  // ── Categories logic ──
-  const visibleCategories = useMemo(
-    () =>
-      showAllCategories
-        ? ALL_CATEGORIES
-        : ALL_CATEGORIES.slice(0, TOP_CATEGORIES_COUNT),
-    [showAllCategories]
-  );
-
-  const hiddenCategoriesCount = ALL_CATEGORIES.length - TOP_CATEGORIES_COUNT;
-
   // ── Detect if any filter is active (to show "Clear all") ──
   const hasActiveFilters =
     sort !== "earliest" ||
@@ -320,20 +264,22 @@ export default function SearchFiltersSidebar({
     profileVerifiedOnly ||
     instantBookingOnly ||
     verifiedTicketOnly ||
-    selectedCategories.length > 0;
+    selectedFamilies.length > 0 ||
+    weightKg !== null;
   // ⚠️ Réactiver pour "Horaires de départ" :
   // || selectedDepartureBuckets.length > 0;
 
   return (
     <aside
       className={[
-        "h-fit overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950",
+        "h-fit overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800/80 dark:bg-slate-900",
         className,
       ].join(" ")}
     >
+      {/* min-h-[44px] : même hauteur que l'en-tête des cartes résultat → alignées */}
       {!hideHeader && (
-        <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-4 dark:border-slate-800/60">
-          <h2 className="text-[15px] font-bold tracking-tight text-slate-900 dark:text-white">
+        <div className="flex min-h-[44px] items-center justify-between gap-3 border-b border-slate-100 bg-slate-50/50 px-5 py-2.5 dark:border-slate-800/60 dark:bg-slate-950/40">
+          <h2 className="text-[13px] font-bold tracking-tight text-slate-900 dark:text-white">
             {t("filters.sortBy")}
           </h2>
           {hasActiveFilters && (
@@ -381,13 +327,18 @@ export default function SearchFiltersSidebar({
                   <CustomRadio checked={isActive} />
                   <span
                     className={[
-                      "truncate text-[13px]",
+                      "min-w-0 text-[13px]",
                       isActive
                         ? "font-semibold text-slate-900 dark:text-white"
                         : "font-medium text-slate-700 dark:text-slate-300",
                     ].join(" ")}
                   >
                     {opt.label}
+                    {opt.hint && (
+                      <span className="block text-[11px] font-normal leading-tight text-slate-400 dark:text-slate-500">
+                        {opt.hint}
+                      </span>
+                    )}
                   </span>
                 </span>
                 <span
@@ -415,8 +366,8 @@ export default function SearchFiltersSidebar({
           </h3>
 
           <div className="space-y-1">
-            {trustOptions.map((option) => {
-              const disabled = option.count === 0;
+            {trustOptions.filter((o) => o.count > 0).map((option) => {
+              const disabled = false;
 
               return (
                 <button
@@ -481,7 +432,7 @@ export default function SearchFiltersSidebar({
                       "inline-flex flex-col items-start gap-0.5 rounded-xl border px-3 py-2 text-left transition-colors",
                       isActive
                         ? "border-[#FF9900]/50 bg-[#FFF6E8] dark:border-[#FF9900]/40 dark:bg-[#FF9900]/10"
-                        : "border-slate-200 bg-white hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:hover:bg-slate-900",
+                        : "border-slate-200 bg-white hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950/60 dark:hover:bg-slate-800",
                     ].join(" ")}
                   >
                     <span className={[
@@ -502,52 +453,71 @@ export default function SearchFiltersSidebar({
         )}
         */}
 
-        {/* ── Categories ── */}
+        {/* ── Votre colis (D33 V2) : le poids pilote prix, tri et capacité ── */}
+        <div className="space-y-2.5 border-t border-slate-100 pt-4 dark:border-slate-800/60">
+          <div className="flex items-center justify-between">
+            <h3 className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+              {t("filters.yourParcel")}
+            </h3>
+            <span className="text-[13px] font-bold tabular-nums text-slate-900 dark:text-white">
+              {(weightKg ?? 2).toLocaleString("fr-FR")} kg
+            </span>
+          </div>
+          <input
+            type="range"
+            min={0.5}
+            max={30}
+            step={0.5}
+            value={weightKg ?? 2}
+            aria-label={t("filters.weight")}
+            onChange={(e) => onWeightChange(Number(e.target.value))}
+            className="h-11 w-full cursor-pointer touch-pan-x"
+            style={{ accentColor: "#FF9900" }}
+          />
+          <p className="text-[11px] leading-snug text-slate-400 dark:text-slate-500">
+            {weightKg ? t("filters.weightHintActive", { kg: weightKg }) : t("filters.weightHint")}
+          </p>
+          <p className="text-[11px] leading-snug text-slate-400 dark:text-slate-500">
+            {t("filters.lightParcel", { min: MIN_PARCEL_PRICE_EUR })}
+          </p>
+        </div>
+
+        {/* ── Familles (D14/D33) : « Que voulez-vous envoyer ? » ── */}
         <div className="space-y-2.5 border-t border-slate-100 pt-4 dark:border-slate-800/60">
           <h3 className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-            {t("filters.categories")}
+            {t("filters.families")}
           </h3>
 
           <div className="flex flex-wrap gap-1.5">
-            {visibleCategories.map((category) => {
-              const meta = getCategoryMeta(category, tCommon);
-              const active = selectedCategories.includes(category);
-
+            {SEARCH_FAMILIES.map((family) => {
+              const active = selectedFamilies.includes(family);
+              const count = familyCounts[family];
+              const disabled = count === 0 && !active;
               return (
                 <button
-                  key={category}
+                  key={family}
                   type="button"
-                  onClick={() => onToggleCategory(category)}
+                  disabled={disabled}
+                  aria-pressed={active}
+                  onClick={() => onToggleFamily(family)}
                   className={[
-                    "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[11px] font-medium transition-colors",
+                    "inline-flex min-h-[36px] items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[11px] font-medium transition-colors",
                     active
                       ? "border-[#FF9900]/40 bg-[#FFF6E8] text-[#B45309] dark:border-[#FF9900]/30 dark:bg-[#FF9900]/10 dark:text-[#FFB84D]"
-                      : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300 dark:hover:bg-slate-900",
+                      : disabled
+                        ? "cursor-not-allowed border-slate-100 text-slate-300 dark:border-slate-800 dark:text-slate-600"
+                        : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950/60 dark:text-slate-300 dark:hover:bg-slate-800",
                   ].join(" ")}
                 >
-                  {meta.icon}
-                  {meta.label}
+                  {FAMILY_ICONS[family]}
+                  {t(`families.${family}`)}
+                  {typeof count === "number" && (
+                    <span className="text-[10px] tabular-nums text-slate-400 dark:text-slate-500">{count}</span>
+                  )}
                 </button>
               );
             })}
           </div>
-
-          {hiddenCategoriesCount > 0 && (
-            <button
-              type="button"
-              onClick={() => setShowAllCategories((prev) => !prev)}
-              className="inline-flex items-center gap-1 text-[12px] font-semibold text-[#FF9900] transition-colors hover:text-[#F08700] dark:text-[#FFB84D] dark:hover:text-[#FF9900]"
-            >
-              {showAllCategories
-                ? t("filters.showLess")
-                : t("filters.showAll", { count: ALL_CATEGORIES.length })}
-              {showAllCategories ? (
-                <ChevronUp size={14} />
-              ) : (
-                <ChevronDown size={14} />
-              )}
-            </button>
-          )}
         </div>
       </div>
     </aside>

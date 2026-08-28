@@ -117,9 +117,20 @@ export function getCreateTripCopy(isFr: boolean): CreateTripCopy {
     // ── Refonte UX step 2 : accordéons, popovers, familles en mots ──
     yourOffer: isFr ? "Ton offre" : "Your offer",
     whyThisPrice: isFr ? "Pourquoi ce prix ?" : "Why this price?",
-    factorBase: (v: string) => (isFr ? `Base du corridor : ${v} €/kg` : `Corridor base: ${v} €/kg`),
+    factorBase: (v: string, corridor: string) =>
+      isFr ? `Base du corridor${corridor ? ` ${corridor}` : ""} : ${v} €/kg` : `Corridor base${corridor ? ` ${corridor}` : ""}: ${v} €/kg`,
+    domesticLabel: isFr ? "trajet intérieur (même pays)" : "domestic trip (same country)",
+    zoneLabel: (zone: string) =>
+      ((isFr
+        ? { EUROPE: "Europe (UE, Royaume-Uni, Suisse…)", RUSSIA: "Russie", MAGHREB: "Maghreb", WEST_AFRICA: "Afrique de l'Ouest", CENTRAL_AFRICA: "Afrique centrale", EAST_SOUTH_AFRICA: "Afrique de l'Est/australe", MIDDLE_EAST: "Moyen-Orient", SOUTH_ASIA: "Asie du Sud", EAST_ASIA: "Asie de l'Est", SOUTHEAST_ASIA: "Asie du Sud-Est", CENTRAL_ASIA: "Asie centrale", NORTH_AMERICA: "Amérique du Nord", LATAM_CARIBBEAN: "Amérique latine/Caraïbes", DOM_TOM: "DOM-TOM", OCEANIA: "Océanie", UNKNOWN: "zone inconnue" }
+        : { EUROPE: "Europe (UE, Royaume-Uni, Suisse…)", RUSSIA: "Russie", MAGHREB: "Maghreb", WEST_AFRICA: "West Africa", CENTRAL_AFRICA: "Central Africa", EAST_SOUTH_AFRICA: "East/Southern Africa", MIDDLE_EAST: "Middle East", SOUTH_ASIA: "South Asia", EAST_ASIA: "East Asia", SOUTHEAST_ASIA: "Southeast Asia", CENTRAL_ASIA: "Central Asia", NORTH_AMERICA: "North America", LATAM_CARIBBEAN: "Latin America/Caribbean", DOM_TOM: "Overseas France", OCEANIA: "Oceania", UNKNOWN: "unknown zone" }
+      ) as Record<string, string>)[zone] ?? zone,
     factorDirectFlight: isFr ? "Vol direct" : "Direct flight",
     factorDepartureSoon: isFr ? "Départ imminent (moins de temps pour remplir)" : "Departure soon (less time to fill)",
+    minParcelPrice: (min: number) =>
+      isFr
+        ? `Colis léger (enveloppe, passeport, lunettes…) : aucun envoi ne te rapporte moins de ${min} €, quel que soit son poids.`
+        : `Light parcel (envelope, passport, glasses…): no shipment earns you less than €${min}, whatever its weight.`,
     priceHint: isFr
       ? "Un seul prix pour tout le trajet : l'Expéditeur paie poids × prix au kilo. La famille du colis ne change pas ce prix."
       : "One price for the whole trip: the sender pays weight × price per kg. The parcel family never changes it.",

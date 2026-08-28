@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Search, SlidersHorizontal, X } from "lucide-react";
 import { useTranslations, useLocale } from "next-intl";
 import TripSearchBar, { type TripSearchValue } from "./TripSearchBar";
@@ -13,12 +13,11 @@ import TripSearchBarSkeleton from "./TripSearchBarSkeleton";
 import MobileSearchExperienceSkeleton from "./MobileSearchExperienceSkeleton";
 import SavedRouteCTA from "@/components/saved-routes/SavedRouteCTA";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { useFixedSidebarPosition } from "@/hooks/useFixedSidebarPosition";
 import { useTripsSearch } from "@/hooks/useTripsSearch";
 import { useSearchFacets } from "@/hooks/useSearchFacets";
 import type {
   DepartureTimeBucket,
-  ParcelCategory,
+  SearchFamily,
   SortOption,
   TransportMode,
 } from "./search-results.types";
@@ -29,9 +28,8 @@ type FilterMode = "all" | TransportMode;
 const HEADER_HEIGHT = 78;
 const SEARCH_BAR_FIXED_HEIGHT = 96;
 const SIDEBAR_TOP = HEADER_HEIGHT + SEARCH_BAR_FIXED_HEIGHT + 16;
+const WEIGHT_STORAGE_KEY = "yamba.search.weightKg";
 
-const SIDEBAR_TRANSITION_MS = 500;
-const SIDEBAR_SLIDE_DISTANCE = 12;
 
 const PAGE_SIZE = 10;
 
@@ -52,45 +50,55 @@ function TransportModeTabsSkeleton() {
 
 function SearchFiltersSidebarSkeleton() {
   return (
-    <aside className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950">
-      <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 dark:border-slate-800/60">
-        <Skeleton className="h-5 w-24 rounded-md" />
+    <aside className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800/80 dark:bg-slate-900">
+      {/* En-tête 44 px, bandeau teinté — comme le vrai */}
+      <div className="flex min-h-[44px] items-center justify-between border-b border-slate-100 bg-slate-50/50 px-5 py-2.5 dark:border-slate-800/60 dark:bg-slate-950/40">
+        <Skeleton className="h-4 w-20 rounded-md" />
       </div>
       <div className="space-y-5 px-5 py-4">
+        {/* Tri : 3 options (la 2e a un sous-titre) */}
         <div className="space-y-2">
           {Array.from({ length: 3 }).map((_, index) => (
             <div key={index} className="flex items-center justify-between gap-3 px-2 py-2">
               <div className="flex items-center gap-3">
                 <Skeleton className="h-3.5 w-3.5 rounded-full" />
-                <Skeleton className="h-4 w-32 rounded-md" />
+                <div className="space-y-1">
+                  <Skeleton className="h-4 w-32 rounded-md" />
+                  {index === 1 && <Skeleton className="h-3 w-24 rounded-md" />}
+                </div>
               </div>
               <Skeleton className="h-4 w-4 rounded-md" />
             </div>
           ))}
         </div>
+        {/* Confiance : 2 lignes (les compteurs à 0 sont masqués) */}
         <div className="space-y-2 border-t border-slate-100 pt-4 dark:border-slate-800/60">
-          <Skeleton className="h-3 w-24 rounded-md" />
-          {Array.from({ length: 4 }).map((_, index) => (
+          <Skeleton className="h-3 w-28 rounded-md" />
+          {Array.from({ length: 2 }).map((_, index) => (
             <div key={index} className="flex items-center justify-between gap-3 px-2 py-1.5">
               <div className="flex items-center gap-3">
                 <Skeleton className="h-3.5 w-3.5 rounded-sm" />
                 <Skeleton className="h-4 w-28 rounded-md" />
               </div>
-              <div className="flex items-center gap-2">
-                <Skeleton className="h-3 w-4 rounded-md" />
-                <Skeleton className="h-4 w-4 rounded-md" />
-              </div>
+              <Skeleton className="h-4 w-4 rounded-md" />
             </div>
           ))}
         </div>
-        <div className="space-y-2 border-t border-slate-100 pt-4 dark:border-slate-800/60">
-          <Skeleton className="h-3 w-32 rounded-md" />
+        {/* Votre colis : libellé + poids, curseur, hint */}
+        <div className="space-y-2.5 border-t border-slate-100 pt-4 dark:border-slate-800/60">
+          <div className="flex items-center justify-between">
+            <Skeleton className="h-3 w-20 rounded-md" />
+            <Skeleton className="h-4 w-10 rounded-md" />
+          </div>
+          <Skeleton className="h-1.5 w-full rounded-full" />
+          <Skeleton className="h-3 w-5/6 rounded-md" />
+        </div>
+        {/* Familles : 8 chips */}
+        <div className="space-y-2.5 border-t border-slate-100 pt-4 dark:border-slate-800/60">
+          <Skeleton className="h-3 w-44 rounded-md" />
           <div className="flex flex-wrap gap-1.5">
-            {Array.from({ length: 6 }).map((_, index) => (
-              <Skeleton
-                key={index}
-                className={`h-7 rounded-full ${index % 3 === 0 ? "w-24" : "w-20"}`}
-              />
+            {["w-36", "w-40", "w-44", "w-44", "w-40", "w-36", "w-40", "w-40"].map((w, index) => (
+              <Skeleton key={index} className={`h-9 rounded-full ${w}`} />
             ))}
           </div>
         </div>
@@ -101,7 +109,7 @@ function SearchFiltersSidebarSkeleton() {
 
 function TripResultCardSkeletonMobile() {
   return (
-    <article className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
+    <article className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-800/80 dark:bg-slate-900">
       <div className="flex items-center justify-between border-b border-slate-100 px-3.5 py-2 dark:border-slate-800/60">
         <div className="flex items-center gap-2">
           <Skeleton className="h-5 w-14 rounded-full" />
@@ -123,11 +131,12 @@ function TripResultCardSkeletonMobile() {
           <Skeleton className="h-3 w-16 rounded-md" />
         </div>
         <div className="flex flex-col items-end space-y-1.5">
-          <Skeleton className="h-2 w-6 rounded-md" />
-          <Skeleton className="h-4 w-12 rounded-md" />
+          <Skeleton className="h-2 w-10 rounded-md" />
+          <Skeleton className="h-4 w-16 rounded-md" />
+          <Skeleton className="h-2 w-12 rounded-md" />
         </div>
       </div>
-      <div className="flex items-center justify-between border-t border-slate-100 px-3.5 py-2 dark:border-slate-800/60">
+      <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50/40 px-3.5 py-2 dark:border-slate-800/60 dark:bg-slate-950/60">
         <div className="flex items-center gap-2">
           <Skeleton className="h-7 w-7 rounded-full" />
           <div className="space-y-1">
@@ -146,8 +155,8 @@ function TripResultCardSkeletonMobile() {
 
 function TripResultCardSkeleton() {
   return (
-    <article className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
-      <div className="flex items-center gap-3 border-b border-slate-100 px-4 py-2.5 dark:border-slate-800/60">
+    <article className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-800/80 dark:bg-slate-900">
+      <div className="flex min-h-[44px] items-center gap-3 border-b border-slate-100 bg-slate-50/50 px-4 py-2.5 dark:border-slate-800/60 dark:bg-slate-950/40">
         <Skeleton className="h-6 w-16 rounded-full" />
         <Skeleton className="h-3 w-20 rounded-md" />
       </div>
@@ -167,12 +176,17 @@ function TripResultCardSkeleton() {
           <Skeleton className="h-3.5 w-12 rounded-md" />
           <Skeleton className="h-2.5 w-16 rounded-md" />
         </div>
+        {/* Bloc prix PER_KG : libellé · €/kg · kg dispo · filet · exemple */}
         <div className="flex flex-col items-end space-y-1.5">
-          <Skeleton className="h-2.5 w-12 rounded-md" />
-          <Skeleton className="h-6 w-20 rounded-md" />
+          <Skeleton className="h-2.5 w-14 rounded-md" />
+          <Skeleton className="h-6 w-24 rounded-md" />
+          <Skeleton className="h-3 w-16 rounded-md" />
+          <div className="w-full border-t border-dashed border-slate-200 pt-1.5 dark:border-slate-700">
+            <Skeleton className="ml-auto h-2.5 w-28 rounded-md" />
+          </div>
         </div>
       </div>
-      <div className="flex items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/50 px-4 py-2.5 dark:border-slate-800/60 dark:bg-slate-900/30">
+      <div className="mt-1 flex items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/50 px-4 py-2.5 dark:border-slate-800/60 dark:bg-slate-950/60">
         <div className="flex items-center gap-2.5">
           <Skeleton className="h-8 w-8 rounded-full" />
           <div className="space-y-1">
@@ -180,11 +194,7 @@ function TripResultCardSkeleton() {
             <Skeleton className="h-3 w-32 rounded-md" />
           </div>
         </div>
-        <div className="flex items-center gap-1.5">
-          {Array.from({ length: 4 }).map((_, index) => (
-            <Skeleton key={index} className="h-6 w-6 rounded-full" />
-          ))}
-        </div>
+        <Skeleton className="h-4 w-4 rounded-md" />
       </div>
     </article>
   );
@@ -263,12 +273,31 @@ export default function SearchResultsView() {
   const [verifiedTicketOnly, setVerifiedTicketOnly] = useState(false);
 
   const [selectedDepartureBuckets, setSelectedDepartureBuckets] = useState<DepartureTimeBucket[]>([]);
-  const [selectedCategories, setSelectedCategories] = useState<ParcelCategory[]>([]);
+  // D33 — le filtre « catégorie » legacy est remplacé par le filtre FAMILLE
+  const [selectedFamilies, setSelectedFamilies] = useState<SearchFamily[]>([]);
+  // D33 V2 — poids du colis (null = référence 2 kg). Mémorisé par navigateur.
+  const [weightKg, setWeightKgState] = useState<number | null>(null);
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(WEIGHT_STORAGE_KEY);
+      const v = raw ? Number(raw) : NaN;
+      if (Number.isFinite(v) && v >= 0.5 && v <= 30) setWeightKgState(v);
+    } catch {
+      /* stockage indisponible : on reste sur la référence */
+    }
+  }, []);
+  const setWeightKg = (v: number | null) => {
+    setWeightKgState(v);
+    try {
+      if (v === null) window.localStorage.removeItem(WEIGHT_STORAGE_KEY);
+      else window.localStorage.setItem(WEIGHT_STORAGE_KEY, String(v));
+    } catch {
+      /* ignore */
+    }
+  };
 
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
-  const { placeholderRef: sidebarPlaceholderRef, fixedRect } =
-    useFixedSidebarPosition(SIDEBAR_TOP);
 
   const [searchDraft, setSearchDraft] = useState<{
     from: string;
@@ -294,7 +323,8 @@ export default function SearchResultsView() {
       profileVerified: profileVerifiedOnly,
       instantBooking: instantBookingOnly,
       verifiedTicket: verifiedTicketOnly,
-      categories: selectedCategories,
+      families: selectedFamilies,
+      weightKg: weightKg ?? undefined,
       departureBuckets: selectedDepartureBuckets,
       limit: PAGE_SIZE,
       locale,
@@ -309,7 +339,8 @@ export default function SearchResultsView() {
       profileVerifiedOnly,
       instantBookingOnly,
       verifiedTicketOnly,
-      selectedCategories,
+      selectedFamilies,
+      weightKg,
       selectedDepartureBuckets,
       locale,
     ]
@@ -324,7 +355,8 @@ export default function SearchResultsView() {
         searchDraft.dateValue?.mode === "exact" && searchDraft.dateValue.date
           ? searchDraft.dateValue.date.toISOString()
           : undefined,
-      categories: selectedCategories,
+      families: selectedFamilies,
+      weightKg: weightKg ?? undefined,
       departureBuckets: selectedDepartureBuckets,
       locale,
     }),
@@ -333,7 +365,8 @@ export default function SearchResultsView() {
       searchDraft.from,
       searchDraft.to,
       searchDraft.dateValue,
-      selectedCategories,
+      selectedFamilies,
+      weightKg,
       selectedDepartureBuckets,
       locale,
     ]
@@ -381,9 +414,9 @@ export default function SearchResultsView() {
 
   const showHint = !searchDraft.from && !searchDraft.to;
 
-  const toggleCategory = (category: ParcelCategory) => {
-    setSelectedCategories((prev) =>
-      prev.includes(category) ? prev.filter((item) => item !== category) : [...prev, category]
+  const toggleFamily = (family: SearchFamily) => {
+    setSelectedFamilies((prev) =>
+      prev.includes(family) ? prev.filter((item) => item !== family) : [...prev, family]
     );
   };
 
@@ -399,7 +432,8 @@ export default function SearchResultsView() {
     setProfileVerifiedOnly(false);
     setInstantBookingOnly(false);
     setVerifiedTicketOnly(false);
-    setSelectedCategories([]);
+    setSelectedFamilies([]);
+    setWeightKg(null);
     setSelectedDepartureBuckets([]);
     setActiveMode("all");
     setSearchDraft({ from: "", to: "", dateValue: null });
@@ -420,7 +454,8 @@ export default function SearchResultsView() {
     profileVerifiedOnly ||
     instantBookingOnly ||
     verifiedTicketOnly ||
-    selectedCategories.length > 0 ||
+    selectedFamilies.length > 0 ||
+    weightKg !== null ||
     selectedDepartureBuckets.length > 0 ||
     !!searchDraft.from ||
     !!searchDraft.to;
@@ -442,8 +477,11 @@ export default function SearchResultsView() {
     verifiedTicketCount: facetsQuery.data?.verifiedTicketCount ?? 0,
     selectedDepartureBuckets,
     onToggleDepartureBucket: toggleDepartureBucket,
-    selectedCategories,
-    onToggleCategory: toggleCategory,
+    selectedFamilies,
+    onToggleFamily: toggleFamily,
+    familyCounts: facetsQuery.data?.familyCounts ?? {},
+    weightKg,
+    onWeightChange: setWeightKg,
     onClear: clearAll,
   };
 
@@ -453,19 +491,6 @@ export default function SearchResultsView() {
         @keyframes yambaShimmer {
           0% { transform: translateX(-100%); }
           100% { transform: translateX(100%); }
-        }
-        .yamba-sidebar-scroll::-webkit-scrollbar { width: 6px; }
-        .yamba-sidebar-scroll::-webkit-scrollbar-track { background: transparent; }
-        .yamba-sidebar-scroll::-webkit-scrollbar-thumb {
-          background-color: rgba(148, 163, 184, 0.3);
-          border-radius: 999px;
-        }
-        .yamba-sidebar-scroll::-webkit-scrollbar-thumb:hover {
-          background-color: rgba(148, 163, 184, 0.5);
-        }
-        .yamba-sidebar-scroll {
-          scrollbar-width: thin;
-          scrollbar-color: rgba(148, 163, 184, 0.3) transparent;
         }
       `}</style>
 
@@ -553,40 +578,23 @@ export default function SearchResultsView() {
               </div>
 
               <div className="grid gap-6 md:grid-cols-[280px_1fr] md:items-start">
-                <div ref={sidebarPlaceholderRef} className="relative hidden md:block">
-                  <div
-                    style={{
-                      opacity: fixedRect.isFixed ? 0 : 1,
-                      visibility: fixedRect.isFixed ? "hidden" : "visible",
-                      transition: `opacity ${SIDEBAR_TRANSITION_MS}ms cubic-bezier(0.16, 1, 0.3, 1)`,
-                    }}
-                  >
-                    <SearchFiltersSidebar {...sidebarProps} />
-                  </div>
+                {/* Sidebar collante : CSS natif (pas de JS au scroll → pas de retard).
+                    Le grid a `md:items-start` (indispensable au sticky) et aucun
+                    ancêtre n'a d'overflow hidden — cf. pièges CLAUDE.md. */}
+                <aside
+                  className="yamba-sidebar-scroll hidden overflow-y-auto rounded-2xl md:sticky md:block"
+                  style={{
+                    top: SIDEBAR_TOP,
+                    maxHeight: `calc(100vh - ${SIDEBAR_TOP}px - 24px)`,
+                  }}
+                >
+                  <SearchFiltersSidebar {...sidebarProps} />
+                </aside>
 
-                  <div
-                    className="yamba-sidebar-scroll overflow-y-auto rounded-2xl"
-                    style={{
-                      position: "fixed",
-                      top: SIDEBAR_TOP,
-                      left: fixedRect.left,
-                      width: fixedRect.width,
-                      maxHeight: `calc(100vh - ${SIDEBAR_TOP}px - 24px)`,
-                      zIndex: 30,
-                      opacity: fixedRect.isFixed ? 1 : 0,
-                      transform: fixedRect.isFixed
-                        ? "translateY(0)"
-                        : `translateY(-${SIDEBAR_SLIDE_DISTANCE}px)`,
-                      pointerEvents: fixedRect.isFixed ? "auto" : "none",
-                      transition: `opacity ${SIDEBAR_TRANSITION_MS}ms cubic-bezier(0.16, 1, 0.3, 1), transform ${SIDEBAR_TRANSITION_MS}ms cubic-bezier(0.16, 1, 0.3, 1)`,
-                    }}
-                    aria-hidden={!fixedRect.isFixed}
-                  >
-                    <SearchFiltersSidebar {...sidebarProps} />
-                  </div>
-                </div>
-
-                <div className="space-y-3">
+                {/* Pas de `space-y-3` ici : la liste mobile (md:hidden) est le 1er
+                    enfant et Tailwind ne l'exclut pas → marge fantôme de 12 px sur
+                    la liste desktop, qui désalignait la 1re carte avec « Trier par ». */}
+                <div>
                   {isError ? (
                     <ErrorState onRetry={() => tripsQuery.refetch()} />
                   ) : trips.length === 0 ? (
@@ -606,7 +614,8 @@ export default function SearchResultsView() {
                           <TripResultCardMobile
                             key={item.id}
                             item={item}
-                            highlightedCategories={selectedCategories}
+                            highlightedFamilies={selectedFamilies}
+                            weightKg={weightKg}
                           />
                         ))}
                       </div>
@@ -616,7 +625,8 @@ export default function SearchResultsView() {
                           <TripResultCard
                             key={item.id}
                             item={item}
-                            highlightedCategories={selectedCategories}
+                            highlightedFamilies={selectedFamilies}
+                            weightKg={weightKg}
                           />
                         ))}
                       </div>
