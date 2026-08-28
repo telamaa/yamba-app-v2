@@ -3605,6 +3605,32 @@
               }
             ]
           },
+          "weightKg": {
+            "description": "D33 V2 — écho du poids saisi par l'Expéditeur (kg) ; absent sinon",
+            "type": "number"
+          },
+          "transportForWeight": {
+            "description": "D33 V2 — transport (net Voyageur) pour ce poids, en euros. Null = aucun moteur",
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "totalForWeight": {
+            "description": "D33 V2 — total Expéditeur (transport + service D16) pour ce poids, en euros",
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "familyConditions": {
             "description": "D14 — positions ≠ ACCEPT du Voyageur (compact). Absent/vide = tout accepté",
             "type": "array",

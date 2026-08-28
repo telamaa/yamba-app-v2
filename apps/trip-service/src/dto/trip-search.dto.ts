@@ -101,6 +101,9 @@ export const searchTripsQuerySchema = z.object({
   categories: csvOf(PARCEL_CATEGORIES),
   // D33 — filtre famille : exclut les trajets qui REFUSENT une des familles
   families: csvOf(PARCEL_FAMILIES),
+  // D33 V2 — poids du colis de l'Expéditeur (kg) : prix par carte, tri et
+  // exclusion des trajets sans assez de capacité
+  weightKg: z.coerce.number().min(0.5).max(30).optional(),
   departureBuckets: csvOf(DEPARTURE_BUCKETS),
 
   // Pagination cursor-based
@@ -128,6 +131,7 @@ export const searchFacetsQuerySchema = z.object({
   dateTo: isoDate,
   categories: csvOf(PARCEL_CATEGORIES),
   families: csvOf(PARCEL_FAMILIES),
+  weightKg: z.coerce.number().min(0.5).max(30).optional(),
   departureBuckets: csvOf(DEPARTURE_BUCKETS),
   locale: z.enum(LOCALES).optional().default("fr"),
 });

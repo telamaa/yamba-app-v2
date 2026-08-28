@@ -80,6 +80,9 @@ export const YambaTripResultSchema = z
     minPrice: z.number().meta({ description: "En unités (euros), PAS en centimes — déjà divisé par 100. 0 pour un trip PER_KG (voir pricePerKg)" }),
     pricePerKg: z.number().nullish().meta({ description: "D13 — moteur PER_KG : prix au kilo en unités (euros). Null = trip legacy PER_CATEGORY" }),
     remainingKg: z.number().nullish().meta({ description: "CAP-02 — capacityKg − reservedKg, dérivé. Null si legacy" }),
+    weightKg: z.number().optional().meta({ description: "D33 V2 — écho du poids saisi par l'Expéditeur (kg) ; absent sinon" }),
+    transportForWeight: z.number().nullish().meta({ description: "D33 V2 — transport (net Voyageur) pour ce poids, en euros. Null = aucun moteur" }),
+    totalForWeight: z.number().nullish().meta({ description: "D33 V2 — total Expéditeur (transport + service D16) pour ce poids, en euros" }),
     familyConditions: z
       .array(
         z.object({

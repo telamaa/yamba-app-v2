@@ -36,7 +36,12 @@
     "showAll": "Voir tout ({count})",
     "showLess": "Voir moins",
     "families": "Que voulez-vous envoyer ?",
-    "lowestPriceHint": "pour un colis de 2 kg"
+    "lowestPriceHint": "pour un colis de 2 kg",
+    "yourParcel": "Votre colis",
+    "weight": "Poids du colis",
+    "weightHint": "Indiquez le poids : chaque trajet affichera son prix pour votre colis.",
+    "weightHintActive": "Prix et tri calculés pour {kg} kg · trajets sans assez de place exclus",
+    "lowestPriceHintWeight": "pour votre colis de {kg} kg"
   },
   "departureTimes": {
     "morning": "Matin",
@@ -59,7 +64,9 @@
     "perKg": "prix au kilo",
     "remainingKg": "{kg} kg dispo",
     "example": "ex. {kg} kg ≈ {price} € tout compris",
-    "surcharge": "{family} : +{pct} %"
+    "surcharge": "{family} : +{pct} %",
+    "exampleForWeight": "≈ {price} € tout compris pour {kg} kg",
+    "notEnoughKg": "Plus assez de place"
   },
   "pricingSheet": {
     "title": "Tarifs par catégorie",
