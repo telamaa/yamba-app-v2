@@ -46,10 +46,14 @@ et le filtre devient **par famille** : un trajet est exclu s'il **refuse** la fa
 - **Le filtre catégorie reste accepté par l'API** (compatibilité des clients / des URLs partagées) mais ne cache plus les trajets au kilo ; l'UI ne le propose plus.
 - **Les facettes famille sont calculées sur la base SANS filtre famille** : sinon, cocher « Alimentaire » mettrait toutes les autres chips au compte des trajets-qui-acceptent-l'alimentaire — ce n'est pas ce qu'un utilisateur attend d'un compteur par chip.
 
+## 3bis. Régression vue en QA : « 5 comptés, 4 affichés »
+
+Les facettes comptent avec un `where` Prisma ; la liste passe ensuite chaque trajet dans `mapTripToYambaResult`, qui **écartait** (try/catch + `console.warn`) tout trajet sans `arrivalAt`. Le trajet seed `bzv-perkg` n'en a pas → compté, jamais affiché. Le mapper n'exige plus que `departureAt` (le critère de recherche) ; sans arrivée : heure « — », pas de durée ni de « lendemain ». **+3 specs** (`trip-mappers.spec.ts`, première fixture du mapper). Règle : *ce que les facettes comptent, la liste doit pouvoir l'afficher* — un rejet dans un mapper de lecture est toujours suspect.
+
 ## 4. Vérifier
 
 ```sh
-npx tsc --noEmit --project apps/trip-service/tsconfig.app.json && npx nx test trip-service   # 179
+npx tsc --noEmit --project apps/trip-service/tsconfig.app.json && npx nx test trip-service   # 182
 npx tsc --noEmit --project apps/user-ui/tsconfig.json
 curl "localhost:6002/trips/search?sort=lowestPrice&locale=fr"          # PER_KG et legacy mélangés, triés
 curl "localhost:6002/trips/search?families=FOOD_DRY_SEALED&locale=fr"  # bzv-perkg (alimentaire refusé) absent
