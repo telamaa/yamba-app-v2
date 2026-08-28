@@ -4,7 +4,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-Yamba is a crowdshipping app: **shippers** (expéditeurs) book parcel deliveries with **carriers** (voyageurs) who publish trips. Nx monorepo (npm workspaces), TypeScript strict, comments/docs/i18n primarily in **French** — keep new comments and docs in French.
+Yamba is a crowdshipping app: **shippers** (expéditeurs) book parcel deliveries with **carriers** (voyageurs — "Yamber"/"Tripper" in UI copy) who publish trips. Nx monorepo (npm workspaces), TypeScript strict, comments/docs/i18n primarily in **French** — keep new comments and docs in French. Public API surfaces (OpenAPI, API error messages, event keys) are in **English**.
+
+## Read first (governance)
+
+Before any non-trivial task, read in this order:
+
+1. `context/YAMBA-CONTEXT.md` — done / remaining / non-negotiable rules.
+2. `context/YAMBA-SPECIFICATION-COMPLETE.md` — end-to-end spec (domain, state machines, pricing, events, security, roadmap).
+3. The latest `context/YAMBA-CONTEXT-HANDOFF-*.md` — exact state of the current worksite.
+4. Per task: `context/YAMBA-REGISTRE-DECISIONS-ROADMAP-v1.3.md` (**the master document** — decisions D1–D31; architecture decisions are recorded there BEFORE code, never after), `context/YAMBA-REGLES-METIER-V2.md` (~50 business rules), `context/mockup-pricing-yamba.html` (pricing form spec).
+
+Precedence on divergence: code + its tests > registre > business rules > syntheses in `context/`. `docs/` also contains detailed French functional + technical specs (booking shipper wizard, carrier deal request) — read the relevant `YAMBA-DOC-TECHNIQUE-*.md` before evolving those features.
 
 ## Commands
 
@@ -16,19 +27,33 @@ npx nx dev user-ui                 # Next.js frontend only (port 3000)
 npx nx serve api-gateway           # gateway (port 8080)
 npx nx serve auth-service          # port 6001
 npx nx serve trip-service          # port 6002
+npx nx serve deal-service          # port 6003
+npx nx serve notification-service  # port 6004 (Kafka consumer — needs Redpanda up)
 
 npx nx build <project>             # production build
 npx nx typecheck <project>         # TS typecheck
 npx nx test <project>              # jest tests for one project
 npx nx test <project> -- --testPathPatterns=<pattern>   # single test file (jest 30)
 
-npx prisma generate                # after editing prisma/schema.prisma
+npx prisma generate                # after editing prisma/schema.prisma (schema at repo ROOT)
 npx prisma db push                 # sync schema to MongoDB (no migrations — Mongo provider)
 
-npm run auth-docs && npm run trip-docs   # regenerate swagger-output.json (swagger-autogen)
+npm run auth-docs                  # regenerate auth swagger-output.json (swagger-autogen — legacy, conversion to Zod-OpenAPI is backlog)
 ```
 
-No linter is configured (Nx generators use `linter: none`). Root `.env` holds all secrets (`DATABASE_URL` Mongo, `REDIS_DATABASE_URI`, JWT secrets, SMTP, Stripe, Google Maps) — see `.env.example`.
+Test platform baseline: **396 tests** (trip-service 157, deal-service 218, notification-service 21) — any deviation must be explained.
+
+Manual `tsc` (when Nx typecheck target is not what you want): `npx tsc --noEmit --project apps/<service>/tsconfig.app.json` — NEVER `--project apps/<service>` (resolves the solution-style tsconfig: 0 files checked).
+
+No linter is configured (Nx generators use `linter: none`). Root `.env` holds all secrets (`DATABASE_URL` Mongo, `REDIS_DATABASE_URI`, JWT secrets, SMTP, Stripe, Google Maps) — see `.env.example`. Never commit any `.env` (`.example` files are fine).
+
+## Git & CI
+
+- Base branch `dev`, protected by **12 required status checks** (TypeScript ×6, unit tests ×3: deal/notification/trip, i18n FR/EN mirror, secrets anti-leak, OpenAPI contracts generate+diff). Never commit directly to `dev`: `feat/*` or `chore/*` branch + PR.
+- "CI OK" is verified by COUNTING checks, not by their color alone.
+- Tests live in the SAME PR as their logic (decision D30). PR number is recorded at merge time.
+- `git status --short` before staging; `git add` always WITH an explicit pathspec; `git log --oneline -1` right after each commit.
+- Never `npm audit fix --force` inside a feature PR (dedicated `chore/deps` PR).
 
 ## Architecture
 
@@ -38,9 +63,10 @@ Requests flow: `user-ui (3000)` → `api-gateway (8080)` → microservices. The 
 
 - `/api/trips/*` → trip-service `:6002` as `/trips/*`
 - `/api/uploads/*` → trip-service `:6002` as `/uploads/*` (ImageKit)
+- deal-service routes → `:6003` (VERIFY exact gateway prefix in `apps/api-gateway/src/main.ts` before relying on it)
 - everything else → auth-service `:6001` (catch-all)
 
-**auth-service**: auth (register/login/refresh), carrier onboarding + Stripe, saved routes, public user profiles, cron jobs (`src/cron/`), nodemailer emails. **trip-service**: trips CRUD + search (zod schemas in `src/schemas/`), uploads, trip notifications. Both follow `routes/ → controller(s)/ → service(s)/`.
+**auth-service**: auth (register/login/refresh), carrier onboarding + Stripe, saved routes, public user profiles, cron jobs (`src/cron/`), nodemailer emails. **trip-service**: trips CRUD + search + lifecycle state machine + pricing gate (zod schemas in `src/schemas/`), uploads, OpenAPI 3.1 generated from Zod (99 paths, Scalar viewer at `:6002/docs`). **deal-service**: Booking model, server-side state machine (9 statuses, 12 actor-bound transitions — mirror of `SPECIFICATIONS-WORKFLOW-BOOKING-YAMBA.md` §2.2), role-scoped DTOs, transactional outbox + Redpanda relay. **notification-service**: first Kafka consumer (event-id dedup, offsets committed post-processing). All follow `routes/ → controller(s)/ → service(s)/`.
 
 ### Shared code — `packages/` via `@packages/*` alias
 
@@ -48,6 +74,8 @@ Requests flow: `user-ui (3000)` → `api-gateway (8080)` → microservices. The 
 - `packages/libs/redis` — ioredis singleton
 - `packages/middleware` — `isAuthenticated`, `isOptionallyAuthenticated`, `authorizeRoles` (JWT from `access_token` cookie or Bearer header)
 - `packages/error-handler`
+- `packages/api-contracts` — Zod schemas + shared status sets, single source for OpenAPI; alias declared BEFORE the `@packages/*` wildcard in `tsconfig.base.json`
+- `packages/messaging` — `EventPublisher` interface; kafkajs isolated here (connection errors come back `retriable: false` — intercept explicitly)
 
 ### Auth flow
 
@@ -55,12 +83,33 @@ JWT `access_token` + `refresh_token` set as cookies by auth-service. Frontend `a
 
 ### Frontend — `apps/user-ui` (Next.js 16 App Router)
 
-- **i18n**: next-intl. All pages live under `src/app/[locale]/`; `src/middleware.ts` handles locale routing (fr/en). Messages are per-domain JSON in `messages/{fr,en}/<domain>.json` — add keys to **both** locales.
+- **i18n**: next-intl. All pages live under `src/app/[locale]/`; `src/middleware.ts` handles locale routing (fr/en). Messages are per-domain JSON in `messages/{fr,en}/<domain>.json` — add keys to **both** locales (CI mirrors them).
 - **Feature-folder convention** in `src/components/<domain>/<feature>/`: `FeatureClient.tsx` (entry), `FeatureSkeleton.tsx`, `feature.api.ts`, `feature.state.ts`, `feature.types.ts`, plus `views/`, `shared/`, `steps/` subfolders. See `components/booking/booking-tracker/` as reference.
-- **Next.js 16 rule**: function props passed to client components must be suffixed `Action` (e.g. `onSelectAction`) or TS71007 fires. Legacy violations are catalogued in `TODO-LEGACY-FIXES.md`.
+- **Next.js 16 rule**: function props passed to client components must be suffixed `Action` (e.g. `onSelectAction`) or TS71007 fires. Legacy violations are catalogued in `TODO-LEGACY-FIXES.md`. `params` in page components is a Promise → `await` it.
 - **Double UI**: many features have separate desktop/mobile component trees (e.g. `BookingStepperDesktop` / `BookingStepperMobile`), switched via `useIsMobile`.
 - Data fetching: TanStack Query; hooks in `src/hooks/`, API layers in `src/services/*.api.ts` or colocated `feature.api.ts`.
+- Design system: mango `#FF9900` + teal `#0F766E`, dark/light via class strategy.
 
-### Domain docs
+## Non-negotiable rules
 
-`docs/` contains detailed French functional + technical specs (booking shipper wizard, carrier deal request). Read the relevant `YAMBA-DOC-TECHNIQUE-*.md` before evolving those features — they document conventions, pitfalls, and file catalogues.
+- Monetary amounts are **cents as `Int`** + a `currency` field. Never Float.
+- Role-scoped DTOs are strict whitelists (never spread+delete).
+- The delivery code NEVER travels in events or emails.
+- No state change without an outbox event written in the SAME Mongo transaction.
+- Pricing snapshot in a Booking is immutable — never recomputed from the Trip.
+- 403 vs 404 semantics respected (don't reveal resource existence).
+- Every business limit is enforced server-side; the front only reflects `allowedActions` from the API — it never decides.
+- State machines are executable mirrors of the spec: any divergence is a bug in the machine or the spec, never an "interpretation" in a controller.
+- Any new architecture decision made during a task must be proposed as a registre entry (D-next), not left implicit in code.
+
+## Known pitfalls (paid once, never twice)
+
+- Prisma+Mongo: `readAt: null` in a `where` misses absent fields → `OR: [{readAt: null}, {readAt: {isSet: false}}]`.
+- Nullable unique fields on Mongo collide on null (P2002).
+- macOS FS is case-insensitive, CI Linux is not → exact-case imports.
+- `overflow-x: clip` (not `hidden`) to preserve `position: sticky`.
+- Seeds live in `packages/libs/prisma/scripts/`, relative imports, run via `npx tsx`.
+
+## End of task
+
+A delivery = a PR merged into `dev` with its tests. If the done/remaining state moved, update `context/YAMBA-CONTEXT.md`.
