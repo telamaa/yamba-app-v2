@@ -44,6 +44,7 @@ export const initialDraft: Draft = {
   recipient: {
     firstName: "",
     lastName: "",
+    phonePrefix: "+33",
     phoneE164: "",
     email: "",
   },
@@ -54,7 +55,7 @@ export const initialDraft: Draft = {
   paymentMethod: "CARD",
 };
 
-export const DRAFT_VERSION = 3; // v3 : moteur PER_KG (product / family / sizeClass) — les brouillons v2 sont abandonnés
+export const DRAFT_VERSION = 4; // v3 : moteur PER_KG (product / family / sizeClass) — les brouillons v2 sont abandonnés
 
 // ============================================================
 // MOCK TRIP

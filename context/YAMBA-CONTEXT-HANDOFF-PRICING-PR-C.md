@@ -14,6 +14,9 @@ Voir `context/fiches-pr/PR-C-booking-per-kg/`. **D34 gravée** : `@packages/pric
 - Front : `pricing-example.ts` / `price-for-weight.ts` / `comparable-price.ts` (recherche) dupliquent encore les paramètres → migrer vers `PRICING_PARAMS` dans la PR « paramètres serveur » (`GET /pricing/params`).
 - `computeComparablePriceCents` (D33) devrait appeler `quoteShipperPrice` pour le colis de référence — même PR.
 
+- **B2 — étape 4 (revue captures)** : le front affiche AUJOURD'HUI deux systèmes de choix de paiement (nos radios Carte / Apple Pay / Google Pay **et** les onglets du Payment Element Stripe : Klarna, Bancontact, Amazon Pay, eps). À la création du PaymentIntent : **restreindre `payment_method_types` à `card`** (+ wallets via le Payment Element lui-même) et **supprimer nos radios** — un seul système, celui de Stripe. Exigence B2, pas un bricolage front.
+- Téléphone destinataire : le stub envoie déjà `recipientPhone` en E.164 (`recipientPhoneE164(draft)`) — B2 le stocke tel quel dans `BookingRecipientSnapshot`.
+
 ## §4 — Leçons
 1. `apps/user-ui/tsconfig.json` **redéfinit `paths`** : un alias ajouté à `tsconfig.base.json` n'y arrive pas ; l'ajouter aussi + `include` du fichier.
 2. Un remplacement de bloc multi-lignes échoue silencieusement sur une ligne vide de plus — vérifier au `grep` après chaque patch.

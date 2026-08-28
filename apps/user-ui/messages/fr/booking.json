@@ -110,10 +110,11 @@
       "firstName": "Prénom",
       "lastName": "Nom",
       "phone": "Téléphone",
-      "phoneHint": "Pour transmettre le code par SMS / WhatsApp",
+      "phoneHint": "Le code de livraison lui sera envoyé par SMS / WhatsApp — indique l'indicatif de son pays.",
       "email": "Email",
       "emailOptional": "(optionnel)",
-      "emailHint": "Pour notifier le destinataire de l''arrivée du colis"
+      "emailHint": "Pour notifier le destinataire de l''arrivée du colis",
+      "phonePrefix": "Indicatif pays"
     }
   },
   "step3": {
@@ -233,5 +234,6 @@
     "subtitle": "Une réservation engage un Voyageur : Yamba a besoin de savoir qui envoie. Ton colis et ce trajet t'attendent après connexion.",
     "login": "Se connecter",
     "register": "Créer un compte"
-  }
+  },
+  "previousStep": "Étape précédente"
 }

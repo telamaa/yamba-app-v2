@@ -168,7 +168,7 @@ export default function BookingBottomSheet({
             onClick={onBackAction}
             className="mt-1 w-full p-2 text-center text-[13px] text-slate-500 dark:text-slate-400"
           >
-            {t("back")}
+            {t("previousStep")}
           </button>
         )}
       </div>
