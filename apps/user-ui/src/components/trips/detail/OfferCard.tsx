@@ -66,34 +66,49 @@ export default function OfferCard({ trip, weightKg }: Props) {
         <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">{t("offer.hint")}</p>
       </header>
 
-      {/* Prix · capacité · exemple */}
-      <div className="mx-5 mb-4 flex flex-wrap items-center gap-x-5 gap-y-2 rounded-xl border border-[#0F766E]/20 px-4 py-3"
-           style={{ background: "linear-gradient(135deg, rgba(15,118,110,0.07) 0%, rgba(255,153,0,0.05) 100%)" }}>
-        <div>
-          <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-            {t("offer.perKg")}
-          </div>
-          <div className="text-xl font-black tabular-nums leading-none text-slate-900 dark:text-white">
-            {formatPrice(perKgCents, trip.currencyCode, locale)}
-            <span className="text-sm font-semibold text-slate-500 dark:text-slate-400">/kg</span>
-          </div>
-        </div>
-        {remaining !== null && (
+      {/* Prix · capacité · estimation — deux stats aérées, puis l'estimation sur sa ligne */}
+      <div
+        className="mx-5 mb-5 rounded-2xl border border-[#0F766E]/20 px-5 py-4"
+        style={{ background: "linear-gradient(135deg, rgba(15,118,110,0.07) 0%, rgba(255,153,0,0.05) 100%)" }}
+      >
+        <div className="grid grid-cols-2 gap-6">
           <div>
             <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              {t("offer.available")}
+              {t("offer.perKg")}
             </div>
-            <div className={`text-xl font-black tabular-nums leading-none ${notEnough ? "text-slate-400 dark:text-slate-500" : "text-[#0F766E] dark:text-teal-400"}`}>
-              {remaining.toLocaleString(locale === "fr" ? "fr-FR" : "en-US")} kg
+            <div className="mt-1.5 text-2xl font-black tabular-nums leading-none text-slate-900 dark:text-white">
+              {formatPrice(perKgCents, trip.currencyCode, locale)}
+              <span className="ml-0.5 text-sm font-semibold text-slate-500 dark:text-slate-400">/kg</span>
             </div>
           </div>
-        )}
-        <div className="min-w-[10rem] flex-1 text-[12px] leading-snug text-slate-600 dark:text-slate-300">
-          {notEnough
-            ? t("offer.notEnough", { kg: kgLabel })
-            : weightKg
-              ? t("offer.exampleFromSearch", { kg: kgLabel, price: formatPrice(example, trip.currencyCode, locale) })
-              : t("offer.example", { kg: kgLabel, price: formatPrice(example, trip.currencyCode, locale) })}
+          {remaining !== null && (
+            <div>
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                {t("offer.available")}
+              </div>
+              <div className={`mt-1.5 text-2xl font-black tabular-nums leading-none ${notEnough ? "text-slate-400 dark:text-slate-500" : "text-[#0F766E] dark:text-teal-400"}`}>
+                {remaining.toLocaleString(locale === "fr" ? "fr-FR" : "en-US")}
+                <span className="ml-0.5 text-sm font-semibold text-slate-500 dark:text-slate-400">kg</span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="mt-4 border-t border-[#0F766E]/15 pt-3.5 dark:border-slate-700">
+          <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+            {notEnough ? t("offer.estimateLabel") : weightKg ? t("offer.estimateLabelFromSearch", { kg: kgLabel }) : t("offer.estimateLabel2", { kg: kgLabel })}
+          </div>
+          {notEnough ? (
+            <div className="mt-1 text-[13px] font-semibold text-slate-600 dark:text-slate-300">{t("offer.notEnough", { kg: kgLabel })}</div>
+          ) : (
+            <>
+              <div className="mt-1 text-lg font-bold tabular-nums leading-tight text-slate-900 dark:text-white">
+                ≈ {formatPrice(example, trip.currencyCode, locale)}
+                <span className="ml-1.5 text-[12px] font-medium text-slate-500 dark:text-slate-400">{t("offer.allIn")}</span>
+              </div>
+              <div className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">{t("offer.finalAtBooking")}</div>
+            </>
+          )}
         </div>
       </div>
 
