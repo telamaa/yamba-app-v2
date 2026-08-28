@@ -21,6 +21,7 @@ import type {
   ParcelFamily,
   TripLocationPoint,
 } from "./create-trip.types";
+import { CABIN_BAG_KG, CHECKED_BAG_KG, isBagActive } from "./create-trip.config";
 
 // ─── Enum conversion ─────────────────────────
 
@@ -292,8 +293,13 @@ export function mapDraftToPayload(
       typeof draft.capacityKg === "number" && draft.capacityKg > 0
         ? draft.capacityKg
         : null,
-    checkedBag23PriceCents: toCentsOrNull(draft.checkedBag23Price),
-    cabinBag12PriceCents: toCentsOrNull(draft.cabinBag12Price),
+    // RG-B-29 : un forfait suspendu (capacité < franchise) ne part jamais
+    checkedBag23PriceCents: isBagActive(draft.checkedBag23Price, CHECKED_BAG_KG, draft.capacityKg)
+      ? toCentsOrNull(draft.checkedBag23Price)
+      : null,
+    cabinBag12PriceCents: isBagActive(draft.cabinBag12Price, CABIN_BAG_KG, draft.capacityKg)
+      ? toCentsOrNull(draft.cabinBag12Price)
+      : null,
     familyConditions: mapFamilyConditionsForApi(draft.familyConditions),
 
     // ── Lieux de remise / livraison ──

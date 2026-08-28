@@ -43,6 +43,7 @@ import {
   estimateNetGain,
   getDefaultLocationsForMode,
   getFairPriceVerdict,
+  isBagActive,
   roundToHalf,
   suggestPricePerKg,
   summarizeFamilyConditions,
@@ -155,7 +156,9 @@ export default function StepConditions({
 
   /* ── Résumés des accordéons ── */
   const familiesSummary = summarizeFamilyConditions(draft.familyConditions, isFr) ?? copy.familiesAllAccepted;
-  const bagsCount = (draft.checkedBag23Price !== "" ? 1 : 0) + (draft.cabinBag12Price !== "" ? 1 : 0);
+  const bagsCount =
+    (isBagActive(draft.checkedBag23Price, CHECKED_BAG_KG, draft.capacityKg) ? 1 : 0) +
+    (isBagActive(draft.cabinBag12Price, CABIN_BAG_KG, draft.capacityKg) ? 1 : 0);
   const bagsSummary = bagsCount === 0 ? copy.bagsNone : copy.bagsSummary(bagsCount);
   const optionsSummary = draft.handDeliveryOnly ? copy.handOnly : null;
 
