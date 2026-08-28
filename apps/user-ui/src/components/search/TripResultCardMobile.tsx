@@ -5,16 +5,23 @@ import { ChevronRight, AlertCircle, HelpCircle } from "lucide-react";
 import { Link } from "@/i18n/navigation";
 import { useBottomSheet } from "@/hooks/useBottomSheet";
 import TripPricingBottomSheet from "./TripPricingBottomSheet";
-import { ParcelCategory, YambaTripResult } from "./search-results.types";
+import { ParcelCategory, SearchFamily, YambaTripResult } from "./search-results.types";
+import { SurchargePills } from "./SurchargePills";
 
 type Props = {
   item: YambaTripResult;
   highlightedCategories?: ParcelCategory[];
+  /** D33 — familles filtrées : on affiche le supplément éventuel du Voyageur */
+  highlightedFamilies?: SearchFamily[];
+  /** D33 V2 — poids saisi : exemple pour CE poids et alerte capacité */
+  weightKg?: number | null;
 };
 
 export default function YambaTripResultCardMobile({
                                                     item,
                                                     highlightedCategories = [],
+                                         highlightedFamilies = [],
+                                         weightKg = null,
                                                   }: Props) {
   const t = useTranslations("search");
   const { isOpen, open, close } = useBottomSheet();
@@ -136,6 +143,12 @@ export default function YambaTripResultCardMobile({
                       {t("card.remainingKg", { kg: item.remainingKg })}
                     </div>
                   )}
+                  <SurchargePills conditions={item.familyConditions} highlightedFamilies={highlightedFamilies} size="[9px]" />
+                  {weightKg && typeof item.totalForWeight === "number" && (
+                    <div className="mt-0.5 text-[9px] text-slate-600 dark:text-slate-300">
+                      {t("card.exampleForWeight", { kg: weightKg, price: item.totalForWeight.toLocaleString("fr-FR", { maximumFractionDigits: 0 }) })}
+                    </div>
+                  )}
                 </>
               ) : (
                 <>
@@ -163,7 +176,7 @@ export default function YambaTripResultCardMobile({
         </div>
 
         {/* ── Footer : tripper + catégories ── */}
-        <div className="flex items-center justify-between gap-2 border-t border-slate-100 bg-slate-50/40 px-3.5 py-2 dark:border-slate-800/60 dark:bg-slate-950/40">
+        <div className="flex items-center justify-between gap-2 border-t border-slate-100 bg-slate-50/40 px-3.5 py-2 dark:border-slate-800/60 dark:bg-slate-950/60">
           <div className="flex min-w-0 flex-1 items-center gap-2">
             <Avatar item={item} />
             <div className="min-w-0 flex-1">

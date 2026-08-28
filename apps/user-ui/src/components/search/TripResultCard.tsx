@@ -30,9 +30,11 @@ import { useTranslations, useLocale } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import {
   ParcelCategory,
+  SearchFamily,
   TransportMode,
   YambaTripResult,
 } from "./search-results.types";
+import { SurchargePills } from "./SurchargePills";
 import { formatLocation } from "./formatTripTimes";
 import TripPricingPopover from "./TripPricingPopover";
 
@@ -40,6 +42,10 @@ type Props = {
   item: YambaTripResult;
   maxVisibleCategories?: number;
   highlightedCategories?: ParcelCategory[];
+  /** D33 — familles filtrées : on affiche le supplément éventuel du Voyageur */
+  highlightedFamilies?: SearchFamily[];
+  /** D33 V2 — poids saisi : exemple pour CE poids et alerte capacité */
+  weightKg?: number | null;
 };
 
 function TransportIcon({ mode, size = 13 }: { mode: TransportMode; size?: number }) {
@@ -81,6 +87,8 @@ export default function TripResultCard({
                                          item,
                                          maxVisibleCategories = 3,
                                          highlightedCategories = [],
+                                         highlightedFamilies = [],
+                                         weightKg = null,
                                        }: Props) {
   const t = useTranslations("search");
   const tCategories = useTranslations("search.categories");
@@ -187,7 +195,7 @@ export default function TripResultCard({
       "
     >
       {/* ── Header: transport + date + capacité ── */}
-      <div className="flex items-center gap-3 border-b border-slate-100 px-4 py-2.5 dark:border-slate-800/60">
+      <div className="flex min-h-[44px] items-center gap-3 border-b border-slate-100 bg-slate-50/50 px-4 py-2.5 dark:border-slate-800/60 dark:bg-slate-950/40">
         <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-300">
           <TransportIcon mode={item.transportMode} />
           {transportLabel}
@@ -317,12 +325,25 @@ export default function TripResultCard({
             )}
           </div>
           {isPerKg && typeof item.remainingKg === "number" && (
-            <div className="mt-0.5 text-[10px] font-medium text-[#0F766E] dark:text-teal-400">
+            <div className="mt-1.5 text-[11px] font-semibold text-[#0F766E] dark:text-teal-400">
               {t("card.remainingKg", { kg: item.remainingKg })}
             </div>
           )}
-          {isPerKg && (
-            <div className="mt-0.5 text-[10px] text-slate-400 dark:text-slate-500">
+          <SurchargePills conditions={item.familyConditions} highlightedFamilies={highlightedFamilies} />
+          {isPerKg && weightKg && typeof item.remainingKg === "number" && item.remainingKg < weightKg && (
+            <div className="mt-1 inline-flex rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+              {t("card.notEnoughKg")}
+            </div>
+          )}
+          {weightKg && typeof item.totalForWeight === "number" ? (
+            <div className="mt-2 border-t border-dashed border-slate-200 pt-1.5 text-[10px] leading-snug text-slate-600 dark:border-slate-700 dark:text-slate-300">
+              {t("card.exampleForWeight", {
+                kg: weightKg,
+                price: item.totalForWeight.toLocaleString(localeTag, { maximumFractionDigits: 0 }),
+              })}
+            </div>
+          ) : isPerKg && (
+            <div className="mt-2 border-t border-dashed border-slate-200 pt-1.5 text-[10px] leading-snug text-slate-400 dark:border-slate-700 dark:text-slate-500">
               {t("card.example", {
                 kg: 2,
                 price: (estimateShipperTotalCents(Math.round((item.pricePerKg as number) * 100)).totalCents / 100).toLocaleString(localeTag, { maximumFractionDigits: 0 }),
@@ -344,7 +365,7 @@ export default function TripResultCard({
       </div>
 
       {/* ── Footer: tripper + catégories + chevron ── */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/50 px-4 py-2.5 dark:border-slate-800/60 dark:bg-slate-950/40">
+      <div className="mt-1 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/50 px-4 py-2.5 dark:border-slate-800/60 dark:bg-slate-950/60">
         {/* Tripper info */}
         <div className="flex min-w-0 items-center gap-2.5">
           <div className="relative h-8 w-8 shrink-0">

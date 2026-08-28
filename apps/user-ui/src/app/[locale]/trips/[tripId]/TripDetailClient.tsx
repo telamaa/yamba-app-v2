@@ -52,8 +52,8 @@ export default function TripDetailClient({ tripId }: Props) {
  * Skeleton fidèle à la structure réelle de la page :
  * - Header (back + titre + sous-titre)
  * - Grid 1fr_360px en desktop :
- *    - Colonne gauche : bloc unifié avec ItineraryCard / CategoriesCard / ConditionsCard
- *    - Colonne droite (sticky) : BookingSummaryCard
+ *    - Colonne gauche : ItineraryCard / OfferCard (+ Locations/Conditions sous lg)
+ *    - Colonne droite (sticky) : BookingSummaryCard + Locations + Conditions
  *
  * IMPORTANT :
  * - Mêmes classes que TripDetailView (max-w-7xl, grid-cols-[minmax(0,1fr)_360px])
@@ -66,24 +66,33 @@ function TripDetailSkeleton() {
       {/* Back link */}
       <Shimmer className="mb-4 h-3 w-32" />
 
-      {/* Header : titre + sous-titre */}
+      {/* Header : titre (20/24 px) + sous-titre */}
       <header className="mb-6 space-y-2">
-        <Shimmer className="h-9 w-3/4 sm:h-10 sm:w-1/2" />
+        <Shimmer className="h-6 w-2/3 sm:h-7 sm:w-1/3" />
         <Shimmer className="h-4 w-48" />
       </header>
 
-      {/* Grid principale */}
+      {/* Grid principale — mêmes classes que TripDetailView */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
-        {/* COLONNE GAUCHE — bloc unifié */}
+        {/* COLONNE GAUCHE — itinéraire · offre · (mobile : lieux + conditions) */}
         <div className="divide-y divide-slate-100 overflow-hidden rounded-2xl border border-slate-200 bg-white dark:divide-slate-800 dark:border-slate-800 dark:bg-slate-950">
           <ItinerarySkeleton />
-          <CategoriesSkeleton />
-          <ConditionsSkeleton />
+          <OfferSkeleton />
+          <div className="lg:hidden">
+            <LocationsSkeleton />
+          </div>
+          <div className="lg:hidden">
+            <ConditionsSkeleton />
+          </div>
         </div>
 
-        {/* COLONNE DROITE — sticky sur desktop */}
+        {/* COLONNE DROITE — carte + lieux + conditions (desktop) */}
         <aside className="hidden lg:block">
           <BookingSummarySkeleton />
+          <div className="mt-4 divide-y divide-slate-100 overflow-hidden rounded-2xl border border-slate-200 bg-white dark:divide-slate-800 dark:border-slate-800 dark:bg-slate-950">
+            <LocationsSkeleton />
+            <ConditionsSkeleton />
+          </div>
         </aside>
       </div>
     </div>
@@ -151,31 +160,68 @@ function ItinerarySkeleton() {
   );
 }
 
-/* ---------------------------------- CATEGORIES ---------------------------- */
+/* ---------------------------------- OFFRE (PER_KG) ------------------------ */
 
-function CategoriesSkeleton() {
+function OfferSkeleton() {
   return (
-    <div className="px-5 py-5">
+    <div className="px-5 py-4">
       {/* Titre + hint */}
       <div className="mb-4 space-y-1.5">
-        <Shimmer className="h-4 w-44" />
-        <Shimmer className="h-3 w-2/3" />
+        <Shimmer className="h-4 w-64" />
+        <Shimmer className="h-3 w-5/6" />
       </div>
 
-      {/* Grille catégories — 1 col mobile, 2 col desktop */}
-      <div className="grid grid-cols-1 gap-x-10 gap-y-4 sm:grid-cols-2">
-        {Array.from({ length: 6 }).map((_, i) => (
-          <div
-            key={i}
-            className={`grid grid-cols-[auto_1fr_auto] items-center gap-3 ${
-              i >= 3 ? "hidden sm:grid" : ""
-            }`}
-          >
-            <Shimmer className="h-5 w-5 shrink-0" />
-            <Shimmer className="h-4 w-full" />
-            <Shimmer className="h-4 w-10" />
+      {/* Bloc stats : 2 colonnes + estimation */}
+      <div className="rounded-2xl border border-slate-200 px-5 py-4 dark:border-slate-800">
+        <div className="grid grid-cols-2 gap-6">
+          <div className="space-y-2">
+            <Shimmer className="h-2.5 w-20" />
+            <Shimmer className="h-7 w-28" />
           </div>
-        ))}
+          <div className="space-y-2">
+            <Shimmer className="h-2.5 w-16" />
+            <Shimmer className="h-7 w-20" />
+          </div>
+        </div>
+        <div className="mt-4 space-y-2 border-t border-slate-100 pt-3.5 dark:border-slate-800">
+          <Shimmer className="h-2.5 w-56" />
+          <Shimmer className="h-5 w-40" />
+          <Shimmer className="h-3 w-48" />
+        </div>
+      </div>
+
+      {/* Familles : 8 chips */}
+      <div className="mt-4">
+        <Shimmer className="mb-2 h-2.5 w-28" />
+        <div className="flex flex-wrap gap-1.5">
+          {["w-36", "w-40", "w-44", "w-44", "w-40", "w-36", "w-40", "w-40"].map((w, i) => (
+            <Shimmer key={i} className={`h-7 rounded-full ${w}`} />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------------------------- LIEUX --------------------------------- */
+
+function LocationsSkeleton() {
+  return (
+    <div className="space-y-4 px-5 py-5">
+      <div className="space-y-1.5">
+        <Shimmer className="h-4 w-48" />
+        <Shimmer className="h-3 w-56" />
+      </div>
+      <div>
+        <Shimmer className="mb-2 h-2.5 w-16" />
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-1">
+          <Shimmer className="h-16 w-full rounded-xl" />
+          <Shimmer className="h-16 w-full rounded-xl" />
+        </div>
+      </div>
+      <div>
+        <Shimmer className="mb-2 h-2.5 w-20" />
+        <Shimmer className="h-16 w-full rounded-xl sm:w-1/2 lg:w-full" />
       </div>
     </div>
   );

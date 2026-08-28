@@ -171,3 +171,18 @@ body::-webkit-scrollbar {
   60% { transform: translateX(-5px); }
   80% { transform: translateX(5px); }
 }
+
+/* ── Colonnes collantes qui défilent sans barre visible ──────────────────
+ * Recherche (« Trier par ») et page trajet (carte + lieux + conditions) :
+ * la zone reste scrollable à la molette / au doigt, la barre est masquée.
+ * Défini ici (global) — la page trajet utilise la même classe sans monter
+ * la page de recherche. */
+.yamba-sidebar-scroll,
+.scrollbar-hide {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.yamba-sidebar-scroll::-webkit-scrollbar,
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}

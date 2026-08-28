@@ -34,7 +34,15 @@
     "departureTimes": "Departure times",
     "categories": "Categories",
     "showAll": "Show all ({count})",
-    "showLess": "Show less"
+    "showLess": "Show less",
+    "families": "What do you want to send?",
+    "lowestPriceHint": "for a 2 kg parcel",
+    "yourParcel": "Your parcel",
+    "weight": "Parcel weight",
+    "weightHint": "Set the weight: every trip will show its price for your parcel.",
+    "weightHintActive": "Price and sort computed for {kg} kg · trips without enough room excluded",
+    "lowestPriceHintWeight": "for your {kg} kg parcel",
+    "lightParcel": "Light parcel (envelope, passport, glasses…): €{min} minimum."
   },
   "departureTimes": {
     "morning": "Morning",
@@ -56,7 +64,10 @@
     "newTripper": "New tripper",
     "perKg": "price per kg",
     "remainingKg": "{kg} kg left",
-    "example": "e.g. {kg} kg parcel ≈ €{price}"
+    "example": "e.g. {kg} kg ≈ €{price} all-in",
+    "surcharge": "{family}: +{pct}%",
+    "exampleForWeight": "≈ €{price} all-in for {kg} kg",
+    "notEnoughKg": "Not enough room"
   },
   "pricingSheet": {
     "title": "Prices by category",
@@ -94,5 +105,15 @@
     "toOnly": "Trips to {to}",
     "dateOnly": "Trips on {date}"
   },
-  "subtitleHint": "Refine with origin and destination, or browse current offers"
+  "subtitleHint": "Refine with origin and destination, or browse current offers",
+  "families": {
+    "DOCUMENTS_PAPERS": "Documents & papers",
+    "CLOTHES_TEXTILE": "Clothes & textile",
+    "FOOD_DRY_SEALED": "Dry sealed food",
+    "ELECTRONICS_DEVICES": "Electronics & devices",
+    "COSMETICS_CARE": "Cosmetics & care",
+    "PARTS_TOOLS": "Parts & tools",
+    "TOYS_CHILDCARE": "Toys & childcare",
+    "MISC_ACCESSORIES": "Accessories & misc."
+  }
 }

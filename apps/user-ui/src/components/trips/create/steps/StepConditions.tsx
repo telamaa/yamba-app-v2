@@ -61,6 +61,7 @@ import {
   formatEur,
 } from "../TripPricingUi";
 import LocationsSection from "../LocationsSection";
+import { MIN_PARCEL_PRICE_EUR } from "@/lib/pricing-example";
 
 export default function StepConditions({
   copy,
@@ -79,7 +80,7 @@ export default function StepConditions({
   const suggestion = useMemo(
     () => suggestPricePerKg(draft),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [draft.transportMode, draft.flightType, draft.departureDate]
+    [draft.transportMode, draft.flightType, draft.departureDate, draft.fromPlace, draft.toPlace]
   );
   const verdict =
     typeof draft.pricePerKg === "number" && draft.pricePerKg > 0
@@ -208,7 +209,14 @@ export default function StepConditions({
               <li key={f.key} className="flex justify-between gap-3">
                 <span>
                   {f.key === "base"
-                    ? copy.factorBase(formatEur(f.value ?? 0))
+                    ? copy.factorBase(
+                        formatEur(f.value ?? 0),
+                        f.corridor
+                          ? f.corridor.domestic
+                            ? copy.domesticLabel
+                            : copy.zoneLabel(f.corridor.fromZone) + " → " + copy.zoneLabel(f.corridor.toZone)
+                          : ""
+                      )
                     : f.key === "directFlight"
                       ? copy.factorDirectFlight
                       : copy.factorDepartureSoon}
@@ -224,6 +232,11 @@ export default function StepConditions({
           </ul>
         </InfoHint>
       </div>
+
+      {/* D32 — le plancher par colis, dit au Voyageur (pas seulement appliqué) */}
+      <p className="mt-1.5 text-[12px] text-slate-500 dark:text-slate-400">
+        {copy.minParcelPrice(MIN_PARCEL_PRICE_EUR)}
+      </p>
 
       <div className="mb-1.5 mt-5 flex items-center gap-1 text-[13px] font-medium text-slate-700 dark:text-slate-300">
         {copy.capacity}

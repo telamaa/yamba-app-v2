@@ -272,9 +272,12 @@ export type CreateTripCopy = {
   netGainSub: string;
   yourOffer: string;
   whyThisPrice: string;
-  factorBase: (v: string) => string;
+  factorBase: (v: string, corridor: string) => string;
+  zoneLabel: (zone: string) => string;
+  domesticLabel: string;
   factorDirectFlight: string;
   factorDepartureSoon: string;
+  minParcelPrice: (min: number) => string;
   priceHint: string;
   capacityHint: string;
   familiesHint: string;

@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { ArrowLeft, Flag, LayoutDashboard, Pencil } from "lucide-react";
 import { useRouter } from "@/i18n/navigation";
@@ -7,6 +8,7 @@ import useUser from "@/hooks/useUser";
 import type { PublicTrip } from "@/lib/public-trip.types";
 import ItineraryCard from "./ItineraryCard";
 import CategoriesCard from "./CategoriesCard";
+import OfferCard from "./OfferCard";
 
 import ReviewsCard from "./ReviewsCard";
 import ConditionsCard from "./ConditionsCard";
@@ -25,6 +27,17 @@ export default function TripDetailView({ trip }: Props) {
   const { user } = useUser();
   // Le créateur ne se réserve pas lui-même : il édite (même écran que le dashboard)
   const isOwner = !!user && user.id === trip.tripper.id;
+
+  // Poids du colis saisi en recherche (même clé) → continuité recherche → détail → réservation
+  const [weightKg, setWeightKg] = useState<number | null>(null);
+  useEffect(() => {
+    try {
+      const v = Number(window.localStorage.getItem("yamba.search.weightKg"));
+      if (Number.isFinite(v) && v >= 0.5 && v <= 30) setWeightKg(v);
+    } catch {
+      /* stockage indisponible */
+    }
+  }, []);
 
   const showReviews =
     !!trip.tripper.carrier && trip.tripper.carrier.ratingsCount > 0;
@@ -45,7 +58,7 @@ export default function TripDetailView({ trip }: Props) {
       </button>
 
       <header className="mb-6">
-        <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white sm:text-3xl">
+        <h1 className="text-xl font-black tracking-tight text-slate-900 dark:text-white sm:text-2xl">
           {trip.origin.city}{" "}
           <span className="text-[#FF9900]">→</span> {trip.destination.city}
         </h1>
@@ -60,17 +73,30 @@ export default function TripDetailView({ trip }: Props) {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
         {/* COLONNE GAUCHE — bloc unifié avec ombre layered moderne (style Stripe/Linear) */}
         <div className="divide-y divide-slate-100 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_4px_24px_-4px_rgba(0,0,0,0.06),0_2px_8px_-2px_rgba(0,0,0,0.04)] dark:divide-slate-800 dark:border-slate-800 dark:bg-slate-950 dark:shadow-[0_4px_24px_-4px_rgba(0,0,0,0.3),0_2px_8px_-2px_rgba(0,0,0,0.2)]">
-          <ItineraryCard trip={trip} />
+          <ItineraryCard trip={trip} isOwner={isOwner} weightKg={weightKg} />
+          <OfferCard trip={trip} weightKg={weightKg} />
           <CategoriesCard trip={trip} />
-          <LocationsCard trip={trip} />
           {showReviews && <ReviewsCard tripper={trip.tripper} />}
-          <ConditionsCard />
+          {/* Sur mobile/tablette, lieux et conditions restent dans le flux ;
+              sur desktop ils montent dans la colonne de droite (page sans scroll). */}
+          <div className="lg:hidden">
+            <LocationsCard trip={trip} />
+          </div>
+          <div className="lg:hidden">
+            <ConditionsCard />
+          </div>
         </div>
 
         {/* COLONNE DROITE — sticky desktop */}
         <aside className="hidden lg:block">
-          <div className="sticky top-[88px]">
-            {isOwner ? <OwnerCard tripId={trip.id} /> : <BookingSummaryCard trip={trip} />}
+          <div className="yamba-sidebar-scroll sticky top-[88px] max-h-[calc(100vh-100px)] overflow-y-auto pb-2">
+            {isOwner ? <OwnerCard tripId={trip.id} /> : <BookingSummaryCard trip={trip} weightKg={weightKg} />}
+
+            {/* Lieux + conditions : blocs courts, à droite sur desktop */}
+            <div className="mt-4 divide-y divide-slate-100 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_4px_24px_-4px_rgba(0,0,0,0.06)] dark:divide-slate-800 dark:border-slate-800 dark:bg-slate-950">
+              <LocationsCard trip={trip} />
+              <ConditionsCard />
+            </div>
 
             {/* Signaler cette annonce — desktop, sous la card sticky */}
             <div className="mt-5 flex justify-center">
