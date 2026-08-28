@@ -46,7 +46,12 @@ const FREIGHT_EMISSION_G_PER_KG_PER_KM: Record<TransportMode, number> = {
   CAR: 80,
 };
 
-export function calculateCO2SavedKg(trip: PublicTrip): number | null {
+/**
+ * CO₂ évité vs fret express, POUR UN COLIS DE `weightKg` (défaut 2 kg —
+ * même référence que la recherche). Le facteur est en g/kg/km : sans le
+ * poids, on annonçait l'émission d'un kilo… présentée comme celle du colis.
+ */
+export function calculateCO2SavedKg(trip: PublicTrip, weightKg: number = 2): number | null {
   if (!trip.transportMode) return null;
 
   const distanceKm = calculateDistanceKm(
@@ -59,7 +64,7 @@ export function calculateCO2SavedKg(trip: PublicTrip): number | null {
   if (distanceKm == null) return null;
 
   const emissionGramPerKm = FREIGHT_EMISSION_G_PER_KG_PER_KM[trip.transportMode];
-  const co2Grams = emissionGramPerKm * distanceKm;
+  const co2Grams = emissionGramPerKm * distanceKm * Math.max(weightKg, 0.5);
   return co2Grams / 1000;
 }
 

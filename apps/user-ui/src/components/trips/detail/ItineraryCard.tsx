@@ -29,6 +29,10 @@ import {
 
 type Props = {
   trip: PublicTrip;
+  /** Le propriétaire ne discute pas avec lui-même */
+  isOwner?: boolean;
+  /** Poids du colis mémorisé (recherche) — CO₂ calculé pour ce poids */
+  weightKg?: number | null;
 };
 
 const TRANSPORT_ICONS: Record<TransportMode, LucideIcon> = {
@@ -37,7 +41,7 @@ const TRANSPORT_ICONS: Record<TransportMode, LucideIcon> = {
   CAR: Car,
 };
 
-export default function ItineraryCard({ trip }: Props) {
+export default function ItineraryCard({ trip, isOwner = false, weightKg = null }: Props) {
   const t = useTranslations("tripDetail");
   const locale = useLocale() as "fr" | "en";
 
@@ -46,7 +50,8 @@ export default function ItineraryCard({ trip }: Props) {
   const departureTime = formatLocalTime(trip.dates.departureAt, trip.dates.departureTimeLocal);
   const arrivalTime = formatLocalTime(trip.dates.arrivalAt, trip.dates.arrivalTimeLocal);
   const duration = formatTripDuration(trip.dates);
-  const co2Saved = calculateCO2SavedKg(trip);
+  const co2Kg = weightKg ?? 2;
+  const co2Saved = calculateCO2SavedKg(trip, co2Kg);
   const memberSince = formatMemberSince(trip.tripper.memberSince, locale);
 
   // Détermination des stopovers selon le mode
@@ -466,12 +471,13 @@ export default function ItineraryCard({ trip }: Props) {
             <span className="font-semibold text-green-700 dark:text-green-400">
               {t("co2.saved", { kg: co2Saved.toFixed(1).replace(".", locale === "fr" ? "," : ".") })}
             </span>{" "}
-            {t("co2.versus")}
+            {t("co2.versus")} · {t("co2.forWeight", { kg: co2Kg })}
           </span>
         </div>
       )}
 
-      {/* CTA discuter */}
+      {/* CTA discuter — pas pour le propriétaire */}
+      {!isOwner && (
       <div className="mt-4">
         <div className="relative inline-block">
           <button
@@ -488,6 +494,7 @@ export default function ItineraryCard({ trip }: Props) {
           </span>
         </div>
       </div>
+      )}
     </section>
   );
 }
