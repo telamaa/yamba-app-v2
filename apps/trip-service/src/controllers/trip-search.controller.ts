@@ -16,6 +16,8 @@ import {
 import {
   searchTripsQuerySchema,
   searchFacetsQuerySchema,
+  PARCEL_FAMILIES,
+  type ParcelFamily,
 } from "../dto/trip-search.dto";
 
 // ─────────────────────────────────────────────────────
@@ -33,6 +35,7 @@ type BaseFilterParams = {
   dateFrom?: Date;
   dateTo?: Date;
   categories: UiParcelCategory[];
+  families: ParcelFamily[];
   departureBuckets: DepartureBucket[];
 };
 
@@ -91,11 +94,24 @@ function buildBaseWhere(
     });
   }
 
-  // Categories : au moins une des acceptedCategories doit matcher (hasSome)
+  // Categories (legacy PER_CATEGORY) : au moins une des acceptedCategories
+  // doit matcher — MAIS un trajet PER_KG n'a pas de catégories (D14 : la
+  // famille les remplace) → il passe toujours ce filtre (D33).
   if (params.categories.length > 0) {
-    where.acceptedCategories = {
-      hasSome: params.categories.map(parcelCategoryUiToDb),
-    };
+    andClauses.push({
+      OR: [
+        { pricePerKgCents: { gt: 0 } },
+        { acceptedCategories: { hasSome: params.categories.map(parcelCategoryUiToDb) } },
+      ],
+    });
+  }
+
+  // Familles (D14/D33) : exclure les trajets qui REFUSENT une famille demandée.
+  // Un trajet sans familyConditions accepte tout (legacy compris).
+  for (const family of params.families) {
+    andClauses.push({
+      familyConditions: { none: { familyKey: family, mode: "REFUSE" } },
+    });
   }
 
   // Departure buckets : OR des conditions horaires
@@ -121,8 +137,9 @@ function buildOrderBy(
 ): Prisma.TripOrderByWithRelationInput[] {
   if (sort === "lowestPrice") {
     // ⚠️ MongoDB ne supporte pas `nulls: 'last'`.
-    // Les trips sans minPriceCents sont exclus côté `where` (voir searchTrips).
-    return [{ minPriceCents: "asc" }, { id: "asc" }];
+    // D33 — tri sur le prix COMPARABLE (colis de référence 2 kg) : PER_KG et
+    // legacy ensemble. Les trips sans valeur sont exclus côté `where`.
+    return [{ comparablePriceCents: "asc" }, { id: "asc" }];
   }
   if (sort === "bestRated") {
     // En desc, MongoDB met les nulls en dernier naturellement → parfait.
@@ -162,6 +179,7 @@ export const searchTrips = async (
       dateFrom: params.dateFrom,
       dateTo: params.dateTo,
       categories: params.categories,
+      families: params.families,
       departureBuckets: params.departureBuckets,
     });
 
@@ -184,7 +202,7 @@ export const searchTrips = async (
     // ⭐ Quand on tri par prix, on exclut les trips sans prix défini
     // (sinon Mongo les remonte en premier en mode asc).
     if (params.sort === "lowestPrice") {
-      where.minPriceCents = { not: null };
+      where.comparablePriceCents = { not: null };
     }
 
     const orderBy = buildOrderBy(params.sort);
@@ -266,6 +284,7 @@ export const searchTripsFacets = async (
       dateFrom: params.dateFrom,
       dateTo: params.dateTo,
       categories: params.categories,
+      families: params.families,
       departureBuckets: params.departureBuckets,
     });
 
@@ -277,6 +296,7 @@ export const searchTripsFacets = async (
         dateFrom: params.dateFrom,
         dateTo: params.dateTo,
         categories: params.categories,
+        families: params.families,
         departureBuckets: params.departureBuckets,
       },
       { ignoreMode: true }
@@ -331,6 +351,36 @@ export const searchTripsFacets = async (
       }),
     ]);
 
+    // D33 — compte par famille : trajets qui NE refusent PAS la famille
+    // (8 counts en parallèle, sur le baseWhere SANS filtre famille courant
+    // pour que chaque chip garde son compte propre).
+    const baseWhereNoFamily = buildBaseWhere({
+      mode: params.mode,
+      from: params.from,
+      to: params.to,
+      dateFrom: params.dateFrom,
+      dateTo: params.dateTo,
+      categories: params.categories,
+      families: [],
+      departureBuckets: params.departureBuckets,
+    });
+    const familyCountValues = await Promise.all(
+      PARCEL_FAMILIES.map((family) =>
+        prisma.trip.count({
+          where: {
+            ...baseWhereNoFamily,
+            AND: [
+              ...((baseWhereNoFamily.AND as Prisma.TripWhereInput[] | undefined) ?? []),
+              { familyConditions: { none: { familyKey: family, mode: "REFUSE" } } },
+            ],
+          },
+        })
+      )
+    );
+    const familyCounts = Object.fromEntries(
+      PARCEL_FAMILIES.map((family, i) => [family, familyCountValues[i]])
+    ) as Record<ParcelFamily, number>;
+
     return res.status(200).json({
       totalCount,
       modeCount: {
@@ -343,6 +393,7 @@ export const searchTripsFacets = async (
       profileVerifiedCount,
       instantBookingCount,
       verifiedTicketCount,
+      familyCounts,
     });
   } catch (err) {
     return next(err);

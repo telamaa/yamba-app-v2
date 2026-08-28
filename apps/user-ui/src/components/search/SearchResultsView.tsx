@@ -18,7 +18,7 @@ import { useTripsSearch } from "@/hooks/useTripsSearch";
 import { useSearchFacets } from "@/hooks/useSearchFacets";
 import type {
   DepartureTimeBucket,
-  ParcelCategory,
+  SearchFamily,
   SortOption,
   TransportMode,
 } from "./search-results.types";
@@ -263,7 +263,8 @@ export default function SearchResultsView() {
   const [verifiedTicketOnly, setVerifiedTicketOnly] = useState(false);
 
   const [selectedDepartureBuckets, setSelectedDepartureBuckets] = useState<DepartureTimeBucket[]>([]);
-  const [selectedCategories, setSelectedCategories] = useState<ParcelCategory[]>([]);
+  // D33 — le filtre « catégorie » legacy est remplacé par le filtre FAMILLE
+  const [selectedFamilies, setSelectedFamilies] = useState<SearchFamily[]>([]);
 
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
@@ -294,7 +295,7 @@ export default function SearchResultsView() {
       profileVerified: profileVerifiedOnly,
       instantBooking: instantBookingOnly,
       verifiedTicket: verifiedTicketOnly,
-      categories: selectedCategories,
+      families: selectedFamilies,
       departureBuckets: selectedDepartureBuckets,
       limit: PAGE_SIZE,
       locale,
@@ -309,7 +310,7 @@ export default function SearchResultsView() {
       profileVerifiedOnly,
       instantBookingOnly,
       verifiedTicketOnly,
-      selectedCategories,
+      selectedFamilies,
       selectedDepartureBuckets,
       locale,
     ]
@@ -324,7 +325,7 @@ export default function SearchResultsView() {
         searchDraft.dateValue?.mode === "exact" && searchDraft.dateValue.date
           ? searchDraft.dateValue.date.toISOString()
           : undefined,
-      categories: selectedCategories,
+      families: selectedFamilies,
       departureBuckets: selectedDepartureBuckets,
       locale,
     }),
@@ -333,7 +334,7 @@ export default function SearchResultsView() {
       searchDraft.from,
       searchDraft.to,
       searchDraft.dateValue,
-      selectedCategories,
+      selectedFamilies,
       selectedDepartureBuckets,
       locale,
     ]
@@ -381,9 +382,9 @@ export default function SearchResultsView() {
 
   const showHint = !searchDraft.from && !searchDraft.to;
 
-  const toggleCategory = (category: ParcelCategory) => {
-    setSelectedCategories((prev) =>
-      prev.includes(category) ? prev.filter((item) => item !== category) : [...prev, category]
+  const toggleFamily = (family: SearchFamily) => {
+    setSelectedFamilies((prev) =>
+      prev.includes(family) ? prev.filter((item) => item !== family) : [...prev, family]
     );
   };
 
@@ -399,7 +400,7 @@ export default function SearchResultsView() {
     setProfileVerifiedOnly(false);
     setInstantBookingOnly(false);
     setVerifiedTicketOnly(false);
-    setSelectedCategories([]);
+    setSelectedFamilies([]);
     setSelectedDepartureBuckets([]);
     setActiveMode("all");
     setSearchDraft({ from: "", to: "", dateValue: null });
@@ -420,7 +421,7 @@ export default function SearchResultsView() {
     profileVerifiedOnly ||
     instantBookingOnly ||
     verifiedTicketOnly ||
-    selectedCategories.length > 0 ||
+    selectedFamilies.length > 0 ||
     selectedDepartureBuckets.length > 0 ||
     !!searchDraft.from ||
     !!searchDraft.to;
@@ -442,8 +443,9 @@ export default function SearchResultsView() {
     verifiedTicketCount: facetsQuery.data?.verifiedTicketCount ?? 0,
     selectedDepartureBuckets,
     onToggleDepartureBucket: toggleDepartureBucket,
-    selectedCategories,
-    onToggleCategory: toggleCategory,
+    selectedFamilies,
+    onToggleFamily: toggleFamily,
+    familyCounts: facetsQuery.data?.familyCounts ?? {},
     onClear: clearAll,
   };
 
@@ -606,7 +608,7 @@ export default function SearchResultsView() {
                           <TripResultCardMobile
                             key={item.id}
                             item={item}
-                            highlightedCategories={selectedCategories}
+                            highlightedFamilies={selectedFamilies}
                           />
                         ))}
                       </div>
@@ -616,7 +618,7 @@ export default function SearchResultsView() {
                           <TripResultCard
                             key={item.id}
                             item={item}
-                            highlightedCategories={selectedCategories}
+                            highlightedFamilies={selectedFamilies}
                           />
                         ))}
                       </div>

@@ -13,6 +13,25 @@ export type ParcelCategory =
   | "cabin-bag-12kg";
 
 export type TransportMode = "plane" | "train" | "car";
+
+/** D14 — familles de risque (mêmes clés que l'API / Prisma ParcelFamily) */
+export const SEARCH_FAMILIES = [
+  "DOCUMENTS_PAPERS",
+  "CLOTHES_TEXTILE",
+  "FOOD_DRY_SEALED",
+  "ELECTRONICS_DEVICES",
+  "COSMETICS_CARE",
+  "PARTS_TOOLS",
+  "TOYS_CHILDCARE",
+  "MISC_ACCESSORIES",
+] as const;
+export type SearchFamily = (typeof SEARCH_FAMILIES)[number];
+
+export type SearchFamilyCondition = {
+  familyKey: SearchFamily | string;
+  mode: "SURCHARGE" | "REFUSE";
+  surchargePct?: number | null;
+};
 export type SortOption = "earliest" | "lowestPrice" | "bestRated";
 
 export type DepartureTimeBucket =
@@ -57,6 +76,8 @@ export type YambaTripResult = {
   pricePerKg?: number | null;
   /** CAP-02 — kilos encore disponibles (capacité − réservé) */
   remainingKg?: number | null;
+  /** D14 — positions ≠ ACCEPT du Voyageur (compact) */
+  familyConditions?: SearchFamilyCondition[];
   currency?: string;
   transportMode: TransportMode;
   allowedCategories: ParcelCategory[];

@@ -21,6 +21,19 @@ export const PARCEL_CATEGORIES = [
   "cabin-bag-12kg",
 ] as const;
 
+/** D14 — familles de risque (miroir ParcelFamily Prisma) */
+export const PARCEL_FAMILIES = [
+  "DOCUMENTS_PAPERS",
+  "CLOTHES_TEXTILE",
+  "FOOD_DRY_SEALED",
+  "ELECTRONICS_DEVICES",
+  "COSMETICS_CARE",
+  "PARTS_TOOLS",
+  "TOYS_CHILDCARE",
+  "MISC_ACCESSORIES",
+] as const;
+export type ParcelFamily = (typeof PARCEL_FAMILIES)[number];
+
 export const DEPARTURE_BUCKETS = [
   "earlyMorning",
   "morning",
@@ -86,6 +99,8 @@ export const searchTripsQuerySchema = z.object({
 
   // Multi-select via CSV
   categories: csvOf(PARCEL_CATEGORIES),
+  // D33 — filtre famille : exclut les trajets qui REFUSENT une des familles
+  families: csvOf(PARCEL_FAMILIES),
   departureBuckets: csvOf(DEPARTURE_BUCKETS),
 
   // Pagination cursor-based
@@ -112,6 +127,7 @@ export const searchFacetsQuerySchema = z.object({
   dateFrom: isoDate,
   dateTo: isoDate,
   categories: csvOf(PARCEL_CATEGORIES),
+  families: csvOf(PARCEL_FAMILIES),
   departureBuckets: csvOf(DEPARTURE_BUCKETS),
   locale: z.enum(LOCALES).optional().default("fr"),
 });

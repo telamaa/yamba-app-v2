@@ -34,7 +34,9 @@
     "departureTimes": "Horaires de départ",
     "categories": "Catégories",
     "showAll": "Voir tout ({count})",
-    "showLess": "Voir moins"
+    "showLess": "Voir moins",
+    "families": "Que voulez-vous envoyer ?",
+    "lowestPriceHint": "pour un colis de 2 kg"
   },
   "departureTimes": {
     "morning": "Matin",
@@ -56,7 +58,8 @@
     "newTripper": "Nouveau tripper",
     "perKg": "prix au kilo",
     "remainingKg": "{kg} kg dispo",
-    "example": "ex. colis {kg} kg ≈ {price} €"
+    "example": "ex. colis {kg} kg ≈ {price} €",
+    "surcharge": "{family} : +{pct} %"
   },
   "pricingSheet": {
     "title": "Tarifs par catégorie",
@@ -94,5 +97,15 @@
     "toOnly": "Trajets à destination de {to}",
     "dateOnly": "Trajets le {date}"
   },
-  "subtitleHint": "Affinez avec un départ et une destination, ou parcourez l'offre actuelle"
+  "subtitleHint": "Affinez avec un départ et une destination, ou parcourez l'offre actuelle",
+  "families": {
+    "DOCUMENTS_PAPERS": "Documents & papiers",
+    "CLOTHES_TEXTILE": "Vêtements & textile",
+    "FOOD_DRY_SEALED": "Alimentaire sec & scellé",
+    "ELECTRONICS_DEVICES": "Électronique & appareils",
+    "COSMETICS_CARE": "Cosmétiques & soins",
+    "PARTS_TOOLS": "Pièces & outillage",
+    "TOYS_CHILDCARE": "Jouets & puériculture",
+    "MISC_ACCESSORIES": "Accessoires & divers"
+  }
 }
