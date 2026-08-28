@@ -1,7 +1,7 @@
 import { FileText, ShieldCheck } from "lucide-react";
 import type { CreateTripCopy, Draft, Step } from "../create-trip.types";
 import { getCategoryOptions } from "../create-trip.copy";
-import { CABIN_BAG_KG, CHECKED_BAG_KG, PARCEL_FAMILIES, estimateNetGain } from "../create-trip.config";
+import { CABIN_BAG_KG, CHECKED_BAG_KG, PARCEL_FAMILIES, estimateNetGain, isBagActive } from "../create-trip.config";
 import { formatEur } from "../TripPricingUi";
 import { ReviewCard, SectionLabel } from "@/components/trips/create/TripFormUi";
 import TripPublicPreview, { summarizeLocations } from "../TripPublicPreview";
@@ -217,12 +217,13 @@ export default function StepReview({
             </div>
           )}
 
-          {(draft.checkedBag23Price !== "" || draft.cabinBag12Price !== "") && (
+          {(isBagActive(draft.checkedBag23Price, CHECKED_BAG_KG, draft.capacityKg) ||
+            isBagActive(draft.cabinBag12Price, CABIN_BAG_KG, draft.capacityKg)) && (
             <div className="mt-2 flex flex-wrap gap-1.5 text-[12px] text-slate-600 dark:text-slate-400">
-              {draft.checkedBag23Price !== "" && (
+              {isBagActive(draft.checkedBag23Price, CHECKED_BAG_KG, draft.capacityKg) && (
                 <span>{copy.checkedBag23} · {formatEur(Number(draft.checkedBag23Price))} € ({copy.bagConsumes(CHECKED_BAG_KG)})</span>
               )}
-              {draft.cabinBag12Price !== "" && (
+              {isBagActive(draft.cabinBag12Price, CABIN_BAG_KG, draft.capacityKg) && (
                 <span>{copy.cabinBag12} · {formatEur(Number(draft.cabinBag12Price))} € ({copy.bagConsumes(CABIN_BAG_KG)})</span>
               )}
             </div>

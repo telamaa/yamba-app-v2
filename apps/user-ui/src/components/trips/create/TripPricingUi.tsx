@@ -14,6 +14,7 @@
  */
 
 import React, { memo, useEffect, useId, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   Baby,
   Backpack,
@@ -76,34 +77,45 @@ export function IconBadge({ icon: Icon, muted }: { icon: LucideIcon; muted?: boo
 /* ── Popover ⓘ — ouverture au tap/clic, fermeture Échap / clic dehors ── */
 
 export function InfoHint({ label, children }: { label: string; children: React.ReactNode }) {
-  const [open, setOpen] = useState(false);
-  const [alignRight, setAlignRight] = useState(false);
+  const [pos, setPos] = useState<{ top: number; left: number; width: number } | null>(null);
   const ref = useRef<HTMLSpanElement>(null);
   const id = useId();
+  const open = pos !== null;
 
-  // Ancré à gauche par défaut ; à droite si le popover (20rem) déborderait
+  // Rendu dans un portal en position FIXE : aucun overflow parent ne peut
+  // le rogner ; borné aux bords de l'écran (mobile compris).
   const toggle = () => {
+    if (open) return setPos(null);
     const r = ref.current?.getBoundingClientRect();
-    if (r) setAlignRight(r.left + 320 > window.innerWidth - 16);
-    setOpen((o) => !o);
+    if (!r) return;
+    const width = Math.min(320, window.innerWidth - 32);
+    const left = Math.max(16, Math.min(r.left, window.innerWidth - width - 16));
+    setPos({ top: r.bottom + 6, left, width });
   };
 
   useEffect(() => {
     if (!open) return;
+    const close = () => setPos(null);
     const onDown = (e: PointerEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      const t = e.target as Node;
+      if (ref.current?.contains(t) || document.getElementById(id)?.contains(t)) return;
+      close();
     };
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && close();
     document.addEventListener("pointerdown", onDown);
     document.addEventListener("keydown", onKey);
+    window.addEventListener("scroll", close, true);
+    window.addEventListener("resize", close);
     return () => {
       document.removeEventListener("pointerdown", onDown);
       document.removeEventListener("keydown", onKey);
+      window.removeEventListener("scroll", close, true);
+      window.removeEventListener("resize", close);
     };
-  }, [open]);
+  }, [open, id]);
 
   return (
-    <span ref={ref} className="relative inline-flex">
+    <span ref={ref} className="inline-flex">
       <button
         type="button"
         aria-label={label}
@@ -117,15 +129,18 @@ export function InfoHint({ label, children }: { label: string; children: React.R
       >
         <Info size={15} />
       </button>
-      {open && (
-        <span
-          id={id}
-          role="tooltip"
-          className={`absolute ${alignRight ? "right-0" : "left-0"} top-full z-20 mt-1 w-[min(20rem,calc(100vw-3rem))] rounded-xl border border-slate-200 bg-white p-3 text-[12px] font-normal normal-case tracking-normal leading-relaxed text-slate-600 shadow-lg animate-[fadeSlide_0.15s_ease] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300`}
-        >
-          {children}
-        </span>
-      )}
+      {open &&
+        createPortal(
+          <span
+            id={id}
+            role="tooltip"
+            style={{ position: "fixed", top: pos.top, left: pos.left, width: pos.width }}
+            className="z-[500] block rounded-xl border border-slate-200 bg-white p-3 text-[12px] font-normal normal-case tracking-normal leading-relaxed text-slate-600 shadow-lg animate-[fadeSlide_0.15s_ease] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+          >
+            {children}
+          </span>,
+          document.body
+        )}
     </span>
   );
 }
@@ -510,7 +525,7 @@ export function BagFlatRateRow({
             type="number"
             inputMode="decimal"
             min={0}
-            value={value}
+            value={disabled ? "" : value}
             disabled={disabled}
             aria-label={label}
             placeholder="—"

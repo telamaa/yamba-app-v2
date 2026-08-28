@@ -147,6 +147,12 @@ export function summarizeFamilyConditions(
   return parts.length === 0 ? null : parts.join(" · ");
 }
 
+/** RG-B-29 — un forfait n'est ACTIF que si son prix > 0 ET que la capacité
+ *  peut contenir la franchise. Sinon il est suspendu (valeur mémorisée). */
+export function isBagActive(price: number | "", bagKg: number, capacityKg: number | ""): boolean {
+  return typeof price === "number" && price > 0 && typeof capacityKg === "number" && capacityKg >= bagKg;
+}
+
 /** Un forfait bagage lu en €/kg — pour que le Voyageur voie s'il brade. */
 export function bagEquivalentPerKg(price: number | "", kg: number): number | null {
   if (typeof price !== "number" || price <= 0) return null;
@@ -461,16 +467,15 @@ export function validateStep2(draft: Draft, isFr: boolean): ValidationErrors {
     }
   }
 
-  // Bagages entiers (PRC-04) — optionnels, > 0 s'ils sont proposés, et la
-  // capacité doit pouvoir les contenir (RG-B-29 — miroir du gate serveur)
-  const capacity = typeof draft.capacityKg === "number" ? draft.capacityKg : 0;
-  if (draft.checkedBag23Price !== "") {
-    if (Number(draft.checkedBag23Price) <= 0) errors.checkedBag23Price = msgs.bagPriceZero;
-    else if (capacity < CHECKED_BAG_KG) errors.checkedBag23Price = msgs.bagNeedsCapacity(CHECKED_BAG_KG);
+  // Bagages entiers (PRC-04) — optionnels, > 0 s'ils sont proposés.
+  // Capacité insuffisante (RG-B-29) = forfait SUSPENDU (ni affiché ni envoyé,
+  // cf. isBagActive + mapper) — pas une erreur bloquante ; le serveur garde
+  // son verrou en dernier rempart.
+  if (draft.checkedBag23Price !== "" && Number(draft.checkedBag23Price) <= 0) {
+    errors.checkedBag23Price = msgs.bagPriceZero;
   }
-  if (draft.cabinBag12Price !== "") {
-    if (Number(draft.cabinBag12Price) <= 0) errors.cabinBag12Price = msgs.bagPriceZero;
-    else if (capacity < CABIN_BAG_KG) errors.cabinBag12Price = msgs.bagNeedsCapacity(CABIN_BAG_KG);
+  if (draft.cabinBag12Price !== "" && Number(draft.cabinBag12Price) <= 0) {
+    errors.cabinBag12Price = msgs.bagPriceZero;
   }
 
   // Locations — at least 1 enabled per context
