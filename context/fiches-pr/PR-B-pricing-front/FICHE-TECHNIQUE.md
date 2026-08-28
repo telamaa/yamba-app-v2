@@ -242,6 +242,16 @@ Les tests ciblent `issues` par `path` plutôt que `success` global, pour ne pas 
 
 ---
 
+## 7ter. Régression trouvée en QA : le trajet créé était publié SANS son offre
+
+Symptôme réel : trajet créé à 11 €/kg, en base `pricePerKgCents: null`, `capacityKg: null`, `familyConditions: []`, statut PUBLISHED. Deux causes dans `createTrip` (`POST /trips`) :
+1. le `data` de `prisma.trip.create` énumère chaque champ à la main — **les 5 champs PER_KG n'y étaient pas** (le schéma Zod les acceptait, le controller les jetait) ;
+2. le **gate A28 n'était appliqué que sur `publishTrip` et `updateTrip`**, pas sur `POST /trips` + `publish: true` → un trajet sans aucun moteur a pu être publié.
+
+Correctif : helper pur `pickPerKgFields(data)` dans `pricing-gate.ts` (typé pour Prisma, **+2 specs**) étalé dans le `create` ; le gate `resolvePricingEngine` + `checkBagCapacity` appliqué sur ce troisième chemin. Leçon : **un chemin d'écriture qui liste ses champs à la main doit passer par un helper testé pour tout groupe de champs ajouté** — sinon le schéma « accepte » et la base « oublie », silencieusement.
+
+Réparation du trajet de test : le rouvrir (« Modifier ») et enregistrer — `updateTrip` copie tous les champs.
+
 ## 7bis. Recherche et page détail : afficher le prix au kilo (retour QA)
 
 Symptôme : un trajet PER_KG fraîchement créé affichait **« 0 € »** dans les résultats de recherche et sur sa page détail. Cause : ces écrans lisent `minPriceCents` (dénormalisé depuis les prix par catégorie), qui est `null` pour un trajet au kilo → `0`.
@@ -271,7 +281,7 @@ Ce fix a sa propre PR (`chore/next-intl-config-path`). Il est cherry-pické ici 
 npx tsc --noEmit --project apps/user-ui/tsconfig.json
 # typecheck + tests trip-service
 npx tsc --noEmit --project apps/trip-service/tsconfig.app.json
-npx nx test trip-service            # attendu : 168 (157 avant + 5 catégories/PER_KG + 4 bagage + 2 schéma bagage)
+npx nx test trip-service            # attendu : 170 (157 avant + 5 catégories/PER_KG + 4 bagage + 2 schéma bagage + 2 pickPerKgFields)
 # lancer et ouvrir
 npm run dev  →  http://localhost:3000/fr/trips/create  (compte Voyageur)
 ```

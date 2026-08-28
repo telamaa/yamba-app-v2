@@ -61,3 +61,44 @@ export function checkBagCapacity(input: BagCapacityInput): string | null {
   }
   return null;
 }
+
+/** Les 5 champs du moteur PER_KG, tels qu'ils doivent être ÉCRITS en base
+ *  (create ET update). Helper pur pour qu'aucun chemin d'écriture ne les
+ *  oublie (le create de PR-B les avait perdus : trip publié à 0 €). */
+export const PER_KG_FIELDS = [
+  "pricePerKgCents",
+  "capacityKg",
+  "checkedBag23PriceCents",
+  "cabinBag12PriceCents",
+  "familyConditions",
+] as const;
+
+export type FamilyConditionInput = {
+  familyKey: "DOCUMENTS_PAPERS" | "CLOTHES_TEXTILE" | "FOOD_DRY_SEALED" | "ELECTRONICS_DEVICES" | "COSMETICS_CARE" | "PARTS_TOOLS" | "TOYS_CHILDCARE" | "MISC_ACCESSORIES";
+  mode: "ACCEPT" | "SURCHARGE" | "REFUSE";
+  surchargePct?: number | null;
+};
+
+export type PerKgFields = {
+  pricePerKgCents: number | null;
+  capacityKg: number | null;
+  checkedBag23PriceCents: number | null;
+  cabinBag12PriceCents: number | null;
+  familyConditions: FamilyConditionInput[];
+};
+
+export function pickPerKgFields(data: {
+  pricePerKgCents?: number | null;
+  capacityKg?: number | null;
+  checkedBag23PriceCents?: number | null;
+  cabinBag12PriceCents?: number | null;
+  familyConditions?: FamilyConditionInput[] | null;
+}): PerKgFields {
+  return {
+    pricePerKgCents: data.pricePerKgCents ?? null,
+    capacityKg: data.capacityKg ?? null,
+    checkedBag23PriceCents: data.checkedBag23PriceCents ?? null,
+    cabinBag12PriceCents: data.cabinBag12PriceCents ?? null,
+    familyConditions: data.familyConditions ?? [],
+  };
+}

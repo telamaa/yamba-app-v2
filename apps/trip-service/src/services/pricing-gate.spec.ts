@@ -1,4 +1,4 @@
-import { checkBagCapacity, resolvePricingEngine } from "./pricing-gate";
+import { checkBagCapacity, pickPerKgFields, resolvePricingEngine } from "./pricing-gate";
 
 describe("resolvePricingEngine — gate bi-moteur (A28, D13)", () => {
   const legacyCond = [{ category: "DOCUMENTS_PAPERS", priceAmountCents: 1500 }];
@@ -54,5 +54,34 @@ describe("checkBagCapacity — un forfait bagage exige sa franchise (PRC-04, RG-
   });
   it("aucun forfait → toujours OK, même sans capacité", () => {
     expect(checkBagCapacity({ capacityKg: null })).toBeNull();
+  });
+});
+
+describe("pickPerKgFields — les 5 champs PER_KG traversent l'écriture (régression PR-B : trip créé à 0 €)", () => {
+  it("copie les 5 champs depuis un payload de création", () => {
+    expect(
+      pickPerKgFields({
+        pricePerKgCents: 1100,
+        capacityKg: 12,
+        checkedBag23PriceCents: null,
+        cabinBag12PriceCents: 3000,
+        familyConditions: [{ familyKey: "FOOD_DRY_SEALED", mode: "REFUSE" }],
+      })
+    ).toEqual({
+      pricePerKgCents: 1100,
+      capacityKg: 12,
+      checkedBag23PriceCents: null,
+      cabinBag12PriceCents: 3000,
+      familyConditions: [{ familyKey: "FOOD_DRY_SEALED", mode: "REFUSE" }],
+    });
+  });
+  it("absents → null / [] (jamais undefined : Prisma ignorerait la clé)", () => {
+    expect(pickPerKgFields({})).toEqual({
+      pricePerKgCents: null,
+      capacityKg: null,
+      checkedBag23PriceCents: null,
+      cabinBag12PriceCents: null,
+      familyConditions: [],
+    });
   });
 });
