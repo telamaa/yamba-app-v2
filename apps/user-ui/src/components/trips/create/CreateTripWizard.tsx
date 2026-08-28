@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useRouter } from "@/i18n/navigation";
 import { useUiPreferences } from "@/components/providers/UiPreferencesProvider";
@@ -8,13 +8,12 @@ import { usePersistedFormState } from "@/hooks/usePersistedFormState";
 import { useCreateTrip, useUpdateTrip } from "@/hooks/useTrip";
 import { useEditTrip } from "@/hooks/useEditTrip";
 import { setFlashToast } from "@/lib/flash-toast";
-import type { Draft, ParcelCategory, Step } from "./create-trip.types";
+import type { Draft, Step } from "./create-trip.types";
 import { initialDraft } from "./create-trip.state";
 import { getCreateTripCopy } from "./create-trip.copy";
 import useUser from "@/hooks/useUser";
 import {
   canContinueStep,
-  createDefaultCategoryCondition,
   validateStep1,
   validateStep2,
   type ValidationErrors,
@@ -88,30 +87,6 @@ export default function CreateTripWizard() {
   useEffect(() => {
     setShowErrors(false);
   }, [step]);
-
-  // ── Category toggle ──
-  const toggleCategory = useCallback(
-    (value: ParcelCategory) => {
-      setDraft((prev) => {
-        const has = prev.acceptedCategories.includes(value);
-        if (has) {
-          const nextCats = prev.acceptedCategories.filter((c) => c !== value);
-          const nextConds = { ...prev.categoryConditions };
-          delete nextConds[value];
-          return { ...prev, acceptedCategories: nextCats, categoryConditions: nextConds };
-        }
-        return {
-          ...prev,
-          acceptedCategories: [...prev.acceptedCategories, value],
-          categoryConditions: {
-            ...prev.categoryConditions,
-            [value]: prev.categoryConditions[value] ?? createDefaultCategoryCondition(value),
-          },
-        };
-      });
-    },
-    [setDraft]
-  );
 
   // ── Navigation ──
   const goTo = (target: Step) => {
@@ -298,7 +273,6 @@ export default function CreateTripWizard() {
                   isFr={isFr}
                   draft={draft}
                   setDraft={setDraft}
-                  toggleCategory={toggleCategory}
                   errors={errors}
                 />
               )}
