@@ -207,6 +207,9 @@ export function mapDraftToPayload(
   publish: boolean
 ): CreateTripPayload {
   const { fromPlace, toPlace } = draft;
+  const perKgComplete =
+    typeof draft.pricePerKg === "number" && draft.pricePerKg > 0 &&
+    typeof draft.capacityKg === "number" && draft.capacityKg > 0;
 
   const resolvePrice = (condition: CategoryCondition): number => {
     if (draft.useGlobalPrice && typeof draft.globalPrice === "number") {
@@ -270,14 +273,18 @@ export function mapDraftToPayload(
     trainStopCities: splitCities(draft.trainStopCities),
     travelReference: draft.travelReference?.trim() || null,
 
-    // ── Conditions (simplified: just category + price) ──
-    acceptedCategories: draft.acceptedCategories.map(mapCategory),
-    categoryConditions: Object.values(draft.categoryConditions)
-      .filter((c): c is CategoryCondition => !!c)
-      .map((c) => ({
-        category: mapCategory(c.categoryKey),
-        priceAmountCents: Math.round(resolvePrice(c) * 100),
-      })),
+    // ── Conditions legacy — vidées dès que l'offre PER_KG est complète
+    //    (A28 : PER_KG prime ; on n'envoie plus l'ancien moteur, l'annonce
+    //    publiée est pure PER_KG) ──
+    acceptedCategories: perKgComplete ? [] : draft.acceptedCategories.map(mapCategory),
+    categoryConditions: perKgComplete
+      ? []
+      : Object.values(draft.categoryConditions)
+          .filter((c): c is CategoryCondition => !!c)
+          .map((c) => ({
+            category: mapCategory(c.categoryKey),
+            priceAmountCents: Math.round(resolvePrice(c) * 100),
+          })),
 
     // ── Moteur PER_KG ──
     pricePerKgCents: toCentsOrNull(draft.pricePerKg),
