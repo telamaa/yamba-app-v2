@@ -1,6 +1,6 @@
 # Fiche technique — chore « ThemeProvider au root layout »
 
-> Branche `chore/theme-provider-root` · base `dev` · 2 fichiers · PR #__
+> Branche `chore/theme-provider-root` · base `dev` · 2 fichiers · **PR #80** (mergée dans `dev`)
 
 ## Symptôme
 En dev, à chaque bascule FR ↔ EN : `Console Error — Encountered a script tag while rendering React component…` pointant `ThemeProvider` dans `app/[locale]/layout.tsx`.

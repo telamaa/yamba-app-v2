@@ -1,11 +1,11 @@
-# YAMBA — CONTEXT HANDOFF · Refonte pricing PR-B « le formulaire du mockup prend vie » — POUSSÉE, PR À OUVRIR
-### Août 2026 · branche `feat/pricing-front-2` (5 commits sur `70f060b`) · PR #__ (à noter au merge)
+# YAMBA — CONTEXT HANDOFF · Refonte pricing PR-B « le formulaire du mockup prend vie » — MERGÉE (#82)
+### Août 2026 · branche `feat/pricing-front-2` (5 commits sur `70f060b`) · **PR #82 — MERGÉE** (`a84c6a5`)
 
 ---
 
 ## §1 — Vérifications d'ouverture de la PROCHAINE session
 
-- [ ] **Merger d'abord la chore** `chore/next-intl-config-path` (`3567d56`, 1 fichier) — PR #__ ; puis `git rebase dev` de `feat/pricing-front-2` (le cherry-pick `ddaa376` du même fix disparaît du diff)
+- [x] Chores mergées : #78 next-intl · #79 docs/context · #80 theme root · #81 build prod ; PR-B rebasée puis mergée (#82) ; search mergée (#83)
 - [ ] Ouvrir/compléter la PR-B : https://github.com/telamaa/yamba-app-v2/pull/new/feat/pricing-front-2 (base `dev`) — `gh` n'est pas authentifié en local (`gh auth login`)
 - [ ] Checks PR-B **__/13** (COMPTER) · checks chore **__/13** · le quatuor reporté du handoff PR-A (checks #76/#77, required checks, titre #72)
 - [ ] Plateforme attendue post-merge : **413** (trip **174** = 157 + 5 + 6 + 2 + 4 · deal 218 · notification 21) — toute déviation expliquée

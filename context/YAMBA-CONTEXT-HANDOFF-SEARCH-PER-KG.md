@@ -1,9 +1,8 @@
-# YAMBA — CONTEXT HANDOFF · PR search « la recherche parle le moteur au kilo » — POUSSÉE, PR À OUVRIR
-### Août 2026 · branche `feat/search-per-kg` (empilée sur `feat/pricing-front-2`) · PR #__
+# YAMBA — CONTEXT HANDOFF · PR search « la recherche parle le moteur au kilo » — MERGÉE (#83)
+### Août 2026 · branche `feat/search-per-kg` (empilée sur `feat/pricing-front-2`) · **PR #83 — MERGÉE** (`a18c0f2`)
 
 ## §1 — Ordre de merge et vérifications
-- [ ] `chore/next-intl-config-path` → `chore/docs-context` → `feat/pricing-front-2` (PR-B) → **`feat/search-per-kg`** (rebase sur `dev` après chaque merge ; les cherry-picks disparaissent)
-- [ ] Checks à COMPTER (13) sur chaque PR · plateforme attendue post-search : **426** (trip **187** = 174 + 5 comparable + 3 mapper + 5 poids · deal 218 · notification 21)
+- [x] Tout est mergé dans `dev` : #78 → #79 → #80 → #81 → #82 (PR-B) → #83 (search). Plateforme vérifiée sur `dev` : **426** (trip 187 · deal 218 · notification 21)
 - [ ] `prisma db push` est fait en local (index `comparablePriceCents`) ; **en environnement partagé : `npx prisma db push` puis `npx tsx packages/libs/prisma/scripts/backfill-comparable-price.ts`** (idempotent)
 - [ ] QA visuelle recherche (desktop dark/light + mobile 375) : fiche métier R1–R10
 
