@@ -103,7 +103,24 @@ export default function BookingBottomSheet({
               </div>
             </div>
           </div>
-          <PriceRow label={t("summary.transport")} amount={price.transport} locale={locale} />
+          <PriceRow
+            label={
+              price.quote?.pricingModel === "PER_KG"
+                ? t("summary.transportDetail", {
+                    kg: (price.quote.billableWeightKg ?? 0).toLocaleString(locale === "fr" ? "fr-FR" : "en-US"),
+                    rate: formatPrice((price.quote.pricePerKgCents ?? 0) / 100, locale),
+                    size: price.quote.sizeClass ?? "",
+                  }) + (price.quote.familySurchargePct > 0 ? ` · +${price.quote.familySurchargePct} %` : "")
+                : t("summary.transport")
+            }
+            amount={price.transport}
+            locale={locale}
+          />
+          {price.quote?.minimumApplied && (
+            <div className="-mt-0.5 mb-1 text-[11px] text-slate-500 dark:text-slate-400">
+              {t("summary.minimumApplied", { min: formatPrice(price.quote.transportCents / 100, locale) })}
+            </div>
+          )}
           <PriceRow
             label={t("summary.serviceYamba")}
             amount={price.serviceFee}

@@ -13,7 +13,7 @@ Before any non-trivial task, read in this order:
 1. `context/YAMBA-CONTEXT.md` — done / remaining / non-negotiable rules.
 2. `context/YAMBA-SPECIFICATION-COMPLETE.md` — end-to-end spec (domain, state machines, pricing, events, security, roadmap).
 3. The latest `context/YAMBA-CONTEXT-HANDOFF-*.md` — exact state of the current worksite.
-4. Per task: `context/YAMBA-REGISTRE-DECISIONS-ROADMAP-v1.3.md` (**the master document** — decisions D1–D33; architecture decisions are recorded there BEFORE code, never after), `context/YAMBA-REGLES-METIER-V2.md` (~50 business rules), `context/mockup-pricing-yamba.html` (pricing form spec).
+4. Per task: `context/YAMBA-REGISTRE-DECISIONS-ROADMAP-v1.3.md` (**the master document** — decisions D1–D34; architecture decisions are recorded there BEFORE code, never after), `context/YAMBA-REGLES-METIER-V2.md` (~50 business rules), `context/mockup-pricing-yamba.html` (pricing form spec).
 
 Precedence on divergence: code + its tests > registre > business rules > syntheses in `context/`. `docs/` also contains detailed French functional + technical specs (booking shipper wizard, carrier deal request) — read the relevant `YAMBA-DOC-TECHNIQUE-*.md` before evolving those features.
 

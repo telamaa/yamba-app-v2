@@ -30,8 +30,11 @@ export async function createDeal(
   draft: Draft,
   trip: TripContext
 ): Promise<CreateDealResponse> {
+  // D17/D34 — le devis calculé par @packages/pricing part avec la demande ;
+  // le serveur (B2) recalcule avec le même moteur et refuse toute divergence.
+  const quote = computeTotal(draft, trip).quote;
   // eslint-disable-next-line no-console
-  console.info("[booking.api.stub] createDeal", { draft, trip });
+  console.info("[booking.api.stub] createDeal", { draft, trip, quote });
   await wait(SIMULATED_LATENCY_MS);
 
   return {

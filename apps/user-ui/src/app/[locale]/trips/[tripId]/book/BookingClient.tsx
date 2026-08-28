@@ -1,16 +1,20 @@
 /**
  * BookingClient.tsx
  * =================
- * Client-side router between BookingWizard (desktop) and BookingMobile.
+ * Routeur desktop/mobile du wizard de réservation — sur le VRAI trajet
+ * (GET /trips/:id/public), plus de mock. Le poids saisi en recherche
+ * (localStorage) pré-remplit le colis.
  */
 
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
+import { useTranslations } from "next-intl";
 import BookingMobile from "@/components/booking/BookingMobile";
-import { mockTrip } from "@/components/booking/booking.state";
 import BookingWizard from "@/components/booking/BookingWizard";
+import { mapPublicTripToContext } from "@/components/booking/trip-context.mapper";
 import { useIsMobile } from "@/hooks/useIsMobile";
+import { usePublicTrip } from "@/hooks/usePublicTrip";
 import { useRouter } from "@/i18n/navigation";
 
 type Props = {
@@ -20,16 +24,36 @@ type Props = {
 export default function BookingClient({ tripId }: Props) {
   const isMobile = useIsMobile();
   const router = useRouter();
+  const t = useTranslations("tripDetail");
+  const tLoc = useTranslations("booking.locationKinds");
+  const { data: publicTrip, isLoading, isError } = usePublicTrip(tripId);
 
-  // MVP: ignore tripId, use mock. Wire to trip-service when ready.
-  const trip = mockTrip;
+  const trip = useMemo(
+    () => (publicTrip ? mapPublicTripToContext(publicTrip, (k) => tLoc(k)) : null),
+    [publicTrip, tLoc]
+  );
 
   const handleClose = useCallback(() => {
     router.push(`/trips/${tripId}`);
   }, [router, tripId]);
 
-  if (isMobile === null) {
+  if (isMobile === null || isLoading) {
     return <BookingFallback />;
+  }
+
+  if (isError || !trip) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-white px-6 text-center dark:bg-slate-950">
+        <p className="text-sm font-semibold text-slate-900 dark:text-white">{t("notFound.title")}</p>
+        <button
+          type="button"
+          onClick={() => router.push("/search")}
+          className="rounded-full bg-[#FF9900] px-4 py-2 text-sm font-bold text-slate-950"
+        >
+          {t("back")}
+        </button>
+      </div>
+    );
   }
 
   if (isMobile) {
