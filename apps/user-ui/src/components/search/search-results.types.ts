@@ -53,6 +53,10 @@ export type YambaTripResult = {
    * Affiché dans le bottom sheet "tarifs par catégorie" sur mobile.
    */
   pricesByCategory?: PricesByCategory;
+  /** D13 — moteur PER_KG : prix au kilo en euros. null/absent = legacy PER_CATEGORY */
+  pricePerKg?: number | null;
+  /** CAP-02 — kilos encore disponibles (capacité − réservé) */
+  remainingKg?: number | null;
   currency?: string;
   transportMode: TransportMode;
   allowedCategories: ParcelCategory[];

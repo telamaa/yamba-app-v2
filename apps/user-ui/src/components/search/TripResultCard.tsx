@@ -159,8 +159,16 @@ export default function TripResultCard({
     item.remainingSlots > 0 &&
     item.remainingSlots < 3;
 
+  // D13 — un trip PER_KG affiche son prix au kilo (le popover legacy n'a plus de sens)
+  const isPerKg = typeof item.pricePerKg === "number" && item.pricePerKg > 0;
+  const formattedPerKg = isPerKg
+    ? (item.pricePerKg as number)
+        .toLocaleString(localeTag, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+        .replace(/\u00a0/g, "")
+    : null;
+
   const hasPricesByCategory =
-    item.pricesByCategory && Object.keys(item.pricesByCategory).length > 0;
+    !isPerKg && !!item.pricesByCategory && Object.keys(item.pricesByCategory).length > 0;
 
   return (
     <Link
@@ -292,13 +300,27 @@ export default function TripResultCard({
             </button>
           ) : (
             <div className="text-[10px] font-medium text-slate-400 dark:text-slate-500">
-              {t("startingFrom")}
+              {isPerKg ? t("card.perKg") : t("startingFrom")}
             </div>
           )}
 
           <div className="text-[22px] font-black leading-none tracking-tight text-slate-950 dark:text-white">
-            {formattedPrice} {item.currency ?? "€"}
+            {isPerKg ? (
+              <>
+                {formattedPerKg} {item.currency ?? "€"}
+                <span className="text-[13px] font-semibold text-slate-500 dark:text-slate-400">/kg</span>
+              </>
+            ) : (
+              <>
+                {formattedPrice} {item.currency ?? "€"}
+              </>
+            )}
           </div>
+          {isPerKg && typeof item.remainingKg === "number" && (
+            <div className="mt-0.5 text-[10px] font-medium text-[#0F766E] dark:text-teal-400">
+              {t("card.remainingKg", { kg: item.remainingKg })}
+            </div>
+          )}
 
           {hasPricesByCategory && (
             <TripPricingPopover

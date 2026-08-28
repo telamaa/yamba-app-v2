@@ -119,25 +119,45 @@ export default function YambaTripResultCardMobile({
               </div>
             </div>
 
-            {/* Price */}
+            {/* Price — PER_KG (D13) ou legacy */}
             <div className="min-w-[50px] text-right">
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  open();
-                }}
-                className="inline-flex items-center justify-end gap-0.5 text-[9px] leading-none text-slate-400 transition-colors hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300"
-                aria-label={t("card.viewPricesByCategory")}
-              >
-                <HelpCircle size={9} strokeWidth={2} />
-                <span>{t("card.fromPrice")}</span>
-              </button>
-              <div className="mt-1 text-[18px] font-semibold leading-tight text-slate-900 dark:text-white">
-                {item.minPrice}
-                {item.currency ?? "€"}
-              </div>
+              {typeof item.pricePerKg === "number" && item.pricePerKg > 0 ? (
+                <>
+                  <div className="text-[9px] leading-none text-slate-400 dark:text-slate-500">
+                    {t("card.perKg")}
+                  </div>
+                  <div className="mt-1 text-[18px] font-semibold leading-tight text-slate-900 dark:text-white">
+                    {item.pricePerKg.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    {item.currency ?? "€"}
+                    <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">/kg</span>
+                  </div>
+                  {typeof item.remainingKg === "number" && (
+                    <div className="text-[9px] font-medium text-[#0F766E] dark:text-teal-400">
+                      {t("card.remainingKg", { kg: item.remainingKg })}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      open();
+                    }}
+                    className="inline-flex items-center justify-end gap-0.5 text-[9px] leading-none text-slate-400 transition-colors hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300"
+                    aria-label={t("card.viewPricesByCategory")}
+                  >
+                    <HelpCircle size={9} strokeWidth={2} />
+                    <span>{t("card.fromPrice")}</span>
+                  </button>
+                  <div className="mt-1 text-[18px] font-semibold leading-tight text-slate-900 dark:text-white">
+                    {item.minPrice}
+                    {item.currency ?? "€"}
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>

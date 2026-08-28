@@ -467,9 +467,19 @@ export default function TripDetails({ tripId }: { tripId: string }) {
             </div>
           </Section>
 
-          {categories.length > 0 && (
+          {(categories.length > 0 || (typeof trip.pricePerKgCents === "number" && trip.pricePerKgCents > 0)) && (
             <Section icon={Tag} title={t("detail.pricingTitle")}>
               <div className="space-y-2">
+                {typeof trip.pricePerKgCents === "number" && trip.pricePerKgCents > 0 && (
+                  <div className="flex items-center justify-between rounded-lg border border-slate-100 px-3 py-2.5 dark:border-slate-800">
+                    <span className="text-[13px] font-medium text-slate-900 dark:text-white">
+                      €/kg{typeof trip.capacityKg === "number" ? ` · ${trip.capacityKg} kg` : ""}
+                    </span>
+                    <span className="text-[13px] font-semibold" style={{ color: MANGO }}>
+                      {(trip.pricePerKgCents / 100).toFixed(2)} €/kg
+                    </span>
+                  </div>
+                )}
                 {categories.map((c: any, i: number) => {
                   const price = typeof c.priceAmountCents === "number" ? (c.priceAmountCents / 100).toFixed(2) : "—";
                   return (
