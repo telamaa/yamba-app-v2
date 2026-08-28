@@ -58,7 +58,7 @@ export default function TripDetailView({ trip }: Props) {
       </button>
 
       <header className="mb-6">
-        <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white sm:text-3xl">
+        <h1 className="text-xl font-black tracking-tight text-slate-900 dark:text-white sm:text-2xl">
           {trip.origin.city}{" "}
           <span className="text-[#FF9900]">→</span> {trip.destination.city}
         </h1>
