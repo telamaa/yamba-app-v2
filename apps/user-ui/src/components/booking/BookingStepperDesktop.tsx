@@ -27,7 +27,7 @@ export default function BookingStepperDesktop({
   const steps: Step[] = [1, 2, 3, 4];
 
   return (
-    <div className="flex items-center justify-center gap-0 border-b border-slate-200 px-6 py-5 dark:border-slate-800">
+    <div className="flex items-center justify-center gap-0 lg:justify-end">
       {steps.map((step, index) => {
         const isActive = step === current;
         const isDone = step < current;
