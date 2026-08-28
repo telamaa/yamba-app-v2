@@ -25,6 +25,7 @@ import { hasActiveBookings } from "../services/booking-queries";
 import {
   resolvePricingEngine,
   PRICING_GATE_MESSAGE,
+  checkBagCapacity,
 } from "../services/pricing-gate";
 
 // ─────────────────────────────────────────────
@@ -353,6 +354,14 @@ export const updateTrip = async (
         }) === null
       ) {
         return next(new ValidationError(PRICING_GATE_MESSAGE));
+      }
+      const bagIssue = checkBagCapacity({
+        capacityKg: updateData.capacityKg ?? trip.capacityKg,
+        checkedBag23PriceCents: updateData.checkedBag23PriceCents ?? trip.checkedBag23PriceCents,
+        cabinBag12PriceCents: updateData.cabinBag12PriceCents ?? trip.cabinBag12PriceCents,
+      });
+      if (bagIssue) {
+        return next(new ValidationError(bagIssue));
       }
 
       updateData.status = "PUBLISHED";
@@ -882,6 +891,10 @@ export const publishTrip = async (
     });
     if (pricingEngine === null) {
       return next(new ValidationError(PRICING_GATE_MESSAGE));
+    }
+    const bagIssue = checkBagCapacity(trip);
+    if (bagIssue) {
+      return next(new ValidationError(bagIssue));
     }
     // Les categories n'existent que pour le moteur legacy (la famille D14 les remplace)
     if (

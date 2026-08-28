@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { checkBagCapacity } from "../services/pricing-gate";
 
 /* ────────────────────────────────────────────────────────────
  * Zod schemas for Trip CRUD payloads.
@@ -195,6 +196,13 @@ export const createTripSchema = z
     publish: z.boolean().optional(),
   })
   .superRefine((data, ctx) => {
+    // Cohérence bagage/capacité (RG-B-29) — brouillon compris : une offre
+    // impossible ne doit jamais être enregistrée.
+    const bagIssue = checkBagCapacity(data);
+    if (bagIssue) {
+      ctx.addIssue({ code: "custom", message: bagIssue, path: ["capacityKg"] });
+    }
+
     if (data.publish !== true) return;
 
     // Publish-only validation: locations
