@@ -1,3 +1,4 @@
+import { DEFAULT_BASE_PER_KG, corridorBasePerKg, haversineKm, type Zone } from "@/lib/pricing-corridors";
 import type {
   CategoryCondition,
   Draft,
@@ -74,7 +75,8 @@ export const DEFAULT_CAPACITY_KG = 12;
  * ──────────────────────────────────────── */
 
 export const PRICE_SUGGESTION_V1 = {
-  baseCorridorPerKg: 11,
+  /** base de repli si le corridor est inconnu — voir lib/pricing-corridors.ts */
+  baseCorridorPerKg: DEFAULT_BASE_PER_KG,
   lowPct: 10,
   highPct: 15,
   directFlightMod: 0.05,
@@ -84,6 +86,8 @@ export const PRICE_SUGGESTION_V1 = {
 
 export type PriceFactor = {
   key: "base" | "directFlight" | "departureSoon";
+  /** zones du corridor (key = base) */
+  corridor?: { fromZone: Zone; toZone: Zone };
   /** variation en % appliquée (0 pour la base) */
   pct: number;
   /** valeur de base en €/kg (key = base) */
@@ -103,11 +107,19 @@ export function roundToHalf(n: number): number {
 }
 
 export function suggestPricePerKg(
-  draft: Pick<Draft, "transportMode" | "flightType" | "departureDate">
+  draft: Pick<Draft, "transportMode" | "flightType" | "departureDate"> &
+    Partial<Pick<Draft, "fromPlace" | "toPlace">>
 ): PriceSuggestion {
   const p = PRICE_SUGGESTION_V1;
-  const factors: PriceFactor[] = [{ key: "base", pct: 0, value: p.baseCorridorPerKg }];
-  let median = p.baseCorridorPerKg;
+  // D15 V1.5 — base PAR CORRIDOR (zone × zone) + distance douce
+  const distanceKm = haversineKm(
+    draft.fromPlace?.lat, draft.fromPlace?.lng, draft.toPlace?.lat, draft.toPlace?.lng
+  );
+  const corridor = corridorBasePerKg(draft.fromPlace?.countryCode, draft.toPlace?.countryCode, distanceKm);
+  const factors: PriceFactor[] = [
+    { key: "base", pct: 0, value: corridor.base, corridor: { fromZone: corridor.fromZone, toZone: corridor.toZone } },
+  ];
+  let median = corridor.base;
 
   if (draft.transportMode === "plane" && draft.flightType === "direct") {
     median *= 1 + p.directFlightMod;

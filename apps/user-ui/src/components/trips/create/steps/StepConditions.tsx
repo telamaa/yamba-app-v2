@@ -80,7 +80,7 @@ export default function StepConditions({
   const suggestion = useMemo(
     () => suggestPricePerKg(draft),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [draft.transportMode, draft.flightType, draft.departureDate]
+    [draft.transportMode, draft.flightType, draft.departureDate, draft.fromPlace, draft.toPlace]
   );
   const verdict =
     typeof draft.pricePerKg === "number" && draft.pricePerKg > 0
@@ -209,7 +209,7 @@ export default function StepConditions({
               <li key={f.key} className="flex justify-between gap-3">
                 <span>
                   {f.key === "base"
-                    ? copy.factorBase(formatEur(f.value ?? 0))
+                    ? copy.factorBase(formatEur(f.value ?? 0), f.corridor ? copy.zoneLabel(f.corridor.fromZone) + " → " + copy.zoneLabel(f.corridor.toZone) : "")
                     : f.key === "directFlight"
                       ? copy.factorDirectFlight
                       : copy.factorDepartureSoon}
