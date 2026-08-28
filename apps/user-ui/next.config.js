@@ -5,8 +5,16 @@ const { composePlugins, withNx } = require("@nx/next");
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const createNextIntlPlugin = require("next-intl/plugin");
 
-// Point vers notre config request.ts (chargement des messages)
-const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
+// Point vers notre config request.ts (chargement des messages).
+// next-intl résout un chemin RELATIF depuis process.cwd() (et refuse les
+// chemins absolus avec Turbopack), or le plugin @nx/next évalue ce fichier
+// depuis la racine du monorepo (« Could not find i18n config at
+// ./src/i18n/request.ts » au calcul du graphe) tandis que `next dev` tourne
+// depuis apps/user-ui. On recalcule donc le relatif au cwd courant.
+const path = require("path");
+const withNextIntl = createNextIntlPlugin(
+  "./" + path.relative(process.cwd(), path.join(__dirname, "src/i18n/request.ts"))
+);
 
 /**
  * @type {import('@nx/next/plugins/with-nx').WithNxOptions}

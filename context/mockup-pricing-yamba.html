@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Yamba — Mockup Pricing (0bis) · Arbitrages D13-D22</title>
+<style>
+  :root{
+    --mango:#FF9900; --mango-soft:rgba(255,153,0,.10); --mango-line:rgba(255,153,0,.35);
+    --teal:#0F766E; --teal-soft:rgba(15,118,110,.10);
+    --ink:#0f172a; --ink-2:#334155; --muted:#64748b; --faint:#94a3b8;
+    --bg:#f1f5f9; --card:#ffffff; --line:#e2e8f0; --line-2:#cbd5e1;
+    --green:#10b981; --green-soft:rgba(16,185,129,.12);
+    --red:#ef4444; --red-soft:rgba(239,68,68,.08);
+    --amber:#f59e0b; --amber-soft:rgba(245,158,11,.12);
+    --radius:16px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    background:var(--bg); color:var(--ink); font-size:14px; line-height:1.5;
+    padding-bottom:80px;
+  }
+
+  /* ── Header ── */
+  header{
+    background:var(--card); border-bottom:1px solid var(--line);
+    padding:18px 24px; position:sticky; top:0; z-index:50;
+    display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+  }
+  .logo{font-weight:800; font-size:19px; letter-spacing:-.02em}
+  .logo b{color:var(--mango)}
+  .hdr-sub{color:var(--muted); font-size:12.5px}
+  .hdr-right{margin-left:auto; display:flex; gap:8px; align-items:center}
+  .pill{
+    font-size:11px; font-weight:600; padding:3px 10px; border-radius:999px;
+    background:var(--teal-soft); color:var(--teal); white-space:nowrap;
+  }
+
+  /* ── Layout ── */
+  .wrap{max-width:1240px; margin:0 auto; padding:22px 20px}
+  .grid{display:grid; grid-template-columns:1fr 1fr; gap:20px; align-items:start}
+  @media(max-width:980px){.grid{grid-template-columns:1fr}}
+
+  .card{
+    background:var(--card); border:1px solid var(--line); border-radius:var(--radius);
+    overflow:hidden;
+  }
+  .card-head{
+    padding:16px 20px 12px; border-bottom:1px solid var(--line);
+    display:flex; align-items:center; gap:10px;
+  }
+  .role-dot{width:10px;height:10px;border-radius:50%}
+  .card-head h2{font-size:15px; font-weight:700; letter-spacing:-.01em}
+  .card-head .who{font-size:11.5px;color:var(--muted);margin-left:auto}
+  .card-body{padding:18px 20px}
+
+  .sec{margin-bottom:22px}
+  .sec:last-child{margin-bottom:4px}
+  .sec-title{
+    font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase;
+    color:var(--faint); margin-bottom:10px; display:flex; align-items:center; gap:8px;
+  }
+  .dbadge{
+    font-size:9.5px; font-weight:700; letter-spacing:.03em;
+    background:var(--ink); color:#fff; border-radius:5px; padding:1.5px 5px;
+    cursor:help;
+  }
+
+  label.fld{display:block; font-size:12.5px; font-weight:600; color:var(--ink-2); margin-bottom:6px}
+  select,input[type=number]{
+    width:100%; padding:9px 12px; border:1px solid var(--line-2); border-radius:10px;
+    font:inherit; font-size:13.5px; background:#fff; color:var(--ink); outline:none;
+  }
+  select:focus,input:focus{border-color:var(--mango); box-shadow:0 0 0 3px var(--mango-soft)}
+  .row2{display:grid; grid-template-columns:1fr 1fr; gap:12px}
+  .row3{display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px}
+
+  /* Chips (options binaires) */
+  .chips{display:flex; gap:8px; flex-wrap:wrap}
+  .chip{
+    border:1px solid var(--line-2); background:#fff; border-radius:999px;
+    padding:7px 14px; font-size:12.5px; font-weight:600; color:var(--ink-2);
+    cursor:pointer; transition:all .12s; user-select:none;
+  }
+  .chip.on{background:var(--ink); border-color:var(--ink); color:#fff}
+
+  /* Sliders */
+  .slider-line{display:flex; align-items:center; gap:12px}
+  input[type=range]{flex:1; accent-color:var(--mango); height:4px}
+  .slider-val{font-weight:800; font-size:14px; min-width:74px; text-align:right; font-variant-numeric:tabular-nums}
+
+  /* ── Jauge prix juste ── */
+  .gauge-wrap{margin-top:14px}
+  .gauge{
+    position:relative; height:34px; border-radius:10px;
+    background:linear-gradient(90deg, var(--red-soft) 0%, var(--red-soft) 14%,
+      var(--green-soft) 14%, var(--green-soft) 72%,
+      var(--amber-soft) 72%, var(--amber-soft) 100%);
+    border:1px solid var(--line);
+  }
+  .gauge .tick{position:absolute; top:100%; font-size:10.5px; color:var(--faint); transform:translateX(-50%); padding-top:3px; white-space:nowrap}
+  .cursor{
+    position:absolute; top:-7px; bottom:-7px; width:3px; background:var(--ink); border-radius:2px;
+    transition:left .15s;
+  }
+  .cursor::after{
+    content:attr(data-label); position:absolute; top:-24px; left:50%; transform:translateX(-50%);
+    background:var(--ink); color:#fff; font-size:10.5px; font-weight:700;
+    padding:2px 7px; border-radius:6px; white-space:nowrap;
+  }
+  .fair{
+    display:inline-flex; align-items:center; gap:6px; margin-top:26px;
+    font-size:12px; font-weight:700; padding:5px 12px; border-radius:999px;
+  }
+  .fair.ok{background:var(--green-soft); color:#047857}
+  .fair.low{background:var(--red-soft); color:#b91c1c}
+  .fair.high{background:var(--amber-soft); color:#b45309}
+  .anchor{font-size:12px; color:var(--muted); margin-top:6px}
+
+  /* ── Familles de risque ── */
+  .fam{
+    display:flex; align-items:center; gap:10px; padding:10px 12px;
+    border:1px solid var(--line); border-radius:12px; margin-bottom:8px; background:#fff;
+  }
+  .fam .fname{font-weight:600; font-size:13px; flex:1}
+  .fam .fico{font-size:16px; width:24px; text-align:center}
+  .fstate{display:flex; gap:6px}
+  .fbtn{
+    font-size:11px; font-weight:700; padding:4px 10px; border-radius:8px;
+    border:1px solid var(--line-2); background:#fff; color:var(--muted); cursor:pointer;
+  }
+  .fbtn.acc.on{background:var(--green-soft); border-color:transparent; color:#047857}
+  .fbtn.sur.on{background:var(--mango-soft); border-color:transparent; color:#b45309}
+  .fbtn.ref.on{background:var(--red-soft); border-color:transparent; color:#b91c1c}
+  .fam .surval{width:110px; display:none; align-items:center; gap:6px}
+  .fam.sur .surval{display:flex}
+  .fam .surval input{accent-color:var(--amber)}
+  .fam .surval b{font-size:12px; min-width:38px; text-align:right}
+  .fam.ref{opacity:.55}
+
+  /* ── Bagages entiers ── */
+  .bag{
+    display:flex; align-items:center; gap:12px; padding:12px 14px;
+    border:1px dashed var(--line-2); border-radius:12px; margin-bottom:8px;
+  }
+  .bag .bname{flex:1; font-weight:600; font-size:13px}
+  .bag .bname small{display:block; font-weight:400; color:var(--muted); font-size:11.5px}
+  .bag input[type=number]{width:92px}
+  .bag .eur{color:var(--muted); font-size:12px}
+  .switch{position:relative; width:38px; height:22px; flex-shrink:0}
+  .switch input{opacity:0; width:0; height:0}
+  .sl{position:absolute; inset:0; background:var(--line-2); border-radius:999px; cursor:pointer; transition:.15s}
+  .sl::before{content:""; position:absolute; width:16px; height:16px; left:3px; top:3px; background:#fff; border-radius:50%; transition:.15s}
+  .switch input:checked + .sl{background:var(--teal)}
+  .switch input:checked + .sl::before{transform:translateX(16px)}
+
+  /* ── Classes de taille (Expéditeur) ── */
+  .sizes{display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px}
+  .size{
+    border:1.5px solid var(--line); border-radius:14px; padding:14px 10px 12px;
+    text-align:center; cursor:pointer; transition:all .12s; background:#fff;
+  }
+  .size:hover{border-color:var(--line-2)}
+  .size.on{border-color:var(--mango); background:var(--mango-soft)}
+  .size .sico{font-size:24px}
+  .size .sname{font-weight:800; font-size:15px; margin-top:4px}
+  .size .sdesc{font-size:11px; color:var(--muted); margin-top:2px; line-height:1.35}
+  .size .scoef{font-size:10.5px; font-weight:700; color:var(--teal); margin-top:5px}
+
+  /* ── Protection ── */
+  .prot{
+    display:flex; gap:10px; align-items:flex-start; padding:12px 14px;
+    border:1.5px solid var(--line); border-radius:14px; margin-bottom:8px; cursor:pointer; background:#fff;
+  }
+  .prot.on{border-color:var(--teal); background:var(--teal-soft)}
+  .prot .radio{
+    width:16px; height:16px; border-radius:50%; border:2px solid var(--line-2);
+    margin-top:2px; flex-shrink:0;
+  }
+  .prot.on .radio{border-color:var(--teal); background:radial-gradient(circle, var(--teal) 45%, transparent 50%)}
+  .prot .pt{font-weight:700; font-size:13px}
+  .prot .pd{font-size:12px; color:var(--muted); margin-top:2px}
+  .prot .pp{margin-left:auto; font-weight:800; font-size:13px; white-space:nowrap}
+
+  /* ── Récap / Breakdown ── */
+  .recap{
+    background:#0f172a; color:#e2e8f0; border-radius:14px; padding:16px 18px; margin-top:8px;
+  }
+  .recap .rline{display:flex; justify-content:space-between; padding:5px 0; font-size:13.5px}
+  .recap .rline .lbl{color:#94a3b8}
+  .recap .rline .lbl small{display:block; font-size:10.5px; color:#64748b}
+  .recap .rline b{font-variant-numeric:tabular-nums}
+  .recap .total{
+    border-top:1px solid #334155; margin-top:8px; padding-top:10px;
+    font-size:16px; font-weight:800;
+  }
+  .recap .total .lbl{color:#fff}
+  .recap .note{font-size:11px; color:#64748b; margin-top:8px}
+  .recap.gain{background:linear-gradient(135deg,#134e4a,#0f766e)}
+  .recap.gain .total .val{color:#5eead4}
+
+  .hintbox{
+    background:var(--amber-soft); border:1px solid rgba(245,158,11,.25); border-radius:10px;
+    padding:9px 12px; font-size:12px; color:#92400e; margin-top:10px;
+  }
+  .infbox{
+    background:var(--teal-soft); border-radius:10px;
+    padding:9px 12px; font-size:12px; color:var(--teal); margin-top:10px;
+  }
+
+  /* ── Panneau arbitrages ── */
+  .arb{
+    background:var(--card); border:1px solid var(--line); border-radius:var(--radius);
+    margin-bottom:20px;
+  }
+  .arb summary{
+    padding:14px 20px; font-weight:700; font-size:13.5px; cursor:pointer; list-style:none;
+    display:flex; align-items:center; gap:10px;
+  }
+  .arb summary::-webkit-details-marker{display:none}
+  .arb summary .chev{margin-left:auto; transition:.15s; color:var(--faint)}
+  .arb[open] summary .chev{transform:rotate(180deg)}
+  .arb-grid{
+    padding:4px 20px 18px; display:grid; grid-template-columns:repeat(4,1fr); gap:16px 20px;
+  }
+  @media(max-width:900px){.arb-grid{grid-template-columns:repeat(2,1fr)}}
+  .param label{font-size:11px; font-weight:700; color:var(--muted); display:flex; gap:6px; align-items:center; margin-bottom:5px}
+  .param .pv{font-weight:800; color:var(--ink); font-size:13px; margin-left:auto; font-variant-numeric:tabular-nums}
+
+  .foot{max-width:1240px; margin:8px auto 0; padding:0 20px; color:var(--faint); font-size:11.5px}
+  .foot b{color:var(--muted)}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">yam<b>ba</b></div>
+  <div class="hdr-sub">Mockup pricing — chantier 0bis · les deux faces du marché, liées en direct</div>
+  <div class="hdr-right">
+    <span class="pill">D13 €/kg</span><span class="pill">D14 familles</span>
+    <span class="pill">D15 suggestion</span><span class="pill">D16 commission</span>
+    <span class="pill">D22 protection</span>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <!-- ═══ PANNEAU ARBITRAGES ═══ -->
+  <details class="arb" open>
+    <summary>⚙️ Paramètres serveur — joue avec les curseurs, tout se recalcule <span class="chev">▾</span></summary>
+    <div class="arb-grid">
+      <div class="param">
+        <label>Commission <span class="dbadge" title="D16 / COM-01">D16</span> <span class="pv" id="pvCom">12 %</span></label>
+        <input type="range" id="pCom" min="8" max="20" step="0.5" value="12">
+      </div>
+      <div class="param">
+        <label>Plancher commission <span class="dbadge" title="COM-02">D16</span> <span class="pv" id="pvFloor">3,00 €</span></label>
+        <input type="range" id="pFloor" min="0" max="6" step="0.5" value="3">
+      </div>
+      <div class="param">
+        <label>Coef. taille M <span class="dbadge" title="PRC-03">D13</span> <span class="pv" id="pvCoefM">×1,10</span></label>
+        <input type="range" id="pCoefM" min="1" max="1.3" step="0.05" value="1.1">
+      </div>
+      <div class="param">
+        <label>Coef. taille L <span class="dbadge" title="PRC-03">D13</span> <span class="pv" id="pvCoefL">×1,25</span></label>
+        <input type="range" id="pCoefL" min="1.1" max="1.6" step="0.05" value="1.25">
+      </div>
+      <div class="param">
+        <label>Prime Garantie 500 € <span class="dbadge" title="GAR-03">D22</span> <span class="pv" id="pvPrime">6,00 €</span></label>
+        <input type="range" id="pPrime" min="2" max="12" step="0.5" value="6">
+      </div>
+      <div class="param">
+        <label>Fourchette basse <span class="dbadge" title="PRC-05">D15</span> <span class="pv" id="pvLow">−10 %</span></label>
+        <input type="range" id="pLow" min="5" max="25" step="1" value="10">
+      </div>
+      <div class="param">
+        <label>Fourchette haute <span class="dbadge" title="PRC-05">D15</span> <span class="pv" id="pvHigh">+15 %</span></label>
+        <input type="range" id="pHigh" min="5" max="30" step="1" value="15">
+      </div>
+      <div class="param">
+        <label>Tolérance poids pickup <span class="dbadge" title="PRC-07">D13</span> <span class="pv" id="pvTol">±10 %</span></label>
+        <input type="range" id="pTol" min="5" max="20" step="1" value="10">
+      </div>
+    </div>
+  </details>
+
+  <div class="grid">
+
+    <!-- ═══════════ FACE YAMBER ═══════════ -->
+    <div class="card">
+      <div class="card-head">
+        <span class="role-dot" style="background:var(--teal)"></span>
+        <h2>Tu publies un trajet</h2>
+        <span class="who">Marie D. · Yamber</span>
+      </div>
+      <div class="card-body">
+
+        <div class="sec">
+          <div class="sec-title">Ton trajet</div>
+          <div class="row2">
+            <div>
+              <label class="fld" for="corridor">Corridor</label>
+              <select id="corridor">
+                <option value="11" selected>Paris → Brazzaville</option>
+                <option value="10">Paris → Douala</option>
+                <option value="9">Paris → Abidjan</option>
+                <option value="11.5">Bruxelles → Kinshasa</option>
+              </select>
+            </div>
+            <div>
+              <label class="fld" for="departIn">Départ dans</label>
+              <select id="departIn">
+                <option value="0" selected>3 semaines</option>
+                <option value="0.08">7 jours</option>
+                <option value="0.12">3 jours</option>
+              </select>
+            </div>
+          </div>
+          <div style="margin-top:12px" class="row2">
+            <div>
+              <label class="fld">Vol</label>
+              <div class="chips">
+                <span class="chip on" data-grp="flight" data-v="0.05">Direct</span>
+                <span class="chip" data-grp="flight" data-v="-0.05">Avec escale</span>
+              </div>
+            </div>
+            <div>
+              <label class="fld">Ta réputation</label>
+              <div class="chips">
+                <span class="chip" data-grp="rep" data-v="-0.05">Nouveau</span>
+                <span class="chip on" data-grp="rep" data-v="0">Confirmé</span>
+                <span class="chip" data-grp="rep" data-v="0.05">Top Yamber</span>
+              </div>
+            </div>
+          </div>
+          <div class="infbox" id="demandSignal">📡 <b>14 alertes actives</b> sur ce corridor autour de ta date — la demande est là. <span class="dbadge" title="PRC-05 : signal propriétaire SavedRoutes">D15</span></div>
+        </div>
+
+        <div class="sec">
+          <div class="sec-title">Ton prix au kilo <span class="dbadge" title="D13 / PRC-01 : UN seul nombre à fixer">D13</span></div>
+          <div class="slider-line">
+            <input type="range" id="pricePerKg" min="5" max="20" step="0.5" value="11.5">
+            <span class="slider-val" id="ppkVal">11,50 €/kg</span>
+          </div>
+          <div class="gauge-wrap">
+            <div class="gauge" id="gauge">
+              <span class="tick" id="tickLow" style="left:14%">basse</span>
+              <span class="tick" id="tickMed" style="left:43%">médiane</span>
+              <span class="tick" id="tickHigh" style="left:72%">haute</span>
+              <div class="cursor" id="cursor" style="left:50%" data-label="11,50"></div>
+            </div>
+            <span class="fair ok" id="fairBadge">✓ Prix juste</span>
+            <div class="anchor" id="anchorTxt">Les trajets similaires partent à <b>11,20 €/kg</b> en médiane.</div>
+          </div>
+        </div>
+
+        <div class="sec">
+          <div class="sec-title">Ta capacité <span class="dbadge" title="PRC-02 / D19 : réservée dès qu'une demande arrive">D19</span></div>
+          <div class="slider-line">
+            <input type="range" id="capacity" min="2" max="30" step="1" value="12">
+            <span class="slider-val" id="capVal">12 kg</span>
+          </div>
+          <div class="hintbox">⚖️ Au pickup, un écart de poids ≤ <b id="tolTxt">10 %</b> est toléré. Au-delà : renégociation ou refus sans pénalité. <span class="dbadge" title="PRC-07">D13</span></div>
+        </div>
+
+        <div class="sec">
+          <div class="sec-title">Familles de colis <span class="dbadge" title="D14 : la catégorie pilote le risque, plus jamais le prix">D14</span></div>
+          <div id="families"></div>
+        </div>
+
+        <div class="sec">
+          <div class="sec-title">Bagages entiers — forfait <span class="dbadge" title="PRC-04 : hors logique €/kg, on loue la franchise complète">D13</span></div>
+          <div class="bag">
+            <label class="switch"><input type="checkbox" id="bag23" checked><span class="sl"></span></label>
+            <div class="bname">Bagage soute 23 kg<small>consomme 23 kg de ta capacité</small></div>
+            <input type="number" id="bag23p" value="230" min="50" step="5"><span class="eur">€</span>
+          </div>
+          <div class="bag">
+            <label class="switch"><input type="checkbox" id="bag12"><span class="sl"></span></label>
+            <div class="bname">Bagage cabine 12 kg<small>consomme 12 kg de ta capacité</small></div>
+            <input type="number" id="bag12p" value="130" min="30" step="5"><span class="eur">€</span>
+          </div>
+        </div>
+
+        <div class="recap gain">
+          <div class="rline"><span class="lbl">Si le colis d'Aminata (ci-contre) est accepté</span></div>
+          <div class="rline total"><span class="lbl">Tu gagnes</span><b class="val" id="carrierNet">— €</b></div>
+          <div class="note">Versé à J+4 après livraison confirmée · la commission est côté Expéditeur, ton prix = ton net <span class="dbadge" title="D16 / COM-03">D16</span></div>
+        </div>
+        <div class="infbox">⏱ Badge « Réponse sous 24 h » — en v1, <b>toute demande passe par ton acceptation</b> : c'est ton contrôle du colis. <span class="dbadge" title="D20 / CAP-04">D20</span></div>
+      </div>
+    </div>
+
+    <!-- ═══════════ FACE EXPÉDITEUR ═══════════ -->
+    <div class="card">
+      <div class="card-head">
+        <span class="role-dot" style="background:var(--mango)"></span>
+        <h2>Tu envoies un colis</h2>
+        <span class="who">Aminata T. · Expéditrice → trajet de Marie</span>
+      </div>
+      <div class="card-body">
+
+        <div class="sec">
+          <div class="sec-title">Ton colis</div>
+          <label class="fld" for="shipFam">Famille</label>
+          <select id="shipFam"></select>
+          <div class="hintbox" id="famSurchargeNote" style="display:none"></div>
+          <div style="margin-top:14px">
+            <label class="fld">Poids déclaré</label>
+            <div class="slider-line">
+              <input type="range" id="shipWeight" min="0.5" max="10" step="0.5" value="2.5">
+              <span class="slider-val" id="shipWVal">2,5 kg</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="sec">
+          <div class="sec-title">Taille — pas besoin de mesurer <span class="dbadge" title="D13 / PRC-03 : classes visuelles, jamais de L×l×H">D13</span></div>
+          <div class="sizes">
+            <div class="size on" data-size="S">
+              <div class="sico">👟</div>
+              <div class="sname">S</div>
+              <div class="sdesc">tient dans une<br>boîte à chaussures</div>
+              <div class="scoef" id="coefSTxt">×1,00</div>
+            </div>
+            <div class="size" data-size="M">
+              <div class="sico">🎒</div>
+              <div class="sname">M</div>
+              <div class="sdesc">tient dans un<br>sac cabine</div>
+              <div class="scoef" id="coefMTxt">×1,10</div>
+            </div>
+            <div class="size" data-size="L">
+              <div class="sico">🧳</div>
+              <div class="sname">L</div>
+              <div class="sdesc">occupe une<br>demi-valise</div>
+              <div class="scoef" id="coefLTxt">×1,25</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="sec">
+          <div class="sec-title">Protection <span class="dbadge" title="D22 : « Garantie Yamba » tant que le contrat assureur n'est pas signé — prime = flux séparé (GAR-04)">D22</span></div>
+          <div class="prot on" data-prot="basic">
+            <span class="radio"></span>
+            <div><div class="pt">Protection de base</div><div class="pd">Non-livraison couverte : ton paiement est bloqué jusqu'à la remise.</div></div>
+            <span class="pp" style="color:var(--teal)">Incluse</span>
+          </div>
+          <div class="prot" data-prot="ext">
+            <span class="radio"></span>
+            <div><div class="pt">Garantie Yamba — jusqu'à 500 €</div><div class="pd">Perte, vol, casse pendant le transport. Exclusions affichées avant validation (dont saisie douanière d'un colis non conforme).</div></div>
+            <span class="pp" id="primeTxt">+ 6,00 €</span>
+          </div>
+        </div>
+
+        <div class="recap">
+          <div class="rline">
+            <span class="lbl">Transport<small id="calcDetail">2,5 kg × 11,50 €/kg × S</small></span>
+            <b id="lineTransport">— €</b>
+          </div>
+          <div class="rline">
+            <span class="lbl">Service &amp; protection<small id="svcDetail">commission + garantie</small></span>
+            <b id="lineService">— €</b>
+          </div>
+          <div class="rline total"><span class="lbl">Total</span><b class="val" id="shipTotal" style="color:var(--mango)">— €</b></div>
+          <div class="note">Autorisé maintenant, débité seulement quand Marie accepte (sous 24 h) · 2 lignes, pas de frais cachés <span class="dbadge" title="D16 / COM-03 : jamais plus de 2 lignes, frais Stripe absorbés">D16</span></div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /grid -->
+</div><!-- /wrap -->
+
+<div class="foot">
+  <b>Ce que ce mockup fige :</b> le Yamber fixe UN prix (€/kg) et vend des kilos · la catégorie devient famille de risque (accepter / surcharger / refuser) · l'Expéditeur qualifie le volume à l'œil (S/M/L) · le total tient en 2 lignes · le net Yamber = son prix, point.
+  Survole les badges D·· pour la décision source. Les valeurs du panneau ⚙️ sont les paramètres serveur du tableau §13 des règles métier.
+</div>
+
+<script>
+/* ══════════ ÉTAT ══════════ */
+const S = {
+  // paramètres serveur (panneau arbitrage)
+  commissionPct: 12, commissionFloor: 3, coefM: 1.10, coefL: 1.25,
+  prime: 6, lowPct: 10, highPct: 15, tol: 10,
+  // yamber
+  base: 11, departMod: 0, flightMod: 0.05, repMod: 0, demandMod: 0.06,
+  pricePerKg: 11.5, capacity: 12,
+  // expéditeur
+  weight: 2.5, size: "S", prot: "basic", famKey: "clothes",
+};
+
+const FAMILIES = [
+  { key:"clothes",  ico:"👕", name:"Vêtements & textile" },
+  { key:"docs",     ico:"📚", name:"Documents & livres" },
+  { key:"elec",     ico:"📱", name:"Électronique" },
+  { key:"acc",      ico:"👜", name:"Accessoires & divers" },
+  { key:"toys",     ico:"🧸", name:"Jouets" },
+];
+// état par famille : mode acc|sur|ref + surcharge %
+const famState = Object.fromEntries(FAMILIES.map(f => [f.key, { mode: f.key==="elec" ? "sur" : "acc", sur: f.key==="elec" ? 20 : 10 }]));
+
+const eur = n => n.toLocaleString("fr-FR",{minimumFractionDigits:2, maximumFractionDigits:2}) + " €";
+const el = id => document.getElementById(id);
+
+/* ══════════ MOTEUR DE SUGGESTION (PRC-05, V1 déterministe) ══════════ */
+function suggestion(){
+  const med = S.base * (1 + S.departMod) * (1 + S.flightMod) * (1 + S.repMod) * (1 + S.demandMod);
+  return { low: med * (1 - S.lowPct/100), med, high: med * (1 + S.highPct/100) };
+}
+
+/* ══════════ CALCUL EXPÉDITEUR (PRC-01/03, COM-01/02/03, GAR) ══════════ */
+function compute(){
+  const sg = suggestion();
+
+  /* — jauge prix juste — */
+  // échelle de la jauge : [low − 25% de span … high + 25% de span]
+  const span = sg.high - sg.low;
+  const gMin = sg.low - span*0.45, gMax = sg.high + span*0.45;
+  const pct = v => Math.min(97, Math.max(3, (v - gMin)/(gMax - gMin)*100));
+  el("tickLow").style.left  = pct(sg.low) + "%";
+  el("tickMed").style.left  = pct(sg.med) + "%";
+  el("tickHigh").style.left = pct(sg.high) + "%";
+  el("gauge").style.background =
+    `linear-gradient(90deg, var(--red-soft) 0%, var(--red-soft) ${pct(sg.low)}%,
+     var(--green-soft) ${pct(sg.low)}%, var(--green-soft) ${pct(sg.high)}%,
+     var(--amber-soft) ${pct(sg.high)}%, var(--amber-soft) 100%)`;
+  const cur = el("cursor");
+  cur.style.left = pct(S.pricePerKg) + "%";
+  cur.dataset.label = S.pricePerKg.toLocaleString("fr-FR",{minimumFractionDigits:2});
+  const badge = el("fairBadge");
+  if (S.pricePerKg < sg.low)      { badge.className="fair low";  badge.textContent="↓ Sous le marché — tu laisses de l'argent"; }
+  else if (S.pricePerKg > sg.high){ badge.className="fair high"; badge.textContent="↑ Au-dessus — moins de demandes probables"; }
+  else                            { badge.className="fair ok";   badge.textContent="✓ Prix juste"; }
+  el("anchorTxt").innerHTML = `Les trajets similaires partent à <b>${sg.med.toLocaleString("fr-FR",{minimumFractionDigits:2})} €/kg</b> en médiane (fourchette ${sg.low.toFixed(2)}–${sg.high.toFixed(2)}).`;
+
+  /* — surcharge de la famille choisie — */
+  const fs = famState[S.famKey];
+  const surPct = fs.mode === "sur" ? fs.sur : 0;
+  const note = el("famSurchargeNote");
+  if (fs.mode === "sur") { note.style.display="block"; note.innerHTML = `⚠️ Marie applique <b>+${fs.sur} %</b> sur cette famille (risque). <span class="dbadge" title="CAT-03">D14</span>`; }
+  else note.style.display="none";
+
+  /* — transport = €/kg × poids × coefTaille × (1+surcharge) — */
+  const coef = S.size==="S" ? 1 : S.size==="M" ? S.coefM : S.coefL;
+  const transport = S.pricePerKg * S.weight * coef * (1 + surPct/100);
+
+  /* — service & protection = max(commission, plancher) + prime — */
+  const commission = Math.max(transport * S.commissionPct/100, S.commissionFloor);
+  const prime = S.prot==="ext" ? S.prime : 0;
+  const service = commission + prime;
+
+  el("calcDetail").textContent =
+    `${S.weight.toLocaleString("fr-FR")} kg × ${S.pricePerKg.toLocaleString("fr-FR",{minimumFractionDigits:2})} €/kg × ${S.size}` + (surPct ? ` × +${surPct}%` : "");
+  el("svcDetail").textContent = prime
+    ? `commission ${eur(commission)} + garantie ${eur(prime)} (flux séparés)`
+    : `commission ${S.commissionPct} % (min. ${eur(S.commissionFloor)})`;
+  el("lineTransport").textContent = eur(transport);
+  el("lineService").textContent   = eur(service);
+  el("shipTotal").textContent     = eur(transport + service);
+
+  /* — net yamber = le transport, point (D16) — */
+  el("carrierNet").textContent = eur(transport);
+}
+
+/* ══════════ RENDUS DYNAMIQUES ══════════ */
+function renderFamilies(){
+  el("families").innerHTML = FAMILIES.map(f => {
+    const st = famState[f.key];
+    return `<div class="fam ${st.mode}" data-f="${f.key}">
+      <span class="fico">${f.ico}</span><span class="fname">${f.name}</span>
+      <span class="surval"><input type="range" min="5" max="30" step="5" value="${st.sur}" data-sur="${f.key}"><b>+${st.sur}%</b></span>
+      <span class="fstate">
+        <button class="fbtn acc ${st.mode==='acc'?'on':''}" data-m="acc">OK</button>
+        <button class="fbtn sur ${st.mode==='sur'?'on':''}" data-m="sur">+%</button>
+        <button class="fbtn ref ${st.mode==='ref'?'on':''}" data-m="ref">Non</button>
+      </span>
+    </div>`;
+  }).join("");
+  // select expéditeur = familles non refusées
+  const opts = FAMILIES.filter(f => famState[f.key].mode !== "ref");
+  el("shipFam").innerHTML = opts.map(f => `<option value="${f.key}" ${f.key===S.famKey?"selected":""}>${f.ico} ${f.name}</option>`).join("");
+  if (!opts.find(f => f.key === S.famKey)) S.famKey = opts[0]?.key ?? "clothes";
+}
+
+/* ══════════ ÉVÉNEMENTS ══════════ */
+// panneau arbitrage
+[["pCom","commissionPct","pvCom",v=>v+" %"],["pFloor","commissionFloor","pvFloor",v=>eur(v)],
+ ["pCoefM","coefM","pvCoefM",v=>"×"+v.toLocaleString("fr-FR",{minimumFractionDigits:2})],
+ ["pCoefL","coefL","pvCoefL",v=>"×"+v.toLocaleString("fr-FR",{minimumFractionDigits:2})],
+ ["pPrime","prime","pvPrime",v=>eur(v)],["pLow","lowPct","pvLow",v=>"−"+v+" %"],
+ ["pHigh","highPct","pvHigh",v=>"+"+v+" %"],["pTol","tol","pvTol",v=>"±"+v+" %"]
+].forEach(([id,key,pv,fmt])=>{
+  el(id).addEventListener("input", e=>{
+    S[key] = parseFloat(e.target.value);
+    el(pv).textContent = fmt(S[key]);
+    el("coefMTxt").textContent = "×"+S.coefM.toLocaleString("fr-FR",{minimumFractionDigits:2});
+    el("coefLTxt").textContent = "×"+S.coefL.toLocaleString("fr-FR",{minimumFractionDigits:2});
+    el("primeTxt").textContent = "+ "+eur(S.prime);
+    el("tolTxt").textContent = S.tol+" %";
+    compute();
+  });
+});
+
+// yamber
+el("corridor").addEventListener("change", e=>{ S.base=parseFloat(e.target.value); compute(); });
+el("departIn").addEventListener("change", e=>{ S.departMod=parseFloat(e.target.value); compute(); });
+document.querySelectorAll(".chip").forEach(c => c.addEventListener("click", ()=>{
+  document.querySelectorAll(`.chip[data-grp="${c.dataset.grp}"]`).forEach(x=>x.classList.remove("on"));
+  c.classList.add("on");
+  if (c.dataset.grp==="flight") S.flightMod = parseFloat(c.dataset.v);
+  if (c.dataset.grp==="rep")    S.repMod    = parseFloat(c.dataset.v);
+  compute();
+}));
+el("pricePerKg").addEventListener("input", e=>{
+  S.pricePerKg = parseFloat(e.target.value);
+  el("ppkVal").textContent = S.pricePerKg.toLocaleString("fr-FR",{minimumFractionDigits:2})+" €/kg";
+  compute();
+});
+el("capacity").addEventListener("input", e=>{
+  S.capacity = parseInt(e.target.value); el("capVal").textContent = S.capacity+" kg";
+});
+
+// familles (délégation)
+el("families").addEventListener("click", e=>{
+  const btn = e.target.closest(".fbtn"); if(!btn) return;
+  const key = e.target.closest(".fam").dataset.f;
+  famState[key].mode = btn.dataset.m;
+  renderFamilies(); compute();
+});
+el("families").addEventListener("input", e=>{
+  const r = e.target.closest("input[data-sur]"); if(!r) return;
+  famState[r.dataset.sur].sur = parseInt(r.value);
+  r.nextElementSibling.textContent = "+"+r.value+"%";
+  compute();
+});
+
+// expéditeur
+el("shipFam").addEventListener("change", e=>{ S.famKey=e.target.value; compute(); });
+el("shipWeight").addEventListener("input", e=>{
+  S.weight = parseFloat(e.target.value);
+  el("shipWVal").textContent = S.weight.toLocaleString("fr-FR")+" kg";
+  compute();
+});
+document.querySelectorAll(".size").forEach(s => s.addEventListener("click", ()=>{
+  document.querySelectorAll(".size").forEach(x=>x.classList.remove("on"));
+  s.classList.add("on"); S.size = s.dataset.size; compute();
+}));
+document.querySelectorAll(".prot").forEach(p => p.addEventListener("click", ()=>{
+  document.querySelectorAll(".prot").forEach(x=>x.classList.remove("on"));
+  p.classList.add("on"); S.prot = p.dataset.prot; compute();
+}));
+
+/* ══════════ INIT ══════════ */
+renderFamilies();
+compute();
+</script>
+</body>
+</html>
