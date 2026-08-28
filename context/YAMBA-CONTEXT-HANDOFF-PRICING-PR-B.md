@@ -8,7 +8,7 @@
 - [ ] **Merger d'abord la chore** `chore/next-intl-config-path` (`3567d56`, 1 fichier) — PR #__ ; puis `git rebase dev` de `feat/pricing-front-2` (le cherry-pick `ddaa376` du même fix disparaît du diff)
 - [ ] Ouvrir/compléter la PR-B : https://github.com/telamaa/yamba-app-v2/pull/new/feat/pricing-front-2 (base `dev`) — `gh` n'est pas authentifié en local (`gh auth login`)
 - [ ] Checks PR-B **__/13** (COMPTER) · checks chore **__/13** · le quatuor reporté du handoff PR-A (checks #76/#77, required checks, titre #72)
-- [ ] Plateforme attendue post-merge : **407** (trip **168** = 157 + 5 + 6 · deal 218 · notification 21) — toute déviation expliquée
+- [ ] Plateforme attendue post-merge : **409** (trip **170** = 157 + 5 + 6 + 2 · deal 218 · notification 21) — toute déviation expliquée
 - [ ] **QA visuelle** (non faite par la session, seul le typecheck + la compilation Next de `/fr/trips/create` sont prouvés) : desktop + mobile + dark ; créer un trajet PER_KG de bout en bout ; rouvrir `bzv-perkg` (seed, Thomas) en édition et vérifier la relecture (11,50 €/kg · 23 kg · électronique +20 % · alimentaire Non · soute 230 €)
 - [ ] `CLAUDE.md` (enrichi) et `context/` sont MODIFIÉS/NON SUIVIS depuis avant la session — à commiter à part (chore/docs) ou à trancher
 

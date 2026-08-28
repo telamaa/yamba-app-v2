@@ -26,6 +26,7 @@ import {
   resolvePricingEngine,
   PRICING_GATE_MESSAGE,
   checkBagCapacity,
+  pickPerKgFields,
 } from "../services/pricing-gate";
 
 // ─────────────────────────────────────────────
@@ -145,6 +146,23 @@ export const createTrip = async (
       if (!carrierPage.stripeOnboardingComplete || !carrierPage.stripeChargesEnabled) {
         return next(new ValidationError("Stripe must be configured to publish a trip."));
       }
+
+      // ⭐ A28 — UN moteur de pricing COMPLET est exigé pour publier, sur ce
+      // chemin aussi (POST /trips + publish: true) — même vérité que
+      // publishTrip et updateTrip.
+      if (
+        resolvePricingEngine({
+          pricePerKgCents: data.pricePerKgCents,
+          capacityKg: data.capacityKg,
+          categoryConditions: data.categoryConditions as unknown[] | undefined,
+        }) === null
+      ) {
+        return next(new ValidationError(PRICING_GATE_MESSAGE));
+      }
+      const bagIssue = checkBagCapacity(data);
+      if (bagIssue) {
+        return next(new ValidationError(bagIssue));
+      }
     }
 
     const { minPriceCents, departureHourLocal } = computeDenormalizedFields({
@@ -211,9 +229,13 @@ export const createTrip = async (
         trainStopCities: data.trainStopCities ?? [],
         travelReference: data.travelReference ?? null,
 
-        // ── Conditions ──
+        // ── Conditions (legacy PER_CATEGORY) ──
         acceptedCategories: data.acceptedCategories ?? [],
         categoryConditions: data.categoryConditions ?? [],
+
+        // ⭐ Moteur PER_KG (D13/D14/D19) — helper pur, testé : ces champs
+        // avaient été oubliés ici en PR-B (trip publié à 0 €)
+        ...pickPerKgFields(data),
 
         // ⭐ Lieux de remise / livraison
         pickupLocations: data.pickupLocations ?? [],
