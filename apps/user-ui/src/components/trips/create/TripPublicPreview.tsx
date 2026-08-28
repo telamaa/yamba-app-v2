@@ -258,14 +258,25 @@ export default function TripPublicPreview({
                 {copy.availableKg(draft.capacityKg)}
               </span>
             )}
-            {PARCEL_FAMILIES.filter((f) => draft.familyConditions[f.key].mode === "REFUSE").map((f) => (
-              <span
-                key={f.key}
-                className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-500 line-through dark:bg-slate-800 dark:text-slate-400"
-              >
-                {f.icon} {isFr ? f.labelFr : f.labelEn}
-              </span>
-            ))}
+            {PARCEL_FAMILIES.filter((f) => draft.familyConditions[f.key].mode !== "ACCEPT").map((f) => {
+              const c = draft.familyConditions[f.key];
+              const refused = c.mode === "REFUSE";
+              return (
+                <span
+                  key={f.key}
+                  className={[
+                    "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium",
+                    refused
+                      ? "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
+                      : "text-slate-900 dark:text-[#FFB84D]",
+                  ].join(" ")}
+                  style={refused ? undefined : { backgroundColor: "rgba(255,153,0,0.12)" }}
+                >
+                  {isFr ? f.labelFr : f.labelEn}
+                  {refused ? ` · ${copy.refused.toLowerCase()}` : ` · ${copy.surchargeShort(c.surchargePct)}`}
+                </span>
+              );
+            })}
           </div>
         )}
 

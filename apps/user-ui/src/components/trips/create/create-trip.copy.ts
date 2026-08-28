@@ -114,6 +114,45 @@ export function getCreateTripCopy(isFr: boolean): CreateTripCopy {
     netGainSub: isFr
       ? "Versé à J+4 après livraison confirmée · la commission est côté Expéditeur, ton prix = ton net"
       : "Paid at D+4 after confirmed delivery · commission is on the sender's side, your price = your net",
+    // ── Refonte UX step 2 : accordéons, popovers, familles en mots ──
+    yourOffer: isFr ? "Ton offre" : "Your offer",
+    whyThisPrice: isFr ? "Pourquoi ce prix ?" : "Why this price?",
+    factorBase: (v: string) => (isFr ? `Base du corridor : ${v} €/kg` : `Corridor base: ${v} €/kg`),
+    factorDirectFlight: isFr ? "Vol direct" : "Direct flight",
+    factorDepartureSoon: isFr ? "Départ imminent (moins de temps pour remplir)" : "Departure soon (less time to fill)",
+    priceHint: isFr
+      ? "Un seul prix pour tout le trajet : l'Expéditeur paie poids × prix au kilo. La famille du colis ne change pas ce prix."
+      : "One price for the whole trip: the sender pays weight × price per kg. The parcel family never changes it.",
+    capacityHint: isFr
+      ? "Les kilos sont réservés à chaque demande acceptée. Au pickup, un écart de poids ≤ 10 % est toléré ; au-delà, renégociation ou refus sans pénalité."
+      : "Kilos get reserved with each accepted request. At pickup a ≤ 10% weight gap is tolerated; beyond that, renegotiation or refusal without penalty.",
+    familiesHint: isFr
+      ? "Tout est accepté par défaut. Refuse une famille, ou ajoute un supplément (en %) pour couvrir un risque : casse, valeur, douane."
+      : "Everything is accepted by default. Refuse a family, or add a surcharge (%) to cover a risk: breakage, value, customs.",
+    bagsHint: isFr
+      ? "Tu loues ta franchise complète à un prix forfaitaire, hors logique au kilo. Le bagage consomme sa franchise sur ta capacité."
+      : "Rent your full allowance at a flat rate, outside the per-kg logic. The bag consumes its allowance from your capacity.",
+    familiesAllAccepted: isFr ? "Toutes les familles acceptées" : "All families accepted",
+    accepted: isFr ? "Accepté" : "Accepted",
+    refused: isFr ? "Refusé" : "Refused",
+    addSurcharge: isFr ? "Ajouter un supplément" : "Add a surcharge",
+    surchargeLabel: isFr ? "Supplément" : "Surcharge",
+    removeSurcharge: isFr ? "Retirer le supplément" : "Remove surcharge",
+    adjust: isFr ? "Ajuster" : "Adjust",
+    add: isFr ? "Ajouter" : "Add",
+    bagsNone: isFr ? "Aucun forfait proposé" : "No flat rate offered",
+    bagsSummary: (n: number) => (isFr ? `${n} forfait${n > 1 ? "s" : ""} proposé${n > 1 ? "s" : ""}` : `${n} flat rate${n > 1 ? "s" : ""} offered`),
+    bagNeedsCapacity: (kg: number) =>
+      isFr ? `Monte ta capacité à ${kg} kg pour proposer ce forfait` : `Raise your capacity to ${kg} kg to offer this`,
+    bagEquivalent: (v: string) => (isFr ? `≈ ${v} €/kg` : `≈ ${v} €/kg`),
+    netGainTitle: (kg: number) => (isFr ? `Si tes ${kg} kg partent` : `If your ${kg} kg get booked`),
+    netGainPaid: isFr ? "net, versé à J+4 après livraison" : "net, paid D+4 after delivery",
+    optionsAndMessage: isFr ? "Options & message" : "Options & message",
+    responseWithin24h: isFr
+      ? "Chaque demande passe par ton accord — tu réponds sous 24 h."
+      : "Every request needs your approval — you answer within 24 h.",
+    surchargeShort: (pct: number) => `+${pct} %`,
+
     reviewPricing: isFr ? "Prix & capacité" : "Price & capacity",
     perKgUnit: "€/kg",
     kgUnit: "kg",

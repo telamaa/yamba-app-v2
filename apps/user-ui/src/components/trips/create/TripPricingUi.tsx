@@ -3,15 +3,36 @@
 /**
  * TripPricingUi.tsx — briques du formulaire PER_KG (mockup-pricing-yamba.html)
  * ============================================================================
- * Curseur + valeur, jauge « prix juste » (D15), ligne famille OK / +% / Non
- * (D14), forfait bagage entier (PRC-04), carte gain net (D16).
- * Aucune logique métier ici : les verdicts viennent de create-trip.config.
+ * Curseur + valeur, jauge « prix juste » (D15), ligne famille Accepté/Refusé
+ * + supplément (D14), forfait bagage entier (PRC-04), carte gain net (D16),
+ * accordéon et popover ⓘ.
+ *
+ * Mobile-first : cibles tactiles ≥ 44 px, lignes qui se replient, popover au
+ * tap (jamais hover-only), sections fermées NON montées (DOM léger), lignes
+ * famille mémoïsées (React.memo) pour ne pas re-rendre 8 lignes à chaque
+ * frappe. Aucune logique métier ici : tout vient de create-trip.config.
  */
 
-import React from "react";
-import type { FairPriceVerdict, PriceSuggestion } from "./create-trip.config";
-import type { FamilyConditionDraft, FamilyConditionMode } from "./create-trip.types";
-import { FieldError } from "@/components/trips/create/TripFormUi";
+import React, { memo, useEffect, useId, useRef, useState } from "react";
+import {
+  Baby,
+  Backpack,
+  ChevronDown,
+  FileText,
+  Info,
+  Luggage,
+  Package,
+  ShoppingBag,
+  Shirt,
+  Smartphone,
+  Sparkles,
+  Wrench,
+  X,
+  type LucideIcon,
+} from "lucide-react";
+import type { FairPriceVerdict, FamilyIconKey, PriceSuggestion } from "./create-trip.config";
+import type { FamilyConditionDraft } from "./create-trip.types";
+import { FieldError, Toggle } from "@/components/trips/create/TripFormUi";
 
 const MANGO = "#FF9900";
 const MANGO_10 = "rgba(255,153,0,0.10)";
@@ -23,6 +44,141 @@ export function formatEur(n: number, digits = 2): string {
     minimumFractionDigits: digits,
     maximumFractionDigits: digits,
   });
+}
+
+/* ── Icônes des familles / bagages (Lucide, colorables) ─────────── */
+
+const FAMILY_ICONS: Record<FamilyIconKey, LucideIcon> = {
+  "file-text": FileText,
+  shirt: Shirt,
+  package: Package,
+  smartphone: Smartphone,
+  sparkles: Sparkles,
+  wrench: Wrench,
+  baby: Baby,
+  "shopping-bag": ShoppingBag,
+};
+
+export const BAG_ICONS = { checked: Luggage, cabin: Backpack } as const;
+
+export function IconBadge({ icon: Icon, muted }: { icon: LucideIcon; muted?: boolean }) {
+  return (
+    <span
+      className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full"
+      style={{ backgroundColor: muted ? "rgba(148,163,184,0.15)" : TEAL_10 }}
+      aria-hidden="true"
+    >
+      <Icon size={16} strokeWidth={1.75} style={{ color: muted ? "#94a3b8" : TEAL }} />
+    </span>
+  );
+}
+
+/* ── Popover ⓘ — ouverture au tap/clic, fermeture Échap / clic dehors ── */
+
+export function InfoHint({ label, children }: { label: string; children: React.ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLSpanElement>(null);
+  const id = useId();
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: PointerEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    document.addEventListener("pointerdown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  return (
+    <span ref={ref} className="relative inline-flex">
+      <button
+        type="button"
+        aria-label={label}
+        aria-expanded={open}
+        aria-controls={id}
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen((o) => !o);
+        }}
+        className="-m-2 flex h-9 w-9 items-center justify-center rounded-full text-slate-400 transition-colors hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300"
+      >
+        <Info size={15} />
+      </button>
+      {open && (
+        <span
+          id={id}
+          role="tooltip"
+          className="absolute left-0 top-full z-20 mt-1 w-[min(20rem,calc(100vw-3rem))] rounded-xl border border-slate-200 bg-white p-3 text-[12px] font-normal normal-case tracking-normal leading-relaxed text-slate-600 shadow-lg animate-[fadeSlide_0.15s_ease] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+        >
+          {children}
+        </span>
+      )}
+    </span>
+  );
+}
+
+/* ── Accordéon — le contenu n'est monté qu'ouvert ─────────────────── */
+
+export function Accordion({
+  title,
+  summary,
+  actionLabel,
+  hint,
+  defaultOpen = false,
+  children,
+}: {
+  title: string;
+  summary: string | null;
+  actionLabel: string;
+  hint?: React.ReactNode;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  const id = useId();
+  return (
+    <div className="border-t border-slate-200/60 dark:border-slate-800/60">
+      <div className="flex min-h-[56px] items-center gap-3 py-3">
+        <button
+          type="button"
+          aria-expanded={open}
+          aria-controls={id}
+          onClick={() => setOpen((o) => !o)}
+          className="flex min-w-0 flex-1 items-center gap-3 text-left"
+        >
+          <div className="min-w-0 flex-1">
+            <div className="text-[11px] font-medium uppercase tracking-wider text-slate-400 dark:text-slate-500">
+              {title}
+            </div>
+            {summary && (
+              <div className="mt-0.5 truncate text-[13px] text-slate-700 dark:text-slate-300">
+                {summary}
+              </div>
+            )}
+          </div>
+          <span className="flex flex-shrink-0 items-center gap-1 text-[12px] font-medium" style={{ color: MANGO }}>
+            {open ? "" : actionLabel}
+            <ChevronDown
+              size={16}
+              className="transition-transform duration-200"
+              style={{ transform: open ? "rotate(180deg)" : undefined }}
+            />
+          </span>
+        </button>
+        {hint}
+      </div>
+      {open && (
+        <div id={id} className="pb-4 animate-[fadeSlide_0.2s_ease]">
+          {children}
+        </div>
+      )}
+    </div>
+  );
 }
 
 /* ── Curseur + saisie numérique synchronisés ─────────── */
@@ -58,7 +214,7 @@ export function SliderField({
           value={sliderValue}
           aria-label={ariaLabel}
           onChange={(e) => onChangeAction(Number(e.target.value))}
-          className="h-1 flex-1 cursor-pointer"
+          className="h-11 flex-1 cursor-pointer touch-pan-x"
           style={{ accentColor: MANGO }}
         />
         <div className="flex items-center gap-1">
@@ -74,7 +230,7 @@ export function SliderField({
               onChangeAction(v === "" ? "" : Number(v));
             }}
             className={[
-              "w-20 rounded-lg border bg-white px-2 py-1.5 text-right text-[14px] font-bold tabular-nums text-slate-900",
+              "h-11 w-[4.5rem] rounded-lg border bg-white px-2 text-right text-[15px] font-bold tabular-nums text-slate-900",
               "focus:outline-none focus:ring-1 focus:ring-[#FF9900]/20 dark:bg-slate-900 dark:text-white",
               error
                 ? "border-[#FF9900]"
@@ -93,6 +249,9 @@ export function SliderField({
 
 /* ── Jauge « prix juste » (D15) ──────────────────────
  * Échelle : [low − 45 % de l'écart … high + 45 %] — miroir du mockup.
+ * Zones en classes Tailwind (thème-aware : alphas plus forts en dark).
+ * L'espace sous la jauge (repères + badge) est TOUJOURS réservé → pas
+ * de chevauchement quand le badge est absent.
  * ──────────────────────────────────────────────────── */
 
 export function FairPriceGauge({
@@ -115,27 +274,30 @@ export function FairPriceGauge({
   const lowPct = pct(suggestion.low);
   const highPct = pct(suggestion.high);
 
-  // Charte : sous le marché = neutre slate, juste = teal, au-dessus = mango
-  const verdictStyle =
+  const verdictClass =
     verdict === "low"
       ? "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300"
       : verdict === "high"
         ? "text-slate-900 dark:text-[#FFB84D]"
         : "text-[#0F766E] dark:text-teal-400";
-  const verdictBg =
-    verdict === "high" ? MANGO_10 : verdict === "ok" ? TEAL_10 : undefined;
+  const verdictBg = verdict === "high" ? MANGO_10 : verdict === "ok" ? TEAL_10 : undefined;
 
   return (
-    <div className="mt-6">
-      <div
-        className="relative h-8 rounded-lg border border-slate-200 dark:border-slate-700"
-        style={{
-          background: `linear-gradient(90deg,
-            rgba(148,163,184,.14) 0%, rgba(148,163,184,.14) ${lowPct}%,
-            ${TEAL_10} ${lowPct}%, ${TEAL_10} ${highPct}%,
-            ${MANGO_10} ${highPct}%, ${MANGO_10} 100%)`,
-        }}
-      >
+    <div className="mt-4">
+      <div className="relative h-7 rounded-lg border border-slate-200 dark:border-slate-700">
+        <div
+          className="absolute inset-y-0 left-0 rounded-l-lg bg-slate-400/15 dark:bg-slate-400/25"
+          style={{ width: `${lowPct}%` }}
+        />
+        <div
+          className="absolute inset-y-0 bg-[#0F766E]/10 dark:bg-[#0F766E]/35"
+          style={{ left: `${lowPct}%`, width: `${highPct - lowPct}%` }}
+        />
+        <div
+          className="absolute inset-y-0 right-0 rounded-r-lg bg-[#FF9900]/10 dark:bg-[#FF9900]/25"
+          style={{ width: `${100 - highPct}%` }}
+        />
+
         {(
           [
             [suggestion.low, labels.low],
@@ -154,156 +316,186 @@ export function FairPriceGauge({
 
         {typeof price === "number" && price > 0 && (
           <div
-            className="absolute -top-2 -bottom-2 w-[3px] rounded bg-slate-900 transition-[left] duration-150 dark:bg-white"
+            className="absolute -top-1.5 -bottom-1.5 w-[3px] rounded bg-slate-900 transition-[left] duration-150 dark:bg-white"
             style={{ left: `${pct(price)}%` }}
-          >
-            <span className="absolute -top-6 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-md bg-slate-900 px-1.5 py-0.5 text-[10px] font-bold text-white dark:bg-white dark:text-slate-900">
-              {formatEur(price)}
-            </span>
-          </div>
+          />
         )}
       </div>
 
-      {verdict && (
-        <div
-          className={`mt-6 inline-flex items-center rounded-full px-3 py-1 text-[12px] font-semibold ${verdictStyle}`}
-          style={verdictBg ? { backgroundColor: verdictBg } : undefined}
-        >
-          {verdict === "low" ? labels.tooLow : verdict === "high" ? labels.tooHigh : labels.ok}
-        </div>
-      )}
+      {/* hauteur stable : repères (pt-1) + badge */}
+      <div className="mt-6 flex min-h-[28px] items-center">
+        {verdict && (
+          <span
+            className={`inline-flex items-center rounded-full px-3 py-1 text-[12px] font-semibold ${verdictClass}`}
+            style={verdictBg ? { backgroundColor: verdictBg } : undefined}
+          >
+            {verdict === "low" ? labels.tooLow : verdict === "high" ? labels.tooHigh : labels.ok}
+          </span>
+        )}
+      </div>
     </div>
   );
 }
 
-/* ── Ligne famille : OK / +% / Non (D14) ─────────────── */
+/* ── Ligne famille : Accepté/Refusé + supplément optionnel (D14) ──── */
 
-/** Charte : accepter = teal, surcharger = mango (actif), refuser = neutre slate. */
-const MODE_STYLES: Record<FamilyConditionMode, { className: string; bg?: string }> = {
-  ACCEPT: { className: "border-[#0F766E]/40 text-[#0F766E] dark:text-teal-400", bg: TEAL_10 },
-  SURCHARGE: { className: "border-[#FF9900] text-slate-900 dark:text-[#FFB84D]", bg: MANGO_10 },
-  REFUSE: { className: "border-slate-300 bg-slate-100 text-slate-600 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300" },
+type FamilyRowProps = {
+  iconKey: FamilyIconKey;
+  label: string;
+  condition: FamilyConditionDraft;
+  surchargeRange: { min: number; max: number; step: number };
+  labels: {
+    accepted: string;
+    refused: string;
+    addSurcharge: string;
+    surcharge: string;
+    removeSurcharge: string;
+  };
+  onChangeAction: (next: FamilyConditionDraft) => void;
+  error?: string;
 };
 
-export function FamilyConditionRow({
-  icon,
+export const FamilyConditionRow = memo(function FamilyConditionRow({
+  iconKey,
   label,
   condition,
   surchargeRange,
   labels,
   onChangeAction,
   error,
-}: {
-  icon: string;
-  label: string;
-  condition: FamilyConditionDraft;
-  surchargeRange: { min: number; max: number; step: number };
-  labels: { accept: string; surcharge: string; refuse: string };
-  onChangeAction: (next: FamilyConditionDraft) => void;
-  error?: string;
-}) {
-  const modes: Array<{ mode: FamilyConditionMode; label: string }> = [
-    { mode: "ACCEPT", label: labels.accept },
-    { mode: "SURCHARGE", label: labels.surcharge },
-    { mode: "REFUSE", label: labels.refuse },
-  ];
+}: FamilyRowProps) {
+  const Icon = FAMILY_ICONS[iconKey];
+  const accepted = condition.mode !== "REFUSE";
+  const surcharged = condition.mode === "SURCHARGE";
 
   return (
     <div>
       <div
         className={[
-          "flex flex-wrap items-center gap-2.5 rounded-xl border bg-white px-3 py-2.5 dark:bg-slate-900",
-          condition.mode === "SURCHARGE"
-            ? "border-[#FF9900]/40"
-            : "border-slate-200 dark:border-slate-700",
-          condition.mode === "REFUSE" ? "opacity-60" : "",
+          "rounded-xl border bg-white px-3 py-1.5 dark:bg-slate-900",
+          surcharged ? "border-[#FF9900]/40" : "border-slate-200 dark:border-slate-700",
         ].join(" ")}
       >
-        <span className="w-6 text-center text-[16px]" aria-hidden="true">
-          {icon}
-        </span>
-        <span className="flex-1 text-[13px] font-semibold text-slate-800 dark:text-slate-200">
-          {label}
-        </span>
+        <div className="flex min-h-[44px] items-center gap-3">
+          <IconBadge icon={Icon} muted={!accepted} />
+          <span
+            className={[
+              "min-w-0 flex-1 truncate text-[13px] font-semibold",
+              accepted
+                ? "text-slate-800 dark:text-slate-200"
+                : "text-slate-400 line-through dark:text-slate-500",
+            ].join(" ")}
+          >
+            {label}
+          </span>
+          {surcharged && (
+            <span
+              className="flex-shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold text-slate-900 dark:text-[#FFB84D]"
+              style={{ backgroundColor: MANGO_10 }}
+            >
+              +{condition.surchargePct} %
+            </span>
+          )}
+          <div className="flex flex-shrink-0 items-center gap-2">
+            <span className="hidden text-[11px] text-slate-400 sm:inline dark:text-slate-500">
+              {accepted ? labels.accepted : labels.refused}
+            </span>
+            <Toggle
+              label={label}
+              on={accepted}
+              onChange={(on) =>
+                onChangeAction({ ...condition, mode: on ? "ACCEPT" : "REFUSE" })
+              }
+            />
+          </div>
+        </div>
 
-        {condition.mode === "SURCHARGE" && (
-          <div className="flex items-center gap-1.5">
+        {accepted && !surcharged && (
+          <button
+            type="button"
+            onClick={() => onChangeAction({ ...condition, mode: "SURCHARGE" })}
+            className="ml-11 min-h-[36px] text-[12px] font-medium"
+            style={{ color: MANGO }}
+          >
+            + {labels.addSurcharge}
+          </button>
+        )}
+
+        {surcharged && (
+          <div className="ml-11 flex items-center gap-2 pb-1 animate-[fadeSlide_0.15s_ease]">
+            <span className="text-[11px] text-slate-500 dark:text-slate-400">{labels.surcharge}</span>
             <input
               type="range"
               min={surchargeRange.min}
               max={surchargeRange.max}
               step={surchargeRange.step}
               value={condition.surchargePct}
-              aria-label={`${label} %`}
+              aria-label={`${labels.surcharge} ${label}`}
               onChange={(e) =>
                 onChangeAction({ ...condition, surchargePct: Number(e.target.value) })
               }
-              className="h-1 w-20 cursor-pointer"
+              className="h-9 min-w-0 flex-1 cursor-pointer touch-pan-x"
               style={{ accentColor: MANGO }}
             />
-            <b className="min-w-[38px] text-right text-[12px] tabular-nums text-slate-800 dark:text-slate-200">
-              +{condition.surchargePct}%
-            </b>
+            <button
+              type="button"
+              aria-label={labels.removeSurcharge}
+              onClick={() => onChangeAction({ ...condition, mode: "ACCEPT" })}
+              className="flex h-9 w-9 items-center justify-center rounded-full text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+            >
+              <X size={14} />
+            </button>
           </div>
         )}
-
-        <div className="flex gap-1.5" role="radiogroup" aria-label={label}>
-          {modes.map((m) => {
-            const on = condition.mode === m.mode;
-            return (
-              <button
-                key={m.mode}
-                type="button"
-                role="radio"
-                aria-checked={on}
-                onClick={() => onChangeAction({ ...condition, mode: m.mode })}
-                className={[
-                  "rounded-full border px-2.5 py-1 text-[11px] font-medium transition-all",
-                  on
-                    ? MODE_STYLES[m.mode].className
-                    : "border-slate-200 text-slate-500 hover:border-slate-300 dark:border-slate-700 dark:text-slate-400 dark:hover:border-slate-600",
-                ].join(" ")}
-                style={on && MODE_STYLES[m.mode].bg ? { backgroundColor: MODE_STYLES[m.mode].bg } : undefined}
-              >
-                {m.label}
-              </button>
-            );
-          })}
-        </div>
       </div>
       <FieldError error={error} />
     </div>
   );
-}
+});
 
 /* ── Forfait bagage entier (PRC-04) ───────────────────── */
 
 export function BagFlatRateRow({
-  icon,
+  icon: Icon,
   label,
   hint,
+  equivalent,
+  disabledReason,
   value,
   onChangeAction,
   error,
 }: {
-  icon: string;
+  icon: LucideIcon;
   label: string;
   hint: string;
+  equivalent: string | null;
+  disabledReason: string | null;
   value: number | "";
   onChangeAction: (value: number | "") => void;
   error?: string;
 }) {
+  const disabled = disabledReason !== null;
   return (
     <div>
-      <div className="flex items-center gap-3 rounded-xl border border-dashed border-slate-300 px-3.5 py-3 dark:border-slate-600">
-        <span className="text-[18px]" aria-hidden="true">
-          {icon}
-        </span>
-        <div className="flex-1 min-w-0">
-          <div className="text-[13px] font-semibold text-slate-800 dark:text-slate-200">
-            {label}
+      <div
+        className={[
+          "flex min-h-[56px] items-center gap-3 rounded-xl border border-dashed px-3 py-2.5",
+          disabled
+            ? "border-slate-200 opacity-70 dark:border-slate-700"
+            : "border-slate-300 dark:border-slate-600",
+        ].join(" ")}
+      >
+        <IconBadge icon={Icon} muted={disabled} />
+        <div className="min-w-0 flex-1">
+          <div className="text-[13px] font-semibold text-slate-800 dark:text-slate-200">{label}</div>
+          <div className="text-[11px] text-slate-400 dark:text-slate-500">
+            {disabled ? disabledReason : hint}
+            {!disabled && equivalent && (
+              <span className="ml-1.5 font-medium text-slate-500 dark:text-slate-400">
+                {equivalent}
+              </span>
+            )}
           </div>
-          <div className="text-[11px] text-slate-400 dark:text-slate-500">{hint}</div>
         </div>
         <div className="flex items-center gap-1">
           <input
@@ -311,6 +503,7 @@ export function BagFlatRateRow({
             inputMode="decimal"
             min={0}
             value={value}
+            disabled={disabled}
             aria-label={label}
             placeholder="—"
             onChange={(e) => {
@@ -318,8 +511,8 @@ export function BagFlatRateRow({
               onChangeAction(v === "" ? "" : Number(v));
             }}
             className={[
-              "w-20 rounded-lg border bg-white px-2 py-1.5 text-right text-[13px] font-semibold text-slate-900",
-              "focus:outline-none dark:bg-slate-900 dark:text-white",
+              "h-11 w-[4.5rem] rounded-lg border bg-white px-2 text-right text-[14px] font-semibold text-slate-900",
+              "focus:outline-none disabled:cursor-not-allowed disabled:bg-slate-50 dark:bg-slate-900 dark:text-white dark:disabled:bg-slate-800",
               error
                 ? "border-[#FF9900]"
                 : "border-slate-200 focus:border-[#FF9900] dark:border-slate-700",
@@ -335,35 +528,20 @@ export function BagFlatRateRow({
 
 /* ── Carte gain net (D16 : ton prix = ton net) ─────────── */
 
-export function NetGainCard({
-  title,
-  amount,
-  label,
-  sub,
-}: {
-  title: string;
-  amount: number;
-  label: string;
-  sub: string;
-}) {
+export function NetGainCard({ title, amount, sub }: { title: string; amount: number; sub: string }) {
   return (
     <div
-      className="rounded-xl border border-[#0F766E]/20 px-4 py-3.5"
+      className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 rounded-xl border border-[#0F766E]/20 px-4 py-3"
       style={{
         background:
           "linear-gradient(135deg, rgba(15,118,110,0.08) 0%, rgba(255,153,0,0.06) 100%)",
       }}
     >
-      <div className="text-[11px] font-medium text-slate-500 dark:text-slate-400">{title}</div>
-      <div className="mt-0.5 flex items-baseline gap-2">
-        <span className="text-[13px] font-semibold text-slate-700 dark:text-slate-300">
-          {label}
-        </span>
-        <span className="text-[22px] font-bold tabular-nums dark:text-teal-400" style={{ color: TEAL }}>
-          {formatEur(amount)} €
-        </span>
-      </div>
-      <div className="mt-1 text-[11px] text-slate-400 dark:text-slate-500">{sub}</div>
+      <span className="text-[12px] font-medium text-slate-500 dark:text-slate-400">{title}</span>
+      <span className="text-[22px] font-bold tabular-nums dark:text-teal-400" style={{ color: TEAL }}>
+        {formatEur(amount)} €
+      </span>
+      <span className="text-[11px] text-slate-400 dark:text-slate-500">{sub}</span>
     </div>
   );
 }

@@ -13,22 +13,28 @@ import type {
  * celui d'affichage du formulaire (mockup-pricing-yamba.html).
  * ──────────────────────────────────────── */
 
+export type FamilyIconKey =
+  | "file-text" | "shirt" | "package" | "smartphone"
+  | "sparkles" | "wrench" | "baby" | "shopping-bag";
+
 export type ParcelFamilyOption = {
   key: ParcelFamily;
-  icon: string;
+  icon: FamilyIconKey;
   labelFr: string;
   labelEn: string;
 };
 
+/** Icônes Lucide (rendu uniforme iOS/Android/desktop, colorables à la charte)
+ *  — jamais d'emoji : rendu OS-dépendant, non thémable. */
 export const PARCEL_FAMILIES: ParcelFamilyOption[] = [
-  { key: "DOCUMENTS_PAPERS", icon: "📄", labelFr: "Documents & papiers", labelEn: "Documents & papers" },
-  { key: "CLOTHES_TEXTILE", icon: "👕", labelFr: "Vêtements & textile", labelEn: "Clothes & textile" },
-  { key: "FOOD_DRY_SEALED", icon: "🥫", labelFr: "Alimentaire sec & scellé", labelEn: "Dry sealed food" },
-  { key: "ELECTRONICS_DEVICES", icon: "📱", labelFr: "Électronique & appareils", labelEn: "Electronics & devices" },
-  { key: "COSMETICS_CARE", icon: "🧴", labelFr: "Cosmétiques & soins", labelEn: "Cosmetics & care" },
-  { key: "PARTS_TOOLS", icon: "🔧", labelFr: "Pièces & outillage", labelEn: "Parts & tools" },
-  { key: "TOYS_CHILDCARE", icon: "🧸", labelFr: "Jouets & puériculture", labelEn: "Toys & childcare" },
-  { key: "MISC_ACCESSORIES", icon: "👜", labelFr: "Accessoires & divers", labelEn: "Accessories & misc." },
+  { key: "DOCUMENTS_PAPERS", icon: "file-text", labelFr: "Documents & papiers", labelEn: "Documents & papers" },
+  { key: "CLOTHES_TEXTILE", icon: "shirt", labelFr: "Vêtements & textile", labelEn: "Clothes & textile" },
+  { key: "FOOD_DRY_SEALED", icon: "package", labelFr: "Alimentaire sec & scellé", labelEn: "Dry sealed food" },
+  { key: "ELECTRONICS_DEVICES", icon: "smartphone", labelFr: "Électronique & appareils", labelEn: "Electronics & devices" },
+  { key: "COSMETICS_CARE", icon: "sparkles", labelFr: "Cosmétiques & soins", labelEn: "Cosmetics & care" },
+  { key: "PARTS_TOOLS", icon: "wrench", labelFr: "Pièces & outillage", labelEn: "Parts & tools" },
+  { key: "TOYS_CHILDCARE", icon: "baby", labelFr: "Jouets & puériculture", labelEn: "Toys & childcare" },
+  { key: "MISC_ACCESSORIES", icon: "shopping-bag", labelFr: "Accessoires & divers", labelEn: "Accessories & misc." },
 ];
 
 export const DEFAULT_SURCHARGE_PCT = 20;
@@ -52,12 +58,19 @@ export const CABIN_BAG_KG = 12;
 /** D13 — tolérance de poids au pickup (paramètre serveur §13, affiché à titre indicatif). */
 export const PICKUP_WEIGHT_TOLERANCE_PCT = 10;
 
+/** Capacité proposée par défaut à l'arrivée sur l'étape 2 (mockup : 12 kg). */
+export const DEFAULT_CAPACITY_KG = 12;
+
 /* ── Suggestion de prix — D15 V1 déterministe (PRC-05) ──
- * prixSuggéré(€/kg) = base_corridor × modificateurs.
- * V1 : valeurs STATIQUES (base unique, pas encore de table base_corridor
- * seedée ni de signal SavedRoutes) — assumé dans le handoff PR-B. Le
- * moteur est pur pour être remplacé par un appel serveur sans toucher
- * l'UI (la jauge ne connaît que { low, median, high }).
+ * prixSuggéré(€/kg) = base_corridor × modificateurs, EXPLICABLE : chaque
+ * modificateur actif est renvoyé dans `factors` (popover « Pourquoi ce
+ * prix ? »). V1 : base unique (pas encore de table base_corridor ni de
+ * signal SavedRoutes) — le moteur est pur pour être remplacé par un appel
+ * serveur sans toucher l'UI (la jauge ne connaît que { low, median, high }).
+ *
+ * Sens du facteur « délai » : côté OFFRE (le Voyageur), un départ imminent
+ * laisse moins de temps pour vendre ses kilos → la suggestion BAISSE.
+ * (La prime d'urgence existe côté demande, pas ici.)
  * ──────────────────────────────────────── */
 
 export const PRICE_SUGGESTION_V1 = {
@@ -65,24 +78,51 @@ export const PRICE_SUGGESTION_V1 = {
   lowPct: 10,
   highPct: 15,
   directFlightMod: 0.05,
-  departureWithin3DaysMod: 0.08,
-  departureWithin7DaysMod: 0.04,
+  departureWithin3DaysMod: -0.05,
+  departureWithin7DaysMod: -0.02,
 } as const;
 
-export type PriceSuggestion = { low: number; median: number; high: number };
+export type PriceFactor = {
+  key: "base" | "directFlight" | "departureSoon";
+  /** variation en % appliquée (0 pour la base) */
+  pct: number;
+  /** valeur de base en €/kg (key = base) */
+  value?: number;
+};
 
-export function suggestPricePerKg(draft: Pick<Draft, "transportMode" | "flightType" | "departureDate">): PriceSuggestion {
+export type PriceSuggestion = {
+  low: number;
+  median: number;
+  high: number;
+  factors: PriceFactor[];
+};
+
+/** Arrondi commercial au 0,50 € (les Voyageurs affichent 11,50 — pas 11,47). */
+export function roundToHalf(n: number): number {
+  return Math.round(n * 2) / 2;
+}
+
+export function suggestPricePerKg(
+  draft: Pick<Draft, "transportMode" | "flightType" | "departureDate">
+): PriceSuggestion {
   const p = PRICE_SUGGESTION_V1;
+  const factors: PriceFactor[] = [{ key: "base", pct: 0, value: p.baseCorridorPerKg }];
   let median = p.baseCorridorPerKg;
 
   if (draft.transportMode === "plane" && draft.flightType === "direct") {
     median *= 1 + p.directFlightMod;
+    factors.push({ key: "directFlight", pct: p.directFlightMod * 100 });
   }
 
   if (draft.departureDate) {
-    const days = (toDateOnly(new Date(draft.departureDate)).getTime() - toDateOnly(new Date()).getTime()) / 86_400_000;
-    if (days <= 3) median *= 1 + p.departureWithin3DaysMod;
-    else if (days <= 7) median *= 1 + p.departureWithin7DaysMod;
+    const days =
+      (toDateOnly(new Date(draft.departureDate)).getTime() - toDateOnly(new Date()).getTime()) /
+      86_400_000;
+    const mod = days <= 3 ? p.departureWithin3DaysMod : days <= 7 ? p.departureWithin7DaysMod : 0;
+    if (mod !== 0) {
+      median *= 1 + mod;
+      factors.push({ key: "departureSoon", pct: mod * 100 });
+    }
   }
 
   const round = (n: number) => Math.round(n * 100) / 100;
@@ -90,7 +130,27 @@ export function suggestPricePerKg(draft: Pick<Draft, "transportMode" | "flightTy
     low: round(median * (1 - p.lowPct / 100)),
     median: round(median),
     high: round(median * (1 + p.highPct / 100)),
+    factors,
   };
+}
+
+/** Résumé d'une ligne d'accordéon fermée : « Tout accepté » ou la liste des écarts. */
+export function summarizeFamilyConditions(
+  conditions: Draft["familyConditions"],
+  isFr: boolean
+): string | null {
+  const parts = PARCEL_FAMILIES.filter((f) => conditions[f.key].mode !== "ACCEPT").map((f) => {
+    const c = conditions[f.key];
+    const label = isFr ? f.labelFr : f.labelEn;
+    return c.mode === "REFUSE" ? `${label} : ${isFr ? "refusé" : "refused"}` : `${label} : +${c.surchargePct} %`;
+  });
+  return parts.length === 0 ? null : parts.join(" · ");
+}
+
+/** Un forfait bagage lu en €/kg — pour que le Voyageur voie s'il brade. */
+export function bagEquivalentPerKg(price: number | "", kg: number): number | null {
+  if (typeof price !== "number" || price <= 0) return null;
+  return Math.round((price / kg) * 100) / 100;
 }
 
 export type FairPriceVerdict = "low" | "ok" | "high";
@@ -299,6 +359,8 @@ export function getValidationErrorsFr(isFr: boolean) {
     capacityZero: isFr ? "La capacité doit être supérieure à 0" : "Capacity must be greater than 0",
     surchargeInvalid: isFr ? "Surcharge entre 1 et 100 %" : "Surcharge between 1 and 100%",
     bagPriceZero: isFr ? "Le forfait doit être supérieur à 0" : "Flat rate must be greater than 0",
+    bagNeedsCapacity: (kg: number) =>
+      isFr ? `Nécessite une capacité d'au moins ${kg} kg` : `Requires a capacity of at least ${kg} kg`,
     priceZero: isFr ? "Le prix doit être supérieur à 0" : "Price must be greater than 0",
     priceEmpty: isFr ? "Prix requis" : "Price required",
     pickupLocationRequired: isFr
@@ -399,12 +461,16 @@ export function validateStep2(draft: Draft, isFr: boolean): ValidationErrors {
     }
   }
 
-  // Bagages entiers (PRC-04) — optionnels, mais > 0 s'ils sont proposés
-  if (draft.checkedBag23Price !== "" && Number(draft.checkedBag23Price) <= 0) {
-    errors.checkedBag23Price = msgs.bagPriceZero;
+  // Bagages entiers (PRC-04) — optionnels, > 0 s'ils sont proposés, et la
+  // capacité doit pouvoir les contenir (RG-B-29 — miroir du gate serveur)
+  const capacity = typeof draft.capacityKg === "number" ? draft.capacityKg : 0;
+  if (draft.checkedBag23Price !== "") {
+    if (Number(draft.checkedBag23Price) <= 0) errors.checkedBag23Price = msgs.bagPriceZero;
+    else if (capacity < CHECKED_BAG_KG) errors.checkedBag23Price = msgs.bagNeedsCapacity(CHECKED_BAG_KG);
   }
-  if (draft.cabinBag12Price !== "" && Number(draft.cabinBag12Price) <= 0) {
-    errors.cabinBag12Price = msgs.bagPriceZero;
+  if (draft.cabinBag12Price !== "") {
+    if (Number(draft.cabinBag12Price) <= 0) errors.cabinBag12Price = msgs.bagPriceZero;
+    else if (capacity < CABIN_BAG_KG) errors.cabinBag12Price = msgs.bagNeedsCapacity(CABIN_BAG_KG);
   }
 
   // Locations — at least 1 enabled per context
