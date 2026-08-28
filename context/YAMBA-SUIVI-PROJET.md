@@ -1,0 +1,119 @@
+# YAMBA — SUIVI DE PROJET DE BOUT EN BOUT
+### État au 28 août 2026 · `main` = `dev` = `9c6e155` · 433 tests · build prod OK
+*Légende : ✅ fait (PR) · 🟡 en cours / partiel · ⬜ à faire · 🔴 bloquant lancement. Vélocité = « sessions » (unité des handoffs). Mis à jour à chaque merge (règle : ce fichier + `YAMBA-CONTEXT.md`).*
+
+---
+
+## 0. Vue d'ensemble
+
+| Jalon | Contenu | Avancement |
+|---|---|---|
+| **Jalon 1 — Boucle transactionnelle** (réserver, payer, livrer, noter) | socle + pricing + B1 faits ; B2 → B5 restent | **~55 %** |
+| **Jalon 2 — Plateforme opérable** (admin, sessions, intégrations) — *constitutif du lancement* | non commencé (sauf CI/OpenAPI) | ~10 % |
+| **Jalon 3 — Expansion** (chat, mobile, locales, reco) | non commencé | 0 % |
+
+Lancement public = fin du Jalon 2. Fourchette tenue au dernier handoff : **5–8 semaines** de sessions (optimiste ≈ 10,5 / réaliste ≈ 16 sessions restantes sur le Jalon 1 avant cette journée ; aujourd'hui ≈ 3 sessions consommées : PR-B, search, PR-C).
+
+---
+
+## 1. Socle et outillage — ✅
+
+| Élément | Statut | Réf. |
+|---|---|---|
+| Monorepo Nx, 4 services Express + gateway + Next 16, Prisma/Mongo partagé, Redis | ✅ | — |
+| Auth (register/login/refresh, cookies JWT, circuit breaker front), onboarding Voyageur + Stripe Connect, saved routes, profils publics, crons | ✅ | — |
+| Politique de session D27 (inactivité + durée absolue) | ✅ #68 | SES-01/02 |
+| Chantier 0 OpenAPI : `@packages/api-contracts` (Zod), OAS 3.1 trip-service 99 paths ×3, viewer Scalar, diff CI | ✅ #64–#66, #69 | D3 |
+| CI : 13 checks requis (TypeScript ×6, tests ×3, i18n FR/EN, secrets, OpenAPI, build) | ✅ #63 | D30 |
+| Build de production réparé (Suspense) — **`next build` à ajouter aux checks requis** | ✅ #81 / ⬜ check | candidat D-next |
+| `context/` versionné (registre, spec, règles, handoffs, fiches par PR), `CLAUDE.md` gouvernance | ✅ #79, #84, #86 | règle d'équipe |
+| Historique Git réécrit (emails corrigés, aucune attribution externe), `main` = `dev` | ✅ 28/08 | — |
+
+## 2. Trajets (trip-service + front Voyageur)
+
+| Élément | Statut | Réf. |
+|---|---|---|
+| CRUD trajets, wizard 3 étapes, lieux de remise/livraison, documents ImageKit, recherche + facettes | ✅ | — |
+| State machine de cycle de vie (exécutable = spec) + tests | ✅ #60, #67 | — |
+| **Pricing PR-A** : schéma PER_KG, contrats, gate bi-moteur A28, seed | ✅ #77 | D13/D14/D19 |
+| **Pricing PR-B** : formulaire « dépôt en 90 s », suggestion D15 explicable, familles, bagages, gate serveur sur les 3 chemins d'écriture, updates par paquets (Atlas) | ✅ #82 | D15, D20, D31, D32, RG-B-01…35 |
+| Suggestion par corridor (15 zones + domestique) — **valeurs = hypothèses à valider (étude GP)** | ✅ code #83 / ⬜ étude | D15 |
+| Page trajet propriétaire (Modifier sans dashboard) | ✅ #82 | — |
+| Step 1 UX : aéroport → ville de rattachement, arrivée repliée, justificatif en step 3, drapeaux | ⬜ | avis 28/08 |
+| Lieux en chips + aperçu public sticky (create-trip) | ⬜ | avis 28/08 |
+| Cleanup legacy PER_CATEGORY (`CategoryChip`, `PriceInput`, `CATEGORY_GROUPS`, champs `@deprecated`), `maxSlots/bookedSlots`, `instantBooking` | ⬜ | PR cleanup post-refonte |
+| Micro-PR D31 : gate Stripe/profil → acceptation (+ carrierPage/Stripe factices au seed) | ⬜ (dans B2) | D31 |
+
+## 3. Recherche et page trajet (Expéditeur)
+
+| Élément | Statut | Réf. |
+|---|---|---|
+| Recherche backend + UI desktop/mobile, facettes, cursor pagination | ✅ | — |
+| Prix au kilo affiché partout (plus de 0 €), exemple « 2 kg ≈ 27 € » | ✅ #82 | — |
+| **D33** comparabilité (colis de référence 2 kg), filtre par famille, poids du colis (prix/tri/capacité), filtres à 0 masqués, sidebar sticky CSS | ✅ #83 | D33, RG-S-01…13 |
+| Page trajet : `OfferCard` (offre complète), CO₂ pour le poids, annulation alignée ANN-01, lieux + conditions à droite | ✅ #83 | — |
+| Tri « prix » en mémoire pour un poids (fenêtre 200) → pipeline d'agrégation quand le volume l'exige | 🟡 assumé v1 | — |
+| Filtres « Horaires de départ » (commentés) | ⬜ | — |
+| Carte propriétaire : vues / demandes reçues | ⬜ | — |
+
+## 4. Réservation (Expéditeur) et deals (Voyageur)
+
+| Élément | Statut | Réf. |
+|---|---|---|
+| Wizard 4 étapes (colis, destinataire, charte, paiement Stripe Elements) — front | ✅ (front) | docs booking shipper |
+| **PR-C** : D34 `@packages/pricing` (moteur unique), vrai trajet, garde CNF-05, produit/famille/poids/S-M-L, récap COM-03, Garantie Yamba (GAR-02), téléphone E.164, Stripe chargé à l'étape 4 | ✅ #85 | D34, RG-C-01…16 |
+| Deal-service B1 : Booking (snapshots), state machine 9 statuts / 12 transitions, DTO par rôle, outbox + relay Redpanda, 218 tests | ✅ #70–#74 | D17, §2.2 workflow |
+| notification-service : consumer Kafka, dédup event-id | ✅ #75 | — |
+| Dashboards : Mes envois, Mes trajets & deals, inbox, listes réelles | ✅ #56–#59, #76 | — |
+| Écrans post-acceptation (front) : pickup + checklist, code de livraison, tracking, vérification J+4, litige, notation | ✅ (front) #48–#54 | — |
+| 🔴 **B2 — argent entrant** : `POST /deals` (recalcul devis = refus de divergence, snapshot D17, `reservedKg` atomique + outbox en transaction), PaymentIntent autorisation → capture, `PaymentProvider` abstrait (D11), accept/decline (gate Stripe à l'acceptation D31), cron expiration 24 h, remboursements ANN-04, **un seul système de paiement** (Payment Element), emails transactionnels, code livraison chiffré AES-256-GCM, payment-service :6008, media-service :6009 | ⬜ **prochaine étape** (2/3 sessions) | D11, D16, D17, D31, D34 |
+| 🔴 **B3 — transport** : pickup serveur (upload R2, code bcrypt, checklist), refus, tracking, deliver (compare + lock), régénération de code | ⬜ (2/3) | — |
+| 🔴 **B4 — argent sortant** : confirmation anticipée, cron J+4 → COMPLETED + `transfers.create()`, dispute avec gel, matrice de remboursements (ANN-01 : `CANCEL_LATE_RETENTION_PCT` à fixer) | ⬜ (1,5/2,5) | ANN-01…04 |
+| 🔴 **B5 — confiance** : rating double-aveugle serveur, relances J+5/J+7, stats de réputation (D29-1) — unicité (bookingId, authorUserId) sans `@@unique` naïf Mongo | ⬜ (1,5/2) | D29 |
+| PR « paramètres serveur » : `GET /pricing/params` (`PRICING_PARAMS` unique : commission, planchers, coefs, référence, corridors) — dédoublonner `comparable-price`, `price-for-weight`, `pricing-example` | ⬜ (0,5) | D34 |
+
+## 5. Jalon 2 — plateforme opérable (⬜ sauf mention)
+
+| Élément | Statut |
+|---|---|
+| Chantier C admin-ui : médiation litiges (tickets YAM-XXXX), vérification billets, file des signalements, gestion users, **paramètres plateforme audités** (les curseurs du mockup §13), TrustScore + plafonds (D29-2), login séparé, 2FA TOTP, audit log | ⬜ |
+| Chantier E : profil public Voyageur (stats réelles, trajets, avis) | ⬜ |
+| Sessions : SES-03 sudo mode, SES-04 modal d'expiration, SES-05 liste des sessions, cleanup legacy | ⬜ |
+| API : conversion OpenAPI auth-service (Zod), `/docs` Scalar auth, index gateway, audit anglais OAS | ⬜ |
+| Micro-PRs confiance : wording statuts D28, bouton Signaler (trajet + membre), CTA alertes, page destinataire | ⬜ |
+| Intégrations : Sentry front + back, PostHog, vérification des backups Atlas | ⬜ |
+| Provider email transactionnel (Resend/Postmark/SES) derrière `@packages/email` — candidat D35 | ⬜ |
+
+## 6. Jalon 3 — expansion (⬜)
+
+message-service :6005 (chat Socket.io, coordination pickup) · fin i18n (ES puis PT) · G mobile (client généré depuis l'OpenAPI, D3) · H recommandations ML (replay outbox + PostHog, D15-V2).
+
+## 7. En continu / dettes techniques
+
+| Élément | Statut |
+|---|---|
+| i18n : dissolution `dashboard.copy.ts`, booking, trips/create, page publique → namespaces ; suppression `UiPreferencesProvider` déprécié ; **messages par route** (payload RSC 100 Ko) | ⬜ |
+| `chore/deps` : 43 vulnérabilités npm (6 critiques), Prisma 6 → 7 — PR dédiée, jamais `npm audit fix --force` en pleine PR | ⬜ |
+| `fix/error-semantics` trip-service (400 partout → 404/401/403) | ⬜ |
+| Front : OnboardingBanner après Header, cron onboarding-reminder (node-cron), page carrier settings (Stripe), `viewsCount` Redis (D5) | ⬜ |
+| Sécurité/robustesse : redaction pino-http (cookie + authorization), `getImageKit()` paresseux, `AddDocumentsBody` en Zod, harmonisation noms Nx, idempotence seed-deals, bug seed shipperId === carrierId | ⬜ |
+| Seeds : `arrivalAt`/heures locales manquants sur `bzv-perkg` ; carrierPage/Stripe factices pour tester la publication | ⬜ |
+| Décisions candidates à graver : « la CI construit ce qu'elle déploie » (`next build`), règle de couleur des CTA (mango = avancer, teal = engager), D35 email provider | ⬜ |
+
+## 8. Chiffres de suivi
+
+| Indicateur | Valeur |
+|---|---|
+| Tests (plateforme) | 433 = trip 187 · deal 225 · notification 21 |
+| Décisions au registre | D1 → D34 |
+| Règles métier | ~50 (V2) + RG-B-01…35, RG-S-01…13, RG-C-01…16, RG-G-01…03 |
+| PR mergées | #1 → #88 (dont 11 le 28/08) |
+| Documents | registre, spec, règles, 4 handoffs, 8 dossiers de fiches PR, `YAMBA-MOTEUR-PRIX.md/.pdf`, ce suivi |
+
+## 9. Ordre recommandé des prochaines sessions
+
+1. **B2 argent entrant** (2–3 sessions) — débloque la boucle ; inclut D31 et le paiement unique.
+2. **B3 transport** (2–3) puis **B4 argent sortant** (1,5–2,5) puis **B5 confiance** (1,5–2).
+3. PR « paramètres serveur » (0,5) + cleanup legacy (0,5) + seeds (0,25) — entre deux lots.
+4. Jalon 2 : admin-ui (C), Sentry/PostHog, provider email, sessions — **constitutif du lancement**.
+5. UX différées (step 1, chips lieux, messages par route) — quand le funnel réel donne des chiffres (PostHog).

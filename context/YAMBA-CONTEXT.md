@@ -80,6 +80,16 @@ Ordre de demarrage : auth -> trip -> gateway.
   ThemeProvider root, #81 build prod repare (Suspense).
 - Plateforme de tests : 433 (trip 187, deal 225, notification 21) — post-#85.
 
+## Release et historique (28 aout 2026)
+
+- `main` = `dev` (`9c6e155`) : release des PR #48 -> #88 (workflow livraison,
+  B1, OpenAPI/CI, refonte pricing PER_KG A/B/C, recherche au kilo).
+- HISTORIQUE REECRIT le 28/08 : emails `egoiomab.com` (sans @) -> `egoiomab@gmail.com`
+  (101 commits) et suppression de 2 trailers Co-Authored-By Claude (regle : aucun
+  contributeur autre que l'auteur). Contenu strictement identique, SHA changes.
+  Tout autre clone : `git fetch && git reset --hard origin/dev`. Les anciennes
+  branches distantes mergees peuvent etre supprimees (contenu dans dev).
+
 ## Ce qui RESTE — Jalon 1
 
 - PR-C (#85) : FAIT cote front — D34
@@ -155,7 +165,7 @@ Ordre de demarrage : auth -> trip -> gateway.
   AddDocumentsBody en Zod dedie · harmonisation noms projets Nx ·
   idempotence seed-deals · bug seed shipperId === carrierId a trancher ·
   git config user.email.
-- Candidat D32 : provider email transactionnel (Resend/Postmark/SES)
+- Candidat D35 (ex-« D32 » avant que D32 = plancher par colis) : provider email transactionnel (Resend/Postmark/SES)
   derriere @packages/email, avant lancement. MailHog docker-compose local
   candidat.
 - Backlog parametre serveur candidat : prix plancher par colis (note A28).
