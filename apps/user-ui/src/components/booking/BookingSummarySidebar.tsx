@@ -41,10 +41,7 @@ export default function BookingSummarySidebar({
                                               }: Props) {
   return (
     <div className="space-y-4">
-      {currentStep === 1 && (
-        <InsuranceCard draft={draft} setDraftAction={setDraftAction} />
-      )}
-
+      {/* Le prix et le CTA d'abord (ce que je paie), la protection ensuite */}
       <RecapCard
         trip={trip}
         price={price}
@@ -56,6 +53,9 @@ export default function BookingSummarySidebar({
         showBackButton={showBackButton}
         onBackAction={onBackAction}
       />
+      {currentStep === 1 && (
+        <InsuranceCard draft={draft} setDraftAction={setDraftAction} />
+      )}
     </div>
   );
 }
@@ -164,8 +164,9 @@ function RecapCard({
               <div className="mt-0.5 flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-400">
                 <Star size={11} fill="#BA7517" stroke="#BA7517" />
                 <span>
-                  {trip.carrier.rating.toFixed(1)} ·{" "}
-                  {t("summary.deals", { count: trip.carrier.dealCount })}
+                  {trip.carrier.dealCount > 0
+                    ? `${trip.carrier.rating.toFixed(1)} · ${t("summary.deals", { count: trip.carrier.dealCount })}`
+                    : t("summary.newTripper")}
                 </span>
               </div>
             </div>
@@ -189,7 +190,29 @@ function RecapCard({
       )}
 
       <div className="px-5">
-        <PriceRow label={t("summary.transport")} amount={price.transport} locale={locale} />
+        <PriceRow
+            label={
+              price.quote?.pricingModel === "PER_KG"
+                ? t("summary.transportDetail", {
+                    kg: (price.quote.billableWeightKg ?? 0).toLocaleString(locale === "fr" ? "fr-FR" : "en-US"),
+                    rate: formatPrice((price.quote.pricePerKgCents ?? 0) / 100, locale),
+                    size: price.quote.sizeClass ?? "",
+                  }) + (price.quote.familySurchargePct > 0 ? ` · +${price.quote.familySurchargePct} %` : "")
+                : t("summary.transport")
+            }
+            amount={price.transport}
+            locale={locale}
+          />
+          {price.quote === null && price.quoteError && (
+            <div className="mb-1 rounded-md bg-[#FFF6E8] px-2.5 py-1.5 text-[11px] text-[#B45309] dark:bg-[#FF9900]/10 dark:text-[#FFB84D]">
+              {t(`summary.quoteHint.${price.quoteError}`)}
+            </div>
+          )}
+          {price.quote?.minimumApplied && (
+            <div className="-mt-0.5 mb-1 text-[11px] text-slate-500 dark:text-slate-400">
+              {t("summary.minimumApplied", { min: formatPrice(price.quote.transportCents / 100, locale) })}
+            </div>
+          )}
         <PriceRow label={t("summary.serviceYamba")} amount={price.serviceFee} locale={locale} />
         {price.insurance > 0 && (
           <PriceRow label={t("summary.insurance500")} amount={price.insurance} locale={locale} />
@@ -225,7 +248,7 @@ function RecapCard({
             className="flex w-full items-center justify-center gap-1 rounded-full px-4 py-2 text-[13px] text-slate-600 transition-colors hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
           >
             <ArrowLeft size={13} />
-            <span>{t("back")}</span>
+            <span>{t("previousStep")}</span>
           </button>
         )}
       </div>

@@ -82,12 +82,12 @@ Ordre de demarrage : auth -> trip -> gateway.
 
 ## Ce qui RESTE — Jalon 1
 
-- PR-C (PROCHAINE) : wizard Expediteur sur le moteur PER_KG — poids
-  (pre-rempli depuis la recherche), taille S/M/L « sans mesurer » (libelle S
-  enrichi), famille filtree par les positions du Voyageur, total 2 lignes
-  (transport + service) avec plancher D32 explicite, ancre express,
-  protection D22, snapshot de prix immuable deal-service (D17) ; migration
-  enums deprecies (maxSlots/bookedSlots).
+- PR-C (EN PR, feat/pricing-front-3) : FAIT cote front — D34
+  @packages/pricing (moteur unique, 7 specs), wizard sur le vrai trajet,
+  etape 1 PER_KG (produit/famille/poids/S-M-L), recap COM-03, Garantie
+  Yamba (GAR-02). RESTE pour B2 : POST /deals + snapshot D17 via le meme
+  moteur + reservedKg atomique ; migration enums deprecies
+  (maxSlots/bookedSlots).
 - PR « parametres serveur » : GET /pricing/params (commission, plancher,
   poids de reference, table corridors) — aujourd'hui dupliques en
   constantes front/serveur (pricing-example, comparable-price,

@@ -7,7 +7,6 @@
   "pay": "Pay {amount}",
   "cancel": "Cancel",
   "close": "Close",
-
   "steps": {
     "parcel": "Parcel",
     "recipient": "Recipient",
@@ -15,7 +14,6 @@
     "payment": "Payment",
     "indicator": "step {current} of {total}"
   },
-
   "step1": {
     "title": "Describe your parcel",
     "subtitle": "Accuracy and photos protect everyone",
@@ -23,16 +21,15 @@
     "pickupBlockTitle": "You hand the parcel to {carrierFirstName}",
     "deliveryBlockTitle": "The recipient picks up the parcel",
     "locationSingleHint": "Set by the tripper",
-
     "goldenRules": {
       "title": "Golden rules for a smooth shipment",
       "pack": "**Pack carefully.** Sturdy bag or box, bubble wrap if fragile, properly taped.",
       "weigh": "**Weigh precisely.** Declared weight must match actual weight at handover.",
       "describe": "**Describe accurately.** {carrierFirstName} will inspect the content before accepting.",
       "prohibited": "**No prohibited items.**",
-      "linkProhibited": "See the full list"
+      "linkProhibited": "See the full list",
+      "open": "Show"
     },
-
     "parcelDetails": {
       "categoryLabel": "Category",
       "categoryOption": "{label} — {price}",
@@ -40,9 +37,10 @@
       "valueLabel": "Declared value (€)",
       "declaredValueTooltip": "The declared value sets the compensation ceiling in case of dispute. Enter the purchase price of the content.",
       "descriptionLabel": "Short description",
-      "descriptionPlaceholder": "Ex: 3 t-shirts, 1 jumper, chocolate"
+      "descriptionPlaceholder": "Ex: 3 t-shirts, 1 jumper, chocolate",
+      "weightTooltip": "Declared weight. A light parcel (envelope, passport, glasses…) is billed {min} kg minimum and never less than €{floor}. At pickup a ≤ 10% gap is tolerated.",
+      "remainingKg": "{kg} kg still available on this trip"
     },
-
     "photos": {
       "label": "Parcel photos",
       "requiredBadge": "Required with insurance",
@@ -51,24 +49,40 @@
       "tagContent": "Content",
       "tagPackaged": "Packed",
       "remove": "Remove this photo"
+    },
+    "product": {
+      "label": "What do you want to send?",
+      "parcel": "A parcel (per kg)",
+      "checkedBag": "A 23 kg checked bag",
+      "cabinBag": "A 12 kg cabin bag"
+    },
+    "family": {
+      "label": "Parcel family",
+      "hint": "The family tells whether the tripper accepts it — it never changes the price per kg, except a displayed surcharge.",
+      "refused": "{carrierFirstName} does not take this family on this trip"
+    },
+    "size": {
+      "label": "Size — no need to measure",
+      "hint": "By eye: the coefficient applies to the price per kg.",
+      "S": "envelope → shoe box",
+      "M": "fits in a cabin bag",
+      "L": "takes half a suitcase"
     }
   },
-
   "insurance": {
-    "title": "Optional insurance",
+    "title": "Parcel protection",
     "basic": {
       "title": "Basic protection",
       "price": "Included",
       "description": "You''re covered against non-delivery. Payment is held until the parcel reaches the recipient."
     },
     "extended": {
-      "title": "Insurance up to €500",
-      "price": "+ €6",
-      "description": "Loss, theft, damage during transport. Partial theft of content covered.",
-      "ipidLink": "See the IPID sheet"
+      "title": "Yamba Guarantee €500",
+      "price": "+€6",
+      "description": "Loss, theft, damage during transport. Exclusions shown before confirmation (including customs seizure of a non-compliant parcel).",
+      "ipidLink": "See the terms"
     }
   },
-
   "categories": {
     "CLOTHES": "Clothes",
     "SHOES": "Shoes",
@@ -83,40 +97,35 @@
     "CHECKED_BAG_23KG": "Checked bag 23 kg",
     "CABIN_BAG_12KG": "Cabin bag 12 kg"
   },
-
   "step2": {
     "title": "Who is the recipient?",
     "subtitle": "The recipient doesn''t need a Yamba account. You''ll share the code with them.",
-
     "deliveryFlow": {
       "title": "How the delivery will work",
       "codeGiven": "**A 6-digit code** will be given to you after payment.",
       "shareIt": "**You share it** with the recipient by SMS, WhatsApp or in person.",
       "handToTraveler": "**They give it to the tripper** at delivery. Without this code, the parcel cannot be released."
     },
-
     "form": {
       "firstName": "First name",
       "lastName": "Last name",
       "phone": "Phone",
-      "phoneHint": "Used to send the code via SMS / WhatsApp",
+      "phoneHint": "The delivery code will be sent by SMS / WhatsApp — pick their country code.",
       "email": "Email",
       "emailOptional": "(optional)",
-      "emailHint": "To notify the recipient when the parcel arrives"
+      "emailHint": "To notify the recipient when the parcel arrives",
+      "phonePrefix": "Country code"
     }
   },
-
   "step3": {
     "title": "Your commitment",
     "subtitle": "You certify on your honor the content of the parcel",
-
     "handoverFlow": {
       "title": "What will happen when you hand over the parcel",
       "visualInspection": "**Mandatory visual inspection.** The tripper will examine your parcel before accepting — don''t be surprised.",
       "refusalPossible": "**Refusal possible if non-compliant.** If the content differs from your declaration, the tripper can refuse. You''ll be refunded but the trip is lost.",
       "crossPhotos": "**Cross-referenced photos.** The tripper will take their own photos as evidence in case of dispute."
     },
-
     "charter": {
       "title": "Shipper Charter",
       "subtitle": "Legal commitment — read carefully",
@@ -127,7 +136,6 @@
       "disclaimer": "Any false declaration engages my sole civil and criminal liability, to the exclusion of the tripper and Yamba.",
       "fullLink": "See the full charter and prohibited items"
     },
-
     "accept": {
       "title": "I accept the Shipper Charter",
       "cgvLabel": "Terms",
@@ -137,12 +145,10 @@
       "descSuffix": "."
     }
   },
-
   "step4": {
     "title": "Payment",
     "subtitle": "You''re only charged when the tripper accepts (within 24h max)",
     "methodTitle": "Payment method",
-
     "card": {
       "title": "Card",
       "description": "Visa, Mastercard, Amex · International cards accepted"
@@ -155,7 +161,6 @@
       "title": "Google Pay",
       "description": "One-click payment from your Google account"
     },
-
     "afterPayment": {
       "title": "After your payment",
       "step1": "The tripper receives your request and has **24h to accept**. You''re only charged on acceptance.",
@@ -164,19 +169,17 @@
       "step4": "The recipient gives the code to the tripper at arrival, who enters it to confirm delivery.",
       "step5": "**3 days after** confirmed delivery, the tripper receives their payment."
     },
-
     "trustStripe": "Payment secured by Stripe. Yamba never stores your card details.",
     "loadingMessage": "Preparing payment…"
   },
-
   "summary": {
     "tripSelectedTitle": "Selected trip",
     "compactTitle": "Summary",
     "toPayTitle": "You pay",
     "transport": "Transport",
-    "serviceYamba": "Yamba service",
-    "insurance": "Insurance",
-    "insurance500": "Insurance €500",
+    "serviceYamba": "Service & protection",
+    "insurance": "Yamba Guarantee",
+    "insurance500": "Yamba Guarantee €500",
     "total": "Total",
     "totalNote": "Charged when the tripper accepts",
     "totalNoteLong": "The amount is authorized now and only charged when the tripper accepts.",
@@ -184,7 +187,6 @@
     "ctaHint": "You''re only charged when the tripper accepts",
     "detail": "Detail",
     "hide": "Hide",
-
     "parcel": "Parcel",
     "photos": "Photos",
     "photosCount": "{count, plural, =1 {# added} other {# added}}",
@@ -192,11 +194,46 @@
     "delivery": "Pickup",
     "recipient": "Recipient",
     "charter": "Commitment",
-    "insuranceLabel": "Insurance",
+    "insuranceLabel": "Protection",
     "date": "Date",
     "route": "Route",
     "directFlight": "Direct",
     "duration": "{hours}h flight",
-    "deals": "{count, plural, =1 {# deal} other {# deals}}"
-  }
+    "deals": "{count, plural, =1 {# deal} other {# deals}}",
+    "transportDetail": "Transport · {kg} kg × {rate}/kg × {size}",
+    "minimumApplied": "Per-parcel minimum applied: {min}",
+    "newTripper": "New Tripper",
+    "quoteHint": {
+      "MISSING_WEIGHT": "Enter the parcel weight to see the price.",
+      "MISSING_SIZE": "Pick a size (S, M or L).",
+      "MISSING_PRICE_PER_KG": "This trip has no price per kg.",
+      "BAG_NOT_OFFERED": "This bag is not offered on this trip.",
+      "UNKNOWN": "Price unavailable."
+    }
+  },
+  "families": {
+    "DOCUMENTS_PAPERS": "Documents & papers",
+    "CLOTHES_TEXTILE": "Clothes & textile",
+    "FOOD_DRY_SEALED": "Dry sealed food",
+    "ELECTRONICS_DEVICES": "Electronics & devices",
+    "COSMETICS_CARE": "Cosmetics & care",
+    "PARTS_TOOLS": "Parts & tools",
+    "TOYS_CHILDCARE": "Toys & childcare",
+    "MISC_ACCESSORIES": "Accessories & misc."
+  },
+  "locationKinds": {
+    "atAirport": "At the airport",
+    "atTrainStation": "At the train station",
+    "inTheCity": "In the city",
+    "radiusKm": "{km} km radius",
+    "cityWide": "Whole city",
+    "exact": "Exact spot"
+  },
+  "authGate": {
+    "title": "Sign in to book",
+    "subtitle": "A booking commits a tripper: Yamba needs to know who is sending. Your parcel and this trip will be waiting after sign-in.",
+    "login": "Sign in",
+    "register": "Create an account"
+  },
+  "previousStep": "Previous step"
 }
