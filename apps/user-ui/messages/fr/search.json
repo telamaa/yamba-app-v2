@@ -10,14 +10,12 @@
   "remainingSlots": "{count, plural, =1 {# place restante} other {# places restantes}}",
   "newTripper": "Nouveau tripper",
   "moreCategoriesTooltip": "{count, plural, =1 {# autre catégorie} other {# autres catégories}}",
-
   "transportTabs": {
     "all": "Tout",
     "plane": "Avion",
     "train": "Train",
     "car": "Voiture"
   },
-
   "badges": {
     "superTripper": "Super tripper",
     "instant": "Instant",
@@ -55,7 +53,10 @@
     "remainingSlots": "{count, plural, one {# place} other {# places}}",
     "direct": "Direct",
     "stopovers": "{count, plural, one {# escale} other {# escales}}",
-    "newTripper": "Nouveau tripper"
+    "newTripper": "Nouveau tripper",
+    "perKg": "prix au kilo",
+    "remainingKg": "{kg} kg dispo",
+    "example": "ex. colis {kg} kg ≈ {price} €"
   },
   "pricingSheet": {
     "title": "Tarifs par catégorie",

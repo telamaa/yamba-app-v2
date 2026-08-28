@@ -70,4 +70,4 @@ next-env.d.ts
 packages/libs/prisma/scripts/seed-output.json
 
 # Captures de revue : locales, jamais versionnées (canal de communication seulement)
-context/fiches-pr/**/captures/
+context/**/captures/

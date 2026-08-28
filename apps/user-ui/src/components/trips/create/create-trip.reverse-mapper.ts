@@ -22,12 +22,17 @@ import type {
   CarTripFlexibility,
   ParcelCategory,
   CategoryCondition,
+  FamilyConditionMode,
+  ParcelFamily,
   TripDocumentDraft,
   TicketVerificationStatus,
   TripLocationPoint,
   LocationFlexibility,
 } from "./create-trip.types";
-import { getDefaultLocationsForMode } from "./create-trip.config";
+import {
+  createDefaultFamilyConditions,
+  getDefaultLocationsForMode,
+} from "./create-trip.config";
 
 function fromSnakeEnum<T extends string>(
   val: string | null | undefined,
@@ -187,6 +192,22 @@ function mergeLocationsWithDefaults(
 export function mapTripToDraft(trip: any): Draft {
   const transportMode = fromSnakeEnum(trip.transportMode, TRANSPORT_MAP);
 
+  // ⭐ Moteur PER_KG — cents → euros ; familles absentes = ACCEPT
+  const fromCents = (v: unknown): number | "" =>
+    typeof v === "number" && v > 0 ? v / 100 : "";
+  const familyConditions = createDefaultFamilyConditions();
+  for (const c of (trip.familyConditions ?? []) as any[]) {
+    const key = c?.familyKey as ParcelFamily | undefined;
+    if (!key || !(key in familyConditions)) continue;
+    const mode = c.mode as FamilyConditionMode;
+    if (mode !== "ACCEPT" && mode !== "SURCHARGE" && mode !== "REFUSE") continue;
+    familyConditions[key] = {
+      mode,
+      surchargePct:
+        typeof c.surchargePct === "number" ? c.surchargePct : familyConditions[key].surchargePct,
+    };
+  }
+
   const acceptedCategories: ParcelCategory[] = (trip.acceptedCategories ?? [])
     .map((c: string) => CATEGORY_MAP[c])
     .filter(Boolean) as ParcelCategory[];
@@ -291,6 +312,12 @@ export function mapTripToDraft(trip: any): Draft {
 
     globalPrice,
     useGlobalPrice,
+
+    pricePerKg: fromCents(trip.pricePerKgCents),
+    capacityKg: typeof trip.capacityKg === "number" && trip.capacityKg > 0 ? trip.capacityKg : "",
+    checkedBag23Price: fromCents(trip.checkedBag23PriceCents),
+    cabinBag12Price: fromCents(trip.cabinBag12PriceCents),
+    familyConditions,
 
     // ⭐ Locations
     pickupLocations: mergeLocationsWithDefaults(

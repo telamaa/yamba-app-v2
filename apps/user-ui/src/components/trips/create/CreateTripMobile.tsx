@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { X, ChevronLeft } from "lucide-react";
 import { toast } from "sonner";
@@ -9,12 +9,11 @@ import { usePersistedFormState } from "@/hooks/usePersistedFormState";
 import { useCreateTrip, useUpdateTrip } from "@/hooks/useTrip";
 import { useEditTrip } from "@/hooks/useEditTrip";
 import { setFlashToast } from "@/lib/flash-toast";
-import type { Draft, ParcelCategory, Step } from "./create-trip.types";
+import type { Draft, Step } from "./create-trip.types";
 import { initialDraft } from "./create-trip.state";
 import { getCreateTripCopy } from "./create-trip.copy";
 import {
   canContinueStep,
-  createDefaultCategoryCondition,
   validateStep1,
   validateStep2,
   type ValidationErrors,
@@ -33,7 +32,8 @@ const EMPTY_ERRORS: ValidationErrors = {};
 // IMPORTANT: doit rester identique à CreateTripWizard.tsx (même clé sessionStorage).
 //   v1 → initial
 //   v2 → ajout pickupLocations/deliveryLocations, suppression handoff/pickup moments
-const DRAFT_VERSION = 2;
+// v3 : moteur PER_KG (PR-B) — les brouillons v2 (catégories legacy) sont abandonnés
+const DRAFT_VERSION = 3;
 
 export default function CreateTripMobile() {
   const { lang } = useUiPreferences();
@@ -107,41 +107,17 @@ export default function CreateTripMobile() {
       return Math.round((filled / total) * 100);
     }
     if (step === 2) {
-      // Categories filled + each category has a price + at least 1 pickup + at least 1 delivery
-      const total = 1 + draft.acceptedCategories.length + 2;
+      // Prix au kilo + capacité (moteur PER_KG) + au moins 1 remise + 1 livraison
+      const total = 4;
       let filled = 0;
-      if (draft.acceptedCategories.length > 0) filled++;
-      draft.acceptedCategories.forEach((key) => {
-        const c = draft.categoryConditions[key];
-        if (c && c.priceAmount !== "") filled++;
-      });
+      if (typeof draft.pricePerKg === "number" && draft.pricePerKg > 0) filled++;
+      if (typeof draft.capacityKg === "number" && draft.capacityKg > 0) filled++;
       if (draft.pickupLocations.some((l) => l.enabled)) filled++;
       if (draft.deliveryLocations.some((l) => l.enabled)) filled++;
       return total > 0 ? Math.round((filled / total) * 100) : 0;
     }
     return 100;
   }, [draft, step]);
-
-  // ── Category toggle ──
-  const toggleCategory = useCallback((value: ParcelCategory) => {
-    setDraft((prev) => {
-      const has = prev.acceptedCategories.includes(value);
-      if (has) {
-        const nextCats = prev.acceptedCategories.filter((c) => c !== value);
-        const nextConds = { ...prev.categoryConditions };
-        delete nextConds[value];
-        return { ...prev, acceptedCategories: nextCats, categoryConditions: nextConds };
-      }
-      return {
-        ...prev,
-        acceptedCategories: [...prev.acceptedCategories, value],
-        categoryConditions: {
-          ...prev.categoryConditions,
-          [value]: prev.categoryConditions[value] ?? createDefaultCategoryCondition(value),
-        },
-      };
-    });
-  }, [setDraft]);
 
   // ── Navigation ──
   const goTo = (target: Step) => {
@@ -167,7 +143,7 @@ export default function CreateTripMobile() {
   };
 
   const handleClose = () => {
-    const hasProgress = draft.transportMode || draft.from || draft.to || draft.acceptedCategories.length > 0;
+    const hasProgress = draft.transportMode || draft.from || draft.to || draft.pricePerKg !== "";
     if (hasProgress && completionPercent > 30) {
       setShowExitGuard(true);
     } else {
@@ -292,7 +268,7 @@ export default function CreateTripMobile() {
         <TripLiveSummary draft={draft} />
         <div key={step} style={{ animation: `${direction === "forward" ? "slideInRight" : "slideInLeft"} 0.2s ease` }}>
           {step === 1 && <StepTrip copy={copy} isFr={isFr} draft={draft} setDraft={setDraft} errors={errors} />}
-          {step === 2 && <StepConditions copy={copy} isFr={isFr} draft={draft} setDraft={setDraft} toggleCategory={toggleCategory} errors={errors} />}
+          {step === 2 && <StepConditions copy={copy} isFr={isFr} draft={draft} setDraft={setDraft} errors={errors} />}
           {step === 3 && <StepReview copy={copy} isFr={isFr} draft={draft} onGoTo={goTo} />}
         </div>
       </div>

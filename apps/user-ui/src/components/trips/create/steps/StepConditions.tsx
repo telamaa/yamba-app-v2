@@ -1,60 +1,111 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+/**
+ * StepConditions — étape 2 du wizard : l'offre tarifaire du Voyageur.
+ * Miroir de context/mockup-pricing-yamba.html (colonne « Tu publies un
+ * trajet »), refondu « dépôt d'annonce en 90 s » :
+ *
+ *   TON OFFRE   prix au kilo (pré-rempli à la médiane D15) + jauge · capacité
+ *               (pré-remplie) · gain net immédiatement dessous (D16)
+ *   ▸ Familles de colis        (accordéon fermé, résumé sur la ligne — D14)
+ *   ▸ Bagage entier (forfait)  (accordéon fermé — PRC-04)
+ *   Lieux de remise / livraison (obligatoires, inchangés)
+ *   ▸ Options & message        (accordéon fermé)
+ *
+ * Trois champs obligatoires visibles (prix, capacité, un lieu par contexte),
+ * tout le reste replié : un Voyageur pressé publie en deux « Continuer ».
+ * Les explications vivent dans des popovers ⓘ (tap-friendly), pas en texte
+ * courant. « Réservation instantanée » n'est plus proposée (D20 v1 : toute
+ * demande passe par l'acceptation du Voyageur).
+ *
+ * Le moteur legacy PER_CATEGORY n'est plus saisi ici (A28) — un trajet
+ * existant relu en édition migre vers PER_KG à sa prochaine publication.
+ */
+
+import React, { useCallback, useEffect, useMemo } from "react";
 import type {
   CreateTripCopy,
   Draft,
-  ParcelCategory,
+  FamilyConditionDraft,
+  ParcelFamily,
   TripLocationPoint,
 } from "../create-trip.types";
 import type { ValidationErrors } from "../create-trip.config";
-import { getCategoryOptions } from "../create-trip.copy";
 import {
-  CATEGORY_GROUPS,
-  estimateRevenue,
+  CABIN_BAG_KG,
+  CAPACITY_KG_RANGE,
+  CHECKED_BAG_KG,
+  DEFAULT_CAPACITY_KG,
+  PARCEL_FAMILIES,
+  PRICE_PER_KG_RANGE,
+  SURCHARGE_PCT_RANGE,
+  bagEquivalentPerKg,
+  estimateNetGain,
   getDefaultLocationsForMode,
+  getFairPriceVerdict,
+  isBagActive,
+  roundToHalf,
+  suggestPricePerKg,
+  summarizeFamilyConditions,
 } from "../create-trip.config";
+import { SectionLabel, Toggle } from "@/components/trips/create/TripFormUi";
 import {
-  CategoryChip,
-  FieldError,
-  PriceInput,
-  RevenueBadge,
-  SectionLabel,
-  Toggle,
-} from "@/components/trips/create/TripFormUi";
+  Accordion,
+  BAG_ICONS,
+  BagFlatRateRow,
+  FairPriceGauge,
+  FamilyConditionRow,
+  InfoHint,
+  NetGainCard,
+  SliderField,
+  formatEur,
+} from "../TripPricingUi";
 import LocationsSection from "../LocationsSection";
 
 export default function StepConditions({
-                                         copy,
-                                         isFr,
-                                         draft,
-                                         setDraft,
-                                         toggleCategory,
-                                         errors,
-                                       }: {
+  copy,
+  isFr,
+  draft,
+  setDraft,
+  errors,
+}: {
   copy: CreateTripCopy;
   isFr: boolean;
   draft: Draft;
   setDraft: React.Dispatch<React.SetStateAction<Draft>>;
-  toggleCategory: (key: ParcelCategory) => void;
   errors: ValidationErrors;
 }) {
-  const [showPerCategory, setShowPerCategory] = useState(!draft.useGlobalPrice);
-  const categoryOptions = getCategoryOptions(isFr);
-  const revenue = estimateRevenue(draft.categoryConditions);
+  // La suggestion ne dépend que de 3 champs de l'étape 1 → mémo ciblé
+  const suggestion = useMemo(
+    () => suggestPricePerKg(draft),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [draft.transportMode, draft.flightType, draft.departureDate]
+  );
+  const verdict =
+    typeof draft.pricePerKg === "number" && draft.pricePerKg > 0
+      ? getFairPriceVerdict(draft.pricePerKg, suggestion)
+      : null;
+  const netGain = estimateNetGain(draft);
+  const capacity = typeof draft.capacityKg === "number" ? draft.capacityKg : 0;
 
-  /* ── Defensive seed of default locations ─────────────
-   * En mode édition, useEditTrip peut renvoyer un draft où
-   * pickupLocations / deliveryLocations sont undefined ou [].
-   * Si on a un transportMode mais pas (encore) de lieux, on
-   * seed les défauts pour ce mode.
-   *
-   * Utilisation de `?.length ?? 0` pour tolérer undefined.
-   * ──────────────────────────────────────────────────── */
+  /* ── Pré-remplissage (D15 : la suggestion guide, le Voyageur ajuste) ──
+   * Une seule fois, à l'arrivée sur l'étape, si rien n'est encore saisi.
+   * ──────────────────────────────────────────────────────────────────── */
+  useEffect(() => {
+    if (draft.pricePerKg === "" || draft.capacityKg === "") {
+      setDraft((prev) => ({
+        ...prev,
+        pricePerKg: prev.pricePerKg === "" ? roundToHalf(suggestion.median) : prev.pricePerKg,
+        capacityKg: prev.capacityKg === "" ? DEFAULT_CAPACITY_KG : prev.capacityKg,
+      }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /* ── Defensive seed of default locations (mode édition) ── */
   useEffect(() => {
     const noPickup = (draft.pickupLocations?.length ?? 0) === 0;
     const noDelivery = (draft.deliveryLocations?.length ?? 0) === 0;
-
     if (draft.transportMode && noPickup && noDelivery) {
       const defaults = getDefaultLocationsForMode(draft.transportMode);
       setDraft((prev) => ({
@@ -66,173 +117,193 @@ export default function StepConditions({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draft.transportMode]);
 
-  /* ── Handlers ────────────────────────────────────── */
+  /* ── Handlers (stables : les lignes famille sont mémoïsées) ── */
 
-  const handleGlobalPriceChange = (value: number | "") => {
-    setDraft((prev) => {
-      const next = { ...prev, globalPrice: value };
-      if (prev.useGlobalPrice) {
-        const updatedConditions = { ...prev.categoryConditions };
-        prev.acceptedCategories.forEach((key) => {
-          if (updatedConditions[key]) {
-            updatedConditions[key] = {
-              ...updatedConditions[key]!,
-              priceAmount: value,
-            };
-          }
-        });
-        next.categoryConditions = updatedConditions;
-      }
-      return next;
-    });
-  };
+  const setField = useCallback(
+    <K extends keyof Draft>(key: K, value: Draft[K]) =>
+      setDraft((prev) => ({ ...prev, [key]: value })),
+    [setDraft]
+  );
 
-  const updateCategoryPrice = (catKey: ParcelCategory, value: number | "") => {
-    setDraft((prev) => {
-      const condition = prev.categoryConditions[catKey];
-      if (!condition) return prev;
-      return {
-        ...prev,
-        useGlobalPrice: false,
-        categoryConditions: {
-          ...prev.categoryConditions,
-          [catKey]: { ...condition, priceAmount: value },
-        },
-      };
-    });
-    setShowPerCategory(true);
-  };
+  const familyHandlers = useMemo(
+    () =>
+      Object.fromEntries(
+        PARCEL_FAMILIES.map((f) => [
+          f.key,
+          (next: FamilyConditionDraft) =>
+            setDraft((prev) => ({
+              ...prev,
+              familyConditions: { ...prev.familyConditions, [f.key]: next },
+            })),
+        ])
+      ) as Record<ParcelFamily, (next: FamilyConditionDraft) => void>,
+    [setDraft]
+  );
 
-  const handlePickupChange = (next: TripLocationPoint[]) => {
-    setDraft((prev) => ({ ...prev, pickupLocations: next }));
-  };
+  const familyLabels = useMemo(
+    () => ({
+      accepted: copy.accepted,
+      refused: copy.refused,
+      addSurcharge: copy.addSurcharge,
+      surcharge: copy.surchargeLabel,
+      removeSurcharge: copy.removeSurcharge,
+    }),
+    [copy]
+  );
 
-  const handleDeliveryChange = (next: TripLocationPoint[]) => {
-    setDraft((prev) => ({ ...prev, deliveryLocations: next }));
-  };
+  const handlePickupChange = (next: TripLocationPoint[]) => setField("pickupLocations", next);
+  const handleDeliveryChange = (next: TripLocationPoint[]) => setField("deliveryLocations", next);
 
-  const togglePerCategory = () => {
-    const opening = !showPerCategory;
-    setShowPerCategory(opening);
-    setDraft((prev) => ({ ...prev, useGlobalPrice: !opening }));
-  };
+  /* ── Résumés des accordéons ── */
+  const familiesSummary = summarizeFamilyConditions(draft.familyConditions, isFr) ?? copy.familiesAllAccepted;
+  const bagsCount =
+    (isBagActive(draft.checkedBag23Price, CHECKED_BAG_KG, draft.capacityKg) ? 1 : 0) +
+    (isBagActive(draft.cabinBag12Price, CABIN_BAG_KG, draft.capacityKg) ? 1 : 0);
+  const bagsSummary = bagsCount === 0 ? copy.bagsNone : copy.bagsSummary(bagsCount);
+  const optionsSummary = draft.handDeliveryOnly ? copy.handOnly : null;
+
+  const eqChecked = bagEquivalentPerKg(draft.checkedBag23Price, CHECKED_BAG_KG);
+  const eqCabin = bagEquivalentPerKg(draft.cabinBag12Price, CABIN_BAG_KG);
 
   /* ── Render ──────────────────────────────────────── */
 
   return (
     <div>
-      {/* ═══ Section 1 : Catégories & prix ═══ */}
-      <SectionLabel first>{copy.categories}</SectionLabel>
+      {/* ═══ TON OFFRE : prix · capacité · gain ═══ */}
+      <SectionLabel first>{copy.yourOffer}</SectionLabel>
 
-      {CATEGORY_GROUPS.map((group) => (
-        <div key={group.labelEn} className="mb-4">
-          <div className="mb-2 text-[11px] text-slate-400 dark:text-slate-500">
-            {isFr ? group.labelFr : group.labelEn}
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {group.items.map((catKey) => {
-              const opt = categoryOptions.find((o) => o.key === catKey);
-              if (!opt) return null;
-              return (
-                <CategoryChip
-                  key={catKey}
-                  label={opt.label}
-                  active={draft.acceptedCategories.includes(catKey)}
-                  onClick={() => toggleCategory(catKey)}
-                />
-              );
-            })}
-          </div>
+      <div className="mb-1.5 flex items-center gap-1 text-[13px] font-medium text-slate-700 dark:text-slate-300">
+        {copy.pricePerKg}
+        <InfoHint label={copy.pricePerKg}>{copy.priceHint}</InfoHint>
+      </div>
+      <SliderField
+        value={draft.pricePerKg}
+        min={PRICE_PER_KG_RANGE.min}
+        max={PRICE_PER_KG_RANGE.max}
+        step={PRICE_PER_KG_RANGE.step}
+        unit={copy.perKgUnit}
+        ariaLabel={copy.pricePerKg}
+        onChangeAction={(v) => setField("pricePerKg", v)}
+        error={errors.pricePerKg}
+      />
+      <FairPriceGauge
+        price={draft.pricePerKg}
+        suggestion={suggestion}
+        verdict={verdict}
+        labels={{
+          low: copy.gaugeLow,
+          median: copy.gaugeMedian,
+          high: copy.gaugeHigh,
+          ok: copy.fairPriceOk,
+          tooLow: copy.fairPriceLow,
+          tooHigh: copy.fairPriceHigh,
+        }}
+      />
+      <div className="-mt-1 flex items-center gap-1 text-[12px] text-slate-500 dark:text-slate-400">
+        {copy.priceAnchor(formatEur(suggestion.median), formatEur(suggestion.low), formatEur(suggestion.high))}
+        <InfoHint label={copy.whyThisPrice}>
+          <span className="block font-semibold text-slate-800 dark:text-slate-100">{copy.whyThisPrice}</span>
+          <ul className="mt-1 space-y-0.5">
+            {suggestion.factors.map((f) => (
+              <li key={f.key} className="flex justify-between gap-3">
+                <span>
+                  {f.key === "base"
+                    ? copy.factorBase(formatEur(f.value ?? 0))
+                    : f.key === "directFlight"
+                      ? copy.factorDirectFlight
+                      : copy.factorDepartureSoon}
+                </span>
+                {f.key !== "base" && (
+                  <span className="tabular-nums font-medium">
+                    {f.pct > 0 ? "+" : ""}
+                    {f.pct} %
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </InfoHint>
+      </div>
+
+      <div className="mb-1.5 mt-5 flex items-center gap-1 text-[13px] font-medium text-slate-700 dark:text-slate-300">
+        {copy.capacity}
+        <InfoHint label={copy.capacity}>{copy.capacityHint}</InfoHint>
+      </div>
+      <SliderField
+        value={draft.capacityKg}
+        min={CAPACITY_KG_RANGE.min}
+        max={CAPACITY_KG_RANGE.max}
+        step={CAPACITY_KG_RANGE.step}
+        unit={copy.kgUnit}
+        ariaLabel={copy.capacity}
+        onChangeAction={(v) => setField("capacityKg", v)}
+        error={errors.capacityKg}
+      />
+
+      {netGain > 0 && capacity > 0 && (
+        <div className="mt-4">
+          <NetGainCard title={copy.netGainTitle(capacity)} amount={netGain} sub={copy.netGainPaid} />
         </div>
-      ))}
-      <FieldError error={errors.categories} />
+      )}
 
-      {/* Global price */}
-      {draft.acceptedCategories.length > 0 && (
-        <div className="animate-[fadeSlide_0.2s_ease]">
-          <SectionLabel>{copy.globalPrice}</SectionLabel>
-          <div className="flex items-center gap-4">
-            <PriceInput
-              value={draft.globalPrice}
-              onChange={handleGlobalPriceChange}
+      {/* ═══ ▸ Familles de colis (D14) ═══ */}
+      <div className="mt-6">
+        <Accordion
+          title={copy.families}
+          summary={familiesSummary}
+          actionLabel={copy.adjust}
+          hint={<InfoHint label={copy.families}>{copy.familiesHint}</InfoHint>}
+        >
+          <div className="space-y-2">
+            {PARCEL_FAMILIES.map((family) => (
+              <FamilyConditionRow
+                key={family.key}
+                iconKey={family.icon}
+                label={isFr ? family.labelFr : family.labelEn}
+                condition={draft.familyConditions[family.key]}
+                surchargeRange={SURCHARGE_PCT_RANGE}
+                labels={familyLabels}
+                onChangeAction={familyHandlers[family.key]}
+                error={errors[`family_${family.key}`]}
+              />
+            ))}
+          </div>
+        </Accordion>
+
+        {/* ═══ ▸ Bagage entier — forfait (PRC-04) ═══ */}
+        <Accordion
+          title={copy.bags}
+          summary={bagsSummary}
+          actionLabel={bagsCount === 0 ? copy.add : copy.adjust}
+          hint={<InfoHint label={copy.bags}>{copy.bagsHint}</InfoHint>}
+          defaultOpen={bagsCount > 0}
+        >
+          <div className="space-y-2">
+            <BagFlatRateRow
+              icon={BAG_ICONS.checked}
+              label={copy.checkedBag23}
+              hint={copy.bagConsumes(CHECKED_BAG_KG)}
+              equivalent={eqChecked !== null ? copy.bagEquivalent(formatEur(eqChecked)) : null}
+              disabledReason={capacity < CHECKED_BAG_KG ? copy.bagNeedsCapacity(CHECKED_BAG_KG) : null}
+              value={draft.checkedBag23Price}
+              onChangeAction={(v) => setField("checkedBag23Price", v)}
+              error={errors.checkedBag23Price}
             />
-            <span className="text-[12px] text-slate-400 dark:text-slate-500">
-              {copy.globalPriceSub}
-            </span>
+            <BagFlatRateRow
+              icon={BAG_ICONS.cabin}
+              label={copy.cabinBag12}
+              hint={copy.bagConsumes(CABIN_BAG_KG)}
+              equivalent={eqCabin !== null ? copy.bagEquivalent(formatEur(eqCabin)) : null}
+              disabledReason={capacity < CABIN_BAG_KG ? copy.bagNeedsCapacity(CABIN_BAG_KG) : null}
+              value={draft.cabinBag12Price}
+              onChangeAction={(v) => setField("cabinBag12Price", v)}
+              error={errors.cabinBag12Price}
+            />
           </div>
+        </Accordion>
+      </div>
 
-          <button
-            type="button"
-            onClick={togglePerCategory}
-            className="mt-3 text-[12px] font-medium transition-colors"
-            style={{ color: "#FF9900" }}
-          >
-            {showPerCategory ? "▾ " : "▸ "}
-            {copy.adjustPrices}
-          </button>
-        </div>
-      )}
-
-      {/* Per-category prices */}
-      {draft.acceptedCategories.length > 0 && showPerCategory && (
-        <div className="mt-3 animate-[fadeSlide_0.2s_ease]">
-          <div className="mb-2 text-[10px] font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">
-            {copy.pricePerCategory}
-          </div>
-          <div className="space-y-1.5">
-            {draft.acceptedCategories.map((catKey) => {
-              const opt = categoryOptions.find((o) => o.key === catKey);
-              const condition = draft.categoryConditions[catKey];
-              if (!opt) return null;
-              const value = condition?.priceAmount ?? "";
-              const priceErr = errors[`price_${catKey}`];
-
-              return (
-                <div key={catKey}>
-                  <div className="flex items-center justify-between rounded-md bg-slate-50 px-3 py-2 dark:bg-slate-800/50">
-                    <span className="text-[12px] text-slate-700 dark:text-slate-300">
-                      {opt.label}
-                    </span>
-                    <div className="flex items-center gap-1">
-                      <input
-                        type="number"
-                        value={value}
-                        min={0}
-                        onChange={(e) => {
-                          const raw = e.target.value;
-                          const v = raw === "" ? "" : Number(raw);
-                          updateCategoryPrice(catKey, v);
-                        }}
-                        className={[
-                          "w-16 rounded-md border bg-white px-2 py-1 text-right text-[12px] text-slate-900 focus:outline-none dark:bg-slate-900 dark:text-white",
-                          priceErr
-                            ? "border-[#FF9900]"
-                            : "border-slate-200 focus:border-[#FF9900] dark:border-slate-700",
-                        ].join(" ")}
-                      />
-                      <span className="text-[12px] text-slate-400">€</span>
-                    </div>
-                  </div>
-                  <FieldError error={priceErr} />
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Revenue estimate */}
-      {revenue.max > 0 && (
-        <div className="mt-5">
-          <RevenueBadge
-            min={revenue.min}
-            max={revenue.max}
-            label={copy.revenueEstimate}
-          />
-        </div>
-      )}
-
-      {/* ═══ Section 2 : Lieux de remise ═══ */}
+      {/* ═══ Lieux de remise / livraison (obligatoires) ═══ */}
       <div className="mt-6">
         <LocationsSection
           context="PICKUP"
@@ -244,8 +315,6 @@ export default function StepConditions({
           error={errors.pickupLocations}
         />
       </div>
-
-      {/* ═══ Section 3 : Lieux de livraison ═══ */}
       <LocationsSection
         context="DELIVERY"
         title={copy.deliveryLocations}
@@ -256,36 +325,31 @@ export default function StepConditions({
         error={errors.deliveryLocations}
       />
 
-      {/* ═══ Section 4 : Options & message ═══ */}
-      <SectionLabel>{copy.options}</SectionLabel>
-      <div className="rounded-xl bg-slate-50 px-4 dark:bg-slate-800/50">
-        <Toggle
-          label={copy.handOnly}
-          on={draft.handDeliveryOnly}
-          onChange={(v) =>
-            setDraft((prev) => ({ ...prev, handDeliveryOnly: v }))
-          }
-        />
-        <Toggle
-          label={copy.instantBooking}
-          on={draft.instantBooking}
-          onChange={(v) =>
-            setDraft((prev) => ({ ...prev, instantBooking: v }))
-          }
-        />
+      {/* ═══ ▸ Options & message ═══ */}
+      <div className="mt-6">
+        <Accordion
+          title={copy.optionsAndMessage}
+          summary={optionsSummary ?? (draft.notes.trim() ? draft.notes.trim() : null)}
+          actionLabel={copy.adjust}
+        >
+          <div className="rounded-xl bg-slate-50 px-4 dark:bg-slate-800/50">
+            <Toggle
+              label={copy.handOnly}
+              on={draft.handDeliveryOnly}
+              onChange={(v) => setField("handDeliveryOnly", v)}
+            />
+          </div>
+          <p className="mt-2 text-[11px] text-slate-400 dark:text-slate-500">{copy.responseWithin24h}</p>
+          <textarea
+            value={draft.notes}
+            onChange={(e) => setField("notes", e.target.value)}
+            placeholder={copy.notesPlaceholder}
+            rows={2}
+            maxLength={2000}
+            className="mt-3 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-[13px] text-slate-900 placeholder:text-slate-400 focus:border-[#FF9900] focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-500"
+          />
+        </Accordion>
       </div>
-
-      <SectionLabel>{copy.notes}</SectionLabel>
-      <textarea
-        value={draft.notes}
-        onChange={(e) =>
-          setDraft((prev) => ({ ...prev, notes: e.target.value }))
-        }
-        placeholder={copy.notesPlaceholder}
-        rows={2}
-        maxLength={2000}
-        className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-[13px] text-slate-900 placeholder:text-slate-400 focus:border-[#FF9900] focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-500"
-      />
     </div>
   );
 }

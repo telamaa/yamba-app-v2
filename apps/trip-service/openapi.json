@@ -5064,7 +5064,29 @@
           },
           "minPrice": {
             "type": "number",
-            "description": "En unités (euros), PAS en centimes — déjà divisé par 100"
+            "description": "En unités (euros), PAS en centimes — déjà divisé par 100. 0 pour un trip PER_KG (voir pricePerKg)"
+          },
+          "pricePerKg": {
+            "description": "D13 — moteur PER_KG : prix au kilo en unités (euros). Null = trip legacy PER_CATEGORY",
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "remainingKg": {
+            "description": "CAP-02 — capacityKg − reservedKg, dérivé. Null si legacy",
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "pricesByCategory": {
             "type": "object",

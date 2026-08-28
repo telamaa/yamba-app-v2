@@ -25,15 +25,19 @@ La maquette de référence est `context/mockup-pricing-yamba.html` (ouvre-la dan
 
 ## 1. Ce qu'un utilisateur voit après PR-B
 
-Dans « Créer un trajet », étape 2 « Conditions », l'ancien bloc « Catégories acceptées + prix » est remplacé par 4 sections + 1 carte :
+> **Révision « dépôt en 90 s » (revue UX du 28/08)** — après une première version qui reproduisait le mockup section par section, l'écran a été resserré : **3 champs obligatoires visibles** (prix, capacité, un lieu par contexte), tout le reste **replié** dans des accordéons avec résumé sur la ligne, les explications dans des **popovers ⓘ** (tap-friendly) au lieu de texte courant, **prix et capacité pré-remplis** (médiane suggérée arrondie au 0,50 ; 12 kg), **icônes Lucide** au lieu d'emojis, familles en **Accepté / Refusé + « Ajouter un supplément »** au lieu de OK / +% / Non. La description ci-dessous reflète cet état final.
 
-1. **Ton prix au kilo** — un curseur (5 → 20 €/kg, pas de 0,50) synchronisé avec un champ numérique, une **jauge « prix juste »** (zone basse / juste / haute) avec la position du prix du Voyageur, un badge (« ✓ Prix juste », « ↓ Sous le marché… », « ↑ Au-dessus… ») et une phrase d'ancrage « Les trajets similaires partent à 11,55 €/kg en médiane… ».
-2. **Ta capacité** — curseur 2 → 30 kg + champ, et un rappel de la tolérance de poids au pickup (± 10 %).
-3. **Familles de colis** — 8 lignes (Documents, Vêtements, Alimentaire sec, Électronique, Cosmétiques, Pièces & outillage, Jouets, Accessoires). Chaque ligne a 3 boutons **OK / +% / Non**. En mode +%, un petit curseur (5 → 50 %) apparaît.
-4. **Bagages entiers — forfait** — deux lignes optionnelles : « Bagage soute 23 kg » et « Bagage cabine 12 kg », chacune avec un prix forfaitaire en euros.
-5. **Carte « Tu gagnes »** — apparaît dès que prix ET capacité sont saisis : `prix × capacité` (ex. 11,50 × 23 = 264,50 €), avec la mention « versé à J+4… ton prix = ton net ».
+Dans « Créer un trajet », étape 2 « Conditions », l'ancien bloc « Catégories acceptées + prix » est remplacé par :
 
-Les sections suivantes (lieux de remise, lieux de livraison, options, message) sont **inchangées**.
+1. **Ton offre — prix au kilo** (pré-rempli) : curseur 5 → 20 €/kg (pas 0,50) synchronisé avec un champ, **jauge « prix juste »** (basse / juste / haute, thème-aware), badge de verdict, phrase d'ancrage + popover **« Pourquoi ce prix ? »** listant les facteurs (base corridor, vol direct +5 %, départ imminent −5 %/−2 %).
+2. **Ton offre — capacité** (pré-remplie à 12 kg) : curseur 2 → 30 kg + champ ; la tolérance ±10 % est dans le ⓘ.
+3. **Carte gain net** juste dessous : « Si tes 12 kg partent · 138,00 € · net, versé à J+4 ».
+4. **▸ Familles de colis** (accordéon fermé, résumé « Toutes les familles acceptées » ou « Électronique : +20 % · Alimentaire : refusé ») — à l'intérieur, 8 lignes : icône Lucide dans une pastille teal, nom, **toggle Accepté/Refusé**, lien **« + Ajouter un supplément »** qui révèle un curseur 5 → 50 % et un ✕.
+5. **▸ Bagage entier — forfait** (accordéon fermé, « Aucun forfait proposé » / « 1 forfait proposé ») — deux lignes soute 23 kg / cabine 12 kg avec prix en €, **équivalent ≈ €/kg** affiché, ligne **désactivée** avec message si la capacité est inférieure à la franchise.
+6. **Lieux de remise / livraison** — inchangés.
+7. **▸ Options & message** (accordéon fermé) — « Main propre uniquement » + message ; « Réservation instantanée » **n'est plus proposée** (D20 v1) — remplacée par l'info « Chaque demande passe par ton accord — tu réponds sous 24 h ».
+
+Étape 1 : le champ « ville d'escale » passe en pleine largeur sous le contrôle « Vol direct / Avec escale ».
 
 Le bandeau résumé en haut (« Avion · Paris → Brazzaville · 12 sept. · 11,50 €/kg · 23 kg · 264,50 € »), l'étape 3 « Vérification » et l'aperçu public reflètent les nouvelles valeurs.
 
@@ -96,15 +100,20 @@ export const PARCEL_FAMILIES = [
   ...
 ];
 ```
-Les `key` sont **exactement** celles de l'enum Prisma `ParcelFamily` et du contrat `packages/libs/api-contracts/src/trip/trip-pricing.schema.ts`. Si tu ajoutes une famille, il faut la faire dans les trois (Prisma, contrat, front) — la liste est dite « figée » (décision D14 / règle CAT-02).
+`icon` est une **clé Lucide** (`"file-text"`, `"shirt"`, `"smartphone"`…) rendue par `TripPricingUi` — jamais un emoji (rendu OS-dépendant, non colorable à la charte). Les `key` sont **exactement** celles de l'enum Prisma `ParcelFamily` et du contrat `packages/libs/api-contracts/src/trip/trip-pricing.schema.ts`. Si tu ajoutes une famille, il faut la faire dans les trois (Prisma, contrat, front) — la liste est dite « figée » (décision D14 / règle CAT-02).
 
 ### 4.2 La suggestion de prix (D15, version 1 déterministe)
 
 ```ts
 suggestPricePerKg(draft) → { low, median, high }
 ```
-- `median = 11 €/kg` (base) × `1,05` si vol direct × `1,08` si départ ≤ 3 jours (ou `1,04` si ≤ 7 jours).
+- `median = 11 €/kg` (base) × `1,05` si vol direct × `0,95` si départ ≤ 3 jours (ou `0,98` si ≤ 7 jours).
 - `low = median × 0,90`, `high = median × 1,15`.
+- Le résultat porte aussi `factors: [{ key, pct }]` — la liste des modificateurs appliqués, affichée dans le popover « Pourquoi ce prix ? » (explicabilité > précision).
+
+**Pourquoi le départ imminent BAISSE la suggestion ?** On est côté *offre* : un Voyageur qui part dans 2 jours a moins de temps pour vendre ses kilos — il doit être compétitif. La prime d'urgence existe côté *demande* (l'Expéditeur pressé), pas ici. La première version avait le signe inversé ; corrigé à la revue.
+
+**Pré-remplissage** : à l'arrivée sur l'étape 2, si `pricePerKg === ""`, on écrit `roundToHalf(median)` (arrondi commercial au 0,50) et `capacityKg = 12` (`DEFAULT_CAPACITY_KG`). Une seule fois (`useEffect` au montage) — l'utilisateur garde la main.
 
 **Pourquoi des valeurs en dur ?** La décision D15 prévoit une V1 « déterministe » avec une table `base_corridor` par corridor (Paris→Brazzaville ≠ Paris→Abidjan) et un signal de demande (alertes SavedRoutes). Ces données n'existent pas encore. On a donc une base unique, **isolée dans une fonction** : le jour où le serveur fournit la suggestion, on remplace le corps de `suggestPricePerKg` (ou on l'alimente par un hook) **sans toucher la jauge**, qui ne connaît que `{ low, median, high }`.
 
@@ -123,7 +132,7 @@ Elle renvoie un objet `{ champ: message }` ; vide = OK. Règles :
 | `pricePerKg` | requis, > 0 | Le serveur refuse de publier sans prix ET capacité (« gate » A28) — on prévient l'utilisateur avant |
 | `capacityKg` | requis, > 0 | idem |
 | `family_<KEY>` | si mode SURCHARGE, `surchargePct` entier entre 1 et 100 | Miroir exact du `superRefine` du contrat API |
-| `checkedBag23Price`, `cabinBag12Price` | optionnels, mais > 0 si saisis | Un forfait à 0 € n'a pas de sens ; le contrat dit `positive()` |
+| `checkedBag23Price`, `cabinBag12Price` | optionnels, > 0 si saisis, **et capacité ≥ 23 / ≥ 12 kg** | Un forfait à 0 € n'a pas de sens ; un bagage entier consomme sa franchise — impossible avec 5 kg de capacité (RG-B-29, miroir de `checkBagCapacity` serveur) |
 | lieux | ≥ 1 remise et ≥ 1 livraison activés | inchangé |
 
 **Règle du projet à retenir** : le front **reflète** les règles serveur pour l'ergonomie, mais c'est **toujours le serveur qui tranche** (règle « toute limite métier est appliquée côté serveur »). Si tu changes une règle, change-la d'abord côté serveur (+ test), puis reflète-la ici.
@@ -157,10 +166,13 @@ Utilisé quand on **édite** un trajet existant. Cents → euros (`/100`), `fami
 
 Chaque composant est « bête » : il reçoit des valeurs et des callbacks, aucune logique métier.
 
+- **`InfoHint`** : le ⓘ. Popover ouvert au **clic/tap** (jamais hover-only : le mobile n'a pas de hover), fermé par Échap ou clic dehors, `aria-expanded`/`aria-controls`. Largeur `min(20rem, 100vw − 3rem)` pour ne jamais déborder en 375 px.
+- **`Accordion`** : titre + résumé + action mango (« Ajuster » / « Ajouter ») ; **le contenu n'est monté qu'ouvert** (`open && children`) — DOM léger, pas de 8 lignes de familles rendues pour rien.
+- **`IconBadge`** : pastille ronde `teal/10` avec l'icône Lucide en trait 1,75 px ; grisée quand la ligne est refusée/désactivée.
 - **`SliderField`** : un `<input type="range">` + un `<input type="number">` liés à la même valeur. Le curseur affiche `min` quand la valeur est `""` (un range ne sait pas être vide), mais la valeur du Draft reste `""` tant que l'utilisateur n'a rien touché.
-- **`FairPriceGauge`** : une barre en 3 zones. L'échelle va de `low − 45 % de l'écart` à `high + 45 %` (repris du mockup) pour que la zone verte soit centrée. La position du curseur est bornée entre 3 % et 97 % pour rester visible. La barre est un `linear-gradient` calculé en JS (`pct(low)`, `pct(high)`).
-- **`FamilyConditionRow`** : la ligne icône + nom + [curseur % si SURCHARGE] + 3 boutons `role="radio"`.
-- **`BagFlatRateRow`** : bordure pointillée (comme le mockup), champ euros, sous-titre « consomme X kg de ta capacité ».
+- **`FairPriceGauge`** : une barre en 3 zones (trois `div` absolus avec classes Tailwind `dark:` — alphas plus forts en dark, où la première version était illisible). Échelle `low − 45 % de l'écart` → `high + 45 %` (mockup), curseur borné 3–97 %. L'espace sous la barre (repères + badge) est **réservé en hauteur fixe** : plus de chevauchement quand le badge est absent.
+- **`FamilyConditionRow`** (`React.memo`) : icône + nom + badge « +20 % » si supplément + **`Toggle`** Accepté/Refusé (le composant existant du projet, compris de tous) ; dessous, « + Ajouter un supplément » → curseur 5–50 % + ✕. Mémoïsée : le parent passe des callbacks **stables** (un par famille, créés une fois via `useMemo`), donc taper dans le prix ne re-rend pas les 8 lignes. Cibles ≥ 44 px.
+- **`BagFlatRateRow`** : bordure pointillée, champ euros, « consomme X kg » + **« ≈ 4,35 €/kg »** (équivalent au kilo pour que le Voyageur voie s'il brade), et un état **désactivé** avec la raison (« Monte ta capacité à 23 kg… »).
 - **`NetGainCard`** : la carte teal du gain.
 - **`formatEur(n)`** : `toLocaleString("fr-FR", 2 décimales)` → « 11,50 ». Utilisée partout pour l'affichage monétaire du formulaire.
 
@@ -212,7 +224,11 @@ Conséquence : un trajet PER_KG sans catégorie (le cas nominal après PR-B, la 
 
 Le troisième chemin de publication (`PATCH /trips/:id` avec `publish: true`) ne vérifiait déjà pas les catégories : rien à changer.
 
-### 7.3 Les tests (`trip.schema.spec.ts`)
+### 7.3 RG-B-29 — un forfait bagage exige sa franchise
+
+`pricing-gate.ts` gagne `checkBagCapacity({ capacityKg, checkedBag23PriceCents, cabinBag12PriceCents })` (pure, renvoie un message ou `null`). Branchée à **trois** endroits : le `superRefine` de `createTripSchema` (**brouillon compris** — une offre impossible ne doit jamais être enregistrée), `publishTrip`, et `updateTrip publish=true` sur les valeurs effectives (`payload ?? trip`). Tests : 4 sur la fonction + 2 sur le schéma.
+
+### 7.4 Les tests (`trip.schema.spec.ts`)
 
 | Test | Vérifie |
 |---|---|
@@ -225,6 +241,44 @@ Le troisième chemin de publication (`PATCH /trips/:id` avec `publish: true`) ne
 Les tests ciblent `issues` par `path` plutôt que `success` global, pour ne pas dépendre des autres règles de publication.
 
 ---
+
+## 7ter. Régression trouvée en QA : le trajet créé était publié SANS son offre
+
+Symptôme réel : trajet créé à 11 €/kg, en base `pricePerKgCents: null`, `capacityKg: null`, `familyConditions: []`, statut PUBLISHED. Deux causes dans `createTrip` (`POST /trips`) :
+1. le `data` de `prisma.trip.create` énumère chaque champ à la main — **les 5 champs PER_KG n'y étaient pas** (le schéma Zod les acceptait, le controller les jetait) ;
+2. le **gate A28 n'était appliqué que sur `publishTrip` et `updateTrip`**, pas sur `POST /trips` + `publish: true` → un trajet sans aucun moteur a pu être publié.
+
+Correctif : helper pur `pickPerKgFields(data)` dans `pricing-gate.ts` (typé pour Prisma, **+2 specs**) étalé dans le `create` ; le gate `resolvePricingEngine` + `checkBagCapacity` appliqué sur ce troisième chemin. Leçon : **un chemin d'écriture qui liste ses champs à la main doit passer par un helper testé pour tout groupe de champs ajouté** — sinon le schéma « accepte » et la base « oublie », silencieusement.
+
+Réparation du trajet de test : le rouvrir (« Modifier ») et enregistrer — `updateTrip` copie tous les champs.
+
+## 7quater. Régression n° 2 en QA : `PUT /trips/:id` → 500 « Pipeline length greater than 50 »
+
+Symptôme : impossible d'enregistrer une modification (500 gateway ; trip-service : `P2010 … AtlasError: Pipeline length greater than 50 not supported`). Cause : MongoDB Atlas en **tier partagé** (M0/M2/M5) limite un pipeline d'agrégation à 50 étapes ; **Prisma + Mongo traduit un `update` contenant des types composites** (listes embarquées `pickupLocations`, `familyConditions`…) **en une étape `$set` par champ**. Le PUT du wizard envoie ~60 champs — les 5 champs PER_KG ont fait franchir la limite.
+
+Correctif : `apps/trip-service/src/lib/mongo-update-chunks.ts` — `chunkUpdateData(data, 40)` (pur, **+4 specs**) découpe l'écriture en paquets ≤ 40 champs appliqués séquentiellement ; les champs de **transition** (`status`, `publishedAt`, `currentStep`, `carrierRatingSnapshot`) vont **toujours dans le dernier paquet** : un trajet ne devient PUBLISHED qu'une fois toutes ses données écrites. Non atomique entre paquets (assumé : pas de transaction multi-documents nécessaire pour un seul document ; le pire cas est un brouillon partiellement mis à jour, jamais un publié incomplet). Ajouté aux pièges connus de `CLAUDE.md`.
+
+## 7bis. Recherche et page détail : afficher le prix au kilo (retour QA)
+
+Symptôme : un trajet PER_KG fraîchement créé affichait **« 0 € »** dans les résultats de recherche et sur sa page détail. Cause : ces écrans lisent `minPriceCents` (dénormalisé depuis les prix par catégorie), qui est `null` pour un trajet au kilo → `0`.
+
+Correctif, de l'API au pixel :
+- **Contrat** `trip-search.schema.ts` : `YambaTripResult` gagne `pricePerKg` (euros, null = legacy) et `remainingKg` (capacité − réservé, dérivé) → `openapi.json` régénéré (`npm run generate:openapi`, check CI « contracts »).
+- **Mapper** `apps/trip-service/src/lib/trip-mappers.ts` : les deux champs calculés depuis `pricePerKgCents`, `capacityKg`, `reservedKg`.
+- **DTO public** `GET /trips/:id/public` (`trip.controller.ts`) : expose `pricePerKgCents`, `capacityKg`, `reservedKg`, `remainingKg`, les forfaits bagages et `familyConditions` (déjà prévus par `trip-public.schema.ts` en PR-A, jamais branchés).
+- **Front** : `YambaTripResult` et `PublicTrip` étendus ; `getPricePerKgCents()` dans `public-trip.helpers.ts` ; `TripResultCard` / `TripResultCardMobile` affichent **« 12,00 €/kg »** + « N kg dispo » (teal) au lieu de « dès 0 € » et n'ouvrent plus le popover par catégorie ; `BookingSummaryCard` / `BookingMobileBar` idem avec le sous-titre « N kg encore disponibles · l'Expéditeur paie poids × prix » ; le dashboard (`TripDetails`) ajoute une ligne €/kg dans « Tarifs ».
+
+**Le créateur sur sa propre page publique** : `TripDetailView` compare `user.id` (hook `useUser`) à `trip.tripper.id` ; s'ils coïncident, la carte « Réserver » est remplacée par une carte **« C'est votre trajet »** avec **Modifier le trajet** (→ `/trips/create?edit=<id>`, le même écran que depuis le dashboard) et « Gérer dans mon tableau de bord ». Même chose dans la barre mobile. Un Voyageur ne se réserve pas lui-même.
+
+Note : la recherche triée par « prix le plus bas » exclut toujours les trajets sans `minPriceCents` (choix 4 de PR-A : moteurs incomparables) — les trajets PER_KG restent visibles dans les autres tris ; la comparabilité est le chantier « PR search ».
+
+## 7quinquies. Revue de la page recherche (lot 1)
+
+- `apps/user-ui/src/lib/pricing-example.ts` — `estimateShipperTotalCents(pricePerKgCents, kg = 2)` : projection pure en **cents** (D13 poids facturable 0,5 kg min, D32 plancher 8 €, D16 commission 12 % min 3 €). Affichée sous le €/kg sur la carte desktop (« ex. colis 2 kg ≈ 27 € ») et sur la carte de réservation. Les paramètres sont ceux du mockup §13 et seront servis par l'API avec le moteur Expéditeur (PR-C) — ne pas les dupliquer ailleurs.
+- **D20** : badge « ⚡ Instant » retiré de `TripResultCard`, entrée « Réservation instantanée » retirée de `SearchFiltersSidebar` (props conservées pour ne pas toucher `SearchResultsView` ; nettoyage complet du champ = PR cleanup).
+- Durée « 2H » → « 2 h » (`formatDuration` ×2, `formatTripTimes.ts`).
+
+Reste pour la **PR search** (registre D33 candidat « comparabilité ») : filtre par **famille** (le filtre catégorie legacy rend invisibles les trajets au kilo), tri « prix au kilo » unifié, filtres à compte 0 masqués, ville de rattachement d'un aéroport.
 
 ## 8. Hors périmètre mais dans la branche : le fix `next.config.js`
 
@@ -241,7 +295,7 @@ Ce fix a sa propre PR (`chore/next-intl-config-path`). Il est cherry-pické ici 
 npx tsc --noEmit --project apps/user-ui/tsconfig.json
 # typecheck + tests trip-service
 npx tsc --noEmit --project apps/trip-service/tsconfig.app.json
-npx nx test trip-service            # attendu : 162 (157 avant + 5)
+npx nx test trip-service            # attendu : 174 (157 avant + 5 catégories/PER_KG + 4 bagage + 2 schéma bagage + 2 pickPerKgFields + 4 chunks Atlas)
 # lancer et ouvrir
 npm run dev  →  http://localhost:3000/fr/trips/create  (compte Voyageur)
 ```

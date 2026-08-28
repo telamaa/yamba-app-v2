@@ -1,4 +1,5 @@
 "use client";
+import { estimateShipperTotalCents } from "@/lib/pricing-example";
 
 import Image from "next/image";
 import { useMemo, useRef, useState } from "react";
@@ -21,7 +22,6 @@ import {
   ToyBrick,
   Train,
   Car,
-  Zap,
   BadgeCheck,
   Award,
   Ticket,
@@ -51,8 +51,8 @@ function TransportIcon({ mode, size = 13 }: { mode: TransportMode; size?: number
 function formatDuration(minutes: number): string {
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
-  if (m === 0) return `${h}H`;
-  return `${h}H ${m.toString().padStart(2, "0")}`;
+  if (m === 0) return `${h} h`;
+  return `${h} h ${m.toString().padStart(2, "0")}`;
 }
 
 function getCategoryMeta(
@@ -159,8 +159,16 @@ export default function TripResultCard({
     item.remainingSlots > 0 &&
     item.remainingSlots < 3;
 
+  // D13 — un trip PER_KG affiche son prix au kilo (le popover legacy n'a plus de sens)
+  const isPerKg = typeof item.pricePerKg === "number" && item.pricePerKg > 0;
+  const formattedPerKg = isPerKg
+    ? (item.pricePerKg as number)
+        .toLocaleString(localeTag, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+        .replace(/\u00a0/g, "")
+    : null;
+
   const hasPricesByCategory =
-    item.pricesByCategory && Object.keys(item.pricesByCategory).length > 0;
+    !isPerKg && !!item.pricesByCategory && Object.keys(item.pricesByCategory).length > 0;
 
   return (
     <Link
@@ -292,13 +300,35 @@ export default function TripResultCard({
             </button>
           ) : (
             <div className="text-[10px] font-medium text-slate-400 dark:text-slate-500">
-              {t("startingFrom")}
+              {isPerKg ? t("card.perKg") : t("startingFrom")}
             </div>
           )}
 
           <div className="text-[22px] font-black leading-none tracking-tight text-slate-950 dark:text-white">
-            {formattedPrice} {item.currency ?? "€"}
+            {isPerKg ? (
+              <>
+                {formattedPerKg} {item.currency ?? "€"}
+                <span className="text-[13px] font-semibold text-slate-500 dark:text-slate-400">/kg</span>
+              </>
+            ) : (
+              <>
+                {formattedPrice} {item.currency ?? "€"}
+              </>
+            )}
           </div>
+          {isPerKg && typeof item.remainingKg === "number" && (
+            <div className="mt-0.5 text-[10px] font-medium text-[#0F766E] dark:text-teal-400">
+              {t("card.remainingKg", { kg: item.remainingKg })}
+            </div>
+          )}
+          {isPerKg && (
+            <div className="mt-0.5 text-[10px] text-slate-400 dark:text-slate-500">
+              {t("card.example", {
+                kg: 2,
+                price: (estimateShipperTotalCents(Math.round((item.pricePerKg as number) * 100)).totalCents / 100).toLocaleString(localeTag, { maximumFractionDigits: 0 }),
+              })}
+            </div>
+          )}
 
           {hasPricesByCategory && (
             <TripPricingPopover
@@ -383,18 +413,12 @@ export default function TripResultCard({
               )}
             </div>
 
-            {(item.superTripper || item.instantBooking || item.verifiedTicket) && (
+            {(item.superTripper || item.verifiedTicket) && (
               <div className="mt-1 flex flex-wrap items-center gap-1">
                 {item.superTripper && (
                   <span className="inline-flex items-center gap-0.5 rounded-md bg-[#FFF6E8] px-1.5 py-0.5 text-[10px] font-semibold text-[#B45309] dark:bg-[#FF9900]/15 dark:text-[#FFB84D]">
                     <Award size={9} strokeWidth={2.5} />
                     {t("badges.superTripper")}
-                  </span>
-                )}
-                {item.instantBooking && (
-                  <span className="inline-flex items-center gap-0.5 rounded-md bg-green-50 px-1.5 py-0.5 text-[10px] font-semibold text-green-700 dark:bg-green-950/40 dark:text-green-400">
-                    <Zap size={9} strokeWidth={2.5} />
-                    {t("badges.instant")}
                   </span>
                 )}
                 {item.verifiedTicket && (

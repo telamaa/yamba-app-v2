@@ -11,6 +11,7 @@ import {
   SwapButton,
 } from "../TripFormUi";
 import DocumentUpload from "../DocumentUpload";
+import { Accordion } from "../TripPricingUi";
 
 function toDateInputValue(date?: Date) {
   if (!date) return "";
@@ -223,7 +224,7 @@ export default function StepTrip({
       {showFlightSub && (
         <div className="animate-[fadeSlide_0.2s_ease]">
           <SectionLabel>{copy.tripPathType}</SectionLabel>
-          <div className="grid grid-cols-1 items-start gap-y-3 sm:grid-cols-2 sm:gap-x-6 sm:gap-y-0">
+          <div className="flex flex-col gap-3">
             <SegmentedControl
               value={draft.flightType}
               options={[
@@ -438,10 +439,20 @@ export default function StepTrip({
         </FormField>
       </div>
 
-      {/* Travel reference + Document upload — stack on mobile (upload needs room) */}
-      <SectionLabel>
-        {isFr ? "Référence & justificatif" : "Reference & proof"}
-      </SectionLabel>
+      {/* Travel reference + Document upload — optionnels, repliés par défaut
+          (ouverts d'office si déjà renseignés, ex. en édition) */}
+      <Accordion
+        title={isFr ? "Référence & justificatif" : "Reference & proof"}
+        summary={
+          draft.tripDocuments.length > 0
+            ? `${draft.tripDocuments.length} ${copy.docCount}`
+            : draft.travelReference.trim()
+              ? draft.travelReference.trim()
+              : copy.docUploadHint
+        }
+        actionLabel={copy.add}
+        defaultOpen={draft.tripDocuments.length > 0 || draft.travelReference.trim().length > 0}
+      >
       <div className="grid grid-cols-1 gap-y-3 sm:grid-cols-2 sm:gap-x-3 sm:gap-y-0">
         <FormField label={copy.travelReference}>
           <FormInput
@@ -461,6 +472,7 @@ export default function StepTrip({
           hint={copy.docUploadSub}
         />
       </div>
+      </Accordion>
     </div>
   );
 }

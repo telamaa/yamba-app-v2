@@ -1,6 +1,8 @@
 import { FileText, ShieldCheck } from "lucide-react";
 import type { CreateTripCopy, Draft, Step } from "../create-trip.types";
 import { getCategoryOptions } from "../create-trip.copy";
+import { CABIN_BAG_KG, CHECKED_BAG_KG, PARCEL_FAMILIES, estimateNetGain, isBagActive } from "../create-trip.config";
+import { formatEur } from "../TripPricingUi";
 import { ReviewCard, SectionLabel } from "@/components/trips/create/TripFormUi";
 import TripPublicPreview, { summarizeLocations } from "../TripPublicPreview";
 
@@ -59,7 +61,7 @@ export default function StepReview({
 
   const optionsList: string[] = [];
   if (draft.handDeliveryOnly) optionsList.push(copy.handOnly);
-  if (draft.instantBooking) optionsList.push(copy.instantBooking);
+  // D20 v1 : l'option instantanée n'est plus proposée — jamais affichée
 
   const pickupSummary = summarizeLocations(draft.pickupLocations, copy, isFr);
   const deliverySummary = summarizeLocations(draft.deliveryLocations, copy, isFr);
@@ -168,7 +170,69 @@ export default function StepReview({
         </ReviewCard>
       )}
 
-      {/* Categories & prices */}
+      {/* ⭐ Prix & capacité (moteur PER_KG — D13/D14/D19) */}
+      {typeof draft.pricePerKg === "number" && draft.pricePerKg > 0 && (
+        <ReviewCard
+          label={copy.reviewPricing}
+          onEdit={() => onGoTo(2)}
+          editLabel={copy.edit}
+        >
+          <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+            <span className="text-[18px] font-extrabold tabular-nums" style={{ color: MANGO }}>
+              {formatEur(draft.pricePerKg)} €/kg
+            </span>
+            {typeof draft.capacityKg === "number" && draft.capacityKg > 0 && (
+              <span className="text-[13px] font-medium text-slate-700 dark:text-slate-300">
+                {copy.availableKg(draft.capacityKg)}
+              </span>
+            )}
+            {estimateNetGain(draft) > 0 && (
+              <span className="text-[13px] font-semibold text-[#0F766E] dark:text-teal-400">
+                {copy.netGain} {formatEur(estimateNetGain(draft))} €
+              </span>
+            )}
+          </div>
+
+          {PARCEL_FAMILIES.some((f) => draft.familyConditions[f.key].mode !== "ACCEPT") && (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {PARCEL_FAMILIES.filter((f) => draft.familyConditions[f.key].mode !== "ACCEPT").map((f) => {
+                const c = draft.familyConditions[f.key];
+                const refused = c.mode === "REFUSE";
+                return (
+                  <span
+                    key={f.key}
+                    className={[
+                      "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium",
+                      refused
+                        ? "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
+                        : "text-slate-900 dark:text-[#FFB84D]",
+                    ].join(" ")}
+                    style={refused ? undefined : { backgroundColor: "rgba(255,153,0,0.10)" }}
+                  >
+                    {isFr ? f.labelFr : f.labelEn}
+                    {refused ? ` · ${copy.refused.toLowerCase()}` : ` · ${copy.surchargeShort(c.surchargePct)}`}
+                  </span>
+                );
+              })}
+            </div>
+          )}
+
+          {(isBagActive(draft.checkedBag23Price, CHECKED_BAG_KG, draft.capacityKg) ||
+            isBagActive(draft.cabinBag12Price, CABIN_BAG_KG, draft.capacityKg)) && (
+            <div className="mt-2 flex flex-wrap gap-1.5 text-[12px] text-slate-600 dark:text-slate-400">
+              {isBagActive(draft.checkedBag23Price, CHECKED_BAG_KG, draft.capacityKg) && (
+                <span>{copy.checkedBag23} · {formatEur(Number(draft.checkedBag23Price))} € ({copy.bagConsumes(CHECKED_BAG_KG)})</span>
+              )}
+              {isBagActive(draft.cabinBag12Price, CABIN_BAG_KG, draft.capacityKg) && (
+                <span>{copy.cabinBag12} · {formatEur(Number(draft.cabinBag12Price))} € ({copy.bagConsumes(CABIN_BAG_KG)})</span>
+              )}
+            </div>
+          )}
+        </ReviewCard>
+      )}
+
+      {/* Legacy PER_CATEGORY — seulement si AUCUNE offre PER_KG (trajet ancien non migré) */}
+      {draft.acceptedCategories.length > 0 && !(typeof draft.pricePerKg === "number" && draft.pricePerKg > 0) && (
       <ReviewCard
         label={copy.reviewCategoryConditions}
         onEdit={() => onGoTo(2)}
@@ -201,6 +265,7 @@ export default function StepReview({
           })}
         </div>
       </ReviewCard>
+      )}
 
       {/* ⭐ Locations */}
       <ReviewCard

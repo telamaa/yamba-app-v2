@@ -147,6 +147,19 @@ export type PublicTrip = {
 
   minPriceCents: number | null;
 
+  // ⭐ Moteur PER_KG (D13/D14/D19)
+  pricePerKgCents?: number | null;
+  capacityKg?: number | null;
+  reservedKg?: number | null;
+  remainingKg?: number | null;
+  checkedBag23PriceCents?: number | null;
+  cabinBag12PriceCents?: number | null;
+  familyConditions?: Array<{
+    familyKey: string;
+    mode: "ACCEPT" | "SURCHARGE" | "REFUSE";
+    surchargePct?: number | null;
+  }> | null;
+
   ticketVerified: boolean;
 
   tripper: PublicTripper;
