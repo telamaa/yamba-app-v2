@@ -38,3 +38,26 @@ export function resolvePricingEngine(
   }
   return null;
 }
+
+/** PRC-04 / RG-B-29 — un bagage entier consomme sa franchise : le forfait
+ *  n'est proposable que si la capacité déclarée peut le contenir. */
+export const CHECKED_BAG_KG = 23;
+export const CABIN_BAG_KG = 12;
+
+export type BagCapacityInput = {
+  capacityKg?: number | null;
+  checkedBag23PriceCents?: number | null;
+  cabinBag12PriceCents?: number | null;
+};
+
+/** Renvoie le message d'erreur, ou null si cohérent. */
+export function checkBagCapacity(input: BagCapacityInput): string | null {
+  const capacity = typeof input.capacityKg === "number" ? input.capacityKg : 0;
+  if (input.checkedBag23PriceCents != null && capacity < CHECKED_BAG_KG) {
+    return `A ${CHECKED_BAG_KG}kg checked bag flat rate requires a capacity of at least ${CHECKED_BAG_KG}kg.`;
+  }
+  if (input.cabinBag12PriceCents != null && capacity < CABIN_BAG_KG) {
+    return `A ${CABIN_BAG_KG}kg cabin bag flat rate requires a capacity of at least ${CABIN_BAG_KG}kg.`;
+  }
+  return null;
+}

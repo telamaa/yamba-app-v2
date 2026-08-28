@@ -1,4 +1,4 @@
-import { resolvePricingEngine } from "./pricing-gate";
+import { checkBagCapacity, resolvePricingEngine } from "./pricing-gate";
 
 describe("resolvePricingEngine — gate bi-moteur (A28, D13)", () => {
   const legacyCond = [{ category: "DOCUMENTS_PAPERS", priceAmountCents: 1500 }];
@@ -39,5 +39,20 @@ describe("resolvePricingEngine — gate bi-moteur (A28, D13)", () => {
 
   it("aucune entrée → null", () => {
     expect(resolvePricingEngine({})).toBeNull();
+  });
+});
+
+describe("checkBagCapacity — un forfait bagage exige sa franchise (PRC-04, RG-B-29)", () => {
+  it("soute 23 kg avec capacité 23 → OK", () => {
+    expect(checkBagCapacity({ capacityKg: 23, checkedBag23PriceCents: 23000 })).toBeNull();
+  });
+  it("soute 23 kg avec capacité 5 → refusé", () => {
+    expect(checkBagCapacity({ capacityKg: 5, checkedBag23PriceCents: 10000 })).toMatch(/23kg/);
+  });
+  it("cabine 12 kg avec capacité 10 → refusé", () => {
+    expect(checkBagCapacity({ capacityKg: 10, cabinBag12PriceCents: 5500 })).toMatch(/12kg/);
+  });
+  it("aucun forfait → toujours OK, même sans capacité", () => {
+    expect(checkBagCapacity({ capacityKg: null })).toBeNull();
   });
 });

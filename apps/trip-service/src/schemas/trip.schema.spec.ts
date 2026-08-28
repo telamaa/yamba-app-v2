@@ -61,3 +61,17 @@ describe("createTripSchema — publish gate categories vs PER_KG (A28)", () => {
     expect(r.success).toBe(false);
   });
 });
+
+describe("createTripSchema — cohérence bagage/capacité (RG-B-29), brouillon compris", () => {
+  const base = { transportMode: "PLANE", originCity: "Paris", destinationCity: "Brazzaville" };
+
+  it("forfait soute avec capacité 5 kg → refusé même en brouillon", () => {
+    const r = createTripSchema.safeParse({ ...base, capacityKg: 5, checkedBag23PriceCents: 10000 });
+    expect(r.success).toBe(false);
+  });
+
+  it("forfait soute avec capacité 23 kg → accepté", () => {
+    const r = createTripSchema.safeParse({ ...base, capacityKg: 23, checkedBag23PriceCents: 23000 });
+    expect(r.success).toBe(true);
+  });
+});
