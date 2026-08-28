@@ -64,7 +64,7 @@
     "size": {
       "label": "Taille — pas besoin de mesurer",
       "hint": "À l'œil : le coefficient s'applique au prix au kilo.",
-      "S": "de l'enveloppe à la boîte à chaussures",
+      "S": "enveloppe → boîte à chaussures",
       "M": "tient dans un sac cabine",
       "L": "occupe une demi-valise"
     }
