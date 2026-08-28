@@ -50,7 +50,8 @@
   "co2": {
     "label": "Shipment with no extra footprint ·",
     "saved": "{kg} kg of CO₂ saved",
-    "versus": "vs express freight"
+    "versus": "vs express freight",
+    "forWeight": "for {kg} kg"
   },
   "reviews": {
     "title": "What people say about {firstName}",
@@ -61,9 +62,9 @@
     "title": "Conditions",
     "cancellation": {
       "title": "Cancellation policy",
-      "full": "Full refund up to 48h before the trip",
-      "half": "50% refund between 48h and 24h before",
-      "none": "No refund within 24h of departure"
+      "full": "Full refund up to 48 h before departure",
+      "half": "Less than 48 h before departure: partial refund (a retention goes to the carrier)",
+      "none": "After the parcel handover: no cancellation, only a dispute"
     },
     "prohibited": {
       "title": "Prohibited items",
@@ -100,5 +101,30 @@
     "subtitle": "Senders see this page exactly like this.",
     "edit": "Edit trip",
     "dashboard": "Manage in my dashboard"
+  },
+  "offer": {
+    "title": "What you can send with {firstName}",
+    "hint": "One price per kg, period. Your parcel's family tells whether it's accepted, surcharged, or refused.",
+    "perKg": "Price per kg",
+    "available": "Available",
+    "example": "Your {kg} kg parcel ≈ {price} all-in (transport + Yamba service)",
+    "notEnough": "Not enough room left for a {kg} kg parcel",
+    "families": "Parcel families",
+    "accepted": "Accepted",
+    "refused": "Refused by the carrier",
+    "surcharge": "{pct}% surcharge (risk)",
+    "bags": "Whole bag — flat rate",
+    "checkedBag": "Checked 23 kg",
+    "cabinBag": "Cabin 12 kg",
+    "family": {
+      "DOCUMENTS_PAPERS": "Documents & papers",
+      "CLOTHES_TEXTILE": "Clothes & textile",
+      "FOOD_DRY_SEALED": "Dry sealed food",
+      "ELECTRONICS_DEVICES": "Electronics & devices",
+      "COSMETICS_CARE": "Cosmetics & care",
+      "PARTS_TOOLS": "Parts & tools",
+      "TOYS_CHILDCARE": "Toys & childcare",
+      "MISC_ACCESSORIES": "Accessories & misc."
+    }
   }
 }

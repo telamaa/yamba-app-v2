@@ -50,7 +50,8 @@
   "co2": {
     "label": "Envoi sans empreinte additionnelle ·",
     "saved": "{kg} kg de CO₂ évités",
-    "versus": "vs fret express"
+    "versus": "vs fret express",
+    "forWeight": "pour {kg} kg"
   },
   "reviews": {
     "title": "Ce qu'on dit de {firstName}",
@@ -61,9 +62,9 @@
     "title": "Conditions",
     "cancellation": {
       "title": "Politique d'annulation",
-      "full": "Remboursement intégral jusqu'à 48h avant le voyage",
-      "half": "Remboursement à 50 % entre 48h et 24h",
-      "none": "Aucun remboursement à moins de 24h"
+      "full": "Remboursement intégral jusqu'à 48 h avant le départ",
+      "half": "Moins de 48 h avant le départ : remboursement partiel (une retenue est reversée au Voyageur)",
+      "none": "Après la remise du colis : plus d'annulation possible, seul le litige"
     },
     "prohibited": {
       "title": "Objets interdits",
@@ -100,5 +101,30 @@
     "subtitle": "Les Expéditeurs voient cette page telle quelle.",
     "edit": "Modifier le trajet",
     "dashboard": "Gérer dans mon tableau de bord"
+  },
+  "offer": {
+    "title": "Ce que vous pouvez envoyer avec {firstName}",
+    "hint": "Un prix au kilo, point. La famille de votre colis dit s'il est accepté, avec supplément, ou refusé.",
+    "perKg": "Prix au kilo",
+    "available": "Disponible",
+    "example": "Votre colis de {kg} kg ≈ {price} tout compris (transport + service Yamba)",
+    "notEnough": "Plus assez de place pour un colis de {kg} kg",
+    "families": "Familles de colis",
+    "accepted": "Accepté",
+    "refused": "Refusé par le Voyageur",
+    "surcharge": "Supplément de {pct} % (risque)",
+    "bags": "Bagage entier — forfait",
+    "checkedBag": "Soute 23 kg",
+    "cabinBag": "Cabine 12 kg",
+    "family": {
+      "DOCUMENTS_PAPERS": "Documents & papiers",
+      "CLOTHES_TEXTILE": "Vêtements & textile",
+      "FOOD_DRY_SEALED": "Alimentaire sec & scellé",
+      "ELECTRONICS_DEVICES": "Électronique & appareils",
+      "COSMETICS_CARE": "Cosmétiques & soins",
+      "PARTS_TOOLS": "Pièces & outillage",
+      "TOYS_CHILDCARE": "Jouets & puériculture",
+      "MISC_ACCESSORIES": "Accessoires & divers"
+    }
   }
 }

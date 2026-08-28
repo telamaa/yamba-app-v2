@@ -13,6 +13,9 @@ Voir `context/fiches-pr/PR-search-per-kg/` (technique + métier). Résumé : **D
 ### §2bis — D33 V2 : le poids de l'Expéditeur
 Sidebar « Votre colis » (0,5–30 kg, mémorisé) → API `weightKg` : prix par carte pour ce poids (`price-for-weight.ts`, +5 specs), tri en mémoire pour ce poids (fenêtre 200, curseur `o:<n>`), exclusion par capacité + badge « Plus assez de place ». Le poids doit **pré-remplir le booking wizard** en PR-C.
 
+### §2ter — Page trajet
+`OfferCard` (offre PER_KG complète, exemple pour le poids mémorisé), chat masqué pour le propriétaire, CO₂ pour le poids, **texte d'annulation aligné ANN-01** (divergence trouvée : l'ancien texte promettait 50 %/0 % hors registre), lieux + conditions dans la colonne droite sur desktop. RG-S-09…12, recette R15–R19.
+
 ## §3 — Décisions / backlog
 - **D33** au registre (poids de référence = 🚪↔, existence = 🚪→). `REFERENCE_KG` et le plancher sont des constantes serveur → paramètres §13 candidats (avec commission/plancher D16/D32) : une **PR « paramètres serveur »** (table + endpoint `GET /pricing/params`) alimenterait à la fois la suggestion V1.5, l'exemple de prix front (`pricing-example.ts`) et le comparable.
 - Reste : ville de rattachement d'un aéroport (step 1) · cleanup `instantBooking` · filtres « Horaires de départ » toujours commentés.
