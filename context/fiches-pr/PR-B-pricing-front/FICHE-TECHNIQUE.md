@@ -1,6 +1,6 @@
 # Fiche technique — PR-B « Le formulaire de prix du Voyageur (moteur PER_KG) »
 
-> Branche `feat/pricing-front-2` · base `dev` (`70f060b`, post-#77) · PR #__ (noté au merge)
+> Branche `feat/pricing-front-2` · base `dev` (`70f060b`, post-#77) · **PR #82** (mergée dans `dev`)
 > Public : développeur junior. Objectif : comprendre CE qui a changé, POURQUOI, et comment le vérifier soi-même.
 
 ---

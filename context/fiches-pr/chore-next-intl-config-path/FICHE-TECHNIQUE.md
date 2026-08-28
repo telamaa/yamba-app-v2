@@ -1,6 +1,6 @@
 # Fiche technique — chore « chemin de config next-intl relatif au cwd »
 
-> Branche `chore/next-intl-config-path` · base `dev` · 1 fichier · PR #__ (noté au merge)
+> Branche `chore/next-intl-config-path` · base `dev` · 1 fichier · **PR #78** (mergée dans `dev`)
 > Public : développeur junior.
 
 ## 1. Symptôme
