@@ -29,7 +29,7 @@ export default function BookingClient({ tripId }: Props) {
   const { data: publicTrip, isLoading, isError } = usePublicTrip(tripId);
 
   const trip = useMemo(
-    () => (publicTrip ? mapPublicTripToContext(publicTrip, (k) => tLoc(k)) : null),
+    () => (publicTrip ? mapPublicTripToContext(publicTrip, (k, v) => tLoc(k, v)) : null),
     [publicTrip, tLoc]
   );
 

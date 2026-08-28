@@ -7,18 +7,24 @@ import type { PublicTrip } from "@/lib/public-trip.types";
 import type { FamilyStance, LocationPoint, ParcelCategory, ParcelFamily, TripContext } from "./booking.types";
 import { PARCEL_FAMILIES } from "./booking.types";
 
-function toLocationPoints(points: PublicTrip["pickupLocations"], t: (k: string) => string): LocationPoint[] {
+export type MapperT = (key: string, values?: Record<string, string | number>) => string;
+
+function toLocationPoints(points: PublicTrip["pickupLocations"], t: MapperT): LocationPoint[] {
   return (points ?? []).map((p, i) => ({
     id: `${p.kind}-${i}`,
     kind: p.kind === "AIRPORT" ? "AIRPORT" : p.kind === "TRAIN_STATION" ? "TRAIN_STATION" : "ADDRESS",
     label: p.kind === "AIRPORT" ? t("atAirport") : p.kind === "TRAIN_STATION" ? t("atTrainStation") : t("inTheCity"),
     subLabel: p.details ?? undefined,
     addressShort:
-      p.flexibility === "RADIUS" && p.radiusKm ? t("radiusKm").replace("{km}", String(p.radiusKm)) : p.flexibility === "CITY_WIDE" ? t("cityWide") : t("exact"),
+      p.flexibility === "RADIUS" && p.radiusKm
+        ? t("radiusKm", { km: p.radiusKm })
+        : p.flexibility === "CITY_WIDE"
+          ? t("cityWide")
+          : t("exact"),
   }));
 }
 
-export function mapPublicTripToContext(trip: PublicTrip, t: (k: string) => string): TripContext {
+export function mapPublicTripToContext(trip: PublicTrip, t: MapperT): TripContext {
   const familyStances = Object.fromEntries(
     PARCEL_FAMILIES.map((f) => [f, { mode: "ACCEPT", surchargePct: 0 }])
   ) as Record<ParcelFamily, FamilyStance>;
