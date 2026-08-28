@@ -1,6 +1,6 @@
 # Fiche technique — PR search « la recherche parle le moteur au kilo »
 
-> Branche `feat/search-per-kg` (empilée sur `feat/pricing-front-2` — à merger APRÈS PR-B) · PR #__ (noté au merge)
+> Branche `feat/search-per-kg` (empilée sur `feat/pricing-front-2` — à merger APRÈS PR-B) · **PR #83** (mergée dans `dev`)
 > Public : développeur junior.
 
 ## 0. Le problème

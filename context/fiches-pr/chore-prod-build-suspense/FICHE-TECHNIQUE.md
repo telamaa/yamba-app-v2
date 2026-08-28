@@ -1,6 +1,6 @@
 # Fiche technique — chore « le build de production passe à nouveau »
 
-> Branche `chore/prod-build-suspense` · base `dev` · 4 pages · PR #__
+> Branche `chore/prod-build-suspense` · base `dev` · 4 pages · **PR #81** (mergée dans `dev`)
 
 ## Symptôme
 `npx nx build user-ui` (= `next build`) sortait en **échec** à l'étape « Generating static pages » :
