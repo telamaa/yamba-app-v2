@@ -17,7 +17,15 @@ export function buildInitialDraft(trip: TripContext): Draft {
   } catch {
     /* SSR ou stockage indisponible */
   }
-  return { ...initialDraft, family: getFirstAcceptedFamily(trip), weightKg };
+  return {
+    ...initialDraft,
+    family: getFirstAcceptedFamily(trip),
+    // D33 : sans poids mémorisé, on part du colis de référence (2 kg) — jamais un 0 € muet
+    weightKg: weightKg || "2",
+    // un seul lieu = pré-sélectionné ; plusieurs = le premier, modifiable
+    pickupLocationId: trip.pickupOptions[0]?.id ?? null,
+    deliveryLocationId: trip.deliveryOptions[0]?.id ?? null,
+  };
 }
 
 export const initialDraft: Draft = {
