@@ -2,6 +2,7 @@ import "./global.css";
 import { Plus_Jakarta_Sans } from "next/font/google";
 import { Toaster } from "sonner";
 import React from "react";
+import { ThemeProvider } from "@/components/theme/ThemeProvider";
 
 const plusJakarta = Plus_Jakarta_Sans({
   subsets: ["latin"],
@@ -20,7 +21,12 @@ export const metadata = {
  * The <html lang="..."> attribute will be updated dynamically by the locale layout
  * when it's available, but we put a sensible default here.
  *
- * All providers and UI chrome are in app/[locale]/layout.tsx.
+ * All providers and UI chrome are in app/[locale]/layout.tsx — SAUF le
+ * ThemeProvider (next-themes) : il vit ICI, au-dessus du segment [locale].
+ * Sinon, à chaque bascule FR/EN le layout de locale est remonté côté client,
+ * React recrée le <script> anti-flash de next-themes et signale en dev
+ * « Encountered a script tag while rendering React component » (React 19).
+ * Le root layout, lui, ne se remonte jamais.
  */
 export default function RootLayout({
                                      children,
@@ -30,7 +36,7 @@ export default function RootLayout({
   return (
     <html lang="fr" className={plusJakarta.variable} suppressHydrationWarning>
     <body className="min-h-screen bg-white font-sans text-slate-900 dark:bg-slate-950 dark:text-slate-50">
-    {children}
+    <ThemeProvider>{children}</ThemeProvider>
     <Toaster
       position="top-right"
       richColors
