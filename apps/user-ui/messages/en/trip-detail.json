@@ -126,6 +126,11 @@
       "TOYS_CHILDCARE": "Toys & childcare",
       "MISC_ACCESSORIES": "Accessories & misc."
     },
-    "exampleFromSearch": "Estimate for a {kg} kg parcel (weight from your search): ≈ {price} all-in · final price at booking"
+    "exampleFromSearch": "Estimate for a {kg} kg parcel (weight from your search): ≈ {price} all-in · final price at booking",
+    "estimateLabel": "Estimate",
+    "estimateLabel2": "Estimate for a {kg} kg parcel",
+    "estimateLabelFromSearch": "Estimate for your {kg} kg parcel (weight from your search)",
+    "allIn": "all-in (transport + Yamba service)",
+    "finalAtBooking": "The final price is set at booking."
   }
 }

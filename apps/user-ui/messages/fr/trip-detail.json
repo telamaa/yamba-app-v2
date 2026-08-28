@@ -126,6 +126,11 @@
       "TOYS_CHILDCARE": "Jouets & puériculture",
       "MISC_ACCESSORIES": "Accessoires & divers"
     },
-    "exampleFromSearch": "Estimation pour un colis de {kg} kg (poids de votre recherche) : ≈ {price} tout compris · prix définitif à la réservation"
+    "exampleFromSearch": "Estimation pour un colis de {kg} kg (poids de votre recherche) : ≈ {price} tout compris · prix définitif à la réservation",
+    "estimateLabel": "Estimation",
+    "estimateLabel2": "Estimation pour un colis de {kg} kg",
+    "estimateLabelFromSearch": "Estimation pour votre colis de {kg} kg (poids de votre recherche)",
+    "allIn": "tout compris (transport + service Yamba)",
+    "finalAtBooking": "Le prix définitif est fixé à la réservation."
   }
 }
