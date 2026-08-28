@@ -213,8 +213,15 @@ export const createTripSchema = z
       });
     }
 
-    // Publish-only validation: categories
-    if (!data.acceptedCategories || data.acceptedCategories.length === 0) {
+    // Publish-only validation: categories — legacy PER_CATEGORY only.
+    // A28 : un trajet PER_KG complet (prix + capacité) n'a plus de catégories
+    // (la famille D14 remplace la catégorie) — le gate pricing-gate.ts tranche.
+    const perKgComplete =
+      typeof data.pricePerKgCents === "number" &&
+      data.pricePerKgCents > 0 &&
+      typeof data.capacityKg === "number" &&
+      data.capacityKg > 0;
+    if (!perKgComplete && (!data.acceptedCategories || data.acceptedCategories.length === 0)) {
       ctx.addIssue({
         code: "custom",
         message: "At least one accepted category is required to publish.",

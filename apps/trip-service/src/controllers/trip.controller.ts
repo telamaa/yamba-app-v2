@@ -874,19 +874,21 @@ export const publishTrip = async (
     if (!trip.departureAt) {
       return next(new ValidationError("Departure date is required to publish."));
     }
-    if (!trip.acceptedCategories || trip.acceptedCategories.length === 0) {
-      return next(new ValidationError("At least one parcel category must be accepted."));
-    }
-
     // ⭐ A28 — UN moteur de pricing COMPLET est exige pour publier.
-    if (
-      resolvePricingEngine({
-        pricePerKgCents: trip.pricePerKgCents,
-        capacityKg: trip.capacityKg,
-        categoryConditions: trip.categoryConditions as unknown[],
-      }) === null
-    ) {
+    const pricingEngine = resolvePricingEngine({
+      pricePerKgCents: trip.pricePerKgCents,
+      capacityKg: trip.capacityKg,
+      categoryConditions: trip.categoryConditions as unknown[],
+    });
+    if (pricingEngine === null) {
       return next(new ValidationError(PRICING_GATE_MESSAGE));
+    }
+    // Les categories n'existent que pour le moteur legacy (la famille D14 les remplace)
+    if (
+      pricingEngine === "PER_CATEGORY" &&
+      (!trip.acceptedCategories || trip.acceptedCategories.length === 0)
+    ) {
+      return next(new ValidationError("At least one parcel category must be accepted."));
     }
 
     // ⭐ Locations gate
