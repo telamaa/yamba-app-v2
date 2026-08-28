@@ -24,7 +24,7 @@
 ## 3. Conventions
 
 - Français pour les docs, anglais pour les surfaces publiques (OpenAPI, messages d'erreur API).
-- Les **captures d'écran** de revue vivent dans `context/fiches-pr/<PR>/captures/` (PNG, quelques Mo par PR — acceptable ; si le dépôt grossit trop, passer par Git LFS).
+- Les **captures d'écran** de revue se déposent dans `context/fiches-pr/<PR>/captures/` mais **ne sont jamais versionnées** (`.gitignore`) : c'est un canal d'échange local, pas de la documentation.
 - Les évolutions de `context/` se commitent **sur la branche de la PR concernée**, jamais sur une branche à part.
 
 ## 4. Vérification
