@@ -104,7 +104,7 @@ export default function BookingMobile({ trip, onCloseAction }: Props) {
 
       <BookingStepperMobile current={step} />
 
-      <div className="flex-1 overflow-y-auto pb-4">
+      <div className="flex-1 overflow-y-auto pb-40">{/* pb-40 : la barre basse (total + CTA) recouvre ~150 px — le dernier bloc doit rester atteignable */}
         {step === 1 && (
           <StepParcel
             trip={trip}

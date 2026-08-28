@@ -64,7 +64,7 @@
     "size": {
       "label": "Size — no need to measure",
       "hint": "By eye: the coefficient applies to the price per kg.",
-      "S": "from an envelope to a shoe box",
+      "S": "envelope → shoe box",
       "M": "fits in a cabin bag",
       "L": "takes half a suitcase"
     }
