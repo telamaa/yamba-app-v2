@@ -55,6 +55,8 @@ export type YambaTripResultDto = {
   stopoverCity?: string;
   minPrice: number;
   pricesByCategory: Record<string, number>;
+  pricePerKg?: number | null;    // D13 — euros/kg, null = legacy
+  remainingKg?: number | null;   // CAP-02 — capacityKg − reservedKg
   currency: string;              // "€", "$", etc.
   transportMode: UiTransportMode;
   allowedCategories: UiParcelCategory[];
@@ -259,6 +261,12 @@ export function mapTripToYambaResult(
     pricesByCategory[uiCategory] = cond.priceAmountCents / 100;
   }
   const minPrice = trip.minPriceCents != null ? trip.minPriceCents / 100 : 0;
+  // Moteur PER_KG (D13) — prime sur le legacy quand présent
+  const pricePerKg = trip.pricePerKgCents != null && trip.pricePerKgCents > 0 ? trip.pricePerKgCents / 100 : null;
+  const remainingKg =
+    trip.capacityKg != null && trip.capacityKg > 0
+      ? Math.max(0, trip.capacityKg - (trip.reservedKg ?? 0))
+      : null;
 
   // ─── Stopovers ─────────────────────────────────────
   let stopoverCities: string[] = [];
@@ -337,6 +345,8 @@ export function mapTripToYambaResult(
     stopoverCity,
     minPrice,
     pricesByCategory,
+    pricePerKg,
+    remainingKg,
     currency: symbolFor(trip.currencyCode),
     transportMode: transportModeDbToUi(trip.transportMode),
     allowedCategories: trip.acceptedCategories.map(parcelCategoryDbToUi),

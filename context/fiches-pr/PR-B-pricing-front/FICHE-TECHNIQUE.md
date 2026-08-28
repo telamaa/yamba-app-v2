@@ -242,6 +242,20 @@ Les tests ciblent `issues` par `path` plutôt que `success` global, pour ne pas 
 
 ---
 
+## 7bis. Recherche et page détail : afficher le prix au kilo (retour QA)
+
+Symptôme : un trajet PER_KG fraîchement créé affichait **« 0 € »** dans les résultats de recherche et sur sa page détail. Cause : ces écrans lisent `minPriceCents` (dénormalisé depuis les prix par catégorie), qui est `null` pour un trajet au kilo → `0`.
+
+Correctif, de l'API au pixel :
+- **Contrat** `trip-search.schema.ts` : `YambaTripResult` gagne `pricePerKg` (euros, null = legacy) et `remainingKg` (capacité − réservé, dérivé) → `openapi.json` régénéré (`npm run generate:openapi`, check CI « contracts »).
+- **Mapper** `apps/trip-service/src/lib/trip-mappers.ts` : les deux champs calculés depuis `pricePerKgCents`, `capacityKg`, `reservedKg`.
+- **DTO public** `GET /trips/:id/public` (`trip.controller.ts`) : expose `pricePerKgCents`, `capacityKg`, `reservedKg`, `remainingKg`, les forfaits bagages et `familyConditions` (déjà prévus par `trip-public.schema.ts` en PR-A, jamais branchés).
+- **Front** : `YambaTripResult` et `PublicTrip` étendus ; `getPricePerKgCents()` dans `public-trip.helpers.ts` ; `TripResultCard` / `TripResultCardMobile` affichent **« 12,00 €/kg »** + « N kg dispo » (teal) au lieu de « dès 0 € » et n'ouvrent plus le popover par catégorie ; `BookingSummaryCard` / `BookingMobileBar` idem avec le sous-titre « N kg encore disponibles · l'Expéditeur paie poids × prix » ; le dashboard (`TripDetails`) ajoute une ligne €/kg dans « Tarifs ».
+
+**Le créateur sur sa propre page publique** : `TripDetailView` compare `user.id` (hook `useUser`) à `trip.tripper.id` ; s'ils coïncident, la carte « Réserver » est remplacée par une carte **« C'est votre trajet »** avec **Modifier le trajet** (→ `/trips/create?edit=<id>`, le même écran que depuis le dashboard) et « Gérer dans mon tableau de bord ». Même chose dans la barre mobile. Un Voyageur ne se réserve pas lui-même.
+
+Note : la recherche triée par « prix le plus bas » exclut toujours les trajets sans `minPriceCents` (choix 4 de PR-A : moteurs incomparables) — les trajets PER_KG restent visibles dans les autres tris ; la comparabilité est le chantier « PR search ».
+
 ## 8. Hors périmètre mais dans la branche : le fix `next.config.js`
 
 Pendant la session, `npm run user-ui` échouait : `Failed to process project graph … Could not find i18n config at ./src/i18n/request.ts`. Cause : `next-intl` résout un chemin relatif depuis `process.cwd()`, mais le plugin `@nx/next` évalue `apps/user-ui/next.config.js` depuis la **racine** du monorepo ; et Turbopack refuse un chemin absolu. Solution : `"./" + path.relative(process.cwd(), path.join(__dirname, "src/i18n/request.ts"))`, valable depuis la racine ET depuis `apps/user-ui`.

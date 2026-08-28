@@ -1171,6 +1171,16 @@ export const getPublicTrip: RequestHandler = async (req, res, next) => {
 
       minPriceCents: trip.minPriceCents,
 
+      // ⭐ Moteur PER_KG (D13/D14/D19) — contrat trip-public.schema.ts
+      pricePerKgCents: trip.pricePerKgCents,
+      capacityKg: trip.capacityKg,
+      reservedKg: trip.reservedKg,
+      remainingKg:
+        trip.capacityKg != null ? Math.max(0, trip.capacityKg - (trip.reservedKg ?? 0)) : null,
+      checkedBag23PriceCents: trip.checkedBag23PriceCents,
+      cabinBag12PriceCents: trip.cabinBag12PriceCents,
+      familyConditions: trip.familyConditions,
+
       ticketVerified: trip.ticketVerificationStatus === "VERIFIED",
 
       tripper: {
