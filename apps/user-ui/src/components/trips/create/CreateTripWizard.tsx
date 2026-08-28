@@ -33,7 +33,8 @@ const EMPTY_ERRORS: ValidationErrors = {};
 // IMPORTANT: doit rester identique à CreateTripMobile.tsx (même clé sessionStorage).
 //   v1 → initial
 //   v2 → ajout pickupLocations/deliveryLocations, suppression handoff/pickup moments
-const DRAFT_VERSION = 2;
+// v3 : moteur PER_KG (PR-B) — les brouillons v2 (catégories legacy) sont abandonnés
+const DRAFT_VERSION = 3;
 
 export default function CreateTripWizard() {
   const { lang } = useUiPreferences();

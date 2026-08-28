@@ -61,7 +61,7 @@ export default function StepReview({
 
   const optionsList: string[] = [];
   if (draft.handDeliveryOnly) optionsList.push(copy.handOnly);
-  if (draft.instantBooking) optionsList.push(copy.instantBooking);
+  // D20 v1 : l'option instantanée n'est plus proposée — jamais affichée
 
   const pickupSummary = summarizeLocations(draft.pickupLocations, copy, isFr);
   const deliverySummary = summarizeLocations(draft.deliveryLocations, copy, isFr);
@@ -230,8 +230,8 @@ export default function StepReview({
         </ReviewCard>
       )}
 
-      {/* Legacy PER_CATEGORY — visible seulement en édition d'un trajet existant */}
-      {draft.acceptedCategories.length > 0 && (
+      {/* Legacy PER_CATEGORY — seulement si AUCUNE offre PER_KG (trajet ancien non migré) */}
+      {draft.acceptedCategories.length > 0 && !(typeof draft.pricePerKg === "number" && draft.pricePerKg > 0) && (
       <ReviewCard
         label={copy.reviewCategoryConditions}
         onEdit={() => onGoTo(2)}

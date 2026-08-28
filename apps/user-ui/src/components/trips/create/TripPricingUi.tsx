@@ -77,8 +77,16 @@ export function IconBadge({ icon: Icon, muted }: { icon: LucideIcon; muted?: boo
 
 export function InfoHint({ label, children }: { label: string; children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
+  const [alignRight, setAlignRight] = useState(false);
   const ref = useRef<HTMLSpanElement>(null);
   const id = useId();
+
+  // Ancré à gauche par défaut ; à droite si le popover (20rem) déborderait
+  const toggle = () => {
+    const r = ref.current?.getBoundingClientRect();
+    if (r) setAlignRight(r.left + 320 > window.innerWidth - 16);
+    setOpen((o) => !o);
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -103,7 +111,7 @@ export function InfoHint({ label, children }: { label: string; children: React.R
         aria-controls={id}
         onClick={(e) => {
           e.stopPropagation();
-          setOpen((o) => !o);
+          toggle();
         }}
         className="-m-2 flex h-9 w-9 items-center justify-center rounded-full text-slate-400 transition-colors hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300"
       >
@@ -113,7 +121,7 @@ export function InfoHint({ label, children }: { label: string; children: React.R
         <span
           id={id}
           role="tooltip"
-          className="absolute left-0 top-full z-20 mt-1 w-[min(20rem,calc(100vw-3rem))] rounded-xl border border-slate-200 bg-white p-3 text-[12px] font-normal normal-case tracking-normal leading-relaxed text-slate-600 shadow-lg animate-[fadeSlide_0.15s_ease] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+          className={`absolute ${alignRight ? "right-0" : "left-0"} top-full z-20 mt-1 w-[min(20rem,calc(100vw-3rem))] rounded-xl border border-slate-200 bg-white p-3 text-[12px] font-normal normal-case tracking-normal leading-relaxed text-slate-600 shadow-lg animate-[fadeSlide_0.15s_ease] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300`}
         >
           {children}
         </span>

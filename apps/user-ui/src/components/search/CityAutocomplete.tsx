@@ -126,7 +126,16 @@ export default function CityAutocomplete({
 
   const select = useCallback(
     async (p: google.maps.places.PlacePrediction) => {
-      const label = p.text?.text ?? "";
+      // Libellé normalisé « Ville, Pays » : Google omet le pays du domicile
+      // (« Paris » mais « Amsterdam, Pays-Bas ») — on le rétablit toujours.
+      const main = p.mainText?.text ?? "";
+      const secondary = p.secondaryText?.text ?? "";
+      const country = secondary.split(",").map((x) => x.trim()).filter(Boolean).pop() ?? "";
+      const label = main
+        ? country && country !== main
+          ? `${main}, ${country}`
+          : main
+        : (p.text?.text ?? "");
       hasSelectedRef.current = true;
 
       action(label);
@@ -200,6 +209,8 @@ export default function CityAutocomplete({
           const { suggestions } = await AutocompleteSuggestion.fetchAutocompleteSuggestions({
             input: value,
             language,
+            // Villes et aéroports uniquement : plus de « Paris 13 », de rues ni de POI
+            includedPrimaryTypes: ["locality", "airport"],
             ...(regionBias ? { region: regionBias } : {}),
             sessionToken: sessionTokenRef.current,
           });
