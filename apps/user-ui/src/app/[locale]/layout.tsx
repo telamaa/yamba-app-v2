@@ -1,7 +1,6 @@
 import { NextIntlClientProvider, hasLocale } from "next-intl";
 import { notFound } from "next/navigation";
 import { setRequestLocale } from "next-intl/server";
-import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import Header from "@/components/layout/Header";
 import { UiPreferencesProvider } from "@/components/providers/UiPreferencesProvider";
 import { ToastProvider } from "@/components/ui/Toast";
@@ -59,16 +58,15 @@ export default async function LocaleLayout({
   return (
     <NextIntlClientProvider>
       <Providers>
-        <ThemeProvider>
-          <UiPreferencesProvider>
-            <ToastProvider>
-              <Header />
-              <div className="min-h-screen bg-slate-50 pt-[78px] dark:bg-slate-950">
-                {children}
-              </div>
-            </ToastProvider>
-          </UiPreferencesProvider>
-        </ThemeProvider>
+        {/* ThemeProvider : dans app/layout.tsx (root) — voir la note là-bas */}
+        <UiPreferencesProvider>
+          <ToastProvider>
+            <Header />
+            <div className="min-h-screen bg-slate-50 pt-[78px] dark:bg-slate-950">
+              {children}
+            </div>
+          </ToastProvider>
+        </UiPreferencesProvider>
       </Providers>
     </NextIntlClientProvider>
   );
