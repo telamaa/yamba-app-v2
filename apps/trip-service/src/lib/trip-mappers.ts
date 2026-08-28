@@ -57,6 +57,8 @@ export type YambaTripResultDto = {
   pricesByCategory: Record<string, number>;
   pricePerKg?: number | null;    // D13 — euros/kg, null = legacy
   remainingKg?: number | null;   // CAP-02 — capacityKg − reservedKg
+  /** D14 — positions ≠ ACCEPT seulement (compact) */
+  familyConditions?: Array<{ familyKey: string; mode: "SURCHARGE" | "REFUSE"; surchargePct?: number | null }>;
   currency: string;              // "€", "$", etc.
   transportMode: UiTransportMode;
   allowedCategories: UiParcelCategory[];
@@ -347,6 +349,9 @@ export function mapTripToYambaResult(
     pricesByCategory,
     pricePerKg,
     remainingKg,
+    familyConditions: ((trip.familyConditions ?? []) as Array<{ familyKey: string; mode: string; surchargePct?: number | null }>)
+      .filter((c) => c.mode !== "ACCEPT")
+      .map((c) => ({ familyKey: c.familyKey, mode: c.mode as "SURCHARGE" | "REFUSE", surchargePct: c.surchargePct ?? null })),
     currency: symbolFor(trip.currencyCode),
     transportMode: transportModeDbToUi(trip.transportMode),
     allowedCategories: trip.acceptedCategories.map(parcelCategoryDbToUi),

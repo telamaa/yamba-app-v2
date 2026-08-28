@@ -5,16 +5,20 @@ import { ChevronRight, AlertCircle, HelpCircle } from "lucide-react";
 import { Link } from "@/i18n/navigation";
 import { useBottomSheet } from "@/hooks/useBottomSheet";
 import TripPricingBottomSheet from "./TripPricingBottomSheet";
-import { ParcelCategory, YambaTripResult } from "./search-results.types";
+import { ParcelCategory, SearchFamily, YambaTripResult } from "./search-results.types";
+import { SurchargePills } from "./SurchargePills";
 
 type Props = {
   item: YambaTripResult;
   highlightedCategories?: ParcelCategory[];
+  /** D33 — familles filtrées : on affiche le supplément éventuel du Voyageur */
+  highlightedFamilies?: SearchFamily[];
 };
 
 export default function YambaTripResultCardMobile({
                                                     item,
                                                     highlightedCategories = [],
+                                         highlightedFamilies = [],
                                                   }: Props) {
   const t = useTranslations("search");
   const { isOpen, open, close } = useBottomSheet();
@@ -136,6 +140,7 @@ export default function YambaTripResultCardMobile({
                       {t("card.remainingKg", { kg: item.remainingKg })}
                     </div>
                   )}
+                  <SurchargePills conditions={item.familyConditions} highlightedFamilies={highlightedFamilies} size="[9px]" />
                 </>
               ) : (
                 <>

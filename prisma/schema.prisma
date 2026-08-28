@@ -440,6 +440,10 @@ model Trip {
 
   minPriceCents Int?
 
+  /// D33 — coût de transport d'un colis de référence 2 kg (cents), dénormalisé
+  /// pour trier/comparer PER_KG et legacy ensemble. Recalculé à chaque écriture.
+  comparablePriceCents Int?
+
   carrierRatingSnapshot Float?
 
   ticketVerificationStatus TicketVerificationStatus @default(NOT_SUBMITTED)
@@ -492,6 +496,7 @@ model Trip {
   @@index([destinationPlaceId])
   @@index([status, departureAt, transportMode])
   @@index([minPriceCents])
+  @@index([comparablePriceCents])
   @@index([carrierRatingSnapshot])
   @@index([departureHourLocal])
   @@index([originCity])

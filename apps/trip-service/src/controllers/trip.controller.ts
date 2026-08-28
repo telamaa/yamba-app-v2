@@ -29,6 +29,7 @@ import {
   pickPerKgFields,
 } from "../services/pricing-gate";
 import { chunkUpdateData } from "../lib/mongo-update-chunks";
+import { computeComparablePriceCents } from "../lib/comparable-price";
 
 // ─────────────────────────────────────────────
 // Helper interne : recalcule les champs dénormalisés
@@ -36,19 +37,25 @@ import { chunkUpdateData } from "../lib/mongo-update-chunks";
 
 function computeDenormalizedFields(input: {
   categoryConditions?: Array<{ priceAmountCents: number }>;
+  pricePerKgCents?: number | null;
   departureAt?: Date | null;
   originTimezone?: string | null;
-}): { minPriceCents: number | null; departureHourLocal: number | null } {
+}): { minPriceCents: number | null; comparablePriceCents: number | null; departureHourLocal: number | null } {
   const minPriceCents = computeMinPriceCents(
     (input.categoryConditions ?? []) as any
   );
+  // D33 — prix comparable (colis de référence 2 kg), PER_KG prime
+  const comparablePriceCents = computeComparablePriceCents({
+    pricePerKgCents: input.pricePerKgCents,
+    minPriceCents,
+  });
   const departureHourLocal =
     input.departureAt && input.originTimezone
       ? computeHourLocal(input.departureAt, input.originTimezone)
       : input.departureAt
         ? computeHourLocal(input.departureAt, "Europe/Paris")
         : null;
-  return { minPriceCents, departureHourLocal };
+  return { minPriceCents, comparablePriceCents, departureHourLocal };
 }
 
 // ─────────────────────────────────────────────
@@ -166,8 +173,9 @@ export const createTrip = async (
       }
     }
 
-    const { minPriceCents, departureHourLocal } = computeDenormalizedFields({
+    const { minPriceCents, comparablePriceCents, departureHourLocal } = computeDenormalizedFields({
       categoryConditions: data.categoryConditions,
+      pricePerKgCents: data.pricePerKgCents,
       departureAt: data.departureAt ?? null,
       originTimezone: data.originTimezone ?? null,
     });
@@ -249,6 +257,7 @@ export const createTrip = async (
         notes: data.notes ?? null,
 
         minPriceCents,
+        comparablePriceCents,
         departureHourLocal,
         carrierRatingSnapshot,
         publishedAt: shouldPublish ? new Date() : null,
@@ -318,16 +327,21 @@ export const updateTrip = async (
       if (value !== undefined) updateData[key] = value;
     }
 
-    const willRecomputePrice = "categoryConditions" in updateData;
+    const willRecomputePrice =
+      "categoryConditions" in updateData || "pricePerKgCents" in updateData;
     const willRecomputeHour = "departureAt" in updateData || "originTimezone" in updateData;
 
     if (willRecomputePrice || willRecomputeHour) {
       const recomputed = computeDenormalizedFields({
         categoryConditions: updateData.categoryConditions ?? (trip.categoryConditions as any),
+        pricePerKgCents: updateData.pricePerKgCents ?? trip.pricePerKgCents,
         departureAt: updateData.departureAt ?? trip.departureAt,
         originTimezone: updateData.originTimezone ?? trip.originTimezone,
       });
-      if (willRecomputePrice) updateData.minPriceCents = recomputed.minPriceCents;
+      if (willRecomputePrice) {
+        updateData.minPriceCents = recomputed.minPriceCents;
+        updateData.comparablePriceCents = recomputed.comparablePriceCents;
+      }
       if (willRecomputeHour) updateData.departureHourLocal = recomputed.departureHourLocal;
     }
 

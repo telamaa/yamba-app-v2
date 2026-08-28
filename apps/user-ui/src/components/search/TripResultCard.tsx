@@ -30,9 +30,11 @@ import { useTranslations, useLocale } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import {
   ParcelCategory,
+  SearchFamily,
   TransportMode,
   YambaTripResult,
 } from "./search-results.types";
+import { SurchargePills } from "./SurchargePills";
 import { formatLocation } from "./formatTripTimes";
 import TripPricingPopover from "./TripPricingPopover";
 
@@ -40,6 +42,8 @@ type Props = {
   item: YambaTripResult;
   maxVisibleCategories?: number;
   highlightedCategories?: ParcelCategory[];
+  /** D33 — familles filtrées : on affiche le supplément éventuel du Voyageur */
+  highlightedFamilies?: SearchFamily[];
 };
 
 function TransportIcon({ mode, size = 13 }: { mode: TransportMode; size?: number }) {
@@ -81,6 +85,7 @@ export default function TripResultCard({
                                          item,
                                          maxVisibleCategories = 3,
                                          highlightedCategories = [],
+                                         highlightedFamilies = [],
                                        }: Props) {
   const t = useTranslations("search");
   const tCategories = useTranslations("search.categories");
@@ -321,6 +326,7 @@ export default function TripResultCard({
               {t("card.remainingKg", { kg: item.remainingKg })}
             </div>
           )}
+          <SurchargePills conditions={item.familyConditions} highlightedFamilies={highlightedFamilies} />
           {isPerKg && (
             <div className="mt-0.5 text-[10px] text-slate-400 dark:text-slate-500">
               {t("card.example", {

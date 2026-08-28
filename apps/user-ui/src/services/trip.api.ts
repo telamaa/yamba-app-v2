@@ -5,6 +5,7 @@ import type {
   TransportMode,
   DepartureTimeBucket,
   YambaTripResult,
+  SearchFamily,
 } from "@/components/search/search-results.types";
 
 // ─── Types ──────────────────────────────────────────
@@ -21,6 +22,8 @@ export type SearchTripsParams = {
   instantBooking?: boolean;
   verifiedTicket?: boolean;
   categories?: ParcelCategory[];
+  /** D33 — familles demandées : exclut les trajets qui en refusent une */
+  families?: SearchFamily[];
   departureBuckets?: DepartureTimeBucket[];
   cursor?: string | null;
   limit?: number;
@@ -40,6 +43,7 @@ export type SearchFacetsParams = {
   dateFrom?: SearchTripsParams["dateFrom"];
   dateTo?: SearchTripsParams["dateTo"];
   categories?: SearchTripsParams["categories"];
+  families?: SearchTripsParams["families"];
   departureBuckets?: SearchTripsParams["departureBuckets"];
   locale?: SearchTripsParams["locale"];
 };
@@ -51,6 +55,8 @@ export type SearchFacets = {
   profileVerifiedCount: number;
   instantBookingCount: number;
   verifiedTicketCount: number;
+  /** D33 — par famille : trajets qui NE la refusent PAS */
+  familyCounts?: Partial<Record<SearchFamily, number>>;
 };
 
 // ─── Helpers ────────────────────────────────────────
@@ -75,6 +81,7 @@ function buildQueryString(params: SearchTripsParams): string {
   if (params.verifiedTicket) qs.set("verifiedTicket", "true");
 
   if (params.categories?.length) qs.set("categories", params.categories.join(","));
+  if (params.families?.length) qs.set("families", params.families.join(","));
   if (params.departureBuckets?.length)
     qs.set("departureBuckets", params.departureBuckets.join(","));
 
