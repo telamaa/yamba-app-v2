@@ -18,6 +18,7 @@ import {
   Wrench,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { MIN_PARCEL_PRICE_EUR } from "@/lib/pricing-example";
 import {
   SEARCH_FAMILIES,
   type DepartureTimeBucket,
@@ -475,6 +476,9 @@ export default function SearchFiltersSidebar({
           />
           <p className="text-[11px] leading-snug text-slate-400 dark:text-slate-500">
             {weightKg ? t("filters.weightHintActive", { kg: weightKg }) : t("filters.weightHint")}
+          </p>
+          <p className="text-[11px] leading-snug text-slate-400 dark:text-slate-500">
+            {t("filters.lightParcel", { min: MIN_PARCEL_PRICE_EUR })}
           </p>
         </div>
 

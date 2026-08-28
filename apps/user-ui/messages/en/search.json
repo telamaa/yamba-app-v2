@@ -41,7 +41,8 @@
     "weight": "Parcel weight",
     "weightHint": "Set the weight: every trip will show its price for your parcel.",
     "weightHintActive": "Price and sort computed for {kg} kg · trips without enough room excluded",
-    "lowestPriceHintWeight": "for your {kg} kg parcel"
+    "lowestPriceHintWeight": "for your {kg} kg parcel",
+    "lightParcel": "Light parcel (envelope, passport, glasses…): €{min} minimum."
   },
   "departureTimes": {
     "morning": "Morning",

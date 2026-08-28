@@ -85,7 +85,8 @@
     "perKg": "Price per kg",
     "perKgHint": "{kg} kg still available · the sender pays weight × price",
     "perKgHintNoCap": "The sender pays weight × price per kg",
-    "example": "Estimate: a {kg} kg parcel ≈ {price} all-in (transport + Yamba service)"
+    "example": "Estimate: a {kg} kg parcel ≈ {price} all-in (transport + Yamba service)",
+    "lightParcel": "Light parcel: €{min} minimum."
   },
   "notFound": {
     "title": "Trip not found",
@@ -131,6 +132,7 @@
     "estimateLabel2": "Estimate for a {kg} kg parcel",
     "estimateLabelFromSearch": "Estimate for your {kg} kg parcel (weight from your search)",
     "allIn": "all-in (transport + Yamba service)",
-    "finalAtBooking": "The final price is set at booking."
+    "finalAtBooking": "The final price is set at booking.",
+    "lightParcel": "Light parcel (envelope, passport, glasses…): €{min} minimum, whatever the weight."
   }
 }

@@ -120,6 +120,10 @@ export function getCreateTripCopy(isFr: boolean): CreateTripCopy {
     factorBase: (v: string) => (isFr ? `Base du corridor : ${v} €/kg` : `Corridor base: ${v} €/kg`),
     factorDirectFlight: isFr ? "Vol direct" : "Direct flight",
     factorDepartureSoon: isFr ? "Départ imminent (moins de temps pour remplir)" : "Departure soon (less time to fill)",
+    minParcelPrice: (min: number) =>
+      isFr
+        ? `Colis léger (enveloppe, passeport, lunettes…) : aucun envoi ne te rapporte moins de ${min} €, quel que soit son poids.`
+        : `Light parcel (envelope, passport, glasses…): no shipment earns you less than €${min}, whatever its weight.`,
     priceHint: isFr
       ? "Un seul prix pour tout le trajet : l'Expéditeur paie poids × prix au kilo. La famille du colis ne change pas ce prix."
       : "One price for the whole trip: the sender pays weight × price per kg. The parcel family never changes it.",
