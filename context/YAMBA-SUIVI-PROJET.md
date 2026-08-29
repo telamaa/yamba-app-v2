@@ -11,7 +11,7 @@
 | **Jalon 1 — Boucle transactionnelle** (réserver, payer, livrer, noter) | socle + pricing + B1 faits ; B2 → B5 restent | **~55 %** |
 | **Jalon 2 — Plateforme opérable** (admin, sessions, intégrations) — *constitutif du lancement* | non commencé (sauf CI/OpenAPI) | ~10 % |
 | **Jalon 3 — Expansion** (chat, locales, reco) | non commencé | 0 % |
-| **Jalon 4 — Application mobile : socle + Android** (React Native/Expo, code partagé, Play Store) | non commencé — D36 à graver | 0 % |
+| **Jalon 4 — Application mobile : socle + Android** (React Native/Expo, code partagé, Play Store) | non commencé — D36 gravée (Expo) | 0 % |
 | **Jalon 5 — iOS** (même base, spécificités Apple, App Store) | non commencé | 0 % |
 
 Lancement public = fin du Jalon 2. Fourchette tenue au dernier handoff : **5–8 semaines** de sessions (optimiste ≈ 10,5 / réaliste ≈ 16 sessions restantes sur le Jalon 1 avant cette journée ; aujourd'hui ≈ 3 sessions consommées : PR-B, search, PR-C).
@@ -94,7 +94,7 @@ message-service :6005 (chat Socket.io, coordination pickup) · fin i18n (ES puis
 
 | Élément | Statut | Réf. |
 |---|---|---|
-| **D36 à graver** : stack React Native + Expo (TypeScript, Expo Router), une base pour les deux OS ; réutilisation de `@packages/pricing`, `@packages/api-contracts`, client généré depuis l'OpenAPI (D3), messages i18n JSON | ⬜ décision | D3, D34 |
+| **D36 gravée (Expo)** : stack React Native + Expo (TypeScript, Expo Router), une base pour les deux OS ; réutilisation de `@packages/pricing`, `@packages/api-contracts`, client généré depuis l'OpenAPI (D3), messages i18n JSON | ⬜ décision | D3, D34 |
 | Fondations : auth par tokens (refresh sans cookies), stockage sécurisé, push (Expo Notifications ↔ notification-service), deep links, thème mango/teal | ⬜ | — |
 | Parcours Expéditeur : recherche (poids, familles), page trajet, réservation 4 étapes (Stripe Payment Sheet), suivi, code de livraison, notation | ⬜ | RG-S/RG-C |
 | Parcours Voyageur : création de trajet PER_KG, deals reçus, accept/decline, pickup (checklist, photos caméra), livraison (code) | ⬜ | RG-B |

@@ -48,7 +48,7 @@ Ordre de demarrage : auth -> trip -> gateway.
 - Jalon 4 — Application mobile, socle + Android : une seule base React Native /
   Expo (TypeScript) reutilisant @packages/pricing, @packages/api-contracts et
   le client genere depuis l'OpenAPI (D3) ; parcours Expediteur et Voyageur ;
-  publication Google Play (D36 candidat : stack et perimetre).
+  publication Google Play (D36 (gravée) : stack et perimetre).
 - Jalon 5 — iOS : meme base, specificites Apple (Sign in with Apple, Apple Pay,
   review App Store, TestFlight), publication App Store.
 
