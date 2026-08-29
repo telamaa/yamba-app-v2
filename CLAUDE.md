@@ -13,7 +13,7 @@ Before any non-trivial task, read in this order:
 1. `context/YAMBA-CONTEXT.md` — done / remaining / non-negotiable rules.
 2. `context/YAMBA-SPECIFICATION-COMPLETE.md` — end-to-end spec (domain, state machines, pricing, events, security, roadmap).
 3. The latest `context/YAMBA-CONTEXT-HANDOFF-*.md` — exact state of the current worksite.
-4. Per task: `context/YAMBA-REGISTRE-DECISIONS-ROADMAP-v1.3.md` (**the master document** — decisions D1–D36 (D35 candidate); architecture decisions are recorded there BEFORE code, never after), `context/YAMBA-REGLES-METIER-V2.md` (~50 business rules), `context/mockup-pricing-yamba.html` (pricing form spec).
+4. Per task: `context/YAMBA-REGISTRE-DECISIONS-ROADMAP-v1.3.md` (**the master document** — decisions D1–D38 (D35 candidate); architecture decisions are recorded there BEFORE code, never after), `context/YAMBA-REGLES-METIER-V2.md` (~50 business rules), `context/mockup-pricing-yamba.html` (pricing form spec).
 
 Precedence on divergence: code + its tests > registre > business rules > syntheses in `context/`. `docs/` also contains detailed French functional + technical specs (booking shipper wizard, carrier deal request) — read the relevant `YAMBA-DOC-TECHNIQUE-*.md` before evolving those features.
 
@@ -41,7 +41,7 @@ npx prisma db push                 # sync schema to MongoDB (no migrations — M
 npm run auth-docs                  # regenerate auth swagger-output.json (swagger-autogen — legacy, conversion to Zod-OpenAPI is backlog)
 ```
 
-Test platform baseline: **433 tests** (trip-service 187, deal-service 225, notification-service 21) — any deviation must be explained.
+Test platform baseline: **457 tests** (trip-service 187, deal-service 249, notification-service 21) — any deviation must be explained.
 
 Manual `tsc` (when Nx typecheck target is not what you want): `npx tsc --noEmit --project apps/<service>/tsconfig.app.json` — NEVER `--project apps/<service>` (resolves the solution-style tsconfig: 0 files checked).
 
@@ -75,6 +75,7 @@ Requests flow: `user-ui (3000)` → `api-gateway (8080)` → microservices. The 
 - `packages/middleware` — `isAuthenticated`, `isOptionallyAuthenticated`, `authorizeRoles` (JWT from `access_token` cookie or Bearer header)
 - `packages/error-handler`
 - `packages/api-contracts` — Zod schemas + shared status sets, single source for OpenAPI; alias declared BEFORE the `@packages/*` wildcard in `tsconfig.base.json`
+- `packages/libs/payments` — `PaymentProvider` abstraction (D11/D38): Stripe (manual capture) + Fake (dev/tests, refused in production); factory from env
 - `packages/messaging` — `EventPublisher` interface; kafkajs isolated here (connection errors come back `retriable: false` — intercept explicitly)
 
 ### Auth flow

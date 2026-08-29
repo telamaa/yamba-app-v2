@@ -52,7 +52,6 @@ export type FamilyStance = { mode: "ACCEPT" | "SURCHARGE" | "REFUSE"; surchargeP
 export type SizeClass = "S" | "M" | "L";
 /** PRC-04 — ce qu'on envoie : un colis au kilo, ou un bagage entier forfaitaire */
 export type ParcelProduct = "PARCEL" | "CHECKED_BAG_23KG" | "CABIN_BAG_12KG";
-export type PaymentMethod = "CARD" | "APPLE_PAY" | "GOOGLE_PAY";
 export type PhotoContext = "DECLARED_CONTENT" | "DECLARED_PACKAGED" | "CUSTOM";
 
 export type ParcelPhoto = {
@@ -168,8 +167,6 @@ export type Draft = {
 
   charterAccepted: boolean;
   termsAccepted: boolean;
-
-  paymentMethod: PaymentMethod;
 };
 
 // ============================================================
@@ -209,14 +206,40 @@ export type ValidationErrors = Partial<{
   recipientEmail: string;
   charterAccepted: string;
   termsAccepted: string;
-  paymentMethod: string;
 }>;
 
 // ============================================================
-// API STUB
+// API (deal-service via gateway — B2, D37)
 // ============================================================
 
-export type CreateDealResponse = {
-  dealId: string;
-  paymentClientSecret?: string;
+/** Réponse de POST /deals/payment-intents */
+export type PaymentIntentInfo = {
+  provider: "STRIPE" | "FAKE";
+  paymentIntentId: string;
+  clientSecret: string | null;
+  amountCents: number;
+  currencyCode: string;
 };
+
+/** Réponse de POST /deals */
+export type CreateDealResponse = {
+  bookingId: string;
+  status: "PENDING";
+  expiresAt: string;
+  totalShipperCents: number;
+  currencyCode: string;
+};
+
+/** details.code d'un 409 du deal-service (+ codes locaux) — traduits dans step4.errors.* */
+export type BookingApiErrorCode =
+  | "QUOTE_DIVERGENCE"
+  | "CAPACITY_EXCEEDED"
+  | "FAMILY_REFUSED"
+  | "TRIP_NOT_BOOKABLE"
+  | "OWN_TRIP"
+  | "PAYMENT_NOT_AUTHORIZED"
+  | "PAYMENT_MISMATCH"
+  | "PAYMENT_ALREADY_USED"
+  | "UNAUTHENTICATED"
+  | "QUOTE_UNAVAILABLE"
+  | "GENERIC";

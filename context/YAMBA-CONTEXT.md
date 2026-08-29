@@ -84,7 +84,15 @@ Ordre de demarrage : auth -> trip -> gateway.
   hypotheses dans lib/pricing-corridors.ts), D32 annoncee a l'ecran.
 - Chores : #78 next-intl/Nx, #79 context/ versionne + CLAUDE.md, #80
   ThemeProvider root, #81 build prod repare (Suspense).
-- Plateforme de tests : 433 (trip 187, deal 225, notification 21) — post-#85.
+- B2-PR1 (naissance du deal, D37/D38) : `POST /deals/payment-intents` +
+  `POST /deals` (deal-service), `@packages/payments` (PaymentProvider D11 :
+  Stripe capture manuelle + Fake), devis serveur = moteur unique (409
+  QUOTE_DIVERGENCE), snapshot D17 enrichi (7 champs D34) + lieux de
+  remise/retrait, reservedKg atomique + 2 events outbox EN TRANSACTION,
+  wizard branche sur l'API (un seul Payment Element, A30), 24 tests.
+  Prouve de bout en bout sur Atlas + Stripe test (29,57 EUR autorises,
+  2 kg reserves, rejeu refuse).
+- Plateforme de tests : 457 (trip 187, deal 249, notification 21) — post-B2-PR1.
 
 ## Release et historique (28 aout 2026)
 
@@ -113,12 +121,13 @@ Ordre de demarrage : auth -> trip -> gateway.
   sticky (create-trip), cleanup legacy PER_CATEGORY + instantBooking.
 - Micro-PR D31 : gate Stripe/profil deplace de la publication vers
   l'acceptation + carrierPage/Stripe factices au seed.
-- B2 argent entrant : creation deal depuis le wizard, PaymentIntent
-  (autorisation -> capture a l'acceptation), accept/decline, cron expiration
-  24h, remboursements, PaymentProvider abstrait, writers outbox EN
-  TRANSACTION Mongo, payment-service :6008, media-service :6009,
-  SiteConfig commissionRate 0.12 + plancher 300 centimes (D16),
-  AES-256-GCM re-affichage code livraison, emails transactionnels.
+- B2 (suite) : PR2 accept/decline (capture / liberation de l'autorisation,
+  gate Stripe-profil deplace a l'acceptation D31, kg restitues CAP-02),
+  cron expiration 24 h (annulation de l'autorisation), annulation
+  Expediteur ANN-01 + remboursements ANN-04 ; PR3 emails transactionnels,
+  webhook Stripe (source de verite des etats de paiement), photos du colis
+  via media-service :6009, AES-256-GCM re-affichage code livraison,
+  SiteConfig commissionRate (D16). payment-service :6008 : NON (D38).
 - B3 transport : pickup (upload R2, code bcrypt, checklist conformite),
   refuse, tracking, deliver (compare + lock serveur), regeneration code.
 - B4 argent sortant : confirmation anticipee, cron J+4 -> COMPLETED +

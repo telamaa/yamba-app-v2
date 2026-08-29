@@ -579,6 +579,22 @@ type BookingPricingSnapshot {
 
   totalShipperCents Int
   currencyCode      String @default("EUR")
+  // D34 (B2) — devis figé tel quel depuis @packages/pricing ; optionnels
+  // car les snapshots antérieurs (seed PER_CATEGORY) ne les portent pas.
+  product            String? // "PARCEL" | "CHECKED_BAG_23KG" | "CABIN_BAG_12KG"
+  billableWeightKg   Float? // max(poids, 0,5) — D32
+  sizeCoef           Float? // 1 / 1,1 / 1,25
+  familySurchargePct Float? // supplément Voyageur de la famille (CAT-03)
+  rawTransportCents  Int? // avant plancher 8 €
+  minimumApplied     Boolean? // plancher D32 appliqué
+  serviceCents       Int? // commission + prime (COM-03, 2e ligne)
+}
+
+// B2 — lieu de remise / de retrait choisi par l'Expéditeur parmi les
+// points du trajet (figé : le trajet peut changer, le rendez-vous non).
+type BookingPlaceSnapshot {
+  kind    LocationKind
+  details String?
 }
 
 // Auto-suffisance : le trip peut changer, le booking garde sa vérité.
@@ -636,6 +652,8 @@ model Booking {
   pricing   BookingPricingSnapshot
   parcel    BookingParcelSnapshot
   recipient BookingRecipientSnapshot
+  pickupPlace   BookingPlaceSnapshot?
+  deliveryPlace BookingPlaceSnapshot?
 
   // ─── Jalons (horodatage SERVEUR) + échéances pré-calculées ───
   requestedAt   DateTime      @default(now())
@@ -659,7 +677,8 @@ model Booking {
   trackingEvents BookingTrackingEvent[]
 
   // ─── Paiement — colonnes prêtes, remplies en B2/B4 ───
-  paymentIntentId   String?
+  paymentIntentId   String? // référence PaymentProvider (D11) — autorisation manuelle, capture à l'acceptation
+  paymentProvider   String? // "STRIPE" | "FAKE" (dev/tests uniquement)
   capturedAt        DateTime?
   refundedAt        DateTime?
   refundAmountCents Int?

@@ -1,73 +1,116 @@
 /**
- * booking.api.ts
- * ==============
- * Frontend stubs for the booking flow.
- * When deal-service is implemented, replace each function's body
- * with a real `fetch()` through the gateway (port 8080).
+ * booking.api.ts — appels réels au deal-service via le gateway (B2, D37)
+ * ======================================================================
+ * Deux appels dans l'ordre :
+ *   1. createPaymentIntent — le serveur recalcule le devis (D34) et pose
+ *      l'empreinte (autorisation, débit à l'acceptation — D31).
+ *   2. createDeal — même saisie + paymentIntentId : le serveur re-vérifie
+ *      tout et crée le deal PENDING dans une transaction.
  *
- * The function signatures should not change — this keeps the swap
- * a one-line change in each function rather than a refactor of the UI.
+ * `expectedTotalCents` = ce que l'Expéditeur a VU (devis @packages/pricing).
+ * Si le serveur trouve autre chose → 409 QUOTE_DIVERGENCE : on rafraîchit,
+ * jamais un débit d'un montant non vu (D17).
  */
 
-import { computeTotal, recipientPhoneE164 } from "@/components/booking/booking.config";
+import axiosInstance from "@/lib/api-client";
+import { computeTotal, parseWeight, recipientPhoneE164 } from "@/components/booking/booking.config";
 import type {
+  BookingApiErrorCode,
   CreateDealResponse,
   Draft,
+  PaymentIntentInfo,
   PriceBreakdown,
   TripContext,
 } from "@/components/booking/booking.types";
 
-const SIMULATED_LATENCY_MS = 800;
+const KIND_TO_API: Record<string, "AIRPORT" | "TRAIN_STATION" | "CITY_AREA"> = {
+  AIRPORT: "AIRPORT",
+  TRAIN_STATION: "TRAIN_STATION",
+  BUS_STATION: "CITY_AREA",
+  ADDRESS: "CITY_AREA",
+};
 
-const wait = (ms: number): Promise<void> =>
-  new Promise((res) => setTimeout(res, ms));
+/** Erreur métier du deal-service (409 + details.code) — le composant traduit `code`. */
+export class BookingApiError extends Error {
+  readonly code: BookingApiErrorCode;
+  readonly status: number;
+  readonly details: Record<string, unknown>;
+  constructor(code: BookingApiErrorCode, status: number, message: string, details: Record<string, unknown> = {}) {
+    super(message);
+    this.code = code;
+    this.status = status;
+    this.details = details;
+  }
+}
 
-/**
- * Create a Deal in PENDING_CARRIER state.
- * Real implementation will POST /api/deals through the gateway.
- */
-export async function createDeal(
-  draft: Draft,
-  trip: TripContext
-): Promise<CreateDealResponse> {
-  // D17/D34 — le devis calculé par @packages/pricing part avec la demande ;
-  // le serveur (B2) recalcule avec le même moteur et refuse toute divergence.
-  const quote = computeTotal(draft, trip).quote;
-  const recipientPhone = recipientPhoneE164(draft); // E.164 — ce que le serveur recevra
-  // eslint-disable-next-line no-console
-  console.info("[booking.api.stub] createDeal", { draft, trip, quote, recipientPhone });
-  await wait(SIMULATED_LATENCY_MS);
+function toBookingError(e: unknown): BookingApiError {
+  const err = e as { response?: { status?: number; data?: { message?: string; details?: Record<string, unknown> } } };
+  const status = err.response?.status ?? 0;
+  const details = err.response?.data?.details ?? {};
+  const code = (typeof details.code === "string" ? details.code : status === 401 ? "UNAUTHENTICATED" : "GENERIC") as BookingApiErrorCode;
+  return new BookingApiError(code, status, err.response?.data?.message ?? "Booking request failed", details);
+}
 
+function quoteFields(draft: Draft, trip: TripContext, price: PriceBreakdown) {
+  if (!price.quote) throw new BookingApiError("QUOTE_UNAVAILABLE", 0, price.quoteError ?? "Quote unavailable");
   return {
-    dealId: `deal-mock-${Date.now()}`,
-    // paymentClientSecret will come from the real backend when wired.
+    tripId: trip.tripId,
+    product: draft.product,
+    family: draft.family,
+    sizeClass: draft.product === "PARCEL" ? draft.sizeClass : null,
+    weightKg: draft.product === "PARCEL" ? parseWeight(draft.weightKg) : null,
+    protection: draft.insurance,
+    expectedTotalCents: price.quote.totalShipperCents,
   };
 }
 
-/**
- * Price breakdown for the sidebar/bottom-sheet.
- * Stays a pure computation for now; later may call backend to get
- * authoritative pricing (currency conversion, dynamic fees, etc.).
- */
-export function computePrice(
-  draft: Draft,
-  trip: TripContext
-): PriceBreakdown {
-  return computeTotal(draft, trip);
+function placeOf(options: TripContext["pickupOptions"], id: string | null) {
+  const p = options.find((o) => o.id === id);
+  return p ? { kind: KIND_TO_API[p.kind] ?? "CITY_AREA", details: p.subLabel ?? null } : null;
 }
 
-/**
- * Fetch the trip context for the booking wizard.
- * Currently returns the mock trip; will hit trip-service in the future.
- */
-export async function fetchTripContext(
-  tripId: string
-): Promise<TripContext | null> {
-  // eslint-disable-next-line no-console
-  console.info("[booking.api.stub] fetchTripContext", { tripId });
-  await wait(SIMULATED_LATENCY_MS / 2);
-  // The page.tsx will pass the real mockTrip from booking.state.ts;
-  // returning null here would force the page to show a 404.
-  // For frontend-only dev we let the caller handle the mock.
-  return null;
+export async function createPaymentIntent(draft: Draft, trip: TripContext): Promise<PaymentIntentInfo> {
+  const price = computeTotal(draft, trip);
+  try {
+    const res = await axiosInstance.post<PaymentIntentInfo>("/deals/payment-intents", quoteFields(draft, trip, price));
+    return res.data;
+  } catch (e) {
+    throw e instanceof BookingApiError ? e : toBookingError(e);
+  }
+}
+
+export async function createDeal(draft: Draft, trip: TripContext, paymentIntentId: string): Promise<CreateDealResponse> {
+  const price = computeTotal(draft, trip);
+  const phoneE164 = recipientPhoneE164(draft);
+  if (!phoneE164) throw new BookingApiError("GENERIC", 0, "Invalid recipient phone");
+  const body = {
+    ...quoteFields(draft, trip, price),
+    paymentIntentId,
+    description: draft.description.trim(),
+    declaredValueCents: Math.round((parseFloat(draft.declaredValueEur.replace(",", ".")) || 0) * 100),
+    // Les photos restent locales tant que media-service (B2.3) n'existe pas :
+    // le serveur accepte une liste vide.
+    photoUrls: [] as string[],
+    recipient: {
+      firstName: draft.recipient.firstName.trim(),
+      lastName: draft.recipient.lastName.trim(),
+      phoneE164,
+      email: draft.recipient.email.trim(),
+    },
+    pickupPlace: placeOf(trip.pickupOptions, draft.pickupLocationId),
+    deliveryPlace: placeOf(trip.deliveryOptions, draft.deliveryLocationId),
+    charterAccepted: draft.charterAccepted,
+    termsAccepted: draft.termsAccepted,
+  };
+  try {
+    const res = await axiosInstance.post<CreateDealResponse>("/deals", body);
+    return res.data;
+  } catch (e) {
+    throw e instanceof BookingApiError ? e : toBookingError(e);
+  }
+}
+
+/** Devis pour le récap — pur, même moteur que le serveur (D34). */
+export function computePrice(draft: Draft, trip: TripContext): PriceBreakdown {
+  return computeTotal(draft, trip);
 }

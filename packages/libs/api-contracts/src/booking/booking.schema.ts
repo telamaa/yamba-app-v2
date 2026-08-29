@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { ObjectIdSchema } from "../common";
-import { ParcelCategorySchema } from "../trip/trip.enums";
+import { LocationKindSchema, ParcelCategorySchema } from "../trip/trip.enums";
 import {
   BookingStatusSchema,
   BookingActorSchema,
@@ -64,6 +64,13 @@ export const BookingRecipientSnapshotSchema = z
     description: "Recipient contact — visible to both roles (the carrier needs it to deliver)",
   });
 
+export const BookingPlaceSnapshotSchema = z
+  .object({
+    kind: LocationKindSchema,
+    details: z.string().nullish(),
+  })
+  .meta({ id: "BookingPlaceSnapshot", description: "Meeting point chosen at booking (frozen)" });
+
 export const BookingPickupInfoSchema = z
   .object({
     confirmedAt: z.iso.datetime(),
@@ -96,6 +103,14 @@ export const ShipperPricingSchema = z
     premiumCents: z.number().int().meta({ description: "Protection premium, separate flow (D22)" }),
     totalShipperCents: z.number().int().meta({ description: "Total charged to the shipper" }),
     currencyCode: z.string().meta({ example: "EUR" }),
+    // D34 (B2) — frozen quote details; absent on pre-B2 snapshots
+    product: z.string().nullish().meta({ description: "PARCEL | CHECKED_BAG_23KG | CABIN_BAG_12KG" }),
+    billableWeightKg: z.number().nullish().meta({ description: "max(weight, 0.5) — D32" }),
+    sizeCoef: z.number().nullish(),
+    familySurchargePct: z.number().nullish(),
+    rawTransportCents: z.number().int().nullish().meta({ description: "Before the 8 € floor" }),
+    minimumApplied: z.boolean().nullish(),
+    serviceCents: z.number().int().nullish().meta({ description: "commission + premium (COM-03)" }),
   })
   .meta({
     id: "ShipperPricing",
@@ -164,6 +179,8 @@ export const ShipperBookingViewSchema = z
     pricing: ShipperPricingSchema,
     parcel: BookingParcelSnapshotSchema,
     recipient: BookingRecipientSnapshotSchema,
+    pickupPlace: BookingPlaceSnapshotSchema.nullish(),
+    deliveryPlace: BookingPlaceSnapshotSchema.nullish(),
     carrier: BookingCounterpartSchema,
 
     ...milestoneFields,
@@ -200,6 +217,8 @@ export const CarrierBookingViewSchema = z
     pricing: CarrierPricingSchema,
     parcel: BookingParcelSnapshotSchema,
     recipient: BookingRecipientSnapshotSchema,
+    pickupPlace: BookingPlaceSnapshotSchema.nullish(),
+    deliveryPlace: BookingPlaceSnapshotSchema.nullish(),
     shipper: BookingCounterpartSchema,
 
     ...milestoneFields,

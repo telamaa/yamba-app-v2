@@ -638,3 +638,56 @@ npx tsc --noEmit --project apps/user-ui/tsconfig.json
 
 
 ---
+
+
+---
+
+# B2-PR1 — Naissance du deal : `POST /deals` + argent autorisé (D37, D38)
+
+> Branche `feat/b2-deal-request` · 29/08/2026 · base `dev` (après #89 + jalons mobile + docs cumulatifs)
+
+### 1. Le problème
+Jusqu'ici le wizard de réservation s'arrêtait sur un **stub** : `createDeal` affichait un toast et redirigeait vers un identifiant inventé. Rien n'était écrit, rien n'était payé, le Voyageur ne recevait rien. B2 doit faire naître le deal **avec l'argent bloqué**, sans jamais faire confiance à un montant venu du navigateur.
+
+### 2. La séquence (D37) — pourquoi deux appels
+```
+Étape 4 du wizard
+  │ POST /deals/payment-intents {tripId, product, family, sizeClass, weightKg, protection, expectedTotalCents}
+  │   serveur : trajet réservable ? devis recalculé (@packages/pricing) == expectedTotalCents ? place ?
+  │   → PaymentProvider.authorize(total)  ⇒ { paymentIntentId, clientSecret, quote }
+  │ (Stripe Payment Element : l'Expéditeur confirme sa carte → l'intent passe à requires_capture)
+  │ POST /deals {…même saisie…, paymentIntentId, description, destinataire, lieux, charte}
+  │   serveur : re-vérifie TOUT + retrieve(intent) = AUTHORIZED, montant/trajet/expéditeur identiques, intent jamais utilisé
+  │   → transaction Mongo : reservedKg += kg (conditionnel) · booking.create PENDING · 2 outbox
+  └ 201 { bookingId, status: PENDING, expiresAt (+24 h), total }
+```
+Un intent abandonné n'est jamais capturé : il expire seul chez Stripe. Une place perdue entre les deux appels annule la transaction **et** libère l'autorisation.
+
+### 3. Où est le code
+| Couche | Fichier | Rôle |
+|---|---|---|
+| Contrats | `packages/libs/api-contracts/src/booking/booking-request.schema.ts` | `CreatePaymentIntentRequest/Response`, `CreateBookingRequest/Response`, `BOOKING_REQUEST_ERROR_CODES` ; `ShipperPricing` + 7 champs D34 ; `BookingPlaceSnapshot` |
+| Paiement | `packages/libs/payments/src/index.ts` | `PaymentProvider` (authorize / retrieve / capture / cancel / refund), `StripePaymentProvider` (`capture_method: "manual"`, `automatic_payment_methods`), `FakePaymentProvider`, `createPaymentProviderFromEnv` (Fake refusé en production) |
+| Logique pure | `apps/deal-service/src/services/booking-request.ts` (+ `.spec.ts`, 18 tests) | `checkTripBookable`, `resolveFamilySurcharge`, `buildQuoteInput`/`quoteForTrip`, `assertQuoteMatches`, `checkCapacity`, `buildBookingSnapshots`, `BookingRequestError` (409 + `details.code`) |
+| Orchestration | `apps/deal-service/src/services/deal-request.service.ts` | `makeDealRequestService(provider)` : les deux cas d'usage, la transaction, la libération de l'empreinte |
+| HTTP | `controllers/deal-request.controller.ts`, `routes/deal.routes.ts`, `openapi/build-openapi.ts` | validation Zod → service → 201 ; OAS régénéré (3 fichiers `openapi.json`) |
+| Schéma | `prisma/schema.prisma` | `BookingPricingSnapshot` + 7 champs optionnels, `BookingPlaceSnapshot`, `Booking.pickupPlace/deliveryPlace/paymentProvider` |
+| Erreurs | `packages/error-handler/error-middleware.ts` | `details.type = "booking"` exposé même en production (le front a besoin du code) |
+| Front | `services/booking.api.ts`, `components/booking/useBookingCheckout.ts`, `steps/StepPayment.tsx`, `BookingWizard/Mobile.tsx`, `booking.types/state.ts`, `messages/*/booking.json` (`step4.*`) | intent créé à l'arrivée en étape 4, un seul Payment Element, `confirmPayment` sans redirection (3-DS : `return_url`), traduction des codes 409 |
+| Webpack | `apps/deal-service/webpack.config.js` | alias `@packages/payments` et `@packages/pricing` (le serve Nx ne lit pas `paths`) |
+
+### 4. Les garde-fous serveur (le front ne décide jamais)
+- **Devis** : recalculé deux fois (aux deux appels) par le même moteur que le front (D34). Divergence ⇒ 409 `QUOTE_DIVERGENCE` avec `actualTotalCents` : le front recrée une autorisation sur le nouveau total, rien n'est débité.
+- **Autorisation** : `retrieve(intent)` doit être `AUTHORIZED`, au bon montant, avec `metadata.tripId/shipperId` identiques (`PAYMENT_MISMATCH` sinon), et jamais rattachée à un Booking (`PAYMENT_ALREADY_USED`).
+- **Capacité (CAP-01)** : vérifiée en mémoire (refus précoce) **et** dans le `WHERE` de l'`updateMany` (garantie atomique face à la concurrence) — 0 ligne ⇒ `CAPACITY_EXCEEDED`.
+- **Trajet** : PUBLISHED, non supprimé, départ futur, pas le sien (`OWN_TRIP`), famille non refusée (`FAMILY_REFUSED`).
+- **Outbox** : les 2 événements passent par `BookingDomainEventSchema.parse` AVANT `create` — un payload invalide est un 500 du writer, jamais un message poison pour le relay.
+
+### 5. Preuve (smoke test réel, 29/08)
+Orly → Amsterdam 12 €/kg, colis 2 kg M : `expectedTotalCents: 1` → 409 QUOTE_DIVERGENCE (actual 2957) · PI Stripe test 29,57 € (`requires_capture` après `pm_card_visa`) · `POST /deals` avant confirmation → 409 PAYMENT_NOT_AUTHORIZED · après → 201 PENDING, `reservedKg 0 → 2`, snapshot `transport 2640 / commission 317 / service 317 / sizeCoef 1.1`, `pickupPlace AIRPORT CDG T2E`, 2 lignes outbox · rejeu → 409 PAYMENT_ALREADY_USED · `GET /deals/:id` → vue SHIPPER. Données de test nettoyées (PI annulé, kg restitués).
+
+### 6. Ce que cette PR ne fait pas (B2 suite)
+Accept/decline + capture/libération et gate D31, cron d'expiration 24 h, annulation ANN-01 / remboursements, **webhook Stripe** (aujourd'hui l'état est lu à la demande via `retrieve`), emails, upload des photos (`photoUrls: []`), chiffrement du code de livraison.
+
+### 7. Pour tester en local
+`STRIPE_SECRET_KEY` (sk_test) côté serveur **et** `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` (pk_test) côté front, carte `4242 4242 4242 4242`. Sans aucune clé : fournisseur FAKE, l'étape 4 affiche « Mode test » et « Payer » envoie directement la demande.

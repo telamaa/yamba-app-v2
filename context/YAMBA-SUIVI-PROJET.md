@@ -68,7 +68,8 @@ Lancement public = fin du Jalon 2. Fourchette tenue au dernier handoff : **5–8
 | notification-service : consumer Kafka, dédup event-id | ✅ #75 | — |
 | Dashboards : Mes envois, Mes trajets & deals, inbox, listes réelles | ✅ #56–#59, #76 | — |
 | Écrans post-acceptation (front) : pickup + checklist, code de livraison, tracking, vérification J+4, litige, notation | ✅ (front) #48–#54 | — |
-| 🔴 **B2 — argent entrant** : `POST /deals` (recalcul devis = refus de divergence, snapshot D17, `reservedKg` atomique + outbox en transaction), PaymentIntent autorisation → capture, `PaymentProvider` abstrait (D11), accept/decline (gate Stripe à l'acceptation D31), cron expiration 24 h, remboursements ANN-04, **un seul système de paiement** (Payment Element), emails transactionnels, code livraison chiffré AES-256-GCM, payment-service :6008, media-service :6009 | ⬜ **prochaine étape** (2/3 sessions) | D11, D16, D17, D31, D34 |
+| **B2-PR1 — naissance du deal** : `POST /deals/payment-intents` + `POST /deals`, `@packages/payments` (PaymentProvider D11 : Stripe capture manuelle + Fake), devis serveur = moteur unique (409 `QUOTE_DIVERGENCE`), snapshot D17 enrichi + lieux, `reservedKg` atomique + outbox en transaction, wizard branché (un seul Payment Element — A30), 24 tests, prouvé de bout en bout (Atlas + Stripe test) | ✅ (PR B2-PR1) | D37, D38, A29, A30, RG-D-01…14 |
+| 🔴 **B2 — suite** : accept/decline (capture / libération, gate Stripe à l'acceptation D31, CAP-02), cron expiration 24 h, annulation ANN-01 + remboursements ANN-04, webhook Stripe, emails transactionnels, photos (media-service :6009), code livraison chiffré AES-256-GCM | ⬜ **prochaine étape** (1,5/2 sessions) | D11, D16, D17, D31, D34 |
 | 🔴 **B3 — transport** : pickup serveur (upload R2, code bcrypt, checklist), refus, tracking, deliver (compare + lock), régénération de code | ⬜ (2/3) | — |
 | 🔴 **B4 — argent sortant** : confirmation anticipée, cron J+4 → COMPLETED + `transfers.create()`, dispute avec gel, matrice de remboursements (ANN-01 : `CANCEL_LATE_RETENTION_PCT` à fixer) | ⬜ (1,5/2,5) | ANN-01…04 |
 | 🔴 **B5 — confiance** : rating double-aveugle serveur, relances J+5/J+7, stats de réputation (D29-1) — unicité (bookingId, authorUserId) sans `@@unique` naïf Mongo | ⬜ (1,5/2) | D29 |
@@ -130,15 +131,15 @@ Estimation : **2–4 sessions** au-dessus du Jalon 4 (l'essentiel du travail est
 
 | Indicateur | Valeur |
 |---|---|
-| Tests (plateforme) | 433 = trip 187 · deal 225 · notification 21 |
-| Décisions au registre | D1 → D34 |
-| Règles métier | ~50 (V2) + RG-B-01…35, RG-S-01…13, RG-C-01…16, RG-G-01…03 |
+| Tests (plateforme) | 457 = trip 187 · deal 249 · notification 21 |
+| Décisions au registre | D1 → D38 (+ arbitrages A1 → A30) |
+| Règles métier | ~50 (V2) + RG-B-01…35, RG-S-01…13, RG-C-01…16, RG-G-01…03, RG-D-01…14 |
 | PR mergées | #1 → #88 (dont 11 le 28/08) |
-| Documents | registre, spec, règles, 4 handoffs, 8 dossiers de fiches PR, `YAMBA-MOTEUR-PRIX.md/.pdf`, ce suivi |
+| Documents | registre, spec, règles, 4 handoffs, fiches PR (archive), 3 docs cumulatifs (technique, métier, apprentissage), `YAMBA-MOTEUR-PRIX.md/.pdf`, ce suivi |
 
 ## 9. Ordre recommandé des prochaines sessions
 
-1. **B2 argent entrant** (2–3 sessions) — débloque la boucle ; inclut D31 et le paiement unique.
+1. **B2 suite** (1,5–2 sessions) — accept/decline + capture, cron 24 h, annulations/remboursements, webhook, emails ; inclut D31.
 2. **B3 transport** (2–3) puis **B4 argent sortant** (1,5–2,5) puis **B5 confiance** (1,5–2).
 3. PR « paramètres serveur » (0,5) + cleanup legacy (0,5) + seeds (0,25) — entre deux lots.
 4. Jalon 2 : admin-ui (C), Sentry/PostHog, provider email, sessions — **constitutif du lancement**.

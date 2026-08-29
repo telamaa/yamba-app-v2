@@ -54,6 +54,11 @@ const response404 = jsonResponse(
 );
 
 /** 500 unhandled — `error` field, not `message`. */
+const response409 = jsonResponse(
+  "ErrorResponse",
+  "Business conflict — details.code ∈ QUOTE_DIVERGENCE | CAPACITY_EXCEEDED | FAMILY_REFUSED | " +
+    "TRIP_NOT_BOOKABLE | OWN_TRIP | PAYMENT_NOT_AUTHORIZED | PAYMENT_MISMATCH | PAYMENT_ALREADY_USED"
+);
 const response500 = jsonResponse("UnhandledError", "Unhandled server error");
 
 /** Cookie OR bearer (OpenAPI OR semantics) — mirror of extractToken. */
@@ -68,6 +73,30 @@ const statusQueryParam = {
 };
 
 /* ══ Document ═════════════════════════════════════════════════ */
+
+const createBookingOperation = {
+    tags: ["deals"],
+    summary: "Create a deal request (PENDING) — step 2 (D37)",
+    description:
+      "Re-validates everything server-side (trip bookable, quote identical — D17, payment authorized " +
+      "and matching), then in ONE Mongo transaction: conditional reservedKg increment (CAP-01), Booking " +
+      "with 5 frozen snapshots, and 2 outbox events (booking.requested, booking.payment_authorized). " +
+      "The carrier is notified by the relay; the 24h acceptance window starts (DEA-01).",
+    operationId: "createBooking",
+    security: authSecurity,
+    requestBody: {
+      required: true,
+      content: { "application/json": { schema: ref("CreateBookingRequest") } },
+    },
+    responses: {
+      "201": jsonResponse("CreateBookingResponse", "Deal created (PENDING)"),
+      "400": response400,
+      "401": response401,
+      "404": response404,
+      "409": response409,
+      "500": response500,
+    },
+};
 
 export function buildOpenApiDocument() {
   const { schemas } = z.toJSONSchema(z.globalRegistry, {
@@ -171,6 +200,32 @@ export function buildOpenApiDocument() {
             "401": response401,
             "403": response403,
             "404": response404,
+            "500": response500,
+          },
+        },
+        post: createBookingOperation,
+      },
+      "/deals/payment-intents": {
+        post: {
+          tags: ["deals"],
+          summary: "Authorize the shipper's payment for a quote (step 1 of a request — D37)",
+          description:
+            "The server recomputes the quote with the single pricing engine (@packages/pricing, D34) and " +
+            "authorizes the total with the PaymentProvider (D11, manual capture — captured at acceptance, D31). " +
+            "Nothing is persisted: an abandoned intent simply expires. 409 with details.code when the total " +
+            "the shipper saw differs (QUOTE_DIVERGENCE), the family is refused, or the trip is not bookable.",
+          operationId: "createPaymentIntent",
+          security: authSecurity,
+          requestBody: {
+            required: true,
+            content: { "application/json": { schema: ref("CreatePaymentIntentRequest") } },
+          },
+          responses: {
+            "201": jsonResponse("CreatePaymentIntentResponse", "Authorization created (clientSecret null for FAKE)"),
+            "400": response400,
+            "401": response401,
+            "404": response404,
+            "409": response409,
             "500": response500,
           },
         },

@@ -175,3 +175,70 @@
 2. **Décision au registre avant le code** (D31–D36) : une phrase de pourquoi vaut une heure de relecture.
 3. **Prouver avec des chiffres** : `curl -w "%{time_total}"`, un build prod, `git diff --stat` = zéro, un test qui échoue avant le fix.
 4. **Une règle qu'on ne dit pas à l'écran est une surprise à la réservation** (D32 était appliquée mais invisible).
+
+
+---
+
+## Chapitre 17 — B2-PR1 · L'interface avant l'implémentation (`PaymentProvider`)
+
+**Théorie.** Une *interface* TypeScript décrit un contrat (« quiconque me donne `authorize`, `retrieve`, `capture`, `cancel`, `refund` me convient ») sans dire comment. Le code métier dépend du contrat, pas de Stripe : c'est l'**inversion de dépendance** (le D de SOLID). Bénéfices concrets : on remplace Stripe par Mobile Money sans toucher au deal-service, et on **teste** avec une implémentation mémoire.
+
+**Pratique.** `packages/libs/payments/src/index.ts` : `interface PaymentProvider`, `StripePaymentProvider`, `FakePaymentProvider`, et une **factory** `createPaymentProviderFromEnv()` qui choisit selon l'environnement — et **refuse** le Fake en production (`throw` au boot : mieux vaut un serveur qui ne démarre pas qu'un serveur qui simule les paiements). Le service reçoit le provider par **injection** : `makeDealRequestService(provider)` ; les routes l'assemblent une fois.
+
+**Statuts normalisés.** Stripe a 7 statuts ; notre contrat en expose 6 génériques (`AUTHORIZED` = `requires_capture`). Traduire à la frontière (`mapStripeStatus`) évite que le vocabulaire d'un fournisseur contamine le métier.
+
+**Pour aller plus loin.** Lis « Ports & Adapters » (architecture hexagonale) : l'interface est le *port*, Stripe et Fake sont deux *adapters*.
+
+---
+
+## Chapitre 18 — B2-PR1 · Transactions MongoDB avec Prisma : « tout ou rien »
+
+**Théorie.** Une transaction garantit que plusieurs écritures réussissent **ensemble** ou pas du tout (atomicité). MongoDB l'offre sur un *replica set* (Atlas en a un). Avec Prisma : `prisma.$transaction(async (tx) => { … })` — toutes les écritures passent par `tx`, une exception annule tout (**rollback**).
+
+**Pratique.** `deal-request.service.ts` : dans la transaction, (a) `tx.trip.updateMany` avec la **condition dans le `where`** (`reservedKg ≤ capacité − kg`) — c'est la réservation **atomique** : si un concurrent a pris la place, `count === 0` et on lève `CAPACITY_EXCEEDED` ; (b) `tx.booking.create` ; (c) deux `tx.outboxEvent.create`. Si (c) échoue, (a) et (b) sont annulés : **jamais de deal sans événement**.
+
+**Le pattern « compare-and-set »**. On ne lit pas puis on écrit (deux Expéditeurs liraient la même valeur) ; on écrit *à condition que* — la base arbitre. Même idée que `RelayLease` (A24) et que `SETNX` Redis (D5).
+
+**Pièges.** Une transaction longue bloque ; ne jamais appeler Stripe *dedans* (réseau lent, non annulable). D'où l'ordre : vérifier l'autorisation **avant**, écrire **ensuite**, libérer l'empreinte **après** en cas d'échec.
+
+---
+
+## Chapitre 19 — B2-PR1 · Les erreurs typées traversent les couches
+
+**Théorie.** Une erreur est une valeur comme une autre : elle porte un **code** stable (`QUOTE_DIVERGENCE`) et des **données** (`actualTotalCents`). Le message texte est pour les humains ; le code est pour le programme (le front traduit, teste, réagit).
+
+**Pratique.** Serveur : `class BookingRequestError extends AppError` avec `details = { type: "booking", code, … }` ; le middleware n'expose `details` en production que pour les types « sûrs » — on ajoute `"booking"` à la liste (sans ça, le front ne recevrait qu'un message anglais). Front : `BookingApiError` reconstruit `code` depuis `response.data.details`, et `useBookingCheckout` fait `t(`step4.errors.${code}`)` avec repli `GENERIC`. Les tests unitaires vérifient **le code**, pas la phrase.
+
+**Ce que tu retiens.** Un `catch {}` muet perd l'information ; un `catch` qui reconnaît `e instanceof BookingApiError && e.code === "QUOTE_DIVERGENCE"` peut agir (ici : recréer l'autorisation).
+
+---
+
+## Chapitre 20 — B2-PR1 · Idempotence et concurrence : penser au « deuxième clic »
+
+**Théorie.** Sur le réseau, tout peut être rejoué : double-clic, retry du navigateur, onglet dupliqué. Une opération est **idempotente** si la rejouer ne change rien de plus. Côté argent, c'est vital.
+
+**Pratique.** (1) `POST /deals` rejoué avec le même `paymentIntentId` → `PAYMENT_ALREADY_USED` (vérifié **dans** la transaction, avant l'écriture). (2) L'intent porte des `metadata` (`tripId`, `shipperId`, `totalShipperCents`) : le serveur refuse une autorisation « recyclée » pour un autre trajet. (3) Le hook front garde `isSubmitting` et ignore les clics pendant l'envoi. Le smoke test a rejoué la requête : 409, `reservedKg` inchangé.
+
+**Pour aller plus loin.** Stripe accepte un `Idempotency-Key` sur `create` : notre interface le prévoit (`idempotencyKey`), à brancher quand le front saura fournir une clé stable par tentative.
+
+---
+
+## Chapitre 21 — B2-PR1 · React : sortir la logique d'un hook partagé
+
+**Théorie.** Deux arbres UI (desktop/mobile) qui dupliquent la même logique de soumission divergeront. Un **hook personnalisé** (`useXxx`) encapsule état + effets + callbacks et se réutilise partout. Un `useRef` garde une valeur **sans** re-rendu (idéal pour une fonction à appeler plus tard) ; `useCallback` stabilise les fonctions passées en props.
+
+**Pratique.** `useBookingCheckout({ draft, trip, step, clear })` : crée l'intent en arrivant à l'étape 4 (`useEffect` sur `step`), expose `registerConfirm(fn)` (le Payment Element, rendu **dans** `<Elements>`, enregistre sa fonction `stripe.confirmPayment` dans un `ref`), et `submit()` qui enchaîne confirmation → `POST /deals` → redirection. `BookingWizard` et `BookingMobile` sont passés de 20 lignes de `handleSubmit` chacun à `const handleSubmit = checkout.submit`.
+
+**Pourquoi `key={intent.paymentIntentId}` sur `<Elements>`** : un `clientSecret` ne peut pas changer sur une instance existante ; changer la `key` force React à **remonter** le composant proprement.
+
+**Pièges.** `dynamic(() => import(...), { ssr: false })` pour Stripe : la lib touche `window` ; et le chargement paresseux garde l'étape 1 légère.
+
+---
+
+## Chapitre 22 — B2-PR1 · Prouver avec un smoke test réel
+
+**Théorie.** Les tests unitaires prouvent la logique ; ils ne prouvent ni le câblage (gateway → service → Mongo → Stripe) ni les contrats réels. Un **smoke test** scripté joue le parcours réel sur l'environnement de dev et vérifie l'état final en base.
+
+**Pratique.** Script `tsx` (non versionné) : login seed via le gateway (cookies — attention : le login pose `access_token` deux fois, il faut garder la **dernière** valeur), `POST /deals/payment-intents` avec un total faux (prouve la divergence), confirmation de l'intent avec `pm_card_visa` (ce que ferait le Payment Element), `POST /deals`, rejeu, puis lecture Prisma de `reservedKg`, du snapshot, de l'outbox. Et le **nettoyage** : annuler l'intent, supprimer le booking et ses événements, restituer les kg — un test qui salit la base est une dette.
+
+**Ce que tu retiens.** Écris le scénario *négatif* d'abord (401, 409…) : c'est lui qui valide les garde-fous ; le chemin heureux ne teste que le câblage.

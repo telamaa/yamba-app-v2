@@ -63,7 +63,17 @@ export type BookingRecord = {
     premiumCents: number;
     totalShipperCents: number;
     currencyCode: string;
+    // D34 (B2) — absents sur les snapshots antérieurs
+    product?: string | null;
+    billableWeightKg?: number | null;
+    sizeCoef?: number | null;
+    familySurchargePct?: number | null;
+    rawTransportCents?: number | null;
+    minimumApplied?: boolean | null;
+    serviceCents?: number | null;
   };
+  pickupPlace?: { kind: string; details: string | null } | null;
+  deliveryPlace?: { kind: string; details: string | null } | null;
   parcel: {
     category: string;
     categoryFamily: string | null;
@@ -128,6 +138,11 @@ const toCounterpart = (u: CounterpartRecord) => ({
   lastInitial: u.lastName?.trim().charAt(0).toUpperCase() ?? "",
   avatarUrl: u.avatarUrl,
 });
+
+const toPlace = (
+  p: { kind: string; details: string | null } | null | undefined
+): { kind: "AIRPORT" | "TRAIN_STATION" | "CITY_AREA"; details: string | null } | null =>
+  p ? { kind: p.kind as "AIRPORT" | "TRAIN_STATION" | "CITY_AREA", details: p.details ?? null } : null;
 
 const toTripSnapshot = (t: BookingRecord["trip"]) => ({
   originCity: t.originCity,
@@ -210,9 +225,18 @@ export function toShipperBookingView(
       premiumCents: booking.pricing.premiumCents,
       totalShipperCents: booking.pricing.totalShipperCents,
       currencyCode: booking.pricing.currencyCode,
+      product: booking.pricing.product ?? null,
+      billableWeightKg: booking.pricing.billableWeightKg ?? null,
+      sizeCoef: booking.pricing.sizeCoef ?? null,
+      familySurchargePct: booking.pricing.familySurchargePct ?? null,
+      rawTransportCents: booking.pricing.rawTransportCents ?? null,
+      minimumApplied: booking.pricing.minimumApplied ?? null,
+      serviceCents: booking.pricing.serviceCents ?? null,
     },
     parcel: toParcelSnapshot(booking.parcel),
     recipient: booking.recipient,
+    pickupPlace: toPlace(booking.pickupPlace),
+    deliveryPlace: toPlace(booking.deliveryPlace),
     carrier: toCounterpart(carrier),
 
     ...toMilestones(booking),
@@ -259,6 +283,8 @@ export function toCarrierBookingView(
     parcel: toParcelSnapshot(booking.parcel),
     // Le destinataire est visible côté Carrier : il en a besoin pour livrer.
     recipient: booking.recipient,
+    pickupPlace: toPlace(booking.pickupPlace),
+    deliveryPlace: toPlace(booking.deliveryPlace),
     shipper: toCounterpart(shipper),
 
     ...toMilestones(booking),
