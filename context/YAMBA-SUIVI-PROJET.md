@@ -10,7 +10,9 @@
 |---|---|---|
 | **Jalon 1 — Boucle transactionnelle** (réserver, payer, livrer, noter) | socle + pricing + B1 faits ; B2 → B5 restent | **~55 %** |
 | **Jalon 2 — Plateforme opérable** (admin, sessions, intégrations) — *constitutif du lancement* | non commencé (sauf CI/OpenAPI) | ~10 % |
-| **Jalon 3 — Expansion** (chat, mobile, locales, reco) | non commencé | 0 % |
+| **Jalon 3 — Expansion** (chat, locales, reco) | non commencé | 0 % |
+| **Jalon 4 — Application mobile : socle + Android** (React Native/Expo, code partagé, Play Store) | non commencé — D36 à graver | 0 % |
+| **Jalon 5 — iOS** (même base, spécificités Apple, App Store) | non commencé | 0 % |
 
 Lancement public = fin du Jalon 2. Fourchette tenue au dernier handoff : **5–8 semaines** de sessions (optimiste ≈ 10,5 / réaliste ≈ 16 sessions restantes sur le Jalon 1 avant cette journée ; aujourd'hui ≈ 3 sessions consommées : PR-B, search, PR-C).
 
@@ -86,7 +88,30 @@ Lancement public = fin du Jalon 2. Fourchette tenue au dernier handoff : **5–8
 
 ## 6. Jalon 3 — expansion (⬜)
 
-message-service :6005 (chat Socket.io, coordination pickup) · fin i18n (ES puis PT) · G mobile (client généré depuis l'OpenAPI, D3) · H recommandations ML (replay outbox + PostHog, D15-V2).
+message-service :6005 (chat Socket.io, coordination pickup) · fin i18n (ES puis PT) · H recommandations ML (replay outbox + PostHog, D15-V2). *(Le mobile sort du Jalon 3 → jalons 4 et 5.)*
+
+## 6bis. Jalon 4 — application mobile : socle + Android (⬜)
+
+| Élément | Statut | Réf. |
+|---|---|---|
+| **D36 à graver** : stack React Native + Expo (TypeScript, Expo Router), une base pour les deux OS ; réutilisation de `@packages/pricing`, `@packages/api-contracts`, client généré depuis l'OpenAPI (D3), messages i18n JSON | ⬜ décision | D3, D34 |
+| Fondations : auth par tokens (refresh sans cookies), stockage sécurisé, push (Expo Notifications ↔ notification-service), deep links, thème mango/teal | ⬜ | — |
+| Parcours Expéditeur : recherche (poids, familles), page trajet, réservation 4 étapes (Stripe Payment Sheet), suivi, code de livraison, notation | ⬜ | RG-S/RG-C |
+| Parcours Voyageur : création de trajet PER_KG, deals reçus, accept/decline, pickup (checklist, photos caméra), livraison (code) | ⬜ | RG-B |
+| Qualité : Jest/RNTL sur la logique partagée, E2E Maestro/Detox sur les 2 parcours critiques, CI EAS Build | ⬜ | D30 |
+| Google Play : internal testing → production, data safety, politique de confidentialité | ⬜ | — |
+
+Prérequis : Jalon 1 clos (B2–B5) et Jalon 2 lancé (le mobile consomme les mêmes API et les mêmes règles). Estimation à affiner après D36 : **6–10 sessions** pour un premier Android complet.
+
+## 6ter. Jalon 5 — iOS (⬜)
+
+| Élément | Statut |
+|---|---|
+| Même base ; Sign in with Apple (obligatoire si login social), Apple Pay via Stripe, textes d'usage des permissions (caméra, photos, notifications) | ⬜ |
+| TestFlight, review App Store — note de review : marketplace de services physiques, paiement hors achat intégré (conforme aux guidelines 3.1.3) | ⬜ |
+| Publication App Store, parité fonctionnelle et visuelle avec Android | ⬜ |
+
+Estimation : **2–4 sessions** au-dessus du Jalon 4 (l'essentiel du travail est partagé).
 
 ## 7. En continu / dettes techniques
 
@@ -117,3 +142,4 @@ message-service :6005 (chat Socket.io, coordination pickup) · fin i18n (ES puis
 3. PR « paramètres serveur » (0,5) + cleanup legacy (0,5) + seeds (0,25) — entre deux lots.
 4. Jalon 2 : admin-ui (C), Sentry/PostHog, provider email, sessions — **constitutif du lancement**.
 5. UX différées (step 1, chips lieux, messages par route) — quand le funnel réel donne des chiffres (PostHog).
+6. **Jalon 4 mobile** : graver D36 (stack + périmètre) dès que B2 est en route, pour que le client OpenAPI et les contrats soient conçus « mobile-ready » (tokens, pagination, erreurs typées) ; puis Jalon 5 iOS.
