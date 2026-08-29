@@ -95,7 +95,8 @@ message-service :6005 (chat Socket.io, coordination pickup) · fin i18n (ES puis
 | Élément | Statut | Réf. |
 |---|---|---|
 | **D36 gravée (Expo)** : stack React Native + Expo (TypeScript, Expo Router), une base pour les deux OS ; réutilisation de `@packages/pricing`, `@packages/api-contracts`, client généré depuis l'OpenAPI (D3), messages i18n JSON | ⬜ décision | D3, D34 |
-| Fondations : auth par tokens (refresh sans cookies), stockage sécurisé, push (Expo Notifications ↔ notification-service), deep links, thème mango/teal | ⬜ | — |
+| Fondations : RN nouvelle architecture (Hermes, Fabric), Expo Router + `react-native-screens`, Reanimated/Gesture Handler, FlashList, `expo-dev-client` + EAS Build ; auth par tokens (refresh sans cookies), stockage sécurisé, push (Expo Notifications ↔ notification-service), deep links, thème mango/teal **idiomatique par OS** | ⬜ | D36 |
+| Budgets de performance en CI (Maestro + Flashlight) : démarrage à froid < 1,5 s (Android milieu de gamme), 60 fps listes, aucune frame > 100 ms sur les 2 parcours critiques, < 40 Mo | ⬜ | D36 |
 | Parcours Expéditeur : recherche (poids, familles), page trajet, réservation 4 étapes (Stripe Payment Sheet), suivi, code de livraison, notation | ⬜ | RG-S/RG-C |
 | Parcours Voyageur : création de trajet PER_KG, deals reçus, accept/decline, pickup (checklist, photos caméra), livraison (code) | ⬜ | RG-B |
 | Qualité : Jest/RNTL sur la logique partagée, E2E Maestro/Detox sur les 2 parcours critiques, CI EAS Build | ⬜ | D30 |
