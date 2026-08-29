@@ -113,4 +113,10 @@ JWT `access_token` + `refresh_token` set as cookies by auth-service. Frontend `a
 
 ## End of task
 
-A delivery = a PR merged into `dev` with its tests. If the done/remaining state moved, update `context/YAMBA-CONTEXT.md`.
+A delivery = a PR merged into `dev` with its tests. If the done/remaining state moved, update `context/YAMBA-CONTEXT.md` and `context/YAMBA-SUIVI-PROJET.md`.
+
+**Before announcing any PR as ready, COMPLETE (never create new files) the three cumulative documents in `context/`:**
+1. `YAMBA-DOC-TECHNIQUE.md` — what was done and why, readable by a junior developer (one section per PR/lot).
+2. `YAMBA-DOC-METIER.md` — the need and the numbered business rules (RG-*), acceptance tests.
+3. `YAMBA-APPRENTISSAGE-DEV.md` — a tutorial chapter per PR: the techniques and language/tool concepts used, the why, from theory to the code actually implemented (real paths + excerpts), pitfalls, going further.
+`context/fiches-pr/` is a frozen archive (PR #78–#85). Screenshots are never versioned. No co-author trailers.
