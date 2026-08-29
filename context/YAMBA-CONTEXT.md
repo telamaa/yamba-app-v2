@@ -44,7 +44,13 @@ Ordre de demarrage : auth -> trip -> gateway.
 - Jalon 1 — Boucle transactionnelle : reserver, payer, livrer, noter.
 - Jalon 2 — Plateforme operable : admin-ui et outillage. CONSTITUTIF du
   lancement public (le lancement = fin du jalon 2, pas du jalon 1).
-- Jalon 3 — Expansion : chat, mobile, locales, reco.
+- Jalon 3 — Expansion : chat, locales, reco (le mobile en sort : jalons 4 et 5).
+- Jalon 4 — Application mobile, socle + Android : une seule base React Native /
+  Expo (TypeScript) reutilisant @packages/pricing, @packages/api-contracts et
+  le client genere depuis l'OpenAPI (D3) ; parcours Expediteur et Voyageur ;
+  publication Google Play (D36 (gravée) : stack et perimetre).
+- Jalon 5 — iOS : meme base, specificites Apple (Sign in with Apple, Apple Pay,
+  review App Store, TestFlight), publication App Store.
 
 ## Ce qui est FAIT (aout 2026)
 
@@ -141,8 +147,29 @@ Ordre de demarrage : auth -> trip -> gateway.
 
 - F message-service :6005 (chat Socket.io, coordination pickup).
 - Fin i18n : PR feat/locale-es (critere de fin), puis PT.
-- G mobile (client genere depuis l'OpenAPI, D3).
 - H recommandations ML (replay outbox + PostHog).
+
+## Ce qui RESTE — Jalon 4 (mobile : socle + Android)
+
+- D36 a graver : stack (React Native + Expo, TypeScript, Expo Router), code
+  partage (pricing, contrats, client OpenAPI genere, i18n JSON reutilises),
+  auth par tokens (refresh) au lieu des cookies web, push notifications
+  (Expo Notifications, branchees sur notification-service), deep links.
+- Parcours Expediteur : recherche (poids, familles), page trajet, reservation
+  4 etapes (Stripe Payment Sheet), suivi, code de livraison, notation.
+- Parcours Voyageur : creation de trajet (formulaire PER_KG), deals recus,
+  accept/decline, pickup + checklist + photos (camera), livraison (code).
+- Qualite : tests Jest/RNTL sur la logique partagee, Detox ou Maestro E2E sur
+  les 2 parcours critiques, CI EAS Build, Play Console (internal testing ->
+  production), politique de confidentialite / data safety.
+
+## Ce qui RESTE — Jalon 5 (iOS)
+
+- Meme base ; Sign in with Apple (obligatoire si login social), Apple Pay
+  via Stripe, permissions camera/photos/notifications avec textes d'usage,
+  TestFlight, review App Store (guidelines marketplace : paiement de
+  services physiques hors IAP = OK, a documenter dans la note de review).
+- Publication App Store, parite fonctionnelle et visuelle avec Android.
 
 ## En continu (entre les lots)
 
