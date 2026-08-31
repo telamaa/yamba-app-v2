@@ -92,7 +92,18 @@ Ordre de demarrage : auth -> trip -> gateway.
   wizard branche sur l'API (un seul Payment Element, A30), 24 tests.
   Prouve de bout en bout sur Atlas + Stripe test (29,57 EUR autorises,
   2 kg reserves, rejeu refuse).
-- Plateforme de tests : 457 (trip 187, deal 249, notification 21) — post-B2-PR1.
+- B2-PR2 (cycle de vie du deal, D39/D40) : `POST /deals/:id/accept`
+  (charte + gate D31 DEPLACE ici — les 2 checks profil/Stripe retires des
+  3 chemins de publication trip-service — puis CAPTURE a l'acceptation,
+  D39), `POST /deals/:id/decline` (raison parmi 5, liberation de
+  l'empreinte, kg restitues CAP-02), `POST /deals/:id/cancel` (ANN-01 :
+  100 % jusqu'a J-2, retenue 50 % ensuite — CANCEL_LATE_RETENTION_PCT
+  grave a 50), cron expiration 24 h (deal-service, toutes les 5 min,
+  BOOKING_EXPIRY_CRON_ENABLED), webhook `POST /webhooks/stripe` (D40 :
+  source de verite — payment_intent.canceled → SYSTEM cancel d'un PENDING,
+  nouvelle transition machine), partout : argent d'abord (PaymentProvider)
+  puis UNE transaction Mongo conditionnelle + outbox. +46 tests.
+- Plateforme de tests : 503 (trip 187, deal 295, notification 21) — post-B2-PR2.
 
 ## Release et historique (28 aout 2026)
 
@@ -119,13 +130,11 @@ Ordre de demarrage : auth -> trip -> gateway.
 - UX restantes : step 1 (aeroport -> ville de rattachement + lieu de
   pickup, arrivee repliee, justificatif en step 3), lieux en chips + apercu
   sticky (create-trip), cleanup legacy PER_CATEGORY + instantBooking.
-- Micro-PR D31 : gate Stripe/profil deplace de la publication vers
-  l'acceptation + carrierPage/Stripe factices au seed.
-- B2 (suite) : PR2 accept/decline (capture / liberation de l'autorisation,
-  gate Stripe-profil deplace a l'acceptation D31, kg restitues CAP-02),
-  cron expiration 24 h (annulation de l'autorisation), annulation
-  Expediteur ANN-01 + remboursements ANN-04 ; PR3 emails transactionnels,
-  webhook Stripe (source de verite des etats de paiement), photos du colis
+- B2 (suite) : PR2 FAITE (accept/decline/cancel + capture D39, gate D31
+  deplace, cron 24 h, webhook D40 — voir « fait » ci-dessus). RESTE :
+  front des transitions (page deal Voyageur É2 encore sur mocks : brancher
+  accept/decline sur l'API ; annulation cote Expediteur), carrierPage/
+  Stripe factices au seed, PR3 emails transactionnels, photos du colis
   via media-service :6009, AES-256-GCM re-affichage code livraison,
   SiteConfig commissionRate (D16). payment-service :6008 : NON (D38).
 - B3 transport : pickup (upload R2, code bcrypt, checklist conformite),

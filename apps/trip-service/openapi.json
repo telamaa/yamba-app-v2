@@ -9949,6 +9949,99 @@
         ],
         "additionalProperties": false
       },
+      "DeclineReason": {
+        "type": "string",
+        "enum": [
+          "CATEGORY_NOT_CARRIED",
+          "TOO_HEAVY",
+          "PLACES_INCOMPATIBLE",
+          "TIMING",
+          "OTHER"
+        ],
+        "description": "The 5 optional decline reasons offered to the carrier (spec É2)"
+      },
+      "AcceptDealRequest": {
+        "type": "object",
+        "properties": {
+          "charterAccepted": {
+            "type": "boolean",
+            "const": true,
+            "description": "Carrier charter (verification, forbidden items, punctuality) — must be true (RGP-03)"
+          }
+        },
+        "required": [
+          "charterAccepted"
+        ],
+        "additionalProperties": false
+      },
+      "DeclineDealRequest": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "description": "Optional — one of 5 (spec É2)",
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DeclineReason"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "CancelDealRequest": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 300
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "DealTransitionResponse": {
+        "type": "object",
+        "properties": {
+          "bookingId": {
+            "$ref": "#/components/schemas/ObjectId"
+          },
+          "status": {
+            "$ref": "#/components/schemas/BookingStatus"
+          },
+          "refundAmountCents": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Amount returned to the shipper (cents). Full total on PENDING closures (authorization released), ANN-01 amount on post-acceptance cancellation, null when nothing is returned (accept)."
+          },
+          "currencyCode": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "bookingId",
+          "status",
+          "refundAmountCents",
+          "currencyCode"
+        ],
+        "additionalProperties": false
+      },
       "NotificationView": {
         "type": "object",
         "properties": {

@@ -242,3 +242,53 @@
 **Pratique.** Script `tsx` (non versionné) : login seed via le gateway (cookies — attention : le login pose `access_token` deux fois, il faut garder la **dernière** valeur), `POST /deals/payment-intents` avec un total faux (prouve la divergence), confirmation de l'intent avec `pm_card_visa` (ce que ferait le Payment Element), `POST /deals`, rejeu, puis lecture Prisma de `reservedKg`, du snapshot, de l'outbox. Et le **nettoyage** : annuler l'intent, supprimer le booking et ses événements, restituer les kg — un test qui salit la base est une dette.
 
 **Ce que tu retiens.** Écris le scénario *négatif* d'abord (401, 409…) : c'est lui qui valide les garde-fous ; le chemin heureux ne teste que le câblage.
+
+---
+
+## Chapitre 23 — B2-PR2 · « L'argent d'abord, la base ensuite » : ordonner les effets externes
+
+**Théorie.** Quand une opération touche DEUX systèmes (Stripe et Mongo) qui ne partagent pas de transaction, il faut choisir un ordre et assumer sa fenêtre d'échec. Règle retenue (D39) : agir d'abord sur le système **qui a l'argent**, puis écrire chez soi ; prévoir une **compensation** (action inverse best-effort) si la seconde étape échoue, et un **réconciliateur** (le webhook) pour les cas où même la compensation rate. C'est le début du monde des *sagas* — sans le framework.
+
+**Pratique.** `deal-lifecycle.service.ts` : `accept` fait `provider.capture()` PUIS la transaction (`PENDING→ACCEPTED`) ; si la transaction perd (course rarissime), `provider.refund()` en compensation dans le `catch`, et on relance l'erreur. `cancel` d'un deal ACCEPTED fait le `refund` d'abord — s'il échoue, **aucune** écriture : 409 `PAYMENT_STATE_CONFLICT`, l'utilisateur réessaie. À l'inverse, le `cancel` d'une simple empreinte (decline/expire) est *best-effort* (`catch` silencieux) : elle expirerait seule, le webhook réconcilie.
+
+**Ce que tu retiens.** Il n'y a pas d'ordre « parfait » : il y a un ordre choisi, documenté, avec sa compensation et son filet. Le pire est l'ordre implicite.
+
+---
+
+## Chapitre 24 — B2-PR2 · La machine à états comme SEULE autorité (et son extension contrôlée)
+
+**Théorie.** Quand chaque endpoint décide lui-même « ai-je le droit ? », les règles divergent vite. Ici, TOUT passe par `canPerform(booking, action, acteur)` : le controller ne connaît ni les statuts ni les guards — il transmet le refus de la machine (409 avec SA raison). Ajouter un comportement = ajouter une **transition déclarée** (données), jamais un `if` dans un controller.
+
+**Pratique.** Le webhook D40 a exigé une transition qui n'existait pas : `PENDING —cancel/SYSTEM→ CANCELLED` (l'empreinte meurt seule). On ne l'a PAS codée dans le handler : on l'a **gravée au registre (D40)**, ajoutée à la table `TRANSITIONS` avec ses effets (`RELEASE_CAPACITY`, `NOTIFY_SHIPPER` — pas de refund : rien n'a été capturé), répercutée dans la spec §2.2 et testée (S1/S5 : 196 tests). L'effet `CAPTURE_PAYMENT` sur accept suit la même idée : la machine DÉCLARE les effets, le service les EXÉCUTE (`effects.includes("REFUND_PER_CANCELLATION_POLICY")` pilote le barème).
+
+**Ce que tu retiens.** Une machine à états ne vaut que si elle est le passage obligé. Le jour où une règle te tente « juste ici, dans le controller », c'est une transition qui manque.
+
+---
+
+## Chapitre 25 — B2-PR2 · Webhooks signés : le corps brut ou rien
+
+**Théorie.** Un webhook est un endpoint PUBLIC : n'importe qui peut le POSTer. La seule preuve d'origine est la **signature HMAC** calculée par Stripe sur les octets exacts du corps. Or Express, avec `express.json()`, parse puis (si on re-sérialise) réordonne/reformate : les octets changent, la signature meurt. Il faut donc capter le corps **brut** (`express.raw`) AVANT tout parseur.
+
+**Pratique.** `main.ts` : `app.post("/webhooks/stripe", express.raw({ type: "application/json" }), handler)` monté AVANT `app.use(express.json())`. En dev : `stripe listen --forward-to localhost:6003/webhooks/stripe` — DIRECT sur le service, jamais via le gateway (qui parse). La vérification vit dans `@packages/payments` (`constructStripeWebhookEvent`) : le SDK Stripe reste isolé dans la lib, comme kafkajs dans `@packages/messaging`. Codes de réponse choisis : 501 sans secret (refuser plutôt qu'accepter sans preuve), 400 signature invalide (retry inutile), **500 si la base échoue — exprès : Stripe réessaie**, c'est le filet.
+
+**Ce que tu retiens.** Un webhook idempotent + des retries fournisseur = la réconciliation gratuite. Un webhook qui répond 200 avant d'avoir réussi = une perte silencieuse.
+
+---
+
+## Chapitre 26 — B2-PR2 · Tester les effets, pas les appels : le Fake avec un état
+
+**Théorie.** Un `jest.fn()` vérifie qu'on a APPELÉ ; un **fake à état** (une vraie petite implémentation en mémoire) vérifie l'EFFET : après `accept`, l'intent EST `CAPTURED` ; après `decline`, il EST `CANCELED`. Les tests deviennent des scénarios lisibles, et le fake sert aussi en dev (D30 : « Stripe remplacé par un fake »).
+
+**Pratique.** `deal-lifecycle.service.spec.ts` : le VRAI `FakePaymentProvider` porte l'argent (`expect((await provider.retrieve(intentId)).status).toBe("CAPTURED")`) ; Prisma est un mock virtuel dont `$transaction` exécute le callback avec le même objet — et `updateMany.mockResolvedValue({ count: 0 })` **simule une course perdue** en une ligne (on vérifie alors la compensation : `refund` appelé). Le gate D31 se teste avec un stub `name: "STRIPE"` puisque le Fake le saute par design. Et le contrat outbox est RÉEL : chaque événement passe `BookingDomainEventSchema.parse` dans le chemin testé — un payload invalide casse le test, c'est voulu.
+
+**Ce que tu retiens.** Choisis le niveau de doublure par ce que tu veux prouver : l'état (fake), l'appel (spy), la course (retour piloté). Et garde toujours UN chemin où le contrat de prod s'exécute vraiment.
+
+---
+
+## Chapitre 27 — B2-PR2 · Un cron n'est pas une horloge de vérité
+
+**Théorie.** Si l'expiration n'existait QUE dans le cron, une demande périmée resterait acceptable pendant 5 minutes (voire pendant une panne du cron). La vérité doit être dans la **donnée** (`expiresAt`) et vérifiée à CHAQUE décision ; le cron ne fait que **matérialiser** l'état (statut, argent, place) après coup.
+
+**Pratique.** Le guard `notExpired` de la machine refuse déjà l'accept d'un PENDING périmé — testé « avant même le passage du cron ». Le cron (`expire-bookings.cron.ts`, node-cron `*/5 * * * *`) traite des fournées de 50 avec un booléen anti-chevauchement (un tick qui déborde saute le suivant), chaque booking isolément (`try/catch` par item : une course perdue n'arrête pas la fournée), et s'éteint par env (`BOOKING_EXPIRY_CRON_ENABLED=false`) pour les instances API pures — même patron que le relay outbox.
+
+**Ce que tu retiens.** Demande-toi toujours : « si mon cron meurt une heure, qu'est-ce qui devient FAUX ? ». La bonne réponse : rien — juste du retard.

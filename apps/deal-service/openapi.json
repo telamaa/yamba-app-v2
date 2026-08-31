@@ -358,6 +358,339 @@
         }
       }
     },
+    "/deals/{id}/accept": {
+      "post": {
+        "tags": [
+          "deals"
+        ],
+        "summary": "Accept a deal request (carrier) — capture at acceptance (D39)",
+        "description": "Carrier only, charter checkbox required. The D31 gate (completed profile + Stripe onboarding) is enforced HERE — no longer at trip publication. The shipper's authorization is CAPTURED (money moves now — an authorization expires in ~7 days, capturing at D-1 would break early acceptances), then in ONE Mongo transaction: conditional PENDING→ACCEPTED, acceptedAt/capturedAt, outbox booking.accepted.",
+        "operationId": "acceptDeal",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ObjectId"
+            },
+            "description": "Deal (booking) identifier"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcceptDealRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Deal accepted (refundAmountCents null)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DealTransitionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed request: invalid ObjectId or unknown status value (ValidationError)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token missing, invalid, expired, or account not found (isAuthenticated middleware)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated caller is not a party to this deal, or does not own the trip (ForbiddenError)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Deal or trip not found (NotFoundError)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Business conflict — details.code ∈ TRANSITION_NOT_ALLOWED (the state machine refused: status, role or guard — details carry its reason) | CARRIER_ONBOARDING_REQUIRED (D31 gate: profile or Stripe onboarding incomplete) | PAYMENT_STATE_CONFLICT (the provider-side payment state forbids the operation)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unhandled server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnhandledError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/deals/{id}/decline": {
+      "post": {
+        "tags": [
+          "deals"
+        ],
+        "summary": "Decline a deal request (carrier)",
+        "description": "Carrier only, optional reason among 5 (spec É2). The authorization is released (never captured), then in ONE Mongo transaction: conditional PENDING→DECLINED, reserved kg released (CAP-02), outbox booking.declined + booking.refund_issued (full amount).",
+        "operationId": "declineDeal",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ObjectId"
+            },
+            "description": "Deal (booking) identifier"
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeclineDealRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Deal declined, full amount returned to the shipper",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DealTransitionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed request: invalid ObjectId or unknown status value (ValidationError)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token missing, invalid, expired, or account not found (isAuthenticated middleware)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated caller is not a party to this deal, or does not own the trip (ForbiddenError)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Deal or trip not found (NotFoundError)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Business conflict — details.code ∈ TRANSITION_NOT_ALLOWED (the state machine refused: status, role or guard — details carry its reason) | CARRIER_ONBOARDING_REQUIRED (D31 gate: profile or Stripe onboarding incomplete) | PAYMENT_STATE_CONFLICT (the provider-side payment state forbids the operation)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unhandled server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnhandledError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/deals/{id}/cancel": {
+      "post": {
+        "tags": [
+          "deals"
+        ],
+        "summary": "Cancel a deal (shipper) — ANN-01 policy",
+        "description": "Shipper only. PENDING: the authorization is released in full. ACCEPTED (payment captured — D39): a real refund per ANN-01 — 100% until 48h before departure, then a 50% retention (CANCEL_LATE_RETENTION_PCT, owed to the carrier — paid out with the B4 payout infrastructure). After PICKED_UP cancellation is impossible (dispute is the only path). One Mongo transaction: conditional transition, kg released (CAP-02), outbox booking.cancelled + booking.refund_issued.",
+        "operationId": "cancelDeal",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ObjectId"
+            },
+            "description": "Deal (booking) identifier"
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CancelDealRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Deal cancelled, refundAmountCents per ANN-01",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DealTransitionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed request: invalid ObjectId or unknown status value (ValidationError)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token missing, invalid, expired, or account not found (isAuthenticated middleware)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated caller is not a party to this deal, or does not own the trip (ForbiddenError)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Deal or trip not found (NotFoundError)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Business conflict — details.code ∈ TRANSITION_NOT_ALLOWED (the state machine refused: status, role or guard — details carry its reason) | CARRIER_ONBOARDING_REQUIRED (D31 gate: profile or Stripe onboarding incomplete) | PAYMENT_STATE_CONFLICT (the provider-side payment state forbids the operation)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unhandled server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnhandledError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/deals/{id}": {
       "get": {
         "tags": [
@@ -8843,6 +9176,99 @@
           "status",
           "expiresAt",
           "totalShipperCents",
+          "currencyCode"
+        ],
+        "additionalProperties": false
+      },
+      "DeclineReason": {
+        "type": "string",
+        "enum": [
+          "CATEGORY_NOT_CARRIED",
+          "TOO_HEAVY",
+          "PLACES_INCOMPATIBLE",
+          "TIMING",
+          "OTHER"
+        ],
+        "description": "The 5 optional decline reasons offered to the carrier (spec É2)"
+      },
+      "AcceptDealRequest": {
+        "type": "object",
+        "properties": {
+          "charterAccepted": {
+            "type": "boolean",
+            "const": true,
+            "description": "Carrier charter (verification, forbidden items, punctuality) — must be true (RGP-03)"
+          }
+        },
+        "required": [
+          "charterAccepted"
+        ],
+        "additionalProperties": false
+      },
+      "DeclineDealRequest": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "description": "Optional — one of 5 (spec É2)",
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DeclineReason"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "CancelDealRequest": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 300
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "DealTransitionResponse": {
+        "type": "object",
+        "properties": {
+          "bookingId": {
+            "$ref": "#/components/schemas/ObjectId"
+          },
+          "status": {
+            "$ref": "#/components/schemas/BookingStatus"
+          },
+          "refundAmountCents": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Amount returned to the shipper (cents). Full total on PENDING closures (authorization released), ANN-01 amount on post-acceptance cancellation, null when nothing is returned (accept)."
+          },
+          "currencyCode": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "bookingId",
+          "status",
+          "refundAmountCents",
           "currencyCode"
         ],
         "additionalProperties": false

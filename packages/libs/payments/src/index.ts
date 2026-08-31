@@ -203,6 +203,41 @@ export class FakePaymentProvider implements PaymentProvider {
   }
 }
 
+/* ══ Webhook Stripe (D40) ═════════════════════════════════════ */
+
+/** Événement webhook normalisé — seul sous-ensemble utile au deal-service. */
+export type PaymentWebhookEvent = {
+  id: string;
+  type: string;
+  /** id du PaymentIntent concerné (null pour les événements non-PI) */
+  paymentIntentId: string | null;
+};
+
+// La vérification de signature n'appelle JAMAIS l'API : la clé de cette
+// instance est un leurre — seul le secret webhook (whsec_…) compte.
+let webhookVerifier: Stripe | null = null;
+
+/**
+ * Vérifie la signature (STRIPE_WEBHOOK_SECRET) et parse le corps BRUT.
+ * Jette si la signature est invalide — l'appelant répond 400.
+ */
+export function constructStripeWebhookEvent(
+  rawBody: Buffer | string,
+  signature: string,
+  webhookSecret: string
+): PaymentWebhookEvent {
+  webhookVerifier ??= new Stripe("sk_webhook_signature_verification_only", {
+    apiVersion: "2026-03-25.dahlia",
+  });
+  const event = webhookVerifier.webhooks.constructEvent(rawBody, signature, webhookSecret);
+  const object = event.data.object as { object?: string; id?: string };
+  return {
+    id: event.id,
+    type: event.type,
+    paymentIntentId: object?.object === "payment_intent" && object.id ? object.id : null,
+  };
+}
+
 /* ══ Factory (env) ════════════════════════════════════════════ */
 
 /**

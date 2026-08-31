@@ -134,27 +134,16 @@ export const createTrip = async (
     const userId = req.user.id;
     const shouldPublish = data.publish === true;
 
-    // ── DB-dependent publish gate ──
+    // ⭐ D31 — le gate profil/Stripe a MIGRÉ vers l'ACCEPTATION d'un deal
+    // (deal-service, B2-PR2) : publier n'exige plus le KYC — on le demande
+    // au moment où l'argent est réel. Le carrierPage ne sert plus ici qu'au
+    // snapshot de note.
     const carrierPage = await prisma.carrierPage.findUnique({
       where: { userId },
-      select: {
-        id: true,
-        onboardingStep: true,
-        stripeOnboardingComplete: true,
-        stripeChargesEnabled: true,
-        ratingsAvg: true,
-        ratingsCount: true,
-      },
+      select: { id: true, ratingsAvg: true, ratingsCount: true },
     });
 
     if (shouldPublish) {
-      if (!carrierPage || carrierPage.onboardingStep === "PROFILE") {
-        return next(new ValidationError("Carrier profile must be completed to publish a trip."));
-      }
-      if (!carrierPage.stripeOnboardingComplete || !carrierPage.stripeChargesEnabled) {
-        return next(new ValidationError("Stripe must be configured to publish a trip."));
-      }
-
       // ⭐ A28 — UN moteur de pricing COMPLET est exigé pour publier, sur ce
       // chemin aussi (POST /trips + publish: true) — même vérité que
       // publishTrip et updateTrip.
@@ -352,24 +341,12 @@ export const updateTrip = async (
         return next(new ValidationError(publishCheck.reason));
       }
 
+      // ⭐ D31 — plus de gate profil/Stripe à la publication (déplacé vers
+      // l'acceptation, deal-service B2-PR2) ; seul le snapshot de note reste.
       const carrierPage = await prisma.carrierPage.findUnique({
         where: { userId },
-        select: {
-          id: true,
-          onboardingStep: true,
-          stripeOnboardingComplete: true,
-          stripeChargesEnabled: true,
-          ratingsAvg: true,
-          ratingsCount: true,
-        },
+        select: { ratingsAvg: true, ratingsCount: true },
       });
-
-      if (!carrierPage || carrierPage.onboardingStep === "PROFILE") {
-        return next(new ValidationError("Carrier profile must be completed to publish a trip."));
-      }
-      if (!carrierPage.stripeOnboardingComplete || !carrierPage.stripeChargesEnabled) {
-        return next(new ValidationError("Stripe must be configured to publish a trip."));
-      }
 
       // Locations gate: at least 1 pickup + 1 delivery
       const effectivePickup = updateData.pickupLocations ?? trip.pickupLocations ?? [];
@@ -404,7 +381,8 @@ export const updateTrip = async (
       updateData.status = "PUBLISHED";
       updateData.publishedAt = new Date();
       updateData.currentStep = 3;
-      updateData.carrierRatingSnapshot = carrierPage.ratingsCount > 0 ? carrierPage.ratingsAvg : null;
+      updateData.carrierRatingSnapshot =
+        carrierPage && carrierPage.ratingsCount > 0 ? carrierPage.ratingsAvg : null;
 
       // ⭐ Lot 2 — Deltas sur la transition DRAFT → PUBLISHED
       await applyCarrierStatDeltas(userId, trip.status, "PUBLISHED");
@@ -900,24 +878,13 @@ export const publishTrip = async (
     const check = canPerform(trip, "publish", ctx);
     if (!check.allowed) return next(new ValidationError(check.reason));
 
+    // ⭐ D31 — plus de gate profil/Stripe à la publication (déplacé vers
+    // l'acceptation, deal-service B2-PR2) ; seul le snapshot de note reste.
     const carrierPage = await prisma.carrierPage.findUnique({
       where: { userId },
-      select: {
-        id: true,
-        onboardingStep: true,
-        stripeOnboardingComplete: true,
-        stripeChargesEnabled: true,
-        ratingsAvg: true,
-        ratingsCount: true,
-      },
+      select: { ratingsAvg: true, ratingsCount: true },
     });
 
-    if (!carrierPage || carrierPage.onboardingStep === "PROFILE") {
-      return next(new ValidationError("Carrier profile must be completed to publish a trip."));
-    }
-    if (!carrierPage.stripeOnboardingComplete || !carrierPage.stripeChargesEnabled) {
-      return next(new ValidationError("Stripe must be configured to publish a trip."));
-    }
     if (!trip.transportMode) {
       return next(new ValidationError("Transport mode is required to publish."));
     }
@@ -957,7 +924,7 @@ export const publishTrip = async (
     }
 
     const carrierRatingSnapshot =
-      carrierPage.ratingsCount > 0 ? carrierPage.ratingsAvg : null;
+      carrierPage && carrierPage.ratingsCount > 0 ? carrierPage.ratingsAvg : null;
 
     const publishedTrip = await prisma.trip.update({
       where: { id },

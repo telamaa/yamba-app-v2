@@ -108,6 +108,7 @@ export { BOOKING_ACTIVE_STATUSES, BOOKING_TERMINAL_STATUSES };
 
 export type BookingEffect =
   | "RELEASE_CAPACITY" // CAP-02 — décrémenter Trip.reservedKg (exécuté dès B1/PR3)
+  | "CAPTURE_PAYMENT" // D39 — capture de l'empreinte à l'acceptation (B2)
   | "FULL_REFUND" // remboursement 100 % transport + prime (B2)
   | "REFUND_PER_CANCELLATION_POLICY" // ANN-01 — barème J-2 calculé au moment T (B2)
   | "PENALIZE_CARRIER" // ANN-02 — impact réputation Voyageur (B5)
@@ -244,7 +245,10 @@ const TRANSITIONS: readonly TransitionDef[] = [
     action: "accept",
     actor: "CARRIER",
     to: "ACCEPTED",
-    effects: ["NOTIFY_SHIPPER"],
+    // D39 — la capture a lieu À l'acceptation (jamais à J-1 : une
+    // empreinte carte expire ~7 jours). Le gate D31 (profil + Stripe)
+    // est une validation de service, pas une transition.
+    effects: ["CAPTURE_PAYMENT", "NOTIFY_SHIPPER"],
     guard: notExpired,
   },
   {
@@ -269,6 +273,17 @@ const TRANSITIONS: readonly TransitionDef[] = [
     actor: "SHIPPER",
     to: "CANCELLED",
     effects: ["FULL_REFUND", "RELEASE_CAPACITY", "NOTIFY_CARRIER"],
+  },
+  {
+    from: "PENDING",
+    action: "cancel",
+    actor: "SYSTEM",
+    to: "CANCELLED",
+    // D40 — l'empreinte de paiement est morte SEULE (expiration ~7 j,
+    // annulation côté fournisseur, webhook payment_intent.canceled) :
+    // plus d'argent à libérer, seulement les kg et l'information.
+    // Pas de guard d'expiration : l'événement Stripe fait foi.
+    effects: ["RELEASE_CAPACITY", "NOTIFY_SHIPPER"],
   },
 
   // ── ACCEPTED ─────────────────────────────

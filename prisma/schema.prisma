@@ -665,7 +665,8 @@ model Booking {
   completedAt   DateTime?
   closedAt      DateTime? // DECLINED / EXPIRED / CANCELLED
   closedBy      BookingActor?
-  declineReason String?
+  declineReason String? // refus PENDING (5 raisons — DeclineReason du contrat)
+  cancelReason  String? // annulation Expéditeur (texte libre court, B2)
 
   // ─── Code de livraison (spec §9 — le serveur est seul juge) ───
   deliveryCodeHash    String? // bcrypt — JAMAIS dans un payload carrier

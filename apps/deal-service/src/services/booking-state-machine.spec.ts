@@ -4,11 +4,11 @@
  * Miroir TESTÉ de SPECIFICATIONS-WORKFLOW-YAMBA.md §2.2 et des
  * matrices ANN-01 / ANN-02 / CAP-02.
  *
- * Structure (188 tests) :
- *  S1  Chemins nominaux : 12 transitions → to + effets EXACTS      (12)
- *  S3  Mauvais acteur : refus par rôle, message dédié              (13)
+ * Structure (196 tests) :
+ *  S1  Chemins nominaux : 13 transitions → to + effets EXACTS      (13)
+ *  S3  Mauvais acteur : refus par rôle, message dédié              (12)
  *  S4  ADMIN : réservé, aucune action ne lui est ouverte           (10)
- *  S5  Mauvais statut : matrice générée (11 paires action×acteur)  (87)
+ *  S5  Mauvais statut : matrice générée (12 paires action×acteur)  (95)
  *  S6  Absences délibérées de la spec (assertions nommées)          (3)
  *  S7  Guards temporels & compteurs, bornes EXACTES                (15)
  *  S8  Soft delete : mort pour tout                                 (3)
@@ -91,7 +91,7 @@ describe("S1 — chemins nominaux (12 transitions du §2.2)", () => {
       "accept",
       "CARRIER",
       "ACCEPTED",
-      ["NOTIFY_SHIPPER"],
+      ["CAPTURE_PAYMENT", "NOTIFY_SHIPPER"],
     ],
     [
       "PENDING --decline(CARRIER)--> DECLINED",
@@ -116,6 +116,14 @@ describe("S1 — chemins nominaux (12 transitions du §2.2)", () => {
       "SHIPPER",
       "CANCELLED",
       ["FULL_REFUND", "RELEASE_CAPACITY", "NOTIFY_CARRIER"],
+    ],
+    [
+      "PENDING --cancel(SYSTEM)--> CANCELLED (empreinte morte — D40)",
+      makeBooking(),
+      "cancel",
+      "SYSTEM",
+      "CANCELLED",
+      ["RELEASE_CAPACITY", "NOTIFY_SHIPPER"],
     ],
     [
       "ACCEPTED --cancel(SHIPPER)--> CANCELLED (barème ANN-01)",
@@ -201,7 +209,6 @@ describe("S3 — mauvais acteur (le rôle fait partie de la transition)", () => 
     ["decline", "SHIPPER", makeBooking()],
     ["expire", "CARRIER", makeBooking({ expiresAt: minutes(-1) })],
     ["expire", "SHIPPER", makeBooking({ expiresAt: minutes(-1) })],
-    ["cancel", "SYSTEM", makeBooking()],
     ["pickup", "SHIPPER", makeBooking({ status: "ACCEPTED" })],
     ["refusePickup", "SHIPPER", makeBooking({ status: "ACCEPTED" })],
     ["deliver", "SHIPPER", makeBooking({ status: "PICKED_UP" })],
@@ -265,6 +272,7 @@ describe("S5 — mauvais statut (matrice action×acteur × statuts illégaux)", 
     { action: "expire", actor: "SYSTEM", legal: ["PENDING"] },
     { action: "cancel", actor: "SHIPPER", legal: ["PENDING", "ACCEPTED"] },
     { action: "cancel", actor: "CARRIER", legal: ["ACCEPTED"] },
+    { action: "cancel", actor: "SYSTEM", legal: ["PENDING"] },
     { action: "pickup", actor: "CARRIER", legal: ["ACCEPTED"] },
     { action: "refusePickup", actor: "CARRIER", legal: ["ACCEPTED"] },
     { action: "deliver", actor: "CARRIER", legal: ["PICKED_UP"] },

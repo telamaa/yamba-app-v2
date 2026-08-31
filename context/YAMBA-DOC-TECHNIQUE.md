@@ -691,3 +691,61 @@ Accept/decline + capture/libération et gate D31, cron d'expiration 24 h, annula
 
 ### 7. Pour tester en local
 `STRIPE_SECRET_KEY` (sk_test) côté serveur **et** `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` (pk_test) côté front, carte `4242 4242 4242 4242`. Sans aucune clé : fournisseur FAKE, l'étape 4 affiche « Mode test » et « Payer » envoie directement la demande.
+
+---
+
+# B2-PR2 — Cycle de vie du deal : accepter, refuser, annuler, expirer (D31, D39, D40)
+
+> Branche `feat/b2-deal-lifecycle` · 31/08/2026 · base `feat/b2-deal-request` (B2-PR1)
+
+### 1. Le problème
+Après B2-PR1, un deal naissait PENDING avec l'argent bloqué… et restait PENDING pour toujours. Rien ne permettait au Voyageur d'accepter (donc de capturer), de refuser (donc de libérer l'empreinte), à l'Expéditeur d'annuler, ni au système de faire expirer les demandes sans réponse. Et personne n'écoutait Stripe : une empreinte qui mourait seule (expiration ~7 jours) laissait un deal « acceptable » sans argent derrière.
+
+### 2. Les décisions gravées AVANT le code
+- **D39 — capture à l'ACCEPTATION** (pas à J-1 du départ) : une empreinte carte expire ~7 jours chez Stripe ; capturer à J-1 casserait tout deal accepté plus d'une semaine avant le départ. Conséquence : toute annulation post-acceptation est un **remboursement**. Barème ANN-01 : 100 % jusqu'à J-2, sinon retenue **50 %** (`CANCEL_LATE_RETENTION_PCT`, destinée au Voyageur — versée avec l'infra payout B4, tracée dès maintenant dans `refundAmountCents` et `booking.refund_issued`).
+- **D40 — le webhook Stripe est la source de vérité** : `payment_intent.canceled` → un Booking PENDING qui porte cet intent est annulé par SYSTEM (nouvelle transition machine `PENDING —cancel/SYSTEM→ CANCELLED`, répercutée dans la spec §2.2). Corps BRUT vérifié par signature, monté AVANT `express.json` ; en dev `stripe listen --forward-to localhost:6003/webhooks/stripe` (jamais via le gateway, qui re-sérialise le JSON).
+- **D31 exécuté** : les 2 checks profil/Stripe sont RETIRÉS des 3 chemins de publication du trip-service (create+publish, update+publish, publish) et appliqués dans l'accept — au moment où l'argent est réel. Le gate est sauté avec le FakePaymentProvider (dev sans clés).
+
+### 3. Le rituel commun à toutes les transitions
+```
+controller (Zod) → service :
+  1. charger le booking, vérifier la PARTIE (403 : le deal existe, pas pour toi)
+  2. canPerform(booking, action, acteur)  ← la MACHINE décide, jamais le controller
+       refus ⇒ 409 TRANSITION_NOT_ALLOWED (avec la raison de la machine)
+  3. L'ARGENT D'ABORD : capture / cancel / refund chez le PaymentProvider
+  4. LA BASE ENSUITE : UNE transaction Mongo
+       booking.updateMany { id, status: attendu }  ← conditionnel : 2 clics, 1 gagnant
+       trip.updateMany reservedKg -= kg            ← CAP-02, si l'effet le déclare
+       outboxEvent.create × N                      ← validés au contrat AVANT écriture
+  5. compensation best-effort (capture réussie mais course perdue → refund)
+```
+
+### 4. Où est le code
+| Couche | Fichier | Rôle |
+|---|---|---|
+| Machine | `apps/deal-service/src/services/booking-state-machine.ts` | effet `CAPTURE_PAYMENT` déclaré sur accept (D39) ; transition `PENDING —cancel/SYSTEM→ CANCELLED` (D40) — spec 196 tests |
+| Contrats | `packages/libs/api-contracts/src/booking/booking-lifecycle.schema.ts` | `DeclineReason` (5 valeurs É2), `AcceptDealRequest` (charte littérale `true`), `DeclineDealRequest`, `CancelDealRequest`, `DealTransitionResponse`, `BOOKING_LIFECYCLE_ERROR_CODES` |
+| Logique pure | `apps/deal-service/src/services/booking-lifecycle.ts` (+ `.spec.ts`) | `computeCancellationRefundCents` (barème ANN-01, bornes exactes), `kgReservedBySnapshot` (miroir CAP-02 de `kgToReserve`), `baseEventPayload` (depuis les snapshots D17, jamais relu du Trip), `BookingLifecycleError` |
+| Orchestration | `apps/deal-service/src/services/deal-lifecycle.service.ts` (+ `.spec.ts`, 31 tests) | `accept` / `decline` / `cancel` / `expireDueBookings` / `cancelBookingForDeadPayment` — le rituel ci-dessus |
+| HTTP | `controllers/deal-lifecycle.controller.ts`, `routes/deal.routes.ts` | `POST /deals/:id/accept · /decline · /cancel` ; le provider est UNE instance partagée (demande + cycle de vie + cron + webhook) |
+| Webhook | `controllers/stripe-webhook.controller.ts`, `main.ts` | `POST /webhooks/stripe` en `express.raw` AVANT `express.json` ; 501 sans secret, 400 signature invalide, 500 ⇒ Stripe réessaie (filet voulu) |
+| Vérif signature | `packages/libs/payments/src/index.ts` | `constructStripeWebhookEvent(rawBody, signature, secret)` — kafkajs-style : stripe reste isolé dans la lib |
+| Cron | `apps/deal-service/src/cron/expire-bookings.cron.ts` | toutes les 5 min, fournées de 50, anti-chevauchement, `BOOKING_EXPIRY_CRON_ENABLED=false` pour une instance API pure |
+| Trip-service | `controllers/trip.controller.ts` | gate profil/Stripe RETIRÉ des 3 chemins de publication (D31) — le `carrierPage` ne sert plus qu'au snapshot de note |
+| Schéma | `prisma/schema.prisma` | `Booking.cancelReason` (l'annulation Expéditeur a sa raison, distincte de `declineReason`) |
+| Env | `.env.example` | `STRIPE_WEBHOOK_SECRET`, `BOOKING_EXPIRY_CRON_ENABLED` |
+
+### 5. Les cinq chemins, argent compris
+| Chemin | Argent | Base (une transaction) | Outbox |
+|---|---|---|---|
+| accept (Voyageur) | `capture(intent)` — après gate D31 et `retrieve = AUTHORIZED` | PENDING→ACCEPTED, `acceptedAt`, `capturedAt` | `booking.accepted` |
+| decline (Voyageur) | `cancel(intent)` best-effort (l'empreinte expirerait seule) | PENDING→DECLINED, `closedBy/At`, `declineReason` ; kg restitués | `booking.declined` + `booking.refund_issued` (total) |
+| cancel PENDING (Expéditeur) | `cancel(intent)` | PENDING→CANCELLED, `cancelReason`, `refundAmountCents` = total ; kg | `booking.cancelled` (wasAccepted:false) + `booking.refund_issued` |
+| cancel ACCEPTED (Expéditeur) | `refund(intent, montant ANN-01)` — échec ⇒ 409, AUCUNE écriture | ACCEPTED→CANCELLED, `refundedAt`, `refundAmountCents` ; kg | `booking.cancelled` (wasAccepted:true) + `booking.refund_issued` (montant) |
+| expire (cron) / webhook (SYSTEM) | `cancel(intent)` / rien (déjà mort) | →EXPIRED / →CANCELLED `closedBy: SYSTEM` ; kg | `booking.expired` + `refund_issued` / `booking.cancelled` seul |
+
+### 6. Les courses (deux clics, deux acteurs, un cron)
+Tous les chemins écrivent avec `updateMany { id, status: attendu }` : le second perdant reçoit 409 « This deal changed in the meantime ». La course accept/decline se joue chez **Stripe** (on ne peut pas capturer un intent annulé, ni annuler un intent capturé) ; si la capture réussit mais que la transaction perd, l'accept rembourse (compensation) ; si un cancel échoue silencieusement, le webhook D40 réconcilie. Le webhook lui-même est idempotent : booking absent, non-PENDING ou course perdue ⇒ no-op 200.
+
+### 7. Tests (+46 → plateforme 503)
+Machine 188→196 (transition SYSTEM + effet CAPTURE_PAYMENT) · `booking-lifecycle.spec.ts` 7 (bornes EXACTES du barème : 48 h pile = 100 %, une minute sous = 50 % arrondi) · `deal-lifecycle.service.spec.ts` 31 : le VRAI FakePaymentProvider (les effets argent s'observent sur son état), prisma mock virtuel, contrat outbox RÉEL (`BookingDomainEventSchema.parse` dans le chemin testé). Gate D31 testé avec un stub STRIPE (le Fake le saute par design).
