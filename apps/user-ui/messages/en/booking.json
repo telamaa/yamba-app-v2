@@ -152,6 +152,7 @@
     "retry": "Try again",
     "testMode": "Test mode: no payment provider is configured. The {amount} authorization is simulated — click “Pay” to send your request.",
     "stripeMissing": "Online payment is unavailable right now. Please try again in a few minutes.",
+    "elementLoadError": "The payment module could not load. Check your connection and try again.",
     "confirmFailed": "The payment could not be authorized. Check your card and try again.",
     "requestSent": "Request sent! The tripper has 24h to accept.",
     "errors": {

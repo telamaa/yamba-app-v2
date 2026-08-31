@@ -152,6 +152,7 @@
     "retry": "Réessayer",
     "testMode": "Mode test : aucun prestataire de paiement n''est configuré. L''autorisation de {amount} est simulée — clique sur « Payer » pour envoyer ta demande.",
     "stripeMissing": "Le paiement en ligne n''est pas disponible pour le moment. Réessaie dans quelques minutes.",
+    "elementLoadError": "Le module de paiement n''a pas pu se charger. Vérifie ta connexion puis réessaie.",
     "confirmFailed": "Le paiement n''a pas pu être autorisé. Vérifie ta carte et réessaie.",
     "requestSent": "Demande envoyée ! Le voyageur a 24 h pour accepter.",
     "errors": {
