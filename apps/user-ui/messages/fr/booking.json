@@ -170,8 +170,8 @@
     "afterPayment": {
       "title": "Après ton paiement",
       "step1": "Le voyageur reçoit ta demande et a **24h pour accepter**. Tu n''es débité qu''à acceptation.",
-      "step2": "Tu reçois ton **code à 6 chiffres**, à transmettre au destinataire.",
-      "step3": "Rendez-vous avec le voyageur pour la **remise du colis**, qu''il vérifiera et photographiera.",
+      "step2": "Rendez-vous avec le voyageur pour la **remise du colis**, qu''il vérifiera et photographiera.",
+      "step3": "Une fois le colis déposé, tu reçois ton **code à 6 chiffres**, à transmettre au destinataire.",
       "step4": "Le destinataire communique le code au voyageur à l''arrivée, qui le saisit pour valider la livraison.",
       "step5": "**3 jours après** la livraison validée, le voyageur reçoit son paiement."
     },

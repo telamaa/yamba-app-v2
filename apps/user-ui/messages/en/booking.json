@@ -170,8 +170,8 @@
     "afterPayment": {
       "title": "After your payment",
       "step1": "The tripper receives your request and has **24h to accept**. You''re only charged on acceptance.",
-      "step2": "You receive your **6-digit code**, to share with the recipient.",
-      "step3": "Meet the tripper for the **handover**, where they''ll inspect and photograph the parcel.",
+      "step2": "Meet the tripper for the **handover**, where they''ll inspect and photograph the parcel.",
+      "step3": "Once the parcel is handed over, you receive your **6-digit code**, to share with the recipient.",
       "step4": "The recipient gives the code to the tripper at arrival, who enters it to confirm delivery.",
       "step5": "**3 days after** confirmed delivery, the tripper receives their payment."
     },
