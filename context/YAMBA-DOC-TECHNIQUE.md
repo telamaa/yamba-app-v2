@@ -823,3 +823,28 @@ Trois specs, 21 → **50 tests** (plateforme 511 → **540**) :
 
 ### 7. Hors périmètre (assumé)
 MailHog en docker-compose (candidat, avec D35) ; retry automatique des FAILED (rejeu manuel possible depuis la collection) ; `preferredLocale` utilisateur ; migration des clones email auth/trip ; les 8 gabarits B3/B4/B5 (chacun arrive avec le writer de son événement).
+
+---
+
+# B2-PR5 — Tracker Expéditeur : `/bookings/[id]` sur le réel (A37)
+
+### 1. Ce qui a été fait
+La page de suivi Expéditeur (48 fichiers, vues É3/É4b/É6/É8/É9 dessinées depuis des mois) tournait à 100 % sur des mocks : `getBooking()` choisissait un scénario selon l'URL (« annexe A » de la spec). Elle lit maintenant `GET /deals/:id` (vue Shipper — A13) via TanStack Query. Les mocks de données (`booking-tracker.state.ts`) sont SUPPRIMÉS.
+
+### 2. L'adapter conservatif (`booking-tracker.adapter.ts`)
+Patron du chapitre 28, avec une contrainte de plus : produire le **view-model EXISTANT** pour que les ~40 fichiers de vues ne bougent pas. Tout le vocabulaire s'absorbe à la frontière : statuts (`PENDING→AWAITING_CARRIER`, `COMPLETED→VERIFIED` ; `IN_TRANSIT` n'est PAS un statut serveur — le client dérive É6 de `PICKED_UP` + trackingEvents), cents→euros d'affichage, `TRAIN_STATION→STATION`, `codeRegenerationsLeft` (serveur) → `regeneratedCount` (front). Prouvé par un script `tsx` jetable (25 assertions : mapping des 9 statuts, dégradations, dérivés).
+
+### 3. Les dégradations honnêtes (champs non servis)
+Quatre familles de champs du view-model n'existent pas encore côté API — devenus **optionnels documentés** (jamais de valeur inventée) : stats Voyageur (rating/dealCount/isVerified — B5 : la ligne « ⭐ x.x · N deals » disparaît, on n'affiche pas un faux 0), métadonnées carte (cardBrand/cardLast4/statementDescriptor — Stripe, backlog : lignes Mode/Libellé relevé masquées dans `BookingPaymentBlock` et `DeliveredPaymentCard`), code de livraison (`deliveryCode.code` — AES B3 : `status` passe bien à AVAILABLE au pickup mais le code attend `deliveryCodeEncrypted`), ETA (durée de vol absente du snapshot — les vues la géraient déjà en optionnel).
+
+### 4. La fin du fallback menteur
+L'ancien client affichait la vue « accepté » pour tout statut inconnu — un deal REFUSÉ montrait « Ton Voyageur a accepté ». Nouvelle vue `BookingStatusNotice` (une seule colonne responsive, pas de double arbre pour un écran d'information) : AWAITING_CARRIER (paiement autorisé + deadline 24 h), DECLINED/EXPIRED (« tu n'es pas débité·e »), CANCELLED, VERIFIED (envoi terminé), DISPUTED (ticket YAM-XXXX + gel). CTA retour vers `/dashboard/shipments` (l'annulation Expéditrice vit LÀ — A31). Clés i18n `bookingTracker.statusNotice.*` FR/EN.
+
+### 5. TanStack Query et les actions encore mock
+`useQuery({ queryKey: ["booking", id], staleTime: 30 s, retry: 1 })` — même patron que `DealClient`. Les actions `regenerateDeliveryCode` / `confirmDeliveryEarly` / `submitDispute` restent des mocks MARQUÉS (B3/B4) : leurs handlers écrivent le cache local (`setQueryData`) et deviendront des `invalidateQueries` quand les endpoints réels existeront — le commentaire du client le dit explicitement. `BookingApiError` (NOT_FOUND avec 403 confondu, UNAUTHENTICATED, GENERIC) ; le client É9 (report) attrape désormais l'échec du fetch réel et revient au tracker.
+
+### 6. Les preuves
+tsc user-ui OK · build de production OK · script adapter 25 assertions OK · i18n FR/EN miroir. Pas de tests Jest côté user-ui (pas d'infra — même statut que l'adapter carrier de B2-PR3) : la plateforme reste à **540**.
+
+### 7. Hors périmètre (assumé)
+Le bouton Annuler sur le tracker (Mes envois le porte — A31) ; le rendu du code à 6 chiffres (AES B3) ; photos réelles (media-service B3) ; polling/temps réel (hors périmètre v1 de la spec).

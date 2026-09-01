@@ -28,10 +28,15 @@ export default function BookingPaymentBlock({ booking, variant }: Props) {
   const { payment, carrier, insurance } = booking;
   const isExtendedInsurance = insurance === "EXTENDED_500";
   const carrierFirstName = carrier.firstName;
-  const paymentMode = t("payment.modeFormat", {
-    brand: payment.cardBrand,
-    last4: payment.cardLast4,
-  });
+  // Métadonnées carte : servies par Stripe un jour (A37) — les lignes
+  // Mode / Libellé relevé disparaissent tant qu'elles sont absentes.
+  const paymentMode =
+    payment.cardBrand && payment.cardLast4
+      ? t("payment.modeFormat", {
+          brand: payment.cardBrand,
+          last4: payment.cardLast4,
+        })
+      : null;
 
   if (variant === "inline") {
     return (
@@ -45,14 +50,16 @@ export default function BookingPaymentBlock({ booking, variant }: Props) {
           </span>
         </div>
         <div className="mt-2.5 space-y-1.5 border-t border-slate-200 pt-2.5 dark:border-slate-700">
-          <div className="flex items-center justify-between text-[12px]">
-            <span className="text-slate-600 dark:text-slate-400">
-              {t("payment.modeLabel")}
-            </span>
-            <span className="font-medium text-slate-900 dark:text-white">
-              {paymentMode}
-            </span>
-          </div>
+          {paymentMode && (
+            <div className="flex items-center justify-between text-[12px]">
+              <span className="text-slate-600 dark:text-slate-400">
+                {t("payment.modeLabel")}
+              </span>
+              <span className="font-medium text-slate-900 dark:text-white">
+                {paymentMode}
+              </span>
+            </div>
+          )}
           {isExtendedInsurance && (
             <div className="flex items-center justify-between text-[12px]">
               <span className="text-slate-600 dark:text-slate-400">
@@ -87,22 +94,26 @@ export default function BookingPaymentBlock({ booking, variant }: Props) {
       <div className="my-3 border-t border-slate-100 dark:border-slate-800" />
 
       <div className="space-y-1.5">
-        <div className="flex items-center justify-between text-[12px]">
-          <span className="text-slate-600 dark:text-slate-400">
-            {t("payment.modeLabel")}
-          </span>
-          <span className="font-medium text-slate-900 dark:text-white">
-            {paymentMode}
-          </span>
-        </div>
-        <div className="flex items-center justify-between text-[12px]">
-          <span className="text-slate-600 dark:text-slate-400">
-            {t("payment.statementLabel")}
-          </span>
-          <span className="font-medium text-slate-900 dark:text-white">
-            {payment.statementDescriptor}
-          </span>
-        </div>
+        {paymentMode && (
+          <div className="flex items-center justify-between text-[12px]">
+            <span className="text-slate-600 dark:text-slate-400">
+              {t("payment.modeLabel")}
+            </span>
+            <span className="font-medium text-slate-900 dark:text-white">
+              {paymentMode}
+            </span>
+          </div>
+        )}
+        {payment.statementDescriptor && (
+          <div className="flex items-center justify-between text-[12px]">
+            <span className="text-slate-600 dark:text-slate-400">
+              {t("payment.statementLabel")}
+            </span>
+            <span className="font-medium text-slate-900 dark:text-white">
+              {payment.statementDescriptor}
+            </span>
+          </div>
+        )}
       </div>
 
       <p className="mt-3 text-[11px] leading-snug text-slate-500 dark:text-slate-400">

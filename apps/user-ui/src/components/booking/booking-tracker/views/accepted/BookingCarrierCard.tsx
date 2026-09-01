@@ -25,7 +25,12 @@ export default function BookingCarrierCard({ booking, compact = false }: Props) 
   const carrierFirstName = booking.carrier.firstName;
   const carrierFullName = `${booking.carrier.firstName} ${booking.carrier.lastInitial}.`;
   const initials = `${booking.carrier.firstName[0] ?? ""}${booking.carrier.lastInitial}`.toUpperCase();
-  const ratingFormatted = booking.carrier.rating.toFixed(1);
+  // Stats de réputation : B5 (A37) — la ligne disparaît tant que l'API
+  // ne les sert pas, on n'invente jamais un 0 étoile.
+  const ratingFormatted =
+    booking.carrier.rating !== undefined
+      ? booking.carrier.rating.toFixed(1)
+      : null;
 
   const handleMessage = () => {
     // TODO Phase backend: ouvrir le canal de messagerie avec le Voyageur
@@ -92,17 +97,19 @@ export default function BookingCarrierCard({ booking, compact = false }: Props) 
           >
             {carrierFullName}
           </div>
-          <div
-            className={`text-slate-500 dark:text-slate-400 ${
-              compact ? "text-[11px]" : "text-[12px]"
-            }`}
-          >
-            ⭐ {ratingFormatted} ·{" "}
-            {booking.carrier.dealCount === 1
-              ? `${booking.carrier.dealCount} deal`
-              : `${booking.carrier.dealCount} deals`}
-            {booking.carrier.isVerified && " · Vérifié"}
-          </div>
+          {ratingFormatted !== null && (
+            <div
+              className={`text-slate-500 dark:text-slate-400 ${
+                compact ? "text-[11px]" : "text-[12px]"
+              }`}
+            >
+              ⭐ {ratingFormatted} ·{" "}
+              {booking.carrier.dealCount === 1
+                ? `${booking.carrier.dealCount} deal`
+                : `${booking.carrier.dealCount} deals`}
+              {booking.carrier.isVerified && " · Vérifié"}
+            </div>
+          )}
         </div>
         <button
           type="button"

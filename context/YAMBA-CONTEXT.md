@@ -128,7 +128,18 @@ Ordre de demarrage : auth -> trip -> gateway.
   trace sans throw — best-effort), jointure User a l'envoi (RGPD : efface =
   saute), 8 gabarits EJS FR/EN (charte teal/mango/slate, jamais le code de
   livraison — teste sur le HTML rendu), +29 tests dont rendu EJS reel.
-- Plateforme de tests : 540 (trip 187, deal 303, notification 50) — post-B2-PR4.
+- B2-PR5 (tracker Expediteur, A37) : /bookings/[id] branche sur GET /deals/:id
+  (vue Shipper) par un adapter CONSERVATIF qui produit le view-model existant
+  (~40 fichiers de vues E3/E4b/E6/E8/E9 intacts ; vocabulaire absorbe a la
+  frontiere : PENDING→AWAITING_CARRIER, COMPLETED→VERIFIED, cents→euros),
+  TanStack Query, fin du fallback menteur (BookingStatusNotice pour attente/
+  refuse/expire/annule/termine/litige), degradations honnetes (stats Voyageur
+  B5, carte Stripe backlog, code AES B3 : lignes masquees, jamais inventees),
+  mocks de donnees supprimes ; actions regenerer/confirmer/litige encore mock
+  (basculent avec B3/B4). Preuve : tsc + build prod + script adapter 25
+  assertions.
+- Plateforme de tests : 540 (trip 187, deal 303, notification 50) — post-B2-PR4
+  (B2-PR5 = front seul, pas de Jest user-ui).
 - MERGE 01/09 : toute la pile B2 est dans `dev` via la SEULE **PR #90**
   (`feat/b2-deal-front` portait la chaîne complète : jalons mobile D36,
   docs cumulatifs, B2-PR1, B2-PR2, B2-PR3 + fix A34) — 13 checks verts
@@ -159,13 +170,11 @@ Ordre de demarrage : auth -> trip -> gateway.
 - UX restantes : step 1 (aeroport -> ville de rattachement + lieu de
   pickup, arrivee repliee, justificatif en step 3), lieux en chips + apercu
   sticky (create-trip), cleanup legacy PER_CATEGORY + instantBooking.
-- B2 (suite) : PR2 (cycle de vie), PR3 (front des transitions + seed) et
-  PR4 (emails transactionnels booking.*) FAITES — voir « fait » ci-dessus.
-  RESTE : tracker Expediteur /bookings/[id] → GET /deals/:id (vues E3 +
-  PENDING + terminaux branchables des maintenant ; E4b→E9 avec B3), photos
-  du colis via media-service :6009, AES-256-GCM re-affichage code
-  livraison, SiteConfig commissionRate (D16). payment-service :6008 :
-  NON (D38).
+- B2 (suite) : PR2 (cycle de vie), PR3 (front des transitions + seed),
+  PR4 (emails transactionnels booking.*) et PR5 (tracker Expediteur)
+  FAITES — voir « fait » ci-dessus. RESTE (avec B3) : photos du colis via
+  media-service :6009, AES-256-GCM re-affichage code livraison, SiteConfig
+  commissionRate (D16). payment-service :6008 : NON (D38).
 - B3 transport : pickup (upload R2, code bcrypt, checklist conformite),
   refuse, tracking, deliver (compare + lock serveur), regeneration code.
 - B4 argent sortant : confirmation anticipee, cron J+4 -> COMPLETED +

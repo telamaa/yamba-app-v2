@@ -2,18 +2,15 @@
   "title": "Mon envoi",
   "back": "Retour",
   "subtitle": "{originCity} → {destinationCity} · {date}",
-
   "banner": {
     "title": "{carrierFirstName} a accepté ton Deal",
     "titleShort": "{carrierFirstName} a accepté",
     "subtitle": "Tu as été débitée de {amount} € · ton colis va voyager le {date}",
     "subtitleShort": "Débit de {amount} € · départ le {date}"
   },
-
   "h1": "Et maintenant ?",
   "h1Subtitle": "{carrierFirstName} va te contacter pour fixer le rendez-vous. En attendant, prépare ton colis.",
   "h1SubtitleMobile": "{carrierFirstName} va te contacter. Prépare ton colis.",
-
   "timeline": {
     "title": "SUIVI DE TON ENVOI",
     "titleShort": "SUIVI DE L''ENVOI",
@@ -26,14 +23,12 @@
       "verificationShort": "Vérif."
     }
   },
-
   "deliveryCode": {
     "title": "Ton code de livraison",
     "pendingBadge": "En attente",
     "pendingDescription": "Tu recevras ton code à 6 chiffres dès que {carrierFirstName} confirmera la prise en charge de ton colis. Tu le transmettras à {recipientFirstName} pour valider la livraison.",
     "pendingDescriptionShort": "Tu le recevras quand {carrierFirstName} confirmera la prise en charge."
   },
-
   "parcelChecklist": {
     "title": "Prépare ton colis",
     "subtitle": "À avoir prêt avant ton rendez-vous avec {carrierFirstName}",
@@ -51,7 +46,6 @@
       "confirmMeetingShort": "Confirmer le rendez-vous avec {carrierFirstName}"
     }
   },
-
   "carrierCard": {
     "title": "Ton Voyageur",
     "subtitle": "{carrierFirstName} va te contacter pour fixer le pickup",
@@ -62,7 +56,6 @@
     "messageButton": "Envoyer un message à {carrierFirstName}",
     "messageButtonShort": "Message à {carrierFirstName}"
   },
-
   "recap": {
     "title": "Récap de l''envoi",
     "titleShort": "Récap",
@@ -76,7 +69,6 @@
     "recipientSub": "Tu lui transmettras le code de livraison à recevoir",
     "recipientSubShort": "{city}"
   },
-
   "payment": {
     "title": "TON PAIEMENT",
     "debitedLabel": "Débité",
@@ -87,7 +79,6 @@
     "insuranceLabel": "Assurance",
     "insuranceCovered": "{amount} € couverts"
   },
-
   "trip": {
     "title": "TON TRAJET",
     "route": "{originCity} → {destinationCity}",
@@ -95,7 +86,6 @@
     "arrivalLabel": "Date arrivée",
     "dateFormat": "{date} · {hour}h"
   },
-
   "nextSteps": {
     "title": "Comment ça va se passer ?",
     "items": {
@@ -111,9 +101,7 @@
       "verificationShort": "**Livraison validée** = versement à J+4."
     }
   },
-
   "dashboardLink": "Voir le Deal dans mon dashboard →",
-
   "pickedUp": {
     "banner": {
       "title": "{carrierFirstName} a pris ton colis en charge",
@@ -124,7 +112,6 @@
     "h1Short": "Ton code est arrivé",
     "h1Subtitle": "Transmets-le à {recipientFirstName}. Sans ce code, {carrierFirstName} ne pourra pas lui remettre le colis.",
     "h1SubtitleShort": "Transmets-le à {recipientFirstName} pour valider la livraison.",
-
     "code": {
       "label": "CODE À TRANSMETTRE À {recipientFirstName}",
       "copy": "Copier le code",
@@ -141,7 +128,6 @@
       "toastMaxReached": "Tu as atteint la limite de régénérations. Contacte le support si besoin.",
       "toastError": "Erreur lors de la régénération. Réessaye."
     },
-
     "share": {
       "title": "Partage le code à {recipientFirstName}",
       "subtitle": "Le message est pré-rempli, tu n''as qu''à envoyer",
@@ -153,14 +139,12 @@
       "messageTemplate": "Bonjour {recipientFirstName} ! Ton colis arrive avec {carrierFirstName} ({route}). Pour le récupérer, donne-lui ce code : {code}. Bisous !",
       "emailSubject": "Code de retrait de ton colis Yamba"
     },
-
     "pickupPhotos": {
       "title": "Photos de la prise en charge par {carrierFirstName}",
       "titleShort": "Photos du pickup",
       "subtitle": "Prises le {date} à {time} · {location}",
       "subtitleShort": "Par {carrierFirstName}, {time} à {location}"
     },
-
     "tracking": {
       "label": "SUIVI DU COLIS",
       "pickedUpLabel": "Pris en charge",
@@ -170,7 +154,6 @@
       "estimatedTonight": "Ce soir",
       "estimatedDate": "{date}"
     },
-
     "nextSteps": {
       "title": "Comment ça va se passer maintenant",
       "items": {
@@ -181,7 +164,6 @@
       }
     }
   },
-
   "delivered": {
     "banner": {
       "title": "Ton colis a été livré à {recipientFirstName}",
@@ -191,8 +173,11 @@
     "h1": "Période de vérification",
     "h1Subtitle": "Tu as 3 jours pour t''assurer que tout va bien avant que {carrierFirstName} reçoive son paiement.",
     "h1SubtitleShort": "3 jours pour t''assurer que tout va bien.",
-    "when": { "yesterday": "hier", "today": "aujourd''hui", "at": "à" },
-
+    "when": {
+      "yesterday": "hier",
+      "today": "aujourd''hui",
+      "at": "à"
+    },
     "countdown": {
       "label": "VERSEMENT AUTOMATIQUE DANS",
       "labelShort": "VERSEMENT DANS",
@@ -201,7 +186,6 @@
       "payout": "versement",
       "today": "aujourd''hui"
     },
-
     "confirmCard": {
       "title": "Tout s'est bien passé ?",
       "text": "Confirme que {recipientFirstName} a bien reçu son colis pour libérer {carrierFirstName} plus tôt. Tu n''as pas besoin d''attendre 3 jours si tu sais déjà que tout est OK.",
@@ -217,12 +201,10 @@
       "toastSuccess": "Merci ! {carrierFirstName} va recevoir son paiement. 🎉",
       "toastError": "Erreur lors de la confirmation. Réessaye."
     },
-
     "confirmedCard": {
       "title": "Paiement libéré",
       "text": "Tu as confirmé la livraison. {carrierFirstName} recevra son versement très vite. Merci pour lui !"
     },
-
     "recap": {
       "label": "RÉCAP DE LA LIVRAISON",
       "labelShort": "RÉCAP",
@@ -238,7 +220,6 @@
       "photosDeliveryShort": "Livraison",
       "codeValidatedBadge": "Code validé"
     },
-
     "howItWorks": {
       "title": "Comment ça marche",
       "confirm": "**Si tu confirmes maintenant**, {carrierFirstName} reçoit son paiement immédiatement. Geste apprécié, rapide.",
@@ -248,20 +229,17 @@
       "report": "**Si tu signales un problème**, le paiement est gelé et nous démarrons une médiation. Tu reçois une réponse de notre équipe sous 48h ouvrées.",
       "reportShort": "**Tu signales** = paiement gelé, médiation lancée."
     },
-
     "rate": {
       "title": "Pense à noter {carrierFirstName}",
       "text": "Ton retour aide les autres Expéditeurs à choisir leurs Voyageurs.",
       "textShort": "Ton retour aide les autres.",
       "button": "Donner mon avis"
     },
-
     "reportCard": {
       "title": "Quelque chose ne va pas avec ce colis ?",
       "text": "Signale-le avant la fin de la période de vérification — on gèlera le paiement le temps d'examiner.",
       "button": "Signaler un problème"
     },
-
     "payment": {
       "stateLabel": "État",
       "stateBlocked": "Bloqué jusqu'à J+4",
@@ -269,32 +247,26 @@
       "note": "Les fonds sont en attente chez Yamba. Ils seront versés à {carrierFirstName} après la période de vérification.",
       "noteReleased": "Tu as confirmé la livraison — les fonds sont en cours de versement à {carrierFirstName}."
     },
-
     "report": "Quelque chose ne va pas avec ce colis ?",
     "reportShort": "Quelque chose ne va pas ?"
   },
-
   "report": {
     "title": "Signaler un problème",
     "subtitle": "Deal {originCity} → {destinationCity} · livré le {date}",
     "subtitleShort": "Deal {originCity} → {destinationCity}",
     "back": "Retour",
-
     "banner": {
       "title": "On est là pour t''aider",
       "text": "Décris ce qui s''est passé, on s''occupe du reste. Pendant l''examen du dossier, le paiement de {carrierFirstName} reste bloqué.",
       "textShort": "Décris, on s''occupe du reste. Paiement {carrierFirstName} gelé."
     },
-
     "h1": "Décris-nous le problème",
     "h1Short": "Décris le problème",
     "h1Subtitle": "Plus tu nous donnes de détails et de preuves, plus rapidement on peut trancher.",
     "h1SubtitleShort": "Plus tu nous donnes de détails, plus vite on tranche.",
-
     "requiredBadge": "Requis",
     "recommendedBadge": "Recommandé",
     "optionalBadge": "Optionnel",
-
     "category": {
       "title": "Quel est le problème ?",
       "titleShort": "Quel problème ?",
@@ -312,7 +284,6 @@
       "OTHER": "Autre problème",
       "OTHER_short": "Autre"
     },
-
     "description": {
       "title": "Raconte-nous ce qui s''est passé",
       "titleShort": "Raconte",
@@ -322,7 +293,6 @@
       "counterBelow": "{count} / minimum {min} caractères",
       "counterOk": "{count} caractères ✓"
     },
-
     "photos": {
       "title": "Ajoute des photos",
       "titleShort": "Photos",
@@ -333,7 +303,6 @@
       "tag": "Preuve",
       "hint": "Demande à {recipientFirstName} de te transmettre des photos si elle peut. Jusqu''à {max} photos, max 10 Mo par photo."
     },
-
     "outcome": {
       "title": "Ta solution souhaitée",
       "titleShort": "Solution souhaitée",
@@ -347,7 +316,6 @@
       "YAMBA_DECIDES": "Je laisse Yamba décider en fonction des éléments",
       "YAMBA_DECIDES_short": "Je laisse Yamba décider"
     },
-
     "process": {
       "title": "Ce qui va se passer après ton signalement",
       "titleShort": "Et après ?",
@@ -360,14 +328,12 @@
       "step4": "**Pendant tout l''examen**, le paiement à {carrierFirstName} reste gelé. Aucun versement ne sera fait avant résolution.",
       "step4Short": "**Paiement {carrierFirstName} gelé** pendant l''examen."
     },
-
     "pledge": {
       "text": "Je déclare sur l''honneur que les informations fournies sont exactes. Je sais qu''un signalement abusif peut entraîner des conséquences contractuelles.",
       "textShort": "Je déclare sur l''honneur que les informations fournies sont exactes.",
       "whyLink": "Pourquoi cet engagement ?",
       "whyText": "Le signalement gèle le paiement d''une vraie personne. Cet engagement protège les Voyageurs honnêtes — comme la Charte les engage envers ton colis."
     },
-
     "cta": {
       "info": "Une fois envoyé, ton signalement ne pourra plus être modifié. Notre équipe te contactera sous 48h.",
       "infoShort": "Une fois envoyé, ton signalement ne pourra plus être modifié.",
@@ -381,7 +347,6 @@
       "confirmCancel": "Annuler",
       "toastError": "Erreur lors de l''envoi. Réessaye."
     },
-
     "sidebar": {
       "dealLabel": "LE DEAL CONCERNÉ",
       "deliveredAt": "Livré le {date} à {time}",
@@ -394,7 +359,6 @@
       "windowLabel": "FENÊTRE DE SIGNALEMENT",
       "windowText": "Tu peux signaler jusqu''au {date}."
     },
-
     "success": {
       "title": "Signalement envoyé",
       "subtitle": "On prend le relais. Tu recevras un accusé de réception sous 48h ouvrées.",
@@ -404,7 +368,6 @@
       "backToTracking": "Retour au suivi de mon envoi"
     }
   },
-
   "senderTracking": {
     "banner": {
       "pickedUpTitle": "Colis entre les mains de {carrierFirstName}",
@@ -418,7 +381,6 @@
       "arrivalIn": "Dans {countdown}",
       "flightIn": "Vol dans {countdown}"
     },
-
     "code": {
       "title": "Ton code de livraison",
       "sub": "À transmettre à {recipientFirstName}",
@@ -427,7 +389,6 @@
       "regenerate": "Régénérer",
       "hint": "Si tu penses que le code a fuité, régénère-le et retransmets-le à {recipientFirstName}. L'ancien sera invalidé."
     },
-
     "timeline": {
       "label": "ÉTAPES DU VOYAGE",
       "accepted": "Deal accepté par {carrierFirstName}",
@@ -453,7 +414,6 @@
       "deliverySub": "Code à saisir par {carrierFirstName} pour valider",
       "deliverySubShort": "Saisie du code par {carrierFirstName}"
     },
-
     "communication": {
       "label": "COMMUNICATION",
       "carrierRole": "Ton Voyageur",
@@ -465,7 +425,6 @@
       "call": "Appeler",
       "whatsapp": "WhatsApp"
     },
-
     "sidebar": {
       "parcelLabel": "LE COLIS",
       "parcelSummary": "{category} · {weight} kg · {value}",
@@ -481,12 +440,44 @@
       "coverageTitle": "Assurance {amount} souscrite",
       "coverageNote": "Perte, vol, casse pendant le transport."
     },
-
     "report": "Signaler un problème"
   },
-
   "error": {
     "notFound": "Cette réservation n''existe pas ou a été annulée.",
     "generic": "Une erreur est survenue. Réessaye dans un instant."
+  },
+  "statusNotice": {
+    "backToShipments": "Voir mes envois",
+    "ticketLine": "Ticket {ticket}",
+    "awaiting": {
+      "title": "En attente du Voyageur",
+      "message": "Ta demande est envoyée et ton paiement est autorisé — rien n'est débité tant que le Voyageur n'a pas accepté.",
+      "dateLine": "Sans réponse, elle expire le {date} et tu es intégralement remboursé·e."
+    },
+    "declined": {
+      "title": "Demande non acceptée",
+      "message": "Le Voyageur n'a pas pu accepter ta demande. Tu n'es pas débité·e : l'autorisation de paiement est levée intégralement.",
+      "dateLine": "Fermée le {date}."
+    },
+    "expired": {
+      "title": "Demande expirée",
+      "message": "Le Voyageur n'a pas répondu dans les 24 heures. Tu n'es pas débité·e : l'autorisation de paiement est levée intégralement.",
+      "dateLine": "Expirée le {date}."
+    },
+    "cancelled": {
+      "title": "Demande annulée",
+      "message": "Cette demande est close. Si un remboursement s'applique, il t'a été confirmé par email.",
+      "dateLine": "Annulée le {date}."
+    },
+    "verified": {
+      "title": "Envoi terminé",
+      "message": "La livraison est confirmée et le paiement du Voyageur est libéré. Merci d'avoir expédié avec Yamba.",
+      "dateLine": "Livré le {date}."
+    },
+    "disputed": {
+      "title": "Signalement en cours",
+      "message": "Ton signalement est enregistré : le versement au Voyageur est gelé le temps de l'examen. Notre équipe te répond sous 48 h ouvrées.",
+      "dateLine": "Ouvert le {date}."
+    }
   }
 }
