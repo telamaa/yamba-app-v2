@@ -120,6 +120,10 @@ Ordre de demarrage : auth -> trip -> gateway.
 - Plateforme de tests : 511 (trip 187, deal 303, notification 21) — post-B2-PR3
   (+A34 : contrat aligné wizard — email destinataire optionnel, description min 5 ;
   backfill reservedKg sur les Trips pré-B2-PR1).
+- MERGE 01/09 : toute la pile B2 est dans `dev` via la SEULE **PR #90**
+  (`feat/b2-deal-front` portait la chaîne complète : jalons mobile D36,
+  docs cumulatifs, B2-PR1, B2-PR2, B2-PR3 + fix A34) — 13 checks verts
+  comptés. Les 5 branches de la pile sont mergées (purge possible).
 
 ## Release et historique (28 aout 2026)
 
