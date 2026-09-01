@@ -46,13 +46,19 @@ export default function BookingReportClient({ bookingId }: Props) {
 
   useEffect(() => {
     let cancelled = false;
-    getBooking(bookingId).then((b) => {
-      if (!cancelled) setBooking(b);
-    });
+    getBooking(bookingId)
+      .then((b) => {
+        if (!cancelled) setBooking(b);
+      })
+      .catch(() => {
+        // getBooking est RÉEL (A37) : introuvable / pas à toi → retour
+        // au tracker, qui affiche son propre état d'erreur.
+        if (!cancelled) router.push("/bookings/" + bookingId);
+      });
     return () => {
       cancelled = true;
     };
-  }, [bookingId]);
+  }, [bookingId, router]);
 
   const handleBack = useCallback(() => {
     router.push("/bookings/" + bookingId);

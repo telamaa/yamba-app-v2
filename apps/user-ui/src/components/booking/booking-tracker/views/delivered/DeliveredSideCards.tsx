@@ -25,10 +25,15 @@ export function DeliveredPaymentCard({
 
   const carrierFirstName = booking.carrier.firstName;
   const { payment } = booking;
-  const paymentMode = t("payment.modeFormat", {
-    brand: payment.cardBrand,
-    last4: payment.cardLast4,
-  });
+  // Métadonnées carte : servies par Stripe un jour (A37) — la ligne
+  // Mode disparaît tant qu'elles sont absentes.
+  const paymentMode =
+    payment.cardBrand && payment.cardLast4
+      ? t("payment.modeFormat", {
+          brand: payment.cardBrand,
+          last4: payment.cardLast4,
+        })
+      : null;
 
   const stateClass = isConfirmed
     ? "font-semibold text-emerald-700 dark:text-emerald-400"
@@ -52,14 +57,16 @@ export function DeliveredPaymentCard({
       <div className="my-3 border-t border-slate-100 dark:border-slate-800" />
 
       <div className="space-y-1.5">
-        <div className="flex items-center justify-between text-[12px]">
-          <span className="text-slate-600 dark:text-slate-400">
-            {t("payment.modeLabel")}
-          </span>
-          <span className="font-medium text-slate-900 dark:text-white">
-            {paymentMode}
-          </span>
-        </div>
+        {paymentMode && (
+          <div className="flex items-center justify-between text-[12px]">
+            <span className="text-slate-600 dark:text-slate-400">
+              {t("payment.modeLabel")}
+            </span>
+            <span className="font-medium text-slate-900 dark:text-white">
+              {paymentMode}
+            </span>
+          </div>
+        )}
         <div className="flex items-center justify-between text-[12px]">
           <span className="text-slate-600 dark:text-slate-400">
             {t("delivered.payment.stateLabel")}

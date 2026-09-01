@@ -2,19 +2,25 @@
  * BookingTrackerClient.tsx
  * ========================
  * Orchestrateur principal du module BookingTracker côté Expéditeur.
+ * Données RÉELLES : GET /deals/:id (vue Shipper) via l'adapter (A37),
+ * TanStack Query (relecture serveur, jamais de vérité locale).
  * Switch sur booking.status :
- *   ACCEPTED  → BookingAccepted*
- *   PICKED_UP → BookingPickedUp* (code révélé)
- *   (futurs)  → IN_TRANSIT, DELIVERED, VERIFIED, etc.
+ *   ACCEPTED           → É3  (BookingAccepted*)
+ *   PICKED_UP sans/avec trackingEvents → É4b / É6
+ *   DELIVERED          → É8
+ *   autres statuts     → BookingStatusNotice (jamais de fallback menteur)
  * L'URL reste stable : /bookings/[bookingId]
  *
- * Mock : un bookingId contenant "picked" charge le statut PICKED_UP.
+ * Les handlers de code régénéré / confirmation anticipée écrivent le
+ * cache local car leurs actions sont ENCORE MOCK (B3/B4) — ils
+ * deviendront des invalidateQueries quand les endpoints existeront.
  */
 
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback } from "react";
 import { useTranslations } from "next-intl";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { useRouter } from "@/i18n/navigation";
 import { getBooking } from "./booking-tracker.api";
@@ -28,6 +34,9 @@ import BookingDeliveredDesktop from "./views/delivered/BookingDeliveredDesktop";
 import BookingDeliveredMobile from "./views/delivered/BookingDeliveredMobile";
 import BookingInTransitDesktop from "./views/in-transit/BookingInTransitDesktop";
 import BookingInTransitMobile from "./views/in-transit/BookingInTransitMobile";
+import BookingStatusNotice from "./views/status/BookingStatusNotice";
+
+export const bookingQueryKey = (bookingId: string) => ["booking", bookingId];
 
 type Props = {
   bookingId: string;
@@ -36,77 +45,67 @@ type Props = {
 export default function BookingTrackerClient({ bookingId }: Props) {
   const isMobile = useIsMobile();
   const router = useRouter();
-  const [booking, setBooking] = useState<Booking | null>(null);
-  const [loadError, setLoadError] = useState(false);
+  const queryClient = useQueryClient();
 
-  useEffect(() => {
-    let cancelled = false;
-    setBooking(null);
-    setLoadError(false);
-    getBooking(bookingId)
-      .then((b) => {
-        if (!cancelled) setBooking(b);
-      })
-      .catch(() => {
-        if (!cancelled) setLoadError(true);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [bookingId]);
+  const {
+    data: booking,
+    isPending,
+    isError,
+  } = useQuery({
+    queryKey: bookingQueryKey(bookingId),
+    queryFn: () => getBooking(bookingId),
+    staleTime: 30_000,
+    retry: 1,
+  });
 
   const handleClose = useCallback(() => {
-    router.push("/");
+    router.push("/dashboard/shipments");
   }, [router]);
 
-  // Mise à jour locale du code après régénération (le mock ne persiste pas)
+  // Actions ENCORE MOCK (B3/B4) : mise à jour du cache local, remplacée
+  // par invalidateQueries quand les endpoints réels existeront (A37).
   const handleCodeRegenerated = useCallback(
     (newCode: string, regeneratedCount: number) => {
-      setBooking((prev) =>
+      queryClient.setQueryData<Booking>(bookingQueryKey(bookingId), (prev) =>
         prev
           ? {
-            ...prev,
-            deliveryCode: {
-              ...prev.deliveryCode,
-              code: newCode,
-              regeneratedCount,
-            },
-          }
+              ...prev,
+              deliveryCode: {
+                ...prev.deliveryCode,
+                code: newCode,
+                regeneratedCount,
+              },
+            }
           : prev
       );
     },
-    []
+    [queryClient, bookingId]
   );
 
-  const [earlyConfirmedAt, setEarlyConfirmedAt] = useState<string | null>(null);
+  const handleEarlyConfirmed = useCallback(
+    (confirmedAt: string) => {
+      queryClient.setQueryData<Booking>(bookingQueryKey(bookingId), (prev) =>
+        prev && prev.delivery
+          ? {
+              ...prev,
+              delivery: { ...prev.delivery, confirmedEarlyAt: confirmedAt },
+            }
+          : prev
+      );
+    },
+    [queryClient, bookingId]
+  );
 
-  const handleEarlyConfirmed = useCallback((confirmedAt: string) => {
-    setEarlyConfirmedAt(confirmedAt);
-    setBooking((prev) =>
-      prev && prev.delivery
-        ? {
-          ...prev,
-          delivery: { ...prev.delivery, confirmedEarlyAt: confirmedAt },
-        }
-        : prev
-    );
-  }, []);
-
-  if (isMobile === null || (!booking && !loadError)) {
+  if (isMobile === null || isPending) {
     return <BookingTrackerSkeleton />;
   }
 
-  if (loadError) {
+  if (isError || !booking) {
     return <BookingTrackerError onBackAction={handleClose} />;
   }
 
-  if (!booking) {
-    return <BookingTrackerSkeleton />;
-  }
-
   if (booking.status === "DELIVERED") {
-    const isConfirmed =
-      earlyConfirmedAt !== null || !!booking.delivery?.confirmedEarlyAt;
+    const isConfirmed = !!booking.delivery?.confirmedEarlyAt;
     return isMobile ? (
       <BookingDeliveredMobile
         booking={booking}
@@ -168,18 +167,9 @@ export default function BookingTrackerClient({ bookingId }: Props) {
     );
   }
 
-  // Statuts futurs (IN_TRANSIT, DELIVERED, VERIFIED, etc.) — fallback ACCEPTED
-  // eslint-disable-next-line no-console
-  console.info(
-    "[booking] Status",
-    booking.status,
-    "— view not yet implemented, fallback to ACCEPTED view"
-  );
-  return isMobile ? (
-    <BookingAcceptedMobile booking={booking} onCloseAction={handleClose} />
-  ) : (
-    <BookingAcceptedDesktop booking={booking} onCloseAction={handleClose} />
-  );
+  // AWAITING_CARRIER, DECLINED, EXPIRED, CANCELLED, VERIFIED, DISPUTED :
+  // vue d'état neutre — une URL directe ne ment jamais (A37).
+  return <BookingStatusNotice booking={booking} onBackAction={handleClose} />;
 }
 
 function BookingTrackerError({ onBackAction }: { onBackAction: () => void }) {

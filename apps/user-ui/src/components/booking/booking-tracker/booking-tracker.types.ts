@@ -9,22 +9,26 @@
  */
 
 export type BookingStatus =
-  | "AWAITING_CARRIER" // Booking créé, en attente qu'un Voyageur accepte
+  | "AWAITING_CARRIER" // PENDING serveur — en attente de réponse du Voyageur
   | "ACCEPTED" // Un Voyageur a accepté (Phase 3 actuelle)
   | "PICKED_UP" // Voyageur a confirmé pickup, code livraison révélé
-  | "IN_TRANSIT" // Colis en transport
+  | "IN_TRANSIT" // Colis en transport (dérivé : PICKED_UP + trackingEvents)
   | "DELIVERED" // Code validé par le Voyageur à l'arrivée
-  | "VERIFIED" // Période de vérification 3j écoulée, payout libéré
+  | "VERIFIED" // COMPLETED serveur — vérification écoulée, payout libéré
   | "DISPUTED" // Sender a signalé un problème
+  | "DECLINED" // Le Voyageur a refusé (remboursement intégral)
+  | "EXPIRED" // 24 h sans réponse (remboursement intégral)
   | "CANCELLED";
 
 export type BookingCarrier = {
   id: string;
   firstName: string;
   lastInitial: string;
-  rating: number;
-  dealCount: number;
-  isVerified: boolean;
+  // Stats de réputation : naissent en B5 — absentes du contrat, jamais
+  // inventées (A37). Les vues dégradent proprement.
+  rating?: number;
+  dealCount?: number;
+  isVerified?: boolean;
   avatarUrl?: string;
 };
 
@@ -76,10 +80,11 @@ export type BookingInsurance = "BASIC" | "EXTENDED_500";
 
 export type BookingPayment = {
   totalPaidEur: number;
-  cardBrand: string; // "Visa", "Mastercard", ...
-  cardLast4: string; // "4242"
-  statementDescriptor: string; // "YAMBA*COLIS"
-  paymentMethod: "CARD"; // pourra évoluer
+  // Métadonnées carte : viendront de Stripe (backlog A37) — le
+  // paiement affiche le total seul d'ici là.
+  cardBrand?: string; // "Visa", "Mastercard", ...
+  cardLast4?: string; // "4242"
+  statementDescriptor?: string; // "YAMBA*COLIS"
 };
 
 export type BookingDeliveryCode = {
@@ -95,6 +100,16 @@ export type Booking = {
   status: BookingStatus;
   createdAt: string;
   acceptedAt?: string;
+  /** Deadline d'acceptation 24 h (statut AWAITING_CARRIER). */
+  expiresAt?: string;
+  /** Posé sur DECLINED / EXPIRED / CANCELLED. */
+  closedAt?: string;
+  /** Fin de la fenêtre de vérification (J+4) — statut DELIVERED. */
+  payoutDueAt?: string;
+  /** Ticket YAM-XXXX si un litige est ouvert. */
+  disputeTicket?: string;
+  /** Machine d'état serveur — les CTA reflètent, ne décident jamais. */
+  allowedActions?: string[];
 
   carrier: BookingCarrier;
   trip: BookingTrip;

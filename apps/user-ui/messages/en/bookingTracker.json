@@ -2,18 +2,15 @@
   "title": "My shipment",
   "back": "Back",
   "subtitle": "{originCity} → {destinationCity} · {date}",
-
   "banner": {
     "title": "{carrierFirstName} accepted your Deal",
     "titleShort": "{carrierFirstName} accepted",
     "subtitle": "You''ve been charged €{amount} · your parcel will travel on {date}",
     "subtitleShort": "€{amount} charged · departing {date}"
   },
-
   "h1": "What now?",
   "h1Subtitle": "{carrierFirstName} will contact you to set the meeting. Meanwhile, prepare your parcel.",
   "h1SubtitleMobile": "{carrierFirstName} will contact you. Prepare your parcel.",
-
   "timeline": {
     "title": "YOUR SHIPMENT TRACKING",
     "titleShort": "TRACKING",
@@ -26,14 +23,12 @@
       "verificationShort": "Verif."
     }
   },
-
   "deliveryCode": {
     "title": "Your delivery code",
     "pendingBadge": "Pending",
     "pendingDescription": "You''ll receive your 6-digit code as soon as {carrierFirstName} confirms picking up your parcel. You''ll share it with {recipientFirstName} to validate the delivery.",
     "pendingDescriptionShort": "You''ll receive it when {carrierFirstName} confirms pickup."
   },
-
   "parcelChecklist": {
     "title": "Prepare your parcel",
     "subtitle": "To have ready before your meeting with {carrierFirstName}",
@@ -51,7 +46,6 @@
       "confirmMeetingShort": "Confirm meeting with {carrierFirstName}"
     }
   },
-
   "carrierCard": {
     "title": "Your Tripper",
     "subtitle": "{carrierFirstName} will contact you to set the pickup",
@@ -62,7 +56,6 @@
     "messageButton": "Send a message to {carrierFirstName}",
     "messageButtonShort": "Message {carrierFirstName}"
   },
-
   "recap": {
     "title": "Shipment recap",
     "titleShort": "Recap",
@@ -76,7 +69,6 @@
     "recipientSub": "You''ll forward them the delivery code you receive",
     "recipientSubShort": "{city}"
   },
-
   "payment": {
     "title": "YOUR PAYMENT",
     "debitedLabel": "Charged",
@@ -87,7 +79,6 @@
     "insuranceLabel": "Insurance",
     "insuranceCovered": "€{amount} covered"
   },
-
   "trip": {
     "title": "YOUR TRIP",
     "route": "{originCity} → {destinationCity}",
@@ -95,7 +86,6 @@
     "arrivalLabel": "Arrival",
     "dateFormat": "{date} · {hour}:00"
   },
-
   "nextSteps": {
     "title": "How will it work?",
     "items": {
@@ -111,9 +101,7 @@
       "verificationShort": "**Delivery validated** = payout D+4."
     }
   },
-
   "dashboardLink": "View Deal in my dashboard →",
-
   "pickedUp": {
     "banner": {
       "title": "{carrierFirstName} has picked up your parcel",
@@ -124,7 +112,6 @@
     "h1Short": "Your code has arrived",
     "h1Subtitle": "Forward it to {recipientFirstName}. Without this code, {carrierFirstName} can''t hand over the parcel.",
     "h1SubtitleShort": "Forward it to {recipientFirstName} to validate delivery.",
-
     "code": {
       "label": "CODE TO FORWARD TO {recipientFirstName}",
       "copy": "Copy code",
@@ -141,7 +128,6 @@
       "toastMaxReached": "You''ve reached the regeneration limit. Contact support if needed.",
       "toastError": "Error regenerating. Try again."
     },
-
     "share": {
       "title": "Share the code with {recipientFirstName}",
       "subtitle": "The message is pre-filled, just hit send",
@@ -153,14 +139,12 @@
       "messageTemplate": "Hi {recipientFirstName}! Your parcel is arriving with {carrierFirstName} ({route}). To collect it, give him this code: {code}. Cheers!",
       "emailSubject": "Pickup code for your Yamba parcel"
     },
-
     "pickupPhotos": {
       "title": "Pickup photos by {carrierFirstName}",
       "titleShort": "Pickup photos",
       "subtitle": "Taken on {date} at {time} · {location}",
       "subtitleShort": "By {carrierFirstName}, {time} at {location}"
     },
-
     "tracking": {
       "label": "PARCEL TRACKING",
       "pickedUpLabel": "Picked up",
@@ -170,7 +154,6 @@
       "estimatedTonight": "Tonight",
       "estimatedDate": "{date}"
     },
-
     "nextSteps": {
       "title": "What happens now",
       "items": {
@@ -181,7 +164,6 @@
       }
     }
   },
-
   "delivered": {
     "banner": {
       "title": "Your parcel was delivered to {recipientFirstName}",
@@ -191,8 +173,11 @@
     "h1": "Verification period",
     "h1Subtitle": "You have 3 days to make sure everything is fine before {carrierFirstName} receives his payment.",
     "h1SubtitleShort": "3 days to make sure everything is fine.",
-    "when": { "yesterday": "yesterday", "today": "today", "at": "at" },
-
+    "when": {
+      "yesterday": "yesterday",
+      "today": "today",
+      "at": "at"
+    },
     "countdown": {
       "label": "AUTOMATIC PAYOUT IN",
       "labelShort": "PAYOUT IN",
@@ -201,7 +186,6 @@
       "payout": "payout",
       "today": "today"
     },
-
     "confirmCard": {
       "title": "Did everything go well?",
       "text": "Confirm that {recipientFirstName} received her parcel to release {carrierFirstName} earlier. No need to wait 3 days if you already know everything is OK.",
@@ -217,12 +201,10 @@
       "toastSuccess": "Thanks! {carrierFirstName} will receive his payment. 🎉",
       "toastError": "Error confirming. Try again."
     },
-
     "confirmedCard": {
       "title": "Payment released",
       "text": "You confirmed the delivery. {carrierFirstName} will receive his payout very soon. Thanks for him!"
     },
-
     "recap": {
       "label": "DELIVERY RECAP",
       "labelShort": "RECAP",
@@ -238,7 +220,6 @@
       "photosDeliveryShort": "Delivery",
       "codeValidatedBadge": "Code validated"
     },
-
     "howItWorks": {
       "title": "How it works",
       "confirm": "**If you confirm now**, {carrierFirstName} receives his payment immediately. Appreciated, quick gesture.",
@@ -248,20 +229,17 @@
       "report": "**If you report an issue**, the payment is frozen and we start a mediation. Our team replies within 48 business hours.",
       "reportShort": "**You report** = payment frozen, mediation started."
     },
-
     "rate": {
       "title": "Remember to rate {carrierFirstName}",
       "text": "Your feedback helps other Shippers choose their Trippers.",
       "textShort": "Your feedback helps others.",
       "button": "Leave a review"
     },
-
     "reportCard": {
       "title": "Something wrong with this parcel?",
       "text": "Report it before the verification period ends — we'll freeze the payment while we review.",
       "button": "Report an issue"
     },
-
     "payment": {
       "stateLabel": "Status",
       "stateBlocked": "Blocked until D+4",
@@ -269,32 +247,26 @@
       "note": "The funds are held by Yamba. They will be paid to {carrierFirstName} after the verification period.",
       "noteReleased": "You confirmed the delivery — the funds are being transferred to {carrierFirstName}."
     },
-
     "report": "Something wrong with this parcel?",
     "reportShort": "Something wrong?"
   },
-
   "report": {
     "title": "Report an issue",
     "subtitle": "Deal {originCity} → {destinationCity} · delivered on {date}",
     "subtitleShort": "Deal {originCity} → {destinationCity}",
     "back": "Back",
-
     "banner": {
       "title": "We''re here to help",
       "text": "Tell us what happened, we''ll take care of the rest. While we review the case, {carrierFirstName}''s payment stays blocked.",
       "textShort": "Tell us, we''ll handle the rest. {carrierFirstName}''s payment frozen."
     },
-
     "h1": "Tell us about the problem",
     "h1Short": "Describe the problem",
     "h1Subtitle": "The more details and evidence you give us, the faster we can decide.",
     "h1SubtitleShort": "The more details you give, the faster we decide.",
-
     "requiredBadge": "Required",
     "recommendedBadge": "Recommended",
     "optionalBadge": "Optional",
-
     "category": {
       "title": "What''s the problem?",
       "titleShort": "What problem?",
@@ -312,7 +284,6 @@
       "OTHER": "Other issue",
       "OTHER_short": "Other"
     },
-
     "description": {
       "title": "Tell us what happened",
       "titleShort": "Tell us",
@@ -322,7 +293,6 @@
       "counterBelow": "{count} / minimum {min} characters",
       "counterOk": "{count} characters ✓"
     },
-
     "photos": {
       "title": "Add photos",
       "titleShort": "Photos",
@@ -333,7 +303,6 @@
       "tag": "Evidence",
       "hint": "Ask {recipientFirstName} to send you photos if she can. Up to {max} photos, max 10 MB each."
     },
-
     "outcome": {
       "title": "Your preferred outcome",
       "titleShort": "Preferred outcome",
@@ -347,7 +316,6 @@
       "YAMBA_DECIDES": "I''ll let Yamba decide based on the evidence",
       "YAMBA_DECIDES_short": "I''ll let Yamba decide"
     },
-
     "process": {
       "title": "What happens after your report",
       "titleShort": "What''s next?",
@@ -360,14 +328,12 @@
       "step4": "**During the entire review**, {carrierFirstName}''s payment stays frozen. Nothing is paid out before resolution.",
       "step4Short": "**{carrierFirstName}''s payment frozen** during the review."
     },
-
     "pledge": {
       "text": "I declare on my honour that the information provided is accurate. I understand that an abusive report may lead to contractual consequences.",
       "textShort": "I declare on my honour that the information provided is accurate.",
       "whyLink": "Why this commitment?",
       "whyText": "A report freezes a real person''s payment. This commitment protects honest Trippers — just like the Charter commits them to your parcel."
     },
-
     "cta": {
       "info": "Once sent, your report can no longer be modified. Our team will contact you within 48h.",
       "infoShort": "Once sent, your report can no longer be modified.",
@@ -381,7 +347,6 @@
       "confirmCancel": "Cancel",
       "toastError": "Error sending. Try again."
     },
-
     "sidebar": {
       "dealLabel": "THE DEAL CONCERNED",
       "deliveredAt": "Delivered on {date} at {time}",
@@ -394,7 +359,6 @@
       "windowLabel": "REPORTING WINDOW",
       "windowText": "You can report until {date}."
     },
-
     "success": {
       "title": "Report sent",
       "subtitle": "We''re taking over. You''ll receive an acknowledgement within 48 business hours.",
@@ -404,7 +368,6 @@
       "backToTracking": "Back to my shipment tracking"
     }
   },
-
   "senderTracking": {
     "banner": {
       "pickedUpTitle": "Parcel in {carrierFirstName}'s hands",
@@ -418,7 +381,6 @@
       "arrivalIn": "In {countdown}",
       "flightIn": "Flight in {countdown}"
     },
-
     "code": {
       "title": "Your delivery code",
       "sub": "To forward to {recipientFirstName}",
@@ -427,7 +389,6 @@
       "regenerate": "Regenerate",
       "hint": "If you think the code leaked, regenerate it and resend it to {recipientFirstName}. The old one will be invalidated."
     },
-
     "timeline": {
       "label": "TRIP STEPS",
       "accepted": "Deal accepted by {carrierFirstName}",
@@ -453,7 +414,6 @@
       "deliverySub": "Code to be entered by {carrierFirstName} to validate",
       "deliverySubShort": "Code entry by {carrierFirstName}"
     },
-
     "communication": {
       "label": "COMMUNICATION",
       "carrierRole": "Your Tripper",
@@ -465,7 +425,6 @@
       "call": "Call",
       "whatsapp": "WhatsApp"
     },
-
     "sidebar": {
       "parcelLabel": "THE PARCEL",
       "parcelSummary": "{category} · {weight} kg · {value}",
@@ -481,12 +440,44 @@
       "coverageTitle": "{amount} insurance active",
       "coverageNote": "Loss, theft, breakage during transport."
     },
-
     "report": "Report an issue"
   },
-
   "error": {
     "notFound": "This booking doesn''t exist or has been cancelled.",
     "generic": "An error occurred. Try again in a moment."
+  },
+  "statusNotice": {
+    "backToShipments": "View my shipments",
+    "ticketLine": "Ticket {ticket}",
+    "awaiting": {
+      "title": "Waiting for the carrier",
+      "message": "Your request is sent and your payment is authorized — nothing is charged until the carrier accepts.",
+      "dateLine": "Without an answer, it expires on {date} and you are fully refunded."
+    },
+    "declined": {
+      "title": "Request not accepted",
+      "message": "The carrier could not accept your request. You are not charged: the payment authorization is fully released.",
+      "dateLine": "Closed on {date}."
+    },
+    "expired": {
+      "title": "Request expired",
+      "message": "The carrier did not answer within 24 hours. You are not charged: the payment authorization is fully released.",
+      "dateLine": "Expired on {date}."
+    },
+    "cancelled": {
+      "title": "Request cancelled",
+      "message": "This request is closed. If a refund applies, it was confirmed to you by email.",
+      "dateLine": "Cancelled on {date}."
+    },
+    "verified": {
+      "title": "Shipment complete",
+      "message": "The delivery is confirmed and the carrier's payout is released. Thank you for shipping with Yamba.",
+      "dateLine": "Delivered on {date}."
+    },
+    "disputed": {
+      "title": "Report under review",
+      "message": "Your report is recorded: the carrier payout is frozen during the review. Our team answers within 48 business hours.",
+      "dateLine": "Opened on {date}."
+    }
   }
 }
