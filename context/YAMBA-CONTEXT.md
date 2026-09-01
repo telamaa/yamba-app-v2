@@ -143,7 +143,9 @@ Ordre de demarrage : auth -> trip -> gateway.
 - MERGE 01/09 : toute la pile B2 est dans `dev` via la SEULE **PR #90**
   (`feat/b2-deal-front` portait la chaîne complète : jalons mobile D36,
   docs cumulatifs, B2-PR1, B2-PR2, B2-PR3 + fix A34) — 13 checks verts
-  comptés. Les 5 branches de la pile sont mergées (purge possible).
+  comptés. Puis dans la même journée : **#91** (docs post-merge, les 5
+  branches de la pile PURGÉES origin+local), **#92** (B2-PR4 emails),
+  **#93** (B2-PR5 tracker) — 13 checks comptés à chaque fois. **B2 SOLDÉ.**
 
 ## Release et historique (28 aout 2026)
 
