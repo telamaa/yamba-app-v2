@@ -90,7 +90,7 @@ export type BookingRecord = {
     firstName: string;
     lastName: string;
     phoneE164: string;
-    email: string;
+    email: string | null;
   };
   pickup: {
     confirmedAt: Date;

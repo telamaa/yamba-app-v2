@@ -9,6 +9,7 @@ import {
   assertQuoteMatches,
   buildBookingSnapshots,
   buildQuoteInput,
+  capacityReservationWhere,
   checkCapacity,
   checkTripBookable,
   kgToReserve,
@@ -17,7 +18,7 @@ import {
   resolveFamilySurcharge,
   type TripForBooking,
 } from "./booking-request";
-import type { CreateBookingRequest } from "@packages/api-contracts";
+import { CreateBookingRequestSchema, type CreateBookingRequest } from "@packages/api-contracts";
 
 const NOW = new Date("2026-09-01T10:00:00.000Z");
 
@@ -163,6 +164,23 @@ describe("capacité (CAP-01)", () => {
     expect(code(() => checkCapacity(trip(), 15.5))).toBe("CAPACITY_EXCEEDED");
     expect(code(() => checkCapacity(trip({ capacityKg: null }), 100))).toBe("no-error");
   });
+  it("A34 — WHERE de réservation : condition dans le filtre, aucune sans capacité déclarée", () => {
+    expect(capacityReservationWhere(trip(), 2)).toEqual({
+      id: "64b000000000000000000001",
+      status: "PUBLISHED",
+      reservedKg: { lte: 18 },
+    });
+    expect(capacityReservationWhere(trip(), 25)).toEqual({
+      id: "64b000000000000000000001",
+      status: "PUBLISHED",
+      reservedKg: { lte: -5 },
+    });
+    // pas de capacité déclarée : aucune condition de kg
+    expect(capacityReservationWhere(trip({ capacityKg: null }), 2)).toEqual({
+      id: "64b000000000000000000001",
+      status: "PUBLISHED",
+    });
+  });
 });
 
 describe("buildBookingSnapshots (D17 : figé tel quel)", () => {
@@ -204,5 +222,32 @@ describe("buildBookingSnapshots (D17 : figé tel quel)", () => {
   });
   it("A29 — chaque famille a une catégorie legacy", () => {
     expect(Object.keys(FAMILY_DEFAULT_CATEGORY)).toHaveLength(8);
+  });
+  it("A34 — email destinataire optionnel : vide/absent → null figé, jamais une chaîne vide", () => {
+    const snap = (email: string | null | undefined) => {
+      const i = input({ recipient: { ...input().recipient, email } });
+      return buildBookingSnapshots({ trip: trip(), input: i, quote: quoteForTrip(trip(), i), now: NOW }).recipient.email;
+    };
+    expect(snap("a@x.io")).toBe("a@x.io");
+    expect(snap("  a@x.io  ")).toBe("a@x.io");
+    expect(snap("")).toBeNull();
+    expect(snap(null)).toBeNull();
+    expect(snap(undefined)).toBeNull();
+  });
+});
+
+describe("A34 — contrat CreateBookingRequest aligné sur le wizard", () => {
+  // le fixture partagé a expectedTotalCents: 0 (hors contrat) — ici on parse le contrat, donc un corps valide
+  const valid = (over: Partial<CreateBookingRequest> = {}) => input({ expectedTotalCents: 2834, ...over });
+  it("description : min 5 (le plancher du wizard), 4 → refus", () => {
+    expect(CreateBookingRequestSchema.safeParse(valid({ description: "Livre" })).success).toBe(true);
+    expect(CreateBookingRequestSchema.safeParse(valid({ description: "Sac" })).success).toBe(false);
+  });
+  it("email destinataire optionnel (spec É1) : null/absent OK, invalide → refus", () => {
+    const withEmail = (email: unknown) => ({ ...valid(), recipient: { ...valid().recipient, email } });
+    expect(CreateBookingRequestSchema.safeParse(withEmail(null)).success).toBe(true);
+    expect(CreateBookingRequestSchema.safeParse(withEmail(undefined)).success).toBe(true);
+    expect(CreateBookingRequestSchema.safeParse(withEmail("a@x.io")).success).toBe(true);
+    expect(CreateBookingRequestSchema.safeParse(withEmail("pas-un-email")).success).toBe(false);
   });
 });

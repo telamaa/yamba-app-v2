@@ -143,6 +143,25 @@ export function remainingKg(trip: TripForBooking): number | null {
   return Math.max(0, trip.capacityKg - trip.reservedKg);
 }
 
+/**
+ * CAP-01 — le WHERE de la réservation atomique (updateMany conditionnel).
+ * ⚠️ Pitfall Prisma+Mongo (A34) : `reservedKg: { lte: X }` NE matche PAS un
+ * document où le champ est ABSENT (trajet créé avant l'ajout du champ) →
+ * faux CAPACITY_EXCEEDED. Aucune défense runtime possible : `isSet` est
+ * refusé sur un champ non-nullable, et `NOT: { gt }` ne matche pas non plus
+ * les champs absents (vérifié). Le fix est un état de données garanti :
+ * `packages/libs/prisma/scripts/backfill-reserved-kg.ts` (idempotent) doit
+ * être rejoué sur tout environnement dont des Trips prédatent B2-PR1.
+ */
+export function capacityReservationWhere(trip: TripForBooking, kg: number) {
+  if (trip.capacityKg == null) return { id: trip.id, status: "PUBLISHED" as const };
+  return {
+    id: trip.id,
+    status: "PUBLISHED" as const,
+    reservedKg: { lte: trip.capacityKg - kg },
+  };
+}
+
 /** Vérification en mémoire (la garantie atomique est l'updateMany conditionnel de la transaction). */
 export function checkCapacity(trip: TripForBooking, kg: number): void {
   const left = remainingKg(trip);
@@ -213,7 +232,12 @@ export function buildBookingSnapshots(args: {
       declaredValueCents: input.declaredValueCents,
       photoUrls: input.photoUrls ?? [],
     },
-    recipient: { ...input.recipient },
+    recipient: {
+      firstName: input.recipient.firstName,
+      lastName: input.recipient.lastName,
+      phoneE164: input.recipient.phoneE164,
+      email: input.recipient.email?.trim() || null, // optionnel — jamais de chaîne vide figée
+    },
     pickupPlace: input.pickupPlace ? { kind: input.pickupPlace.kind, details: input.pickupPlace.details ?? null } : null,
     deliveryPlace: input.deliveryPlace
       ? { kind: input.deliveryPlace.kind, details: input.deliveryPlace.details ?? null }

@@ -752,7 +752,7 @@ Machine 188→196 (transition SYSTEM + effet CAPTURE_PAYMENT) · `booking-lifecy
 
 ---
 
-# B2-PR3 — Front des transitions : l'écran É2 réel, l'annulation Expéditeur (A31–A33)
+# B2-PR3 — Front des transitions : l'écran É2 réel, l'annulation Expéditeur (A31–A34)
 
 > Branche `feat/b2-deal-front` · 01/09/2026 · base `feat/b2-deal-lifecycle` (B2-PR2)
 
@@ -787,5 +787,11 @@ B2-PR2 avait donné au serveur les trois transitions (accept/decline/cancel) —
 ### 5. Tests (+4 → plateforme 507)
 `booking-view.mapper.spec.ts` 14→18 : préviz PENDING = total même tardif ; ACCEPTED ≥ 48 h = 100 % ; < 48 h = 50 % ; null dès PICKED_UP et JAMAIS dans la vue Carrier (le champ n'y existe pas).
 
-### 6. Hors périmètre (assumé)
+### 6. A34 — Le premier paiement Stripe RÉEL a cassé, deux fois (addendum 01/09)
+Le premier essai carte réelle (test `4242…`) après l'alignement des clés pk/sk s'est soldé par le toast GENERIC — carte **autorisée** (`requires_capture`), aucun booking, aucune trace serveur. Diagnostic e2e (script scratchpad : login seed → intent → confirm `pm_card_visa` → `POST /deals`) — DEUX bugs indépendants :
+1. **Contrat plus strict que le wizard** : `recipient.email` exigé (`.email()`) alors que l'UI le dit « (optionnel) » (spec É1) et `description` min 10 alors que le wizard valide min 5. Un corps accepté par l'UI partait en 400 Zod **sans `details.code`** → toast GENERIC, PI orphelin jamais annulé. Fix : contrat `email nullish` + `description min(5)` (`booking-request.schema.ts`), snapshot Prisma `email String?` (jamais de chaîne vide figée — normalisation dans `buildBookingSnapshots`), vue `BookingRecipientSnapshotSchema.email nullable`, le front envoie `null` (`booking.api.ts`), OAS régénérés.
+2. **Faux `CAPACITY_EXCEEDED`** sur les Trips créés AVANT B2-PR1 : le champ `reservedKg` est ABSENT de leurs documents Mongo, or `reservedKg: { lte: X }` ne matche pas un champ absent (pitfall CLAUDE.md). Défense runtime IMPOSSIBLE : Prisma refuse `isSet` sur un champ non-nullable (500 `PrismaClientValidationError` — testé) et `NOT:{gt}` ne matche pas non plus les champs absents (testé sur doc brut). Fix : `backfill-reserved-kg.ts` (idempotent, 27 Trips corrigés en dev) **à rejouer sur tout environnement dont des Trips prédatent B2-PR1** ; le WHERE devient le helper pur `capacityReservationWhere` (testé) qui documente le piège.
+Preuve finale : e2e rejoué → `201 PENDING` avec `email: null`, kg réservés puis restitués, PI annulé. Tests 507 → **511** (deal-service 299→303 : contrat aligné ×2, snapshot email ×1, WHERE ×1).
+
+### 7. Hors périmètre (assumé)
 Le tracker Expéditeur `/bookings/[id]` reste mock (chantier B3 : il basculera sur `GET /deals/:id` avec les vues É3→É9) ; les emails transactionnels booking.* restent à écrire (notification-service ne fait que l'in-app) — prochaine PR.

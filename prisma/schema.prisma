@@ -623,7 +623,7 @@ type BookingRecipientSnapshot {
   firstName String
   lastName  String
   phoneE164 String
-  email     String
+  email     String? // optionnel à la demande (spec É1 : « pour notifications si renseigné »)
 }
 
 type BookingPickupInfo {

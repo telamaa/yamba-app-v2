@@ -117,7 +117,9 @@ Ordre de demarrage : auth -> trip -> gateway.
   `pi_fake_seed_*` adoptes par le FakePaymentProvider (A33) — parcours
   B2 jouables en dev sans cles. TanStack Query sur le module deal
   (invalidation, jamais de mutation locale du statut). +4 tests.
-- Plateforme de tests : 507 (trip 187, deal 299, notification 21) — post-B2-PR3.
+- Plateforme de tests : 511 (trip 187, deal 303, notification 21) — post-B2-PR3
+  (+A34 : contrat aligné wizard — email destinataire optionnel, description min 5 ;
+  backfill reservedKg sur les Trips pré-B2-PR1).
 
 ## Release et historique (28 aout 2026)
 

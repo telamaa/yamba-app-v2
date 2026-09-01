@@ -95,7 +95,8 @@ export async function createDeal(draft: Draft, trip: TripContext, paymentIntentI
       firstName: draft.recipient.firstName.trim(),
       lastName: draft.recipient.lastName.trim(),
       phoneE164,
-      email: draft.recipient.email.trim(),
+      // Optionnel (spec É1) : le contrat attend null, jamais une chaîne vide.
+      email: draft.recipient.email.trim() || null,
     },
     pickupPlace: placeOf(trip.pickupOptions, draft.pickupLocationId),
     deliveryPlace: placeOf(trip.deliveryOptions, draft.deliveryLocationId),

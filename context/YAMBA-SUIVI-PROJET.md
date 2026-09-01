@@ -133,9 +133,9 @@ Estimation : **2–4 sessions** au-dessus du Jalon 4 (l'essentiel du travail est
 
 | Indicateur | Valeur |
 |---|---|
-| Tests (plateforme) | 507 = trip 187 · deal 299 · notification 21 |
-| Décisions au registre | D1 → D40 (+ arbitrages A1 → A33) |
-| Règles métier | ~50 (V2) + RG-B-01…35, RG-S-01…13, RG-C-01…16, RG-G-01…03, RG-D-01…14, RG-V-01…09, RG-F-01…06 |
+| Tests (plateforme) | 511 = trip 187 · deal 303 · notification 21 |
+| Décisions au registre | D1 → D40 (+ arbitrages A1 → A34) |
+| Règles métier | ~50 (V2) + RG-B-01…35, RG-S-01…13, RG-C-01…16, RG-G-01…03, RG-D-01…16, RG-V-01…09, RG-F-01…06 |
 | PR mergées | #1 → #89 · en attente de merge (01/09, dans l'ordre) : jalons mobile, docs cumulatifs, B2-PR1, B2-PR2, B2-PR3 |
 | Documents | registre, spec, règles, 5 handoffs (dernier : SESSION-2026-08-28 + addendum 29/08), fiches PR (archive), 3 docs cumulatifs (technique, métier, apprentissage), `YAMBA-MOTEUR-PRIX.md/.pdf`, ce suivi |
 

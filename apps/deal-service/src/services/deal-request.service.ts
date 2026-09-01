@@ -38,6 +38,7 @@ import {
   BookingRequestError,
   assertQuoteMatches,
   buildBookingSnapshots,
+  capacityReservationWhere,
   checkCapacity,
   checkTripBookable,
   kgToReserve,
@@ -194,13 +195,10 @@ export function makeDealRequestService(provider: PaymentProvider, clock: () => D
           });
           if (reused) throw new BookingRequestError("PAYMENT_ALREADY_USED", "This payment is already attached to a request.");
 
-          // CAP-01 — réservation ATOMIQUE : la condition est dans le WHERE.
+          // CAP-01 — réservation ATOMIQUE : la condition est dans le WHERE
+          // (helper pur, robuste au champ reservedKg absent — pitfall isSet).
           const reserved = await tx.trip.updateMany({
-            where: {
-              id: trip.id,
-              status: "PUBLISHED",
-              ...(trip.capacityKg != null ? { reservedKg: { lte: trip.capacityKg - kg } } : {}),
-            },
+            where: capacityReservationWhere(trip, kg),
             data: { reservedKg: { increment: kg } },
           });
           if (reserved.count === 0) {

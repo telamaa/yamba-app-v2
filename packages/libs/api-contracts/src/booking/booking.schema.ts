@@ -57,7 +57,7 @@ export const BookingRecipientSnapshotSchema = z
     firstName: z.string(),
     lastName: z.string(),
     phoneE164: z.string().meta({ example: "+242061234567" }),
-    email: z.string(),
+    email: z.string().nullable().meta({ description: "Optional at request time" }),
   })
   .meta({
     id: "BookingRecipientSnapshot",
