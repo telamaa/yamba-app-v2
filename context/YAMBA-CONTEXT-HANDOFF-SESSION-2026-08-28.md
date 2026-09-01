@@ -226,3 +226,33 @@ puis ⭐ B2 reste : emails transactionnels booking.* (matrice A15, notification-
 Expéditeur /bookings/[id] → GET /deals/:id. Rituel : inventaire AVANT le code, décisions au
 registre AVANT le code, compléter les 3 docs cumulatifs, mobile-first, aucune attribution Claude.
 ```
+
+---
+
+# ADDENDUM · 1er septembre 2026 (nuit) — B2 SOLDÉ (#91 → #93)
+
+## A. Ce qui s'est passé dans la session
+
+1. **#91 mergée** — la mini-PR docs post-merge-90 (13 checks comptés) ; `gh` ré-authentifié (device flow).
+2. **Purge exécutée** : les 5 branches de la pile B2 supprimées (origin + local), ancrage `git merge-base --is-ancestor` vérifié AVANT. Les vieilles branches pré-release 28/08 (`backup-carrier-onboarding*`, …) sont toujours là — décision d'étendre la purge toujours en suspens.
+3. **#92 — B2-PR4 emails transactionnels `booking.*`** : D41 (canal email du MÊME consumer + `@packages/email`, 3e clone évité), A35 (matrice email reconstituée et gravée EN DATA — le « handoff PR3 §4 » qui la portait n'était pas versionné), A36 (at-most-once par destinataire, `EmailDelivery` claim-first, best-effort). 8 gabarits EJS FR/EN testés en RENDU réel. `npx prisma db push` fait (collection + index uniques). Plateforme **511 → 540** (notification 21 → 50).
+4. **#93 — B2-PR5 tracker Expéditeur** : `/bookings/[id]` → `GET /deals/:id` par un adapter CONSERVATIF (A37 — view-model existant produit, ~40 fichiers de vues intacts), TanStack Query, fin du fallback menteur (`BookingStatusNotice`), dégradations honnêtes (stats B5 / carte Stripe / code AES : lignes masquées, jamais inventées), mocks de données supprimés. Preuves : tsc + build prod + script adapter 25 assertions (pas de Jest user-ui).
+
+## B. État exact et reprise
+
+- `dev` = `33a6889` (#93) · plateforme **540** (trip 187 · deal 303 · notification 50) · registre D1→D41, A1→A37 · aucun trailer.
+- **B2 EST SOLDÉ.** Restes rattachés à B3 : photos du colis (media-service :6009), ré-affichage code AES-256-GCM (`deliveryCodeEncrypted`), bascule des 3 actions mock du tracker (régénérer/confirmer/litige) et des 4 actions mock carrier (pickup/refuse/tracking/deliver), gabarits emails des événements B3+ (chacun avec son writer — A35), `SiteConfig.commissionRate` (A11/D16).
+- Toujours en attente (hors code) : protections `dev`/`main` ; purge des vieilles branches pré-release ; check requis `next build` (candidat).
+- ⭐ **Prochaine étape — B3 transport** : pickup serveur (upload R2, code bcrypt + AES, checklist conformité), refuse, tracking events, deliver (compare + lock), régénération de code — writers outbox EN TRANSACTION, transitions par la machine, emails `picked_up`/`pickup_refused`/`code_regenerated`/`delivered` dans les MÊMES PR que leurs writers (A35), bascule des mocks front des deux côtés (tracker É4b→É9 déjà branché en lecture).
+
+### Prompt d'ouverture prêt-à-coller
+```
+On reprend Yamba — lis context/YAMBA-CONTEXT-HANDOFF-SESSION-2026-08-28.md (addendum 01/09 nuit),
+context/YAMBA-CONTEXT.md, le registre (D1–D41, A1–A37) et context/YAMBA-SUIVI-PROJET.md.
+État : dev = 33a6889 (#93), B2 SOLDÉ (#90 pile + #92 emails + #93 tracker), plateforme 540.
+⭐ B3 transport : pickup serveur (R2, code bcrypt + AES deliveryCodeEncrypted, checklist), refuse,
+tracking, deliver (compare + lock), régénération — machine d'état seule autorité, outbox en
+transaction, emails B3 avec leurs writers (A35), bascule des mocks front (carrier + tracker).
+Rituel : inventaire AVANT le code, décisions au registre AVANT le code, compléter les 3 docs
+cumulatifs, mobile-first, aucune attribution Claude.
+```
