@@ -123,3 +123,52 @@ annulation ANN-01 / webhook Stripe — via booking-state-machine, outbox en tran
 Rituel : inventaire AVANT le code, décisions au registre AVANT le code, compléter les 3 docs cumulatifs
 (technique, métier, apprentissage), mobile-first, aucune attribution Claude, charte mango/teal/slate.
 ```
+
+---
+
+# ADDENDUM · 1er septembre 2026 — pause en cours de session (clés Stripe à aligner, 5 lots à merger)
+
+## A. État exact au moment de la pause
+
+- **`origin/dev` = `8519296` (#89) — RIEN n'a été mergé depuis.** Tout le travail B2 est empilé sur des branches poussées, arbre propre partout.
+- Branche courante : **`feat/b2-deal-front` = `53cb0f4`**, synchronisée avec origin.
+- **Pile de merge, dans cet ordre (5 PR à ouvrir/merger)** :
+  1. `chore/docs-jalons-mobile` — D36, jalons 4/5.
+  2. `chore/docs-cumulatifs` (`daa3551`) — les 3 docs cumulatifs + règle CLAUDE.md.
+  3. `feat/b2-deal-request` (`33393f1`) — **B2-PR1** (D37/D38, POST /deals + payment-intents, @packages/payments).
+  4. `feat/b2-deal-lifecycle` (`21379a3`) — **B2-PR2** (`396dec9` : accept/decline/cancel, capture à l'acceptation D39, gate D31 déplacé, cron 24 h, webhook Stripe D40) + 2 fix front (timeline étape 4, erreurs Payment Element).
+  5. `feat/b2-deal-front` (`53cb0f4`) — **B2-PR3** (É2 branché accept/decline réels A32/A13, CTA par `allowedActions`, annulation Expéditrice + préviz ANN-01 servie A31, seed CarrierPage + `pi_fake_seed_*` A33).
+- **Plateforme de tests : 507** (457 baseline → +46 B2-PR2 → +4 B2-PR3). Docs cumulatifs, registre (jusqu'à D40), `YAMBA-CONTEXT.md` et `YAMBA-SUIVI-PROJET.md` à jour dans les branches.
+- ⚠️ `gh` n'est pas authentifié dans le terminal (`gh auth login` requis) — les PR peuvent aussi être ouvertes via l'interface GitHub.
+
+## B. 🔴 Problème en cours — Payment Element ne charge pas (clés Stripe de DEUX comptes)
+
+**Symptôme** (étape 4 du wizard) : `The client_secret provided does not match any associated PaymentIntent on this account…` — le front affiche le message générique + Réessayer (comportement du fix `21379a3`), la vraie cause est dans la console.
+
+**Cause diagnostiquée** : les deux clés Stripe appartiennent à des comptes différents (le préfixe après `51` identifie le compte) :
+- `.env` racine (serveur) : `STRIPE_SECRET_KEY = sk_test_51THXnv…` → le PaymentIntent est créé sur CE compte.
+- `apps/user-ui/.env.local` (front) : `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY = pk_test_51SMmbN…` → le Payment Element cherche le PI sur CET autre compte.
+
+**Fix (à faire par l'utilisateur, non encore appliqué)** :
+1. Dashboard Stripe du compte de la clé secrète (`51THXnv…`, celui qui porte l'onboarding Connect) → Developers → API keys (mode test).
+2. Copier la **Publishable key** `pk_test_51THXnv…` dans `apps/user-ui/.env.local`.
+3. **Redémarrer `user-ui`** (les `NEXT_PUBLIC_*` sont inlinées au démarrage — un refresh ne suffit pas).
+4. Alternative si c'est le compte `51SMmbN…` qu'on veut garder : remplacer la clé secrète racine et redémarrer deal-service — mais les PI et comptes Connect de test du compte `51THXnv…` deviennent invisibles.
+
+## C. Prochaine étape à la reprise
+
+1. Corriger les clés Stripe (B) et re-tester le paiement de bout en bout (carte `4242 4242 4242 4242`).
+2. Merger les 5 lots dans l'ordre (A) — 13 checks à COMPTER par PR ; protections `dev`/`main` et purge des vieilles branches toujours en attente.
+3. **B2 reste** (🔴 suivi §) : emails transactionnels `booking.*` (notification-service, colonne email de la matrice A15), tracker Expéditeur `/bookings/[id]` → `GET /deals/:id` (vues É3→É9, avec B3), photos (media-service :6009), code livraison chiffré AES-256-GCM.
+
+### Prompt d'ouverture prêt-à-coller
+```
+On reprend Yamba — lis context/YAMBA-CONTEXT-HANDOFF-SESSION-2026-08-28.md (addendum 01/09),
+context/YAMBA-CONTEXT.md, le registre (D1–D40) et context/YAMBA-SUIVI-PROJET.md.
+État : origin/dev = #89, 5 lots poussés à merger dans l'ordre (jalons mobile, docs cumulatifs,
+B2-PR1 feat/b2-deal-request, B2-PR2 feat/b2-deal-lifecycle, B2-PR3 feat/b2-deal-front) ; plateforme 507.
+D'abord : vérifier le fix des clés Stripe (pk/sk du même compte, addendum §B) et tester le paiement ;
+puis les merges ; puis ⭐ B2 reste : emails transactionnels booking.* (matrice A15) + tracker Expéditeur.
+Rituel : inventaire AVANT le code, décisions au registre AVANT le code, compléter les 3 docs cumulatifs,
+mobile-first, aucune attribution Claude, charte mango/teal/slate.
+```
