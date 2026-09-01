@@ -1,5 +1,5 @@
 # YAMBA — SUIVI DE PROJET DE BOUT EN BOUT
-### État au 28 août 2026 · `main` = `dev` = `9c6e155` · 433 tests · build prod OK
+### État au 1er septembre 2026 · `dev` = `800edb9` (#90, pile B2 complète) · 511 tests · `main` = `9c6e155` (#88)
 *Légende : ✅ fait (PR) · 🟡 en cours / partiel · ⬜ à faire · 🔴 bloquant lancement. Vélocité = « sessions » (unité des handoffs). Mis à jour à chaque merge (règle : ce fichier + `YAMBA-CONTEXT.md`).*
 
 ---
@@ -44,7 +44,7 @@ Lancement public = fin du Jalon 2. Fourchette tenue au dernier handoff : **5–8
 | Step 1 UX : aéroport → ville de rattachement, arrivée repliée, justificatif en step 3, drapeaux | ⬜ | avis 28/08 |
 | Lieux en chips + aperçu public sticky (create-trip) | ⬜ | avis 28/08 |
 | Cleanup legacy PER_CATEGORY (`CategoryChip`, `PriceInput`, `CATEGORY_GROUPS`, champs `@deprecated`), `maxSlots/bookedSlots`, `instantBooking` | ⬜ | PR cleanup post-refonte |
-| Micro-PR D31 : gate Stripe/profil → acceptation (checks retirés des 3 chemins de publication, appliqués dans `POST /deals/:id/accept`) | ✅ (PR B2-PR2) · seed factice ✅ (B2-PR3) | D31 |
+| Micro-PR D31 : gate Stripe/profil → acceptation (checks retirés des 3 chemins de publication, appliqués dans `POST /deals/:id/accept`) | ✅ #90 · seed factice ✅ #90 | D31 |
 
 ## 3. Recherche et page trajet (Expéditeur)
 
@@ -68,9 +68,9 @@ Lancement public = fin du Jalon 2. Fourchette tenue au dernier handoff : **5–8
 | notification-service : consumer Kafka, dédup event-id | ✅ #75 | — |
 | Dashboards : Mes envois, Mes trajets & deals, inbox, listes réelles | ✅ #56–#59, #76 | — |
 | Écrans post-acceptation (front) : pickup + checklist, code de livraison, tracking, vérification J+4, litige, notation | ✅ (front) #48–#54 | — |
-| **B2-PR1 — naissance du deal** : `POST /deals/payment-intents` + `POST /deals`, `@packages/payments` (PaymentProvider D11 : Stripe capture manuelle + Fake), devis serveur = moteur unique (409 `QUOTE_DIVERGENCE`), snapshot D17 enrichi + lieux, `reservedKg` atomique + outbox en transaction, wizard branché (un seul Payment Element — A30), 24 tests, prouvé de bout en bout (Atlas + Stripe test) | ✅ (PR B2-PR1) | D37, D38, A29, A30, RG-D-01…14 |
-| **B2-PR2 — cycle de vie du deal** : `POST /deals/:id/accept` (charte + gate D31 déplacé + **capture à l'acceptation D39**), `/decline` (5 raisons, libération, CAP-02), `/cancel` (ANN-01 : 100 % ≥ J-2, retenue **50 %** ensuite), cron expiration 24 h, webhook Stripe D40 (`payment_intent.canceled` → SYSTEM cancel, nouvelle transition machine), argent d'abord → transaction Mongo conditionnelle + outbox, +46 tests | ✅ (PR B2-PR2) | D31, D39, D40, ANN-01/04 |
-| **B2-PR3 — front des transitions** : écran É2 branché (adapter whitelist, accept/decline réels, 409 mappés, raisons contrat — A32), gains nets seuls (A13), CTA par `allowedActions`, annulation Expéditrice dans Mes envois (préviz ANN-01 servie — A31), seed CarrierPage/intents FAKE adoptés (A33), +4 tests | ✅ (PR B2-PR3) | A31–A33, RG-F-01…06 |
+| **B2-PR1 — naissance du deal** : `POST /deals/payment-intents` + `POST /deals`, `@packages/payments` (PaymentProvider D11 : Stripe capture manuelle + Fake), devis serveur = moteur unique (409 `QUOTE_DIVERGENCE`), snapshot D17 enrichi + lieux, `reservedKg` atomique + outbox en transaction, wizard branché (un seul Payment Element — A30), 24 tests, prouvé de bout en bout (Atlas + Stripe test) | ✅ #90 | D37, D38, A29, A30, RG-D-01…14 |
+| **B2-PR2 — cycle de vie du deal** : `POST /deals/:id/accept` (charte + gate D31 déplacé + **capture à l'acceptation D39**), `/decline` (5 raisons, libération, CAP-02), `/cancel` (ANN-01 : 100 % ≥ J-2, retenue **50 %** ensuite), cron expiration 24 h, webhook Stripe D40 (`payment_intent.canceled` → SYSTEM cancel, nouvelle transition machine), argent d'abord → transaction Mongo conditionnelle + outbox, +46 tests | ✅ #90 | D31, D39, D40, ANN-01/04 |
+| **B2-PR3 — front des transitions** : écran É2 branché (adapter whitelist, accept/decline réels, 409 mappés, raisons contrat — A32), gains nets seuls (A13), CTA par `allowedActions`, annulation Expéditrice dans Mes envois (préviz ANN-01 servie — A31), seed CarrierPage/intents FAKE adoptés (A33), +4 tests | ✅ #90 (+A34) | A31–A33, RG-F-01…06 |
 | 🔴 **B2 — reste** : emails transactionnels booking.*, photos (media-service :6009), code livraison chiffré AES-256-GCM. (Front des transitions É2 + annulation Expéditrice + seed carrierPage/Stripe : FAITS en B2-PR3.) | ⬜ **prochaine étape** | D11, D16, D17 |
 | 🔴 **B3 — transport** : pickup serveur (upload R2, code bcrypt, checklist), refus, tracking, deliver (compare + lock), régénération de code | ⬜ (2/3) | — |
 | 🔴 **B4 — argent sortant** : confirmation anticipée, cron J+4 → COMPLETED + `transfers.create()`, dispute avec gel, versement de la retenue ANN-01 au Voyageur (`CANCEL_LATE_RETENTION_PCT` = 50, gravé D39) | ⬜ (1,5/2,5) | ANN-01…04, D39 |
@@ -136,7 +136,7 @@ Estimation : **2–4 sessions** au-dessus du Jalon 4 (l'essentiel du travail est
 | Tests (plateforme) | 511 = trip 187 · deal 303 · notification 21 |
 | Décisions au registre | D1 → D40 (+ arbitrages A1 → A34) |
 | Règles métier | ~50 (V2) + RG-B-01…35, RG-S-01…13, RG-C-01…16, RG-G-01…03, RG-D-01…16, RG-V-01…09, RG-F-01…06 |
-| PR mergées | #1 → #89 · en attente de merge (01/09, dans l'ordre) : jalons mobile, docs cumulatifs, B2-PR1, B2-PR2, B2-PR3 |
+| PR mergées | #1 → #90 (#90 = toute la pile B2 en une PR : jalons mobile D36, docs cumulatifs, B2-PR1, B2-PR2, B2-PR3 + fix A34 — 13 checks comptés) |
 | Documents | registre, spec, règles, 5 handoffs (dernier : SESSION-2026-08-28 + addendum 29/08), fiches PR (archive), 3 docs cumulatifs (technique, métier, apprentissage), `YAMBA-MOTEUR-PRIX.md/.pdf`, ce suivi |
 
 ## 9. Ordre recommandé des prochaines sessions

@@ -172,3 +172,43 @@ puis les merges ; puis ⭐ B2 reste : emails transactionnels booking.* (matrice 
 Rituel : inventaire AVANT le code, décisions au registre AVANT le code, compléter les 3 docs cumulatifs,
 mobile-first, aucune attribution Claude, charte mango/teal/slate.
 ```
+
+---
+
+# ADDENDUM · 1er septembre 2026 (soir) — session soldée : A34 + merge #90
+
+## A. Ce qui s'est passé à la reprise
+
+1. **Clés Stripe alignées** (pk/sk du même compte `51THXnv…`) — mais le premier
+   paiement réel a alors révélé DEUX bugs (toast GENERIC après carte autorisée,
+   PI `requires_capture` orphelin, aucune écriture) :
+   - contrat plus strict que le wizard (`recipient.email` exigé vs « (optionnel) »
+     spec É1 ; `description` min 10 vs min 5) → 400 Zod sans `details.code` ;
+   - faux `CAPACITY_EXCEEDED` sur les Trips pré-B2-PR1 (champ `reservedKg` ABSENT
+     des documents Mongo — le `updateMany` conditionnel CAP-01 ne matche pas ;
+     `isSet` refusé sur champ non-nullable et `NOT:{gt}` inopérant, tous deux prouvés).
+2. **Fix A34** (commit `f973499`) : contrat aligné (email nullish, min 5), snapshot
+   Prisma `email String?`, front envoie null, `backfill-reserved-kg.ts` (27 trajets,
+   idempotent, À REJOUER par environnement), helper `capacityReservationWhere`,
+   OAS régénérés, +4 tests → **plateforme 511** (trip 187 · deal 303 · notif 21).
+   Preuve e2e : 201 PENDING avec email vide, kg restitués, PI annulé.
+3. **Merge** : la pile ENTIÈRE est passée en UNE PR — **#90**
+   (`feat/b2-deal-front` → `dev`, 13 checks verts comptés). `dev` = `800edb9`.
+   Les 5 branches de la pile sont mergées → purge possible.
+
+## B. Prochaine étape
+
+⭐ **B2 reste** : emails transactionnels `booking.*` (notification-service, colonne
+email de la matrice A15), tracker Expéditeur `/bookings/[id]` → `GET /deals/:id`
+(vues É3→É9, avec B3), photos (media-service :6009), code livraison AES-256-GCM.
+Toujours en attente : protections `dev`/`main`, purge des branches mergées.
+
+### Prompt d'ouverture prêt-à-coller
+```
+On reprend Yamba — lis context/YAMBA-CONTEXT-HANDOFF-SESSION-2026-08-28.md (addendum 01/09 soir),
+context/YAMBA-CONTEXT.md, le registre (D1–D40, A1–A34) et context/YAMBA-SUIVI-PROJET.md.
+État : dev = 800edb9 (#90, toute la pile B2 mergée), plateforme 511, paiement Stripe réel prouvé e2e.
+⭐ B2 reste : emails transactionnels booking.* (matrice A15, notification-service) + tracker
+Expéditeur /bookings/[id] → GET /deals/:id. Rituel : inventaire AVANT le code, décisions au
+registre AVANT le code, compléter les 3 docs cumulatifs, mobile-first, aucune attribution Claude.
+```
