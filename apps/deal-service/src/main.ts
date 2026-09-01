@@ -31,7 +31,9 @@ import { pinoHttp } from "pino-http";
 import { errorMiddleware } from "@packages/error-handler/error-middleware";
 import { KafkaEventPublisher } from "@packages/messaging";
 import { buildOpenApiDocument } from "./openapi/build-openapi";
-import dealRouter from "./routes/deal.routes";
+import dealRouter, { dealLifecycleService } from "./routes/deal.routes";
+import { makeStripeWebhookHandler } from "./controllers/stripe-webhook.controller";
+import { startBookingExpiryCron } from "./cron/expire-bookings.cron";
 import { OutboxRelay } from "./relay/outbox-relay";
 
 const logger = pino({
@@ -62,6 +64,15 @@ app.use(
     credentials: true,
   })
 );
+// ── Webhook Stripe (D40) — AVANT express.json : la signature porte sur
+// les octets BRUTS du corps (un JSON re-sérialisé la casse — même raison
+// pour laquelle on n'y passe jamais par le gateway).
+app.post(
+  "/webhooks/stripe",
+  express.raw({ type: "application/json" }),
+  makeStripeWebhookHandler(dealLifecycleService, logger.child({ module: "stripe-webhook" }))
+);
+
 app.use(express.json({ limit: "10mb" }));
 app.use(cookieParser());
 
@@ -137,6 +148,17 @@ if (relayEnabled) {
   logger.info("Outbox relay disabled (OUTBOX_RELAY_ENABLED=false)");
 }
 
+// ── Cron expiration 24 h (DEA-01, B2-PR2) ───────────────────────────
+// Matérialise les PENDING périmés (la machine les traite déjà comme
+// EXPIRED via son guard — le cron libère l'argent et les kg).
+const expiryCronEnabled = process.env.BOOKING_EXPIRY_CRON_ENABLED !== "false";
+const expiryCron = expiryCronEnabled
+  ? startBookingExpiryCron(dealLifecycleService, logger.child({ module: "expire-bookings-cron" }))
+  : null;
+if (!expiryCronEnabled) {
+  logger.info("Booking expiry cron disabled (BOOKING_EXPIRY_CRON_ENABLED=false)");
+}
+
 // Arrêt propre : batch en vol terminé, bail libéré, producer déconnecté,
 // serveur HTTP fermé. La ceinture setTimeout garantit la sortie même si
 // une déconnexion traîne (5 s max). Le garde évite qu'un SIGINT répété
@@ -148,6 +170,9 @@ function shutdown(signal: string): void {
   shuttingDown = true;
   logger.info({ signal }, "Shutting down deal-service");
   void (async () => {
+    if (expiryCron) {
+      expiryCron.stop();
+    }
     if (relay) {
       await relay.stop().catch((err) => logger.error({ err }, "Relay stop failed"));
     }

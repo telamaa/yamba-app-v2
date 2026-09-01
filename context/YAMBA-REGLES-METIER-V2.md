@@ -88,7 +88,7 @@ Migration : mapping ci-dessus livré avec la refonte pricing (front + JSON i18n 
 |---|---|---|
 | Statut PENDING | 100 % | Le Voyageur n'a rien engagé |
 | ACCEPTED, jusqu'à J-2 du départ | 100 % | |
-| ACCEPTED, moins de 48 h du départ | Partiel (retenue X %, versée au Voyageur) | Le Voyageur a réservé sa capacité |
+| ACCEPTED, moins de 48 h du départ | Partiel (retenue **50 %** — D39, versée au Voyageur en B4) | Le Voyageur a réservé sa capacité |
 | Après PICKED_UP | Aucune annulation | Seule voie : le litige (DISPUTED) |
 
 **ANN-02 — Annulation par le Voyageur après acceptation** : remboursement **intégral** de l'Expéditeur, quel que soit le moment + impact sur la réputation du Voyageur (compteur d'annulations visible / effet sur badge). C'est lui qui fait défaut.
@@ -223,7 +223,7 @@ Migration : mapping ci-dessus livré avec la refonte pricing (front + JSON i18n 
 | `REPUTATION_TOP_MIN_DEALS / MIN_RATING / MAX_LATE_CANCEL` | 10 / 4,8 / 0 | REP-03 |
 | `CATEGORY_SURCHARGE_MAX_PCT` | 30 % | CAT-03 |
 | `CANCEL_FULL_REFUND_UNTIL_HOURS` | 48 h avant départ | ANN-01 |
-| `CANCEL_LATE_RETENTION_PCT` | à fixer | ANN-01 |
+| `CANCEL_LATE_RETENTION_PCT` | **50 %** *(gravé D39, 31/08/2026)* | ANN-01 |
 | `NEW_ACCOUNT_MAX_DECLARED_VALUE / MAX_WEIGHT / MAX_SHIPMENTS_PER_MONTH` | à fixer | CNF-06 |
 | `IDENTITY_REQUIRED_FROM` | 1re réservation | CNF-05 |
 | `PROTECTION_BASIC_CAP / EXTENDED_CAP / EXTENDED_PRICE` | à fixer / 500 € / à fixer | GAR-03/06 |

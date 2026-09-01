@@ -5,7 +5,6 @@
   "close": "Fermer",
   "share": "Partager",
   "stateLabel": "État : demande reçue, en attente de réponse",
-
   "expiry": {
     "label": "Cette demande expire dans",
     "labelShort": "Expire dans",
@@ -16,27 +15,20 @@
     "timeFormatShort": "{hours}h {minutes}min",
     "timeFormatMinutesOnly": "{minutes}min"
   },
-
   "earnings": {
     "hero": "TU GAGNES",
     "currency": "€",
     "heroNote": "Versement à J+{days} après livraison validée · sur ton compte Stripe",
     "heroNoteShort": "Versé à J+{days} après livraison validée",
-    "breakdownTitle": "CE QUE TU TOUCHES",
-    "totalPaid": "Prix total payé",
-    "yambaCommission": "Commission Yamba",
-    "stripeFees": "Frais Stripe",
     "net": "Net pour toi",
     "payoutNote": "Versé {days} jours après livraison validée par code confidentiel",
     "detailTitle": "DÉTAIL DE TON GAIN"
   },
-
   "tripCard": {
     "title": "TON TRAJET",
     "directFlight": "Direct, {hours}h de vol",
     "departure": "{weekday} {day} {month} · {hour}h"
   },
-
   "shipperCard": {
     "title": "DE LA PART DE",
     "verifiedBadge": "Vérifié",
@@ -44,7 +36,6 @@
     "shipmentCount": "{count, plural, =1 {# envoi} other {# envois}}",
     "memberSince": "Membre depuis {month} {year}"
   },
-
   "parcelDetails": {
     "title": "DÉTAILS DU COLIS",
     "categoryLabel": "Catégorie",
@@ -55,7 +46,6 @@
     "descriptionLabel": "Description",
     "kg": "kg"
   },
-
   "photos": {
     "title": "PHOTOS DÉCLARÉES PAR {shipperFirstName}",
     "subtitle": "cliquez pour agrandir",
@@ -68,7 +58,6 @@
       "next": "Suivant"
     }
   },
-
   "locations": {
     "title": "MODALITÉS DE REMISE ET LIVRAISON",
     "titleShort": "REMISE ET LIVRAISON",
@@ -76,7 +65,6 @@
     "deliveryLabel": "LIVRAISON",
     "deliveryNotePending": "Téléphone communiqué après acceptation"
   },
-
   "coverage": {
     "title": "COUVERTURE DU COLIS",
     "extended": "Assurance 500 € incluse",
@@ -84,7 +72,6 @@
     "shipperNoteExtended": "{shipperFirstName} a souscrit une assurance — tu es protégé en cas de litige sur la valeur du colis.",
     "shipperNoteExtendedShort": "{shipperFirstName} a souscrit l''assurance 500 € · tu es protégé en cas de litige sur la valeur"
   },
-
   "acceptTip": {
     "title": "Avant d''accepter, lis bien ces points",
     "titleShort": "Avant d''accepter",
@@ -97,7 +84,6 @@
     "takePhotosShort": "**Prends tes photos** avant de partir.",
     "codeShort": "**Code à 6 chiffres** pour valider la livraison."
   },
-
   "charter": {
     "blockTitle": "TON ENGAGEMENT",
     "title": "Charte Voyageur",
@@ -120,7 +106,6 @@
     "acceptDescSuffix": ".",
     "acceptError": "Tu dois accepter la Charte pour confirmer ce Deal"
   },
-
   "actions": {
     "decline": "Refuser",
     "accept": "Accepter",
@@ -130,23 +115,18 @@
     "charterAcceptedIndicator": "✓ Charte acceptée",
     "charterPendingIndicator": "Coche la Charte pour confirmer"
   },
-
   "decline": {
     "dialogTitle": "Refuser cette demande ?",
     "dialogIntro": "{shipperFirstName} sera notifiée et pourra contacter un autre Tripper. Ton taux d''acceptation reste intact.",
     "reasonLabel": "Raison (optionnel)",
     "reasonPlaceholder": "Choisir une raison",
     "reasonOption": {
-      "CATEGORY_NOT_TRANSPORTED": "Catégorie non transportée",
-      "WEIGHT_TOO_HEAVY": "Poids ou volume trop important",
-      "LOCATION_INCOMPATIBLE": "Lieu de remise ou livraison incompatible",
-      "TIMING_TOO_TIGHT": "Délais trop courts",
+      "CATEGORY_NOT_CARRIED": "Catégorie non transportée",
+      "TOO_HEAVY": "Poids ou volume trop important",
+      "PLACES_INCOMPATIBLE": "Lieu de remise ou livraison incompatible",
+      "TIMING": "Délais trop courts",
       "OTHER": "Autre raison"
     },
-    "detailsLabel": "Détails complémentaires (optionnel)",
-    "detailsPlaceholder": "Une précision pour {shipperFirstName} ?",
-    "detailsToggleExpand": "Ajouter des détails",
-    "detailsToggleCollapse": "Masquer les détails",
     "finalWarning": "Cette action est définitive",
     "cancel": "Annuler",
     "confirmDecline": "Refuser le Deal",
@@ -154,17 +134,33 @@
     "toastSuccess": "Demande refusée. {shipperFirstName} a été notifiée.",
     "toastError": "Erreur lors du refus. Réessaye."
   },
-
   "accept": {
     "submitting": "Confirmation…",
     "toastSuccess": "Deal accepté ! Code de livraison généré.",
     "toastError": "Erreur lors de l''acceptation. Réessaye."
   },
-
   "loading": "Chargement de la demande…",
   "error": {
     "notFound": "Cette demande n''existe pas ou a déjà été traitée.",
     "expired": "Cette demande a expiré. Tu peux la consulter mais plus y répondre.",
     "generic": "Une erreur est survenue. Réessaye dans quelques instants."
+  },
+  "loadError": "Cette demande n'existe pas ou n'est plus accessible.",
+  "closed": {
+    "PENDING": "Demande en attente",
+    "ACCEPTED": "Deal accepté",
+    "PICKED_UP": "Colis en cours de transport",
+    "DELIVERED": "Livraison validée",
+    "COMPLETED": "Deal terminé — paiement libéré",
+    "DISPUTED": "Un litige est en cours sur ce deal",
+    "DECLINED": "Tu as refusé cette demande",
+    "EXPIRED": "Cette demande a expiré",
+    "CANCELLED": "Cette demande a été annulée",
+    "hint": "Il n'y a plus d'action à faire ici."
+  },
+  "errors": {
+    "onboardingRequired": "Termine ton profil Voyageur et ta configuration Stripe pour pouvoir accepter un deal.",
+    "dealChanged": "Ce deal a changé entre-temps. La page vient d'être actualisée.",
+    "paymentConflict": "Le paiement de cette demande n'est plus valide. La page vient d'être actualisée."
   }
 }

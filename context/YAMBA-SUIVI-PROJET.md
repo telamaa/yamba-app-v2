@@ -10,7 +10,9 @@
 |---|---|---|
 | **Jalon 1 — Boucle transactionnelle** (réserver, payer, livrer, noter) | socle + pricing + B1 faits ; B2 → B5 restent | **~55 %** |
 | **Jalon 2 — Plateforme opérable** (admin, sessions, intégrations) — *constitutif du lancement* | non commencé (sauf CI/OpenAPI) | ~10 % |
-| **Jalon 3 — Expansion** (chat, mobile, locales, reco) | non commencé | 0 % |
+| **Jalon 3 — Expansion** (chat, locales, reco) | non commencé | 0 % |
+| **Jalon 4 — Application mobile : socle + Android** (React Native/Expo, code partagé, Play Store) | non commencé — D36 gravée (Expo) | 0 % |
+| **Jalon 5 — iOS** (même base, spécificités Apple, App Store) | non commencé | 0 % |
 
 Lancement public = fin du Jalon 2. Fourchette tenue au dernier handoff : **5–8 semaines** de sessions (optimiste ≈ 10,5 / réaliste ≈ 16 sessions restantes sur le Jalon 1 avant cette journée ; aujourd'hui ≈ 3 sessions consommées : PR-B, search, PR-C).
 
@@ -42,7 +44,7 @@ Lancement public = fin du Jalon 2. Fourchette tenue au dernier handoff : **5–8
 | Step 1 UX : aéroport → ville de rattachement, arrivée repliée, justificatif en step 3, drapeaux | ⬜ | avis 28/08 |
 | Lieux en chips + aperçu public sticky (create-trip) | ⬜ | avis 28/08 |
 | Cleanup legacy PER_CATEGORY (`CategoryChip`, `PriceInput`, `CATEGORY_GROUPS`, champs `@deprecated`), `maxSlots/bookedSlots`, `instantBooking` | ⬜ | PR cleanup post-refonte |
-| Micro-PR D31 : gate Stripe/profil → acceptation (+ carrierPage/Stripe factices au seed) | ⬜ (dans B2) | D31 |
+| Micro-PR D31 : gate Stripe/profil → acceptation (checks retirés des 3 chemins de publication, appliqués dans `POST /deals/:id/accept`) | ✅ (PR B2-PR2) · seed factice ✅ (B2-PR3) | D31 |
 
 ## 3. Recherche et page trajet (Expéditeur)
 
@@ -66,9 +68,12 @@ Lancement public = fin du Jalon 2. Fourchette tenue au dernier handoff : **5–8
 | notification-service : consumer Kafka, dédup event-id | ✅ #75 | — |
 | Dashboards : Mes envois, Mes trajets & deals, inbox, listes réelles | ✅ #56–#59, #76 | — |
 | Écrans post-acceptation (front) : pickup + checklist, code de livraison, tracking, vérification J+4, litige, notation | ✅ (front) #48–#54 | — |
-| 🔴 **B2 — argent entrant** : `POST /deals` (recalcul devis = refus de divergence, snapshot D17, `reservedKg` atomique + outbox en transaction), PaymentIntent autorisation → capture, `PaymentProvider` abstrait (D11), accept/decline (gate Stripe à l'acceptation D31), cron expiration 24 h, remboursements ANN-04, **un seul système de paiement** (Payment Element), emails transactionnels, code livraison chiffré AES-256-GCM, payment-service :6008, media-service :6009 | ⬜ **prochaine étape** (2/3 sessions) | D11, D16, D17, D31, D34 |
+| **B2-PR1 — naissance du deal** : `POST /deals/payment-intents` + `POST /deals`, `@packages/payments` (PaymentProvider D11 : Stripe capture manuelle + Fake), devis serveur = moteur unique (409 `QUOTE_DIVERGENCE`), snapshot D17 enrichi + lieux, `reservedKg` atomique + outbox en transaction, wizard branché (un seul Payment Element — A30), 24 tests, prouvé de bout en bout (Atlas + Stripe test) | ✅ (PR B2-PR1) | D37, D38, A29, A30, RG-D-01…14 |
+| **B2-PR2 — cycle de vie du deal** : `POST /deals/:id/accept` (charte + gate D31 déplacé + **capture à l'acceptation D39**), `/decline` (5 raisons, libération, CAP-02), `/cancel` (ANN-01 : 100 % ≥ J-2, retenue **50 %** ensuite), cron expiration 24 h, webhook Stripe D40 (`payment_intent.canceled` → SYSTEM cancel, nouvelle transition machine), argent d'abord → transaction Mongo conditionnelle + outbox, +46 tests | ✅ (PR B2-PR2) | D31, D39, D40, ANN-01/04 |
+| **B2-PR3 — front des transitions** : écran É2 branché (adapter whitelist, accept/decline réels, 409 mappés, raisons contrat — A32), gains nets seuls (A13), CTA par `allowedActions`, annulation Expéditrice dans Mes envois (préviz ANN-01 servie — A31), seed CarrierPage/intents FAKE adoptés (A33), +4 tests | ✅ (PR B2-PR3) | A31–A33, RG-F-01…06 |
+| 🔴 **B2 — reste** : emails transactionnels booking.*, photos (media-service :6009), code livraison chiffré AES-256-GCM. (Front des transitions É2 + annulation Expéditrice + seed carrierPage/Stripe : FAITS en B2-PR3.) | ⬜ **prochaine étape** | D11, D16, D17 |
 | 🔴 **B3 — transport** : pickup serveur (upload R2, code bcrypt, checklist), refus, tracking, deliver (compare + lock), régénération de code | ⬜ (2/3) | — |
-| 🔴 **B4 — argent sortant** : confirmation anticipée, cron J+4 → COMPLETED + `transfers.create()`, dispute avec gel, matrice de remboursements (ANN-01 : `CANCEL_LATE_RETENTION_PCT` à fixer) | ⬜ (1,5/2,5) | ANN-01…04 |
+| 🔴 **B4 — argent sortant** : confirmation anticipée, cron J+4 → COMPLETED + `transfers.create()`, dispute avec gel, versement de la retenue ANN-01 au Voyageur (`CANCEL_LATE_RETENTION_PCT` = 50, gravé D39) | ⬜ (1,5/2,5) | ANN-01…04, D39 |
 | 🔴 **B5 — confiance** : rating double-aveugle serveur, relances J+5/J+7, stats de réputation (D29-1) — unicité (bookingId, authorUserId) sans `@@unique` naïf Mongo | ⬜ (1,5/2) | D29 |
 | PR « paramètres serveur » : `GET /pricing/params` (`PRICING_PARAMS` unique : commission, planchers, coefs, référence, corridors) — dédoublonner `comparable-price`, `price-for-weight`, `pricing-example` | ⬜ (0,5) | D34 |
 
@@ -86,7 +91,31 @@ Lancement public = fin du Jalon 2. Fourchette tenue au dernier handoff : **5–8
 
 ## 6. Jalon 3 — expansion (⬜)
 
-message-service :6005 (chat Socket.io, coordination pickup) · fin i18n (ES puis PT) · G mobile (client généré depuis l'OpenAPI, D3) · H recommandations ML (replay outbox + PostHog, D15-V2).
+message-service :6005 (chat Socket.io, coordination pickup) · fin i18n (ES puis PT) · H recommandations ML (replay outbox + PostHog, D15-V2). *(Le mobile sort du Jalon 3 → jalons 4 et 5.)*
+
+## 6bis. Jalon 4 — application mobile : socle + Android (⬜)
+
+| Élément | Statut | Réf. |
+|---|---|---|
+| **D36 gravée (Expo)** : stack React Native + Expo (TypeScript, Expo Router), une base pour les deux OS ; réutilisation de `@packages/pricing`, `@packages/api-contracts`, client généré depuis l'OpenAPI (D3), messages i18n JSON | ⬜ décision | D3, D34 |
+| Fondations : RN nouvelle architecture (Hermes, Fabric), Expo Router + `react-native-screens`, Reanimated/Gesture Handler, FlashList, `expo-dev-client` + EAS Build ; auth par tokens (refresh sans cookies), stockage sécurisé, push (Expo Notifications ↔ notification-service), deep links, thème mango/teal **idiomatique par OS** | ⬜ | D36 |
+| Budgets de performance en CI (Maestro + Flashlight) : démarrage à froid < 1,5 s (Android milieu de gamme), 60 fps listes, aucune frame > 100 ms sur les 2 parcours critiques, < 40 Mo | ⬜ | D36 |
+| Parcours Expéditeur : recherche (poids, familles), page trajet, réservation 4 étapes (Stripe Payment Sheet), suivi, code de livraison, notation | ⬜ | RG-S/RG-C |
+| Parcours Voyageur : création de trajet PER_KG, deals reçus, accept/decline, pickup (checklist, photos caméra), livraison (code) | ⬜ | RG-B |
+| Qualité : Jest/RNTL sur la logique partagée, E2E Maestro/Detox sur les 2 parcours critiques, CI EAS Build | ⬜ | D30 |
+| Google Play : internal testing → production, data safety, politique de confidentialité | ⬜ | — |
+
+Prérequis : Jalon 1 clos (B2–B5) et Jalon 2 lancé (le mobile consomme les mêmes API et les mêmes règles). Estimation à affiner après D36 : **6–10 sessions** pour un premier Android complet.
+
+## 6ter. Jalon 5 — iOS (⬜)
+
+| Élément | Statut |
+|---|---|
+| Même base ; Sign in with Apple (obligatoire si login social), Apple Pay via Stripe, textes d'usage des permissions (caméra, photos, notifications) | ⬜ |
+| TestFlight, review App Store — note de review : marketplace de services physiques, paiement hors achat intégré (conforme aux guidelines 3.1.3) | ⬜ |
+| Publication App Store, parité fonctionnelle et visuelle avec Android | ⬜ |
+
+Estimation : **2–4 sessions** au-dessus du Jalon 4 (l'essentiel du travail est partagé).
 
 ## 7. En continu / dettes techniques
 
@@ -104,16 +133,17 @@ message-service :6005 (chat Socket.io, coordination pickup) · fin i18n (ES puis
 
 | Indicateur | Valeur |
 |---|---|
-| Tests (plateforme) | 433 = trip 187 · deal 225 · notification 21 |
-| Décisions au registre | D1 → D34 |
-| Règles métier | ~50 (V2) + RG-B-01…35, RG-S-01…13, RG-C-01…16, RG-G-01…03 |
-| PR mergées | #1 → #88 (dont 11 le 28/08) |
-| Documents | registre, spec, règles, 4 handoffs, 8 dossiers de fiches PR, `YAMBA-MOTEUR-PRIX.md/.pdf`, ce suivi |
+| Tests (plateforme) | 511 = trip 187 · deal 303 · notification 21 |
+| Décisions au registre | D1 → D40 (+ arbitrages A1 → A34) |
+| Règles métier | ~50 (V2) + RG-B-01…35, RG-S-01…13, RG-C-01…16, RG-G-01…03, RG-D-01…16, RG-V-01…09, RG-F-01…06 |
+| PR mergées | #1 → #89 · en attente de merge (01/09, dans l'ordre) : jalons mobile, docs cumulatifs, B2-PR1, B2-PR2, B2-PR3 |
+| Documents | registre, spec, règles, 5 handoffs (dernier : SESSION-2026-08-28 + addendum 29/08), fiches PR (archive), 3 docs cumulatifs (technique, métier, apprentissage), `YAMBA-MOTEUR-PRIX.md/.pdf`, ce suivi |
 
 ## 9. Ordre recommandé des prochaines sessions
 
-1. **B2 argent entrant** (2–3 sessions) — débloque la boucle ; inclut D31 et le paiement unique.
+1. **B2 reste** (0,5–1 session) — emails transactionnels booking.* (notification-service, colonne email de la matrice A15), tracker Expéditeur /bookings/[id] → GET /deals/:id (vues É3→É9, avec B3). (Front É2 + annulation + seed : FAITS en B2-PR3 ; accept/decline/cancel serveur : B2-PR2.)
 2. **B3 transport** (2–3) puis **B4 argent sortant** (1,5–2,5) puis **B5 confiance** (1,5–2).
 3. PR « paramètres serveur » (0,5) + cleanup legacy (0,5) + seeds (0,25) — entre deux lots.
 4. Jalon 2 : admin-ui (C), Sentry/PostHog, provider email, sessions — **constitutif du lancement**.
 5. UX différées (step 1, chips lieux, messages par route) — quand le funnel réel donne des chiffres (PostHog).
+6. **Jalon 4 mobile** : graver D36 (stack + périmètre) dès que B2 est en route, pour que le client OpenAPI et les contrats soient conçus « mobile-ready » (tokens, pagination, erreurs typées) ; puis Jalon 5 iOS.

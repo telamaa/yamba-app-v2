@@ -26,6 +26,9 @@
       "@packages/messaging": [
         "packages/libs/messaging/src/index.ts"
       ],
+      "@packages/payments": [
+        "packages/libs/payments/src/index.ts"
+      ],
       "@packages/pricing": [
         "packages/libs/pricing/src/index.ts"
       ],

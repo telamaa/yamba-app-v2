@@ -1,0 +1,312 @@
+# YAMBA — APPRENTISSAGE DÉVELOPPEUR (cumulatif, format tutoriel)
+
+> **Règle d'équipe (29/08/2026)** : à chaque PR, une section « Ce que tu apprends avec cette PR » est **ajoutée** ici : les techniques et notions des langages/outils utilisés, **le pourquoi**, de la théorie à la pratique **telle qu'implémentée dans Yamba** (chemins réels, extraits), les pièges, et « pour aller plus loin ». Jamais de nouveau fichier. Lire dans l'ordre : chaque chapitre s'appuie sur les précédents.
+
+---
+
+## Chapitre 0 — La carte du territoire (à relire quand tu es perdu)
+
+**Théorie.** Un *monorepo* regroupe plusieurs applications et bibliothèques dans un seul dépôt Git, avec un outil (ici **Nx**) qui sait quel projet dépend de quel autre. Avantage : un changement dans une lib partagée est vu par tous ses consommateurs *dans la même PR* ; inconvénient : il faut de la discipline (alias, frontières).
+
+**Pratique Yamba.** `apps/` = ce qui s'exécute (user-ui Next.js, api-gateway, auth/trip/deal/notification-service Express) ; `packages/` = ce qui est partagé (`api-contracts` Zod, `pricing`, `prisma`, `messaging`, `middleware`). Un import `@packages/pricing` est résolu par **`tsconfig.base.json` → `paths`** : ce n'est pas un paquet npm, c'est un chemin. Piège vu en PR-C : `apps/user-ui/tsconfig.json` **redéfinit `paths`** et perd donc ceux de la base — il faut ajouter l'alias aux deux endroits (et le fichier à `include`).
+
+**Pour aller plus loin.** Lis `nx graph` (`npx nx graph`) : tu verras pourquoi modifier `api-contracts` relance les tests de trois services.
+
+---
+
+## Chapitre 1 — PR #78 · Un chemin relatif n'est relatif qu'à *quelque chose*
+
+**Théorie.** En Node, `path.resolve("./x")` résout depuis `process.cwd()` — le dossier où le **processus** a été lancé, pas le dossier du fichier. `__dirname`, lui, est toujours le dossier du fichier courant.
+
+**Pratique.** `apps/user-ui/next.config.js` passait `./src/i18n/request.ts` à next-intl. Lancé par Next depuis `apps/user-ui`, ça marche ; évalué par le plugin Nx depuis la racine, ça casse — et Turbopack refuse un chemin absolu. Solution : `"./" + path.relative(process.cwd(), path.join(__dirname, "src/i18n/request.ts"))` — on **calcule** un relatif correct quel que soit le cwd.
+
+**Ce que tu retiens.** Quand un outil dit « fichier introuvable » alors que le fichier existe : demande-toi *depuis où* il cherche.
+
+---
+
+## Chapitre 2 — PR #80 · React 19, le rendu client et les layouts Next
+
+**Théorie.** Dans l'App Router de Next, chaque segment d'URL (`[locale]`, `trips`, `[tripId]`) peut avoir un `layout.tsx`. Quand un segment **change** (FR → EN), son layout est **remonté** côté client ; le layout racine (`app/layout.tsx`), lui, ne bouge jamais. React 19 refuse d'exécuter un `<script>` créé pendant un rendu client (sécurité et prévisibilité) et prévient.
+
+**Pratique.** `next-themes` injecte un `<script>` anti-flash. Placé dans le layout `[locale]`, il était recréé à chaque bascule de langue → erreur console. Déplacé dans le layout racine → plus jamais remonté. Règle dérivée : *les providers indépendants de la langue vivent au-dessus de `[locale]`*.
+
+**Pour aller plus loin.** Distingue *hydratation* (React relie le HTML serveur au DOM une fois) et *rendu client* (React crée des nœuds après coup) : le warning ne concerne que le second.
+
+---
+
+## Chapitre 3 — PR #81 · Pré-rendu statique et `Suspense`
+
+**Théorie.** `next build` pré-rend en HTML toutes les pages qui n'ont pas besoin de la requête. `useSearchParams()` a besoin de l'URL réelle → impossible au build. Next exige alors une **frontière `<Suspense>`** : la partie statique est servie tout de suite, la partie dynamique arrive après. Sans frontière, le build échoue… et la CI qui ne fait que `tsc` ne le voit pas.
+
+**Pratique.** 4 pages (`refresh`, `carrier/onboarding`, `stripe/callback`, `trips/create`) enveloppées : `<Suspense fallback={null}><RefreshGate /></Suspense>`. Le fallback ne s'affiche qu'au pré-rendu.
+
+**Ce que tu retiens.** *La CI doit construire ce qu'elle déploie.* `tsc` prouve les types, pas le déploiement.
+
+---
+
+## Chapitre 4 — PR #82 (PR-B) · Le modèle de données côté formulaire : le `Draft`
+
+**Théorie.** Un formulaire complexe est un **état** (objet) + des **transitions** pures (`setDraft(prev => ({...prev, x}))`). Toujours passer par `prev` (mise à jour fonctionnelle) : deux saisies rapides ne s'écrasent pas. Les champs numériques d'un `<input>` renvoient `""` quand ils sont vides — on le garde tel quel (`number | ""`) pour ne pas afficher « 0 ».
+
+**Pratique.** `create-trip.types.ts` → `Draft` gagne `pricePerKg`, `capacityKg`, `familyConditions: Record<ParcelFamily, {mode, surchargePct}>`. Un `Record` (objet indexé) plutôt qu'un tableau : lecture/écriture d'une famille en O(1). Les **euros** vivent dans le Draft, les **cents** dans le payload : la conversion n'existe qu'au mapper (`Math.round(x * 100)`).
+
+**Pièges.** `Math.round` sur des euros × 100 évite `0.1 + 0.2 ≠ 0.3` ; ne jamais faire d'arithmétique monétaire en flottant côté serveur (règle non négociable : cents `Int`).
+
+**Pour aller plus loin.** Les *types utilitaires* TypeScript : `Record<K, V>`, `Partial<T>`, `Pick<T, K>` (`suggestPricePerKg(draft: Pick<Draft, "transportMode" | ...>)` = la fonction déclare *exactement* ce dont elle a besoin → testable sans construire un Draft entier).
+
+---
+
+## Chapitre 5 — PR #82 · Fonctions pures et tests : le gate de publication
+
+**Théorie.** Une fonction **pure** ne dépend que de ses arguments et n'a aucun effet de bord. Elle se teste sans base, sans mock, en une ligne. La logique métier critique (prix, règles, transitions d'état) doit être pure ; les controllers ne font que l'appeler.
+
+**Pratique.** `apps/trip-service/src/services/pricing-gate.ts` : `resolvePricingEngine`, `checkBagCapacity`, `pickPerKgFields` — trois fonctions pures, 15 specs Jest. Le controller (`createTrip`, `updateTrip`, `publishTrip`) les appelle sur ses trois chemins. Leçon payée : `POST /trips` **listait ses champs à la main** et avait oublié les 5 champs PER_KG (trajet publié à 0 €) → un helper pur `pickPerKgFields(data)` « étalé » (`...`) dans l'écriture, testé.
+
+**Jest en 5 lignes.** `describe("…", () => { it("cas", () => { expect(f(x)).toBe(y); }); });` — un `it` = un comportement, nommé en français métier (« PER_KG complet SANS catégorie → aucune issue »). Lance `npx nx test trip-service -- --testPathPatterns=pricing-gate`.
+
+**Pour aller plus loin.** Le pattern *table de vérité* : quand une fonction combine 2–3 booléens, écris un test par ligne de la table.
+
+---
+
+## Chapitre 6 — PR #82 · Zod : un schéma qui valide ET documente
+
+**Théorie.** Zod décrit une forme de données (`z.object({...})`) et sait **valider** à l'exécution (`safeParse`) **et** produire des types TypeScript (`z.infer`) **et**, chez nous, l'OpenAPI. Une seule source pour trois usages.
+
+**Pratique.** `trip.schema.ts` : `superRefine((data, ctx) => …)` ajoute des règles inter-champs (« si `publish`, alors… »). PR-B y a mis : *catégories exigées seulement si le moteur effectif est legacy* et *forfait bagage ⇒ capacité suffisante*. Les tests visent `result.error.issues` filtrées par `path` plutôt que `success` global : un test ne doit dépendre que de **sa** règle.
+
+**Pièges.** `.optional()` vs `.nullish()` (accepte aussi `null`) ; `z.coerce.number()` pour une query string.
+
+---
+
+## Chapitre 7 — PR #82 · Prisma sur MongoDB : les pièges qui coûtent une journée
+
+**Théorie.** Prisma génère un client typé à partir de `schema.prisma`. Sur Mongo, pas de migrations : `prisma db push`. Les **types composites** (`type TripFamilyCondition {…}` embarqué dans `Trip`) sont des sous-documents.
+
+**Pratique et pièges (tous vécus).**
+- Un `update` avec des composites devient un **pipeline d'agrégation** avec une étape `$set` **par champ** ; Atlas en tier partagé refuse > 50 étapes (`P2010`). Solution : `chunkUpdateData()` (`lib/mongo-update-chunks.ts`) écrit par paquets ≤ 40, les champs de **transition** (`status`, `publishedAt`) en dernier.
+- Prisma/Mongo ne compare pas deux champs entre eux dans un `where` → on filtre sur `capacityKg ≥ poids` (approximation) et on vérifie l'exact ailleurs.
+- `readAt: null` rate les champs absents → `OR: [{readAt: null}, {readAt: {isSet: false}}]` (CLAUDE.md).
+
+**Pour aller plus loin.** Lis le SQL/Mongo généré avec `DEBUG=prisma:query` : tu comprendras pourquoi « une ligne de Prisma » peut coûter cher.
+
+---
+
+## Chapitre 8 — PR #82 · UI : accordéons non montés, popovers en portal, mémoïsation
+
+**Théorie.** React re-rend un composant quand ses props ou son état changent. Trois outils pour rester fluide : ne pas **monter** ce qui est fermé (`open && children`), `React.memo` + callbacks **stables** (`useCallback`/`useMemo`) pour que 8 lignes ne se re-rendent pas à chaque frappe, et `createPortal` pour sortir un popover du flux (un `overflow: hidden` parent ne peut plus le rogner).
+
+**Pratique.** `TripPricingUi.tsx` : `Accordion` (contenu non monté), `FamilyConditionRow = memo(...)` avec un handler par famille créé une fois, `InfoHint` rendu dans `document.body` en `position: fixed`, borné aux bords de l'écran, fermé au scroll/Échap/tap dehors.
+
+**Mobile.** Cibles ≥ 44 px, `touch-pan-x` sur les curseurs, `inputMode="decimal"` (clavier numérique), jamais de hover-only.
+
+**Pour aller plus loin.** Le React Profiler (DevTools) : mesure avant d'optimiser ; `memo` sur tout est une erreur classique.
+
+---
+
+## Chapitre 9 — PR #82 · Tailwind, thème et charte
+
+**Théorie.** Tailwind génère uniquement les classes qu'il **voit** dans le code : `w-${n}` dynamique ne produit rien → chaînes littérales. Le dark mode « class » applique `dark:` quand `<html class="dark">`.
+
+**Pratique.** Jauge « prix juste » : trois `div` absolus avec `bg-[#0F766E]/10 dark:bg-[#0F766E]/35` — alphas plus forts en dark (les zones étaient invisibles). Charte : mango = actif/avancer, teal = accepter/argent, slate = neutre/refus ; les couleurs du mockup (rouge/ambre) **ne sont pas** reprises : le mockup fixe la structure, la charte les couleurs.
+
+**Piège.** `space-y-3` + enfant masqué par la classe `hidden` = marge fantôme sur le suivant (le sélecteur Tailwind ignore `[hidden]` l'attribut, pas la classe).
+
+---
+
+## Chapitre 10 — PR #83 · Dénormaliser pour trier : `comparablePriceCents`
+
+**Théorie.** Une base trie vite sur un **champ indexé**, jamais sur une formule. Quand un tri dépend d'un calcul (`max(2 × €/kg, 800)`), on **dénormalise** : on stocke le résultat, recalculé à chaque écriture, et un **backfill** l'initialise pour l'existant.
+
+**Pratique.** `lib/comparable-price.ts` (pur, 5 specs) ; recalcul dans `computeDenormalizedFields` (create/update) ; `scripts/backfill-comparable-price.ts` idempotent. Quand le calcul dépend d'une entrée utilisateur (le poids), plus d'index possible → tri **en mémoire** sur une fenêtre bornée (200) avec un curseur-offset `o:<n>` : compromis assumé et documenté.
+
+**Ce que tu retiens.** Toute dénormalisation a deux obligations : *qui la recalcule* et *comment on rattrape l'existant*.
+
+---
+
+## Chapitre 11 — PR #83 · Filtres, facettes et « ce qu'on compte, on doit pouvoir l'afficher »
+
+**Théorie.** Une facette = un compteur par valeur de filtre. Elle se calcule sur la base **sans** le filtre qu'elle représente, sinon chaque chip se compte elle-même.
+
+**Pratique.** `familyCounts` : 8 `count` en parallèle (`Promise.all`) sur `baseWhereNoFamily` ; filtre `familyConditions: { none: { familyKey, mode: "REFUSE" } }` en AND par famille. Bug trouvé : les facettes comptaient 5, la liste affichait 4 — le mapper **rejetait** un trajet sans `arrivalAt`. Un mapper de lecture ne doit jamais jeter ce que la requête a compté.
+
+---
+
+## Chapitre 12 — PR #83 · CSS `position: sticky` vs JavaScript
+
+**Théorie.** `sticky` est géré par le moteur de rendu : zéro JavaScript, zéro retard. Conditions : un parent `display: grid/flex` avec `align-items: start`, et **aucun ancêtre en `overflow: hidden`** (clip). Un hook JS qui mesure au scroll et bascule deux copies sera toujours en retard d'une frame.
+
+**Pratique.** Sidebar de recherche : hook supprimé, `<aside className="md:sticky" style={{ top, maxHeight }}>`, scroll interne sans barre visible (`scrollbar-width: none`).
+
+---
+
+## Chapitre 13 — PR #85 (PR-C) · Une bibliothèque partagée front/serveur : `@packages/pricing`
+
+**Théorie.** Si deux implémentations d'une même règle existent (front pour l'affichage, serveur pour la vérité), elles divergeront. Une **lib pure** importée des deux côtés supprime la classe de bug. Elle doit être sans dépendance (pas de React, pas de Prisma) et travailler en **cents entiers**.
+
+**Pratique.** `packages/libs/pricing/src/index.ts` : `quoteShipperPrice(input, params)` renvoie un `ShipperQuote` dont chaque champ est conçu pour être figé tel quel dans le snapshot du Booking (D17). Erreurs **typées** (`class QuoteError extends Error { code }`) : le front traduit `code` en message, le serveur en 400. Tests dans deal-service (c'est lui qui figera). Alias ajouté dans `tsconfig.base.json` **et** `apps/user-ui/tsconfig.json` (+ `include`).
+
+**Pour aller plus loin.** *Discriminated unions* : `pricingModel: "PER_KG" | "FLAT_BAG"` permet à TypeScript de savoir quels champs existent selon le cas.
+
+---
+
+## Chapitre 14 — PR #85 · Normaliser une donnée utilisateur : le téléphone E.164
+
+**Théorie.** Une donnée saisie a mille formes (« 06 42… », « +33 6… », « 0033… ») ; le système n'en stocke qu'**une** (E.164 : `+` + indicatif + numéro national sans le 0). Normaliser **avant** valider : la validation porte sur la forme canonique.
+
+**Pratique.** `toE164(prefix, national)` dans `booking.config.ts` : retire tout sauf les chiffres, tolère `00` et l'indicatif retapé, enlève le zéro national, valide `^\+[1-9]\d{6,14}$`. Testé à la main sur 6 cas avant commit.
+
+---
+
+## Chapitre 15 — Git au quotidien (tout ce qui a servi le 28/08)
+
+- **Branche par PR**, base `dev` protégée : `feat/*`, `chore/*` ; jamais de commit direct sur `dev`.
+- **Rebase** pour intégrer `dev` dans ta branche (`git rebase origin/dev`) : historique linéaire, cherry-picks dupliqués sautés automatiquement (« skipped previously applied commit »).
+- **Cherry-pick** pour prendre un commit précis d'une autre branche (`git cherry-pick <sha>` — sans `-q`, l'option n'existe pas).
+- **`git cherry origin/dev <branche>`** : compare **par contenu**, pas par SHA — indispensable après une réécriture d'historique.
+- **Stratégies de merge** : `-X ours` ne protège que les *conflits* ; `-s ours` garde **tout l'arbre** courant (utilisé pour la release : `main` n'apportait rien).
+- **`filter-branch`** réécrit l'historique (emails, trailers) : toujours une branche de sauvegarde, vérifier « diff de contenu = 0 », force-push avec `--force-with-lease` seulement.
+- **`git stash push -u -- <chemins>`** : sans `-u`, les fichiers non suivis restent.
+
+---
+
+## Chapitre 16 — Méthode (ce qui a le plus fait gagner de temps)
+
+1. **Inventaire avant le code** : `grep` tous les endroits qui écrivent/lisent la donnée (les 3 chemins de publication, le mapper de lecture, les facettes). La moitié des bugs du 28/08 étaient « un endroit oublié ».
+2. **Décision au registre avant le code** (D31–D36) : une phrase de pourquoi vaut une heure de relecture.
+3. **Prouver avec des chiffres** : `curl -w "%{time_total}"`, un build prod, `git diff --stat` = zéro, un test qui échoue avant le fix.
+4. **Une règle qu'on ne dit pas à l'écran est une surprise à la réservation** (D32 était appliquée mais invisible).
+
+
+---
+
+## Chapitre 17 — B2-PR1 · L'interface avant l'implémentation (`PaymentProvider`)
+
+**Théorie.** Une *interface* TypeScript décrit un contrat (« quiconque me donne `authorize`, `retrieve`, `capture`, `cancel`, `refund` me convient ») sans dire comment. Le code métier dépend du contrat, pas de Stripe : c'est l'**inversion de dépendance** (le D de SOLID). Bénéfices concrets : on remplace Stripe par Mobile Money sans toucher au deal-service, et on **teste** avec une implémentation mémoire.
+
+**Pratique.** `packages/libs/payments/src/index.ts` : `interface PaymentProvider`, `StripePaymentProvider`, `FakePaymentProvider`, et une **factory** `createPaymentProviderFromEnv()` qui choisit selon l'environnement — et **refuse** le Fake en production (`throw` au boot : mieux vaut un serveur qui ne démarre pas qu'un serveur qui simule les paiements). Le service reçoit le provider par **injection** : `makeDealRequestService(provider)` ; les routes l'assemblent une fois.
+
+**Statuts normalisés.** Stripe a 7 statuts ; notre contrat en expose 6 génériques (`AUTHORIZED` = `requires_capture`). Traduire à la frontière (`mapStripeStatus`) évite que le vocabulaire d'un fournisseur contamine le métier.
+
+**Pour aller plus loin.** Lis « Ports & Adapters » (architecture hexagonale) : l'interface est le *port*, Stripe et Fake sont deux *adapters*.
+
+---
+
+## Chapitre 18 — B2-PR1 · Transactions MongoDB avec Prisma : « tout ou rien »
+
+**Théorie.** Une transaction garantit que plusieurs écritures réussissent **ensemble** ou pas du tout (atomicité). MongoDB l'offre sur un *replica set* (Atlas en a un). Avec Prisma : `prisma.$transaction(async (tx) => { … })` — toutes les écritures passent par `tx`, une exception annule tout (**rollback**).
+
+**Pratique.** `deal-request.service.ts` : dans la transaction, (a) `tx.trip.updateMany` avec la **condition dans le `where`** (`reservedKg ≤ capacité − kg`) — c'est la réservation **atomique** : si un concurrent a pris la place, `count === 0` et on lève `CAPACITY_EXCEEDED` ; (b) `tx.booking.create` ; (c) deux `tx.outboxEvent.create`. Si (c) échoue, (a) et (b) sont annulés : **jamais de deal sans événement**.
+
+**Le pattern « compare-and-set »**. On ne lit pas puis on écrit (deux Expéditeurs liraient la même valeur) ; on écrit *à condition que* — la base arbitre. Même idée que `RelayLease` (A24) et que `SETNX` Redis (D5).
+
+**Pièges.** Une transaction longue bloque ; ne jamais appeler Stripe *dedans* (réseau lent, non annulable). D'où l'ordre : vérifier l'autorisation **avant**, écrire **ensuite**, libérer l'empreinte **après** en cas d'échec.
+
+---
+
+## Chapitre 19 — B2-PR1 · Les erreurs typées traversent les couches
+
+**Théorie.** Une erreur est une valeur comme une autre : elle porte un **code** stable (`QUOTE_DIVERGENCE`) et des **données** (`actualTotalCents`). Le message texte est pour les humains ; le code est pour le programme (le front traduit, teste, réagit).
+
+**Pratique.** Serveur : `class BookingRequestError extends AppError` avec `details = { type: "booking", code, … }` ; le middleware n'expose `details` en production que pour les types « sûrs » — on ajoute `"booking"` à la liste (sans ça, le front ne recevrait qu'un message anglais). Front : `BookingApiError` reconstruit `code` depuis `response.data.details`, et `useBookingCheckout` fait `t(`step4.errors.${code}`)` avec repli `GENERIC`. Les tests unitaires vérifient **le code**, pas la phrase.
+
+**Ce que tu retiens.** Un `catch {}` muet perd l'information ; un `catch` qui reconnaît `e instanceof BookingApiError && e.code === "QUOTE_DIVERGENCE"` peut agir (ici : recréer l'autorisation).
+
+---
+
+## Chapitre 20 — B2-PR1 · Idempotence et concurrence : penser au « deuxième clic »
+
+**Théorie.** Sur le réseau, tout peut être rejoué : double-clic, retry du navigateur, onglet dupliqué. Une opération est **idempotente** si la rejouer ne change rien de plus. Côté argent, c'est vital.
+
+**Pratique.** (1) `POST /deals` rejoué avec le même `paymentIntentId` → `PAYMENT_ALREADY_USED` (vérifié **dans** la transaction, avant l'écriture). (2) L'intent porte des `metadata` (`tripId`, `shipperId`, `totalShipperCents`) : le serveur refuse une autorisation « recyclée » pour un autre trajet. (3) Le hook front garde `isSubmitting` et ignore les clics pendant l'envoi. Le smoke test a rejoué la requête : 409, `reservedKg` inchangé.
+
+**Pour aller plus loin.** Stripe accepte un `Idempotency-Key` sur `create` : notre interface le prévoit (`idempotencyKey`), à brancher quand le front saura fournir une clé stable par tentative.
+
+---
+
+## Chapitre 21 — B2-PR1 · React : sortir la logique d'un hook partagé
+
+**Théorie.** Deux arbres UI (desktop/mobile) qui dupliquent la même logique de soumission divergeront. Un **hook personnalisé** (`useXxx`) encapsule état + effets + callbacks et se réutilise partout. Un `useRef` garde une valeur **sans** re-rendu (idéal pour une fonction à appeler plus tard) ; `useCallback` stabilise les fonctions passées en props.
+
+**Pratique.** `useBookingCheckout({ draft, trip, step, clear })` : crée l'intent en arrivant à l'étape 4 (`useEffect` sur `step`), expose `registerConfirm(fn)` (le Payment Element, rendu **dans** `<Elements>`, enregistre sa fonction `stripe.confirmPayment` dans un `ref`), et `submit()` qui enchaîne confirmation → `POST /deals` → redirection. `BookingWizard` et `BookingMobile` sont passés de 20 lignes de `handleSubmit` chacun à `const handleSubmit = checkout.submit`.
+
+**Pourquoi `key={intent.paymentIntentId}` sur `<Elements>`** : un `clientSecret` ne peut pas changer sur une instance existante ; changer la `key` force React à **remonter** le composant proprement.
+
+**Pièges.** `dynamic(() => import(...), { ssr: false })` pour Stripe : la lib touche `window` ; et le chargement paresseux garde l'étape 1 légère.
+
+---
+
+## Chapitre 22 — B2-PR1 · Prouver avec un smoke test réel
+
+**Théorie.** Les tests unitaires prouvent la logique ; ils ne prouvent ni le câblage (gateway → service → Mongo → Stripe) ni les contrats réels. Un **smoke test** scripté joue le parcours réel sur l'environnement de dev et vérifie l'état final en base.
+
+**Pratique.** Script `tsx` (non versionné) : login seed via le gateway (cookies — attention : le login pose `access_token` deux fois, il faut garder la **dernière** valeur), `POST /deals/payment-intents` avec un total faux (prouve la divergence), confirmation de l'intent avec `pm_card_visa` (ce que ferait le Payment Element), `POST /deals`, rejeu, puis lecture Prisma de `reservedKg`, du snapshot, de l'outbox. Et le **nettoyage** : annuler l'intent, supprimer le booking et ses événements, restituer les kg — un test qui salit la base est une dette.
+
+**Ce que tu retiens.** Écris le scénario *négatif* d'abord (401, 409…) : c'est lui qui valide les garde-fous ; le chemin heureux ne teste que le câblage.
+
+---
+
+## Chapitre 23 — B2-PR2 · « L'argent d'abord, la base ensuite » : ordonner les effets externes
+
+**Théorie.** Quand une opération touche DEUX systèmes (Stripe et Mongo) qui ne partagent pas de transaction, il faut choisir un ordre et assumer sa fenêtre d'échec. Règle retenue (D39) : agir d'abord sur le système **qui a l'argent**, puis écrire chez soi ; prévoir une **compensation** (action inverse best-effort) si la seconde étape échoue, et un **réconciliateur** (le webhook) pour les cas où même la compensation rate. C'est le début du monde des *sagas* — sans le framework.
+
+**Pratique.** `deal-lifecycle.service.ts` : `accept` fait `provider.capture()` PUIS la transaction (`PENDING→ACCEPTED`) ; si la transaction perd (course rarissime), `provider.refund()` en compensation dans le `catch`, et on relance l'erreur. `cancel` d'un deal ACCEPTED fait le `refund` d'abord — s'il échoue, **aucune** écriture : 409 `PAYMENT_STATE_CONFLICT`, l'utilisateur réessaie. À l'inverse, le `cancel` d'une simple empreinte (decline/expire) est *best-effort* (`catch` silencieux) : elle expirerait seule, le webhook réconcilie.
+
+**Ce que tu retiens.** Il n'y a pas d'ordre « parfait » : il y a un ordre choisi, documenté, avec sa compensation et son filet. Le pire est l'ordre implicite.
+
+---
+
+## Chapitre 24 — B2-PR2 · La machine à états comme SEULE autorité (et son extension contrôlée)
+
+**Théorie.** Quand chaque endpoint décide lui-même « ai-je le droit ? », les règles divergent vite. Ici, TOUT passe par `canPerform(booking, action, acteur)` : le controller ne connaît ni les statuts ni les guards — il transmet le refus de la machine (409 avec SA raison). Ajouter un comportement = ajouter une **transition déclarée** (données), jamais un `if` dans un controller.
+
+**Pratique.** Le webhook D40 a exigé une transition qui n'existait pas : `PENDING —cancel/SYSTEM→ CANCELLED` (l'empreinte meurt seule). On ne l'a PAS codée dans le handler : on l'a **gravée au registre (D40)**, ajoutée à la table `TRANSITIONS` avec ses effets (`RELEASE_CAPACITY`, `NOTIFY_SHIPPER` — pas de refund : rien n'a été capturé), répercutée dans la spec §2.2 et testée (S1/S5 : 196 tests). L'effet `CAPTURE_PAYMENT` sur accept suit la même idée : la machine DÉCLARE les effets, le service les EXÉCUTE (`effects.includes("REFUND_PER_CANCELLATION_POLICY")` pilote le barème).
+
+**Ce que tu retiens.** Une machine à états ne vaut que si elle est le passage obligé. Le jour où une règle te tente « juste ici, dans le controller », c'est une transition qui manque.
+
+---
+
+## Chapitre 25 — B2-PR2 · Webhooks signés : le corps brut ou rien
+
+**Théorie.** Un webhook est un endpoint PUBLIC : n'importe qui peut le POSTer. La seule preuve d'origine est la **signature HMAC** calculée par Stripe sur les octets exacts du corps. Or Express, avec `express.json()`, parse puis (si on re-sérialise) réordonne/reformate : les octets changent, la signature meurt. Il faut donc capter le corps **brut** (`express.raw`) AVANT tout parseur.
+
+**Pratique.** `main.ts` : `app.post("/webhooks/stripe", express.raw({ type: "application/json" }), handler)` monté AVANT `app.use(express.json())`. En dev : `stripe listen --forward-to localhost:6003/webhooks/stripe` — DIRECT sur le service, jamais via le gateway (qui parse). La vérification vit dans `@packages/payments` (`constructStripeWebhookEvent`) : le SDK Stripe reste isolé dans la lib, comme kafkajs dans `@packages/messaging`. Codes de réponse choisis : 501 sans secret (refuser plutôt qu'accepter sans preuve), 400 signature invalide (retry inutile), **500 si la base échoue — exprès : Stripe réessaie**, c'est le filet.
+
+**Ce que tu retiens.** Un webhook idempotent + des retries fournisseur = la réconciliation gratuite. Un webhook qui répond 200 avant d'avoir réussi = une perte silencieuse.
+
+---
+
+## Chapitre 26 — B2-PR2 · Tester les effets, pas les appels : le Fake avec un état
+
+**Théorie.** Un `jest.fn()` vérifie qu'on a APPELÉ ; un **fake à état** (une vraie petite implémentation en mémoire) vérifie l'EFFET : après `accept`, l'intent EST `CAPTURED` ; après `decline`, il EST `CANCELED`. Les tests deviennent des scénarios lisibles, et le fake sert aussi en dev (D30 : « Stripe remplacé par un fake »).
+
+**Pratique.** `deal-lifecycle.service.spec.ts` : le VRAI `FakePaymentProvider` porte l'argent (`expect((await provider.retrieve(intentId)).status).toBe("CAPTURED")`) ; Prisma est un mock virtuel dont `$transaction` exécute le callback avec le même objet — et `updateMany.mockResolvedValue({ count: 0 })` **simule une course perdue** en une ligne (on vérifie alors la compensation : `refund` appelé). Le gate D31 se teste avec un stub `name: "STRIPE"` puisque le Fake le saute par design. Et le contrat outbox est RÉEL : chaque événement passe `BookingDomainEventSchema.parse` dans le chemin testé — un payload invalide casse le test, c'est voulu.
+
+**Ce que tu retiens.** Choisis le niveau de doublure par ce que tu veux prouver : l'état (fake), l'appel (spy), la course (retour piloté). Et garde toujours UN chemin où le contrat de prod s'exécute vraiment.
+
+---
+
+## Chapitre 27 — B2-PR2 · Un cron n'est pas une horloge de vérité
+
+**Théorie.** Si l'expiration n'existait QUE dans le cron, une demande périmée resterait acceptable pendant 5 minutes (voire pendant une panne du cron). La vérité doit être dans la **donnée** (`expiresAt`) et vérifiée à CHAQUE décision ; le cron ne fait que **matérialiser** l'état (statut, argent, place) après coup.
+
+**Pratique.** Le guard `notExpired` de la machine refuse déjà l'accept d'un PENDING périmé — testé « avant même le passage du cron ». Le cron (`expire-bookings.cron.ts`, node-cron `*/5 * * * *`) traite des fournées de 50 avec un booléen anti-chevauchement (un tick qui déborde saute le suivant), chaque booking isolément (`try/catch` par item : une course perdue n'arrête pas la fournée), et s'éteint par env (`BOOKING_EXPIRY_CRON_ENABLED=false`) pour les instances API pures — même patron que le relay outbox.
+
+**Ce que tu retiens.** Demande-toi toujours : « si mon cron meurt une heure, qu'est-ce qui devient FAUX ? ». La bonne réponse : rien — juste du retard.
+
+## Chapitre 28 — B2-PR3 · L'adapter comme frontière : brancher du réel sous une UI née mock
+Quand une UI naît sur des mocks, ses types dérivent (enum réinventée, champs rêvés). Le branchement réel n'est PAS « remplacer l'URL » : c'est réconcilier deux vocabulaires. La technique : un **adapter pur** (`deal.adapter.ts`, miroir de `shipments.adapter.ts`) qui définit une *whitelist de lecture* structurelle (`CarrierBookingViewDto` — seuls les champs lus) et traduit vers le view-model. Les champs que le réel ne fournit pas deviennent **optionnels et documentés** (stats du profil → B5), ceux qu'il ne DOIT pas fournir disparaissent de l'UI (commission — A13). Piège évité : importer `@packages/api-contracts` dans user-ui aurait exigé un alias tsconfig (le tsconfig de l'app redéfinit `paths`) — le miroir structurel local suit la convention du module voisin et casse au premier appel réel si le contrat bouge.
+
+## Chapitre 29 — B2-PR3 · `allowedActions` : l'UI pilotée par la machine, pas par le statut
+Un `switch (status)` au front finit toujours par mentir (une demande expirée est encore « PENDING » en base jusqu'au cron). Le serveur expose `allowedActions` — la liste exacte des transitions permises À CE lecteur, MAINTENANT. Le front teste `allowedActions.includes("cancel")`, jamais `status === "PENDING"`. Corollaire côté serveur : tout ce qui accompagne une action doit suivre la même condition — la préviz d'annulation (`cancellationPreview`) est non nulle *exactement* quand `cancel` est permis, et le test du mapper vérifie cette équivalence.
+
+## Chapitre 30 — B2-PR3 · Après une mutation : invalider, jamais muter
+L'ancien code faisait `setDeal({...deal, status: "ACCEPTED"})` après l'appel — une vérité locale, fausse à la première course. Avec TanStack Query : la mutation réussit → `invalidateQueries(["deal", id])` → la page re-render depuis le SERVEUR. Même discipline sur les erreurs 409 : `TRANSITION_NOT_ALLOWED` ne se « gère » pas, il s'affiche et on RELIT (le serveur a déjà la bonne réponse). Le hook partagé `useDealRequestActions` centralise ce mapping pour les deux mises en page (desktop/mobile) — la logique n'existe qu'une fois.
+
+## Chapitre 31 — B2-PR3 · Un Fake persistable : faire jouer les seeds sans casser les tests
+Le `FakePaymentProvider` vit en mémoire ; les bookings seedés portent des intents que l'instance n'a jamais vus → tout accept seedé finissait en conflit. Ni « tolérer tous les ids » (les tests de conflit comptent sur l'erreur), ni « seeder la mémoire » (autre process). La solution : une **convention de nommage comme contrat** — seuls les ids `pi_fake_seed_*` sont adoptés (matérialisés AUTHORIZED à la première lecture), tout autre id inconnu jette toujours. Le préfixe encode l'intention ; les deux mondes (tests stricts, dev jouable) coexistent sans flag.
+
+## Chapitre 32 — B2-PR3 · Diagnostiquer un toast générique : remonter la chaîne par les FAITS (A34)
+Un « une erreur est survenue » n'est pas un point de départ, c'est un écran de fumée. La méthode qui a marché (premier paiement Stripe réel, 01/09) : (1) **chercher les traces d'écriture** — aucun booking, aucun outbox → l'échec est AVANT toute transaction ; (2) **interroger le fournisseur** — les PaymentIntents du jour sont `requires_capture` → la carte, elle, a réussi ; et ils ne sont PAS annulés → le chemin `CAPACITY_EXCEEDED` (qui annule) est exclu ; (3) **rejouer le parcours en script** (login seed → intent → `confirm` avec `pm_card_visa` + `return_url` → `POST /deals`) pour voir la réponse brute que le front avale. Verdict : deux contrats qui divergent du wizard (email exigé, description min 10 vs 5) → 400 Zod sans `details.code` → toast générique. **Leçons** : un code d'erreur non whitelisté doit tout de même être LOGGÉ côté front ; et chaque règle de validation doit exister à UN endroit ou être testée des deux côtés — ici le contrat gagne des tests qui verrouillent les seuils du wizard.
+
+## Chapitre 33 — B2-PR3 · Quand Prisma ne peut PAS te défendre : le champ absent en Mongo (A34)
+Ajout d'un champ `Int @default(0)` au schéma ≠ ajout du champ dans les documents EXISTANTS : Prisma n'applique le défaut qu'à la lecture/création. Dans un FILTRE, `reservedKg: { lte: X }` ne matche pas un document sans le champ → la réservation atomique refusait des trajets vides (faux `CAPACITY_EXCEEDED`). Trois défenses tentées, deux mortes prouvées par l'expérience : `isSet: false` → refusé par Prisma sur un champ NON-nullable (500 de validation) ; `NOT: { gt: X }` → ne matche pas non plus les champs absents (testé sur un document inséré brut, hors de tout a priori sur `$not`). La seule vraie solution est un **état de données garanti** : un backfill idempotent (`$runCommandRaw` + `$exists: false`), versionné dans `scripts/` à côté des seeds, documenté comme À REJOUER par environnement. **Ce que tu retiens** : quand l'outil ne peut pas exprimer la garde, ne la simule pas à moitié — garantis l'invariant sur les DONNÉES et documente-le là où le prochain dev tombera dessus (le helper `capacityReservationWhere` porte le commentaire).

@@ -9,6 +9,11 @@ import {
   MAX_CODE_REGENERATIONS,
   MAX_DELIVERY_ATTEMPTS,
 } from "./booking-state-machine";
+import {
+  computeCancellationRefundCents,
+  CANCEL_FULL_REFUND_UNTIL_HOURS,
+  CANCEL_LATE_RETENTION_PCT,
+} from "./booking-lifecycle";
 
 /**
  * booking-view.mapper.ts
@@ -63,7 +68,17 @@ export type BookingRecord = {
     premiumCents: number;
     totalShipperCents: number;
     currencyCode: string;
+    // D34 (B2) — absents sur les snapshots antérieurs
+    product?: string | null;
+    billableWeightKg?: number | null;
+    sizeCoef?: number | null;
+    familySurchargePct?: number | null;
+    rawTransportCents?: number | null;
+    minimumApplied?: boolean | null;
+    serviceCents?: number | null;
   };
+  pickupPlace?: { kind: string; details: string | null } | null;
+  deliveryPlace?: { kind: string; details: string | null } | null;
   parcel: {
     category: string;
     categoryFamily: string | null;
@@ -75,7 +90,7 @@ export type BookingRecord = {
     firstName: string;
     lastName: string;
     phoneE164: string;
-    email: string;
+    email: string | null;
   };
   pickup: {
     confirmedAt: Date;
@@ -128,6 +143,11 @@ const toCounterpart = (u: CounterpartRecord) => ({
   lastInitial: u.lastName?.trim().charAt(0).toUpperCase() ?? "",
   avatarUrl: u.avatarUrl,
 });
+
+const toPlace = (
+  p: { kind: string; details: string | null } | null | undefined
+): { kind: "AIRPORT" | "TRAIN_STATION" | "CITY_AREA"; details: string | null } | null =>
+  p ? { kind: p.kind as "AIRPORT" | "TRAIN_STATION" | "CITY_AREA", details: p.details ?? null } : null;
 
 const toTripSnapshot = (t: BookingRecord["trip"]) => ({
   originCity: t.originCity,
@@ -182,12 +202,47 @@ const toMilestones = (b: BookingRecord) => ({
   updatedAt: toIsoRequired(b.updatedAt),
 });
 
+/** ANN-01 servie au front (« le front reflète, ne décide jamais ») —
+ *  non nulle exactement quand `cancel` est permis. PENDING : libération
+ *  intégrale de l'empreinte ; ACCEPTED : barème au moment de la lecture.
+ *  Informatif : le montant réel est RECALCULÉ au cancel effectif. */
+const toCancellationPreview = (
+  b: BookingRecord,
+  allowed: readonly string[],
+  now: Date
+): ShipperBookingView["cancellationPreview"] => {
+  if (!allowed.includes("cancel")) return null;
+  const total = b.pricing.totalShipperCents;
+  const refundCents =
+    b.status === "ACCEPTED"
+      ? computeCancellationRefundCents({
+        totalShipperCents: total,
+        departureAt: b.trip.departureAt,
+        now,
+      })
+      : total;
+  return {
+    refundCents,
+    retentionCents: total - refundCents,
+    retentionPct: CANCEL_LATE_RETENTION_PCT,
+    fullRefundUntil: new Date(
+      b.trip.departureAt.getTime() - CANCEL_FULL_REFUND_UNTIL_HOURS * 3_600_000
+    ).toISOString(),
+    currencyCode: b.pricing.currencyCode,
+  };
+};
+
 /* ══ Vues par rôle ════════════════════════════════════════════ */
 
 export function toShipperBookingView(
   booking: BookingRecord,
-  carrier: CounterpartRecord
+  carrier: CounterpartRecord,
+  now: Date = new Date()
 ): ShipperBookingView {
+  const allowedActions = getAllowedActions(
+    booking as Parameters<typeof getAllowedActions>[0],
+    "SHIPPER"
+  );
   return {
     id: booking.id,
     tripId: booking.tripId,
@@ -210,9 +265,18 @@ export function toShipperBookingView(
       premiumCents: booking.pricing.premiumCents,
       totalShipperCents: booking.pricing.totalShipperCents,
       currencyCode: booking.pricing.currencyCode,
+      product: booking.pricing.product ?? null,
+      billableWeightKg: booking.pricing.billableWeightKg ?? null,
+      sizeCoef: booking.pricing.sizeCoef ?? null,
+      familySurchargePct: booking.pricing.familySurchargePct ?? null,
+      rawTransportCents: booking.pricing.rawTransportCents ?? null,
+      minimumApplied: booking.pricing.minimumApplied ?? null,
+      serviceCents: booking.pricing.serviceCents ?? null,
     },
     parcel: toParcelSnapshot(booking.parcel),
     recipient: booking.recipient,
+    pickupPlace: toPlace(booking.pickupPlace),
+    deliveryPlace: toPlace(booking.deliveryPlace),
     carrier: toCounterpart(carrier),
 
     ...toMilestones(booking),
@@ -228,10 +292,8 @@ export function toShipperBookingView(
     pickup: toPickup(booking.pickup),
     trackingEvents: toTrackingEvents(booking.trackingEvents),
 
-    allowedActions: getAllowedActions(
-      booking as Parameters<typeof getAllowedActions>[0],
-      "SHIPPER"
-    ),
+    allowedActions,
+    cancellationPreview: toCancellationPreview(booking, allowedActions, now),
   };
 }
 
@@ -259,6 +321,8 @@ export function toCarrierBookingView(
     parcel: toParcelSnapshot(booking.parcel),
     // Le destinataire est visible côté Carrier : il en a besoin pour livrer.
     recipient: booking.recipient,
+    pickupPlace: toPlace(booking.pickupPlace),
+    deliveryPlace: toPlace(booking.deliveryPlace),
     shipper: toCounterpart(shipper),
 
     ...toMilestones(booking),

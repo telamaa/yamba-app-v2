@@ -202,6 +202,45 @@ describe("allowedActions — le front reflète, ne décide jamais", () => {
   });
 });
 
+/* ══ cancellationPreview — ANN-01 servie, jamais recalculée front ═ */
+
+describe("cancellationPreview — le serveur annonce le remboursement (ANN-01/D39)", () => {
+  // Départ fixture : 2026-08-02T14:00Z → seuil 100 % = 2026-07-31T14:00Z.
+  const WELL_BEFORE = new Date("2026-07-20T10:00:00.000Z"); // ≥ 48 h avant
+  const LATE = new Date("2026-08-01T10:00:00.000Z"); // < 48 h avant
+
+  it("PENDING : libération intégrale — refund = total, retenue 0", () => {
+    const pending = makeBooking({ status: "PENDING", acceptedAt: null });
+    const view = toShipperBookingView(pending, CARRIER, LATE); // même tardif : l'empreinte n'est pas capturée
+    expect(view.cancellationPreview).toEqual({
+      refundCents: 3000,
+      retentionCents: 0,
+      retentionPct: 50,
+      fullRefundUntil: "2026-07-31T14:00:00.000Z",
+      currencyCode: "EUR",
+    });
+  });
+
+  it("ACCEPTED à J-2 ou plus : 100 %", () => {
+    const view = toShipperBookingView(makeBooking(), CARRIER, WELL_BEFORE);
+    expect(view.cancellationPreview?.refundCents).toBe(3000);
+    expect(view.cancellationPreview?.retentionCents).toBe(0);
+  });
+
+  it("ACCEPTED sous 48 h : retenue 50 %", () => {
+    const view = toShipperBookingView(makeBooking(), CARRIER, LATE);
+    expect(view.cancellationPreview?.refundCents).toBe(1500);
+    expect(view.cancellationPreview?.retentionCents).toBe(1500);
+  });
+
+  it("null dès que cancel n'est plus permis (PICKED_UP), et jamais côté Carrier", () => {
+    const picked = makeBooking({ status: "PICKED_UP", pickedUpAt: T0 });
+    expect(toShipperBookingView(picked, CARRIER, WELL_BEFORE).cancellationPreview).toBeNull();
+    const carrierView = toCarrierBookingView(makeBooking(), SHIPPER) as unknown as Record<string, unknown>;
+    expect("cancellationPreview" in carrierView).toBe(false);
+  });
+});
+
 /* ══ Sérialisation & privacy ══════════════════════════════════ */
 
 describe("sérialisation et privacy", () => {

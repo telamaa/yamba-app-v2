@@ -27,8 +27,11 @@ export default function DealAcceptedRecap({ deal }: Props) {
   const locale = useLocale();
 
   const shipperFirstName = deal.shipper.firstName;
-  const ratingFormatted = deal.shipper.rating.toFixed(1);
+  // Stats absentes de l'API réelle (BookingCounterpart) — masquées alors.
+  const ratingFormatted = deal.shipper.rating?.toFixed(1);
+  const shipmentCount = deal.shipper.shipmentCount;
   const isVerified = deal.shipper.isVerified;
+  const hasShipperSub = ratingFormatted != null || shipmentCount != null || isVerified;
 
   return (
     <section className="rounded-xl border border-slate-200 bg-white px-4 py-3.5 dark:border-slate-800 dark:bg-slate-950 sm:rounded-2xl sm:px-5 sm:py-4">
@@ -41,13 +44,15 @@ export default function DealAcceptedRecap({ deal }: Props) {
         label={t("recap.shipperLabel")}
         value={`${deal.shipper.firstName} ${deal.shipper.lastInitial}.`}
         sub={
-          <span>
-            ⭐ {ratingFormatted} ·{" "}
-            {deal.shipper.shipmentCount === 1
-              ? `${deal.shipper.shipmentCount} envoi`
-              : `${deal.shipper.shipmentCount} envois`}
-            {isVerified && " · Vérifiée"}
-          </span>
+          hasShipperSub ? (
+            <span>
+              {ratingFormatted != null && `⭐ ${ratingFormatted}`}
+              {ratingFormatted != null && shipmentCount != null && " · "}
+              {shipmentCount != null &&
+                (shipmentCount === 1 ? `${shipmentCount} envoi` : `${shipmentCount} envois`)}
+              {isVerified && " · Vérifiée"}
+            </span>
+          ) : undefined
         }
       />
 

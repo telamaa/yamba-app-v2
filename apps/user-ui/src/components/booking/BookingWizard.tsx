@@ -2,11 +2,9 @@
 
 import { ArrowLeft } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
-import { useRouter } from "@/i18n/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { toast } from "sonner";
 import { useBookingDraft } from "@/hooks/useBookingDraft";
-import { createDeal } from "@/services/booking.api";
+import { useBookingCheckout } from "./useBookingCheckout";
 import {
   canContinueStep,
   computeTotal,
@@ -44,9 +42,9 @@ export default function BookingWizard({ trip, onCloseAction }: Props) {
   const isFr = locale === "fr";
 
   const { draft, setDraft, step, setStep, clear } = useBookingDraft();
-  const router = useRouter();
   const [showErrors, setShowErrors] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const checkout = useBookingCheckout({ draft, trip, step, clear });
+  const isSubmitting = checkout.isSubmitting;
 
   // Normalize category if not accepted by this trip
   useEffect(() => {
@@ -85,25 +83,7 @@ export default function BookingWizard({ trip, onCloseAction }: Props) {
     setStep((s) => (s > 1 ? ((s - 1) as Step) : s));
   };
 
-  const handleSubmit = async () => {
-    if (isSubmitting) return;
-    setIsSubmitting(true);
-    try {
-      const result = await createDeal(draft, trip);
-      toast.success(
-        isFr ? "Paiement confirmé !" : "Payment confirmed!",
-        { duration: 3000 }
-      );
-      clear();
-      // Phase 4: redirection vers le tracker post-confirmation paiement
-      // En mock, dealId = bookingId. Plus tard, l'API renverra les 2.
-      router.push(`/bookings/${result.dealId}`);
-    } catch {
-      toast.error(isFr ? "Erreur lors du paiement" : "Payment failed");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+  const handleSubmit = checkout.submit;
 
   const subtitle = `${trip.originCity} → ${trip.destinationCity} · ${formatDate(
     trip.departureDate,
@@ -170,9 +150,12 @@ export default function BookingWizard({ trip, onCloseAction }: Props) {
           )}
           {step === 4 && (
             <StepPayment
-              draft={draft}
-              setDraftAction={setDraft}
               price={price}
+              intent={checkout.intent}
+              intentLoading={checkout.intentLoading}
+              intentError={checkout.intentError}
+              onRetryAction={checkout.refreshIntent}
+              registerConfirmAction={checkout.registerConfirm}
             />
           )}
         </div>

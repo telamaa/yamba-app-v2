@@ -72,6 +72,15 @@ export const mockShipments: ShipmentListItem[] = [
     carrier: { firstName: "Karim", lastInitial: "A." },
     requestedAt: new Date(now - 3 * HOUR).toISOString(),
     expiresAt: new Date(now + 21 * HOUR).toISOString(),
+    // B2 : allowedActions serveur — PENDING = annulable, préviz 100 %
+    canCancel: true,
+    cancellationPreview: {
+      refundCents: 1250,
+      retentionCents: 0,
+      retentionPct: 50,
+      fullRefundUntil: new Date(now + 8 * DAY).toISOString(),
+      currencyCode: "EUR",
+    },
   },
 
   // Accepté — préparation du colis (É3b)
@@ -88,6 +97,15 @@ export const mockShipments: ShipmentListItem[] = [
     acceptedAt: new Date(now - 5 * HOUR).toISOString(),
     pickupMeetingAt: new Date(now + 2 * DAY).toISOString(),
     pickupLocationName: "CDG Terminal 2E",
+    // B2 : ACCEPTED sous 48 h du départ — retenue ANN-01 de 50 %
+    canCancel: true,
+    cancellationPreview: {
+      refundCents: 2140,
+      retentionCents: 2140,
+      retentionPct: 50,
+      fullRefundUntil: new Date(now - 6 * HOUR).toISOString(),
+      currencyCode: "EUR",
+    },
   },
 
   // En transit — vol en cours (É6)

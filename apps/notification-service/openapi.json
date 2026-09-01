@@ -4730,7 +4730,15 @@
             "example": "+242061234567"
           },
           "email": {
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional at request time"
           }
         },
         "required": [
@@ -4741,6 +4749,29 @@
         ],
         "additionalProperties": false,
         "description": "Recipient contact — visible to both roles (the carrier needs it to deliver)"
+      },
+      "BookingPlaceSnapshot": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/LocationKind"
+          },
+          "details": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "additionalProperties": false,
+        "description": "Meeting point chosen at booking (frozen)"
       },
       "BookingPickupInfo": {
         "type": "object",
@@ -4889,6 +4920,84 @@
           "currencyCode": {
             "type": "string",
             "example": "EUR"
+          },
+          "product": {
+            "description": "PARCEL | CHECKED_BAG_23KG | CABIN_BAG_12KG",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "billableWeightKg": {
+            "description": "max(weight, 0.5) — D32",
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "sizeCoef": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "familySurchargePct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "rawTransportCents": {
+            "description": "Before the 8 € floor",
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "minimumApplied": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "serviceCents": {
+            "description": "commission + premium (COM-03)",
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -5006,6 +5115,45 @@
         "additionalProperties": false,
         "description": "Minimal profile of the other party (explicit join — Booking has no Prisma relations)"
       },
+      "CancellationPreview": {
+        "type": "object",
+        "properties": {
+          "refundCents": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Amount returned to the shipper if they cancel NOW (full total while PENDING; ANN-01 scale once ACCEPTED)"
+          },
+          "retentionCents": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "totalShipperCents - refundCents (0 while full refund applies)"
+          },
+          "retentionPct": {
+            "type": "number",
+            "description": "Retention percentage applied after the full-refund deadline (server parameter §13)"
+          },
+          "fullRefundUntil": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+            "description": "departureAt - 48h — cancelling before this instant refunds 100% (ANN-01/D39)"
+          },
+          "currencyCode": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "refundCents",
+          "retentionCents",
+          "retentionPct",
+          "fullRefundUntil",
+          "currencyCode"
+        ],
+        "additionalProperties": false,
+        "description": "Server-computed ANN-01 preview shown before the shipper confirms a cancellation. Informative snapshot at read time — the refund is recomputed at the actual cancel."
+      },
       "ShipperBookingView": {
         "type": "object",
         "properties": {
@@ -5032,6 +5180,26 @@
           },
           "recipient": {
             "$ref": "#/components/schemas/BookingRecipientSnapshot"
+          },
+          "pickupPlace": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BookingPlaceSnapshot"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "deliveryPlace": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BookingPlaceSnapshot"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "carrier": {
             "$ref": "#/components/schemas/BookingCounterpart"
@@ -5213,6 +5381,17 @@
               "$ref": "#/components/schemas/BookingTransitionAction"
             },
             "description": "getAllowedActions(booking, 'SHIPPER') — drives the frontend CTAs"
+          },
+          "cancellationPreview": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CancellationPreview"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Non-null exactly when 'cancel' is in allowedActions (PENDING or ACCEPTED)"
           }
         },
         "required": [
@@ -5232,7 +5411,8 @@
           "deliveryCode",
           "codeRegenerationsLeft",
           "trackingEvents",
-          "allowedActions"
+          "allowedActions",
+          "cancellationPreview"
         ],
         "additionalProperties": false,
         "description": "Deal as seen by the shipper ('Mes envois')"
@@ -5263,6 +5443,26 @@
           },
           "recipient": {
             "$ref": "#/components/schemas/BookingRecipientSnapshot"
+          },
+          "pickupPlace": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BookingPlaceSnapshot"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "deliveryPlace": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BookingPlaceSnapshot"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "shipper": {
             "$ref": "#/components/schemas/BookingCounterpart"
@@ -7944,6 +8144,487 @@
           }
         ],
         "description": "Any booking domain event — the parsing contract for every consumer (notifications, analytics, replay)"
+      },
+      "ParcelProduct": {
+        "type": "string",
+        "enum": [
+          "PARCEL",
+          "CHECKED_BAG_23KG",
+          "CABIN_BAG_12KG"
+        ],
+        "description": "PRC-04 — parcel priced per kg, or a whole bag at a flat rate"
+      },
+      "SizeClass": {
+        "type": "string",
+        "enum": [
+          "S",
+          "M",
+          "L"
+        ],
+        "description": "PRC-03 — visual size class (coef 1 / 1.1 / 1.25)"
+      },
+      "ProtectionTier": {
+        "type": "string",
+        "enum": [
+          "BASIC",
+          "EXTENDED_500"
+        ],
+        "description": "GAR-02 — Yamba Guarantee tier (D22)"
+      },
+      "BookingQuoteInput": {
+        "type": "object",
+        "properties": {
+          "product": {
+            "$ref": "#/components/schemas/ParcelProduct"
+          },
+          "family": {
+            "$ref": "#/components/schemas/ParcelFamily"
+          },
+          "sizeClass": {
+            "description": "Required for PARCEL",
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SizeClass"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "weightKg": {
+            "description": "Declared weight (kg) — required for PARCEL; ignored for bags",
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "maximum": 50
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "protection": {
+            "default": "BASIC",
+            "$ref": "#/components/schemas/ProtectionTier"
+          }
+        },
+        "required": [
+          "product",
+          "family",
+          "protection"
+        ],
+        "additionalProperties": false
+      },
+      "CreatePaymentIntentRequest": {
+        "type": "object",
+        "properties": {
+          "product": {
+            "$ref": "#/components/schemas/ParcelProduct"
+          },
+          "family": {
+            "$ref": "#/components/schemas/ParcelFamily"
+          },
+          "sizeClass": {
+            "description": "Required for PARCEL",
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SizeClass"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "weightKg": {
+            "description": "Declared weight (kg) — required for PARCEL; ignored for bags",
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "maximum": 50
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "protection": {
+            "default": "BASIC",
+            "$ref": "#/components/schemas/ProtectionTier"
+          },
+          "tripId": {
+            "$ref": "#/components/schemas/ObjectId"
+          },
+          "expectedTotalCents": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991,
+            "description": "Total the shipper saw (D17 check)"
+          }
+        },
+        "required": [
+          "product",
+          "family",
+          "protection",
+          "tripId",
+          "expectedTotalCents"
+        ],
+        "additionalProperties": false
+      },
+      "PaymentProviderName": {
+        "type": "string",
+        "enum": [
+          "STRIPE",
+          "FAKE"
+        ],
+        "description": "FAKE only outside production (D11/D30)"
+      },
+      "CreatePaymentIntentResponse": {
+        "type": "object",
+        "properties": {
+          "provider": {
+            "$ref": "#/components/schemas/PaymentProviderName"
+          },
+          "paymentIntentId": {
+            "type": "string"
+          },
+          "clientSecret": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "null for the FAKE provider"
+          },
+          "amountCents": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "currencyCode": {
+            "type": "string"
+          },
+          "quote": {
+            "description": "Server-side quote — what will be frozen (D17/D34)",
+            "$ref": "#/components/schemas/ShipperPricing"
+          }
+        },
+        "required": [
+          "provider",
+          "paymentIntentId",
+          "clientSecret",
+          "amountCents",
+          "currencyCode",
+          "quote"
+        ],
+        "additionalProperties": false
+      },
+      "BookingPlaceInput": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/LocationKind"
+          },
+          "details": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "additionalProperties": false,
+        "description": "Chosen among the trip's pickup/delivery points"
+      },
+      "CreateBookingRequest": {
+        "type": "object",
+        "properties": {
+          "product": {
+            "$ref": "#/components/schemas/ParcelProduct"
+          },
+          "family": {
+            "$ref": "#/components/schemas/ParcelFamily"
+          },
+          "sizeClass": {
+            "description": "Required for PARCEL",
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SizeClass"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "weightKg": {
+            "description": "Declared weight (kg) — required for PARCEL; ignored for bags",
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "maximum": 50
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "protection": {
+            "default": "BASIC",
+            "$ref": "#/components/schemas/ProtectionTier"
+          },
+          "tripId": {
+            "$ref": "#/components/schemas/ObjectId"
+          },
+          "paymentIntentId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "expectedTotalCents": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "description": {
+            "type": "string",
+            "minLength": 5,
+            "maxLength": 500,
+            "description": "Min 5 — same floor as the wizard (spec: recommended, low friction)"
+          },
+          "declaredValueCents": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 5000000
+          },
+          "photoUrls": {
+            "default": [],
+            "maxItems": 5,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          "recipient": {
+            "type": "object",
+            "properties": {
+              "firstName": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 80
+              },
+              "lastName": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 80
+              },
+              "phoneE164": {
+                "type": "string",
+                "pattern": "^\\+[1-9]\\d{6,14}$"
+              },
+              "email": {
+                "description": "Optional — recipient notifications only when provided",
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "email",
+                    "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "firstName",
+              "lastName",
+              "phoneE164"
+            ],
+            "additionalProperties": false
+          },
+          "pickupPlace": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BookingPlaceInput"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "deliveryPlace": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BookingPlaceInput"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "charterAccepted": {
+            "type": "boolean",
+            "const": true,
+            "description": "Shipper charter (CNF-02) — must be true"
+          },
+          "termsAccepted": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "product",
+          "family",
+          "protection",
+          "tripId",
+          "paymentIntentId",
+          "expectedTotalCents",
+          "description",
+          "declaredValueCents",
+          "photoUrls",
+          "recipient",
+          "charterAccepted",
+          "termsAccepted"
+        ],
+        "additionalProperties": false
+      },
+      "CreateBookingResponse": {
+        "type": "object",
+        "properties": {
+          "bookingId": {
+            "$ref": "#/components/schemas/ObjectId"
+          },
+          "status": {
+            "$ref": "#/components/schemas/BookingStatus"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+            "description": "24h acceptance deadline (DEA-01)"
+          },
+          "totalShipperCents": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "currencyCode": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "bookingId",
+          "status",
+          "expiresAt",
+          "totalShipperCents",
+          "currencyCode"
+        ],
+        "additionalProperties": false
+      },
+      "DeclineReason": {
+        "type": "string",
+        "enum": [
+          "CATEGORY_NOT_CARRIED",
+          "TOO_HEAVY",
+          "PLACES_INCOMPATIBLE",
+          "TIMING",
+          "OTHER"
+        ],
+        "description": "The 5 optional decline reasons offered to the carrier (spec É2)"
+      },
+      "AcceptDealRequest": {
+        "type": "object",
+        "properties": {
+          "charterAccepted": {
+            "type": "boolean",
+            "const": true,
+            "description": "Carrier charter (verification, forbidden items, punctuality) — must be true (RGP-03)"
+          }
+        },
+        "required": [
+          "charterAccepted"
+        ],
+        "additionalProperties": false
+      },
+      "DeclineDealRequest": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "description": "Optional — one of 5 (spec É2)",
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DeclineReason"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "CancelDealRequest": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 300
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "DealTransitionResponse": {
+        "type": "object",
+        "properties": {
+          "bookingId": {
+            "$ref": "#/components/schemas/ObjectId"
+          },
+          "status": {
+            "$ref": "#/components/schemas/BookingStatus"
+          },
+          "refundAmountCents": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Amount returned to the shipper (cents). Full total on PENDING closures (authorization released), ANN-01 amount on post-acceptance cancellation, null when nothing is returned (accept)."
+          },
+          "currencyCode": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "bookingId",
+          "status",
+          "refundAmountCents",
+          "currencyCode"
+        ],
+        "additionalProperties": false
       },
       "NotificationView": {
         "type": "object",

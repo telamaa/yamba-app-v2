@@ -44,7 +44,13 @@ Ordre de demarrage : auth -> trip -> gateway.
 - Jalon 1 — Boucle transactionnelle : reserver, payer, livrer, noter.
 - Jalon 2 — Plateforme operable : admin-ui et outillage. CONSTITUTIF du
   lancement public (le lancement = fin du jalon 2, pas du jalon 1).
-- Jalon 3 — Expansion : chat, mobile, locales, reco.
+- Jalon 3 — Expansion : chat, locales, reco (le mobile en sort : jalons 4 et 5).
+- Jalon 4 — Application mobile, socle + Android : une seule base React Native /
+  Expo (TypeScript) reutilisant @packages/pricing, @packages/api-contracts et
+  le client genere depuis l'OpenAPI (D3) ; parcours Expediteur et Voyageur ;
+  publication Google Play (D36 (gravée) : stack et perimetre).
+- Jalon 5 — iOS : meme base, specificites Apple (Sign in with Apple, Apple Pay,
+  review App Store, TestFlight), publication App Store.
 
 ## Ce qui est FAIT (aout 2026)
 
@@ -78,7 +84,42 @@ Ordre de demarrage : auth -> trip -> gateway.
   hypotheses dans lib/pricing-corridors.ts), D32 annoncee a l'ecran.
 - Chores : #78 next-intl/Nx, #79 context/ versionne + CLAUDE.md, #80
   ThemeProvider root, #81 build prod repare (Suspense).
-- Plateforme de tests : 433 (trip 187, deal 225, notification 21) — post-#85.
+- B2-PR1 (naissance du deal, D37/D38) : `POST /deals/payment-intents` +
+  `POST /deals` (deal-service), `@packages/payments` (PaymentProvider D11 :
+  Stripe capture manuelle + Fake), devis serveur = moteur unique (409
+  QUOTE_DIVERGENCE), snapshot D17 enrichi (7 champs D34) + lieux de
+  remise/retrait, reservedKg atomique + 2 events outbox EN TRANSACTION,
+  wizard branche sur l'API (un seul Payment Element, A30), 24 tests.
+  Prouve de bout en bout sur Atlas + Stripe test (29,57 EUR autorises,
+  2 kg reserves, rejeu refuse).
+- B2-PR2 (cycle de vie du deal, D39/D40) : `POST /deals/:id/accept`
+  (charte + gate D31 DEPLACE ici — les 2 checks profil/Stripe retires des
+  3 chemins de publication trip-service — puis CAPTURE a l'acceptation,
+  D39), `POST /deals/:id/decline` (raison parmi 5, liberation de
+  l'empreinte, kg restitues CAP-02), `POST /deals/:id/cancel` (ANN-01 :
+  100 % jusqu'a J-2, retenue 50 % ensuite — CANCEL_LATE_RETENTION_PCT
+  grave a 50), cron expiration 24 h (deal-service, toutes les 5 min,
+  BOOKING_EXPIRY_CRON_ENABLED), webhook `POST /webhooks/stripe` (D40 :
+  source de verite — payment_intent.canceled → SYSTEM cancel d'un PENDING,
+  nouvelle transition machine), partout : argent d'abord (PaymentProvider)
+  puis UNE transaction Mongo conditionnelle + outbox. +46 tests.
+- B2-PR3 (front des transitions, A31–A33) : ecran Voyageur E2
+  (`/carrier/deals/[dealId]`) branche sur les VRAIES API — GET /deals/:id
+  via un adapter whitelist (`deal.adapter.ts`), accept/decline reels
+  (hook partage desktop/mobile, mapping des 409 : onboarding D31 →
+  redirection, TRANSITION_NOT_ALLOWED → relecture), raisons de refus
+  alignees contrat (textarea supprime, A32), gains = net seul (A13),
+  CTA pilotes par `allowedActions` (jamais par le statut). Annulation
+  Expeditrice dans Mes envois : bouton si `cancel` permis, modale avec
+  `cancellationPreview` SERVIE par la vue Shipper (A31 — ANN-01 jamais
+  recalcule au front), POST /deals/:id/cancel puis relecture. Seed :
+  CarrierPage COMPLETE/Stripe factice par Voyageur + intents
+  `pi_fake_seed_*` adoptes par le FakePaymentProvider (A33) — parcours
+  B2 jouables en dev sans cles. TanStack Query sur le module deal
+  (invalidation, jamais de mutation locale du statut). +4 tests.
+- Plateforme de tests : 511 (trip 187, deal 303, notification 21) — post-B2-PR3
+  (+A34 : contrat aligné wizard — email destinataire optionnel, description min 5 ;
+  backfill reservedKg sur les Trips pré-B2-PR1).
 
 ## Release et historique (28 aout 2026)
 
@@ -105,14 +146,13 @@ Ordre de demarrage : auth -> trip -> gateway.
 - UX restantes : step 1 (aeroport -> ville de rattachement + lieu de
   pickup, arrivee repliee, justificatif en step 3), lieux en chips + apercu
   sticky (create-trip), cleanup legacy PER_CATEGORY + instantBooking.
-- Micro-PR D31 : gate Stripe/profil deplace de la publication vers
-  l'acceptation + carrierPage/Stripe factices au seed.
-- B2 argent entrant : creation deal depuis le wizard, PaymentIntent
-  (autorisation -> capture a l'acceptation), accept/decline, cron expiration
-  24h, remboursements, PaymentProvider abstrait, writers outbox EN
-  TRANSACTION Mongo, payment-service :6008, media-service :6009,
-  SiteConfig commissionRate 0.12 + plancher 300 centimes (D16),
-  AES-256-GCM re-affichage code livraison, emails transactionnels.
+- B2 (suite) : PR2 FAITE (accept/decline/cancel + capture D39, gate D31
+  deplace, cron 24 h, webhook D40 — voir « fait » ci-dessus). RESTE :
+  front des transitions (page deal Voyageur É2 encore sur mocks : brancher
+  accept/decline sur l'API ; annulation cote Expediteur), carrierPage/
+  Stripe factices au seed, PR3 emails transactionnels, photos du colis
+  via media-service :6009, AES-256-GCM re-affichage code livraison,
+  SiteConfig commissionRate (D16). payment-service :6008 : NON (D38).
 - B3 transport : pickup (upload R2, code bcrypt, checklist conformite),
   refuse, tracking, deliver (compare + lock serveur), regeneration code.
 - B4 argent sortant : confirmation anticipee, cron J+4 -> COMPLETED +
@@ -141,8 +181,29 @@ Ordre de demarrage : auth -> trip -> gateway.
 
 - F message-service :6005 (chat Socket.io, coordination pickup).
 - Fin i18n : PR feat/locale-es (critere de fin), puis PT.
-- G mobile (client genere depuis l'OpenAPI, D3).
 - H recommandations ML (replay outbox + PostHog).
+
+## Ce qui RESTE — Jalon 4 (mobile : socle + Android)
+
+- D36 a graver : stack (React Native + Expo, TypeScript, Expo Router), code
+  partage (pricing, contrats, client OpenAPI genere, i18n JSON reutilises),
+  auth par tokens (refresh) au lieu des cookies web, push notifications
+  (Expo Notifications, branchees sur notification-service), deep links.
+- Parcours Expediteur : recherche (poids, familles), page trajet, reservation
+  4 etapes (Stripe Payment Sheet), suivi, code de livraison, notation.
+- Parcours Voyageur : creation de trajet (formulaire PER_KG), deals recus,
+  accept/decline, pickup + checklist + photos (camera), livraison (code).
+- Qualite : tests Jest/RNTL sur la logique partagee, Detox ou Maestro E2E sur
+  les 2 parcours critiques, CI EAS Build, Play Console (internal testing ->
+  production), politique de confidentialite / data safety.
+
+## Ce qui RESTE — Jalon 5 (iOS)
+
+- Meme base ; Sign in with Apple (obligatoire si login social), Apple Pay
+  via Stripe, permissions camera/photos/notifications avec textes d'usage,
+  TestFlight, review App Store (guidelines marketplace : paiement de
+  services physiques hors IAP = OK, a documenter dans la note de review).
+- Publication App Store, parite fonctionnelle et visuelle avec Android.
 
 ## En continu (entre les lots)
 

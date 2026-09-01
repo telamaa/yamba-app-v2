@@ -54,10 +54,31 @@ const response404 = jsonResponse(
 );
 
 /** 500 unhandled — `error` field, not `message`. */
+const response409 = jsonResponse(
+  "ErrorResponse",
+  "Business conflict — details.code ∈ QUOTE_DIVERGENCE | CAPACITY_EXCEEDED | FAMILY_REFUSED | " +
+    "TRIP_NOT_BOOKABLE | OWN_TRIP | PAYMENT_NOT_AUTHORIZED | PAYMENT_MISMATCH | PAYMENT_ALREADY_USED"
+);
 const response500 = jsonResponse("UnhandledError", "Unhandled server error");
+
+/** 409 des transitions (B2-PR2) — codes du cycle de vie. */
+const response409Lifecycle = jsonResponse(
+  "ErrorResponse",
+  "Business conflict — details.code ∈ TRANSITION_NOT_ALLOWED (the state machine refused: status, role or " +
+    "guard — details carry its reason) | CARRIER_ONBOARDING_REQUIRED (D31 gate: profile or Stripe onboarding " +
+    "incomplete) | PAYMENT_STATE_CONFLICT (the provider-side payment state forbids the operation)"
+);
 
 /** Cookie OR bearer (OpenAPI OR semantics) — mirror of extractToken. */
 const authSecurity = [{ cookieAuth: [] }, { bearerAuth: [] }];
+
+const dealIdPathParam = {
+  name: "id",
+  in: "path",
+  required: true,
+  schema: ref("ObjectId"),
+  description: "Deal (booking) identifier",
+};
 
 const statusQueryParam = {
   name: "status",
@@ -68,6 +89,30 @@ const statusQueryParam = {
 };
 
 /* ══ Document ═════════════════════════════════════════════════ */
+
+const createBookingOperation = {
+    tags: ["deals"],
+    summary: "Create a deal request (PENDING) — step 2 (D37)",
+    description:
+      "Re-validates everything server-side (trip bookable, quote identical — D17, payment authorized " +
+      "and matching), then in ONE Mongo transaction: conditional reservedKg increment (CAP-01), Booking " +
+      "with 5 frozen snapshots, and 2 outbox events (booking.requested, booking.payment_authorized). " +
+      "The carrier is notified by the relay; the 24h acceptance window starts (DEA-01).",
+    operationId: "createBooking",
+    security: authSecurity,
+    requestBody: {
+      required: true,
+      content: { "application/json": { schema: ref("CreateBookingRequest") } },
+    },
+    responses: {
+      "201": jsonResponse("CreateBookingResponse", "Deal created (PENDING)"),
+      "400": response400,
+      "401": response401,
+      "404": response404,
+      "409": response409,
+      "500": response500,
+    },
+};
 
 export function buildOpenApiDocument() {
   const { schemas } = z.toJSONSchema(z.globalRegistry, {
@@ -171,6 +216,113 @@ export function buildOpenApiDocument() {
             "401": response401,
             "403": response403,
             "404": response404,
+            "500": response500,
+          },
+        },
+        post: createBookingOperation,
+      },
+      "/deals/payment-intents": {
+        post: {
+          tags: ["deals"],
+          summary: "Authorize the shipper's payment for a quote (step 1 of a request — D37)",
+          description:
+            "The server recomputes the quote with the single pricing engine (@packages/pricing, D34) and " +
+            "authorizes the total with the PaymentProvider (D11, manual capture — captured at acceptance, D31). " +
+            "Nothing is persisted: an abandoned intent simply expires. 409 with details.code when the total " +
+            "the shipper saw differs (QUOTE_DIVERGENCE), the family is refused, or the trip is not bookable.",
+          operationId: "createPaymentIntent",
+          security: authSecurity,
+          requestBody: {
+            required: true,
+            content: { "application/json": { schema: ref("CreatePaymentIntentRequest") } },
+          },
+          responses: {
+            "201": jsonResponse("CreatePaymentIntentResponse", "Authorization created (clientSecret null for FAKE)"),
+            "400": response400,
+            "401": response401,
+            "404": response404,
+            "409": response409,
+            "500": response500,
+          },
+        },
+      },
+      "/deals/{id}/accept": {
+        post: {
+          tags: ["deals"],
+          summary: "Accept a deal request (carrier) — capture at acceptance (D39)",
+          description:
+            "Carrier only, charter checkbox required. The D31 gate (completed profile + Stripe onboarding) is " +
+            "enforced HERE — no longer at trip publication. The shipper's authorization is CAPTURED (money moves " +
+            "now — an authorization expires in ~7 days, capturing at D-1 would break early acceptances), then in " +
+            "ONE Mongo transaction: conditional PENDING→ACCEPTED, acceptedAt/capturedAt, outbox booking.accepted.",
+          operationId: "acceptDeal",
+          security: authSecurity,
+          parameters: [dealIdPathParam],
+          requestBody: {
+            required: true,
+            content: { "application/json": { schema: ref("AcceptDealRequest") } },
+          },
+          responses: {
+            "200": jsonResponse("DealTransitionResponse", "Deal accepted (refundAmountCents null)"),
+            "400": response400,
+            "401": response401,
+            "403": response403,
+            "404": response404,
+            "409": response409Lifecycle,
+            "500": response500,
+          },
+        },
+      },
+      "/deals/{id}/decline": {
+        post: {
+          tags: ["deals"],
+          summary: "Decline a deal request (carrier)",
+          description:
+            "Carrier only, optional reason among 5 (spec É2). The authorization is released (never captured), " +
+            "then in ONE Mongo transaction: conditional PENDING→DECLINED, reserved kg released (CAP-02), outbox " +
+            "booking.declined + booking.refund_issued (full amount).",
+          operationId: "declineDeal",
+          security: authSecurity,
+          parameters: [dealIdPathParam],
+          requestBody: {
+            required: false,
+            content: { "application/json": { schema: ref("DeclineDealRequest") } },
+          },
+          responses: {
+            "200": jsonResponse("DealTransitionResponse", "Deal declined, full amount returned to the shipper"),
+            "400": response400,
+            "401": response401,
+            "403": response403,
+            "404": response404,
+            "409": response409Lifecycle,
+            "500": response500,
+          },
+        },
+      },
+      "/deals/{id}/cancel": {
+        post: {
+          tags: ["deals"],
+          summary: "Cancel a deal (shipper) — ANN-01 policy",
+          description:
+            "Shipper only. PENDING: the authorization is released in full. ACCEPTED (payment captured — D39): a " +
+            "real refund per ANN-01 — 100% until 48h before departure, then a 50% retention " +
+            "(CANCEL_LATE_RETENTION_PCT, owed to the carrier — paid out with the B4 payout infrastructure). " +
+            "After PICKED_UP cancellation is impossible (dispute is the only path). One Mongo transaction: " +
+            "conditional transition, kg released (CAP-02), outbox booking.cancelled + booking.refund_issued.",
+          operationId: "cancelDeal",
+          security: authSecurity,
+          parameters: [dealIdPathParam],
+          requestBody: {
+            required: false,
+            content: { "application/json": { schema: ref("CancelDealRequest") } },
+          },
+          responses: {
+            "200": jsonResponse("DealTransitionResponse", "Deal cancelled, refundAmountCents per ANN-01"),
+            "400": response400,
+            "401": response401,
+            "403": response403,
+            "404": response404,
+            "409": response409Lifecycle,
             "500": response500,
           },
         },

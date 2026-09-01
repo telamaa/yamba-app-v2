@@ -122,7 +122,9 @@ export function TrackingShipperCard({ deal }: { deal: DealRequest }) {
             {shipper.firstName} {shipper.lastInitial}.
           </div>
           <div className="text-[11px] text-slate-500 dark:text-slate-400">
-            ⭐ {shipper.rating.toFixed(1)} · {t("shipperCard.subtitle")}
+            {/* rating absent de l'API réelle — masqué alors */}
+            {shipper.rating != null && <>⭐ {shipper.rating.toFixed(1)} · </>}
+            {t("shipperCard.subtitle")}
           </div>
         </div>
       </div>

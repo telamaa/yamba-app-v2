@@ -45,11 +45,16 @@ export default function PickupContactCard({ deal }: Props) {
           <div className="text-[14px] font-semibold text-slate-900 dark:text-white">
             {shipper.firstName} {shipper.lastInitial}.
           </div>
-          <div className="text-[11px] text-slate-500 dark:text-slate-400">
-            ⭐ {shipper.rating.toFixed(1)} ·{" "}
-            {t("contactCard.shipments", { count: shipper.shipmentCount })} ·{" "}
-            {t("contactCard.verified")}
-          </div>
+          {/* Stats absentes de l'API réelle (BookingCounterpart) — masquées */}
+          {(shipper.rating != null || shipper.shipmentCount != null) && (
+            <div className="text-[11px] text-slate-500 dark:text-slate-400">
+              {shipper.rating != null && <>⭐ {shipper.rating.toFixed(1)} ·{" "}</>}
+              {shipper.shipmentCount != null && (
+                <>{t("contactCard.shipments", { count: shipper.shipmentCount })} ·{" "}</>
+              )}
+              {t("contactCard.verified")}
+            </div>
+          )}
         </div>
       </div>
       <div className="mt-3.5 flex gap-2">
