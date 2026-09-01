@@ -103,7 +103,21 @@ Ordre de demarrage : auth -> trip -> gateway.
   source de verite — payment_intent.canceled → SYSTEM cancel d'un PENDING,
   nouvelle transition machine), partout : argent d'abord (PaymentProvider)
   puis UNE transaction Mongo conditionnelle + outbox. +46 tests.
-- Plateforme de tests : 503 (trip 187, deal 295, notification 21) — post-B2-PR2.
+- B2-PR3 (front des transitions, A31–A33) : ecran Voyageur E2
+  (`/carrier/deals/[dealId]`) branche sur les VRAIES API — GET /deals/:id
+  via un adapter whitelist (`deal.adapter.ts`), accept/decline reels
+  (hook partage desktop/mobile, mapping des 409 : onboarding D31 →
+  redirection, TRANSITION_NOT_ALLOWED → relecture), raisons de refus
+  alignees contrat (textarea supprime, A32), gains = net seul (A13),
+  CTA pilotes par `allowedActions` (jamais par le statut). Annulation
+  Expeditrice dans Mes envois : bouton si `cancel` permis, modale avec
+  `cancellationPreview` SERVIE par la vue Shipper (A31 — ANN-01 jamais
+  recalcule au front), POST /deals/:id/cancel puis relecture. Seed :
+  CarrierPage COMPLETE/Stripe factice par Voyageur + intents
+  `pi_fake_seed_*` adoptes par le FakePaymentProvider (A33) — parcours
+  B2 jouables en dev sans cles. TanStack Query sur le module deal
+  (invalidation, jamais de mutation locale du statut). +4 tests.
+- Plateforme de tests : 507 (trip 187, deal 299, notification 21) — post-B2-PR3.
 
 ## Release et historique (28 aout 2026)
 

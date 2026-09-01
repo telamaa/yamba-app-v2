@@ -166,6 +166,35 @@ const milestoneFields = {
   updatedAt: z.iso.datetime(),
 };
 
+/* ══ Prévisualisation d'annulation (ANN-01 — servie, jamais
+      recalculée par le front : « le front reflète, ne décide
+      jamais »). Présente quand `cancel` ∈ allowedActions. ═══════ */
+
+export const CancellationPreviewSchema = z
+  .object({
+    refundCents: z.number().int().meta({
+      description:
+        "Amount returned to the shipper if they cancel NOW (full total while PENDING; ANN-01 scale once ACCEPTED)",
+    }),
+    retentionCents: z.number().int().meta({
+      description: "totalShipperCents - refundCents (0 while full refund applies)",
+    }),
+    retentionPct: z.number().meta({
+      description: "Retention percentage applied after the full-refund deadline (server parameter §13)",
+    }),
+    fullRefundUntil: z.iso.datetime().meta({
+      description: "departureAt - 48h — cancelling before this instant refunds 100% (ANN-01/D39)",
+    }),
+    currencyCode: z.string(),
+  })
+  .meta({
+    id: "CancellationPreview",
+    description:
+      "Server-computed ANN-01 preview shown before the shipper confirms a cancellation. " +
+      "Informative snapshot at read time — the refund is recomputed at the actual cancel.",
+  });
+export type CancellationPreview = z.infer<typeof CancellationPreviewSchema>;
+
 /* ══ Vues par rôle (listes blanches — A13) ════════════════════ */
 
 export const ShipperBookingViewSchema = z
@@ -198,6 +227,10 @@ export const ShipperBookingViewSchema = z
 
     allowedActions: z.array(BookingTransitionActionSchema).meta({
       description: "getAllowedActions(booking, 'SHIPPER') — drives the frontend CTAs",
+    }),
+
+    cancellationPreview: CancellationPreviewSchema.nullable().meta({
+      description: "Non-null exactly when 'cancel' is in allowedActions (PENDING or ACCEPTED)",
     }),
   })
   .meta({

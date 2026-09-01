@@ -56,6 +56,16 @@ export type ShipperBookingViewDto = {
   completedAt?: string | null;
   disputeTicket?: string | null;
   trackingEvents: TrackingEventDto[];
+  /** Machine d'état serveur — pilote les CTA (« le front reflète »). */
+  allowedActions: string[];
+  /** ANN-01 servie (B2) — non nulle exactement quand `cancel` est permis. */
+  cancellationPreview?: {
+    refundCents: number;
+    retentionCents: number;
+    retentionPct: number;
+    fullRefundUntil: string;
+    currencyCode: string;
+  } | null;
 };
 
 /** null backend → undefined front (les optionnels du DTO liste). */
@@ -92,6 +102,8 @@ export function toShipmentListItem(
     hasTrackingEvents: view.trackingEvents.length > 0,
     lastTrackingStep: lastTracking?.step,
     disputeTicket: orUndef(view.disputeTicket),
+    canCancel: view.allowedActions.includes("cancel"),
+    cancellationPreview: orUndef(view.cancellationPreview),
   };
 }
 

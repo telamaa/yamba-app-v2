@@ -749,3 +749,43 @@ Tous les chemins écrivent avec `updateMany { id, status: attendu }` : le second
 
 ### 7. Tests (+46 → plateforme 503)
 Machine 188→196 (transition SYSTEM + effet CAPTURE_PAYMENT) · `booking-lifecycle.spec.ts` 7 (bornes EXACTES du barème : 48 h pile = 100 %, une minute sous = 50 % arrondi) · `deal-lifecycle.service.spec.ts` 31 : le VRAI FakePaymentProvider (les effets argent s'observent sur son état), prisma mock virtuel, contrat outbox RÉEL (`BookingDomainEventSchema.parse` dans le chemin testé). Gate D31 testé avec un stub STRIPE (le Fake le saute par design).
+
+---
+
+# B2-PR3 — Front des transitions : l'écran É2 réel, l'annulation Expéditeur (A31–A33)
+
+> Branche `feat/b2-deal-front` · 01/09/2026 · base `feat/b2-deal-lifecycle` (B2-PR2)
+
+### 1. Le problème
+B2-PR2 avait donné au serveur les trois transitions (accept/decline/cancel) — mais aucun écran ne les appelait. L'écran Voyageur É2 (`/carrier/deals/[dealId]`) tournait sur des mocks (`sleep(800)` + code de livraison inventé), son vocabulaire de refus divergeait du contrat, sa décomposition des gains affichait la commission et le total Expéditeur (interdits par A13), et l'Expéditeur n'avait AUCUN moyen d'annuler. `allowedActions`, exposé par les deux vues depuis B1-PR3, n'était consommé nulle part.
+
+### 2. Les décisions gravées AVANT le code (registre §2bis.5)
+- **A31** — la préviz d'annulation (`cancellationPreview`) est SERVIE par la vue Shipper, calculée par le mapper avec le même `computeCancellationRefundCents` que le cancel réel. Le front ne connaît pas le barème ANN-01 : il affiche.
+- **A32** — le refus = la raison seule (5 valeurs du contrat, optionnelle). Le textarea « détails » du mock n'existait pas côté serveur : supprimé de l'UI (jamais un champ qui ment).
+- **A33** — le FakePaymentProvider adopte les intents `pi_fake_seed_*` inconnus (AUTHORIZED à la lecture) ; le seed pose `paymentProvider: FAKE`, un intent par booking et un `CarrierPage` COMPLETE/Stripe factice par Voyageur → les parcours accept/decline/cancel sont JOUABLES en dev sans clés.
+
+### 3. Où est le code
+| Couche | Fichier | Rôle |
+|---|---|---|
+| Contrat | `packages/libs/api-contracts/src/booking/booking.schema.ts` | `CancellationPreviewSchema` (`refundCents`, `retentionCents`, `retentionPct`, `fullRefundUntil`, `currencyCode`) ; `ShipperBookingView.cancellationPreview` non nul ⇔ `cancel` ∈ `allowedActions` |
+| Mapper | `apps/deal-service/src/services/booking-view.mapper.ts` | `toCancellationPreview` — PENDING : total (l'empreinte n'est pas capturée) ; ACCEPTED : barème au moment de la lecture ; `now` injectable (tests) |
+| Adapter carrier | `apps/user-ui/src/components/carrier/deal/deal.adapter.ts` | `toDealRequest(CarrierBookingView)` — SEULE frontière contrat→vue (pattern shipments.adapter) ; dégradations documentées : stats shipper absentes (B5), gains = net seul (A13), recipient révélé après pickup |
+| API carrier | `.../carrier/deal/deal.api.ts` | `getDealRequest`/`acceptDeal`/`declineDeal` réels (`DealApiError` typée, 403 confondu en NOT_FOUND) ; pickup/deliver/tracking restent mock (B3) |
+| Orchestrateur | `.../carrier/deal/DealClient.tsx` | TanStack Query `["deal", dealId]` ; après transition on INVALIDE (jamais de mutation locale du statut) ; statuts terminaux → écran `DealClosed` |
+| Hook actions | `.../views/request/useDealRequestActions.ts` | accept/decline partagés desktop+mobile ; mapping des 409 : `CARRIER_ONBOARDING_REQUIRED` → `/carrier/onboarding`, `TRANSITION_NOT_ALLOWED`/`PAYMENT_STATE_CONFLICT` → toast + relecture |
+| É2 | `DealRequestDesktop/Mobile.tsx`, `DealDeclineModal/Sheet.tsx`, `DealEarningsBreakdown.tsx`, `DealShipperCard.tsx` | footer gé par `allowedActions` ; raisons alignées contrat, textarea retiré ; gains = net + note J+4 (plus de commission/total — A13) ; bouton refus slate (charte §3.4, plus de rouge) ; stats shipper optionnelles masquées |
+| Annulation | `.../dashboard/shipments/` : `CancelShipmentModal.tsx` (nouveau), `ShipmentRow.tsx`, `ShipmentsClient.tsx`, `shipments.{adapter,api,types}.ts` | bouton « Annuler » si `cancel` ∈ `allowedActions` ; modale = montant SERVI (A31) + retenue expliquée ; `POST /deals/:id/cancel` puis RELECTURE de la liste ; preview QA sans appel réel |
+| Payments | `packages/libs/payments/src/index.ts` | `FakePaymentProvider.adoptSeeded` — ids `pi_fake_seed_*` matérialisés AUTHORIZED ; les autres ids inconnus jettent toujours |
+| Seed | `packages/libs/prisma/scripts/seed-deals.ts` | `CarrierPage` upsert par Voyageur (COMPLETE, Stripe factice) ; `paymentProvider`/`paymentIntentId` sur chaque booking |
+| i18n | `messages/{fr,en}/carrierDealRequest.json`, `shipments.json` | raisons renommées, `closed.*`, `errors.*`, `cancel.*` — miroir FR/EN |
+| OpenAPI | `apps/*/openapi.json` | régénérés (`npm run generate:openapi`) — CancellationPreview publié |
+
+### 4. Deux pièges évités
+- **La row de liste est un `<Link>`** : le bouton Annuler fait `preventDefault + stopPropagation` — sinon chaque clic ouvrait la page du booking.
+- **`deal.state.ts` supprimé** (mock devenu mort) et les 3 fichiers vides `booking-tracker/shared/*` nettoyés — un mock qui traîne à côté d'une API réelle finit toujours importé par erreur.
+
+### 5. Tests (+4 → plateforme 507)
+`booking-view.mapper.spec.ts` 14→18 : préviz PENDING = total même tardif ; ACCEPTED ≥ 48 h = 100 % ; < 48 h = 50 % ; null dès PICKED_UP et JAMAIS dans la vue Carrier (le champ n'y existe pas).
+
+### 6. Hors périmètre (assumé)
+Le tracker Expéditeur `/bookings/[id]` reste mock (chantier B3 : il basculera sur `GET /deals/:id` avec les vues É3→É9) ; les emails transactionnels booking.* restent à écrire (notification-service ne fait que l'in-app) — prochaine PR.

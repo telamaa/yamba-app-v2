@@ -1,14 +1,16 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { useTranslations } from "next-intl";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useLocale, useTranslations } from "next-intl";
 import { useRouter } from "@/i18n/navigation";
 import { Package } from "lucide-react";
+import { toast } from "sonner";
 import SectionHeader from "@/components/dashboard/SectionHeader";
 import { EmptyState } from "@/components/dashboard/DashboardUI";
+import CancelShipmentModal from "./CancelShipmentModal";
 import ShipmentRow from "./ShipmentRow";
 import ShipmentsSkeleton from "./ShipmentsSkeleton";
-import { getMyShipments, getMyShipmentsPreview } from "./shipments.api";
+import { cancelShipment, getMyShipments, getMyShipmentsPreview } from "./shipments.api";
 import {
   getShipmentPresentation,
   type ShipmentGroup,
@@ -31,12 +33,15 @@ export default function ShipmentsClient({
   source?: "live" | "preview";
 }) {
   const t = useTranslations("shipments");
+  const locale = useLocale();
   const router = useRouter();
 
   const [items, setItems] = useState<ShipmentListItem[] | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [filter, setFilter] = useState<Filter>("all");
   const [nowMs, setNowMs] = useState(() => Date.now());
+  const [cancelTarget, setCancelTarget] = useState<ShipmentListItem | null>(null);
+  const [isCancelling, setIsCancelling] = useState(false);
 
   /* Chargement avec garde d'annulation (pattern projet) */
   useEffect(() => {
@@ -53,6 +58,51 @@ export default function ShipmentsClient({
       cancelled = true;
     };
   }, [source]);
+
+  /* Annulation Expéditeur (B2) : le serveur décide du montant et de la
+     légalité de la transition ; après succès on RELIT la liste (jamais
+     une mutation locale du statut). */
+  const handleCancelConfirm = useCallback(
+    async (item: ShipmentListItem) => {
+      if (source === "preview") {
+        // Vitrine QA : jamais d'appel réel.
+        toast.success(t("cancel.toastSuccess"));
+        setCancelTarget(null);
+        return;
+      }
+      setIsCancelling(true);
+      try {
+        const result = await cancelShipment(item.id);
+        const refund =
+          result.refundAmountCents != null
+            ? new Intl.NumberFormat(locale === "fr" ? "fr-FR" : "en-US", {
+              style: "currency",
+              currency: result.currencyCode,
+            }).format(result.refundAmountCents / 100)
+            : null;
+        toast.success(
+          refund
+            ? t("cancel.toastSuccessRefund", { refund })
+            : t("cancel.toastSuccess"),
+          { duration: 6000 }
+        );
+        setCancelTarget(null);
+        setItems(await getMyShipments());
+      } catch {
+        // 409 inclus : le deal a changé entre-temps — on recharge et on ferme.
+        toast.error(t("cancel.toastError"));
+        setCancelTarget(null);
+        try {
+          setItems(await getMyShipments());
+        } catch {
+          /* la liste affichée reste valable */
+        }
+      } finally {
+        setIsCancelling(false);
+      }
+    },
+    [locale, t, source]
+  );
 
   /* Tick 60s pour les countdowns (jamais plus fréquent) */
   useEffect(() => {
@@ -183,10 +233,22 @@ export default function ShipmentsClient({
           </div>
 
           {grouped[group].map((item) => (
-            <ShipmentRow key={item.id} item={item} nowMs={nowMs} />
+            <ShipmentRow
+              key={item.id}
+              item={item}
+              nowMs={nowMs}
+              onCancelAction={setCancelTarget}
+            />
           ))}
         </section>
       ))}
+
+      <CancelShipmentModal
+        item={cancelTarget}
+        isSubmitting={isCancelling}
+        onCloseAction={() => !isCancelling && setCancelTarget(null)}
+        onConfirmAction={handleCancelConfirm}
+      />
     </>
   );
 }

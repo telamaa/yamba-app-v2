@@ -5,7 +5,6 @@
   "close": "Close",
   "share": "Share",
   "stateLabel": "State: request received, awaiting your response",
-
   "expiry": {
     "label": "This request expires in",
     "labelShort": "Expires in",
@@ -16,27 +15,20 @@
     "timeFormatShort": "{hours}h {minutes}min",
     "timeFormatMinutesOnly": "{minutes}min"
   },
-
   "earnings": {
     "hero": "YOU EARN",
     "currency": "€",
     "heroNote": "Paid out D+{days} after delivery confirmation · to your Stripe account",
     "heroNoteShort": "Paid out D+{days} after delivery",
-    "breakdownTitle": "WHAT YOU GET",
-    "totalPaid": "Total paid",
-    "yambaCommission": "Yamba commission",
-    "stripeFees": "Stripe fees",
     "net": "Net for you",
     "payoutNote": "Paid out {days} days after delivery confirmed via secret code",
     "detailTitle": "EARNINGS BREAKDOWN"
   },
-
   "tripCard": {
     "title": "YOUR TRIP",
     "directFlight": "Direct, {hours}h flight",
     "departure": "{weekday}, {month} {day} · {hour}:00"
   },
-
   "shipperCard": {
     "title": "FROM",
     "verifiedBadge": "Verified",
@@ -44,7 +36,6 @@
     "shipmentCount": "{count, plural, =1 {# shipment} other {# shipments}}",
     "memberSince": "Member since {month} {year}"
   },
-
   "parcelDetails": {
     "title": "PARCEL DETAILS",
     "categoryLabel": "Category",
@@ -55,7 +46,6 @@
     "descriptionLabel": "Description",
     "kg": "kg"
   },
-
   "photos": {
     "title": "PHOTOS DECLARED BY {shipperFirstName}",
     "subtitle": "click to enlarge",
@@ -68,7 +58,6 @@
       "next": "Next"
     }
   },
-
   "locations": {
     "title": "PICKUP AND DELIVERY",
     "titleShort": "PICKUP & DELIVERY",
@@ -76,7 +65,6 @@
     "deliveryLabel": "DELIVERY",
     "deliveryNotePending": "Phone shared after acceptance"
   },
-
   "coverage": {
     "title": "PARCEL COVERAGE",
     "extended": "500 € insurance included",
@@ -84,7 +72,6 @@
     "shipperNoteExtended": "{shipperFirstName} purchased insurance — you''re protected in case of value-related dispute.",
     "shipperNoteExtendedShort": "{shipperFirstName} bought 500 € insurance · you''re protected in case of dispute"
   },
-
   "acceptTip": {
     "title": "Before accepting, read these points carefully",
     "titleShort": "Before accepting",
@@ -97,7 +84,6 @@
     "takePhotosShort": "**Take your photos** before leaving.",
     "codeShort": "**6-digit code** to validate delivery."
   },
-
   "charter": {
     "blockTitle": "YOUR COMMITMENT",
     "title": "Tripper Charter",
@@ -120,7 +106,6 @@
     "acceptDescSuffix": ".",
     "acceptError": "You must accept the Charter to confirm this Deal"
   },
-
   "actions": {
     "decline": "Decline",
     "accept": "Accept",
@@ -130,23 +115,18 @@
     "charterAcceptedIndicator": "✓ Charter accepted",
     "charterPendingIndicator": "Tick the Charter to confirm"
   },
-
   "decline": {
     "dialogTitle": "Decline this request?",
     "dialogIntro": "{shipperFirstName} will be notified and can contact another Tripper. Your acceptance rate stays intact.",
     "reasonLabel": "Reason (optional)",
     "reasonPlaceholder": "Choose a reason",
     "reasonOption": {
-      "CATEGORY_NOT_TRANSPORTED": "Category not transported",
-      "WEIGHT_TOO_HEAVY": "Weight or volume too heavy",
-      "LOCATION_INCOMPATIBLE": "Pickup or delivery location incompatible",
-      "TIMING_TOO_TIGHT": "Timing too tight",
+      "CATEGORY_NOT_CARRIED": "Category not carried",
+      "TOO_HEAVY": "Weight or volume too heavy",
+      "PLACES_INCOMPATIBLE": "Pickup or delivery place incompatible",
+      "TIMING": "Timing too tight",
       "OTHER": "Other reason"
     },
-    "detailsLabel": "Additional details (optional)",
-    "detailsPlaceholder": "Anything to add for {shipperFirstName}?",
-    "detailsToggleExpand": "Add details",
-    "detailsToggleCollapse": "Hide details",
     "finalWarning": "This action is final",
     "cancel": "Cancel",
     "confirmDecline": "Decline Deal",
@@ -154,17 +134,33 @@
     "toastSuccess": "Request declined. {shipperFirstName} has been notified.",
     "toastError": "Error declining the request. Try again."
   },
-
   "accept": {
     "submitting": "Confirming…",
     "toastSuccess": "Deal accepted! Delivery code generated.",
     "toastError": "Error accepting the Deal. Try again."
   },
-
   "loading": "Loading request…",
   "error": {
     "notFound": "This request doesn''t exist or has already been processed.",
     "expired": "This request has expired. You can still view it but no longer respond.",
     "generic": "An error occurred. Try again in a moment."
+  },
+  "loadError": "This request does not exist or is no longer accessible.",
+  "closed": {
+    "PENDING": "Request pending",
+    "ACCEPTED": "Deal accepted",
+    "PICKED_UP": "Parcel in transit",
+    "DELIVERED": "Delivery confirmed",
+    "COMPLETED": "Deal completed — payment released",
+    "DISPUTED": "A dispute is open on this deal",
+    "DECLINED": "You declined this request",
+    "EXPIRED": "This request has expired",
+    "CANCELLED": "This request was cancelled",
+    "hint": "There is nothing left to do here."
+  },
+  "errors": {
+    "onboardingRequired": "Finish your Tripper profile and Stripe setup to be able to accept a deal.",
+    "dealChanged": "This deal changed in the meantime. The page has just been refreshed.",
+    "paymentConflict": "The payment on this request is no longer valid. The page has just been refreshed."
   }
 }

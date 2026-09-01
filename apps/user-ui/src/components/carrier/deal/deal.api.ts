@@ -1,19 +1,35 @@
 /**
  * deal.api.ts
  * ===========
- * Wrapper côté client pour les appels backend liés au Deal côté Voyageur.
- * Mock pour l'instant — à brancher sur deal-service via le gateway dans
- * la PR backend.
+ * Appels backend du module Deal côté Voyageur.
+ *
+ * RÉELS (B2, via le gateway → deal-service) :
+ *   - getDealRequest : GET /deals/:id (vue Carrier — A13)
+ *   - acceptDeal     : POST /deals/:id/accept  (charte, gate D31, capture D39)
+ *   - declineDeal    : POST /deals/:id/decline (raison É2 optionnelle)
+ *
+ * ENCORE MOCK (B3 — transport) : confirmPickup, refusePickup,
+ * confirmTrackingEvent, validateDeliveryCode.
  */
 
+import apiClient from "@/lib/api-client";
 import type {
   AcceptPayload,
   ConfirmPickupPayload,
   DealRequest,
+  DealStatus,
   DeclinePayload,
   RefusePickupPayload,
 } from "./deal.types";
-import {mockDealPickedUp, mockDealRequest} from "./deal.state";
+import { toDealRequest, type CarrierBookingViewDto } from "./deal.adapter";
+
+/** Réponse des transitions (DealTransitionResponse, contrat B2-PR2). */
+export type DealTransitionResult = {
+  bookingId: string;
+  status: DealStatus;
+  refundAmountCents: number | null;
+  currencyCode: string;
+};
 
 const MOCK_DELAY_MS = 800;
 
@@ -21,36 +37,94 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/* ══ Erreur métier (pattern BookingApiError) ══════════════════ */
+
+/** Codes 409 des transitions + états transverses — le composant traduit. */
+export type DealApiErrorCode =
+  | "TRANSITION_NOT_ALLOWED"
+  | "CARRIER_ONBOARDING_REQUIRED"
+  | "PAYMENT_STATE_CONFLICT"
+  | "NOT_FOUND"
+  | "UNAUTHENTICATED"
+  | "GENERIC";
+
+export class DealApiError extends Error {
+  readonly code: DealApiErrorCode;
+  readonly status: number;
+  constructor(code: DealApiErrorCode, status: number, message: string) {
+    super(message);
+    this.code = code;
+    this.status = status;
+  }
+}
+
+function toDealApiError(e: unknown): DealApiError {
+  const err = e as {
+    response?: { status?: number; data?: { message?: string; details?: Record<string, unknown> } };
+  };
+  const status = err.response?.status ?? 0;
+  const detailCode = err.response?.data?.details?.code;
+  const code: DealApiErrorCode =
+    typeof detailCode === "string" &&
+    ["TRANSITION_NOT_ALLOWED", "CARRIER_ONBOARDING_REQUIRED", "PAYMENT_STATE_CONFLICT"].includes(detailCode)
+      ? (detailCode as DealApiErrorCode)
+      : status === 404 || status === 403
+        ? "NOT_FOUND" // 403 volontairement confondu (le deal existe, pas pour toi)
+        : status === 401
+          ? "UNAUTHENTICATED"
+          : "GENERIC";
+  return new DealApiError(code, status, err.response?.data?.message ?? "Deal request failed");
+}
+
+/* ══ Appels réels ═════════════════════════════════════════════ */
+
+type DealResponseDto = {
+  success: boolean;
+  viewerRole: "SHIPPER" | "CARRIER";
+  deal: CarrierBookingViewDto;
+};
+
 export async function getDealRequest(dealId: string): Promise<DealRequest> {
-  await sleep(MOCK_DELAY_MS);
-  const base = dealId.includes("picked") ? mockDealPickedUp : mockDealRequest;
-  return { ...base, id: dealId || base.id };
+  try {
+    const res = await apiClient.get<DealResponseDto>(`/deals/${dealId}`, {
+      requireAuth: true,
+    });
+    return toDealRequest(res.data.deal);
+  } catch (e) {
+    throw toDealApiError(e);
+  }
 }
 
 export async function acceptDeal(
   dealId: string,
   payload: AcceptPayload
-): Promise<{ dealId: string; deliveryCode: string }> {
-  await sleep(MOCK_DELAY_MS);
-  if (!payload.charterAccepted) {
-    throw new Error("Charter must be accepted");
+): Promise<DealTransitionResult> {
+  try {
+    const res = await apiClient.post<DealTransitionResult>(
+      `/deals/${dealId}/accept`,
+      { charterAccepted: payload.charterAccepted },
+      { requireAuth: true }
+    );
+    return res.data;
+  } catch (e) {
+    throw toDealApiError(e);
   }
-  // eslint-disable-next-line no-console
-  console.info("[deal] acceptDeal mock:", { dealId, payload });
-  return {
-    dealId,
-    deliveryCode: generateMockCode(),
-  };
 }
 
 export async function declineDeal(
   dealId: string,
   payload: DeclinePayload
-): Promise<{ dealId: string }> {
-  await sleep(MOCK_DELAY_MS);
-  // eslint-disable-next-line no-console
-  console.info("[deal] declineDeal mock:", { dealId, payload });
-  return { dealId };
+): Promise<DealTransitionResult> {
+  try {
+    const res = await apiClient.post<DealTransitionResult>(
+      `/deals/${dealId}/decline`,
+      { reason: payload.reason ?? null },
+      { requireAuth: true }
+    );
+    return res.data;
+  } catch (e) {
+    throw toDealApiError(e);
+  }
 }
 
 /**
@@ -88,11 +162,6 @@ export async function refusePickup(
   console.info("[deal] refusePickup mock:", { dealId, payload });
   return { dealId };
 }
-
-function generateMockCode(): string {
-  return Math.floor(100000 + Math.random() * 900000).toString();
-}
-
 
 /**
  * Confirme un événement de suivi optionnel (philosophie A+B).

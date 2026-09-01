@@ -20,6 +20,9 @@ type Props = {
   item: ShipmentListItem;
   /** Horloge partagée (tick 60s dans le Client) pour les countdowns */
   nowMs: number;
+  /** Ouvre la confirmation d'annulation — rendu seulement si item.canCancel
+   *  (allowedActions serveur : le front reflète, ne décide jamais). */
+  onCancelAction?: (item: ShipmentListItem) => void;
 };
 
 /* ─────────────────────── Styles (concaténation, convention projet) ─── */
@@ -313,12 +316,25 @@ function buildLabels(
 
 /* ─────────────────────── Composant ─────────────────────────────────── */
 
-export default function ShipmentRow({ item, nowMs }: Props) {
+export default function ShipmentRow({ item, nowMs, onCancelAction }: Props) {
   const t = useTranslations("shipments");
   const locale = useLocale();
 
   const presentation = getShipmentPresentation(item);
   const labels = buildLabels(item, t, locale, nowMs);
+
+  const showCancel = Boolean(item.canCancel && onCancelAction);
+  const handleCancelClick = (e: React.MouseEvent) => {
+    // La row entière est un Link : on neutralise la navigation.
+    e.preventDefault();
+    e.stopPropagation();
+    onCancelAction?.(item);
+  };
+
+  const cancelBtnClass =
+    "inline-flex items-center whitespace-nowrap rounded-lg px-3 py-1.5 " +
+    "text-xs text-slate-400 underline-offset-2 transition-colors " +
+    "hover:text-slate-700 hover:underline dark:text-slate-500 dark:hover:text-slate-300";
 
   const rowClass =
     "group relative mb-1.5 flex w-full items-center gap-3 rounded-lg px-4 py-3 " +
@@ -398,11 +414,21 @@ export default function ShipmentRow({ item, nowMs }: Props) {
           >
             {labels.cta}
           </span>
+          {showCancel && (
+            <button type="button" onClick={handleCancelClick} className={cancelBtnClass}>
+              {t("cancel.rowCta")}
+            </button>
+          )}
         </div>
       </div>
 
       {/* Desktop : badge + CTA + chevron en ligne */}
       <div className="hidden flex-shrink-0 items-center gap-3 md:flex">
+        {showCancel && (
+          <button type="button" onClick={handleCancelClick} className={cancelBtnClass}>
+            {t("cancel.rowCta")}
+          </button>
+        )}
         <span className={badgeClass}>
           {labels.pulse && (
             <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-current" />

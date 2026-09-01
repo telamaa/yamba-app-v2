@@ -82,5 +82,21 @@
     "subtitle": "Trouve un Voyageur sur ta route et envoie ton premier colis.",
     "cta": "Chercher un trajet"
   },
-  "loadError": "Impossible de charger tes envois. Réessaie dans un instant."
+  "loadError": "Impossible de charger tes envois. Réessaie dans un instant.",
+  "cancel": {
+    "rowCta": "Annuler",
+    "dialogTitle": "Annuler cet envoi ?",
+    "dialogIntro": "Ta demande {route} auprès de {carrierFirstName} sera annulée définitivement.",
+    "refundLabel": "Tu seras remboursée de",
+    "fullRefundNote": "Remboursement intégral : le paiement n'a pas encore été débité ou tu annules plus de 48 h avant le départ.",
+    "retentionNote": "Une retenue de {pct} % ({retention}) s'applique car le départ est dans moins de 48 h (elle dédommage le Voyageur).",
+    "finalWarning": "Cette action est définitive",
+    "keep": "Garder l'envoi",
+    "confirm": "Confirmer l'annulation",
+    "submitting": "Annulation…",
+    "close": "Fermer",
+    "toastSuccess": "Envoi annulé.",
+    "toastSuccessRefund": "Envoi annulé. Remboursement de {refund} en cours.",
+    "toastError": "L'annulation n'a pas abouti — la liste vient d'être actualisée."
+  }
 }

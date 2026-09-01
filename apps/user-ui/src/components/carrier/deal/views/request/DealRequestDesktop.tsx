@@ -19,9 +19,8 @@
 import { ArrowLeft } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useState } from "react";
-import { toast } from "sonner";
-import { acceptDeal, declineDeal } from "@/components/carrier/deal/deal.api";
 import type { DealRequest, DeclineReason } from "@/components/carrier/deal/deal.types";
+import { useDealRequestActions } from "./useDealRequestActions";
 import DealLocationsBlock from "@/components/carrier/deal/shared/DealLocationsBlock";
 import DealParcelDetails from "@/components/carrier/deal/shared/DealParcelDetails";
 import DealParcelPhotos from "@/components/carrier/deal/shared/DealParcelPhotos";
@@ -37,7 +36,7 @@ import DealExpiryBanner from "./DealExpiryBanner";
 type Props = {
   deal: DealRequest;
   onCloseAction: () => void;
-  onAcceptedAction: (deal: DealRequest) => void;
+  onAcceptedAction: () => void;
 };
 
 export default function DealRequestDesktop({
@@ -50,9 +49,20 @@ export default function DealRequestDesktop({
 
   const [charterAccepted, setCharterAccepted] = useState(false);
   const [charterError, setCharterError] = useState(false);
-  const [isSubmittingAccept, setIsSubmittingAccept] = useState(false);
-  const [isSubmittingDecline, setIsSubmittingDecline] = useState(false);
   const [declineModalOpen, setDeclineModalOpen] = useState(false);
+
+  const {
+    submitAccept,
+    submitDecline,
+    isSubmitting,
+    isSubmittingDecline,
+  } = useDealRequestActions({ deal, onAcceptedAction, onCloseAction });
+
+  // Le serveur est seul juge : les CTA ne s'affichent que si la machine
+  // les permet (une demande expirée mais pas encore balayée par le cron
+  // n'a plus d'allowedActions, le footer disparaît).
+  const canRespond =
+    !deal.allowedActions || deal.allowedActions.includes("accept");
 
   const handleAccept = async () => {
     if (!charterAccepted) {
@@ -62,41 +72,13 @@ export default function DealRequestDesktop({
         ?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
-    setIsSubmittingAccept(true);
-    try {
-      const result = await acceptDeal(deal.id, { charterAccepted: true });
-      toast.success(t("accept.toastSuccess"), { duration: 4500 });
-      // eslint-disable-next-line no-console
-      console.info("[deal] accepted, deliveryCode:", result.deliveryCode);
-      onAcceptedAction(deal);
-    } catch {
-      toast.error(t("accept.toastError"));
-    } finally {
-      setIsSubmittingAccept(false);
-    }
+    await submitAccept();
   };
 
-  const handleDeclineConfirm = async (payload: {
-    reason?: DeclineReason;
-    details?: string;
-  }) => {
-    setIsSubmittingDecline(true);
-    try {
-      await declineDeal(deal.id, payload);
-      toast.success(
-        t("decline.toastSuccess", { shipperFirstName: deal.shipper.firstName }),
-        { duration: 4500 }
-      );
-      setDeclineModalOpen(false);
-      onCloseAction();
-    } catch {
-      toast.error(t("decline.toastError"));
-    } finally {
-      setIsSubmittingDecline(false);
-    }
+  const handleDeclineConfirm = async (payload: { reason?: DeclineReason }) => {
+    const ok = await submitDecline(payload);
+    if (ok) setDeclineModalOpen(false);
   };
-
-  const isSubmitting = isSubmittingAccept || isSubmittingDecline;
 
   // Sous-titre dynamique : "Reçue il y a 2h · Paris → Brazza · jeu. 28 mai · vol direct 8h"
   const subtitleParts = [
@@ -197,14 +179,16 @@ export default function DealRequestDesktop({
                   variant="sidebar"
                 />
 
-                <DealActionsFooter
-                  shipperFirstName={deal.shipper.firstName}
-                  charterAccepted={charterAccepted}
-                  onDeclineAction={() => setDeclineModalOpen(true)}
-                  onAcceptAction={handleAccept}
-                  isSubmitting={isSubmitting}
-                  variant="desktop"
-                />
+                {canRespond && (
+                  <DealActionsFooter
+                    shipperFirstName={deal.shipper.firstName}
+                    charterAccepted={charterAccepted}
+                    onDeclineAction={() => setDeclineModalOpen(true)}
+                    onAcceptAction={handleAccept}
+                    isSubmitting={isSubmitting}
+                    variant="desktop"
+                  />
+                )}
               </div>
             </aside>
           </div>

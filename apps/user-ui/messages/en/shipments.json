@@ -82,5 +82,21 @@
     "subtitle": "Find a Tripper on your route and send your first parcel.",
     "cta": "Search trips"
   },
-  "loadError": "Could not load your shipments. Please try again shortly."
+  "loadError": "Could not load your shipments. Please try again shortly.",
+  "cancel": {
+    "rowCta": "Cancel",
+    "dialogTitle": "Cancel this shipment?",
+    "dialogIntro": "Your request {route} with {carrierFirstName} will be permanently cancelled.",
+    "refundLabel": "You will be refunded",
+    "fullRefundNote": "Full refund: the payment has not been captured yet, or you are cancelling more than 48h before departure.",
+    "retentionNote": "A {pct}% retention ({retention}) applies because departure is less than 48h away (it compensates the Tripper).",
+    "finalWarning": "This action is final",
+    "keep": "Keep the shipment",
+    "confirm": "Confirm cancellation",
+    "submitting": "Cancelling…",
+    "close": "Close",
+    "toastSuccess": "Shipment cancelled.",
+    "toastSuccessRefund": "Shipment cancelled. A {refund} refund is on its way.",
+    "toastError": "The cancellation did not go through — the list has just been refreshed."
+  }
 }

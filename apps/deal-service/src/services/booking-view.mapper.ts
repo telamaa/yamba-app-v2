@@ -9,6 +9,11 @@ import {
   MAX_CODE_REGENERATIONS,
   MAX_DELIVERY_ATTEMPTS,
 } from "./booking-state-machine";
+import {
+  computeCancellationRefundCents,
+  CANCEL_FULL_REFUND_UNTIL_HOURS,
+  CANCEL_LATE_RETENTION_PCT,
+} from "./booking-lifecycle";
 
 /**
  * booking-view.mapper.ts
@@ -197,12 +202,47 @@ const toMilestones = (b: BookingRecord) => ({
   updatedAt: toIsoRequired(b.updatedAt),
 });
 
+/** ANN-01 servie au front (« le front reflète, ne décide jamais ») —
+ *  non nulle exactement quand `cancel` est permis. PENDING : libération
+ *  intégrale de l'empreinte ; ACCEPTED : barème au moment de la lecture.
+ *  Informatif : le montant réel est RECALCULÉ au cancel effectif. */
+const toCancellationPreview = (
+  b: BookingRecord,
+  allowed: readonly string[],
+  now: Date
+): ShipperBookingView["cancellationPreview"] => {
+  if (!allowed.includes("cancel")) return null;
+  const total = b.pricing.totalShipperCents;
+  const refundCents =
+    b.status === "ACCEPTED"
+      ? computeCancellationRefundCents({
+        totalShipperCents: total,
+        departureAt: b.trip.departureAt,
+        now,
+      })
+      : total;
+  return {
+    refundCents,
+    retentionCents: total - refundCents,
+    retentionPct: CANCEL_LATE_RETENTION_PCT,
+    fullRefundUntil: new Date(
+      b.trip.departureAt.getTime() - CANCEL_FULL_REFUND_UNTIL_HOURS * 3_600_000
+    ).toISOString(),
+    currencyCode: b.pricing.currencyCode,
+  };
+};
+
 /* ══ Vues par rôle ════════════════════════════════════════════ */
 
 export function toShipperBookingView(
   booking: BookingRecord,
-  carrier: CounterpartRecord
+  carrier: CounterpartRecord,
+  now: Date = new Date()
 ): ShipperBookingView {
+  const allowedActions = getAllowedActions(
+    booking as Parameters<typeof getAllowedActions>[0],
+    "SHIPPER"
+  );
   return {
     id: booking.id,
     tripId: booking.tripId,
@@ -252,10 +292,8 @@ export function toShipperBookingView(
     pickup: toPickup(booking.pickup),
     trackingEvents: toTrackingEvents(booking.trackingEvents),
 
-    allowedActions: getAllowedActions(
-      booking as Parameters<typeof getAllowedActions>[0],
-      "SHIPPER"
-    ),
+    allowedActions,
+    cancellationPreview: toCancellationPreview(booking, allowedActions, now),
   };
 }
 

@@ -284,6 +284,35 @@ async function main() {
   }
   console.log(`✓ ${USERS.length} users (upsert par emailNormalized)`);
 
+  // 1bis. CarrierPage Stripe-complet pour chaque Voyageur — le gate D31
+  // (accept) exige onboardingStep ≠ PROFILE + stripeOnboardingComplete +
+  // stripeChargesEnabled quand le provider est STRIPE. Compte factice :
+  // aucune API Stripe n'est appelée avec cet acct_ en dev.
+  let carrierPages = 0;
+  for (const u of USERS.filter((x) => x.carrier)) {
+    const userId = userIds.get(u.key)!;
+    await prisma.carrierPage.upsert({
+      where: { userId },
+      update: {
+        onboardingStep: "COMPLETE",
+        stripeOnboardingComplete: true,
+        stripeChargesEnabled: true,
+        stripePayoutsEnabled: true,
+      },
+      create: {
+        userId,
+        name: `${u.firstName} ${u.lastName.charAt(0)}.`,
+        onboardingStep: "COMPLETE",
+        stripeAccountId: `acct_fake_seed_${u.key}`,
+        stripeOnboardingComplete: true,
+        stripeChargesEnabled: true,
+        stripePayoutsEnabled: true,
+      },
+    });
+    carrierPages += 1;
+  }
+  console.log(`✓ ${carrierPages} carrier pages (onboarding COMPLETE, Stripe factice — gate D31 passant)`);
+
   const seedIds = [...userIds.values()];
 
   // 2. Wipe du périmètre seed (idempotence trips/bookings)
@@ -363,6 +392,11 @@ async function main() {
         recipient: b.recipient,
         pickup: b.pickup ?? undefined,
         trackingEvents: b.trackingEvents ?? [],
+        // B2 : un intent FAKE par booking — le FakePaymentProvider ADOPTE
+        // les ids `pi_fake_seed_…` inconnus (AUTHORIZED à la lecture), donc
+        // accept/decline/cancel sont jouables en dev sans clés Stripe.
+        paymentProvider: "FAKE",
+        paymentIntentId: `pi_fake_seed_${b.key}`,
         ...b.milestones,
       } as never,
     });

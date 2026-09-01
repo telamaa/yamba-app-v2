@@ -170,14 +170,37 @@ export class FakePaymentProvider implements PaymentProvider {
     return auth;
   }
 
+  /**
+   * Adoption des intents SEEDÉS : le Fake est en mémoire, un id écrit en
+   * base par packages/libs/prisma/scripts/seed-deals.ts n'existe pas dans
+   * cette instance. Tout id `pi_fake_seed_…` inconnu est matérialisé
+   * AUTHORIZED à la première lecture (dev : accept/decline/cancel jouables
+   * sur les deals seedés). Les autres ids inconnus jettent toujours —
+   * les tests de PAYMENT_STATE_CONFLICT restent valides.
+   */
+  private adoptSeeded(intentId: string): PaymentAuthorization | undefined {
+    if (!intentId.startsWith("pi_fake_seed_")) return undefined;
+    const auth: PaymentAuthorization = {
+      provider: "FAKE",
+      intentId,
+      clientSecret: null,
+      status: "AUTHORIZED",
+      amountCents: 0, // montant inconnu ici — les événements lisent le snapshot
+      currencyCode: "EUR",
+      metadata: { seeded: "true" },
+    };
+    this.intents.set(intentId, auth);
+    return auth;
+  }
+
   async retrieve(intentId: string): Promise<PaymentAuthorization> {
-    const a = this.intents.get(intentId);
+    const a = this.intents.get(intentId) ?? this.adoptSeeded(intentId);
     if (!a) throw new Error(`Unknown fake payment intent: ${intentId}`);
     return { ...a };
   }
 
   private setStatus(intentId: string, status: PaymentAuthorizationStatus) {
-    const a = this.intents.get(intentId);
+    const a = this.intents.get(intentId) ?? this.adoptSeeded(intentId);
     if (!a) throw new Error(`Unknown fake payment intent: ${intentId}`);
     const next = { ...a, status };
     this.intents.set(intentId, next);
