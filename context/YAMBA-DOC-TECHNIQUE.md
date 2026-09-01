@@ -795,3 +795,31 @@ Preuve finale : e2e rejoué → `201 PENDING` avec `email: null`, kg réservés 
 
 ### 7. Hors périmètre (assumé)
 Le tracker Expéditeur `/bookings/[id]` reste mock (chantier B3 : il basculera sur `GET /deals/:id` avec les vues É3→É9) ; les emails transactionnels booking.* restent à écrire (notification-service ne fait que l'in-app) — prochaine PR.
+
+---
+
+# B2-PR4 — Emails transactionnels `booking.*` : le canal email de la matrice A15 (D41, A35, A36)
+
+### 1. Ce qui a été fait
+Le notification-service ne savait produire que des notifications in-app (rows `Notification`). Cette PR ajoute le **deuxième canal** de la matrice A15 : les emails transactionnels des 7 événements que le deal-service émet aujourd'hui (`requested`, `payment_authorized`, `accepted`, `declined`, `expired`, `cancelled`, `refund_issued`) — dont les 3 « email seul » qui n'avaient AUCUNE matérialisation jusqu'ici (reçu de paiement, remboursement… le troisième, `code_regenerated`, attend son writer B3).
+
+### 2. La lib `@packages/email` (D41)
+`packages/libs/email/src/index.ts` — le 3e clone Nodemailer+EJS est évité : auth-service et trip-service en portent déjà un chacun, et le handoff PR-A avait gravé « la lib naît au 1er email B2 ». Contrat minimal : `isEmailConfigured()` (SMTP_HOST + SMTP_USER présents) et `sendTemplatedEmail({ to, subject, templatesDir, template, data })`. Différences avec les clones : transport **paresseux** (créé au premier envoi, jamais à l'import — les tests mockent le module sans toucher au réseau), gestion 465/587 reprise de trip-service (le plus propre des deux), `templatesDir` fourni par l'appelant (chaque service garde ses gabarits). Alias déclaré dans `tsconfig.base.json` AVANT le wildcard, comme les autres libs. La migration des 2 clones existants reste au backlog ; le provider transactionnel dédié (candidat D35) se branchera derrière la même interface.
+
+### 3. La matrice email EN DATA (A35)
+`apps/notification-service/src/emails/booking-emails.ts` : `EMAIL_MATRIX` est un `Record` TOTAL sur les 17 clés (comme `IN_APP_MATRIX` — tsc casse si une clé manque). Règles : `SHIPPER`, `CARRIER`, `SHIPPER_PLUS_CARRIER_IF_WAS_ACCEPTED` (cancelled seul), ou `null` (jamais — anti-spam/in-app seul — ou « à venir » avec le writer B3/B4/B5, miroir D30). `buildBookingEmail(event, role, firstName)` construit sujet + gabarit + données par événement ; frontière A13 respectée : un email Voyageur ne montre QUE son net (`transportCents`), jamais le total Expéditeur.
+
+### 4. L'idempotence at-most-once (A36)
+Le retraitement d'un `ConsumedEvent` PENDING/FAILED re-exécute tout le handler — sans marqueur, un crash renverrait les emails. Nouveau modèle Prisma **`EmailDelivery`** (unique `[eventId, userId]`) : claim-first (create PENDING) AVANT l'envoi, P2002 = déjà claimé → jamais de renvoi ; envoi OK → SENT + sentAt ; échec d'envoi → FAILED + lastError **sans throw** (best-effort : l'email ne bloque ni la partition, ni l'in-app, ni le PROCESSED). Une erreur transitoire de CLAIM (Mongo down), elle, remonte — la re-livraison Kafka retrouvera les claims posés. `npx prisma db push` exécuté (index unique créé) ; rien à rejouer par environnement (la collection naît vide).
+
+### 5. Le branchement et les gabarits
+`handleBookingEventMessage` gagne l'étape **3bis** : `dispatchBookingEmails(eventId, event, logger)` après la matérialisation in-app, avant le PROCESSED. Le dispatcher fait la jointure `User` (les événements ne portent ni email ni prénom — user effacé RGPD = envoi sauté, tracé `warn`), locale FR par défaut (pas de `preferredLocale` sur User, même repli que trip-notifications). 8 gabarits EJS sous `src/emails/templates/booking/` (cancelled a une variante par rôle), charte respectée : teal = argent (reçu, remboursement, accepté), mango = CTA avancer, slate = refus/expiration/annulation ; texte FR/EN inline par gabarit ; **le code de livraison n'apparaît nulle part** (re-vérifié sur les 17 payloads ET testé sur le HTML rendu).
+
+### 6. Les preuves (D30)
+Trois specs, 21 → **50 tests** (plateforme 511 → **540**) :
+- `booking-events.consumer.spec.ts` (+4 assertions/test) : le dispatch est appelé APRÈS la matérialisation avec l'eventId du claim, jamais sur un doublon PROCESSED ni sur un parse FAILED ;
+- `booking-emails.spec.ts` (18) : matrice totale, routage (dont cancelled ±wasAccepted), frontière A13 (le JSON construit d'un email carrier ne contient pas le total shipper), claim-first, P2002 = silence, ghost user, échec d'envoi = FAILED sans throw, transitoire = throw ;
+- `booking-templates.spec.ts` (10) : **rendu EJS RÉEL** des 8 gabarits dans les 2 locales — un gabarit cassé ne doit pas attendre la prod pour exploser (les autres specs mockent l'envoi). Piège rencontré : `<%= %>` échappe le HTML, une assertion sur « n'était » doit viser la sous-chaîne sans apostrophe (`&#39;`).
+
+### 7. Hors périmètre (assumé)
+MailHog en docker-compose (candidat, avec D35) ; retry automatique des FAILED (rejeu manuel possible depuis la collection) ; `preferredLocale` utilisateur ; migration des clones email auth/trip ; les 8 gabarits B3/B4/B5 (chacun arrive avec le writer de son événement).

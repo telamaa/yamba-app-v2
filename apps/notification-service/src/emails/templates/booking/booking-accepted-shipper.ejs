@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="<%= locale %>">
+<head><meta charset="UTF-8" /><title><%= subject %></title></head>
+<body style="margin:0;padding:0;background-color:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#0f172a;">
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color:#f8fafc;">
+    <tr>
+        <td align="center" style="padding:32px 16px;">
+            <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="max-width:560px;background-color:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px -4px rgba(0,0,0,0.06);">
+                <tr>
+                    <td style="background:linear-gradient(135deg,#0F766E 0%,#14b8a6 100%);padding:32px 24px;text-align:center;">
+                        <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:800;letter-spacing:-0.5px;">
+                            <%= locale === "fr" ? "Ta demande est acceptée" : "Your request was accepted" %>
+                        </h1>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding:32px 24px;">
+                        <p style="margin:0 0 16px 0;font-size:16px;line-height:1.6;">
+                            <%= locale === "fr" ? `Bonjour ${firstName},` : `Hi ${firstName},` %>
+                        </p>
+                        <p style="margin:0 0 16px 0;font-size:15px;line-height:1.6;color:#334155;">
+                            <%= locale === "fr"
+                                    ? `Bonne nouvelle : le Voyageur a accepté ta demande ${route} (${weightKg} kg) le ${acceptedAt}. Ton paiement de ${total} est confirmé.`
+                                    : `Good news: the carrier accepted your request ${route} (${weightKg} kg) on ${acceptedAt}. Your payment of ${total} is confirmed.` %>
+                        </p>
+                        <p style="margin:0 0 24px 0;font-size:14px;line-height:1.6;color:#64748b;">
+                            <%= locale === "fr"
+                                    ? "Prochaine étape : la remise du colis. Retrouve la checklist de préparation et les coordonnées du point de remise dans ton suivi."
+                                    : "Next step: the parcel handoff. Find the preparation checklist and the handoff point details in your tracker." %>
+                        </p>
+                        <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
+                            <tr>
+                                <td style="background-color:#FF9900;border-radius:12px;">
+                                    <a href="<%= ctaUrl %>" style="display:inline-block;padding:14px 28px;font-size:15px;font-weight:700;color:#ffffff;text-decoration:none;">
+                                        <%= locale === "fr" ? "Voir mon suivi" : "View my tracker" %>
+                                    </a>
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding:20px 24px;background-color:#f8fafc;text-align:center;">
+                        <p style="margin:0;font-size:12px;color:#94a3b8;">Yamba</p>
+                    </td>
+                </tr>
+            </table>
+        </td>
+    </tr>
+</table>
+</body>
+</html>

@@ -1,0 +1,402 @@
+/**
+ * booking-emails.spec.ts — preuves du canal email (D41/A35/A36, D30)
+ * ==================================================================
+ * Même doctrine que le spec du consumer :
+ * - prisma & @packages/email : mocks VIRTUELS ;
+ * - LE CONTRAT EST RÉEL : les fixtures passent le vrai
+ *   BookingDomainEventSchema (méta-test) ;
+ * - la matrice (A35) se teste comme une TABLE ; le pipeline se
+ *   teste sur les claims (A36) et la frontière A13 (jamais le
+ *   total Expéditeur dans un email Voyageur).
+ */
+import { Prisma } from "@prisma/client";
+
+const prismaMock = {
+  user: {
+    findMany: jest.fn(),
+  },
+  emailDelivery: {
+    create: jest.fn(),
+    update: jest.fn(),
+  },
+};
+jest.mock(
+  "@packages/libs/prisma",
+  () => ({ __esModule: true, default: prismaMock }),
+  { virtual: true }
+);
+
+const emailMock = {
+  isEmailConfigured: jest.fn(),
+  sendTemplatedEmail: jest.fn(),
+};
+jest.mock("@packages/email", () => emailMock, { virtual: true });
+
+import { BookingDomainEventSchema } from "@packages/api-contracts";
+import {
+  EMAIL_MATRIX,
+  buildBookingEmail,
+  dispatchBookingEmails,
+  resolveEmailRecipients,
+} from "./booking-emails";
+
+/* ── Fixtures : événements VALIDES au contrat réel ───────────── */
+
+const OID = {
+  booking: "64b000000000000000000001",
+  trip: "64b000000000000000000010",
+  shipper: "64b000000000000000000020",
+  carrier: "64b000000000000000000030",
+};
+const EVENT_ID = "6f0000000000000000000001";
+
+function basePayload() {
+  return {
+    bookingId: OID.booking,
+    tripId: OID.trip,
+    shipperId: OID.shipper,
+    carrierId: OID.carrier,
+    corridor: {
+      originCity: "Paris",
+      originCountryCode: "FR",
+      destinationCity: "Brazzaville",
+      destinationCountryCode: "CG",
+    },
+    category: "DOCUMENTS",
+    categoryFamily: null,
+    weightKg: 2.5,
+    transportCents: 3000,
+    totalShipperCents: 3900,
+    currencyCode: "EUR",
+    actor: "SHIPPER" as const,
+  };
+}
+
+function envelope(eventType: string, payload: Record<string, unknown>) {
+  return {
+    aggregateType: "booking",
+    aggregateId: OID.booking,
+    occurredAt: "2026-07-19T10:00:00.000Z",
+    correlationId: "spec",
+    schemaVersion: 1,
+    eventType,
+    payload,
+  };
+}
+
+function requestedEvent() {
+  return envelope("booking.requested", {
+    ...basePayload(),
+    expiresAt: "2026-07-20T10:00:00.000Z",
+  });
+}
+
+function paymentAuthorizedEvent() {
+  return envelope("booking.payment_authorized", {
+    ...basePayload(),
+    paymentIntentId: "pi_spec",
+    amountCents: 3900,
+  });
+}
+
+function cancelledEvent(wasAccepted: boolean) {
+  return envelope("booking.cancelled", {
+    ...basePayload(),
+    cancelledBy: "SHIPPER" as const,
+    reason: null,
+    wasAccepted,
+    closedAt: "2026-07-19T12:00:00.000Z",
+  });
+}
+
+function declinedEvent(reason: string | null) {
+  return envelope("booking.declined", {
+    ...basePayload(),
+    actor: "CARRIER" as const,
+    reason,
+    closedAt: "2026-07-19T12:00:00.000Z",
+  });
+}
+
+function parse(event: unknown) {
+  return BookingDomainEventSchema.parse(event);
+}
+
+function buildLogger() {
+  const logger = { info: jest.fn(), warn: jest.fn(), error: jest.fn() };
+  return logger as unknown as import("pino").Logger & typeof logger;
+}
+
+function p2002() {
+  return new Prisma.PrismaClientKnownRequestError("duplicate", {
+    code: "P2002",
+    clientVersion: "6.19.3",
+  });
+}
+
+const CARRIER_USER = {
+  id: OID.carrier,
+  email: "carrier@spec.test",
+  firstName: "Awa",
+};
+const SHIPPER_USER = {
+  id: OID.shipper,
+  email: "shipper@spec.test",
+  firstName: "Naomi",
+};
+
+beforeEach(() => {
+  jest.clearAllMocks();
+  emailMock.isEmailConfigured.mockReturnValue(true);
+  emailMock.sendTemplatedEmail.mockResolvedValue(undefined);
+  prismaMock.user.findMany.mockResolvedValue([CARRIER_USER, SHIPPER_USER]);
+  prismaMock.emailDelivery.create.mockResolvedValue({});
+  prismaMock.emailDelivery.update.mockResolvedValue({});
+});
+
+/* ── Matrice A35 ─────────────────────────────────────────────── */
+
+describe("matrice email (A35)", () => {
+  it("méta-test : les fixtures passent le VRAI contrat", () => {
+    expect(() => parse(requestedEvent())).not.toThrow();
+    expect(() => parse(paymentAuthorizedEvent())).not.toThrow();
+    expect(() => parse(cancelledEvent(true))).not.toThrow();
+    expect(() => parse(declinedEvent("TIMING"))).not.toThrow();
+  });
+
+  it("la matrice couvre les 17 événements du contrat", () => {
+    expect(Object.keys(EMAIL_MATRIX)).toHaveLength(17);
+  });
+
+  it("requested → CARRIER seul ; payment_authorized → SHIPPER seul (email-only)", () => {
+    expect(resolveEmailRecipients(parse(requestedEvent()))).toEqual([
+      { userId: OID.carrier, role: "CARRIER" },
+    ]);
+    expect(resolveEmailRecipients(parse(paymentAuthorizedEvent()))).toEqual([
+      { userId: OID.shipper, role: "SHIPPER" },
+    ]);
+  });
+
+  it("cancelled : SHIPPER toujours, CARRIER seulement si wasAccepted", () => {
+    expect(resolveEmailRecipients(parse(cancelledEvent(false)))).toEqual([
+      { userId: OID.shipper, role: "SHIPPER" },
+    ]);
+    expect(resolveEmailRecipients(parse(cancelledEvent(true)))).toEqual([
+      { userId: OID.shipper, role: "SHIPPER" },
+      { userId: OID.carrier, role: "CARRIER" },
+    ]);
+  });
+
+  it("tracking_event : JAMAIS d'email (anti-spam)", () => {
+    const event = parse(
+      envelope("booking.tracking_event", {
+        ...basePayload(),
+        actor: "CARRIER" as const,
+        step: "AT_AIRPORT",
+        confirmedAt: "2026-07-19T12:00:00.000Z",
+      })
+    );
+    expect(resolveEmailRecipients(event)).toEqual([]);
+  });
+
+  it("toute règle non-null a un builder (aucune clé ne rend null une fois routée)", () => {
+    for (const [eventType, rule] of Object.entries(EMAIL_MATRIX)) {
+      if (rule === null) continue;
+      // Les 7 clés actives sont toutes constructibles pour leur rôle.
+      const role = rule === "CARRIER" ? "CARRIER" : "SHIPPER";
+      const fixtures: Record<string, unknown> = {
+        "booking.requested": requestedEvent(),
+        "booking.payment_authorized": paymentAuthorizedEvent(),
+        "booking.accepted": envelope("booking.accepted", {
+          ...basePayload(),
+          actor: "CARRIER" as const,
+          acceptedAt: "2026-07-19T12:00:00.000Z",
+        }),
+        "booking.declined": declinedEvent(null),
+        "booking.expired": envelope("booking.expired", {
+          ...basePayload(),
+          actor: "SYSTEM" as const,
+          closedAt: "2026-07-20T10:00:00.000Z",
+        }),
+        "booking.cancelled": cancelledEvent(true),
+        "booking.refund_issued": envelope("booking.refund_issued", {
+          ...basePayload(),
+          actor: "SYSTEM" as const,
+          amountCents: 3900,
+          refundedAt: "2026-07-19T12:00:00.000Z",
+        }),
+      };
+      const built = buildBookingEmail(parse(fixtures[eventType]), role, "Test");
+      expect(built).not.toBeNull();
+      expect(built!.template).toMatch(/^booking\//);
+    }
+  });
+});
+
+/* ── Contenus : frontière A13, raisons, montants ─────────────── */
+
+describe("contenus construits", () => {
+  it("A13 : l'email Voyageur montre son NET (transportCents), jamais le total Expéditeur", () => {
+    const built = buildBookingEmail(parse(requestedEvent()), "CARRIER", "Awa")!;
+    const serialized = JSON.stringify(built);
+    expect(built.data.earnings).toContain("30");
+    expect(serialized).not.toContain("39"); // 3900 = total shipper
+  });
+
+  it("le reçu Expéditeur porte le montant AUTORISÉ de l'événement", () => {
+    const built = buildBookingEmail(
+      parse(paymentAuthorizedEvent()),
+      "SHIPPER",
+      "Naomi"
+    )!;
+    expect(built.template).toBe("booking/payment-authorized-shipper");
+    expect(built.data.amount).toContain("39");
+  });
+
+  it("declined : la raison contrat est traduite, une raison inconnue devient null", () => {
+    const withReason = buildBookingEmail(
+      parse(declinedEvent("TIMING")),
+      "SHIPPER",
+      "Naomi"
+    )!;
+    expect(withReason.data.reason).toBeTruthy();
+    const unknown = buildBookingEmail(
+      parse(declinedEvent("SOMETHING_ELSE")),
+      "SHIPPER",
+      "Naomi"
+    )!;
+    expect(unknown.data.reason).toBeNull();
+  });
+
+  it("cancelled : gabarit distinct par rôle", () => {
+    const event = parse(cancelledEvent(true));
+    expect(buildBookingEmail(event, "SHIPPER", "N")!.template).toBe(
+      "booking/booking-cancelled-shipper"
+    );
+    expect(buildBookingEmail(event, "CARRIER", "A")!.template).toBe(
+      "booking/booking-cancelled-carrier"
+    );
+  });
+});
+
+/* ── Pipeline d'envoi (A36) ──────────────────────────────────── */
+
+describe("dispatch (A36 — claim-first, best-effort)", () => {
+  it("nominal : claim PENDING → envoi → SENT, destinataire et gabarit exacts", async () => {
+    await dispatchBookingEmails(EVENT_ID, parse(requestedEvent()), buildLogger());
+
+    expect(prismaMock.emailDelivery.create).toHaveBeenCalledWith({
+      data: {
+        eventId: EVENT_ID,
+        userId: OID.carrier,
+        template: "booking/booking-requested-carrier",
+      },
+    });
+    expect(emailMock.sendTemplatedEmail).toHaveBeenCalledTimes(1);
+    const sent = emailMock.sendTemplatedEmail.mock.calls[0][0];
+    expect(sent.to).toBe(CARRIER_USER.email);
+    expect(sent.template).toBe("booking/booking-requested-carrier");
+    expect(prismaMock.emailDelivery.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { eventId_userId: { eventId: EVENT_ID, userId: OID.carrier } },
+        data: expect.objectContaining({ status: "SENT" }),
+      })
+    );
+  });
+
+  it("SMTP non configuré : skip total, AUCUN claim ni accès base", async () => {
+    emailMock.isEmailConfigured.mockReturnValue(false);
+    const logger = buildLogger();
+
+    await dispatchBookingEmails(EVENT_ID, parse(requestedEvent()), logger);
+
+    expect(prismaMock.user.findMany).not.toHaveBeenCalled();
+    expect(prismaMock.emailDelivery.create).not.toHaveBeenCalled();
+    expect(emailMock.sendTemplatedEmail).not.toHaveBeenCalled();
+    expect(logger.info).toHaveBeenCalled();
+  });
+
+  it("règle null (tracking_event) : return immédiat, pas même isEmailConfigured", async () => {
+    const event = parse(
+      envelope("booking.tracking_event", {
+        ...basePayload(),
+        actor: "CARRIER" as const,
+        step: "AT_AIRPORT",
+        confirmedAt: "2026-07-19T12:00:00.000Z",
+      })
+    );
+
+    await dispatchBookingEmails(EVENT_ID, event, buildLogger());
+
+    expect(emailMock.isEmailConfigured).not.toHaveBeenCalled();
+    expect(prismaMock.user.findMany).not.toHaveBeenCalled();
+  });
+
+  it("claim déjà posé (P2002) : jamais de renvoi (at-most-once)", async () => {
+    prismaMock.emailDelivery.create.mockRejectedValue(p2002());
+
+    await dispatchBookingEmails(EVENT_ID, parse(requestedEvent()), buildLogger());
+
+    expect(emailMock.sendTemplatedEmail).not.toHaveBeenCalled();
+    expect(prismaMock.emailDelivery.update).not.toHaveBeenCalled();
+  });
+
+  it("user effacé (RGPD) : envoi sauté et tracé, pas de claim", async () => {
+    prismaMock.user.findMany.mockResolvedValue([]);
+    const logger = buildLogger();
+
+    await dispatchBookingEmails(EVENT_ID, parse(requestedEvent()), logger);
+
+    expect(prismaMock.emailDelivery.create).not.toHaveBeenCalled();
+    expect(emailMock.sendTemplatedEmail).not.toHaveBeenCalled();
+    expect(logger.warn).toHaveBeenCalled();
+  });
+
+  it("échec d'ENVOI : FAILED + lastError tracés, PAS de throw (best-effort)", async () => {
+    emailMock.sendTemplatedEmail.mockRejectedValue(new Error("smtp down"));
+    const logger = buildLogger();
+
+    await expect(
+      dispatchBookingEmails(EVENT_ID, parse(requestedEvent()), logger)
+    ).resolves.toBeUndefined();
+
+    expect(prismaMock.emailDelivery.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          status: "FAILED",
+          lastError: "smtp down",
+        }),
+      })
+    );
+    expect(logger.error).toHaveBeenCalled();
+  });
+
+  it("claim en erreur TRANSITOIRE (Mongo down) : throw → re-livraison amont", async () => {
+    prismaMock.emailDelivery.create.mockRejectedValue(
+      new Error("connection refused")
+    );
+
+    await expect(
+      dispatchBookingEmails(EVENT_ID, parse(requestedEvent()), buildLogger())
+    ).rejects.toThrow("connection refused");
+
+    expect(emailMock.sendTemplatedEmail).not.toHaveBeenCalled();
+  });
+
+  it("cancelled wasAccepted : DEUX envois, un gabarit par rôle", async () => {
+    await dispatchBookingEmails(
+      EVENT_ID,
+      parse(cancelledEvent(true)),
+      buildLogger()
+    );
+
+    expect(emailMock.sendTemplatedEmail).toHaveBeenCalledTimes(2);
+    const templates = emailMock.sendTemplatedEmail.mock.calls.map(
+      (c: unknown[]) => (c[0] as { template: string }).template
+    );
+    expect(templates).toEqual([
+      "booking/booking-cancelled-shipper",
+      "booking/booking-cancelled-carrier",
+    ]);
+  });
+});

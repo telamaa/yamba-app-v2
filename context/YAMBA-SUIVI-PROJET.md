@@ -1,5 +1,5 @@
 # YAMBA — SUIVI DE PROJET DE BOUT EN BOUT
-### État au 1er septembre 2026 · `dev` = `800edb9` (#90, pile B2 complète) · 511 tests · `main` = `9c6e155` (#88)
+### État au 1er septembre 2026 (soir) · `dev` = `3c489bf` (#91, docs post-merge) · 540 tests avec B2-PR4 · `main` = `9c6e155` (#88)
 *Légende : ✅ fait (PR) · 🟡 en cours / partiel · ⬜ à faire · 🔴 bloquant lancement. Vélocité = « sessions » (unité des handoffs). Mis à jour à chaque merge (règle : ce fichier + `YAMBA-CONTEXT.md`).*
 
 ---
@@ -71,7 +71,8 @@ Lancement public = fin du Jalon 2. Fourchette tenue au dernier handoff : **5–8
 | **B2-PR1 — naissance du deal** : `POST /deals/payment-intents` + `POST /deals`, `@packages/payments` (PaymentProvider D11 : Stripe capture manuelle + Fake), devis serveur = moteur unique (409 `QUOTE_DIVERGENCE`), snapshot D17 enrichi + lieux, `reservedKg` atomique + outbox en transaction, wizard branché (un seul Payment Element — A30), 24 tests, prouvé de bout en bout (Atlas + Stripe test) | ✅ #90 | D37, D38, A29, A30, RG-D-01…14 |
 | **B2-PR2 — cycle de vie du deal** : `POST /deals/:id/accept` (charte + gate D31 déplacé + **capture à l'acceptation D39**), `/decline` (5 raisons, libération, CAP-02), `/cancel` (ANN-01 : 100 % ≥ J-2, retenue **50 %** ensuite), cron expiration 24 h, webhook Stripe D40 (`payment_intent.canceled` → SYSTEM cancel, nouvelle transition machine), argent d'abord → transaction Mongo conditionnelle + outbox, +46 tests | ✅ #90 | D31, D39, D40, ANN-01/04 |
 | **B2-PR3 — front des transitions** : écran É2 branché (adapter whitelist, accept/decline réels, 409 mappés, raisons contrat — A32), gains nets seuls (A13), CTA par `allowedActions`, annulation Expéditrice dans Mes envois (préviz ANN-01 servie — A31), seed CarrierPage/intents FAKE adoptés (A33), +4 tests | ✅ #90 (+A34) | A31–A33, RG-F-01…06 |
-| 🔴 **B2 — reste** : emails transactionnels booking.*, photos (media-service :6009), code livraison chiffré AES-256-GCM. (Front des transitions É2 + annulation Expéditrice + seed carrierPage/Stripe : FAITS en B2-PR3.) | ⬜ **prochaine étape** | D11, D16, D17 |
+| **B2-PR4 — emails transactionnels booking.*** : canal email du MÊME consumer (D41), `@packages/email` (3e clone évité, provider D35 branchable derrière), `EMAIL_MATRIX` totale en data (A35 — 7 clés actives, les 10 autres avec leur writer B3/B4/B5), idempotence at-most-once par destinataire (`EmailDelivery` claim-first, best-effort — A36), 8 gabarits EJS FR/EN testés en rendu réel, +29 tests | ✅ PR à numéroter au merge | D41, A35, A36, RG-N-01…08 |
+| 🔴 **B2 — reste** : tracker Expéditeur `/bookings/[id]` → `GET /deals/:id` (É3 + PENDING + terminaux branchables dès maintenant ; É4b→É9 avec B3), photos (media-service :6009), code livraison chiffré AES-256-GCM | ⬜ **prochaine étape** | D11, D16, D17 |
 | 🔴 **B3 — transport** : pickup serveur (upload R2, code bcrypt, checklist), refus, tracking, deliver (compare + lock), régénération de code | ⬜ (2/3) | — |
 | 🔴 **B4 — argent sortant** : confirmation anticipée, cron J+4 → COMPLETED + `transfers.create()`, dispute avec gel, versement de la retenue ANN-01 au Voyageur (`CANCEL_LATE_RETENTION_PCT` = 50, gravé D39) | ⬜ (1,5/2,5) | ANN-01…04, D39 |
 | 🔴 **B5 — confiance** : rating double-aveugle serveur, relances J+5/J+7, stats de réputation (D29-1) — unicité (bookingId, authorUserId) sans `@@unique` naïf Mongo | ⬜ (1,5/2) | D29 |
@@ -133,15 +134,15 @@ Estimation : **2–4 sessions** au-dessus du Jalon 4 (l'essentiel du travail est
 
 | Indicateur | Valeur |
 |---|---|
-| Tests (plateforme) | 511 = trip 187 · deal 303 · notification 21 |
-| Décisions au registre | D1 → D40 (+ arbitrages A1 → A34) |
-| Règles métier | ~50 (V2) + RG-B-01…35, RG-S-01…13, RG-C-01…16, RG-G-01…03, RG-D-01…16, RG-V-01…09, RG-F-01…06 |
+| Tests (plateforme) | 540 = trip 187 · deal 303 · notification 50 |
+| Décisions au registre | D1 → D41 (+ arbitrages A1 → A36) |
+| Règles métier | ~50 (V2) + RG-B-01…35, RG-S-01…13, RG-C-01…16, RG-G-01…03, RG-D-01…16, RG-V-01…09, RG-F-01…06, RG-N-01…08 |
 | PR mergées | #1 → #90 (#90 = toute la pile B2 en une PR : jalons mobile D36, docs cumulatifs, B2-PR1, B2-PR2, B2-PR3 + fix A34 — 13 checks comptés) |
 | Documents | registre, spec, règles, 5 handoffs (dernier : SESSION-2026-08-28 + addendum 29/08), fiches PR (archive), 3 docs cumulatifs (technique, métier, apprentissage), `YAMBA-MOTEUR-PRIX.md/.pdf`, ce suivi |
 
 ## 9. Ordre recommandé des prochaines sessions
 
-1. **B2 reste** (0,5–1 session) — emails transactionnels booking.* (notification-service, colonne email de la matrice A15), tracker Expéditeur /bookings/[id] → GET /deals/:id (vues É3→É9, avec B3). (Front É2 + annulation + seed : FAITS en B2-PR3 ; accept/decline/cancel serveur : B2-PR2.)
+1. **B2 reste** (0,5 session) — tracker Expéditeur /bookings/[id] → GET /deals/:id (É3 + PENDING + terminaux dès maintenant, É4b→É9 avec B3). (Emails booking.* : FAITS en B2-PR4 ; front É2 + annulation + seed : B2-PR3 ; accept/decline/cancel serveur : B2-PR2.)
 2. **B3 transport** (2–3) puis **B4 argent sortant** (1,5–2,5) puis **B5 confiance** (1,5–2).
 3. PR « paramètres serveur » (0,5) + cleanup legacy (0,5) + seeds (0,25) — entre deux lots.
 4. Jalon 2 : admin-ui (C), Sentry/PostHog, provider email, sessions — **constitutif du lancement**.

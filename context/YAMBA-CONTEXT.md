@@ -117,9 +117,18 @@ Ordre de demarrage : auth -> trip -> gateway.
   `pi_fake_seed_*` adoptes par le FakePaymentProvider (A33) — parcours
   B2 jouables en dev sans cles. TanStack Query sur le module deal
   (invalidation, jamais de mutation locale du statut). +4 tests.
-- Plateforme de tests : 511 (trip 187, deal 303, notification 21) — post-B2-PR3
-  (+A34 : contrat aligné wizard — email destinataire optionnel, description min 5 ;
-  backfill reservedKg sur les Trips pré-B2-PR1).
+- B2-PR4 (emails transactionnels booking.*, D41/A35/A36) : le canal EMAIL de la
+  matrice A15 dans le MEME consumer que l'in-app — `@packages/email` (3e clone
+  evite, transport paresseux, provider D35 branchable derriere), `EMAIL_MATRIX`
+  totale en data (7 cles actives : requested→carrier avec gains+deadline,
+  payment_authorized→recu shipper, accepted/declined/expired→shipper,
+  cancelled→shipper + carrier si wasAccepted, refund_issued→shipper ; les cles
+  B3/B4/B5 arrivent avec leur writer), idempotence at-most-once par destinataire
+  (modele `EmailDelivery` unique [eventId,userId], claim-first, echec = FAILED
+  trace sans throw — best-effort), jointure User a l'envoi (RGPD : efface =
+  saute), 8 gabarits EJS FR/EN (charte teal/mango/slate, jamais le code de
+  livraison — teste sur le HTML rendu), +29 tests dont rendu EJS reel.
+- Plateforme de tests : 540 (trip 187, deal 303, notification 50) — post-B2-PR4.
 - MERGE 01/09 : toute la pile B2 est dans `dev` via la SEULE **PR #90**
   (`feat/b2-deal-front` portait la chaîne complète : jalons mobile D36,
   docs cumulatifs, B2-PR1, B2-PR2, B2-PR3 + fix A34) — 13 checks verts
@@ -150,13 +159,13 @@ Ordre de demarrage : auth -> trip -> gateway.
 - UX restantes : step 1 (aeroport -> ville de rattachement + lieu de
   pickup, arrivee repliee, justificatif en step 3), lieux en chips + apercu
   sticky (create-trip), cleanup legacy PER_CATEGORY + instantBooking.
-- B2 (suite) : PR2 FAITE (accept/decline/cancel + capture D39, gate D31
-  deplace, cron 24 h, webhook D40 — voir « fait » ci-dessus). RESTE :
-  front des transitions (page deal Voyageur É2 encore sur mocks : brancher
-  accept/decline sur l'API ; annulation cote Expediteur), carrierPage/
-  Stripe factices au seed, PR3 emails transactionnels, photos du colis
-  via media-service :6009, AES-256-GCM re-affichage code livraison,
-  SiteConfig commissionRate (D16). payment-service :6008 : NON (D38).
+- B2 (suite) : PR2 (cycle de vie), PR3 (front des transitions + seed) et
+  PR4 (emails transactionnels booking.*) FAITES — voir « fait » ci-dessus.
+  RESTE : tracker Expediteur /bookings/[id] → GET /deals/:id (vues E3 +
+  PENDING + terminaux branchables des maintenant ; E4b→E9 avec B3), photos
+  du colis via media-service :6009, AES-256-GCM re-affichage code
+  livraison, SiteConfig commissionRate (D16). payment-service :6008 :
+  NON (D38).
 - B3 transport : pickup (upload R2, code bcrypt, checklist conformite),
   refuse, tracking, deliver (compare + lock serveur), regeneration code.
 - B4 argent sortant : confirmation anticipee, cron J+4 -> COMPLETED +
