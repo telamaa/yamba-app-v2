@@ -25,6 +25,7 @@ import {
   CONSUMER_GROUPS,
   type ConsumedEventMessage,
 } from "@packages/messaging";
+import { dispatchBookingEmails } from "../emails/booking-emails";
 
 type BookingDomainEvent = z.infer<typeof BookingDomainEventSchema>;
 type BookingEventKey = BookingDomainEvent["eventType"];
@@ -154,6 +155,12 @@ export async function handleBookingEventMessage(
       update: {},
     });
   }
+
+  // 3bis. CANAL EMAIL (D41/A35/A36) — best-effort : claims
+  // EmailDelivery par destinataire, jamais de throw sur un échec
+  // d'ENVOI (une erreur transitoire de claim, elle, remonte — la
+  // re-livraison retrouvera les claims posés).
+  await dispatchBookingEmails(eventId, event, logger);
 
   // 4. PROCESSED — la row garde la trace du passage.
   await prisma.consumedEvent.update({

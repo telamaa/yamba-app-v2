@@ -1003,6 +1003,34 @@ model ConsumedEvent {
   @@unique([consumerGroup, eventId])
 }
 
+/// Statut d'un envoi d'email transactionnel (D41/A36).
+enum EmailDeliveryStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+/// Marqueur d'envoi email PAR DESTINATAIRE (A36 — at-most-once).
+/// Le retraitement d'un ConsumedEvent PENDING/FAILED re-exécute tout
+/// le handler : sans ce claim, un crash renverrait les emails.
+/// Claim-first : create PENDING AVANT l'envoi ; P2002 = déjà claimé
+/// (SENT, PENDING ou FAILED) → jamais de renvoi. Échec d'envoi →
+/// FAILED + lastError (rejeu MANUEL possible, jamais automatique).
+model EmailDelivery {
+  id        String              @id @default(auto()) @map("_id") @db.ObjectId
+  /// _id de l'OutboxEvent source (header `event-id`).
+  eventId   String              @db.ObjectId
+  userId    String              @db.ObjectId
+  /// Gabarit envoyé (ex. "booking/booking-accepted-shipper") — trace.
+  template  String
+  status    EmailDeliveryStatus @default(PENDING)
+  lastError String?
+  sentAt    DateTime?
+  claimedAt DateTime            @default(now())
+
+  @@unique([eventId, userId])
+}
+
 // ─── D14 / CAT-02 — les 8 familles de risque (PR pricing socle, A28) ───
 // La famille repond a « qu'est-ce que c'est ? » (conformite, risque,
 // protection) — plus jamais au prix (D14). Liste FIGEE en CAT-02 v1.2.

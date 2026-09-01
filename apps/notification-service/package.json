@@ -61,7 +61,9 @@
     }
   },
   "dependencies": {
+    "ejs": "^4.0.1",
     "express": "^4.21.2",
+    "nodemailer": "9.0.3",
     "pino": "^9.5.0",
     "pino-http": "^10.3.0"
   }

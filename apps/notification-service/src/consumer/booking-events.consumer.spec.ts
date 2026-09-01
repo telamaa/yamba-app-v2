@@ -32,6 +32,13 @@ jest.mock(
   () => ({ CONSUMER_GROUPS: { NOTIFICATION_SERVICE: "notification-service" } }),
   { virtual: true }
 );
+// Le canal email (D41) a son propre spec — ici on ne prouve que
+// l'ORCHESTRATION : appelé au bon moment, pas sur les skips.
+jest.mock("../emails/booking-emails", () => ({
+  dispatchBookingEmails: jest.fn().mockResolvedValue(undefined),
+}));
+
+import { dispatchBookingEmails } from "../emails/booking-emails";
 
 import { BookingDomainEventSchema } from "@packages/api-contracts";
 import {
@@ -217,6 +224,17 @@ describe("pipeline nominal", () => {
     );
   });
 
+  it("canal email (D41) : dispatché APRÈS la matérialisation, avec l'eventId du claim", async () => {
+    const logger = buildLogger();
+
+    await handleBookingEventMessage(makeMessage(requestedEvent()), logger);
+
+    expect(dispatchBookingEmails).toHaveBeenCalledTimes(1);
+    const [eventId, event] = (dispatchBookingEmails as jest.Mock).mock.calls[0];
+    expect(eventId).toBe(EVENT_ID);
+    expect(event.eventType).toBe("booking.requested");
+  });
+
   it("rating_reminder RÉEL bout en bout : notifié = targetRole", async () => {
     const logger = buildLogger();
 
@@ -251,6 +269,7 @@ describe("idempotence claim-first", () => {
 
     expect(prismaMock.notification.upsert).not.toHaveBeenCalled();
     expect(prismaMock.consumedEvent.update).not.toHaveBeenCalled();
+    expect(dispatchBookingEmails).not.toHaveBeenCalled();
   });
 
   it("claim existant PENDING (crash antérieur) : retraitement complet", async () => {
@@ -303,6 +322,7 @@ describe("erreurs définitives vs transitoires", () => {
     const update = prismaMock.consumedEvent.update.mock.calls[0][0];
     expect(update.data.status).toBe("FAILED");
     expect(update.data.lastError).toBeTruthy();
+    expect(dispatchBookingEmails).not.toHaveBeenCalled();
   });
 
   it("claim en erreur TRANSITOIRE (Mongo down) : throw → re-livraison", async () => {
