@@ -196,19 +196,33 @@ mobile-first, aucune attribution Claude, charte mango/teal/slate.
    (`feat/b2-deal-front` → `dev`, 13 checks verts comptés). `dev` = `800edb9`.
    Les 5 branches de la pile sont mergées → purge possible.
 
-## B. Prochaine étape
+## B. État exact à la pause (01/09 soir) et reprise
 
-⭐ **B2 reste** : emails transactionnels `booking.*` (notification-service, colonne
-email de la matrice A15), tracker Expéditeur `/bookings/[id]` → `GET /deals/:id`
-(vues É3→É9, avec B3), photos (media-service :6009), code livraison AES-256-GCM.
-Toujours en attente : protections `dev`/`main`, purge des branches mergées.
+- Branche courante : **`chore/docs-post-merge-90`** (= `dev` + le commit docs
+  post-merge), poussée, arbre propre. `gh` toujours non authentifié.
+- **1. À merger d'abord — la mini-PR docs post-merge** (ce fichier + suivi + contexte) :
+  https://github.com/telamaa/yamba-app-v2/compare/dev...chore/docs-post-merge-90
+  (13 checks à compter, comme toujours).
+- **2. Purge des branches mergées** (contenu PROUVÉ dans dev, `git merge-base
+  --is-ancestor` vérifié) : `chore/docs-jalons-mobile`, `chore/docs-cumulatifs`,
+  `feat/b2-deal-request`, `feat/b2-deal-lifecycle`, `feat/b2-deal-front` —
+  décision en suspens : étendre ou non aux vieilles branches pré-release 28/08
+  (`backup-carrier-onboarding*`, `feat/auth-pages-redesign`, …).
+- **3. ⭐ B2 reste** : emails transactionnels `booking.*` (notification-service,
+  colonne email de la matrice A15), tracker Expéditeur `/bookings/[id]` →
+  `GET /deals/:id` (vues É3→É9, avec B3), photos (media-service :6009),
+  code livraison AES-256-GCM. Toujours en attente : protections `dev`/`main`.
+- Rappel A34 : `backfill-reserved-kg.ts` est à REJOUER sur tout nouvel
+  environnement dont des Trips prédatent B2-PR1 (déjà fait sur le dev Atlas).
 
 ### Prompt d'ouverture prêt-à-coller
 ```
-On reprend Yamba — lis context/YAMBA-CONTEXT-HANDOFF-SESSION-2026-08-28.md (addendum 01/09 soir),
+On reprend Yamba — lis context/YAMBA-CONTEXT-HANDOFF-SESSION-2026-08-28.md (addendum 01/09 soir, §B),
 context/YAMBA-CONTEXT.md, le registre (D1–D40, A1–A34) et context/YAMBA-SUIVI-PROJET.md.
-État : dev = 800edb9 (#90, toute la pile B2 mergée), plateforme 511, paiement Stripe réel prouvé e2e.
-⭐ B2 reste : emails transactionnels booking.* (matrice A15, notification-service) + tracker
+État : dev = 800edb9 (#90, toute la pile B2 mergée, 13 checks comptés), plateforme 511,
+paiement Stripe réel prouvé e2e ; branche chore/docs-post-merge-90 poussée, PR docs À OUVRIR/MERGER.
+D'abord : merger la mini-PR docs post-merge-90, puis purge des 5 branches de la pile ;
+puis ⭐ B2 reste : emails transactionnels booking.* (matrice A15, notification-service) + tracker
 Expéditeur /bookings/[id] → GET /deals/:id. Rituel : inventaire AVANT le code, décisions au
 registre AVANT le code, compléter les 3 docs cumulatifs, mobile-first, aucune attribution Claude.
 ```
