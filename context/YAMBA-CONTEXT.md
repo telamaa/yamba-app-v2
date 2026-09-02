@@ -182,7 +182,8 @@ Ordre de demarrage : auth -> trip -> gateway.
   (« Garantie Yamba », « Protection etendue », plus jamais « assurance »
   avant contrat — carrierDealRequest, tracker, wizard, home) ; RGP-02
   (telephone « a la prise en charge ») ; `BookingCounterpart.publicSlug`
-  → « Voir profil » reel vers /u/[slug]. deal-service 355 tests.
+  → « Voir profil » reel vers /u/[slug]. deal-service 355 tests. MERGE **#100**.
+- Plateforme de tests : 601 (trip 187, deal 355, notification 59) — post-#100.
 - Plateforme de tests : 600 (trip 187, deal 354, notification 59) — post-B3 (#96).
 - MERGE 01/09 : toute la pile B2 est dans `dev` via la SEULE **PR #90**
   (`feat/b2-deal-front` portait la chaîne complète : jalons mobile D36,

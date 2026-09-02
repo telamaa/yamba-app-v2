@@ -339,6 +339,6 @@ AVANT le code, compléter les 3 docs cumulatifs, mobile-first, aucune attributio
 Captures utilisateur sur `/carrier/deals/[id]` : (1) à ~900 px, aucune colonne Accepter/Refuser (`aside hidden lg:block` vs bascule mobile à 768) ; (2) pas de photos du colis — `createDeal` envoyait `photoUrls: []` depuis B2-PR1 ; (3) « Assurance basique » (GAR-02) et « téléphone après acceptation » (RGP-02) ; (4) « Voir profil » loguait en console. A45 gravé, B3-PR4 sur `feat/b3-deal-request-page` : upload ImageKit des photos déclarées AVANT la carte (`useBookingCheckout`), `createDeal(…, photoUrls)`, grille/aside dès `md`, libellés GAR-02/RGP-02 FR/EN (carrierDealRequest, bookingTracker, booking, home), `BookingCounterpart.publicSlug` + lien `/u/[slug]`, test mapper (+1 → deal 355, plateforme 601).
 
 ## B. Reprise
-- Merger B3-PR4 (13 checks), purger `feat/b3-deal-request-page`. Recette D1–D7 puis F/V.
+- **FAIT** : #100 mergée (13 checks comptés), branche purgée. Recette D1–D7 puis F/V à jouer par l'utilisateur.
 - Pistes UX restantes sur É2 : stats de confiance (B5), galerie photos plein écran.
 - Ensuite : B4 (prompt inchangé).
