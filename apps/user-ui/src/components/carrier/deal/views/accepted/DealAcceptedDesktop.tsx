@@ -66,11 +66,11 @@ export default function DealAcceptedDesktop({ deal, onCloseAction }: Props) {
           />
         </div>
 
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-[minmax(0,1fr)_300px] lg:grid-cols-[minmax(0,1fr)_320px]">
           {/* Main column */}
           <div className="space-y-5">
             <header>
-              <h2 className="text-xl font-black tracking-tight text-slate-900 dark:text-white sm:text-2xl">
+              <h2 className="text-[17px] font-semibold tracking-tight text-slate-900 dark:text-white sm:text-lg">
                 {t("h1")}
               </h2>
               <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
@@ -99,7 +99,7 @@ export default function DealAcceptedDesktop({ deal, onCloseAction }: Props) {
           </div>
 
           {/* Sidebar sticky */}
-          <aside className="hidden lg:block">
+          <aside className="hidden md:block">
             <div className="sticky top-[88px] space-y-4">
               <DealPaymentBlock
                 netForCarrier={deal.earnings.netForCarrier}
