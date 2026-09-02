@@ -5,6 +5,8 @@ import { useMemo, useState } from "react";
 import { useUiPreferences } from "@/components/providers/UiPreferencesProvider";
 import { useForm } from "react-hook-form";
 import { useRouter } from "@/i18n/navigation";
+import { useSearchParams } from "next/navigation";
+import { REGISTER_REDIRECT_KEY, sanitizeRedirect, withRedirect } from "@/lib/auth/safe-redirect";
 import { Eye, EyeOff, Loader2, ShieldCheck } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import {
@@ -143,6 +145,12 @@ export default function RegisterForm({ heroVisual }: Props) {
   const [passwordFocused, setPasswordFocused] = useState(false);
 
   const copy = useMemo(() => buildCopy(lang), [lang]);
+  // Page visée avant l'inscription (ex. réservation) : conservée jusqu'à la
+  // connexion qui suit l'OTP — en sessionStorage, l'URL de vérification
+  // reste propre.
+  const searchParams = useSearchParams();
+  const redirectTo = sanitizeRedirect(searchParams.get("redirect"));
+  const loginHref = withRedirect("/login", redirectTo);
 
   const {
     register,
@@ -199,6 +207,8 @@ export default function RegisterForm({ heroVisual }: Props) {
       // 🔒 SÉCURITÉ : token + email écrits en sessionStorage AVANT la redirection
       sessionStorage.setItem("register_verification_token", String(data.verificationToken));
       sessionStorage.setItem("register_verification_email", normalizedEmail);
+      if (redirectTo) sessionStorage.setItem(REGISTER_REDIRECT_KEY, redirectTo);
+      else sessionStorage.removeItem(REGISTER_REDIRECT_KEY);
 
       // 🔒 SÉCURITÉ : URL propre, pas d'email exposé via logs serveur, historique
       // navigateur, referrer headers ou analytics. L'email est lu côté verify
@@ -617,7 +627,7 @@ export default function RegisterForm({ heroVisual }: Props) {
           <p className="mt-5 text-center text-sm text-slate-500 dark:text-slate-400">
             {copy.haveAccount}{" "}
             <Link
-              href="/login"
+              href={loginHref}
               className="font-bold text-[#FF9900] hover:underline hover:underline-offset-[3px] dark:text-[#FFB347]"
             >
               {copy.login}

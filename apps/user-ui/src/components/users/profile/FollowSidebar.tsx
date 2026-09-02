@@ -35,7 +35,7 @@ export default function FollowSidebar({ user }: Props) {
 
   const handleToggleFollow = () => {
     if (!isLoggedIn) {
-      router.push(`/login?returnTo=/u/${user.publicSlug}`);
+      router.push(`/login?redirect=${encodeURIComponent(`/u/${user.publicSlug}`)}`);
       return;
     }
 
