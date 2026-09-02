@@ -24,6 +24,7 @@ import {
 import type { HeroVisual } from "@/lib/auth/hero-visuals";
 import { maskEmail } from "@/lib/auth/email-mask";
 import { setFlashToast } from "@/lib/flash-toast";
+import { REGISTER_REDIRECT_KEY, sanitizeRedirect, withRedirect } from "@/lib/auth/safe-redirect";
 import { useToast } from "@/components/ui/Toast";
 import AuthHeroVisual from "@/components/auth/visual/AuthHeroVisual";
 
@@ -298,11 +299,16 @@ export default function RegisterVerifyForm({ heroVisual }: Props) {
       // muet vers le formulaire de connexion.
       const verifiedEmail =
         emailFromQuery || sessionStorage.getItem("register_verification_email") || "";
+      const redirectTo = sanitizeRedirect(sessionStorage.getItem(REGISTER_REDIRECT_KEY));
       sessionStorage.removeItem("register_verification_token");
       sessionStorage.removeItem("register_verification_email");
+      sessionStorage.removeItem(REGISTER_REDIRECT_KEY);
       setFlashToast({ type: "success", message: copy.verifiedFlash, persistent: true });
       router.push(
-        "/login?verified=1" + (verifiedEmail ? "&email=" + encodeURIComponent(verifiedEmail) : "")
+        withRedirect(
+          "/login?verified=1" + (verifiedEmail ? "&email=" + encodeURIComponent(verifiedEmail) : ""),
+          redirectTo
+        )
       );
       router.refresh();
     },

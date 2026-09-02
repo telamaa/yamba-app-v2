@@ -7,6 +7,7 @@ import { useForm } from "react-hook-form";
 import { useRouter, useSearchParams } from "next/navigation";
 import { CheckCircle2, Eye, EyeOff, Loader2, ShieldCheck } from "lucide-react";
 import { useFlashToast } from "@/hooks/useFlashToast";
+import { sanitizeRedirect, withRedirect } from "@/lib/auth/safe-redirect";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   getApiErrorData,
@@ -183,6 +184,9 @@ export default function LoginForm({ heroVisual }: Props) {
   // Message de succès posé par l'étape précédente (vérification OTP, etc.)
   useFlashToast();
   const justVerified = searchParams.get("verified") === "1";
+  // Retour à la page visée (réservation, publication…) — chemin interne seulement
+  const redirectTo = sanitizeRedirect(searchParams.get("redirect") ?? searchParams.get("returnTo"));
+  const registerHref = withRedirect("/register", redirectTo);
   const prefilledEmail = searchParams.get("email") ?? "";
 
   const {
@@ -205,8 +209,7 @@ export default function LoginForm({ heroVisual }: Props) {
     mutationFn: loginUser,
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["user"] });
-      const redirect = searchParams.get("redirect");
-      router.push(redirect || "/");
+      router.push(redirectTo || "/");
       router.refresh();
     },
     onError: (error) => {
@@ -473,7 +476,7 @@ export default function LoginForm({ heroVisual }: Props) {
           <p className="mt-5 text-center text-sm text-slate-500 dark:text-slate-400">
             {copy.notMemberYet}{" "}
             <Link
-              href="/register"
+              href={registerHref}
               className="font-bold text-[#FF9900] hover:underline hover:underline-offset-[3px] dark:text-[#FFB347]"
             >
               {copy.signup}
