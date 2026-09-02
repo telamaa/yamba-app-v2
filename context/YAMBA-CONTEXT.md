@@ -163,7 +163,9 @@ Ordre de demarrage : auth -> trip -> gateway.
   client), regeneration puis invalidateQueries (le code vient toujours de
   GET /deals/:id), `deliveryCode.status` VALIDATED apres livraison.
   Preuve : tsc + build prod + i18n miroir (pas de Jest user-ui).
-- Plateforme de tests : 600 (trip 187, deal 354, notification 59) — post-B3-PR1 (#95).
+- MERGE 02/09 : **#95** (B3-PR1 serveur) puis **#96** (B3-PR2 front) — 13 checks
+  comptes a chaque fois, branches purgees. **B3 SOLDE.**
+- Plateforme de tests : 600 (trip 187, deal 354, notification 59) — post-B3 (#96).
 - MERGE 01/09 : toute la pile B2 est dans `dev` via la SEULE **PR #90**
   (`feat/b2-deal-front` portait la chaîne complète : jalons mobile D36,
   docs cumulatifs, B2-PR1, B2-PR2, B2-PR3 + fix A34) — 13 checks verts
