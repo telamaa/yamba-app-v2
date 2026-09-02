@@ -164,7 +164,16 @@ Ordre de demarrage : auth -> trip -> gateway.
   GET /deals/:id), `deliveryCode.status` VALIDATED apres livraison.
   Preuve : tsc + build prod + i18n miroir (pas de Jest user-ui).
 - MERGE 02/09 : **#95** (B3-PR1 serveur) puis **#96** (B3-PR2 front) — 13 checks
-  comptes a chaque fois, branches purgees. **B3 SOLDE.**
+  comptes a chaque fois, branches purgees.
+- B3-PR3 (boite du Voyageur, A44) : recette a deux vrais comptes → le Voyageur
+  n'avait AUCUN chemin vers ses demandes (Mes trajets sans deals, notifications
+  non cliquables, `pendingDemandsCount` jamais servi). `GET /me/deals` (vue
+  Carrier, tous trajets, gateway `/api/me/deals`), hook `useMyDeals` + adapter
+  vers le view-model du mock, bande « A traiter » (repondre/prise en charge/
+  livraison) dans Mes trajets ET a l'accueil, deals reels sous chaque trajet
+  (`TripDealRow` extrait du mock), section sur la page trajet, notifications =
+  liens (deal ou suivi selon le lecteur), badge partage sidebar + barre mobile
+  (`useTripsBadge`). Preuve : tsc, build prod, i18n, GET /me/deals sur Atlas.
 - Plateforme de tests : 600 (trip 187, deal 354, notification 59) — post-B3 (#96).
 - MERGE 01/09 : toute la pile B2 est dans `dev` via la SEULE **PR #90**
   (`feat/b2-deal-front` portait la chaîne complète : jalons mobile D36,
@@ -207,7 +216,8 @@ Ordre de demarrage : auth -> trip -> gateway.
   Dettes rattachees : URLs signees / fichiers prives ImageKit et
   verification du domaine des URLs photo (D42), procedure de rotation de
   cle AES (format v1 pret), vue DELIVERED persistante cote Voyageur
-  (spec §11, hors v1), actions tracker confirmer/litige (B4).
+  (spec §11, hors v1), actions tracker confirmer/litige (B4). Docker/Redpanda
+  DOIT tourner pour les notifications et emails (relay outbox + consumer).
 - B4 argent sortant : confirmation anticipee, cron J+4 -> COMPLETED +
   transfers.create(), dispute avec gel, matrice remboursements.
 - B5 confiance : rating double-aveugle, relances J+5/J+7, stats de

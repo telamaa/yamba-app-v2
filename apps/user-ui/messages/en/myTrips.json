@@ -145,7 +145,13 @@
     "demands": "{count, plural, =1 {1 request} other {# requests}}",
     "setupRequired": "Setup required",
     "errorTitle": "Unable to load your trips.",
-    "retry": "Retry"
+    "retry": "Retry",
+    "subtitle": "{actions, plural, =0 {Nothing to handle} =1 {1 action to handle} other {# actions to handle}} · {upcoming, plural, =0 {no upcoming trip} =1 {1 upcoming trip} other {# upcoming trips}}",
+    "deals": {
+      "title": "Requests and parcels",
+      "empty": "No request for this trip yet.",
+      "toggle": "{count, plural, =1 {1 parcel} other {# parcels}}"
+    }
   },
   "gates": {
     "onboardingToast": "Complete your carrier profile to activate this trip",

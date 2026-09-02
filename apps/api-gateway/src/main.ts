@@ -105,6 +105,15 @@ app.use(
   })
 );
 
+// /api/me/deals/* → deal-service reçoit /me/deals/*
+// (deals reçus côté Voyageur, tous trajets — A44)
+app.use(
+  "/api/me/deals",
+  proxy("http://localhost:6003", {
+    proxyReqPathResolver: (req) => `/me/deals${req.url}`,
+  })
+);
+
 // ─── Notification Service (port 6004) ───────
 // ⚠️ Déclaré AVANT le catch-all auth ("/") — sinon /api/me/notifications
 // partirait vers auth-service (leçon squelette deal, PR1).

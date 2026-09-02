@@ -5781,6 +5781,32 @@
         ],
         "additionalProperties": false
       },
+      "MyDealsResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true
+          },
+          "deals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CarrierBookingView"
+            }
+          },
+          "count": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "success",
+          "deals",
+          "count"
+        ],
+        "additionalProperties": false
+      },
       "TripDealsResponse": {
         "type": "object",
         "properties": {

@@ -913,3 +913,34 @@ tsc user-ui OK · build de production OK · i18n FR/EN miroir parfait (script CI
 
 ### 8. Hors périmètre (assumé)
 Vue DELIVERED persistante côté Voyageur (`DealClosed` « Livraison validée » — spec §11 hors v1) ; `confirmDeliveryEarly`/`submitDispute` restent des mocks marqués (B4) ; barre de progression des uploads (le hook l'expose, non affichée) ; compression HEIC côté client.
+
+---
+
+# B3-PR3 — La boîte du Voyageur : demandes dans « Mes trajets », notifications cliquables (A44)
+
+### 1. Ce qui a été fait
+Constat de recette (02/09, deux vrais comptes) : le Voyageur n'avait aucun chemin vers `/carrier/deals/:id`. La liste réelle « Mes trajets » ignorait les deals, la seule vitrine à deals était le mock `/dashboard/trips/preview`, la boîte de notifications n'était pas cliquable, et `pendingDemandsCount` (attendu par trois composants) n'était servi par personne. Cette PR ferme le chemin : un endpoint de lecture, une bande « À traiter », les deals sous chaque trajet, des notifications qui mènent au deal, un badge sur mobile.
+
+### 2. Serveur : `GET /me/deals` (deal-service)
+`getMyDeals` dans `deal.controller.ts`, miroir exact de `getMyBookings` : `carrierId = moi`, `isDeleted: false`, `?status` optionnel (même `MyBookingsQuerySchema`), tri `requestedAt desc`, jointure des Expéditeurs par `loadCounterparts`, vue **Carrier** stricte (A13). Contrat `MyDealsResponseSchema` (`deals`, `count`), OAS `/me/deals`, proxy gateway `/api/me/deals` (déclaré AVANT le catch-all auth, comme `/api/me/bookings`). Une seule lecture alimente la liste, l'accueil, la sidebar et la barre mobile — jamais un appel par trajet.
+
+### 3. Le hook et l'adapter (`useMyDeals`, `my-deals.adapter.ts`)
+`useMyDeals()` : TanStack Query, clé `["my-deals"]`, `staleTime` 30 s, désactivable (`enabled`) pour un compte sans rôle Voyageur. `my-deals.adapter.ts` traduit `CarrierBookingViewDto` vers le view-model du mock (`CarrierDealItem`) et `TripListItem` vers `CarrierTripItem` (le strict nécessaire pour `deriveCarrierActions`). Dégradations documentées : `hasRated: true` (B5 : jamais d'action « Noter » inventée), pas de `pickupMeetingAt` (aucun RDV dans le snapshot), destinataire révélé après pickup seulement. Les transitions du module carrier/deal (accept, decline, pickup, deliver) invalident `["my-deals"]` en plus de `["deal", id]`.
+
+### 4. « Mes trajets » (`MyTripsList.tsx`)
+- **Bande « À traiter »** en tête (trans-trajets) : `deriveCarrierActions` du mock sur données réelles, rendue par `TripActionRow` (répondre avec « expire dans 3 h », prise en charge, livraison après atterrissage). Tick 60 s pour les échéances.
+- **Sous-titre** : « N actions à traiter · N trajets à venir » (`list.subtitle`, ICU plural FR/EN).
+- **Deals sous chaque trajet** : `TripDealRow` (extrait de `TripCard.tsx` dans `TripDealRow.tsx` — le mock l'importe désormais, une seule ligne pour la vitrine et le réel), replié/déplié par un bouton « N colis » (ouvert par défaut quand un deal est vivant, replié sur l'historique). Le badge « +N demandes » est dérivé des deals réels ; le champ `pendingDemandsCount` disparaît du type.
+- Mobile : badge + « N colis » passent sous le titre (`sm:hidden`), cibles ≥ 32 px, la liste des deals reste pleine largeur ; desktop : contrôles en ligne, liste décalée sous l'icône du trajet.
+
+### 5. Accueil, sidebar, barre mobile, page trajet, notifications
+- `HomeClient` (live) : la bande « À traiter » affiche d'abord les actions de deals (`TripActionRow`) puis brouillons/pauses ; l'ancien type `DEMANDS` (compteur jamais servi) disparaît.
+- `useTripsBadge()` : hook partagé (demandes en attente + brouillons/pauses) pour `DashboardSidebar` ET `DashboardMobileNav` — pastille mango sur l'onglet Activité (« 9+ » au-delà).
+- `TripDealsSection` sur `/dashboard/trips/[id]` (trajet publié ou terminé) : mêmes lignes, filtrées par `tripId`, en tête de colonne.
+- `Notifications.tsx` : chaque ligne devient un `Link` (`/carrier/deals/:id` si `payload.carrierId === user.id`, sinon `/bookings/:id`) ; le clic marque lu ET navigue ; chevron à droite comme affordance ; sans `bookingId` la ligne reste un bouton.
+
+### 6. Les preuves
+tsc user-ui + deal-service + gateway · build de production user-ui · i18n miroir · OAS régénéré · `GET /me/deals` vérifié sur Atlas avec le Voyageur du seed (bundle deal-service en FAKE). Pas de Jest user-ui.
+
+### 7. Hors périmètre (assumé)
+Badge « Mes envois » côté Expéditeur (envois à suivre) ; « tout marquer lu » ; temps réel sur la boîte ; l'action « Noter » (B5) ; l'heure de RDV de pickup (absente du modèle).

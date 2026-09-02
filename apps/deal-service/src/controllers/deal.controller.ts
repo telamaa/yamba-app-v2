@@ -232,3 +232,46 @@ export const getTripDeals = async (
     return next(error);
   }
 };
+
+/* ══ GET /me/deals — mes deals reçus (vue Carrier, tous trajets — A44) ══ */
+
+/**
+ * Tous les deals dont l'appelant est le VOYAGEUR, tous trajets confondus,
+ * les plus récents d'abord (`?status=` optionnel). Vue Carrier stricte
+ * (A13 : jamais de code, de hash ni de compteur de régénérations).
+ * Le front en dérive la bande « À traiter », les demandes par trajet et
+ * le badge de la sidebar — une seule lecture, jamais un appel par trajet.
+ */
+export const getMyDeals = async (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const parsedQuery = MyBookingsQuerySchema.safeParse(req.query);
+    if (!parsedQuery.success) {
+      return next(new ValidationError("Invalid query: unknown status value."));
+    }
+    const { status } = parsedQuery.data;
+
+    const bookings = (await prisma.booking.findMany({
+      where: {
+        carrierId: req.user.id,
+        isDeleted: false,
+        ...(status ? { status } : {}),
+      },
+      orderBy: { requestedAt: "desc" },
+    })) as unknown as BookingRecord[];
+
+    const counterparts = await loadCounterparts(bookings.map((b) => b.shipperId));
+
+    const deals = bookings.map((b) =>
+      toCarrierBookingView(b, counterparts.get(b.shipperId) ?? GHOST_COUNTERPART(b.shipperId))
+    );
+
+    return res.status(200).json({ success: true, deals, count: deals.length });
+  } catch (error) {
+    return next(error);
+  }
+};
+

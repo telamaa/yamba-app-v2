@@ -16,6 +16,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import apiClient from "@/lib/api-client";
 import { setFlashToast } from "@/lib/flash-toast";
 import TripDocumentsManager from "@/components/trips/create/TripDocumentsManager";
+import TripDealsSection from "@/components/dashboard/trips/TripDealsSection";
 import {
   STATUS_CONFIG, TRANSPORT_LABEL_KEYS, MANGO, TEAL, formatTripDate, isTripPastDeparture,
   type TripStatus, type TransportMode,
@@ -439,6 +440,11 @@ export default function TripDetails({ tripId }: { tripId: string }) {
       <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
         {/* LEFT */}
         <div className="flex flex-col gap-5">
+          {/* Demandes et colis du trajet (A44) — en tête : c'est ce qu'on vient chercher */}
+          {(status === "PUBLISHED" || status === "COMPLETED") && (
+            <TripDealsSection tripId={tripId} />
+          )}
+
           <Section icon={MapPin} title={t("detail.route")}>
             <div className="flex items-center gap-4">
               <div className="flex flex-col items-center gap-1"><div className="h-3 w-3 rounded-full border-2" style={{ borderColor: MANGO }} /><div className="h-8 w-px bg-slate-200 dark:bg-slate-700" /><div className="h-3 w-3 rounded-full" style={{ background: TEAL }} /></div>

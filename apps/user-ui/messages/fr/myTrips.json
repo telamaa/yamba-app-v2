@@ -145,7 +145,13 @@
     "demands": "{count, plural, =1 {1 demande} other {# demandes}}",
     "setupRequired": "Config. requise",
     "errorTitle": "Impossible de charger vos trajets.",
-    "retry": "Réessayer"
+    "retry": "Réessayer",
+    "subtitle": "{actions, plural, =0 {Rien à traiter} =1 {1 action à traiter} other {# actions à traiter}} · {upcoming, plural, =0 {aucun trajet à venir} =1 {1 trajet à venir} other {# trajets à venir}}",
+    "deals": {
+      "title": "Demandes et colis",
+      "empty": "Aucune demande pour ce trajet pour l''instant.",
+      "toggle": "{count, plural, =1 {1 colis} other {# colis}}"
+    }
   },
   "gates": {
     "onboardingToast": "Complétez votre profil transporteur pour activer ce trajet",

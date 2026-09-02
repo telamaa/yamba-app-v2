@@ -21,6 +21,7 @@ import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { useRouter } from "@/i18n/navigation";
 import { dealQueryKey } from "@/components/carrier/deal/DealClient";
+import { MY_DEALS_QUERY_KEY } from "@/hooks/useMyDeals";
 import { acceptDeal, DealApiError, declineDeal } from "@/components/carrier/deal/deal.api";
 import type { DealRequest, DeclineReason } from "@/components/carrier/deal/deal.types";
 
@@ -40,8 +41,10 @@ export function useDealRequestActions({ deal, onAcceptedAction, onCloseAction }:
   const [isSubmittingAccept, setIsSubmittingAccept] = useState(false);
   const [isSubmittingDecline, setIsSubmittingDecline] = useState(false);
 
-  const refreshDeal = () =>
+  const refreshDeal = () => {
     void queryClient.invalidateQueries({ queryKey: dealQueryKey(deal.id) });
+    void queryClient.invalidateQueries({ queryKey: MY_DEALS_QUERY_KEY });
+  };
 
   const handleTransitionError = (e: unknown, fallback: string) => {
     if (e instanceof DealApiError) {

@@ -69,6 +69,7 @@ export type CarrierBookingViewDto = {
   requestedAt: string;
   expiresAt: string;
   pickedUpAt?: string | null;
+  deliveredAt?: string | null;
   pickup?: {
     confirmedAt: string;
     photoUrls: string[];

@@ -24,6 +24,7 @@ import { useIsMobile } from "@/hooks/useIsMobile";
 import { useImageKitUpload } from "@/hooks/useImageKitUpload";
 import { useRouter } from "@/i18n/navigation";
 import { dealQueryKey } from "../../DealClient";
+import { MY_DEALS_QUERY_KEY } from "@/hooks/useMyDeals";
 import { DealApiError, confirmPickup, getDealRequest, refusePickup } from "../../deal.api";
 import type {
   DealRequest,
@@ -98,10 +99,10 @@ export default function DealPickupClient({ dealId }: Props) {
     PICKUP_CHECKLIST_ITEMS.every((id) => checked.has(id)) && photos.length >= 1;
 
   /** Après une transition la vérité est en base : on invalide, on ne mute pas. */
-  const refreshDeal = useCallback(
-    () => void queryClient.invalidateQueries({ queryKey: dealQueryKey(dealId) }),
-    [queryClient, dealId]
-  );
+  const refreshDeal = useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: dealQueryKey(dealId) });
+    void queryClient.invalidateQueries({ queryKey: MY_DEALS_QUERY_KEY });
+  }, [queryClient, dealId]);
 
   const handleTransitionError = (e: unknown, fallback: string) => {
     if (e instanceof DealApiError && e.code === "TRANSITION_NOT_ALLOWED") {

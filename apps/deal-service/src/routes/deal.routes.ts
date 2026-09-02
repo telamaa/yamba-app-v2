@@ -3,6 +3,7 @@ import isAuthenticated from "@packages/middleware/isAuthenticated";
 import {
   getDeal,
   getMyBookings,
+  getMyDeals,
   getTripDeals,
 } from "../controllers/deal.controller";
 import { makeDealRequestController } from "../controllers/deal-request.controller";
@@ -72,5 +73,8 @@ router.get("/deals/:id", isAuthenticated, getDeal);
 
 // Mes envois (vue Shipper) — [?status=]
 router.get("/me/bookings", isAuthenticated, getMyBookings);
+
+// Mes deals reçus (vue Carrier, tous trajets — A44) — [?status=]
+router.get("/me/deals", isAuthenticated, getMyDeals);
 
 export default router;

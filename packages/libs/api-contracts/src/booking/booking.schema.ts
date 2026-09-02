@@ -320,6 +320,15 @@ export const MyBookingsResponseSchema = z
   })
   .meta({ id: "MyBookingsResponse" });
 
+/** GET /me/deals — 200 (vue Carrier, TOUS ses trajets — A44 : une lecture pour « Mes trajets », l'accueil et le badge). */
+export const MyDealsResponseSchema = z
+  .object({
+    success: z.literal(true),
+    deals: z.array(CarrierBookingViewSchema),
+    count: z.number().int(),
+  })
+  .meta({ id: "MyDealsResponse" });
+
 /** GET /deals?tripId= — 200 (vue Carrier, deals d'un de ses trips). */
 export const TripDealsResponseSchema = z
   .object({
