@@ -23,6 +23,7 @@ import {
 } from "@/services/auth.api";
 import type { HeroVisual } from "@/lib/auth/hero-visuals";
 import { maskEmail } from "@/lib/auth/email-mask";
+import { setFlashToast } from "@/lib/flash-toast";
 import { useToast } from "@/components/ui/Toast";
 import AuthHeroVisual from "@/components/auth/visual/AuthHeroVisual";
 
@@ -109,6 +110,9 @@ function buildCopy(lang: string) {
       : "Session expired. Please register again.",
     incomplete: fr ? "Veuillez saisir le code complet." : "Please enter the full code.",
     invalidOtp: fr ? "Code invalide ou expiré." : "Invalid or expired code.",
+    verifiedFlash: fr
+      ? "Ton compte est activé. Connecte-toi pour commencer."
+      : "Your account is activated. Sign in to get started.",
     genericError: fr
       ? "Validation impossible pour le moment."
       : "Unable to verify right now.",
@@ -288,9 +292,18 @@ export default function RegisterVerifyForm({ heroVisual }: Props) {
   const verifyOtpMutation = useMutation({
     mutationFn: verifyRegistrationOtp,
     onSuccess: () => {
+      // Le serveur crée le compte SANS ouvrir de session : on emmène
+      // l'utilisateur au login en lui disant pourquoi (toast persistant +
+      // bandeau « compte activé »), email pré-rempli — jamais un renvoi
+      // muet vers le formulaire de connexion.
+      const verifiedEmail =
+        emailFromQuery || sessionStorage.getItem("register_verification_email") || "";
       sessionStorage.removeItem("register_verification_token");
       sessionStorage.removeItem("register_verification_email");
-      router.push("/login");
+      setFlashToast({ type: "success", message: copy.verifiedFlash, persistent: true });
+      router.push(
+        "/login?verified=1" + (verifiedEmail ? "&email=" + encodeURIComponent(verifiedEmail) : "")
+      );
       router.refresh();
     },
     onError: (error) => {
