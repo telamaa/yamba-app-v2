@@ -74,8 +74,12 @@ export const BookingPlaceSnapshotSchema = z
 export const BookingPickupInfoSchema = z
   .object({
     confirmedAt: z.iso.datetime(),
-    photoUrls: z.array(z.string()).meta({ description: "Carrier pickup photos (R2, timestamped)" }),
+    photoUrls: z.array(z.string()).meta({ description: "Carrier pickup photos (ImageKit URLs — D42, 1..5, server-timestamped)" }),
     notes: z.string().nullish(),
+    checklist: z
+      .array(z.string())
+      .default([])
+      .meta({ description: "The 5 inspection items ticked at pickup (CNF-04 attestation, frozen — B3). Empty on pre-B3 records." }),
   })
   .meta({ id: "BookingPickupInfo" });
 
@@ -160,6 +164,7 @@ const milestoneFields = {
   closedAt: z.iso.datetime().nullish().meta({ description: "Set on DECLINED / EXPIRED / CANCELLED" }),
   closedBy: BookingActorSchema.nullish(),
   declineReason: z.string().nullish(),
+  pickupRefusalReason: z.string().nullish().meta({ description: "Set when the carrier refused the parcel at pickup (PickupRefusalReason — B3/A40)" }),
   disputeTicket: z.string().nullish().meta({ example: "YAM-2041" }),
   disputedAt: z.iso.datetime().nullish(),
   createdAt: z.iso.datetime(),
@@ -216,7 +221,8 @@ export const ShipperBookingViewSchema = z
 
     deliveryCode: z.string().nullable().meta({
       description:
-        "6-digit delivery code — null until encrypted-at-rest storage lands (B2, deliveryCodeEncrypted). Never present in any carrier payload.",
+        "6-digit delivery code, revealed to the shipper ONLY while the parcel is in transit (PICKED_UP) and only on " +
+        "GET /deals/:id (never in lists — D43, AES-256-GCM at rest). null otherwise. Never present in any carrier payload.",
     }),
     codeRegenerationsLeft: z.number().int().meta({
       description: "MAX_CODE_REGENERATIONS (5) minus regenerations used — server is the only judge",

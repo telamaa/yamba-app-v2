@@ -99,10 +99,13 @@ function makeBooking(overrides: Partial<BookingRecord> = {}): BookingRecord {
 }
 
 /** Record "à la Prisma" : AVEC les secrets, comme en base. */
+const SECRET_ENCRYPTED = "v1.aaaaaaaaaaaaaaaa.bbbbbbbbbbbbbbbbbbbbbb.cccccccc";
+
 function makeLeakyBooking(overrides: Partial<BookingRecord> = {}): BookingRecord {
   return {
     ...makeBooking(overrides),
     deliveryCodeHash: SECRET_HASH,
+    deliveryCodeEncrypted: SECRET_ENCRYPTED,
     deliveryCode: SECRET_CODE,
   } as unknown as BookingRecord;
 }
@@ -129,16 +132,50 @@ describe("frontière carrier — liste blanche résistante au spread (A13)", () 
     const json = JSON.stringify(view);
     expect(json).not.toContain(SECRET_HASH);
     expect(json).not.toContain(SECRET_CODE);
+    expect(json).not.toContain(SECRET_ENCRYPTED);
     expect(view).not.toHaveProperty("deliveryCode");
+    expect(view).not.toHaveProperty("deliveryCodeEncrypted");
     expect(view).not.toHaveProperty("deliveryCodeHash");
     expect(view).not.toHaveProperty("codeRegenerationsLeft");
     expect(view).not.toHaveProperty("codeRegenerations");
   });
 
-  it("le hash injecté ne traverse pas non plus la vue Shipper (seul le code y a une place, null en B1)", () => {
+  it("ni le hash ni le chiffré ne traversent la vue Shipper ; sans paramètre, deliveryCode = null (listes)", () => {
     const view = toShipperBookingView(makeLeakyBooking(), CARRIER);
-    expect(JSON.stringify(view)).not.toContain(SECRET_HASH);
+    const json = JSON.stringify(view);
+    expect(json).not.toContain(SECRET_HASH);
+    expect(json).not.toContain(SECRET_ENCRYPTED);
     expect(view.deliveryCode).toBeNull();
+    expect(view).not.toHaveProperty("deliveryCodeEncrypted");
+  });
+
+  it("D43 : le code en clair n'apparaît que s'il est PASSÉ par l'appelant (GET /deals/:id, Shipper) — le mapper ne déchiffre rien", () => {
+    const view = toShipperBookingView(makeLeakyBooking({ status: "PICKED_UP", pickedUpAt: T0 }), CARRIER, T0, "742891");
+    expect(view.deliveryCode).toBe("742891");
+    expect(JSON.stringify(view)).not.toContain(SECRET_ENCRYPTED);
+    // Le paramètre est ignoré par la vue Carrier (elle ne l'accepte même pas).
+    const carrierView = toCarrierBookingView(makeLeakyBooking({ status: "PICKED_UP", pickedUpAt: T0 }), SHIPPER);
+    expect(JSON.stringify(carrierView)).not.toContain("742891");
+  });
+
+  it("B3 : la checklist du pickup est exposée (vide sur un enregistrement antérieur) et pickupRefusalReason suit les jalons", () => {
+    const withChecklist = toShipperBookingView(
+      makeBooking({
+        status: "PICKED_UP",
+        pickedUpAt: T0,
+        pickup: { confirmedAt: T0, photoUrls: ["https://ik.imagekit.io/yamba/p.jpg"], notes: null, checklist: ["CONTENT_MATCHES"] },
+      }),
+      CARRIER
+    );
+    expect(withChecklist.pickup?.checklist).toEqual(["CONTENT_MATCHES"]);
+    const legacy = toCarrierBookingView(
+      makeBooking({ status: "PICKED_UP", pickedUpAt: T0, pickup: { confirmedAt: T0, photoUrls: [], notes: null } }),
+      SHIPPER
+    );
+    expect(legacy.pickup?.checklist).toEqual([]);
+    const refused = toShipperBookingView(makeBooking({ status: "CANCELLED", pickupRefusalReason: "OVERWEIGHT" }), CARRIER);
+    expect(refused.pickupRefusalReason).toBe("OVERWEIGHT");
+    expect(toShipperBookingView(makeBooking(), CARRIER).pickupRefusalReason).toBeNull();
   });
 
   it("la vue Carrier n'expose ni commission ni total Expéditeur", () => {

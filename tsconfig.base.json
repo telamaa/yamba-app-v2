@@ -23,6 +23,9 @@
       "@packages/api-contracts": [
         "packages/libs/api-contracts/src/index.ts"
       ],
+      "@packages/delivery-code": [
+        "packages/libs/delivery-code/src/index.ts"
+      ],
       "@packages/email": [
         "packages/libs/email/src/index.ts"
       ],

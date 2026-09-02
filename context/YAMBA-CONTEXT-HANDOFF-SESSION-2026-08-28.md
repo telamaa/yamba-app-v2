@@ -256,3 +256,34 @@ transaction, emails B3 avec leurs writers (A35), bascule des mocks front (carrie
 Rituel : inventaire AVANT le code, décisions au registre AVANT le code, compléter les 3 docs
 cumulatifs, mobile-first, aucune attribution Claude.
 ```
+
+---
+
+# ADDENDUM · 2 septembre 2026 — B3-PR1 transport serveur (D42/D43, A38–A42)
+
+## A. Ce qui s'est passé dans la session
+
+1. **Inventaire complet** avant code : la machine d'états portait déjà `pickup/refusePickup/deliver` + `canRegenerateCode/canConfirmTrackingStep`, les 17 événements du contrat existaient, `EMAIL_MATRIX`/`IN_APP_MATRIX` connaissaient les clés B3 ; l'infra d'upload existante est **ImageKit** (signature courte `GET /api/uploads/imagekit-auth` + upload direct navigateur, hook `useImageKitUpload`) — aucun R2 ni media-service n'existe.
+2. **Décisions gravées AVANT le code** : D42 (photos via ImageKit, URLs seules côté serveur, checklist figée), D43 (bcrypt + AES-256-GCM `deliveryCodeEncrypted`, clé d'env, lib `@packages/delivery-code`), A38 (compteur serveur, verrou 15 min + remise à zéro, écriture conditionnelle), A39 (undo client seul), A40 (refus = remboursement intégral sans pénalité), A41 (4 emails B3 → Expéditeur, garde-fou 6 chiffres), A42 (annexe : `CarrierPage.primaryAddressId` plus @unique — bloquait le seed ET tout 2e Voyageur sans adresse).
+3. **Code** : contrats `booking-transport.schema.ts`, schéma (3 champs + A42, `prisma db push` fait), `packages/libs/delivery-code`, `booking-write.ts` (extrait de deal-lifecycle, `where` optionnel), `deal-transport.service.ts` (5 writers), controller + routes + OAS (5 opérations), mapper (`deliveryCode` en paramètre, checklist, `pickupRefusalReason`), `getDeal` révèle via `revealDeliveryCode` (Shipper, PICKED_UP, jamais en liste), 4 gabarits EJS, seed avec `742891`.
+4. **Preuves** : plateforme **540 → 600** (deal 354, notif 59) ; tsc ×6 ; OAS régénérés ; **e2e Atlas 33 vérifications vertes** (script scratchpad, deal-service bundle en FAKE via `node --env-file`) ; probe outbox : bons événements, zéro code dans les payloads, `reservedKg` 8 → 5 ; seed rejoué ensuite.
+5. **Pièges payés** : alias `@packages/*` à déclarer AUSSI dans `webpack.config.js` (tsc vert, `nx serve` « Module not found ») ; `nx serve` écrase les variables de la ligne de commande (impossible de forcer FAKE) → lancer `dist/main.js` avec `node --env-file` ; sourcer `.env` en zsh corrompt `DATABASE_URL` → `npx tsx --env-file=.env` ; garde-fou « 6 chiffres » : exclure les couleurs CSS (`#334155`) par lookbehind.
+
+## B. État exact et reprise
+
+- Branche **`feat/b3-transport-server`** (base `dev` = `407cfa5`, #94). PR à ouvrir/merger (13 checks à COMPTER). Docs complétées : registre (D42, D43, §2bis.8 A38–A42, §7.1), `YAMBA-CONTEXT.md`, `YAMBA-SUIVI-PROJET.md`, les 3 cumulatifs (B3-PR1 : technique §1–11, métier RG-P-01…12 + recette P1–P14, chapitres 39–43), `CLAUDE.md` (baseline 600, lib, pièges), `.env.example` (`DELIVERY_CODE_ENCRYPTION_KEY`).
+- **À faire par l'utilisateur** : générer une clé (`openssl rand -base64 32`) dans `.env` racine `DELIVERY_CODE_ENCRYPTION_KEY` (sinon clé de dev + avertissement — les codes seedés ont été chiffrés avec la clé de dev : après pose d'une vraie clé, REJOUER le seed) ; `npx prisma db push` sur tout autre environnement (A42) ; rejouer `seed-deals.ts` là où les bookings PICKED_UP prédatent B3 (sinon `DELIVERY_CODE_UNAVAILABLE` à la livraison).
+- Le deal-service de l'utilisateur (:6003) n'était PAS lancé pendant la session (auth/trip/notif/gateway l'étaient) ; les événements outbox de l'e2e ont été rejoués par le seed (wipe), rien ne reste à relayer.
+- ⭐ **Prochaine étape — B3-PR2 front** : `deal.api.ts` (confirmPickup → upload ImageKit des `PickupPhotoDraft.file` via `useImageKitUpload("/deals/pickup")` puis `POST /deals/:id/pickup` avec les URLs ; refusePickup → `POST …/pickup/refuse` raison seule ; confirmTrackingEvent → `POST …/events` appelé À LA FIN de la fenêtre d'undo (déplacer l'appel du toggle vers le timer de `TrackingSpotlight`) ; validateDeliveryCode → `POST …/deliver`, plus de compteur client : lire `attemptsLeft`/`lockedUntil` des 409 et `deliveryAttemptsLeft`/`deliveryLockedUntil` de la vue), `DealClient` (DELIVERED = vue de succès persistante É7b plutôt que `DealClosed`), `booking-tracker.api.ts` (regenerateDeliveryCode → `POST …/code/regenerate`, puis `invalidateQueries` — le code vient de GET /deals/:id), adapter tracker (`deliveryCode.code` réel, `regeneratedCount` déjà mappé), i18n des nouveaux codes 409 FR/EN, mobile-first. Pas de Jest user-ui : preuve = tsc + build prod + parcours manuel sur seed (`742891`).
+
+### Prompt d'ouverture prêt-à-coller
+```
+On reprend Yamba — lis context/YAMBA-CONTEXT-HANDOFF-SESSION-2026-08-28.md (addendum 02/09),
+context/YAMBA-CONTEXT.md, le registre (D1–D43, A1–A42, §2bis.8) et context/YAMBA-SUIVI-PROJET.md.
+État : feat/b3-transport-server = B3-PR1 (serveur transport complet, e2e prouvé, plateforme 600) —
+vérifier son merge (13 checks comptés) ; DELIVERY_CODE_ENCRYPTION_KEY à poser + seed à rejouer.
+⭐ B3-PR2 front : bascule des 4 mocks Voyageur (pickup avec upload ImageKit, refus, jalons après
+undo, livraison à compteur serveur) + régénération Expéditeur réelle + code affiché, vue DELIVERED
+Voyageur persistante. Rituel : inventaire AVANT le code, décisions au registre AVANT le code,
+compléter les 3 docs cumulatifs, mobile-first, aucune attribution Claude, charte mango/teal/slate.
+```

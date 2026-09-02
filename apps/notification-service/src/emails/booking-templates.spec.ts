@@ -1,5 +1,5 @@
 /**
- * booking-templates.spec.ts — les 8 gabarits EJS se RENDENT vraiment
+ * booking-templates.spec.ts — les 12 gabarits EJS se RENDENT vraiment
  * ==================================================================
  * Le spec du dispatcher mocke @packages/email : sans ce fichier, une
  * erreur de syntaxe EJS ou une variable manquante n'exploserait qu'en
@@ -13,6 +13,9 @@ import ejs from "ejs";
 import path from "path";
 
 const TEMPLATES_DIR = path.join(__dirname, "templates");
+
+/** Une suite de 6 chiffres isolée — hors couleurs hexadécimales (#334155). */
+const SIX_DIGITS = /(?<![#0-9A-Za-z])\d{6}(?![0-9A-Za-z])/;
 
 const BASE = {
   subject: "Sujet de test",
@@ -38,6 +41,15 @@ const TEMPLATE_DATA: Record<string, Record<string, unknown>> = {
   "booking/booking-cancelled-shipper": { cancelledBy: "SHIPPER" },
   "booking/booking-cancelled-carrier": { cancelledBy: "SHIPPER" },
   "booking/refund-issued-shipper": { amount: "39,00 €" },
+  // B3 (A41)
+  "booking/booking-picked-up-shipper": { pickedUpAt: "samedi 19 juillet à 12:00", photoCount: 2 },
+  "booking/pickup-refused-shipper": { reason: "Le colis dépasse le poids déclaré", total: "39,00 €" },
+  "booking/code-regenerated-shipper": { regenerationsLeft: 3 },
+  "booking/booking-delivered-shipper": {
+    deliveredAt: "samedi 19 juillet à 12:00",
+    payoutDueAt: "mercredi 23 juillet",
+    transport: "30,00 €",
+  },
 };
 
 async function render(
@@ -60,12 +72,33 @@ describe("rendu réel des gabarits booking", () => {
         expect(html).toContain(BASE.firstName);
         expect(html).toContain(BASE.ctaUrl);
         expect(html).not.toContain("undefined");
-        // Le code de livraison ne voyage JAMAIS dans un email.
+        // Le code de livraison ne voyage JAMAIS dans un email : ni la
+        // locution, ni (A41) une suite de 6 chiffres.
         expect(html.toLowerCase()).not.toContain("code de livraison");
         expect(html.toLowerCase()).not.toContain("delivery code");
+        // (les couleurs CSS #334155 sont exclues par le lookbehind « # »)
+        expect(html).not.toMatch(SIX_DIGITS);
       }
     });
   }
+
+  it("pickup-refused sans raison : le bloc raison disparaît proprement", async () => {
+    const html = await render("booking/pickup-refused-shipper", "fr", { reason: null });
+    expect(html).not.toContain("Raison indiquée");
+    expect(html).not.toContain("undefined");
+    expect(html).toContain("39,00");
+  });
+
+  it("delivered : la date J+4 et le net du Voyageur sont rendus", async () => {
+    const html = await render("booking/booking-delivered-shipper", "en");
+    expect(html).toContain("mercredi 23 juillet");
+    expect(html).toContain("30,00");
+  });
+
+  it("méta-test : le garde-fou 6 chiffres attrape un code injecté", async () => {
+    const html = await render("booking/booking-picked-up-shipper", "fr", { firstName: "742891" });
+    expect(html).toMatch(SIX_DIGITS);
+  });
 
   it("declined sans raison : le bloc raison disparaît proprement", async () => {
     const html = await render("booking/booking-declined-shipper", "fr", {

@@ -9,6 +9,8 @@ import { makeDealRequestController } from "../controllers/deal-request.controlle
 import { makeDealRequestService } from "../services/deal-request.service";
 import { makeDealLifecycleController } from "../controllers/deal-lifecycle.controller";
 import { makeDealLifecycleService } from "../services/deal-lifecycle.service";
+import { makeDealTransportController } from "../controllers/deal-transport.controller";
+import { makeDealTransportService } from "../services/deal-transport.service";
 import { createPaymentProviderFromEnv } from "@packages/payments";
 
 /**
@@ -37,6 +39,7 @@ const paymentProvider = createPaymentProviderFromEnv();
 export const dealLifecycleService = makeDealLifecycleService(paymentProvider);
 const dealRequest = makeDealRequestController(makeDealRequestService(paymentProvider));
 const dealLifecycle = makeDealLifecycleController(dealLifecycleService);
+const dealTransport = makeDealTransportController(makeDealTransportService(paymentProvider));
 
 // Autorisation du montant (empreinte) — étape 1 de la demande (D37)
 router.post("/deals/payment-intents", isAuthenticated, dealRequest.createPaymentIntent);
@@ -50,6 +53,16 @@ router.post("/deals", isAuthenticated, dealRequest.createBooking);
 router.post("/deals/:id/accept", isAuthenticated, dealLifecycle.accept);
 router.post("/deals/:id/decline", isAuthenticated, dealLifecycle.decline);
 router.post("/deals/:id/cancel", isAuthenticated, dealLifecycle.cancel);
+
+// B3-PR1 — transport (D42/D43, A38–A41) : pickup = checklist 5/5 + photos
+// + code généré (bcrypt + AES) · refuse = remboursement intégral + CAP-02 ·
+// events = jalons optionnels (séquence stricte) · code/regenerate =
+// Expéditeur, ≤ 5 · deliver = bcrypt, 3 essais / verrou 15 min
+router.post("/deals/:id/pickup", isAuthenticated, dealTransport.confirmPickup);
+router.post("/deals/:id/pickup/refuse", isAuthenticated, dealTransport.refusePickup);
+router.post("/deals/:id/events", isAuthenticated, dealTransport.confirmTrackingStep);
+router.post("/deals/:id/code/regenerate", isAuthenticated, dealTransport.regenerateCode);
+router.post("/deals/:id/deliver", isAuthenticated, dealTransport.deliver);
 
 // Deals d'un de MES trips (vue Carrier) — ?tripId=<ObjectId>[&status=]
 router.get("/deals", isAuthenticated, getTripDeals);

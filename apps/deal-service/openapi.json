@@ -3,7 +3,7 @@
   "info": {
     "title": "Yamba — Deal Service API",
     "version": "0.1.0",
-    "description": "Transactional core: deal (Booking) lifecycle. Contracts generated from @packages/api-contracts (Zod v4, single source of truth — D3). Clients consume the API through the gateway (:8080, /api prefix); this service listens directly on :6003. Authentication: access_token cookie OR Authorization: Bearer header (cookie wins). PR3 scope: read-only endpoints — write transitions land in B2/B3."
+    "description": "Transactional core: deal (Booking) lifecycle. Contracts generated from @packages/api-contracts (Zod v4, single source of truth — D3). Clients consume the API through the gateway (:8080, /api prefix); this service listens directly on :6003. Authentication: access_token cookie OR Authorization: Bearer header (cookie wins). Write surface: request (B2-PR1), lifecycle (B2-PR2), transport (B3-PR1)."
   },
   "servers": [
     {
@@ -670,6 +670,551 @@
           },
           "409": {
             "description": "Business conflict — details.code ∈ TRANSITION_NOT_ALLOWED (the state machine refused: status, role or guard — details carry its reason) | CARRIER_ONBOARDING_REQUIRED (D31 gate: profile or Stripe onboarding incomplete) | PAYMENT_STATE_CONFLICT (the provider-side payment state forbids the operation)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unhandled server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnhandledError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/deals/{id}/pickup": {
+      "post": {
+        "tags": [
+          "deals"
+        ],
+        "summary": "Confirm the parcel pickup (carrier) — generates the delivery code",
+        "description": "Carrier only. Requires ALL 5 inspection items (CNF-04) and 1 to 5 photo URLs already uploaded to ImageKit by the browser (D42 — no bytes go through this API). ACCEPTED→PICKED_UP in ONE Mongo transaction with the server-generated 6-digit delivery code stored twice (bcrypt for validation, AES-256-GCM for shipper re-display — D43), the frozen checklist and photos, outbox booking.picked_up. The code is revealed to the SHIPPER on GET /deals/:id only — never in this response, never to the carrier.",
+        "operationId": "confirmPickup",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ObjectId"
+            },
+            "description": "Deal (booking) identifier"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmPickupRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Parcel picked up (status PICKED_UP, refundAmountCents null)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DealTransitionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed request: invalid ObjectId or unknown status value (ValidationError)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token missing, invalid, expired, or account not found (isAuthenticated middleware)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated caller is not a party to this deal, or does not own the trip (ForbiddenError)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Deal or trip not found (NotFoundError)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Business conflict — details.code ∈ TRANSITION_NOT_ALLOWED (state machine refused, or a concurrent write won) | PAYMENT_STATE_CONFLICT (refund impossible) | DELIVERY_CODE_INVALID (details.attemptsLeft) | DELIVERY_LOCKED (details.lockedUntil — 3 failures, 15 min) | DELIVERY_CODE_UNAVAILABLE (pre-B3 record without a code) | TRACKING_STEP_NOT_ALLOWED (strict sequence, duplicate or wrong status) | CODE_REGENERATION_LIMIT (5 reached, or not in transit)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unhandled server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnhandledError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/deals/{id}/pickup/refuse": {
+      "post": {
+        "tags": [
+          "deals"
+        ],
+        "summary": "Refuse the parcel at pickup (carrier) — full refund, no penalty",
+        "description": "Carrier only, optional reason among 5 (A40). The captured payment is REFUNDED in full at the provider (money first), then ACCEPTED→CANCELLED (closedBy CARRIER, pickupRefusalReason), reserved kg released (CAP-02), outbox booking.pickup_refused + booking.refund_issued. No reputation penalty (CNF-07).",
+        "operationId": "refusePickup",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ObjectId"
+            },
+            "description": "Deal (booking) identifier"
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefusePickupRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Deal cancelled, full amount returned to the shipper",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DealTransitionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed request: invalid ObjectId or unknown status value (ValidationError)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token missing, invalid, expired, or account not found (isAuthenticated middleware)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated caller is not a party to this deal, or does not own the trip (ForbiddenError)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Deal or trip not found (NotFoundError)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Business conflict — details.code ∈ TRANSITION_NOT_ALLOWED (state machine refused, or a concurrent write won) | PAYMENT_STATE_CONFLICT (refund impossible) | DELIVERY_CODE_INVALID (details.attemptsLeft) | DELIVERY_LOCKED (details.lockedUntil — 3 failures, 15 min) | DELIVERY_CODE_UNAVAILABLE (pre-B3 record without a code) | TRACKING_STEP_NOT_ALLOWED (strict sequence, duplicate or wrong status) | CODE_REGENERATION_LIMIT (5 reached, or not in transit)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unhandled server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnhandledError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/deals/{id}/events": {
+      "post": {
+        "tags": [
+          "deals"
+        ],
+        "summary": "Confirm an optional tracking milestone (carrier)",
+        "description": "Carrier only, while PICKED_UP. Strict sequence AT_AIRPORT → FLIGHT_DEPARTED → FLIGHT_ARRIVED, no skip, no duplicate (409 TRACKING_STEP_NOT_ALLOWED). No status transition: the milestone is pushed in ONE transaction guarded by its absence, outbox booking.tracking_event (shipper in-app only, no email). The 5-second undo is client-side (A39): call this endpoint AFTER the undo window — there is no server undo.",
+        "operationId": "confirmTrackingStep",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ObjectId"
+            },
+            "description": "Deal (booking) identifier"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmTrackingStepRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Milestone confirmed — full sequence returned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrackingStepResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed request: invalid ObjectId or unknown status value (ValidationError)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token missing, invalid, expired, or account not found (isAuthenticated middleware)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated caller is not a party to this deal, or does not own the trip (ForbiddenError)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Deal or trip not found (NotFoundError)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Business conflict — details.code ∈ TRANSITION_NOT_ALLOWED (state machine refused, or a concurrent write won) | PAYMENT_STATE_CONFLICT (refund impossible) | DELIVERY_CODE_INVALID (details.attemptsLeft) | DELIVERY_LOCKED (details.lockedUntil — 3 failures, 15 min) | DELIVERY_CODE_UNAVAILABLE (pre-B3 record without a code) | TRACKING_STEP_NOT_ALLOWED (strict sequence, duplicate or wrong status) | CODE_REGENERATION_LIMIT (5 reached, or not in transit)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unhandled server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnhandledError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/deals/{id}/code/regenerate": {
+      "post": {
+        "tags": [
+          "deals"
+        ],
+        "summary": "Regenerate the delivery code (shipper) — max 5",
+        "description": "Shipper only, while PICKED_UP, at most MAX_CODE_REGENERATIONS (5). A new code replaces the previous one (old hash invalid immediately), delivery attempts and lock are reset, outbox booking.code_regenerated (count only — the code never travels in events or emails). The NEW code is returned here and on GET /deals/:id (shipper view). Optimistic guard on the regeneration counter (two clicks = one regeneration).",
+        "operationId": "regenerateDeliveryCode",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ObjectId"
+            },
+            "description": "Deal (booking) identifier"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "New 6-digit code and remaining regenerations",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegenerateCodeResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed request: invalid ObjectId or unknown status value (ValidationError)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token missing, invalid, expired, or account not found (isAuthenticated middleware)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated caller is not a party to this deal, or does not own the trip (ForbiddenError)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Deal or trip not found (NotFoundError)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Business conflict — details.code ∈ TRANSITION_NOT_ALLOWED (state machine refused, or a concurrent write won) | PAYMENT_STATE_CONFLICT (refund impossible) | DELIVERY_CODE_INVALID (details.attemptsLeft) | DELIVERY_LOCKED (details.lockedUntil — 3 failures, 15 min) | DELIVERY_CODE_UNAVAILABLE (pre-B3 record without a code) | TRACKING_STEP_NOT_ALLOWED (strict sequence, duplicate or wrong status) | CODE_REGENERATION_LIMIT (5 reached, or not in transit)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unhandled server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnhandledError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/deals/{id}/deliver": {
+      "post": {
+        "tags": [
+          "deals"
+        ],
+        "summary": "Validate the delivery code (carrier) — PICKED_UP → DELIVERED",
+        "description": "Carrier only. The 6-digit code given by the recipient is compared with bcrypt server-side. Wrong code: attempts +1 (conditional write on the counter read — A38) → 409 DELIVERY_CODE_INVALID with attemptsLeft; 3rd failure → 15-minute lock AND counter reset → 409 DELIVERY_LOCKED with lockedUntil; an active lock is refused by the state machine before any comparison. Valid code: PICKED_UP→DELIVERED in ONE transaction, payoutDueAt = deliveredAt + 4 days (shipper verification window, B4), outbox booking.delivered.",
+        "operationId": "deliverDeal",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ObjectId"
+            },
+            "description": "Deal (booking) identifier"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeliverDealRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Delivered — verification window started",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliverDealResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed request: invalid ObjectId or unknown status value (ValidationError)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token missing, invalid, expired, or account not found (isAuthenticated middleware)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated caller is not a party to this deal, or does not own the trip (ForbiddenError)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Deal or trip not found (NotFoundError)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Business conflict — details.code ∈ TRANSITION_NOT_ALLOWED (state machine refused, or a concurrent write won) | PAYMENT_STATE_CONFLICT (refund impossible) | DELIVERY_CODE_INVALID (details.attemptsLeft) | DELIVERY_LOCKED (details.lockedUntil — 3 failures, 15 min) | DELIVERY_CODE_UNAVAILABLE (pre-B3 record without a code) | TRACKING_STEP_NOT_ALLOWED (strict sequence, duplicate or wrong status) | CODE_REGENERATION_LIMIT (5 reached, or not in transit)",
             "content": {
               "application/json": {
                 "schema": {
@@ -5500,7 +6045,7 @@
             "items": {
               "type": "string"
             },
-            "description": "Carrier pickup photos (R2, timestamped)"
+            "description": "Carrier pickup photos (ImageKit URLs — D42, 1..5, server-timestamped)"
           },
           "notes": {
             "anyOf": [
@@ -5511,11 +6056,20 @@
                 "type": "null"
               }
             ]
+          },
+          "checklist": {
+            "default": [],
+            "description": "The 5 inspection items ticked at pickup (CNF-04 attestation, frozen — B3). Empty on pre-B3 records.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "required": [
           "confirmedAt",
-          "photoUrls"
+          "photoUrls",
+          "checklist"
         ],
         "additionalProperties": false
       },
@@ -6023,6 +6577,17 @@
               }
             ]
           },
+          "pickupRefusalReason": {
+            "description": "Set when the carrier refused the parcel at pickup (PickupRefusalReason — B3/A40)",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "disputeTicket": {
             "example": "YAM-2041",
             "anyOf": [
@@ -6065,7 +6630,7 @@
                 "type": "null"
               }
             ],
-            "description": "6-digit delivery code — null until encrypted-at-rest storage lands (B2, deliveryCodeEncrypted). Never present in any carrier payload."
+            "description": "6-digit delivery code, revealed to the shipper ONLY while the parcel is in transit (PICKED_UP) and only on GET /deals/:id (never in lists — D43, AES-256-GCM at rest). null otherwise. Never present in any carrier payload."
           },
           "codeRegenerationsLeft": {
             "type": "integer",
@@ -6277,6 +6842,17 @@
             ]
           },
           "declineReason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "pickupRefusalReason": {
+            "description": "Set when the carrier refused the parcel at pickup (PickupRefusalReason — B3/A40)",
             "anyOf": [
               {
                 "type": "string"
@@ -9337,6 +9913,196 @@
           "status",
           "refundAmountCents",
           "currencyCode"
+        ],
+        "additionalProperties": false
+      },
+      "PickupChecklistItem": {
+        "type": "string",
+        "enum": [
+          "CONTENT_MATCHES",
+          "WEIGHT_OK",
+          "NO_FORBIDDEN",
+          "PACKAGING_OK",
+          "ITEMS_IDENTIFIED"
+        ],
+        "description": "One of the 5 mandatory inspection items (spec É4a, CNF-04)"
+      },
+      "ConfirmPickupRequest": {
+        "type": "object",
+        "properties": {
+          "checklist": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PickupChecklistItem"
+            },
+            "description": "Must contain ALL 5 items — the server refuses a partial inspection (CNF-04)"
+          },
+          "photoUrls": {
+            "minItems": 1,
+            "maxItems": 5,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uri"
+            },
+            "description": "1 to 5 photo URLs already uploaded to ImageKit by the browser (D42)"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "checklist",
+          "photoUrls"
+        ],
+        "additionalProperties": false
+      },
+      "PickupRefusalReason": {
+        "type": "string",
+        "enum": [
+          "CONTENT_MISMATCH",
+          "SUSPICIOUS_CONTENT",
+          "OVERWEIGHT",
+          "BAD_PACKAGING",
+          "OTHER"
+        ],
+        "description": "The 5 optional refusal reasons offered to the carrier at pickup (spec É4a)"
+      },
+      "RefusePickupRequest": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "description": "Optional — one of 5 (spec É4a)",
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PickupRefusalReason"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "ConfirmTrackingStepRequest": {
+        "type": "object",
+        "properties": {
+          "step": {
+            "$ref": "#/components/schemas/TrackingStep"
+          }
+        },
+        "required": [
+          "step"
+        ],
+        "additionalProperties": false
+      },
+      "TrackingStepResponse": {
+        "type": "object",
+        "properties": {
+          "bookingId": {
+            "$ref": "#/components/schemas/ObjectId"
+          },
+          "step": {
+            "$ref": "#/components/schemas/TrackingStep"
+          },
+          "confirmedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          },
+          "trackingEvents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BookingTrackingEvent"
+            },
+            "description": "Full sequence after this confirmation"
+          }
+        },
+        "required": [
+          "bookingId",
+          "step",
+          "confirmedAt",
+          "trackingEvents"
+        ],
+        "additionalProperties": false
+      },
+      "DeliveryCode": {
+        "type": "string",
+        "pattern": "^\\d{6}$",
+        "description": "6 decimal digits (100000–999999)"
+      },
+      "RegenerateCodeResponse": {
+        "type": "object",
+        "properties": {
+          "bookingId": {
+            "$ref": "#/components/schemas/ObjectId"
+          },
+          "deliveryCode": {
+            "description": "The NEW code — the only write-path surface where it appears (shipper only). The previous code is invalid.",
+            "$ref": "#/components/schemas/DeliveryCode"
+          },
+          "codeRegenerationsLeft": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "bookingId",
+          "deliveryCode",
+          "codeRegenerationsLeft"
+        ],
+        "additionalProperties": false
+      },
+      "DeliverDealRequest": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "description": "Code given by the recipient — compared with bcrypt server-side",
+            "$ref": "#/components/schemas/DeliveryCode"
+          }
+        },
+        "required": [
+          "code"
+        ],
+        "additionalProperties": false
+      },
+      "DeliverDealResponse": {
+        "type": "object",
+        "properties": {
+          "bookingId": {
+            "$ref": "#/components/schemas/ObjectId"
+          },
+          "status": {
+            "description": "DELIVERED",
+            "$ref": "#/components/schemas/BookingStatus"
+          },
+          "deliveredAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          },
+          "payoutDueAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+            "description": "deliveredAt + 4 days — end of the shipper verification window (B4 payout)"
+          }
+        },
+        "required": [
+          "bookingId",
+          "status",
+          "deliveredAt",
+          "payoutDueAt"
         ],
         "additionalProperties": false
       },

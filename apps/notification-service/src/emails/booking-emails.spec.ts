@@ -99,6 +99,44 @@ function paymentAuthorizedEvent() {
   });
 }
 
+/* ── B3 (A41) ─────────────────────────────────────────────────── */
+
+function pickedUpEvent() {
+  return envelope("booking.picked_up", {
+    ...basePayload(),
+    actor: "CARRIER" as const,
+    pickedUpAt: "2026-07-19T12:00:00.000Z",
+    photoCount: 2,
+  });
+}
+
+function pickupRefusedEvent(reason: string | null) {
+  return envelope("booking.pickup_refused", {
+    ...basePayload(),
+    actor: "CARRIER" as const,
+    reason,
+    closedAt: "2026-07-19T12:00:00.000Z",
+  });
+}
+
+function codeRegeneratedEvent() {
+  return envelope("booking.code_regenerated", {
+    ...basePayload(),
+    regenerationsUsed: 2,
+    regenerationsLeft: 3,
+  });
+}
+
+function deliveredEvent() {
+  return envelope("booking.delivered", {
+    ...basePayload(),
+    actor: "CARRIER" as const,
+    deliveredAt: "2026-07-19T12:00:00.000Z",
+    payoutDueAt: "2026-07-23T12:00:00.000Z",
+    attemptsUsed: 1,
+  });
+}
+
 function cancelledEvent(wasAccepted: boolean) {
   return envelope("booking.cancelled", {
     ...basePayload(),
@@ -187,6 +225,28 @@ describe("matrice email (A35)", () => {
     ]);
   });
 
+  it("B3 (A41) : picked_up / pickup_refused / code_regenerated / delivered → SHIPPER seul", () => {
+    for (const ev of [pickedUpEvent(), pickupRefusedEvent(null), codeRegeneratedEvent(), deliveredEvent()]) {
+      expect(resolveEmailRecipients(parse(ev))).toEqual([{ userId: OID.shipper, role: "SHIPPER" }]);
+    }
+  });
+
+  it("B3 : les 4 builders portent leurs données, sans jamais un code à 6 chiffres", () => {
+    const picked = buildBookingEmail(parse(pickedUpEvent()), "SHIPPER", "Naomi")!;
+    expect(picked.template).toBe("booking/booking-picked-up-shipper");
+    expect(picked.data).toMatchObject({ photoCount: 2 });
+    const refused = buildBookingEmail(parse(pickupRefusedEvent("OVERWEIGHT")), "SHIPPER", "Naomi")!;
+    expect(refused.data).toMatchObject({ reason: "Le colis dépasse le poids déclaré", total: expect.stringContaining("39") });
+    expect(buildBookingEmail(parse(pickupRefusedEvent("UNKNOWN")), "SHIPPER", "Naomi")!.data).toMatchObject({ reason: null });
+    const regen = buildBookingEmail(parse(codeRegeneratedEvent()), "SHIPPER", "Naomi")!;
+    expect(regen.data).toMatchObject({ regenerationsLeft: 3 });
+    const delivered = buildBookingEmail(parse(deliveredEvent()), "SHIPPER", "Naomi")!;
+    expect(delivered.data).toMatchObject({ transport: expect.stringContaining("30") });
+    for (const built of [picked, refused, regen, delivered]) {
+      expect(JSON.stringify(built)).not.toMatch(/(?<![#0-9A-Za-z])\d{6}(?![0-9A-Za-z])/);
+    }
+  });
+
   it("tracking_event : JAMAIS d'email (anti-spam)", () => {
     const event = parse(
       envelope("booking.tracking_event", {
@@ -202,7 +262,7 @@ describe("matrice email (A35)", () => {
   it("toute règle non-null a un builder (aucune clé ne rend null une fois routée)", () => {
     for (const [eventType, rule] of Object.entries(EMAIL_MATRIX)) {
       if (rule === null) continue;
-      // Les 7 clés actives sont toutes constructibles pour leur rôle.
+      // Les 11 clés actives (7 B2 + 4 B3) sont toutes constructibles pour leur rôle.
       const role = rule === "CARRIER" ? "CARRIER" : "SHIPPER";
       const fixtures: Record<string, unknown> = {
         "booking.requested": requestedEvent(),
@@ -225,6 +285,11 @@ describe("matrice email (A35)", () => {
           amountCents: 3900,
           refundedAt: "2026-07-19T12:00:00.000Z",
         }),
+        // B3 (A41)
+        "booking.picked_up": pickedUpEvent(),
+        "booking.pickup_refused": pickupRefusedEvent("OVERWEIGHT"),
+        "booking.code_regenerated": codeRegeneratedEvent(),
+        "booking.delivered": deliveredEvent(),
       };
       const built = buildBookingEmail(parse(fixtures[eventType]), role, "Test");
       expect(built).not.toBeNull();

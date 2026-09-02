@@ -69,6 +69,15 @@ const response409Lifecycle = jsonResponse(
     "incomplete) | PAYMENT_STATE_CONFLICT (the provider-side payment state forbids the operation)"
 );
 
+/** 409 du transport (B3-PR1) — codes A38/A39 + machine. */
+const response409Transport = jsonResponse(
+  "ErrorResponse",
+  "Business conflict — details.code ∈ TRANSITION_NOT_ALLOWED (state machine refused, or a concurrent write won) | " +
+    "PAYMENT_STATE_CONFLICT (refund impossible) | DELIVERY_CODE_INVALID (details.attemptsLeft) | DELIVERY_LOCKED " +
+    "(details.lockedUntil — 3 failures, 15 min) | DELIVERY_CODE_UNAVAILABLE (pre-B3 record without a code) | " +
+    "TRACKING_STEP_NOT_ALLOWED (strict sequence, duplicate or wrong status) | CODE_REGENERATION_LIMIT (5 reached, or not in transit)"
+);
+
 /** Cookie OR bearer (OpenAPI OR semantics) — mirror of extractToken. */
 const authSecurity = [{ cookieAuth: [] }, { bearerAuth: [] }];
 
@@ -139,7 +148,7 @@ export function buildOpenApiDocument() {
         "Clients consume the API through the gateway (:8080, /api prefix); " +
         "this service listens directly on :6003. " +
         "Authentication: access_token cookie OR Authorization: Bearer header (cookie wins). " +
-        "PR3 scope: read-only endpoints — write transitions land in B2/B3.",
+        "Write surface: request (B2-PR1), lifecycle (B2-PR2), transport (B3-PR1).",
     },
     servers: [
       { url: "http://localhost:8080/api", description: "API Gateway (dev)" },
@@ -323,6 +332,139 @@ export function buildOpenApiDocument() {
             "403": response403,
             "404": response404,
             "409": response409Lifecycle,
+            "500": response500,
+          },
+        },
+      },
+      /* ── Transport (B3-PR1 — D42/D43, A38–A41) ──────────── */
+      "/deals/{id}/pickup": {
+        post: {
+          tags: ["deals"],
+          summary: "Confirm the parcel pickup (carrier) — generates the delivery code",
+          description:
+            "Carrier only. Requires ALL 5 inspection items (CNF-04) and 1 to 5 photo URLs already uploaded to " +
+            "ImageKit by the browser (D42 — no bytes go through this API). ACCEPTED→PICKED_UP in ONE Mongo " +
+            "transaction with the server-generated 6-digit delivery code stored twice (bcrypt for validation, " +
+            "AES-256-GCM for shipper re-display — D43), the frozen checklist and photos, outbox booking.picked_up. " +
+            "The code is revealed to the SHIPPER on GET /deals/:id only — never in this response, never to the carrier.",
+          operationId: "confirmPickup",
+          security: authSecurity,
+          parameters: [dealIdPathParam],
+          requestBody: {
+            required: true,
+            content: { "application/json": { schema: ref("ConfirmPickupRequest") } },
+          },
+          responses: {
+            "200": jsonResponse("DealTransitionResponse", "Parcel picked up (status PICKED_UP, refundAmountCents null)"),
+            "400": response400,
+            "401": response401,
+            "403": response403,
+            "404": response404,
+            "409": response409Transport,
+            "500": response500,
+          },
+        },
+      },
+      "/deals/{id}/pickup/refuse": {
+        post: {
+          tags: ["deals"],
+          summary: "Refuse the parcel at pickup (carrier) — full refund, no penalty",
+          description:
+            "Carrier only, optional reason among 5 (A40). The captured payment is REFUNDED in full at the provider " +
+            "(money first), then ACCEPTED→CANCELLED (closedBy CARRIER, pickupRefusalReason), reserved kg released " +
+            "(CAP-02), outbox booking.pickup_refused + booking.refund_issued. No reputation penalty (CNF-07).",
+          operationId: "refusePickup",
+          security: authSecurity,
+          parameters: [dealIdPathParam],
+          requestBody: {
+            required: false,
+            content: { "application/json": { schema: ref("RefusePickupRequest") } },
+          },
+          responses: {
+            "200": jsonResponse("DealTransitionResponse", "Deal cancelled, full amount returned to the shipper"),
+            "400": response400,
+            "401": response401,
+            "403": response403,
+            "404": response404,
+            "409": response409Transport,
+            "500": response500,
+          },
+        },
+      },
+      "/deals/{id}/events": {
+        post: {
+          tags: ["deals"],
+          summary: "Confirm an optional tracking milestone (carrier)",
+          description:
+            "Carrier only, while PICKED_UP. Strict sequence AT_AIRPORT → FLIGHT_DEPARTED → FLIGHT_ARRIVED, no skip, " +
+            "no duplicate (409 TRACKING_STEP_NOT_ALLOWED). No status transition: the milestone is pushed in ONE " +
+            "transaction guarded by its absence, outbox booking.tracking_event (shipper in-app only, no email). " +
+            "The 5-second undo is client-side (A39): call this endpoint AFTER the undo window — there is no server undo.",
+          operationId: "confirmTrackingStep",
+          security: authSecurity,
+          parameters: [dealIdPathParam],
+          requestBody: {
+            required: true,
+            content: { "application/json": { schema: ref("ConfirmTrackingStepRequest") } },
+          },
+          responses: {
+            "200": jsonResponse("TrackingStepResponse", "Milestone confirmed — full sequence returned"),
+            "400": response400,
+            "401": response401,
+            "403": response403,
+            "404": response404,
+            "409": response409Transport,
+            "500": response500,
+          },
+        },
+      },
+      "/deals/{id}/code/regenerate": {
+        post: {
+          tags: ["deals"],
+          summary: "Regenerate the delivery code (shipper) — max 5",
+          description:
+            "Shipper only, while PICKED_UP, at most MAX_CODE_REGENERATIONS (5). A new code replaces the previous one " +
+            "(old hash invalid immediately), delivery attempts and lock are reset, outbox booking.code_regenerated " +
+            "(count only — the code never travels in events or emails). The NEW code is returned here and on " +
+            "GET /deals/:id (shipper view). Optimistic guard on the regeneration counter (two clicks = one regeneration).",
+          operationId: "regenerateDeliveryCode",
+          security: authSecurity,
+          parameters: [dealIdPathParam],
+          responses: {
+            "200": jsonResponse("RegenerateCodeResponse", "New 6-digit code and remaining regenerations"),
+            "400": response400,
+            "401": response401,
+            "403": response403,
+            "404": response404,
+            "409": response409Transport,
+            "500": response500,
+          },
+        },
+      },
+      "/deals/{id}/deliver": {
+        post: {
+          tags: ["deals"],
+          summary: "Validate the delivery code (carrier) — PICKED_UP → DELIVERED",
+          description:
+            "Carrier only. The 6-digit code given by the recipient is compared with bcrypt server-side. Wrong code: " +
+            "attempts +1 (conditional write on the counter read — A38) → 409 DELIVERY_CODE_INVALID with attemptsLeft; " +
+            "3rd failure → 15-minute lock AND counter reset → 409 DELIVERY_LOCKED with lockedUntil; an active lock is " +
+            "refused by the state machine before any comparison. Valid code: PICKED_UP→DELIVERED in ONE transaction, " +
+            "payoutDueAt = deliveredAt + 4 days (shipper verification window, B4), outbox booking.delivered.",
+          operationId: "deliverDeal",
+          security: authSecurity,
+          parameters: [dealIdPathParam],
+          requestBody: {
+            required: true,
+            content: { "application/json": { schema: ref("DeliverDealRequest") } },
+          },
+          responses: {
+            "200": jsonResponse("DeliverDealResponse", "Delivered — verification window started"),
+            "400": response400,
+            "401": response401,
+            "403": response403,
+            "404": response404,
+            "409": response409Transport,
             "500": response500,
           },
         },
