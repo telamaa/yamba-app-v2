@@ -12,6 +12,7 @@ import {
   TripDealsQuerySchema,
   type BookingViewerRole,
 } from "@packages/api-contracts";
+import { revealDeliveryCode } from "@packages/delivery-code";
 import {
   toBookingView,
   toShipperBookingView,
@@ -115,10 +116,14 @@ export const getDeal = async (
     const counterpart =
       counterparts.get(counterpartId) ?? GHOST_COUNTERPART(counterpartId);
 
+    // D43 — le code en clair n'existe que pour l'Expéditeur, en PICKED_UP,
+    // sur cette route (jamais dans les listes) ; null si indéchiffrable.
+    const deliveryCode = viewerRole === "SHIPPER" ? revealDeliveryCode(booking) : null;
+
     return res.status(200).json({
       success: true,
       viewerRole,
-      deal: toBookingView(booking, viewerRole, counterpart),
+      deal: toBookingView(booking, viewerRole, counterpart, deliveryCode),
     });
   } catch (error) {
     return next(error);

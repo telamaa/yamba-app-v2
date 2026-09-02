@@ -56,11 +56,11 @@ export const EMAIL_MATRIX: Record<BookingEventKey, EmailRule> = {
   "booking.expired": "SHIPPER",
   "booking.cancelled": "SHIPPER_PLUS_CARRIER_IF_WAS_ACCEPTED",
   "booking.refund_issued": "SHIPPER",
-  "booking.picked_up": null, // à venir (writer B3)
-  "booking.pickup_refused": null, // à venir (writer B3)
+  "booking.picked_up": "SHIPPER", // B3/A41 : « ton code est prêt dans ton suivi » (sans le code)
+  "booking.pickup_refused": "SHIPPER", // B3/A41 : raison + remboursement annoncé (refund_issued suit)
   "booking.tracking_event": null, // JAMAIS : push seul (anti-spam)
-  "booking.code_regenerated": null, // à venir (writer B3)
-  "booking.delivered": null, // à venir (writer B3)
+  "booking.code_regenerated": "SHIPPER", // B3/A41 : email de sécurité (sans le code)
+  "booking.delivered": "SHIPPER", // B3/A41 : « 3 jours pour confirmer ou signaler » (le Voyageur : in-app seul)
   "booking.completed": null, // à venir (writer B4)
   "booking.payout_sent": null, // à venir (writer B4)
   "booking.disputed": null, // à venir (writer B4)
@@ -144,6 +144,35 @@ const DECLINE_REASON_LABELS: Record<string, { fr: string; en: string }> = {
   },
   OTHER: { fr: "Autre raison", en: "Other reason" },
 };
+
+/** Libellés FR/EN des 5 raisons de refus au pickup (A40). */
+const PICKUP_REFUSAL_REASON_LABELS: Record<string, { fr: string; en: string }> = {
+  CONTENT_MISMATCH: {
+    fr: "Le contenu ne correspond pas à la déclaration",
+    en: "The content does not match the declaration",
+  },
+  SUSPICIOUS_CONTENT: {
+    fr: "Le contenu a paru suspect au Voyageur",
+    en: "The carrier found the content suspicious",
+  },
+  OVERWEIGHT: {
+    fr: "Le colis dépasse le poids déclaré",
+    en: "The parcel exceeds the declared weight",
+  },
+  BAD_PACKAGING: {
+    fr: "L'emballage n'est pas adapté au voyage",
+    en: "The packaging is not fit for travel",
+  },
+  OTHER: { fr: "Autre raison", en: "Other reason" },
+};
+
+function formatDate(iso: string, locale: "fr" | "en"): string {
+  return new Date(iso).toLocaleDateString(locale === "fr" ? "fr-FR" : "en-US", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  });
+}
 
 /* ══ Construction sujet + gabarit + données par événement ═════ */
 
@@ -267,6 +296,60 @@ export function buildBookingEmail(
             p.currencyCode,
             locale
           ),
+        },
+      };
+    /* ── B3 (A41) — le code de livraison n'apparaît dans AUCUN de ces
+          quatre gabarits : on annonce qu'il existe, jamais sa valeur. ── */
+    case "booking.picked_up":
+      return {
+        subject: fr
+          ? `Ton colis ${route} est pris en charge`
+          : `Your parcel ${route} has been picked up`,
+        template: "booking/booking-picked-up-shipper",
+        data: {
+          ...base,
+          pickedUpAt: formatDateTime(event.payload.pickedUpAt, locale),
+          photoCount: event.payload.photoCount,
+        },
+      };
+    case "booking.pickup_refused": {
+      const reason = event.payload.reason
+        ? PICKUP_REFUSAL_REASON_LABELS[event.payload.reason]?.[locale] ?? null
+        : null;
+      return {
+        subject: fr
+          ? `Ton colis ${route} n'a pas pu être pris en charge`
+          : `Your parcel ${route} could not be picked up`,
+        template: "booking/pickup-refused-shipper",
+        data: {
+          ...base,
+          reason,
+          total: formatMoney(p.totalShipperCents, p.currencyCode, locale),
+        },
+      };
+    }
+    case "booking.code_regenerated":
+      return {
+        subject: fr
+          ? `Nouveau code pour ton envoi ${route}`
+          : `New code for your shipment ${route}`,
+        template: "booking/code-regenerated-shipper",
+        data: {
+          ...base,
+          regenerationsLeft: event.payload.regenerationsLeft,
+        },
+      };
+    case "booking.delivered":
+      return {
+        subject: fr
+          ? `Ton colis ${route} a été livré`
+          : `Your parcel ${route} has been delivered`,
+        template: "booking/booking-delivered-shipper",
+        data: {
+          ...base,
+          deliveredAt: formatDateTime(event.payload.deliveredAt, locale),
+          payoutDueAt: formatDate(event.payload.payoutDueAt, locale),
+          transport: formatMoney(p.transportCents, p.currencyCode, locale),
         },
       };
     default:

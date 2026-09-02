@@ -2,6 +2,10 @@ import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import prisma from "../index";
 import bcrypt from "bcryptjs";
+import {
+  encryptDeliveryCode,
+  hashDeliveryCode,
+} from "../../delivery-code/src/index";
 
 /**
  * Mot de passe DEV commun aux 12 users du seed (PR5) : Yamba-Dev-2026!
@@ -10,6 +14,10 @@ import bcrypt from "bcryptjs";
  * Hash calcule UNE fois par run (bcryptjs, meme lib que loginUser).
  */
 const SEED_PASSWORD_HASH = bcrypt.hashSync("Yamba-Dev-2026!", 10);
+
+/** Code de livraison DEV commun aux bookings seedés passés par le pickup (D43). */
+export const SEED_DELIVERY_CODE = "742891";
+const SEED_CHECKLIST = ["CONTENT_MATCHES", "WEIGHT_OK", "NO_FORBIDDEN", "PACKAGING_OK", "ITEMS_IDENTIFIED"];
 
 /**
  * seed-deals.ts — jeu de données Deal lifecycle (PR3, A14)
@@ -36,8 +44,11 @@ const SEED_PASSWORD_HASH = bcrypt.hashSync("Yamba-Dev-2026!", 10);
  * bookings ACTIFS (PENDING/ACCEPTED/PICKED_UP/DELIVERED/DISPUTED) —
  * CALCULÉ par le script, jamais posé à la main.
  *
- * B1 : deliveryCodeHash reste null (aucun endpoint ne le lit) — B3
- * seedera de vrais hashes bcrypt avec les codes documentés.
+ * B3 (D43) : tout booking passé par le pickup (PICKED_UP, DELIVERED,
+ * DISPUTED, COMPLETED) porte un VRAI code — SEED_DELIVERY_CODE ci-dessous,
+ * haché (bcrypt) ET chiffré (AES, clé d'env ou clé de dev) — et une
+ * checklist 5/5 figée. Le Voyageur du seed peut donc livrer avec ce code
+ * et l'Expéditrice le voit dans son suivi.
  *
  * Sortie : table console + seed-output.json (à côté du script,
  * gitignoré) — successeur des magic IDs du mock front (PR5).
@@ -363,6 +374,8 @@ async function main() {
     shipper: string; carrier: string;
   }[] = [];
 
+  const seedCodeHash = await hashDeliveryCode(SEED_DELIVERY_CODE);
+
   for (const b of BOOKINGS) {
     const t = TRIPS.find((x) => x.key === b.tripKey)!;
     const booking = await prisma.booking.create({
@@ -390,8 +403,12 @@ async function main() {
           photoUrls: [`https://r2.seed.yamba.dev/${b.key}-declared.jpg`],
         },
         recipient: b.recipient,
-        pickup: b.pickup ?? undefined,
+        pickup: b.pickup ? { ...b.pickup, checklist: SEED_CHECKLIST } : undefined,
         trackingEvents: b.trackingEvents ?? [],
+        // D43 — un vrai code (haché + chiffré) dès qu'il y a eu pickup.
+        ...(b.pickup
+          ? { deliveryCodeHash: seedCodeHash, deliveryCodeEncrypted: encryptDeliveryCode(SEED_DELIVERY_CODE) }
+          : {}),
         // B2 : un intent FAKE par booking — le FakePaymentProvider ADOPTE
         // les ids `pi_fake_seed_…` inconnus (AUTHORIZED à la lecture), donc
         // accept/decline/cancel sont jouables en dev sans clés Stripe.

@@ -111,7 +111,7 @@ model CarrierPage {
   socialLinks Json[]  @default([])
 
   // Localisation publique
-  primaryAddressId String?  @unique @db.ObjectId
+  primaryAddressId String?  @db.ObjectId // A42 : plus de @unique — sur Mongo deux pages sans adresse collisionnent sur null (P2002) ; l'adresse est créée par le service pour UNE page (unicité par construction)
   primaryAddress   Address? @relation("CarrierPrimaryAddress", fields: [primaryAddressId], references: [id])
 
   // Onboarding tracking
@@ -149,6 +149,7 @@ model CarrierPage {
   @@index([isVerified])
   @@index([isSuperCarrier])
   @@index([ratingsAvg])
+  @@index([primaryAddressId]) // A42 — index simple (jointure), non unique
 }
 
 // ─────────────────────────────────────────────
@@ -321,7 +322,7 @@ model Address {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  carrierPage CarrierPage? @relation("CarrierPrimaryAddress")
+  carrierPage CarrierPage[] @relation("CarrierPrimaryAddress") // A42 : liste déclarative (Prisma exige @unique pour un 1-1) — une adresse n'est jamais partagée par construction
 
   @@index([userId])
   @@index([userId, isArchived])
@@ -628,8 +629,9 @@ type BookingRecipientSnapshot {
 
 type BookingPickupInfo {
   confirmedAt DateTime
-  photoUrls   String[]
+  photoUrls   String[] // ImageKit (D42), 1..5, horodatées serveur
   notes       String?
+  checklist   String[] @default([]) // B3 — les 5 points d'inspection cochés (CNF-04, attestation figée)
 }
 
 // Événements optionnels DANS l'état PICKED_UP — hors machine d'états
@@ -667,9 +669,11 @@ model Booking {
   closedBy      BookingActor?
   declineReason String? // refus PENDING (5 raisons — DeclineReason du contrat)
   cancelReason  String? // annulation Expéditeur (texte libre court, B2)
+  pickupRefusalReason String? // refus au pickup (5 raisons — PickupRefusalReason, B3/A40)
 
   // ─── Code de livraison (spec §9 — le serveur est seul juge) ───
-  deliveryCodeHash    String? // bcrypt — JAMAIS dans un payload carrier
+  deliveryCodeHash    String? // bcrypt — JAMAIS dans un payload carrier (validation seule)
+  deliveryCodeEncrypted String? // AES-256-GCM (D43) — ré-affichage Expéditeur SEUL, en PICKED_UP, jamais en liste/event/email
   codeRegenerations   Int       @default(0) // ≤ MAX_CODE_REGENERATIONS (5)
   deliveryAttempts    Int       @default(0) // ≤ MAX_DELIVERY_ATTEMPTS (3)
   deliveryLockedUntil DateTime? // lock DELIVERY_LOCK_MINUTES (15)

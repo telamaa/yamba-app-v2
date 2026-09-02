@@ -18,6 +18,9 @@
  *   5. Compensation best-effort si la base refuse après une capture
  *      (rarissime : course accept/decline) + filet webhook D40.
  *
+ * B3-PR1 : le chargement et la transaction commune vivent dans
+ * booking-write.ts (partagés avec deal-transport.service.ts).
+ *
  * Gate D31 : le profil Voyageur + Stripe Connect sont exigés À
  * L'ACCEPTATION (plus à la publication — les 2 checks du trip-service
  * sont retirés dans cette même PR). Sauté avec le FakePaymentProvider
@@ -25,15 +28,14 @@
  */
 
 import prisma from "@packages/libs/prisma";
-import { ForbiddenError, NotFoundError } from "@packages/error-handler";
+import { ForbiddenError } from "@packages/error-handler";
 import type { PaymentProvider } from "@packages/payments";
-import {
-  BookingDomainEventSchema,
-  type AcceptDealRequest,
-  type BookingActor,
-  type CancelDealRequest,
-  type DealTransitionResponse,
-  type DeclineDealRequest,
+import type {
+  AcceptDealRequest,
+  BookingActor,
+  CancelDealRequest,
+  DealTransitionResponse,
+  DeclineDealRequest,
 } from "@packages/api-contracts";
 import {
   canPerform,
@@ -45,65 +47,23 @@ import {
   BookingLifecycleError,
   baseEventPayload,
   computeCancellationRefundCents,
-  kgReservedBySnapshot,
-  type BookingSnapshotsForLifecycle,
 } from "./booking-lifecycle";
+import {
+  BOOKING_WRITE_SELECT,
+  applyBookingTransition,
+  loadBookingForWrite,
+  toBookingForWrite,
+  type BookingForWrite,
+} from "./booking-write";
 
 export type RequestingUser = { id: string };
 
-/* ══ Chargement ═══════════════════════════════════════════════ */
+/* ══ Chargement / transaction : voir booking-write.ts (partagé avec
+      deal-transport.service.ts depuis B3-PR1) ═══════════════════ */
 
-const BOOKING_SELECT = {
-  id: true,
-  tripId: true,
-  shipperId: true,
-  carrierId: true,
-  status: true,
-  isDeleted: true,
-  expiresAt: true,
-  paymentIntentId: true,
-  trip: true,
-  pricing: true,
-  parcel: true,
-} as const;
-
-type BookingForLifecycle = {
-  id: string;
-  tripId: string;
-  shipperId: string;
-  carrierId: string;
-  status: string;
-  isDeleted: boolean;
-  expiresAt: Date;
-  paymentIntentId: string | null;
-} & BookingSnapshotsForLifecycle;
-
-async function loadBooking(id: string): Promise<BookingForLifecycle> {
-  const booking = await prisma.booking.findUnique({ where: { id }, select: BOOKING_SELECT });
-  if (!booking || booking.isDeleted) throw new NotFoundError("Deal not found.");
-  return {
-    ...booking,
-    status: String(booking.status),
-    parcel: {
-      category: String(booking.parcel.category),
-      categoryFamily: booking.parcel.categoryFamily ?? null,
-    },
-  };
-}
-
-/* ══ Transaction commune (transition + kg + outbox) ═══════════ */
-
-type OutboxEventInput = { eventType: string; payload: Record<string, unknown> };
-
-function makeEnvelope(bookingId: string, now: Date) {
-  return {
-    aggregateType: "booking" as const,
-    aggregateId: bookingId,
-    occurredAt: now.toISOString(),
-    correlationId: null,
-    schemaVersion: 1 as const,
-  };
-}
+type BookingForLifecycle = BookingForWrite;
+const loadBooking = loadBookingForWrite;
+const BOOKING_SELECT = BOOKING_WRITE_SELECT;
 
 export function makeDealLifecycleService(provider: PaymentProvider, clock: () => Date = () => new Date()) {
   /** La machine a-t-elle dit oui ? Sinon 409 avec SA raison. */
@@ -123,60 +83,6 @@ export function makeDealLifecycleService(provider: PaymentProvider, clock: () =>
       throw new BookingLifecycleError("TRANSITION_NOT_ALLOWED", check.reason);
     }
     return { to: check.to, effects: check.effects };
-  }
-
-  /**
-   * UNE transaction Mongo : transition conditionnelle (0 ligne = un
-   * concurrent a gagné → TRANSITION_NOT_ALLOWED), kg restitués si
-   * demandé, outbox validée au contrat AVANT écriture (payload invalide
-   * = bug de writer ⇒ 500 ici, jamais un poison pour le relay).
-   */
-  async function applyTransition(args: {
-    booking: BookingForLifecycle;
-    from: BookingStatus;
-    data: Record<string, unknown>;
-    releaseKg: boolean;
-    events: OutboxEventInput[];
-    now: Date;
-  }): Promise<void> {
-    const { booking, from, data, releaseKg, events, now } = args;
-    const envelope = makeEnvelope(booking.id, now);
-    const parsed = events.map((e) => BookingDomainEventSchema.parse({ ...envelope, ...e }));
-
-    await prisma.$transaction(async (tx) => {
-      const updated = await tx.booking.updateMany({
-        where: { id: booking.id, status: from as never },
-        data: data as never,
-      });
-      if (updated.count === 0) {
-        throw new BookingLifecycleError(
-          "TRANSITION_NOT_ALLOWED",
-          "This deal changed in the meantime — please refresh."
-        );
-      }
-
-      if (releaseKg) {
-        // CAP-02 — la transition conditionnelle ci-dessus garantit UNE
-        // exécution : le décrément est sûr (le gte pare un état corrompu).
-        const kg = kgReservedBySnapshot(booking.pricing);
-        await tx.trip.updateMany({
-          where: { id: booking.tripId, reservedKg: { gte: kg } },
-          data: { reservedKg: { decrement: kg } },
-        });
-      }
-
-      for (const e of parsed) {
-        await tx.outboxEvent.create({
-          data: {
-            aggregateType: "booking",
-            aggregateId: booking.id,
-            eventType: e.eventType,
-            payload: e as never,
-            occurredAt: now,
-          },
-        });
-      }
-    });
   }
 
   function transitionResponse(
@@ -261,7 +167,7 @@ export function makeDealLifecycleService(provider: PaymentProvider, clock: () =>
       }
 
       try {
-        await applyTransition({
+        await applyBookingTransition({
           booking,
           from: "PENDING",
           data: { status: to, acceptedAt: now, capturedAt: now },
@@ -298,7 +204,7 @@ export function makeDealLifecycleService(provider: PaymentProvider, clock: () =>
       await releaseAuthorization(booking.paymentIntentId);
 
       const total = booking.pricing.totalShipperCents;
-      await applyTransition({
+      await applyBookingTransition({
         booking,
         from: "PENDING",
         data: { status: to, closedAt: now, closedBy: "CARRIER", declineReason: input.reason ?? null },
@@ -360,7 +266,7 @@ export function makeDealLifecycleService(provider: PaymentProvider, clock: () =>
         await releaseAuthorization(booking.paymentIntentId);
       }
 
-      await applyTransition({
+      await applyBookingTransition({
         booking,
         from: booking.status as BookingStatus,
         data: {
@@ -416,16 +322,12 @@ export function makeDealLifecycleService(provider: PaymentProvider, clock: () =>
 
       let expired = 0;
       for (const raw of due) {
-        const booking: BookingForLifecycle = {
-          ...raw,
-          status: String(raw.status),
-          parcel: { category: String(raw.parcel.category), categoryFamily: raw.parcel.categoryFamily ?? null },
-        };
+        const booking: BookingForLifecycle = toBookingForWrite(raw as unknown as Record<string, unknown>);
         try {
           const { to } = assertTransition(booking, "expire", "SYSTEM", now);
           await releaseAuthorization(booking.paymentIntentId);
           const total = booking.pricing.totalShipperCents;
-          await applyTransition({
+          await applyBookingTransition({
             booking,
             from: "PENDING",
             data: { status: to, closedAt: now, closedBy: "SYSTEM" },
@@ -470,15 +372,11 @@ export function makeDealLifecycleService(provider: PaymentProvider, clock: () =>
         select: BOOKING_SELECT,
       });
       if (!raw || String(raw.status) !== "PENDING") return false;
-      const booking: BookingForLifecycle = {
-        ...raw,
-        status: String(raw.status),
-        parcel: { category: String(raw.parcel.category), categoryFamily: raw.parcel.categoryFamily ?? null },
-      };
+      const booking: BookingForLifecycle = toBookingForWrite(raw as unknown as Record<string, unknown>);
 
       try {
         const { to } = assertTransition(booking, "cancel", "SYSTEM", now);
-        await applyTransition({
+        await applyBookingTransition({
           booking,
           from: "PENDING",
           data: { status: to, closedAt: now, closedBy: "SYSTEM", cancelReason: "PAYMENT_AUTHORIZATION_LOST" },

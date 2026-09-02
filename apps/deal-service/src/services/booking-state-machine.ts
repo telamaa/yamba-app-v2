@@ -82,6 +82,8 @@ export type BookingGuardedOperation = "regenerateCode" | "confirmTrackingStep";
 export const MAX_CODE_REGENERATIONS = 5;
 export const MAX_DELIVERY_ATTEMPTS = 3;
 export const DELIVERY_LOCK_MINUTES = 15;
+/** J+4 : payoutDueAt = deliveredAt + PAYOUT_DELAY_DAYS (spec §3.5 — cron B4). */
+export const PAYOUT_DELAY_DAYS = 4;
 
 /** Séquence stricte des jalons de tracking (dans PICKED_UP) */
 export const TRACKING_SEQUENCE = [

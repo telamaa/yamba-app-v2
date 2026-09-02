@@ -28,7 +28,7 @@ Ordre de demarrage : auth -> trip -> gateway.
 
 ## Sources de verite (a lire avant toute tache)
 
-- context/YAMBA-REGISTRE-DECISIONS-ROADMAP-v1.3.md — arbitrages D1-D31,
+- context/YAMBA-REGISTRE-DECISIONS-ROADMAP-v1.3.md — arbitrages D1-D43 (A1-A42),
   roadmap 3 jalons, backlog maitre §7. TOUTE decision d'architecture y est
   gravee AVANT le code. C'est LE document maitre : si ce fichier-ci et le
   registre divergent, le registre gagne.
@@ -138,8 +138,23 @@ Ordre de demarrage : auth -> trip -> gateway.
   mocks de donnees supprimes ; actions regenerer/confirmer/litige encore mock
   (basculent avec B3/B4). Preuve : tsc + build prod + script adapter 25
   assertions.
-- Plateforme de tests : 540 (trip 187, deal 303, notification 50) — post-B2-PR4
-  (B2-PR5 = front seul, pas de Jest user-ui).
+- B3-PR1 (transport serveur, D42/D43, A38-A42) : `POST /deals/:id/pickup`
+  (checklist 5/5 + 1..5 photos ImageKit — D42 —, code de livraison GENERE
+  par le serveur : bcrypt + AES-256-GCM `deliveryCodeEncrypted` — D43 —,
+  revele a l'Expediteur SEUL sur GET /deals/:id en PICKED_UP, jamais en
+  liste/event/email), `/pickup/refuse` (raison parmi 5, remboursement
+  INTEGRAL reel puis CANCELLED + CAP-02, sans penalite — A40), `/events`
+  (jalons optionnels, sequence stricte, undo client seul — A39),
+  `/code/regenerate` (Expediteur, <= 5, essais remis a zero),
+  `/deliver` (bcrypt, 3 essais puis verrou 15 min ET compteur a zero — A38,
+  payoutDueAt = J+4). `@packages/delivery-code` (lib pure, aussi importee
+  par le seed), `booking-write.ts` (socle transaction/chargement partage),
+  4 emails B3 (A41 : picked_up / pickup_refused / code_regenerated /
+  delivered → Expediteur, garde-fou « aucune suite de 6 chiffres »), seed
+  avec vrai code `742891` + checklist. Annexe A42 : `CarrierPage.primaryAddressId`
+  n'est plus @unique (collision sur null, db push fait). E2E Atlas :
+  33 verifications vertes, outbox sans code, kg restitues. +60 tests.
+- Plateforme de tests : 600 (trip 187, deal 354, notification 59) — post-B3-PR1.
 - MERGE 01/09 : toute la pile B2 est dans `dev` via la SEULE **PR #90**
   (`feat/b2-deal-front` portait la chaîne complète : jalons mobile D36,
   docs cumulatifs, B2-PR1, B2-PR2, B2-PR3 + fix A34) — 13 checks verts
@@ -177,8 +192,13 @@ Ordre de demarrage : auth -> trip -> gateway.
   FAITES — voir « fait » ci-dessus. RESTE (avec B3) : photos du colis via
   media-service :6009, AES-256-GCM re-affichage code livraison, SiteConfig
   commissionRate (D16). payment-service :6008 : NON (D38).
-- B3 transport : pickup (upload R2, code bcrypt, checklist conformite),
-  refuse, tracking, deliver (compare + lock serveur), regeneration code.
+- B3 transport : PR1 serveur FAITE (voir « fait »). RESTE B3-PR2 front :
+  bascule des 4 mocks Voyageur (pickup avec upload ImageKit
+  `useImageKitUpload("/deals/pickup")`, refus, jalons — appel APRES la
+  fenetre d'undo —, livraison avec compteur SERVEUR) et du mock
+  regeneration Expediteur (code servi par GET /deals/:id), vue DELIVERED
+  persistante cote Voyageur. Dettes D42 : URLs signees / fichiers prives
+  ImageKit, verification du domaine des URLs photo.
 - B4 argent sortant : confirmation anticipee, cron J+4 -> COMPLETED +
   transfers.create(), dispute avec gel, matrice remboursements.
 - B5 confiance : rating double-aveugle, relances J+5/J+7, stats de
@@ -276,6 +296,10 @@ Ordre de demarrage : auth -> trip -> gateway.
 - Tests dans la MEME PR que leur logique (D30).
 - prisma/schema.prisma est A LA RACINE du repo.
 - Prisma+Mongo : readAt null -> OR [{readAt: null}, {readAt: {isSet: false}}].
+- Prisma+Mongo : jamais de `String? @unique` (null collisionne — A42) ;
+  unicite par construction ou index partiel raw.
+- Nouvel alias @packages/* : tsconfig.base.json ET webpack.config.js du
+  service (nx serve ne lit pas tsconfig paths).
 - Nouveaux alias @packages/* : declares dans tsconfig.base.json, et
   @packages/api-contracts AVANT le wildcard.
 - Props callback des composants "use client" : suffixe *Action (TS71007).

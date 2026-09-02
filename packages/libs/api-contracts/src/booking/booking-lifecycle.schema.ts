@@ -73,5 +73,11 @@ export const BOOKING_LIFECYCLE_ERROR_CODES = [
   "TRANSITION_NOT_ALLOWED", // la machine a dit non (statut, rôle, guard) — details.reason
   "CARRIER_ONBOARDING_REQUIRED", // gate D31 : profil incomplet ou Stripe non configuré
   "PAYMENT_STATE_CONFLICT", // l'état chez le fournisseur ne permet pas l'opération (capture/cancel/refund)
+  // B3 — transport (booking-transport.schema.ts)
+  "DELIVERY_CODE_INVALID", // mauvais code — details.attemptsLeft (A38)
+  "DELIVERY_LOCKED", // 3 échecs → verrou 15 min — details.lockedUntil (A38)
+  "DELIVERY_CODE_UNAVAILABLE", // PICKED_UP sans hash (enregistrement antérieur à B3)
+  "TRACKING_STEP_NOT_ALLOWED", // séquence stricte AT_AIRPORT → FLIGHT_DEPARTED → FLIGHT_ARRIVED (A39)
+  "CODE_REGENERATION_LIMIT", // plafond MAX_CODE_REGENERATIONS (5) atteint, ou hors PICKED_UP
 ] as const;
 export type BookingLifecycleErrorCode = (typeof BOOKING_LIFECYCLE_ERROR_CODES)[number];

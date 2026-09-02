@@ -21,7 +21,7 @@ import {
  * Construction des DTOs PAR RÔLE (A13) — LISTE BLANCHE stricte :
  * chaque champ est posé explicitement, jamais de spread du document
  * Prisma. C'est la frontière de sécurité de la lecture :
- *   - `deliveryCodeHash` n'est LU par aucun mapper (il n'existe pas ici) ;
+ *   - `deliveryCodeHash` et `deliveryCodeEncrypted` ne sont LUS par aucun mapper ;
  *   - le code n'apparaît que côté Shipper (null en B1 — B2 ajoutera
  *     deliveryCodeEncrypted pour le ré-affichage) ;
  *   - le Carrier ne voit ni compteur de régénérations, ni commission,
@@ -96,6 +96,7 @@ export type BookingRecord = {
     confirmedAt: Date;
     photoUrls: string[];
     notes: string | null;
+    checklist?: string[]; // B3 — absent sur les enregistrements antérieurs
   } | null;
   trackingEvents: { step: string; confirmedAt: Date }[];
 
@@ -109,6 +110,7 @@ export type BookingRecord = {
   closedAt: Date | null;
   closedBy: string | null;
   declineReason: string | null;
+  pickupRefusalReason?: string | null; // B3/A40
 
   codeRegenerations: number;
   deliveryAttempts: number;
@@ -174,6 +176,7 @@ const toPickup = (p: BookingRecord["pickup"]) =>
       confirmedAt: toIsoRequired(p.confirmedAt),
       photoUrls: p.photoUrls,
       notes: p.notes,
+      checklist: p.checklist ?? [],
     }
     : null;
 
@@ -196,6 +199,7 @@ const toMilestones = (b: BookingRecord) => ({
   closedAt: toIso(b.closedAt),
   closedBy: (b.closedBy as ShipperBookingView["closedBy"]) ?? null,
   declineReason: b.declineReason,
+  pickupRefusalReason: b.pickupRefusalReason ?? null,
   disputeTicket: b.disputeTicket,
   disputedAt: toIso(b.disputedAt),
   createdAt: toIsoRequired(b.createdAt),
@@ -234,10 +238,17 @@ const toCancellationPreview = (
 
 /* ══ Vues par rôle ════════════════════════════════════════════ */
 
+/**
+ * `deliveryCode` : le code EN CLAIR, déchiffré par l'appelant
+ * (`revealDeliveryCode`, lib/delivery-code.ts — D43) pour la seule vue
+ * Shipper de GET /deals/:id ; les listes passent null. Le mapper reste
+ * pur (aucune clé, aucun env) et ne lit JAMAIS deliveryCodeEncrypted.
+ */
 export function toShipperBookingView(
   booking: BookingRecord,
   carrier: CounterpartRecord,
-  now: Date = new Date()
+  now: Date = new Date(),
+  deliveryCode: string | null = null
 ): ShipperBookingView {
   const allowedActions = getAllowedActions(
     booking as Parameters<typeof getAllowedActions>[0],
@@ -281,9 +292,8 @@ export function toShipperBookingView(
 
     ...toMilestones(booking),
 
-    // B1 : pas de stockage ré-affichable (bcrypt seul) — B2 ajoute
-    // deliveryCodeEncrypted (AES-256-GCM) et ce null devient le code.
-    deliveryCode: null,
+    // D43 : révélé en PICKED_UP seulement, jamais en liste (paramètre).
+    deliveryCode,
     codeRegenerationsLeft: Math.max(
       0,
       MAX_CODE_REGENERATIONS - booking.codeRegenerations
@@ -348,9 +358,10 @@ export function toCarrierBookingView(
 export function toBookingView(
   booking: BookingRecord,
   role: BookingViewerRole,
-  counterpart: CounterpartRecord
+  counterpart: CounterpartRecord,
+  deliveryCode: string | null = null
 ): ShipperBookingView | CarrierBookingView {
   return role === "SHIPPER"
-    ? toShipperBookingView(booking, counterpart)
+    ? toShipperBookingView(booking, counterpart, new Date(), deliveryCode)
     : toCarrierBookingView(booking, counterpart);
 }

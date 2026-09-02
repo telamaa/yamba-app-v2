@@ -41,7 +41,7 @@ npx prisma db push                 # sync schema to MongoDB (no migrations — M
 npm run auth-docs                  # regenerate auth swagger-output.json (swagger-autogen — legacy, conversion to Zod-OpenAPI is backlog)
 ```
 
-Test platform baseline: **457 tests** (trip-service 187, deal-service 249, notification-service 21) — any deviation must be explained.
+Test platform baseline: **600 tests** (trip-service 187, deal-service 354, notification-service 59) — any deviation must be explained.
 
 Manual `tsc` (when Nx typecheck target is not what you want): `npx tsc --noEmit --project apps/<service>/tsconfig.app.json` — NEVER `--project apps/<service>` (resolves the solution-style tsconfig: 0 files checked).
 
@@ -77,6 +77,7 @@ Requests flow: `user-ui (3000)` → `api-gateway (8080)` → microservices. The 
 - `packages/api-contracts` — Zod schemas + shared status sets, single source for OpenAPI; alias declared BEFORE the `@packages/*` wildcard in `tsconfig.base.json`
 - `packages/libs/payments` — `PaymentProvider` abstraction (D11/D38): Stripe (manual capture) + Fake (dev/tests, refused in production); factory from env
 - `packages/messaging` — `EventPublisher` interface; kafkajs isolated here (connection errors come back `retriable: false` — intercept explicitly)
+- `packages/libs/delivery-code` — delivery code (D43): CSPRNG 6 digits, bcrypt hash (validation) + AES-256-GCM `deliveryCodeEncrypted` (shipper re-display, `DELIVERY_CODE_ENCRYPTION_KEY`, dev key fallback outside production). Zero infra deps — also imported relatively by the seed. New `@packages/*` aliases must ALSO be added to each consuming service's `webpack.config.js` (`resolve.alias`) — tsc resolves `tsconfig.base.json`, `nx serve` does not.
 
 ### Auth flow
 
@@ -110,7 +111,8 @@ JWT `access_token` + `refresh_token` set as cookies by auth-service. Frontend `a
 - Atlas shared tiers cap aggregation pipelines at 50 stages; Prisma emits one `$set` stage per field on updates touching composite types → `P2010 Pipeline length greater than 50`. Chunk wide updates with `apps/trip-service/src/lib/mongo-update-chunks.ts` (transition fields last).
 - macOS FS is case-insensitive, CI Linux is not → exact-case imports.
 - `overflow-x: clip` (not `hidden`) to preserve `position: sticky`.
-- Seeds live in `packages/libs/prisma/scripts/`, relative imports, run via `npx tsx`.
+- Seeds live in `packages/libs/prisma/scripts/`, relative imports, run via `npx tsx --env-file=.env …` (sourcing `.env` in zsh mangles the Mongo password). `seed-deals.ts` is the QA reset: wipe + recreate trips/bookings of the seed users, real delivery code `742891` on every post-pickup booking.
+- `nx serve` loads root `.env` and OVERRIDES variables passed on the command line — to run a service with a controlled env (e.g. forcing the FAKE payment provider), run the built bundle: `STRIPE_SECRET_KEY= node --env-file=../../.env dist/main.js` from `apps/<service>` (Node lets the process env win).
 
 ## End of task
 
