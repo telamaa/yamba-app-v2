@@ -299,6 +299,10 @@ Ordre de demarrage : auth -> trip -> gateway.
   AddDocumentsBody en Zod dedie · harmonisation noms projets Nx ·
   idempotence seed-deals · bug seed shipperId === carrierId a trancher ·
   git config user.email.
+- Inscription : messages d'erreur EXPLICITES (quel critere du mot de passe echoue
+  — prenom/nom/email interdit, suite, date —, email deja pris, telephone) : front
+  RegisterForm + password-strength, serveur validatePasswordStrength avec un code
+  par regle. Demande utilisateur 02/09, micro-PR a planifier.
 - Candidat D35 (ex-« D32 » avant que D32 = plancher par colis) : provider email transactionnel (Resend/Postmark/SES)
   derriere @packages/email, avant lancement. MailHog docker-compose local
   candidat.

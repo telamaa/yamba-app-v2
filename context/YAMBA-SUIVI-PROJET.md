@@ -136,6 +136,7 @@ Estimation : **2–4 sessions** au-dessus du Jalon 4 (l'essentiel du travail est
 | Front : OnboardingBanner après Header, cron onboarding-reminder (node-cron), page carrier settings (Stripe), `viewsCount` Redis (D5) | ⬜ |
 | Sécurité/robustesse : redaction pino-http (cookie + authorization), `getImageKit()` paresseux, `AddDocumentsBody` en Zod, harmonisation noms Nx, idempotence seed-deals, bug seed shipperId === carrierId | ⬜ |
 | Seeds : `arrivalAt`/heures locales manquants sur `bzv-perkg` ; carrierPage/Stripe factices pour tester la publication | ⬜ |
+| **Inscription — messages d'erreur explicites** (demande utilisateur 02/09) : « ne respecte pas tous les critères » ne dit pas LEQUEL ; nommer le critère fautif au submit (prénom/nom/email dans le mot de passe, suite, date…), côté front (`RegisterForm`, `password-strength.ts`) ET dans les 400 du serveur (`validatePasswordStrength` : un code par règle, traduit) ; même revue pour email déjà utilisé, téléphone, champs requis | ⬜ micro-PR |
 | Décisions candidates à graver : « la CI construit ce qu'elle déploie » (`next build`), règle de couleur des CTA (mango = avancer, teal = engager), D35 email provider | ⬜ |
 
 ## 8. Chiffres de suivi
