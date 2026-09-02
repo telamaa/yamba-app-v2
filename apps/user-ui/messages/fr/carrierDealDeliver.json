@@ -74,6 +74,8 @@
   },
 
   "error": {
-    "toastGeneric": "Erreur lors de la validation. Réessaye."
+    "toastGeneric": "Erreur lors de la validation. Réessaye.",
+    "codeUnavailable": "Aucun code n''a été généré pour ce deal (prise en charge antérieure à la mise à jour). Contacte le support.",
+    "dealChanged": "La saisie n''est pas possible pour le moment (verrou en cours ou deal modifié). On recharge."
   }
 }

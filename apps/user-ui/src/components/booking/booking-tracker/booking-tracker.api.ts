@@ -7,8 +7,10 @@
  *   - getBooking : GET /deals/:id (vue Shipper — A13), traduit par
  *     l'adapter (A37) — le module ne voit jamais la forme backend.
  *
+ *   - regenerateDeliveryCode : POST /deals/:id/code/regenerate (B3 — le
+ *     nouveau code est servi, puis la page RELIT GET /deals/:id — A43)
+ *
  * ENCORE MOCK (basculent avec leurs endpoints — A37) :
- *   - regenerateDeliveryCode (B3 — AES `deliveryCodeEncrypted`)
  *   - confirmDeliveryEarly   (B4 — COMPLETED + transfert)
  *   - submitDispute          (B4 — DISPUTED + gel du payout)
  */
@@ -26,6 +28,8 @@ function sleep(ms: number): Promise<void> {
 /* ══ Erreur métier (pattern DealApiError, module carrier/deal) ═ */
 
 export type BookingApiErrorCode =
+  | "CODE_REGENERATION_LIMIT" // plafond 5 atteint, ou colis plus en transit (B3)
+  | "TRANSITION_NOT_ALLOWED" // deux clics : un seul gagne — relire
   | "NOT_FOUND"
   | "UNAUTHENTICATED"
   | "GENERIC";
@@ -42,15 +46,18 @@ export class BookingApiError extends Error {
 
 function toBookingApiError(e: unknown): BookingApiError {
   const err = e as {
-    response?: { status?: number; data?: { message?: string } };
+    response?: { status?: number; data?: { message?: string; details?: Record<string, unknown> } };
   };
   const status = err.response?.status ?? 0;
+  const detailCode = err.response?.data?.details?.code;
   const code: BookingApiErrorCode =
-    status === 404 || status === 403
-      ? "NOT_FOUND" // 403 volontairement confondu (le deal existe, pas pour toi)
-      : status === 401
-        ? "UNAUTHENTICATED"
-        : "GENERIC";
+    detailCode === "CODE_REGENERATION_LIMIT" || detailCode === "TRANSITION_NOT_ALLOWED"
+      ? detailCode
+      : status === 404 || status === 403
+        ? "NOT_FOUND" // 403 volontairement confondu (le deal existe, pas pour toi)
+        : status === 401
+          ? "UNAUTHENTICATED"
+          : "GENERIC";
   return new BookingApiError(
     code,
     status,
@@ -78,26 +85,27 @@ export async function getBooking(bookingId: string): Promise<Booking> {
 }
 
 /**
- * Régénère un nouveau code livraison (max MAX_CODE_REGENERATIONS).
- * Seul l'Expéditeur peut le faire — le Voyageur ne voit jamais le code.
- * MOCK — bascule en B3 avec le stockage AES du code.
+ * Régénère un nouveau code de livraison (plafond SERVEUR : 5, colis en
+ * transit seulement). Seul l'Expéditeur peut le faire — le Voyageur ne voit
+ * jamais le code. RÉEL : POST /deals/:id/code/regenerate (B3/A43).
  */
 export async function regenerateDeliveryCode(
-  bookingId: string,
-  currentRegeneratedCount: number
+  bookingId: string
 ): Promise<{ bookingId: string; newCode: string; regeneratedCount: number }> {
-  await sleep(MOCK_DELAY_MS);
-  if (currentRegeneratedCount >= MAX_CODE_REGENERATIONS) {
-    throw new Error("MAX_REGENERATIONS_REACHED");
+  try {
+    const res = await apiClient.post<{ bookingId: string; deliveryCode: string; codeRegenerationsLeft: number }>(
+      `/deals/${bookingId}/code/regenerate`,
+      {},
+      { requireAuth: true }
+    );
+    return {
+      bookingId: res.data.bookingId,
+      newCode: res.data.deliveryCode,
+      regeneratedCount: MAX_CODE_REGENERATIONS - res.data.codeRegenerationsLeft,
+    };
+  } catch (e) {
+    throw toBookingApiError(e);
   }
-  const newCode = Math.floor(100000 + Math.random() * 900000).toString();
-  // eslint-disable-next-line no-console
-  console.info("[booking] regenerateDeliveryCode mock:", { bookingId, newCode });
-  return {
-    bookingId,
-    newCode,
-    regeneratedCount: currentRegeneratedCount + 1,
-  };
 }
 
 /**

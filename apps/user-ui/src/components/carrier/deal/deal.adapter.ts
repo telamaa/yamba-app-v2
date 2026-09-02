@@ -76,6 +76,8 @@ export type CarrierBookingViewDto = {
   } | null;
   trackingEvents: { step: DealTrackingEvent["id"]; confirmedAt: string }[];
   allowedActions: string[];
+  deliveryAttemptsLeft?: number;
+  deliveryLockedUntil?: string | null;
 };
 
 /** J+4 : fenêtre de vérification avant versement (payoutDueAt = deliveredAt + 4j). */
@@ -186,5 +188,9 @@ export function toDealRequest(view: CarrierBookingViewDto): DealRequest {
       : undefined,
 
     trackingEvents: toTrackingEvents(view.trackingEvents),
+
+    // A38 — le serveur compte les essais ; l'écran de saisie s'initialise ici.
+    deliveryAttemptsLeft: view.deliveryAttemptsLeft,
+    deliveryLockedUntil: view.deliveryLockedUntil ?? undefined,
   };
 }

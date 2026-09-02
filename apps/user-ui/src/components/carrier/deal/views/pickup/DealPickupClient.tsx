@@ -4,19 +4,27 @@
  * Orchestrateur de l'écran pickup. Charge le Deal, tient le state du
  * formulaire (checklist, photos, notes) et rend Desktop ou Mobile.
  *
- * canConfirm = 5 checks cochés + au moins 1 photo.
- * Confirmer → confirmPickup (mock) → toast + retour sur /carrier/deals/[dealId].
- * Refuser  → refusePickup (mock) → toast + retour à la home.
+ * canConfirm = 5 checks cochés + au moins 1 photo (le serveur revalide).
+ * Confirmer → upload des photos vers ImageKit UNE PAR UNE (D42/A43 :
+ *   premier échec = arrêt, rien n'est envoyé) → POST /deals/:id/pickup →
+ *   invalidation du cache deal → retour sur /carrier/deals/[dealId]
+ *   (la page bascule d'elle-même sur la vue PICKED_UP).
+ * Refuser  → POST /deals/:id/pickup/refuse (raison seule — A40) → toast
+ *   + retour à l'accueil.
+ * 409 TRANSITION_NOT_ALLOWED (deal déjà passé ailleurs) → toast + relecture.
  */
 
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useTranslations } from "next-intl";
 import { useIsMobile } from "@/hooks/useIsMobile";
+import { useImageKitUpload } from "@/hooks/useImageKitUpload";
 import { useRouter } from "@/i18n/navigation";
-import { confirmPickup, getDealRequest, refusePickup } from "../../deal.api";
+import { dealQueryKey } from "../../DealClient";
+import { DealApiError, confirmPickup, getDealRequest, refusePickup } from "../../deal.api";
 import type {
   DealRequest,
   PickupChecklistItemId,
@@ -36,6 +44,9 @@ export default function DealPickupClient({ dealId }: Props) {
   const t = useTranslations("carrierDealPickup");
   const isMobile = useIsMobile();
   const router = useRouter();
+  const queryClient = useQueryClient();
+  // D42 : upload direct signé vers ImageKit, dossier dédié aux preuves de pickup.
+  const { upload } = useImageKitUpload("/deals/pickup");
 
   const [deal, setDeal] = useState<DealRequest | null>(null);
   const [loadError, setLoadError] = useState(false);
@@ -86,33 +97,64 @@ export default function DealPickupClient({ dealId }: Props) {
   const canConfirm =
     PICKUP_CHECKLIST_ITEMS.every((id) => checked.has(id)) && photos.length >= 1;
 
+  /** Après une transition la vérité est en base : on invalide, on ne mute pas. */
+  const refreshDeal = useCallback(
+    () => void queryClient.invalidateQueries({ queryKey: dealQueryKey(dealId) }),
+    [queryClient, dealId]
+  );
+
+  const handleTransitionError = (e: unknown, fallback: string) => {
+    if (e instanceof DealApiError && e.code === "TRANSITION_NOT_ALLOWED") {
+      // Le deal a changé entre-temps (annulé, déjà pris en charge…) : on relit.
+      toast.error(t("errors.dealChanged"));
+      refreshDeal();
+      router.push(`/carrier/deals/${dealId}`);
+      return;
+    }
+    toast.error(fallback);
+  };
+
   const handleConfirm = async () => {
     if (!deal || !canConfirm || isSubmittingConfirm) return;
     setIsSubmittingConfirm(true);
     try {
+      // 1. Les photos partent d'abord vers ImageKit (D42) — une par une,
+      //    le premier échec arrête tout : le deal-service ne reçoit que des URLs.
+      const photoUrls: string[] = [];
+      for (const photo of photos) {
+        if (!photo.file) continue;
+        const uploaded = await upload(photo.file);
+        if (!uploaded) {
+          toast.error(t("errors.uploadFailed"));
+          return;
+        }
+        photoUrls.push(uploaded.url);
+      }
+      if (photoUrls.length === 0) {
+        toast.error(t("errors.uploadFailed"));
+        return;
+      }
+
+      // 2. La transition : le serveur revalide 5/5 + 1..5 photos et génère le code.
       await confirmPickup(deal.id, {
         checklist: Array.from(checked),
-        photos,
+        photoUrls,
         notes: notes.trim() || undefined,
       });
       toast.success(
         t("confirm.toastSuccess", { shipperFirstName: deal.shipper.firstName }),
         { duration: 4500 }
       );
-      // Retour sur la page Deal. NB mock stateless : la vue PICKED_UP
-      // persistante arrive avec le chantier Expéditeur (code révélé).
+      refreshDeal();
       router.push(`/carrier/deals/${deal.id}`);
-    } catch {
-      toast.error(t("confirm.toastError"));
+    } catch (e) {
+      handleTransitionError(e, t("confirm.toastError"));
     } finally {
       setIsSubmittingConfirm(false);
     }
   };
 
-  const handleRefuse = async (payload: {
-    reason?: PickupRefuseReason;
-    details?: string;
-  }) => {
+  const handleRefuse = async (payload: { reason?: PickupRefuseReason }) => {
     if (!deal || isSubmittingRefuse) return;
     setIsSubmittingRefuse(true);
     try {
@@ -122,9 +164,10 @@ export default function DealPickupClient({ dealId }: Props) {
         { duration: 4500 }
       );
       setRefuseOpen(false);
+      refreshDeal();
       router.push("/");
-    } catch {
-      toast.error(t("refuse.toastError"));
+    } catch (e) {
+      handleTransitionError(e, t("refuse.toastError"));
     } finally {
       setIsSubmittingRefuse(false);
     }
@@ -179,6 +222,5 @@ export type DealPickupViewProps = {
   onConfirmAction: () => void;
   onRefuseConfirmAction: (payload: {
     reason?: import("../../deal.types").PickupRefuseReason;
-    details?: string;
   }) => void;
 };

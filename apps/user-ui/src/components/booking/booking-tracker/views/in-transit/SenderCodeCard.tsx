@@ -67,7 +67,7 @@ export default function SenderCodeCard({
     }
     setIsRegenerating(true);
     try {
-      const result = await regenerateDeliveryCode(booking.id, regeneratedCount);
+      const result = await regenerateDeliveryCode(booking.id);
       onCodeRegeneratedAction(result.newCode, result.regeneratedCount);
       toast.success(
         t("pickedUp.code.toastRegenerated", { recipientFirstName }),

@@ -120,8 +120,6 @@
       "BAD_PACKAGING": "Emballage inadapté au transport",
       "OTHER": "Autre raison"
     },
-    "detailsLabel": "Détails (optionnel)",
-    "detailsPlaceholder": "Précise ce qui ne va pas…",
     "finalWarning": "Cette action est définitive",
     "cancel": "Annuler",
     "confirmRefuse": "Refuser le colis",
@@ -139,5 +137,9 @@
     "title": "Le jour J : la prise en charge",
     "subtitle": "Quand tu rencontres {shipperFirstName}, vérifie le colis et confirme la prise en charge — elle recevra alors son code de livraison.",
     "button": "Confirmer la prise en charge"
+  },
+  "errors": {
+    "uploadFailed": "Le téléversement d''une photo a échoué. Vérifie ta connexion et réessaye — rien n''a été envoyé.",
+    "dealChanged": "Ce deal a changé entre-temps. On recharge la page."
   }
 }

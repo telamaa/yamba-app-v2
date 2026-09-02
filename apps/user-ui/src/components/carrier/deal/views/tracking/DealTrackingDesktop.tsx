@@ -58,6 +58,7 @@ export default function DealTrackingDesktop(props: DealTrackingViewProps) {
               deal={deal}
               confirmedEvents={props.confirmedEvents}
               onEventConfirmedAction={props.onEventConfirmedAction}
+          onEventCommittedAction={props.onEventCommittedAction}
               onDeliverAction={props.onDeliverAction}
             />
 

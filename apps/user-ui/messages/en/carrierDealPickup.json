@@ -120,8 +120,6 @@
       "BAD_PACKAGING": "Packaging unfit for transport",
       "OTHER": "Other reason"
     },
-    "detailsLabel": "Details (optional)",
-    "detailsPlaceholder": "Explain what''s wrong…",
     "finalWarning": "This action is final",
     "cancel": "Cancel",
     "confirmRefuse": "Refuse the parcel",
@@ -139,5 +137,9 @@
     "title": "On the day: parcel pickup",
     "subtitle": "When you meet {shipperFirstName}, inspect the parcel and confirm pickup — she''ll then receive her delivery code.",
     "button": "Confirm pickup"
+  },
+  "errors": {
+    "uploadFailed": "A photo upload failed. Check your connection and try again — nothing was sent.",
+    "dealChanged": "This deal changed in the meantime. Reloading."
   }
 }
