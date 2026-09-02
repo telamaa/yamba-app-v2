@@ -1,13 +1,22 @@
 "use client";
 
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import { toast } from "sonner";
-import { Car, Plane, Plus, Train } from "lucide-react";
+import { Car, ChevronDown, Plane, Plus, Train } from "lucide-react";
 import { useFlashToast } from "@/hooks/useFlashToast";
 import useUser from "@/hooks/useUser";
+import { useMyDeals } from "@/hooks/useMyDeals";
+import TripActionRow from "@/components/dashboard/trips/TripActionRow";
+import TripDealRow from "@/components/dashboard/trips/TripDealRow";
+import { deriveCarrierActions, type CarrierDealItem } from "@/components/dashboard/trips/trips.types";
+import {
+  countPending,
+  groupDealsByTrip,
+  toCarrierTripItem,
+} from "@/components/dashboard/trips/my-deals.adapter";
 import {
   useMyTrips,
   usePauseTrip,
@@ -40,10 +49,12 @@ import {
 import MyTripsSkeleton from "@/components/dashboard/trips/list/MyTripsSkeleton";
 
 /**
- * Mes trajets — vue réelle (trip-service), identité visuelle "Mes envois" :
+ * Mes trajets — vue réelle (trip-service + deal-service), identité
+ * visuelle "Mes envois" : bande « À traiter » trans-trajets (A44 :
+ * répondre / prise en charge / livraison, dérivée de GET /me/deals),
  * groupes par urgence (À finaliser / À venir / Historique), rows flat,
- * CTA contextuel. La vitrine mock des états deals vit sur
- * /dashboard/trips/preview.
+ * CTA contextuel, et sous chaque trajet ses deals réels (lignes
+ * cliquables). La vitrine mock vit sur /dashboard/trips/preview.
  * ⭐ i18n : namespace "myTrips" (next-intl) — zéro ternaire isFr.
  */
 
@@ -61,11 +72,15 @@ type Filter = "all" | Group;
 function TripRow({
                    trip,
                    group,
+                   deals,
+                   nowMs,
                    needsOnboarding,
                    onAction,
                  }: {
   trip: TripListItem;
   group: Group;
+  deals: CarrierDealItem[];
+  nowMs: number;
   needsOnboarding: boolean;
   onAction: (key: TripActionKey, trip: TripListItem) => void;
 }) {
@@ -75,7 +90,13 @@ function TripRow({
   const TransportIcon = trip.transportMode
     ? TRANSPORT_ICONS[trip.transportMode]
     : Plane;
-  const demands = trip.pendingDemandsCount ?? 0;
+  // A44 : dérivé des deals réels (le compteur serveur n'existe pas)
+  const demands = countPending(deals);
+  const hasLiveDeal = deals.some((d) =>
+    d.status === "PENDING" || d.status === "ACCEPTED" || d.status === "PICKED_UP" || d.status === "DELIVERED"
+  );
+  // Ouvert par défaut quand quelque chose se passe ; replié sur l'historique.
+  const [dealsOpen, setDealsOpen] = useState(hasLiveDeal && group !== "history");
   const isDraft = trip.status === "DRAFT";
   const isPaused = trip.status === "PAUSED";
   const muted = group === "history";
@@ -142,7 +163,27 @@ function TripRow({
     );
   }
 
+  const dealsToggle =
+    deals.length > 0 ? (
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          setDealsOpen((v) => !v);
+        }}
+        aria-expanded={dealsOpen}
+        className="inline-flex min-h-[32px] items-center gap-1 rounded-lg px-2 py-1 text-[12px] font-medium text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
+      >
+        {t("list.deals.toggle", { count: deals.length })}
+        <ChevronDown
+          size={14}
+          className={"transition-transform " + (dealsOpen ? "rotate-180" : "")}
+        />
+      </button>
+    ) : null;
+
   return (
+    <>
     <div className={rowClass}>
       {/* Lien réel en overlay : toute la row est un <a> natif
           (clic droit → nouvel onglet, clic molette, Enter au clavier),
@@ -166,8 +207,8 @@ function TripRow({
         <div className="mt-0.5 truncate text-xs text-slate-500 dark:text-slate-400">
           {subParts.filter(Boolean).join(" · ")}
         </div>
-        {/* Mobile : badge + demandes sous le texte */}
-        <div className="mt-2 flex flex-wrap items-center gap-2 sm:hidden">
+        {/* Mobile : badge + demandes + colis sous le texte */}
+        <div className="relative z-10 mt-2 flex flex-wrap items-center gap-2 sm:hidden">
           <StatusBadge status={trip.status} needsOnboarding={needsOnboarding} />
           {demands > 0 && (
             <span
@@ -177,6 +218,7 @@ function TripRow({
               {t("list.demands", { count: demands })}
             </span>
           )}
+          {dealsToggle}
         </div>
       </div>
 
@@ -186,9 +228,20 @@ function TripRow({
           <StatusBadge status={trip.status} needsOnboarding={needsOnboarding} />
         </span>
         {cta}
+        <span className="hidden sm:inline-flex">{dealsToggle}</span>
         <ActionMenu trip={trip} onAction={onAction} />
       </div>
     </div>
+
+    {/* Deals réels du trajet (A44) — lignes cliquables vers /carrier/deals/[id] */}
+    {deals.length > 0 && dealsOpen && (
+      <div className="mb-1.5 -mt-0.5 rounded-lg border border-slate-100 bg-white px-2 py-1.5 dark:border-slate-800 dark:bg-slate-950 sm:ml-[52px]">
+        {deals.map((deal) => (
+          <TripDealRow key={deal.id} deal={deal} nowMs={nowMs} />
+        ))}
+      </div>
+    )}
+    </>
   );
 }
 
@@ -208,6 +261,26 @@ export default function MyTripsList() {
     if (rawData.trips && Array.isArray(rawData.trips)) return rawData.trips;
     return [];
   }, [rawData]);
+
+  /* Deals réels (A44) : une lecture, dérivations en mémoire */
+  const { data: dealViews } = useMyDeals();
+  const dealsByTrip = useMemo(() => groupDealsByTrip(dealViews ?? []), [dealViews]);
+  const actions = useMemo(
+    () =>
+      deriveCarrierActions(
+        trips
+          .filter((trip) => (dealsByTrip.get(trip.id)?.length ?? 0) > 0)
+          .map((trip) => toCarrierTripItem(trip, dealsByTrip.get(trip.id) ?? []))
+      ),
+    [trips, dealsByTrip]
+  );
+
+  /* Tick 60 s pour les échéances (« expire dans 3 h ») */
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    const interval = setInterval(() => setNowMs(Date.now()), 60_000);
+    return () => clearInterval(interval);
+  }, []);
 
   const pauseTrip = usePauseTrip();
   const resumeTrip = useResumeTrip();
@@ -503,9 +576,19 @@ export default function MyTripsList() {
     <div>
       {/* Header + CTA */}
       <div className="mb-5 flex items-center justify-between gap-3">
-        <h1 className="text-xl font-medium text-slate-900 dark:text-white">
-          {t("title")}
-        </h1>
+        <div className="min-w-0">
+          <h1 className="text-xl font-medium text-slate-900 dark:text-white">
+            {t("title")}
+          </h1>
+          {totalCount > 0 && (
+            <p className="mt-0.5 truncate text-[13px] text-slate-500 dark:text-slate-400">
+              {t("list.subtitle", {
+                actions: actions.length,
+                upcoming: grouped.upcoming.length,
+              })}
+            </p>
+          )}
+        </div>
         <button
           type="button"
           onClick={() => router.push("/trips/create")}
@@ -523,6 +606,20 @@ export default function MyTripsList() {
           onAction={() => router.push("/carrier/onboarding")}
           onDismiss={() => setBannerDismissed(true)}
         />
+      )}
+
+      {/* À traiter — inbox dérivée, trans-trajets (A44) */}
+      {actions.length > 0 && (
+        <section className="mb-6">
+          {groupHead("bg-amber-400", t("groups.actions"), actions.length)}
+          {actions.map((action) => (
+            <TripActionRow
+              key={action.kind + "_" + action.dealId}
+              action={action}
+              nowMs={nowMs}
+            />
+          ))}
+        </section>
       )}
 
       {totalCount === 0 ? (
@@ -573,6 +670,8 @@ export default function MyTripsList() {
                   key={trip.id}
                   trip={trip}
                   group={g}
+                  deals={dealsByTrip.get(trip.id) ?? []}
+                  nowMs={nowMs}
                   needsOnboarding={needsOnboarding}
                   onAction={handleAction}
                 />

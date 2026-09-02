@@ -6,13 +6,15 @@ import { useTranslations } from "next-intl";
 import {
   CheckCircle2,
   FileText,
-  Mail,
   Package,
   Pause,
   Plane,
 } from "lucide-react";
 import useUser from "@/hooks/useUser";
 import { useMyTrips } from "@/hooks/useTrip";
+import { useMyDeals } from "@/hooks/useMyDeals";
+import { groupDealsByTrip, toCarrierTripItem } from "@/components/dashboard/trips/my-deals.adapter";
+import { deriveCarrierActions } from "@/components/dashboard/trips/trips.types";
 import {
   isTripPastDeparture,
   type TripListItem,
@@ -114,11 +116,18 @@ function EmptyInbox() {
 
 /* ── LIVE : dérivé des données réelles disponibles ───────────────── */
 
-type LiveActionKind = "FINALIZE_DRAFT" | "RESUME_PAUSED" | "DEMANDS";
+type LiveActionKind = "FINALIZE_DRAFT" | "RESUME_PAUSED";
 
 function HomeLive() {
   const t = useTranslations("dashboardHome");
   const { data: rawData, isLoading } = useMyTrips();
+  const { data: dealViews, isLoading: dealsLoading } = useMyDeals();
+  const [nowMs, setNowMs] = useState(() => Date.now());
+
+  useEffect(() => {
+    const interval = setInterval(() => setNowMs(Date.now()), 60_000);
+    return () => clearInterval(interval);
+  }, []);
 
   const trips: TripListItem[] = useMemo(() => {
     if (!rawData) return [];
@@ -127,16 +136,20 @@ function HomeLive() {
     return [];
   }, [rawData]);
 
+  /* A44 : les deals réels d'abord (répondre / prise en charge / livraison) */
+  const dealActions = useMemo(() => {
+    const byTrip = groupDealsByTrip(dealViews ?? []);
+    return deriveCarrierActions(
+      trips
+        .filter((trip) => (byTrip.get(trip.id)?.length ?? 0) > 0)
+        .map((trip) => toCarrierTripItem(trip, byTrip.get(trip.id) ?? []))
+    );
+  }, [trips, dealViews]);
+
   const liveActions = useMemo(() => {
     const actions: { kind: LiveActionKind; trip: TripListItem }[] = [];
     for (const trip of trips) {
-      if (
-        trip.status === "PUBLISHED" &&
-        !isTripPastDeparture(trip.departureDateLocal) &&
-        (trip.pendingDemandsCount ?? 0) > 0
-      ) {
-        actions.push({ kind: "DEMANDS", trip });
-      } else if (trip.status === "DRAFT") {
+      if (trip.status === "DRAFT") {
         actions.push({ kind: "FINALIZE_DRAFT", trip });
       } else if (
         trip.status === "PAUSED" &&
@@ -145,30 +158,36 @@ function HomeLive() {
         actions.push({ kind: "RESUME_PAUSED", trip });
       }
     }
-    // Demandes d'abord (revenu), puis pauses, puis brouillons
+    // Pauses (trajet perdu de vue) avant brouillons
     const order: Record<LiveActionKind, number> = {
-      DEMANDS: 0,
-      RESUME_PAUSED: 1,
-      FINALIZE_DRAFT: 2,
+      RESUME_PAUSED: 0,
+      FINALIZE_DRAFT: 1,
     };
     return actions.sort((a, b) => order[a.kind] - order[b.kind]);
   }, [trips]);
 
-  if (isLoading) return <HomeSkeleton />;
+  if (isLoading || dealsLoading) return <HomeSkeleton />;
+
+  const total = dealActions.length + liveActions.length;
 
   return (
     <>
       <Greeting
         subtitle={
-          liveActions.length > 0
-            ? t("subtitleActions", { count: liveActions.length })
-            : t("subtitleEmpty")
+          total > 0 ? t("subtitleActions", { count: total }) : t("subtitleEmpty")
         }
       />
 
-      {liveActions.length > 0 ? (
+      {total > 0 ? (
         <section>
-          <GroupHead label={t("groups.actions")} count={liveActions.length} />
+          <GroupHead label={t("groups.actions")} count={total} />
+          {dealActions.map((action) => (
+            <TripActionRow
+              key={action.kind + "_" + action.dealId}
+              action={action}
+              nowMs={nowMs}
+            />
+          ))}
           {liveActions.map(({ kind, trip }) => (
             <LiveActionRow key={kind + "_" + trip.id} kind={kind} trip={trip} />
           ))}
@@ -192,21 +211,9 @@ function LiveActionRow({
   const t = useTranslations("dashboardHome");
   const origin = trip.originCity ?? trip.originLabel ?? "—";
   const destination = trip.destinationCity ?? trip.destinationLabel ?? "—";
-  const demands = trip.pendingDemandsCount ?? 0;
 
   const content =
-    kind === "DEMANDS"
-      ? {
-        Icon: Mail,
-        iconClass:
-          "bg-amber-50 text-amber-700 dark:bg-amber-900/25 dark:text-amber-300",
-        title: t("liveTrip.demandsTitle", { count: demands }),
-        sub: t("liveTrip.demandsSub", { origin, destination }),
-        badge: t("liveTrip.badgeDemands"),
-        cta: t("liveTrip.ctaRespond"),
-        pulse: true,
-      }
-      : kind === "RESUME_PAUSED"
+    kind === "RESUME_PAUSED"
         ? {
           Icon: Pause,
           iconClass:

@@ -1327,6 +1327,77 @@
         }
       }
     },
+    "/me/deals": {
+      "get": {
+        "tags": [
+          "me"
+        ],
+        "summary": "My received deals (carrier view, all my trips)",
+        "description": "All deals where the caller is the carrier, across all trips, newest first. CarrierBookingView (earnings only, no delivery code). One read for the trips list, the dashboard inbox and the sidebar badge.",
+        "operationId": "listMyDeals",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/BookingStatus"
+            },
+            "description": "Filter by booking status (exact match)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "My received deals (CarrierBookingView[])",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyDealsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed request: invalid ObjectId or unknown status value (ValidationError)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token missing, invalid, expired, or account not found (isAuthenticated middleware)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unhandled server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnhandledError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/me/bookings": {
       "get": {
         "tags": [
@@ -7036,6 +7107,32 @@
         "required": [
           "success",
           "bookings",
+          "count"
+        ],
+        "additionalProperties": false
+      },
+      "MyDealsResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true
+          },
+          "deals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CarrierBookingView"
+            }
+          },
+          "count": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "success",
+          "deals",
           "count"
         ],
         "additionalProperties": false

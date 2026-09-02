@@ -19,6 +19,7 @@ import { toast } from "sonner";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { useRouter } from "@/i18n/navigation";
 import { dealQueryKey } from "../../DealClient";
+import { MY_DEALS_QUERY_KEY } from "@/hooks/useMyDeals";
 import {
   DealApiError,
   getDealRequest,
@@ -100,6 +101,7 @@ export default function DealDeliverClient({ dealId }: Props) {
         setDeliveredAt(result.deliveredAt);
         // La vérité est en base : la page Deal relira DELIVERED.
         void queryClient.invalidateQueries({ queryKey: dealQueryKey(deal.id) });
+        void queryClient.invalidateQueries({ queryKey: MY_DEALS_QUERY_KEY });
       } catch (e) {
         if (e instanceof DealApiError) {
           if (e.code === "DELIVERY_CODE_INVALID") {

@@ -10,196 +10,27 @@ import {
   Plane,
   PlaneLanding,
 } from "lucide-react";
-import type {
-  CarrierDealItem,
-  CarrierDealStatus,
-  CarrierTripItem,
-} from "./trips.types";
+import type { CarrierTripItem } from "./trips.types";
 import {
   getTripConfirmedEarnings,
   getTripEngagedCount,
   getTripPendingCount,
 } from "./trips.types";
 import {
-  categoryLabel,
   formatDateShort,
   formatDayMonth,
   formatMoney,
   formatRelativePast,
-  formatRemaining,
   formatTimeShort,
   formatWeight,
-  type Translator,
 } from "./trips.format";
+import TripDealRow, { BADGE_BASE, BADGE_TONES } from "./TripDealRow";
 
 type Props = {
   trip: CarrierTripItem;
   nowMs: number;
   defaultOpen?: boolean;
 };
-
-/* ── Badges deal (mapping statique) ─────────────────────────────── */
-
-const BADGE_BASE =
-  "inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-0.5 text-[11px] font-medium ";
-
-const BADGE_TONES = {
-  slate: "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400",
-  teal: "bg-teal-50 text-teal-800 dark:bg-teal-900/30 dark:text-teal-300",
-  amber: "bg-amber-50 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300",
-  emerald:
-    "bg-emerald-50 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300",
-  red: "bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-300",
-} as const;
-
-type DealBadge = { label: string; tone: keyof typeof BADGE_TONES; pulse: boolean };
-
-function buildDealBadge(
-  deal: CarrierDealItem,
-  t: Translator
-): DealBadge {
-  switch (deal.status) {
-    case "PENDING":
-      return { label: t("deal.badgePending"), tone: "amber", pulse: true };
-    case "ACCEPTED":
-      return { label: t("deal.badgeAccepted"), tone: "teal", pulse: false };
-    case "PICKED_UP":
-      if (deal.lastTrackingStep === "FLIGHT_ARRIVED") {
-        return { label: t("deal.badgeReady"), tone: "emerald", pulse: true };
-      }
-      return { label: t("deal.badgeInTransit"), tone: "teal", pulse: false };
-    case "DELIVERED":
-      return { label: t("deal.badgeDelivered"), tone: "emerald", pulse: false };
-    case "COMPLETED":
-      return { label: t("deal.badgeCompleted"), tone: "emerald", pulse: false };
-    case "DISPUTED":
-      return { label: t("deal.badgeDisputed"), tone: "red", pulse: false };
-    case "DECLINED":
-    case "EXPIRED":
-    case "CANCELLED":
-      return { label: t("trip.statusCancelled"), tone: "slate", pulse: false };
-  }
-}
-
-function buildDealSub(
-  deal: CarrierDealItem,
-  t: Translator,
-  locale: string,
-  nowMs: number
-): string {
-  switch (deal.status) {
-    case "PENDING":
-      return t("deal.pendingSub", {
-        remaining: deal.expiresAt
-          ? formatRemaining(deal.expiresAt, nowMs, locale) ?? "—"
-          : "—",
-      });
-    case "ACCEPTED":
-      return t("deal.acceptedSub", {
-        when: deal.pickupMeetingAt
-          ? formatTimeShort(locale, deal.pickupMeetingAt)
-          : "",
-        location: deal.pickupLocationName ?? "",
-      });
-    case "PICKED_UP":
-      if (deal.lastTrackingStep === "FLIGHT_ARRIVED") {
-        return t("deal.readySub", {
-          recipientFirstName: deal.recipientFirstName ?? "",
-        });
-      }
-      return t("deal.pickedUpSub");
-    case "DELIVERED":
-      return t("deal.deliveredSub");
-    case "COMPLETED":
-      return deal.hasRated
-        ? t("deal.completedRatedSub", {
-          recipientFirstName: deal.recipientFirstName ?? "",
-          earnings: formatMoney(locale, deal.netEarningsEur),
-        })
-        : t("deal.completedUnratedSub", {
-          recipientFirstName: deal.recipientFirstName ?? "",
-          firstName: deal.shipper.firstName,
-        });
-    default:
-      return "";
-  }
-}
-
-const ENGAGED_STATUSES: CarrierDealStatus[] = [
-  "ACCEPTED",
-  "PICKED_UP",
-  "DELIVERED",
-  "COMPLETED",
-];
-
-/* ── Sous-composant : deal row (Link, pas de CTA imbriqué) ──────── */
-
-function TripDealRow({
-                       deal,
-                       nowMs,
-                     }: {
-  deal: CarrierDealItem;
-  nowMs: number;
-}) {
-  const t = useTranslations("myTrips");
-  const locale = useLocale();
-
-  const badge = buildDealBadge(deal, t);
-  const sub = buildDealSub(deal, t, locale, nowMs);
-
-  const line = deal.recipientFirstName
-    ? t("deal.lineWithRecipient", {
-      firstName: deal.shipper.firstName,
-      lastInitial: deal.shipper.lastInitial,
-      category: categoryLabel(t, deal.category),
-      weight: formatWeight(locale, deal.weightKg),
-      recipientFirstName: deal.recipientFirstName,
-    })
-    : t("deal.line", {
-      firstName: deal.shipper.firstName,
-      lastInitial: deal.shipper.lastInitial,
-      category: categoryLabel(t, deal.category),
-      weight: formatWeight(locale, deal.weightKg),
-    });
-
-  const isEngaged = ENGAGED_STATUSES.includes(deal.status);
-  const moneyClass =
-    "flex-none text-[13px] font-medium " +
-    (isEngaged
-      ? "text-emerald-700 dark:text-emerald-300"
-      : "text-slate-400 dark:text-slate-500");
-  const moneyLabel =
-    (isEngaged ? "" : "+ ") + formatMoney(locale, deal.netEarningsEur);
-
-  const initials =
-    deal.shipper.firstName.charAt(0) + deal.shipper.lastInitial.charAt(0);
-
-  return (
-    <Link
-      href={"/carrier/deals/" + deal.id}
-      className="flex items-center gap-3 rounded-lg px-2 py-2.5 transition-colors hover:hover:bg-slate-100 dark:hover:bg-slate-800/60"
-    >
-      <div className="grid h-8 w-8 flex-shrink-0 place-items-center rounded-full bg-teal-700 text-[11px] font-bold text-white">
-        {initials.toUpperCase()}
-      </div>
-      <div className="min-w-0 flex-1">
-        <div className="truncate text-[13px] font-medium text-slate-900 dark:text-white">
-          {line}
-        </div>
-        <div className="mt-0.5 truncate text-[11.5px] text-slate-500 dark:text-slate-400">
-          {sub}
-        </div>
-      </div>
-      <span className={BADGE_BASE + BADGE_TONES[badge.tone]}>
-        {badge.pulse && (
-          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-current" />
-        )}
-        {badge.label}
-      </span>
-      <span className={moneyClass}>{moneyLabel}</span>
-    </Link>
-  );
-}
 
 /* ── Composant principal ────────────────────────────────────────── */
 

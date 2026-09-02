@@ -500,6 +500,26 @@ export function buildOpenApiDocument() {
         },
       },
 
+      /* ── Mes deals reçus (A44) ────────────────────────────── */
+      "/me/deals": {
+        get: {
+          tags: ["me"],
+          summary: "My received deals (carrier view, all my trips)",
+          description:
+            "All deals where the caller is the carrier, across all trips, newest first. CarrierBookingView " +
+            "(earnings only, no delivery code). One read for the trips list, the dashboard inbox and the sidebar badge.",
+          operationId: "listMyDeals",
+          security: authSecurity,
+          parameters: [statusQueryParam],
+          responses: {
+            "200": jsonResponse("MyDealsResponse", "My received deals (CarrierBookingView[])"),
+            "400": response400,
+            "401": response401,
+            "500": response500,
+          },
+        },
+      },
+
       /* ── Mes envois ───────────────────────────────────────── */
       "/me/bookings": {
         get: {

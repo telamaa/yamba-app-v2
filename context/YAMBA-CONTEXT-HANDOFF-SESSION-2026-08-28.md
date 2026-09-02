@@ -315,3 +315,18 @@ dispute (gel, ticket YAM-XXXX, photos ImageKit D42), emails completed/payout_sen
 bascule des mocks tracker confirmer/litige. Rituel : inventaire AVANT le code, décisions au registre
 AVANT le code, compléter les 3 docs cumulatifs, mobile-first, aucune attribution Claude.
 ```
+
+---
+
+# ADDENDUM · 2 septembre 2026 (soir) — recette à deux vrais comptes → B3-PR3 boîte du Voyageur (A44)
+
+## A. Ce qui s'est passé
+1. Recette utilisateur avec deux vrais comptes : étapes 1–3 OK (trajet, réservation Stripe test, acceptation). Étape 4 bloquée : **aucun chemin front vers `/carrier/deals/:id`** pour le Voyageur ; **aucun email** reçu ; bruit `KafkaJSNumberOfRetriesExceeded` dans deal/notification-service.
+2. Diagnostic : (a) Docker n'était pas lancé → Redpanda absent → relay outbox et consumer down → ni in-app ni email (les événements attendent en base) ; (b) « Mes trajets » réel sans deals, vitrine à deals en mock, notifications non cliquables, `pendingDemandsCount` attendu par 3 composants et servi par personne.
+3. **A44 gravé** puis B3-PR3 sur `feat/b3-carrier-inbox` : `GET /me/deals` + gateway + OAS ; `useMyDeals`, `my-deals.adapter.ts`, `TripDealRow` extrait du mock ; bande « À traiter » + deals sous chaque trajet + sous-titre dans `MyTripsList` ; accueil ; `useTripsBadge` (sidebar + barre mobile) ; `Notifications` = liens ; `TripDealsSection` sur la page trajet ; invalidation `["my-deals"]` après accept/decline/pickup/deliver ; i18n `list.subtitle`, `list.deals.*`. Docs : registre (A44, §7.1), contexte, suivi, 3 cumulatifs (B3-PR3, RG-P-18…22, chapitre 45).
+
+## B. Reprise
+- Merger la PR B3-PR3 (13 checks), purger `feat/b3-carrier-inbox`.
+- **Utilisateur** : lancer Docker puis `docker compose up -d` (+ `./scripts/redpanda-bootstrap.sh` une fois) AVANT de reprendre la recette — les emails et notifications en dépendent ; puis recette V1–V9 (`YAMBA-DOC-METIER.md`) et F1–F8.
+- Pistes UX notées, non faites : badge « Mes envois » (Expéditeur), « tout marquer lu », temps réel sur la boîte, RDV de pickup dans le modèle (heure sur la bande « prise en charge »).
+- ⭐ Ensuite : B4 argent sortant (prompt de l'addendum précédent inchangé).
