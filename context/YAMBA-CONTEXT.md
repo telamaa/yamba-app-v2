@@ -174,6 +174,7 @@ Ordre de demarrage : auth -> trip -> gateway.
   (`TripDealRow` extrait du mock), section sur la page trajet, notifications =
   liens (deal ou suivi selon le lecteur), badge partage sidebar + barre mobile
   (`useTripsBadge`). Preuve : tsc, build prod, i18n, GET /me/deals sur Atlas.
+  MERGE **#98** (13 checks comptes, branche purgee). **B3 SOLDE.**
 - Plateforme de tests : 600 (trip 187, deal 354, notification 59) — post-B3 (#96).
 - MERGE 01/09 : toute la pile B2 est dans `dev` via la SEULE **PR #90**
   (`feat/b2-deal-front` portait la chaîne complète : jalons mobile D36,
