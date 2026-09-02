@@ -969,3 +969,9 @@ tsc (user-ui, deal-service) · build de production · i18n miroir · deal-servic
 
 ### 7. Hors périmètre (assumé)
 Stats de confiance du Voyageur/Expéditeur (B5) ; galerie plein écran des photos ; compression HEIC ; la vitrine `/dashboard/trips/preview` (mock).
+
+---
+
+# B3-PR5 (chore) — Échelle typographique des pages Deal et grilles dès `md` (A46)
+
+Recette utilisateur : « Mon Deal accepté » et « Et maintenant ? » trop grands, même remarque sur la page de prise en charge. Cause : les cinq vues desktop du module `carrier/deal` (`DealRequestDesktop`, `DealAcceptedHeader`/`Desktop`, `DealPickupDesktop`, `DealTrackingDesktop`, `DealDeliverDesktop`) portaient un H1 `text-2xl font-black sm:text-3xl` suivi d'un H2 `text-xl font-black sm:text-2xl`, et les vues mobiles un H2 `19px black`. Remplacement mécanique (script, 5 + 3 + 3 + 1 occurrences) par l'échelle du dashboard : H1 `text-[22px] font-semibold sm:text-2xl`, H2 `text-[17px] font-semibold sm:text-lg`, succès `22/26px bold`. Les montants (`DealEarningsHero`, `DealPaymentBlock`, sidebars) gardent `font-black` : c'est l'information qu'on veut voir. Dans la même passe, les quatre grilles restées en `lg:grid-cols` + `aside hidden lg:block` (accepté, pickup, tracking, deliver) et `DealSkeleton` passent en `md:` (300 px) puis `lg:` (320/340 px) — le correctif A45 s'applique à tout le module. Preuves : tsc, build de production.

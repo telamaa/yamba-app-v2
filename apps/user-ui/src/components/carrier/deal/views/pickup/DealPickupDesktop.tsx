@@ -48,7 +48,7 @@ export default function DealPickupDesktop(props: DealPickupViewProps) {
             <ArrowLeft size={14} />
             {t("back")}
           </button>
-          <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white sm:text-3xl">
+          <h1 className="text-[22px] font-semibold tracking-tight text-slate-900 dark:text-white sm:text-2xl">
             {t("title")}
           </h1>
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
@@ -67,11 +67,11 @@ export default function DealPickupDesktop(props: DealPickupViewProps) {
           </div>
 
           {/* Grid contenu + sidebar */}
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-[minmax(0,1fr)_300px] lg:grid-cols-[minmax(0,1fr)_320px]">
             {/* Colonne principale : les actions */}
             <div className="space-y-5">
               <header>
-                <h2 className="text-xl font-black tracking-tight text-slate-900 dark:text-white sm:text-2xl">
+                <h2 className="text-[17px] font-semibold tracking-tight text-slate-900 dark:text-white sm:text-lg">
                   {t("sectionTitle")}
                 </h2>
                 <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
@@ -100,7 +100,7 @@ export default function DealPickupDesktop(props: DealPickupViewProps) {
             </div>
 
             {/* Sidebar sticky */}
-            <aside className="hidden lg:block">
+            <aside className="hidden md:block">
               <div className="sticky top-[88px] space-y-4">
                 <PickupDeclaredCard deal={deal} />
 

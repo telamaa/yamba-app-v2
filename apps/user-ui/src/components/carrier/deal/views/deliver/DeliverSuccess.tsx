@@ -48,7 +48,7 @@ export default function DeliverSuccess({
           <Check size={38} strokeWidth={3} aria-hidden="true" />
         </div>
 
-        <h1 className="mt-6 text-[26px] font-black tracking-tight text-slate-900 dark:text-white sm:text-[30px]">
+        <h1 className="mt-6 text-[22px] font-bold tracking-tight text-slate-900 dark:text-white sm:text-[26px]">
           {t("success.title")}
         </h1>
         <p className="mt-2 text-[14px] leading-relaxed text-slate-600 dark:text-slate-400">
