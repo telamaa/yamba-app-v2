@@ -184,6 +184,13 @@ Ordre de demarrage : auth -> trip -> gateway.
   (telephone « a la prise en charge ») ; `BookingCounterpart.publicSlug`
   → « Voir profil » reel vers /u/[slug]. deal-service 355 tests. MERGE **#100**.
 - Plateforme de tests : 601 (trip 187, deal 355, notification 59) — post-#100.
+- 02/09 apres-midi (recette reelle a deux comptes, LAN) : #102 typographie Deal
+  (A46), #104 fix SDK imagekit 1.5.0→6.0.0 (A47 — aucun upload ne marchait),
+  #106 visionneuse photos partagee (A48), #109 fix relay outbox — aucun
+  evenement reel n'etait relaye, pitfall null/absent 3e occurrence (A49),
+  #111 allowedDevOrigins (Next 16 bloque /_next hors localhost), #113
+  atterrissage post-OTP, #114 redirect conserve inscription→connexion.
+  Recette OK jusqu'a F1 ; reste F4→F7, D1–D7, V1–V9 (utilisateur). dev = 3370efa.
 - Plateforme de tests : 600 (trip 187, deal 354, notification 59) — post-B3 (#96).
 - MERGE 01/09 : toute la pile B2 est dans `dev` via la SEULE **PR #90**
   (`feat/b2-deal-front` portait la chaîne complète : jalons mobile D36,

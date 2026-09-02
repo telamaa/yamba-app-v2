@@ -346,3 +346,53 @@ Captures utilisateur sur `/carrier/deals/[id]` : (1) à ~900 px, aucune colonne 
 - **B3-PR5 (chore, A46)** : titres des 5 pages Deal ramenés à l'échelle du dashboard (22/17 px semibold), colonne d'action dès `md` sur accepté/pickup/tracking/deliver + squelette. **#102 mergée**, branche purgée.
 - Pistes UX restantes sur É2 : stats de confiance (B5), galerie photos plein écran.
 - Ensuite : B4 (prompt inchangé).
+
+---
+
+# ADDENDUM · 2 septembre 2026 (fin de journée) — SYNTHÈSE DE REPRISE (prime sur les addenda précédents du 02/09)
+
+## A. État exact
+
+- **`dev` = `3370efa` (#114)**, arbre propre, toutes les branches du jour purgées. `main` = `9c6e155` (#88) — release à faire un jour (pas urgent).
+- **Plateforme de tests : 601** (trip 187 · deal 355 · notification 59) · tsc ×6 · i18n miroir · aucun trailer.
+- Registre : D1→D43, arbitrages A1→A49 (§2bis.8). Docs cumulatifs à jour jusqu'à B3-PR6 + fixes (A47 ImageKit, A49 relay).
+- **PR mergées aujourd'hui (13 checks comptés à chaque fois)** : #95 B3-PR1 serveur · #96 B3-PR2 front · #98 B3-PR3 boîte du Voyageur (A44) · #100 B3-PR4 page demande (A45) · #102 typographie Deal (A46) · #104 fix ImageKit SDK (A47) · #106 visionneuse photos (A48) · #109 fix relay outbox (A49) · #111 `allowedDevOrigins` (recette LAN) · #112 backlog messages d'inscription · #113 atterrissage post-OTP · #114 redirect conservé inscription → connexion · + les mini-PR docs (#97, #99, #101, #103, #105, #108, #110). **B3 SOLDÉ.**
+
+## B. Recette réelle (deux vrais comptes, plusieurs postes en LAN) — où on en est
+
+- **OK** : 1 → 3 (trajet, réservation Stripe test avec photos, acceptation), **F1** (prise en charge : 5/5 + 2 photos, upload ImageKit réel, code généré), photos visibles des deux côtés (visionneuse), emails reçus à chaque étape (nouvelle demande → Voyageur ; reçu, acceptation, « colis en route » → Expéditrice), notifications in-app cliquables, bande « À traiter » et deals dans Mes trajets, badge mobile.
+- **À faire (l'utilisateur reprend ici)** : **F4** (jalon + Annuler sous 5 s : rien ne part) · **F5** (jalon confirmé : timeline Expéditrice + in-app, pas d'email) · **F6** (3 codes faux → verrou 15 min, persiste au rechargement) · **F7** (régénération Expéditrice → email « nouveau code », verrou levé ; ancien code refusé ; bon code → succès J+4, email « colis livré ») · puis D1–D7 (page demande, dont le test à 900 px) et V1–V9 (boîte du Voyageur). Grilles de recette : `YAMBA-DOC-METIER.md` (P, F, V, D).
+- Deals réels en base au moment de la pause : `6a983c1899b9b5457e01f251` (PICKED_UP, 2 photos), `6a97da7083072671f271b057` (PICKED_UP, 2 photos), `6a97090dc356f11ec8493ac5` (ACCEPTED — matière pour un 2e parcours ou un refus au pickup F3, avec vrai remboursement Stripe).
+
+## C. Environnement local — ce qui a changé aujourd'hui (à connaître avant de relancer quoi que ce soit)
+
+- **Recette LAN** : `apps/user-ui/.env.local` pointe sur `http://192.168.1.155:8080/api` (lignes localhost commentées) → utiliser `http://192.168.1.155:3000` sur TOUS les postes, y compris le Mac (cookies liés à l'hôte). Pour revenir en local : réinverser les commentaires et relancer user-ui. `allowedDevOrigins` (réseaux privés) dans `next.config.js` (#111).
+- **`.env` racine** : fins de ligne converties CR → LF (contenu identique) ; il contient bien les 6 `SMTP_*` (Gmail, mot de passe d'application avec espaces — toléré ; `SMTP_FROM_NAME` non lu, la lib prend son défaut). **`DELIVERY_CODE_ENCRYPTION_KEY` toujours absente** → clé de dev dérivée + avertissement : à poser (`openssl rand -base64 32`) puis rejouer le seed.
+- **Docker** doit tourner (`docker compose up -d`) : sans Redpanda, ni in-app ni email. Le relay ne voyait AUCUN événement réel avant #109 (pitfall `null`/absent, 3e occurrence) : 31 événements orphelins parqués, tout est vert depuis.
+- `imagekit@6.0.0` épinglé (le 1.5.0 était un SDK 2016) : `npm ls imagekit` doit dire « deduped ».
+- Seed : `npx tsx --env-file=.env packages/libs/prisma/scripts/seed-deals.ts` (jamais `source .env`).
+- Ne PAS lancer `nx build user-ui` pendant qu'un `nx dev user-ui` tourne (même dossier `.next`).
+
+## D. Backlog ouvert aujourd'hui (non fait, volontairement)
+
+- **Messages d'erreur explicites à l'inscription** (#112, suivi §7, mémoire) : nommer le critère fautif (prénom/nom/email dans le mot de passe…), codes serveur par règle, revue email déjà pris / téléphone / champs requis.
+- Dettes D42 : URLs signées / fichiers privés ImageKit ; vérification du domaine des URLs photo. Rotation clé AES (format `v1.` prêt). Vue DELIVERED persistante Voyageur (spec §11). Badge « Mes envois », « tout marquer lu », temps réel boîte.
+- Compression HEIC/photos côté client ; galerie plein écran = faite (A48).
+- Toujours en attente hors code : protections `dev`/`main`, purge des vieilles branches pré-release, check requis `next build`, release `main`.
+
+## E. ⭐ Prochaine étape — B4 argent sortant
+
+`POST /deals/:id/confirm` (confirmation anticipée, définitive — INV-3), cron J+4 (`status: DELIVERED, payoutDueAt <= now` → COMPLETED), `transfers.create()` vers le compte Connect du Voyageur (`PaymentProvider.transfer` à ajouter, Fake inclus), `POST /deals/:id/dispute` (DISPUTED, gel du payout, ticket `YAM-XXXX`, photos ImageKit comme D42, description ≥ 50, pledge), matrice remboursements médiation (à graver), emails `completed` / `payout_sent` / `disputed` avec leurs writers (A35), bascule des mocks tracker `confirmDeliveryEarly` / `submitDispute`, vue COMPLETED des deux côtés. Décisions à graver AVANT le code : moment du transfert (à COMPLETED — INV-2), retenue ANN-01 versée au Voyageur (D39), unicité du ticket, destinataires des notifications de litige.
+
+### Prompt d'ouverture prêt-à-coller
+```
+On reprend Yamba — lis context/YAMBA-CONTEXT-HANDOFF-SESSION-2026-08-28.md (addendum « fin de journée » 02/09,
+il prime), context/YAMBA-CONTEXT.md, le registre (D1–D43, A1–A49, §2bis.8) et context/YAMBA-SUIVI-PROJET.md.
+État : dev = 3370efa (#114), B3 SOLDÉ, plateforme 601, recette réelle OK jusqu'à F1 ; l'utilisateur joue F4→F7
+puis D1–D7 et V1–V9 (remonter les écarts avant B4). Env : front en LAN (192.168.1.155), Docker requis,
+DELIVERY_CODE_ENCRYPTION_KEY à poser + seed à rejouer.
+⭐ B4 argent sortant : confirm anticipé, cron J+4 → COMPLETED + PaymentProvider.transfer, dispute (gel, ticket
+YAM-XXXX, photos ImageKit D42), emails completed/payout_sent/disputed (A35), bascule des mocks tracker.
+Rituel : inventaire AVANT le code, décisions au registre AVANT le code, compléter les 3 docs cumulatifs,
+mobile-first, aucune attribution Claude, charte mango/teal/slate.
+```
