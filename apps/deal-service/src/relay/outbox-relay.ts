@@ -132,7 +132,13 @@ export class OutboxRelay {
 
   private async drainBatch(): Promise<void> {
     const rows = await prisma.outboxEvent.findMany({
-      where: { publishedAt: null, attempts: { lt: MAX_RELAY_ATTEMPTS } },
+      // Pitfall Prisma+Mongo (CLAUDE.md, 3e occurrence — A49) : `null` ne
+      // matche PAS un champ ABSENT ; les writers posent désormais `null`
+      // explicitement, mais les documents antérieurs n'ont pas le champ.
+      where: {
+        OR: [{ publishedAt: null }, { publishedAt: { isSet: false } }],
+        attempts: { lt: MAX_RELAY_ATTEMPTS },
+      },
       orderBy: { occurredAt: "asc" },
       take: this.batchSize,
     });
