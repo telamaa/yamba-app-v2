@@ -140,6 +140,8 @@
   },
   "errors": {
     "uploadFailed": "Le téléversement d''une photo a échoué. Vérifie ta connexion et réessaye — rien n''a été envoyé.",
+    "uploadTooLarge": "Une photo dépasse {maxMb} Mo. Réduis-la ou choisis-en une autre — rien n''a été envoyé.",
+    "uploadInvalidType": "Format de photo non pris en charge (JPG, PNG, HEIC ou WebP). Rien n''a été envoyé.",
     "dealChanged": "Ce deal a changé entre-temps. On recharge la page."
   }
 }

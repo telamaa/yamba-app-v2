@@ -15,7 +15,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { useRouter } from "@/i18n/navigation";
-import { useImageKitUpload } from "@/hooks/useImageKitUpload";
+import { PHOTO_MAX_SIZE_BYTES, PHOTO_MIME_TYPES, useImageKitUpload } from "@/hooks/useImageKitUpload";
 import { BookingApiError, createDeal, createPaymentIntent } from "@/services/booking.api";
 import type { Draft, PaymentIntentInfo, Step, TripContext } from "./booking.types";
 
@@ -38,7 +38,10 @@ const KNOWN_CODES = new Set([
 export function useBookingCheckout(args: { draft: Draft; trip: TripContext; step: Step; clear: () => void }) {
   const { draft, trip, step, clear } = args;
   // A45 — photos déclarées : upload direct ImageKit (D42), dossier dédié
-  const { upload } = useImageKitUpload("/bookings/declared");
+  const { uploadDetailed } = useImageKitUpload("/bookings/declared", {
+    maxSizeBytes: PHOTO_MAX_SIZE_BYTES,
+    allowedMimeTypes: PHOTO_MIME_TYPES,
+  });
   const t = useTranslations("booking");
   const router = useRouter();
 
@@ -94,12 +97,19 @@ export function useBookingCheckout(args: { draft: Draft; trip: TripContext; step
       const photoUrls: string[] = [];
       for (const photo of draft.photos) {
         if (!photo.file) continue;
-        const uploaded = await upload(photo.file);
-        if (!uploaded) {
-          toast.error(t("step4.errors.UPLOAD_FAILED"));
+        const result = await uploadDetailed(photo.file);
+        if (!result.ok) {
+          toast.error(
+            result.error.code === "TOO_LARGE"
+              ? t("step4.errors.UPLOAD_TOO_LARGE", { maxMb: Math.round(PHOTO_MAX_SIZE_BYTES / (1024 * 1024)) })
+              : result.error.code === "INVALID_TYPE"
+                ? t("step4.errors.UPLOAD_INVALID_TYPE")
+                : t("step4.errors.UPLOAD_FAILED"),
+            { duration: 6000 }
+          );
           return;
         }
-        photoUrls.push(uploaded.url);
+        photoUrls.push(result.file.url);
       }
 
       if (intent.provider === "STRIPE") {
@@ -128,7 +138,7 @@ export function useBookingCheckout(args: { draft: Draft; trip: TripContext; step
     } finally {
       setIsSubmitting(false);
     }
-  }, [isSubmitting, intent, draft, trip, clear, router, t, errorMessage, refreshIntent, upload]);
+  }, [isSubmitting, intent, draft, trip, clear, router, t, errorMessage, refreshIntent, uploadDetailed]);
 
   return { intent, intentLoading, intentError, refreshIntent, registerConfirm, submit, isSubmitting };
 }
