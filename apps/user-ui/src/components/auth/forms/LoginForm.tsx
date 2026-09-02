@@ -5,7 +5,8 @@ import { useMemo, useState } from "react";
 import { useUiPreferences } from "@/components/providers/UiPreferencesProvider";
 import { useForm } from "react-hook-form";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Eye, EyeOff, Loader2, ShieldCheck } from "lucide-react";
+import { CheckCircle2, Eye, EyeOff, Loader2, ShieldCheck } from "lucide-react";
+import { useFlashToast } from "@/hooks/useFlashToast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   getApiErrorData,
@@ -81,6 +82,10 @@ function buildCopy(lang: string) {
     minPassword: fr
       ? "Le mot de passe doit contenir au moins 8 caractères."
       : "Password must be at least 8 characters.",
+    verifiedTitle: fr ? "Compte activé" : "Account activated",
+    verifiedBody: fr
+      ? "Ton adresse est vérifiée. Connecte-toi avec ton mot de passe pour commencer."
+      : "Your email is verified. Sign in with your password to get started.",
     genericError: fr
       ? "Connexion impossible pour le moment."
       : "Unable to sign in right now.",
@@ -175,6 +180,10 @@ export default function LoginForm({ heroVisual }: Props) {
   const [passwordVisible, setPasswordVisible] = useState(false);
 
   const copy = useMemo(() => buildCopy(lang), [lang]);
+  // Message de succès posé par l'étape précédente (vérification OTP, etc.)
+  useFlashToast();
+  const justVerified = searchParams.get("verified") === "1";
+  const prefilledEmail = searchParams.get("email") ?? "";
 
   const {
     register,
@@ -186,7 +195,7 @@ export default function LoginForm({ heroVisual }: Props) {
     mode: "onBlur",
     reValidateMode: "onChange",
     defaultValues: {
-      email: "",
+      email: prefilledEmail,
       password: "",
       remember: true, // ✅ coché par défaut (UX friendly)
     },
@@ -321,6 +330,19 @@ export default function LoginForm({ heroVisual }: Props) {
           </div>
 
           {/* Form e-mail/password */}
+          {justVerified && (
+            <div
+              role="status"
+              className="mb-4 flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3.5 dark:border-emerald-900/50 dark:bg-emerald-950/30"
+            >
+              <CheckCircle2 size={18} className="mt-0.5 flex-shrink-0 text-emerald-700 dark:text-emerald-300" aria-hidden="true" />
+              <div>
+                <p className="text-[13.5px] font-semibold text-emerald-900 dark:text-emerald-100">{copy.verifiedTitle}</p>
+                <p className="mt-0.5 text-[12.5px] text-emerald-800/90 dark:text-emerald-200/80">{copy.verifiedBody}</p>
+              </div>
+            </div>
+          )}
+
           <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-3">
             <div>
               <label htmlFor="email" className={labelBase}>
