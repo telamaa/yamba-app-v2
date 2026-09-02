@@ -7,12 +7,13 @@
 
 "use client";
 
-import { AlertTriangle, ArrowLeft, ImageIcon, Package, PlaneLanding } from "lucide-react";
+import { AlertTriangle, ArrowLeft, PlaneLanding } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import type { DealDeliverViewProps } from "./DealDeliverClient";
 import DeliverHelpCard from "./DeliverHelpCard";
 import { DeliverInfoBox, DeliverRecipientRow } from "./DeliverInfoBox";
 import DeliverOtpInput from "./DeliverOtpInput";
+import PhotoThumbs from "@/components/shared/photos/PhotoThumbs";
 
 export default function DealDeliverDesktop(props: DealDeliverViewProps) {
   const t = useTranslations("carrierDealDeliver");
@@ -121,25 +122,7 @@ export default function DealDeliverDesktop(props: DealDeliverViewProps) {
                 </p>
                 {deal.pickup && deal.pickup.photos.length > 0 && (
                   <>
-                    <div className="mt-3 flex gap-2">
-                      {deal.pickup.photos.map((photo) => (
-                        <div
-                          key={photo.id}
-                          className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg text-white"
-                          style={{
-                            background:
-                              "linear-gradient(135deg, #BA7517, #EF9F27)",
-                          }}
-                          aria-label={photo.label}
-                        >
-                          {photo.context === "PICKUP_PACKAGED" ? (
-                            <Package size={15} aria-hidden="true" />
-                          ) : (
-                            <ImageIcon size={15} aria-hidden="true" />
-                          )}
-                        </div>
-                      ))}
-                    </div>
+                    <PhotoThumbs photos={deal.pickup.photos} tone="amber" size="md" className="mt-3" />
                     <p className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">
                       {t("sidebar.parcelPhotosNote", {
                         location: deal.pickup.locationName,

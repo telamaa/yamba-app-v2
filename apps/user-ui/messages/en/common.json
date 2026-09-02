@@ -168,5 +168,11 @@
   },
   "dates": {
     "today": "Today"
+  },
+  "lightbox": {
+      "close": "Close",
+      "previous": "Previous photo",
+      "next": "Next photo",
+      "counter": "{current} / {total}"
   }
 }

@@ -9,9 +9,10 @@
 
 "use client";
 
-import { ImageIcon, Package, ShieldCheck } from "lucide-react";
+import { ShieldCheck } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import type { Booking } from "@/components/booking/booking-tracker/booking-tracker.types";
+import PhotoThumbs from "@/components/shared/photos/PhotoThumbs";
 
 export function SenderParcelCard({ booking }: { booking: Booking }) {
   const t = useTranslations("bookingTracker");
@@ -35,22 +36,7 @@ export function SenderParcelCard({ booking }: { booking: Booking }) {
       </p>
       {booking.parcel.photos.length > 0 && (
         <>
-          <div className="mt-3 flex gap-2">
-            {booking.parcel.photos.map((photo) => (
-              <div
-                key={photo.id}
-                className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg text-white"
-                style={{ background: "linear-gradient(135deg, #534AB7, #7F77DD)" }}
-                aria-label={photo.label}
-              >
-                {photo.context === "DECLARED_PACKAGED" ? (
-                  <Package size={15} aria-hidden="true" />
-                ) : (
-                  <ImageIcon size={15} aria-hidden="true" />
-                )}
-              </div>
-            ))}
-          </div>
+          <PhotoThumbs photos={booking.parcel.photos} tone="violet" size="md" className="mt-3" />
           <p className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">
             {t("senderTracking.sidebar.parcelPhotosNote")}
           </p>

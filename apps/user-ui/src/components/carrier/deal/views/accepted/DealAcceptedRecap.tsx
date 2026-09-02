@@ -12,10 +12,11 @@
 
 "use client";
 
-import { Home, ImageIcon, MapPin, Package, User } from "lucide-react";
+import { Home, MapPin, Package, User } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import type { ReactNode } from "react";
 import type { DealRequest } from "@/components/carrier/deal/deal.types";
+import PhotoThumbs from "@/components/shared/photos/PhotoThumbs";
 
 type Props = {
   deal: DealRequest;
@@ -67,24 +68,7 @@ export default function DealAcceptedRecap({ deal }: Props) {
         sub={deal.parcel.description}
         extra={
           deal.parcel.photos.length > 0 ? (
-            <div className="mt-2 flex gap-1.5">
-              {deal.parcel.photos.slice(0, 3).map((photo, i) => (
-                <div
-                  key={photo.id}
-                  className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-md text-white shadow-sm sm:h-12 sm:w-12"
-                  style={{
-                    background: "linear-gradient(135deg, #534AB7, #7F77DD)",
-                  }}
-                  aria-label={photo.label || `Photo ${i + 1}`}
-                >
-                  {photo.context === "DECLARED_PACKAGED" ? (
-                    <Package size={16} />
-                  ) : (
-                    <ImageIcon size={16} />
-                  )}
-                </div>
-              ))}
-            </div>
+            <PhotoThumbs photos={deal.parcel.photos} tone="violet" size="md" max={3} className="mt-2" />
           ) : null
         }
       />

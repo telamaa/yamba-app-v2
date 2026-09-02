@@ -14,7 +14,7 @@
 
 "use client";
 
-import { Check, ImageIcon, Package } from "lucide-react";
+import { Check } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import type { ReactNode } from "react";
 import type {
@@ -22,6 +22,7 @@ import type {
   DealTrackingEventId,
 } from "@/components/carrier/deal/deal.types";
 import { getNextEvent } from "./TrackingSpotlight";
+import PhotoThumbs from "@/components/shared/photos/PhotoThumbs";
 
 type Props = {
   deal: DealRequest;
@@ -81,22 +82,7 @@ export default function TrackingTimeline({
         : undefined,
       extra:
         deal.pickup && deal.pickup.photos.length > 0 ? (
-          <div className="mt-2 flex gap-1.5">
-            {deal.pickup.photos.map((photo) => (
-              <div
-                key={photo.id}
-                className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-md text-white"
-                style={{ background: "linear-gradient(135deg, #BA7517, #EF9F27)" }}
-                aria-label={photo.label}
-              >
-                {photo.context === "PICKUP_PACKAGED" ? (
-                  <Package size={14} aria-hidden="true" />
-                ) : (
-                  <ImageIcon size={14} aria-hidden="true" />
-                )}
-              </div>
-            ))}
-          </div>
+          <PhotoThumbs photos={deal.pickup.photos} tone="amber" size="sm" className="mt-2" />
         ) : null,
     },
     {
