@@ -267,6 +267,8 @@ export function makeDealRequestService(provider: PaymentProvider, clock: () => D
                 eventType: e.eventType,
                 payload: e as never,
                 occurredAt: now,
+              // Explicite : sur Mongo, absent ≠ null pour le relay (A49)
+              publishedAt: null,
               },
             });
           }

@@ -1004,3 +1004,9 @@ Voyageur : `TrackingTimeline` (sm), `TrackingSidebarCards` (md), `DealAcceptedRe
 
 ### 5. Preuves
 tsc user-ui, i18n miroir, aucun dégradé orphelin (`grep BA7517|534AB7` ne remonte plus que la visionneuse et les grilles d'upload).
+
+---
+
+# Fix relay outbox (annexe B3, A49) — le relay ne voyait aucun événement réel
+
+Recette : aucun email ni notification à aucune étape, pour aucun des deux comptes. Probe Atlas : 44 événements outbox, 38 sans `publishedAt` avec `attempts: 0` (jamais tentés), Redpanda up, consumer group stable, lag 0. Cause : `OutboxRelay.drainBatch` filtre `publishedAt: null` ; `applyBookingTransition` et `createBooking` n'écrivaient pas le champ ; sur Mongo, Prisma ne matche pas un champ absent avec `null` (compté : `publishedAt: null` → 0, `OR isSet:false` → 38). Les preuves B1/B2 tenaient sur `seed-outbox.ts`, qui pose `null` explicitement. Fix : filtre `OR` dans le relay (spec mise à jour) + `publishedAt: null` explicite dans les deux writers ; 38 lignes orphelines (bookings effacés par les rejeux du seed) parquées par script (`publishedAt` posé, `lastError` PARKED) ; les 4 événements du deal réel partent au redémarrage du deal-service. Deuxième cause, indépendante : le `.env` racine n'a aucune variable `SMTP_*` (elles ne vivent que dans `apps/trip-service/.env`) — à copier (`SMTP_HOST/PORT/USER/PASS/SERVICE/FROM`) puis relancer notification-service. deal-service 355 tests.

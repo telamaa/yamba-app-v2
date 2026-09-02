@@ -206,7 +206,10 @@ describe("publication nominale", () => {
     await relay.tick();
 
     expect(findManyMock).toHaveBeenCalledWith({
-      where: { publishedAt: null, attempts: { lt: MAX_RELAY_ATTEMPTS } },
+      where: {
+        OR: [{ publishedAt: null }, { publishedAt: { isSet: false } }],
+        attempts: { lt: MAX_RELAY_ATTEMPTS },
+      },
       orderBy: { occurredAt: "asc" },
       take: 50,
     });
