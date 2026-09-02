@@ -1,5 +1,5 @@
 # YAMBA — SUIVI DE PROJET DE BOUT EN BOUT
-### État au 2 septembre 2026 · `dev` = #106 (B3 SOLDÉ, uploads + visionneuse) · 601 tests · `main` = `9c6e155` (#88)
+### État au 2 septembre 2026 · `dev` = #109 (B3 SOLDÉ, uploads, visionneuse, relay réparé) · 601 tests · `main` = `9c6e155` (#88)
 *Légende : ✅ fait (PR) · 🟡 en cours / partiel · ⬜ à faire · 🔴 bloquant lancement. Vélocité = « sessions » (unité des handoffs). Mis à jour à chaque merge (règle : ce fichier + `YAMBA-CONTEXT.md`).*
 
 ---
@@ -80,7 +80,7 @@ Lancement public = fin du Jalon 2. Fourchette tenue au dernier handoff : **5–8
 | **B3-PR5 (chore) — typographie des pages Deal** : H1/H2 alignés sur le dashboard (22/17 px semibold), grilles et colonne d'action dès 768 px sur les 5 pages + squelette — A46 | ✅ #102 | A46 |
 | **Fix ImageKit (A47)** : `imagekit@1.5.0` (fossile 2016) → 6.0.0, d.ts maison supprimée, copie imbriquée dédupliquée ; `uploadDetailed` + erreurs explicites, photos 10 Mo/WebP | ✅ #104 | A47 |
 | **B3-PR6 — visionneuse de photos** : `PhotoThumbs` + `PhotoLightbox` partagés, vignettes réelles cliquables dans les 10 vues (Voyageur + Expéditrice), plein écran clavier/tactile — A48 | ✅ #106 | A48 |
-| **Fix relay outbox (A49)** : filtre `publishedAt` null/absent + writers explicites — aucun événement réel n'avait jamais été relayé ; 38 orphelins parqués ; SMTP à copier dans le `.env` racine | 🟡 PR ouverte | A49 |
+| **Fix relay outbox (A49)** : filtre `publishedAt` null/absent + writers explicites — aucun événement réel n'avait jamais été relayé ; 38 orphelins parqués ; SMTP à copier dans le `.env` racine | ✅ #109 | A49 |
 | ⬜ **B3 — dettes** : URLs signées / fichiers privés ImageKit, vérification du domaine des URLs photo, procédure de rotation de clé AES (format `v1.` prêt), actions tracker confirmer/litige (B4) | ⬜ avec B4 | D42, D43 |
 | 🔴 **B4 — argent sortant** : confirmation anticipée, cron J+4 → COMPLETED + `transfers.create()`, dispute avec gel, versement de la retenue ANN-01 au Voyageur (`CANCEL_LATE_RETENTION_PCT` = 50, gravé D39) | ⬜ (1,5/2,5) | ANN-01…04, D39 |
 | 🔴 **B5 — confiance** : rating double-aveugle serveur, relances J+5/J+7, stats de réputation (D29-1) — unicité (bookingId, authorUserId) sans `@@unique` naïf Mongo | ⬜ (1,5/2) | D29 |
@@ -145,7 +145,7 @@ Estimation : **2–4 sessions** au-dessus du Jalon 4 (l'essentiel du travail est
 | Tests (plateforme) | 601 = trip 187 · deal 355 · notification 59 |
 | Décisions au registre | D1 → D43 (+ arbitrages A1 → A49) |
 | Règles métier | ~50 (V2) + RG-B-01…35, RG-S-01…13, RG-C-01…16, RG-G-01…03, RG-D-01…16, RG-V-01…09, RG-F-01…06, RG-N-01…08, RG-T-01…06, RG-P-01…27 |
-| PR mergées | #1 → #95 (#90 = pile B2-PR1/2/3 · #91 = docs post-merge · #92 = B2-PR4 emails · #93 = B2-PR5 tracker · #94 = docs post-merge · #95 = B3-PR1 serveur · #96 = B3-PR2 front · #97 = docs · #98 = B3-PR3 boîte du Voyageur · #99 = docs · #100 = B3-PR4 page demande · #101 = docs · #102 = typographie Deal · #103 = docs · #104 = fix ImageKit · #105 = docs · #106 = visionneuse photos — 13 checks comptés à chaque fois) |
+| PR mergées | #1 → #95 (#90 = pile B2-PR1/2/3 · #91 = docs post-merge · #92 = B2-PR4 emails · #93 = B2-PR5 tracker · #94 = docs post-merge · #95 = B3-PR1 serveur · #96 = B3-PR2 front · #97 = docs · #98 = B3-PR3 boîte du Voyageur · #99 = docs · #100 = B3-PR4 page demande · #101 = docs · #102 = typographie Deal · #103 = docs · #104 = fix ImageKit · #105 = docs · #106 = visionneuse photos · #108 = docs · #109 = fix relay outbox — 13 checks comptés à chaque fois) |
 | Documents | registre, spec, règles, 5 handoffs (dernier : SESSION-2026-08-28 + addendum 29/08), fiches PR (archive), 3 docs cumulatifs (technique, métier, apprentissage), `YAMBA-MOTEUR-PRIX.md/.pdf`, ce suivi |
 
 ## 9. Ordre recommandé des prochaines sessions
