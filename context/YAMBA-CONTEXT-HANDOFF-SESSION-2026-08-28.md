@@ -340,6 +340,6 @@ Captures utilisateur sur `/carrier/deals/[id]` : (1) à ~900 px, aucune colonne 
 
 ## B. Reprise
 - **FAIT** : #100 mergée (13 checks comptés), branche purgée. Recette D1–D7 puis F/V à jouer par l'utilisateur.
-- **B3-PR5 (chore, A46)** : titres des 5 pages Deal ramenés à l'échelle du dashboard (22/17 px semibold), colonne d'action dès `md` sur accepté/pickup/tracking/deliver + squelette. À merger (13 checks), purger `chore/deal-pages-typography`.
+- **B3-PR5 (chore, A46)** : titres des 5 pages Deal ramenés à l'échelle du dashboard (22/17 px semibold), colonne d'action dès `md` sur accepté/pickup/tracking/deliver + squelette. **#102 mergée**, branche purgée.
 - Pistes UX restantes sur É2 : stats de confiance (B5), galerie photos plein écran.
 - Ensuite : B4 (prompt inchangé).
