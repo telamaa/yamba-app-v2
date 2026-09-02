@@ -1,5 +1,5 @@
 # YAMBA — SUIVI DE PROJET DE BOUT EN BOUT
-### État au 2 septembre 2026 · `dev` = `896faac` (#96, B3 SOLDÉ) · 600 tests · `main` = `9c6e155` (#88)
+### État au 2 septembre 2026 · `dev` = `14dc301` (#98, B3 SOLDÉ) · 600 tests · `main` = `9c6e155` (#88)
 *Légende : ✅ fait (PR) · 🟡 en cours / partiel · ⬜ à faire · 🔴 bloquant lancement. Vélocité = « sessions » (unité des handoffs). Mis à jour à chaque merge (règle : ce fichier + `YAMBA-CONTEXT.md`).*
 
 ---
@@ -75,7 +75,7 @@ Lancement public = fin du Jalon 2. Fourchette tenue au dernier handoff : **5–8
 | **B2-PR5 — tracker Expéditeur réel** : `/bookings/[id]` → `GET /deals/:id` par un adapter CONSERVATIF (view-model existant produit, ~40 vues intactes — A37), TanStack Query, fin du fallback menteur (`BookingStatusNotice` : attente/refusé/expiré/annulé/terminé/litige), dégradations honnêtes (stats B5, carte Stripe, code AES : lignes masquées), mocks de données supprimés | ✅ #93 | A37, RG-T-01…06 |
 | **B3-PR1 — transport serveur** : `POST /deals/:id/pickup` (checklist 5/5 figée + 1..5 photos ImageKit — D42 — + code GÉNÉRÉ bcrypt + AES — D43), `/pickup/refuse` (remboursement intégral, CAP-02, sans pénalité — A40), `/events` (séquence stricte, undo client — A39), `/code/regenerate` (Expéditeur ≤ 5), `/deliver` (bcrypt, 3 essais / verrou 15 min + remise à zéro — A38, J+4) ; code révélé dans la vue Shipper seule ; `@packages/delivery-code`, `booking-write.ts` ; 4 emails B3 (A41) ; seed avec vrai code ; annexe A42 (`primaryAddressId` plus @unique) ; e2e Atlas 33 vérifications ; +60 tests | ✅ #95 | D42, D43, A38–A42, RG-P-01…12 |
 | **B3-PR2 — transport front** : bascule des 4 mocks Voyageur (pickup + upload `useImageKitUpload` AVANT l'appel, refus = raison seule, jalons envoyés après la fenêtre d'undo, livraison à compteur serveur) et du mock régénération Expéditeur (code relu de l'API) ; tsc + build prod + i18n | ✅ #96 | A43, RG-P-13…17 |
-| **B3-PR3 — boîte du Voyageur** : `GET /me/deals`, bande « À traiter » (Mes trajets + accueil), deals réels sous chaque trajet, section page trajet, notifications cliquables, badge sidebar + barre mobile (`useTripsBadge`) — A44 | 🟡 PR ouverte | A44, RG-P-18…22 |
+| **B3-PR3 — boîte du Voyageur** : `GET /me/deals`, bande « À traiter » (Mes trajets + accueil), deals réels sous chaque trajet, section page trajet, notifications cliquables, badge sidebar + barre mobile (`useTripsBadge`) — A44 | ✅ #98 | A44, RG-P-18…22 |
 | ⬜ **B3 — dettes** : URLs signées / fichiers privés ImageKit, vérification du domaine des URLs photo, procédure de rotation de clé AES (format `v1.` prêt), actions tracker confirmer/litige (B4) | ⬜ avec B4 | D42, D43 |
 | 🔴 **B4 — argent sortant** : confirmation anticipée, cron J+4 → COMPLETED + `transfers.create()`, dispute avec gel, versement de la retenue ANN-01 au Voyageur (`CANCEL_LATE_RETENTION_PCT` = 50, gravé D39) | ⬜ (1,5/2,5) | ANN-01…04, D39 |
 | 🔴 **B5 — confiance** : rating double-aveugle serveur, relances J+5/J+7, stats de réputation (D29-1) — unicité (bookingId, authorUserId) sans `@@unique` naïf Mongo | ⬜ (1,5/2) | D29 |
@@ -140,7 +140,7 @@ Estimation : **2–4 sessions** au-dessus du Jalon 4 (l'essentiel du travail est
 | Tests (plateforme) | 600 = trip 187 · deal 354 · notification 59 |
 | Décisions au registre | D1 → D43 (+ arbitrages A1 → A44) |
 | Règles métier | ~50 (V2) + RG-B-01…35, RG-S-01…13, RG-C-01…16, RG-G-01…03, RG-D-01…16, RG-V-01…09, RG-F-01…06, RG-N-01…08, RG-T-01…06, RG-P-01…22 |
-| PR mergées | #1 → #95 (#90 = pile B2-PR1/2/3 · #91 = docs post-merge · #92 = B2-PR4 emails · #93 = B2-PR5 tracker · #94 = docs post-merge · #95 = B3-PR1 serveur · #96 = B3-PR2 front — 13 checks comptés à chaque fois) |
+| PR mergées | #1 → #95 (#90 = pile B2-PR1/2/3 · #91 = docs post-merge · #92 = B2-PR4 emails · #93 = B2-PR5 tracker · #94 = docs post-merge · #95 = B3-PR1 serveur · #96 = B3-PR2 front · #97 = docs · #98 = B3-PR3 boîte du Voyageur — 13 checks comptés à chaque fois) |
 | Documents | registre, spec, règles, 5 handoffs (dernier : SESSION-2026-08-28 + addendum 29/08), fiches PR (archive), 3 docs cumulatifs (technique, métier, apprentissage), `YAMBA-MOTEUR-PRIX.md/.pdf`, ce suivi |
 
 ## 9. Ordre recommandé des prochaines sessions

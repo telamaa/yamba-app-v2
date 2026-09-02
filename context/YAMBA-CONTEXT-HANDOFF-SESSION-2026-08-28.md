@@ -326,7 +326,7 @@ AVANT le code, compléter les 3 docs cumulatifs, mobile-first, aucune attributio
 3. **A44 gravé** puis B3-PR3 sur `feat/b3-carrier-inbox` : `GET /me/deals` + gateway + OAS ; `useMyDeals`, `my-deals.adapter.ts`, `TripDealRow` extrait du mock ; bande « À traiter » + deals sous chaque trajet + sous-titre dans `MyTripsList` ; accueil ; `useTripsBadge` (sidebar + barre mobile) ; `Notifications` = liens ; `TripDealsSection` sur la page trajet ; invalidation `["my-deals"]` après accept/decline/pickup/deliver ; i18n `list.subtitle`, `list.deals.*`. Docs : registre (A44, §7.1), contexte, suivi, 3 cumulatifs (B3-PR3, RG-P-18…22, chapitre 45).
 
 ## B. Reprise
-- Merger la PR B3-PR3 (13 checks), purger `feat/b3-carrier-inbox`.
+- **FAIT** : #98 mergée (13 checks comptés), `feat/b3-carrier-inbox` purgée ; `dev` = `14dc301`. Le deal-service local de l'utilisateur doit être RELANCÉ (arrêté pendant la session — il porte maintenant `GET /me/deals`).
 - **Utilisateur** : lancer Docker puis `docker compose up -d` (+ `./scripts/redpanda-bootstrap.sh` une fois) AVANT de reprendre la recette — les emails et notifications en dépendent ; puis recette V1–V9 (`YAMBA-DOC-METIER.md`) et F1–F8.
 - Pistes UX notées, non faites : badge « Mes envois » (Expéditeur), « tout marquer lu », temps réel sur la boîte, RDV de pickup dans le modèle (heure sur la bande « prise en charge »).
 - ⭐ Ensuite : B4 argent sortant (prompt de l'addendum précédent inchangé).
