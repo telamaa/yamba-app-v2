@@ -15,8 +15,8 @@
  * - carrier.rating / dealCount / isVerified : les stats naissent en B5 ;
  * - payment.cardBrand / cardLast4 / statementDescriptor : viendront de
  *   Stripe (backlog) — le paiement affiche le total seul d'ici là ;
- * - deliveryCode.code : re-affichage chiffré AES en B3
- *   (`deliveryCodeEncrypted`) — d'ici là null (post-pickup = seed) ;
+ * - deliveryCode.code : servi par l'API en PICKED_UP (D43) — absent sur
+ *   un enregistrement antérieur à B3 (jamais inventé) ;
  * - trip.durationHours / isDirect : durée absente du snapshot (pas
  *   d'ETA inventée) ;
  * - photos (déclaration + pickup) : URLs réelles avec media-service B3.
@@ -204,9 +204,10 @@ export function toBooking(view: ShipperBookingViewDto): Booking {
       // cardBrand / cardLast4 / statementDescriptor : Stripe (backlog)
     },
     deliveryCode: {
-      // AVAILABLE dès le pickup ; le code lui-même attend l'AES B3
-      // (`deliveryCodeEncrypted`) — les vues gèrent `code` absent.
-      status: view.pickedUpAt ? "AVAILABLE" : "PENDING",
+      // AVAILABLE dès le pickup (le code est servi par GET /deals/:id en
+      // PICKED_UP — D43), VALIDATED une fois la remise faite. Un PICKED_UP
+      // sans code (enregistrement antérieur à B3) garde `code` absent.
+      status: view.deliveredAt ? "VALIDATED" : view.pickedUpAt ? "AVAILABLE" : "PENDING",
       code: hasCode ? (view.deliveryCode as string) : undefined,
       regeneratedCount: MAX_CODE_REGENERATIONS - view.codeRegenerationsLeft,
     },

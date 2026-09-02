@@ -74,6 +74,8 @@
   },
 
   "error": {
-    "toastGeneric": "Error validating. Try again."
+    "toastGeneric": "Error validating. Try again.",
+    "codeUnavailable": "No code was generated for this deal (pickup predates the update). Please contact support.",
+    "dealChanged": "Entry is not possible right now (active lock or the deal changed). Reloading."
   }
 }

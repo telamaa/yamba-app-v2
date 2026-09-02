@@ -62,25 +62,18 @@ export default function BookingTrackerClient({ bookingId }: Props) {
     router.push("/dashboard/shipments");
   }, [router]);
 
-  // Actions ENCORE MOCK (B3/B4) : mise à jour du cache local, remplacée
-  // par invalidateQueries quand les endpoints réels existeront (A37).
+  // Régénération RÉELLE (B3/A43) : le serveur a écrit le nouveau code, on
+  // RELIT — le code affiché vient toujours de GET /deals/:id, jamais du
+  // cache local (les deux paramètres restent pour la signature des cards).
   const handleCodeRegenerated = useCallback(
-    (newCode: string, regeneratedCount: number) => {
-      queryClient.setQueryData<Booking>(bookingQueryKey(bookingId), (prev) =>
-        prev
-          ? {
-              ...prev,
-              deliveryCode: {
-                ...prev.deliveryCode,
-                code: newCode,
-                regeneratedCount,
-              },
-            }
-          : prev
-      );
+    (_newCode: string, _regeneratedCount: number) => {
+      void queryClient.invalidateQueries({ queryKey: bookingQueryKey(bookingId) });
     },
     [queryClient, bookingId]
   );
+
+  // Actions ENCORE MOCK (B4) : mise à jour du cache local, remplacée
+  // par invalidateQueries quand les endpoints réels existeront (A37).
 
   const handleEarlyConfirmed = useCallback(
     (confirmedAt: string) => {

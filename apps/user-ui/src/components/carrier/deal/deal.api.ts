@@ -3,21 +3,24 @@
  * ===========
  * Appels backend du module Deal côté Voyageur.
  *
- * RÉELS (B2, via le gateway → deal-service) :
- *   - getDealRequest : GET /deals/:id (vue Carrier — A13)
- *   - acceptDeal     : POST /deals/:id/accept  (charte, gate D31, capture D39)
- *   - declineDeal    : POST /deals/:id/decline (raison É2 optionnelle)
- *
- * ENCORE MOCK (B3 — transport) : confirmPickup, refusePickup,
- * confirmTrackingEvent, validateDeliveryCode.
+ * TOUS RÉELS (via le gateway → deal-service) :
+ *   - getDealRequest       : GET /deals/:id (vue Carrier — A13)
+ *   - acceptDeal           : POST /deals/:id/accept  (charte, gate D31, capture D39)
+ *   - declineDeal          : POST /deals/:id/decline (raison É2 optionnelle)
+ *   - confirmPickup        : POST /deals/:id/pickup (B3 — checklist 5/5 + URLs
+ *                            ImageKit déjà téléversées par le client, D42/A43)
+ *   - refusePickup         : POST /deals/:id/pickup/refuse (raison seule — A40)
+ *   - confirmTrackingEvent : POST /deals/:id/events (appelé APRÈS l'undo — A39)
+ *   - validateDeliveryCode : POST /deals/:id/deliver (compteur SERVEUR — A38)
  */
 
 import apiClient from "@/lib/api-client";
 import type {
   AcceptPayload,
-  ConfirmPickupPayload,
+  ConfirmPickupApiPayload,
   DealRequest,
   DealStatus,
+  DealTrackingEventId,
   DeclinePayload,
   RefusePickupPayload,
 } from "./deal.types";
@@ -31,30 +34,43 @@ export type DealTransitionResult = {
   currencyCode: string;
 };
 
-const MOCK_DELAY_MS = 800;
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 /* ══ Erreur métier (pattern BookingApiError) ══════════════════ */
 
-/** Codes 409 des transitions + états transverses — le composant traduit. */
+/** Codes 409 du cycle de vie + du transport (BOOKING_LIFECYCLE_ERROR_CODES) + états transverses — le composant traduit. */
 export type DealApiErrorCode =
   | "TRANSITION_NOT_ALLOWED"
   | "CARRIER_ONBOARDING_REQUIRED"
   | "PAYMENT_STATE_CONFLICT"
+  | "DELIVERY_CODE_INVALID" // details.attemptsLeft (A38)
+  | "DELIVERY_LOCKED" // details.lockedUntil (A38)
+  | "DELIVERY_CODE_UNAVAILABLE"
+  | "TRACKING_STEP_NOT_ALLOWED"
+  | "CODE_REGENERATION_LIMIT"
   | "NOT_FOUND"
   | "UNAUTHENTICATED"
   | "GENERIC";
 
+const KNOWN_CODES: readonly DealApiErrorCode[] = [
+  "TRANSITION_NOT_ALLOWED",
+  "CARRIER_ONBOARDING_REQUIRED",
+  "PAYMENT_STATE_CONFLICT",
+  "DELIVERY_CODE_INVALID",
+  "DELIVERY_LOCKED",
+  "DELIVERY_CODE_UNAVAILABLE",
+  "TRACKING_STEP_NOT_ALLOWED",
+  "CODE_REGENERATION_LIMIT",
+];
+
 export class DealApiError extends Error {
   readonly code: DealApiErrorCode;
   readonly status: number;
-  constructor(code: DealApiErrorCode, status: number, message: string) {
+  /** `details` du 409 (ex. attemptsLeft, lockedUntil) — le serveur est seul juge. */
+  readonly details: Record<string, unknown>;
+  constructor(code: DealApiErrorCode, status: number, message: string, details: Record<string, unknown> = {}) {
     super(message);
     this.code = code;
     this.status = status;
+    this.details = details;
   }
 }
 
@@ -63,17 +79,17 @@ function toDealApiError(e: unknown): DealApiError {
     response?: { status?: number; data?: { message?: string; details?: Record<string, unknown> } };
   };
   const status = err.response?.status ?? 0;
-  const detailCode = err.response?.data?.details?.code;
+  const details = err.response?.data?.details ?? {};
+  const detailCode = details.code;
   const code: DealApiErrorCode =
-    typeof detailCode === "string" &&
-    ["TRANSITION_NOT_ALLOWED", "CARRIER_ONBOARDING_REQUIRED", "PAYMENT_STATE_CONFLICT"].includes(detailCode)
+    typeof detailCode === "string" && (KNOWN_CODES as readonly string[]).includes(detailCode)
       ? (detailCode as DealApiErrorCode)
       : status === 404 || status === 403
         ? "NOT_FOUND" // 403 volontairement confondu (le deal existe, pas pour toi)
         : status === 401
           ? "UNAUTHENTICATED"
           : "GENERIC";
-  return new DealApiError(code, status, err.response?.data?.message ?? "Deal request failed");
+  return new DealApiError(code, status, err.response?.data?.message ?? "Deal request failed", details);
 }
 
 /* ══ Appels réels ═════════════════════════════════════════════ */
@@ -127,103 +143,102 @@ export async function declineDeal(
   }
 }
 
+/* ══ B3 — transport (tout réel) ═══════════════════════════════ */
+
+/** Miroirs d'affichage des constantes SERVEUR (booking-state-machine) — le serveur reste seul juge. */
+export const MAX_DELIVERY_ATTEMPTS = 3;
+export const DELIVERY_LOCK_MINUTES = 15;
+
 /**
- * Confirme la prise en charge du colis.
- * Côté backend (PR future) : passe le Deal en PICKED_UP et révèle
- * le code de livraison à l'Expéditeur (jamais au Voyageur).
+ * Confirme la prise en charge : checklist 5/5 + URLs des photos DÉJÀ
+ * téléversées vers ImageKit par le client (D42/A43). Le serveur passe le
+ * Deal en PICKED_UP et génère le code — révélé à l'Expéditrice seule.
  */
 export async function confirmPickup(
   dealId: string,
-  payload: ConfirmPickupPayload
-): Promise<{ dealId: string; status: "PICKED_UP" }> {
-  await sleep(MOCK_DELAY_MS);
-  if (payload.checklist.length < 5) {
-    throw new Error("All checklist items must be checked");
+  payload: ConfirmPickupApiPayload
+): Promise<DealTransitionResult> {
+  try {
+    const res = await apiClient.post<DealTransitionResult>(
+      `/deals/${dealId}/pickup`,
+      { checklist: payload.checklist, photoUrls: payload.photoUrls, notes: payload.notes ?? null },
+      { requireAuth: true }
+    );
+    return res.data;
+  } catch (e) {
+    throw toDealApiError(e);
   }
-  if (payload.photos.length < 1) {
-    throw new Error("At least one photo is required");
-  }
-  // eslint-disable-next-line no-console
-  console.info("[deal] confirmPickup mock:", { dealId, payload });
-  return { dealId, status: "PICKED_UP" };
 }
 
 /**
- * Refuse le colis au moment du pickup (contenu non conforme, etc.).
- * Côté backend (PR future) : annule le Deal, rembourse l'Expéditeur,
- * aucune pénalité pour le Voyageur.
+ * Refuse le colis à la remise (raison seule — A40) : le serveur annule,
+ * rembourse intégralement et restitue les kg, sans pénalité.
  */
 export async function refusePickup(
   dealId: string,
   payload: RefusePickupPayload
-): Promise<{ dealId: string }> {
-  await sleep(MOCK_DELAY_MS);
-  // eslint-disable-next-line no-console
-  console.info("[deal] refusePickup mock:", { dealId, payload });
-  return { dealId };
+): Promise<DealTransitionResult> {
+  try {
+    const res = await apiClient.post<DealTransitionResult>(
+      `/deals/${dealId}/pickup/refuse`,
+      { reason: payload.reason ?? null },
+      { requireAuth: true }
+    );
+    return res.data;
+  } catch (e) {
+    throw toDealApiError(e);
+  }
 }
 
+export type TrackingStepResult = {
+  bookingId: string;
+  step: DealTrackingEventId;
+  confirmedAt: string;
+  trackingEvents: { step: DealTrackingEventId; confirmedAt: string }[];
+};
+
 /**
- * Confirme un événement de suivi optionnel (philosophie A+B).
- * Backend futur : push notification à l'Expéditeur + timeline mise à jour.
+ * Confirme un jalon optionnel — à appeler APRÈS la fenêtre d'undo (A39) :
+ * le serveur n'a pas d'annulation, la séquence est stricte (409 sinon).
  */
 export async function confirmTrackingEvent(
   dealId: string,
-  eventId: import("./deal.types").DealTrackingEventId
-): Promise<{ dealId: string; eventId: string; at: string }> {
-  await sleep(MOCK_DELAY_MS);
-  // eslint-disable-next-line no-console
-  console.info("[deal] confirmTrackingEvent mock:", { dealId, eventId });
-  return { dealId, eventId, at: new Date().toISOString() };
+  step: DealTrackingEventId
+): Promise<TrackingStepResult> {
+  try {
+    const res = await apiClient.post<TrackingStepResult>(
+      `/deals/${dealId}/events`,
+      { step },
+      { requireAuth: true }
+    );
+    return res.data;
+  } catch (e) {
+    throw toDealApiError(e);
+  }
 }
 
-
-// ============================================================
-// Livraison — saisie du code (feat/delivery-code-entry)
-// ============================================================
-
-/** Code correct du mock (= celui révélé côté Expéditeur : 742 891) */
-const MOCK_VALID_CODE = "742891";
-export const MAX_DELIVERY_ATTEMPTS = 3;
-export const DELIVERY_LOCK_MINUTES = 15;
-
-export type ValidateCodeResult =
-  | { ok: true; dealId: string; deliveredAt: string }
-  | { ok: false; reason: "WRONG_CODE"; attemptsLeft: number }
-  | { ok: false; reason: "LOCKED"; lockedUntil: string };
+export type DeliverResult = {
+  bookingId: string;
+  status: "DELIVERED";
+  deliveredAt: string;
+  payoutDueAt: string;
+};
 
 /**
- * Valide le code de livraison saisi par le Voyageur.
- * Backend futur : comparaison bcrypt avec le hash en base, Deal → DELIVERED,
- * TrackingEvent DELIVERED, démarrage du timer J+1→J+4, notif à l'Expéditeur.
- * Mock : code correct = 742891, compteur de tentatives géré côté client.
+ * Valide le code de livraison. Le serveur compare (bcrypt) et COMPTE :
+ * mauvais code → DealApiError DELIVERY_CODE_INVALID (details.attemptsLeft),
+ * 3e échec → DELIVERY_LOCKED (details.lockedUntil), verrou actif →
+ * TRANSITION_NOT_ALLOWED. Aucun compteur côté client (A38).
  */
-export async function validateDeliveryCode(
-  dealId: string,
-  code: string,
-  attemptsSoFar: number
-): Promise<ValidateCodeResult> {
-  await sleep(MOCK_DELAY_MS);
-
-  if (code === MOCK_VALID_CODE) {
-    // eslint-disable-next-line no-console
-    console.info("[deal] validateDeliveryCode mock: SUCCESS", { dealId });
-    return { ok: true, dealId, deliveredAt: new Date().toISOString() };
+export async function validateDeliveryCode(dealId: string, code: string): Promise<DeliverResult> {
+  try {
+    const res = await apiClient.post<DeliverResult>(
+      `/deals/${dealId}/deliver`,
+      { code },
+      { requireAuth: true }
+    );
+    return res.data;
+  } catch (e) {
+    throw toDealApiError(e);
   }
-
-  const attemptsLeft = MAX_DELIVERY_ATTEMPTS - attemptsSoFar - 1;
-  // eslint-disable-next-line no-console
-  console.info("[deal] validateDeliveryCode mock: WRONG_CODE", {
-    dealId,
-    attemptsLeft,
-  });
-
-  if (attemptsLeft <= 0) {
-    const lockedUntil = new Date(
-      Date.now() + DELIVERY_LOCK_MINUTES * 60 * 1000
-    ).toISOString();
-    return { ok: false, reason: "LOCKED", lockedUntil };
-  }
-
-  return { ok: false, reason: "WRONG_CODE", attemptsLeft };
 }

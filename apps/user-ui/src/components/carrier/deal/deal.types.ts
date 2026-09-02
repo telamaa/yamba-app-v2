@@ -109,6 +109,9 @@ export type DealRequest = {
   earnings: DealEarningsBreakdown;
   // ✨ Suivi du voyage (présents dès PICKED_UP)
   pickup?: DealPickupInfo;
+  /** Compteur SERVEUR de la saisie du code (vue Carrier — A38) : essais restants et verrou. */
+  deliveryAttemptsLeft?: number;
+  deliveryLockedUntil?: string;
   recipient?: DealRecipient;
   trackingEvents?: DealTrackingEvent[];
 };
@@ -169,9 +172,17 @@ export type PickupPhotoDraft = {
   file?: File; // le fichier réel, envoyé vers R2 dans la PR backend
 };
 
+/** Ce que le formulaire tient (photos = fichiers locaux, pas encore téléversés). */
 export type ConfirmPickupPayload = {
   checklist: PickupChecklistItemId[];
   photos: PickupPhotoDraft[];
+  notes?: string;
+};
+
+/** Ce que l'API reçoit (D42/A43) : les URLs ImageKit, téléversées AVANT l'appel. */
+export type ConfirmPickupApiPayload = {
+  checklist: PickupChecklistItemId[];
+  photoUrls: string[];
   notes?: string;
 };
 
@@ -182,9 +193,10 @@ export type PickupRefuseReason =
   | "BAD_PACKAGING"
   | "OTHER";
 
+// Le contrat (RefusePickupRequest) ne porte que la raison — le textarea
+// « détails » du mock a disparu (A43, miroir A32).
 export type RefusePickupPayload = {
   reason?: PickupRefuseReason;
-  details?: string;
 };
 
 // ============================================================

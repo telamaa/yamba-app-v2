@@ -154,7 +154,16 @@ Ordre de demarrage : auth -> trip -> gateway.
   avec vrai code `742891` + checklist. Annexe A42 : `CarrierPage.primaryAddressId`
   n'est plus @unique (collision sur null, db push fait). E2E Atlas :
   33 verifications vertes, outbox sans code, kg restitues. +60 tests.
-- Plateforme de tests : 600 (trip 187, deal 354, notification 59) — post-B3-PR1.
+- B3-PR2 (transport front, A43) : les 4 mocks Voyageur et la regeneration
+  Expeditrice basculent sur les endpoints #95 — pickup avec upload ImageKit
+  AVANT l'appel (sequentiel, premier echec = rien d'envoye), refus = raison
+  seule (textarea supprime, miroir A32), jalons envoyes A LA FIN de la
+  fenetre d'undo (`onEventCommittedAction`, rollback sur 409), saisie du
+  code a compteur SERVEUR (vue Carrier + details des 409, plus de compteur
+  client), regeneration puis invalidateQueries (le code vient toujours de
+  GET /deals/:id), `deliveryCode.status` VALIDATED apres livraison.
+  Preuve : tsc + build prod + i18n miroir (pas de Jest user-ui).
+- Plateforme de tests : 600 (trip 187, deal 354, notification 59) — post-B3-PR1 (#95).
 - MERGE 01/09 : toute la pile B2 est dans `dev` via la SEULE **PR #90**
   (`feat/b2-deal-front` portait la chaîne complète : jalons mobile D36,
   docs cumulatifs, B2-PR1, B2-PR2, B2-PR3 + fix A34) — 13 checks verts
@@ -192,13 +201,11 @@ Ordre de demarrage : auth -> trip -> gateway.
   FAITES — voir « fait » ci-dessus. RESTE (avec B3) : photos du colis via
   media-service :6009, AES-256-GCM re-affichage code livraison, SiteConfig
   commissionRate (D16). payment-service :6008 : NON (D38).
-- B3 transport : PR1 serveur FAITE (voir « fait »). RESTE B3-PR2 front :
-  bascule des 4 mocks Voyageur (pickup avec upload ImageKit
-  `useImageKitUpload("/deals/pickup")`, refus, jalons — appel APRES la
-  fenetre d'undo —, livraison avec compteur SERVEUR) et du mock
-  regeneration Expediteur (code servi par GET /deals/:id), vue DELIVERED
-  persistante cote Voyageur. Dettes D42 : URLs signees / fichiers prives
-  ImageKit, verification du domaine des URLs photo.
+- B3 transport : PR1 serveur (#95) et PR2 front FAITES (voir « fait »).
+  Dettes rattachees : URLs signees / fichiers prives ImageKit et
+  verification du domaine des URLs photo (D42), procedure de rotation de
+  cle AES (format v1 pret), vue DELIVERED persistante cote Voyageur
+  (spec §11, hors v1), actions tracker confirmer/litige (B4).
 - B4 argent sortant : confirmation anticipee, cron J+4 -> COMPLETED +
   transfers.create(), dispute avec gel, matrice remboursements.
 - B5 confiance : rating double-aveugle, relances J+5/J+7, stats de

@@ -885,3 +885,31 @@ Tests : deal-service 303 → **354** (`delivery-code.spec` 14, `booking-transpor
 
 ### 11. Hors périmètre (assumé)
 Le front (B3-PR2 : bascule des 4 mocks Voyageur avec upload ImageKit, régénération Expéditeur réelle, code affiché) ; URLs signées / fichiers privés ImageKit (dette D42) ; vérification serveur que l'URL photo appartient à notre compte ImageKit ; `confirmEarly`/`dispute`/cron J+4 (B4) ; rotation de clé AES (format versionné, procédure à écrire).
+
+---
+
+# B3-PR2 — Transport côté front : les quatre mocks Voyageur et la régénération Expéditeur sur le réel (A43)
+
+### 1. Ce qui a été fait
+Les écrans É4a (prise en charge), É5 (tracking), É7 (saisie du code) du Voyageur et la carte « code » de l'Expéditrice (É4b/É6) appellent maintenant les endpoints de B3-PR1 (#95). Plus aucun `sleep(MOCK_DELAY_MS)`, plus de code aléatoire local, plus de compteur d'essais client. Les ~30 fichiers de vues ne bougent pas : seuls les orchestrateurs (`*Client.tsx`), la couche API, les types et l'adapter changent — même stratégie conservative que B2-PR3/PR5.
+
+### 2. `deal.api.ts` (Voyageur)
+`confirmPickup(dealId, { checklist, photoUrls, notes })` → `POST /deals/:id/pickup` ; `refusePickup(dealId, { reason })` → `POST …/pickup/refuse` ; `confirmTrackingEvent(dealId, step)` → `POST …/events` ; `validateDeliveryCode(dealId, code)` → `POST …/deliver`. `DealApiError` porte désormais `details` (les `attemptsLeft`/`lockedUntil` des 409) et connaît les 5 codes transport. `MAX_DELIVERY_ATTEMPTS`/`DELIVERY_LOCK_MINUTES` restent exportés comme MIROIRS d'affichage des constantes serveur.
+
+### 3. Prise en charge : les photos partent d'abord (`DealPickupClient.tsx`)
+Le formulaire garde ses `PickupPhotoDraft` (fichier + preview locale). À la confirmation : `useImageKitUpload("/deals/pickup")` téléverse chaque fichier — séquentiellement, le premier échec arrête tout avec `errors.uploadFailed` et RIEN n'est envoyé au deal-service (D42/A43) — puis `confirmPickup` reçoit les URLs. Succès → `invalidateQueries(["deal", id])` + retour sur `/carrier/deals/[dealId]` : `DealClient` relit PICKED_UP et bascule sur la vue tracking. 409 `TRANSITION_NOT_ALLOWED` (deal annulé entre-temps, ou déjà pris en charge) → `errors.dealChanged` + relecture. Le refus n'envoie plus que la raison : le textarea « détails » du `PickupRefuseDialog` est supprimé (le contrat ne le portait pas — miroir A32), clés i18n retirées dans les 2 locales.
+
+### 4. Tracking : l'appel part à la FIN de la fenêtre (`TrackingSpotlight.tsx`, `DealTrackingClient.tsx`)
+Avant : le parent appelait l'API DANS le toggle (donc immédiatement, l'undo ne rattrapait rien). Maintenant : le toggle ne touche que l'état optimiste ; `TrackingSpotlight` reçoit `onEventCommittedAction`, appelée par le timer des 5 s (l'undo annule le timer → aucun appel). `DealTrackingClient.handleEventCommitted` fait le `POST /deals/:id/events` ; succès → invalidation ; échec (séquence, doublon, deal changé, réseau) → rollback de l'événement + `spotlight.errorToast` + relecture. Desktop et Mobile ne font que passer la prop.
+
+### 5. Saisie du code : le serveur compte (`DealDeliverClient.tsx`)
+`attemptsUsed` et `lockedUntil` s'initialisent depuis la vue Carrier (`deliveryAttemptsLeft`, `deliveryLockedUntil` — nouveaux dans `deal.adapter.ts`/`deal.types.ts`) au chargement, puis suivent les `details` des 409 : `DELIVERY_CODE_INVALID.attemptsLeft` → compteur, `DELIVERY_LOCKED.lockedUntil` → verrou + countdown local (à l'expiration, le serveur a déjà remis le compteur à zéro — A38), `DELIVERY_CODE_UNAVAILABLE` → `error.codeUnavailable` (enregistrement antérieur à B3), `TRANSITION_NOT_ALLOWED` (verrou actif côté serveur, deal changé) → `error.dealChanged` + relecture de la vue. Succès → écran É7b + invalidation du cache deal (la page Deal relira DELIVERED).
+
+### 6. Régénération Expéditrice (`booking-tracker.api.ts`, `BookingTrackerClient.tsx`)
+`regenerateDeliveryCode(bookingId)` → `POST /deals/:id/code/regenerate` (la réponse porte `deliveryCode` + `codeRegenerationsLeft`, traduits en `newCode`/`regeneratedCount` pour la signature des cards). Le handler du client ne fait plus `setQueryData` : il INVALIDE — le code affiché vient toujours de `GET /deals/:id` (D43), jamais du cache local. `BookingApiError` connaît `CODE_REGENERATION_LIMIT` et `TRANSITION_NOT_ALLOWED`. Adapter : `deliveryCode.status` passe à `VALIDATED` après `deliveredAt`.
+
+### 7. Les preuves
+tsc user-ui OK · build de production OK · i18n FR/EN miroir parfait (script CI joué en local) · pas de Jest user-ui (même statut que B2-PR3/PR5). Parcours manuel sur seed : Voyageur `thomas.carrier@seed.yamba.dev`, deal `bzv-accepted` → prise en charge avec 1 photo → code visible côté `pauline.shipper@…` → jalons → saisie (mauvais code ×3 → verrou 15 min affiché) → régénération côté Expéditrice → bon code → livraison ; deal seed `bzv-picked` livrable avec `742891`.
+
+### 8. Hors périmètre (assumé)
+Vue DELIVERED persistante côté Voyageur (`DealClosed` « Livraison validée » — spec §11 hors v1) ; `confirmDeliveryEarly`/`submitDispute` restent des mocks marqués (B4) ; barre de progression des uploads (le hook l'expose, non affichée) ; compression HEIC côté client.

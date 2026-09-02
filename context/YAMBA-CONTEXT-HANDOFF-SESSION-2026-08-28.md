@@ -287,3 +287,32 @@ undo, livraison à compteur serveur) + régénération Expéditeur réelle + cod
 Voyageur persistante. Rituel : inventaire AVANT le code, décisions au registre AVANT le code,
 compléter les 3 docs cumulatifs, mobile-first, aucune attribution Claude, charte mango/teal/slate.
 ```
+
+---
+
+# ADDENDUM · 2 septembre 2026 (suite) — #95 mergée, B3-PR2 front (A43)
+
+## A. Ce qui s'est passé
+
+1. **#95 mergée** (`feat/b3-transport-server` → `dev` = `390eb57`, 13 checks comptés) — B3-PR1 serveur.
+2. **B3-PR2 front** sur `feat/b3-transport-front` (A43 gravé AVANT le code) : `deal.api.ts` tout réel (+ `details` sur `DealApiError`, 5 codes transport), `DealPickupClient` (upload ImageKit séquentiel AVANT `POST …/pickup`, `errors.uploadFailed`/`dealChanged`), `PickupRefuseDialog` sans textarea (raison seule), `TrackingSpotlight.onEventCommittedAction` (appel à la fin de l'undo, rollback + toast sur échec), `DealDeliverClient` à compteur serveur (init depuis `deliveryAttemptsLeft`/`deliveryLockedUntil`, mise à jour depuis les `details` des 409, `error.codeUnavailable`/`dealChanged`), tracker : `regenerateDeliveryCode(bookingId)` réel + `invalidateQueries`, `deliveryCode.status` VALIDATED après livraison. Preuves : tsc user-ui, build prod, i18n miroir.
+3. Docs complétées : registre (A43, §7.1 #95), contexte, suivi, 3 cumulatifs (B3-PR2 : technique, RG-P-13…17 + recette F1–F8, chapitre 44), ce handoff.
+
+## B. Reprise
+
+- Merger la PR B3-PR2 (13 checks à compter), puis **purger** `feat/b3-transport-server` et `feat/b3-transport-front` (origin + local, ancrage `git merge-base --is-ancestor` vérifié).
+- Toujours à faire par l'utilisateur : `DELIVERY_CODE_ENCRYPTION_KEY` dans `.env` + rejeu du seed ; `npx prisma db push` sur les autres environnements (A42) ; relancer son deal-service local (`npx nx serve deal-service` — il était éteint pendant la session) ; parcours manuel recette F1–F8 sur le seed (`742891`).
+- ⭐ **Prochaine étape — B4 argent sortant** : `POST /deals/:id/confirm` (confirmation anticipée, définitive), cron J+4 (`status: DELIVERED, payoutDueAt <= now` → COMPLETED), `transfers.create()` vers le compte Connect du Voyageur (PaymentProvider : ajouter `transfer`), `POST /deals/:id/dispute` (DISPUTED, gel, ticket YAM-XXXX, photos ImageKit comme D42), matrice remboursements médiation (à graver), emails `completed`/`payout_sent`/`disputed` avec leurs writers (A35), bascule des mocks tracker `confirmDeliveryEarly`/`submitDispute`. Décisions à graver avant le code : moment du transfert (à COMPLETED — INV-2), retenue ANN-01 versée au Voyageur (D39), format et unicité du ticket, qui reçoit quoi quand un litige est ouvert.
+
+### Prompt d'ouverture prêt-à-coller
+```
+On reprend Yamba — lis context/YAMBA-CONTEXT-HANDOFF-SESSION-2026-08-28.md (addenda 02/09),
+context/YAMBA-CONTEXT.md, le registre (D1–D43, A1–A43, §2bis.8) et context/YAMBA-SUIVI-PROJET.md.
+État : dev = 390eb57 (#95 B3-PR1 serveur), B3-PR2 front en PR (feat/b3-transport-front) —
+vérifier son merge (13 checks comptés) puis purger les 2 branches B3 ; plateforme 600.
+DELIVERY_CODE_ENCRYPTION_KEY à poser + seed à rejouer ; deal-service local à relancer.
+⭐ B4 argent sortant : confirm anticipé, cron J+4 → COMPLETED + transfers.create() (PaymentProvider.transfer),
+dispute (gel, ticket YAM-XXXX, photos ImageKit D42), emails completed/payout_sent/disputed (A35),
+bascule des mocks tracker confirmer/litige. Rituel : inventaire AVANT le code, décisions au registre
+AVANT le code, compléter les 3 docs cumulatifs, mobile-first, aucune attribution Claude.
+```
