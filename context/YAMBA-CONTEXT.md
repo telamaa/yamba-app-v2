@@ -174,7 +174,15 @@ Ordre de demarrage : auth -> trip -> gateway.
   (`TripDealRow` extrait du mock), section sur la page trajet, notifications =
   liens (deal ou suivi selon le lecteur), badge partage sidebar + barre mobile
   (`useTripsBadge`). Preuve : tsc, build prod, i18n, GET /me/deals sur Atlas.
-  MERGE **#98** (13 checks comptes, branche purgee). **B3 SOLDE.**
+  MERGE **#98** (13 checks comptes, branche purgee).
+- B3-PR4 (page demande Voyageur, A45) : recette reelle etape 4 → photos
+  declarees JAMAIS envoyees depuis B2-PR1 (`photoUrls: []`) → le wizard les
+  televerse (ImageKit `/bookings/declared`) AVANT la carte ; colonne
+  Accepter/Refuser invisible entre 768 et 1023 px → dès `md` ; GAR-02
+  (« Garantie Yamba », « Protection etendue », plus jamais « assurance »
+  avant contrat — carrierDealRequest, tracker, wizard, home) ; RGP-02
+  (telephone « a la prise en charge ») ; `BookingCounterpart.publicSlug`
+  → « Voir profil » reel vers /u/[slug]. deal-service 355 tests.
 - Plateforme de tests : 600 (trip 187, deal 354, notification 59) — post-B3 (#96).
 - MERGE 01/09 : toute la pile B2 est dans `dev` via la SEULE **PR #90**
   (`feat/b2-deal-front` portait la chaîne complète : jalons mobile D36,

@@ -330,3 +330,15 @@ AVANT le code, compléter les 3 docs cumulatifs, mobile-first, aucune attributio
 - **Utilisateur** : lancer Docker puis `docker compose up -d` (+ `./scripts/redpanda-bootstrap.sh` une fois) AVANT de reprendre la recette — les emails et notifications en dépendent ; puis recette V1–V9 (`YAMBA-DOC-METIER.md`) et F1–F8.
 - Pistes UX notées, non faites : badge « Mes envois » (Expéditeur), « tout marquer lu », temps réel sur la boîte, RDV de pickup dans le modèle (heure sur la bande « prise en charge »).
 - ⭐ Ensuite : B4 argent sortant (prompt de l'addendum précédent inchangé).
+
+---
+
+# ADDENDUM · 2 septembre 2026 (suite 2) — recette étape 4 → B3-PR4 page demande (A45)
+
+## A. Ce qui s'est passé
+Captures utilisateur sur `/carrier/deals/[id]` : (1) à ~900 px, aucune colonne Accepter/Refuser (`aside hidden lg:block` vs bascule mobile à 768) ; (2) pas de photos du colis — `createDeal` envoyait `photoUrls: []` depuis B2-PR1 ; (3) « Assurance basique » (GAR-02) et « téléphone après acceptation » (RGP-02) ; (4) « Voir profil » loguait en console. A45 gravé, B3-PR4 sur `feat/b3-deal-request-page` : upload ImageKit des photos déclarées AVANT la carte (`useBookingCheckout`), `createDeal(…, photoUrls)`, grille/aside dès `md`, libellés GAR-02/RGP-02 FR/EN (carrierDealRequest, bookingTracker, booking, home), `BookingCounterpart.publicSlug` + lien `/u/[slug]`, test mapper (+1 → deal 355, plateforme 601).
+
+## B. Reprise
+- Merger B3-PR4 (13 checks), purger `feat/b3-deal-request-page`. Recette D1–D7 puis F/V.
+- Pistes UX restantes sur É2 : stats de confiance (B5), galerie photos plein écran.
+- Ensuite : B4 (prompt inchangé).

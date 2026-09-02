@@ -43,7 +43,7 @@
     },
     "photos": {
       "label": "Parcel photos",
-      "requiredBadge": "Required with insurance",
+      "requiredBadge": "Required with extended protection",
       "hint": "Ideally: one photo of unpacked content + one of the packed parcel. JPEG or PNG, max 10 MB per photo.",
       "add": "Add",
       "tagContent": "Content",
@@ -156,6 +156,7 @@
     "confirmFailed": "The payment could not be authorized. Check your card and try again.",
     "requestSent": "Request sent! The tripper has 24h to accept.",
     "errors": {
+        "UPLOAD_FAILED": "A photo upload failed. Check your connection and try again — your card was not charged.",
       "QUOTE_DIVERGENCE": "The price changed since your quote. The new total is shown — check it before paying.",
       "CAPACITY_EXCEEDED": "There is not enough space left on this trip for your parcel.",
       "FAMILY_REFUSED": "The tripper does not accept this kind of parcel on this trip.",

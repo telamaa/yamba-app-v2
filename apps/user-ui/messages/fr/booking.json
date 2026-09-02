@@ -43,7 +43,7 @@
     },
     "photos": {
       "label": "Photos du colis",
-      "requiredBadge": "Obligatoire avec l''assurance",
+      "requiredBadge": "Obligatoire avec la protection étendue",
       "hint": "Idéalement : une photo du contenu déballé + une du colis emballé. JPEG ou PNG, max 10 Mo par photo.",
       "add": "Ajouter",
       "tagContent": "Contenu",
@@ -156,6 +156,7 @@
     "confirmFailed": "Le paiement n''a pas pu être autorisé. Vérifie ta carte et réessaie.",
     "requestSent": "Demande envoyée ! Le voyageur a 24 h pour accepter.",
     "errors": {
+        "UPLOAD_FAILED": "Le téléversement d''une photo a échoué. Vérifie ta connexion et réessaye — ta carte n''a pas été débitée.",
       "QUOTE_DIVERGENCE": "Le prix a changé depuis ton devis. Le nouveau total est affiché — vérifie-le avant de payer.",
       "CAPACITY_EXCEEDED": "Il ne reste plus assez de place sur ce trajet pour ton colis.",
       "FAMILY_REFUSED": "Le voyageur n''accepte pas ce type de colis sur ce trajet.",

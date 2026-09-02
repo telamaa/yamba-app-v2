@@ -76,7 +76,7 @@
     "modeFormat": "{brand} ••{last4}",
     "statementLabel": "On your statement",
     "note": "Funds are secured. {carrierFirstName} is paid only 3 days after delivery validated.",
-    "insuranceLabel": "Insurance",
+    "insuranceLabel": "Protection",
     "insuranceCovered": "€{amount} covered"
   },
   "trip": {
@@ -433,11 +433,11 @@
       "debitedLabel": "Debited",
       "stateLabel": "Status",
       "stateBlocked": "Blocked until delivery",
-      "insuranceLabel": "Insurance",
+      "insuranceLabel": "Protection",
       "insuranceValue": "{amount} covered",
       "paymentNote": "{carrierFirstName} will be paid 3 days after the delivery is validated by {recipientFirstName}.",
       "coverageLabel": "COVERAGE",
-      "coverageTitle": "{amount} insurance active",
+      "coverageTitle": "{amount} protection active",
       "coverageNote": "Loss, theft, breakage during transport."
     },
     "report": "Report an issue"
