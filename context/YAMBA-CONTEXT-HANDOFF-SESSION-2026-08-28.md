@@ -300,7 +300,7 @@ compléter les 3 docs cumulatifs, mobile-first, aucune attribution Claude, chart
 
 ## B. Reprise
 
-- Merger la PR B3-PR2 (13 checks à compter), puis **purger** `feat/b3-transport-server` et `feat/b3-transport-front` (origin + local, ancrage `git merge-base --is-ancestor` vérifié).
+- **FAIT dans la session** : #96 mergée (13 checks comptés), `feat/b3-transport-server` et `feat/b3-transport-front` purgées (origin + local, ancrage vérifié) ; `dev` = `896faac`. **B3 SOLDÉ.**
 - Toujours à faire par l'utilisateur : `DELIVERY_CODE_ENCRYPTION_KEY` dans `.env` + rejeu du seed ; `npx prisma db push` sur les autres environnements (A42) ; relancer son deal-service local (`npx nx serve deal-service` — il était éteint pendant la session) ; parcours manuel recette F1–F8 sur le seed (`742891`).
 - ⭐ **Prochaine étape — B4 argent sortant** : `POST /deals/:id/confirm` (confirmation anticipée, définitive), cron J+4 (`status: DELIVERED, payoutDueAt <= now` → COMPLETED), `transfers.create()` vers le compte Connect du Voyageur (PaymentProvider : ajouter `transfer`), `POST /deals/:id/dispute` (DISPUTED, gel, ticket YAM-XXXX, photos ImageKit comme D42), matrice remboursements médiation (à graver), emails `completed`/`payout_sent`/`disputed` avec leurs writers (A35), bascule des mocks tracker `confirmDeliveryEarly`/`submitDispute`. Décisions à graver avant le code : moment du transfert (à COMPLETED — INV-2), retenue ANN-01 versée au Voyageur (D39), format et unicité du ticket, qui reçoit quoi quand un litige est ouvert.
 
@@ -308,8 +308,7 @@ compléter les 3 docs cumulatifs, mobile-first, aucune attribution Claude, chart
 ```
 On reprend Yamba — lis context/YAMBA-CONTEXT-HANDOFF-SESSION-2026-08-28.md (addenda 02/09),
 context/YAMBA-CONTEXT.md, le registre (D1–D43, A1–A43, §2bis.8) et context/YAMBA-SUIVI-PROJET.md.
-État : dev = 390eb57 (#95 B3-PR1 serveur), B3-PR2 front en PR (feat/b3-transport-front) —
-vérifier son merge (13 checks comptés) puis purger les 2 branches B3 ; plateforme 600.
+État : dev = 896faac (#96, B3 SOLDÉ : #95 serveur + #96 front), plateforme 600, branches purgées.
 DELIVERY_CODE_ENCRYPTION_KEY à poser + seed à rejouer ; deal-service local à relancer.
 ⭐ B4 argent sortant : confirm anticipé, cron J+4 → COMPLETED + transfers.create() (PaymentProvider.transfer),
 dispute (gel, ticket YAM-XXXX, photos ImageKit D42), emails completed/payout_sent/disputed (A35),
