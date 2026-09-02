@@ -53,6 +53,7 @@ async function loadCounterparts(
       id: true,
       firstName: true,
       lastName: true,
+      publicSlug: true,
       avatar: { select: { url: true } },
     },
   });
@@ -65,6 +66,7 @@ async function loadCounterparts(
         firstName: u.firstName ?? null,
         lastName: u.lastName ?? null,
         avatarUrl: u.avatar?.url ?? null,
+        publicSlug: u.publicSlug ?? null,
       },
     ])
   );
@@ -76,6 +78,7 @@ const GHOST_COUNTERPART = (id: string): CounterpartRecord => ({
   firstName: null,
   lastName: null,
   avatarUrl: null,
+  publicSlug: null,
 });
 
 /* ══ GET /deals/:id — vue par rôle ════════════════════════════ */

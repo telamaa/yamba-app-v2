@@ -125,14 +125,17 @@ export default function DealRequestDesktop({
           </div>
 
           {/* Grid 2 cols */}
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+          {/* A45 : la colonne d'action existe dès md (768 px = bascule mobile) — jamais un écran sans Accepter/Refuser */}
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-[minmax(0,1fr)_300px] lg:grid-cols-[minmax(0,1fr)_340px]">
             {/* Main column */}
             <div className="space-y-6">
               <DealShipperCard
                 shipper={deal.shipper}
                 showMemberSince
-                onViewProfileAction={() =>
-                  console.info("[deal] view shipper profile")
+                onViewProfileAction={
+                  deal.shipper.publicSlug
+                    ? () => window.open(`/${locale}/u/${deal.shipper.publicSlug}`, "_blank", "noopener")
+                    : undefined
                 }
               />
 
@@ -169,7 +172,7 @@ export default function DealRequestDesktop({
             </div>
 
             {/* Sidebar — vraiment sticky, regroupe earnings + couverture + actions */}
-            <aside className="hidden lg:block">
+            <aside className="hidden md:block">
               <div className="sticky top-[88px] space-y-4">
                 <DealEarningsBreakdown earnings={deal.earnings} variant="sidebar" />
 

@@ -114,7 +114,7 @@
       "yamberLabel": "Yamber",
       "yambaLabel": "Yamba commission",
       "yambaSubtitle": "Security, support, guarantees",
-      "insuranceLabel": "Optional insurance",
+      "insuranceLabel": "Optional extended protection",
       "insuranceSubtitle": "Coverage up to €500"
     },
     "timeline": {
@@ -186,7 +186,7 @@
   "finalCta": {
     "trustSignals": {
       "stripe": "✅ Stripe secure payment",
-      "insurance": "🛡️ Insurance up to €500",
+      "insurance": "🛡️ Protection up to €500",
       "speed": "⚡ 24h max delivery",
       "ecology": "🌱 Zero additional CO₂"
     },

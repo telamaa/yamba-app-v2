@@ -63,14 +63,14 @@
     "titleShort": "REMISE ET LIVRAISON",
     "pickupLabel": "REMISE DU COLIS",
     "deliveryLabel": "LIVRAISON",
-    "deliveryNotePending": "Téléphone communiqué après acceptation"
+    "deliveryNotePending": "Téléphone du destinataire communiqué à la prise en charge"
   },
   "coverage": {
     "title": "COUVERTURE DU COLIS",
-    "extended": "Assurance 500 € incluse",
-    "basic": "Assurance basique",
-    "shipperNoteExtended": "{shipperFirstName} a souscrit une assurance — tu es protégé en cas de litige sur la valeur du colis.",
-    "shipperNoteExtendedShort": "{shipperFirstName} a souscrit l''assurance 500 € · tu es protégé en cas de litige sur la valeur"
+    "extended": "Protection étendue 500 € incluse",
+    "basic": "Garantie Yamba incluse",
+    "shipperNoteExtended": "{shipperFirstName} a choisi la protection étendue — tu es couvert en cas de litige sur la valeur du colis.",
+    "shipperNoteExtendedShort": "{shipperFirstName} a choisi la protection étendue 500 € · tu es couvert en cas de litige sur la valeur"
   },
   "acceptTip": {
     "title": "Avant d''accepter, lis bien ces points",

@@ -944,3 +944,28 @@ tsc user-ui + deal-service + gateway · build de production user-ui · i18n miro
 
 ### 7. Hors périmètre (assumé)
 Badge « Mes envois » côté Expéditeur (envois à suivre) ; « tout marquer lu » ; temps réel sur la boîte ; l'action « Noter » (B5) ; l'heure de RDV de pickup (absente du modèle).
+
+---
+
+# B3-PR4 — La page « demande » du Voyageur passe la recette réelle (A45)
+
+### 1. Ce qui a été fait
+Recette à deux vrais comptes, étape 4 : la page `/carrier/deals/[id]` n'affichait ni les photos du colis ni, sur un écran de 900 px, les boutons Accepter/Refuser. Quatre corrections, toutes côté vérité produit : les photos déclarées sont enfin envoyées, la colonne d'action existe dès 768 px, les libellés respectent GAR-02 et RGP-02, « Voir profil » mène au profil public.
+
+### 2. Les photos déclarées (wizard → ImageKit → `parcel.photoUrls`)
+Depuis B2-PR1, `createDeal` envoyait `photoUrls: []` « en attendant un media-service » — les photos du wizard (`ParcelPhoto.file`) restaient dans le navigateur. `useBookingCheckout.submit` téléverse maintenant chaque fichier via `useImageKitUpload("/bookings/declared")` **avant** la confirmation carte : un upload qui échoue arrête la soumission avec `step4.errors.UPLOAD_FAILED` (« ta carte n'a pas été débitée ») — aucune empreinte orpheline, leçon A34. Les URLs passent à `createDeal(draft, trip, paymentIntentId, photoUrls)` (contrat inchangé : `photoUrls` max 5). Côté Voyageur, `DealParcelPhotos` était déjà câblé sur `parcel.photoUrls` : il affiche désormais quelque chose.
+
+### 3. La colonne d'action dès `md` (`DealRequestDesktop.tsx`)
+`DealClient` bascule sur la vue mobile sous 768 px (`useIsMobile`), mais la grille desktop passait en deux colonnes à `lg` (1024 px) et l'`aside` était `hidden lg:block` : entre 768 et 1023 px, ni gains, ni couverture, ni CTA. Grille `md:grid-cols-[minmax(0,1fr)_300px] lg:…_340px]`, `aside hidden md:block`, sticky conservé.
+
+### 4. Les mots (GAR-02, RGP-02)
+« Assurance basique » → « Garantie Yamba incluse », « Assurance 500 € » → « Protection étendue 500 € », notes Expéditeur alignées (carrierDealRequest FR/EN) ; même chasse dans le tracker Expéditeur (`insuranceLabel`, `coverageTitle`), le wizard (`requiredBadge`) et la home. « Téléphone communiqué après acceptation » → « … à la prise en charge » (RGP-02 : le destinataire est révélé après PICKED_UP, ce que l'adapter faisait déjà).
+
+### 5. « Voir profil » (`publicSlug`)
+`BookingCounterpart.publicSlug` (contrat, nullable) : `loadCounterparts` le sélectionne, `toCounterpart` le propage, le contrat OAS est régénéré. Front : `DealShipper.publicSlug`, les deux vues (desktop, mobile) ouvrent `/[locale]/u/[slug]` dans un nouvel onglet ; sans slug, le bouton n'est pas rendu (jamais un lien mort). Test mapper : slug traverse, null sinon (355 tests deal-service).
+
+### 6. Les preuves
+tsc (user-ui, deal-service) · build de production · i18n miroir · deal-service 355 tests · OAS régénéré. Parcours manuel : refaire une réservation avec 2 photos (elles apparaissent dans « Photos du colis » côté Voyageur), redimensionner la fenêtre à 900 px (les boutons restent visibles à droite).
+
+### 7. Hors périmètre (assumé)
+Stats de confiance du Voyageur/Expéditeur (B5) ; galerie plein écran des photos ; compression HEIC ; la vitrine `/dashboard/trips/preview` (mock).

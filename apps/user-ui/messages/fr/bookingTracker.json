@@ -76,7 +76,7 @@
     "modeFormat": "CB {brand} ••{last4}",
     "statementLabel": "Sur ton relevé",
     "note": "Les fonds sont sécurisés. {carrierFirstName} est payé seulement 3 jours après livraison validée.",
-    "insuranceLabel": "Assurance",
+    "insuranceLabel": "Protection",
     "insuranceCovered": "{amount} € couverts"
   },
   "trip": {
@@ -433,11 +433,11 @@
       "debitedLabel": "Débité",
       "stateLabel": "État",
       "stateBlocked": "Bloqué jusqu'à livraison",
-      "insuranceLabel": "Assurance",
+      "insuranceLabel": "Protection",
       "insuranceValue": "{amount} couverts",
       "paymentNote": "{carrierFirstName} sera payé 3 jours après la livraison validée par {recipientFirstName}.",
       "coverageLabel": "COUVERTURE",
-      "coverageTitle": "Assurance {amount} souscrite",
+      "coverageTitle": "Protection {amount} choisie",
       "coverageNote": "Perte, vol, casse pendant le transport."
     },
     "report": "Signaler un problème"

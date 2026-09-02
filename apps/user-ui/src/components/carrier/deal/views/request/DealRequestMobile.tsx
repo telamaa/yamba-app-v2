@@ -7,7 +7,7 @@
 
 "use client";
 
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { useState } from "react";
 import type { DealRequest, DeclineReason } from "@/components/carrier/deal/deal.types";
 import { useDealRequestActions } from "./useDealRequestActions";
@@ -37,6 +37,7 @@ export default function DealRequestMobile({
                                             onAcceptedAction,
                                           }: Props) {
   const t = useTranslations("carrierDealRequest");
+  const locale = useLocale();
 
   const [charterAccepted, setCharterAccepted] = useState(false);
   const [charterError, setCharterError] = useState(false);
@@ -87,9 +88,11 @@ export default function DealRequestMobile({
 
           <DealShipperCard
             shipper={deal.shipper}
-            onViewProfileAction={() =>
-              console.info("[deal] view shipper profile")
-            }
+            onViewProfileAction={
+                  deal.shipper.publicSlug
+                    ? () => window.open(`/${locale}/u/${deal.shipper.publicSlug}`, "_blank", "noopener")
+                    : undefined
+                }
           />
 
           <DealParcelDetails

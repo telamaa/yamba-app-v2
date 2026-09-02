@@ -79,7 +79,12 @@ export async function createPaymentIntent(draft: Draft, trip: TripContext): Prom
   }
 }
 
-export async function createDeal(draft: Draft, trip: TripContext, paymentIntentId: string): Promise<CreateDealResponse> {
+export async function createDeal(
+  draft: Draft,
+  trip: TripContext,
+  paymentIntentId: string,
+  photoUrls: string[] = []
+): Promise<CreateDealResponse> {
   const price = computeTotal(draft, trip);
   const phoneE164 = recipientPhoneE164(draft);
   if (!phoneE164) throw new BookingApiError("GENERIC", 0, "Invalid recipient phone");
@@ -88,9 +93,9 @@ export async function createDeal(draft: Draft, trip: TripContext, paymentIntentI
     paymentIntentId,
     description: draft.description.trim(),
     declaredValueCents: Math.round((parseFloat(draft.declaredValueEur.replace(",", ".")) || 0) * 100),
-    // Les photos restent locales tant que media-service (B2.3) n'existe pas :
-    // le serveur accepte une liste vide.
-    photoUrls: [] as string[],
+    // A45 : URLs ImageKit téléversées par useBookingCheckout AVANT la confirmation
+    // carte (D42) — le serveur les fige dans parcel.photoUrls (max 5).
+    photoUrls,
     recipient: {
       firstName: draft.recipient.firstName.trim(),
       lastName: draft.recipient.lastName.trim(),

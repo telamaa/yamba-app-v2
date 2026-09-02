@@ -296,8 +296,15 @@ describe("sérialisation et privacy", () => {
       firstName: "Thomas",
       lastInitial: "N",
       avatarUrl: null,
+      publicSlug: null,
     });
     expect(JSON.stringify(view.carrier)).not.toContain("Nkounkou");
+  });
+
+  it("A45 : le slug public traverse (lien « Voir profil »), null quand absent", () => {
+    const withSlug = toCarrierBookingView(makeBooking(), { ...SHIPPER, publicSlug: "aminata-d" });
+    expect(withSlug.shipper.publicSlug).toBe("aminata-d");
+    expect(toCarrierBookingView(makeBooking(), SHIPPER).shipper.publicSlug).toBeNull();
   });
 
   it("contrepartie sans nom : lastInitial = '' (jamais undefined)", () => {

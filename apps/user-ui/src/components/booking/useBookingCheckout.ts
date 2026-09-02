@@ -15,6 +15,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { useRouter } from "@/i18n/navigation";
+import { useImageKitUpload } from "@/hooks/useImageKitUpload";
 import { BookingApiError, createDeal, createPaymentIntent } from "@/services/booking.api";
 import type { Draft, PaymentIntentInfo, Step, TripContext } from "./booking.types";
 
@@ -36,6 +37,8 @@ const KNOWN_CODES = new Set([
 
 export function useBookingCheckout(args: { draft: Draft; trip: TripContext; step: Step; clear: () => void }) {
   const { draft, trip, step, clear } = args;
+  // A45 — photos déclarées : upload direct ImageKit (D42), dossier dédié
+  const { upload } = useImageKitUpload("/bookings/declared");
   const t = useTranslations("booking");
   const router = useRouter();
 
@@ -86,6 +89,19 @@ export function useBookingCheckout(args: { draft: Draft; trip: TripContext; step
     if (isSubmitting || !intent) return;
     setIsSubmitting(true);
     try {
+      // 1. Les photos déclarées partent D'ABORD (A45) : un échec ici
+      //    arrête tout AVANT la carte — jamais d'empreinte orpheline (A34).
+      const photoUrls: string[] = [];
+      for (const photo of draft.photos) {
+        if (!photo.file) continue;
+        const uploaded = await upload(photo.file);
+        if (!uploaded) {
+          toast.error(t("step4.errors.UPLOAD_FAILED"));
+          return;
+        }
+        photoUrls.push(uploaded.url);
+      }
+
       if (intent.provider === "STRIPE") {
         const confirm = confirmRef.current;
         if (!confirm) {
@@ -98,7 +114,7 @@ export function useBookingCheckout(args: { draft: Draft; trip: TripContext; step
           return;
         }
       }
-      const result = await createDeal(draft, trip, intent.paymentIntentId);
+      const result = await createDeal(draft, trip, intent.paymentIntentId, photoUrls);
       toast.success(t("step4.requestSent"), { duration: 3500 });
       clear();
       router.push(`/bookings/${result.bookingId}`);
@@ -112,7 +128,7 @@ export function useBookingCheckout(args: { draft: Draft; trip: TripContext; step
     } finally {
       setIsSubmitting(false);
     }
-  }, [isSubmitting, intent, draft, trip, clear, router, t, errorMessage, refreshIntent]);
+  }, [isSubmitting, intent, draft, trip, clear, router, t, errorMessage, refreshIntent, upload]);
 
   return { intent, intentLoading, intentError, refreshIntent, registerConfirm, submit, isSubmitting };
 }

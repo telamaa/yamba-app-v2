@@ -6444,12 +6444,24 @@
                 "type": "null"
               }
             ]
+          },
+          "publicSlug": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Public profile slug (/u/[slug]) — null for accounts without one (A45)"
           }
         },
         "required": [
           "id",
           "lastInitial",
-          "avatarUrl"
+          "avatarUrl",
+          "publicSlug"
         ],
         "additionalProperties": false,
         "description": "Minimal profile of the other party (explicit join — Booking has no Prisma relations)"

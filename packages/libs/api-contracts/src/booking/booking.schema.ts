@@ -145,6 +145,7 @@ export const BookingCounterpartSchema = z
     firstName: z.string().nullish(),
     lastInitial: z.string().meta({ description: "Last-name initial, '' if absent (privacy)" }),
     avatarUrl: z.string().nullable(),
+    publicSlug: z.string().nullable().meta({ description: "Public profile slug (/u/[slug]) — null for accounts without one (A45)" }),
   })
   .meta({
     id: "BookingCounterpart",

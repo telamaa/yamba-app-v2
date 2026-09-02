@@ -65,6 +65,7 @@ export type CarrierBookingViewDto = {
     firstName?: string | null;
     lastInitial: string;
     avatarUrl: string | null;
+    publicSlug?: string | null;
   };
   requestedAt: string;
   expiresAt: string;
@@ -133,6 +134,7 @@ export function toDealRequest(view: CarrierBookingViewDto): DealRequest {
       firstName: view.shipper.firstName ?? "",
       lastInitial: view.shipper.lastInitial,
       avatarUrl: view.shipper.avatarUrl ?? undefined,
+      publicSlug: view.shipper.publicSlug ?? undefined,
     },
 
     trip: {

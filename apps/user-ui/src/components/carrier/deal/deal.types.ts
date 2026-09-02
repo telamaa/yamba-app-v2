@@ -47,6 +47,8 @@ export type DealShipper = {
   firstName: string;
   lastInitial: string;
   avatarUrl?: string;
+  /** Slug du profil public (/u/[slug]) — absent = pas de lien « Voir profil » (A45). */
+  publicSlug?: string;
   // Stats de confiance : absentes de BookingCounterpart (l'API réelle) —
   // l'UI les masque quand elles manquent. Reviendront avec le profil
   // public enrichi (B5 notation).

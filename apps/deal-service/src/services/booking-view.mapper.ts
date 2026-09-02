@@ -129,6 +129,7 @@ export type CounterpartRecord = {
   firstName: string | null;
   lastName: string | null;
   avatarUrl: string | null;
+  publicSlug?: string | null; // A45 — lien « Voir profil » (/u/[slug])
 };
 
 /* ══ Helpers ══════════════════════════════════════════════════ */
@@ -144,6 +145,7 @@ const toCounterpart = (u: CounterpartRecord) => ({
   firstName: u.firstName ?? null,
   lastInitial: u.lastName?.trim().charAt(0).toUpperCase() ?? "",
   avatarUrl: u.avatarUrl,
+  publicSlug: u.publicSlug ?? null,
 });
 
 const toPlace = (

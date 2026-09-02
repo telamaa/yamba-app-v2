@@ -63,14 +63,14 @@
     "titleShort": "PICKUP & DELIVERY",
     "pickupLabel": "PARCEL PICKUP",
     "deliveryLabel": "DELIVERY",
-    "deliveryNotePending": "Phone shared after acceptance"
+    "deliveryNotePending": "Recipient phone shared at pickup"
   },
   "coverage": {
     "title": "PARCEL COVERAGE",
-    "extended": "500 € insurance included",
-    "basic": "Basic insurance",
-    "shipperNoteExtended": "{shipperFirstName} purchased insurance — you''re protected in case of value-related dispute.",
-    "shipperNoteExtendedShort": "{shipperFirstName} bought 500 € insurance · you''re protected in case of dispute"
+    "extended": "Extended 500 € protection included",
+    "basic": "Yamba Guarantee included",
+    "shipperNoteExtended": "{shipperFirstName} chose the extended protection — you''re covered in case of a value-related dispute.",
+    "shipperNoteExtendedShort": "{shipperFirstName} chose the 500 € extended protection · you''re covered in case of dispute"
   },
   "acceptTip": {
     "title": "Before accepting, read these points carefully",
