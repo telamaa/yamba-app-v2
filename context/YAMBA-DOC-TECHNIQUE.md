@@ -985,3 +985,22 @@ Recette F1 : « Le téléversement d'une photo a échoué ». Diagnostic par les
 Fix : `imagekit@6.0.0` exact dans les deux `package.json` (racine, `apps/trip-service`), d.ts maison supprimée (le SDK livre ses types), `npm install` après alignement des deux fichiers — sinon une copie imbriquée `apps/trip-service/node_modules/imagekit` (ancienne version) masque la racine (`npm ls imagekit` doit dire « deduped »). Preuve : script `getAuthenticationParameters()` → token/signature/expire. trip-service 187 tests, tsc OK. **Le trip-service doit être relancé** (l'ancienne copie était chargée en mémoire).
 
 Dans la même PR, le hook `useImageKitUpload` gagne des options (`maxSizeBytes`, `allowedMimeTypes`) et `uploadDetailed()` qui rend le CODE d'erreur à l'appelant (`INVALID_TYPE` / `TOO_LARGE` / `AUTH_FAILED` / `UPLOAD_FAILED`) : le pickup et le wizard affichent « une photo dépasse 10 Mo » ou « format non pris en charge » au lieu du message générique ; photos de colis à 10 Mo (spec §3.4), WebP accepté. Les justificatifs de trajet gardent 5 Mo + PDF.
+
+---
+
+# B3-PR6 — Visionneuse de photos partagée : les preuves se regardent (A48)
+
+### 1. Ce qui a été fait
+Recette F1 réussie (deux photos figées), mais la page de suivi du Voyageur montrait deux carrés amber à pictogramme — des restes de l'époque mock, présents dans dix composants des deux côtés. `PhotoThumbs` + `PhotoLightbox` (`components/shared/photos/`) les remplacent partout : vignettes réelles cliquables, visionneuse plein écran.
+
+### 2. `PhotoThumbs`
+`photos: { id, url, label?, context? }[]`, `tone` (`violet` déclarées · `amber` pickup · `red` litige — liseré `ring-2`, spec §3.4), `size` (`sm` 40 px · `md` 48/56 px · `lg` 64 px), `max` (les suivantes deviennent une case « +N » qui ouvre la visionneuse à la première cachée). Image `object-cover`, `loading="lazy"` ; `onError` → dégradé de la couleur + pictogramme (Package si le contexte finit par `PACKAGED`), jamais une case vide. Cibles ≥ 40 px.
+
+### 3. `PhotoLightbox`
+Extraite de `DealParcelPhotos` (qui l'utilise désormais ; son `Lightbox` privé et ses handlers clavier disparaissent). Contrat : `photos`, `index`, `onCloseAction`, `onIndexChangeAction`. Échap / ← → au clavier, balayage horizontal (> 40 px) au tactile, boutons 44 px, compteur « 2 / 3 », fermeture au clic hors image, `body.overflow` verrouillé pendant l'ouverture, `z-[60]` au-dessus des bottom-bars mobiles. Libellés `common.lightbox.{close,previous,next,counter}` FR/EN.
+
+### 4. Les dix remplacements (script, un bloc = une ligne)
+Voyageur : `TrackingTimeline` (sm), `TrackingSidebarCards` (md), `DealAcceptedRecap` (md, max 3), `PickupDeclaredCard` (lg), `DealDeliverDesktop` (md). Expéditrice : `BookingAcceptedRecap` (md, max 3), `SenderTrackingSideCards` (md), `SenderTrackingTimeline` (sm), `DeliveryRecapCard` (md), `BookingPickupPhotos` (lg), `BookingReportDesktop` (sm ×2, `PhotoMini` supprimé). Imports lucide élagués automatiquement (tsc `noUnusedLocals`).
+
+### 5. Preuves
+tsc user-ui, i18n miroir, aucun dégradé orphelin (`grep BA7517|534AB7` ne remonte plus que la visionneuse et les grilles d'upload).

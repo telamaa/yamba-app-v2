@@ -1,8 +1,8 @@
 /**
  * DealParcelPhotos.tsx
  * ====================
- * Grid de photos déclarées par l'expéditeur, avec lightbox simple
- * (modal full-screen) au clic.
+ * Grid de photos déclarées par l'expéditeur ; visionneuse partagée
+ * (PhotoLightbox — A48) au clic.
  *
  * Layout responsive :
  *  - Mobile : 2 cols (photos lisibles ~170px pour juger le contenu)
@@ -14,9 +14,10 @@
 
 "use client";
 
-import { ChevronLeft, ChevronRight, ImageIcon, Package, X } from "lucide-react";
+import { ImageIcon, Package } from "lucide-react";
+import PhotoLightbox from "@/components/shared/photos/PhotoLightbox";
 import { useTranslations } from "next-intl";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import type { DealPhoto } from "../deal.types";
 
 type Props = {
@@ -30,28 +31,6 @@ export default function DealParcelPhotos({ photos, shipperFirstName }: Props) {
 
   const open = useCallback((idx: number) => setActiveIndex(idx), []);
   const close = useCallback(() => setActiveIndex(null), []);
-  const next = useCallback(
-    () => setActiveIndex((i) => (i === null ? null : (i + 1) % photos.length)),
-    [photos.length]
-  );
-  const prev = useCallback(
-    () =>
-      setActiveIndex((i) =>
-        i === null ? null : (i - 1 + photos.length) % photos.length
-      ),
-    [photos.length]
-  );
-
-  useEffect(() => {
-    if (activeIndex === null) return;
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") close();
-      if (e.key === "ArrowRight") next();
-      if (e.key === "ArrowLeft") prev();
-    };
-    window.addEventListener("keydown", handleKey);
-    return () => window.removeEventListener("keydown", handleKey);
-  }, [activeIndex, close, next, prev]);
 
   if (photos.length === 0) return null;
 
@@ -78,12 +57,11 @@ export default function DealParcelPhotos({ photos, shipperFirstName }: Props) {
       </div>
 
       {activeIndex !== null && (
-        <Lightbox
+        <PhotoLightbox
           photos={photos}
           index={activeIndex}
           onCloseAction={close}
-          onNextAction={next}
-          onPrevAction={prev}
+          onIndexChangeAction={setActiveIndex}
         />
       )}
     </section>
@@ -139,89 +117,5 @@ function PhotoThumbnail({
         </div>
       )}
     </button>
-  );
-}
-
-function Lightbox({
-                    photos,
-                    index,
-                    onCloseAction,
-                    onNextAction,
-                    onPrevAction,
-                  }: {
-  photos: DealPhoto[];
-  index: number;
-  onCloseAction: () => void;
-  onNextAction: () => void;
-  onPrevAction: () => void;
-}) {
-  const t = useTranslations("carrierDealRequest");
-  const photo = photos[index];
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm"
-      onClick={onCloseAction}
-      role="dialog"
-      aria-modal="true"
-    >
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          onCloseAction();
-        }}
-        className="absolute right-4 top-4 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20"
-        aria-label={t("photos.lightbox.close")}
-      >
-        <X size={20} />
-      </button>
-
-      {photos.length > 1 && (
-        <>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onPrevAction();
-            }}
-            className="absolute left-4 top-1/2 z-10 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20"
-            aria-label={t("photos.lightbox.previous")}
-          >
-            <ChevronLeft size={24} />
-          </button>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onNextAction();
-            }}
-            className="absolute right-4 top-1/2 z-10 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20"
-            aria-label={t("photos.lightbox.next")}
-          >
-            <ChevronRight size={24} />
-          </button>
-        </>
-      )}
-
-      <div
-        className="max-h-[90vh] max-w-[90vw]"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <img
-          src={photo.url}
-          alt={photo.label || ""}
-          className="max-h-[90vh] max-w-[90vw] object-contain"
-          onError={(e) => {
-            (e.target as HTMLImageElement).style.display = "none";
-          }}
-        />
-        {photo.label && (
-          <div className="mt-3 text-center text-[12px] font-medium text-white/80">
-            {photo.label}
-          </div>
-        )}
-      </div>
-    </div>
   );
 }

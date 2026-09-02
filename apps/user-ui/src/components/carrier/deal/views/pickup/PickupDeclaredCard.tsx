@@ -10,9 +10,10 @@
 
 "use client";
 
-import { Eye, ImageIcon, Package } from "lucide-react";
+import { Eye } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import type { DealRequest } from "@/components/carrier/deal/deal.types";
+import PhotoThumbs from "@/components/shared/photos/PhotoThumbs";
 
 type Props = {
   deal: DealRequest;
@@ -56,27 +57,7 @@ export default function PickupDeclaredCard({ deal, compact = false }: Props) {
       </div>
 
       {deal.parcel.photos.length > 0 && (
-        <div className="mt-3 flex gap-2">
-          {deal.parcel.photos.map((photo) => (
-            <div
-              key={photo.id}
-              className="relative flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-lg text-white"
-              style={{ background: "linear-gradient(135deg, #534AB7, #7F77DD)" }}
-              aria-label={photo.label}
-            >
-              {photo.context === "DECLARED_PACKAGED" ? (
-                <Package size={18} aria-hidden="true" />
-              ) : (
-                <ImageIcon size={18} aria-hidden="true" />
-              )}
-              {photo.label && (
-                <div className="absolute inset-x-1 bottom-1 rounded-sm bg-black/55 px-1 py-px text-center text-[8px] font-medium">
-                  {photo.label}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
+        <PhotoThumbs photos={deal.parcel.photos} tone="violet" size="lg" className="mt-3" />
       )}
 
       {!compact && (

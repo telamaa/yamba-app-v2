@@ -9,9 +9,10 @@
 
 "use client";
 
-import { ImageIcon, MessageSquare, Package } from "lucide-react";
+import { MessageSquare } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import type { DealRequest } from "@/components/carrier/deal/deal.types";
+import PhotoThumbs from "@/components/shared/photos/PhotoThumbs";
 
 // ── TON PAIEMENT ──────────────────────────────────────────
 
@@ -71,22 +72,7 @@ export function TrackingParcelCard({ deal }: { deal: DealRequest }) {
         {deal.parcel.description}
       </p>
       {deal.pickup && deal.pickup.photos.length > 0 && (
-        <div className="mt-3 flex gap-2">
-          {deal.pickup.photos.map((photo) => (
-            <div
-              key={photo.id}
-              className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg text-white"
-              style={{ background: "linear-gradient(135deg, #BA7517, #EF9F27)" }}
-              aria-label={photo.label}
-            >
-              {photo.context === "PICKUP_PACKAGED" ? (
-                <Package size={15} aria-hidden="true" />
-              ) : (
-                <ImageIcon size={15} aria-hidden="true" />
-              )}
-            </div>
-          ))}
-        </div>
+        <PhotoThumbs photos={deal.pickup.photos} tone="amber" size="md" className="mt-3" />
       )}
     </section>
   );

@@ -340,6 +340,7 @@ Captures utilisateur sur `/carrier/deals/[id]` : (1) à ~900 px, aucune colonne 
 
 ## B. Reprise
 - **FAIT** : #100 mergée (13 checks comptés), branche purgée. Recette D1–D7 puis F/V à jouer par l'utilisateur.
+- **B3-PR6 (A48)** : recette F1 OK (2 photos) mais vignettes = pictogrammes → `components/shared/photos/{PhotoThumbs,PhotoLightbox}`, 10 vues remplacées (Voyageur + Expéditrice), `common.lightbox.*`. À merger (13 checks), purger `feat/photo-viewer`.
 - **Fix ImageKit (A47)** : recette F1 → 500 sur `imagekit-auth` → paquet `imagekit@1.5.0` = SDK 2016 ; → 6.0.0 exact (racine + trip-service), d.ts maison supprimée, copie imbriquée dédupliquée, `uploadDetailed` + erreurs explicites, photos 10 Mo. **#104 mergée** — trip-service à relancer.
 - **B3-PR5 (chore, A46)** : titres des 5 pages Deal ramenés à l'échelle du dashboard (22/17 px semibold), colonne d'action dès `md` sur accepté/pickup/tracking/deliver + squelette. **#102 mergée**, branche purgée.
 - Pistes UX restantes sur É2 : stats de confiance (B5), galerie photos plein écran.
