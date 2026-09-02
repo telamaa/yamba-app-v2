@@ -110,6 +110,7 @@ JWT `access_token` + `refresh_token` set as cookies by auth-service. Frontend `a
 - Nullable unique fields on Mongo collide on null (P2002).
 - Atlas shared tiers cap aggregation pipelines at 50 stages; Prisma emits one `$set` stage per field on updates touching composite types → `P2010 Pipeline length greater than 50`. Chunk wide updates with `apps/trip-service/src/lib/mongo-update-chunks.ts` (transition fields last).
 - macOS FS is case-insensitive, CI Linux is not → exact-case imports.
+- A nested `apps/<service>/node_modules/<pkg>` (version drift between the service `package.json` and the root) shadows the root copy: `npm ls <pkg>` must say « deduped ». `imagekit` is pinned exact (6.0.0) in BOTH package.json files — 1.5.0 was a 2016 fossil with another API (A47).
 - `overflow-x: clip` (not `hidden`) to preserve `position: sticky`.
 - Seeds live in `packages/libs/prisma/scripts/`, relative imports, run via `npx tsx --env-file=.env …` (sourcing `.env` in zsh mangles the Mongo password). `seed-deals.ts` is the QA reset: wipe + recreate trips/bookings of the seed users, real delivery code `742891` on every post-pickup booking.
 - `nx serve` loads root `.env` and OVERRIDES variables passed on the command line — to run a service with a controlled env (e.g. forcing the FAKE payment provider), run the built bundle: `STRIPE_SECRET_KEY= node --env-file=../../.env dist/main.js` from `apps/<service>` (Node lets the process env win).

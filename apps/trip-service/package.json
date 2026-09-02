@@ -62,7 +62,7 @@
   },
   "dependencies": {
     "express": "^4.21.2",
-    "imagekit": "^1.5.0",
+    "imagekit": "6.0.0",
     "nodemailer": "9.0.3"
   }
 }

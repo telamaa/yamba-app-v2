@@ -21,7 +21,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useTranslations } from "next-intl";
 import { useIsMobile } from "@/hooks/useIsMobile";
-import { useImageKitUpload } from "@/hooks/useImageKitUpload";
+import { PHOTO_MAX_SIZE_BYTES, PHOTO_MIME_TYPES, useImageKitUpload } from "@/hooks/useImageKitUpload";
 import { useRouter } from "@/i18n/navigation";
 import { dealQueryKey } from "../../DealClient";
 import { MY_DEALS_QUERY_KEY } from "@/hooks/useMyDeals";
@@ -47,7 +47,10 @@ export default function DealPickupClient({ dealId }: Props) {
   const router = useRouter();
   const queryClient = useQueryClient();
   // D42 : upload direct signé vers ImageKit, dossier dédié aux preuves de pickup.
-  const { upload } = useImageKitUpload("/deals/pickup");
+  const { uploadDetailed } = useImageKitUpload("/deals/pickup", {
+    maxSizeBytes: PHOTO_MAX_SIZE_BYTES,
+    allowedMimeTypes: PHOTO_MIME_TYPES,
+  });
 
   const [deal, setDeal] = useState<DealRequest | null>(null);
   const [loadError, setLoadError] = useState(false);
@@ -124,12 +127,19 @@ export default function DealPickupClient({ dealId }: Props) {
       const photoUrls: string[] = [];
       for (const photo of photos) {
         if (!photo.file) continue;
-        const uploaded = await upload(photo.file);
-        if (!uploaded) {
-          toast.error(t("errors.uploadFailed"));
+        const result = await uploadDetailed(photo.file);
+        if (!result.ok) {
+          toast.error(
+            result.error.code === "TOO_LARGE"
+              ? t("errors.uploadTooLarge", { maxMb: Math.round(PHOTO_MAX_SIZE_BYTES / (1024 * 1024)) })
+              : result.error.code === "INVALID_TYPE"
+                ? t("errors.uploadInvalidType")
+                : t("errors.uploadFailed"),
+            { duration: 6000 }
+          );
           return;
         }
-        photoUrls.push(uploaded.url);
+        photoUrls.push(result.file.url);
       }
       if (photoUrls.length === 0) {
         toast.error(t("errors.uploadFailed"));

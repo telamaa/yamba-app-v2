@@ -157,6 +157,8 @@
     "requestSent": "Request sent! The tripper has 24h to accept.",
     "errors": {
         "UPLOAD_FAILED": "A photo upload failed. Check your connection and try again — your card was not charged.",
+        "UPLOAD_TOO_LARGE": "A photo exceeds {maxMb} MB. Reduce or remove it — your card was not charged.",
+        "UPLOAD_INVALID_TYPE": "Unsupported photo format (JPG, PNG, HEIC or WebP) — your card was not charged.",
       "QUOTE_DIVERGENCE": "The price changed since your quote. The new total is shown — check it before paying.",
       "CAPACITY_EXCEEDED": "There is not enough space left on this trip for your parcel.",
       "FAMILY_REFUSED": "The tripper does not accept this kind of parcel on this trip.",

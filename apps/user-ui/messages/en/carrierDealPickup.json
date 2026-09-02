@@ -140,6 +140,8 @@
   },
   "errors": {
     "uploadFailed": "A photo upload failed. Check your connection and try again — nothing was sent.",
+    "uploadTooLarge": "A photo exceeds {maxMb} MB. Reduce it or pick another one — nothing was sent.",
+    "uploadInvalidType": "Unsupported photo format (JPG, PNG, HEIC or WebP). Nothing was sent.",
     "dealChanged": "This deal changed in the meantime. Reloading."
   }
 }
