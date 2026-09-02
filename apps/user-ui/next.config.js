@@ -23,6 +23,11 @@ const nextConfig = {
   // Use this to set Nx-specific options
   // See: https://nx.dev/recipes/next/next-config-setup
   nx: {},
+  // Recette sur le réseau local (autres ordinateurs, téléphones) : Next 16
+  // répond 403 aux assets /_next/* demandés depuis une origine autre que
+  // localhost — la page reste figée sur son squelette SSR. Réseaux privés
+  // uniquement, sans effet en production (option de dev).
+  allowedDevOrigins: ["192.168.*.*", "10.*.*.*", "172.16.*.*"],
 };
 
 const plugins = [
