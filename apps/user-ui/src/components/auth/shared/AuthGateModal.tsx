@@ -11,6 +11,7 @@
  * `redirect` (l'intention de départ). Le serveur reste seul juge (CNF-05).
  */
 import { useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useTranslations } from "next-intl";
 import { Lock, X } from "lucide-react";
 import { useRouter } from "@/i18n/navigation";
@@ -50,7 +51,7 @@ export default function AuthGateModal({ open, onCloseAction, title, subtitle, re
     };
   }, [open, onCloseAction]);
 
-  if (!open) return null;
+  if (!open || typeof document === "undefined") return null;
 
   const goLogin = () => router.push(withRedirect("/login", redirect));
   const goRegister = () => router.push(withRedirect("/register", redirect));
@@ -61,10 +62,13 @@ export default function AuthGateModal({ open, onCloseAction, title, subtitle, re
       ? "rounded-t-3xl px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-3"
       : "max-w-md rounded-3xl p-6");
 
-  return (
+  // Portail vers <body> : la porte peut être déclenchée DEPUIS une carte-lien
+  // (cœur favori) — rendue dans l'ancre, chaque clic naviguerait.
+  return createPortal(
     <div
       className={`fixed inset-0 z-[210] flex ${isMobile ? "items-end" : "items-center justify-center p-4"}`}
       role="dialog"
+      onClick={(e) => e.stopPropagation()}
       aria-modal="true"
       aria-labelledby="auth-gate-title"
       aria-describedby="auth-gate-subtitle"
@@ -129,6 +133,7 @@ export default function AuthGateModal({ open, onCloseAction, title, subtitle, re
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

@@ -183,6 +183,10 @@
     "shareTrip": {
       "title": "Connecte-toi pour partager un trajet",
       "subtitle": "Publier un trajet engage un Voyageur identifié : Yamba a besoin de savoir qui transporte. Ton trajet t'attend après connexion."
+    },
+    "favorite": {
+      "title": "Connecte-toi pour enregistrer un favori",
+      "subtitle": "Tes favoris sont liés à ton compte : ils te suivent sur tous tes appareils. Ce trajet t'attend après connexion."
     }
   }
 }

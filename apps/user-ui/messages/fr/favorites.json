@@ -14,7 +14,6 @@
   "button": {
     "add": "Ajouter aux favoris",
     "remove": "Retirer des favoris",
-    "signInRequired": "Connecte-toi pour enregistrer un favori",
     "ownTrip": "Tu ne peux pas mettre ton propre trajet en favori",
     "notFavoritable": "Ce trajet n'est plus disponible",
     "error": "Impossible de modifier le favori, réessaie"

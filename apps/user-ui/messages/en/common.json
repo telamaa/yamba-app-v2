@@ -183,6 +183,10 @@
     "shareTrip": {
       "title": "Sign in to share a trip",
       "subtitle": "Publishing a trip commits an identified carrier: Yamba needs to know who is carrying. Your trip will be waiting after sign-in."
+    },
+    "favorite": {
+      "title": "Sign in to save a favorite",
+      "subtitle": "Your favorites are tied to your account: they follow you on every device. This trip will be waiting after sign-in."
     }
   }
 }

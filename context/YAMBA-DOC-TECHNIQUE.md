@@ -1113,6 +1113,7 @@ Implémentation de D44 (langue des emails = langue de l'utilisateur, conçue pou
 3. **Mobile** — `px-3.5 py-2.5 text-sm` → `text-base sm:text-sm` sur tous les champs des six formulaires : 16 px sous 640 px (iOS ne zoome plus au focus), 14 px au-dessus.
 4. **`components/auth/shared/AuthGateModal.tsx`** — la modale de #118 devient générique (`title`, `subtitle`, `redirect`, boutons `common.authGate.login/register/later`) ; `BookingAuthGateModal` n'est plus qu'un habillage (`booking.authGate.title/subtitle`, retour wizard). Les clés `booking.authGate.login/register/later` sont retirées (fr/en).
 5. **« Partager un trajet »** — `useShareTrip` expose `gateOpen` / `closeGate` / `shareRedirect` et n'envoie plus vers `/login` ; `HeaderShareTripCTA` rend `AuthGateModal` (texte `common.authGate.shareTrip`) dans ses trois variantes. Utilisateur en chargement → `/trips/create` (la page tranche).
+6. **Cœur favori** — `FavoriteButton` ouvre `AuthGateModal` (`common.authGate.favorite`, retour sur la page courante) au lieu de pousser vers `/login` ; la clé `favorites.button.signInRequired` disparaît. `AuthGateModal` est rendue par `createPortal` dans `<body>` avec `stopPropagation` : déclenchée depuis une carte-lien, rendue dans l'ancre, chaque clic aurait navigué.
 
 ### Preuves
 tsc user-ui, miroir i18n (24 namespaces), page login 200 sur le serveur de dev. Pas de Jest user-ui : recette I1–I8 (`YAMBA-DOC-METIER.md`).

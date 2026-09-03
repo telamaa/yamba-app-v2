@@ -4,21 +4,23 @@
  * FavoriteButton — le cœur (D46, A59)
  * ===================================
  * Reflète `isFavorite` servi par l'API et bascule de façon optimiste
- * (useToggleFavorite). Visiteur → porte de connexion avec retour sur la
- * page courante. Les refus serveur (propre trajet, trajet non publié) sont
+ * (useToggleFavorite). Visiteur → porte d'identité EN MODALE (AuthGateModal,
+ * A60) « Connecte-toi pour enregistrer un favori », retour sur la page
+ * courante. Les refus serveur (propre trajet, trajet non publié) sont
  * traduits depuis `details.code` et annulent la bascule.
  *
  * Posé DANS une carte-lien : stopPropagation + preventDefault pour ne pas
  * ouvrir le trajet au clic sur le cœur.
  */
+import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { Heart } from "lucide-react";
 import { toast } from "sonner";
-import { usePathname, useRouter } from "@/i18n/navigation";
+import { usePathname } from "@/i18n/navigation";
 import useUser from "@/hooks/useUser";
 import { useToggleFavorite } from "@/hooks/useFavoriteMutations";
-import { loginHrefFor } from "@/lib/auth/login-redirect";
 import { getApiErrorData } from "@/services/auth.api";
+import AuthGateModal from "@/components/auth/shared/AuthGateModal";
 
 type Props = {
   tripId: string;
@@ -30,10 +32,21 @@ type Props = {
 
 export default function FavoriteButton({ tripId, isFavorite, variant = "card", className = "" }: Props) {
   const t = useTranslations("favorites.button");
-  const router = useRouter();
+  const tGate = useTranslations("common.authGate.favorite");
   const pathname = usePathname();
   const { user, isLoading: userLoading } = useUser();
   const toggle = useToggleFavorite();
+  const [gateOpen, setGateOpen] = useState(false);
+
+  const gate = (
+    <AuthGateModal
+      open={gateOpen}
+      onCloseAction={() => setGateOpen(false)}
+      title={tGate("title")}
+      subtitle={tGate("subtitle")}
+      redirect={pathname || "/search"}
+    />
+  );
 
   const active = !!isFavorite;
   const label = active ? t("remove") : t("add");
@@ -43,8 +56,7 @@ export default function FavoriteButton({ tripId, isFavorite, variant = "card", c
     e.stopPropagation();
     if (userLoading || toggle.isPending) return;
     if (!user) {
-      toast.info(t("signInRequired"));
-      router.push(loginHrefFor(pathname));
+      setGateOpen(true);
       return;
     }
     toggle.mutate(
@@ -64,6 +76,8 @@ export default function FavoriteButton({ tripId, isFavorite, variant = "card", c
 
   if (variant === "detail") {
     return (
+      <>
+      {gate}
       <button
         type="button"
         onClick={onClick}
@@ -79,10 +93,13 @@ export default function FavoriteButton({ tripId, isFavorite, variant = "card", c
         <Heart size={16} className={iconClass} aria-hidden />
         {label}
       </button>
+      </>
     );
   }
 
   return (
+    <>
+    {gate}
     <button
       type="button"
       onClick={onClick}
@@ -93,5 +110,6 @@ export default function FavoriteButton({ tripId, isFavorite, variant = "card", c
     >
       <Heart size={16} className={iconClass} aria-hidden />
     </button>
+    </>
   );
 }

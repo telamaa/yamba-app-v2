@@ -752,3 +752,4 @@ Une seule voix (tutoiement, D45) sur tout le parcours d'entrée ; un panneau d'a
 | I6 | Panneau gauche (desktop) | Trois promesses (compte vérifié, débité à l'acceptation, Garantie Yamba) ; plus de « 12k+ », « 4.8 », ni de témoignage |
 | I7 | iPhone, focus sur un champ de connexion | Pas de zoom automatique |
 | I8 | Réserver, visiteur | Fenêtre inchangée par rapport à #118 (mêmes boutons, retour wizard) |
+| I9 | Visiteur, cœur sur une carte de recherche ou sur la fiche | Fenêtre « Connecte-toi pour enregistrer un favori », la carte ne s'ouvre pas ; retour sur la même page après connexion |
