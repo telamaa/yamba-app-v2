@@ -31,6 +31,7 @@ export default getRequestConfig(async ({ requestLocale }) => {
     dashboardHome, // ✨ NEW dashboard home inbox
     notifications, // ✨ NEW dashboard notifications (PR5)
     favorites, // D46 — Mes favoris
+    finances, // A83 — Finances (portefeuille + paiements)
   ] = await Promise.all([
     import(`../../messages/${locale}/common.json`),
     import(`../../messages/${locale}/home.json`),
@@ -56,6 +57,7 @@ export default getRequestConfig(async ({ requestLocale }) => {
     import(`../../messages/${locale}/dashboardHome.json`), // ✨ NEW dashboard home inbox
     import(`../../messages/${locale}/notifications.json`), // ✨ NEW dashboard notifications (PR5)
     import(`../../messages/${locale}/favorites.json`), // D46
+    import(`../../messages/${locale}/finances.json`), // A83
   ]);
   return {
     locale,
@@ -84,6 +86,7 @@ export default getRequestConfig(async ({ requestLocale }) => {
       dashboardHome: dashboardHome.default, // ✨ NEW dashboard home inbox
       notifications: notifications.default, // ✨ NEW dashboard notifications (PR5)
       favorites: favorites.default, // D46
+      finances: finances.default, // A83
     },
   };
 });

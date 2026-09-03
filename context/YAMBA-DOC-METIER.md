@@ -951,3 +951,27 @@ D39 promettait que la retenue de 50 % d'une annulation tardive reviendrait au Vo
 | ANN6 | Même chose, Stripe réel, compte Voyageur non prêt | Carte ambre « en attente : finalise ton compte Stripe », bandeau en tête de « Mes trajets », rejeu au cron après onboarding |
 | ANN7 | Annulation APRÈS le départ (pas de prise en charge) | Remboursement 50 %, `HELD_FOR_MEDIATION`, aucun versement ; côté Voyageur « retenue conservée, on te contacte » ; ligne « Annulée après le départ » |
 | ANN8 | Annulation à plus de 48 h | Remboursement intégral, aucune retenue, rien côté Voyageur |
+
+# Finances — le portefeuille du Voyageur et les paiements de l'Expéditeur
+
+### Le besoin
+La section Finances était une promesse : deux onglets vides et une maquette aux chiffres inventés. Chaque membre doit savoir où est son argent, sans rien estimer. Décisions utilisateur du 03/09 (1A à 5A) : les deux rôles, totaux calculés par le serveur, accès au tableau de bord Stripe, trois cartes et une liste, traduction.
+
+### Règles de gestion (FIN)
+- **RG-FIN-01 — Un seul calcul, côté serveur.** Les totaux et l'état de chaque ligne sont servis par l'API ; aucun écran ne recalcule un montant. Deux écrans montrent toujours le même chiffre.
+- **RG-FIN-02 — Le Voyageur lit ses versements par état** : à venir (livraison en vérification, avec la date), en cours d'envoi, en attente (compte Stripe à finaliser, avec le bouton), gelé (signalement), parti le … (2 à 7 jours), retenue conservée (annulation après le départ). Une compensation d'annulation tardive est nommée comme telle.
+- **RG-FIN-03 — L'Expéditeur lit ses paiements par état** : autorisé mais pas débité, bloqué chez Yamba (jusqu'au … quand la livraison est faite), libéré, jamais débité (empreinte disparue), remboursé de … le …, remboursé partiellement avec la retenue reversée au Voyageur.
+- **RG-FIN-04 — Trois cartes par onglet** : Voyageur = à venir · envoyés (avec « ce mois ») · en attente ; Expéditeur = bloqué chez Yamba · dépensé · remboursé. « Dépensé » inclut les retenues d'annulation ; « remboursé » ne compte que l'argent réellement rendu.
+- **RG-FIN-05 — La date d'arrivée sur le compte bancaire n'est jamais promise** : le portefeuille dit « parti le … », et renvoie au tableau de bord Stripe du Voyageur pour le reste (RIB, calendrier, historique).
+
+### Recette
+| # | Scénario | Attendu |
+|---|---|---|
+| FIN1 | Voyageur seed (`ines`), onglet Portefeuille | Cartes À venir / Envoyés / En attente non nulles selon les deals seed ; lignes triées par date, badge par état ; clic → page du deal |
+| FIN2 | Deal COMPLETED avec versement SENT | Ligne verte « Parti le … · 2 à 7 jours », montant en +, compté dans « Envoyés » |
+| FIN3 | Deal COMPLETED bloqué (compte Stripe) | Bandeau « finalise ton compte Stripe » en tête, ligne ambre, montant compté dans « En attente » |
+| FIN4 | Annulation tardive compensée | Ligne « Compensation · annulation tardive de {prénom} », montant de la compensation |
+| FIN5 | Bouton « Voir mes virements sur Stripe » | Nouvel onglet sur le tableau de bord Stripe Express ; sans compte : toast « finalise d'abord ton compte » |
+| FIN6 | Expéditrice seed (`aminata`), onglet Paiements | Cartes Bloqué / Dépensé / Remboursé ; ligne « bloqué jusqu'au … » sur un deal livré ; ligne remboursement partiel avec « retenue … reversée au Voyageur » |
+| FIN7 | Membre sans aucun deal | États vides honnêtes ; non-Voyageur : « Devenir Voyageur » |
+| FIN8 | Mobile (≤ 640 px), onglet Finances de la barre du bas | Même contenu en une colonne, cartes empilées |

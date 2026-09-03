@@ -14,6 +14,7 @@ import { makeDealTransportController } from "../controllers/deal-transport.contr
 import { makeDealTransportService } from "../services/deal-transport.service";
 import { makeDealSettlementController } from "../controllers/deal-settlement.controller";
 import { makeDealSettlementService } from "../services/deal-settlement.service";
+import { getMyWallet } from "../controllers/wallet.controller";
 import { createPaymentProviderFromEnv } from "@packages/payments";
 
 /**
@@ -86,5 +87,8 @@ router.get("/me/bookings", isAuthenticated, getMyBookings);
 
 // Mes deals reçus (vue Carrier, tous trajets — A44) — [?status=]
 router.get("/me/deals", isAuthenticated, getMyDeals);
+
+// ── Finances (A83) : totaux calculés serveur, les deux rôles ──
+router.get("/me/wallet", isAuthenticated, getMyWallet);
 
 export default router;

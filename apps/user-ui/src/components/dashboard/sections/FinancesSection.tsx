@@ -1,142 +1,174 @@
 "use client";
 
+/**
+ * Finances — Paiements (Expéditeur) + Portefeuille (Voyageur), données RÉELLES (A83/A84)
+ * =======================================================================================
+ * Tout vient de GET /me/wallet (totaux calculés serveur — décision 2A) ;
+ * le front affiche, ne recalcule rien. Trois cartes + une liste par onglet
+ * (décision 4A), bandeau « finalise ton compte Stripe » quand un versement
+ * est bloqué, bouton vers le tableau de bord Stripe Express (3A).
+ * Passé sous next-intl (espace `finances`, 5A) — fin du `isFr` inline.
+ */
+
 import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { CreditCard, Wallet } from "lucide-react";
+import { CreditCard, ExternalLink, Wallet } from "lucide-react";
+import { useLocale, useTranslations } from "next-intl";
+import { toast } from "sonner";
+import { useRouter } from "@/i18n/navigation";
+import apiClient from "@/lib/api-client";
 import useUser from "@/hooks/useUser";
-import { useUiPreferences } from "@/components/providers/UiPreferencesProvider";
+import { useWallet } from "@/hooks/useWallet";
 import { DashboardCopy } from "@/app/[locale]/dashboard/dashboard.copy";
 import SectionHeader from "@/components/dashboard/SectionHeader";
-import { EmptyState } from "@/components/dashboard/DashboardUI";
-
-const MANGO = "#FF9900";
-
-/**
- * Finances — fusion Paiements + Portefeuille en une page à onglets.
- * Remplace les sections payments/wallet (segments aliasés dans
- * dashboard.config). États vides honnêtes : le contenu réel arrive
- * avec le chantier Stripe backend (transactions, escrow, versements J+4).
- * Dette assumée : isFr inline (comme le module trips réel), migration
- * next-intl au branchement Stripe.
- */
+import { EmptyState, StatCard } from "@/components/dashboard/DashboardUI";
+import PayoutBlockedBanner from "@/components/dashboard/trips/PayoutBlockedBanner";
+import { PaymentRow, PayoutRow, formatCents } from "@/components/dashboard/finances/WalletRows";
 
 type FinancesTab = "payments" | "wallet";
 
 export default function FinancesSection({ copy }: { copy: DashboardCopy }) {
   void copy; // signature conservée pour le renderer
-  const { lang } = useUiPreferences();
-  const isFr = lang === "fr";
+  const t = useTranslations("finances");
+  const locale = useLocale();
   const router = useRouter();
-  const [tab, setTab] = useState<FinancesTab>("payments");
-
   const { user } = useUser();
-  const carrierPage = (user as any)?.carrierPage;
-  const isCarrier = Boolean((user as any)?.roles?.includes("CARRIER"));
-  const stripeConfigured = Boolean(
-    carrierPage?.stripeOnboardingComplete && carrierPage?.stripeChargesEnabled
-  );
+  const isCarrier = Boolean(user?.roles?.includes("CARRIER"));
+  const [tab, setTab] = useState<FinancesTab>(isCarrier ? "wallet" : "payments");
+  const { data, isPending, isError, refetch } = useWallet();
 
-  const tabs: { key: FinancesTab; label: string }[] = [
-    { key: "payments", label: isFr ? "Paiements" : "Payments" },
-    { key: "wallet", label: isFr ? "Portefeuille" : "Wallet" },
-  ];
-
-  const chipBase =
-    "rounded-full border px-3 py-1 text-xs font-medium transition-colors ";
-  const chipInactive =
-    "border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-900 " +
-    "dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800/60 dark:hover:text-white";
-  const chipActive =
-    "border-slate-900 bg-slate-900 text-white dark:border-white dark:bg-white dark:text-slate-900";
+  const chipBase = "rounded-full px-3.5 py-1.5 text-[12.5px] font-semibold transition-colors ";
+  const chipActive = "bg-slate-900 text-white dark:bg-white dark:text-slate-900";
+  const chipInactive = "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700";
 
   return (
-    <>
-      <SectionHeader
-        title={isFr ? "Finances" : "Finances"}
-        subtitle={
-          isFr
-            ? "Tes paiements, gains et versements"
-            : "Your payments, earnings and payouts"
-        }
-      />
-
-      {/* Onglets */}
-      <div className="mb-6 flex flex-wrap gap-2">
-        {tabs.map((t) => (
-          <button
-            key={t.key}
-            type="button"
-            onClick={() => setTab(t.key)}
-            className={chipBase + (tab === t.key ? chipActive : chipInactive)}
-          >
-            {t.label}
+    <div>
+      <SectionHeader title={t("title")} subtitle={t("subtitle")} />
+      <div className="mb-5 flex gap-2">
+        {(["wallet", "payments"] as FinancesTab[]).map((k) => (
+          <button key={k} type="button" onClick={() => setTab(k)} className={chipBase + (tab === k ? chipActive : chipInactive)}>
+            {t(`tabs.${k}`)}
           </button>
         ))}
       </div>
 
-      {tab === "payments" ? (
-        /* TODO chantier Stripe backend : historique des transactions
-           Expéditeur (débits, remboursements, statut escrow). */
-        <EmptyState
-          icon={CreditCard}
-          title={isFr ? "Aucun paiement pour l'instant" : "No payments yet"}
-          description={
-            isFr
-              ? "Tes paiements apparaîtront ici après ta première réservation de transport."
-              : "Your payments will appear here after your first transport booking."
-          }
-          actionLabel={isFr ? "Chercher un trajet" : "Search trips"}
-          onAction={() => router.push("/search")}
-        />
+      {isPending ? (
+        <p className="text-[13px] text-slate-500 dark:text-slate-400">{t("loading")}</p>
+      ) : isError || !data ? (
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-[13px] text-red-800 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300">
+          {t("error")}{" "}
+          <button type="button" onClick={() => void refetch()} className="font-semibold underline">
+            {t("retry")}
+          </button>
+        </div>
+      ) : tab === "wallet" ? (
+        <WalletTab data={data.carrier} isCarrier={isCarrier} locale={locale} onBecomeCarrierAction={() => router.push("/carrier/onboarding")} />
       ) : (
-        <>
-          {/* TODO chantier Stripe backend : gains par deal, versements
-             J+4, solde en séquestre, lien Stripe Express Dashboard. */}
-          <EmptyState
-            icon={Wallet}
-            title={isFr ? "Aucun gain pour l'instant" : "No earnings yet"}
-            description={
-              isFr
-                ? "Tes gains apparaîtront ici après ton premier colis livré. Les versements sont effectués à J+4 après livraison validée."
-                : "Your earnings will appear here after your first delivered parcel. Payouts are sent at D+4 after validated delivery."
-            }
-            actionLabel={
-              isCarrier
-                ? undefined
-                : isFr
-                  ? "Devenir Yamber"
-                  : "Become a Yamber"
-            }
-            onAction={
-              isCarrier ? undefined : () => router.push("/carrier/onboarding")
-            }
-          />
-
-          {/* Hint Stripe si carrier sans compte configuré */}
-          {isCarrier && !stripeConfigured && (
-            <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-500/10">
-              <p className="text-[13px] font-medium text-amber-800 dark:text-amber-300">
-                {isFr
-                  ? "Stripe n'est pas encore configuré"
-                  : "Stripe is not configured yet"}
-              </p>
-              <p className="mt-0.5 text-[12px] text-amber-600 dark:text-amber-400">
-                {isFr
-                  ? "Connecte ton compte bancaire pour recevoir tes versements."
-                  : "Connect your bank account to receive your payouts."}
-              </p>
-              <button
-                type="button"
-                onClick={() => router.push("/carrier/onboarding?step=stripe")}
-                className="mt-2.5 rounded-lg px-3.5 py-1.5 text-[12px] font-semibold text-slate-900 transition-[filter] hover:brightness-95"
-                style={{ backgroundColor: MANGO }}
-              >
-                {isFr ? "Configurer Stripe" : "Configure Stripe"}
-              </button>
-            </div>
-          )}
-        </>
+        <PaymentsTab data={data.shipper} locale={locale} onSearchAction={() => router.push("/search")} />
       )}
-    </>
+    </div>
+  );
+}
+
+/* ── Portefeuille Voyageur ───────────────────────────────────── */
+
+function WalletTab({ data, isCarrier, locale, onBecomeCarrierAction }: {
+  data: { upcomingCents: number; pendingCents: number; blockedCents: number; sentCents: number; sentThisMonthCents: number; currencyCode: string; items: Parameters<typeof PayoutRow>[0]["item"][] };
+  isCarrier: boolean;
+  locale: string;
+  onBecomeCarrierAction: () => void;
+}) {
+  const t = useTranslations("finances.wallet");
+  const { user } = useUser();
+  const stripeAccountReady = Boolean(user?.carrierPage?.stripeAccountId);
+  const [opening, setOpening] = useState(false);
+  const cur = data.currencyCode;
+
+  const openStripe = async () => {
+    if (opening) return;
+    setOpening(true);
+    try {
+      const res = await apiClient.post<{ success: boolean; url: string }>("/carrier/stripe/dashboard-link", {}, { requireAuth: true });
+      window.open(res.data.url, "_blank", "noopener,noreferrer");
+    } catch {
+      toast.error(t("stripeError"));
+    } finally {
+      setOpening(false);
+    }
+  };
+
+  if (data.items.length === 0) {
+    return (
+      <EmptyState
+        icon={Wallet}
+        title={t("empty.title")}
+        description={isCarrier ? t("empty.text") : t("empty.notCarrier")}
+        actionLabel={isCarrier ? undefined : t("empty.cta")}
+        onAction={isCarrier ? undefined : onBecomeCarrierAction}
+      />
+    );
+  }
+
+  return (
+    <div className="space-y-5">
+      <PayoutBlockedBanner />
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <StatCard label={t("stats.upcoming")} value={formatCents(data.upcomingCents, cur, locale)} change={t("stats.upcomingHint")} />
+        <StatCard
+          label={t("stats.sent")}
+          value={formatCents(data.sentCents, cur, locale)}
+          change={data.sentThisMonthCents > 0 ? t("stats.sentThisMonth", { amount: formatCents(data.sentThisMonthCents, cur, locale) }) : undefined}
+        />
+        <StatCard label={t("stats.pending")} value={formatCents(data.pendingCents, cur, locale)} change={t("stats.pendingHint")} />
+      </div>
+
+      {isCarrier && (
+        <div className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3.5 dark:border-slate-800 dark:bg-slate-900 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-[12.5px] text-slate-600 dark:text-slate-400">{t("stripeHint")}</p>
+          <button
+            type="button"
+            onClick={stripeAccountReady ? openStripe : () => toast.info(t("stripeMissing"))}
+            disabled={opening}
+            className="inline-flex min-h-[38px] items-center justify-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3.5 text-[12.5px] font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
+          >
+            <ExternalLink size={13} aria-hidden="true" />
+            {t("stripeCta")}
+          </button>
+        </div>
+      )}
+
+      <div className="space-y-2">
+        {data.items.map((item) => (
+          <PayoutRow key={item.bookingId} item={item} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ── Paiements Expéditeur ────────────────────────────────────── */
+
+function PaymentsTab({ data, locale, onSearchAction }: {
+  data: { heldCents: number; spentCents: number; refundedCents: number; currencyCode: string; items: Parameters<typeof PaymentRow>[0]["item"][] };
+  locale: string;
+  onSearchAction: () => void;
+}) {
+  const t = useTranslations("finances.payments");
+  const cur = data.currencyCode;
+  if (data.items.length === 0) {
+    return <EmptyState icon={CreditCard} title={t("empty.title")} description={t("empty.text")} actionLabel={t("empty.cta")} onAction={onSearchAction} />;
+  }
+  return (
+    <div className="space-y-5">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <StatCard label={t("stats.held")} value={formatCents(data.heldCents, cur, locale)} change={t("stats.heldHint")} />
+        <StatCard label={t("stats.spent")} value={formatCents(data.spentCents, cur, locale)} />
+        <StatCard label={t("stats.refunded")} value={formatCents(data.refundedCents, cur, locale)} />
+      </div>
+      <div className="space-y-2">
+        {data.items.map((item) => (
+          <PaymentRow key={item.bookingId} item={item} />
+        ))}
+      </div>
+    </div>
   );
 }

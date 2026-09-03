@@ -7372,6 +7372,44 @@
             ],
             "description": "Non-null exactly when 'cancel' is in allowedActions (PENDING or ACCEPTED)"
           },
+          "capturedAt": {
+            "description": "When the shipper's card was actually charged (at acceptance, D39)",
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "refundedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "refundAmountCents": {
+            "description": "Amount returned (ANN-01 scale); null when nothing was refunded",
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "dispute": {
             "description": "The dispute file (status DISPUTED) — shipper only (A68); absent otherwise",
             "anyOf": [
@@ -11106,6 +11144,354 @@
           "payoutDueAt"
         ],
         "additionalProperties": false
+      },
+      "WalletPayoutState": {
+        "type": "string",
+        "enum": [
+          "UPCOMING",
+          "PENDING",
+          "BLOCKED",
+          "FROZEN",
+          "SENT",
+          "HELD"
+        ],
+        "description": "UPCOMING = delivered, shipper verification running (payoutDueAt) · PENDING = being sent / retried · BLOCKED = carrier Stripe account not ready (CTA onboarding) · FROZEN = dispute open · SENT = transfer executed (payoutSentAt) · HELD = late cancellation after departure, retention held for mediation (no amount)"
+      },
+      "WalletPayoutItem": {
+        "type": "object",
+        "properties": {
+          "bookingId": {
+            "$ref": "#/components/schemas/ObjectId"
+          },
+          "tripId": {
+            "$ref": "#/components/schemas/ObjectId"
+          },
+          "bookingStatus": {
+            "$ref": "#/components/schemas/BookingStatus"
+          },
+          "corridor": {
+            "type": "object",
+            "properties": {
+              "originCity": {
+                "type": "string"
+              },
+              "destinationCity": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "originCity",
+              "destinationCity"
+            ],
+            "additionalProperties": false
+          },
+          "counterpartFirstName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Shipper first name (null if account deleted)"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "DELIVERY",
+              "LATE_CANCELLATION"
+            ],
+            "description": "Net for a delivery, or ANN-01 compensation"
+          },
+          "state": {
+            "$ref": "#/components/schemas/WalletPayoutState"
+          },
+          "amountCents": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "null for HELD (nothing decided yet)"
+          },
+          "currencyCode": {
+            "type": "string"
+          },
+          "date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "UPCOMING: payoutDueAt · SENT: payoutSentAt · else: last update"
+          }
+        },
+        "required": [
+          "bookingId",
+          "tripId",
+          "bookingStatus",
+          "corridor",
+          "counterpartFirstName",
+          "kind",
+          "state",
+          "amountCents",
+          "currencyCode",
+          "date"
+        ],
+        "additionalProperties": false
+      },
+      "CarrierWallet": {
+        "type": "object",
+        "properties": {
+          "upcomingCents": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Σ UPCOMING"
+          },
+          "pendingCents": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Σ PENDING + BLOCKED + FROZEN"
+          },
+          "blockedCents": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Σ BLOCKED — drives the 'finish your Stripe account' banner"
+          },
+          "sentCents": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Σ SENT, all time"
+          },
+          "sentThisMonthCents": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Σ SENT with payoutSentAt in the current calendar month (UTC)"
+          },
+          "currencyCode": {
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WalletPayoutItem"
+            },
+            "description": "Most recent first"
+          }
+        },
+        "required": [
+          "upcomingCents",
+          "pendingCents",
+          "blockedCents",
+          "sentCents",
+          "sentThisMonthCents",
+          "currencyCode",
+          "items"
+        ],
+        "additionalProperties": false
+      },
+      "WalletPaymentState": {
+        "type": "string",
+        "enum": [
+          "AUTHORIZED",
+          "HELD",
+          "RELEASED",
+          "RELEASED_NO_CHARGE",
+          "REFUNDED",
+          "PARTIALLY_REFUNDED"
+        ],
+        "description": "AUTHORIZED = hold placed, nothing debited (PENDING request) · HELD = captured, kept by Yamba until completion (ACCEPTED/PICKED_UP/DELIVERED/DISPUTED) · RELEASED = completed, carrier paid · RELEASED_NO_CHARGE = declined / expired / cancelled before capture, the hold simply vanished · REFUNDED = captured then refunded in full · PARTIALLY_REFUNDED = late cancellation, ANN-01 retention kept"
+      },
+      "WalletPaymentItem": {
+        "type": "object",
+        "properties": {
+          "bookingId": {
+            "$ref": "#/components/schemas/ObjectId"
+          },
+          "tripId": {
+            "$ref": "#/components/schemas/ObjectId"
+          },
+          "bookingStatus": {
+            "$ref": "#/components/schemas/BookingStatus"
+          },
+          "corridor": {
+            "type": "object",
+            "properties": {
+              "originCity": {
+                "type": "string"
+              },
+              "destinationCity": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "originCity",
+              "destinationCity"
+            ],
+            "additionalProperties": false
+          },
+          "counterpartFirstName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Carrier first name (null if account deleted)"
+          },
+          "state": {
+            "$ref": "#/components/schemas/WalletPaymentState"
+          },
+          "amountCents": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Total charged (or authorized) to the shipper"
+          },
+          "refundAmountCents": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "REFUNDED / PARTIALLY_REFUNDED: amount returned"
+          },
+          "retentionCents": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "PARTIALLY_REFUNDED: amount kept (ANN-01)"
+          },
+          "currencyCode": {
+            "type": "string"
+          },
+          "date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "HELD (delivered): payoutDueAt · RELEASED: completedAt · REFUNDED: refundedAt · else: requestedAt"
+          }
+        },
+        "required": [
+          "bookingId",
+          "tripId",
+          "bookingStatus",
+          "corridor",
+          "counterpartFirstName",
+          "state",
+          "amountCents",
+          "refundAmountCents",
+          "retentionCents",
+          "currencyCode",
+          "date"
+        ],
+        "additionalProperties": false
+      },
+      "ShipperWallet": {
+        "type": "object",
+        "properties": {
+          "heldCents": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Σ HELD — captured, not yet settled"
+          },
+          "spentCents": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Σ RELEASED totals + retentions of PARTIALLY_REFUNDED"
+          },
+          "refundedCents": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Σ refunds actually returned (REFUNDED + PARTIALLY_REFUNDED)"
+          },
+          "currencyCode": {
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WalletPaymentItem"
+            },
+            "description": "Most recent first"
+          }
+        },
+        "required": [
+          "heldCents",
+          "spentCents",
+          "refundedCents",
+          "currencyCode",
+          "items"
+        ],
+        "additionalProperties": false
+      },
+      "WalletResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true
+          },
+          "carrier": {
+            "$ref": "#/components/schemas/CarrierWallet"
+          },
+          "shipper": {
+            "$ref": "#/components/schemas/ShipperWallet"
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          }
+        },
+        "required": [
+          "success",
+          "carrier",
+          "shipper",
+          "generatedAt"
+        ],
+        "additionalProperties": false,
+        "description": "Finances page — both roles, totals computed server-side (A83)"
       },
       "NotificationView": {
         "type": "object",

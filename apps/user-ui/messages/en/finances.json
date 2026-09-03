@@ -1,0 +1,68 @@
+{
+  "title": "Finances",
+  "subtitle": "Your payments, earnings and payouts — all from your deals, nothing estimated.",
+  "tabs": {
+    "payments": "Payments",
+    "wallet": "Wallet"
+  },
+  "loading": "Loading your finances…",
+  "error": "Your finances cannot be loaded right now.",
+  "retry": "Retry",
+  "wallet": {
+    "stats": {
+      "upcoming": "Upcoming",
+      "upcomingHint": "Deliveries under verification",
+      "sent": "Sent",
+      "sentThisMonth": "+ {amount} this month",
+      "pending": "On hold",
+      "pendingHint": "Stripe account, report or transfer in progress"
+    },
+    "stripeCta": "View my payouts on Stripe",
+    "stripeHint": "Arrival dates, bank account and history: on your Stripe dashboard.",
+    "stripeError": "Your Stripe dashboard cannot be opened right now.",
+    "stripeMissing": "Finish your Stripe account first.",
+    "empty": {
+      "title": "No earnings yet",
+      "text": "Your payouts will show up here after your first validated delivery.",
+      "notCarrier": "Become a carrier to earn money with your luggage allowance.",
+      "cta": "Become a carrier"
+    },
+    "kind": {
+      "DELIVERY": "Transport for {name}",
+      "LATE_CANCELLATION": "Compensation · late cancellation by {name}"
+    },
+    "state": {
+      "UPCOMING": "Upcoming on {date}",
+      "PENDING": "Being sent",
+      "BLOCKED": "On hold: finish your Stripe account",
+      "FROZEN": "Frozen · report under review",
+      "SENT": "Sent on {date} · 2 to 7 days",
+      "HELD": "Retention held · we will contact you"
+    }
+  },
+  "payments": {
+    "stats": {
+      "held": "Held by Yamba",
+      "heldHint": "Released at the end of each transaction",
+      "spent": "Spent",
+      "refunded": "Refunded"
+    },
+    "empty": {
+      "title": "No payments yet",
+      "text": "Your payments will show up here after your first booking.",
+      "cta": "Search trips"
+    },
+    "line": "Shipment {route} · {name}",
+    "lineNoName": "Shipment {route}",
+    "state": {
+      "AUTHORIZED": "Authorized, not charged · waiting for the carrier",
+      "HELD": "Held by Yamba",
+      "HELD_UNTIL": "Held until {date}",
+      "RELEASED": "Released on {date} · transaction closed",
+      "RELEASED_NO_CHARGE": "Never charged · the hold vanished",
+      "REFUNDED": "Refunded {amount} on {date}",
+      "PARTIALLY_REFUNDED": "Refunded {amount} on {date} · {retention} retention passed on to the carrier"
+    }
+  },
+  "unknownName": "a member"
+}

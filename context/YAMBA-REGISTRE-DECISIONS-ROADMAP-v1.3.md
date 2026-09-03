@@ -328,6 +328,15 @@ Objectif produit assumé : **solide, propre, pro, secure, long terme** — les f
 
 ---
 
+## 2bis.22 — Session `feat/wallet` (Finances : portefeuille Voyageur + paiements Expéditeur) — A83→A84
+
+| # | Arbitrage | Pourquoi | Compromis | PR |
+|---|---|---|---|---|
+| A83 | **Les totaux d'argent sont calculés SERVEUR** : `GET /me/wallet` (deal-service, `wallet.service.ts` pur et testé) renvoie, pour les DEUX rôles de l'appelant (décision 1A), des agrégats en cents et des lignes à état de vocabulaire produit — Voyageur : UPCOMING · PENDING · BLOCKED · FROZEN · SENT · HELD ; Expéditeur : AUTHORIZED · HELD · RELEASED · RELEASED_NO_CHARGE · REFUNDED · PARTIALLY_REFUNDED. Le front affiche, ne recalcule jamais (décision 2A). Trois cartes + une liste unique triée par date, badge par état (4A). `ShipperBookingView` sert désormais `capturedAt`, `refundedAt`, `refundAmountCents` (jamais au Voyageur, A13). Section passée sous next-intl (`finances`, 5A) | Un total d'argent doit être auditable et identique partout ; c'est le point d'entrée du solde Stripe plus tard ; deux écrans calculant chacun divergeraient | Un endpoint de plus, un proxy gateway de plus ; pas de pagination (volumes v1) | `feat/wallet` |
+| A84 | **« Voir mes virements sur Stripe »** : `POST /carrier/stripe/dashboard-link` (auth-service, `accounts.createLoginLink`, lien à usage unique jamais stocké) ouvre le tableau de bord Stripe Express du Voyageur — dates d'arrivée, RIB, historique (décision 3A). Sans compte Stripe : 409 `STRIPE_ACCOUNT_MISSING`, le front dit « finalise d'abord ton compte » | La date d'arrivée sur le compte bancaire n'est connue que de Stripe ; ne pas la promettre, y renvoyer | Le Voyageur quitte l'app pour ce détail ; contrôleur mince sans test unitaire (appel Stripe direct) | `feat/wallet` |
+
+---
+
 # 3. Roadmap maîtresse
 
 ## 3.0 Les trois jalons
