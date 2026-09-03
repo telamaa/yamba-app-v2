@@ -191,6 +191,15 @@ Ordre de demarrage : auth -> trip -> gateway.
   #111 allowedDevOrigins (Next 16 bloque /_next hors localhost), #113
   atterrissage post-OTP, #114 redirect conserve inscription→connexion.
   Recette OK jusqu'a F1 ; reste F4→F7, D1–D7, V1–V9 (utilisateur). dev = 3370efa.
+- 03/09 matin (retours de recette auth, decisions utilisateur) : branche
+  fix/auth-recette (A50–A54) — critere de mot de passe NOMME (codes serveur
+  PASSWORD_* / EMAIL_ALREADY_USED traduits par le front), messages OTP construits
+  des codes (plus d'anglais brut), bareme OTP par paliers de 5 avec code
+  invalide, fenetre d'inscription 30 min prolongee au renvoi, "5 minutes" →
+  duree injectee (10), sujets OTP en francais, oeil centre, photos manquantes
+  retirees du pool ; D44 (langue des emails, N langues) et D45 (tutoiement,
+  prenom reel) GRAVEES avant leur code. Backlog priorise P1→P3 dans
+  YAMBA-SUIVI-PROJET.md §7.
 - Plateforme de tests : 600 (trip 187, deal 354, notification 59) — post-B3 (#96).
 - MERGE 01/09 : toute la pile B2 est dans `dev` via la SEULE **PR #90**
   (`feat/b2-deal-front` portait la chaîne complète : jalons mobile D36,
@@ -306,10 +315,17 @@ Ordre de demarrage : auth -> trip -> gateway.
   AddDocumentsBody en Zod dedie · harmonisation noms projets Nx ·
   idempotence seed-deals · bug seed shipperId === carrierId a trancher ·
   git config user.email.
-- Inscription : messages d'erreur EXPLICITES (quel critere du mot de passe echoue
-  — prenom/nom/email interdit, suite, date —, email deja pris, telephone) : front
-  RegisterForm + password-strength, serveur validatePasswordStrength avec un code
-  par regle. Demande utilisateur 02/09, micro-PR a planifier.
+- Inscription : messages d'erreur explicites — FAIT le 03/09 (fix/auth-recette,
+  A51) pour le mot de passe, l'email deja pris et les erreurs OTP ; reste :
+  telephone et champs requis (memes codes, a faire quand le formulaire les aura).
+- Backlog recette 03/09 (priorise, decisions utilisateur prises) : P1
+  feat/email-locale (D44 : preferredLocale N langues, x-locale, gabarit partage,
+  prenom reel D45, migration des 3 mailers) · P1 feat/booking-auth-modal (modale
+  sur la page trajet + redirect header) · P2 feat/trip-favorites · P2
+  feat/auth-pages-ux (tutoiement, faux chiffres, vocabulaire du role a trancher)
+  · P2 feat/auth-google (ecran consentement CGU) · P3 chore/api-same-origin
+  (rewrite Next /api → gateway, fin du piege localhost/LAN). Mode LAN conserve,
+  boutons Google/Facebook laisses tels quels jusqu'a leur PR.
 - Candidat D35 (ex-« D32 » avant que D32 = plancher par colis) : provider email transactionnel (Resend/Postmark/SES)
   derriere @packages/email, avant lancement. MailHog docker-compose local
   candidat.

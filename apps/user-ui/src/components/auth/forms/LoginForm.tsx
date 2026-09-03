@@ -423,7 +423,7 @@ export default function LoginForm({ heroVisual }: Props) {
                     passwordVisible ? copy.hidePasswordAria : copy.showPasswordAria
                   }
                   aria-pressed={passwordVisible}
-                  className="absolute inset-y-0 right-1.5 my-auto inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+                  className="absolute bottom-0 right-1.5 top-1.5 my-auto inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
                 >
                   {passwordVisible ? <EyeOff size={15} /> : <Eye size={15} />}
                 </button>

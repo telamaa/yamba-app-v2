@@ -396,3 +396,30 @@ YAM-XXXX, photos ImageKit D42), emails completed/payout_sent/disputed (A35), bas
 Rituel : inventaire AVANT le code, décisions au registre AVANT le code, compléter les 3 docs cumulatifs,
 mobile-first, aucune attribution Claude, charte mango/teal/slate.
 ```
+
+---
+
+# ADDENDUM · 3 septembre 2026 (matin) — RETOURS DE RECETTE AUTH ET DÉCISIONS (prime sur l'addendum du 02/09 soir pour le backlog)
+
+## A. Ce qui s'est passé
+
+- L'utilisateur a remonté 12 retours de recette (inscription, connexion, OTP, emails, favoris, popup de réservation, Google). Diagnostic livré AVANT tout code, puis décisions utilisateur :
+  **mode LAN conservé** (le « impossible de se reconnecter » = front sur `localhost:3000` avec l'API sur l'IP LAN → cookies `SameSite=Lax` jamais renvoyés, pas un bug de code) · **boutons Google / Facebook laissés tels quels** jusqu'à leur PR · **langue des emails** selon D44 en prévoyant **N langues** · **délais OTP** selon A50 · **tutoiement partout** et **prénom réel** dans les emails (D45) · backlog à prioriser, GO pour développer.
+- Branche `fix/auth-recette` (A50–A54, RG-A-01…05) : voir `YAMBA-DOC-TECHNIQUE.md` / `YAMBA-DOC-METIER.md` (sections « Fix recette auth »). 40 tests auth-service (dont 19 nouveaux), tsc ×5 Nx + user-ui OK, smoke test sur une instance `PORT=6011`.
+- D44 (langue des emails, N langues, gabarit partagé) et D45 (tutoiement, prénom réel ; vocabulaire du rôle OUVERT) gravées au registre AVANT leur code.
+
+## B. Ordre des PR suivantes (validé)
+1. `fix/auth-recette` — cette PR.
+2. `feat/email-locale` — D44 + D45 dans les emails (P1).
+3. `feat/booking-auth-modal` — modale « Connecte-toi pour réserver » + redirect du header, retour dans le wizard (P1).
+4. `feat/trip-favorites` — modèle, routes, cœur, page « Mes favoris » (P2).
+5. `feat/auth-pages-ux` — tutoiement, faux chiffres, vocabulaire du rôle à trancher, mobile natif (P2).
+6. `feat/auth-google` — avec l'écran de consentement CGU (P2).
+7. `chore/api-same-origin` — rewrite Next `/api` → gateway (P3).
+
+## C. Questions encore ouvertes pour l'utilisateur
+- Nom du rôle transporteur : Yamber / Tripper / Voyageur (une seule réponse, appliquée partout).
+- Facebook : garder le bouton inerte ou le retirer à la PR Google.
+
+## D. Environnement (inchangé)
+Front en LAN (`192.168.1.155`), Docker requis, `DELIVERY_CODE_ENCRYPTION_KEY` toujours à poser. Le `nx serve auth-service` en cours ne recharge PAS le code : relancer le service pour voir les correctifs de cette PR en recette.

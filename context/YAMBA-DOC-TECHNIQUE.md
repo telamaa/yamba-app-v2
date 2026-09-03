@@ -1010,3 +1010,28 @@ tsc user-ui, i18n miroir, aucun dégradé orphelin (`grep BA7517|534AB7` ne remo
 # Fix relay outbox (annexe B3, A49) — le relay ne voyait aucun événement réel
 
 Recette : aucun email ni notification à aucune étape, pour aucun des deux comptes. Probe Atlas : 44 événements outbox, 38 sans `publishedAt` avec `attempts: 0` (jamais tentés), Redpanda up, consumer group stable, lag 0. Cause : `OutboxRelay.drainBatch` filtre `publishedAt: null` ; `applyBookingTransition` et `createBooking` n'écrivaient pas le champ ; sur Mongo, Prisma ne matche pas un champ absent avec `null` (compté : `publishedAt: null` → 0, `OR isSet:false` → 38). Les preuves B1/B2 tenaient sur `seed-outbox.ts`, qui pose `null` explicitement. Fix : filtre `OR` dans le relay (spec mise à jour) + `publishedAt: null` explicite dans les deux writers ; 38 lignes orphelines (bookings effacés par les rejeux du seed) parquées par script (`publishedAt` posé, `lastError` PARKED) ; les 4 événements du deal réel partent au redémarrage du deal-service. Deuxième cause, indépendante : le `.env` racine n'a aucune variable `SMTP_*` (elles ne vivent que dans `apps/trip-service/.env`) — à copier (`SMTP_HOST/PORT/USER/PASS/SERVICE/FROM`) puis relancer notification-service. deal-service 355 tests.
+
+# Fix recette auth (03/09, A50–A54) — le formulaire dit quoi corriger, l'OTP pardonne la faute de frappe
+
+Retours de recette du 03/09 sur l'inscription, la connexion et les codes OTP. Sept corrections dans une PR, `fix/auth-recette`, toutes sans décision d'architecture nouvelle (D44 et D45 sont gravées dans la même PR mais implémentées dans les suivantes).
+
+### Ce qui a été fait
+
+1. **Deux modules purs extraits de `auth.helper.ts`** (qui importe Redis au chargement, donc intestable sans infra) :
+   - `apps/auth-service/src/utils/otp-policy.ts` — `getOtpFailurePolicy(n)` renvoie `{ lockSeconds, invalidateOtp, securityAlert, attemptsLeft }` pour le n-ième échec cumulé. Paliers de 5 : 5e → 60 s, 10e → 1 800 s + alerte, 15e et suivants → 86 400 s ; à chaque palier le code courant est supprimé de Redis (`DEL otp:<scope>:<email>`). `formatLockDuration` a déménagé ici.
+   - `apps/auth-service/src/utils/password-rules.ts` — `findPasswordRuleViolation(password, ctx)` renvoie le PREMIER code violé (`PASSWORD_TOO_SHORT` … `PASSWORD_CONTAINS_PERSONAL_INFO`) ; `validatePasswordStrength` lève une `ValidationError` avec `details: { type: "password", code, field: "password" }`. `auth.helper.ts` ré-exporte pour que les contrôleurs ne changent pas d'import.
+   - 19 tests Jest (`otp-policy.spec.ts`, `password-rules.spec.ts`) : un par palier, un par règle, la propriété « jamais 24 h avant le 15e échec ».
+2. **`verifyOtpScoped`** applique la politique : compteur cumulé 24 h inchangé, puis `policy.invalidateOtp` → `DEL`, `policy.lockSeconds` → `SET otp_lock EX`, `policy.securityAlert` → email « activité suspecte ». Les `details` portent désormais un `code` (`OTP_INCORRECT`, `OTP_INVALIDATED`, `OTP_LOCKED`, `OTP_EXPIRED`) et `otpInvalidated`.
+3. **`error-middleware.ts`** : `password` et `register` rejoignent la liste des types « safe » exposés en production (le front en a besoin pour traduire).
+4. **Contrôleur** : `resendRegistrationOtp` appelle `refreshPendingRegistration` (`EXPIRE pending_user:<email> 1800`) après l'envoi ; `PENDING_REG_TTL_SECONDS` 900 → 1 800. Les trois « User already exists » portent `details: { type: "register", code: "EMAIL_ALREADY_USED", field: "email" }`.
+5. **Emails OTP** : `sendOtpScoped` passe `expiresInMinutes: OTP_TTL_MINUTES` (export dérivé de `OTP_TTL_SECONDS`) ; les deux templates remplacent « 5 minutes » par `<%= expiresInMinutes %> minutes`. Sujets : « Ton code d'activation Yamba » / « Ton code de réinitialisation Yamba ».
+6. **Front** : nouveau `apps/user-ui/src/lib/auth/auth-error-codes.ts` — `firstFailingCheck(checks)` (ordre = ordre serveur), `passwordCheckMessage` / `passwordCodeMessage`, `registerCodeMessage`, `otpCodeMessage`, `readAuthErrorDetails`. `RegisterForm` nomme le critère au submit et pose l'erreur serveur sur le champ (`password` ou `email`) ; `ResetPasswordForm` idem ; `RegisterVerifyForm` / `ResetVerifyForm` construisent le message OTP à partir de `details.code` (le `message` anglais n'est plus jamais rendu) et disent « essais restants avant invalidation du code ».
+7. **Pixel** : `LoginForm` / `RegisterForm` — bouton œil `absolute bottom-0 right-1.5 top-1.5 my-auto` (le champ a `mt-1.5` DANS le conteneur `relative` : `inset-y-0` centrait sur la marge) ; `hero-visuals.ts` — les entrées `photo-route` et `photo-package` (fichiers absents) sont retirées.
+
+### Preuves
+- `npx nx test auth-service` : 40 tests (21 existants + 19). tsc ×5 projets Nx OK, `tsc --project apps/user-ui/tsconfig.json` OK.
+- Instance de test sur `PORT=6011` (bundle `dist/main.js`, l'instance de recette sur 6001 intacte) : `POST /api/auth/register` avec `Ab1!` → `PASSWORD_TOO_SHORT` ; avec le prénom dedans → `PASSWORD_CONTAINS_PERSONAL_INFO` ; email seed → `EMAIL_ALREADY_USED`. OTP planté dans Redis puis 5 mauvais codes → `attemptsLeft` 4, 3, 2, 1 puis `OTP_INVALIDATED` (`lockUntilSeconds: 60`), clé `otp:forgot:<email>` absente, 6e appel → `OTP_LOCKED` (TTL 60). Clés nettoyées.
+
+### Pièges rencontrés
+- `nx serve auth-service` ne recharge pas à chaud : le premier smoke test sur `:8080` a répondu avec l'ANCIEN code (aucun `details`). Preuve = bundle reconstruit lancé sur un autre port.
+- Les routes du service sont montées sous `/api` même en direct (`app.use("/api", router)`) : `POST :6011/auth/register` → 404, `POST :6011/api/auth/register` → OK.

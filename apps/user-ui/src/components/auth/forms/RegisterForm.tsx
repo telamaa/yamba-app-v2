@@ -24,6 +24,13 @@ import {
   isPasswordValid,
   type PasswordContext,
 } from "@/lib/auth/password-strength";
+import {
+  firstFailingCheck,
+  passwordCheckMessage,
+  passwordCodeMessage,
+  readAuthErrorDetails,
+  registerCodeMessage,
+} from "@/lib/auth/auth-error-codes";
 import PasswordStrengthIndicator from "../shared/PasswordStrengthIndicator";
 import { useToast } from "@/components/ui/Toast";
 import AuthHeroVisual from "@/components/auth/visual/AuthHeroVisual";
@@ -91,9 +98,6 @@ function buildCopy(lang: string) {
     requiredEmail: fr ? "L'e-mail est requis." : "Email is required.",
     invalidEmail: fr ? "Veuillez saisir un e-mail valide." : "Please enter a valid email.",
     requiredPassword: fr ? "Le mot de passe est requis." : "Password is required.",
-    weakPassword: fr
-      ? "Le mot de passe ne respecte pas tous les critères."
-      : "Password does not meet all criteria.",
     requiredPasswordConfirm: fr
       ? "Veuillez confirmer le mot de passe."
       : "Please confirm the password.",
@@ -218,6 +222,24 @@ export default function RegisterForm({ heroVisual }: Props) {
     },
     onError: (error) => {
       const data = getApiErrorData(error);
+
+      // Codes de règle du serveur → message localisé sur LE champ concerné
+      const details = readAuthErrorDetails(data);
+      if (details?.type === "password") {
+        setError("password", {
+          type: "server",
+          message: passwordCodeMessage(lang === "fr", details.code),
+        });
+        return;
+      }
+      if (details?.type === "register") {
+        setError("email", {
+          type: "server",
+          message: registerCodeMessage(lang === "fr", details.code),
+        });
+        return;
+      }
+
       let hasFieldErrors = false;
       const fieldNames: Array<keyof RegisterFormData> = [
         "firstName",
@@ -257,7 +279,11 @@ export default function RegisterForm({ heroVisual }: Props) {
       email: values.email,
     });
     if (!isPasswordValid(checks)) {
-      setError("password", { type: "validate", message: copy.weakPassword });
+      // Nommer LE critère fautif (recette 03/09) — plus jamais « ne respecte pas tous les critères »
+      setError("password", {
+        type: "validate",
+        message: passwordCheckMessage(lang === "fr", firstFailingCheck(checks)),
+      });
       return;
     }
 
@@ -484,7 +510,7 @@ export default function RegisterForm({ heroVisual }: Props) {
                   onClick={() => setPasswordVisible((v) => !v)}
                   aria-label={passwordVisible ? copy.hidePasswordAria : copy.showPasswordAria}
                   aria-pressed={passwordVisible}
-                  className="absolute inset-y-0 right-1.5 my-auto inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+                  className="absolute bottom-0 right-1.5 top-1.5 my-auto inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
                 >
                   {passwordVisible ? <EyeOff size={15} /> : <Eye size={15} />}
                 </button>
@@ -547,7 +573,7 @@ export default function RegisterForm({ heroVisual }: Props) {
                   aria-label={
                     confirmVisible ? copy.hidePasswordAria : copy.showPasswordAria
                   }
-                  className="absolute inset-y-0 right-1.5 my-auto inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100 dark:text-slate-400"
+                  className="absolute bottom-0 right-1.5 top-1.5 my-auto inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100 dark:text-slate-400"
                 >
                   {confirmVisible ? <EyeOff size={15} /> : <Eye size={15} />}
                 </button>

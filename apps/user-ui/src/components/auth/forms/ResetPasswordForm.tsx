@@ -9,6 +9,7 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useUiPreferences } from "@/components/providers/UiPreferencesProvider";
+import { passwordCodeMessage, readAuthErrorDetails } from "@/lib/auth/auth-error-codes";
 import { useForm } from "react-hook-form";
 import { useMutation } from "@tanstack/react-query";
 import { ArrowLeft, Eye, EyeOff, Loader2, ShieldCheck } from "lucide-react";
@@ -253,6 +254,13 @@ export default function ResetPasswordForm({ heroVisual }: Props) {
 
       if (data?.message?.toLowerCase().includes("expired")) {
         setSessionExpired(true);
+        return;
+      }
+
+      // Règle de mot de passe refusée par le serveur → nommer le critère
+      const details = readAuthErrorDetails(data);
+      if (details?.type === "password") {
+        setServerError(passwordCodeMessage(fr, details.code));
         return;
       }
 
