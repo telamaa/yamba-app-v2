@@ -529,6 +529,23 @@ export function buildOpenApiDocument() {
           },
         },
       },
+      "/me/wallet": {
+        get: {
+          tags: ["me"],
+          summary: "Finances — carrier payouts and shipper payments, totals computed server-side (A83)",
+          description:
+            "Both roles of the caller in one payload. Carrier: UPCOMING (delivered, verification running) · PENDING · BLOCKED " +
+            "(Stripe account not ready) · FROZEN (dispute) · SENT · HELD (late cancellation after departure). Shipper: AUTHORIZED · " +
+            "HELD · RELEASED · RELEASED_NO_CHARGE · REFUNDED · PARTIALLY_REFUNDED. Amounts are integer cents; the frontend never recomputes.",
+          operationId: "getMyWallet",
+          security: authSecurity,
+          responses: {
+            "200": jsonResponse("WalletResponse", "Wallet for both roles"),
+            "401": response401,
+            "500": response500,
+          },
+        },
+      },
       "/deals/{id}": {
         get: {
           tags: ["deals"],

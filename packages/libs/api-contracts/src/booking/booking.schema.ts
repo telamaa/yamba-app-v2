@@ -250,6 +250,10 @@ export const ShipperBookingViewSchema = z
       description: "Non-null exactly when 'cancel' is in allowedActions (PENDING or ACCEPTED)",
     }),
 
+    capturedAt: z.iso.datetime().nullish().meta({ description: "When the shipper's card was actually charged (at acceptance, D39)" }),
+    refundedAt: z.iso.datetime().nullish(),
+    refundAmountCents: z.number().int().nullish().meta({ description: "Amount returned (ANN-01 scale); null when nothing was refunded" }),
+
     dispute: ShipperDisputeViewSchema.nullish().meta({
       description: "The dispute file (status DISPUTED) — shipper only (A68); absent otherwise",
     }),

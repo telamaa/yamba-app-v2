@@ -1250,3 +1250,20 @@ deal-service **390** (384 + 3 lifecycle + 2 settlement + 1 mapper) · notificati
 
 ### Reste
 Portefeuille Voyageur (A77, PR dédiée) · **chantier C** (admin-ui : médiation DISPUTED, arbitrage des retenues HELD_FOR_MEDIATION, remboursements partiels) · prime de protection remboursée à 100 % quand D22 sera réel (gravé A79).
+
+# `feat/wallet` — Finances : portefeuille Voyageur et paiements Expéditeur (A83–A84)
+
+## Ce qui a été fait
+
+1. **Contrat** (`packages/libs/api-contracts/src/booking/booking-wallet.schema.ts`) : `WalletResponse { carrier: CarrierWallet, shipper: ShipperWallet, generatedAt }` — agrégats en cents (`upcomingCents`, `pendingCents`, `blockedCents`, `sentCents`, `sentThisMonthCents` / `heldCents`, `spentCents`, `refundedCents`) et lignes `WalletPayoutItem` (état `UPCOMING | PENDING | BLOCKED | FROZEN | SENT | HELD`, `kind DELIVERY | LATE_CANCELLATION`, `amountCents` nullable pour HELD) et `WalletPaymentItem` (état `AUTHORIZED | HELD | RELEASED | RELEASED_NO_CHARGE | REFUNDED | PARTIALLY_REFUNDED`, `refundAmountCents`, `retentionCents`).
+2. **Service pur** (`apps/deal-service/src/services/wallet.service.ts`) : `toPayoutItem`, `buildCarrierWallet(bookings, counterparts, now)`, `toPaymentItem`, `buildShipperWallet` — chaque état découle des champs posés par les transitions (`payoutStatus`, `payoutFailureReason`, `retentionDisposition`, `capturedAt`, `refundAmountCents`…) ; « ce mois » en UTC ; tri par date décroissante. **Spec** : 8 tests (chaque état, totaux contre les lignes, contrat Zod).
+3. **Contrôleur + route** : `GET /me/wallet` (`wallet.controller.ts`) — deux `findMany` (rôle Voyageur / Expéditeur, `select` whitelist), prénoms des contreparties par jointure explicite, délégation au service pur. Gateway : proxy `/api/me/wallet` → deal-service (déclaré avant le catch-all auth). OpenAPI : chemin `getMyWallet`, schémas auto-enregistrés.
+4. **`ShipperBookingView`** : `capturedAt`, `refundedAt`, `refundAmountCents` (décision 1A) ; test mapper : servis à l'Expéditeur, absents de la vue Voyageur (A13).
+5. **auth-service** (A84) : `POST /carrier/stripe/dashboard-link` (`createStripeDashboardLink`) — `stripe.accounts.createLoginLink(stripeAccountId)` → `{ url }` ; sans compte → 409 `STRIPE_ACCOUNT_MISSING`.
+6. **Front** : espace `finances` (FR/EN, enregistré dans `i18n/request.ts`), `useWallet` (`GET /me/wallet`, clé `["wallet"]`), `finances/wallet.types.ts` (miroir de lecture du contrat), `finances/WalletRows.tsx` (`PayoutRow`, `PaymentRow`, `formatCents` — ligne cliquable vers le deal / le suivi, ton et icône par état), **`sections/FinancesSection.tsx` réécrite** : onglets Portefeuille / Paiements (onglet par défaut selon le rôle), 3 `StatCard` par onglet, `PayoutBlockedBanner` réutilisé, bloc « Voir mes virements sur Stripe » (ouvre le lien dans un nouvel onglet ; sans compte : toast « finalise d'abord »), états vides honnêtes, erreur avec « Réessayer ». Fin du `isFr` inline dans cette section. La route `/dashboard/finances/preview` (maquette) est conservée telle quelle.
+
+### Preuves
+deal-service **399** (390 + 8 wallet + 1 mapper) · auth-service 65 (inchangé — contrôleur mince, appel Stripe direct) · notification 76 · trip 198 · tsc user-ui + deal-service + auth-service + api-gateway · miroir i18n (25 espaces) · OpenAPI régénéré · `/fr/dashboard/finances` en 200. Recette FIN1–FIN8 (`YAMBA-DOC-METIER.md`, RG-FIN-01…05).
+
+### Reste
+Chantier C (admin-ui : médiation DISPUTED, arbitrage des retenues HELD_FOR_MEDIATION, remboursements partiels, Reports, paramètres) · pagination du portefeuille si les volumes l'exigent · solde Stripe (balance) dans le portefeuille (via le même endpoint).

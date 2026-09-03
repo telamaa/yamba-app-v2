@@ -127,6 +127,9 @@ export type BookingRecord = {
   deliveryPhotoUrls?: string[] | null;
   payoutAmountCents?: number | null;
   retentionDisposition?: string | null;
+  capturedAt?: Date | null;
+  refundedAt?: Date | null;
+  refundAmountCents?: number | null;
 
   createdAt: Date;
   updatedAt: Date;
@@ -335,6 +338,11 @@ export function toShipperBookingView(
 
     allowedActions,
     cancellationPreview: toCancellationPreview(booking, allowedActions, now),
+
+    // A83 — le sort de l'argent de l'Expéditeur (Finances) ; jamais servi au Voyageur (A13).
+    capturedAt: toIso(booking.capturedAt ?? null),
+    refundedAt: toIso(booking.refundedAt ?? null),
+    refundAmountCents: booking.refundAmountCents ?? null,
 
     // A72 — la date d'ouverture du litige « non livré » est SERVIE (jamais calculée par le front).
     disputeOpensAt:

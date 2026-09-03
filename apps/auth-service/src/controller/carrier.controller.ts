@@ -438,3 +438,35 @@ export const completeCarrierOnboarding = async (
     return next(error);
   }
 };
+
+/**
+ * POST /carrier/stripe/dashboard-link — lien de connexion au tableau de bord
+ * Stripe Express du Voyageur (A84) : virements, calendrier, RIB. Le lien
+ * est à usage unique et expire vite : généré à la demande, jamais stocké.
+ */
+export const createStripeDashboardLink = async (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    if (!req.user) {
+      return next(new ValidationError("Unauthorized"));
+    }
+    const carrierPage = await prisma.carrierPage.findUnique({
+      where: { userId: req.user.id },
+      select: { stripeAccountId: true },
+    });
+    if (!carrierPage?.stripeAccountId) {
+      return res.status(409).json({
+        success: false,
+        message: "No Stripe account yet — finish the carrier onboarding first.",
+        details: { type: "carrier", code: "STRIPE_ACCOUNT_MISSING" },
+      });
+    }
+    const link = await stripe.accounts.createLoginLink(carrierPage.stripeAccountId);
+    return res.status(200).json({ success: true, url: link.url });
+  } catch (error) {
+    return next(error);
+  }
+};

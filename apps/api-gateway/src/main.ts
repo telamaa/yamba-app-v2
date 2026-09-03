@@ -114,6 +114,15 @@ app.use(
   })
 );
 
+// /api/me/wallet → deal-service reçoit /me/wallet
+// (Finances : portefeuille Voyageur + paiements Expéditeur — A83)
+app.use(
+  "/api/me/wallet",
+  proxy("http://localhost:6003", {
+    proxyReqPathResolver: (req) => `/me/wallet${req.url}`,
+  })
+);
+
 // ─── Notification Service (port 6004) ───────
 // ⚠️ Déclaré AVANT le catch-all auth ("/") — sinon /api/me/notifications
 // partirait vers auth-service (leçon squelette deal, PR1).

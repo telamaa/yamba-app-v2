@@ -1,0 +1,68 @@
+{
+  "title": "Finances",
+  "subtitle": "Tes paiements, gains et versements — tout vient de tes deals, rien n'est estimé.",
+  "tabs": {
+    "payments": "Paiements",
+    "wallet": "Portefeuille"
+  },
+  "loading": "Chargement de tes finances…",
+  "error": "Impossible de charger tes finances pour le moment.",
+  "retry": "Réessayer",
+  "wallet": {
+    "stats": {
+      "upcoming": "À venir",
+      "upcomingHint": "Livraisons en vérification",
+      "sent": "Envoyés",
+      "sentThisMonth": "+ {amount} ce mois",
+      "pending": "En attente",
+      "pendingHint": "Compte Stripe, signalement ou envoi en cours"
+    },
+    "stripeCta": "Voir mes virements sur Stripe",
+    "stripeHint": "Dates d'arrivée, RIB et historique : sur ton tableau de bord Stripe.",
+    "stripeError": "Impossible d'ouvrir ton tableau de bord Stripe pour le moment.",
+    "stripeMissing": "Finalise d'abord ton compte Stripe.",
+    "empty": {
+      "title": "Aucun gain pour l'instant",
+      "text": "Tes versements apparaîtront ici dès ta première livraison validée.",
+      "notCarrier": "Deviens Voyageur pour gagner de l'argent avec ta franchise bagage.",
+      "cta": "Devenir Voyageur"
+    },
+    "kind": {
+      "DELIVERY": "Transport pour {name}",
+      "LATE_CANCELLATION": "Compensation · annulation tardive de {name}"
+    },
+    "state": {
+      "UPCOMING": "À venir le {date}",
+      "PENDING": "En cours d'envoi",
+      "BLOCKED": "En attente : finalise ton compte Stripe",
+      "FROZEN": "Gelé · signalement en cours",
+      "SENT": "Parti le {date} · 2 à 7 jours",
+      "HELD": "Retenue conservée · on te contacte"
+    }
+  },
+  "payments": {
+    "stats": {
+      "held": "Bloqué chez Yamba",
+      "heldHint": "Libéré à la fin de chaque transaction",
+      "spent": "Dépensé",
+      "refunded": "Remboursé"
+    },
+    "empty": {
+      "title": "Aucun paiement pour l'instant",
+      "text": "Tes paiements apparaîtront ici dès ta première réservation.",
+      "cta": "Chercher un trajet"
+    },
+    "line": "Envoi {route} · {name}",
+    "lineNoName": "Envoi {route}",
+    "state": {
+      "AUTHORIZED": "Autorisé, pas débité · en attente du Voyageur",
+      "HELD": "Bloqué chez Yamba",
+      "HELD_UNTIL": "Bloqué jusqu'au {date}",
+      "RELEASED": "Libéré le {date} · transaction close",
+      "RELEASED_NO_CHARGE": "Jamais débité · l'empreinte a disparu",
+      "REFUNDED": "Remboursé {amount} le {date}",
+      "PARTIALLY_REFUNDED": "Remboursé {amount} le {date} · retenue {retention} reversée au Voyageur"
+    }
+  },
+  "unknownName": "un membre"
+}
