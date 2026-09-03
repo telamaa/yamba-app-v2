@@ -286,7 +286,8 @@ Ordre de demarrage : auth -> trip -> gateway.
 - 03/09 : B5-PR2 feat/b5-rating-front (A95–A97, decisions 1A–6A) — etat de
   notation servi avec le deal (canRate machine), ecrans reels sans ancrage,
   carte « Noter » partagee, listes/accueil sur canRate, profil : niveau + faits
-  + pouces + « Signaler cet avis » (mailto). Suite : chantier C (admin-ui).
+  + pouces + « Signaler cet avis » (mailto). Mergee #146. Suite : chantier C
+  (admin-ui, points a trancher avant code).
 - Plateforme de tests : 694 (trip 198, deal 418, notification 78) + auth 65.
 - (historique) Plateforme de tests : 600 (trip 187, deal 354, notification 59) — post-B3 (#96).
 - MERGE 01/09 : toute la pile B2 est dans `dev` via la SEULE **PR #90**
