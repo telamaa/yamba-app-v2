@@ -421,6 +421,20 @@ describe("B4 (D52) — completed / payout_sent / disputed / verification_reminde
     expect(auto.content!.paragraphs[0]).toContain("automatiquement");
   });
 
+  it("D50/A82 : payout_sent LATE_CANCELLATION → variante « compensation » ; refund_issued partiel → la retenue revient au Voyageur", () => {
+    const late = parse(envelope("booking.payout_sent", { ...basePayload(), actor: "SYSTEM" as const, transferId: "tr_1", amountCents: 1200, reason: "LATE_CANCELLATION" }));
+    const built = buildBookingEmail(late, "CARRIER", "Thomas", { locale: "fr", counterpartFirstName: "Naomi" })!;
+    expect(built.subject).toContain("compensation");
+    expect(built.content!.paragraphs[0]).toContain("annulé");
+    const normal = buildBookingEmail(parse(payoutSentEvent()), "CARRIER", "Thomas", { locale: "fr" })!;
+    expect(normal.subject).not.toContain("compensation");
+
+    const partial = parse(envelope("booking.refund_issued", { ...basePayload(), actor: "SHIPPER" as const, amountCents: 1950, refundedAt: "2026-07-19T12:00:00.000Z" }));
+    expect(buildBookingEmail(partial, "SHIPPER", "Naomi", { locale: "fr" })!.data.retainedForCarrier).toEqual(expect.stringContaining("19"));
+    const full = parse(envelope("booking.refund_issued", { ...basePayload(), actor: "SYSTEM" as const, amountCents: 3900, refundedAt: "2026-07-19T12:00:00.000Z" }));
+    expect(buildBookingEmail(full, "SHIPPER", "Naomi", { locale: "fr" })!.data.retainedForCarrier).toBeNull();
+  });
+
   it("payout_sent : le Voyageur lit le MONTANT DE L'ÉVÉNEMENT et une copie honnête (2 à 7 jours) — jamais le total Expéditeur", () => {
     const built = buildBookingEmail(parse(payoutSentEvent()), "CARRIER", "Thomas", { locale: "fr" })!;
     expect(built.template).toBe("settlement/payout-sent-carrier");

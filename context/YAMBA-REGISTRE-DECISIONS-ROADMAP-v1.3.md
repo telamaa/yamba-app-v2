@@ -317,6 +317,17 @@ Objectif produit assumé : **solide, propre, pro, secure, long terme** — les f
 
 ---
 
+## 2bis.21 — Session `feat/b4-late-cancel-payout` (retenue ANN-01 au Voyageur, D50) — A79→A82
+
+| # | Arbitrage | Pourquoi | Compromis | PR |
+|---|---|---|---|---|
+| A79 | **Compensation = `round(retenue × transportCents / totalShipperCents)`**, retenue = total − remboursement ANN-01 (50 %), arrondi au centime, sans minimum, reste d'arrondi à Yamba (décisions 1A, 5A). La prime de protection vaut 0 aujourd'hui ; **quand D22 sera réel, la prime sera remboursée à 100 % et le prorata calculé hors prime** (gravé ici, à appliquer avec D22) | Un seul calcul, lisible, sur des cents entiers ; ne pas inventer un traitement de prime pour un flux qui n'existe pas encore | Tant que D22 n'est pas là, le prorata inclut une prime nulle | `feat/b4-late-cancel-payout` |
+| A80 | **La compensation part IMMÉDIATEMENT à l'annulation** (décision 2A), après le remboursement de l'Expéditeur : la transition CANCELLED pose `payoutStatus = PENDING` + `payoutAmountCents` + `retentionCents` + `retentionDisposition = CARRIER`, puis l'exécuteur unique de versement (A65) transfère en ligne ; échec → FAILED rejoué par le cron (passe 2 étendue aux CANCELLED). Rien de rétroactif (4A) : les deals annulés avant cette PR n'ont pas de `payoutStatus`, le cron les ignore | Un seul chemin d'argent sortant (D49) ; l'argent est capturé, rien n'attend de vérification | Un transfert `source_transaction` sur une charge partiellement remboursée : Stripe accepte tant que le montant ≤ charge − remboursements (50 % ≥ part nette) | `feat/b4-late-cancel-payout` |
+| A81 | **Annulation APRÈS le départ sans prise en charge : pas de compensation automatique** (décision 3A) — `retentionDisposition = HELD_FOR_MEDIATION`, `retentionCents` tracé, `payoutStatus` absent ; le chantier C tranchera (Voyageur absent ou Expéditeur absent ?) | Compenser automatiquement récompenserait un Voyageur qui ne s'est pas présenté ; la machine ne sait pas qui a fait défaut | Le Voyageur d'une annulation post-départ attend la médiation | `feat/b4-late-cancel-payout` |
+| A82 | **Même événement `booking.payout_sent` avec `reason = LATE_CANCELLATION`** (défaut `DELIVERY`), email Voyageur en variante « compensation d'annulation », ligne « Mes trajets » et page du deal annulé avec l'état du versement (montant de la compensation, pas le net) ; côté Expéditeur, l'aperçu d'annulation et l'email de remboursement disent que la retenue revient au Voyageur (décision 6A) | Un moment d'argent laisse un email (RG-N-01) ; l'Expéditeur doit savoir où va sa retenue ; une clé d'événement de plus n'apporterait rien | L'email `refund_issued` (gabarit EJS historique) reçoit une ligne conditionnelle, pas une migration | `feat/b4-late-cancel-payout` |
+
+---
+
 # 3. Roadmap maîtresse
 
 ## 3.0 Les trois jalons
@@ -341,7 +352,7 @@ Le lancement public = **fin du jalon 2**. L'admin-ui n'est pas un confort d'apr�
 | **B1-solde** | 1 | **PR4bis notification-service :6004 + PR5 front** | Premier consumer (dédup event-id, matrice des 17), listes réelles Mes envois / deals Mes trajets (seed A14) | B1 | D2, D8 (A15, A16) |
 | **B2** | 1 | **Naissance du deal + argent entrant** | Création depuis wizard, PaymentIntent (autorisation → capture à l'acceptation), accept/decline, cron expiration 24h, remboursements, `PaymentProvider` abstrait, writers outbox EN TRANSACTION, payment-service :6008, media-service :6009 | B1-solde + transactions Atlas prouvées (§7.2) | D11, D16, D20, D21 |
 | **B3** | 1 | **Transport** | Pickup (upload R2 + code bcrypt + checklist conformité), refuse, tracking events, deliver (compare + lock serveur), régénération | B2 | D4, D9 |
-| **B4** | 1 | **Argent sortant** | **PR1 serveur, PR2 Expéditeur, PR3 Voyageur faites** (D49–D52, A65–A78) : confirmation anticipée, cron J+4 → COMPLETED + `transfer`, dispute avec gel (aussi « non livré » depuis PICKED_UP), rappel J+3, écrans des deux côtés, photo de remise · reste retenue ANN-01 (D50), portefeuille (A77) ; matrice remboursements = chantier C | B3 | D21, D22, D49–D52 |
+| **B4** | 1 | **Argent sortant** | **PR1 serveur, PR2 Expéditeur, PR3 Voyageur faites** (D49–D52, A65–A78) : confirmation anticipée, cron J+4 → COMPLETED + `transfer`, dispute avec gel (aussi « non livré » depuis PICKED_UP), rappel J+3, écrans des deux côtés, photo de remise, **retenue ANN-01 au Voyageur (A79–A82)** · reste portefeuille (A77) ; matrice remboursements = chantier C | B3 | D21, D22, D49–D52 |
 | **B5** | 1 | **Confiance** | Rating double-aveugle, relances J+5/J+7, **stats de réputation visibles** (D29①) — le notification-service est déjà né en PR4bis | B4 | D2, D29 |
 | **C** | 2 | **admin-ui** | Médiation litiges (tickets YAM-XXXX), vérification billets, file des Reports, gestion users, **paramètres plateforme** (curseurs du mockup, audités), **TrustScore interne + plafonds progressifs** (D29②). Login séparé, 2FA TOTP, audit log | B4 | D6, D7, D26, D29 |
 | **E** | 2 | **Profil public Voyageur** | Page publique (stats réelles, trajets, avis) + Shop-preview équivalent | B1 (stats), B5 (avis) | — |

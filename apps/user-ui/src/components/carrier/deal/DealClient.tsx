@@ -29,7 +29,9 @@ import DealRequestDesktop from "./views/request/DealRequestDesktop";
 import DealRequestMobile from "./views/request/DealRequestMobile";
 import DealAcceptedDesktop from "./views/accepted/DealAcceptedDesktop";
 import DealAcceptedMobile from "./views/accepted/DealAcceptedMobile";
+import type { DealRequest } from "./deal.types";
 import DealSettledView from "./views/settled/DealSettledView";
+import DealPayoutStatusCard from "./shared/DealPayoutStatusCard";
 import DealTrackingClient from "./views/tracking/DealTrackingClient";
 
 type Props = {
@@ -93,7 +95,7 @@ export default function DealClient({ dealId }: Props) {
   // Terminaux (DECLINED, EXPIRED, CANCELLED) : plus rien à décider ici —
   // écran de clôture sobre.
   if (deal.status !== "PENDING") {
-    return <DealClosed status={deal.status} onBackAction={handleClose} />;
+    return <DealClosed status={deal.status} deal={deal} onBackAction={handleClose} />;
   }
 
   // Statut PENDING → vues request
@@ -134,12 +136,16 @@ function DealError({ onBackAction }: { onBackAction: () => void }) {
 
 function DealClosed({
   status,
+  deal,
   onBackAction,
 }: {
   status: string;
+  deal: DealRequest;
   onBackAction: () => void;
 }) {
   const t = useTranslations("carrierDealRequest");
+  // D50/A81–A82 — annulation tardive : la compensation (ou la retenue « à arbitrer ») se lit ici.
+  const lateCancel = status === "CANCELLED" && !!deal.retentionDisposition;
   return (
     <div className="flex min-h-screen items-center justify-center bg-white px-4 dark:bg-slate-950">
       <div className="max-w-sm text-center">
@@ -149,6 +155,16 @@ function DealClosed({
         <p className="mt-1.5 text-[13px] text-slate-500 dark:text-slate-400">
           {t("closed.hint")}
         </p>
+        {lateCancel && deal.retentionDisposition === "CARRIER" && (
+          <div className="mt-5 text-left">
+            <DealPayoutStatusCard deal={deal} compact />
+          </div>
+        )}
+        {lateCancel && deal.retentionDisposition === "HELD_FOR_MEDIATION" && (
+          <p className="mt-5 rounded-xl bg-slate-100 px-4 py-3 text-left text-[12.5px] leading-snug text-slate-600 dark:bg-slate-900 dark:text-slate-400">
+            {t("closed.retentionHeld")}
+          </p>
+        )}
         <button
           type="button"
           onClick={onBackAction}

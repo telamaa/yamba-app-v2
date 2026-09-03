@@ -47,6 +47,7 @@ import {
   BookingLifecycleError,
   baseEventPayload,
   computeCancellationRefundCents,
+  computeLateCancellationCompensationCents,
 } from "./booking-lifecycle";
 import {
   BOOKING_WRITE_SELECT,
@@ -65,7 +66,16 @@ type BookingForLifecycle = BookingForWrite;
 const loadBooking = loadBookingForWrite;
 const BOOKING_SELECT = BOOKING_WRITE_SELECT;
 
-export function makeDealLifecycleService(provider: PaymentProvider, clock: () => Date = () => new Date()) {
+/** Exécuteur de versement (A65) — injecté pour la compensation d'annulation tardive (A80). */
+export type PayoutExecutor = {
+  executePayout(booking: BookingForWrite, now: Date): Promise<unknown>;
+};
+
+export function makeDealLifecycleService(
+  provider: PaymentProvider,
+  clock: () => Date = () => new Date(),
+  payoutExecutor: PayoutExecutor | null = null
+) {
   /** La machine a-t-elle dit oui ? Sinon 409 avec SA raison. */
   function assertTransition(
     booking: BookingForLifecycle,
@@ -246,6 +256,12 @@ export function makeDealLifecycleService(provider: PaymentProvider, clock: () =>
       const wasAccepted = effects.includes("REFUND_PER_CANCELLATION_POLICY");
 
       let refundAmountCents: number;
+      // D50 (A79–A81) — la retenue ANN-01 et son sort.
+      let retention: {
+        retentionCents: number;
+        retentionDisposition: "CARRIER" | "HELD_FOR_MEDIATION";
+        compensationCents: number;
+      } | null = null;
       if (wasAccepted) {
         // ANN-01 (D39) : le paiement est CAPTURÉ — vrai remboursement,
         // 100 % jusqu'à J-2, sinon retenue 50 % (versée au Voyageur en B4).
@@ -261,6 +277,23 @@ export function makeDealLifecycleService(provider: PaymentProvider, clock: () =>
           await provider.refund(booking.paymentIntentId, refundAmountCents);
         } catch {
           throw new BookingLifecycleError("PAYMENT_STATE_CONFLICT", "The refund could not be issued.");
+        }
+        const retentionCents = booking.pricing.totalShipperCents - refundAmountCents;
+        if (retentionCents > 0) {
+          // A81 — après le départ sans prise en charge, personne ne sait qui a
+          // fait défaut : la retenue est conservée « à arbitrer » (chantier C).
+          const beforeDeparture = now.getTime() < booking.trip.departureAt.getTime();
+          retention = beforeDeparture
+            ? {
+                retentionCents,
+                retentionDisposition: "CARRIER",
+                compensationCents: computeLateCancellationCompensationCents({
+                  retentionCents,
+                  transportCents: booking.pricing.transportCents,
+                  totalShipperCents: booking.pricing.totalShipperCents,
+                }),
+              }
+            : { retentionCents, retentionDisposition: "HELD_FOR_MEDIATION", compensationCents: 0 };
         }
       } else {
         // PENDING : l'empreinte n'a jamais été capturée — libération intégrale.
@@ -278,6 +311,16 @@ export function makeDealLifecycleService(provider: PaymentProvider, clock: () =>
           cancelReason: input.reason ?? null,
           refundedAt: now,
           refundAmountCents,
+          ...(retention
+            ? {
+                retentionCents: retention.retentionCents,
+                retentionDisposition: retention.retentionDisposition,
+                // A80 — la compensation part par l'exécuteur unique, juste après.
+                ...(retention.compensationCents > 0
+                  ? { payoutStatus: "PENDING", payoutAmountCents: retention.compensationCents, payoutFailureReason: null }
+                  : {}),
+              }
+            : {}),
         },
         releaseKg: true,
         events: [
@@ -302,6 +345,19 @@ export function makeDealLifecycleService(provider: PaymentProvider, clock: () =>
         ],
         now,
       });
+
+      // A80 — compensation IMMÉDIATE (l'annulation est déjà acquise : un échec
+      // du transfert devient FAILED, rejoué par le cron — jamais une erreur ici).
+      if (retention && retention.compensationCents > 0 && payoutExecutor) {
+        try {
+          await payoutExecutor.executePayout(
+            { ...booking, status: "CANCELLED", payoutStatus: "PENDING", payoutAmountCents: retention.compensationCents, payoutAttempts: 0 },
+            now
+          );
+        } catch {
+          // L'état FAILED est écrit par l'exécuteur ; le cron reprend.
+        }
+      }
 
       return transitionResponse(booking, to, refundAmountCents);
     },

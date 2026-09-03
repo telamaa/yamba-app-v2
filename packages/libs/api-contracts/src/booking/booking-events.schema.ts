@@ -251,7 +251,10 @@ export const BookingPayoutSentEventSchema = z
     eventType: z.literal("booking.payout_sent"),
     payload: BookingEventBasePayloadSchema.extend({
       transferId: z.string().nullish().meta({ description: "Stripe transfer id (B4)" }),
-      amountCents: z.number().int().meta({ description: "= transportCents (carrier net)" }),
+      amountCents: z.number().int().meta({ description: "Carrier net (DELIVERY) or ANN-01 compensation (LATE_CANCELLATION)" }),
+      reason: z.enum(["DELIVERY", "LATE_CANCELLATION"]).nullish().meta({
+        description: "Why the carrier is paid (A82). Absent on pre-D50 events = DELIVERY.",
+      }),
     }),
   })
   .meta({ id: "BookingPayoutSentEvent", description: "Stripe transfer executed → notify carrier" });

@@ -89,7 +89,7 @@
     "dialogIntro": "Ta demande {route} auprès de {carrierFirstName} sera annulée définitivement.",
     "refundLabel": "Tu seras remboursée de",
     "fullRefundNote": "Remboursement intégral : le paiement n'a pas encore été débité ou tu annules plus de 48 h avant le départ.",
-    "retentionNote": "Une retenue de {pct} % ({retention}) s'applique car le départ est dans moins de 48 h (elle dédommage le Voyageur).",
+    "retentionNote": "Une retenue de {pct} % ({retention}) s'applique car le départ est dans moins de 48 h : elle est reversée au Voyageur, qui avait réservé sa capacité pour toi.",
     "finalWarning": "Cette action est définitive",
     "keep": "Garder l'envoi",
     "confirm": "Confirmer l'annulation",

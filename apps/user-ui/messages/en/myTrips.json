@@ -78,7 +78,11 @@
     "completedSentSub": "{earnings} sent to your account on {date} · 2 to 7 days to arrive",
     "completedPendingSub": "Completed · {earnings} being sent to your account",
     "completedBlockedSub": "Completed · {earnings} on hold: finish your Stripe account",
-    "disputedSub": "Report {ticket} · payout on hold · we will contact you"
+    "disputedSub": "Report {ticket} · payout on hold · we will contact you",
+    "cancelledCompensationSentSub": "Cancelled late · {amount} compensation sent to your account",
+    "cancelledCompensationPendingSub": "Cancelled late · {amount} compensation being sent",
+    "cancelledCompensationBlockedSub": "Cancelled late · {amount} compensation on hold: finish your Stripe account",
+    "cancelledHeldSub": "Cancelled after departure · retention held, we will contact you"
   },
   "historyRow": {
     "title": "{origin} → {destination} · {date}",

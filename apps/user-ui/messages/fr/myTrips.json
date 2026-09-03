@@ -78,7 +78,11 @@
     "completedSentSub": "{earnings} partis vers ton compte le {date} · 2 à 7 jours pour arriver",
     "completedPendingSub": "Terminé · {earnings} en cours d'envoi vers ton compte",
     "completedBlockedSub": "Terminé · {earnings} en attente : finalise ton compte Stripe",
-    "disputedSub": "Signalement {ticket} · versement en attente · on te contacte"
+    "disputedSub": "Signalement {ticket} · versement en attente · on te contacte",
+    "cancelledCompensationSentSub": "Annulée tardivement · {amount} de compensation partis vers ton compte",
+    "cancelledCompensationPendingSub": "Annulée tardivement · {amount} de compensation en cours d'envoi",
+    "cancelledCompensationBlockedSub": "Annulée tardivement · {amount} de compensation en attente : finalise ton compte Stripe",
+    "cancelledHeldSub": "Annulée après le départ · retenue conservée, on te contacte"
   },
   "historyRow": {
     "title": "{origin} → {destination} · {date}",

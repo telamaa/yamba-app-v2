@@ -7515,6 +7515,34 @@
               }
             ]
           },
+          "payoutAmountCents": {
+            "description": "Amount paid out to the carrier: the net at COMPLETED, the ANN-01 compensation at late CANCELLED (D50/A82)",
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "retentionDisposition": {
+            "description": "Late cancellation only: the retention went to the carrier (compensation) or is held for mediation (cancelled after departure, A81)",
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "CARRIER",
+                  "HELD_FOR_MEDIATION"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "payoutBlocker": {
             "anyOf": [
               {
@@ -9593,7 +9621,22 @@
                 "type": "integer",
                 "minimum": -9007199254740991,
                 "maximum": 9007199254740991,
-                "description": "= transportCents (carrier net)"
+                "description": "Carrier net (DELIVERY) or ANN-01 compensation (LATE_CANCELLATION)"
+              },
+              "reason": {
+                "description": "Why the carrier is paid (A82). Absent on pre-D50 events = DELIVERY.",
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "DELIVERY",
+                      "LATE_CANCELLATION"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               }
             },
             "required": [

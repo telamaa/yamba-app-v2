@@ -751,6 +751,9 @@ model Booking {
   payoutAttempts      Int     @default(0) // rejeux du cron (A65/A66), borné
   payoutFailureReason String? // CARRIER_ACCOUNT_NOT_READY | PROVIDER_ERROR:<message>
   completedBy         String? // "SHIPPER" (confirmation anticipée) | "SYSTEM" (J+4)
+  // ─── Retenue ANN-01 (D50, A79–A81) ───
+  retentionCents        Int? // total − remboursement (annulation tardive de l'Expéditeur)
+  retentionDisposition  String? // "CARRIER" (compensation versée, payoutAmountCents) | "HELD_FOR_MEDIATION" (annulation après le départ, chantier C)
   verificationReminderSentAt DateTime? // rappel J+3 émis (A70) — jamais deux fois
 
   // ─── Litige (B4, D51 — le dossier est dans Dispute) ───

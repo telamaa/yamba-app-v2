@@ -51,6 +51,7 @@ export const BOOKING_WRITE_SELECT = {
   payoutDueAt: true,
   payoutStatus: true,
   payoutAttempts: true,
+  payoutAmountCents: true,
   chargeId: true,
 } as const;
 
@@ -76,6 +77,8 @@ export type BookingForWrite = {
   payoutDueAt?: Date | null;
   payoutStatus?: string | null;
   payoutAttempts?: number | null;
+  /** Montant à verser quand il diffère du net (compensation ANN-01, A79). */
+  payoutAmountCents?: number | null;
   chargeId?: string | null;
 } & BookingSnapshotsForLifecycle;
 

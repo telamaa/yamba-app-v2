@@ -28,7 +28,7 @@ type Base = {
   ctaUrl: string;
 };
 export type CompletedParams = Base & { weightKg: number; transport: string; completedBy: "SHIPPER" | "SYSTEM" };
-export type PayoutSentParams = Base & { amount: string };
+export type PayoutSentParams = Base & { amount: string; reason: "DELIVERY" | "LATE_CANCELLATION" };
 export type DisputedShipperParams = Base & { ticketNumber: string; supportEmail: string };
 export type DisputedCarrierParams = Base & { ticketNumber: string; disputeCategory: DisputeCategory | null; supportEmail: string };
 export type VerificationReminderParams = Base & { payoutDueAt: string; transport: string };
@@ -87,14 +87,17 @@ const fr: SettlementEmailDictionary = {
   },
   payoutSentCarrier: (p) => {
     const shipper = p.counterpartFirstName ?? "l'Expéditeur";
+    const late = p.reason === "LATE_CANCELLATION";
     return {
-      subject: `${p.amount} en route vers ton compte pour ${p.route}`,
+      subject: late ? `${p.amount} de compensation en route vers ton compte pour ${p.route}` : `${p.amount} en route vers ton compte pour ${p.route}`,
       content: {
-        preheader: `Ton paiement pour le colis de ${shipper} est parti.`,
-        title: "Ton paiement est parti",
+        preheader: late ? `${shipper} a annulé tardivement : ta compensation est partie.` : `Ton paiement pour le colis de ${shipper} est parti.`,
+        title: late ? "Ta compensation est partie" : "Ton paiement est parti",
         greeting: `Bonjour ${p.firstName},`,
         paragraphs: [
-          `Le transport ${p.route} pour ${shipper} est terminé : ${p.amount} viennent d'être envoyés vers ton compte de paiement.`,
+          late
+            ? `${shipper} a annulé le transport ${p.route} à moins de 48 h du départ. Comme prévu par nos conditions, une partie du montant retenu te revient : ${p.amount} viennent d'être envoyés vers ton compte de paiement.`
+            : `Le transport ${p.route} pour ${shipper} est terminé : ${p.amount} viennent d'être envoyés vers ton compte de paiement.`,
           "Selon ta banque, la somme apparaît sur ton compte bancaire sous 2 à 7 jours. Rien à faire de ton côté.",
         ],
         cta: { label: "Voir le deal", url: p.ctaUrl },
@@ -186,14 +189,17 @@ const en: SettlementEmailDictionary = {
   },
   payoutSentCarrier: (p) => {
     const shipper = p.counterpartFirstName ?? "the shipper";
+    const late = p.reason === "LATE_CANCELLATION";
     return {
-      subject: `${p.amount} on its way to your account for ${p.route}`,
+      subject: late ? `${p.amount} compensation on its way to your account for ${p.route}` : `${p.amount} on its way to your account for ${p.route}`,
       content: {
-        preheader: `Your payment for ${shipper}'s parcel has been sent.`,
-        title: "Your payment is on its way",
+        preheader: late ? `${shipper} cancelled late: your compensation has been sent.` : `Your payment for ${shipper}'s parcel has been sent.`,
+        title: late ? "Your compensation is on its way" : "Your payment is on its way",
         greeting: `Hi ${p.firstName},`,
         paragraphs: [
-          `The transport ${p.route} for ${shipper} is complete: ${p.amount} has just been sent to your payment account.`,
+          late
+            ? `${shipper} cancelled the transport ${p.route} less than 48h before departure. As set out in our terms, part of the retained amount goes to you: ${p.amount} has just been sent to your payment account.`
+            : `The transport ${p.route} for ${shipper} is complete: ${p.amount} has just been sent to your payment account.`,
           "Depending on your bank, the money shows up on your bank account within 2 to 7 days. Nothing to do on your side.",
         ],
         cta: { label: "View the deal", url: p.ctaUrl },

@@ -1232,3 +1232,21 @@ tsc user-ui + deal-service · miroir i18n · deal-service **384** (381 + 3) · O
 
 ### Reste (B4)
 `feat/b4-late-cancel-payout` (retenue ANN-01 au prorata, D50), portefeuille Voyageur (PR dédiée, A77), puis chantier C (admin, médiation). Photo de remise : le seed n'en crée pas (recette réelle).
+
+# `feat/b4-late-cancel-payout` — la retenue ANN-01 revient au Voyageur (D50, A79–A82)
+
+## Ce qui a été fait
+
+1. **Calcul** (`booking-lifecycle.ts`) : `computeLateCancellationCompensationCents({ retentionCents, transportCents, totalShipperCents })` = `round(retenue × net / total)` (A79) ; 0 si rien n'est retenu.
+2. **Annulation** (`deal-lifecycle.service.ts`, `cancel`) : après le remboursement ANN-01, retenue = total − remboursement ; si > 0 : avant le départ → `retentionDisposition = CARRIER`, `payoutStatus = PENDING`, `payoutAmountCents = compensation` dans la MÊME transaction que CANCELLED, puis **compensation immédiate** par l'exécuteur injecté (`PayoutExecutor`, 3e paramètre de `makeDealLifecycleService`, A80) — un échec ne casse jamais l'annulation (l'état FAILED est écrit par l'exécuteur, le cron reprend) ; après le départ → `retentionDisposition = HELD_FOR_MEDIATION`, aucune compensation (A81). Prisma : `retentionCents`, `retentionDisposition`.
+3. **Exécuteur** (`deal-settlement.service.ts`) : accepte COMPLETED (montant = net) **et CANCELLED** (montant = `payoutAmountCents`, refus si 0) ; `reason` DELIVERY | LATE_CANCELLATION dans l'événement `booking.payout_sent` et les métadonnées du transfert ; écritures conditionnelles sur `status` du booking ; passe 2 du cron élargie à `status ∈ {COMPLETED, CANCELLED}` et `payoutStatus ∈ {PENDING, FAILED}` (couvre aussi un crash entre transition et transfert en ligne — idempotent). `BOOKING_WRITE_SELECT` + `payoutAmountCents`. Routes : le service de règlement est construit avant le cycle de vie et injecté.
+4. **Contrats** : `BookingPayoutSentEvent.reason` (nullish), `CarrierBookingView.payoutAmountCents` + `retentionDisposition` (A82). OpenAPI régénéré.
+5. **Emails** (A82) : `payoutSentCarrier` reçoit `reason` — variante « Ta compensation est partie » (FR/EN) ; `refund_issued` : donnée `retainedForCarrier` quand le remboursement est partiel → ligne conditionnelle dans le gabarit EJS « la retenue revient au Voyageur ».
+6. **Front Voyageur** : `DealPayoutStatusCard` affiche la compensation (pas le net) sur un deal CANCELLED, titre « … de compensation partis » ; `DealClosed` (deal annulé) embarque la carte quand `retentionDisposition = CARRIER`, ou l'explication « retenue conservée, on te contacte » quand HELD_FOR_MEDIATION ; lignes « Mes trajets » CANCELLED : compensation partie / en cours / bloquée, ou retenue conservée ; le bandeau « finalise ton compte Stripe » couvre aussi ces deals (même filtre `payoutBlocker`).
+7. **Front Expéditeur** : la note de retenue de la modale d'annulation dit « reversée au Voyageur ».
+
+### Preuves
+deal-service **390** (384 + 3 lifecycle + 2 settlement + 1 mapper) · notification-service **76** (+1) · tsc ×2 · miroir i18n · OpenAPI régénéré · page d'un deal annulé en 200. Recette ANN1–ANN8 (`YAMBA-DOC-METIER.md`, RG-ANN-01…06).
+
+### Reste
+Portefeuille Voyageur (A77, PR dédiée) · **chantier C** (admin-ui : médiation DISPUTED, arbitrage des retenues HELD_FOR_MEDIATION, remboursements partiels) · prime de protection remboursée à 100 % quand D22 sera réel (gravé A79).

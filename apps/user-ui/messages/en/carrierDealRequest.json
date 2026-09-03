@@ -156,7 +156,8 @@
     "DECLINED": "You declined this request",
     "EXPIRED": "This request has expired",
     "CANCELLED": "This request was cancelled",
-    "hint": "There is nothing left to do here."
+    "hint": "There is nothing left to do here.",
+    "retentionHeld": "Cancelled after departure: the shipper's retention is held by Yamba while we understand what happened. We will contact you."
   },
   "errors": {
     "onboardingRequired": "Finish your Tripper profile and Stripe setup to be able to accept a deal.",

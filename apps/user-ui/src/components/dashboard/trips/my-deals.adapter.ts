@@ -42,6 +42,8 @@ export function toCarrierDealItem(view: CarrierBookingViewDto): CarrierDealItem 
     payoutSentAt: view.payoutSentAt ?? undefined,
     payoutBlocker: view.payoutBlocker ?? undefined,
     disputeTicket: view.disputeTicket ?? undefined,
+    payoutAmountCents: view.payoutAmountCents ?? undefined,
+    retentionDisposition: view.retentionDisposition ?? undefined,
   };
 }
 
