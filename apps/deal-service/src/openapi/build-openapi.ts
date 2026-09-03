@@ -529,6 +529,41 @@ export function buildOpenApiDocument() {
           },
         },
       },
+      "/deals/{id}/rating": {
+        get: {
+          tags: ["deals"],
+          summary: "Rating context (B5, D53) — who I rate, my rating, whether the other rated, reveal",
+          description:
+            "Either party. Double-blind: counterpartRating is null until both rated or the 14-day window elapsed. " +
+            "canRate is the state machine verdict (COMPLETED, window open, not rated yet by this role).",
+          operationId: "getDealRatingContext",
+          security: authSecurity,
+          parameters: [dealIdPathParam],
+          responses: { "200": jsonResponse("RatingContextResponse", "Rating context"), "401": response401, "403": response403, "404": response404, "500": response500 },
+        },
+        post: {
+          tags: ["deals"],
+          summary: "Rate the other party (B5, D53) — once per role, COMPLETED, within 14 days",
+          description:
+            "ONE transaction: Review (revealedAt null) + booking mark (optimistic lock on updatedAt). If the counterpart had " +
+            "already rated, both reviews are revealed now and outbox booking.rating_revealed (BOTH_RATED) is written; " +
+            "otherwise the cron reveals at the end of the window (WINDOW_ELAPSED). Only revealed reviews feed the public " +
+            "reputation (D29①). Criteria outside the rated role are dropped.",
+          operationId: "submitDealRating",
+          security: authSecurity,
+          parameters: [dealIdPathParam],
+          requestBody: { required: true, content: { "application/json": { schema: ref("SubmitRatingRequest") } } },
+          responses: {
+            "201": jsonResponse("SubmitRatingResponse", "Rating recorded"),
+            "400": response400,
+            "401": response401,
+            "403": response403,
+            "404": response404,
+            "409": response409Settlement,
+            "500": response500,
+          },
+        },
+      },
       "/me/wallet": {
         get: {
           tags: ["me"],

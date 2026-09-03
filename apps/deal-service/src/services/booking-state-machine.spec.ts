@@ -19,6 +19,7 @@
  *  S13 Partition ACTIVE/TERMINAL + constantes §5.4                  (3)
  */
 import {
+  canRate,
   BOOKING_ACTIVE_STATUSES,
   BOOKING_TERMINAL_STATUSES,
   BookingActor,
@@ -531,6 +532,24 @@ describe("S10 — getAllowedActions par rôle (source des CTAs front)", () => {
 // ─────────────────────────────────────────────
 // S11 — canRegenerateCode
 // ─────────────────────────────────────────────
+
+describe("S12 — notation (B5/D53) : COMPLETED, fenêtre 14 j, une fois par rôle", () => {
+  it("permise sur COMPLETED dans la fenêtre, par chaque rôle indépendamment", () => {
+    const b = makeBooking({ status: "COMPLETED", ratingWindowEndsAt: hours(24) });
+    expect(canRate(b, "SHIPPER", NOW).allowed).toBe(true);
+    expect(canRate(b, "CARRIER", NOW).allowed).toBe(true);
+    expect(canRate({ ...b, shipperRatedAt: hours(-1) }, "SHIPPER", NOW).allowed).toBe(false);
+    expect(canRate({ ...b, shipperRatedAt: hours(-1) }, "CARRIER", NOW).allowed).toBe(true);
+  });
+  it("refusée hors COMPLETED, après la fenêtre, sur un booking effacé", () => {
+    expect(canRate(makeBooking({ status: "DISPUTED" }), "SHIPPER", NOW).allowed).toBe(false);
+    expect(canRate(makeBooking({ status: "CANCELLED" }), "SHIPPER", NOW).allowed).toBe(false);
+    const closed = canRate(makeBooking({ status: "COMPLETED", ratingWindowEndsAt: NOW }), "SHIPPER", NOW);
+    expect(closed.allowed).toBe(false);
+    if (!closed.allowed) expect(closed.reason).toContain("14 days");
+    expect(canRate(makeBooking({ status: "COMPLETED", isDeleted: true }), "SHIPPER", NOW).allowed).toBe(false);
+  });
+});
 
 describe("S11 — régénération du code (Expéditeur, PICKED_UP, ≤ 5)", () => {
   it("permise en PICKED_UP, compteur à 0", () => {

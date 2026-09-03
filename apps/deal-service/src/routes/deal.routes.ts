@@ -15,6 +15,8 @@ import { makeDealTransportService } from "../services/deal-transport.service";
 import { makeDealSettlementController } from "../controllers/deal-settlement.controller";
 import { makeDealSettlementService } from "../services/deal-settlement.service";
 import { getMyWallet } from "../controllers/wallet.controller";
+import { makeDealRatingController } from "../controllers/deal-rating.controller";
+import { makeDealRatingService } from "../services/deal-rating.service";
 import { createPaymentProviderFromEnv } from "@packages/payments";
 
 /**
@@ -48,6 +50,8 @@ const dealRequest = makeDealRequestController(makeDealRequestService(paymentProv
 const dealLifecycle = makeDealLifecycleController(dealLifecycleService);
 const dealTransport = makeDealTransportController(makeDealTransportService(paymentProvider));
 const dealSettlement = makeDealSettlementController(dealSettlementService);
+export const dealRatingService = makeDealRatingService();
+const dealRating = makeDealRatingController(dealRatingService);
 
 // Autorisation du montant (empreinte) — étape 1 de la demande (D37)
 router.post("/deals/payment-intents", isAuthenticated, dealRequest.createPaymentIntent);
@@ -75,6 +79,10 @@ router.post("/deals/:id/deliver", isAuthenticated, dealTransport.deliver);
 // ── B4-PR1 : règlement (D49/D51) ─────────────────────────────
 router.post("/deals/:id/confirm", isAuthenticated, dealSettlement.confirm);
 router.post("/deals/:id/dispute", isAuthenticated, dealSettlement.dispute);
+
+// ── B5 : notation mutuelle double-aveugle (D53) ──────────────
+router.get("/deals/:id/rating", isAuthenticated, dealRating.getContext);
+router.post("/deals/:id/rating", isAuthenticated, dealRating.submit);
 
 // Deals d'un de MES trips (vue Carrier) — ?tripId=<ObjectId>[&status=]
 router.get("/deals", isAuthenticated, getTripDeals);

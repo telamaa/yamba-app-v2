@@ -27,7 +27,8 @@ type Base = {
   route: string;
   ctaUrl: string;
 };
-export type CompletedParams = Base & { weightKg: number; transport: string; completedBy: "SHIPPER" | "SYSTEM" };
+export type CompletedParams = Base & { weightKg: number; transport: string; completedBy: "SHIPPER" | "SYSTEM"; rateUrl: string };
+export type RatingReminderParams = Base & { reminderNumber: 1 | 2; rateUrl: string };
 export type PayoutSentParams = Base & { amount: string; reason: "DELIVERY" | "LATE_CANCELLATION" };
 export type DisputedShipperParams = Base & { ticketNumber: string; supportEmail: string };
 export type DisputedCarrierParams = Base & { ticketNumber: string; disputeCategory: DisputeCategory | null; supportEmail: string };
@@ -35,6 +36,7 @@ export type VerificationReminderParams = Base & { payoutDueAt: string; transport
 
 export type SettlementEmailDictionary = {
   flightArrivedShipper(p: Base): SettlementEmail;
+  ratingReminder(p: RatingReminderParams): SettlementEmail;
   completedShipper(p: CompletedParams): SettlementEmail;
   payoutSentCarrier(p: PayoutSentParams): SettlementEmail;
   disputedShipper(p: DisputedShipperParams): SettlementEmail;
@@ -66,6 +68,24 @@ export function disputeCategoryLabel(locale: SupportedLocale, category: DisputeC
 }
 
 const fr: SettlementEmailDictionary = {
+  ratingReminder: (p) => {
+    const other = p.counterpartFirstName ?? "l'autre membre";
+    return {
+      subject: p.reminderNumber === 1 ? `Pense à noter ${other}` : `Dernier rappel : note ${other}`,
+      content: {
+        preheader: `30 secondes pour dire comment s'est passé ${p.route}.`,
+        title: p.reminderNumber === 1 ? `Pense à noter ${other}` : `Dernier rappel pour noter ${other}`,
+        greeting: `Bonjour ${p.firstName},`,
+        paragraphs: [
+          `Ton deal ${p.route} est terminé. Une note (1 à 5) suffit ; un mot en plus aide vraiment les autres membres à choisir.`,
+          "Ta note reste secrète jusqu'à ce que vous ayez noté tous les deux, ou 14 jours après la fin du deal : personne ne peut répondre à ta note par une autre.",
+          p.reminderNumber === 2 ? "C'est le dernier rappel — après, on ne t'en parle plus." : "On te le rappellera une seule fois de plus.",
+        ],
+        cta: { label: `Noter ${other}`, url: p.rateUrl },
+        reason: "Tu reçois cet email parce qu'un deal Yamba terminé attend ta note (deux rappels au plus).",
+      },
+    };
+  },
   flightArrivedShipper: (p) => {
     const carrier = p.counterpartFirstName ?? "ton Voyageur";
     return {
@@ -98,8 +118,8 @@ const fr: SettlementEmailDictionary = {
             : `La période de vérification de ton colis ${p.route} (${p.weightKg} kg) est terminée sans signalement de ta part. Le paiement de ${carrier} (${p.transport}) est libéré automatiquement.`,
           "Cette transaction est maintenant close : il n'est plus possible d'ouvrir un signalement.",
         ],
-        cta: { label: "Voir mon envoi", url: p.ctaUrl },
-        footnotes: ["Tu pourras bientôt laisser une note à ton Voyageur depuis ton suivi."],
+        cta: { label: `Noter ${carrier}`, url: p.rateUrl },
+        footnotes: ["Une note prend 30 secondes et aide les autres Expéditeurs à choisir. Elle reste secrète jusqu'à ce que vous ayez noté tous les deux, ou 14 jours."],
         reason: "Tu reçois cet email parce que ton envoi Yamba vient d'être clôturé.",
       },
     };
@@ -186,6 +206,24 @@ const fr: SettlementEmailDictionary = {
 };
 
 const en: SettlementEmailDictionary = {
+  ratingReminder: (p) => {
+    const other = p.counterpartFirstName ?? "the other member";
+    return {
+      subject: p.reminderNumber === 1 ? `Remember to rate ${other}` : `Last reminder: rate ${other}`,
+      content: {
+        preheader: `30 seconds to say how ${p.route} went.`,
+        title: p.reminderNumber === 1 ? `Remember to rate ${other}` : `Last reminder to rate ${other}`,
+        greeting: `Hi ${p.firstName},`,
+        paragraphs: [
+          `Your deal ${p.route} is complete. A rating (1 to 5) is enough; a word more really helps other members choose.`,
+          "Your rating stays hidden until you have both rated, or 14 days after the deal ended: nobody can answer a rating with another one.",
+          p.reminderNumber === 2 ? "This is the last reminder — after that, we stop." : "We will remind you only once more.",
+        ],
+        cta: { label: `Rate ${other}`, url: p.rateUrl },
+        reason: "You are receiving this email because a completed Yamba deal is waiting for your rating (two reminders at most).",
+      },
+    };
+  },
   flightArrivedShipper: (p) => {
     const carrier = p.counterpartFirstName ?? "your carrier";
     return {
@@ -218,8 +256,8 @@ const en: SettlementEmailDictionary = {
             : `The verification period for your parcel ${p.route} (${p.weightKg} kg) ended without a report from you. ${carrier}'s payment (${p.transport}) has been released automatically.`,
           "This transaction is now closed: it is no longer possible to open a report.",
         ],
-        cta: { label: "View my shipment", url: p.ctaUrl },
-        footnotes: ["You will soon be able to rate your carrier from your tracking page."],
+        cta: { label: `Rate ${carrier}`, url: p.rateUrl },
+        footnotes: ["A rating takes 30 seconds and helps other shippers choose. It stays hidden until you have both rated, or 14 days."],
         reason: "You are receiving this email because your Yamba shipment has just been closed.",
       },
     };

@@ -73,7 +73,7 @@ export type BookingTransitionAction =
   | "dispute";
 
 /** Opérations gardées SANS transition de statut */
-export type BookingGuardedOperation = "regenerateCode" | "confirmTrackingStep";
+export type BookingGuardedOperation = "regenerateCode" | "confirmTrackingStep" | "rate";
 
 // ─────────────────────────────────────────────
 // Constantes serveur (spec §5.4)
@@ -86,6 +86,8 @@ export const DELIVERY_LOCK_MINUTES = 15;
 export const PAYOUT_DELAY_DAYS = 4;
 /** B4/D51 — litige « non livré » depuis PICKED_UP : dès que le départ du trajet est dépassé de 48 h. */
 export const DISPUTE_AFTER_DEPARTURE_HOURS = 48;
+/** B5/D53 — fenêtre de notation après COMPLETED ; à son terme, les avis sont révélés même si un seul a noté. */
+export const RATING_WINDOW_DAYS = 14;
 
 /** Séquence stricte des jalons de tracking (dans PICKED_UP) */
 export const TRACKING_SEQUENCE = [
@@ -138,6 +140,10 @@ export type BookingLike = {
   payoutDueAt?: Date | string | null;
   /** Départ du trajet (snapshot `trip.departureAt`, UTC — FUS-03) : guard du litige « non livré » (B4/D51). */
   departureAt?: Date | string | null;
+  /** B5 — notation : fenêtre et notes déjà déposées par rôle. */
+  ratingWindowEndsAt?: Date | string | null;
+  shipperRatedAt?: Date | string | null;
+  carrierRatedAt?: Date | string | null;
   deliveryLockedUntil?: Date | string | null;
   deliveryAttempts?: number | null;
   codeRegenerations?: number | null;
@@ -518,6 +524,34 @@ export function canConfirmTrackingStep(
       allowed: false,
       reason: `Tracking steps must be confirmed in order. Next expected step: "${expected}".`,
     };
+  }
+  return { allowed: true };
+}
+
+/**
+ * B5/D53 — noter l'autre partie (opération gardée SANS transition, comme la
+ * régénération du code) : deal COMPLETED, fenêtre de 14 jours ouverte, pas
+ * encore noté par CE rôle. Les deals annulés ou en litige ne se notent pas
+ * (la médiation tranche d'abord — chantier C).
+ */
+export function canRate(
+  booking: BookingLike,
+  role: "SHIPPER" | "CARRIER",
+  now: Date = new Date()
+): BookingOperationCheck {
+  if (booking.isDeleted) {
+    return { allowed: false, reason: "Booking not found." };
+  }
+  if (booking.status !== "COMPLETED") {
+    return { allowed: false, reason: "Only a completed deal can be rated." };
+  }
+  const windowEnd = toDate(booking.ratingWindowEndsAt);
+  if (windowEnd !== null && windowEnd <= now) {
+    return { allowed: false, reason: "The rating window (14 days) has closed." };
+  }
+  const already = role === "SHIPPER" ? toDate(booking.shipperRatedAt) : toDate(booking.carrierRatedAt);
+  if (already !== null) {
+    return { allowed: false, reason: "You have already rated this deal." };
   }
   return { allowed: true };
 }

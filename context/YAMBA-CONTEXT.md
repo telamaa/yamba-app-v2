@@ -280,7 +280,10 @@ Ordre de demarrage : auth -> trip -> gateway.
 - 03/09 : feat/notifications-vivantes (A91) — polling 30 s, copie par evenement
   et role avec prenom servi, cloche = menu + tout marquer lu, email d'atterrissage.
   Suite : B5 Confiance (points a trancher).
-- Plateforme de tests : 677 (trip 198, deal 402, notification 77) + auth 65.
+- 03/09 : B5-PR1 feat/b5-rating-server (D53, A92–A94) — notation double-aveugle
+  (14 j, une fois par role), relances J+5/J+7, reputation denormalisee (D29①),
+  profil public sur avis reveles. Reste PR2 front (ecrans, boutons, niveaux).
+- Plateforme de tests : 693 (trip 198, deal 417, notification 78) + auth 65.
 - (historique) Plateforme de tests : 600 (trip 187, deal 354, notification 59) — post-B3 (#96).
 - MERGE 01/09 : toute la pile B2 est dans `dev` via la SEULE **PR #90**
   (`feat/b2-deal-front` portait la chaîne complète : jalons mobile D36,

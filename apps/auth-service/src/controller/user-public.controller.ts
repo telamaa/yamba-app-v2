@@ -257,7 +257,8 @@ export const getUserPublic: RequestHandler = async (
         : Promise.resolve(0),
 
       prisma.review.findMany({
-        where: { subjectUserId: user.id, kind: ReviewKind.AS_CARRIER },
+        // B5/D53 — seuls les avis RÉVÉLÉS sont publics (double-aveugle)
+        where: { subjectUserId: user.id, kind: ReviewKind.AS_CARRIER, revealedAt: { not: null } },
         orderBy: { createdAt: "desc" },
         take: PREVIEW_REVIEWS_LIMIT,
         include: {
@@ -272,11 +273,11 @@ export const getUserPublic: RequestHandler = async (
       }),
 
       prisma.review.count({
-        where: { subjectUserId: user.id, kind: ReviewKind.AS_CARRIER },
+        where: { subjectUserId: user.id, kind: ReviewKind.AS_CARRIER, revealedAt: { not: null } },
       }),
 
       prisma.review.findMany({
-        where: { subjectUserId: user.id, kind: ReviewKind.AS_SHIPPER },
+        where: { subjectUserId: user.id, kind: ReviewKind.AS_SHIPPER, revealedAt: { not: null } },
         orderBy: { createdAt: "desc" },
         take: PREVIEW_REVIEWS_LIMIT,
         include: {
@@ -291,7 +292,7 @@ export const getUserPublic: RequestHandler = async (
       }),
 
       prisma.review.count({
-        where: { subjectUserId: user.id, kind: ReviewKind.AS_SHIPPER },
+        where: { subjectUserId: user.id, kind: ReviewKind.AS_SHIPPER, revealedAt: { not: null } },
       }),
 
       prisma.userFollow.count({ where: { followedId: user.id } }),
@@ -342,6 +343,27 @@ export const getUserPublic: RequestHandler = async (
       shipperRating: {
         average: user.shipperRatingsAvg,
         count: user.shipperRatingsCount,
+      },
+
+      // B5 / D29① — réputation visible : niveau + faits (calculés par le deal-service, dénormalisés)
+      reputation: {
+        carrier:
+          isCarrier && carrierPage
+            ? {
+                level: carrierPage.reputationLevel ?? "NEW",
+                ratingsAvg: carrierPage.ratingsAvg,
+                ratingsCount: carrierPage.ratingsCount,
+                completedDealsCount: carrierPage.completedDealsCount,
+                lateCancellationsCount: carrierPage.lateCancellationsCount,
+              }
+            : null,
+        shipper: {
+          level: user.shipperReputationLevel ?? "NEW",
+          ratingsAvg: user.shipperRatingsAvg,
+          ratingsCount: user.shipperRatingsCount,
+          completedDealsCount: user.shipperCompletedDealsCount,
+          lateCancellationsCount: user.shipperLateCancellationsCount,
+        },
       },
 
       tripper:

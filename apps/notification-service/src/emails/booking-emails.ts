@@ -53,6 +53,7 @@ type EmailRule =
   | "BOTH"
   | "SHIPPER_PLUS_CARRIER_IF_WAS_ACCEPTED"
   | "SHIPPER_IF_FLIGHT_ARRIVED"
+  | "TARGET_ROLE"
   | null;
 
 export const EMAIL_MATRIX: Record<BookingEventKey, EmailRule> = {
@@ -72,7 +73,7 @@ export const EMAIL_MATRIX: Record<BookingEventKey, EmailRule> = {
   "booking.payout_sent": "CARRIER", // B4/D52 : montant net, « parti vers ton compte, 2 à 7 jours »
   "booking.disputed": "BOTH", // B4/D52 : accusé à l'Expéditeur, information calme au Voyageur
   "booking.verification_reminder": "SHIPPER", // B4/A70 : J+3, dernier jour
-  "booking.rating_reminder": null, // à venir (writer B5)
+  "booking.rating_reminder": "TARGET_ROLE", // B5 (décision 4A) : J+5 et J+7 au rôle qui n'a pas noté, puis silence
   "booking.rating_revealed": null, // JAMAIS : in-app seul
 };
 
@@ -96,6 +97,8 @@ export function resolveEmailRecipients(
       return [carrier];
     case "BOTH":
       return [shipper, carrier];
+    case "TARGET_ROLE":
+      return event.eventType === "booking.rating_reminder" ? [event.payload.targetRole === "CARRIER" ? carrier : shipper] : [];
     case "SHIPPER_IF_FLIGHT_ARRIVED":
       return event.eventType === "booking.tracking_event" && event.payload.step === "FLIGHT_ARRIVED" ? [shipper] : [];
     case "SHIPPER_PLUS_CARRIER_IF_WAS_ACCEPTED":
@@ -393,6 +396,7 @@ export function buildBookingEmail(
         ...base,
         transport: formatMoney(p.transportCents, p.currencyCode, locale),
         completedBy: event.payload.completedBy === "SHIPPER" ? "SHIPPER" : "SYSTEM",
+        rateUrl: `${ctaUrl}/rate`, // B5 (4A) : le bouton « Noter » revient
       });
       return { subject: built.subject, template: "settlement/completed-shipper", data: {}, content: built.content };
     }
@@ -420,6 +424,10 @@ export function buildBookingEmail(
         data: {},
         content: built.content,
       };
+    }
+    case "booking.rating_reminder": {
+      const built = SETTLEMENT_EMAILS[locale].ratingReminder({ ...base, reminderNumber: event.payload.reminderNumber, rateUrl: `${ctaUrl}/rate` });
+      return { subject: built.subject, template: `settlement/rating-reminder-${role.toLowerCase()}`, data: {}, content: built.content };
     }
     case "booking.verification_reminder": {
       const built = SETTLEMENT_EMAILS[locale].verificationReminderShipper({

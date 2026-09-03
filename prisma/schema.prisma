@@ -33,8 +33,12 @@ model User {
   publicSlug String? @unique
 
   // Stats shipper (notes reçues en tant qu'expéditeur)
-  shipperRatingsAvg   Float @default(0)
+  shipperRatingsAvg   Float @default(0) // B5 : avis révélés seulement
   shipperRatingsCount Int   @default(0)
+  // B5 / D29① — miroir Expéditeur (« Expéditeur fiable »)
+  shipperReputationLevel        String? // "NEW" | "CONFIRMED" | "TOP"
+  shipperCompletedDealsCount    Int     @default(0)
+  shipperLateCancellationsCount Int     @default(0) // annulations tardives ANN-01 (retenue > 0)
   parcelsSentCount    Int   @default(0)
 
   // Carrier onboarding
@@ -142,8 +146,12 @@ model CarrierPage {
   totalTripsPublished Int   @default(0)
   totalParcelsCarried Int   @default(0)
   totalTripsCancelled Int   @default(0)
-  ratingsAvg          Float @default(0)
+  ratingsAvg          Float @default(0) // B5 : moyenne des avis RÉVÉLÉS seulement
   ratingsCount        Int   @default(0)
+  // B5 / D29① — réputation visible, calculée serveur (reputation.service), critères affichés
+  reputationLevel        String? // "NEW" | "CONFIRMED" | "TOP"
+  completedDealsCount    Int     @default(0)
+  lateCancellationsCount Int     @default(0) // annulations Voyageur après acceptation (ANN-02)
 
   // Relations
   trips Trip[]
@@ -178,14 +186,19 @@ model Review {
 
   kind ReviewKind
 
-  bookingId String? @db.ObjectId
+  bookingId String? @db.ObjectId // B5 : toujours posé (une note par rôle et par deal, garde service)
 
   rating  Float
   comment String?
+  /// B5 — critères optionnels en pouces : { PUNCTUALITY: "UP", PARCEL_CARE: "DOWN", … }
+  criteria Json?
+  /// B5 — double-aveugle (D53) : null tant que l'autre n'a pas noté (ou 14 j) ; seuls les avis révélés sont publics
+  revealedAt DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@index([bookingId])
   @@index([subjectUserId])
   @@index([authorUserId])
   @@index([subjectUserId, kind])
@@ -760,6 +773,13 @@ model Booking {
   disputeTicket String? // YAM-XXXX (copie du Dispute.ticketNumber pour les listes)
   disputedAt    DateTime?
 
+  // ─── Notation mutuelle (B5, D53) ───
+  ratingWindowEndsAt   DateTime? // completedAt + 14 j : fin de la fenêtre de notation ET révélation forcée
+  shipperRatedAt       DateTime? // l'Expéditeur a noté le Voyageur
+  carrierRatedAt       DateTime? // le Voyageur a noté l'Expéditeur
+  ratingsRevealedAt    DateTime? // double-aveugle levé (les deux ont noté, ou 14 j)
+  ratingRemindersSent  Int       @default(0) // J+5 puis J+7, puis silence
+
   // ─── Lifecycle / RGPD ───
   isDeleted Boolean   @default(false)
   deletedAt DateTime?
@@ -772,6 +792,7 @@ model Booking {
   @@index([status, expiresAt]) // cron expiration 24h (B2)
   @@index([status, payoutDueAt]) // cron versement J+4 (B4)
   @@index([status, payoutStatus]) // rejeu des versements FAILED (B4, A66)
+  @@index([status, ratingWindowEndsAt]) // cron notation : relances J+5/J+7, révélation à 14 j (B5)
 }
 
 // ─────────────────────────────────────────────
