@@ -29,6 +29,8 @@ type Props = {
   redirectTo: string | null;
   rememberMe?: boolean;
   text?: "signin_with" | "signup_with" | "continue_with";
+  /** A63 — connexion dans la page : remplace la navigation vers redirectTo. */
+  onSuccessAction?: () => void;
 };
 
 type Pending = { credential: string; profile: Extract<GoogleSignInResponse, { status: "CONSENT_REQUIRED" }>["profile"] };
@@ -44,7 +46,7 @@ function GoogleIcon() {
   );
 }
 
-export default function GoogleSignInButton({ redirectTo, rememberMe = false, text = "continue_with" }: Props) {
+export default function GoogleSignInButton({ redirectTo, rememberMe = false, text = "continue_with", onSuccessAction }: Props) {
   const t = useTranslations("auth.google");
   const locale = useLocale();
   const router = useRouter();
@@ -60,6 +62,10 @@ export default function GoogleSignInButton({ redirectTo, rememberMe = false, tex
     if (result.created) toast.success(t("created", { firstName: result.user.firstName }));
     else if (result.linked) toast.success(t("linked"));
     else toast.success(t("welcomeBack", { firstName: result.user.firstName }));
+    if (onSuccessAction) {
+      onSuccessAction();
+      return;
+    }
     router.push(redirectTo || "/");
     router.refresh();
   };

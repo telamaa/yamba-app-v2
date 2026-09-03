@@ -4,19 +4,21 @@
  * AuthGateModal — la porte d'identité SANS quitter la page (A58, A60)
  * ===================================================================
  * Un visiteur non connecté qui tente une action réservée (réserver, partager
- * un trajet…) voit la porte dans une MODALE (dialogue centré sur desktop,
- * feuille du bas sur mobile) au-dessus de la page, jamais une page blanche.
- * Le texte est celui de l'ACTION (title / subtitle) ; les boutons sont
- * communs (`common.authGate`). Après connexion ou inscription, retour sur
- * `redirect` (l'intention de départ). Le serveur reste seul juge (CNF-05).
+ * un trajet, mettre en favori…) voit la porte dans une MODALE (dialogue
+ * centré sur desktop, feuille du bas sur mobile) au-dessus de la page, jamais
+ * une page blanche. A63 : la modale embarque LE FORMULAIRE DE CONNEXION
+ * (e-mail / mot de passe, Google, Facebook) — aucune redirection. Après
+ * connexion : `onSignedInAction` si fourni (l'appelant reprend son geste),
+ * sinon navigation vers `redirect` (l'intention de départ). L'inscription
+ * reste une page (lien avec retour). Le serveur reste seul juge (CNF-05).
  */
 import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useTranslations } from "next-intl";
 import { Lock, X } from "lucide-react";
 import { useRouter } from "@/i18n/navigation";
-import { withRedirect } from "@/lib/auth/safe-redirect";
 import { useIsMobile } from "@/hooks/useIsMobile";
+import LoginForm from "@/components/auth/forms/LoginForm";
 
 type Props = {
   open: boolean;
@@ -26,13 +28,24 @@ type Props = {
   subtitle: string;
   /** Chemin interne de retour après connexion / inscription. */
   redirect: string;
+  /** A63 — après connexion DANS la modale : reprendre le geste (sinon navigation vers `redirect`). */
+  onSignedInAction?: () => void;
 };
 
-export default function AuthGateModal({ open, onCloseAction, title, subtitle, redirect }: Props) {
+export default function AuthGateModal({ open, onCloseAction, title, subtitle, redirect, onSignedInAction }: Props) {
   const t = useTranslations("common.authGate");
   const router = useRouter();
   const isMobile = useIsMobile();
-  const primaryRef = useRef<HTMLButtonElement | null>(null);
+  const panelRef = useRef<HTMLDivElement | null>(null);
+
+  const handleSignedIn = () => {
+    onCloseAction();
+    if (onSignedInAction) onSignedInAction();
+    else {
+      router.push(redirect);
+      router.refresh();
+    }
+  };
 
   // ESC ferme, focus sur l'action principale, scroll du fond verrouillé.
   useEffect(() => {
@@ -43,7 +56,10 @@ export default function AuthGateModal({ open, onCloseAction, title, subtitle, re
     document.addEventListener("keydown", onKey);
     const original = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    const raf = requestAnimationFrame(() => primaryRef.current?.focus());
+    const raf = requestAnimationFrame(() => {
+      const first = panelRef.current?.querySelector<HTMLElement>("input, button");
+      first?.focus();
+    });
     return () => {
       document.removeEventListener("keydown", onKey);
       document.body.style.overflow = original;
@@ -53,14 +69,11 @@ export default function AuthGateModal({ open, onCloseAction, title, subtitle, re
 
   if (!open || typeof document === "undefined") return null;
 
-  const goLogin = () => router.push(withRedirect("/login", redirect));
-  const goRegister = () => router.push(withRedirect("/register", redirect));
-
   const panelBase =
     "w-full bg-white text-left shadow-2xl dark:bg-slate-950 " +
     (isMobile
-      ? "rounded-t-3xl px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-3"
-      : "max-w-md rounded-3xl p-6");
+      ? "max-h-[92vh] overflow-y-auto rounded-t-3xl px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-3"
+      : "max-h-[92vh] max-w-md overflow-y-auto rounded-3xl p-6");
 
   // Portail vers <body> : la porte peut être déclenchée DEPUIS une carte-lien
   // (cœur favori) — rendue dans l'ancre, chaque clic naviguerait.
@@ -80,7 +93,7 @@ export default function AuthGateModal({ open, onCloseAction, title, subtitle, re
         className="absolute inset-0 bg-slate-900/50 backdrop-blur-[2px]"
       />
 
-      <div className={`relative ${panelBase}`}>
+      <div ref={panelRef} className={`relative ${panelBase}`}>
         {isMobile ? (
           <div className="mx-auto mb-3 h-1.5 w-10 rounded-full bg-slate-300 dark:bg-slate-700" aria-hidden />
         ) : (
@@ -108,30 +121,18 @@ export default function AuthGateModal({ open, onCloseAction, title, subtitle, re
           </div>
         </div>
 
-        <div className="mt-5 flex flex-col gap-2.5">
-          <button
-            ref={primaryRef}
-            type="button"
-            onClick={goLogin}
-            className="w-full rounded-full bg-[#FF9900] px-5 py-3 text-sm font-bold text-slate-950 transition-all hover:brightness-95 active:scale-[0.99]"
-          >
-            {t("login")}
-          </button>
-          <button
-            type="button"
-            onClick={goRegister}
-            className="w-full rounded-full border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-800 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:text-slate-100 dark:hover:bg-slate-900"
-          >
-            {t("register")}
-          </button>
-          <button
-            type="button"
-            onClick={onCloseAction}
-            className="mt-1 text-center text-xs font-medium text-slate-500 underline-offset-4 hover:underline dark:text-slate-400"
-          >
-            {t("later")}
-          </button>
+        {/* A63 — le formulaire de connexion lui-même (e-mail, Google, Facebook, lien inscription) */}
+        <div className="mt-4">
+          <LoginForm variant="modal" redirectOverride={redirect} onSuccessAction={handleSignedIn} />
         </div>
+
+        <button
+          type="button"
+          onClick={onCloseAction}
+          className="mt-4 block w-full text-center text-xs font-medium text-slate-500 underline-offset-4 hover:underline dark:text-slate-400"
+        >
+          {t("later")}
+        </button>
       </div>
     </div>,
     document.body

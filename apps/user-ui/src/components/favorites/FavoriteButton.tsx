@@ -38,6 +38,17 @@ export default function FavoriteButton({ tripId, isFavorite, variant = "card", c
   const toggle = useToggleFavorite();
   const [gateOpen, setGateOpen] = useState(false);
 
+
+  const active = !!isFavorite;
+  const label = active ? t("remove") : t("add");
+
+  const failWith = (error: unknown) => {
+    const details = getApiErrorData(error).details as { type?: string; code?: string } | undefined;
+    if (details?.type === "favorite" && details.code === "OWN_TRIP") toast.error(t("ownTrip"));
+    else if (details?.type === "favorite" && details.code === "TRIP_NOT_FAVORITABLE") toast.error(t("notFavoritable"));
+    else toast.error(t("error"));
+  };
+
   const gate = (
     <AuthGateModal
       open={gateOpen}
@@ -45,11 +56,9 @@ export default function FavoriteButton({ tripId, isFavorite, variant = "card", c
       title={tGate("title")}
       subtitle={tGate("subtitle")}
       redirect={pathname || "/search"}
+      onSignedInAction={() => toggle.mutate({ tripId, next: true }, { onError: (error) => failWith(error) })}
     />
   );
-
-  const active = !!isFavorite;
-  const label = active ? t("remove") : t("add");
 
   const onClick = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -59,17 +68,7 @@ export default function FavoriteButton({ tripId, isFavorite, variant = "card", c
       setGateOpen(true);
       return;
     }
-    toggle.mutate(
-      { tripId, next: !active },
-      {
-        onError: (error) => {
-          const details = getApiErrorData(error).details as { type?: string; code?: string } | undefined;
-          if (details?.type === "favorite" && details.code === "OWN_TRIP") toast.error(t("ownTrip"));
-          else if (details?.type === "favorite" && details.code === "TRIP_NOT_FAVORITABLE") toast.error(t("notFavoritable"));
-          else toast.error(t("error"));
-        },
-      }
-    );
+    toggle.mutate({ tripId, next: !active }, { onError: (error) => failWith(error) });
   };
 
   const iconClass = active ? "fill-[#FF9900] text-[#FF9900]" : "text-slate-500 dark:text-slate-400";

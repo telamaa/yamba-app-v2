@@ -261,6 +261,12 @@ Objectif produit assumé : **solide, propre, pro, secure, long terme** — les f
 |---|---|---|---|---|
 | A62 | **« Rester connecté » est DÉCOCHÉ par défaut, et la case dit ce qu'elle fait.** Recette 03/09 : « l'utilisateur reste indéfiniment connecté ». Le serveur applique bien D27 (standard : 60 min d'inactivité, 7 j max ; rememberMe : 7 j d'inactivité, 30 j max ; rotation qui ne repousse jamais le plafond ; cookie de session sans `maxAge` hors rememberMe) — mais la case était cochée par défaut, donc chaque connexion de recette était une session « 7 jours ». Correctif : `remember: false` par défaut, libellé « Rester connecté sur cet appareil » + aide « Coché : 7 jours sans activité. Sinon : déconnexion après 60 minutes sans activité. » Aucune valeur de D27 ne change | Un défaut coché transforme un choix de confort en comportement par défaut invisible ; l'utilisateur doit comprendre la durée qu'il accepte | Les testeurs devront cocher la case pour les recettes longues ; le chemin Google ouvre une session standard (pas de case) | `fix/session-remember-default` |
 
+## 2bis.16 — Session `feat/auth-gate-inline-login` (connexion DANS la porte) — A63
+
+| # | Arbitrage | Pourquoi | Compromis | PR |
+|---|---|---|---|---|
+| A63 | **La porte d'identité contient le formulaire de connexion, pas des boutons vers lui.** `AuthGateModal` embarque `LoginForm` en variante `modal` (mêmes champs, mêmes erreurs traduites, même bouton Google officiel, Facebook inerte, lien « Inscris-toi » avec retour) : ZÉRO redirection pour se connecter au moment d'un geste. Après connexion (mot de passe ou Google), `onSignedInAction` reprend le geste sans quitter la page (le cœur favori met le trajet en favori immédiatement) ; sans reprise fournie, navigation vers `redirect` (réserver → wizard, partager → création). Le formulaire de connexion reste UN composant (`LoginForm`, variante `page` | `modal`) — pas de copie | Un visiteur décidé ne doit pas changer de page pour prouver qui il est ; deux formulaires de connexion divergeraient (A60 : généraliser à la 2e occurrence) | L'inscription reste une page (formulaire long, OTP) ; les `id` des champs (`email`, `password`) sont partagés page/modale — jamais les deux à la fois | `feat/auth-gate-inline-login` |
+
 ---
 
 # 3. Roadmap maîtresse
