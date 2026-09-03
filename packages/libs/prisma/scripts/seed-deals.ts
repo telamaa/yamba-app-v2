@@ -443,6 +443,9 @@ async function main() {
         where: { id: booking.id },
         data: {
           completedBy: "SYSTEM",
+          // B5 : fenêtre de notation ouverte (14 j après completedAt) — recette de la notation
+          ratingWindowEndsAt: new Date((m.completedAt ?? NOW).getTime() + 14 * 86_400_000),
+          ratingRemindersSent: 0,
           payoutStatus: "SENT",
           payoutAmountCents: (booking as unknown as { pricing: { transportCents: number } }).pricing.transportCents,
           payoutSentAt: m.completedAt ?? NOW,

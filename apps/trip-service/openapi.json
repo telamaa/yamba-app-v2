@@ -11495,6 +11495,351 @@
         "additionalProperties": false,
         "description": "Finances page — both roles, totals computed server-side (A83)"
       },
+      "RatingCriterion": {
+        "type": "string",
+        "enum": [
+          "PUNCTUALITY",
+          "COMMUNICATION",
+          "PARCEL_CARE",
+          "DECLARATION_CLARITY",
+          "RESPONSIVENESS"
+        ],
+        "description": "Optional thumbs criteria — carrier: punctuality, communication, parcel care · shipper: declaration clarity, responsiveness, punctuality"
+      },
+      "RatingVote": {
+        "type": "string",
+        "enum": [
+          "UP",
+          "DOWN"
+        ]
+      },
+      "SubmitRatingRequest": {
+        "type": "object",
+        "properties": {
+          "rating": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5,
+            "description": "1 (disappointing) … 5 (excellent) — the only required field"
+          },
+          "criteria": {
+            "description": "Optional thumbs, only the criteria of the rated role are kept",
+            "type": "object",
+            "propertyNames": {
+              "$ref": "#/components/schemas/RatingCriterion"
+            },
+            "additionalProperties": {
+              "$ref": "#/components/schemas/RatingVote"
+            },
+            "required": [
+              "PUNCTUALITY",
+              "COMMUNICATION",
+              "PARCEL_CARE",
+              "DECLARATION_CLARITY",
+              "RESPONSIVENESS"
+            ]
+          },
+          "comment": {
+            "description": "Public, attributed, immutable — 280 chars max",
+            "type": "string",
+            "maxLength": 280
+          }
+        },
+        "required": [
+          "rating"
+        ],
+        "additionalProperties": false
+      },
+      "MyRating": {
+        "type": "object",
+        "properties": {
+          "rating": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "criteria": {
+            "anyOf": [
+              {
+                "type": "object",
+                "propertyNames": {
+                  "$ref": "#/components/schemas/RatingCriterion"
+                },
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/RatingVote"
+                },
+                "required": [
+                  "PUNCTUALITY",
+                  "COMMUNICATION",
+                  "PARCEL_CARE",
+                  "DECLARATION_CLARITY",
+                  "RESPONSIVENESS"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "submittedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          }
+        },
+        "required": [
+          "rating",
+          "criteria",
+          "comment",
+          "submittedAt"
+        ],
+        "additionalProperties": false
+      },
+      "RatingContextResponse": {
+        "type": "object",
+        "properties": {
+          "bookingId": {
+            "$ref": "#/components/schemas/ObjectId"
+          },
+          "viewerRole": {
+            "$ref": "#/components/schemas/BookingViewerRole"
+          },
+          "ratedRole": {
+            "description": "The role being rated (opposite of viewerRole) — drives the criteria set",
+            "$ref": "#/components/schemas/BookingViewerRole"
+          },
+          "person": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "$ref": "#/components/schemas/ObjectId"
+              },
+              "firstName": {
+                "type": "string"
+              },
+              "lastInitial": {
+                "type": "string"
+              },
+              "avatarUrl": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "firstName",
+              "lastInitial",
+              "avatarUrl"
+            ],
+            "additionalProperties": false
+          },
+          "corridor": {
+            "type": "object",
+            "properties": {
+              "originCity": {
+                "type": "string"
+              },
+              "destinationCity": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "originCity",
+              "destinationCity"
+            ],
+            "additionalProperties": false
+          },
+          "completedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "windowEndsAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "completedAt + 14 days: rating closes and reviews are revealed"
+          },
+          "canRate": {
+            "type": "boolean",
+            "description": "Server verdict (state machine): COMPLETED, within the window, not rated yet by this role"
+          },
+          "cannotRateReason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "myRating": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MyRating"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "counterpartHasRated": {
+            "type": "boolean"
+          },
+          "revealedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Double-blind lifted: both rated, or window elapsed"
+          },
+          "counterpartRating": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MyRating"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "bookingId",
+          "viewerRole",
+          "ratedRole",
+          "person",
+          "corridor",
+          "completedAt",
+          "windowEndsAt",
+          "canRate",
+          "cannotRateReason",
+          "myRating",
+          "counterpartHasRated",
+          "revealedAt",
+          "counterpartRating"
+        ],
+        "additionalProperties": false,
+        "description": "Everything the rating screen needs — the frontend reflects, never decides"
+      },
+      "SubmitRatingResponse": {
+        "type": "object",
+        "properties": {
+          "bookingId": {
+            "$ref": "#/components/schemas/ObjectId"
+          },
+          "submittedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          },
+          "revealed": {
+            "type": "boolean",
+            "description": "true when the counterpart had already rated → both reviews revealed now"
+          },
+          "revealedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "bookingId",
+          "submittedAt",
+          "revealed",
+          "revealedAt"
+        ],
+        "additionalProperties": false
+      },
+      "ReputationLevel": {
+        "type": "string",
+        "enum": [
+          "NEW",
+          "CONFIRMED",
+          "TOP"
+        ],
+        "description": "Public reputation level, computed server-side from explainable facts (D29①). Carrier: NEW < 3 completed deals · CONFIRMED ≥ 3 · TOP ≥ 10 deals, revealed average ≥ 4.8, 0 post-acceptance cancellation. Shipper mirror ('reliable'): CONFIRMED ≥ 3 · TOP ≥ 5 deals, ≥ 4.8, 0 late cancellation. Thresholds are server parameters."
+      },
+      "ReputationSummary": {
+        "type": "object",
+        "properties": {
+          "level": {
+            "$ref": "#/components/schemas/ReputationLevel"
+          },
+          "ratingsAvg": {
+            "type": "number",
+            "description": "Average of REVEALED reviews only (double-blind)"
+          },
+          "ratingsCount": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "completedDealsCount": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "lateCancellationsCount": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "level",
+          "ratingsAvg",
+          "ratingsCount",
+          "completedDealsCount",
+          "lateCancellationsCount"
+        ],
+        "additionalProperties": false,
+        "description": "Badges + statistics, never an opaque score (D29①)"
+      },
       "NotificationType": {
         "anyOf": [
           {

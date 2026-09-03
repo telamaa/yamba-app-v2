@@ -56,6 +56,7 @@ import {
   toBookingForWrite,
   type BookingForWrite,
 } from "./booking-write";
+import { recomputeBookingParties } from "./reputation.service";
 
 export type RequestingUser = { id: string };
 
@@ -358,6 +359,9 @@ export function makeDealLifecycleService(
           // L'état FAILED est écrit par l'exécuteur ; le cron reprend.
         }
       }
+
+      // D29① — une annulation tardive est un fait de réputation (Expéditeur).
+      if (retention) await recomputeBookingParties(booking);
 
       return transitionResponse(booking, to, refundAmountCents);
     },

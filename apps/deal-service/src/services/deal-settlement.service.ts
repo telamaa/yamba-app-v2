@@ -37,7 +37,8 @@ import type {
   DisputeDealRequest,
   DisputeDealResponse,
 } from "@packages/api-contracts";
-import { canPerform, type BookingStatus, type BookingTransitionAction } from "./booking-state-machine";
+import { RATING_WINDOW_DAYS, canPerform, type BookingStatus, type BookingTransitionAction } from "./booking-state-machine";
+import { recomputeBookingParties } from "./reputation.service";
 import { BookingLifecycleError, baseEventPayload } from "./booking-lifecycle";
 import {
   BOOKING_WRITE_SELECT,
@@ -141,6 +142,9 @@ export function makeDealSettlementService(
         payoutStatus: "PENDING",
         payoutAmountCents: booking.pricing.transportCents, // D50 — le net du snapshot
         payoutFailureReason: null,
+        // B5/D53 — la fenêtre de notation s'ouvre à la fin de transaction.
+        ratingWindowEndsAt: new Date(now.getTime() + RATING_WINDOW_DAYS * 86_400_000),
+        ratingRemindersSent: 0,
       },
       releaseKg: false,
       events: [
@@ -151,6 +155,8 @@ export function makeDealSettlementService(
       ],
       now,
     });
+    // D29① — « deals terminés » est un fait de réputation : recalcul best-effort.
+    await recomputeBookingParties(booking);
   }
 
   /* ── Le versement : l'exécuteur unique (A65) ─────────────────── */

@@ -1030,3 +1030,26 @@ La section Finances était une promesse : deux onglets vides et une maquette aux
 | N6 | Versement parti / compensation | Voyageur : « {montant} partis vers ton compte » ou « {montant} de compensation partis » |
 | N7 | Notification système « virement refusé » (seed impossible, Stripe test) | Listée sans lien, titre « Virement bancaire refusé : vérifie ton RIB » ; la liste ne casse pas |
 | N8 | Mobile | Badge sur la cloche, lien vers la page, mêmes titres |
+
+# B5-PR1 — la notation mutuelle, double-aveugle, et la réputation qui s'explique
+
+### Règles de gestion (NOTE)
+- **RG-NOTE-01 — Chaque partie note l'autre, une fois, sur un deal terminé, dans les 14 jours.** Une note de 1 à 5 suffit ; critères et commentaire sont facultatifs. Pas de note sur un deal annulé ni en litige.
+- **RG-NOTE-02 — La note reste secrète jusqu'à ce que les deux aient noté, ou 14 jours.** Personne ne peut répondre à une note par une autre. À l'échéance, les notes déposées sont révélées même si une seule existe.
+- **RG-NOTE-03 — Seules les notes révélées sont publiques et comptent** dans la moyenne, le nombre d'avis et le niveau.
+- **RG-NOTE-04 — Deux rappels, puis silence** : J+5 et J+7 après la fin de transaction, aux seuls rôles qui n'ont pas noté, dans l'application et par email. « Plus tard » toujours possible.
+- **RG-NOTE-05 — Un commentaire est public, attribué au prénom, non modifiable**, 280 caractères au plus.
+- **RG-NOTE-06 — Les critères appartiennent au rôle noté** (Voyageur : ponctualité, communication, soin du colis ; Expéditeur : clarté de la déclaration, réactivité, ponctualité) ; un critère hors rôle est ignoré.
+- **RG-NOTE-07 — La réputation s'explique** : un niveau avec ses critères affichés (Nouveau, Confirmé, Top Voyageur / Expéditeur fiable) et des faits (deals terminés, annulations fautives, moyenne des avis révélés). Jamais de score opaque, et aucun effet sur le prix pour l'instant.
+
+### Recette (API, en attendant PR2)
+| # | Scénario | Attendu |
+|---|---|---|
+| NOTE1 | Expéditrice, deal COMPLETED (seed `bzv-completed`), `POST /deals/:id/rating {rating:5, comment}` | 201 `revealed:false` ; `GET /deals/:id/rating` : `myRating` présent, `counterpartRating` null, `canRate` false « already rated » |
+| NOTE2 | Voyageur, même deal, `GET` | `counterpartHasRated:true`, `counterpartRating` null (secret), `canRate:true` |
+| NOTE3 | Voyageur note à son tour | 201 `revealed:true` ; les deux `GET` montrent la note de l'autre ; in-app « Les notes sont révélées » des deux côtés ; profil public : moyenne, nombre, niveau mis à jour |
+| NOTE4 | Une seconde note du même rôle | 409 « already rated » |
+| NOTE5 | Deal DISPUTED ou CANCELLED | 409 « Only a completed deal can be rated » |
+| NOTE6 | Deal COMPLETED depuis 5 jours, une seule partie a noté, cron | Rappel in-app + email « Pense à noter … » au rôle muet seulement ; à J+7 « Dernier rappel » ; rien ensuite |
+| NOTE7 | Deal COMPLETED depuis 14 jours, une seule note | Note révélée (événement WINDOW_ELAPSED), visible sur le profil ; sans aucune note : fenêtre fermée en silence |
+| NOTE8 | Profil public d'un Voyageur avec 10 deals terminés, moyenne révélée ≥ 4,8, 0 annulation | `reputation.carrier.level = TOP`, badge « Top Voyageur » (`isSuperCarrier`) sur les cartes de recherche |

@@ -1310,3 +1310,21 @@ deal-service **402** (399 + 3 : rejeu par Voyageur, renversement, digest) · not
 
 ### Preuves
 notification-service **77** (+1) · tsc user-ui + notification-service · miroir i18n · OpenAPI régénéré · `/fr/dashboard/notifications` en 200. Recette N1–N8 (`YAMBA-DOC-METIER.md`, RG-NOT-01…05).
+
+# B5-PR1 — `feat/b5-rating-server` : notation double-aveugle et réputation (D53, A92–A94)
+
+## Ce qui a été fait
+
+1. **Prisma** : Booking + `ratingWindowEndsAt`, `shipperRatedAt`, `carrierRatedAt`, `ratingsRevealedAt`, `ratingRemindersSent`, index `[status, ratingWindowEndsAt]` ; Review + `criteria Json?`, `revealedAt`, index `bookingId` ; CarrierPage + `reputationLevel`, `completedDealsCount`, `lateCancellationsCount` ; User + `shipperReputationLevel`, `shipperCompletedDealsCount`, `shipperLateCancellationsCount`. `prisma db push` joué.
+2. **Contrats** (`booking-rating.schema.ts`) : `SubmitRatingRequest` (rating 1–5 entier, `criteria` record, `comment` ≤ 280), `RatingContextResponse` (rôles, personne, `canRate` + raison, `myRating`, `counterpartHasRated`, `revealedAt`, `counterpartRating` nul tant que non révélé), `SubmitRatingResponse`, `ReputationLevel`, `REPUTATION_PARAMS`, `ReputationSummary`, constantes `RATING_WINDOW_DAYS`, `RATING_REMINDER_DAYS`, critères par rôle.
+3. **Machine** : `canRate` (opération gardée, A92) + `BookingLike` étendu ; spec S12.
+4. **`deal-rating.service.ts`** : `getContext`, `submit` (transaction Review + marquage, révélation immédiate si l'autre a noté + `booking.rating_revealed`, critères filtrés par rôle noté, unicité de service), `sendRatingReminders` (J+5/J+7, garde sur `ratingRemindersSent`), `revealElapsed` (14 j, WINDOW_ELAPSED, silencieux sans note). **`reputation.service.ts`** : `computeReputationLevel` / `averageOf` (purs), `recomputeReputation`, `recomputeBookingParties` (best-effort) — appelé à la révélation, à COMPLETED (settlement) et à l'annulation tardive (lifecycle). Contrôleur, routes `GET/POST /deals/:id/rating`, cron `rating.cron.ts` (horaire), `main.ts`, `.env.example` (`RATING_CRON_ENABLED`), OpenAPI.
+5. **notification-service** : `rating_reminder` → email au rôle cible (règle `TARGET_ROLE`, dictionnaire `ratingReminder`, « dernier rappel » à J+7) ; l'email de fin de transaction porte le bouton « Noter {prénom} » (décision 4A) ; spec 78.
+6. **auth-service** : profil public → `reputation.{carrier, shipper}` (niveau + faits) ; avis et compteurs limités aux avis révélés. `repair-legacy-reviews.ts` joué (0 avis historique en base).
+7. **Seed** : `ratingWindowEndsAt` posé sur les COMPLETED (notation jouable en recette).
+
+### Preuves
+deal-service **417** (402 + 10 rating + 3 réputation + 2 machine) · notification **78** (+1) · auth 65 · tsc ×3 · OpenAPI régénéré · `prisma db push` + seed rejoués. Recette NOTE1–NOTE8 (`YAMBA-DOC-METIER.md`, RG-NOTE-01…07) — via API jusqu'à PR2.
+
+### Reste
+**B5-PR2 front** : `rating.api.ts` réel (`GET/POST /deals/:id/rating`), écrans de notation branchés (les deux rôles), boutons « Noter » (terminé, listes, accueil), état « note envoyée, révélée quand … », affichage des niveaux et faits sur le profil public et les cartes (« Top Voyageur » = `isSuperCarrier`, « Expéditeur fiable »), lien « Signaler cet avis » (mailto).

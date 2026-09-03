@@ -284,6 +284,22 @@ describe("matrice email (A35)", () => {
     }
   });
 
+  it("B5 : rating_reminder → le rôle CIBLE seul, J+5 puis « dernier rappel » ; completed porte le bouton « Noter »", () => {
+    const rem = (n: 1 | 2, targetRole: "SHIPPER" | "CARRIER") =>
+      parse(envelope("booking.rating_reminder", { ...basePayload(), actor: "SYSTEM" as const, reminderNumber: n, targetRole }));
+    expect(resolveEmailRecipients(rem(1, "CARRIER"))).toEqual([{ userId: OID.carrier, role: "CARRIER" }]);
+    expect(resolveEmailRecipients(rem(2, "SHIPPER"))).toEqual([{ userId: OID.shipper, role: "SHIPPER" }]);
+    const first = buildBookingEmail(rem(1, "CARRIER"), "CARRIER", "Thomas", { locale: "fr", counterpartFirstName: "Naomi" })!;
+    expect(first.subject).toBe("Pense à noter Naomi");
+    expect(first.content!.cta!.url).toMatch(/\/carrier\/deals\/.*\/rate$/);
+    const last = buildBookingEmail(rem(2, "SHIPPER"), "SHIPPER", "Naomi", { locale: "en" })!;
+    expect(last.subject).toContain("Last reminder");
+    expect(last.content!.cta!.url).toMatch(/\/bookings\/.*\/rate$/);
+    const completed = buildBookingEmail(parse(completedEvent()), "SHIPPER", "Naomi", { locale: "fr", counterpartFirstName: "Thomas" })!;
+    expect(completed.content!.cta!.label).toBe("Noter Thomas");
+    expect(completed.content!.cta!.url).toMatch(/\/rate$/);
+  });
+
   it("tracking_event : aucun email pour AT_AIRPORT / FLIGHT_DEPARTED (anti-spam) ; l'ATTERRISSAGE écrit à l'Expéditeur (décision 03/09, 4A)", () => {
     const step = (s: string) =>
       parse(envelope("booking.tracking_event", { ...basePayload(), actor: "CARRIER" as const, step: s, confirmedAt: "2026-07-19T12:00:00.000Z" }));
@@ -333,6 +349,8 @@ describe("matrice email (A35)", () => {
         "booking.payout_sent": payoutSentEvent(),
         "booking.disputed": disputedEvent(),
         "booking.verification_reminder": verificationReminderEvent(),
+        // B5 : rappel de notation au rôle cible
+        "booking.rating_reminder": envelope("booking.rating_reminder", { ...basePayload(), actor: "SYSTEM" as const, reminderNumber: 1, targetRole: "CARRIER" }),
         // 4A : la règle n'est non-null que pour l'atterrissage
         "booking.tracking_event": envelope("booking.tracking_event", { ...basePayload(), actor: "CARRIER" as const, step: "FLIGHT_ARRIVED", confirmedAt: "2026-07-19T12:00:00.000Z" }),
       };
@@ -409,8 +427,8 @@ describe("B4 (D52) — completed / payout_sent / disputed / verification_reminde
       expect(completed.content).toBeDefined();
       expect(completed.content!.greeting).toContain("Naomi");
       expect(completed.content!.paragraphs.join(" ")).toContain("Thomas");
-      // Décision 03/09 (10) : aucun bouton « Noter » avant B5.
-      expect(completed.content!.cta!.label).not.toMatch(/noter|rate/i);
+      // B5 (décision 4A) : le bouton « Noter » est de retour dans l'email de fin de transaction.
+      expect(completed.content!.cta!.label).toMatch(/noter|rate/i);
       const reminder = buildBookingEmail(parse(verificationReminderEvent()), "SHIPPER", "Naomi", { locale })!;
       expect(reminder.template).toBe("settlement/verification-reminder-shipper");
       expect(reminder.content!.paragraphs.join(" ")).toMatch(/23/); // l'échéance formatée
