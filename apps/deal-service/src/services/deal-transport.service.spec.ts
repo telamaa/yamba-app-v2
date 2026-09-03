@@ -42,6 +42,7 @@ const CARRIER = { id: CARRIER_ID };
 const STRANGER = { id: "64b0000000000000000000f9" };
 
 const PHOTO = "https://ik.imagekit.io/yamba/deals/pickup/abc.jpg";
+const UPDATED_AT = new Date("2026-07-17T09:00:00.000Z");
 const CHECKLIST = [...PICKUP_CHECKLIST_ITEMS];
 const KEY = resolveDeliveryCodeKey({ NODE_ENV: "test" } as NodeJS.ProcessEnv);
 
@@ -76,6 +77,7 @@ function makeBookingRecord(o: Overrides = {}) {
     deliveryAttempts: o.deliveryAttempts ?? 0,
     deliveryLockedUntil: o.deliveryLockedUntil ?? null,
     codeRegenerations: o.codeRegenerations ?? 0,
+    updatedAt: UPDATED_AT,
   };
 }
 
@@ -250,7 +252,9 @@ describe("C — confirmTrackingStep (A39)", () => {
     prismaMock.booking.findUnique.mockResolvedValue(makeBookingRecord({ status: "PICKED_UP" }));
     const result = await makeService().confirmTrackingStep(CARRIER, BOOKING_ID, { step: "AT_AIRPORT" });
     const { where, data } = lastUpdate();
-    expect(where).toEqual({ id: BOOKING_ID, status: "PICKED_UP", trackingEvents: { none: { step: "AT_AIRPORT" } } });
+    // A85 : verrou optimiste sur updatedAt — jamais un filtre sur la liste composite (absente sur les vrais documents)
+    expect(where).toEqual({ id: BOOKING_ID, status: "PICKED_UP", updatedAt: UPDATED_AT });
+    expect(JSON.stringify(where)).not.toContain("trackingEvents");
     expect(data).toEqual({ trackingEvents: { push: { step: "AT_AIRPORT", confirmedAt: NOW } } });
     expect(writtenEventTypes()).toEqual(["booking.tracking_event"]);
     expect(writtenEventPayload("booking.tracking_event")).toMatchObject({ step: "AT_AIRPORT", confirmedAt: NOW.toISOString() });

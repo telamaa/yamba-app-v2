@@ -265,6 +265,11 @@ Ordre de demarrage : auth -> trip -> gateway.
 - 03/09 : feat/wallet (A83–A84) — Finances reelle : GET /me/wallet (totaux
   serveur, deux roles, service pur teste), lien tableau de bord Stripe Express,
   section a onglets sous next-intl. B4 SOLDE. Suite : chantier C (admin).
+- 03/09 : fix/tracking-absent-composite (A85) — jalons de voyage en 409 sur
+  les deals reels : liste composite ABSENTE (pitfall Mongo, 4e fois) ; writer
+  cree les listes, verrou optimiste updatedAt, script repair-absent-lists joue.
+  Regeneration du code signalee en recette : cause non etablie (ligne gateway
+  a fournir), hypothese session expiree (A62, 60 min).
 - Plateforme de tests : 673 (trip 198, deal 399, notification 76) + auth 65.
 - (historique) Plateforme de tests : 600 (trip 187, deal 354, notification 59) — post-B3 (#96).
 - MERGE 01/09 : toute la pile B2 est dans `dev` via la SEULE **PR #90**

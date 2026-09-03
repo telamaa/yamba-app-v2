@@ -208,6 +208,9 @@ describe("buildBookingSnapshots (D17 : figé tel quel)", () => {
       currencyCode: "EUR",
     });
     expect(s.parcel).toMatchObject({ category: "CLOTHES", categoryFamily: "CLOTHES_TEXTILE", declaredValueCents: 12000 });
+    // A85 — les listes EXISTENT dès la création (pitfall Mongo : une liste absente n'est matchée par aucun filtre).
+    expect(s.trackingEvents).toEqual([]);
+    expect(s.deliveryPhotoUrls).toEqual([]);
     expect(s.recipient.phoneE164).toBe("+242061234567");
     expect(s.pickupPlace).toEqual({ kind: "AIRPORT", details: "CDG T2" });
     expect(s.deliveryPlace).toBeNull();
