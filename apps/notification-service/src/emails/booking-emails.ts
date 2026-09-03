@@ -13,8 +13,10 @@
  *   [eventId, userId] AVANT l'envoi ; échec = FAILED tracé, JAMAIS
  *   de throw (best-effort : ne bloque ni la partition ni l'in-app).
  * - D41 : jointure User à l'envoi (les événements ne portent ni
- *   email ni prénom) ; user effacé (RGPD) = envoi sauté, tracé ;
- *   locale FR par défaut (pas de preferredLocale sur User).
+ *   email ni prénom) ; user effacé (RGPD) = envoi sauté, tracé.
+ * - D44/D45 : la locale est `User.preferredLocale` du DESTINATAIRE ;
+ *   la contrepartie est nommée par son PRÉNOM (jointure sur l'autre
+ *   partie), le mot de rôle n'est qu'un repli (compte effacé).
  *
  * Le code de livraison ne voyage JAMAIS ici : aucun payload ne le
  * contient (vérifié), aucun gabarit ne doit le demander.
@@ -26,12 +28,13 @@ import { Prisma } from "@prisma/client";
 import prisma from "@packages/libs/prisma";
 import { BookingDomainEventSchema } from "@packages/api-contracts";
 import { isEmailConfigured, sendTemplatedEmail } from "@packages/email";
+import { resolveLocale, type SupportedLocale } from "@packages/api-contracts";
 
 type BookingDomainEvent = z.infer<typeof BookingDomainEventSchema>;
 type BookingEventKey = BookingDomainEvent["eventType"];
 
 const APP_URL = process.env.USER_APP_URL ?? "http://localhost:3000";
-const DEFAULT_LOCALE: "fr" | "en" = "fr"; // Plus tard : depuis user.preferredLocale
+// D44 — la locale est celle du DESTINATAIRE (User.preferredLocale), jamais de l'acteur.
 const TEMPLATES_DIR = path.join(
   process.cwd(),
   "apps/notification-service/src/emails/templates"
@@ -183,12 +186,20 @@ type BuiltEmail = {
   data: Record<string, unknown>;
 };
 
+export type BuildBookingEmailOptions = {
+  /** Locale du destinataire (brute ou résolue) — repli fr. */
+  locale?: string | null;
+  /** Prénom de l'AUTRE partie (D45) — null si compte effacé : le gabarit replie sur le rôle. */
+  counterpartFirstName?: string | null;
+};
+
 export function buildBookingEmail(
   event: BookingDomainEvent,
   role: "SHIPPER" | "CARRIER",
-  recipientFirstName: string
+  recipientFirstName: string,
+  options: BuildBookingEmailOptions = {}
 ): BuiltEmail | null {
-  const locale = DEFAULT_LOCALE;
+  const locale: SupportedLocale = resolveLocale(options.locale);
   const fr = locale === "fr";
   const p = event.payload;
   const route = `${p.corridor.originCity} → ${p.corridor.destinationCity}`;
@@ -201,6 +212,7 @@ export function buildBookingEmail(
   const base = {
     locale,
     firstName: recipientFirstName,
+    counterpartFirstName: options.counterpartFirstName ?? null,
     route,
     weightKg: p.weightKg,
     ctaUrl,
@@ -389,9 +401,14 @@ export async function dispatchBookingEmails(
     return;
   }
 
+  // D44/D45 : on charge les DEUX parties — le destinataire (email, locale)
+  // et la contrepartie (prénom), même quand une seule reçoit l'email.
+  const partyIds = Array.from(
+    new Set([...recipients.map((r) => r.userId), event.payload.shipperId, event.payload.carrierId])
+  );
   const users = await prisma.user.findMany({
-    where: { id: { in: recipients.map((r) => r.userId) } },
-    select: { id: true, email: true, firstName: true },
+    where: { id: { in: partyIds } },
+    select: { id: true, email: true, firstName: true, preferredLocale: true },
   });
   const byId = new Map(users.map((u) => [u.id, u]));
 
@@ -406,7 +423,12 @@ export async function dispatchBookingEmails(
       continue;
     }
 
-    const built = buildBookingEmail(event, recipient.role, user.firstName);
+    const counterpartId =
+      recipient.role === "SHIPPER" ? event.payload.carrierId : event.payload.shipperId;
+    const built = buildBookingEmail(event, recipient.role, user.firstName, {
+      locale: user.preferredLocale,
+      counterpartFirstName: byId.get(counterpartId)?.firstName ?? null,
+    });
     if (!built) continue;
 
     // A36 — claim AVANT l'envoi : P2002 = déjà claimé, jamais de renvoi.

@@ -12,6 +12,7 @@ import {
   resetPassword,
   verifyPasswordResetOtp,
   verifyRegistrationOtp,
+  updateMyLocale,
 } from "../controller/auth.controller";
 import isAuthenticated from "@packages/middleware/isAuthenticated";
 
@@ -28,6 +29,7 @@ router.post("/auth/login", loginUser);
 router.post("/auth/refresh", refreshAuthTokens);
 router.post("/auth/logout", logoutUser);
 router.get("/auth/me", isAuthenticated, getMe);
+router.patch("/auth/me/locale", isAuthenticated, updateMyLocale); // D44
 
 // ─── Mot de passe oublié ───────────────────────────────
 router.post("/auth/password/forgot", requestPasswordResetOtp);

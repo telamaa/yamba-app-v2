@@ -1,6 +1,7 @@
 "use client";
 
 import axios, { AxiosError } from "axios";
+import { getCurrentLocale } from "@/lib/current-locale";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ||
@@ -9,6 +10,15 @@ const API_BASE_URL =
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
   withCredentials: true,
+});
+
+// D44 — chaque requête porte la langue de l'interface : les services en
+// font la langue des emails sans compte (OTP, mot de passe oublié) et la
+// langue initiale de `User.preferredLocale` à l'inscription.
+apiClient.interceptors.request.use((config) => {
+  const locale = getCurrentLocale();
+  if (locale) config.headers.set("x-locale", locale);
+  return config;
 });
 
 let isRefreshing = false;

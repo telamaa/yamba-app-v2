@@ -20,8 +20,8 @@
                         </p>
                         <p style="margin:0 0 16px 0;font-size:15px;line-height:1.6;color:#334155;">
                             <%= locale === "fr"
-                                    ? `Bonne nouvelle : le Voyageur a accepté ta demande ${route} (${weightKg} kg) le ${acceptedAt}. Ton paiement de ${total} est confirmé.`
-                                    : `Good news: the carrier accepted your request ${route} (${weightKg} kg) on ${acceptedAt}. Your payment of ${total} is confirmed.` %>
+                                    ? `Bonne nouvelle : ${counterpartFirstName || "ton Voyageur"} a accepté ta demande ${route} (${weightKg} kg) le ${acceptedAt}. Ton paiement de ${total} est confirmé.`
+                                    : `Good news: ${counterpartFirstName || "your carrier"} accepted your request ${route} (${weightKg} kg) on ${acceptedAt}. Your payment of ${total} is confirmed.` %>
                         </p>
                         <p style="margin:0 0 24px 0;font-size:14px;line-height:1.6;color:#64748b;">
                             <%= locale === "fr"

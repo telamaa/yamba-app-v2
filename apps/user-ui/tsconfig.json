@@ -28,7 +28,8 @@
       "@/*": [
         "src/*"
       ],
-      "@packages/pricing": ["../../packages/libs/pricing/src/index.ts"]
+      "@packages/pricing": ["../../packages/libs/pricing/src/index.ts"],
+      "@packages/api-contracts/locale": ["../../packages/libs/api-contracts/src/locale.ts"]
     },
     "outDir": "dist",
     "rootDir": "../../",
@@ -36,6 +37,7 @@
   },
   "include": [
     "../../packages/libs/pricing/src/index.ts",
+    "../../packages/libs/api-contracts/src/locale.ts",
     "../../apps/user-ui/.next/types/**/*.ts",
     "../../packages/**/*.tsx",
     "../../dist/apps/user-ui/.next/types/**/*.ts",

@@ -2,7 +2,9 @@ import type { Trip } from "@prisma/client";
 import { sendEmail } from "./send-email";
 
 const APP_URL = process.env.USER_APP_URL ?? "http://localhost:3000";
-const DEFAULT_LOCALE: "fr" | "en" = "fr"; // Plus tard : depuis user.preferredLocale
+import { resolveLocale } from "@packages/api-contracts";
+
+// D44 — la locale vient du DESTINATAIRE (User.preferredLocale), repli fr.
 
 // ───────────────────────────────────────────────────────
 // Constantes i18n légères pour les emails
@@ -41,6 +43,8 @@ export type TripPublishedEmailPayload = {
     userId: string;
     email: string;
     firstName: string;
+    /** D44 — User.preferredLocale du destinataire (résolue par resolveLocale). */
+    preferredLocale?: string | null;
     // Pourquoi cette personne reçoit cet email
     followsTripper: boolean;
     matchingSavedRoute: {
@@ -112,7 +116,7 @@ export async function sendTripPublishedEmail(
   payload: TripPublishedEmailPayload
 ): Promise<void> {
   const { recipient, tripper, trip } = payload;
-  const locale = DEFAULT_LOCALE;
+  const locale = resolveLocale(recipient.preferredLocale);
   const firstInitial = tripper.firstName.charAt(0).toUpperCase();
   const lastInitial = tripper.lastName.charAt(0).toUpperCase();
   const initials = `${firstInitial}${lastInitial}`;
@@ -175,10 +179,12 @@ export async function sendTripPublishedEmail(
 // ─────────────────────────────────────────────────────────
 
 export async function sendSavedRouteExpiryWarningEmail(payload: {
+  /** D44 — User.preferredLocale du destinataire. */
+  preferredLocale?: string | null;
   recipient: { email: string; firstName: string };
   savedRoute: { id: string; originCity: string; destinationCity: string };
 }): Promise<void> {
-  const locale = DEFAULT_LOCALE;
+  const locale = resolveLocale(payload.preferredLocale);
   const subject =
     locale === "fr"
       ? `Votre alerte ${payload.savedRoute.originCity} → ${payload.savedRoute.destinationCity} expire bientôt`
@@ -200,10 +206,12 @@ export async function sendSavedRouteExpiryWarningEmail(payload: {
 }
 
 export async function sendSavedRouteExpiredEmail(payload: {
+  /** D44 — User.preferredLocale du destinataire. */
+  preferredLocale?: string | null;
   recipient: { email: string; firstName: string };
   savedRoute: { originCity: string; destinationCity: string };
 }): Promise<void> {
-  const locale = DEFAULT_LOCALE;
+  const locale = resolveLocale(payload.preferredLocale);
   const subject =
     locale === "fr"
       ? `Votre alerte ${payload.savedRoute.originCity} → ${payload.savedRoute.destinationCity} a expiré`

@@ -1035,3 +1035,37 @@ Retours de recette du 03/09 sur l'inscription, la connexion et les codes OTP. Se
 ### Pièges rencontrés
 - `nx serve auth-service` ne recharge pas à chaud : le premier smoke test sur `:8080` a répondu avec l'ANCIEN code (aucun `details`). Preuve = bundle reconstruit lancé sur un autre port.
 - Les routes du service sont montées sous `/api` même en direct (`app.use("/api", router)`) : `POST :6011/auth/register` → 404, `POST :6011/api/auth/register` → OK.
+
+# feat/email-locale — la langue de l'utilisateur, un seul gabarit, des emails en données (D44, D45, A55–A57)
+
+Implémentation de D44 (langue des emails = langue de l'utilisateur, conçue pour N langues) et de D45 dans les emails (prénom réel de la contrepartie). Une PR, cinq zones du monorepo.
+
+### 1. La liste des langues, à un seul endroit
+`packages/libs/api-contracts/src/locale.ts` : `SUPPORTED_LOCALES = ["fr", "en"]`, `DEFAULT_LOCALE`, `isSupportedLocale` (garde de type strict) et `resolveLocale` (tolérant : « fr-FR », « en-US,en;q=0.9 », vide, inconnu → repli). Le fichier n'importe pas zod : le front le consomme par l'alias `@packages/api-contracts/locale` (déclaré dans `apps/user-ui/tsconfig.json`, qui REDÉFINIT `paths` — piège connu) et `src/i18n/routing.ts` passe `SUPPORTED_LOCALES` à next-intl au lieu de redéclarer `["fr", "en"]`.
+
+### 2. La donnée : `User.preferredLocale`
+`prisma/schema.prisma` : `preferredLocale String @default("fr")` — `npx prisma generate` + `db push`. Écrite à l'inscription (`registerUser` → `PendingRegistration.preferredLocale` → `user.create`) depuis `resolveLocale(getClientLocale(req))`, mise à jour par `PATCH /auth/me/locale` (`updateMyLocale`, `isAuthenticated`, 400 `LOCALE_UNSUPPORTED` hors liste). `GET /auth/me` la renvoie déjà (spread du user).
+
+### 3. Le front dit sa langue
+- `apps/user-ui/src/lib/current-locale.ts` : `getCurrentLocale()` lit le premier segment de `window.location.pathname` (next-intl impose le préfixe) ; `null` côté serveur.
+- `lib/api-client.ts` : intercepteur de requête → en-tête `x-locale`. `lib/api.ts` (`apiFetch`) : `...localeHeaders()`.
+- `HeaderLocaleSwitcher` : après `router.replace`, si `useUser()` a un utilisateur → `apiClient.patch("/auth/me/locale")` puis `setQueryData(["user"])` ; échec silencieux (la navigation a déjà eu lieu).
+
+### 4. Le gabarit partagé et les emails auth
+- `packages/libs/email/src/layout.ts` : type `EmailContent` + `LAYOUT_EJS` (chaîne). `index.ts` : `renderTransactionalEmail` (pur, `ejs.render`), `sendTransactionalEmail`, `getFromAddress()` (`SMTP_FROM`, sinon `SMTP_FROM_NAME <SMTP_USER>` — enfin lu).
+- `apps/auth-service/src/emails/auth-emails.ts` : `AUTH_EMAILS: Record<SupportedLocale, AuthEmailDictionary>` (7 fonctions par langue : `verifyEmail`, `resetPassword`, `passwordChanged`, `accountCreated`, `securityAlert`, `carrierOnboardingComplete`, `carrierOnboardingReminder`), `getAuthEmails(locale)` avec repli. `send-auth-email.ts` : best-effort (log, jamais de throw), saute si SMTP absent.
+- `auth.helper.ts` : `sendOtpScoped(scope, firstName, emailKey, locale)`, `verifyOtpScoped(…, locale)` (l'alerte sécurité du 10e échec porte le VRAI verrou du palier), `sendPasswordChangedEmail` / `sendAccountCreatedEmail` avec `locale`, `localeFromHeaders(headers)`. `onboarding-email.service.ts` : `user.preferredLocale`. Supprimés : `utils/sendMail/` et les 7 `.ejs` de `utils/email-templates/`.
+- `webpack.config.js` de l'auth-service : alias explicites `@packages/api-contracts` et `@packages/email` AVANT le générique (le chemin réel est `packages/libs/<lib>/src`).
+
+### 5. notification-service et trip-service dans la langue du destinataire
+- `booking-emails.ts` : `buildBookingEmail(event, role, firstName, { locale, counterpartFirstName })` ; le dispatcher charge `shipperId` + `carrierId` + destinataires en UNE `findMany` (`preferredLocale` sélectionnée) et passe le prénom de l'autre partie. Cinq gabarits (`accepted`, `payment-authorized`, `requested-carrier`, `picked-up`, `delivered`) remplacent « le Voyageur » / « l'Expéditeur » par `${counterpartFirstName || "ton Voyageur"}`.
+- `trip-notifications.email.ts` : `recipient.preferredLocale` (sélectionné dans les deux requêtes de `trip-notifications.service.ts`) → `resolveLocale` ; les emails d'alerte de route acceptent `preferredLocale` en option.
+
+### Preuves
+- Tests : auth-service 59 (+19 : `locale.spec.ts`, `auth-emails.spec.ts` — miroir des dictionnaires, aucun emoji dans les sujets, OTP et durée rendus dans les deux langues, repli `de` → `fr`, verrou du palier dans l'alerte) ; notification-service 68 (+9 : prénom dans 5 gabrits × 2 langues, repli rôle sans « null », locale du destinataire dans le dispatch, deux parties chargées, contrepartie effacée) ; trip 187 ; deal 355 → plateforme 610. tsc ×5 Nx + user-ui.
+- Smoke test sur `PORT=6011` : login seed avec `x-locale: en`, `GET /auth/me` → `preferredLocale`, `PATCH /auth/me/locale` `en` → 200 puis relu `en`, `de` → 400 `LOCALE_UNSUPPORTED`, retour `fr`.
+- Le serveur Next en cours résout le nouvel alias (page login 200, aucun « Module not found »).
+
+### Pièges rencontrés
+- `verifyOtp` s'exécutait AVANT la lecture de `pending` : la langue de l'alerte sécurité vient donc de la requête, celle de l'email de bienvenue de l'inscription.
+- `CarrierPage.onboardingStep` est un enum (`PROFILE`, `STRIPE`, `COMPLETE`), pas un nombre : le dictionnaire compare à `"PROFILE"`.

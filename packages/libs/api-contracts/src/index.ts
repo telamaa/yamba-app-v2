@@ -11,6 +11,7 @@
  */
 
 export * from "./common";
+export * from "./locale";
 export * from "./trip/trip.enums";
 export * from "./trip/trip.schema";
 export * from "./trip/trip-search.schema";

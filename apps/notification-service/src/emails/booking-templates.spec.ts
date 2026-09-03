@@ -20,6 +20,7 @@ const SIX_DIGITS = /(?<![#0-9A-Za-z])\d{6}(?![0-9A-Za-z])/;
 const BASE = {
   subject: "Sujet de test",
   firstName: "Naomi",
+  counterpartFirstName: "Thomas",
   route: "Paris → Brazzaville",
   weightKg: 2.5,
   ctaUrl: "http://localhost:3000/fr/bookings/64b000000000000000000001",
@@ -114,5 +115,30 @@ describe("rendu réel des gabarits booking", () => {
     });
     // <%= %> échappe le HTML : l'apostrophe sort en &#39;.
     expect(html).toContain("plus valide");
+  });
+});
+
+describe("D45 — la contrepartie est nommée par son prénom, le rôle n'est qu'un repli", () => {
+  const NAMED = [
+    "booking/booking-accepted-shipper",
+    "booking/payment-authorized-shipper",
+    "booking/booking-requested-carrier",
+    "booking/booking-picked-up-shipper",
+    "booking/booking-delivered-shipper",
+  ];
+
+  it.each(NAMED)("%s : le prénom apparaît, dans les deux langues", async (template) => {
+    for (const locale of ["fr", "en"] as const) {
+      const html = await render(template, locale, { counterpartFirstName: "Thomas" });
+      expect(html).toContain("Thomas");
+    }
+  });
+
+  it("compte effacé (prénom null) : repli sur le mot de rôle, jamais « null »", async () => {
+    const fr = await render("booking/booking-accepted-shipper", "fr", { counterpartFirstName: null });
+    expect(fr).toContain("ton Voyageur a accepté");
+    expect(fr).not.toContain("null");
+    const en = await render("booking/booking-requested-carrier", "en", { counterpartFirstName: null });
+    expect(en).toContain("A shipper wants");
   });
 });
