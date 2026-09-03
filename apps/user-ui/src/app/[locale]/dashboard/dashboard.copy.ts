@@ -34,7 +34,7 @@ export function getDashboardCopy(isFr: boolean) {
         : "Get notified when a matching trip is published",
     },
     following: {
-      title: isFr ? "Trippers suivis" : "Followed trippers",
+      title: isFr ? "Voyageurs suivis" : "Followed travelers",
       sub: isFr
         ? "Restez à l'affût des publications de vos trippers favoris"
         : "Stay tuned for posts from your favorite trippers",
@@ -52,7 +52,7 @@ export function getDashboardCopy(isFr: boolean) {
       sub: isFr ? "Informations personnelles et vérifications" : "Personal info and verifications",
     },
     yamber: {
-      title: isFr ? "Devenir Yamber" : "Become a Yamber",
+      title: isFr ? "Devenir Voyageur" : "Become a Traveler",
       sub: isFr ? "Rejoignez la communauté des voyageurs Yamba" : "Join the Yamba travelers community",
     },
     security: {
@@ -72,7 +72,7 @@ export function getDashboardCopy(isFr: boolean) {
     qaCreateTrip: isFr ? "Créer un trajet" : "Create a trip",
     qaMessages: "Messages",
     qaPayments: isFr ? "Paiements" : "Payments",
-    qaYamber: isFr ? "Devenir Yamber" : "Become a Yamber",
+    qaYamber: isFr ? "Devenir Voyageur" : "Become a Traveler",
     qaSecurity: isFr ? "Sécurité" : "Security",
     qaProfile: isFr ? "Mon profil" : "My profile",
     qaSettings: isFr ? "Paramètres" : "Settings",

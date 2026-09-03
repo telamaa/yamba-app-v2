@@ -94,8 +94,8 @@ export default function LocationsCard({ trip }: { trip: PublicTrip }) {
         </h2>
         <p className="mt-0.5 text-[12px] text-slate-500 dark:text-slate-400">
           {isFr
-            ? "Où retrouver le Tripper pour la remise et la livraison"
-            : "Where to meet the Tripper for handoff and delivery"}
+            ? "Où retrouver le Voyageur pour la remise et la livraison"
+            : "Where to meet the Traveler for handoff and delivery"}
         </p>
       </div>
 

@@ -356,8 +356,12 @@ Objectif produit assumé : **solide, propre, pro, secure, long terme** — les f
 
 ---
 
-## 2bis.26 — Session `feat/notifications-vivantes` (les notifications parlent et se rafraîchissent) — A91
+## 2bis.25 — Session `chore/vocabulaire-voyageur` (D45 : le nom du rôle) — A90
+| # | Arbitrage | Pourquoi | Compromis | PR |
+|---|---|---|---|---|
+| A90 | **« Voyageur » partout dans l'interface FR (décision utilisateur 03/09), « Traveler » en EN** — 57 valeurs de traduction dans 11 fichiers + 8 chaînes visibles dans le code (copie du dashboard, inscription, badge d'avatar, bannière d'onboarding, carte des lieux). Les IDENTIFIANTS (`superTripper`, `TripperBlock`, `becomeYamber`, route `/become-yamber`, `PublicTripper`) ne changent pas : ils sont du code, pas de la copie | Un seul mot pour un seul rôle, en FR comme dans les emails (D45) ; renommer des identifiants et une route publique n'apporte rien au membre et casserait des liens | Le code garde son ancien vocabulaire interne (`carrier` en API, `tripper` dans quelques noms de composants) ; « Traveler » en EN est un choix d'alignement, révisable | `chore/vocabulaire-voyageur` |
 
+## 2bis.26 — Session `feat/notifications-vivantes` (les notifications parlent et se rafraîchissent) — A91
 | # | Arbitrage | Pourquoi | Compromis | PR |
 |---|---|---|---|---|
 | A91 | **Notifications vivantes** (décisions utilisateur 03/09, 1A–4A) : (1) rafraîchissement par polling 30 s onglet visible + au retour sur l'onglet + invalidation après les gestes (pas de flux temps réel) ; (2) **copie par événement ET par rôle** (`notifications.copy.<event>.<ROLE>`, un jalon par étape), avec prénom de la contrepartie SERVI par l'API (`NotificationView.counterpartFirstName`, jointure au listing), corridor, montant, dossier, date — le front formate, ne recalcule rien ; (3) cloche desktop = menu des 5 dernières + « Tout marquer lu » (`PATCH /me/notifications/read-all`) + « Voir tout » ; (4) matrice A35 amendée : l'ATTERRISSAGE écrit à l'Expéditeur (« préviens le destinataire »), les autres jalons restent in-app. Le contrat `NotificationView.type` accepte les notifications SYSTÈME (`carrier.payout_failed`, A87) — le mapper strict les rejetait (bug latent de #139, corrigé ici) | Une notification qui ne dit ni qui ni quoi n'est pas lue ; une cloche figée ment ; l'atterrissage est le seul jalon où l'Expéditeur doit AGIR (prévenir le destinataire) | Polling = jusqu'à 30 s de retard ; un menu de plus dans le header | `feat/notifications-vivantes` |

@@ -3,17 +3,15 @@
   "subtitle": "Deal {originCity} → {destinationCity} · completed",
   "subtitleShort": "Deal completed",
   "back": "Back",
-
   "banner": {
     "titleCARRIER": "Your Deal is complete · {amount} paid to {firstName}",
     "titleSHIPPER": "Your Deal is complete · {amount} received on your Stripe account",
     "titleShortCARRIER": "Deal complete · {amount} paid",
     "titleShortSHIPPER": "Deal complete · {amount} received",
     "subCARRIER": "Your feedback helps the community choose better partners",
-    "subSHIPPER": "Your feedback helps other Trippers choose their Shippers",
+    "subSHIPPER": "Your feedback helps other Travelers choose their Shippers",
     "subShort": "Your feedback helps the community"
   },
-
   "h1": {
     "CARRIER": "How did {firstName} do?",
     "SHIPPER": "How did {firstName} do?"
@@ -22,14 +20,12 @@
     "CARRIER": "Rate this traveller on what matters to you.",
     "SHIPPER": "Rate this shipper on what matters to you."
   },
-
   "person": {
-    "roleCARRIER": "Tripper",
+    "roleCARRIER": "Traveler",
     "roleSHIPPER": "Shipper",
     "dealsCARRIER": "{count} deals",
     "dealsSHIPPER": "{count} shipments"
   },
-
   "stars": {
     "label": "Your overall rating",
     "value1": "Disappointing",
@@ -38,7 +34,6 @@
     "value4": "Very good",
     "value5": "Excellent"
   },
-
   "criteria": {
     "label": "ON THESE SPECIFIC POINTS",
     "labelShort": "SPECIFIC POINTS",
@@ -77,7 +72,6 @@
     "thumbUp": "Good",
     "thumbDown": "Could improve"
   },
-
   "comment": {
     "label": "YOUR COMMENT",
     "labelShort": "COMMENT",
@@ -88,20 +82,17 @@
     "counter": "{count} / {max}",
     "counterWarning": "{count} / {max} — almost at the limit"
   },
-
   "visibility": {
     "text": "**Your rating and comment will be public** on {ratedFirstName}''s profile, attributed to {raterName}. Once published, you can no longer edit your review.",
     "textShort": "**Public review** on {ratedFirstName}''s profile. Not editable after publishing."
   },
-
   "sidebar": {
     "publishLabel": "PUBLICATION",
     "completedBadge": "Completed",
-    "amountPaidLabel": "Paid to your Tripper",
+    "amountPaidLabel": "Paid to your Traveler",
     "amountReceivedLabel": "Received on your account",
     "starsRequiredHint": "Pick your overall rating first"
   },
-
   "cta": {
     "later": "Later",
     "publish": "Publish my review",
@@ -109,14 +100,12 @@
     "publishing": "Publishing…",
     "toastError": "Error publishing. Try again."
   },
-
   "success": {
     "title": "Thanks for your feedback!",
     "subtitle": "Your review helps the whole Yamba community travel with confidence.",
     "reciprocity": "{firstName} will also be invited to rate you. Your reviews will be revealed once both are published, or within 14 days.",
     "backHome": "Back to home"
   },
-
   "error": {
     "notFound": "This Deal doesn''t exist or can''t be rated."
   }

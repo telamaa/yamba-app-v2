@@ -62,7 +62,7 @@ function buildCopy(lang: string) {
   const fr = lang === "fr";
   return {
     trust: fr ? "Inscription sécurisée" : "Secure signup",
-    title: fr ? "Deviens Yamber" : "Become a Yamber",
+    title: fr ? "Deviens Voyageur" : "Become a Traveler",
     subtitle: fr
       ? "Envoie ou transporte des colis, en toute simplicité."
       : "Send or transport parcels, simply.",

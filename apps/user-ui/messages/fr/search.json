@@ -8,7 +8,7 @@
   "oneStopIn": "1 escale · {city}",
   "stopsCount": "{count, plural, =1 {# escale} other {# escales}}",
   "remainingSlots": "{count, plural, =1 {# place restante} other {# places restantes}}",
-  "newTripper": "Nouveau tripper",
+  "newTripper": "Nouveau voyageur",
   "moreCategoriesTooltip": "{count, plural, =1 {# autre catégorie} other {# autres catégories}}",
   "transportTabs": {
     "all": "Tout",
@@ -17,7 +17,7 @@
     "car": "Voiture"
   },
   "badges": {
-    "superTripper": "Super tripper",
+    "superTripper": "Super Voyageur",
     "instant": "Instant",
     "instantBooking": "Réservation instantanée",
     "verifiedTicket": "Billet vérifié",
@@ -61,7 +61,7 @@
     "remainingSlots": "{count, plural, one {# place} other {# places}}",
     "direct": "Direct",
     "stopovers": "{count, plural, one {# escale} other {# escales}}",
-    "newTripper": "Nouveau tripper",
+    "newTripper": "Nouveau voyageur",
     "perKg": "prix au kilo",
     "remainingKg": "{kg} kg dispo",
     "example": "ex. {kg} kg ≈ {price} € tout compris",

@@ -6,7 +6,7 @@
   "reviewsCount": "{count, plural, =0 {aucun avis} =1 {# avis} other {# avis}}",
   "chatWith": "Discuter avec {firstName}",
   "comingSoon": "Bientôt disponible",
-  "newTripper": "Nouveau Tripper",
+  "newTripper": "Nouveau Voyageur",
   "memberSince": "Membre depuis {date}",
   "close": "Fermer",
   "reportListing": "Signaler cette annonce",
@@ -26,7 +26,7 @@
   },
   "badges": {
     "profileVerified": "Profil vérifié",
-    "superTripper": "Super Tripper",
+    "superTripper": "Super Voyageur",
     "verifiedTicket": "Billet vérifié"
   },
   "categories": {

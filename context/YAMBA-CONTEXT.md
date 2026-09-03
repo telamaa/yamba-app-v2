@@ -275,6 +275,8 @@ Ordre de demarrage : auth -> trip -> gateway.
   → Voyageur prevenu), recap quotidien support, fenetre « session expiree ».
   GESTE UTILISATEUR : second endpoint webhook Stripe (comptes connectes) +
   STRIPE_CONNECT_WEBHOOK_SECRET. Suite : vocabulaire Voyageur (PR copie), B5.
+- 03/09 : chore/vocabulaire-voyageur (A90) — « Voyageur » / « Traveler » partout dans
+  l'UI, identifiants inchanges. D45 (nom du role) CLOS.
 - 03/09 : feat/notifications-vivantes (A91) — polling 30 s, copie par evenement
   et role avec prenom servi, cloche = menu + tout marquer lu, email d'atterrissage.
   Suite : B5 Confiance (points a trancher).
