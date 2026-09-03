@@ -200,7 +200,11 @@ export function makeDealTransportService(provider: PaymentProvider, clock: () =>
       await applyBookingTransition({
         booking,
         from: "PICKED_UP",
-        where: { trackingEvents: { none: { step: input.step } } },
+        // A85 — verrou optimiste sur `updatedAt` : l'ancien `trackingEvents: { none }`
+        // ne matchait JAMAIS un document sans le champ (pitfall Mongo, 4e occurrence).
+        // La séquence et le doublon sont déjà refusés par la machine sur la lecture ;
+        // ce where ne sert qu'à la course entre deux clics.
+        where: booking.updatedAt ? { updatedAt: booking.updatedAt } : {},
         data: { trackingEvents: { push: { step: input.step, confirmedAt: now } } },
         releaseKg: false,
         events: [

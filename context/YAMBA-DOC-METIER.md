@@ -975,3 +975,16 @@ La section Finances était une promesse : deux onglets vides et une maquette aux
 | FIN6 | Expéditrice seed (`aminata`), onglet Paiements | Cartes Bloqué / Dépensé / Remboursé ; ligne « bloqué jusqu'au … » sur un deal livré ; ligne remboursement partiel avec « retenue … reversée au Voyageur » |
 | FIN7 | Membre sans aucun deal | États vides honnêtes ; non-Voyageur : « Devenir Voyageur » |
 | FIN8 | Mobile (≤ 640 px), onglet Finances de la barre du bas | Même contenu en une colonne, cartes empilées |
+
+# Fix recette 03/09 — le suivi du voyage marche sur de vrais deals
+
+### Règle
+- **RG-P-14 — Un jalon de voyage confirmé est écrit, sur tout deal réel** : la garde de concurrence ne dépend jamais de la présence d'un champ ; un deal créé avant le correctif est réparé une fois.
+
+### Recette
+| # | Scénario | Attendu |
+|---|---|---|
+| J1 | Voyageur, deal réel PICKED_UP (`6a983c…`), « À l'aéroport » puis 5 s | Jalon écrit, timeline Expéditrice + in-app ; plus de « Erreur, réessaye » |
+| J2 | « Décollage » puis « Atterrissage » dans l'ordre | Écrits ; « Décollage » avant « Aéroport » → refus propre (ordre) |
+| J3 | Double clic sur un jalon | Un seul jalon écrit, le second refusé sans erreur visible |
+| J4 | Expéditrice, « Régénérer le code » | Nouveau code affiché, email « nouveau code » ; sinon relever la ligne `POST …/code/regenerate` du gateway |

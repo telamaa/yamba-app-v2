@@ -53,6 +53,7 @@ export const BOOKING_WRITE_SELECT = {
   payoutAttempts: true,
   payoutAmountCents: true,
   chargeId: true,
+  updatedAt: true,
 } as const;
 
 export type BookingForWrite = {
@@ -80,6 +81,8 @@ export type BookingForWrite = {
   /** Montant à verser quand il diffère du net (compensation ANN-01, A79). */
   payoutAmountCents?: number | null;
   chargeId?: string | null;
+  /** Verrou optimiste (A85) : les gardes conditionnelles qui portaient sur une liste composite passent par lui. */
+  updatedAt?: Date | null;
 } & BookingSnapshotsForLifecycle;
 
 /** Normalise un enregistrement Prisma (ou un mock de test) en BookingForWrite. */

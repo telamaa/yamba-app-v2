@@ -337,6 +337,14 @@ Objectif produit assumé : **solide, propre, pro, secure, long terme** — les f
 
 ---
 
+## 2bis.23 — Session `fix/tracking-absent-composite` (recette réelle 03/09) — A85
+
+| # | Arbitrage | Pourquoi | Compromis | PR |
+|---|---|---|---|---|
+| A85 | **Les listes d'un Booking EXISTENT dès la création, et les gardes de concurrence ne portent jamais sur une liste.** Pitfall Prisma+Mongo, 4e occurrence : `trackingEvents: { none: { step } }` ne matchait AUCUN document réel (le champ était absent — le seed le posait, `booking-request.ts` non) → chaque jalon de voyage répondait 409 en recette réelle. Correctif : le writer crée `trackingEvents: []` et `deliveryPhotoUrls: []` ; la garde du jalon devient un **verrou optimiste sur `updatedAt`** (`BOOKING_WRITE_SELECT` l'inclut) ; `repair-absent-lists.ts` pose `[]` sur les documents existants via `$exists` (Prisma ne sait pas exprimer « liste absente ») — joué le 03/09 : 3 + 23 documents | Aucun filtre Prisma (`none`, `some`, `isEmpty`, `equals: []`) ne matche une liste absente ; une règle de concurrence doit tenir quel que soit l'état du document | Le verrou `updatedAt` refuse aussi une écriture concurrente sans rapport (relecture) — acceptable sur un geste rare | `fix/tracking-absent-composite` |
+
+---
+
 # 3. Roadmap maîtresse
 
 ## 3.0 Les trois jalons

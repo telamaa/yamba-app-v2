@@ -1267,3 +1267,20 @@ deal-service **399** (390 + 8 wallet + 1 mapper) · auth-service 65 (inchangé �
 
 ### Reste
 Chantier C (admin-ui : médiation DISPUTED, arbitrage des retenues HELD_FOR_MEDIATION, remboursements partiels, Reports, paramètres) · pagination du portefeuille si les volumes l'exigent · solde Stripe (balance) dans le portefeuille (via le même endpoint).
+
+# Fix recette 03/09 — jalons de voyage en 409 (pitfall Mongo, 4e occurrence — A85)
+
+**Symptôme** (recette réelle, deal `6a983c…`) : côté Voyageur, « À l'aéroport », « Décollage »… → `POST /api/deals/:id/events` 409 « Erreur, réessaye », puis 409 « must be confirmed in order » (le premier jalon n'ayant jamais été écrit). Le seed passait : ses bookings portent `trackingEvents: []`, les bookings créés par l'API non.
+
+**Cause** : `deal-transport.service.ts` gardait l'écriture par `where: { trackingEvents: { none: { step } } }`. Sur un document sans le champ, aucun filtre Prisma de liste (`none`, `some`, `isEmpty`, `equals: []`) ne matche (prouvé en base : `count` = 0 pour les quatre) → `updateMany` 0 → 409 « changé entre-temps ».
+
+**Correctif** :
+1. `booking-request.ts` : `trackingEvents: []` et `deliveryPhotoUrls: []` à la création (test snapshots).
+2. `deal-transport.service.ts` : verrou optimiste `where: { updatedAt: booking.updatedAt }` (`BOOKING_WRITE_SELECT` + `updatedAt`) — la séquence et le doublon restent refusés par la machine sur la lecture ; le `where` ne sert qu'à la course entre deux clics. Spec : le `where` ne contient plus `trackingEvents`.
+3. `packages/libs/prisma/scripts/repair-absent-lists.ts` : `$runCommandRaw` `update` avec `$exists: false` → `[]` ; joué : 3 bookings (`trackingEvents`), 23 (`deliveryPhotoUrls`). Vérifié : le filtre `none` matche désormais le deal réel.
+4. `CLAUDE.md` : pitfall porté à 4 occurrences avec la règle des listes.
+
+**Régénération du code (Expéditeur)** : signalée le même jour ; en base, aucun événement `booking.code_regenerated` sur le deal et les compteurs sont présents (`codeRegenerations: 0`) — la garde `codeRegenerations` matche. Cause non établie sans la ligne du gateway (`POST /api/deals/:id/code/regenerate <statut>`) : hypothèse principale = session Expéditeur expirée (60 min sans activité depuis A62 → 401 → toast générique). À confirmer en recette.
+
+### Preuves
+deal-service 399 (assertions renforcées, même total) · tsc · réparation jouée et vérifiée sur le deal réel.

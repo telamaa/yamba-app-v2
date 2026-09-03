@@ -107,7 +107,7 @@ JWT `access_token` + `refresh_token` set as cookies by auth-service. Frontend `a
 
 ## Known pitfalls (paid once, never twice)
 
-- Prisma+Mongo: `field: null` in a `where` misses ABSENT fields → `OR: [{field: null}, {field: {isSet: false}}]` — for EVERY nullable filter (`readAt`, `publishedAt`…), and writers must set `null` explicitly. Paid three times (readAt, reservedKg A34, outbox relay A49): a fixture that sets the field proves nothing about the real writer.
+- Prisma+Mongo: `field: null` in a `where` misses ABSENT fields → `OR: [{field: null}, {field: {isSet: false}}]` — for EVERY nullable filter (`readAt`, `publishedAt`…), and writers must set `null` explicitly. Paid FOUR times (readAt, reservedKg A34, outbox relay A49, trackingEvents A85): a fixture that sets the field proves nothing about the real writer. **Composite/scalar LISTS are worse: no Prisma filter (`none`, `some`, `isEmpty`, `equals: []`) matches an ABSENT list** — writers must create lists as `[]` (booking-request.ts does), concurrency guards go through `updatedAt` (optimistic lock), and `packages/libs/prisma/scripts/repair-absent-lists.ts` back-fills existing documents.
 - Nullable unique fields on Mongo collide on null (P2002).
 - Atlas shared tiers cap aggregation pipelines at 50 stages; Prisma emits one `$set` stage per field on updates touching composite types → `P2010 Pipeline length greater than 50`. Chunk wide updates with `apps/trip-service/src/lib/mongo-update-chunks.ts` (transition fields last).
 - macOS FS is case-insensitive, CI Linux is not → exact-case imports.

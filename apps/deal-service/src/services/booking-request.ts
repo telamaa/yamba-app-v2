@@ -244,5 +244,11 @@ export function buildBookingSnapshots(args: {
       : null,
     requestedAt: now,
     expiresAt: new Date(now.getTime() + ACCEPTANCE_WINDOW_HOURS * 3600 * 1000),
+    // Pitfall Prisma+Mongo (4e occurrence, A85) : une liste composite ABSENTE
+    // n'est matchée par AUCUN filtre (`none`, `isEmpty`, `equals: []`…). Le
+    // seed la posait, le vrai writer non → le suivi du voyage cassait en
+    // recette réelle. Les listes existent dès la création.
+    trackingEvents: [],
+    deliveryPhotoUrls: [],
   };
 }
