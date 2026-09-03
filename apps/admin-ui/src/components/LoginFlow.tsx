@@ -14,6 +14,16 @@ import { ApiError, post } from "@/lib/api";
 
 type Stage = "PASSWORD" | "TOTP" | "SETUP" | "BACKUP_CODES";
 
+/** Un message qui dit la VRAIE cause (code HTTP + message serveur) : l'admin sait lire. */
+function describeError(err: unknown, prefix: string): string {
+  if (err instanceof ApiError) {
+    if (err.status === 401) return "Email ou mot de passe incorrect.";
+    if (err.status === 429) return "Trop de requêtes vers l'API (limiteur du gateway) : réessaie dans quelques minutes.";
+    return `${prefix} (HTTP ${err.status}) : ${err.message}`;
+  }
+  return `${prefix} : ${err instanceof Error ? err.message : "erreur réseau"} — le gateway (8080) et auth-service (6001) tournent-ils ?`;
+}
+
 export default function LoginFlow() {
   const router = useRouter();
   const [stage, setStage] = useState<Stage>("PASSWORD");
@@ -29,7 +39,7 @@ export default function LoginFlow() {
     if (stage !== "SETUP" || setup) return;
     post<{ secret: string; otpauthUrl: string }>("/auth/admin/totp/setup", undefined, { auth: false })
       .then(async (r) => setSetup({ ...r, qr: await QRCode.toDataURL(r.otpauthUrl, { width: 220, margin: 1 }) }))
-      .catch((e) => setError(e instanceof ApiError ? e.message : "Impossible de préparer la 2FA."));
+      .catch((e) => setError(describeError(e, "Impossible de préparer la 2FA")));
   }, [stage, setup]);
 
   async function submitPassword(e: React.FormEvent) {
@@ -41,7 +51,7 @@ export default function LoginFlow() {
       setPassword("");
       setStage(r.next);
     } catch (err) {
-      setError(err instanceof ApiError && err.status === 401 ? "Email ou mot de passe incorrect." : "Connexion impossible.");
+      setError(describeError(err, "Connexion impossible"));
     } finally {
       setBusy(false);
     }
@@ -65,7 +75,7 @@ export default function LoginFlow() {
         setError("Délai dépassé : recommence depuis le mot de passe.");
         setStage("PASSWORD");
       } else {
-        setError(err instanceof ApiError ? (err.status === 401 ? "Code invalide." : err.message) : "Vérification impossible.");
+        setError(err instanceof ApiError && err.status === 401 ? "Code invalide." : describeError(err, "Vérification impossible"));
       }
     } finally {
       setBusy(false);
