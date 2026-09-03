@@ -165,6 +165,7 @@ export function buildOpenApiDocument() {
       { name: "system", description: "Health & meta" },
       { name: "deals", description: "Deal read views, role-based (auth required)" },
       { name: "me", description: "Authenticated user's own resources" },
+      { name: "admin", description: "Back-office (chantier C, D54) — ADMIN session with TOTP only" },
     ],
     paths: {
       /* ── Meta ─────────────────────────────────────────────── */
@@ -562,6 +563,33 @@ export function buildOpenApiDocument() {
             "409": response409Settlement,
             "500": response500,
           },
+        },
+      },
+      "/admin/disputes": {
+        get: {
+          tags: ["admin"],
+          summary: "Arbitration queue (chantier C, D54) — open disputes + retentions held for mediation",
+          description:
+            "ADMIN session only (admin_access_token cookie carrying amr totp). One queue, two kinds: DISPUTE (DISPUTED + " +
+            "Dispute OPEN) and RETENTION (CANCELLED after departure without pickup, retentionDisposition HELD_FOR_MEDIATION, A81). " +
+            "Oldest first.",
+          operationId: "adminListArbitrationQueue",
+          security: authSecurity,
+          responses: { "200": jsonResponse("ArbitrationQueueResponse", "Queue"), "401": response401, "403": response403, "500": response500 },
+        },
+      },
+      "/admin/disputes/{id}": {
+        get: {
+          tags: ["admin"],
+          summary: "Mediation file (chantier C, D54) — both parties' evidence, money state, never the delivery code",
+          description:
+            "ADMIN session only. Declaration photos, pickup checklist + photos, tracking events, delivery photos, dispute file " +
+            "(description, photos, desired outcome), money snapshot and payout/refund state. Reading a file is journaled " +
+            "(AdminAction DISPUTE_VIEWED). 404 when the deal is not awaiting arbitration.",
+          operationId: "adminGetDisputeFile",
+          security: authSecurity,
+          parameters: [dealIdPathParam],
+          responses: { "200": jsonResponse("AdminDisputeFile", "File"), "401": response401, "403": response403, "404": response404, "500": response500 },
         },
       },
       "/me/wallet": {

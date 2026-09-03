@@ -41,6 +41,12 @@ model User {
   shipperLateCancellationsCount Int     @default(0) // annulations tardives ANN-01 (retenue > 0)
   parcelsSentCount    Int   @default(0)
 
+  // ── Chantier C (D54, 8A) : 2FA TOTP obligatoire pour les sessions admin ──
+  totpSecretEncrypted  String?   // AES-256-GCM (@packages/totp, clé TOTP_ENCRYPTION_KEY) — posé au setup, jamais servi
+  totpEnabledAt        DateTime? // null = 2FA non activée (un ADMIN sans 2FA ne peut PAS ouvrir de session admin)
+  totpLastUsedStep     Int?      // anti-rejeu : un pas de 30 s ne sert qu'une fois
+  totpBackupCodeHashes String[]  // SHA-256 des codes de secours restants (liste créée [] — pitfall Mongo)
+
   // Carrier onboarding
   carrierStatus CarrierStatus @default(NONE)
 
@@ -885,6 +891,25 @@ model Report {
   @@index([targetType, targetId])
   @@index([status, createdAt])
   @@index([reporterUserId])
+}
+
+/// Chantier C (D7, D54 8A) — journal d'audit : une ligne par geste admin,
+/// écrite dans la MÊME transaction que le geste (@packages/admin-audit).
+model AdminAction {
+  id          String  @id @default(auto()) @map("_id") @db.ObjectId
+  adminUserId String  @db.ObjectId
+  action      String // ADMIN_LOGIN | ADMIN_TOTP_ENABLED | DISPUTE_VIEWED | … (ADMIN_ACTIONS)
+  targetType  String // USER | BOOKING | DISPUTE | SESSION
+  targetId    String?
+  before      Json?
+  after       Json?
+  ip          String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([targetType, targetId])
+  @@index([adminUserId, createdAt])
 }
 
 // ─────────────────────────────────────────────

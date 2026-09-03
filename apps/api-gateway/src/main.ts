@@ -114,6 +114,15 @@ app.use(
   })
 );
 
+// /api/admin/disputes/* → deal-service reçoit /admin/disputes/* (chantier C, D54)
+// Le reste de /api/admin/* (me, audit) et /api/auth/admin/* → auth-service (catch-all).
+app.use(
+  "/api/admin/disputes",
+  proxy("http://localhost:6003", {
+    proxyReqPathResolver: (req) => `/admin/disputes${req.url}`,
+  })
+);
+
 // /api/me/wallet → deal-service reçoit /me/wallet
 // (Finances : portefeuille Voyageur + paiements Expéditeur — A83)
 app.use(
