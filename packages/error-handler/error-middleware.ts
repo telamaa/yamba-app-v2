@@ -44,7 +44,9 @@ export const errorMiddleware = (
 
       // Cas 2 : details a un type connu et "safe" → on l'expose toujours (même en prod)
       // Liste des types safe : "otp" (exponential backoff), à étendre selon les besoins
-      const safeTypes = ["otp", "booking"]; // "booking" : codes métier 409 du deal-service (B2)
+      // "booking" : codes métier 409 du deal-service (B2) · "password" / "register" :
+      // codes de règle (auth-service, recette 03/09) traduits par le front
+      const safeTypes = ["otp", "booking", "password", "register"];
       const detailsType = detailsObj.type as string | undefined;
 
       if (detailsType && safeTypes.includes(detailsType)) {

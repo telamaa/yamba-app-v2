@@ -10,6 +10,7 @@ import {
 } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useUiPreferences } from "@/components/providers/UiPreferencesProvider";
+import { otpCodeMessage, type OtpErrorCode } from "@/lib/auth/auth-error-codes";
 import { useForm } from "react-hook-form";
 import { useMutation } from "@tanstack/react-query";
 import { AlertTriangle, Clock, Loader2, ShieldCheck } from "lucide-react";
@@ -40,9 +41,11 @@ type VerifyFormData = {
 
 type OtpErrorDetails = {
   type?: string;
+  code?: OtpErrorCode;
   attemptsLeft?: number;
   locked?: boolean;
   lockUntilSeconds?: number;
+  otpInvalidated?: boolean;
 };
 
 type ErrorContext = {
@@ -121,11 +124,11 @@ function buildCopy(lang: string) {
       ? "La configuration de l'application est incomplète."
       : "Application configuration is incomplete.",
     attemptsLeftSingular: fr
-      ? "tentative restante avant verrouillage temporaire"
-      : "attempt left before temporary lock",
+      ? "essai restant avant invalidation du code"
+      : "attempt left before the code is invalidated",
     attemptsLeftPlural: fr
-      ? "tentatives restantes avant verrouillage temporaire"
-      : "attempts left before temporary lock",
+      ? "essais restants avant invalidation du code"
+      : "attempts left before the code is invalidated",
     incorrectCode: fr ? "Code incorrect." : "Incorrect code.",
     locked: fr ? "Compte verrouillé temporairement." : "Account temporarily locked.",
     lockedRetryIn: fr ? "Réessayez dans" : "Try again in",
@@ -328,10 +331,12 @@ export default function RegisterVerifyForm({ heroVisual }: Props) {
           startLockTimer(details.lockUntilSeconds);
         }
 
-        if (data?.message) {
-          setError("otp", { type: "server", message: data.message });
-          return;
-        }
+        // Jamais le message anglais brut de l'API : phrase construite du code
+        setError("otp", {
+          type: "server",
+          message: otpCodeMessage(fr, { ...details, type: "otp" }),
+        });
+        return;
       }
 
       if (data?.errors?.otp) {

@@ -23,6 +23,7 @@ import {
   sendPasswordChangedEmail,
   storePasswordResetToken,
   storePendingRegistration,
+  refreshPendingRegistration,
   storeRefreshSession,
   storeVerificationToken,
   trackForgotPasswordOtpRequests,
@@ -82,7 +83,13 @@ export const registerUser = async (req: Request, res: Response, next: NextFuncti
       where: { emailNormalized: emailKey },
     });
     if (existingUser) {
-      return next(new ValidationError("User already exists with this email!"));
+      return next(
+        new ValidationError("User already exists with this email!", {
+          type: "register",
+          code: "EMAIL_ALREADY_USED",
+          field: "email",
+        })
+      );
     }
 
     await checkOtpRestrictions(emailKey);
@@ -147,13 +154,21 @@ export const resendRegistrationOtp = async (
       where: { emailNormalized: emailKey },
     });
     if (existingUser) {
-      return next(new ValidationError("User already exists with this email!"));
+      return next(
+        new ValidationError("User already exists with this email!", {
+          type: "register",
+          code: "EMAIL_ALREADY_USED",
+          field: "email",
+        })
+      );
     }
 
     await checkOtpRestrictions(emailKey);
     await trackOtpRequests(emailKey);
 
     await sendOtp(pending.firstName, emailKey, "register-activation-mail");
+    // Le renvoi PROLONGE la fenêtre d'inscription (sinon : code valide, session morte)
+    await refreshPendingRegistration(emailKey);
 
     return res.status(200).json({
       message: "OTP sent again.",
@@ -244,7 +259,13 @@ export const verifyRegistrationOtp = async (
       where: { emailNormalized: emailKey },
     });
     if (existingUser) {
-      return next(new ValidationError("User already exists with this email!"));
+      return next(
+        new ValidationError("User already exists with this email!", {
+          type: "register",
+          code: "EMAIL_ALREADY_USED",
+          field: "email",
+        })
+      );
     }
 
     // ✨ NEW — Génération du slug public AVANT la transaction.
