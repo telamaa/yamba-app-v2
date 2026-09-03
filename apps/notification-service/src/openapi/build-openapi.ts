@@ -78,6 +78,18 @@ export function buildOpenApiDocument() {
           },
         },
       },
+      "/me/notifications/read-all": {
+        patch: {
+          summary: "Mark ALL my notifications as read (idempotent — A91)",
+          operationId: "markAllNotificationsRead",
+          security: authSecurity,
+          responses: {
+            "200": jsonResponse("MarkAllNotificationsReadResponse", "How many were unread"),
+            "401": response401,
+            "500": response500,
+          },
+        },
+      },
       "/me/notifications/{id}/read": {
         patch: {
           summary: "Mark one notification as read (idempotent)",

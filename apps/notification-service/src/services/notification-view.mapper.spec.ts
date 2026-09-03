@@ -28,12 +28,20 @@ describe("toNotificationView — whitelist A13", () => {
     const view = toNotificationView(makeLeakyRecord());
     expect(Object.keys(view).sort()).toEqual([
       "bookingId",
+      "counterpartFirstName",
       "createdAt",
       "id",
       "payload",
       "readAt",
       "type",
     ]);
+    expect(view.counterpartFirstName).toBeNull();
+    expect(toNotificationView(makeLeakyRecord(), "Thomas").counterpartFirstName).toBe("Thomas");
+  });
+
+  it("A87 : une notification SYSTÈME (carrier.payout_failed) passe le contrat", () => {
+    const record = { ...makeLeakyRecord(), type: "carrier.payout_failed", bookingId: null };
+    expect(toNotificationView(record).type).toBe("carrier.payout_failed");
   });
 
   it("sérialise createdAt en ISO et readAt null reste null", () => {

@@ -284,16 +284,17 @@ describe("matrice email (A35)", () => {
     }
   });
 
-  it("tracking_event : JAMAIS d'email (anti-spam)", () => {
-    const event = parse(
-      envelope("booking.tracking_event", {
-        ...basePayload(),
-        actor: "CARRIER" as const,
-        step: "AT_AIRPORT",
-        confirmedAt: "2026-07-19T12:00:00.000Z",
-      })
-    );
-    expect(resolveEmailRecipients(event)).toEqual([]);
+  it("tracking_event : aucun email pour AT_AIRPORT / FLIGHT_DEPARTED (anti-spam) ; l'ATTERRISSAGE écrit à l'Expéditeur (décision 03/09, 4A)", () => {
+    const step = (s: string) =>
+      parse(envelope("booking.tracking_event", { ...basePayload(), actor: "CARRIER" as const, step: s, confirmedAt: "2026-07-19T12:00:00.000Z" }));
+    expect(resolveEmailRecipients(step("AT_AIRPORT"))).toEqual([]);
+    expect(resolveEmailRecipients(step("FLIGHT_DEPARTED"))).toEqual([]);
+    expect(resolveEmailRecipients(step("FLIGHT_ARRIVED"))).toEqual([{ userId: OID.shipper, role: "SHIPPER" }]);
+    const built = buildBookingEmail(step("FLIGHT_ARRIVED"), "SHIPPER", "Naomi", { locale: "fr", counterpartFirstName: "Thomas" })!;
+    expect(built.template).toBe("settlement/flight-arrived-shipper");
+    expect(built.subject).toContain("Thomas a atterri");
+    expect(built.content!.paragraphs.join(" ")).toContain("code de livraison");
+    expect(buildBookingEmail(step("AT_AIRPORT"), "SHIPPER", "Naomi")).toBeNull();
   });
 
   it("toute règle non-null a un builder (aucune clé ne rend null une fois routée)", () => {
@@ -332,6 +333,8 @@ describe("matrice email (A35)", () => {
         "booking.payout_sent": payoutSentEvent(),
         "booking.disputed": disputedEvent(),
         "booking.verification_reminder": verificationReminderEvent(),
+        // 4A : la règle n'est non-null que pour l'atterrissage
+        "booking.tracking_event": envelope("booking.tracking_event", { ...basePayload(), actor: "CARRIER" as const, step: "FLIGHT_ARRIVED", confirmedAt: "2026-07-19T12:00:00.000Z" }),
       };
       const built = buildBookingEmail(parse(fixtures[eventType]), role, "Test");
       expect(built).not.toBeNull();

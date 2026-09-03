@@ -52,6 +52,7 @@ type EmailRule =
   | "CARRIER"
   | "BOTH"
   | "SHIPPER_PLUS_CARRIER_IF_WAS_ACCEPTED"
+  | "SHIPPER_IF_FLIGHT_ARRIVED"
   | null;
 
 export const EMAIL_MATRIX: Record<BookingEventKey, EmailRule> = {
@@ -64,7 +65,7 @@ export const EMAIL_MATRIX: Record<BookingEventKey, EmailRule> = {
   "booking.refund_issued": "SHIPPER",
   "booking.picked_up": "SHIPPER", // B3/A41 : « ton code est prêt dans ton suivi » (sans le code)
   "booking.pickup_refused": "SHIPPER", // B3/A41 : raison + remboursement annoncé (refund_issued suit)
-  "booking.tracking_event": null, // JAMAIS : push seul (anti-spam)
+  "booking.tracking_event": "SHIPPER_IF_FLIGHT_ARRIVED", // décision 03/09 (4A) : l'ATTERRISSAGE seul — « préviens le destinataire » ; les autres jalons : in-app seul (anti-spam)
   "booking.code_regenerated": "SHIPPER", // B3/A41 : email de sécurité (sans le code)
   "booking.delivered": "SHIPPER", // B3/A41 : « 3 jours pour confirmer ou signaler » (le Voyageur : in-app seul)
   "booking.completed": "SHIPPER", // B4/D52 : « paiement libéré » (le Voyageur reçoit payout_sent, pas deux emails)
@@ -95,6 +96,8 @@ export function resolveEmailRecipients(
       return [carrier];
     case "BOTH":
       return [shipper, carrier];
+    case "SHIPPER_IF_FLIGHT_ARRIVED":
+      return event.eventType === "booking.tracking_event" && event.payload.step === "FLIGHT_ARRIVED" ? [shipper] : [];
     case "SHIPPER_PLUS_CARRIER_IF_WAS_ACCEPTED":
       // Seul booking.cancelled porte cette règle (wasAccepted).
       return event.eventType === "booking.cancelled" &&
@@ -378,6 +381,12 @@ export function buildBookingEmail(
           transport: formatMoney(p.transportCents, p.currencyCode, locale),
         },
       };
+    case "booking.tracking_event": {
+      // 4A — seul l'atterrissage a un email (les autres jalons sont filtrés par la matrice).
+      if (event.payload.step !== "FLIGHT_ARRIVED") return null;
+      const built = SETTLEMENT_EMAILS[locale].flightArrivedShipper({ ...base });
+      return { subject: built.subject, template: "settlement/flight-arrived-shipper", data: {}, content: built.content };
+    }
     // ── B4 (D52) — dictionnaires par langue, gabarit partagé D44 ──
     case "booking.completed": {
       const built = SETTLEMENT_EMAILS[locale].completedShipper({

@@ -27,9 +27,61 @@ export type NotificationListItem = {
   bookingId: string | null;
   /** Payload d'événement (A15) — accès défensif via les helpers. */
   payload: Record<string, unknown>;
+  /** Prénom de l'autre partie (A91) — null si compte effacé / notification système. */
+  counterpartFirstName?: string | null;
   readAt: string | null;
   createdAt: string;
 };
+
+export type NotificationRole = "SHIPPER" | "CARRIER";
+
+/** Le rôle du lecteur dans le deal de la notification (A44). */
+export function readerRole(payload: Record<string, unknown>, userId: string | undefined): NotificationRole {
+  return userId && payload.carrierId === userId ? "CARRIER" : "SHIPPER";
+}
+
+type Translate = (key: string, values?: Record<string, string | number | Date>) => string;
+
+/**
+ * A91 (décision 2A) — titre et ligne PAR événement et PAR rôle, avec prénom,
+ * corridor et détail utile (jalon, montant, dossier, date). Les clés vivent
+ * dans `notifications.copy.<event>.<ROLE>` ; un jalon a sa propre entrée par
+ * étape. Tout vient de la charge utile servie — rien n'est recalculé.
+ */
+export function buildNotificationCopy(
+  item: NotificationListItem,
+  role: NotificationRole,
+  t: Translate,
+  locale: string
+): { title: string; line: string } {
+  const p = item.payload;
+  const name = item.counterpartFirstName ?? t("unknownName");
+  const route = getCorridorLabel(p) ?? "";
+  const weight = getWeightKg(p);
+  const fmtMoney = (cents: unknown, currency: unknown) =>
+    typeof cents === "number"
+      ? new Intl.NumberFormat(locale === "fr" ? "fr-FR" : "en-US", { style: "currency", currency: typeof currency === "string" ? currency : "EUR" }).format(cents / 100)
+      : "";
+  const fmtDate = (iso: unknown) =>
+    typeof iso === "string" ? new Intl.DateTimeFormat(locale === "fr" ? "fr-FR" : "en-US", { day: "numeric", month: "long" }).format(new Date(iso)) : "";
+  const values = {
+    name,
+    route,
+    weight: weight !== undefined ? `${weight} kg` : "",
+    amount: fmtMoney(p.amountCents, p.currencyCode),
+    net: fmtMoney(p.transportCents, p.currencyCode),
+    ticket: typeof p.ticketNumber === "string" ? p.ticketNumber : "",
+    date: fmtDate(p.payoutDueAt),
+  };
+  const key = item.type.replace(/\./g, "_");
+  if (item.type === "booking.tracking_event" && typeof p.step === "string") {
+    return { title: t(`copy.${key}.${role}.${p.step}.title`, values), line: t(`copy.${key}.${role}.${p.step}.line`, values) };
+  }
+  if (item.type === "booking.payout_sent" && p.reason === "LATE_CANCELLATION") {
+    return { title: t(`copy.${key}.${role}.lateTitle`, values), line: t(`copy.${key}.${role}.line`, values) };
+  }
+  return { title: t(`copy.${key}.${role}.title`, values), line: t(`copy.${key}.${role}.line`, values) };
+}
 
 export type NotificationTone = "amber" | "emerald" | "teal" | "red" | "slate";
 

@@ -10,12 +10,20 @@ import { z } from "zod";
 import { ObjectIdSchema } from "../common";
 import { BookingEventTypeSchema } from "../booking/booking-events.schema";
 
+/** Notifications qui ne viennent PAS d'un événement de deal (A87 : compte Stripe). */
+export const SYSTEM_NOTIFICATION_TYPES = ["carrier.payout_failed"] as const;
+export const NotificationTypeSchema = z
+  .union([BookingEventTypeSchema, z.enum(SYSTEM_NOTIFICATION_TYPES)])
+  .meta({ id: "NotificationType", description: "Booking event key, or a system notification (A87)" });
+
 export const NotificationViewSchema = z
   .object({
     id: ObjectIdSchema,
-    type: BookingEventTypeSchema,
+    type: NotificationTypeSchema,
     bookingId: ObjectIdSchema.nullable(),
     payload: z.record(z.string(), z.unknown()),
+    /** Prénom de l'AUTRE partie du deal (A91) — null si compte effacé ou notification système. */
+    counterpartFirstName: z.string().nullable(),
     readAt: z.iso.datetime().nullable(),
     createdAt: z.iso.datetime(),
   })
@@ -48,3 +56,11 @@ export const MarkNotificationReadResponseSchema = z
     description: "PATCH /me/notifications/{id}/read — the updated notification",
   });
 export type MarkNotificationReadResponse = z.infer<typeof MarkNotificationReadResponseSchema>;
+
+export const MarkAllNotificationsReadResponseSchema = z
+  .object({
+    updatedCount: z.int().nonnegative(),
+  })
+  .strict()
+  .meta({ id: "MarkAllNotificationsReadResponse", description: "PATCH /me/notifications/read-all — how many were unread" });
+export type MarkAllNotificationsReadResponse = z.infer<typeof MarkAllNotificationsReadResponseSchema>;

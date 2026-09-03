@@ -22,5 +22,223 @@
     "booking_rating_revealed": "Les notes sont révélées",
     "fallback": "Notification",
     "carrier_payout_failed": "Virement bancaire refusé : vérifie ton RIB"
+  },
+  "bellTitle": "Notifications",
+  "markAllRead": "Tout marquer lu",
+  "viewAll": "Voir toutes les notifications",
+  "unknownName": "un membre",
+  "copy": {
+    "booking_requested": {
+      "SHIPPER": {
+        "title": "Nouvelle demande",
+        "line": "{route}"
+      },
+      "CARRIER": {
+        "title": "Nouvelle demande de {name}",
+        "line": "{route} · {weight} · réponds sous 24 h"
+      }
+    },
+    "booking_payment_authorized": {
+      "SHIPPER": {
+        "title": "Paiement autorisé",
+        "line": "{route} · rien n'est débité avant l'acceptation"
+      },
+      "CARRIER": {
+        "title": "Paiement autorisé",
+        "line": "{route}"
+      }
+    },
+    "booking_accepted": {
+      "SHIPPER": {
+        "title": "{name} a accepté ta demande",
+        "line": "{route} · paiement débité, prise en charge à organiser"
+      },
+      "CARRIER": {
+        "title": "Demande acceptée",
+        "line": "{route} · {weight}"
+      }
+    },
+    "booking_declined": {
+      "SHIPPER": {
+        "title": "{name} n''a pas pu accepter",
+        "line": "{route} · tu n''es pas débité·e"
+      },
+      "CARRIER": {
+        "title": "Demande refusée",
+        "line": "{route}"
+      }
+    },
+    "booking_expired": {
+      "SHIPPER": {
+        "title": "Demande expirée",
+        "line": "{name} n''a pas répondu · tu n''es pas débité·e"
+      },
+      "CARRIER": {
+        "title": "Demande expirée",
+        "line": "{route} · sans réponse sous 24 h"
+      }
+    },
+    "booking_cancelled": {
+      "SHIPPER": {
+        "title": "Envoi annulé",
+        "line": "{route} · le remboursement est confirmé par email"
+      },
+      "CARRIER": {
+        "title": "{name} a annulé",
+        "line": "{route} · {weight} · ta capacité est libérée"
+      }
+    },
+    "booking_refund_issued": {
+      "SHIPPER": {
+        "title": "Remboursement émis",
+        "line": "{amount} · {route}"
+      },
+      "CARRIER": {
+        "title": "Remboursement émis",
+        "line": "{route}"
+      }
+    },
+    "booking_picked_up": {
+      "SHIPPER": {
+        "title": "{name} a pris ton colis en charge",
+        "line": "{route} · ton code de livraison est prêt dans ton suivi"
+      },
+      "CARRIER": {
+        "title": "Prise en charge confirmée",
+        "line": "{route} · {weight}"
+      }
+    },
+    "booking_pickup_refused": {
+      "SHIPPER": {
+        "title": "{name} n''a pas pu prendre ton colis",
+        "line": "{route} · remboursement intégral en cours"
+      },
+      "CARRIER": {
+        "title": "Prise en charge refusée",
+        "line": "{route}"
+      }
+    },
+    "booking_tracking_event": {
+      "SHIPPER": {
+        "AT_AIRPORT": {
+          "title": "{name} est à l''aéroport",
+          "line": "{route} · ton colis est avec {name}"
+        },
+        "FLIGHT_DEPARTED": {
+          "title": "Vol décollé · {name} est en route",
+          "line": "{route}"
+        },
+        "FLIGHT_ARRIVED": {
+          "title": "{name} a atterri · préviens le destinataire",
+          "line": "{route} · la remise approche, le code est dans ton suivi"
+        }
+      },
+      "CARRIER": {
+        "AT_AIRPORT": {
+          "title": "Jalon confirmé : à l''aéroport",
+          "line": "{route}"
+        },
+        "FLIGHT_DEPARTED": {
+          "title": "Jalon confirmé : décollage",
+          "line": "{route}"
+        },
+        "FLIGHT_ARRIVED": {
+          "title": "Jalon confirmé : atterrissage",
+          "line": "{route} · remets le colis contre le code"
+        }
+      }
+    },
+    "booking_code_regenerated": {
+      "SHIPPER": {
+        "title": "Nouveau code de livraison",
+        "line": "{route} · l''ancien code ne marche plus"
+      },
+      "CARRIER": {
+        "title": "Code de livraison renouvelé",
+        "line": "{route}"
+      }
+    },
+    "booking_delivered": {
+      "SHIPPER": {
+        "title": "Colis remis · vérifie avant le {date}",
+        "line": "{route} · confirme si tout va bien, ou signale un problème"
+      },
+      "CARRIER": {
+        "title": "Livraison validée",
+        "line": "{route} · versement après la vérification de {name}, le {date}"
+      }
+    },
+    "booking_completed": {
+      "SHIPPER": {
+        "title": "Transaction close · paiement de {name} libéré",
+        "line": "{route} · merci d''avoir expédié avec Yamba"
+      },
+      "CARRIER": {
+        "title": "Deal terminé · ton versement part",
+        "line": "{route} · {net}"
+      }
+    },
+    "booking_payout_sent": {
+      "SHIPPER": {
+        "title": "Versement parti",
+        "line": "{route}",
+        "lateTitle": "Versement parti"
+      },
+      "CARRIER": {
+        "title": "{amount} partis vers ton compte",
+        "line": "{route} · sur ton compte bancaire sous 2 à 7 jours",
+        "lateTitle": "{amount} de compensation partis vers ton compte"
+      }
+    },
+    "booking_disputed": {
+      "SHIPPER": {
+        "title": "Signalement {ticket} enregistré",
+        "line": "{route} · paiement gelé, réponse sous 48 h ouvrées"
+      },
+      "CARRIER": {
+        "title": "Signalement ouvert par {name} · {ticket}",
+        "line": "{route} · paiement en attente, on te contacte pour ta version"
+      }
+    },
+    "booking_verification_reminder": {
+      "SHIPPER": {
+        "title": "Dernier jour pour vérifier ton colis",
+        "line": "{route} · sans action, le paiement de {name} part le {date}"
+      },
+      "CARRIER": {
+        "title": "Vérification en cours",
+        "line": "{route}"
+      }
+    },
+    "booking_rating_reminder": {
+      "SHIPPER": {
+        "title": "Pense à noter {name}",
+        "line": "{route}"
+      },
+      "CARRIER": {
+        "title": "Pense à noter {name}",
+        "line": "{route}"
+      }
+    },
+    "booking_rating_revealed": {
+      "SHIPPER": {
+        "title": "Les notes sont révélées",
+        "line": "{route}"
+      },
+      "CARRIER": {
+        "title": "Les notes sont révélées",
+        "line": "{route}"
+      }
+    },
+    "carrier_payout_failed": {
+      "SHIPPER": {
+        "title": "Virement bancaire refusé",
+        "line": "Vérifie ton RIB sur Stripe"
+      },
+      "CARRIER": {
+        "title": "Virement bancaire refusé : vérifie ton RIB",
+        "line": "Ton argent reste sur ton compte de paiement · Finances → Stripe"
+      }
+    }
   }
 }

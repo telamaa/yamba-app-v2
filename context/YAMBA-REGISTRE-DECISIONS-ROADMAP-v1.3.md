@@ -356,6 +356,14 @@ Objectif produit assumé : **solide, propre, pro, secure, long terme** — les f
 
 ---
 
+## 2bis.26 — Session `feat/notifications-vivantes` (les notifications parlent et se rafraîchissent) — A91
+
+| # | Arbitrage | Pourquoi | Compromis | PR |
+|---|---|---|---|---|
+| A91 | **Notifications vivantes** (décisions utilisateur 03/09, 1A–4A) : (1) rafraîchissement par polling 30 s onglet visible + au retour sur l'onglet + invalidation après les gestes (pas de flux temps réel) ; (2) **copie par événement ET par rôle** (`notifications.copy.<event>.<ROLE>`, un jalon par étape), avec prénom de la contrepartie SERVI par l'API (`NotificationView.counterpartFirstName`, jointure au listing), corridor, montant, dossier, date — le front formate, ne recalcule rien ; (3) cloche desktop = menu des 5 dernières + « Tout marquer lu » (`PATCH /me/notifications/read-all`) + « Voir tout » ; (4) matrice A35 amendée : l'ATTERRISSAGE écrit à l'Expéditeur (« préviens le destinataire »), les autres jalons restent in-app. Le contrat `NotificationView.type` accepte les notifications SYSTÈME (`carrier.payout_failed`, A87) — le mapper strict les rejetait (bug latent de #139, corrigé ici) | Une notification qui ne dit ni qui ni quoi n'est pas lue ; une cloche figée ment ; l'atterrissage est le seul jalon où l'Expéditeur doit AGIR (prévenir le destinataire) | Polling = jusqu'à 30 s de retard ; un menu de plus dans le header | `feat/notifications-vivantes` |
+
+---
+
 # 3. Roadmap maîtresse
 
 ## 3.0 Les trois jalons

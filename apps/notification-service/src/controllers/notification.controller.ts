@@ -43,10 +43,43 @@ export async function getMyNotifications(
         },
       }),
     ]);
+    // A91 — le prénom de l'AUTRE partie (jointure explicite, une requête) :
+    // l'Expéditeur lit le Voyageur, le Voyageur lit l'Expéditeur.
+    const counterpartIds = new Set<string>();
+    for (const row of rows) {
+      const p = row.payload as { shipperId?: unknown; carrierId?: unknown };
+      const other = p.carrierId === userId ? p.shipperId : p.shipperId === userId ? p.carrierId : null;
+      if (typeof other === "string") counterpartIds.add(other);
+    }
+    const users = counterpartIds.size
+      ? await prisma.user.findMany({ where: { id: { in: [...counterpartIds] } }, select: { id: true, firstName: true } })
+      : [];
+    const firstNames = new Map(users.map((u) => [u.id, u.firstName]));
     res.json({
-      notifications: rows.map(toNotificationView),
+      notifications: rows.map((row) => {
+        const p = row.payload as { shipperId?: unknown; carrierId?: unknown };
+        const other = p.carrierId === userId ? p.shipperId : p.shipperId === userId ? p.carrierId : null;
+        return toNotificationView(row, typeof other === "string" ? (firstNames.get(other) ?? null) : null);
+      }),
       unreadCount,
     });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/** PATCH /me/notifications/read-all — idempotent (A91). */
+export async function markAllNotificationsRead(
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const updated = await prisma.notification.updateMany({
+      where: { userId: req.user.id, OR: [{ readAt: null }, { readAt: { isSet: false } }] },
+      data: { readAt: new Date() },
+    });
+    res.json({ updatedCount: updated.count });
   } catch (err) {
     next(err);
   }

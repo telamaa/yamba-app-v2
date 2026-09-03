@@ -2,21 +2,23 @@
 
 import { useEffect, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import { Bell, ChevronRight } from "lucide-react";
+import { Bell, CheckCheck, ChevronRight } from "lucide-react";
 import { Link } from "@/i18n/navigation";
 import useUser from "@/hooks/useUser";
 import { DashboardCopy } from "@/app/[locale]/dashboard/dashboard.copy";
 import SectionHeader from "@/components/dashboard/SectionHeader";
 import { EmptyState } from "@/components/dashboard/DashboardUI";
 import {
+  useMarkAllNotificationsRead,
   useMarkNotificationRead,
   useNotifications,
 } from "@/hooks/useNotifications";
 import {
   formatWhen,
+  buildNotificationCopy,
   getCorridorLabel,
+  readerRole,
   getNotificationPresentation,
-  getWeightKg,
   isKnownNotificationType,
   type NotificationTone,
 } from "@/components/dashboard/notifications/notifications.types";
@@ -45,6 +47,7 @@ export default function Notifications({ copy }: { copy: DashboardCopy }) {
   const locale = useLocale();
   const { data, isLoading } = useNotifications();
   const markRead = useMarkNotificationRead();
+  const markAll = useMarkAllNotificationsRead();
   const { user } = useUser();
   const userId: string | undefined = (user as { id?: string } | undefined)?.id;
   const [nowMs, setNowMs] = useState(() => Date.now());
@@ -68,6 +71,19 @@ export default function Notifications({ copy }: { copy: DashboardCopy }) {
             : copy.notifications.sub
         }
       />
+      {unreadCount > 0 && (
+        <div className="-mt-3 mb-4 flex justify-end">
+          <button
+            type="button"
+            onClick={() => markAll.mutate()}
+            disabled={markAll.isPending}
+            className="inline-flex items-center gap-1.5 rounded-full border border-slate-300 bg-white px-3 py-1.5 text-[12px] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
+          >
+            <CheckCheck size={13} aria-hidden="true" />
+            {t("markAllRead")}
+          </button>
+        </div>
+      )}
 
       {isLoading && (
         <div className="space-y-3">
@@ -94,16 +110,12 @@ export default function Notifications({ copy }: { copy: DashboardCopy }) {
             const p = getNotificationPresentation(item.type);
             const Icon = p.icon;
             const unread = item.readAt === null;
-            const title = isKnownNotificationType(item.type)
-              ? t(`items.${p.i18nKey}`)
-              : t("items.fallback");
-            const weight = getWeightKg(item.payload);
-            const sub = [
-              getCorridorLabel(item.payload),
-              weight !== undefined ? `${weight} kg` : undefined,
-            ]
-              .filter(Boolean)
-              .join(" · ");
+            // A91 — copie contextuelle par événement et par rôle (prénom, corridor, détail).
+            const copy = isKnownNotificationType(item.type)
+              ? buildNotificationCopy(item, readerRole(item.payload, userId), t, locale)
+              : { title: t("items.fallback"), line: getCorridorLabel(item.payload) ?? "" };
+            const title = copy.title;
+            const sub = copy.line;
             // A44 — destination : le deal (Voyageur) ou le suivi (Expéditeur)
             const carrierId = item.payload.carrierId;
             const href = item.bookingId
