@@ -240,10 +240,7 @@
   },
   "authGate": {
     "title": "Sign in to book",
-    "subtitle": "A booking commits a tripper: Yamba needs to know who is sending. Your parcel and this trip will be waiting after sign-in.",
-    "login": "Sign in",
-    "register": "Create an account",
-    "later": "Not now"
+    "subtitle": "A booking commits a tripper: Yamba needs to know who is sending. Your parcel and this trip will be waiting after sign-in."
   },
   "previousStep": "Previous step"
 }

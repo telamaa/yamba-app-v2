@@ -72,9 +72,9 @@ function buildCopy(lang: string) {
   const fr = lang === "fr";
   return {
     trust: fr ? "Inscription sécurisée" : "Secure signup",
-    title: fr ? "Devenez Yamber" : "Become a Yamber",
+    title: fr ? "Deviens Yamber" : "Become a Yamber",
     subtitle: fr
-      ? "Envoyez ou transportez des colis, en toute simplicité."
+      ? "Envoie ou transporte des colis, en toute simplicité."
       : "Send or transport parcels, simply.",
     google: fr ? "Continuer avec Google" : "Continue with Google",
     facebook: fr ? "Continuer avec Facebook" : "Continue with Facebook",
@@ -84,26 +84,26 @@ function buildCopy(lang: string) {
     lastName: fr ? "Nom" : "Last name",
     lastNamePh: fr ? "Diallo" : "Diallo",
     email: fr ? "E-mail" : "Email",
-    emailPh: fr ? "vous@email.com" : "you@email.com",
+    emailPh: fr ? "prenom@email.com" : "you@email.com",
     password: fr ? "Mot de passe" : "Password",
     passwordConfirm: fr ? "Confirmer le mot de passe" : "Confirm password",
     cta: fr ? "Créer mon compte" : "Create my account",
     ctaLoading: fr ? "Création…" : "Creating…",
     haveAccount: fr ? "Déjà membre ?" : "Already a member?",
-    login: fr ? "Connectez-vous" : "Sign in",
+    login: fr ? "Connecte-toi" : "Sign in",
     showPasswordAria: fr ? "Afficher le mot de passe" : "Show password",
     hidePasswordAria: fr ? "Masquer le mot de passe" : "Hide password",
     requiredFirstName: fr ? "Le prénom est requis." : "First name is required.",
     requiredLastName: fr ? "Le nom est requis." : "Last name is required.",
     requiredEmail: fr ? "L'e-mail est requis." : "Email is required.",
-    invalidEmail: fr ? "Veuillez saisir un e-mail valide." : "Please enter a valid email.",
+    invalidEmail: fr ? "Saisis un e-mail valide." : "Please enter a valid email.",
     requiredPassword: fr ? "Le mot de passe est requis." : "Password is required.",
     requiredPasswordConfirm: fr
-      ? "Veuillez confirmer le mot de passe."
+      ? "Confirme le mot de passe."
       : "Please confirm the password.",
     passwordMismatch: fr ? "Les mots de passe ne correspondent pas." : "Passwords do not match.",
     requiredTerms: fr
-      ? "Vous devez accepter les conditions pour continuer."
+      ? "Tu dois accepter les conditions pour continuer."
       : "You must accept the terms to continue.",
     cguTextStart: fr ? "J'accepte les" : "I accept the",
     cguLink1: fr ? "Conditions générales d'utilisation" : "Terms of Service",
@@ -116,7 +116,7 @@ function buildCopy(lang: string) {
       : "Application configuration is incomplete.",
     pasteBlockedTitle: fr ? "Collage désactivé" : "Paste disabled",
     pasteBlocked: fr
-      ? "Pour votre sécurité, veuillez ressaisir le mot de passe."
+      ? "Pour ta sécurité, ressaisis le mot de passe."
       : "For your security, please retype the password.",
     pwdPopover: {
       title: fr ? "Sécurité du mot de passe" : "Password security",
@@ -132,7 +132,7 @@ function buildCopy(lang: string) {
         uppercase: fr ? "Une majuscule" : "One uppercase letter",
         number: fr ? "Un chiffre" : "One number",
         special: fr ? "Un caractère spécial" : "One special character",
-        personalInfo: fr ? "Pas votre nom ou e-mail" : "Not your name or email",
+        personalInfo: fr ? "Pas ton nom ni ton e-mail" : "Not your name or email",
         simpleDate: fr ? "Pas une date évidente" : "Not an obvious date",
         predictable: fr ? "Pas de suite simple (1234, abcd)" : "No simple sequence (1234, abcd)",
       },
@@ -308,7 +308,7 @@ export default function RegisterForm({ heroVisual }: Props) {
   };
 
   const inputBase =
-    "mt-1.5 w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none " +
+    "mt-1.5 w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 text-base sm:text-sm text-slate-900 outline-none " +
     "transition-colors placeholder:text-slate-400 " +
     "focus:border-[#FF9900] focus:ring-4 focus:ring-[#FF9900]/20 " +
     "dark:border-slate-800 dark:bg-slate-950 dark:text-white dark:placeholder:text-slate-600 " +

@@ -87,14 +87,14 @@ function buildCopy(lang: string) {
       : "We've sent a 6-digit code to:",
     timerLabel: fr ? "Code valable" : "Code valid for",
     timerExpired: fr ? "Code expiré" : "Code expired",
-    otpLabel: fr ? "Saisissez votre code" : "Enter your code",
+    otpLabel: fr ? "Saisis ton code" : "Enter your code",
     otpHelp: fr
-      ? "Astuce : vous pouvez coller le code directement."
+      ? "Astuce : tu peux coller le code directement."
       : "Tip: you can paste the full code at once.",
     cta: fr ? "Valider mon code" : "Verify my code",
     ctaLoading: fr ? "Vérification…" : "Verifying…",
     resendText: fr
-      ? "Pas reçu le code ? Vérifiez vos spams ou"
+      ? "Pas reçu le code ? Vérifie tes spams ou"
       : "Didn't get the code? Check your spam or",
     resendCta: fr ? "Renvoyer le code" : "Resend code",
     resendCooldown: fr ? "Renvoyer dans" : "Resend in",
@@ -106,9 +106,9 @@ function buildCopy(lang: string) {
     wrongEmailQuestion: fr ? "Trompé d'adresse e-mail ?" : "Wrong email?",
     startOver: fr ? "Recommencer" : "Start over",
     missingEmail: fr
-      ? "Session expirée. Merci de recommencer la procédure."
+      ? "Session expirée. Recommence la procédure."
       : "Session expired. Please restart the recovery flow.",
-    incomplete: fr ? "Veuillez saisir le code complet." : "Please enter the full code.",
+    incomplete: fr ? "Saisis le code complet." : "Please enter the full code.",
     invalidOtp: fr ? "Code invalide ou expiré." : "Invalid or expired code.",
     genericError: fr
       ? "Validation impossible pour le moment."
@@ -124,10 +124,10 @@ function buildCopy(lang: string) {
       ? "essais restants avant invalidation du code"
       : "attempts left before the code is invalidated",
     incorrectCode: fr ? "Code incorrect." : "Incorrect code.",
-    locked: fr ? "Compte verrouillé temporairement." : "Account temporarily locked.",
-    lockedRetryIn: fr ? "Réessayez dans" : "Try again in",
+    locked: fr ? "Saisie bloquée temporairement." : "Account temporarily locked.",
+    lockedRetryIn: fr ? "Réessaie dans" : "Try again in",
     lockedTip: fr
-      ? "Pour votre sécurité, votre compte est verrouillé suite à plusieurs tentatives incorrectes."
+      ? "Pour ta sécurité, la saisie est bloquée après plusieurs tentatives incorrectes."
       : "For your security, your account has been locked due to multiple incorrect attempts.",
   };
 }

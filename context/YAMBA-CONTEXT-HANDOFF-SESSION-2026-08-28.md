@@ -413,7 +413,7 @@ mobile-first, aucune attribution Claude, charte mango/teal/slate.
 2. `feat/email-locale` — **FAIT, en PR** (D44 + D45 dans les emails, A55–A57 ; plateforme 610 + auth 59).
 3. `feat/booking-auth-modal` — **FAIT, en PR** (A58 ; branchée sur `feat/email-locale`).
 4. `feat/trip-favorites` — **FAIT, en PR** (D46, A59 ; trip-service 198).
-5. `feat/auth-pages-ux` — tutoiement, faux chiffres, vocabulaire du rôle à trancher, mobile natif (P2).
+5. `feat/auth-pages-ux` — **FAIT, en PR** (D45 pages auth, A60 : porte « Partager un trajet » en modale, demande utilisateur 03/09). Vocabulaire du rôle toujours ouvert.
 6. `feat/auth-google` — avec l'écran de consentement CGU (P2).
 7. `chore/api-same-origin` — rewrite Next `/api` → gateway (P3).
 

@@ -731,3 +731,24 @@ Un Expéditeur compare plusieurs trajets avant de réserver. Il doit pouvoir en 
 | H7 | `POST /trips/:id/favorite` sur un trajet en pause | 409 `TRIP_NOT_FAVORITABLE`, cœur revenu à vide, toast « n'est plus disponible » |
 | H8 | Trajet en favori qui passe COMPLETED | Toujours listé dans « Mes favoris » ; retrait possible |
 | H9 | Voyageur du trajet | Aucune notification, aucun email, aucun compteur visible |
+
+# feat/auth-pages-ux — Yamba te tutoie, ne ment pas sur ses chiffres, et te demande ton identité au bon moment
+
+### 1. Le besoin
+Une seule voix (tutoiement, D45) sur tout le parcours d'entrée ; un panneau d'accueil qui dit ce que le produit garantit vraiment ; et « Partager un trajet » qui, comme « Réserver », demande l'identité sans faire perdre la page.
+
+### 2. Règles de gestion
+- **RG-C-19 — Toute action réservée aux membres ouvre la même porte d'identité, avec les mots de l'action.** « Connecte-toi pour réserver », « Connecte-toi pour partager un trajet » : même fenêtre, même retour à l'intention de départ, jamais une redirection sèche.
+- Rappel D45 : tutoiement sur l'interface, les emails et les erreurs ; aucun chiffre ni témoignage inventé ; les textes juridiques restent au vouvoiement.
+
+### 3. Recette
+| # | Scénario | Attendu |
+|---|---|---|
+| I1 | Visiteur, « Partager un trajet » (desktop, mobile, icône +) | Fenêtre « Connecte-toi pour partager un trajet », page inchangée derrière |
+| I2 | « Se connecter » puis connexion | Atterrissage sur le formulaire de création de trajet |
+| I3 | « Plus tard » / Échap | Fenêtre fermée, page inchangée |
+| I4 | Connecté, « Partager un trajet » | Formulaire de création directement |
+| I5 | Pages login / inscription / OTP / mot de passe | Aucun « vous », « votre », « veuillez » ; boutons et erreurs au tutoiement |
+| I6 | Panneau gauche (desktop) | Trois promesses (compte vérifié, débité à l'acceptation, Garantie Yamba) ; plus de « 12k+ », « 4.8 », ni de témoignage |
+| I7 | iPhone, focus sur un champ de connexion | Pas de zoom automatique |
+| I8 | Réserver, visiteur | Fenêtre inchangée par rapport à #118 (mêmes boutons, retour wizard) |

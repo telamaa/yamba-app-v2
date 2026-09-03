@@ -55,27 +55,27 @@ function buildCopy(lang: string) {
   const fr = lang === "fr";
   return {
     trust: fr ? "Connexion sécurisée" : "Secure connection",
-    title: fr ? "Connectez-vous" : "Sign in to Yamba",
+    title: fr ? "Connecte-toi" : "Sign in to Yamba",
     subtitle: fr
-      ? "Reprenez là où vous vous êtes arrêté."
+      ? "Reprends là où tu t'es arrêté·e."
       : "Pick up where you left off.",
     google: fr ? "Continuer avec Google" : "Continue with Google",
     facebook: fr ? "Continuer avec Facebook" : "Continue with Facebook",
     orMail: fr ? "ou par e-mail" : "or with email",
     email: fr ? "E-mail" : "Email",
-    emailPh: fr ? "vous@email.com" : "you@email.com",
+    emailPh: fr ? "prenom@email.com" : "you@email.com",
     password: fr ? "Mot de passe" : "Password",
     forgot: fr ? "Oublié ?" : "Forgot?",
     remember: fr ? "Rester connecté" : "Stay signed in",
     cta: fr ? "Se connecter" : "Sign in",
     ctaLoading: fr ? "Connexion…" : "Signing in…",
     notMemberYet: fr ? "Pas encore membre ?" : "Not a member yet?",
-    signup: fr ? "Inscrivez-vous" : "Sign up",
+    signup: fr ? "Inscris-toi" : "Sign up",
     showPasswordAria: fr ? "Afficher le mot de passe" : "Show password",
     hidePasswordAria: fr ? "Masquer le mot de passe" : "Hide password",
     requiredEmail: fr ? "L'e-mail est requis." : "Email is required.",
     invalidEmail: fr
-      ? "Veuillez saisir un e-mail valide."
+      ? "Saisis un e-mail valide."
       : "Please enter a valid email.",
     requiredPassword: fr
       ? "Le mot de passe est requis."
@@ -97,10 +97,10 @@ function buildCopy(lang: string) {
       ? "La configuration de l'application est incomplète."
       : "Application configuration is incomplete.",
     networkError: fr
-      ? "Impossible de joindre le serveur. Vérifiez votre connexion."
+      ? "Impossible de joindre le serveur. Vérifie ta connexion."
       : "Unable to reach the server. Please check your connection.",
     rateLimitError: fr
-      ? "Trop de tentatives. Réessayez dans quelques instants."
+      ? "Trop de tentatives. Réessaie dans quelques instants."
       : "Too many attempts. Please try again in a moment.",
   };
 }
@@ -263,7 +263,7 @@ export default function LoginForm({ heroVisual }: Props) {
 
   // ====== Styles centralisés ======
   const inputBase =
-    "mt-1.5 w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none " +
+    "mt-1.5 w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 text-base sm:text-sm text-slate-900 outline-none " +
     "transition-colors placeholder:text-slate-400 " +
     "focus:border-[#FF9900] focus:ring-4 focus:ring-[#FF9900]/20 " +
     "dark:border-slate-800 dark:bg-slate-950 dark:text-white dark:placeholder:text-slate-600 " +

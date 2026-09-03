@@ -171,9 +171,18 @@
     "today": "Today"
   },
   "lightbox": {
-      "close": "Close",
-      "previous": "Previous photo",
-      "next": "Next photo",
-      "counter": "{current} / {total}"
+    "close": "Close",
+    "previous": "Previous photo",
+    "next": "Next photo",
+    "counter": "{current} / {total}"
+  },
+  "authGate": {
+    "login": "Sign in",
+    "register": "Create an account",
+    "later": "Not now",
+    "shareTrip": {
+      "title": "Sign in to share a trip",
+      "subtitle": "Publishing a trip commits an identified carrier: Yamba needs to know who is carrying. Your trip will be waiting after sign-in."
+    }
   }
 }

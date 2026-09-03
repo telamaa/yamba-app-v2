@@ -215,6 +215,10 @@ Ordre de demarrage : auth -> trip -> gateway.
   feat/trip-favorites (D46, A59) — TripFavorite, POST/DELETE /trips/:id/favorite,
   GET /trips/favorites, isFavorite sur recherche + fiche (authent optionnelle),
   coeur optimiste, page « Mes favoris » ; trip-service 198 tests. Plateforme 621.
+- 03/09 : feat/auth-pages-ux (D45, A60) — tutoiement des six formulaires auth,
+  promesses produit a la place des faux chiffres, champs 16 px mobile,
+  AuthGateModal generique + porte « Partager un trajet » en modale (demande
+  utilisateur). Reste ouvert : nom du role (Yamber / Tripper / Voyageur).
 - Plateforme de tests : 600 (trip 187, deal 354, notification 59) — post-B3 (#96).
 - MERGE 01/09 : toute la pile B2 est dans `dev` via la SEULE **PR #90**
   (`feat/b2-deal-front` portait la chaîne complète : jalons mobile D36,
