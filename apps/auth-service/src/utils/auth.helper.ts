@@ -2,7 +2,9 @@
 import { ValidationError } from "@packages/error-handler";
 import crypto from "node:crypto";
 import redis from "@packages/libs/redis";
-import { sendEmail } from "./sendMail";
+import { sendAuthEmail } from "../emails/send-auth-email";
+import { getAuthEmails } from "../emails/auth-emails";
+import { resolveLocale } from "@packages/api-contracts";
 import { getOtpFailurePolicy, formatLockDuration } from "./otp-policy";
 import { validatePasswordStrength } from "./password-rules";
 
@@ -91,6 +93,8 @@ export type PendingRegistration = {
   consentIp?: string;
   consentUserAgent?: string;
   consentLocale?: string;
+  /** D44 — locale résolue à l'inscription (x-locale), copiée sur User.preferredLocale. */
+  preferredLocale?: string;
 };
 
 type OtpScope = "register" | "forgot";
@@ -268,16 +272,14 @@ const sendOtpScoped = async (
   scope: OtpScope,
   firstName: string,
   emailKey: string,
-  template: string,
-  subject: string
+  locale: string | null | undefined
 ) => {
   // 🔒 OTP 6 chiffres (standard 2026)
   const otp = crypto.randomInt(100000, 1000000).toString();
-  await sendEmail(emailKey, subject, template, {
-    firstName,
-    otp,
-    expiresInMinutes: OTP_TTL_MINUTES,
-  });
+  const emails = getAuthEmails(locale);
+  const params = { firstName, otp, expiresInMinutes: OTP_TTL_MINUTES };
+  const email = scope === "register" ? emails.verifyEmail(params) : emails.resetPassword(params);
+  await sendAuthEmail(emailKey, locale, email);
   await redis.set(keys.otp(scope, emailKey), otp, "EX", OTP_TTL_SECONDS);
   await redis.set(
     keys.otpCooldown(scope, emailKey),
@@ -295,7 +297,12 @@ const sendOtpScoped = async (
  * Le compteur d'échecs persiste 24 h. Le renvoi ne remet PAS le compteur à zéro
  * (sécurité) — il fournit seulement un nouveau code.
  */
-const verifyOtpScoped = async (scope: OtpScope, emailKey: string, otp: string) => {
+const verifyOtpScoped = async (
+  scope: OtpScope,
+  emailKey: string,
+  otp: string,
+  locale: string | null | undefined
+) => {
   // 1. Vérifier si lock actif
   const existingLockTtl = await redis.ttl(keys.otpLock(scope, emailKey));
   if (existingLockTtl > 0) {
@@ -352,7 +359,7 @@ const verifyOtpScoped = async (scope: OtpScope, emailKey: string, otp: string) =
     await redis.set(keys.otpLock(scope, emailKey), "locked", "EX", policy.lockSeconds);
 
     if (policy.securityAlert) {
-      await maybeSendSecurityAlert(scope, emailKey);
+      await maybeSendSecurityAlert(scope, emailKey, locale, currentAttempt, policy.lockSeconds);
     }
 
     throw new ValidationError(
@@ -381,36 +388,32 @@ const verifyOtpScoped = async (scope: OtpScope, emailKey: string, otp: string) =
 };
 
 /**
- * Envoie un email d'alerte sécurité au 6ème échec OTP.
+ * Envoie un email d'alerte sécurité à partir du 10e échec OTP (palier 2, A50).
  * Une seule alerte par session de tentatives (pour ne pas spammer).
  */
-async function maybeSendSecurityAlert(scope: OtpScope, emailKey: string) {
+async function maybeSendSecurityAlert(
+  scope: OtpScope,
+  emailKey: string,
+  locale: string | null | undefined,
+  attemptCount: number,
+  lockSeconds: number
+) {
   const alertedKey = keys.otpSecurityAlerted(scope, emailKey);
   const alreadySent = await redis.get(alertedKey);
   if (alreadySent) return;
 
   await redis.set(alertedKey, "1", "EX", OTP_FAILED_COUNTER_TTL);
 
-  const isRegister = scope === "register";
-
-  try {
-    await sendEmail(
-      emailKey,
-      isRegister
-        ? "Activité suspecte sur votre inscription Yamba"
-        : "Activité suspecte sur votre compte Yamba",
-      "security-alert-mail",
-      {
-        scope,
-        scopeLabel: isRegister ? "inscription" : "réinitialisation de mot de passe",
-        attemptCount: 6,
-        lockDuration: "24 heures",
-        supportEmail: "support@yamba.com",
-      }
-    );
-  } catch (error) {
-    console.error("[security-alert] Failed to send alert email:", error);
-  }
+  await sendAuthEmail(
+    emailKey,
+    locale,
+    getAuthEmails(locale).securityAlert({
+      scope,
+      attemptCount,
+      lockSeconds,
+      supportEmail: "support@yamba.com",
+    })
+  );
 }
 
 // ─── Exports backward-compatible ──────────────────────────
@@ -420,11 +423,17 @@ export const checkOtpRestrictions = async (emailKey: string) =>
 export const trackOtpRequests = async (emailKey: string) =>
   trackOtpRequestsScoped("register", emailKey);
 
-export const sendOtp = async (firstName: string, emailKey: string, template: string) =>
-  sendOtpScoped("register", firstName, emailKey, template, "Ton code d'activation Yamba");
+export const sendOtp = async (
+  firstName: string,
+  emailKey: string,
+  locale: string | null | undefined
+) => sendOtpScoped("register", firstName, emailKey, locale);
 
-export const verifyOtp = async (emailKey: string, otp: string) =>
-  verifyOtpScoped("register", emailKey, otp);
+export const verifyOtp = async (
+  emailKey: string,
+  otp: string,
+  locale: string | null | undefined
+) => verifyOtpScoped("register", emailKey, otp, locale);
 
 export const checkForgotPasswordOtpRestrictions = async (emailKey: string) =>
   checkOtpRestrictionsScoped("forgot", emailKey);
@@ -435,11 +444,14 @@ export const trackForgotPasswordOtpRequests = async (emailKey: string) =>
 export const sendForgotPasswordOtp = async (
   firstName: string,
   emailKey: string,
-  template: string
-) => sendOtpScoped("forgot", firstName, emailKey, template, "Ton code de réinitialisation Yamba");
+  locale: string | null | undefined
+) => sendOtpScoped("forgot", firstName, emailKey, locale);
 
-export const verifyForgotPasswordOtpCode = async (emailKey: string, otp: string) =>
-  verifyOtpScoped("forgot", emailKey, otp);
+export const verifyForgotPasswordOtpCode = async (
+  emailKey: string,
+  otp: string,
+  locale: string | null | undefined
+) => verifyOtpScoped("forgot", emailKey, otp, locale);
 
 /** ---------- Pending Registration ---------- */
 export const storePendingRegistration = async (
@@ -622,10 +634,8 @@ export const revokeRefreshJti = async (userId: string, jti?: string) => {
   }
 };
 
-/** ---------- Email helpers ---------- */
+/** ---------- Email helpers (D44 : locale du destinataire) ---------- */
 type PasswordChangedEmailPayload = {
-  firstName?: string;
-  name?: string;
   changedAt?: string;
   ip?: string;
   userAgent?: string;
@@ -635,18 +645,21 @@ type PasswordChangedEmailPayload = {
 export const sendPasswordChangedEmail = async (
   firstName: string | undefined,
   emailKey: string,
-  payload?: Omit<PasswordChangedEmailPayload, "firstName">
+  locale: string | null | undefined,
+  payload?: PasswordChangedEmailPayload
 ) => {
-  return sendEmail(
+  return sendAuthEmail(
     emailKey,
-    "Mot de passe modifié - Yamba",
-    "password-changed-mail",
-    { firstName, ...(payload ?? {}) }
+    locale,
+    getAuthEmails(locale).passwordChanged({
+      firstName,
+      ...(payload ?? {}),
+      supportEmail: "support@yamba.com",
+    })
   );
 };
 
 type AccountCreatedEmailPayload = {
-  firstName?: string;
   loginUrl?: string;
   supportEmail?: string;
 };
@@ -654,16 +667,24 @@ type AccountCreatedEmailPayload = {
 export const sendAccountCreatedEmail = async (
   firstName: string | undefined,
   emailKey: string,
-  payload?: Omit<AccountCreatedEmailPayload, "firstName">
+  locale: string | null | undefined,
+  payload?: AccountCreatedEmailPayload
 ) => {
-  return sendEmail(
+  return sendAuthEmail(
     emailKey,
-    "Bienvenue sur Yamba 🎉",
-    "account-created-mail",
-    {
+    locale,
+    getAuthEmails(locale).accountCreated({
       firstName,
       loginUrl: payload?.loginUrl,
       supportEmail: payload?.supportEmail ?? "support@yamba.com",
-    }
+    })
   );
+};
+
+/** Locale d'une requête HTTP (x-locale, sinon Accept-Language) — résolue. */
+export const localeFromHeaders = (headers: Record<string, unknown>): string => {
+  const x = headers["x-locale"];
+  if (typeof x === "string" && x) return resolveLocale(x);
+  const accept = headers["accept-language"];
+  return resolveLocale(typeof accept === "string" ? accept : undefined);
 };

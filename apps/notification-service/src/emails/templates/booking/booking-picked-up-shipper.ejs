@@ -20,13 +20,13 @@
                         </p>
                         <p style="margin:0 0 16px 0;font-size:15px;line-height:1.6;color:#334155;">
                             <%= locale === "fr"
-                                    ? `Le Voyageur a confirmé la prise en charge de ton colis ${route} (${weightKg} kg) le ${pickedUpAt}, après inspection et ${photoCount} photo(s) de traçabilité.`
-                                    : `The carrier confirmed the pickup of your parcel ${route} (${weightKg} kg) on ${pickedUpAt}, after inspection and ${photoCount} traceability photo(s).` %>
+                                    ? `${counterpartFirstName || "Ton Voyageur"} a confirmé la prise en charge de ton colis ${route} (${weightKg} kg) le ${pickedUpAt}, après inspection et ${photoCount} photo(s) de traçabilité.`
+                                    : `${counterpartFirstName || "Your carrier"} confirmed the pickup of your parcel ${route} (${weightKg} kg) on ${pickedUpAt}, after inspection and ${photoCount} traceability photo(s).` %>
                         </p>
                         <p style="margin:0 0 24px 0;font-size:14px;line-height:1.6;color:#64748b;">
                             <%= locale === "fr"
-                                    ? "Ton code de remise est prêt dans ton suivi : transmets-le au destinataire (WhatsApp, SMS, appel) — il le donnera au Voyageur pour valider la livraison. Pour ta sécurité, il ne figure jamais dans un email."
-                                    : "Your handover code is ready in your tracker: share it with the recipient (WhatsApp, SMS, call) — they will give it to the carrier to validate the delivery. For your safety, it never appears in an email." %>
+                                    ? `Ton code de remise est prêt dans ton suivi : transmets-le au destinataire (WhatsApp, SMS, appel) — il le donnera à ${counterpartFirstName || "ton Voyageur"} pour valider la livraison. Pour ta sécurité, il ne figure jamais dans un email.`
+                                    : `Your handover code is ready in your tracker: share it with the recipient (WhatsApp, SMS, call) — they will give it to ${counterpartFirstName || "your carrier"} to validate the delivery. For your safety, it never appears in an email.` %>
                         </p>
                         <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
                             <tr>

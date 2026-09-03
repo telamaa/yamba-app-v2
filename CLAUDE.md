@@ -41,7 +41,7 @@ npx prisma db push                 # sync schema to MongoDB (no migrations — M
 npm run auth-docs                  # regenerate auth swagger-output.json (swagger-autogen — legacy, conversion to Zod-OpenAPI is backlog)
 ```
 
-Test platform baseline: **601 tests** (trip-service 187, deal-service 355, notification-service 59) — any deviation must be explained.
+Test platform baseline: **610 tests** (trip-service 187, deal-service 355, notification-service 68) + auth-service 59 (also a CI check) — any deviation must be explained.
 
 Manual `tsc` (when Nx typecheck target is not what you want): `npx tsc --noEmit --project apps/<service>/tsconfig.app.json` — NEVER `--project apps/<service>` (resolves the solution-style tsconfig: 0 files checked).
 
@@ -49,7 +49,7 @@ No linter is configured (Nx generators use `linter: none`). Root `.env` holds al
 
 ## Git & CI
 
-- Base branch `dev`, protected by **12 required status checks** (TypeScript ×6, unit tests ×3: deal/notification/trip, i18n FR/EN mirror, secrets anti-leak, OpenAPI contracts generate+diff). Never commit directly to `dev`: `feat/*` or `chore/*` branch + PR.
+- Base branch `dev`, protected by **13 required status checks** (TypeScript ×6, unit tests ×4: auth/deal/notification/trip, i18n FR/EN mirror, secrets anti-leak, OpenAPI contracts generate+diff). Never commit directly to `dev`: `feat/*` or `chore/*` branch + PR.
 - "CI OK" is verified by COUNTING checks, not by their color alone.
 - Tests live in the SAME PR as their logic (decision D30). PR number is recorded at merge time.
 - `git status --short` before staging; `git add` always WITH an explicit pathspec; `git log --oneline -1` right after each commit.
@@ -77,6 +77,7 @@ Requests flow: `user-ui (3000)` → `api-gateway (8080)` → microservices. The 
 - `packages/api-contracts` — Zod schemas + shared status sets, single source for OpenAPI; alias declared BEFORE the `@packages/*` wildcard in `tsconfig.base.json`
 - `packages/libs/payments` — `PaymentProvider` abstraction (D11/D38): Stripe (manual capture) + Fake (dev/tests, refused in production); factory from env
 - `packages/messaging` — `EventPublisher` interface; kafkajs isolated here (connection errors come back `retriable: false` — intercept explicitly)
+- `packages/libs/email` — shared transactional mailer (D41/D44): lazy SMTP transport, `sendTemplatedEmail` (per-service EJS files, legacy) and `sendTransactionalEmail` (ONE embedded EJS layout string + `EmailContent` data). auth-service emails are per-locale dictionaries (`apps/auth-service/src/emails/auth-emails.ts`). The locale list lives ONLY in `packages/libs/api-contracts/src/locale.ts` (`SUPPORTED_LOCALES`, `resolveLocale`); the front consumes it through the dedicated alias `@packages/api-contracts/locale`. Never write a new `fr ? … : …` — add a dictionary entry. Email language = the RECIPIENT's `User.preferredLocale`; account-less flows use the request locale (`x-locale` header sent by the API clients).
 - `packages/libs/delivery-code` — delivery code (D43): CSPRNG 6 digits, bcrypt hash (validation) + AES-256-GCM `deliveryCodeEncrypted` (shipper re-display, `DELIVERY_CODE_ENCRYPTION_KEY`, dev key fallback outside production). Zero infra deps — also imported relatively by the seed. New `@packages/*` aliases must ALSO be added to each consuming service's `webpack.config.js` (`resolve.alias`) — tsc resolves `tsconfig.base.json`, `nx serve` does not.
 
 ### Auth flow

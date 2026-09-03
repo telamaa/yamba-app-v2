@@ -24,6 +24,11 @@ model User {
   birthDate       DateTime?
   roles           Role[]    @default([SHIPPER])
 
+  // D44 — langue des emails et de l'interface (code court : "fr", "en", …).
+  // Initialisée à l'inscription depuis l'en-tête x-locale, mise à jour quand
+  // l'utilisateur bascule la langue dans le header. Liste : SUPPORTED_LOCALES.
+  preferredLocale String    @default("fr")
+
   // Slug public unique pour la page profil /u/[slug]
   publicSlug String? @unique
 

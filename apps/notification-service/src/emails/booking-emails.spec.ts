@@ -176,11 +176,13 @@ const CARRIER_USER = {
   id: OID.carrier,
   email: "carrier@spec.test",
   firstName: "Awa",
+  preferredLocale: "en",
 };
 const SHIPPER_USER = {
   id: OID.shipper,
   email: "shipper@spec.test",
   firstName: "Naomi",
+  preferredLocale: "fr",
 };
 
 beforeEach(() => {
@@ -463,5 +465,44 @@ describe("dispatch (A36 — claim-first, best-effort)", () => {
       "booking/booking-cancelled-shipper",
       "booking/booking-cancelled-carrier",
     ]);
+  });
+});
+
+/* ── D44/D45 — locale du destinataire, prénom de la contrepartie ── */
+
+describe("D44/D45 — locale du destinataire et prénom de la contrepartie", () => {
+  it("buildBookingEmail : la locale demandée pilote le sujet et l'URL, repli fr", () => {
+    const event = parse(deliveredEvent());
+    const en = buildBookingEmail(event, "SHIPPER", "Naomi", { locale: "en-US" })!;
+    expect(en.subject).toMatch(/^Your parcel/);
+    expect(en.data.locale).toBe("en");
+    expect(String(en.data.ctaUrl)).toContain("/en/bookings/");
+    const fallback = buildBookingEmail(event, "SHIPPER", "Naomi", { locale: "de" })!;
+    expect(fallback.data.locale).toBe("fr");
+    const legacy = buildBookingEmail(event, "SHIPPER", "Naomi")!;
+    expect(legacy.data.locale).toBe("fr");
+    expect(legacy.data.counterpartFirstName).toBeNull();
+  });
+
+  it("dispatch : l'email du Voyageur part dans SA langue (en) avec le prénom de l'Expéditrice", async () => {
+    const logger = buildLogger();
+    await dispatchBookingEmails("evt-d44", parse(requestedEvent()), logger);
+    expect(emailMock.sendTemplatedEmail).toHaveBeenCalledTimes(1);
+    const sent = emailMock.sendTemplatedEmail.mock.calls[0][0];
+    expect(sent.to).toBe(CARRIER_USER.email);
+    expect(sent.subject).toMatch(/^New transport request/);
+    expect(sent.data.locale).toBe("en");
+    expect(sent.data.counterpartFirstName).toBe("Naomi");
+    // Les DEUX parties sont chargées, même quand une seule reçoit l'email.
+    const where = prismaMock.user.findMany.mock.calls[0][0].where.id.in as string[];
+    expect(where).toEqual(expect.arrayContaining([OID.carrier, OID.shipper]));
+  });
+
+  it("dispatch : contrepartie effacée → prénom null, l'email part quand même", async () => {
+    const logger = buildLogger();
+    prismaMock.user.findMany.mockResolvedValue([CARRIER_USER]);
+    await dispatchBookingEmails("evt-d45", parse(requestedEvent()), logger);
+    expect(emailMock.sendTemplatedEmail).toHaveBeenCalledTimes(1);
+    expect(emailMock.sendTemplatedEmail.mock.calls[0][0].data.counterpartFirstName).toBeNull();
   });
 });

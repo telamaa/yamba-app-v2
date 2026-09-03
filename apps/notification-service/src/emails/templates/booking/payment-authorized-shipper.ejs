@@ -35,8 +35,8 @@
                         </table>
                         <p style="margin:0 0 24px 0;font-size:14px;line-height:1.6;color:#64748b;">
                             <%= locale === "fr"
-                                    ? "Rien n'est débité tant que le Voyageur n'a pas accepté. S'il refuse ou ne répond pas sous 24 h, l'autorisation est levée et tu n'es pas débité·e."
-                                    : "Nothing is charged until the carrier accepts. If they decline or do not answer within 24 hours, the authorization is released and you are not charged." %>
+                                    ? `Rien n'est débité tant que ${counterpartFirstName || "le Voyageur"} n'a pas accepté. En cas de refus ou sans réponse sous 24 h, l'autorisation est levée et tu n'es pas débité·e.`
+                                    : `Nothing is charged until ${counterpartFirstName || "the carrier"} accepts. If they decline or do not answer within 24 hours, the authorization is released and you are not charged.` %>
                         </p>
                         <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
                             <tr>

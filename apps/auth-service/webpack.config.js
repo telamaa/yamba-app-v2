@@ -7,6 +7,11 @@ module.exports = {
   },
   resolve: {
     alias: {
+      // Entrées explicites AVANT la générique : le chemin réel de ces libs
+      // diverge de leur alias (packages/libs/<lib>/src, pas packages/<lib>).
+      // Leçon §6.2 : TROIS résolveurs — tsc, webpack (PAR service), jest.
+      "@packages/api-contracts": resolve(__dirname, "../../packages/libs/api-contracts/src"),
+      "@packages/email": resolve(__dirname, "../../packages/libs/email/src"),
       "@packages": resolve(__dirname, "../../packages"),
     },
     extensions: [".ts", ".js"],

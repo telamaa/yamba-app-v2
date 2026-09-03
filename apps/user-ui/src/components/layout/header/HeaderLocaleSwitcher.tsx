@@ -3,9 +3,12 @@
 
 import { useTransition } from "react";
 import { useLocale } from "next-intl";
+import { useQueryClient } from "@tanstack/react-query";
 import { usePathname, useRouter } from "@/i18n/navigation";
 import { routing } from "@/i18n/routing";
 import type { Locale } from "@/i18n/routing";
+import useUser from "@/hooks/useUser";
+import apiClient from "@/lib/api-client";
 
 type Props = {
   /** Variante : `header` segmented compact, `inline` plus aéré pour bottom sheet. */
@@ -23,12 +26,26 @@ export default function HeaderLocaleSwitcher({ variant = "header" }: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const [isPending, startTransition] = useTransition();
+  const { user } = useUser();
+  const queryClient = useQueryClient();
 
   const handleChange = (newLocale: Locale) => {
     if (newLocale === locale) return;
     startTransition(() => {
       router.replace(pathname, { locale: newLocale });
     });
+    // D44 — un utilisateur CONNECTÉ qui bascule la langue enregistre sa
+    // préférence immédiatement (emails) ; best-effort, jamais bloquant.
+    if (user) {
+      apiClient
+        .patch("/auth/me/locale", { locale: newLocale }, { requireAuth: true })
+        .then(() => {
+          queryClient.setQueryData(["user"], { ...user, preferredLocale: newLocale });
+        })
+        .catch(() => {
+          /* la navigation a déjà eu lieu ; la préférence sera reprise à la prochaine bascule */
+        });
+    }
   };
 
   const labels: Record<Locale, { label: string; short: string }> = {

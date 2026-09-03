@@ -1,3 +1,5 @@
+import { localeHeaders } from "@/lib/current-locale";
+
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL;
 
 /**
@@ -28,6 +30,7 @@ export async function apiFetch<T>(
     ...init,
     headers: {
       "Content-Type": "application/json",
+      ...localeHeaders(), // D44
       ...(init.headers ?? {}),
     },
     credentials: "include", // important pour cookies access/refresh

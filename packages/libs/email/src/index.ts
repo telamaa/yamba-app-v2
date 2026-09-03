@@ -17,6 +17,9 @@
 import nodemailer, { type Transporter } from "nodemailer";
 import ejs from "ejs";
 import path from "path";
+import { LAYOUT_EJS, NOTICE_STYLES, type EmailContent } from "./layout";
+
+export type { EmailContent, EmailNoticeTone } from "./layout";
 
 let transporter: Transporter | null = null;
 
@@ -58,7 +61,52 @@ export async function sendTemplatedEmail(email: TemplatedEmail): Promise<void> {
   const html = await ejs.renderFile(templatePath, email.data, { async: true });
 
   await getTransporter().sendMail({
-    from: process.env.SMTP_FROM ?? "Yamba <no-reply@yamba.app>",
+    from: getFromAddress(),
+    to: email.to,
+    subject: email.subject,
+    html,
+  });
+}
+
+/**
+ * Expéditeur affiché : `SMTP_FROM` complet si présent, sinon
+ * `SMTP_FROM_NAME <SMTP_USER>` (recette 03/09 : `SMTP_FROM_NAME` était posé
+ * dans le .env mais jamais lu par cette lib).
+ */
+export function getFromAddress(): string {
+  if (process.env.SMTP_FROM) return process.env.SMTP_FROM;
+  const name = process.env.SMTP_FROM_NAME || "Yamba";
+  const address = process.env.SMTP_USER || "no-reply@yamba.app";
+  return `${name} <${address}>`;
+}
+
+/* ══ D44 ④ — gabarit unique, emails = données ═══════════════════ */
+
+export type TransactionalEmail = {
+  to: string;
+  /** Locale du DESTINATAIRE (jamais de l'acteur) — déjà résolue. */
+  locale: string;
+  subject: string;
+  content: EmailContent;
+};
+
+/** Rend le gabarit partagé (pur : pas de réseau, pas de disque). */
+export function renderTransactionalEmail(email: Pick<TransactionalEmail, "locale" | "subject" | "content">): string {
+  const noticeStyle = email.content.notice ? NOTICE_STYLES[email.content.notice.tone] : null;
+  return ejs.render(LAYOUT_EJS, {
+    locale: email.locale,
+    subject: email.subject,
+    content: email.content,
+    noticeStyle,
+    year: new Date().getFullYear(),
+  });
+}
+
+/** Envoie un email rendu par le gabarit partagé. */
+export async function sendTransactionalEmail(email: TransactionalEmail): Promise<void> {
+  const html = renderTransactionalEmail(email);
+  await getTransporter().sendMail({
+    from: getFromAddress(),
     to: email.to,
     subject: email.subject,
     html,

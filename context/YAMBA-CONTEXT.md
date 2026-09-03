@@ -200,6 +200,13 @@ Ordre de demarrage : auth -> trip -> gateway.
   retirees du pool ; D44 (langue des emails, N langues) et D45 (tutoiement,
   prenom reel) GRAVEES avant leur code. Backlog priorise P1→P3 dans
   YAMBA-SUIVI-PROJET.md §7.
+- 03/09 midi : feat/email-locale (D44/D45 implementees, A55–A57) —
+  User.preferredLocale, SUPPORTED_LOCALES unique (api-contracts/locale.ts,
+  consommee par next-intl), x-locale sur chaque requete, PATCH /auth/me/locale
+  a la bascule header, gabarit partage packages/libs/email (chaine EJS) + 7
+  emails auth en dictionnaires fr/en (ancien mailer supprime),
+  notification/trip dans la langue du destinataire, prenom reel de la
+  contrepartie dans 5 gabarits. Plateforme 610 + auth 59.
 - Plateforme de tests : 600 (trip 187, deal 354, notification 59) — post-B3 (#96).
 - MERGE 01/09 : toute la pile B2 est dans `dev` via la SEULE **PR #90**
   (`feat/b2-deal-front` portait la chaîne complète : jalons mobile D36,
@@ -326,6 +333,9 @@ Ordre de demarrage : auth -> trip -> gateway.
   · P2 feat/auth-google (ecran consentement CGU) · P3 chore/api-same-origin
   (rewrite Next /api → gateway, fin du piege localhost/LAN). Mode LAN conserve,
   boutons Google/Facebook laisses tels quels jusqu'a leur PR.
+- Dette D44 : templates trip-service et notification-service encore en ternaires
+  fr/en (.ejs) — a migrer sur le gabarit partage + dictionnaires quand une 3e langue
+  arrive (ou avant lancement) ; trip-service garde son propre transport Nodemailer.
 - Candidat D35 (ex-« D32 » avant que D32 = plancher par colis) : provider email transactionnel (Resend/Postmark/SES)
   derriere @packages/email, avant lancement. MailHog docker-compose local
   candidat.

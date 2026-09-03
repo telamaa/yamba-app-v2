@@ -2,6 +2,7 @@ import type { Request, Response, NextFunction } from "express";
 import bcrypt from "bcryptjs";
 import prisma from "@packages/libs/prisma";
 import { AuthError, ValidationError } from "@packages/error-handler";
+import { isSupportedLocale, resolveLocale } from "@packages/api-contracts";
 
 import {
   checkForgotPasswordOtpRestrictions,
@@ -24,6 +25,7 @@ import {
   storePasswordResetToken,
   storePendingRegistration,
   refreshPendingRegistration,
+  localeFromHeaders,
   storeRefreshSession,
   storeVerificationToken,
   trackForgotPasswordOtpRequests,
@@ -100,6 +102,9 @@ export const registerUser = async (req: Request, res: Response, next: NextFuncti
     const consentIp = getClientIp(req);
     const consentUserAgent = req.headers["user-agent"];
     const consentLocale = getClientLocale(req);
+    // D44 — la langue de l'interface au moment de l'inscription devient la
+    // langue de l'utilisateur (emails), modifiable ensuite via PATCH /auth/me/locale.
+    const preferredLocale = resolveLocale(consentLocale);
 
     await storePendingRegistration(emailKey, {
       firstName: data.firstName,
@@ -112,9 +117,10 @@ export const registerUser = async (req: Request, res: Response, next: NextFuncti
       consentIp,
       consentUserAgent: typeof consentUserAgent === "string" ? consentUserAgent : undefined,
       consentLocale,
+      preferredLocale,
     });
 
-    await sendOtp(data.firstName, emailKey, "register-activation-mail");
+    await sendOtp(data.firstName, emailKey, preferredLocale);
 
     const verificationToken = createVerificationToken();
     await storeVerificationToken(verificationToken, emailKey);
@@ -166,7 +172,7 @@ export const resendRegistrationOtp = async (
     await checkOtpRestrictions(emailKey);
     await trackOtpRequests(emailKey);
 
-    await sendOtp(pending.firstName, emailKey, "register-activation-mail");
+    await sendOtp(pending.firstName, emailKey, pending.preferredLocale ?? localeFromHeaders(req.headers));
     // Le renvoi PROLONGE la fenêtre d'inscription (sinon : code valide, session morte)
     await refreshPendingRegistration(emailKey);
 
@@ -246,7 +252,9 @@ export const verifyRegistrationOtp = async (
     const token = String(verificationToken);
     const emailKey = await getEmailKeyFromToken(token);
 
-    await verifyOtp(emailKey, String(otp));
+    // L'alerte sécurité (10e échec) part dans la langue de la requête ;
+    // l'inscription elle-même n'est lue qu'après un code correct.
+    await verifyOtp(emailKey, String(otp), localeFromHeaders(req.headers));
 
     const pending = await getPendingRegistration(emailKey);
     if (!pending) {
@@ -254,6 +262,7 @@ export const verifyRegistrationOtp = async (
         new ValidationError("Registration session expired. Please register again.")
       );
     }
+    const registrationLocale = pending.preferredLocale ?? localeFromHeaders(req.headers);
 
     const existingUser = await prisma.user.findUnique({
       where: { emailNormalized: emailKey },
@@ -285,6 +294,7 @@ export const verifyRegistrationOtp = async (
           emailNormalized: pending.emailNormalized,
           passwordHash: pending.passwordHash,
           publicSlug, // ✨ NEW — Slug public unique pour /u/[slug]
+          preferredLocale: resolveLocale(registrationLocale), // D44
         },
       });
 
@@ -297,7 +307,7 @@ export const verifyRegistrationOtp = async (
       });
     });
 
-    sendAccountCreatedEmail(pending.firstName, pending.emailNormalized, {
+    sendAccountCreatedEmail(pending.firstName, pending.emailNormalized, registrationLocale, {
       loginUrl: process.env.USER_APP_URL
         ? `${process.env.USER_APP_URL}/login`
         : undefined,
@@ -519,7 +529,7 @@ export const requestPasswordResetOtp = async (
     if (user) {
       await checkForgotPasswordOtpRestrictions(emailKey);
       await trackForgotPasswordOtpRequests(emailKey);
-      await sendForgotPasswordOtp(user.firstName, emailKey, "forgot-password-mail");
+      await sendForgotPasswordOtp(user.firstName, emailKey, localeFromHeaders(req.headers));
     }
 
     return res.status(200).json({
@@ -551,7 +561,7 @@ export const resendPasswordResetOtp = async (
     if (user) {
       await checkForgotPasswordOtpRestrictions(emailKey);
       await trackForgotPasswordOtpRequests(emailKey);
-      await sendForgotPasswordOtp(user.firstName, emailKey, "forgot-password-mail");
+      await sendForgotPasswordOtp(user.firstName, emailKey, localeFromHeaders(req.headers));
     }
 
     return res.status(200).json({
@@ -574,7 +584,7 @@ export const verifyPasswordResetOtp = async (
     }
 
     const emailKey = normalizeEmail(String(email));
-    await verifyForgotPasswordOtpCode(emailKey, String(otp));
+    await verifyForgotPasswordOtpCode(emailKey, String(otp), localeFromHeaders(req.headers));
 
     const passwordResetToken = createPasswordResetToken();
     await storePasswordResetToken(passwordResetToken, emailKey);
@@ -706,13 +716,53 @@ export const resetPassword = async (req: Request, res: Response, next: NextFunct
       data: { passwordHash },
     });
 
-    await sendPasswordChangedEmail(user.firstName, emailKey, {
-      changedAt: new Date().toLocaleString("fr-FR"),
+    const resetLocale = localeFromHeaders(req.headers);
+    await sendPasswordChangedEmail(user.firstName, emailKey, resetLocale, {
+      changedAt: new Date().toLocaleString(resetLocale === "en" ? "en-US" : "fr-FR"),
       ip: req.ip,
       userAgent: req.headers["user-agent"] as string,
     });
 
     return res.status(200).json({ message: "Password reset successfully!" });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+// ───────────────────────────────────────────────────────
+// D44 — langue préférée (emails + interface)
+// ───────────────────────────────────────────────────────
+
+/**
+ * PATCH /auth/me/locale — body { locale: "fr" | "en" | … }
+ * Appelé par le header quand un utilisateur CONNECTÉ bascule la langue :
+ * la préférence est enregistrée immédiatement, sans écran de profil.
+ */
+export const updateMyLocale = async (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    if (!req.user) return next(new AuthError("Unauthorized"));
+
+    const { locale } = (req.body ?? {}) as { locale?: unknown };
+    if (!isSupportedLocale(locale)) {
+      return next(
+        new ValidationError("Unsupported locale.", {
+          type: "locale",
+          code: "LOCALE_UNSUPPORTED",
+          field: "locale",
+        })
+      );
+    }
+
+    await prisma.user.update({
+      where: { id: req.user.id },
+      data: { preferredLocale: locale },
+    });
+
+    return res.status(200).json({ success: true, preferredLocale: locale });
   } catch (error) {
     return next(error);
   }

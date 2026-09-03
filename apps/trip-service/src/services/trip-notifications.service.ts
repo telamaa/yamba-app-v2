@@ -50,7 +50,7 @@ export async function dispatchTripPublishedNotifications(
       where: { followedId: trip.userId, notifyNextTrip: true },
       select: {
         follower: {
-          select: { id: true, firstName: true, emailNormalized: true, isDeleted: true },
+          select: { id: true, firstName: true, emailNormalized: true, isDeleted: true, preferredLocale: true },
         },
       },
     });
@@ -72,7 +72,7 @@ export async function dispatchTripPublishedNotifications(
       where: baseWhere,
       include: {
         user: {
-          select: { id: true, firstName: true, emailNormalized: true, isDeleted: true },
+          select: { id: true, firstName: true, emailNormalized: true, isDeleted: true, preferredLocale: true },
         },
       },
     });
@@ -137,6 +137,7 @@ export async function dispatchTripPublishedNotifications(
         userId: follower.id,
         email: follower.emailNormalized,
         firstName: follower.firstName,
+        preferredLocale: follower.preferredLocale,
         followsTripper: true,
         matchingSavedRoute: null,
       });
@@ -157,6 +158,7 @@ export async function dispatchTripPublishedNotifications(
           userId: sr.userId,
           email: sr.user.emailNormalized,
           firstName: sr.user.firstName,
+          preferredLocale: sr.user.preferredLocale,
           followsTripper: false,
           matchingSavedRoute: matchInfo,
         });

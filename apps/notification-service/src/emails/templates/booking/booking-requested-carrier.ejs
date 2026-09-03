@@ -20,8 +20,8 @@
                         </p>
                         <p style="margin:0 0 16px 0;font-size:15px;line-height:1.6;color:#334155;">
                             <%= locale === "fr"
-                                    ? `Un Expéditeur souhaite te confier un colis de ${weightKg} kg sur ton trajet ${route}. Son paiement est déjà autorisé.`
-                                    : `A shipper wants to entrust you with a ${weightKg} kg parcel on your trip ${route}. Their payment is already authorized.` %>
+                                    ? `${counterpartFirstName || "Un Expéditeur"} souhaite te confier un colis de ${weightKg} kg sur ton trajet ${route}. Son paiement est déjà autorisé.`
+                                    : `${counterpartFirstName || "A shipper"} wants to entrust you with a ${weightKg} kg parcel on your trip ${route}. Their payment is already authorized.` %>
                         </p>
                         <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color:#f0fdfa;border-radius:12px;margin:0 0 16px 0;">
                             <tr>
@@ -35,8 +35,8 @@
                         </table>
                         <p style="margin:0 0 24px 0;font-size:14px;line-height:1.6;color:#64748b;">
                             <%= locale === "fr"
-                                    ? `Tu as jusqu'au ${expiresAt} pour répondre — passé ce délai, la demande expire et l'Expéditeur est remboursé.`
-                                    : `You have until ${expiresAt} to answer — after that, the request expires and the shipper is refunded.` %>
+                                    ? `Tu as jusqu'au ${expiresAt} pour répondre — passé ce délai, la demande expire et ${counterpartFirstName || "l'Expéditeur"} est remboursé·e.`
+                                    : `You have until ${expiresAt} to answer — after that, the request expires and ${counterpartFirstName || "the shipper"} is refunded.` %>
                         </p>
                         <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
                             <tr>

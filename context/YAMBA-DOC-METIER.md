@@ -660,3 +660,26 @@ Une personne qui s'inscrit doit savoir QUOI corriger (« le mot de passe contien
 | A6 | Renvoyer le code à la 12e minute, saisir le bon code à la 17e | Inscription validée (fenêtre prolongée) |
 | A7 | Ouvrir l'email « Ton code d'activation Yamba » | « Ce code expire dans 10 minutes », écran « Code valable 10:00 » au départ |
 | A8 | Login et inscription, 5 chargements | Jamais de texte alternatif à la place du visuel ; œil centré dans le champ mot de passe |
+
+# feat/email-locale — chaque email dans la langue de celui qui le lit, et avec les vrais prénoms
+
+### 1. Le besoin
+Une personne qui utilise Yamba en anglais reçoit des emails en anglais, sujet compris, même quand c'est un utilisateur francophone qui a déclenché l'envoi. Et un email parle de « Thomas », pas du « Voyageur », parce que c'est ainsi que l'application le nomme partout.
+
+### 2. Règles de gestion (RG-A, suite)
+- **RG-A-06 — La langue d'un email est celle de son destinataire.** Avec un compte : la langue préférée du compte. Sans compte (code d'inscription, mot de passe oublié, alerte de sécurité) : la langue de l'écran d'où vient la demande. Le sujet et le corps sont toujours dans la même langue.
+- **RG-A-07 — La langue préférée suit la bascule de langue.** Un utilisateur connecté qui passe l'interface en anglais recevra ses prochains emails en anglais, sans passer par un écran de profil. À l'inscription, la langue de l'écran devient la langue du compte.
+- **RG-A-08 — Les personnes sont nommées par leur prénom dans les emails.** Le mot de rôle (« ton Voyageur », « un Expéditeur ») n'apparaît que si le prénom est inconnu (compte supprimé).
+- Rappel D44 : ajouter une langue à Yamba = l'ajouter à la liste unique et fournir son dictionnaire d'emails ; la plateforme n'est pas conçue pour deux langues mais pour N.
+
+### 3. Recette
+| # | Scénario | Attendu |
+|---|---|---|
+| L1 | Interface en EN, s'inscrire | Email « Your Yamba activation code », corps en anglais, « expires in 10 minutes » |
+| L2 | Compte créé depuis l'interface EN, puis connexion | `GET /auth/me` renvoie `preferredLocale: "en"` ; email de bienvenue en anglais |
+| L3 | Connecté, basculer FR → EN dans le header, puis se faire accepter une demande | Email « Your request … was accepted » en anglais |
+| L4 | Voyageur EN accepte la demande d'une Expéditrice FR | Elle reçoit « Ta demande … est acceptée » en français ; lui, ses notifications en anglais |
+| L5 | Email d'acceptation reçu par l'Expéditrice | « Bonne nouvelle : Thomas a accepté ta demande … » — jamais « le Voyageur » |
+| L6 | Compte du Voyageur supprimé avant l'envoi | « ton Voyageur a accepté » — jamais « null » |
+| L7 | `PATCH /auth/me/locale` avec `de` | 400, code `LOCALE_UNSUPPORTED`, langue inchangée |
+| L8 | Interface FR, mot de passe oublié | Sujet « Ton code de réinitialisation Yamba », sans emoji, expéditeur « Yamba <adresse SMTP> » |
