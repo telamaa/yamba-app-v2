@@ -38,7 +38,14 @@ async function raw<T>(path: string, init: RequestInit): Promise<T> {
     credentials: "include",
   });
   const text = await res.text();
-  const data = text ? (JSON.parse(text) as unknown) : undefined;
+  let data: unknown;
+  try {
+    data = text ? (JSON.parse(text) as unknown) : undefined;
+  } catch {
+    // Réponse non JSON (page d'erreur du proxy Next, gateway éteint…) : on garde
+    // le début du corps pour l'afficher, jamais une exception muette.
+    data = { message: text.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 160) };
+  }
   if (!res.ok) {
     const err = data as { message?: string; error?: string } | undefined;
     throw new ApiError(err?.message || err?.error || `Erreur ${res.status}`, res.status, data);
