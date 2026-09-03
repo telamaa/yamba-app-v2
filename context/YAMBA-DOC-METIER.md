@@ -705,3 +705,29 @@ Au moment où un visiteur clique « Réserver », il est décidé : lui demander
 | G6 | URL `/trips/:id/book` tapée à la main, non connecté | Porte pleine page (inchangée) |
 | G7 | Non connecté sur `/search?…`, « Connexion » dans le header | Retour sur la même recherche après connexion |
 | G8 | Sur `/login`, lien « Inscrivez-vous » ; sur `/`, « Connexion » | Aucun `redirect` ajouté ; retour à l'accueil après connexion |
+
+# feat/trip-favorites — mettre un trajet de côté
+
+### 1. Le besoin
+Un Expéditeur compare plusieurs trajets avant de réserver. Il doit pouvoir en mettre de côté d'un geste, depuis la recherche ou la fiche, et les retrouver dans son espace — sans que le Voyageur en soit informé.
+
+### 2. Règles de gestion (RG-FAV)
+- **RG-FAV-01 — Un favori est privé.** Le Voyageur n'est pas notifié, aucun compteur public n'existe.
+- **RG-FAV-02 — Seul un trajet publié peut être ajouté.** Un trajet en brouillon, en pause, terminé, annulé ou archivé ne peut pas être mis en favori (le retrait, lui, est toujours possible).
+- **RG-FAV-03 — On ne met pas son propre trajet en favori.** Le cœur n'apparaît pas sur sa propre fiche ; le serveur refuse dans tous les cas.
+- **RG-FAV-04 — Un favori survit à la fin du trajet.** « Mes favoris » continue de le montrer, avec ses informations, tant que l'utilisateur ne le retire pas.
+- **RG-FAV-05 — Il faut un compte.** Un visiteur qui touche le cœur est invité à se connecter et revient sur la page où il était.
+- **RG-FAV-06 — Le geste est immédiat et réversible.** Le cœur change à l'instant du clic ; si le serveur refuse, il revient à son état et la raison est affichée.
+
+### 3. Recette
+| # | Scénario | Attendu |
+|---|---|---|
+| H1 | Connecté, recherche, cœur d'une carte | Cœur plein immédiatement, la carte ne s'ouvre pas ; rechargement : toujours plein |
+| H2 | Même trajet, sa fiche | Pilule « Retirer des favoris » ; clic → cœur vide, disparaît de « Mes favoris » |
+| H3 | « Mes favoris » (sidebar, onglet Activité mobile, menu utilisateur) | Liste du plus récent au plus ancien, même carte que la recherche, cœur plein |
+| H4 | Aucun favori | État vide avec « Chercher un trajet » |
+| H5 | Visiteur, cœur sur une carte | Toast « Connecte-toi… », page de connexion, retour sur la recherche après connexion |
+| H6 | Sa propre fiche de trajet | Aucun cœur |
+| H7 | `POST /trips/:id/favorite` sur un trajet en pause | 409 `TRIP_NOT_FAVORITABLE`, cœur revenu à vide, toast « n'est plus disponible » |
+| H8 | Trajet en favori qui passe COMPLETED | Toujours listé dans « Mes favoris » ; retrait possible |
+| H9 | Voyageur du trajet | Aucune notification, aucun email, aucun compteur visible |

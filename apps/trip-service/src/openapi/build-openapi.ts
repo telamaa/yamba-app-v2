@@ -292,6 +292,64 @@ export function buildOpenApiDocument() {
       },
 
       /* ── Vue publique ─────────────────────────────────────── */
+      /* ── Favoris (D46) ───────────────────────────────────── */
+      "/trips/favorites": {
+        get: {
+          tags: ["trips-favorites"],
+          summary: "Mes trajets favoris",
+          description:
+            "Cartes de recherche (YambaTripResult, isFavorite = true) des trajets mis en favori, " +
+            "du plus récent au plus ancien ; les trajets passés restent listés. Auth requise.",
+          operationId: "listMyFavoriteTrips",
+          security: authSecurity,
+          parameters: [
+            { name: "locale", in: "query", required: false, schema: ref("SearchLocale"), description: "Locale des libellés (sinon x-locale, sinon fr)" },
+          ],
+          responses: {
+            "200": jsonResponse("FavoriteTripsResponse", "Liste { trips, totalCount }"),
+            "401": response401,
+            "500": response500,
+          },
+        },
+      },
+      "/trips/{id}/favorite": {
+        post: {
+          tags: ["trips-favorites"],
+          summary: "Mettre un trajet en favori (idempotent)",
+          description:
+            "Signet privé : jamais notifié au Voyageur. 404 si le trajet n'existe pas (jamais 403 : ne pas révéler), " +
+            "403 OWN_TRIP sur son propre trajet, 409 TRIP_NOT_FAVORITABLE si le trajet n'est pas PUBLISHED. " +
+            "Rejouer l'action renvoie le même état.",
+          operationId: "addTripFavorite",
+          security: authSecurity,
+          parameters: [idPathParam],
+          responses: {
+            "200": jsonResponse("TripFavoriteState", "{ tripId, isFavorite: true }"),
+            "400": response400,
+            "401": response401,
+            "403": jsonResponse("ErrorResponse", "OWN_TRIP — details.type = favorite"),
+            "404": jsonResponse("ErrorResponse", "Trajet introuvable ou supprimé"),
+            "409": jsonResponse("ErrorResponse", "TRIP_NOT_FAVORITABLE — trajet non publié"),
+            "500": response500,
+          },
+        },
+        delete: {
+          tags: ["trips-favorites"],
+          summary: "Retirer un trajet des favoris (idempotent)",
+          description: "Toujours possible, même sur un trajet passé. 404 si le trajet n'existe pas.",
+          operationId: "removeTripFavorite",
+          security: authSecurity,
+          parameters: [idPathParam],
+          responses: {
+            "200": jsonResponse("TripFavoriteState", "{ tripId, isFavorite: false }"),
+            "400": response400,
+            "401": response401,
+            "404": jsonResponse("ErrorResponse", "Trajet introuvable ou supprimé"),
+            "500": response500,
+          },
+        },
+      },
+
       "/trips/{id}/public": {
         get: {
           tags: ["trips-public"],

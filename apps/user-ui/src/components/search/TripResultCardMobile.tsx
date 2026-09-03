@@ -3,6 +3,7 @@
 import { useTranslations } from "next-intl";
 import { ChevronRight, AlertCircle, HelpCircle } from "lucide-react";
 import { Link } from "@/i18n/navigation";
+import FavoriteButton from "@/components/favorites/FavoriteButton";
 import { useBottomSheet } from "@/hooks/useBottomSheet";
 import TripPricingBottomSheet from "./TripPricingBottomSheet";
 import { ParcelCategory, SearchFamily, YambaTripResult } from "./search-results.types";
@@ -60,12 +61,16 @@ export default function YambaTripResultCardMobile({
               {item.travelDate}
             </span>
           </div>
-          {showRemainingAlert && (
-            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 text-[11px] text-red-700 dark:bg-red-950/40 dark:text-red-400">
-              <AlertCircle size={9} strokeWidth={2.5} />
-              {t("card.remainingSlots", { count: item.remainingSlots! })}
-            </span>
-          )}
+          <div className="flex shrink-0 items-center gap-2">
+            {showRemainingAlert && (
+              <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 text-[11px] text-red-700 dark:bg-red-950/40 dark:text-red-400">
+                <AlertCircle size={9} strokeWidth={2.5} />
+                {t("card.remainingSlots", { count: item.remainingSlots! })}
+              </span>
+            )}
+            {/* D46 — cœur (44 px de cible tactile via h-9 + marge) */}
+            <FavoriteButton tripId={item.id} isFavorite={item.isFavorite} />
+          </div>
         </div>
 
         {/* ── Body : horaires + prix ── */}

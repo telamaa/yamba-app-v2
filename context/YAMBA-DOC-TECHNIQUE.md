@@ -1083,3 +1083,24 @@ Implémentation de D44 (langue des emails = langue de l'utilisateur, conçue pou
 
 ### Piège rencontré
 - `HeaderMobileBottomSheet.tsx` contient DEUX composants : le hook `usePathname` inséré dans le premier (`const t = useTranslations` trouvé par regex) n'était pas visible du second, qui rend les liens. Règle : chercher le composant qui RENDU l'élément, pas le premier hook du fichier.
+
+# feat/trip-favorites — mettre un trajet de côté (D46, A59)
+
+### Serveur (trip-service)
+1. **Prisma** — `TripFavorite { userId, tripId, createdAt, @@unique([userId, tripId]), @@index([userId, createdAt]), @@index([tripId]) }`, relations `User.tripFavorites` et `Trip.favorites` (cascade). `prisma generate` + `db push` (index créés).
+2. **Contrats** — `packages/libs/api-contracts/src/trip/trip-favorite.schema.ts` : `TripFavoriteState { tripId, isFavorite }`, `FavoriteTripsResponse { trips: YambaTripResult[], totalCount }`, codes `TRIP_NOT_FAVORITABLE` / `OWN_TRIP`. `YambaTripResult` et `PublicTrip` gagnent `isFavorite?: boolean`.
+3. **Service** — `services/trip-favorite.service.ts` : `addFavorite` (404 si absent/supprimé, 403 `OWN_TRIP`, 409 `TRIP_NOT_FAVORITABLE` hors PUBLISHED, `upsert` sur la clé composite → idempotent), `removeFavorite` (`deleteMany`, toujours possible), `favoriteTripIds` (une requête `in`, aucune pour un visiteur ou une liste vide), `markFavorites` (pose `isFavorite` sur des DTO), `listFavoriteTrips` (jointure `trip` + `TRIP_SEARCH_INCLUDE`, `mapTripToYambaResult`, `isFavorite = true`, trajets passés inclus, supprimés exclus).
+4. **Routes** — `GET /trips/favorites` (AVANT `/:id`), `POST` / `DELETE /trips/:id/favorite` (`isAuthenticated`) ; `GET /trips/search` et `GET /trips/:id/public` passent sous `isOptionallyAuthenticated`. Contrôleur `controllers/trip-favorite.controller.ts` (validation ObjectId, locale depuis `?locale` ou `x-locale`).
+5. **Enrichissement** — `trip-search.controller.ts` : `markFavorites(req.user?.id, mapped)` sur les DEUX chemins (tri par poids et pagination curseur) ; `getPublicTrip` : `isFavorite` via `favoriteTripIds`.
+6. **OpenAPI** — trois chemins ajoutés dans `build-openapi.ts` (tag `trips-favorites`), `npm run generate:openapi` → les trois `openapi.json` bougent (registre Zod global partagé) et sont commités.
+7. **Tests** — `trip-favorite.service.spec.ts` (mock Prisma virtuel, patron deal-service) : idempotence, 404 / 403 / 409 par statut, retrait sur trajet passé, `markFavorites` visiteur vs connecté, aucune requête sur liste vide → trip-service **198**.
+
+### Front (user-ui)
+- `services/favorite.api.ts` (axios, `requireAuth`), `hooks/useFavoriteTrips.ts` (clé `["favorites", locale]`), `hooks/useFavoriteMutations.ts` (`useToggleFavorite` : bascule optimiste des caches fiche / pages infinies de recherche / liste, rollback complet en erreur, invalidation à la fin).
+- `components/favorites/FavoriteButton.tsx` — variantes `card` (rond 36 px, `stopPropagation` + `preventDefault` dans la carte-lien) et `detail` (pilule avec libellé), `aria-pressed`, visiteur → `loginHrefFor(pathname)` + toast, refus serveur traduits depuis `details.code` (sonner).
+- Cœur posé dans `TripResultCard` (à la place de l'espace flexible de l'en-tête), `TripResultCardMobile` (en-tête, à côté de l'alerte capacité), `TripDetailView` (en-tête, masqué pour le créateur).
+- Page `app/[locale]/dashboard/favorites/page.tsx` + `components/favorites/FavoriteTripsList.tsx` (squelette, erreur, état vide avec CTA recherche, cartes desktop/mobile réutilisées). Navigation : `dashboard.config.ts` (`SectionKey` `favorites`, groupe « Activité », onglet mobile), `menu-items.ts` (`myFavorites`), messages `dashboard.sections.favorites`, `common.userMenu.myFavorites`, nouveau namespace `favorites.json` fr/en enregistré aux trois endroits de `i18n/request.ts`.
+
+### Preuves
+- trip-service 198 tests, tsc ×5 Nx + user-ui, miroir i18n (24 namespaces), OpenAPI régénéré sans diff résiduel.
+- Smoke test sur `PORT=6012` (bundle, instance de recette intacte), cookie du seed Marc : recherche connectée → `isFavorite: false` partout ; `POST` sur un trajet d'Enrique → `{ isFavorite: true }`, rejoué → identique ; `GET /trips/favorites` → 1 ; la recherche montre `true` sur ce seul trajet ; fiche publique connectée `true`, visiteur `false` ; `POST` sur son propre trajet → 403 `OWN_TRIP` ; `DELETE` → `false` ; id inconnu → 404. `favorite` (et `locale`) ajoutés aux types « safe » du middleware pour que `details.code` sorte aussi en production.

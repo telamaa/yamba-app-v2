@@ -2,6 +2,7 @@ import type { Request, Response, NextFunction } from "express";
 import { Prisma } from "@prisma/client";
 import { sortByPriceForWeight, totalForWeightCents, transportForWeightCents } from "../lib/price-for-weight";
 import prisma from "@packages/libs/prisma";
+import { markFavorites } from "../services/trip-favorite.service";
 import { ValidationError } from "@packages/error-handler";
 import {
   TRIP_SEARCH_INCLUDE,
@@ -260,6 +261,7 @@ export const searchTrips = async (
           console.warn(`[search] Skipping invalid trip ${t.id}: ${(err as Error).message}`);
         }
       }
+      await markFavorites((req as { user?: { id?: string } }).user?.id, mapped); // D46
       return res.status(200).json({ trips: mapped, nextCursor, totalCount: Math.min(totalCount, sorted.length) });
     }
 
@@ -298,6 +300,8 @@ export const searchTrips = async (
         );
       }
     }
+
+    await markFavorites((req as { user?: { id?: string } }).user?.id, mapped); // D46 — visiteur → false
 
     return res.status(200).json({
       trips: mapped,

@@ -30,6 +30,7 @@
   "userMenu": {
     "myAccount": "My account",
     "myTrips": "My trips",
+    "myFavorites": "My favorites",
     "notifications": "Notifications",
     "help": "Help",
     "logout": "Sign out",

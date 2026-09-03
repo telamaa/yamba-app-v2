@@ -119,6 +119,7 @@ export const PublicTripSchema = z
 
     tripper: PublicTripperSchema,
     publishedAt: z.iso.datetime().nullish(),
+    isFavorite: z.boolean().optional().meta({ description: "D46 — true si l'utilisateur connecté a mis ce trajet en favori (isOptionallyAuthenticated)" }),
   })
   .meta({ id: "PublicTrip", description: "Vue publique filtrée d'un trip PUBLISHED" });
 

@@ -73,6 +73,8 @@ export type YambaTripResultDto = {
   verifiedTicket: boolean;
   rating?: number;
   reviewCount?: number;
+  /** D46 — posé par le controller après mapping (jamais par le mapper) */
+  isFavorite?: boolean;
   travelerFirstName?: string;
   travelerLastName?: string;     // toujours juste l'initiale (privacy)
   travelerAvatarUrl?: string;

@@ -30,6 +30,7 @@
   "userMenu": {
     "myAccount": "Mon compte",
     "myTrips": "Mes trajets",
+    "myFavorites": "Mes favoris",
     "notifications": "Notifications",
     "help": "Aide",
     "logout": "Déconnexion",

@@ -211,6 +211,10 @@ Ordre de demarrage : auth -> trip -> gateway.
   reserver » en modale sur la page trajet (desktop + feuille mobile), retour
   dans le wizard ; « Connexion » / « Creer un compte » du header transmettent
   la page courante en redirect (hors pages auth et accueil).
+- 03/09 : #116, #117, #118 fusionnees par l'utilisateur (dev = bb57c49).
+  feat/trip-favorites (D46, A59) — TripFavorite, POST/DELETE /trips/:id/favorite,
+  GET /trips/favorites, isFavorite sur recherche + fiche (authent optionnelle),
+  coeur optimiste, page « Mes favoris » ; trip-service 198 tests. Plateforme 621.
 - Plateforme de tests : 600 (trip 187, deal 354, notification 59) — post-B3 (#96).
 - MERGE 01/09 : toute la pile B2 est dans `dev` via la SEULE **PR #90**
   (`feat/b2-deal-front` portait la chaîne complète : jalons mobile D36,

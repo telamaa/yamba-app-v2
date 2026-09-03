@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import { useTranslations, useLocale } from "next-intl";
 import { Link } from "@/i18n/navigation";
+import FavoriteButton from "@/components/favorites/FavoriteButton";
 import {
   ParcelCategory,
   SearchFamily,
@@ -205,6 +206,9 @@ export default function TripResultCard({
         </span>
 
         <div className="flex-1" />
+
+        {/* D46 — cœur : stopPropagation dans FavoriteButton (la carte est un lien) */}
+        <FavoriteButton tripId={item.id} isFavorite={item.isFavorite} className="h-8 w-8" />
 
         {showLowCapacity && (
           <span className="inline-flex items-center gap-1 rounded-full border border-red-300/50 bg-red-50 px-2 py-0.5 text-[10px] font-semibold text-red-600 dark:border-red-500/30 dark:bg-red-950/30 dark:text-red-400">
