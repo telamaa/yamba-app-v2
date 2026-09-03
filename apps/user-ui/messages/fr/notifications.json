@@ -15,11 +15,12 @@
     "booking_tracking_event": "Ton colis est en route",
     "booking_delivered": "Colis livré",
     "booking_completed": "Transaction terminée",
-    "booking_payout_sent": "Versement effectué",
+    "booking_payout_sent": "Versement parti vers ton compte",
     "booking_disputed": "Signalement enregistré",
     "booking_verification_reminder": "Dernier jour pour vérifier ta livraison",
     "booking_rating_reminder": "Pense à laisser une note",
     "booking_rating_revealed": "Les notes sont révélées",
-    "fallback": "Notification"
+    "fallback": "Notification",
+    "carrier_payout_failed": "Virement bancaire refusé : vérifie ton RIB"
   }
 }

@@ -123,13 +123,13 @@ export const BOOKING_COMPLETION_BLOCKING_STATUSES: readonly BookingStatus[] = [
 
 /** Versement au Voyageur : INV-2 (rien avant COMPLETED), INV-5 (FROZEN sur litige). */
 export const PayoutStatusSchema = z
-  .enum(["PENDING", "SENT", "FAILED", "FROZEN"])
+  .enum(["PENDING", "SENT", "FAILED", "FROZEN", "REVERSED"])
   .meta({
     id: "PayoutStatus",
     description:
       "Carrier payout state (B4/D49). PENDING = deal COMPLETED, transfer not yet executed · SENT = transfer executed " +
-      "(payoutSentAt) · FAILED = transfer refused (retried by the payout cron) · FROZEN = dispute open (INV-5). " +
-      "null before COMPLETED / DISPUTED.",
+      "(payoutSentAt) · FAILED = transfer refused (retried by the payout cron) · FROZEN = dispute open (INV-5) · " +
+      "REVERSED = Stripe reversed the transfer (never re-sent automatically — admin, A87). null before COMPLETED / DISPUTED.",
   });
 export type PayoutStatus = z.infer<typeof PayoutStatusSchema>;
 

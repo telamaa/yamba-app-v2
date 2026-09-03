@@ -37,7 +37,8 @@
       "BLOCKED": "On hold: finish your Stripe account",
       "FROZEN": "Frozen · report under review",
       "SENT": "Sent on {date} · 2 to 7 days",
-      "HELD": "Retention held · we will contact you"
+      "HELD": "Retention held · we will contact you",
+      "REVERSED": "Under review · transfer reversed, we will contact you"
     }
   },
   "payments": {

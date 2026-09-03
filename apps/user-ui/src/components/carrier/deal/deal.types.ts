@@ -139,7 +139,7 @@ export type DealRequest = {
   retentionDisposition?: "CARRIER" | "HELD_FOR_MEDIATION";
 };
 
-export type DealPayoutStatus = "PENDING" | "SENT" | "FAILED" | "FROZEN";
+export type DealPayoutStatus = "PENDING" | "SENT" | "FAILED" | "FROZEN" | "REVERSED";
 export type DealPayoutBlocker = "ACCOUNT_NOT_READY" | "RETRYING";
 export type DealDisputeCategory =
   | "NOT_DELIVERED"

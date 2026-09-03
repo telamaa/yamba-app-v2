@@ -54,6 +54,7 @@ const PRESENTATION: Record<string, Omit<NotificationPresentation, "i18nKey">> = 
   "booking.payout_sent": { icon: Wallet, tone: "emerald" },
   "booking.disputed": { icon: BadgeCheck, tone: "red" },
   "booking.verification_reminder": { icon: Star, tone: "amber" },
+  "carrier.payout_failed": { icon: Wallet, tone: "red" }, // A87 : virement bancaire refusé
   "booking.rating_reminder": { icon: Star, tone: "amber" },
   "booking.rating_revealed": { icon: PartyPopper, tone: "emerald" },
 };

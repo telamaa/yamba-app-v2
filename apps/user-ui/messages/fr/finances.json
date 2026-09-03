@@ -37,7 +37,8 @@
       "BLOCKED": "En attente : finalise ton compte Stripe",
       "FROZEN": "Gelé · signalement en cours",
       "SENT": "Parti le {date} · 2 à 7 jours",
-      "HELD": "Retenue conservée · on te contacte"
+      "HELD": "Retenue conservée · on te contacte",
+      "REVERSED": "Sous examen · transfert renversé, on te contacte"
     }
   },
   "payments": {

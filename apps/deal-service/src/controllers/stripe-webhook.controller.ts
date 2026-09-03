@@ -26,12 +26,35 @@
 
 import type { Request, Response } from "express";
 import type { Logger } from "pino";
-import { constructStripeWebhookEvent } from "@packages/payments";
+import prisma from "@packages/libs/prisma";
+import { constructStripeWebhookEvent, type PaymentWebhookEvent } from "@packages/payments";
 import type { DealLifecycleService } from "../services/deal-lifecycle.service";
+import type { DealSettlementService } from "../services/deal-settlement.service";
+import { notifyCarrierPayoutFailed } from "../services/ops-notify.service";
 
-export function makeStripeWebhookHandler(service: DealLifecycleService, logger: Logger) {
+/**
+ * A87 — un seul URL, DEUX endpoints Stripe : les événements de la plateforme
+ * (STRIPE_WEBHOOK_SECRET) et ceux des comptes connectés (Connect,
+ * STRIPE_CONNECT_WEBHOOK_SECRET). Chaque endpoint signe avec SON secret :
+ * on essaie l'un puis l'autre.
+ */
+function verifyWithAnySecret(rawBody: Buffer, signature: string, secrets: string[]): PaymentWebhookEvent | null {
+  for (const secret of secrets) {
+    try {
+      return constructStripeWebhookEvent(rawBody, signature, secret);
+    } catch {
+      // secret suivant
+    }
+  }
+  return null;
+}
+
+export function makeStripeWebhookHandler(service: DealLifecycleService, logger: Logger, settlement?: DealSettlementService) {
   return async (req: Request, res: Response): Promise<void> => {
-    const secret = process.env.STRIPE_WEBHOOK_SECRET?.trim();
+    const secrets = [process.env.STRIPE_WEBHOOK_SECRET, process.env.STRIPE_CONNECT_WEBHOOK_SECRET]
+      .map((s) => s?.trim())
+      .filter((s): s is string => !!s);
+    const secret = secrets[0];
     if (!secret) {
       // Provider FAKE ou secret non posé : l'endpoint existe mais ne peut
       // rien vérifier — on refuse plutôt que d'accepter sans signature.
@@ -45,10 +68,8 @@ export function makeStripeWebhookHandler(service: DealLifecycleService, logger: 
       return;
     }
 
-    let event;
-    try {
-      event = constructStripeWebhookEvent(req.body as Buffer, signature, secret);
-    } catch {
+    const event = verifyWithAnySecret(req.body as Buffer, signature, secrets);
+    if (!event) {
       res.status(400).json({ error: "Invalid webhook signature." });
       return;
     }
@@ -65,6 +86,29 @@ export function makeStripeWebhookHandler(service: DealLifecycleService, logger: 
           { eventId: event.id, paymentIntentId: event.paymentIntentId },
           "Stripe webhook: authorization confirmed"
         );
+      } else if (event.type === "account.updated" && event.accountFlags && event.objectId) {
+        // A87 — les drapeaux du Voyageur suivent Stripe sans qu'il repasse par l'onboarding ;
+        // compte prêt → ses versements bloqués repartent tout de suite (hors plafond A65).
+        const flags = event.accountFlags;
+        const page = await prisma.carrierPage.findFirst({ where: { stripeAccountId: event.objectId }, select: { userId: true, stripePayoutsEnabled: true } });
+        if (page) {
+          await prisma.carrierPage.update({
+            where: { userId: page.userId },
+            data: { stripeChargesEnabled: flags.chargesEnabled, stripePayoutsEnabled: flags.payoutsEnabled, stripeOnboardingComplete: flags.detailsSubmitted },
+          });
+          let retried = 0;
+          if (flags.payoutsEnabled && settlement) retried = await settlement.retryPayoutsForCarrier(page.userId);
+          logger.info({ eventId: event.id, account: event.objectId, ...flags, retried }, "Stripe webhook: account.updated processed");
+        } else {
+          logger.warn({ eventId: event.id, account: event.objectId }, "Stripe webhook: account.updated for an unknown carrier");
+        }
+      } else if (event.type === "transfer.reversed" && event.objectId && settlement) {
+        const marked = await settlement.markTransferReversed(event.objectId);
+        logger.warn({ eventId: event.id, transferId: event.objectId, marked }, "Stripe webhook: transfer.reversed processed");
+      } else if (event.type === "payout.failed" && event.account) {
+        // Compte connecté : la banque du Voyageur a refusé le virement — on le prévient (RIB).
+        const notified = await notifyCarrierPayoutFailed(event.account, event.id);
+        logger.warn({ eventId: event.id, account: event.account, notified }, "Stripe webhook: payout.failed processed");
       }
       res.json({ received: true });
     } catch (err) {

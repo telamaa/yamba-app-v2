@@ -60,6 +60,7 @@ const PAYOUT_TONE: Record<WalletPayoutItem["state"], { tone: Tone; icon: typeof 
   FROZEN: { tone: "slate", icon: Lock },
   SENT: { tone: "emerald", icon: ArrowDownLeft },
   HELD: { tone: "slate", icon: Lock },
+  REVERSED: { tone: "slate", icon: ShieldAlert },
 };
 
 export function PayoutRow({ item }: { item: WalletPayoutItem }) {

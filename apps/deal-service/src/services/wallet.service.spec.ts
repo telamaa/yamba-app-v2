@@ -42,6 +42,7 @@ describe("Voyageur — toPayoutItem", () => {
     expect(toPayoutItem(rec({ status: "COMPLETED", payoutStatus: "FAILED", payoutFailureReason: "CARRIER_ACCOUNT_NOT_READY" }), counterparts)).toMatchObject({ state: "BLOCKED" });
     expect(toPayoutItem(rec({ status: "COMPLETED", payoutStatus: "FAILED", payoutFailureReason: "PROVIDER_ERROR:x" }), counterparts)).toMatchObject({ state: "PENDING" });
     expect(toPayoutItem(rec({ status: "COMPLETED" }), counterparts)).toBeNull();
+    expect(toPayoutItem(rec({ status: "COMPLETED", payoutStatus: "REVERSED" }), counterparts)).toMatchObject({ state: "REVERSED" }); // A87
   });
 
   it("CANCELLED tardif compensé : kind LATE_CANCELLATION, montant = compensation (jamais le net)", () => {

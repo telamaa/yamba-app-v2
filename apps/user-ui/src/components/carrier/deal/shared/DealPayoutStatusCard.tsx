@@ -60,6 +60,12 @@ export default function DealPayoutStatusCard({ deal, compact = false }: Props) {
     Icon = Clock3;
     title = t("retrying.title", { amount });
     text = t("retrying.text");
+  } else if (status === "REVERSED") {
+    // A87 — Stripe a renversé le transfert : sous examen, jamais renvoyé automatiquement.
+    tone = "slate";
+    Icon = Lock;
+    title = t("reversed.title", { amount });
+    text = t("reversed.text");
   } else if (status === "FROZEN") {
     tone = "slate";
     Icon = Lock;

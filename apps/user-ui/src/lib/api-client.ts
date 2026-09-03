@@ -132,8 +132,13 @@ apiClient.interceptors.response.use(
       // Refresh échoué : enclenchement du circuit breaker
       refreshFailedAt = Date.now();
       flushRefreshQueue(refreshError);
-      // Pas de redirection ici — on laisse le composant gérer
-      // (useUser retournera user: undefined, le header affichera "Connexion")
+      // Pas de redirection ici — mais UN signal global (A89) : la fenêtre
+      // « ta session a expiré » s'ouvre par-dessus la page (SessionExpiredGate),
+      // à la place d'un toast « Erreur » par écran. useUser retourne user:
+      // undefined, le header affiche « Connexion ».
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("yamba:session-expired"));
+      }
       return Promise.reject(refreshError);
     } finally {
       isRefreshing = false;

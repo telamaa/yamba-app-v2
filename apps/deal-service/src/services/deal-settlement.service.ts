@@ -51,8 +51,11 @@ export type RequestingUser = { id: string };
 
 /* ══ Paramètres serveur (B4) ══════════════════════════════════ */
 
-/** Rejeux d'un versement FAILED par le cron (A65) — au-delà, visible en base (admin C). */
-export const PAYOUT_MAX_ATTEMPTS = 10;
+/** Rejeux d'un versement FAILED par le cron (A65, décision 03/09 1B : 100) — au-delà, visible en base et dans le récapitulatif quotidien (A88).
+ *  Le rejeu déclenché par `account.updated` (A87) ignore ce plafond. */
+export const PAYOUT_MAX_ATTEMPTS = 100;
+/** Récapitulatif support (A88) : un versement FAILED plus vieux que ce délai est signalé. */
+export const OPS_DIGEST_FAILED_AFTER_HOURS = 24;
 /** Rappel J+3 : émis quand il reste ≤ 24 h avant `payoutDueAt` (A70). */
 export const VERIFICATION_REMINDER_HOURS_BEFORE = 24;
 /** Tirages d'un ticket à 4 chiffres avant de passer à 6 (D51). */
@@ -432,6 +435,65 @@ export function makeDealSettlementService(
         }
       }
       return reminded;
+    },
+
+    /* ── Webhook Connect `account.updated` (A87) ─────────────── */
+
+    /**
+     * Le compte Stripe du Voyageur vient d'être déclaré prêt : rejoue SES
+     * versements FAILED immédiatement, quel que soit le compteur d'essais
+     * (le plafond A65 ne vaut que pour le cron). Retourne le nombre envoyé.
+     */
+    async retryPayoutsForCarrier(carrierId: string): Promise<number> {
+      const now = clock();
+      const failed = await prisma.booking.findMany({
+        where: { carrierId, isDeleted: false, status: { in: ["COMPLETED", "CANCELLED"] }, payoutStatus: "FAILED" },
+        select: BOOKING_WRITE_SELECT,
+        orderBy: { updatedAt: "asc" },
+      });
+      let sent = 0;
+      for (const raw of failed) {
+        const booking = toBookingForWrite(raw as unknown as Record<string, unknown>);
+        try {
+          if ((await executePayout(booking, now)).payoutStatus === "SENT") sent += 1;
+        } catch (err) {
+          logger.error({ bookingId: booking.id, err }, "Payout retry (account.updated) failed unexpectedly");
+        }
+      }
+      return sent;
+    },
+
+    /* ── Webhook `transfer.reversed` (A87) ───────────────────── */
+
+    /** Stripe a renversé un transfert : l'argent est revenu à la plateforme. JAMAIS renvoyé automatiquement (arbitrage admin). */
+    async markTransferReversed(transferId: string): Promise<boolean> {
+      const written = await prisma.booking.updateMany({
+        where: { transferId, payoutStatus: "SENT" },
+        data: { payoutStatus: "REVERSED", payoutFailureReason: "PROVIDER_REVERSED" },
+      });
+      if (written.count > 0) logger.warn({ transferId }, "Stripe transfer reversed — payout marked REVERSED (admin review)");
+      return written.count > 0;
+    },
+
+    /* ── Récapitulatif quotidien support (A88) ───────────────── */
+
+    /** Ce que le support doit regarder : échecs > 24 h, renversés, retenues à arbitrer. */
+    async collectOpsDigest(): Promise<{
+      failed: BookingForWrite[];
+      reversed: BookingForWrite[];
+      held: BookingForWrite[];
+    }> {
+      const now = clock();
+      const since = new Date(now.getTime() - OPS_DIGEST_FAILED_AFTER_HOURS * 3_600_000);
+      const load = (where: Record<string, unknown>) =>
+        prisma.booking.findMany({ where: { isDeleted: false, ...where } as never, select: BOOKING_WRITE_SELECT, take: 100, orderBy: { updatedAt: "asc" } });
+      const [failed, reversed, held] = await Promise.all([
+        load({ status: { in: ["COMPLETED", "CANCELLED"] }, payoutStatus: "FAILED", updatedAt: { lt: since } }),
+        load({ payoutStatus: "REVERSED" }),
+        load({ status: "CANCELLED", retentionDisposition: "HELD_FOR_MEDIATION" }),
+      ]);
+      const conv = (rows: unknown[]) => rows.map((r) => toBookingForWrite(r as Record<string, unknown>));
+      return { failed: conv(failed), reversed: conv(reversed), held: conv(held) };
     },
 
     /** Exposé pour la PR retenue ANN-01 (D50) et les tests. */

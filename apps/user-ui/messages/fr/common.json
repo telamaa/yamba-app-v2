@@ -189,6 +189,10 @@
     "follow": {
       "title": "Connecte-toi pour suivre {firstName}",
       "subtitle": "Suivre {firstName} te prévient de ses prochains trajets : c'est lié à ton compte. Tu restes sur ce profil après connexion."
+    },
+    "sessionExpired": {
+      "title": "Ta session a expiré",
+      "subtitle": "Par sécurité, une session se ferme après une heure sans activité (coche « Rester connecté » pour 7 jours). Reconnecte-toi : tu restes sur cette page."
     }
   }
 }

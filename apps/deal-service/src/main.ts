@@ -35,6 +35,7 @@ import dealRouter, { dealLifecycleService, dealSettlementService } from "./route
 import { makeStripeWebhookHandler } from "./controllers/stripe-webhook.controller";
 import { startBookingExpiryCron } from "./cron/expire-bookings.cron";
 import { startBookingPayoutCron } from "./cron/payout-bookings.cron";
+import { startOpsDigestCron } from "./cron/ops-digest.cron";
 import { OutboxRelay } from "./relay/outbox-relay";
 
 const logger = pino({
@@ -71,7 +72,7 @@ app.use(
 app.post(
   "/webhooks/stripe",
   express.raw({ type: "application/json" }),
-  makeStripeWebhookHandler(dealLifecycleService, logger.child({ module: "stripe-webhook" }))
+  makeStripeWebhookHandler(dealLifecycleService, logger.child({ module: "stripe-webhook" }), dealSettlementService)
 );
 
 app.use(express.json({ limit: "10mb" }));
@@ -169,6 +170,15 @@ if (!payoutCronEnabled) {
   logger.info("Booking payout cron disabled (BOOKING_PAYOUT_CRON_ENABLED=false)");
 }
 
+// ── Récapitulatif quotidien support (A88) ─────────────────────────────
+const opsDigestEnabled = process.env.OPS_DIGEST_CRON_ENABLED !== "false";
+const opsDigestCron = opsDigestEnabled
+  ? startOpsDigestCron(dealSettlementService, logger.child({ module: "ops-digest-cron" }))
+  : null;
+if (!opsDigestEnabled) {
+  logger.info("Ops digest cron disabled (OPS_DIGEST_CRON_ENABLED=false)");
+}
+
 // Arrêt propre : batch en vol terminé, bail libéré, producer déconnecté,
 // serveur HTTP fermé. La ceinture setTimeout garantit la sortie même si
 // une déconnexion traîne (5 s max). Le garde évite qu'un SIGINT répété
@@ -185,6 +195,9 @@ function shutdown(signal: string): void {
     }
     if (payoutCron) {
       payoutCron.stop();
+    }
+    if (opsDigestCron) {
+      opsDigestCron.stop();
     }
     if (relay) {
       await relay.stop().catch((err) => logger.error({ err }, "Relay stop failed"));

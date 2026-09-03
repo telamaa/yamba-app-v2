@@ -4611,9 +4611,10 @@
           "PENDING",
           "SENT",
           "FAILED",
-          "FROZEN"
+          "FROZEN",
+          "REVERSED"
         ],
-        "description": "Carrier payout state (B4/D49). PENDING = deal COMPLETED, transfer not yet executed · SENT = transfer executed (payoutSentAt) · FAILED = transfer refused (retried by the payout cron) · FROZEN = dispute open (INV-5). null before COMPLETED / DISPUTED."
+        "description": "Carrier payout state (B4/D49). PENDING = deal COMPLETED, transfer not yet executed · SENT = transfer executed (payoutSentAt) · FAILED = transfer refused (retried by the payout cron) · FROZEN = dispute open (INV-5) · REVERSED = Stripe reversed the transfer (never re-sent automatically — admin, A87). null before COMPLETED / DISPUTED."
       },
       "DisputeCategory": {
         "type": "string",
@@ -9429,9 +9430,10 @@
           "BLOCKED",
           "FROZEN",
           "SENT",
-          "HELD"
+          "HELD",
+          "REVERSED"
         ],
-        "description": "UPCOMING = delivered, shipper verification running (payoutDueAt) · PENDING = being sent / retried · BLOCKED = carrier Stripe account not ready (CTA onboarding) · FROZEN = dispute open · SENT = transfer executed (payoutSentAt) · HELD = late cancellation after departure, retention held for mediation (no amount)"
+        "description": "UPCOMING = delivered, shipper verification running (payoutDueAt) · PENDING = being sent / retried · BLOCKED = carrier Stripe account not ready (CTA onboarding) · FROZEN = dispute open · SENT = transfer executed (payoutSentAt) · HELD = late cancellation after departure, retention held for mediation (no amount) · REVERSED = Stripe reversed the transfer, under review (A87)"
       },
       "WalletPayoutItem": {
         "type": "object",

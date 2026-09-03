@@ -345,6 +345,17 @@ Objectif produit assumé : **solide, propre, pro, secure, long terme** — les f
 
 ---
 
+## 2bis.24 — Session `chore/b4-hardening` (durcissement de l'argent sortant) — A86→A89
+
+| # | Arbitrage | Pourquoi | Compromis | PR |
+|---|---|---|---|---|
+| A86 | **Plafond de rejeu porté à 100 essais** (décision utilisateur 03/09, 1B), toutes causes confondues ; au-delà, le versement reste FAILED, visible dans le récapitulatif support (A88). Le rejeu déclenché par `account.updated` (A87) IGNORE le plafond | 100 × 5 min ≈ 8 h de rejeu automatique ; le cas « compte Stripe finalisé le lendemain » est rattrapé par le webhook, pas par le compteur | Une erreur fournisseur persistante n'est plus rejouée après 8 h : le support la voit le lendemain | `chore/b4-hardening` |
+| A87 | **Un seul URL de webhook, deux endpoints Stripe** (plateforme + comptes connectés, `STRIPE_WEBHOOK_SECRET` + `STRIPE_CONNECT_WEBHOOK_SECRET`, chaque signature essayée) — décision 2A. `account.updated` → drapeaux `CarrierPage` mis à jour sans repasser par l'onboarding + rejeu immédiat des versements FAILED du Voyageur si `payouts_enabled` · `transfer.reversed` → `payoutStatus = REVERSED` (`PROVIDER_REVERSED`), JAMAIS renvoyé automatiquement (arbitrage admin) · `payout.failed` (compte connecté) → le Voyageur est prévenu (in-app `carrier.payout_failed` + email « vérifie ton RIB »), jamais le message brut de la banque | Un compte prêt doit payer sans que le Voyageur clique ; un renversement est une anomalie à examiner, pas à réparer en boucle ; un virement bancaire refusé est invisible sans ce webhook | Deux exceptions au patron outbox (événement de COMPTE, pas de deal) : le deal-service écrit lui-même la notification et l'email (`ops-notify.service.ts`) | `chore/b4-hardening` |
+| A88 | **Récapitulatif quotidien au support** (décision 3A) : cron `0 8 * * *` (`OPS_DIGEST_CRON_ENABLED`) → email `SUPPORT_EMAIL` avec les versements FAILED depuis > 24 h, les transferts renversés et les retenues « à arbitrer » (liens vers les deals) ; rien à dire → pas d'email | Filet de sécurité avant l'admin (chantier C) : aucun argent ne reste bloqué en silence | Un email de plus par jour ouvré ; le support agit à la main jusqu'au chantier C | `chore/b4-hardening` |
+| A89 | **Session expirée = UNE fenêtre de connexion, pas un toast par écran** (décision 4A) : le client API émet `yamba:session-expired` quand le rafraîchissement échoue, `SessionExpiredGate` (monté dans les providers) ouvre `AuthGateModal` « Ta session a expiré » sur la page courante ; après connexion, le circuit breaker est réarmé et le cache invalidé — l'utilisateur refait son geste. Cause probable de l'« erreur » de régénération du code en recette (A62 : 60 min sans activité) | Un 401 silencieux transformé en « Erreur, réessaye » fait croire à un bug ; la porte d'identité existe déjà (A63) | Sur une page publique, la fenêtre s'ouvre aussi si une requête authentifiée échoue (rare : `requireAuth` seulement) | `chore/b4-hardening` |
+
+---
+
 # 3. Roadmap maîtresse
 
 ## 3.0 Les trois jalons
