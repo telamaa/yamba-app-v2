@@ -2,6 +2,7 @@ import express, { Router } from "express";
 import {
   cancelRegistration,
   getMe,
+  googleSignIn,
   loginUser,
   logoutUser,
   refreshAuthTokens,
@@ -26,6 +27,7 @@ router.post("/auth/register/cancel", cancelRegistration); // 🆕
 
 // ─── Authentification ──────────────────────────────────
 router.post("/auth/login", loginUser);
+router.post("/auth/google", googleSignIn); // D47
 router.post("/auth/refresh", refreshAuthTokens);
 router.post("/auth/logout", logoutUser);
 router.get("/auth/me", isAuthenticated, getMe);

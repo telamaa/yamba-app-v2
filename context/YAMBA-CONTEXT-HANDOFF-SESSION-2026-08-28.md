@@ -414,12 +414,13 @@ mobile-first, aucune attribution Claude, charte mango/teal/slate.
 3. `feat/booking-auth-modal` — **FAIT, en PR** (A58 ; branchée sur `feat/email-locale`).
 4. `feat/trip-favorites` — **FAIT, en PR** (D46, A59 ; trip-service 198).
 5. `feat/auth-pages-ux` — **FAIT, en PR** (D45 pages auth, A60 : porte « Partager un trajet » en modale, demande utilisateur 03/09). Vocabulaire du rôle toujours ouvert.
-6. `feat/auth-google` — avec l'écran de consentement CGU (P2).
+6. `feat/auth-google` — **FAIT, en PR** (D47, A61). **Geste utilisateur** : créer l'ID client OAuth (Google Cloud → Identifiants → « Application Web », origines `http://localhost:3000` + IP LAN) et poser `GOOGLE_CLIENT_ID` + `NEXT_PUBLIC_GOOGLE_CLIENT_ID` dans `.env` / `apps/user-ui/.env.local`, puis recette J1–J8.
 7. `chore/api-same-origin` — rewrite Next `/api` → gateway (P3).
 
 ## C. Questions encore ouvertes pour l'utilisateur
 - Nom du rôle transporteur : Yamber / Tripper / Voyageur (une seule réponse, appliquée partout).
-- Facebook : garder le bouton inerte ou le retirer à la PR Google.
+- Facebook : garder le bouton inerte ou le retirer (toujours inerte après la PR Google).
+- Session : « Rester connecté » coché par défaut = 7 jours d'inactivité / 30 jours (D27) — l'utilisateur le vit comme « connecté indéfiniment » ; correctif prévu (défaut décoché → 60 min / 7 jours).
 
 ## C bis. Fusions
 - Les fusions sont faites PAR L'UTILISATEUR (le classificateur de permissions de la session refuse `gh pr merge`) : #116, #117, #118 fusionnées le 03/09 (`dev` = `bb57c49`). Chaque PR suivante part de `dev` à jour.

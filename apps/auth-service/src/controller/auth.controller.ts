@@ -42,6 +42,8 @@ import {
   remainingLifetimeMs,
 } from "../utils/session-policy";
 import { recordRegistrationConsents } from "../utils/consent/consent.helper";
+import { googleSignIn as googleSignInService } from "../services/google-auth.service";
+import { buildGoogleTokenVerifier } from "../services/google-token.verifier";
 import { clearAuthCookies, setCookie } from "../utils/cookies/setCookie";
 import jwt from "jsonwebtoken";
 import { AuthenticatedRequest } from "@packages/middleware/isAuthenticated";
@@ -332,6 +334,43 @@ export const verifyRegistrationOtp = async (
 // LOGIN, REFRESH, etc. — INCHANGÉS
 // ───────────────────────────────────────────────────────
 
+/**
+ * Ouvre une session (D27) : cookies access + refresh, record Redis.
+ * Partagé par le login mot de passe et la connexion Google (D47).
+ */
+async function issueSession(
+  res: Response,
+  user: { id: string; roles: string[] },
+  shouldRemember: boolean
+): Promise<void> {
+  clearAuthCookies(res);
+
+  const accessToken = jwt.sign(
+    { id: user.id, roles: user.roles },
+    process.env.ACCESS_TOKEN_SECRET as string,
+    { expiresIn: "15m" }
+  );
+
+  // D27 — nouvelle session : createdAt = now, TTL = min(inactivité, vie absolue)
+  const sessionCreatedAt = Date.now();
+  const jti = createRefreshJti();
+  await storeRefreshSession(user.id, jti, shouldRemember, sessionCreatedAt);
+
+  // Le JWT refresh est borné à la vie absolue de la session (SES-02) —
+  // plus jamais un "30d" plein pot re-signé à chaque rotation.
+  const refreshLifetimeSeconds = Math.ceil(
+    remainingLifetimeMs(sessionCreatedAt, shouldRemember, loadSessionPolicy(), sessionCreatedAt) / 1000
+  );
+  const refreshToken = jwt.sign(
+    { id: user.id, jti, rememberMe: shouldRemember, sca: sessionCreatedAt },
+    process.env.REFRESH_TOKEN_SECRET as string,
+    { expiresIn: refreshLifetimeSeconds }
+  );
+
+  setCookie(res, "access_token", accessToken);
+  setCookie(res, "refresh_token", refreshToken, { rememberMe: shouldRemember });
+}
+
 export const loginUser = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { email, password, rememberMe } = req.body as {
@@ -355,33 +394,7 @@ export const loginUser = async (req: Request, res: Response, next: NextFunction)
     if (!isMatch) return next(new AuthError("Invalid email or password"));
 
     const shouldRemember = Boolean(rememberMe);
-
-    clearAuthCookies(res);
-
-    const accessToken = jwt.sign(
-      { id: user.id, roles: user.roles },
-      process.env.ACCESS_TOKEN_SECRET as string,
-      { expiresIn: "15m" }
-    );
-
-    // D27 — nouvelle session : createdAt = now, TTL = min(inactivité, vie absolue)
-    const sessionCreatedAt = Date.now();
-    const jti = createRefreshJti();
-    await storeRefreshSession(user.id, jti, shouldRemember, sessionCreatedAt);
-
-    // Le JWT refresh est borné à la vie absolue de la session (SES-02) —
-    // plus jamais un "30d" plein pot re-signé à chaque rotation.
-    const refreshLifetimeSeconds = Math.ceil(
-      remainingLifetimeMs(sessionCreatedAt, shouldRemember, loadSessionPolicy(), sessionCreatedAt) / 1000
-    );
-    const refreshToken = jwt.sign(
-      { id: user.id, jti, rememberMe: shouldRemember, sca: sessionCreatedAt },
-      process.env.REFRESH_TOKEN_SECRET as string,
-      { expiresIn: refreshLifetimeSeconds }
-    );
-
-    setCookie(res, "access_token", accessToken);
-    setCookie(res, "refresh_token", refreshToken, { rememberMe: shouldRemember });
+    await issueSession(res, user, shouldRemember);
 
     return res.status(200).json({
       message: "Login successful!",
@@ -763,6 +776,79 @@ export const updateMyLocale = async (
     });
 
     return res.status(200).json({ success: true, preferredLocale: locale });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+// ───────────────────────────────────────────────────────
+// D47 — Connexion / inscription par Google
+// ───────────────────────────────────────────────────────
+
+const googleVerifier = buildGoogleTokenVerifier();
+
+/**
+ * POST /auth/google — body { credential, rememberMe?, consent?: { termsVersion, privacyVersion } }
+ * 200 { status: "LOGGED_IN", user, created, linked } (cookies posés)
+ * 200 { status: "CONSENT_REQUIRED", profile } (rien créé : le front demande les CGU puis rejoue)
+ * 401 GOOGLE_TOKEN_INVALID · 403 GOOGLE_EMAIL_UNVERIFIED · 503 GOOGLE_NOT_CONFIGURED
+ */
+export const googleSignIn = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { credential, rememberMe, consent } = (req.body ?? {}) as {
+      credential?: string;
+      rememberMe?: boolean;
+      consent?: { termsVersion?: string; privacyVersion?: string };
+    };
+    if (!credential || typeof credential !== "string") {
+      return next(new ValidationError("credential (Google id_token) is required."));
+    }
+
+    const result = await googleSignInService(
+      {
+        verify: googleVerifier,
+        prisma,
+        generatePublicSlug: generateUniquePublicSlug,
+        recordConsents: recordRegistrationConsents,
+        normalizeEmail,
+      },
+      {
+        idToken: credential,
+        consent:
+          consent?.termsVersion && consent?.privacyVersion
+            ? { termsVersion: String(consent.termsVersion), privacyVersion: String(consent.privacyVersion) }
+            : undefined,
+        locale: localeFromHeaders(req.headers),
+        ip: getClientIp(req),
+        userAgent: typeof req.headers["user-agent"] === "string" ? req.headers["user-agent"] : undefined,
+      }
+    );
+
+    if (result.status === "CONSENT_REQUIRED") {
+      return res.status(200).json(result);
+    }
+
+    await issueSession(res, result.user, Boolean(rememberMe));
+
+    if (result.created) {
+      sendAccountCreatedEmail(result.user.firstName, result.user.email, result.user.preferredLocale, {
+        loginUrl: process.env.USER_APP_URL ? `${process.env.USER_APP_URL}/login` : undefined,
+        supportEmail: "support@yamba.com",
+      }).catch((err) => console.error("Welcome email failed:", err));
+    }
+
+    return res.status(200).json({
+      status: "LOGGED_IN",
+      created: result.created,
+      linked: result.linked,
+      user: {
+        id: result.user.id,
+        email: result.user.email,
+        firstName: result.user.firstName,
+        lastName: result.user.lastName,
+        roles: result.user.roles,
+      },
+    });
   } catch (error) {
     return next(error);
   }

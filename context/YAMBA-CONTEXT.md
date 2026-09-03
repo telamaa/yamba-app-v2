@@ -219,6 +219,11 @@ Ordre de demarrage : auth -> trip -> gateway.
   promesses produit a la place des faux chiffres, champs 16 px mobile,
   AuthGateModal generique + porte « Partager un trajet » en modale (demande
   utilisateur). Reste ouvert : nom du role (Yamber / Tripper / Voyageur).
+- 03/09 : feat/auth-google (D47, A61) — AuthIdentity, POST /auth/google (jeton
+  verifie serveur, rattachement par email verifie, consentement obligatoire a la
+  creation), bouton officiel GIS + ecran « Finalise ton compte ». Sans
+  GOOGLE_CLIENT_ID / NEXT_PUBLIC_GOOGLE_CLIENT_ID : bouton inerte, API 503.
+  A FAIRE par l'utilisateur : ID client OAuth Google Cloud (voir .env.example).
 - Plateforme de tests : 600 (trip 187, deal 354, notification 59) — post-B3 (#96).
 - MERGE 01/09 : toute la pile B2 est dans `dev` via la SEULE **PR #90**
   (`feat/b2-deal-front` portait la chaîne complète : jalons mobile D36,

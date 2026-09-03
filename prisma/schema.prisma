@@ -60,6 +60,9 @@ model User {
   // Favoris de trajets (D46)
   tripFavorites TripFavorite[]
 
+  // Identités externes (D47) — Google aujourd'hui
+  identities AuthIdentity[]
+
   consentLogs ConsentLog[]
 
   // Lifecycle
@@ -226,6 +229,28 @@ model UserFollow {
 //   - expiresAt = createdAt + 6 mois (sinon)
 //   - Cron quotidien : warn à J-7, désactive à J
 // ─────────────────────────────────────────────
+
+/// D47 — Identité externe (OAuth / OpenID). Un utilisateur peut avoir un mot
+/// de passe ET une ou plusieurs identités. Modèle séparé (pas de `googleSub`
+/// nullable unique sur User : sur Mongo, les null se percutent — pitfall P2002).
+model AuthIdentity {
+  id          String       @id @default(auto()) @map("_id") @db.ObjectId
+  userId      String       @db.ObjectId
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider    AuthProvider
+  /// Identifiant STABLE chez le fournisseur (`sub` du jeton OpenID) — jamais l'email.
+  providerSub String
+  email       String?
+  createdAt   DateTime     @default(now())
+  lastUsedAt  DateTime     @default(now())
+
+  @@unique([provider, providerSub])
+  @@index([userId])
+}
+
+enum AuthProvider {
+  GOOGLE
+}
 
 /// D46 — Favori de trajet : signet PRIVÉ d'un utilisateur sur un trajet publié.
 /// Jamais notifié au Voyageur, jamais compté publiquement. Conservé quand le

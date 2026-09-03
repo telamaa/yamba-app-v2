@@ -150,6 +150,18 @@ export async function loginUser(payload: LoginPayload) {
   return response.data;
 }
 
+// ─── D47 — Google sign-in ──────────────────────────────
+export type GoogleConsentPayload = { termsVersion: string; privacyVersion: string };
+export type GoogleSignInPayload = { credential: string; rememberMe?: boolean; consent?: GoogleConsentPayload };
+export type GoogleSignInResponse =
+  | { status: "LOGGED_IN"; created: boolean; linked: boolean; user: { id: string; email: string; firstName: string; lastName: string; roles: string[] } }
+  | { status: "CONSENT_REQUIRED"; profile: { email: string; firstName: string; lastName: string; avatarUrl?: string } };
+
+export async function googleSignIn(payload: GoogleSignInPayload) {
+  const response = await authApi.post<GoogleSignInResponse>("/auth/google", payload);
+  return response.data;
+}
+
 // ─── Forgot password API calls ─────────────────────────
 export async function requestPasswordResetOtp(payload: ForgotPasswordPayload) {
   const response = await authApi.post<ForgotPasswordResponse>(
