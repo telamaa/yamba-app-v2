@@ -1011,6 +1011,7 @@ enum PayoutStatus {
   SENT
   FAILED
   FROZEN
+  REVERSED // transfert renversé côté Stripe (webhook transfer.reversed, A87) — jamais renvoyé automatiquement
 }
 
 /// Litige (B4, D51) — catégories de la spec §3.6.

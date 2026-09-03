@@ -270,7 +270,12 @@ Ordre de demarrage : auth -> trip -> gateway.
   cree les listes, verrou optimiste updatedAt, script repair-absent-lists joue.
   Regeneration du code signalee en recette : cause non etablie (ligne gateway
   a fournir), hypothese session expiree (A62, 60 min).
-- Plateforme de tests : 673 (trip 198, deal 399, notification 76) + auth 65.
+- 03/09 : chore/b4-hardening (A86–A89) — plafond de rejeu 100, webhooks Connect
+  (account.updated → rejeu immediat, transfer.reversed → REVERSED, payout.failed
+  → Voyageur prevenu), recap quotidien support, fenetre « session expiree ».
+  GESTE UTILISATEUR : second endpoint webhook Stripe (comptes connectes) +
+  STRIPE_CONNECT_WEBHOOK_SECRET. Suite : vocabulaire Voyageur (PR copie), B5.
+- Plateforme de tests : 676 (trip 198, deal 402, notification 76) + auth 65.
 - (historique) Plateforme de tests : 600 (trip 187, deal 354, notification 59) — post-B3 (#96).
 - MERGE 01/09 : toute la pile B2 est dans `dev` via la SEULE **PR #90**
   (`feat/b2-deal-front` portait la chaîne complète : jalons mobile D36,

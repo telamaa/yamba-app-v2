@@ -311,6 +311,15 @@ export type PaymentWebhookEvent = {
   type: string;
   /** id du PaymentIntent concerné (null pour les événements non-PI) */
   paymentIntentId: string | null;
+  /** Événement d'un compte CONNECTÉ (Connect) : `acct_…`, sinon null (A87) */
+  account: string | null;
+  /** Objet porté par l'événement : type et id (transfer, payout, account…) */
+  objectType: string | null;
+  objectId: string | null;
+  /** `account.updated` : les drapeaux qui pilotent les versements */
+  accountFlags: { chargesEnabled: boolean; payoutsEnabled: boolean; detailsSubmitted: boolean } | null;
+  /** `payout.failed` : message de la banque (jamais servi au front tel quel) */
+  failureMessage: string | null;
 };
 
 // La vérification de signature n'appelle JAMAIS l'API : la clé de cette
@@ -330,11 +339,30 @@ export function constructStripeWebhookEvent(
     apiVersion: "2026-03-25.dahlia",
   });
   const event = webhookVerifier.webhooks.constructEvent(rawBody, signature, webhookSecret);
-  const object = event.data.object as { object?: string; id?: string };
+  const object = event.data.object as {
+    object?: string;
+    id?: string;
+    charges_enabled?: boolean;
+    payouts_enabled?: boolean;
+    details_submitted?: boolean;
+    failure_message?: string | null;
+  };
   return {
     id: event.id,
     type: event.type,
     paymentIntentId: object?.object === "payment_intent" && object.id ? object.id : null,
+    account: (event as { account?: string }).account ?? null,
+    objectType: object?.object ?? null,
+    objectId: object?.id ?? null,
+    accountFlags:
+      object?.object === "account"
+        ? {
+            chargesEnabled: object.charges_enabled ?? false,
+            payoutsEnabled: object.payouts_enabled ?? false,
+            detailsSubmitted: object.details_submitted ?? false,
+          }
+        : null,
+    failureMessage: object?.object === "payout" ? (object.failure_message ?? null) : null,
   };
 }
 

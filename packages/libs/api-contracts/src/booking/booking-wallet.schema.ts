@@ -18,13 +18,14 @@ const corridor = z.object({ originCity: z.string(), destinationCity: z.string() 
 
 /* ══ Voyageur — versements ════════════════════════════════════ */
 
-export const WALLET_PAYOUT_STATES = ["UPCOMING", "PENDING", "BLOCKED", "FROZEN", "SENT", "HELD"] as const;
+export const WALLET_PAYOUT_STATES = ["UPCOMING", "PENDING", "BLOCKED", "FROZEN", "SENT", "HELD", "REVERSED"] as const;
 export const WalletPayoutStateSchema = z.enum(WALLET_PAYOUT_STATES).meta({
   id: "WalletPayoutState",
   description:
     "UPCOMING = delivered, shipper verification running (payoutDueAt) · PENDING = being sent / retried · " +
     "BLOCKED = carrier Stripe account not ready (CTA onboarding) · FROZEN = dispute open · SENT = transfer executed " +
-    "(payoutSentAt) · HELD = late cancellation after departure, retention held for mediation (no amount)",
+    "(payoutSentAt) · HELD = late cancellation after departure, retention held for mediation (no amount) · " +
+    "REVERSED = Stripe reversed the transfer, under review (A87)",
 });
 
 export const WalletPayoutItemSchema = z

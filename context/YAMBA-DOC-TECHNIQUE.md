@@ -1284,3 +1284,18 @@ Chantier C (admin-ui : médiation DISPUTED, arbitrage des retenues HELD_FOR_MEDI
 
 ### Preuves
 deal-service 399 (assertions renforcées, même total) · tsc · réparation jouée et vérifiée sur le deal réel.
+
+# `chore/b4-hardening` — durcissement de l'argent sortant (A86–A89)
+
+## Ce qui a été fait
+
+1. **Plafond de rejeu** (`deal-settlement.service.ts`) : `PAYOUT_MAX_ATTEMPTS = 100` (A86). `retryPayoutsForCarrier(carrierId)` rejoue tous les FAILED d'un Voyageur sans plafond (appelé par le webhook). `markTransferReversed(transferId)` : SENT → REVERSED (`PROVIDER_REVERSED`), exclu de la passe de rejeu. `collectOpsDigest()` : trois requêtes bornées (FAILED > 24 h, REVERSED, HELD_FOR_MEDIATION). Prisma / contrat : `PayoutStatus.REVERSED`, `WalletPayoutState.REVERSED` (+ mapping wallet).
+2. **Webhook Stripe** (`stripe-webhook.controller.ts`, A87) : vérification avec `STRIPE_WEBHOOK_SECRET` puis `STRIPE_CONNECT_WEBHOOK_SECRET` (`verifyWithAnySecret`) ; `PaymentWebhookEvent` enrichi (`account`, `objectType`, `objectId`, `accountFlags`, `failureMessage`) dans `@packages/payments`. Traitements : `account.updated` → `CarrierPage` (charges / payouts / details) + rejeu immédiat si `payouts_enabled` ; `transfer.reversed` → REVERSED ; `payout.failed` → `notifyCarrierPayoutFailed` (in-app `carrier.payout_failed` avec id d'événement synthétique + email D44 `OPS_EMAILS.payoutFailedCarrier`). `main.ts` passe le service de règlement au webhook.
+3. **Récapitulatif support** (A88) : `emails/ops-emails.ts` (dictionnaire FR/EN : `payoutFailedCarrier`, `opsDigest`), `services/ops-notify.service.ts` (`sendOpsDigest`, `notifyCarrierPayoutFailed`), `cron/ops-digest.cron.ts` (`0 8 * * *`, `OPS_DIGEST_CRON_ENABLED`), câblé dans `main.ts`. Alias webpack `@packages/email` ajouté au deal-service (bundle vérifié : `nx build deal-service`).
+4. **Session expirée** (A89) : `api-client.ts` émet `yamba:session-expired` sur échec de rafraîchissement ; `components/providers/SessionExpiredGate.tsx` (monté dans `app/[locale]/providers.tsx`) ouvre `AuthGateModal` « Ta session a expiré » ; après connexion : `resetAuthRefreshCircuitBreaker()` + `invalidateQueries()`. Copie `common.authGate.sessionExpired` FR/EN.
+5. **Copie** : in-app `booking_payout_sent` → « Versement parti vers ton compte » ; `carrier_payout_failed` ; `payoutStatus.reversed.*` (carte Voyageur) ; `wallet.state.REVERSED`.
+6. **Seed** : `bzv-completed-blocked` (COMPLETED, `FAILED` / `CARRIER_ACCOUNT_NOT_READY`, 4 essais) pour jouer V12–V13 et le bandeau sans compte Stripe réel — 21 bookings.
+7. `.env.example` : `STRIPE_CONNECT_WEBHOOK_SECRET`, `OPS_DIGEST_CRON_ENABLED`. **Geste utilisateur** : dans Stripe → Développeurs → Webhooks, ajouter un SECOND endpoint sur la même URL `/api/webhooks/stripe` avec « Écouter les événements des comptes connectés » (`account.updated`, `transfer.reversed`, `payout.failed`) et poser son secret dans `STRIPE_CONNECT_WEBHOOK_SECRET`.
+
+### Preuves
+deal-service **402** (399 + 3 : rejeu par Voyageur, renversement, digest) · notification 76 · tsc user-ui + deal-service · miroir i18n · OpenAPI régénéré · `nx build deal-service` OK · seed rejoué (21) · pages Finances / Mes trajets en 200. Recette H1–H8 (`YAMBA-DOC-METIER.md`, RG-H-01…05).

@@ -988,3 +988,24 @@ La section Finances était une promesse : deux onglets vides et une maquette aux
 | J2 | « Décollage » puis « Atterrissage » dans l'ordre | Écrits ; « Décollage » avant « Aéroport » → refus propre (ordre) |
 | J3 | Double clic sur un jalon | Un seul jalon écrit, le second refusé sans erreur visible |
 | J4 | Expéditrice, « Régénérer le code » | Nouveau code affiché, email « nouveau code » ; sinon relever la ligne `POST …/code/regenerate` du gateway |
+
+# Durcissement B4 — aucun argent bloqué en silence, aucune session expirée déguisée en bug
+
+### Règles de gestion (H)
+- **RG-H-01 — Un versement en échec est rejoué jusqu'à 100 fois** (toutes les 5 minutes) ; au-delà, il reste visible et remonte au support chaque matin.
+- **RG-H-02 — Un compte Stripe déclaré prêt paie tout de suite** : Stripe prévient Yamba, les drapeaux du Voyageur suivent, ses versements bloqués repartent sans qu'il clique.
+- **RG-H-03 — Un transfert renversé par Stripe n'est jamais renvoyé automatiquement** : il passe « sous examen », le Voyageur le voit calmement, le support tranche.
+- **RG-H-04 — Un virement bancaire refusé est dit au Voyageur** (in-app + email « vérifie ton RIB »), sans le message brut de la banque, avec le chemin vers son tableau de bord Stripe.
+- **RG-H-05 — Une session expirée ouvre la fenêtre de connexion sur place**, jamais un « Erreur, réessaye » ; après connexion, l'utilisateur refait son geste sur la même page.
+
+### Recette
+| # | Scénario | Attendu |
+|---|---|---|
+| H1 | Seed `bzv-completed-blocked`, Voyageur Inès | Page du deal : carte ambre « en attente : finalise ton compte Stripe » + bouton ; bandeau en tête de « Mes trajets » et de Finances ; ligne « en attente : finalise ton compte » |
+| H2 | Stripe test : compte Voyageur complété (webhook `account.updated` reçu) | Drapeaux mis à jour en base, versement FAILED reparti dans la foulée (log « account.updated processed », `retried` ≥ 1), carte verte « partis vers ton compte » |
+| H3 | Stripe test : renverser un transfert (dashboard → transfer → reverse) | Deal en `REVERSED`, carte « versement sous examen », ligne Finances « sous examen », présent dans le récapitulatif du lendemain |
+| H4 | Stripe test : `payout.failed` sur le compte connecté (RIB de test en échec) | Notification in-app « Virement bancaire refusé : vérifie ton RIB » + email calme avec bouton Finances |
+| H5 | 08:00 UTC (ou déclenchement manuel du cron) avec un FAILED > 24 h | Email « Argent à surveiller » à `SUPPORT_EMAIL` avec les liens ; rien à dire → pas d'email |
+| H6 | Session Expéditrice inactive > 60 min, puis « Régénérer le code » | Fenêtre « Ta session a expiré » par-dessus le suivi ; après connexion, la régénération fonctionne |
+| H7 | Même chose côté Voyageur sur un jalon | Idem, jalon confirmable après reconnexion |
+| H8 | Notification in-app d'un versement | Libellé « Versement parti vers ton compte » |

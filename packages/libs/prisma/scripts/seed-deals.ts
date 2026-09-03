@@ -223,6 +223,9 @@ const BOOKINGS: SeedBooking[] = [
   { key: "bzv-disputed", tripKey: "bzv-inflight", shipperKey: "chinwe", status: "DISPUTED", weightKg: 3, category: "SMALL_TOYS", description: "Jouets anniversaire", declaredValueCents: 8000, pricing: perCategory(2800), recipient: RCP_BZV,
     milestones: { requestedAt: days(-9), expiresAt: days(-8), acceptedAt: days(-8), pickedUpAt: days(-6), deliveredAt: days(-2), payoutDueAt: days(2), disputeTicket: "YAM-2041", disputedAt: days(-1) },
     pickup: { confirmedAt: days(-6), photoUrls: ["https://r2.seed.yamba.dev/bzv-disputed-1.jpg"], notes: null } },
+  { key: "bzv-completed-blocked", tripKey: "bzv-inflight", shipperKey: "aminata", status: "COMPLETED", weightKg: 2, category: "BOOKS", description: "Manuels scolaires (versement bloqué : compte Stripe incomplet — recette V12/V13)", declaredValueCents: 4000, pricing: perCategory(2600), recipient: RCP_BZV,
+    milestones: { requestedAt: days(-13), expiresAt: days(-12), acceptedAt: days(-12), pickedUpAt: days(-7), deliveredAt: days(-7), payoutDueAt: days(-3), completedAt: days(-3) },
+    pickup: { confirmedAt: days(-7), photoUrls: ["https://r2.seed.yamba.dev/bzv-completed-blocked-1.jpg"], notes: null } },
   { key: "bzv-completed", tripKey: "bzv-inflight", shipperKey: "mai", status: "COMPLETED", weightKg: 4, category: "CLOTHES", description: "Pagnes et tissus", declaredValueCents: 20000, pricing: perCategory(3500), recipient: RCP_BZV,
     milestones: { requestedAt: days(-12), expiresAt: days(-11), acceptedAt: days(-11), pickedUpAt: days(-6), deliveredAt: days(-6), payoutDueAt: days(-2), completedAt: days(-2) },
     pickup: { confirmedAt: days(-6), photoUrls: ["https://r2.seed.yamba.dev/bzv-completed-1.jpg"], notes: null } },
@@ -423,7 +426,19 @@ async function main() {
     });
     // B4 — versement (D49/D50) et dossier de litige (D51) cohérents avec le statut.
     const m = b.milestones as { completedAt?: Date; disputeTicket?: string; disputedAt?: Date };
-    if (b.status === "COMPLETED") {
+    if (b.status === "COMPLETED" && b.key.endsWith("-blocked")) {
+      // A75/V12 : versement FAILED faute de compte Stripe prêt — bandeau + CTA sans Stripe réel.
+      await prisma.booking.update({
+        where: { id: booking.id },
+        data: {
+          completedBy: "SYSTEM",
+          payoutStatus: "FAILED",
+          payoutFailureReason: "CARRIER_ACCOUNT_NOT_READY",
+          payoutAmountCents: (booking as unknown as { pricing: { transportCents: number } }).pricing.transportCents,
+          payoutAttempts: 4,
+        },
+      });
+    } else if (b.status === "COMPLETED") {
       await prisma.booking.update({
         where: { id: booking.id },
         data: {

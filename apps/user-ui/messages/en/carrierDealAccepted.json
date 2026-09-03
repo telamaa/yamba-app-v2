@@ -99,6 +99,10 @@
     "sentLate": {
       "title": "{amount} compensation on its way to your account",
       "text": "The shipper cancelled less than 48h before departure: part of the retention goes to you. Sent on {date}, on your bank account within 2 to 7 days."
+    },
+    "reversed": {
+      "title": "{amount}: payout under review",
+      "text": "The transfer was reversed by our payment provider. Nothing is lost: we will contact you to sort it out."
     }
   },
   "settled": {

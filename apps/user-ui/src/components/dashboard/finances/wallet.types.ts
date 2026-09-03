@@ -6,7 +6,7 @@
  * comme pour les autres DTO du front (le paquet Zod n'est pas embarqué).
  */
 
-export type WalletPayoutState = "UPCOMING" | "PENDING" | "BLOCKED" | "FROZEN" | "SENT" | "HELD";
+export type WalletPayoutState = "UPCOMING" | "PENDING" | "BLOCKED" | "FROZEN" | "SENT" | "HELD" | "REVERSED";
 export type WalletPaymentState = "AUTHORIZED" | "HELD" | "RELEASED" | "RELEASED_NO_CHARGE" | "REFUNDED" | "PARTIALLY_REFUNDED";
 
 export type WalletPayoutItem = {

@@ -99,6 +99,10 @@
     "sentLate": {
       "title": "{amount} de compensation partis vers ton compte",
       "text": "L'Expéditeur a annulé à moins de 48 h du départ : une partie de la retenue te revient. Envoyés le {date}, sur ton compte bancaire sous 2 à 7 jours."
+    },
+    "reversed": {
+      "title": "{amount} : versement sous examen",
+      "text": "Le transfert a été renversé par notre prestataire de paiement. Rien n'est perdu : nous te contactons pour le régulariser."
     }
   },
   "settled": {

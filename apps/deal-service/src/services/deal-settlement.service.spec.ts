@@ -473,6 +473,45 @@ describe("D — cron de versement (A66/A70)", () => {
     expect(() => BookingDomainEventSchema.parse(writtenEvent("booking.verification_reminder"))).not.toThrow();
   });
 
+  it("A87 : retryPayoutsForCarrier rejoue les FAILED du Voyageur SANS plafond d'essais (compte prêt), COMPLETED et CANCELLED", async () => {
+    prismaMock.booking.findMany.mockResolvedValue([
+      makeBookingRecord({ status: "COMPLETED", payoutStatus: "FAILED", payoutAttempts: 250 }),
+      { ...makeBookingRecord({ status: "CANCELLED", payoutStatus: "FAILED", payoutAttempts: 3 }), id: "64b0000000000000000000b2", payoutAmountCents: 1200 },
+    ]);
+    const fake = new FakePaymentProvider();
+    const n = await makeService(fake).retryPayoutsForCarrier(CARRIER_ID);
+    expect(n).toBe(2);
+    expect(prismaMock.booking.findMany.mock.calls[0][0].where).toEqual({
+      carrierId: CARRIER_ID,
+      isDeleted: false,
+      status: { in: ["COMPLETED", "CANCELLED"] },
+      payoutStatus: "FAILED",
+    });
+    expect(fake.transfers.map((t) => t.amountCents)).toEqual([2400, 1200]);
+  });
+
+  it("A87 : markTransferReversed passe un versement SENT en REVERSED (jamais renvoyé) ; inconnu → false", async () => {
+    prismaMock.booking.updateMany.mockResolvedValueOnce({ count: 1 });
+    expect(await makeService().markTransferReversed("tr_1")).toBe(true);
+    expect(prismaMock.booking.updateMany).toHaveBeenCalledWith({
+      where: { transferId: "tr_1", payoutStatus: "SENT" },
+      data: { payoutStatus: "REVERSED", payoutFailureReason: "PROVIDER_REVERSED" },
+    });
+    prismaMock.booking.updateMany.mockResolvedValueOnce({ count: 0 });
+    expect(await makeService().markTransferReversed("tr_x")).toBe(false);
+  });
+
+  it("A88 : collectOpsDigest — échecs de plus de 24 h, renversés, retenues à arbitrer (trois requêtes bornées)", async () => {
+    prismaMock.booking.findMany.mockResolvedValue([]);
+    const digest = await makeService().collectOpsDigest();
+    expect(digest).toEqual({ failed: [], reversed: [], held: [] });
+    const wheres = prismaMock.booking.findMany.mock.calls.map((c) => c[0].where);
+    expect(wheres[0]).toMatchObject({ status: { in: ["COMPLETED", "CANCELLED"] }, payoutStatus: "FAILED", updatedAt: { lt: hoursFromNow(-24) } });
+    expect(wheres[1]).toMatchObject({ payoutStatus: "REVERSED" });
+    expect(wheres[2]).toMatchObject({ status: "CANCELLED", retentionDisposition: "HELD_FOR_MEDIATION" });
+    expect(PAYOUT_MAX_ATTEMPTS).toBe(100); // décision 03/09 (1B)
+  });
+
   it("sendVerificationReminders : course (déjà rappelé) → sauté sans erreur", async () => {
     prismaMock.booking.findMany.mockResolvedValue([makeBookingRecord({ payoutDueAt: hoursFromNow(20) })]);
     prismaMock.booking.updateMany.mockResolvedValueOnce({ count: 0 });

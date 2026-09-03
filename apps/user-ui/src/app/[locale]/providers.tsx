@@ -1,6 +1,7 @@
 "use client";
 import React, {useState} from 'react';
 import {QueryClient, QueryClientProvider} from "@tanstack/react-query";
+import SessionExpiredGate from "@/components/providers/SessionExpiredGate";
 
 const Providers = ({ children }: { children: React.ReactNode }) => {
   const [queryClient] = useState(
@@ -19,6 +20,8 @@ const Providers = ({ children }: { children: React.ReactNode }) => {
     <QueryClientProvider client={queryClient}>
       {/*<ProvidersWithWebSocket>{children}</ProvidersWithWebSocket>*/}
       {/*<Toaster />*/}
+
+      <SessionExpiredGate />
 
       {children}
     </QueryClientProvider>

@@ -15,6 +15,7 @@ module.exports = {
         "../../packages/libs/api-contracts/src"
       ),
       "@packages/payments": resolve(__dirname, "../../packages/libs/payments/src"),
+      "@packages/email": resolve(__dirname, "../../packages/libs/email/src"),
       "@packages/delivery-code": resolve(__dirname, "../../packages/libs/delivery-code/src"),
       "@packages/pricing": resolve(__dirname, "../../packages/libs/pricing/src"),
       "@packages/messaging": resolve(

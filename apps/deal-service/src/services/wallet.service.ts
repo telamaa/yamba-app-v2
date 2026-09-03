@@ -78,6 +78,8 @@ export function toPayoutItem(b: WalletBookingRecord, counterparts: WalletCounter
           : { ...base, kind, state: "PENDING", amountCents: amount, date: iso(b.updatedAt) };
       case "PENDING":
         return { ...base, kind, state: "PENDING", amountCents: amount, date: iso(b.updatedAt) };
+      case "REVERSED":
+        return { ...base, kind, state: "REVERSED", amountCents: amount, date: iso(b.updatedAt) }; // A87 : sous examen
       default:
         return null; // COMPLETED antérieur à B4 sans versement tracé : rien à montrer
     }
