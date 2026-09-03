@@ -55,7 +55,10 @@ function buildCopy(lang: string) {
     emailPh: fr ? "prenom@email.com" : "you@email.com",
     password: fr ? "Mot de passe" : "Password",
     forgot: fr ? "Oublié ?" : "Forgot?",
-    remember: fr ? "Rester connecté" : "Stay signed in",
+    remember: fr ? "Rester connecté sur cet appareil" : "Stay signed in on this device",
+    rememberHint: fr
+      ? "Coché : 7 jours sans activité. Sinon : déconnexion après 60 minutes sans activité."
+      : "Checked: 7 days without activity. Otherwise: signed out after 60 minutes without activity.",
     cta: fr ? "Se connecter" : "Sign in",
     ctaLoading: fr ? "Connexion…" : "Signing in…",
     notMemberYet: fr ? "Pas encore membre ?" : "Not a member yet?",
@@ -190,7 +193,9 @@ export default function LoginForm({ heroVisual }: Props) {
     defaultValues: {
       email: prefilledEmail,
       password: "",
-      remember: true, // ✅ coché par défaut (UX friendly)
+      // A62 — DÉCOCHÉ par défaut : session standard (60 min d'inactivité, 7 j max — D27).
+      // Coché = 7 j d'inactivité / 30 j, ce que la recette vivait comme « connecté indéfiniment ».
+      remember: false,
     },
   });
 
@@ -421,13 +426,19 @@ export default function LoginForm({ heroVisual }: Props) {
               )}
             </div>
 
-            <label className="flex cursor-pointer items-center gap-2.5 text-sm text-slate-700 dark:text-slate-300">
+            <label className="flex cursor-pointer items-start gap-2.5 text-sm text-slate-700 dark:text-slate-300">
               <input
                 type="checkbox"
-                className="h-4 w-4 rounded border-slate-300 accent-[#FF9900] focus:ring-2 focus:ring-[#FF9900]/30 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-slate-950"
+                aria-describedby="remember-hint"
+                className="mt-0.5 h-4 w-4 rounded border-slate-300 accent-[#FF9900] focus:ring-2 focus:ring-[#FF9900]/30 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-slate-950"
                 {...register("remember")}
               />
-              <span>{copy.remember}</span>
+              <span>
+                {copy.remember}
+                <span id="remember-hint" className="mt-0.5 block text-xs text-slate-500 dark:text-slate-400">
+                  {copy.rememberHint}
+                </span>
+              </span>
             </label>
 
             {errors.root?.serverError?.message && (

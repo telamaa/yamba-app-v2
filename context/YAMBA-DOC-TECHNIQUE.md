@@ -1135,3 +1135,7 @@ tsc user-ui, miroir i18n (24 namespaces), page login 200 sur le serveur de dev. 
 
 ### Preuves
 auth-service 65 tests, tsc auth + user-ui, miroir i18n. Le flux réel exige un ID client Google (geste utilisateur) : recette J1–J8 (`YAMBA-DOC-METIER.md`) à jouer après configuration.
+
+# fix/session-remember-default — la session expirait bien, la case cochée par défaut le cachait (A62)
+
+Diagnostic avant code : `session-policy.ts` (60 min / 7 j standard, 7 j / 30 j rememberMe, 21 tests), `storeRefreshSession` (TTL Redis = min(inactivité, vie absolue restante)), `refreshAuthTokens` (rotation avec le MÊME `createdAt`, plafond revérifié), `setCookie` (refresh de session sans `maxAge` hors rememberMe) : conformes à D27. Cause : `LoginForm` initialisait `remember: true`. Correctif : `remember: false`, libellé « Rester connecté sur cet appareil », aide `rememberHint` (`aria-describedby`) qui énonce les deux durées. Rien côté serveur. Recette K1–K4 (`YAMBA-DOC-METIER.md`).
