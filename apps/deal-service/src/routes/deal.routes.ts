@@ -12,6 +12,8 @@ import { makeDealLifecycleController } from "../controllers/deal-lifecycle.contr
 import { makeDealLifecycleService } from "../services/deal-lifecycle.service";
 import { makeDealTransportController } from "../controllers/deal-transport.controller";
 import { makeDealTransportService } from "../services/deal-transport.service";
+import { makeDealSettlementController } from "../controllers/deal-settlement.controller";
+import { makeDealSettlementService } from "../services/deal-settlement.service";
 import { createPaymentProviderFromEnv } from "@packages/payments";
 
 /**
@@ -41,6 +43,8 @@ export const dealLifecycleService = makeDealLifecycleService(paymentProvider);
 const dealRequest = makeDealRequestController(makeDealRequestService(paymentProvider));
 const dealLifecycle = makeDealLifecycleController(dealLifecycleService);
 const dealTransport = makeDealTransportController(makeDealTransportService(paymentProvider));
+export const dealSettlementService = makeDealSettlementService(paymentProvider);
+const dealSettlement = makeDealSettlementController(dealSettlementService);
 
 // Autorisation du montant (empreinte) — étape 1 de la demande (D37)
 router.post("/deals/payment-intents", isAuthenticated, dealRequest.createPaymentIntent);
@@ -64,6 +68,10 @@ router.post("/deals/:id/pickup/refuse", isAuthenticated, dealTransport.refusePic
 router.post("/deals/:id/events", isAuthenticated, dealTransport.confirmTrackingStep);
 router.post("/deals/:id/code/regenerate", isAuthenticated, dealTransport.regenerateCode);
 router.post("/deals/:id/deliver", isAuthenticated, dealTransport.deliver);
+
+// ── B4-PR1 : règlement (D49/D51) ─────────────────────────────
+router.post("/deals/:id/confirm", isAuthenticated, dealSettlement.confirm);
+router.post("/deals/:id/dispute", isAuthenticated, dealSettlement.dispute);
 
 // Deals d'un de MES trips (vue Carrier) — ?tripId=<ObjectId>[&status=]
 router.get("/deals", isAuthenticated, getTripDeals);

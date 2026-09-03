@@ -84,6 +84,8 @@ export const MAX_DELIVERY_ATTEMPTS = 3;
 export const DELIVERY_LOCK_MINUTES = 15;
 /** J+4 : payoutDueAt = deliveredAt + PAYOUT_DELAY_DAYS (spec §3.5 — cron B4). */
 export const PAYOUT_DELAY_DAYS = 4;
+/** B4/D51 — litige « non livré » depuis PICKED_UP : dès que le départ du trajet est dépassé de 48 h. */
+export const DISPUTE_AFTER_DEPARTURE_HOURS = 48;
 
 /** Séquence stricte des jalons de tracking (dans PICKED_UP) */
 export const TRACKING_SEQUENCE = [
@@ -134,6 +136,8 @@ export type BookingLike = {
   isDeleted?: boolean | null;
   expiresAt?: Date | string | null;
   payoutDueAt?: Date | string | null;
+  /** Départ du trajet (snapshot `trip.departureAt`, UTC — FUS-03) : guard du litige « non livré » (B4/D51). */
+  departureAt?: Date | string | null;
   deliveryLockedUntil?: Date | string | null;
   deliveryAttempts?: number | null;
   codeRegenerations?: number | null;
@@ -171,6 +175,12 @@ export function isExpired(booking: BookingLike, now: Date = new Date()): boolean
 export function isPayoutDue(booking: BookingLike, now: Date = new Date()): boolean {
   const due = toDate(booking.payoutDueAt);
   return due !== null && due <= now;
+}
+
+/** Colis en transit dont le trajet est parti depuis ≥ 48 h : le litige « non livré » s'ouvre (B4/D51). Sans date : refus (conservatif). */
+export function isDepartureLongPast(booking: BookingLike, now: Date = new Date()): boolean {
+  const departure = toDate(booking.departureAt);
+  return departure !== null && departure.getTime() + DISPUTE_AFTER_DEPARTURE_HOURS * 3_600_000 <= now.getTime();
 }
 
 export function isDeliveryLocked(
@@ -219,6 +229,11 @@ const beforePayoutDue: GuardFn = (booking, ctx) =>
     ? "The verification period has ended; this deal can no longer be disputed."
     : null;
 
+const departureLongPast: GuardFn = (booking, ctx) =>
+  isDepartureLongPast(booking, ctx.now)
+    ? null
+    : `A parcel in transit can only be reported as not delivered ${DISPUTE_AFTER_DEPARTURE_HOURS} hours after the trip departure.`;
+
 const deliveryAllowed: GuardFn = (booking, ctx) => {
   if (isDeliveryLocked(booking, ctx.now)) {
     return "Delivery confirmation is temporarily locked. Please try again later.";
@@ -235,7 +250,8 @@ const deliveryAllowed: GuardFn = (booking, ctx) => {
  *
  * Absences DÉLIBÉRÉES (testées par assertion explicite) :
  * - Aucun `cancel` depuis PICKED_UP ni DELIVERED (ANN-01 : après
- *   remise du colis, la seule voie de sortie est `dispute`).
+ *   remise du colis, la seule voie de sortie est `dispute` — depuis
+ *   PICKED_UP seulement 48 h après le départ du trajet, B4/D51).
  * - Aucune transition ADMIN (résolutions de litige : chantier C).
  * - Aucune transition depuis COMPLETED / DECLINED / EXPIRED /
  *   CANCELLED (terminaux) ni depuis DISPUTED (terminal v1).
@@ -334,6 +350,16 @@ const TRANSITIONS: readonly TransitionDef[] = [
     // ne vérifie que le lock 15 min et le plafond de tentatives.
     effects: ["SCHEDULE_PAYOUT", "NOTIFY_SHIPPER"],
     guard: deliveryAllowed,
+  },
+  {
+    from: "PICKED_UP",
+    action: "dispute",
+    actor: "SHIPPER",
+    to: "DISPUTED",
+    // B4/D51 — colis jamais livré (catégorie NOT_DELIVERED imposée par le
+    // service) : aucun versement n'était programmé, rien à geler.
+    effects: ["CREATE_TICKET", "NOTIFY_CARRIER"],
+    guard: departureLongPast,
   },
 
   // ── DELIVERED ────────────────────────────

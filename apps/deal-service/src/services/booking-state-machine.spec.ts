@@ -189,6 +189,14 @@ describe("S1 — chemins nominaux (12 transitions du §2.2)", () => {
       "DISPUTED",
       ["FREEZE_PAYOUT", "CREATE_TICKET", "NOTIFY_CARRIER"],
     ],
+    [
+      "PICKED_UP --dispute(SHIPPER)--> DISPUTED (non livré, départ + 48 h — B4/D51)",
+      makeBooking({ status: "PICKED_UP", departureAt: hours(-48) }),
+      "dispute",
+      "SHIPPER",
+      "DISPUTED",
+      ["CREATE_TICKET", "NOTIFY_CARRIER"],
+    ],
   ];
 
   it.each(rows)("%s", (_label, booking, action, actor, to, effects) => {
@@ -278,7 +286,7 @@ describe("S5 — mauvais statut (matrice action×acteur × statuts illégaux)", 
     { action: "deliver", actor: "CARRIER", legal: ["PICKED_UP"] },
     { action: "confirmEarly", actor: "SHIPPER", legal: ["DELIVERED"] },
     { action: "autoComplete", actor: "SYSTEM", legal: ["DELIVERED"] },
-    { action: "dispute", actor: "SHIPPER", legal: ["DELIVERED"] },
+    { action: "dispute", actor: "SHIPPER", legal: ["DELIVERED", "PICKED_UP"] },
   ];
 
   pairs.forEach(({ action, actor, legal }) => {
@@ -300,10 +308,22 @@ describe("S5 — mauvais statut (matrice action×acteur × statuts illégaux)", 
 // ─────────────────────────────────────────────
 
 describe("S6 — absences délibérées (ANN-01 : plus d'annulation après remise)", () => {
-  it("aucune annulation depuis PICKED_UP, ni Shipper ni Carrier — seule voie : dispute", () => {
-    const booking = makeBooking({ status: "PICKED_UP" });
+  it("aucune annulation depuis PICKED_UP, ni Shipper ni Carrier — seule voie : dispute (48 h après le départ)", () => {
+    const booking = makeBooking({ status: "PICKED_UP", departureAt: hours(-48) });
     expect(canPerform(booking, "cancel", "SHIPPER", ctx).allowed).toBe(false);
     expect(canPerform(booking, "cancel", "CARRIER", ctx).allowed).toBe(false);
+    expect(canPerform(booking, "dispute", "SHIPPER", ctx).allowed).toBe(true);
+    expect(canPerform(booking, "dispute", "CARRIER", ctx).allowed).toBe(false);
+  });
+
+  // B4/D51 — « non livré » : la fenêtre s'ouvre à départ + 48 h, jamais avant, jamais sans date.
+  it("dispute depuis PICKED_UP est refusé avant départ + 48 h, et sans date de départ (conservatif)", () => {
+    const early = canPerform(makeBooking({ status: "PICKED_UP", departureAt: hours(-47) }), "dispute", "SHIPPER", ctx);
+    expect(early.allowed).toBe(false);
+    if (!early.allowed) expect(early.reason).toContain("48 hours after the trip departure");
+    expect(canPerform(makeBooking({ status: "PICKED_UP", departureAt: hours(2) }), "dispute", "SHIPPER", ctx).allowed).toBe(false);
+    expect(canPerform(makeBooking({ status: "PICKED_UP" }), "dispute", "SHIPPER", ctx).allowed).toBe(false);
+    expect(canPerform(makeBooking({ status: "PICKED_UP", departureAt: hours(-48) }), "dispute", "SHIPPER", ctx).allowed).toBe(true);
   });
 
   it("aucune annulation depuis DELIVERED — seule voie : dispute (avant J+4)", () => {
@@ -468,7 +488,7 @@ describe("S10 — getAllowedActions par rôle (source des CTAs front)", () => {
     ["PENDING", "CARRIER", ["accept", "decline"]],
     ["ACCEPTED", "SHIPPER", ["cancel"]],
     ["ACCEPTED", "CARRIER", ["cancel", "pickup", "refusePickup"]],
-    ["PICKED_UP", "SHIPPER", []],
+    ["PICKED_UP", "SHIPPER", []], // sans départ dépassé : rien (le guard 48 h ferme `dispute`)
     ["PICKED_UP", "CARRIER", ["deliver"]],
     ["DELIVERED", "SHIPPER", ["confirmEarly", "dispute"]],
     ["DELIVERED", "CARRIER", []],

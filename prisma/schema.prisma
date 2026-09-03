@@ -738,12 +738,22 @@ model Booking {
   paymentIntentId   String? // référence PaymentProvider (D11) — autorisation manuelle, capture à l'acceptation
   paymentProvider   String? // "STRIPE" | "FAKE" (dev/tests uniquement)
   capturedAt        DateTime?
+  chargeId          String? // charge Stripe de la capture (A69) — `source_transaction` du transfert B4
   refundedAt        DateTime?
   refundAmountCents Int?
   transferId        String?
 
-  // ─── Litige ───
-  disputeTicket String? // YAM-XXXX
+  // ─── Versement Voyageur (B4, D49) ───
+  payoutStatus        PayoutStatus? // PENDING dès COMPLETED · SENT/FAILED après transfert · FROZEN sur DISPUTED (INV-5)
+  payoutAmountCents   Int? // = pricing.transportCents (D50), figé à COMPLETED
+  payoutSentAt        DateTime?
+  payoutAttempts      Int     @default(0) // rejeux du cron (A65/A66), borné
+  payoutFailureReason String? // CARRIER_ACCOUNT_NOT_READY | PROVIDER_ERROR:<message>
+  completedBy         String? // "SHIPPER" (confirmation anticipée) | "SYSTEM" (J+4)
+  verificationReminderSentAt DateTime? // rappel J+3 émis (A70) — jamais deux fois
+
+  // ─── Litige (B4, D51 — le dossier est dans Dispute) ───
+  disputeTicket String? // YAM-XXXX (copie du Dispute.ticketNumber pour les listes)
   disputedAt    DateTime?
 
   // ─── Lifecycle / RGPD ───
@@ -757,6 +767,7 @@ model Booking {
   @@index([carrierId, status]) // deals Mes trajets
   @@index([status, expiresAt]) // cron expiration 24h (B2)
   @@index([status, payoutDueAt]) // cron versement J+4 (B4)
+  @@index([status, payoutStatus]) // rejeu des versements FAILED (B4, A66)
 }
 
 // ─────────────────────────────────────────────
@@ -764,6 +775,31 @@ model Booking {
 // ─────────────────────────────────────────────
 // Écrit dans la MÊME transaction Mongo que tout changement d'état.
 // Le relay (PR4) publie vers Redpanda/Kafka puis pose publishedAt.
+
+/// Dossier de litige (B4, D51 / A10) — UN par deal, lu par la médiation (chantier C).
+/// Le Booking porte le statut DISPUTED et le gel (payoutStatus FROZEN) ; ce modèle porte le dossier.
+model Dispute {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  bookingId    String @unique @db.ObjectId
+  ticketNumber String @unique // YAM-XXXX — CSPRNG, retiré en cas de collision (D51)
+  shipperId    String @db.ObjectId
+  carrierId    String @db.ObjectId
+
+  category       DisputeCategory
+  description    String // ≥ 50 caractères (DISPUTE_MIN_DESCRIPTION_LENGTH)
+  desiredOutcome DisputeDesiredOutcome?
+  photoUrls      String[] // ≤ 5, ImageKit (D42) — preuves rouges de la spec
+  pledgeAcceptedAt DateTime // engagement sur l'honneur horodaté (anti-abus)
+
+  status DisputeStatus @default(OPEN)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([carrierId])
+  @@index([status, createdAt])
+}
 
 model OutboxEvent {
   id            String    @id @default(auto()) @map("_id") @db.ObjectId
@@ -963,6 +999,36 @@ enum BookingStatus {
   EXPIRED
   CANCELLED
   DISPUTED
+}
+
+/// Versement au Voyageur (B4, D49) — INV-2 : aucun transfert avant COMPLETED ; INV-5 : FROZEN tant que le litige n'est pas résolu.
+enum PayoutStatus {
+  PENDING
+  SENT
+  FAILED
+  FROZEN
+}
+
+/// Litige (B4, D51) — catégories de la spec §3.6.
+enum DisputeCategory {
+  NOT_DELIVERED
+  CONTENT_MISSING
+  DAMAGED
+  SIGNIFICANT_DELAY
+  RECIPIENT_ISSUE
+  OTHER
+}
+
+enum DisputeDesiredOutcome {
+  FULL_REFUND
+  PARTIAL_REFUND
+  CONTACT_CARRIER
+  YAMBA_DECIDES
+}
+
+/// OPEN seul en v1 — les résolutions (médiation) arrivent avec l'admin-ui (chantier C).
+enum DisputeStatus {
+  OPEN
 }
 
 enum BookingActor {

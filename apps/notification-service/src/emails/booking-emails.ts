@@ -27,13 +27,15 @@ import type { Logger } from "pino";
 import { Prisma } from "@prisma/client";
 import prisma from "@packages/libs/prisma";
 import { BookingDomainEventSchema } from "@packages/api-contracts";
-import { isEmailConfigured, sendTemplatedEmail } from "@packages/email";
+import { isEmailConfigured, sendTemplatedEmail, sendTransactionalEmail, type EmailContent } from "@packages/email";
+import { SETTLEMENT_EMAILS } from "./settlement-emails";
 import { resolveLocale, type SupportedLocale } from "@packages/api-contracts";
 
 type BookingDomainEvent = z.infer<typeof BookingDomainEventSchema>;
 type BookingEventKey = BookingDomainEvent["eventType"];
 
 const APP_URL = process.env.USER_APP_URL ?? "http://localhost:3000";
+const SUPPORT_EMAIL = process.env.SUPPORT_EMAIL ?? "support@yamba.app";
 // D44 — la locale est celle du DESTINATAIRE (User.preferredLocale), jamais de l'acteur.
 const TEMPLATES_DIR = path.join(
   process.cwd(),
@@ -48,6 +50,7 @@ const TEMPLATES_DIR = path.join(
 type EmailRule =
   | "SHIPPER"
   | "CARRIER"
+  | "BOTH"
   | "SHIPPER_PLUS_CARRIER_IF_WAS_ACCEPTED"
   | null;
 
@@ -64,9 +67,10 @@ export const EMAIL_MATRIX: Record<BookingEventKey, EmailRule> = {
   "booking.tracking_event": null, // JAMAIS : push seul (anti-spam)
   "booking.code_regenerated": "SHIPPER", // B3/A41 : email de sécurité (sans le code)
   "booking.delivered": "SHIPPER", // B3/A41 : « 3 jours pour confirmer ou signaler » (le Voyageur : in-app seul)
-  "booking.completed": null, // à venir (writer B4)
-  "booking.payout_sent": null, // à venir (writer B4)
-  "booking.disputed": null, // à venir (writer B4)
+  "booking.completed": "SHIPPER", // B4/D52 : « paiement libéré » (le Voyageur reçoit payout_sent, pas deux emails)
+  "booking.payout_sent": "CARRIER", // B4/D52 : montant net, « parti vers ton compte, 2 à 7 jours »
+  "booking.disputed": "BOTH", // B4/D52 : accusé à l'Expéditeur, information calme au Voyageur
+  "booking.verification_reminder": "SHIPPER", // B4/A70 : J+3, dernier jour
   "booking.rating_reminder": null, // à venir (writer B5)
   "booking.rating_revealed": null, // JAMAIS : in-app seul
 };
@@ -89,6 +93,8 @@ export function resolveEmailRecipients(
       return [shipper];
     case "CARRIER":
       return [carrier];
+    case "BOTH":
+      return [shipper, carrier];
     case "SHIPPER_PLUS_CARRIER_IF_WAS_ACCEPTED":
       // Seul booking.cancelled porte cette règle (wasAccepted).
       return event.eventType === "booking.cancelled" &&
@@ -181,9 +187,12 @@ function formatDate(iso: string, locale: "fr" | "en"): string {
 
 type BuiltEmail = {
   subject: string;
-  /** Relatif à templates/, sans .ejs — aussi tracé dans EmailDelivery. */
+  /** Relatif à templates/, sans .ejs — aussi tracé dans EmailDelivery.
+   *  Pour les emails D44 (`content` présent) : identifiant logique `settlement/…`, aucun fichier. */
   template: string;
   data: Record<string, unknown>;
+  /** D44/D52 — contenu structuré rendu par le gabarit partagé (`sendTransactionalEmail`) ; les emails B4 l'utilisent. */
+  content?: EmailContent;
 };
 
 export type BuildBookingEmailOptions = {
@@ -364,6 +373,47 @@ export function buildBookingEmail(
           transport: formatMoney(p.transportCents, p.currencyCode, locale),
         },
       };
+    // ── B4 (D52) — dictionnaires par langue, gabarit partagé D44 ──
+    case "booking.completed": {
+      const built = SETTLEMENT_EMAILS[locale].completedShipper({
+        ...base,
+        transport: formatMoney(p.transportCents, p.currencyCode, locale),
+        completedBy: event.payload.completedBy === "SHIPPER" ? "SHIPPER" : "SYSTEM",
+      });
+      return { subject: built.subject, template: "settlement/completed-shipper", data: {}, content: built.content };
+    }
+    case "booking.payout_sent": {
+      const built = SETTLEMENT_EMAILS[locale].payoutSentCarrier({
+        ...base,
+        amount: formatMoney(event.payload.amountCents, p.currencyCode, locale),
+      });
+      return { subject: built.subject, template: "settlement/payout-sent-carrier", data: {}, content: built.content };
+    }
+    case "booking.disputed": {
+      const built =
+        role === "SHIPPER"
+          ? SETTLEMENT_EMAILS[locale].disputedShipper({ ...base, ticketNumber: event.payload.ticketNumber, supportEmail: SUPPORT_EMAIL })
+          : SETTLEMENT_EMAILS[locale].disputedCarrier({
+              ...base,
+              ticketNumber: event.payload.ticketNumber,
+              disputeCategory: event.payload.disputeCategory ?? null,
+              supportEmail: SUPPORT_EMAIL,
+            });
+      return {
+        subject: built.subject,
+        template: role === "SHIPPER" ? "settlement/disputed-shipper" : "settlement/disputed-carrier",
+        data: {},
+        content: built.content,
+      };
+    }
+    case "booking.verification_reminder": {
+      const built = SETTLEMENT_EMAILS[locale].verificationReminderShipper({
+        ...base,
+        payoutDueAt: formatDate(event.payload.payoutDueAt, locale),
+        transport: formatMoney(p.transportCents, p.currencyCode, locale),
+      });
+      return { subject: built.subject, template: "settlement/verification-reminder-shipper", data: {}, content: built.content };
+    }
     default:
       // Clé sans gabarit : la matrice (A35) empêche d'arriver ici —
       // filet si une règle est ajoutée sans son builder.
@@ -454,14 +504,24 @@ export async function dispatchBookingEmails(
     }
 
     try {
-      await sendTemplatedEmail({
-        to: user.email,
-        subject: built.subject,
-        templatesDir: TEMPLATES_DIR,
-        template: built.template,
-        // subject injecté : les gabarits le reprennent dans <title>.
-        data: { ...built.data, subject: built.subject },
-      });
+      if (built.content) {
+        // D44 — gabarit partagé, contenu en données (emails B4).
+        await sendTransactionalEmail({
+          to: user.email,
+          locale: resolveLocale(user.preferredLocale),
+          subject: built.subject,
+          content: built.content,
+        });
+      } else {
+        await sendTemplatedEmail({
+          to: user.email,
+          subject: built.subject,
+          templatesDir: TEMPLATES_DIR,
+          template: built.template,
+          // subject injecté : les gabarits le reprennent dans <title>.
+          data: { ...built.data, subject: built.subject },
+        });
+      }
       await prisma.emailDelivery.update({
         where: {
           eventId_userId: { eventId, userId: recipient.userId },

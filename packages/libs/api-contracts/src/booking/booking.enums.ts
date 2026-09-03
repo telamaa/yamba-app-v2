@@ -118,3 +118,36 @@ export const BOOKING_COMPLETION_BLOCKING_STATUSES: readonly BookingStatus[] = [
   "PICKED_UP",
   "DELIVERED",
 ] as const;
+
+/* ══ B4 — versement et litige (D49, D51) ═════════════════════ */
+
+/** Versement au Voyageur : INV-2 (rien avant COMPLETED), INV-5 (FROZEN sur litige). */
+export const PayoutStatusSchema = z
+  .enum(["PENDING", "SENT", "FAILED", "FROZEN"])
+  .meta({
+    id: "PayoutStatus",
+    description:
+      "Carrier payout state (B4/D49). PENDING = deal COMPLETED, transfer not yet executed · SENT = transfer executed " +
+      "(payoutSentAt) · FAILED = transfer refused (retried by the payout cron) · FROZEN = dispute open (INV-5). " +
+      "null before COMPLETED / DISPUTED.",
+  });
+export type PayoutStatus = z.infer<typeof PayoutStatusSchema>;
+
+export const DISPUTE_CATEGORIES = [
+  "NOT_DELIVERED",
+  "CONTENT_MISSING",
+  "DAMAGED",
+  "SIGNIFICANT_DELAY",
+  "RECIPIENT_ISSUE",
+  "OTHER",
+] as const;
+export const DisputeCategorySchema = z
+  .enum(DISPUTE_CATEGORIES)
+  .meta({ id: "DisputeCategory", description: "Dispute category (spec §3.6 — one of six)" });
+export type DisputeCategory = z.infer<typeof DisputeCategorySchema>;
+
+export const DISPUTE_DESIRED_OUTCOMES = ["FULL_REFUND", "PARTIAL_REFUND", "CONTACT_CARRIER", "YAMBA_DECIDES"] as const;
+export const DisputeDesiredOutcomeSchema = z
+  .enum(DISPUTE_DESIRED_OUTCOMES)
+  .meta({ id: "DisputeDesiredOutcome", description: "What the shipper asks for (optional, informs mediation)" });
+export type DisputeDesiredOutcome = z.infer<typeof DisputeDesiredOutcomeSchema>;

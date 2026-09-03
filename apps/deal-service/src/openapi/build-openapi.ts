@@ -78,6 +78,13 @@ const response409Transport = jsonResponse(
     "TRACKING_STEP_NOT_ALLOWED (strict sequence, duplicate or wrong status) | CODE_REGENERATION_LIMIT (5 reached, or not in transit)"
 );
 
+/** 409 du règlement (B4-PR1) — machine + courses. */
+const response409Settlement = jsonResponse(
+  "ErrorResponse",
+  "Business conflict — details.code ∈ TRANSITION_NOT_ALLOWED (state machine refused: not DELIVERED, verification " +
+    "window over, parcel in transit for less than 48h after departure, or a concurrent write won — details carry its reason)"
+);
+
 /** Cookie OR bearer (OpenAPI OR semantics) — mirror of extractToken. */
 const authSecurity = [{ cookieAuth: [] }, { bearerAuth: [] }];
 
@@ -465,6 +472,59 @@ export function buildOpenApiDocument() {
             "403": response403,
             "404": response404,
             "409": response409Transport,
+            "500": response500,
+          },
+        },
+      },
+      "/deals/{id}/confirm": {
+        post: {
+          tags: ["deals"],
+          summary: "Confirm the delivery early (shipper) — DELIVERED → COMPLETED, payout released (INV-3: final)",
+          description:
+            "Shipper only, while DELIVERED. ONE conditional transaction: COMPLETED, completedBy=SHIPPER, payoutStatus=PENDING, " +
+            "outbox booking.completed (D49). Then the carrier payout is executed INLINE (A67): PaymentProvider.transfer of " +
+            "pricing.transportCents (carrier net, D50) to the carrier's Connect account, idempotency key = booking id, " +
+            "source_transaction = capture charge (A69). Success → payoutStatus SENT + outbox booking.payout_sent; provider " +
+            "refusal → FAILED (retried by the payout cron every 5 min, up to 10 attempts). Irreversible: the right to " +
+            "dispute is gone.",
+          operationId: "confirmDeal",
+          security: authSecurity,
+          parameters: [dealIdPathParam],
+          responses: {
+            "200": jsonResponse("ConfirmDealResponse", "Completed — payoutStatus tells whether the transfer went through"),
+            "400": response400,
+            "401": response401,
+            "403": response403,
+            "404": response404,
+            "409": response409Settlement,
+            "500": response500,
+          },
+        },
+      },
+      "/deals/{id}/dispute": {
+        post: {
+          tags: ["deals"],
+          summary: "Open a dispute (shipper) — DELIVERED (before D+4) or PICKED_UP (not delivered, 48h after departure) → DISPUTED",
+          description:
+            "Shipper only. From DELIVERED before payoutDueAt (INV-4), or from PICKED_UP once the trip departure is 48h past " +
+            "(category MUST be NOT_DELIVERED — 400 otherwise). Body: category, description ≥ 50 chars, pledgeAccepted=true, " +
+            "up to 5 ImageKit photo URLs (D42), optional desiredOutcome. ONE transaction: DISPUTED, ticket YAM-XXXX " +
+            "(CSPRNG, unique — redrawn on collision), payoutStatus=FROZEN when a payout was scheduled (INV-5), Dispute " +
+            "document created (D51), outbox booking.disputed. Terminal in v1 — resolution belongs to the admin (chantier C).",
+          operationId: "disputeDeal",
+          security: authSecurity,
+          parameters: [dealIdPathParam],
+          requestBody: {
+            required: true,
+            content: { "application/json": { schema: ref("DisputeDealRequest") } },
+          },
+          responses: {
+            "200": jsonResponse("DisputeDealResponse", "Dispute opened — payout frozen, ticket issued"),
+            "400": response400,
+            "401": response401,
+            "403": response403,
+            "404": response404,
+            "409": response409Settlement,
             "500": response500,
           },
         },

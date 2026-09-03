@@ -53,6 +53,7 @@ export const IN_APP_MATRIX: Record<BookingEventKey, RecipientRule> = {
   "booking.completed": "BOTH",
   "booking.payout_sent": "CARRIER",
   "booking.disputed": "BOTH",
+  "booking.verification_reminder": "SHIPPER", // B4/A70 : J+3, dernier jour pour vérifier ou signaler
   "booking.rating_reminder": "TARGET_ROLE",
   "booking.rating_revealed": "BOTH",
 };

@@ -143,7 +143,8 @@ describe("A — accept (capture D39, gate D31)", () => {
     // La base ensuite : conditionnel sur le statut attendu.
     expect(prismaMock.booking.updateMany).toHaveBeenCalledWith({
       where: { id: BOOKING_ID, status: "PENDING" },
-      data: { status: "ACCEPTED", acceptedAt: NOW, capturedAt: NOW },
+      // A69 — la charge de la capture est conservée pour le `source_transaction` du versement B4.
+      data: { status: "ACCEPTED", acceptedAt: NOW, capturedAt: NOW, chargeId: `ch_fake_${intentId}` },
     });
     // Pas de kg restitués à l'acceptation.
     expect(prismaMock.trip.updateMany).not.toHaveBeenCalled();

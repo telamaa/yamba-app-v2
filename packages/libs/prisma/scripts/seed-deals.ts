@@ -327,11 +327,15 @@ async function main() {
   const seedIds = [...userIds.values()];
 
   // 2. Wipe du périmètre seed (idempotence trips/bookings)
+  // B4 (D51) : les dossiers de litige suivent leurs bookings.
+  const delD = await prisma.dispute.deleteMany({
+    where: { OR: [{ shipperId: { in: seedIds } }, { carrierId: { in: seedIds } }] },
+  });
   const delB = await prisma.booking.deleteMany({
     where: { OR: [{ shipperId: { in: seedIds } }, { carrierId: { in: seedIds } }] },
   });
   const delT = await prisma.trip.deleteMany({ where: { userId: { in: seedIds } } });
-  console.log(`✓ wipe : ${delB.count} bookings, ${delT.count} trips (périmètre seed)`);
+  console.log(`✓ wipe : ${delB.count} bookings, ${delD.count} disputes, ${delT.count} trips (périmètre seed)`);
 
   // 3. Trips — reservedKg = Σ poids des bookings ACTIFS (CAP-02, calculé)
   const tripIds = new Map<string, string>();
@@ -417,6 +421,37 @@ async function main() {
         ...b.milestones,
       } as never,
     });
+    // B4 — versement (D49/D50) et dossier de litige (D51) cohérents avec le statut.
+    const m = b.milestones as { completedAt?: Date; disputeTicket?: string; disputedAt?: Date };
+    if (b.status === "COMPLETED") {
+      await prisma.booking.update({
+        where: { id: booking.id },
+        data: {
+          completedBy: "SYSTEM",
+          payoutStatus: "SENT",
+          payoutAmountCents: (booking as unknown as { pricing: { transportCents: number } }).pricing.transportCents,
+          payoutSentAt: m.completedAt ?? NOW,
+          payoutAttempts: 1,
+          transferId: `tr_fake_seed_${b.key}`,
+        },
+      });
+    }
+    if (b.status === "DISPUTED") {
+      await prisma.booking.update({ where: { id: booking.id }, data: { payoutStatus: "FROZEN" } });
+      await prisma.dispute.create({
+        data: {
+          bookingId: booking.id,
+          ticketNumber: m.disputeTicket ?? `YAM-${1000 + output.length}`,
+          shipperId: userIds.get(b.shipperKey)!,
+          carrierId: userIds.get(t.carrierKey)!,
+          category: "CONTENT_MISSING",
+          description: "Le colis est bien arrivé mais il manque une partie du contenu déclaré : deux des trois jouets prévus ne sont pas dans le carton.",
+          desiredOutcome: "PARTIAL_REFUND",
+          photoUrls: [],
+          pledgeAcceptedAt: m.disputedAt ?? NOW,
+        },
+      });
+    }
     output.push({
       key: b.key,
       id: booking.id,

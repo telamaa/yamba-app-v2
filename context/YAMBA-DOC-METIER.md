@@ -822,3 +822,48 @@ Sur le profil public d'un Voyageur (`/u/:slug`), le bouton « Suivre » envoyait
 | S3 | « Plus tard » ou Échap | Fenêtre fermée, bouton « Suivre » inchangé, profil intact |
 | S4 | « Inscris-toi » dans la fenêtre, inscription, OTP, connexion | Retour sur `/u/seed-ines` |
 | S5 | Connexion dans la fenêtre avec le compte du profil lui-même | Le bouton « Suivre » laisse place à « Modifier mon profil », aucun suivi créé |
+
+# B4-PR1 — l'argent sortant : confirmer, verser, signaler
+
+### Le besoin
+Après la remise contre code, l'argent de l'Expéditeur était capturé mais rien ne le libérait : ni confirmation, ni versement au Voyageur, ni recours. Ce lot ferme la boucle : l'Expéditeur confirme ou laisse courir 4 jours, le Voyageur est versé, un signalement gèle tout. Décisions utilisateur du 03/09 après challenge métier/UX : litige possible pour un colis jamais livré, transfert rattaché à la charge, copie honnête sur les délais bancaires, rappel la veille de l'échéance, aucun bouton « Noter » avant la notation (B5).
+
+### Règles de gestion — versement (PAY)
+- **RG-PAY-01 — Aucun versement avant la fin de transaction** (INV-2). Le Voyageur n'est payé qu'une fois le deal COMPLETED : confirmation anticipée de l'Expéditeur, ou fin de la période de vérification (J+4 après la remise).
+- **RG-PAY-02 — Le montant versé est le net du Voyageur figé à la réservation** (snapshot), dans sa devise. Jamais recalculé, jamais le total payé par l'Expéditeur.
+- **RG-PAY-03 — La fin de transaction précède le versement.** Le deal passe COMPLETED d'abord, le transfert part ensuite ; un transfert refusé ne défait jamais la complétion : il est « en attente » et rejoué automatiquement (toutes les 5 minutes, 10 essais).
+- **RG-PAY-04 — Un versement ne part jamais deux fois.** Rejeu ou double clic : même clé chez le fournisseur, même transfert.
+- **RG-PAY-05 — Le transfert est rattaché à la charge de l'Expéditeur.** Il attend que ces fonds soient disponibles au lieu d'échouer sur la trésorerie de la plateforme.
+- **RG-PAY-06 — Sans compte de paiement prêt (compte Connect absent ou virements non activés), le versement reste en attente** avec un motif lisible ; le Voyageur devra finaliser son compte (état visible côté front en B4-PR3).
+- **RG-PAY-07 — Les deux parties lisent l'état du versement** (en attente, envoyé le …, en échec, gelé) ; l'identifiant du transfert n'est servi à personne.
+- **RG-PAY-08 — « Versement envoyé » n'est pas « argent reçu ».** Toute copie dit : parti vers ton compte, sur ton compte bancaire sous 2 à 7 jours.
+- **RG-PAY-09 — La confirmation anticipée est définitive** (INV-3) : elle libère le versement immédiatement et retire le droit de signaler.
+- **RG-PAY-10 — La veille de l'échéance, l'Expéditeur reçoit un rappel** (in-app + email) : dernier jour pour vérifier ou signaler. Une seule fois par deal.
+- **RG-PAY-11 — La retenue d'annulation tardive revient au Voyageur au prorata de sa part nette** (décision 03/09, D50) — versée par le même mécanisme, PR dédiée.
+
+### Règles de gestion — litige (LIT)
+- **RG-LIT-01 — Qui, quand.** Seul l'Expéditeur signale : après la remise, jusqu'à J+4 (INV-4) ; ou pendant le transport, pour un colis jamais livré, dès que le départ du trajet est dépassé de 48 h.
+- **RG-LIT-02 — En transit, seul le motif « non livré » est recevable** ; le contenu ne se constate qu'après la remise.
+- **RG-LIT-03 — Un dossier complet ou rien** : motif parmi six, description d'au moins 50 caractères, engagement sur l'honneur coché ; photos (5 max) et solution souhaitée facultatives.
+- **RG-LIT-04 — Le signalement gèle le versement** (INV-5) quand un versement était programmé ; il n'est ni modifiable ni retirable ; le deal devient DISPUTED, état terminal jusqu'à la médiation (chantier C, lancé juste après B4).
+- **RG-LIT-05 — Un ticket unique `YAM-XXXX`** est remis à l'Expéditeur et rappelé dans chaque échange.
+- **RG-LIT-06 — Le Voyageur est informé calmement** : un signalement est ouvert, son motif (catégorie), le paiement est en attente, on recueillera sa version. Jamais la description ni les photos avant la médiation.
+- **RG-LIT-07 — Chaque moment laisse un email** (RG-N-01) : fin de transaction → Expéditeur ; versement → Voyageur ; signalement → les deux ; rappel J+3 → Expéditeur. Aucun bouton « Noter » tant que la notation n'existe pas.
+
+### Recette (API, en attendant les écrans B4-PR2/PR3)
+| # | Scénario | Attendu |
+|---|---|---|
+| PAY1 | Expéditrice, deal DELIVERED, `POST /deals/:id/confirm` | 200, `status COMPLETED`, `payoutStatus SENT` (Fake) ou `FAILED` (Stripe sans compte prêt) ; emails « Transaction terminée » (Expéditrice) et « paiement parti » (Voyageur, si SENT) ; in-app des deux côtés |
+| PAY2 | Même appel une 2e fois | 409 TRANSITION_NOT_ALLOWED |
+| PAY3 | Le Voyageur appelle `/confirm` | 403 |
+| PAY4 | Deal DELIVERED avec `payoutDueAt` dépassé, cron (≤ 5 min) | COMPLETED par SYSTEM, versement tenté, email « libéré automatiquement » |
+| PAY5 | Deal DELIVERED à moins de 24 h de l'échéance, cron | UN rappel in-app + email « Dernier jour », jamais un second |
+| PAY6 | Voyageur sans compte Stripe prêt (Stripe réel) | `payoutStatus FAILED`, motif `CARRIER_ACCOUNT_NOT_READY`, rejoué au cron suivant ; après onboarding complet → SENT |
+| LIT1 | Expéditrice, deal DELIVERED avant J+4, `POST /deals/:id/dispute` complet | 200, ticket `YAM-XXXX`, deal DISPUTED, `payoutStatus FROZEN` ; email accusé (Expéditrice) + information (Voyageur, catégorie) ; in-app des deux côtés |
+| LIT2 | Description < 50 caractères ou `pledgeAccepted` absent | 400, erreurs par champ |
+| LIT3 | Après J+4 | 409 « verification period has ended » |
+| LIT4 | Deal PICKED_UP, départ < 48 h | 409 « 48 hours after the trip departure » |
+| LIT5 | Deal PICKED_UP, départ ≥ 48 h, catégorie ≠ NOT_DELIVERED | 400 |
+| LIT6 | Deal PICKED_UP, départ ≥ 48 h, `NOT_DELIVERED` | 200, DISPUTED, pas de gel (rien n'était programmé) |
+| LIT7 | `GET /deals/:id` en DISPUTED | Expéditrice : `dispute` complet ; Voyageur : `disputeCategory` seul, ni description ni photos |
+| LIT8 | Cron J+4 sur un deal DISPUTED | Rien : jamais de versement automatique (INV-5) |

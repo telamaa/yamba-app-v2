@@ -17,6 +17,7 @@
     "booking_completed": "Transaction completed",
     "booking_payout_sent": "Payout sent",
     "booking_disputed": "Report received",
+    "booking_verification_reminder": "Last day to check your delivery",
     "booking_rating_reminder": "Remember to leave a rating",
     "booking_rating_revealed": "Ratings revealed",
     "fallback": "Notification"
