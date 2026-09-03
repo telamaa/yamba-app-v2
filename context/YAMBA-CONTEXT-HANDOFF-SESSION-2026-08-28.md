@@ -411,7 +411,7 @@ mobile-first, aucune attribution Claude, charte mango/teal/slate.
 ## B. Ordre des PR suivantes (validé)
 1. `fix/auth-recette` — **#116** (cette PR).
 2. `feat/email-locale` — **FAIT, en PR** (D44 + D45 dans les emails, A55–A57 ; plateforme 610 + auth 59).
-3. `feat/booking-auth-modal` — modale « Connecte-toi pour réserver » + redirect du header, retour dans le wizard (P1).
+3. `feat/booking-auth-modal` — **FAIT, en PR** (A58 ; branchée sur `feat/email-locale`).
 4. `feat/trip-favorites` — modèle, routes, cœur, page « Mes favoris » (P2).
 5. `feat/auth-pages-ux` — tutoiement, faux chiffres, vocabulaire du rôle à trancher, mobile natif (P2).
 6. `feat/auth-google` — avec l'écran de consentement CGU (P2).

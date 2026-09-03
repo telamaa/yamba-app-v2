@@ -207,6 +207,10 @@ Ordre de demarrage : auth -> trip -> gateway.
   emails auth en dictionnaires fr/en (ancien mailer supprime),
   notification/trip dans la langue du destinataire, prenom reel de la
   contrepartie dans 5 gabarits. Plateforme 610 + auth 59.
+- 03/09 apres-midi : feat/booking-auth-modal (A58) — porte « Connecte-toi pour
+  reserver » en modale sur la page trajet (desktop + feuille mobile), retour
+  dans le wizard ; « Connexion » / « Creer un compte » du header transmettent
+  la page courante en redirect (hors pages auth et accueil).
 - Plateforme de tests : 600 (trip 187, deal 354, notification 59) — post-B3 (#96).
 - MERGE 01/09 : toute la pile B2 est dans `dev` via la SEULE **PR #90**
   (`feat/b2-deal-front` portait la chaîne complète : jalons mobile D36,

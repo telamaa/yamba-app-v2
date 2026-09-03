@@ -3,7 +3,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
-import { Link } from "@/i18n/navigation";
+import { Link, usePathname } from "@/i18n/navigation";
+import { loginHrefFor, registerHrefFor } from "@/lib/auth/login-redirect";
 import { DISCOVER_MENU_ITEMS, type MenuItem } from "./menu-items";
 import HeaderLocaleSwitcher from "./HeaderLocaleSwitcher";
 import HeaderThemeToggle from "./HeaderThemeToggle";
@@ -150,6 +151,7 @@ type AnonymousContentProps = { onCloseAction: () => void };
 
 function AnonymousContent({ onCloseAction }: AnonymousContentProps) {
   const t = useTranslations("common");
+  const pathname = usePathname(); // A58 — retour sur la page courante après connexion
 
   const renderItem = (item: MenuItem, key: string) => {
     if (item.type === "separator") return null;
@@ -215,7 +217,7 @@ function AnonymousContent({ onCloseAction }: AnonymousContentProps) {
       {/* CTAs */}
       <div className="flex flex-col gap-2.5 px-4 py-4">
         <Link
-          href="/register"
+          href={registerHrefFor(pathname)}
           onClick={onCloseAction}
           className="flex items-center justify-center rounded-xl px-4 py-3 text-sm font-semibold text-slate-950 transition-opacity hover:opacity-90"
           style={{ backgroundColor: HEADER_COLORS.mango }}
@@ -223,7 +225,7 @@ function AnonymousContent({ onCloseAction }: AnonymousContentProps) {
           {t("header.createAccount")}
         </Link>
         <Link
-          href="/login"
+          href={loginHrefFor(pathname)}
           onClick={onCloseAction}
           className="flex items-center justify-center rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-800 dark:text-slate-200 dark:hover:bg-slate-900"
         >
