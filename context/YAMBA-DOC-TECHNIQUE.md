@@ -1069,3 +1069,17 @@ Implémentation de D44 (langue des emails = langue de l'utilisateur, conçue pou
 ### Pièges rencontrés
 - `verifyOtp` s'exécutait AVANT la lecture de `pending` : la langue de l'alerte sécurité vient donc de la requête, celle de l'email de bienvenue de l'inscription.
 - `CarrierPage.onboardingStep` est un enum (`PROFILE`, `STRIPE`, `COMPLETE`), pas un nombre : le dictionnaire compare à `"PROFILE"`.
+
+# feat/booking-auth-modal — la porte de réservation en modale, le header qui ramène (A58)
+
+### Ce qui a été fait
+1. **`components/trips/detail/BookingAuthGateModal.tsx`** — `open`, `tripId`, `onCloseAction`. `useIsMobile()` choisit la forme : dialogue centré (`max-w-md`, bouton ×) ou feuille du bas (poignée, `safe-area-inset-bottom`). `role="dialog"`, `aria-modal`, `aria-labelledby` / `aria-describedby` ; effet : Échap ferme, `body.overflow = hidden`, focus sur « Se connecter » au prochain frame ; fond cliquable (`<button aria-label="Plus tard">`). Les deux actions poussent `withRedirect("/login" | "/register", "/trips/:id/book")`. Textes : `booking.authGate.*` (clé `later` ajoutée fr/en).
+2. **`BookingSummaryCard` / `BookingMobileBar`** — `useUser()` ; `handleReserve` : `!user && !userLoading` → ouvre la modale, sinon `router.push(/book)` (utilisateur inconnu pendant le chargement : la page `/book` tranche, comme avant). Chaque composant possède sa modale (un seul est visible à la fois : `lg:hidden` / carte desktop).
+3. **`lib/auth/login-redirect.ts`** — `shouldCarryRedirect(pathname)` (faux pour `/`, `/login`, `/register`, `/password/*`), `loginHrefFor`, `registerHrefFor` (sur `withRedirect` de #114, donc anti open redirect), `bookingRedirectFor(tripId)`.
+4. **Header** — `usePathname()` de `@/i18n/navigation` (chemin SANS locale) → `loginHref` pour le lien desktop ET l'entrée de la palette de commandes (dépendance du `useMemo`). **`HeaderMobileBottomSheet`** — dans `AnonymousContent` (le composant qui rend les deux liens), `registerHrefFor` / `loginHrefFor`.
+
+### Preuves
+- tsc user-ui OK ; miroir i18n fr/en (clé `later` des deux côtés) ; page trajet réelle en 200 sur le serveur de dev LAN. Pas de Jest user-ui : recette G1–G8 (`YAMBA-DOC-METIER.md`).
+
+### Piège rencontré
+- `HeaderMobileBottomSheet.tsx` contient DEUX composants : le hook `usePathname` inséré dans le premier (`const t = useTranslations` trouvé par regex) n'était pas visible du second, qui rend les liens. Règle : chercher le composant qui RENDU l'élément, pas le premier hook du fichier.

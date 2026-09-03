@@ -242,7 +242,8 @@
     "title": "Connecte-toi pour réserver",
     "subtitle": "Une réservation engage un Voyageur : Yamba a besoin de savoir qui envoie. Ton colis et ce trajet t'attendent après connexion.",
     "login": "Se connecter",
-    "register": "Créer un compte"
+    "register": "Créer un compte",
+    "later": "Plus tard"
   },
   "previousStep": "Étape précédente"
 }

@@ -1,7 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import { useTranslations, useLocale } from "next-intl";
 import { useRouter } from "@/i18n/navigation";
+import useUser from "@/hooks/useUser";
+import BookingAuthGateModal from "./BookingAuthGateModal";
 import type { PublicTrip } from "@/lib/public-trip.types";
 import { getMinPriceCents, getPricePerKgCents, formatPrice } from "@/lib/public-trip.helpers";
 
@@ -18,11 +21,21 @@ export default function BookingMobileBar({ trip }: Props) {
   const minPriceCents = getMinPriceCents(trip);
   const formattedPrice = formatPrice(perKgCents ?? minPriceCents, trip.currencyCode, locale);
 
+  const { user, isLoading: userLoading } = useUser();
+  const [gateOpen, setGateOpen] = useState(false);
+
+  // A58 — même règle que la carte desktop : porte en feuille du bas.
   const handleReserve = () => {
+    if (!user && !userLoading) {
+      setGateOpen(true);
+      return;
+    }
     router.push(`/trips/${trip.id}/book`);
   };
 
   return (
+    <>
+    <BookingAuthGateModal open={gateOpen} tripId={trip.id} onCloseAction={() => setGateOpen(false)} />
     <div className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white px-4 py-3 shadow-[0_-4px_16px_rgba(15,23,42,0.06)] dark:border-slate-800 dark:bg-slate-950 lg:hidden">
       <div className="mx-auto flex max-w-md items-center gap-3">
         <div className="min-w-0 flex-1">
@@ -43,5 +56,6 @@ export default function BookingMobileBar({ trip }: Props) {
         </button>
       </div>
     </div>
+  </>
   );
 }

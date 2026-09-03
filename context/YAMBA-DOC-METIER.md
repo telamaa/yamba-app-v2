@@ -316,7 +316,7 @@ L'Expéditeur a trouvé un trajet au kilo ; il doit pouvoir réserver **sans mes
 - **RG-C-10** — Deux niveaux : « Protection de base » (incluse : non-livraison couverte, paiement bloqué jusqu'à la remise) et « **Garantie Yamba — jusqu'à 500 €** » (+6 €, perte/vol/casse, exclusions affichées avant validation). Le mot « assurance » n'apparaît **pas** tant que le contrat assureur n'est pas signé (GAR-02).
 
 #### Accès et confort
-- **RG-C-12** — **Réserver exige un compte** (CNF-05 : identité requise dès la 1re réservation). Un visiteur non connecté voit « Connecte-toi pour réserver » avec retour automatique sur ce trajet après connexion ou inscription.
+- **RG-C-12** — **Réserver exige un compte** (CNF-05 : identité requise dès la 1re réservation). Un visiteur non connecté voit « Connecte-toi pour réserver » **dans une fenêtre au-dessus du trajet** (sans quitter la page), avec retour automatique **dans le formulaire de réservation** de ce trajet après connexion ou inscription. Un accès direct par URL au formulaire montre la même porte en pleine page. *(précisé le 03/09, A58)*
 - **RG-C-13** — Le wizard ne montre **jamais « 0 € »** : sans poids, un indice (« Indique le poids… ») ; par défaut, le poids est celui de la recherche, sinon 2 kg (colis de référence). Le lieu de remise et de retrait sont pré-sélectionnés quand il n'y a qu'un choix évident.
 - **RG-C-14** — Un Voyageur sans historique est présenté « Nouveau Tripper », jamais « 0.0 · 0 deals ».
 
@@ -683,3 +683,25 @@ Une personne qui utilise Yamba en anglais reçoit des emails en anglais, sujet c
 | L6 | Compte du Voyageur supprimé avant l'envoi | « ton Voyageur a accepté » — jamais « null » |
 | L7 | `PATCH /auth/me/locale` avec `de` | 400, code `LOCALE_UNSUPPORTED`, langue inchangée |
 | L8 | Interface FR, mot de passe oublié | Sujet « Ton code de réinitialisation Yamba », sans emoji, expéditeur « Yamba <adresse SMTP> » |
+
+# feat/booking-auth-modal — réserver sans perdre le trajet, revenir là où on était
+
+### 1. Le besoin
+Au moment où un visiteur clique « Réserver », il est décidé : lui demander de se connecter ne doit pas lui faire perdre le trajet, le prix et l'élan. Et quiconque clique « Connexion » dans le header doit revenir sur la page qu'il lisait.
+
+### 2. Règles de gestion
+- **RG-C-12** (précisée ci-dessus) : la porte de réservation est une fenêtre au-dessus du trajet ; retour dans le formulaire de réservation après connexion.
+- **RG-C-17 — « Connexion » et « Créer un compte » ramènent sur la page en cours.** Exceptions : depuis une page d'authentification (pas de boucle) et depuis l'accueil (retour par défaut). Seuls des chemins internes sont acceptés (anti open redirect, #114).
+- **RG-C-18 — La fenêtre se referme sans conséquence** (« Plus tard », touche Échap, fond) : le visiteur reste sur le trajet, rien n'est réservé, rien n'est mémorisé.
+
+### 3. Recette
+| # | Scénario | Attendu |
+|---|---|---|
+| G1 | Non connecté, page trajet desktop, « Réserver » | Fenêtre centrée « Connecte-toi pour réserver », le trajet reste visible derrière, focus sur « Se connecter » |
+| G2 | Idem sur mobile | Feuille du bas avec poignée, mêmes boutons, « Plus tard » referme |
+| G3 | « Se connecter » puis connexion | Atterrissage direct dans le formulaire de réservation du trajet |
+| G4 | « Créer un compte » → OTP → connexion | Même atterrissage (retour conservé, #114) |
+| G5 | Échap ou tap sur le fond | Fenêtre fermée, page inchangée |
+| G6 | URL `/trips/:id/book` tapée à la main, non connecté | Porte pleine page (inchangée) |
+| G7 | Non connecté sur `/search?…`, « Connexion » dans le header | Retour sur la même recherche après connexion |
+| G8 | Sur `/login`, lien « Inscrivez-vous » ; sur `/`, « Connexion » | Aucun `redirect` ajouté ; retour à l'accueil après connexion |
