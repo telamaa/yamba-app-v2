@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations, useLocale } from "next-intl";
-import { Package, Plane, Train, Car, Star, ArrowRight, Heart } from "lucide-react";
+import { Package, Plane, Train, Car, Star, ArrowRight, Heart, ThumbsUp, ThumbsDown, Flag } from "lucide-react";
 import { Link } from "@/i18n/navigation";
 import type {
   PublicTripperBlock,
@@ -9,6 +9,7 @@ import type {
   PublicReview,
   PublicTopRoute,
   PublicRating,
+  PublicReputation,
 } from "@/lib/public-user.types";
 import {
   formatPriceShort,
@@ -21,6 +22,8 @@ import {
 type Props = {
   tripper: PublicTripperBlock;
   tripperRating: PublicRating | null;
+  /** B5 / D29① — faits de réputation, calculés serveur. */
+  reputation?: PublicReputation | null;
   firstName: string;
   userSlug: string;
 };
@@ -28,6 +31,7 @@ type Props = {
 export default function TripperBlock({
                                        tripper,
                                        tripperRating,
+                                       reputation,
                                        firstName,
                                        userSlug,
                                      }: Props) {
@@ -47,6 +51,9 @@ export default function TripperBlock({
           {t("title")}
         </h2>
       </header>
+
+      {/* B5 — les faits derrière le niveau (D29① : réputation explicable) */}
+      {reputation && <ReputationFacts reputation={reputation} />}
 
       {/* Routes fréquentes */}
       {tripper.topRoutes.length > 0 && (
@@ -253,6 +260,69 @@ function ReviewCard({ review }: { review: PublicReview }) {
         <p className="text-xs leading-relaxed text-slate-700 dark:text-slate-300">
           {review.comment}
         </p>
+      )}
+      <ReviewCriteriaChips criteria={review.criteria} />
+      <ReportReviewLink reviewId={review.id} />
+    </div>
+  );
+}
+
+/* B5 — critères (pouces) publics + « Signaler cet avis » (décision 6A : mailto support). */
+const SUPPORT_EMAIL = process.env.NEXT_PUBLIC_SUPPORT_EMAIL ?? "support@yamba.app";
+
+function ReviewCriteriaChips({ criteria }: { criteria: PublicReview["criteria"] }) {
+  const t = useTranslations("userProfile.reviews");
+  if (!criteria) return null;
+  const entries = Object.entries(criteria);
+  if (entries.length === 0) return null;
+  return (
+    <div className="mt-2 flex flex-wrap gap-1.5">
+      {entries.map(([key, value]) => (
+        <span
+          key={key}
+          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${
+            value === "UP"
+              ? "bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300"
+              : "bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
+          }`}
+        >
+          {value === "UP" ? <ThumbsUp size={10} aria-hidden="true" /> : <ThumbsDown size={10} aria-hidden="true" />}
+          {t(`criteria.${key}` as never)}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function ReportReviewLink({ reviewId }: { reviewId: string }) {
+  const t = useTranslations("userProfile.reviews");
+  const subject = encodeURIComponent(t("reportSubject", { id: reviewId }));
+  return (
+    <a
+      href={`mailto:${SUPPORT_EMAIL}?subject=${subject}`}
+      className="mt-2 inline-flex items-center gap-1 text-[10px] font-medium text-slate-400 transition-colors hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300"
+    >
+      <Flag size={10} aria-hidden="true" />
+      {t("report")}
+    </a>
+  );
+}
+
+function ReputationFacts({ reputation }: { reputation: PublicReputation }) {
+  const t = useTranslations("userProfile.reputation");
+  const nextKey = reputation.level === "NEW" ? "nextConfirmed" : reputation.level === "CONFIRMED" ? "nextTop" : null;
+  return (
+    <div className="mb-5 rounded-xl border border-slate-200 px-4 py-3 dark:border-slate-800">
+      <p className="text-[12.5px] text-slate-700 dark:text-slate-300">
+        {t("facts", {
+          deals: reputation.completedDealsCount,
+          avg: reputation.ratingsCount > 0 ? reputation.ratingsAvg.toFixed(1).replace(".", ",") : "—",
+          count: reputation.ratingsCount,
+          late: reputation.lateCancellationsCount,
+        })}
+      </p>
+      {nextKey && (
+        <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">{t(`carrier.${nextKey}`)}</p>
       )}
     </div>
   );

@@ -3,17 +3,15 @@
   "subtitle": "Deal {originCity} → {destinationCity} · terminé",
   "subtitleShort": "Deal terminé",
   "back": "Retour",
-
   "banner": {
-    "titleCARRIER": "Ton Deal est terminé · {amount} versés à {firstName}",
-    "titleSHIPPER": "Ton Deal est terminé · {amount} reçus sur ton compte Stripe",
-    "titleShortCARRIER": "Deal terminé · {amount} versés",
-    "titleShortSHIPPER": "Deal terminé · {amount} reçus",
+    "titleCARRIER": "Ton Deal avec {firstName} est terminé",
+    "titleSHIPPER": "Ton Deal avec {firstName} est terminé",
+    "titleShortCARRIER": "Deal terminé",
+    "titleShortSHIPPER": "Deal terminé",
     "subCARRIER": "Ton retour aide la communauté à mieux choisir ses partenaires",
     "subSHIPPER": "Ton retour aide les autres Voyageurs à choisir leurs Expéditeurs",
     "subShort": "Ton retour aide la communauté"
   },
-
   "h1": {
     "CARRIER": "Comment {firstName} s'est-il comporté ?",
     "SHIPPER": "Comment {firstName} s'est-elle comportée ?"
@@ -22,14 +20,12 @@
     "CARRIER": "Note ce voyageur sur les éléments qui comptent pour toi.",
     "SHIPPER": "Note cette expéditrice sur les éléments qui comptent pour toi."
   },
-
   "person": {
     "roleCARRIER": "Voyageur",
     "roleSHIPPER": "Expéditrice",
     "dealsCARRIER": "{count} deals",
     "dealsSHIPPER": "{count} envois"
   },
-
   "stars": {
     "label": "Ta note globale",
     "value1": "Décevant",
@@ -38,7 +34,6 @@
     "value4": "Très bien",
     "value5": "Excellent"
   },
-
   "criteria": {
     "label": "SUR CES POINTS PRÉCIS",
     "labelShort": "POINTS SPÉCIFIQUES",
@@ -77,7 +72,6 @@
     "thumbUp": "Bien",
     "thumbDown": "À améliorer"
   },
-
   "comment": {
     "label": "TON COMMENTAIRE",
     "labelShort": "COMMENTAIRE",
@@ -88,12 +82,10 @@
     "counter": "{count} / {max}",
     "counterWarning": "{count} / {max} — bientôt la limite"
   },
-
   "visibility": {
-    "text": "**Ta note et ton commentaire seront publics** sur le profil de {ratedFirstName}, attribués à {raterName}. Une fois publié, tu ne pourras plus modifier ton avis.",
-    "textShort": "**Note publique** sur le profil de {ratedFirstName}. Pas modifiable après publication."
+    "text": "**Ta note et ton commentaire seront publics** sur le profil de {ratedFirstName}, mais seulement une fois que vous aurez tous les deux noté — ou dans 14 jours. Une fois publié, tu ne pourras plus modifier ton avis.",
+    "textShort": "**Note publique** sur le profil de {ratedFirstName}, révélée quand vous aurez tous les deux noté. Pas modifiable après publication."
   },
-
   "sidebar": {
     "publishLabel": "PUBLICATION",
     "completedBadge": "Terminé",
@@ -101,23 +93,49 @@
     "amountReceivedLabel": "Reçu sur ton compte",
     "starsRequiredHint": "Choisis d'abord ta note globale"
   },
-
   "cta": {
     "later": "Plus tard",
     "publish": "Publier mon avis",
     "publishShort": "Publier",
     "publishing": "Publication…",
-    "toastError": "Erreur lors de la publication. Réessaye."
+    "toastError": "Erreur lors de la publication. Réessaye.",
+    "toastConflict": "Ce Deal ne peut plus être noté (déjà noté ou fenêtre fermée)."
   },
-
   "success": {
     "title": "Merci pour ton retour !",
     "subtitle": "Ton avis aide toute la communauté Yamba à voyager en confiance.",
-    "reciprocity": "{firstName} recevra aussi une invitation à te noter. Vos avis seront révélés une fois les deux publiés, ou sous 14 jours.",
-    "backHome": "Retour à l'accueil"
+    "reciprocity": "{firstName} recevra aussi une invitation à te noter. Vos avis seront révélés une fois les deux publiés, ou le {date} au plus tard.",
+    "revealedNow": "{firstName} t'avait déjà noté : vos deux avis sont maintenant visibles.",
+    "backToDeal": "Retour au Deal"
   },
-
   "error": {
     "notFound": "Ce Deal n'existe pas ou ne peut pas être noté."
+  },
+  "status": {
+    "promptTitle": "Comment s'est passé ton Deal avec {name} ?",
+    "promptText": "Tu as jusqu'au {date}. Ta note ne sera visible qu'une fois les deux avis publiés.",
+    "promptCta": "Noter {name}",
+    "sentTitle": "Note envoyée",
+    "sentText": "Révélée quand {name} aura noté, ou le {date} au plus tard.",
+    "sentTextBoth": "Vos deux avis vont être révélés d'un instant à l'autre.",
+    "revealedTitle": "Vos avis",
+    "mine": "Ta note pour {name}",
+    "mineMissing": "Tu n'as pas noté ce Deal.",
+    "theirs": "La note de {name}",
+    "theirsMissing": "{name} n'a pas noté ce Deal.",
+    "closed": "La fenêtre de notation est fermée — tu n'as pas noté {name}."
+  },
+  "done": {
+    "revealedTitle": "Vos avis sont publics",
+    "sentTitle": "Ta note est envoyée",
+    "closedTitle": "La notation est fermée",
+    "revealedText": "Les deux avis ont été publiés sur vos profils.",
+    "sentText": "Elle sera révélée quand {name} aura noté, ou le {date} au plus tard.",
+    "closedText": "La fenêtre de 14 jours est passée : ce Deal ne peut plus être noté.",
+    "mine": "Ta note",
+    "theirs": "Sa note",
+    "theirsMissing": "Pas de note reçue pour ce Deal.",
+    "back": "Retour au Deal",
+    "unavailable": "Ce Deal ne peut pas être noté pour le moment."
   }
 }

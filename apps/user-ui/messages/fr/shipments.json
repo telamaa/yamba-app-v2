@@ -39,7 +39,8 @@
     "disputed": "{category} · {weight} · réponse de Yamba sous 48 h ouvrées",
     "expired": "Expirée le {date} · remboursée intégralement",
     "declined": "Refusée le {date} · remboursée intégralement",
-    "cancelled": "Annulée le {date}"
+    "cancelled": "Annulée le {date}",
+    "completedRatedNoStars": "Livré le {date} par {firstName}"
   },
   "trackingSteps": {
     "AT_AIRPORT": "arrivé à l'aéroport",

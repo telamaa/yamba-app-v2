@@ -47,6 +47,8 @@ export type ShipperBookingViewDto = {
     firstName: string;
     lastInitial: string;
   };
+  /** B5 — état de notation de l'Expéditeur (servi) ; absent = rien à noter. */
+  rating?: { windowEndsAt: string | null; ratedByMe: boolean; counterpartHasRated: boolean; revealedAt: string | null; canRate: boolean } | null;
   requestedAt: string;
   expiresAt: string;
   acceptedAt?: string | null;
@@ -102,6 +104,8 @@ export function toShipmentListItem(
     hasTrackingEvents: view.trackingEvents.length > 0,
     lastTrackingStep: lastTracking?.step,
     disputeTicket: orUndef(view.disputeTicket),
+    // B5 — « à noter » tant que le serveur le permet ; sinon la ligne est au repos.
+    hasRated: view.rating ? !view.rating.canRate : true,
     canCancel: view.allowedActions.includes("cancel"),
     cancellationPreview: orUndef(view.cancellationPreview),
   };

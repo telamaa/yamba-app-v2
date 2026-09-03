@@ -119,6 +119,8 @@ export type Booking = {
   completedAt?: string;
   /** PICKED_UP : quand « signaler un colis non livré » devient possible (servi, A72). */
   disputeOpensAt?: string;
+  /** B5 — état de notation de MON rôle (servi) : bouton, note envoyée, révélé. */
+  rating?: { windowEndsAt: string | null; ratedByMe: boolean; counterpartHasRated: boolean; revealedAt: string | null; canRate: boolean } | null;
   /** Machine d'état serveur — les CTA reflètent, ne décident jamais. */
   allowedActions?: string[];
 

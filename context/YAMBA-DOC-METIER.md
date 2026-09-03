@@ -1053,3 +1053,24 @@ La section Finances était une promesse : deux onglets vides et une maquette aux
 | NOTE6 | Deal COMPLETED depuis 5 jours, une seule partie a noté, cron | Rappel in-app + email « Pense à noter … » au rôle muet seulement ; à J+7 « Dernier rappel » ; rien ensuite |
 | NOTE7 | Deal COMPLETED depuis 14 jours, une seule note | Note révélée (événement WINDOW_ELAPSED), visible sur le profil ; sans aucune note : fenêtre fermée en silence |
 | NOTE8 | Profil public d'un Voyageur avec 10 deals terminés, moyenne révélée ≥ 4,8, 0 annulation | `reputation.carrier.level = TOP`, badge « Top Voyageur » (`isSuperCarrier`) sur les cartes de recherche |
+
+# B5-PR2 — noter sans harceler, comprendre sa réputation
+
+### Règles de gestion (NOTE, suite)
+- **RG-NOTE-08 — Le bouton « Noter » vit sur le deal terminé, pas dans une fenêtre bloquante.** Il apparaît sur l'écran terminé des deux rôles, en mention sur la ligne de liste et en action « à traiter » sur l'accueil, tant que le serveur dit que la note est possible. « Plus tard » ramène au deal sans question.
+- **RG-NOTE-09 — On ne montre jamais la note moyenne de la personne AVANT de la noter** (biais d'ancrage) : prénom, initiale, corridor et date de fin seulement.
+- **RG-NOTE-10 — Après la note, l'écran dit pourquoi on ne voit pas encore celle de l'autre** : « révélée quand {prénom} aura noté, ou le {date} ». Une fois révélées, les deux notes s'affichent côte à côte sur le deal.
+- **RG-NOTE-11 — Le niveau se lit avec ses raisons** : badge (Nouveau / Confirmé / Top Voyageur ; Nouvel / fiable / Top Expéditeur) avec les critères en info-bulle, ligne de faits (Deals terminés, moyenne sur N avis, annulations tardives) et le critère du niveau suivant. Seuils : Confirmé = 3 Deals ; Top = 10 Deals Voyageur ou 5 envois Expéditeur, moyenne ≥ 4,8, 0 annulation tardive.
+- **RG-NOTE-12 — Chaque avis public porte les pouces de ses critères et un lien « Signaler cet avis »** (email au support avec la référence) jusqu'à la file de signalements de l'admin.
+
+### Recette (écrans)
+| # | Scénario | Attendu |
+|---|---|---|
+| NOTE9 | Expéditrice, deal terminé non noté (seed), écran du deal | Carte « Comment s'est passé ton Deal avec {prénom} ? » + échéance + bouton « Noter {prénom} » ; ligne de liste « Livré · Note {prénom} » ; accueil : action « à traiter » |
+| NOTE10 | Clic « Noter » | Écran de notation : prénom, initiale, corridor, date — **pas** de moyenne ni de nombre de deals ; bannière sans montant |
+| NOTE11 | « Plus tard » | Retour au deal, la carte « Noter » reste, aucune fenêtre |
+| NOTE12 | Publier 5 ★ + pouces + commentaire | « Merci ! … révélée quand {prénom} aura noté, ou le {date} » → retour au deal : carte « Note envoyée · révélée quand … » ; la ligne de liste repasse au repos |
+| NOTE13 | Voyageur, même deal | Carte « Noter {prénom} » (il ne voit pas la note de l'expéditrice) ; ligne « … · pense à noter {prénom} » ; après sa note : « {prénom} t'avait déjà noté : vos deux avis sont visibles » ; les deux écrans terminé montrent les deux notes et le commentaire reçu |
+| NOTE14 | Ouvrir `/bookings/:id/rate` sur un deal déjà noté, en litige ou d'un autre compte | Écran « Ta note est envoyée » / « Ce Deal ne peut pas être noté pour le moment » + retour — jamais d'erreur brute |
+| NOTE15 | Profil public du Voyageur après révélation | Badge de niveau (info-bulle des critères), ligne de faits, « prochain niveau », avis avec pouces et « Signaler cet avis » (ouvre l'email support avec la référence) |
+| NOTE16 | Profil public de l'Expéditrice | Même chose côté « En tant qu'expéditeur » : faits, badge « Expéditeur fiable » à partir de 3 envois |

@@ -4,10 +4,10 @@
   "subtitleShort": "Deal completed",
   "back": "Back",
   "banner": {
-    "titleCARRIER": "Your Deal is complete · {amount} paid to {firstName}",
-    "titleSHIPPER": "Your Deal is complete · {amount} received on your Stripe account",
-    "titleShortCARRIER": "Deal complete · {amount} paid",
-    "titleShortSHIPPER": "Deal complete · {amount} received",
+    "titleCARRIER": "Your Deal with {firstName} is complete",
+    "titleSHIPPER": "Your Deal with {firstName} is complete",
+    "titleShortCARRIER": "Deal complete",
+    "titleShortSHIPPER": "Deal complete",
     "subCARRIER": "Your feedback helps the community choose better partners",
     "subSHIPPER": "Your feedback helps other Travelers choose their Shippers",
     "subShort": "Your feedback helps the community"
@@ -83,8 +83,8 @@
     "counterWarning": "{count} / {max} — almost at the limit"
   },
   "visibility": {
-    "text": "**Your rating and comment will be public** on {ratedFirstName}''s profile, attributed to {raterName}. Once published, you can no longer edit your review.",
-    "textShort": "**Public review** on {ratedFirstName}''s profile. Not editable after publishing."
+    "text": "**Your rating and comment will be public** on {ratedFirstName}'s profile, but only once you have both rated — or in 14 days. Once published, you can't edit your review.",
+    "textShort": "**Public rating** on {ratedFirstName}'s profile, revealed once you have both rated. Can't be edited after publishing."
   },
   "sidebar": {
     "publishLabel": "PUBLICATION",
@@ -98,15 +98,44 @@
     "publish": "Publish my review",
     "publishShort": "Publish",
     "publishing": "Publishing…",
-    "toastError": "Error publishing. Try again."
+    "toastError": "Error publishing. Try again.",
+    "toastConflict": "This Deal can no longer be rated (already rated or window closed)."
   },
   "success": {
     "title": "Thanks for your feedback!",
     "subtitle": "Your review helps the whole Yamba community travel with confidence.",
-    "reciprocity": "{firstName} will also be invited to rate you. Your reviews will be revealed once both are published, or within 14 days.",
-    "backHome": "Back to home"
+    "reciprocity": "{firstName} will also be invited to rate you. Reviews are revealed once both are published, or by {date} at the latest.",
+    "revealedNow": "{firstName} had already rated you: both reviews are now visible.",
+    "backToDeal": "Back to the Deal"
   },
   "error": {
     "notFound": "This Deal doesn''t exist or can''t be rated."
+  },
+  "status": {
+    "promptTitle": "How did your Deal with {name} go?",
+    "promptText": "You have until {date}. Your rating is only visible once both reviews are published.",
+    "promptCta": "Rate {name}",
+    "sentTitle": "Rating sent",
+    "sentText": "Revealed once {name} has rated, or by {date} at the latest.",
+    "sentTextBoth": "Both reviews are about to be revealed.",
+    "revealedTitle": "Your reviews",
+    "mine": "Your rating for {name}",
+    "mineMissing": "You didn't rate this Deal.",
+    "theirs": "{name}'s rating",
+    "theirsMissing": "{name} didn't rate this Deal.",
+    "closed": "The rating window is closed — you didn't rate {name}."
+  },
+  "done": {
+    "revealedTitle": "Your reviews are public",
+    "sentTitle": "Your rating is sent",
+    "closedTitle": "Rating is closed",
+    "revealedText": "Both reviews have been published on your profiles.",
+    "sentText": "It will be revealed once {name} has rated, or by {date} at the latest.",
+    "closedText": "The 14-day window has passed: this Deal can no longer be rated.",
+    "mine": "Your rating",
+    "theirs": "Their rating",
+    "theirsMissing": "No rating received for this Deal.",
+    "back": "Back to the Deal",
+    "unavailable": "This Deal can't be rated right now."
   }
 }

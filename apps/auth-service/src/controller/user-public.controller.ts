@@ -37,6 +37,7 @@ type TripPreviewDto = {
 };
 
 type ReviewPreviewDto = {
+  criteria: Record<string, "UP" | "DOWN"> | null;
   id: string;
   rating: number;
   comment: string | null;
@@ -132,6 +133,7 @@ function toReviewPreview(r: {
   id: string;
   rating: number;
   comment: string | null;
+  criteria?: unknown;
   createdAt: Date;
   authorUser: {
     firstName: string;
@@ -143,6 +145,8 @@ function toReviewPreview(r: {
     id: r.id,
     rating: r.rating,
     comment: r.comment,
+    // B5 — pouces des critères (public, comme la note)
+    criteria: r.criteria && typeof r.criteria === "object" ? (r.criteria as Record<string, "UP" | "DOWN">) : null,
     createdAt: r.createdAt,
     author: {
       firstName: r.authorUser.firstName,

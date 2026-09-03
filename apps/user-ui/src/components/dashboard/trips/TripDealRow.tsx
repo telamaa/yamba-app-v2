@@ -95,17 +95,19 @@ export function buildDealSub(
       return t("deal.deliveredSub");
     case "COMPLETED": {
       // B4-PR3 (A77) : la ligne dit l'état RÉEL du versement, jamais « versés » par défaut.
+      // B5 : « pense à noter {prénom} » tant que le serveur le permet.
+      const rateHint = deal.hasRated ? "" : " · " + t("deal.rateHint", { firstName: deal.shipper.firstName });
       const earnings = formatMoney(locale, deal.netEarningsEur);
       if (deal.payoutStatus === "SENT") {
         return t("deal.completedSentSub", {
           earnings,
           date: deal.payoutSentAt ? new Date(deal.payoutSentAt).toLocaleDateString(locale, { day: "numeric", month: "short" }) : "",
-        });
+        }) + rateHint;
       }
       if (deal.payoutStatus === "FAILED" && deal.payoutBlocker === "ACCOUNT_NOT_READY") {
-        return t("deal.completedBlockedSub", { earnings });
+        return t("deal.completedBlockedSub", { earnings }) + rateHint;
       }
-      return t("deal.completedPendingSub", { earnings });
+      return t("deal.completedPendingSub", { earnings }) + rateHint;
     }
     case "DISPUTED":
       return t("deal.disputedSub", { ticket: deal.disputeTicket ?? "" });

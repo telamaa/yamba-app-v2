@@ -53,10 +53,33 @@ export default function UserHero({ user }: Props) {
               </span>
             )}
 
-            {isCarrier && user.tripper?.badges.isSuperCarrier && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] font-semibold text-amber-900 dark:bg-amber-500/15 dark:text-amber-300">
+            {/* B5 / D29① — le niveau de réputation, avec ses critères en info-bulle */}
+            {isCarrier && user.reputation?.carrier && (
+              <span
+                title={t(`reputation.carrier.${user.reputation.carrier.level}.criteria`)}
+                className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
+                  user.reputation.carrier.level === "TOP"
+                    ? "bg-amber-50 text-amber-900 dark:bg-amber-500/15 dark:text-amber-300"
+                    : user.reputation.carrier.level === "CONFIRMED"
+                      ? "bg-teal-50 text-[#0F766E] dark:bg-teal-950/40 dark:text-teal-300"
+                      : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300"
+                }`}
+              >
                 <Star size={11} strokeWidth={2.5} />
-                {t("badges.superTripper")}
+                {t(`reputation.carrier.${user.reputation.carrier.level}.label`)}
+              </span>
+            )}
+            {!isCarrier && user.reputation?.shipper && user.reputation.shipper.level !== "NEW" && (
+              <span
+                title={t(`reputation.shipper.${user.reputation.shipper.level}.criteria`)}
+                className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
+                  user.reputation.shipper.level === "TOP"
+                    ? "bg-amber-50 text-amber-900 dark:bg-amber-500/15 dark:text-amber-300"
+                    : "bg-teal-50 text-[#0F766E] dark:bg-teal-950/40 dark:text-teal-300"
+                }`}
+              >
+                <Star size={11} strokeWidth={2.5} />
+                {t(`reputation.shipper.${user.reputation.shipper.level}.label`)}
               </span>
             )}
           </div>

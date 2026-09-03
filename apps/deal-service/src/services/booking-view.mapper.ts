@@ -6,6 +6,7 @@ import type {
 } from "@packages/api-contracts";
 import {
   DISPUTE_AFTER_DEPARTURE_HOURS,
+  canRate,
   getAllowedActions,
   MAX_CODE_REGENERATIONS,
   MAX_DELIVERY_ATTEMPTS,
@@ -130,6 +131,11 @@ export type BookingRecord = {
   capturedAt?: Date | null;
   refundedAt?: Date | null;
   refundAmountCents?: number | null;
+  // B5
+  ratingWindowEndsAt?: Date | null;
+  shipperRatedAt?: Date | null;
+  carrierRatedAt?: Date | null;
+  ratingsRevealedAt?: Date | null;
 
   createdAt: Date;
   updatedAt: Date;
@@ -210,6 +216,23 @@ const toTrackingEvents = (events: BookingRecord["trackingEvents"]) =>
     step: e.step as TrackingStep,
     confirmedAt: toIsoRequired(e.confirmedAt),
   }));
+
+/** B5/D53 — l'état de notation pour un rôle (bouton « Noter », « note envoyée », révélé). */
+const toRatingState = (b: BookingRecord, role: "SHIPPER" | "CARRIER", now: Date): ShipperBookingView["rating"] => {
+  if (b.status !== "COMPLETED") return null;
+  const check = canRate(
+    { status: "COMPLETED", isDeleted: false, ratingWindowEndsAt: b.ratingWindowEndsAt ?? null, shipperRatedAt: b.shipperRatedAt ?? null, carrierRatedAt: b.carrierRatedAt ?? null },
+    role,
+    now
+  );
+  return {
+    windowEndsAt: toIso(b.ratingWindowEndsAt ?? null),
+    ratedByMe: role === "SHIPPER" ? !!b.shipperRatedAt : !!b.carrierRatedAt,
+    counterpartHasRated: role === "SHIPPER" ? !!b.carrierRatedAt : !!b.shipperRatedAt,
+    revealedAt: toIso(b.ratingsRevealedAt ?? null),
+    canRate: check.allowed,
+  };
+};
 
 /** A75 — le Voyageur apprend s'il doit agir (compte Stripe) ou attendre (rejeu automatique). */
 const toPayoutBlocker = (b: BookingRecord): CarrierBookingView["payoutBlocker"] => {
@@ -344,6 +367,9 @@ export function toShipperBookingView(
     refundedAt: toIso(booking.refundedAt ?? null),
     refundAmountCents: booking.refundAmountCents ?? null,
 
+    // B5 — état de notation du rôle Expéditeur.
+    rating: toRatingState(booking, "SHIPPER", now),
+
     // A72 — la date d'ouverture du litige « non livré » est SERVIE (jamais calculée par le front).
     disputeOpensAt:
       booking.status === "PICKED_UP"
@@ -372,7 +398,8 @@ export function toShipperBookingView(
 export function toCarrierBookingView(
   booking: BookingRecord,
   shipper: CounterpartRecord,
-  dispute: DisputeRecord | null = null
+  dispute: DisputeRecord | null = null,
+  now: Date = new Date()
 ): CarrierBookingView {
   return {
     id: booking.id,
@@ -414,6 +441,8 @@ export function toCarrierBookingView(
       { ...booking, departureAt: booking.trip.departureAt } as Parameters<typeof getAllowedActions>[0],
       "CARRIER"
     ),
+    // B5 — état de notation du rôle Voyageur.
+    rating: toRatingState(booking, "CARRIER", now),
     // A75 — cause GROSSIÈRE d'un versement bloqué (jamais le message Stripe).
     payoutBlocker: toPayoutBlocker(booking),
     // D50/A82 — le montant réellement versé (net, ou compensation ANN-01) et le sort de la retenue.

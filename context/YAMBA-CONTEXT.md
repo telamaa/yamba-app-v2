@@ -283,7 +283,11 @@ Ordre de demarrage : auth -> trip -> gateway.
 - 03/09 : B5-PR1 feat/b5-rating-server (D53, A92–A94) — notation double-aveugle
   (14 j, une fois par role), relances J+5/J+7, reputation denormalisee (D29①),
   profil public sur avis reveles. Reste PR2 front (ecrans, boutons, niveaux).
-- Plateforme de tests : 693 (trip 198, deal 417, notification 78) + auth 65.
+- 03/09 : B5-PR2 feat/b5-rating-front (A95–A97, decisions 1A–6A) — etat de
+  notation servi avec le deal (canRate machine), ecrans reels sans ancrage,
+  carte « Noter » partagee, listes/accueil sur canRate, profil : niveau + faits
+  + pouces + « Signaler cet avis » (mailto). Suite : chantier C (admin-ui).
+- Plateforme de tests : 694 (trip 198, deal 418, notification 78) + auth 65.
 - (historique) Plateforme de tests : 600 (trip 187, deal 354, notification 59) — post-B3 (#96).
 - MERGE 01/09 : toute la pile B2 est dans `dev` via la SEULE **PR #90**
   (`feat/b2-deal-front` portait la chaîne complète : jalons mobile D36,

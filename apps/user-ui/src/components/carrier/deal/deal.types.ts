@@ -135,6 +135,8 @@ export type DealRequest = {
   disputeCategory?: DealDisputeCategory;
   /** D50/A82 — montant réellement versé : le net à COMPLETED, la compensation ANN-01 à CANCELLED tardif. */
   payoutAmountCents?: number;
+  /** B5 — état de notation de MON rôle (servi). */
+  rating?: { windowEndsAt: string | null; ratedByMe: boolean; counterpartHasRated: boolean; revealedAt: string | null; canRate: boolean } | null;
   /** Annulation tardive : la retenue est versée (CARRIER) ou conservée « à arbitrer » (HELD_FOR_MEDIATION, A81). */
   retentionDisposition?: "CARRIER" | "HELD_FOR_MEDIATION";
 };

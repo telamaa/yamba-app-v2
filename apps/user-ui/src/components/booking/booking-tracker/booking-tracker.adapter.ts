@@ -93,6 +93,7 @@ export type ShipperBookingViewDto = {
   disputeTicket?: string | null;
   disputedAt?: string | null;
   deliveryPhotoUrls?: string[] | null;
+  rating?: { windowEndsAt: string | null; ratedByMe: boolean; counterpartHasRated: boolean; revealedAt: string | null; canRate: boolean } | null;
   payoutStatus?: "PENDING" | "SENT" | "FAILED" | "FROZEN" | null;
   completedBy?: string | null;
   disputeOpensAt?: string | null;
@@ -196,6 +197,7 @@ export function toBooking(view: ShipperBookingViewDto): Booking {
     completedBy: view.completedBy === "SHIPPER" || view.completedBy === "SYSTEM" ? view.completedBy : undefined,
     completedAt: view.completedAt ?? undefined,
     disputeOpensAt: view.disputeOpensAt ?? undefined,
+    rating: view.rating ?? null,
 
     carrier: {
       id: view.carrier.id,

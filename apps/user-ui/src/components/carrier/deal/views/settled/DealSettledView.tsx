@@ -20,6 +20,7 @@ import DealShipperCard from "../../shared/DealShipperCard";
 import DealPayoutStatusCard from "../../shared/DealPayoutStatusCard";
 import DealStepper, { type StepperStep } from "../../shared/DealStepper";
 import PhotoThumbs from "@/components/shared/photos/PhotoThumbs";
+import RatingStatusCard from "@/components/rating/RatingStatusCard";
 
 const SUPPORT_EMAIL = process.env.NEXT_PUBLIC_SUPPORT_EMAIL ?? "support@yamba.app";
 
@@ -116,7 +117,7 @@ export default function DealSettledView({ deal, variant, onCloseAction }: Props)
       <DealAcceptedRecap deal={deal} />
 
       {status === "COMPLETED" && (
-        <p className="text-[12px] text-slate-500 dark:text-slate-400">{t("settled.completed.ratingSoon", { shipperFirstName })}</p>
+        <RatingStatusCard dealId={deal.id} rating={deal.rating} counterpartFirstName={shipperFirstName} rateHref={`/carrier/deals/${deal.id}/rate`} compact={compact} />
       )}
 
       <button

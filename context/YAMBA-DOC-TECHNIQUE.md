@@ -1328,3 +1328,21 @@ deal-service **417** (402 + 10 rating + 3 réputation + 2 machine) · notificati
 
 ### Reste
 **B5-PR2 front** : `rating.api.ts` réel (`GET/POST /deals/:id/rating`), écrans de notation branchés (les deux rôles), boutons « Noter » (terminé, listes, accueil), état « note envoyée, révélée quand … », affichage des niveaux et faits sur le profil public et les cartes (« Top Voyageur » = `isSuperCarrier`, « Expéditeur fiable »), lien « Signaler cet avis » (mailto).
+
+# B5-PR2 — `feat/b5-rating-front` : la notation et la réputation à l'écran (A95–A97)
+
+## Ce qui a été fait
+
+1. **Contrat + mapper** (`booking.schema.ts`, `booking-view.mapper.ts`) : `BookingRatingState` (`windowEndsAt`, `ratedByMe`, `counterpartHasRated`, `revealedAt`, `canRate`) servi sur les DEUX vues de deal, calculé par `toRatingState(booking, role, now)` à partir de `canRate` de la machine — le front n'a jamais à dériver « à noter ». `toCarrierBookingView` reçoit `now` (testabilité). Spec du mapper +1 (deal 418). OpenAPI régénéré.
+2. **Profil public** (`user-public.controller.ts`) : chaque avis révélé porte `criteria` (pouces).
+3. **Module de notation** (`components/rating/`) : `rating.types.ts` (contexte réel, sans moyenne ni nombre de deals — 2A), `rating.api.ts` réel (`GET/POST /deals/:id/rating`, `RatingApiError` avec le code serveur), `RatingClient.tsx` (charge le contexte ; `canRate` faux → `RatingDone` ; échec de chargement → `RatingUnavailable` ; 409 `TRANSITION_NOT_ALLOWED` → toast + rechargement), `RatingSuccess.tsx` (révélé tout de suite ou « révélée quand … ou le {date} », retour au deal), `RatingDone.tsx` (note envoyée / révélée côte à côte / fenêtre fermée), `RatingBlocks.tsx` (bannière sans montant, sans note moyenne, sans « attribué à »).
+4. **Carte d'état partagée** `RatingStatusCard.tsx` (1A) : bouton « Noter {prénom} » + échéance ; « Note envoyée · révélée quand {prénom} aura noté, ou le {date} » ; révélé : les deux notes et le commentaire reçu (contexte chargé à la demande) ; fenêtre fermée sans note : une ligne. Posée sur l'écran terminé Expéditeur (`CompletedCards.tsx`, remplace la note « bientôt », desktop + mobile) et Voyageur (`DealSettledView.tsx`).
+5. **Adapters** : booking-tracker et carrier `deal.adapter` transportent `rating` ; listes `shipments.adapter` / `my-deals.adapter` : `hasRated = !rating.canRate` (A95) → « à traiter » à l'accueil, ligne « Livré le … par {prénom} » sans étoiles inventées, ligne Voyageur « … · pense à noter {prénom} ».
+6. **Profil public** : `public-user.types` (`reputation.{carrier,shipper}`, `PublicReview.criteria`), `UserHero` (badge de niveau coloré avec l'info-bulle des critères, à la place de « Super Voyageur » seul), `TripperBlock` / `ShipperBlock` (ligne de faits « N Deals terminés · ★ moy. sur N avis · N annulation tardive », « prochain niveau », pouces des critères par avis, « Signaler cet avis » mailto `NEXT_PUBLIC_SUPPORT_EMAIL`).
+7. **i18n** FR/EN : `rating.json` (`status.*`, `done.*`, `success.*`, `cta.toastConflict`, bannière et visibilité réécrites), `shipments.sub.completedRatedNoStars`, `myTrips.deal.rateHint`, `user-profile.reputation.*` + `reviews.*`.
+
+### Preuves
+deal-service **418** (+1 mapper) · notification 78 · auth 65 · tsc user-ui · miroir i18n parfait (25 namespaces) · OpenAPI régénéré. Recette NOTE9–NOTE16 (`YAMBA-DOC-METIER.md`).
+
+### Reste
+Chantier C (admin-ui) : file « Signaler cet avis » réelle (remplace le mailto), masquage d'un avis sans suppression, paramètres `REPUTATION_PARAMS` servis au front (fin de la copie dupliquée A97).

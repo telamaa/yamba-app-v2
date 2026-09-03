@@ -5376,6 +5376,54 @@
         "additionalProperties": false,
         "description": "Minimal profile of the other party (explicit join — Booking has no Prisma relations)"
       },
+      "BookingRatingState": {
+        "type": "object",
+        "properties": {
+          "windowEndsAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "completedAt + 14 days"
+          },
+          "ratedByMe": {
+            "type": "boolean"
+          },
+          "counterpartHasRated": {
+            "type": "boolean"
+          },
+          "revealedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "canRate": {
+            "type": "boolean",
+            "description": "COMPLETED, window open, not rated by me — the state machine verdict (canRate)"
+          }
+        },
+        "required": [
+          "windowEndsAt",
+          "ratedByMe",
+          "counterpartHasRated",
+          "revealedAt",
+          "canRate"
+        ],
+        "additionalProperties": false
+      },
       "CancellationPreview": {
         "type": "object",
         "properties": {
@@ -5744,6 +5792,17 @@
               }
             ]
           },
+          "rating": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BookingRatingState"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "null unless COMPLETED (B5)"
+          },
           "disputeOpensAt": {
             "anyOf": [
               {
@@ -5778,6 +5837,7 @@
           "trackingEvents",
           "allowedActions",
           "cancellationPreview",
+          "rating",
           "disputeOpensAt"
         ],
         "additionalProperties": false,
@@ -6086,6 +6146,17 @@
               }
             ]
           },
+          "rating": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BookingRatingState"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "null unless COMPLETED (B5)"
+          },
           "payoutBlocker": {
             "anyOf": [
               {
@@ -6126,6 +6197,7 @@
           "updatedAt",
           "deliveryAttemptsLeft",
           "trackingEvents",
+          "rating",
           "payoutBlocker",
           "allowedActions"
         ],

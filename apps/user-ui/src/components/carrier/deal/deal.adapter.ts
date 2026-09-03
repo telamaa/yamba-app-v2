@@ -93,6 +93,7 @@ export type CarrierBookingViewDto = {
   disputeCategory?: DealRequest["disputeCategory"] | null;
   payoutAmountCents?: number | null;
   retentionDisposition?: DealRequest["retentionDisposition"] | null;
+  rating?: DealRequest["rating"];
 };
 
 /** J+4 : fenêtre de vérification avant versement (payoutDueAt = deliveredAt + 4j). */
@@ -227,5 +228,6 @@ export function toDealRequest(view: CarrierBookingViewDto): DealRequest {
     disputeCategory: view.disputeCategory ?? undefined,
     payoutAmountCents: view.payoutAmountCents ?? undefined,
     retentionDisposition: view.retentionDisposition ?? undefined,
+    rating: view.rating ?? null,
   };
 }

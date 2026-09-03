@@ -52,5 +52,51 @@
     "title": "Profil introuvable",
     "message": "Ce profil n'existe pas ou a été supprimé.",
     "goHome": "Retour à l'accueil"
+  },
+  "reputation": {
+    "carrier": {
+      "NEW": {
+        "label": "Nouveau Voyageur",
+        "criteria": "Moins de 3 Deals terminés."
+      },
+      "CONFIRMED": {
+        "label": "Voyageur confirmé",
+        "criteria": "Au moins 3 Deals terminés."
+      },
+      "TOP": {
+        "label": "Top Voyageur",
+        "criteria": "Au moins 10 Deals terminés, une moyenne ≥ 4,8 et aucune annulation tardive."
+      },
+      "nextConfirmed": "Prochain niveau « Voyageur confirmé » : 3 Deals terminés.",
+      "nextTop": "Prochain niveau « Top Voyageur » : 10 Deals terminés, moyenne ≥ 4,8, 0 annulation tardive."
+    },
+    "shipper": {
+      "NEW": {
+        "label": "Nouvel Expéditeur",
+        "criteria": "Moins de 3 envois terminés."
+      },
+      "CONFIRMED": {
+        "label": "Expéditeur fiable",
+        "criteria": "Au moins 3 envois terminés."
+      },
+      "TOP": {
+        "label": "Top Expéditeur",
+        "criteria": "Au moins 5 envois terminés, une moyenne ≥ 4,8 et aucune annulation tardive."
+      },
+      "nextConfirmed": "Prochain niveau « Expéditeur fiable » : 3 envois terminés.",
+      "nextTop": "Prochain niveau « Top Expéditeur » : 5 envois terminés, moyenne ≥ 4,8, 0 annulation tardive."
+    },
+    "facts": "{deals, plural, =0 {Aucun Deal terminé} one {# Deal terminé} other {# Deals terminés}} · {count, plural, =0 {pas encore d'avis} one {★ {avg} sur # avis} other {★ {avg} sur # avis}} · {late, plural, =0 {0 annulation tardive} one {# annulation tardive} other {# annulations tardives}}"
+  },
+  "reviews": {
+    "criteria": {
+      "PUNCTUALITY": "Ponctualité",
+      "COMMUNICATION": "Communication",
+      "PARCEL_CARE": "Soin du colis",
+      "DECLARATION_CLARITY": "Déclaration claire",
+      "RESPONSIVENESS": "Réactivité"
+    },
+    "report": "Signaler cet avis",
+    "reportSubject": "Signalement d'un avis (#{id})"
   }
 }
