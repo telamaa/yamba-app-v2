@@ -86,7 +86,7 @@
   },
   "charter": {
     "blockTitle": "YOUR COMMITMENT",
-    "title": "Tripper Charter",
+    "title": "Traveler Charter",
     "subtitle": "Legal commitment — read carefully",
     "subtitleShort": "Legal commitment",
     "intro": "By accepting this Deal, I commit to:",
@@ -98,7 +98,7 @@
     "reportIncident": "**Report any incident** to Yamba without delay",
     "disclaimer": "I acknowledge that my sole responsibility would be engaged in case of transport of illicit goods, even without prior verification.",
     "viewFullLink": "View full Charter and Transport Contract",
-    "acceptTitle": "I accept the Tripper Charter",
+    "acceptTitle": "I accept the Traveler Charter",
     "acceptDescPrefix": "I have read and accept the ",
     "acceptContractLabel": "Transport Contract",
     "acceptDescJoin": " and the ",
@@ -110,14 +110,14 @@
     "decline": "Decline",
     "accept": "Accept",
     "acceptConfirm": "Accept and confirm",
-    "footerNote": "If you decline, {shipperFirstName} can look for another Tripper with no penalty.",
-    "footerNoteShort": "Declining doesn''t harm your reputation. {shipperFirstName} will find another Tripper.",
+    "footerNote": "If you decline, {shipperFirstName} can look for another Traveler with no penalty.",
+    "footerNoteShort": "Declining doesn''t harm your reputation. {shipperFirstName} will find another Traveler.",
     "charterAcceptedIndicator": "✓ Charter accepted",
     "charterPendingIndicator": "Tick the Charter to confirm"
   },
   "decline": {
     "dialogTitle": "Decline this request?",
-    "dialogIntro": "{shipperFirstName} will be notified and can contact another Tripper. Your acceptance rate stays intact.",
+    "dialogIntro": "{shipperFirstName} will be notified and can contact another Traveler. Your acceptance rate stays intact.",
     "reasonLabel": "Reason (optional)",
     "reasonPlaceholder": "Choose a reason",
     "reasonOption": {
@@ -160,7 +160,7 @@
     "retentionHeld": "Cancelled after departure: the shipper's retention is held by Yamba while we understand what happened. We will contact you."
   },
   "errors": {
-    "onboardingRequired": "Finish your Tripper profile and Stripe setup to be able to accept a deal.",
+    "onboardingRequired": "Finish your Traveler profile and Stripe setup to be able to accept a deal.",
     "dealChanged": "This deal changed in the meantime. The page has just been refreshed.",
     "paymentConflict": "The payment on this request is no longer valid. The page has just been refreshed."
   }

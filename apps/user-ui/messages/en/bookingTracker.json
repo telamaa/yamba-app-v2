@@ -47,7 +47,7 @@
     }
   },
   "carrierCard": {
-    "title": "Your Tripper",
+    "title": "Your Traveler",
     "subtitle": "{carrierFirstName} will contact you to set the pickup",
     "subtitleShort": "{carrierFirstName} will contact you",
     "meta": "⭐ {rating} · {count, plural, =1 {# deal} other {# deals}} · {verified, select, true {Verified} other {}}",
@@ -233,7 +233,7 @@
     },
     "rate": {
       "title": "Remember to rate {carrierFirstName}",
-      "text": "Your feedback helps other Shippers choose their Trippers.",
+      "text": "Your feedback helps other Shippers choose their Travelers.",
       "textShort": "Your feedback helps others.",
       "button": "Leave a review"
     },
@@ -337,7 +337,7 @@
       "text": "I declare on my honour that the information provided is accurate. I understand that an abusive report may lead to contractual consequences.",
       "textShort": "I declare on my honour that the information provided is accurate.",
       "whyLink": "Why this commitment?",
-      "whyText": "A report freezes a real person''s payment. This commitment protects honest Trippers — just like the Charter commits them to your parcel."
+      "whyText": "A report freezes a real person''s payment. This commitment protects honest Travelers — just like the Charter commits them to your parcel."
     },
     "cta": {
       "info": "Once sent, your report can no longer be modified. Our team will contact you within 48h.",
@@ -425,7 +425,7 @@
     },
     "communication": {
       "label": "COMMUNICATION",
-      "carrierRole": "Your Tripper",
+      "carrierRole": "Your Traveler",
       "carrierInFlight": "currently in flight",
       "carrierTraveling": "traveling",
       "message": "Send a message",

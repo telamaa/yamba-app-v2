@@ -83,7 +83,7 @@
     "steps": {
       "find": {
         "title": "Trouvez",
-        "description": "Un Yamber qui se rend à votre destination."
+        "description": "Un Voyageur qui se rend à votre destination."
       },
       "book": {
         "title": "Réservez",
@@ -111,7 +111,7 @@
     "subtitle": "Aucun frais caché. Aucun abonnement.",
     "breakdown": {
       "title": "Sur chaque transaction",
-      "yamberLabel": "Yamber",
+      "yamberLabel": "Voyageur",
       "yambaLabel": "Commission Yamba",
       "yambaSubtitle": "Sécurité, support, garanties",
       "insuranceLabel": "Protection étendue en option",
@@ -119,7 +119,7 @@
     },
     "timeline": {
       "label": "Protection mutuelle",
-      "titleStart": "Yamber payé",
+      "titleStart": "Voyageur payé",
       "titleHighlight": "3 jours",
       "titleEnd": "après livraison",
       "subtitle": "Période de sécurité pour signaler tout problème avant déblocage des fonds.",
@@ -142,7 +142,7 @@
         "day4": {
           "label": "J4",
           "title": "Paiement",
-          "subtitle": "Yamber payé"
+          "subtitle": "Voyageur payé"
         }
       },
       "shipperBenefit": "3 jours pour vérifier",
@@ -162,9 +162,9 @@
         "role": "Paris → Brazzaville"
       },
       "r2": {
-        "quote": "Yamber depuis 6 mois sur Lyon-Paris. Mes billets de train sont financés. Vraiment au top.",
+        "quote": "Voyageur depuis 6 mois sur Lyon-Paris. Mes billets de train sont financés. Vraiment au top.",
         "name": "Thomas F.",
-        "role": "Yamber · Lyon"
+        "role": "Voyageur · Lyon"
       },
       "r3": {
         "quote": "Service nickel. Le système de notation et les paiements sécurisés m'ont rassurée dès le début.",
@@ -202,9 +202,9 @@
     },
     "yamber": {
       "tag": "Pour transporter",
-      "title": "Yamber",
+      "title": "Voyageur",
       "description": "Vous voyagez déjà ? Gagnez en moyenne 120€/mois sur vos trajets prévus.",
-      "cta": "Devenir Yamber"
+      "cta": "Devenir Voyageur"
     }
   }
 }

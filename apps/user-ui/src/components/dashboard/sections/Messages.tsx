@@ -24,7 +24,7 @@ export default function Messages({ copy }: { copy: DashboardCopy }) {
         description={
           isFr
             ? "La messagerie arrive bientôt. Tes échanges avec les Voyageurs et Expéditeurs vivront ici."
-            : "Messaging is coming soon. Your conversations with Trippers and Shippers will live here."
+            : "Messaging is coming soon. Your conversations with Travelers and Shippers will live here."
         }
       />
     </>

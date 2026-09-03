@@ -69,7 +69,7 @@ export default function HeaderUserAvatar({
 
       {!hasPendingAction && carrierState === "verified" && (
         <span
-          aria-label="Yamber vérifié"
+          aria-label="Voyageur vérifié"
           className="absolute -right-0.5 -bottom-0.5 flex items-center justify-center rounded-full border-2 border-white text-white dark:border-slate-950"
           style={{
             width: indicatorPx,

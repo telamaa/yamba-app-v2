@@ -156,9 +156,9 @@
     "confirmFailed": "Le paiement n''a pas pu être autorisé. Vérifie ta carte et réessaie.",
     "requestSent": "Demande envoyée ! Le voyageur a 24 h pour accepter.",
     "errors": {
-        "UPLOAD_FAILED": "Le téléversement d''une photo a échoué. Vérifie ta connexion et réessaye — ta carte n''a pas été débitée.",
-        "UPLOAD_TOO_LARGE": "Une photo dépasse {maxMb} Mo. Réduis-la ou retire-la — ta carte n''a pas été débitée.",
-        "UPLOAD_INVALID_TYPE": "Format de photo non pris en charge (JPG, PNG, HEIC ou WebP) — ta carte n''a pas été débitée.",
+      "UPLOAD_FAILED": "Le téléversement d''une photo a échoué. Vérifie ta connexion et réessaye — ta carte n''a pas été débitée.",
+      "UPLOAD_TOO_LARGE": "Une photo dépasse {maxMb} Mo. Réduis-la ou retire-la — ta carte n''a pas été débitée.",
+      "UPLOAD_INVALID_TYPE": "Format de photo non pris en charge (JPG, PNG, HEIC ou WebP) — ta carte n''a pas été débitée.",
       "QUOTE_DIVERGENCE": "Le prix a changé depuis ton devis. Le nouveau total est affiché — vérifie-le avant de payer.",
       "CAPACITY_EXCEEDED": "Il ne reste plus assez de place sur ce trajet pour ton colis.",
       "FAMILY_REFUSED": "Le voyageur n''accepte pas ce type de colis sur ce trajet.",
@@ -211,7 +211,7 @@
     "deals": "{count, plural, =1 {# deal} other {# deals}}",
     "transportDetail": "Transport · {kg} kg × {rate}/kg × {size}",
     "minimumApplied": "Minimum par colis appliqué : {min}",
-    "newTripper": "Nouveau Tripper",
+    "newTripper": "Nouveau Voyageur",
     "quoteHint": {
       "MISSING_WEIGHT": "Indique le poids du colis pour voir le prix.",
       "MISSING_SIZE": "Choisis une taille (S, M ou L).",

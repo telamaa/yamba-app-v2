@@ -20,7 +20,7 @@
     "locationsTitle": "Meeting locations",
     "pickupBlockTitle": "You hand the parcel to {carrierFirstName}",
     "deliveryBlockTitle": "The recipient picks up the parcel",
-    "locationSingleHint": "Set by the tripper",
+    "locationSingleHint": "Set by the traveler",
     "goldenRules": {
       "title": "Golden rules for a smooth shipment",
       "pack": "**Pack carefully.** Sturdy bag or box, bubble wrap if fragile, properly taped.",
@@ -58,7 +58,7 @@
     },
     "family": {
       "label": "Parcel family",
-      "hint": "The family tells whether the tripper accepts it — it never changes the price per kg, except a displayed surcharge.",
+      "hint": "The family tells whether the traveler accepts it — it never changes the price per kg, except a displayed surcharge.",
       "refused": "{carrierFirstName} does not take this family on this trip"
     },
     "size": {
@@ -104,7 +104,7 @@
       "title": "How the delivery will work",
       "codeGiven": "**A 6-digit code** will be given to you after payment.",
       "shareIt": "**You share it** with the recipient by SMS, WhatsApp or in person.",
-      "handToTraveler": "**They give it to the tripper** at delivery. Without this code, the parcel cannot be released."
+      "handToTraveler": "**They give it to the traveler** at delivery. Without this code, the parcel cannot be released."
     },
     "form": {
       "firstName": "First name",
@@ -122,9 +122,9 @@
     "subtitle": "You certify on your honor the content of the parcel",
     "handoverFlow": {
       "title": "What will happen when you hand over the parcel",
-      "visualInspection": "**Mandatory visual inspection.** The tripper will examine your parcel before accepting — don''t be surprised.",
-      "refusalPossible": "**Refusal possible if non-compliant.** If the content differs from your declaration, the tripper can refuse. You''ll be refunded but the trip is lost.",
-      "crossPhotos": "**Cross-referenced photos.** The tripper will take their own photos as evidence in case of dispute."
+      "visualInspection": "**Mandatory visual inspection.** The traveler will examine your parcel before accepting — don''t be surprised.",
+      "refusalPossible": "**Refusal possible if non-compliant.** If the content differs from your declaration, the traveler can refuse. You''ll be refunded but the trip is lost.",
+      "crossPhotos": "**Cross-referenced photos.** The traveler will take their own photos as evidence in case of dispute."
     },
     "charter": {
       "title": "Shipper Charter",
@@ -133,7 +133,7 @@
       "noIllicit": "contains **no illicit**, dangerous or prohibited products",
       "matchDeclared": "matches exactly the **declared category, weight and content**",
       "customsCompliant": "complies with the **customs regulations** of the destination country",
-      "disclaimer": "Any false declaration engages my sole civil and criminal liability, to the exclusion of the tripper and Yamba.",
+      "disclaimer": "Any false declaration engages my sole civil and criminal liability, to the exclusion of the traveler and Yamba.",
       "fullLink": "See the full charter and prohibited items"
     },
     "accept": {
@@ -147,21 +147,21 @@
   },
   "step4": {
     "title": "Payment",
-    "subtitle": "The amount is authorized now and only charged when the tripper accepts (within 24h).",
+    "subtitle": "The amount is authorized now and only charged when the traveler accepts (within 24h).",
     "loadingMessage": "Preparing payment…",
     "retry": "Try again",
     "testMode": "Test mode: no payment provider is configured. The {amount} authorization is simulated — click “Pay” to send your request.",
     "stripeMissing": "Online payment is unavailable right now. Please try again in a few minutes.",
     "elementLoadError": "The payment module could not load. Check your connection and try again.",
     "confirmFailed": "The payment could not be authorized. Check your card and try again.",
-    "requestSent": "Request sent! The tripper has 24h to accept.",
+    "requestSent": "Request sent! The traveler has 24h to accept.",
     "errors": {
-        "UPLOAD_FAILED": "A photo upload failed. Check your connection and try again — your card was not charged.",
-        "UPLOAD_TOO_LARGE": "A photo exceeds {maxMb} MB. Reduce or remove it — your card was not charged.",
-        "UPLOAD_INVALID_TYPE": "Unsupported photo format (JPG, PNG, HEIC or WebP) — your card was not charged.",
+      "UPLOAD_FAILED": "A photo upload failed. Check your connection and try again — your card was not charged.",
+      "UPLOAD_TOO_LARGE": "A photo exceeds {maxMb} MB. Reduce or remove it — your card was not charged.",
+      "UPLOAD_INVALID_TYPE": "Unsupported photo format (JPG, PNG, HEIC or WebP) — your card was not charged.",
       "QUOTE_DIVERGENCE": "The price changed since your quote. The new total is shown — check it before paying.",
       "CAPACITY_EXCEEDED": "There is not enough space left on this trip for your parcel.",
-      "FAMILY_REFUSED": "The tripper does not accept this kind of parcel on this trip.",
+      "FAMILY_REFUSED": "The traveler does not accept this kind of parcel on this trip.",
       "TRIP_NOT_BOOKABLE": "This trip no longer accepts requests.",
       "OWN_TRIP": "You cannot book your own trip.",
       "PAYMENT_NOT_AUTHORIZED": "The payment has not been authorized yet. Please try again.",
@@ -173,11 +173,11 @@
     },
     "afterPayment": {
       "title": "After your payment",
-      "step1": "The tripper receives your request and has **24h to accept**. You''re only charged on acceptance.",
-      "step2": "Meet the tripper for the **handover**, where they''ll inspect and photograph the parcel.",
+      "step1": "The traveler receives your request and has **24h to accept**. You''re only charged on acceptance.",
+      "step2": "Meet the traveler for the **handover**, where they''ll inspect and photograph the parcel.",
       "step3": "Once the parcel is handed over, you receive your **6-digit code**, to share with the recipient.",
-      "step4": "The recipient gives the code to the tripper at arrival, who enters it to confirm delivery.",
-      "step5": "**3 days after** confirmed delivery, the tripper receives their payment."
+      "step4": "The recipient gives the code to the traveler at arrival, who enters it to confirm delivery.",
+      "step5": "**3 days after** confirmed delivery, the traveler receives their payment."
     },
     "trustStripe": "Payment secured by Stripe. Yamba never stores your card details."
   },
@@ -190,10 +190,10 @@
     "insurance": "Yamba Guarantee",
     "insurance500": "Yamba Guarantee €500",
     "total": "Total",
-    "totalNote": "Charged when the tripper accepts",
-    "totalNoteLong": "The amount is authorized now and only charged when the tripper accepts.",
+    "totalNote": "Charged when the traveler accepts",
+    "totalNoteLong": "The amount is authorized now and only charged when the traveler accepts.",
     "totalLabel": "Total to pay",
-    "ctaHint": "You''re only charged when the tripper accepts",
+    "ctaHint": "You''re only charged when the traveler accepts",
     "detail": "Detail",
     "hide": "Hide",
     "parcel": "Parcel",
@@ -211,7 +211,7 @@
     "deals": "{count, plural, =1 {# deal} other {# deals}}",
     "transportDetail": "Transport · {kg} kg × {rate}/kg × {size}",
     "minimumApplied": "Per-parcel minimum applied: {min}",
-    "newTripper": "New Tripper",
+    "newTripper": "New Traveler",
     "quoteHint": {
       "MISSING_WEIGHT": "Enter the parcel weight to see the price.",
       "MISSING_SIZE": "Pick a size (S, M or L).",
@@ -240,7 +240,7 @@
   },
   "authGate": {
     "title": "Sign in to book",
-    "subtitle": "A booking commits a tripper: Yamba needs to know who is sending. Your parcel and this trip will be waiting after sign-in."
+    "subtitle": "A booking commits a traveler: Yamba needs to know who is sending. Your parcel and this trip will be waiting after sign-in."
   },
   "previousStep": "Previous step"
 }

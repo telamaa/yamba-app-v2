@@ -19,18 +19,18 @@
     "messages": "Messages",
     "notifications": "Notifications",
     "savedRoutes": "Alertes route",
-    "following": "Trippers suivis",
+    "following": "Voyageurs suivis",
     "favorites": "Mes favoris",
     "payments": "Paiements",
     "wallet": "Portefeuille",
     "profile": "Profil",
-    "yamber": "Devenir Yamber",
+    "yamber": "Devenir Voyageur",
     "security": "Sécurité",
     "settings": "Paramètres",
     "help": "Aide",
     "activity": "Activité",
     "finances": "Finances",
     "more": "Plus",
-    "becomeYamber": "Devenir Tripper"
+    "becomeYamber": "Devenir Voyageur"
   }
 }
