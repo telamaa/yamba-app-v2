@@ -790,3 +790,18 @@ Se connecter ou s'inscrire en un clic avec Google, sans mot de passe ni code par
 | K2 | Connexion sans cocher, fermer le navigateur, rouvrir | Déconnecté |
 | K3 | Connexion en cochant, revenir le lendemain | Toujours connecté |
 | K4 | Formulaire de connexion | Case décochée par défaut, aide « Coché : 7 jours sans activité. Sinon : déconnexion après 60 minutes sans activité. » |
+
+# feat/auth-gate-inline-login — se connecter sans quitter la page
+
+### Règle de gestion
+- **RG-C-20 — La fenêtre d'identité permet de se connecter sur place** (e-mail et mot de passe, Google) et reprend le geste engagé : le favori est enregistré, la réservation s'ouvre, la création de trajet s'ouvre. Créer un compte reste une page, avec retour.
+
+### Recette
+| # | Scénario | Attendu |
+|---|---|---|
+| M1 | Visiteur, cœur d'une carte, connexion par e-mail dans la fenêtre | Fenêtre fermée, cœur plein, toujours sur la recherche |
+| M2 | Idem par Google | Même résultat, toast de bienvenue |
+| M3 | Visiteur, « Réserver », connexion dans la fenêtre | Arrivée dans le formulaire de réservation |
+| M4 | Visiteur, « Partager un trajet », connexion dans la fenêtre | Arrivée sur la création de trajet |
+| M5 | Mauvais mot de passe dans la fenêtre | Erreur sous le champ, fenêtre ouverte |
+| M6 | « Inscris-toi » dans la fenêtre | Page d'inscription, retour sur la page d'origine après OTP et connexion |

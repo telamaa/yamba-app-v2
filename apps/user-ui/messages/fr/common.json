@@ -177,8 +177,6 @@
     "counter": "{current} / {total}"
   },
   "authGate": {
-    "login": "Se connecter",
-    "register": "Créer un compte",
     "later": "Plus tard",
     "shareTrip": {
       "title": "Connecte-toi pour partager un trajet",

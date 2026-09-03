@@ -29,7 +29,14 @@ type FormData = {
 };
 
 type Props = {
-  heroVisual: HeroVisual;
+  /** Page : visuel de gauche (absent en variante modale). */
+  heroVisual?: HeroVisual;
+  /** `page` (défaut) = /login plein écran · `modal` = formulaire seul dans AuthGateModal (A63). */
+  variant?: "page" | "modal";
+  /** Modal : chemin de retour imposé (sinon lu dans ?redirect=). */
+  redirectOverride?: string | null;
+  /** Modal : appelé après connexion réussie (cache utilisateur déjà rafraîchi) — remplace la navigation. */
+  onSuccessAction?: () => void;
 };
 
 function FacebookIcon() {
@@ -165,7 +172,8 @@ function localizeLoginError(message: string | undefined, copy: Copy) {
   return copy.genericError;
 }
 
-export default function LoginForm({ heroVisual }: Props) {
+export default function LoginForm({ heroVisual, variant = "page", redirectOverride, onSuccessAction }: Props) {
+  const isModal = variant === "modal";
   const router = useRouter();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
@@ -175,9 +183,11 @@ export default function LoginForm({ heroVisual }: Props) {
   const copy = useMemo(() => buildCopy(lang), [lang]);
   // Message de succès posé par l'étape précédente (vérification OTP, etc.)
   useFlashToast();
-  const justVerified = searchParams.get("verified") === "1";
+  const justVerified = !isModal && searchParams.get("verified") === "1";
   // Retour à la page visée (réservation, publication…) — chemin interne seulement
-  const redirectTo = sanitizeRedirect(searchParams.get("redirect") ?? searchParams.get("returnTo"));
+  const redirectTo = isModal
+    ? sanitizeRedirect(redirectOverride)
+    : sanitizeRedirect(searchParams.get("redirect") ?? searchParams.get("returnTo"));
   const registerHref = withRedirect("/register", redirectTo);
   const prefilledEmail = searchParams.get("email") ?? "";
 
@@ -203,6 +213,11 @@ export default function LoginForm({ heroVisual }: Props) {
     mutationFn: loginUser,
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["user"] });
+      if (onSuccessAction) {
+        // A63 — connexion DANS la page : l'appelant reprend son action, pas de navigation ici
+        onSuccessAction();
+        return;
+      }
       router.push(redirectTo || "/");
       router.refresh();
     },
@@ -273,11 +288,199 @@ export default function LoginForm({ heroVisual }: Props) {
     "text-sm font-semibold text-slate-900 transition-colors hover:bg-slate-50 " +
     "dark:border-slate-800 dark:bg-slate-950 dark:text-white dark:hover:bg-slate-900/50";
 
+  const formBlock = (
+    <>
+    {/* OAuth — en haut */}
+    <div className="mt-6 space-y-2">
+      {/* D47 — bouton officiel Google Identity Services (inerte sans client ID) */}
+      <GoogleSignInButton redirectTo={redirectTo} rememberMe={false} text="signin_with" onSuccessAction={onSuccessAction} />
+      <button
+        type="button"
+        onClick={() => console.log("facebook oauth (ui only)")}
+        className={oauthBtn}
+      >
+        <FacebookIcon />
+        {copy.facebook}
+      </button>
+    </div>
+
+    {/* Séparateur */}
+    <div className="my-4 flex items-center gap-3">
+      <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
+      <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+        {copy.orMail}
+      </span>
+      <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
+    </div>
+
+    {/* Form e-mail/password */}
+    {justVerified && (
+      <div
+        role="status"
+        className="mb-4 flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3.5 dark:border-emerald-900/50 dark:bg-emerald-950/30"
+      >
+        <CheckCircle2 size={18} className="mt-0.5 flex-shrink-0 text-emerald-700 dark:text-emerald-300" aria-hidden="true" />
+        <div>
+          <p className="text-[13.5px] font-semibold text-emerald-900 dark:text-emerald-100">{copy.verifiedTitle}</p>
+          <p className="mt-0.5 text-[12.5px] text-emerald-800/90 dark:text-emerald-200/80">{copy.verifiedBody}</p>
+        </div>
+      </div>
+    )}
+
+    <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-3">
+      <div>
+        <label htmlFor="email" className={labelBase}>
+          {copy.email}
+        </label>
+        <input
+          id="email"
+          type="email"
+          inputMode="email"
+          enterKeyHint="next"
+          autoComplete="email"
+          placeholder={copy.emailPh}
+          aria-invalid={!!errors.email}
+          aria-describedby={errors.email ? "email-error" : undefined}
+          className={`${inputBase} ${errors.email ? inputError : ""}`}
+          {...register("email", {
+            required: copy.requiredEmail,
+            pattern: {
+              value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+              message: copy.invalidEmail,
+            },
+            setValueAs: (value) =>
+              typeof value === "string" ? value.trim().toLowerCase() : value,
+            onChange: () => {
+              clearErrors("email");
+              clearErrors("root.serverError");
+            },
+          })}
+        />
+        {errors.email?.message && (
+          <p
+            id="email-error"
+            className="mt-1.5 text-xs text-red-600 dark:text-red-400"
+          >
+            {errors.email.message}
+          </p>
+        )}
+      </div>
+
+      <div>
+        <div className="flex items-center justify-between gap-3">
+          <label htmlFor="password" className={labelBase}>
+            {copy.password}
+          </label>
+          <Link href="/password/forgot" className={linkSubtle}>
+            {copy.forgot}
+          </Link>
+        </div>
+        <div className="relative">
+          <input
+            id="password"
+            type={passwordVisible ? "text" : "password"}
+            enterKeyHint="go"
+            autoComplete="current-password"
+            aria-invalid={!!errors.password}
+            aria-describedby={errors.password ? "password-error" : undefined}
+            className={`${inputBase} pr-11 ${errors.password ? inputError : ""}`}
+            {...register("password", {
+              required: copy.requiredPassword,
+              minLength: {
+                value: 8,
+                message: copy.minPassword,
+              },
+              onChange: () => {
+                clearErrors("password");
+                clearErrors("root.serverError");
+              },
+            })}
+          />
+          {/* Bouton œil — centrage robuste avec inset-y-0 + my-auto */}
+          <button
+            type="button"
+            onClick={() => setPasswordVisible((v) => !v)}
+            aria-label={
+              passwordVisible ? copy.hidePasswordAria : copy.showPasswordAria
+            }
+            aria-pressed={passwordVisible}
+            className="absolute bottom-0 right-1.5 top-1.5 my-auto inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+          >
+            {passwordVisible ? <EyeOff size={15} /> : <Eye size={15} />}
+          </button>
+        </div>
+        {errors.password?.message && (
+          <p
+            id="password-error"
+            className="mt-1.5 text-xs text-red-600 dark:text-red-400"
+          >
+            {errors.password.message}
+          </p>
+        )}
+      </div>
+
+      <label className="flex cursor-pointer items-start gap-2.5 text-sm text-slate-700 dark:text-slate-300">
+        <input
+          type="checkbox"
+          aria-describedby="remember-hint"
+          className="mt-0.5 h-4 w-4 rounded border-slate-300 accent-[#FF9900] focus:ring-2 focus:ring-[#FF9900]/30 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-slate-950"
+          {...register("remember")}
+        />
+        <span>
+          {copy.remember}
+          <span id="remember-hint" className="mt-0.5 block text-xs text-slate-500 dark:text-slate-400">
+            {copy.rememberHint}
+          </span>
+        </span>
+      </label>
+
+      {errors.root?.serverError?.message && (
+        <div
+          role="alert"
+          className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-200"
+        >
+          {errors.root.serverError.message}
+        </div>
+      )}
+
+      <button
+        type="submit"
+        disabled={loginMutation.isPending}
+        className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#FF9900] px-4 py-2.5 text-sm font-bold text-slate-900 shadow-sm transition-colors hover:bg-[#F08700] active:bg-[#E07A00] disabled:opacity-60 focus:outline-none focus-visible:ring-4 focus-visible:ring-[#FF9900]/30 dark:focus-visible:ring-[#FF9900]/20"
+      >
+        {loginMutation.isPending ? (
+          <>
+            <Loader2 size={16} className="animate-spin" />
+            {copy.ctaLoading}
+          </>
+        ) : (
+          copy.cta
+        )}
+      </button>
+    </form>
+
+    {/* Footer signup — texte simple sur une ligne, lien orange */}
+    <p className="mt-5 text-center text-sm text-slate-500 dark:text-slate-400">
+      {copy.notMemberYet}{" "}
+      <Link
+        href={registerHref}
+        className="font-bold text-[#FF9900] hover:underline hover:underline-offset-[3px] dark:text-[#FFB347]"
+      >
+        {copy.signup}
+      </Link>
+    </p>
+    </>
+  );
+
+  if (isModal) {
+    return <div className="w-full">{formBlock}</div>;
+  }
+
   return (
     <main className="lg:grid lg:grid-cols-2 lg:min-h-[calc(100vh-64px)]">
       {/* LEFT — visuel desktop only */}
       <div className="hidden lg:block">
-        <AuthHeroVisual visual={heroVisual} />
+        {heroVisual && <AuthHeroVisual visual={heroVisual} />}
       </div>
 
       {/* RIGHT — formulaire */}
@@ -297,185 +500,7 @@ export default function LoginForm({ heroVisual }: Props) {
             {copy.subtitle}
           </p>
 
-          {/* OAuth — en haut */}
-          <div className="mt-6 space-y-2">
-            {/* D47 — bouton officiel Google Identity Services (inerte sans client ID) */}
-            <GoogleSignInButton redirectTo={redirectTo} rememberMe={false} text="signin_with" />
-            <button
-              type="button"
-              onClick={() => console.log("facebook oauth (ui only)")}
-              className={oauthBtn}
-            >
-              <FacebookIcon />
-              {copy.facebook}
-            </button>
-          </div>
-
-          {/* Séparateur */}
-          <div className="my-4 flex items-center gap-3">
-            <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-              {copy.orMail}
-            </span>
-            <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
-          </div>
-
-          {/* Form e-mail/password */}
-          {justVerified && (
-            <div
-              role="status"
-              className="mb-4 flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3.5 dark:border-emerald-900/50 dark:bg-emerald-950/30"
-            >
-              <CheckCircle2 size={18} className="mt-0.5 flex-shrink-0 text-emerald-700 dark:text-emerald-300" aria-hidden="true" />
-              <div>
-                <p className="text-[13.5px] font-semibold text-emerald-900 dark:text-emerald-100">{copy.verifiedTitle}</p>
-                <p className="mt-0.5 text-[12.5px] text-emerald-800/90 dark:text-emerald-200/80">{copy.verifiedBody}</p>
-              </div>
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-3">
-            <div>
-              <label htmlFor="email" className={labelBase}>
-                {copy.email}
-              </label>
-              <input
-                id="email"
-                type="email"
-                inputMode="email"
-                enterKeyHint="next"
-                autoComplete="email"
-                placeholder={copy.emailPh}
-                aria-invalid={!!errors.email}
-                aria-describedby={errors.email ? "email-error" : undefined}
-                className={`${inputBase} ${errors.email ? inputError : ""}`}
-                {...register("email", {
-                  required: copy.requiredEmail,
-                  pattern: {
-                    value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
-                    message: copy.invalidEmail,
-                  },
-                  setValueAs: (value) =>
-                    typeof value === "string" ? value.trim().toLowerCase() : value,
-                  onChange: () => {
-                    clearErrors("email");
-                    clearErrors("root.serverError");
-                  },
-                })}
-              />
-              {errors.email?.message && (
-                <p
-                  id="email-error"
-                  className="mt-1.5 text-xs text-red-600 dark:text-red-400"
-                >
-                  {errors.email.message}
-                </p>
-              )}
-            </div>
-
-            <div>
-              <div className="flex items-center justify-between gap-3">
-                <label htmlFor="password" className={labelBase}>
-                  {copy.password}
-                </label>
-                <Link href="/password/forgot" className={linkSubtle}>
-                  {copy.forgot}
-                </Link>
-              </div>
-              <div className="relative">
-                <input
-                  id="password"
-                  type={passwordVisible ? "text" : "password"}
-                  enterKeyHint="go"
-                  autoComplete="current-password"
-                  aria-invalid={!!errors.password}
-                  aria-describedby={errors.password ? "password-error" : undefined}
-                  className={`${inputBase} pr-11 ${errors.password ? inputError : ""}`}
-                  {...register("password", {
-                    required: copy.requiredPassword,
-                    minLength: {
-                      value: 8,
-                      message: copy.minPassword,
-                    },
-                    onChange: () => {
-                      clearErrors("password");
-                      clearErrors("root.serverError");
-                    },
-                  })}
-                />
-                {/* Bouton œil — centrage robuste avec inset-y-0 + my-auto */}
-                <button
-                  type="button"
-                  onClick={() => setPasswordVisible((v) => !v)}
-                  aria-label={
-                    passwordVisible ? copy.hidePasswordAria : copy.showPasswordAria
-                  }
-                  aria-pressed={passwordVisible}
-                  className="absolute bottom-0 right-1.5 top-1.5 my-auto inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
-                >
-                  {passwordVisible ? <EyeOff size={15} /> : <Eye size={15} />}
-                </button>
-              </div>
-              {errors.password?.message && (
-                <p
-                  id="password-error"
-                  className="mt-1.5 text-xs text-red-600 dark:text-red-400"
-                >
-                  {errors.password.message}
-                </p>
-              )}
-            </div>
-
-            <label className="flex cursor-pointer items-start gap-2.5 text-sm text-slate-700 dark:text-slate-300">
-              <input
-                type="checkbox"
-                aria-describedby="remember-hint"
-                className="mt-0.5 h-4 w-4 rounded border-slate-300 accent-[#FF9900] focus:ring-2 focus:ring-[#FF9900]/30 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-slate-950"
-                {...register("remember")}
-              />
-              <span>
-                {copy.remember}
-                <span id="remember-hint" className="mt-0.5 block text-xs text-slate-500 dark:text-slate-400">
-                  {copy.rememberHint}
-                </span>
-              </span>
-            </label>
-
-            {errors.root?.serverError?.message && (
-              <div
-                role="alert"
-                className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-200"
-              >
-                {errors.root.serverError.message}
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={loginMutation.isPending}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#FF9900] px-4 py-2.5 text-sm font-bold text-slate-900 shadow-sm transition-colors hover:bg-[#F08700] active:bg-[#E07A00] disabled:opacity-60 focus:outline-none focus-visible:ring-4 focus-visible:ring-[#FF9900]/30 dark:focus-visible:ring-[#FF9900]/20"
-            >
-              {loginMutation.isPending ? (
-                <>
-                  <Loader2 size={16} className="animate-spin" />
-                  {copy.ctaLoading}
-                </>
-              ) : (
-                copy.cta
-              )}
-            </button>
-          </form>
-
-          {/* Footer signup — texte simple sur une ligne, lien orange */}
-          <p className="mt-5 text-center text-sm text-slate-500 dark:text-slate-400">
-            {copy.notMemberYet}{" "}
-            <Link
-              href={registerHref}
-              className="font-bold text-[#FF9900] hover:underline hover:underline-offset-[3px] dark:text-[#FFB347]"
-            >
-              {copy.signup}
-            </Link>
-          </p>
+          {formBlock}
         </div>
       </div>
     </main>

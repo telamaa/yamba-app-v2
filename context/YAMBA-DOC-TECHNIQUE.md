@@ -1139,3 +1139,13 @@ auth-service 65 tests, tsc auth + user-ui, miroir i18n. Le flux réel exige un I
 # fix/session-remember-default — la session expirait bien, la case cochée par défaut le cachait (A62)
 
 Diagnostic avant code : `session-policy.ts` (60 min / 7 j standard, 7 j / 30 j rememberMe, 21 tests), `storeRefreshSession` (TTL Redis = min(inactivité, vie absolue restante)), `refreshAuthTokens` (rotation avec le MÊME `createdAt`, plafond revérifié), `setCookie` (refresh de session sans `maxAge` hors rememberMe) : conformes à D27. Cause : `LoginForm` initialisait `remember: true`. Correctif : `remember: false`, libellé « Rester connecté sur cet appareil », aide `rememberHint` (`aria-describedby`) qui énonce les deux durées. Rien côté serveur. Recette K1–K4 (`YAMBA-DOC-METIER.md`).
+
+# feat/auth-gate-inline-login — se connecter dans la fenêtre, reprendre le geste (A63)
+
+1. **`LoginForm`** gagne `variant: "page" | "modal"`, `redirectOverride`, `onSuccessAction`. Le JSX du formulaire (OAuth, séparateur, champs, bouton, lien inscription) devient `formBlock` ; la variante `page` l'enveloppe dans la grille visuel + carte (visuel optionnel), la variante `modal` le rend seul. En modal : pas de bandeau « compte activé », retour = `redirectOverride`, succès → `onSuccessAction` (après `invalidateQueries(["user"])`) au lieu de `router.push`.
+2. **`GoogleSignInButton`** : `onSuccessAction` (même sémantique) — le bouton officiel Google fonctionne dans la modale.
+3. **`AuthGateModal`** : rend `<LoginForm variant="modal" />` sous le titre de l'action ; `onSignedInAction` (reprise) sinon navigation vers `redirect` ; focus sur le premier champ ; panneau `max-h-[92vh] overflow-y-auto` (le formulaire est plus haut que deux boutons) ; les clés `common.authGate.login/register` disparaissent.
+4. **`FavoriteButton`** : `onSignedInAction` → `toggle.mutate({ next: true })` : le favori est appliqué dans la foulée, `failWith` factorisé. Réservation et partage gardent la navigation (leur geste EST une page).
+
+### Preuves
+tsc user-ui, miroir i18n, pages login et trajet en 200 sur le serveur de dev. Recette M1–M6 (`YAMBA-DOC-METIER.md`).
