@@ -1,7 +1,17 @@
 "use client";
 
+/**
+ * FollowSidebar — suivre un profil (A64)
+ * ======================================
+ * Visiteur non connecté qui clique « Suivre » → porte d'identité EN MODALE
+ * (AuthGateModal, A60/A63) « Connecte-toi pour suivre {prénom} », jamais une
+ * redirection vers /login. Après connexion dans la fenêtre, le geste reprend :
+ * le suivi est appliqué immédiatement (mutation optimiste) et le profil est
+ * rechargé côté connecté (isFollowedByMe, isOwnProfile).
+ */
+import { useState } from "react";
 import { useTranslations } from "next-intl";
-import { useRouter } from "@/i18n/navigation";
+import { useRouter, usePathname } from "@/i18n/navigation";
 import {
   Heart,
   MessageCircle,
@@ -16,6 +26,7 @@ import {
   useUnfollowUser,
   useUpdateFollowPreferences,
 } from "@/hooks/useFollowMutations";
+import AuthGateModal from "@/components/auth/shared/AuthGateModal";
 
 type Props = {
   user: PublicUser;
@@ -23,7 +34,10 @@ type Props = {
 
 export default function FollowSidebar({ user }: Props) {
   const t = useTranslations("userProfile.sidebar");
+  const tGate = useTranslations("common.authGate.follow");
   const router = useRouter();
+  const pathname = usePathname();
+  const [gateOpen, setGateOpen] = useState(false);
 
   const { mutate: follow, isPending: isFollowing } = useFollowUser();
   const { mutate: unfollow, isPending: isUnfollowing } = useUnfollowUser();
@@ -35,7 +49,7 @@ export default function FollowSidebar({ user }: Props) {
 
   const handleToggleFollow = () => {
     if (!isLoggedIn) {
-      router.push(`/login?redirect=${encodeURIComponent(`/u/${user.publicSlug}`)}`);
+      setGateOpen(true);
       return;
     }
 
@@ -60,6 +74,17 @@ export default function FollowSidebar({ user }: Props) {
 
   return (
     <div className="space-y-3">
+      {!user.isOwnProfile && (
+        <AuthGateModal
+          open={gateOpen}
+          onCloseAction={() => setGateOpen(false)}
+          title={tGate("title", { firstName: user.firstName })}
+          subtitle={tGate("subtitle", { firstName: user.firstName })}
+          redirect={pathname || `/u/${user.publicSlug}`}
+          onSignedInAction={() => follow({ slug: user.publicSlug, notifyNextTrip: true })}
+        />
+      )}
+
       {/* ─── Card actions ─────────────────────────── */}
       <div
         className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950"

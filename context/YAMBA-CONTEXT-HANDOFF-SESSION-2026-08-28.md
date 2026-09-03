@@ -416,7 +416,8 @@ mobile-first, aucune attribution Claude, charte mango/teal/slate.
 5. `feat/auth-pages-ux` — **FAIT, en PR** (D45 pages auth, A60 : porte « Partager un trajet » en modale, demande utilisateur 03/09). Vocabulaire du rôle toujours ouvert.
 6. `feat/auth-google` — **FAIT, en PR** (D47, A61). **Geste utilisateur** : créer l'ID client OAuth (Google Cloud → Identifiants → « Application Web », origines `http://localhost:3000` + IP LAN) et poser `GOOGLE_CLIENT_ID` + `NEXT_PUBLIC_GOOGLE_CLIENT_ID` dans `.env` / `apps/user-ui/.env.local`, puis recette J1–J8.
 7. `feat/auth-gate-inline-login` — **FAIT, en PR** (A63 : formulaire de connexion dans la fenêtre, reprise du geste — demande utilisateur 03/09).
-8. `chore/api-same-origin` — **FAIT, en PR** (D48, opt-in). **Backlog recette 03/09 SOLDÉ.** Suite : ⭐ B4 argent sortant (voir §E de l'addendum du 02/09).
+8. `chore/api-same-origin` — **FAIT, en PR** (D48, opt-in). **Backlog recette 03/09 SOLDÉ.**
+9. `feat/follow-auth-gate` — **FAIT, en PR** (A64 : « Suivre » sur `/u/:slug` → porte d'identité en modale, demande utilisateur 03/09 après-midi). Suite : ⭐ B4 argent sortant (voir §E de l'addendum du 02/09).
 
 ## C. Questions encore ouvertes pour l'utilisateur
 - Nom du rôle transporteur : Yamber / Tripper / Voyageur (une seule réponse, appliquée partout).
@@ -424,7 +425,7 @@ mobile-first, aucune attribution Claude, charte mango/teal/slate.
 - Session : « connecté indéfiniment » = case « Rester connecté » cochée par défaut (7 j d'inactivité, D27) — **corrigé** (`fix/session-remember-default`, A62 : décochée par défaut + aide sur les durées).
 
 ## C bis. Fusions
-- Les fusions sont faites PAR L'UTILISATEUR (le classificateur de permissions de la session refuse `gh pr merge`) : #116, #117, #118 fusionnées le 03/09 (`dev` = `bb57c49`). Chaque PR suivante part de `dev` à jour.
+- Les fusions sont faites PAR L'UTILISATEUR (le classificateur de permissions de la session refuse `gh pr merge`) : #116, #117, #118 fusionnées le 03/09 (`dev` = `bb57c49`), puis #119 → #124 dans l'ordre (merge commits, `dev` = `bba3562`, branches purgées). Chaque PR suivante part de `dev` à jour.
 
 ## D. Environnement (inchangé)
 Front en LAN (`192.168.1.155`), Docker requis, `DELIVERY_CODE_ENCRYPTION_KEY` toujours à poser. Le `nx serve auth-service` en cours ne recharge PAS le code : relancer le service pour voir les correctifs de cette PR en recette.
