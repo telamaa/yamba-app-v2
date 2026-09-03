@@ -119,8 +119,22 @@ export type BookingRecord = {
   disputeTicket: string | null;
   disputedAt: Date | null;
 
+  // B4 — absents sur les enregistrements antérieurs
+  payoutStatus?: string | null;
+  payoutSentAt?: Date | null;
+
   createdAt: Date;
   updatedAt: Date;
+};
+
+/** Dossier de litige (B4/D51) — chargé par le contrôleur quand le deal est DISPUTED. */
+export type DisputeRecord = {
+  ticketNumber: string;
+  category: string;
+  description: string;
+  desiredOutcome: string | null;
+  photoUrls: string[];
+  createdAt: Date;
 };
 
 /** Contrepartie chargée par le controller (jointure explicite). */
@@ -204,6 +218,8 @@ const toMilestones = (b: BookingRecord) => ({
   pickupRefusalReason: b.pickupRefusalReason ?? null,
   disputeTicket: b.disputeTicket,
   disputedAt: toIso(b.disputedAt),
+  payoutStatus: (b.payoutStatus as ShipperBookingView["payoutStatus"]) ?? null,
+  payoutSentAt: toIso(b.payoutSentAt ?? null),
   createdAt: toIsoRequired(b.createdAt),
   updatedAt: toIsoRequired(b.updatedAt),
 });
@@ -250,10 +266,11 @@ export function toShipperBookingView(
   booking: BookingRecord,
   carrier: CounterpartRecord,
   now: Date = new Date(),
-  deliveryCode: string | null = null
+  deliveryCode: string | null = null,
+  dispute: DisputeRecord | null = null
 ): ShipperBookingView {
   const allowedActions = getAllowedActions(
-    booking as Parameters<typeof getAllowedActions>[0],
+    { ...booking, departureAt: booking.trip.departureAt } as Parameters<typeof getAllowedActions>[0],
     "SHIPPER"
   );
   return {
@@ -306,12 +323,30 @@ export function toShipperBookingView(
 
     allowedActions,
     cancellationPreview: toCancellationPreview(booking, allowedActions, now),
+
+    // A68 — le dossier n'est servi qu'à l'Expéditeur, et seulement en DISPUTED.
+    dispute:
+      dispute && booking.status === "DISPUTED"
+        ? {
+            ticketNumber: dispute.ticketNumber,
+            category: dispute.category as ShipperBookingView["dispute"] extends infer D
+              ? D extends { category: infer C }
+                ? C
+                : never
+              : never,
+            description: dispute.description,
+            desiredOutcome: (dispute.desiredOutcome as NonNullable<ShipperBookingView["dispute"]>["desiredOutcome"]) ?? null,
+            photoUrls: dispute.photoUrls,
+            createdAt: toIsoRequired(dispute.createdAt),
+          }
+        : null,
   };
 }
 
 export function toCarrierBookingView(
   booking: BookingRecord,
-  shipper: CounterpartRecord
+  shipper: CounterpartRecord,
+  dispute: DisputeRecord | null = null
 ): CarrierBookingView {
   return {
     id: booking.id,
@@ -350,9 +385,14 @@ export function toCarrierBookingView(
     trackingEvents: toTrackingEvents(booking.trackingEvents),
 
     allowedActions: getAllowedActions(
-      booking as Parameters<typeof getAllowedActions>[0],
+      { ...booking, departureAt: booking.trip.departureAt } as Parameters<typeof getAllowedActions>[0],
       "CARRIER"
     ),
+    // A68 — la catégorie seule (jamais la description ni les photos).
+    disputeCategory:
+      dispute && booking.status === "DISPUTED"
+        ? (dispute.category as CarrierBookingView["disputeCategory"])
+        : null,
   };
 }
 
@@ -361,9 +401,10 @@ export function toBookingView(
   booking: BookingRecord,
   role: BookingViewerRole,
   counterpart: CounterpartRecord,
-  deliveryCode: string | null = null
+  deliveryCode: string | null = null,
+  dispute: DisputeRecord | null = null
 ): ShipperBookingView | CarrierBookingView {
   return role === "SHIPPER"
-    ? toShipperBookingView(booking, counterpart, new Date(), deliveryCode)
-    : toCarrierBookingView(booking, counterpart);
+    ? toShipperBookingView(booking, counterpart, new Date(), deliveryCode, dispute)
+    : toCarrierBookingView(booking, counterpart, dispute);
 }

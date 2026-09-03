@@ -5,6 +5,7 @@ import {
   BookingActorSchema,
   BookingViewerRoleSchema,
   TrackingStepSchema,
+  DisputeCategorySchema,
 } from "./booking.enums";
 
 /**
@@ -41,6 +42,7 @@ export const BOOKING_EVENT_TYPES = [
   "booking.completed",
   "booking.payout_sent",
   "booking.disputed",
+  "booking.verification_reminder",
   "booking.rating_reminder",
   "booking.rating_revealed",
 ] as const;
@@ -261,12 +263,25 @@ export const BookingDisputedEventSchema = z
     payload: BookingEventBasePayloadSchema.extend({
       ticketNumber: z.string().meta({ example: "YAM-2041" }),
       disputedAt: z.iso.datetime(),
+      disputeCategory: DisputeCategorySchema.nullish().meta({
+        description: "Why the shipper disputed — the carrier learns the category, never the file (A68). Absent on pre-B4 events.",
+      }),
     }),
   })
   .meta({
     id: "BookingDisputedEvent",
     description: "Dispute filed → payout frozen, shipper acknowledgment (≤48 business hours) + carrier statement request",
   });
+
+export const BookingVerificationReminderEventSchema = z
+  .object({
+    ...envelope,
+    eventType: z.literal("booking.verification_reminder"),
+    payload: BookingEventBasePayloadSchema.extend({
+      payoutDueAt: z.iso.datetime().meta({ description: "End of the verification window (D+4) — the reminder fires at D+3" }),
+    }),
+  })
+  .meta({ id: "BookingVerificationReminderEvent", description: "D+3 reminder to the shipper: last day to confirm or dispute (B4/A70)" });
 
 export const BookingRatingReminderEventSchema = z
   .object({
@@ -308,6 +323,7 @@ export const BookingDomainEventSchema = z
     BookingCompletedEventSchema,
     BookingPayoutSentEventSchema,
     BookingDisputedEventSchema,
+    BookingVerificationReminderEventSchema,
     BookingRatingReminderEventSchema,
     BookingRatingRevealedEventSchema,
   ])

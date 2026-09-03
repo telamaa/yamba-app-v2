@@ -17,6 +17,7 @@
     "booking_completed": "Transaction terminée",
     "booking_payout_sent": "Versement effectué",
     "booking_disputed": "Signalement enregistré",
+    "booking_verification_reminder": "Dernier jour pour vérifier ta livraison",
     "booking_rating_reminder": "Pense à laisser une note",
     "booking_rating_revealed": "Les notes sont révélées",
     "fallback": "Notification"

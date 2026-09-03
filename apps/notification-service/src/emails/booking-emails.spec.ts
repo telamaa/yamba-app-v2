@@ -29,6 +29,7 @@ jest.mock(
 const emailMock = {
   isEmailConfigured: jest.fn(),
   sendTemplatedEmail: jest.fn(),
+  sendTransactionalEmail: jest.fn(),
 };
 jest.mock("@packages/email", () => emailMock, { virtual: true });
 
@@ -137,6 +138,40 @@ function deliveredEvent() {
   });
 }
 
+/* ══ Fixtures B4 (D52) ════════════════════════════════════════ */
+function completedEvent(completedBy: "SHIPPER" | "SYSTEM" = "SHIPPER") {
+  return envelope("booking.completed", {
+    ...basePayload(),
+    actor: completedBy,
+    completedAt: "2026-07-20T09:00:00.000Z",
+    completedBy,
+  });
+}
+function payoutSentEvent() {
+  return envelope("booking.payout_sent", {
+    ...basePayload(),
+    actor: "SYSTEM" as const,
+    transferId: "tr_test_1",
+    amountCents: 3000,
+  });
+}
+function disputedEvent(disputeCategory: string | null = "DAMAGED") {
+  return envelope("booking.disputed", {
+    ...basePayload(),
+    actor: "SHIPPER" as const,
+    ticketNumber: "YAM-2041",
+    disputedAt: "2026-07-20T09:00:00.000Z",
+    ...(disputeCategory ? { disputeCategory } : {}),
+  });
+}
+function verificationReminderEvent() {
+  return envelope("booking.verification_reminder", {
+    ...basePayload(),
+    actor: "SYSTEM" as const,
+    payoutDueAt: "2026-07-23T12:00:00.000Z",
+  });
+}
+
 function cancelledEvent(wasAccepted: boolean) {
   return envelope("booking.cancelled", {
     ...basePayload(),
@@ -204,8 +239,8 @@ describe("matrice email (A35)", () => {
     expect(() => parse(declinedEvent("TIMING"))).not.toThrow();
   });
 
-  it("la matrice couvre les 17 événements du contrat", () => {
-    expect(Object.keys(EMAIL_MATRIX)).toHaveLength(17);
+  it("la matrice couvre les 18 événements du contrat (17 + verification_reminder B4/A70)", () => {
+    expect(Object.keys(EMAIL_MATRIX)).toHaveLength(18);
   });
 
   it("requested → CARRIER seul ; payment_authorized → SHIPPER seul (email-only)", () => {
@@ -292,10 +327,15 @@ describe("matrice email (A35)", () => {
         "booking.pickup_refused": pickupRefusedEvent("OVERWEIGHT"),
         "booking.code_regenerated": codeRegeneratedEvent(),
         "booking.delivered": deliveredEvent(),
+        // B4 (D52)
+        "booking.completed": completedEvent(),
+        "booking.payout_sent": payoutSentEvent(),
+        "booking.disputed": disputedEvent(),
+        "booking.verification_reminder": verificationReminderEvent(),
       };
       const built = buildBookingEmail(parse(fixtures[eventType]), role, "Test");
       expect(built).not.toBeNull();
-      expect(built!.template).toMatch(/^booking\//);
+      expect(built!.template).toMatch(/^(booking|settlement)\//);
     }
   });
 });
@@ -347,6 +387,93 @@ describe("contenus construits", () => {
 });
 
 /* ── Pipeline d'envoi (A36) ──────────────────────────────────── */
+
+describe("B4 (D52) — completed / payout_sent / disputed / verification_reminder", () => {
+  it("routage : completed → SHIPPER seul ; payout_sent → CARRIER seul ; disputed → LES DEUX ; reminder → SHIPPER", () => {
+    expect(resolveEmailRecipients(parse(completedEvent()))).toEqual([{ userId: OID.shipper, role: "SHIPPER" }]);
+    expect(resolveEmailRecipients(parse(payoutSentEvent()))).toEqual([{ userId: OID.carrier, role: "CARRIER" }]);
+    expect(resolveEmailRecipients(parse(disputedEvent()))).toEqual([
+      { userId: OID.shipper, role: "SHIPPER" },
+      { userId: OID.carrier, role: "CARRIER" },
+    ]);
+    expect(resolveEmailRecipients(parse(verificationReminderEvent()))).toEqual([{ userId: OID.shipper, role: "SHIPPER" }]);
+  });
+
+  it("les 4 builders rendent un CONTENU D44 (gabarit partagé), en fr ET en en, sans gabarit EJS", () => {
+    for (const locale of ["fr", "en"]) {
+      const completed = buildBookingEmail(parse(completedEvent()), "SHIPPER", "Naomi", { locale, counterpartFirstName: "Thomas" })!;
+      expect(completed.template).toBe("settlement/completed-shipper");
+      expect(completed.content).toBeDefined();
+      expect(completed.content!.greeting).toContain("Naomi");
+      expect(completed.content!.paragraphs.join(" ")).toContain("Thomas");
+      // Décision 03/09 (10) : aucun bouton « Noter » avant B5.
+      expect(completed.content!.cta!.label).not.toMatch(/noter|rate/i);
+      const reminder = buildBookingEmail(parse(verificationReminderEvent()), "SHIPPER", "Naomi", { locale })!;
+      expect(reminder.template).toBe("settlement/verification-reminder-shipper");
+      expect(reminder.content!.paragraphs.join(" ")).toMatch(/23/); // l'échéance formatée
+    }
+  });
+
+  it("completed : le texte distingue confirmation anticipée et libération automatique (J+4)", () => {
+    const early = buildBookingEmail(parse(completedEvent("SHIPPER")), "SHIPPER", "Naomi", { locale: "fr" })!;
+    const auto = buildBookingEmail(parse(completedEvent("SYSTEM")), "SHIPPER", "Naomi", { locale: "fr" })!;
+    expect(early.content!.paragraphs[0]).toContain("Tu as confirmé");
+    expect(auto.content!.paragraphs[0]).toContain("automatiquement");
+  });
+
+  it("payout_sent : le Voyageur lit le MONTANT DE L'ÉVÉNEMENT et une copie honnête (2 à 7 jours) — jamais le total Expéditeur", () => {
+    const built = buildBookingEmail(parse(payoutSentEvent()), "CARRIER", "Thomas", { locale: "fr" })!;
+    expect(built.template).toBe("settlement/payout-sent-carrier");
+    expect(built.subject).toContain("30");
+    expect(built.content!.paragraphs.join(" ")).toContain("2 à 7 jours");
+    expect(JSON.stringify(built)).not.toContain("39");
+  });
+
+  it("disputed : accusé à l'Expéditeur (ticket, gel, 48 h) ; information calme au Voyageur avec la CATÉGORIE, jamais le dossier", () => {
+    const shipper = buildBookingEmail(parse(disputedEvent("DAMAGED")), "SHIPPER", "Naomi", { locale: "fr", counterpartFirstName: "Thomas" })!;
+    expect(shipper.template).toBe("settlement/disputed-shipper");
+    expect(shipper.subject).toContain("YAM-2041");
+    expect(shipper.content!.paragraphs.join(" ")).toMatch(/gelé/);
+    expect(shipper.content!.paragraphs.join(" ")).toContain("48 h");
+
+    const carrier = buildBookingEmail(parse(disputedEvent("DAMAGED")), "CARRIER", "Thomas", { locale: "en", counterpartFirstName: "Naomi" })!;
+    expect(carrier.template).toBe("settlement/disputed-carrier");
+    expect(carrier.content!.paragraphs[0]).toContain("damaged parcel");
+    expect(carrier.content!.paragraphs.join(" ")).toContain("on hold");
+    expect(carrier.content!.paragraphs.join(" ")).not.toMatch(/faute|fault|guilty/i);
+
+    // Événement antérieur à B4 (sans catégorie) : la phrase reste correcte.
+    const legacy = buildBookingEmail(parse(disputedEvent(null)), "CARRIER", "Thomas", { locale: "fr" })!;
+    expect(legacy.content!.paragraphs[0]).not.toContain("motif");
+  });
+
+  it("dispatch : un email D44 part par sendTransactionalEmail dans la langue du destinataire, claim et SENT identiques", async () => {
+    await dispatchBookingEmails(EVENT_ID, parse(payoutSentEvent()), buildLogger());
+    expect(emailMock.sendTemplatedEmail).not.toHaveBeenCalled();
+    expect(emailMock.sendTransactionalEmail).toHaveBeenCalledTimes(1);
+    const sent = emailMock.sendTransactionalEmail.mock.calls[0][0];
+    expect(sent.to).toBe(CARRIER_USER.email);
+    expect(sent.locale).toBe("en");
+    expect(sent.content.title).toBe("Your payment is on its way");
+    expect(prismaMock.emailDelivery.create).toHaveBeenCalledWith({
+      data: { eventId: EVENT_ID, userId: OID.carrier, template: "settlement/payout-sent-carrier" },
+    });
+    expect(prismaMock.emailDelivery.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ status: "SENT" }) })
+    );
+  });
+
+  it("dispatch disputed : DEUX envois, un contenu par rôle, chacun dans SA langue", async () => {
+    await dispatchBookingEmails(EVENT_ID, parse(disputedEvent()), buildLogger());
+    expect(emailMock.sendTransactionalEmail).toHaveBeenCalledTimes(2);
+    const [toShipper, toCarrier] = emailMock.sendTransactionalEmail.mock.calls.map((c) => c[0]);
+    expect(toShipper.to).toBe(SHIPPER_USER.email);
+    expect(toShipper.locale).toBe("fr");
+    expect(toCarrier.to).toBe(CARRIER_USER.email);
+    expect(toCarrier.locale).toBe("en");
+    expect(toShipper.content.title).not.toBe(toCarrier.content.title);
+  });
+});
 
 describe("dispatch (A36 — claim-first, best-effort)", () => {
   it("nominal : claim PENDING → envoi → SENT, destinataire et gabarit exacts", async () => {

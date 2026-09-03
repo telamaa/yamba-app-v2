@@ -28,6 +28,30 @@ describe("FakePaymentProvider", () => {
   });
 });
 
+describe("FakePaymentProvider — versement B4 (D49/A69)", () => {
+  it("capture pose un chargeId (A69) ; l'autorisation n'en a pas", async () => {
+    const provider = new FakePaymentProvider();
+    const auth = await provider.authorize({ amountCents: 2957, currencyCode: "EUR", description: "t", metadata: {} });
+    expect(auth.chargeId).toBeNull();
+    const captured = await provider.capture(auth.intentId);
+    expect(captured.chargeId).toBe(`ch_fake_${auth.intentId}`);
+    expect((await provider.retrieve(auth.intentId)).chargeId).toBe(`ch_fake_${auth.intentId}`);
+  });
+
+  it("transfer : observable, clé d'idempotence honorée (même clé ⇒ même transfert), clés différentes ⇒ deux transferts", async () => {
+    const provider = new FakePaymentProvider();
+    const input = { amountCents: 2400, currencyCode: "EUR", destinationAccountId: "acct_fake", description: "t", metadata: {}, idempotencyKey: "payout:b1" };
+    const a = await provider.transfer(input);
+    const b = await provider.transfer(input);
+    expect(a).toEqual(b);
+    expect(a.transferId).toMatch(/^tr_fake_/);
+    expect(a).toMatchObject({ provider: "FAKE", amountCents: 2400, currencyCode: "EUR" });
+    expect(provider.transfers).toHaveLength(1);
+    await provider.transfer({ ...input, idempotencyKey: "payout:b2" });
+    expect(provider.transfers).toHaveLength(2);
+  });
+});
+
 describe("createPaymentProviderFromEnv", () => {
   it("sans clé hors production → FAKE", () => {
     expect(createPaymentProviderFromEnv({ NODE_ENV: "test" } as NodeJS.ProcessEnv).name).toBe("FAKE");

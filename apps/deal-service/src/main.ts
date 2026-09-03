@@ -31,9 +31,10 @@ import { pinoHttp } from "pino-http";
 import { errorMiddleware } from "@packages/error-handler/error-middleware";
 import { KafkaEventPublisher } from "@packages/messaging";
 import { buildOpenApiDocument } from "./openapi/build-openapi";
-import dealRouter, { dealLifecycleService } from "./routes/deal.routes";
+import dealRouter, { dealLifecycleService, dealSettlementService } from "./routes/deal.routes";
 import { makeStripeWebhookHandler } from "./controllers/stripe-webhook.controller";
 import { startBookingExpiryCron } from "./cron/expire-bookings.cron";
+import { startBookingPayoutCron } from "./cron/payout-bookings.cron";
 import { OutboxRelay } from "./relay/outbox-relay";
 
 const logger = pino({
@@ -159,6 +160,15 @@ if (!expiryCronEnabled) {
   logger.info("Booking expiry cron disabled (BOOKING_EXPIRY_CRON_ENABLED=false)");
 }
 
+// ── Cron versement J+4 + rejeu + rappel J+3 (B4, A66/A70) ───────────
+const payoutCronEnabled = process.env.BOOKING_PAYOUT_CRON_ENABLED !== "false";
+const payoutCron = payoutCronEnabled
+  ? startBookingPayoutCron(dealSettlementService, logger.child({ module: "payout-bookings-cron" }))
+  : null;
+if (!payoutCronEnabled) {
+  logger.info("Booking payout cron disabled (BOOKING_PAYOUT_CRON_ENABLED=false)");
+}
+
 // Arrêt propre : batch en vol terminé, bail libéré, producer déconnecté,
 // serveur HTTP fermé. La ceinture setTimeout garantit la sortie même si
 // une déconnexion traîne (5 s max). Le garde évite qu'un SIGINT répété
@@ -172,6 +182,9 @@ function shutdown(signal: string): void {
   void (async () => {
     if (expiryCron) {
       expiryCron.stop();
+    }
+    if (payoutCron) {
+      payoutCron.stop();
     }
     if (relay) {
       await relay.stop().catch((err) => logger.error({ err }, "Relay stop failed"));

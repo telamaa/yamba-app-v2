@@ -46,6 +46,12 @@ export const BOOKING_WRITE_SELECT = {
   deliveryAttempts: true,
   deliveryLockedUntil: true,
   codeRegenerations: true,
+  // B4 — versement et litige
+  deliveredAt: true,
+  payoutDueAt: true,
+  payoutStatus: true,
+  payoutAttempts: true,
+  chargeId: true,
 } as const;
 
 export type BookingForWrite = {
@@ -65,6 +71,12 @@ export type BookingForWrite = {
   deliveryAttempts: number;
   deliveryLockedUntil: Date | null;
   codeRegenerations: number;
+  // B4 — absents sur les enregistrements antérieurs (mocks, seed) : tolérés
+  deliveredAt?: Date | null;
+  payoutDueAt?: Date | null;
+  payoutStatus?: string | null;
+  payoutAttempts?: number | null;
+  chargeId?: string | null;
 } & BookingSnapshotsForLifecycle;
 
 /** Normalise un enregistrement Prisma (ou un mock de test) en BookingForWrite. */
@@ -127,8 +139,11 @@ export async function applyBookingTransition(args: {
   now: Date;
   /** Message du 409 quand la condition ne matche plus (défaut : « changé entre-temps »). */
   conflictMessage?: string;
+  /** Écritures supplémentaires DANS la même transaction, après la transition
+   *  conditionnelle (ex. création du dossier `Dispute`, B4/D51). */
+  within?: (tx: typeof prisma) => Promise<void>;
 }): Promise<void> {
-  const { booking, from, where, data, releaseKg, events, now } = args;
+  const { booking, from, where, data, releaseKg, events, now, within } = args;
   const envelope = makeEnvelope(booking.id, now);
   const parsed = events.map((e) => BookingDomainEventSchema.parse({ ...envelope, ...e }));
 
@@ -153,6 +168,8 @@ export async function applyBookingTransition(args: {
         data: { reservedKg: { decrement: kg } },
       });
     }
+
+    if (within) await within(tx as typeof prisma);
 
     for (const e of parsed) {
       await tx.outboxEvent.create({

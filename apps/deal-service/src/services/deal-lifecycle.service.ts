@@ -160,8 +160,9 @@ export function makeDealLifecycleService(provider: PaymentProvider, clock: () =>
       }
 
       // ── D39 : capture MAINTENANT (l'argent d'abord, la base ensuite).
+      let captured;
       try {
-        await provider.capture(booking.paymentIntentId);
+        captured = await provider.capture(booking.paymentIntentId);
       } catch {
         throw new BookingLifecycleError("PAYMENT_STATE_CONFLICT", "The payment could not be captured.");
       }
@@ -170,7 +171,8 @@ export function makeDealLifecycleService(provider: PaymentProvider, clock: () =>
         await applyBookingTransition({
           booking,
           from: "PENDING",
-          data: { status: to, acceptedAt: now, capturedAt: now },
+          // A69 — la charge de la capture sert de `source_transaction` au versement B4.
+          data: { status: to, acceptedAt: now, capturedAt: now, chargeId: captured.chargeId ?? null },
           releaseKg: false,
           events: [
             {

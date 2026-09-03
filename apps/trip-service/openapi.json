@@ -6329,6 +6329,191 @@
         ],
         "description": "Optional tracking milestones inside PICKED_UP, strictly sequential"
       },
+      "PayoutStatus": {
+        "type": "string",
+        "enum": [
+          "PENDING",
+          "SENT",
+          "FAILED",
+          "FROZEN"
+        ],
+        "description": "Carrier payout state (B4/D49). PENDING = deal COMPLETED, transfer not yet executed · SENT = transfer executed (payoutSentAt) · FAILED = transfer refused (retried by the payout cron) · FROZEN = dispute open (INV-5). null before COMPLETED / DISPUTED."
+      },
+      "DisputeCategory": {
+        "type": "string",
+        "enum": [
+          "NOT_DELIVERED",
+          "CONTENT_MISSING",
+          "DAMAGED",
+          "SIGNIFICANT_DELAY",
+          "RECIPIENT_ISSUE",
+          "OTHER"
+        ],
+        "description": "Dispute category (spec §3.6 — one of six)"
+      },
+      "DisputeDesiredOutcome": {
+        "type": "string",
+        "enum": [
+          "FULL_REFUND",
+          "PARTIAL_REFUND",
+          "CONTACT_CARRIER",
+          "YAMBA_DECIDES"
+        ],
+        "description": "What the shipper asks for (optional, informs mediation)"
+      },
+      "ConfirmDealResponse": {
+        "type": "object",
+        "properties": {
+          "bookingId": {
+            "$ref": "#/components/schemas/ObjectId"
+          },
+          "status": {
+            "type": "string",
+            "const": "COMPLETED"
+          },
+          "completedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          },
+          "payoutStatus": {
+            "description": "SENT if the transfer succeeded inline, FAILED if the provider refused (retried by the cron — A67)",
+            "$ref": "#/components/schemas/PayoutStatus"
+          },
+          "payoutAmountCents": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "= pricing.transportCents (carrier net, D50)"
+          },
+          "currencyCode": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "bookingId",
+          "status",
+          "completedAt",
+          "payoutStatus",
+          "payoutAmountCents",
+          "currencyCode"
+        ],
+        "additionalProperties": false,
+        "description": "Early confirmation done — payout released (INV-3: final)"
+      },
+      "DisputeDealRequest": {
+        "type": "object",
+        "properties": {
+          "category": {
+            "$ref": "#/components/schemas/DisputeCategory"
+          },
+          "description": {
+            "type": "string",
+            "minLength": 50,
+            "maxLength": 2000
+          },
+          "pledgeAccepted": {
+            "type": "boolean",
+            "const": true,
+            "description": "Honour pledge — must be true (anti-abuse, spec §3.6)"
+          },
+          "photoUrls": {
+            "default": [],
+            "description": "ImageKit URLs (direct signed upload — D42), optional but recommended",
+            "maxItems": 5,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          "desiredOutcome": {
+            "$ref": "#/components/schemas/DisputeDesiredOutcome"
+          }
+        },
+        "required": [
+          "category",
+          "description",
+          "pledgeAccepted",
+          "photoUrls"
+        ],
+        "additionalProperties": false,
+        "description": "Open a dispute (shipper, DELIVERED, before payoutDueAt)"
+      },
+      "DisputeDealResponse": {
+        "type": "object",
+        "properties": {
+          "bookingId": {
+            "$ref": "#/components/schemas/ObjectId"
+          },
+          "status": {
+            "type": "string",
+            "const": "DISPUTED"
+          },
+          "ticketNumber": {
+            "type": "string",
+            "example": "YAM-2041"
+          },
+          "disputedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          }
+        },
+        "required": [
+          "bookingId",
+          "status",
+          "ticketNumber",
+          "disputedAt"
+        ],
+        "additionalProperties": false,
+        "description": "Dispute opened — payout frozen, ticket issued (INV-4/INV-5)"
+      },
+      "ShipperDisputeView": {
+        "type": "object",
+        "properties": {
+          "ticketNumber": {
+            "type": "string"
+          },
+          "category": {
+            "$ref": "#/components/schemas/DisputeCategory"
+          },
+          "description": {
+            "type": "string"
+          },
+          "desiredOutcome": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DisputeDesiredOutcome"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "photoUrls": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          }
+        },
+        "required": [
+          "ticketNumber",
+          "category",
+          "description",
+          "desiredOutcome",
+          "photoUrls",
+          "createdAt"
+        ],
+        "additionalProperties": false,
+        "description": "The dispute file as filed by the shipper (never served to the carrier)"
+      },
       "BookingTripSnapshot": {
         "type": "object",
         "properties": {
@@ -7096,6 +7281,29 @@
               }
             ]
           },
+          "payoutStatus": {
+            "description": "Carrier payout state (B4/A68) — both roles read it; the transfer id is served to nobody",
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PayoutStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "payoutSentAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time",
@@ -7156,6 +7364,17 @@
               }
             ],
             "description": "Non-null exactly when 'cancel' is in allowedActions (PENDING or ACCEPTED)"
+          },
+          "dispute": {
+            "description": "The dispute file (status DISPUTED) — shipper only (A68); absent otherwise",
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ShipperDisputeView"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -7370,6 +7589,29 @@
               }
             ]
           },
+          "payoutStatus": {
+            "description": "Carrier payout state (B4/A68) — both roles read it; the transfer id is served to nobody",
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PayoutStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "payoutSentAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time",
@@ -7414,6 +7656,17 @@
             "items": {
               "$ref": "#/components/schemas/BookingTrackingEvent"
             }
+          },
+          "disputeCategory": {
+            "description": "Why the shipper disputed (status DISPUTED) — the carrier sees the category, never the file (A68)",
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DisputeCategory"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "allowedActions": {
             "type": "array",
@@ -7595,6 +7848,7 @@
           "booking.completed",
           "booking.payout_sent",
           "booking.disputed",
+          "booking.verification_reminder",
           "booking.rating_reminder",
           "booking.rating_revealed"
         ],
@@ -9601,6 +9855,17 @@
                 "type": "string",
                 "format": "date-time",
                 "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              "disputeCategory": {
+                "description": "Why the shipper disputed — the carrier learns the category, never the file (A68). Absent on pre-B4 events.",
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/DisputeCategory"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               }
             },
             "required": [
@@ -9631,6 +9896,128 @@
         ],
         "additionalProperties": false,
         "description": "Dispute filed → payout frozen, shipper acknowledgment (≤48 business hours) + carrier statement request"
+      },
+      "BookingVerificationReminderEvent": {
+        "type": "object",
+        "properties": {
+          "aggregateType": {
+            "type": "string",
+            "const": "booking"
+          },
+          "aggregateId": {
+            "$ref": "#/components/schemas/ObjectId"
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+            "description": "Server clock at transition time"
+          },
+          "correlationId": {
+            "description": "Propagated request correlation ID (gateway-born)",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "schemaVersion": {
+            "type": "number",
+            "const": 1
+          },
+          "eventType": {
+            "type": "string",
+            "const": "booking.verification_reminder"
+          },
+          "payload": {
+            "type": "object",
+            "properties": {
+              "bookingId": {
+                "$ref": "#/components/schemas/ObjectId"
+              },
+              "tripId": {
+                "$ref": "#/components/schemas/ObjectId"
+              },
+              "shipperId": {
+                "$ref": "#/components/schemas/ObjectId"
+              },
+              "carrierId": {
+                "$ref": "#/components/schemas/ObjectId"
+              },
+              "corridor": {
+                "$ref": "#/components/schemas/BookingEventCorridor"
+              },
+              "category": {
+                "$ref": "#/components/schemas/ParcelCategory"
+              },
+              "categoryFamily": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "weightKg": {
+                "type": "number"
+              },
+              "transportCents": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991,
+                "description": "Carrier net (integer cents, A2)"
+              },
+              "totalShipperCents": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "currencyCode": {
+                "type": "string"
+              },
+              "actor": {
+                "description": "Who triggered the event",
+                "$ref": "#/components/schemas/BookingActor"
+              },
+              "payoutDueAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                "description": "End of the verification window (D+4) — the reminder fires at D+3"
+              }
+            },
+            "required": [
+              "bookingId",
+              "tripId",
+              "shipperId",
+              "carrierId",
+              "corridor",
+              "category",
+              "weightKg",
+              "transportCents",
+              "totalShipperCents",
+              "currencyCode",
+              "actor",
+              "payoutDueAt"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "aggregateType",
+          "aggregateId",
+          "occurredAt",
+          "schemaVersion",
+          "eventType",
+          "payload"
+        ],
+        "additionalProperties": false,
+        "description": "D+3 reminder to the shipper: last day to confirm or dispute (B4/A70)"
       },
       "BookingRatingReminderEvent": {
         "type": "object",
@@ -9936,6 +10323,9 @@
           },
           {
             "$ref": "#/components/schemas/BookingDisputedEvent"
+          },
+          {
+            "$ref": "#/components/schemas/BookingVerificationReminderEvent"
           },
           {
             "$ref": "#/components/schemas/BookingRatingReminderEvent"

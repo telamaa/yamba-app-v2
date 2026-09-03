@@ -84,7 +84,7 @@ Lancement public = fin du Jalon 2. Fourchette tenue au dernier handoff : **5–8
 | **Recette réelle 02/09** (2 vrais comptes, LAN) : OK 1→3 + F1, emails/in-app à chaque étape ; **reste F4→F7, D1–D7, V1–V9** (l'utilisateur) | 🟡 en cours | — |
 | **Auth (recette)** : atterrissage post-OTP expliqué (#113), redirect conservé inscription → OTP → connexion + anti open redirect (#114) | ✅ | — |
 | ⬜ **B3 — dettes** : URLs signées / fichiers privés ImageKit, vérification du domaine des URLs photo, procédure de rotation de clé AES (format `v1.` prêt), actions tracker confirmer/litige (B4) | ⬜ avec B4 | D42, D43 |
-| 🔴 **B4 — argent sortant** : confirmation anticipée, cron J+4 → COMPLETED + `transfers.create()`, dispute avec gel, versement de la retenue ANN-01 au Voyageur (`CANCEL_LATE_RETENTION_PCT` = 50, gravé D39) | ⬜ (1,5/2,5) | ANN-01…04, D39 |
+| 🔄 **B4 — argent sortant** : **PR1 serveur FAITE** (`feat/b4-payout-server`, D49–D52, A65–A70 : confirm, dispute — aussi depuis PICKED_UP après 48 h —, cron J+4 + rejeu + rappel J+3, `PaymentProvider.transfer` avec `source_transaction`, `Dispute`, 5 emails D44) → PR2 front Expéditeur → PR3 front Voyageur → `feat/b4-late-cancel-payout` (retenue ANN-01 au prorata, D50) | 🔄 (PR1 ouverte) | D49–D52, INV-2…5 |
 | 🔴 **B5 — confiance** : rating double-aveugle serveur, relances J+5/J+7, stats de réputation (D29-1) — unicité (bookingId, authorUserId) sans `@@unique` naïf Mongo | ⬜ (1,5/2) | D29 |
 | PR « paramètres serveur » : `GET /pricing/params` (`PRICING_PARAMS` unique : commission, planchers, coefs, référence, corridors) — dédoublonner `comparable-price`, `price-for-weight`, `pricing-example` | ⬜ (0,5) | D34 |
 
@@ -149,15 +149,16 @@ Estimation : **2–4 sessions** au-dessus du Jalon 4 (l'essentiel du travail est
 | UX · `feat/auth-gate-inline-login` — **A63** : la fenêtre de connexion embarque le formulaire complet (e-mail, Google, Facebook, lien inscription), reprise du geste après connexion (favori appliqué, réservation → wizard, partage → création) — demande utilisateur 03/09 | ✅ mergée #123 |
 | P3 · `chore/api-same-origin` — **D48** : rewrite Next `/api/*` → gateway (opt-in `API_PROXY_TARGET`), `NEXT_PUBLIC_API_BASE_URL=/api` relatif accepté par les clients API, cookies first-party sur tout hôte (fin du piège localhost ↔ LAN du 03/09) ; `.env.example` + `CLAUDE.md` mis à jour, aucun appel API serveur Next à ce jour | ✅ mergée #124 |
 | UX · `feat/follow-auth-gate` — **A64** : bouton « Suivre » du profil public → porte d'identité en modale (« Connecte-toi pour suivre {prénom} »), suivi appliqué après connexion sans quitter le profil ; fin de la dernière redirection `/login` sur un geste — demande utilisateur 03/09 | ✅ mergée #125 |
+| B4 · `feat/b4-payout-server` — **D49–D52 / A65–A70** : `POST /deals/:id/confirm` (COMPLETED puis transfert en ligne), `POST /deals/:id/dispute` (DELIVERED avant J+4, PICKED_UP « non livré » après 48 h, ticket YAM-XXXX, `Dispute`, gel), cron `*/5` (J+4 → COMPLETED + versement, rejeu FAILED, rappel J+3), `PaymentProvider.transfer` (Stripe `source_transaction`, Fake idempotent), `chargeId` à la capture, 5 emails en dictionnaire D44, in-app `verification_reminder` ; deal 380 · notification 75 | ✅ PR ouverte |
 | Décisions candidates à graver : « la CI construit ce qu'elle déploie » (`next build`), règle de couleur des CTA (mango = avancer, teal = engager), D35 email provider | ⬜ |
 
 ## 8. Chiffres de suivi
 
 | Indicateur | Valeur |
 |---|---|
-| Tests (plateforme) | 621 = trip 198 · deal 355 · notification 68 (+ auth-service 65, check CI « Tests unitaires (auth-service) ») |
-| Décisions au registre | D1 → D48 (+ arbitrages A1 → A64) |
-| Règles métier | ~50 (V2) + RG-B-01…35, RG-S-01…13, RG-C-01…16, RG-G-01…03, RG-D-01…16, RG-V-01…09, RG-F-01…06, RG-N-01…08, RG-T-01…06, RG-P-01…27, RG-A-01…08, RG-C-17…19, RG-FAV-01…06, RG-A-09…12, RG-C-21 |
+| Tests (plateforme) | 653 = trip 198 · deal 380 · notification 75 (+ auth-service 65, check CI « Tests unitaires (auth-service) ») |
+| Décisions au registre | D1 → D52 (+ arbitrages A1 → A70) |
+| Règles métier | ~50 (V2) + RG-B-01…35, RG-S-01…13, RG-C-01…16, RG-G-01…03, RG-D-01…16, RG-V-01…09, RG-F-01…06, RG-N-01…08, RG-T-01…06, RG-P-01…27, RG-A-01…08, RG-C-17…19, RG-FAV-01…06, RG-A-09…12, RG-C-21, RG-PAY-01…11, RG-LIT-01…07 |
 | PR mergées | #1 → #125 (#90 = pile B2-PR1/2/3 · #91 = docs post-merge · #92 = B2-PR4 emails · #93 = B2-PR5 tracker · #94 = docs post-merge · #95 = B3-PR1 serveur · #96 = B3-PR2 front · #97 = docs · #98 = B3-PR3 boîte du Voyageur · #99 = docs · #100 = B3-PR4 page demande · #101 = docs · #102 = typographie Deal · #103 = docs · #104 = fix ImageKit · #105 = docs · #106 = visionneuse photos · #108 = docs · #109 = fix relay outbox · #111 = allowedDevOrigins LAN · #112 = backlog inscription · #113 = atterrissage post-OTP · #114 = redirect inscription→connexion · #116 = fix recette auth · #117 = email-locale D44/D45 · #118 = modale de réservation A58 · #119 = favoris D46/A59 · #120 = pages auth D45/A60 · #121 = Google D47/A61 · #122 = « Rester connecté » A62 · #123 = connexion dans la fenêtre A63 · #124 = API même origine D48 · #125 = « Suivre » en modale A64 — 13 checks comptés à chaque fois) |
 | Documents | registre, spec, règles, 5 handoffs (dernier : SESSION-2026-08-28 + addendum 29/08), fiches PR (archive), 3 docs cumulatifs (technique, métier, apprentissage), `YAMBA-MOTEUR-PRIX.md/.pdf`, ce suivi |
 

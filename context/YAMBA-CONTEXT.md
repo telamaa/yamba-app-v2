@@ -239,7 +239,15 @@ Ordre de demarrage : auth -> trip -> gateway.
   /u/:slug → porte d'identite en modale (formulaire embarque), suivi applique
   apres connexion sans quitter le profil ; derniere redirection /login sur un
   geste supprimee.
-- Plateforme de tests : 600 (trip 187, deal 354, notification 59) — post-B3 (#96).
+- 03/09 : B4-PR1 feat/b4-payout-server (D49–D52, A65–A70) — confirm anticipe,
+  dispute (DELIVERED avant J+4 ; PICKED_UP « non livre » 48 h apres le depart),
+  cron J+4 + rejeu des versements + rappel J+3, PaymentProvider.transfer
+  (Stripe source_transaction, chargeId stocke a la capture), modele Dispute,
+  5 emails en dictionnaire D44. Decisions utilisateur 03/09 : DISPUTED reste
+  terminal, chantier C (admin) juste apres B4 ; retenue ANN-01 au prorata
+  (PR dediee). Reste : PR2 front Expediteur, PR3 front Voyageur.
+- Plateforme de tests : 653 (trip 198, deal 380, notification 75) + auth 65.
+- (historique) Plateforme de tests : 600 (trip 187, deal 354, notification 59) — post-B3 (#96).
 - MERGE 01/09 : toute la pile B2 est dans `dev` via la SEULE **PR #90**
   (`feat/b2-deal-front` portait la chaîne complète : jalons mobile D36,
   docs cumulatifs, B2-PR1, B2-PR2, B2-PR3 + fix A34) — 13 checks verts

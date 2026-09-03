@@ -8,7 +8,10 @@ import {
   BookingTransitionActionSchema,
   PricingModelSchema,
   TrackingStepSchema,
+  PayoutStatusSchema,
+  DisputeCategorySchema,
 } from "./booking.enums";
+import { ShipperDisputeViewSchema } from "./booking-settlement.schema";
 
 /**
  * @packages/api-contracts — booking schemas (surface deal, PR3)
@@ -168,6 +171,10 @@ const milestoneFields = {
   pickupRefusalReason: z.string().nullish().meta({ description: "Set when the carrier refused the parcel at pickup (PickupRefusalReason — B3/A40)" }),
   disputeTicket: z.string().nullish().meta({ example: "YAM-2041" }),
   disputedAt: z.iso.datetime().nullish(),
+  payoutStatus: PayoutStatusSchema.nullish().meta({
+    description: "Carrier payout state (B4/A68) — both roles read it; the transfer id is served to nobody",
+  }),
+  payoutSentAt: z.iso.datetime().nullish(),
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
 };
@@ -239,6 +246,10 @@ export const ShipperBookingViewSchema = z
     cancellationPreview: CancellationPreviewSchema.nullable().meta({
       description: "Non-null exactly when 'cancel' is in allowedActions (PENDING or ACCEPTED)",
     }),
+
+    dispute: ShipperDisputeViewSchema.nullish().meta({
+      description: "The dispute file (status DISPUTED) — shipper only (A68); absent otherwise",
+    }),
   })
   .meta({
     id: "ShipperBookingView",
@@ -272,6 +283,10 @@ export const CarrierBookingViewSchema = z
 
     pickup: BookingPickupInfoSchema.nullish(),
     trackingEvents: z.array(BookingTrackingEventSchema),
+
+    disputeCategory: DisputeCategorySchema.nullish().meta({
+      description: "Why the shipper disputed (status DISPUTED) — the carrier sees the category, never the file (A68)",
+    }),
 
     allowedActions: z.array(BookingTransitionActionSchema).meta({
       description: "getAllowedActions(booking, 'CARRIER') — drives the frontend CTAs",

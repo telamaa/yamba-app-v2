@@ -123,10 +123,27 @@ export const getDeal = async (
     // sur cette route (jamais dans les listes) ; null si indéchiffrable.
     const deliveryCode = viewerRole === "SHIPPER" ? revealDeliveryCode(booking) : null;
 
+    // B4/A68 — le dossier de litige n'est lu qu'en DISPUTED ; le mapper
+    // n'en sert que ce que le rôle a le droit de voir.
+    const dispute =
+      booking.status === "DISPUTED"
+        ? await prisma.dispute.findUnique({
+            where: { bookingId: booking.id },
+            select: {
+              ticketNumber: true,
+              category: true,
+              description: true,
+              desiredOutcome: true,
+              photoUrls: true,
+              createdAt: true,
+            },
+          })
+        : null;
+
     return res.status(200).json({
       success: true,
       viewerRole,
-      deal: toBookingView(booking, viewerRole, counterpart, deliveryCode),
+      deal: toBookingView(booking, viewerRole, counterpart, deliveryCode, dispute),
     });
   } catch (error) {
     return next(error);

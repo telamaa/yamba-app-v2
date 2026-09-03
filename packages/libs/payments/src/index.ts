@@ -15,6 +15,9 @@
  *   3. `cancel`     — libération de l'autorisation (refus, expiration 24 h,
  *                     capacité épuisée après autorisation).
  *   4. `refund`     — remboursement après capture (ANN-01…04).
+ *   5. `transfer`   — versement du net au compte Connect du Voyageur à
+ *                     COMPLETED (B4, D49 : COMPLETED d'abord, transfert
+ *                     ensuite, idempotent par clé = id du booking).
  *
  * Deux implémentations :
  *   - StripePaymentProvider : PaymentIntent `capture_method: "manual"`.
@@ -56,6 +59,32 @@ export type PaymentAuthorization = {
   amountCents: number;
   currencyCode: string;
   metadata: Record<string, string>;
+  /** charge créée par la capture (Stripe `latest_charge`) — null tant que rien n'est débité (A69) */
+  chargeId: string | null;
+};
+
+/** Versement sortant (B4) — charges et transferts SÉPARÉS (Stripe Connect). */
+export type TransferInput = {
+  amountCents: number;
+  currencyCode: string; // "EUR"
+  /** compte Connect du Voyageur (acct_…) — `CarrierPage.stripeAccountId` */
+  destinationAccountId: string;
+  description: string;
+  /** clés de rapprochement (bookingId, tripId, carrierId) — jamais de PII */
+  metadata: Record<string, string>;
+  /** regroupe charge et transfert dans le dashboard fournisseur (= bookingId) */
+  transferGroup?: string;
+  /** charge d'origine (A69) : Stripe attend que SES fonds soient disponibles au lieu d'échouer sur le solde plateforme */
+  sourceTransactionId?: string;
+  /** idempotence côté fournisseur : un rejeu ne verse jamais deux fois */
+  idempotencyKey?: string;
+};
+
+export type TransferResult = {
+  provider: PaymentProviderName;
+  transferId: string;
+  amountCents: number;
+  currencyCode: string;
 };
 
 export interface PaymentProvider {
@@ -65,6 +94,7 @@ export interface PaymentProvider {
   capture(intentId: string): Promise<PaymentAuthorization>;
   cancel(intentId: string, reason?: string): Promise<PaymentAuthorization>;
   refund(intentId: string, amountCents?: number): Promise<{ refundId: string; amountCents: number }>;
+  transfer(input: TransferInput): Promise<TransferResult>;
 }
 
 /* ══ Stripe ═══════════════════════════════════════════════════ */
@@ -97,6 +127,7 @@ function fromStripe(pi: Stripe.PaymentIntent): PaymentAuthorization {
     amountCents: pi.amount,
     currencyCode: pi.currency.toUpperCase(),
     metadata: (pi.metadata ?? {}) as Record<string, string>,
+    chargeId: typeof pi.latest_charge === "string" ? pi.latest_charge : pi.latest_charge?.id ?? null,
   };
 }
 
@@ -146,6 +177,24 @@ export class StripePaymentProvider implements PaymentProvider {
     });
     return { refundId: r.id, amountCents: r.amount };
   }
+
+  async transfer(input: TransferInput): Promise<TransferResult> {
+    // v1 (D49) : sans `source_transaction` — le solde plateforme couvre le
+    // versement (vrai en test ; à surveiller en production).
+    const t = await this.stripe.transfers.create(
+      {
+        amount: input.amountCents,
+        currency: input.currencyCode.toLowerCase(),
+        destination: input.destinationAccountId,
+        description: input.description,
+        metadata: input.metadata,
+        ...(input.transferGroup ? { transfer_group: input.transferGroup } : {}),
+        ...(input.sourceTransactionId ? { source_transaction: input.sourceTransactionId } : {}),
+      },
+      input.idempotencyKey ? { idempotencyKey: input.idempotencyKey } : undefined
+    );
+    return { provider: "STRIPE", transferId: t.id, amountCents: t.amount, currencyCode: t.currency.toUpperCase() };
+  }
 }
 
 /* ══ Fake (dev sans clés + tests) ═════════════════════════════ */
@@ -165,6 +214,7 @@ export class FakePaymentProvider implements PaymentProvider {
       amountCents: input.amountCents,
       currencyCode: input.currencyCode,
       metadata: { ...input.metadata },
+      chargeId: null,
     };
     this.intents.set(intentId, auth);
     return auth;
@@ -188,6 +238,7 @@ export class FakePaymentProvider implements PaymentProvider {
       amountCents: 0, // montant inconnu ici — les événements lisent le snapshot
       currencyCode: "EUR",
       metadata: { seeded: "true" },
+      chargeId: null,
     };
     this.intents.set(intentId, auth);
     return auth;
@@ -202,7 +253,12 @@ export class FakePaymentProvider implements PaymentProvider {
   private setStatus(intentId: string, status: PaymentAuthorizationStatus) {
     const a = this.intents.get(intentId) ?? this.adoptSeeded(intentId);
     if (!a) throw new Error(`Unknown fake payment intent: ${intentId}`);
-    const next = { ...a, status };
+    const next: PaymentAuthorization = {
+      ...a,
+      status,
+      // La capture crée la charge (A69) — jamais avant.
+      chargeId: status === "CAPTURED" ? (a.chargeId ?? `ch_fake_${intentId}`) : a.chargeId,
+    };
     this.intents.set(intentId, next);
     return next;
   }
@@ -218,6 +274,27 @@ export class FakePaymentProvider implements PaymentProvider {
   async refund(intentId: string, amountCents?: number) {
     const a = await this.retrieve(intentId);
     return { refundId: `re_fake_${intentId}`, amountCents: amountCents ?? a.amountCents };
+  }
+
+  /** Transferts effectués (observables par les tests) — la clé
+   *  d'idempotence est honorée : même clé ⇒ même transfert, pas de doublon. */
+  readonly transfers: TransferResult[] = [];
+  private readonly transfersByKey = new Map<string, TransferResult>();
+
+  async transfer(input: TransferInput): Promise<TransferResult> {
+    if (input.idempotencyKey) {
+      const known = this.transfersByKey.get(input.idempotencyKey);
+      if (known) return known;
+    }
+    const result: TransferResult = {
+      provider: "FAKE",
+      transferId: `tr_fake_${Date.now().toString(36)}_${++this.seq}`,
+      amountCents: input.amountCents,
+      currencyCode: input.currencyCode,
+    };
+    this.transfers.push(result);
+    if (input.idempotencyKey) this.transfersByKey.set(input.idempotencyKey, result);
+    return result;
   }
 
   /** aide aux tests : forcer un état (ex. simuler une autorisation non confirmée) */
