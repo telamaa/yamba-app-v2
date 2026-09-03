@@ -211,7 +211,9 @@ Ordre de demarrage : auth -> trip -> gateway.
   reserver » en modale sur la page trajet (desktop + feuille mobile), retour
   dans le wizard ; « Connexion » / « Creer un compte » du header transmettent
   la page courante en redirect (hors pages auth et accueil).
-- 03/09 : #116, #117, #118 fusionnees par l'utilisateur (dev = bb57c49).
+- 03/09 : #116, #117, #118 fusionnees par l'utilisateur (dev = bb57c49), puis
+  #119 → #124 dans l'ordre et #125 (dev = e698364, 13 checks comptes a chaque
+  fois, branches purgees). Backlog recette 03/09 entierement dans dev.
   feat/trip-favorites (D46, A59) — TripFavorite, POST/DELETE /trips/:id/favorite,
   GET /trips/favorites, isFavorite sur recherche + fiche (authent optionnelle),
   coeur optimiste, page « Mes favoris » ; trip-service 198 tests. Plateforme 621.
