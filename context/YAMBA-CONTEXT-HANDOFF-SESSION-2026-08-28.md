@@ -420,7 +420,7 @@ mobile-first, aucune attribution Claude, charte mango/teal/slate.
 ## C. Questions encore ouvertes pour l'utilisateur
 - Nom du rôle transporteur : Yamber / Tripper / Voyageur (une seule réponse, appliquée partout).
 - Facebook : garder le bouton inerte ou le retirer (toujours inerte après la PR Google).
-- Session : « Rester connecté » coché par défaut = 7 jours d'inactivité / 30 jours (D27) — l'utilisateur le vit comme « connecté indéfiniment » ; correctif prévu (défaut décoché → 60 min / 7 jours).
+- Session : « connecté indéfiniment » = case « Rester connecté » cochée par défaut (7 j d'inactivité, D27) — **corrigé** (`fix/session-remember-default`, A62 : décochée par défaut + aide sur les durées).
 
 ## C bis. Fusions
 - Les fusions sont faites PAR L'UTILISATEUR (le classificateur de permissions de la session refuse `gh pr merge`) : #116, #117, #118 fusionnées le 03/09 (`dev` = `bb57c49`). Chaque PR suivante part de `dev` à jour.

@@ -224,6 +224,9 @@ Ordre de demarrage : auth -> trip -> gateway.
   creation), bouton officiel GIS + ecran « Finalise ton compte ». Sans
   GOOGLE_CLIENT_ID / NEXT_PUBLIC_GOOGLE_CLIENT_ID : bouton inerte, API 503.
   A FAIRE par l'utilisateur : ID client OAuth Google Cloud (voir .env.example).
+- 03/09 : fix/session-remember-default (A62) — « Rester connecte » decoche par
+  defaut + aide sur les durees ; D27 inchange (le serveur expirait bien, la case
+  cochee par defaut donnait 7 j d'inactivite a chaque connexion de recette).
 - Plateforme de tests : 600 (trip 187, deal 354, notification 59) — post-B3 (#96).
 - MERGE 01/09 : toute la pile B2 est dans `dev` via la SEULE **PR #90**
   (`feat/b2-deal-front` portait la chaîne complète : jalons mobile D36,

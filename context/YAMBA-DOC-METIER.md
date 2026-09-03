@@ -776,3 +776,17 @@ Se connecter ou s'inscrire en un clic avec Google, sans mot de passe ni code par
 | J6 | Interface en anglais, création par Google | `preferredLocale: "en"`, email de bienvenue en anglais |
 | J7 | « Mot de passe oublié » sur un compte Google seul | Code envoyé, mot de passe créé, les deux chemins fonctionnent |
 | J8 | Annuler l'écran de consentement | Rien créé, page inchangée |
+
+# fix/session-remember-default — une session qui se termine, sauf si tu le demandes
+
+### Règles de gestion
+- **RG-A-13 — Sans action de ta part, la session se ferme après 60 minutes sans activité** (et au plus tard 7 jours après la connexion).
+- **RG-A-14 — « Rester connecté sur cet appareil » est un choix explicite**, décoché par défaut : coché, la session tient 7 jours sans activité (30 jours au plus). La case explique ces durées.
+
+### Recette
+| # | Scénario | Attendu |
+|---|---|---|
+| K1 | Connexion sans cocher, 61 minutes sans rien faire, action | Déconnecté, retour à la connexion |
+| K2 | Connexion sans cocher, fermer le navigateur, rouvrir | Déconnecté |
+| K3 | Connexion en cochant, revenir le lendemain | Toujours connecté |
+| K4 | Formulaire de connexion | Case décochée par défaut, aide « Coché : 7 jours sans activité. Sinon : déconnexion après 60 minutes sans activité. » |
