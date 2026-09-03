@@ -110,14 +110,14 @@
     "decline": "Refuser",
     "accept": "Accepter",
     "acceptConfirm": "Accepter et confirmer",
-    "footerNote": "Si tu refuses, {shipperFirstName} pourra chercher un autre Tripper sans pénalité.",
-    "footerNoteShort": "Refuser n''engage pas ta réputation. {shipperFirstName} trouvera un autre Tripper.",
+    "footerNote": "Si tu refuses, {shipperFirstName} pourra chercher un autre Voyageur sans pénalité.",
+    "footerNoteShort": "Refuser n''engage pas ta réputation. {shipperFirstName} trouvera un autre Voyageur.",
     "charterAcceptedIndicator": "✓ Charte acceptée",
     "charterPendingIndicator": "Coche la Charte pour confirmer"
   },
   "decline": {
     "dialogTitle": "Refuser cette demande ?",
-    "dialogIntro": "{shipperFirstName} sera notifiée et pourra contacter un autre Tripper. Ton taux d''acceptation reste intact.",
+    "dialogIntro": "{shipperFirstName} sera notifiée et pourra contacter un autre Voyageur. Ton taux d''acceptation reste intact.",
     "reasonLabel": "Raison (optionnel)",
     "reasonPlaceholder": "Choisir une raison",
     "reasonOption": {

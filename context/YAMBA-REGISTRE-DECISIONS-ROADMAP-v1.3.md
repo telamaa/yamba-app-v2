@@ -356,6 +356,14 @@ Objectif produit assumé : **solide, propre, pro, secure, long terme** — les f
 
 ---
 
+## 2bis.25 — Session `chore/vocabulaire-voyageur` (D45 : le nom du rôle) — A90
+
+| # | Arbitrage | Pourquoi | Compromis | PR |
+|---|---|---|---|---|
+| A90 | **« Voyageur » partout dans l'interface FR (décision utilisateur 03/09), « Traveler » en EN** — 57 valeurs de traduction dans 11 fichiers + 8 chaînes visibles dans le code (copie du dashboard, inscription, badge d'avatar, bannière d'onboarding, carte des lieux). Les IDENTIFIANTS (`superTripper`, `TripperBlock`, `becomeYamber`, route `/become-yamber`, `PublicTripper`) ne changent pas : ils sont du code, pas de la copie | Un seul mot pour un seul rôle, en FR comme dans les emails (D45) ; renommer des identifiants et une route publique n'apporte rien au membre et casserait des liens | Le code garde son ancien vocabulaire interne (`carrier` en API, `tripper` dans quelques noms de composants) ; « Traveler » en EN est un choix d'alignement, révisable | `chore/vocabulaire-voyageur` |
+
+---
+
 # 3. Roadmap maîtresse
 
 ## 3.0 Les trois jalons

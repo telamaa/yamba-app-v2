@@ -83,7 +83,7 @@
     "steps": {
       "find": {
         "title": "Find",
-        "description": "A Yamber going to your destination."
+        "description": "A Traveler going to your destination."
       },
       "book": {
         "title": "Book",
@@ -111,7 +111,7 @@
     "subtitle": "No hidden fees. No subscription.",
     "breakdown": {
       "title": "On every transaction",
-      "yamberLabel": "Yamber",
+      "yamberLabel": "Traveler",
       "yambaLabel": "Yamba commission",
       "yambaSubtitle": "Security, support, guarantees",
       "insuranceLabel": "Optional extended protection",
@@ -119,7 +119,7 @@
     },
     "timeline": {
       "label": "Mutual protection",
-      "titleStart": "Yamber paid",
+      "titleStart": "Traveler paid",
       "titleHighlight": "3 days",
       "titleEnd": "after delivery",
       "subtitle": "Safety period to report any issue before fund release.",
@@ -142,7 +142,7 @@
         "day4": {
           "label": "D4",
           "title": "Payment",
-          "subtitle": "Yamber paid"
+          "subtitle": "Traveler paid"
         }
       },
       "shipperBenefit": "3 days to verify",
@@ -162,9 +162,9 @@
         "role": "Paris → Brazzaville"
       },
       "r2": {
-        "quote": "Yamber for 6 months on Lyon-Paris. My train tickets are paid. Really top-notch.",
+        "quote": "Traveler for 6 months on Lyon-Paris. My train tickets are paid. Really top-notch.",
         "name": "Thomas F.",
-        "role": "Yamber · Lyon"
+        "role": "Traveler · Lyon"
       },
       "r3": {
         "quote": "Excellent service. The rating system and secure payments reassured me from the start.",
@@ -202,9 +202,9 @@
     },
     "yamber": {
       "tag": "To transport",
-      "title": "Yamber",
+      "title": "Traveler",
       "description": "Already traveling? Earn an average of €120/month on your planned trips.",
-      "cta": "Become a Yamber"
+      "cta": "Become a Traveler"
     }
   }
 }

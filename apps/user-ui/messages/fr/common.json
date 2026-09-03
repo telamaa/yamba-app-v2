@@ -47,15 +47,15 @@
       "theme": "Apparence"
     },
     "badges": {
-      "yamberActive": "Yamber actif",
-      "yamberVerified": "Yamber vérifié",
+      "yamberActive": "Voyageur actif",
+      "yamberVerified": "Voyageur vérifié",
       "yamberPending": "Profil à compléter"
     }
   },
   "discover": {
     "sectionLabel": "Découvrir Yamba",
     "howItWorks": "Comment ça marche",
-    "becomeYamber": "Devenir Yamber",
+    "becomeYamber": "Devenir Voyageur",
     "helpFaq": "Aide & FAQ"
   },
   "footer": {
@@ -68,7 +68,7 @@
     },
     "discover": {
       "howItWorks": "Comment ça marche",
-      "becomeYamber": "Devenir Yamber",
+      "becomeYamber": "Devenir Voyageur",
       "helpFaq": "Aide & FAQ"
     },
     "company": {

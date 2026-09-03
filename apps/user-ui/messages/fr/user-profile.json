@@ -1,20 +1,17 @@
 {
   "memberSince": "Membre depuis {date}",
-
   "badges": {
     "verified": "Vérifié",
-    "superTripper": "Super Tripper"
+    "superTripper": "Super Voyageur"
   },
-
   "stats": {
     "trips": "Trajets",
     "parcelsCarried": "Colis livrés",
     "globalRating": "Note globale",
     "notRatedYet": "Pas encore noté"
   },
-
   "tripperBlock": {
-    "title": "En tant que Tripper",
+    "title": "En tant que Voyageur",
     "frequentRoutes": "Routes fréquentes",
     "routeCount": "{count, plural, one {1 trajet} other {# trajets}}",
     "availableTrips": "{count, plural, =0 {Aucun trajet disponible} one {# trajet disponible} other {# trajets disponibles}}",
@@ -23,9 +20,8 @@
     "noAvailableTripsCta": "Suivre pour être notifié",
     "reviewsHeader": "{count, plural, =0 {Aucun avis} one {# avis · {average}} other {# avis · {average}}}",
     "viewAllReviews": "Voir tous",
-    "noReviews": "{firstName} n'a pas encore reçu d'avis en tant que Tripper. Soyez le premier à voyager avec lui."
+    "noReviews": "{firstName} n'a pas encore reçu d'avis en tant que Voyageur. Soyez le premier à voyager avec lui."
   },
-
   "shipperBlock": {
     "title": "En tant qu'expéditeur",
     "parcelsSent": "Colis envoyés",
@@ -34,7 +30,6 @@
     "noReviews": "{firstName} n'a pas encore reçu d'avis en tant qu'expéditeur.",
     "compactNoActivity": "Pas encore d'activité"
   },
-
   "sidebar": {
     "editProfile": "Modifier mon profil",
     "follow": "Suivre",
@@ -49,12 +44,10 @@
     "followersCount": "{count, plural, one {# personne suit {firstName}} other {# personnes suivent {firstName}}}",
     "reportProfile": "Signaler ce profil"
   },
-
   "error": {
     "title": "Une erreur est survenue",
     "message": "Impossible de charger ce profil pour le moment. Réessaie dans quelques instants."
   },
-
   "notFound": {
     "title": "Profil introuvable",
     "message": "Ce profil n'existe pas ou a été supprimé.",

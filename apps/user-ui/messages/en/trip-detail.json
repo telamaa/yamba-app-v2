@@ -6,7 +6,7 @@
   "reviewsCount": "{count, plural, =0 {no reviews} =1 {# review} other {# reviews}}",
   "chatWith": "Chat with {firstName}",
   "comingSoon": "Coming soon",
-  "newTripper": "New Tripper",
+  "newTripper": "New Traveler",
   "memberSince": "Member since {date}",
   "close": "Close",
   "reportListing": "Report this listing",
@@ -26,7 +26,7 @@
   },
   "badges": {
     "profileVerified": "Verified profile",
-    "superTripper": "Super Tripper",
+    "superTripper": "Super Traveler",
     "verifiedTicket": "Verified ticket"
   },
   "categories": {

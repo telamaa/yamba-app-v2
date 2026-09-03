@@ -47,8 +47,8 @@
     "FLIGHT_ARRIVED": "landing confirmed"
   },
   "roles": {
-    "yourCarrier": "Your Tripper",
-    "requested": "Tripper requested",
+    "yourCarrier": "Your Traveler",
+    "requested": "Traveler requested",
     "inFlight": "Currently in flight",
     "noReply": "No reply"
   },
@@ -79,7 +79,7 @@
   },
   "empty": {
     "title": "No shipments yet",
-    "subtitle": "Find a Tripper on your route and send your first parcel.",
+    "subtitle": "Find a Traveler on your route and send your first parcel.",
     "cta": "Search trips"
   },
   "loadError": "Could not load your shipments. Please try again shortly.",
