@@ -191,7 +191,7 @@ Ordre de demarrage : auth -> trip -> gateway.
   #111 allowedDevOrigins (Next 16 bloque /_next hors localhost), #113
   atterrissage post-OTP, #114 redirect conserve inscription→connexion.
   Recette OK jusqu'a F1 ; reste F4→F7, D1–D7, V1–V9 (utilisateur). dev = 3370efa.
-- 03/09 matin (retours de recette auth, decisions utilisateur) : branche
+- 03/09 matin (retours de recette auth, decisions utilisateur) : PR #116
   fix/auth-recette (A50–A54) — critere de mot de passe NOMME (codes serveur
   PASSWORD_* / EMAIL_ALREADY_USED traduits par le front), messages OTP construits
   des codes (plus d'anglais brut), bareme OTP par paliers de 5 avec code

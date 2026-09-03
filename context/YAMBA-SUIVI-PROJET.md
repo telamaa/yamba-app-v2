@@ -1,5 +1,5 @@
 # YAMBA — SUIVI DE PROJET DE BOUT EN BOUT
-### État au 3 septembre 2026 · `dev` = `3370efa` (#114) + `fix/auth-recette` en PR (recette auth 03/09, A50–A54, D44–D45 gravées) · 601 tests plateforme + 40 auth-service · `main` = `9c6e155` (#88)
+### État au 3 septembre 2026 · `dev` = `3370efa` (#114) + #116 `fix/auth-recette` (recette auth 03/09, A50–A54, D44–D45 gravées) · 601 tests plateforme + 40 auth-service · `main` = `9c6e155` (#88)
 *Légende : ✅ fait (PR) · 🟡 en cours / partiel · ⬜ à faire · 🔴 bloquant lancement. Vélocité = « sessions » (unité des handoffs). Mis à jour à chaque merge (règle : ce fichier + `YAMBA-CONTEXT.md`).*
 
 ---
@@ -138,7 +138,7 @@ Estimation : **2–4 sessions** au-dessus du Jalon 4 (l'essentiel du travail est
 | Front : OnboardingBanner après Header, cron onboarding-reminder (node-cron), page carrier settings (Stripe), `viewsCount` Redis (D5) | ⬜ |
 | Sécurité/robustesse : redaction pino-http (cookie + authorization), `getImageKit()` paresseux, `AddDocumentsBody` en Zod, harmonisation noms Nx, idempotence seed-deals, bug seed shipperId === carrierId | ⬜ |
 | Seeds : `arrivalAt`/heures locales manquants sur `bzv-perkg` ; carrierPage/Stripe factices pour tester la publication | ⬜ |
-| **Recette auth 03/09 — `fix/auth-recette`** (A50–A54) : critère de mot de passe NOMMÉ (front + codes serveur `PASSWORD_*`, `EMAIL_ALREADY_USED`), messages OTP construits des codes (plus d'anglais brut), barème OTP par paliers de 5 avec invalidation du code, fenêtre d'inscription 30 min prolongée au renvoi, « 5 minutes » → durée injectée, sujets OTP en français, œil centré, visuels manquants retirés ; +19 tests auth-service | ✅ PR ouverte |
+| **Recette auth 03/09 — `fix/auth-recette`** (A50–A54) : critère de mot de passe NOMMÉ (front + codes serveur `PASSWORD_*`, `EMAIL_ALREADY_USED`), messages OTP construits des codes (plus d'anglais brut), barème OTP par paliers de 5 avec invalidation du code, fenêtre d'inscription 30 min prolongée au renvoi, « 5 minutes » → durée injectée, sujets OTP en français, œil centré, visuels manquants retirés ; +19 tests auth-service | ✅ #116 |
 | **Backlog recette 03/09 — PRIORISÉ** (décisions utilisateur : mode LAN conservé, boutons Google/Facebook laissés tels quels, tutoiement partout, prénom réel dans les emails, N langues) | | |
 | P1 · `feat/email-locale` — **D44** : `User.preferredLocale` (N langues, liste centralisée), `x-locale` sur chaque requête, gabarit partagé `packages/libs/email` + dictionnaires par langue, migration des 3 mailers, prénom réel du Voyageur/de l'Expéditrice dans les corps (D45), sujets sans emoji, `SMTP_FROM_NAME` réellement lu | ⬜ |
 | P1 · `feat/booking-auth-modal` — « Connecte-toi pour réserver » en MODALE sur la page trajet (dialogue desktop / feuille du bas mobile), la page `/book` garde sa porte pour l'accès direct ; le lien « Connexion » du header transmet la page courante en `redirect` (hors pages auth) ; retour dans le wizard après connexion (intention = réserver) | ⬜ |
@@ -155,7 +155,7 @@ Estimation : **2–4 sessions** au-dessus du Jalon 4 (l'essentiel du travail est
 | Tests (plateforme) | 601 = trip 187 · deal 355 · notification 59 (+ auth-service 40, hors CI : 21 session-policy + 19 recette auth) |
 | Décisions au registre | D1 → D45 (+ arbitrages A1 → A54) |
 | Règles métier | ~50 (V2) + RG-B-01…35, RG-S-01…13, RG-C-01…16, RG-G-01…03, RG-D-01…16, RG-V-01…09, RG-F-01…06, RG-N-01…08, RG-T-01…06, RG-P-01…27, RG-A-01…05 |
-| PR mergées | #1 → #95 (#90 = pile B2-PR1/2/3 · #91 = docs post-merge · #92 = B2-PR4 emails · #93 = B2-PR5 tracker · #94 = docs post-merge · #95 = B3-PR1 serveur · #96 = B3-PR2 front · #97 = docs · #98 = B3-PR3 boîte du Voyageur · #99 = docs · #100 = B3-PR4 page demande · #101 = docs · #102 = typographie Deal · #103 = docs · #104 = fix ImageKit · #105 = docs · #106 = visionneuse photos · #108 = docs · #109 = fix relay outbox · #111 = allowedDevOrigins LAN · #112 = backlog inscription · #113 = atterrissage post-OTP · #114 = redirect inscription→connexion — 13 checks comptés à chaque fois) |
+| PR mergées | #1 → #95 (#90 = pile B2-PR1/2/3 · #91 = docs post-merge · #92 = B2-PR4 emails · #93 = B2-PR5 tracker · #94 = docs post-merge · #95 = B3-PR1 serveur · #96 = B3-PR2 front · #97 = docs · #98 = B3-PR3 boîte du Voyageur · #99 = docs · #100 = B3-PR4 page demande · #101 = docs · #102 = typographie Deal · #103 = docs · #104 = fix ImageKit · #105 = docs · #106 = visionneuse photos · #108 = docs · #109 = fix relay outbox · #111 = allowedDevOrigins LAN · #112 = backlog inscription · #113 = atterrissage post-OTP · #114 = redirect inscription→connexion · #116 = fix recette auth — 13 checks comptés à chaque fois) |
 | Documents | registre, spec, règles, 5 handoffs (dernier : SESSION-2026-08-28 + addendum 29/08), fiches PR (archive), 3 docs cumulatifs (technique, métier, apprentissage), `YAMBA-MOTEUR-PRIX.md/.pdf`, ce suivi |
 
 ## 9. Ordre recommandé des prochaines sessions

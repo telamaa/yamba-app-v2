@@ -1011,7 +1011,7 @@ tsc user-ui, i18n miroir, aucun dégradé orphelin (`grep BA7517|534AB7` ne remo
 
 Recette : aucun email ni notification à aucune étape, pour aucun des deux comptes. Probe Atlas : 44 événements outbox, 38 sans `publishedAt` avec `attempts: 0` (jamais tentés), Redpanda up, consumer group stable, lag 0. Cause : `OutboxRelay.drainBatch` filtre `publishedAt: null` ; `applyBookingTransition` et `createBooking` n'écrivaient pas le champ ; sur Mongo, Prisma ne matche pas un champ absent avec `null` (compté : `publishedAt: null` → 0, `OR isSet:false` → 38). Les preuves B1/B2 tenaient sur `seed-outbox.ts`, qui pose `null` explicitement. Fix : filtre `OR` dans le relay (spec mise à jour) + `publishedAt: null` explicite dans les deux writers ; 38 lignes orphelines (bookings effacés par les rejeux du seed) parquées par script (`publishedAt` posé, `lastError` PARKED) ; les 4 événements du deal réel partent au redémarrage du deal-service. Deuxième cause, indépendante : le `.env` racine n'a aucune variable `SMTP_*` (elles ne vivent que dans `apps/trip-service/.env`) — à copier (`SMTP_HOST/PORT/USER/PASS/SERVICE/FROM`) puis relancer notification-service. deal-service 355 tests.
 
-# Fix recette auth (03/09, A50–A54) — le formulaire dit quoi corriger, l'OTP pardonne la faute de frappe
+# Fix recette auth (#116, 03/09, A50–A54) — le formulaire dit quoi corriger, l'OTP pardonne la faute de frappe
 
 Retours de recette du 03/09 sur l'inscription, la connexion et les codes OTP. Sept corrections dans une PR, `fix/auth-recette`, toutes sans décision d'architecture nouvelle (D44 et D45 sont gravées dans la même PR mais implémentées dans les suivantes).
 

@@ -637,7 +637,7 @@ Le Voyageur décide d'accepter un colis sur trois choses : qui l'envoie, ce qu'i
 | D6 | Bloc livraison | « Téléphone du destinataire communiqué à la prise en charge » |
 | D7 | « Voir profil » | Ouvre `/u/[slug]` de l'Expéditrice ; absent si elle n'a pas de profil public |
 
-# Fix recette auth (03/09) — l'inscription explique, l'OTP pardonne
+# Fix recette auth (#116, 03/09) — l'inscription explique, l'OTP pardonne
 
 ### 1. Le besoin
 Une personne qui s'inscrit doit savoir QUOI corriger (« le mot de passe contient ton prénom », pas « ne respecte pas tous les critères »), dans SA langue. Une personne qui se trompe en tapant un code à 6 chiffres ne doit pas être bloquée 24 heures. Et l'email ne doit pas contredire l'écran (5 minutes contre 10).
