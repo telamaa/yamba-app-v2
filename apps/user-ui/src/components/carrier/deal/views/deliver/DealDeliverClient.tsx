@@ -14,6 +14,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { PHOTO_MAX_SIZE_BYTES, PHOTO_MIME_TYPES, useImageKitUpload } from "@/hooks/useImageKitUpload";
+import { NOTIFICATIONS_QUERY_KEY } from "@/hooks/useNotifications";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
@@ -136,6 +137,7 @@ export default function DealDeliverClient({ dealId }: Props) {
         // La vérité est en base : la page Deal relira DELIVERED.
         void queryClient.invalidateQueries({ queryKey: dealQueryKey(deal.id) });
         void queryClient.invalidateQueries({ queryKey: MY_DEALS_QUERY_KEY });
+        void queryClient.invalidateQueries({ queryKey: NOTIFICATIONS_QUERY_KEY }); // A91
       } catch (e) {
         if (e instanceof DealApiError) {
           if (e.code === "DELIVERY_CODE_INVALID") {

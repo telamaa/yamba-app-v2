@@ -1009,3 +1009,24 @@ La section Finances était une promesse : deux onglets vides et une maquette aux
 | H6 | Session Expéditrice inactive > 60 min, puis « Régénérer le code » | Fenêtre « Ta session a expiré » par-dessus le suivi ; après connexion, la régénération fonctionne |
 | H7 | Même chose côté Voyageur sur un jalon | Idem, jalon confirmable après reconnexion |
 | H8 | Notification in-app d'un versement | Libellé « Versement parti vers ton compte » |
+
+# Notifications vivantes — elles se rafraîchissent, elles nomment, elles disent quoi faire
+
+### Règles de gestion (NOT)
+- **RG-NOT-01 — La cloche dit vrai** : le compteur et la liste se rafraîchissent seuls (au plus 30 s de retard, tout de suite au retour sur l'onglet et après un geste).
+- **RG-NOT-02 — Chaque notification nomme l'autre partie et le trajet**, et dit ce qui se passe pour MOI : la même livraison se lit « Colis remis · vérifie avant le … » pour l'Expéditrice et « Livraison validée · versement après vérification » pour le Voyageur.
+- **RG-NOT-03 — Un jalon de voyage est nommé** (à l'aéroport, décollé, atterri) ; l'atterrissage dit à l'Expéditrice de prévenir le destinataire.
+- **RG-NOT-04 — Une action, pas dix** : « Tout marquer lu » depuis la cloche et la page ; ouvrir une notification la marque lue et mène au deal ou au suivi.
+- **RG-NOT-05 — Un seul jalon envoie un email** : l'atterrissage, à l'Expéditrice (« préviens le destinataire, le code est dans ton suivi »). Les autres jalons restent dans l'application.
+
+### Recette
+| # | Scénario | Attendu |
+|---|---|---|
+| N1 | Voyageur confirme « à l'aéroport » ; Expéditrice sur une autre page, sans recharger | Sous 30 s, badge +1 ; menu de la cloche : « {prénom} est à l'aéroport · {route} » |
+| N2 | Atterrissage confirmé | Notification « {prénom} a atterri · préviens le destinataire » + email « {prénom} a atterri » à l'Expéditrice ; aucun email pour aéroport / décollage |
+| N3 | Ouvrir une notification depuis le menu | Marquée lue, arrivée sur le suivi ou le deal, badge −1 |
+| N4 | « Tout marquer lu » (menu ou page) | Badge à 0, lignes en blanc |
+| N5 | Livraison validée | Expéditrice : « Colis remis · vérifie avant le {date} » ; Voyageur : « Livraison validée · versement après vérification » |
+| N6 | Versement parti / compensation | Voyageur : « {montant} partis vers ton compte » ou « {montant} de compensation partis » |
+| N7 | Notification système « virement refusé » (seed impossible, Stripe test) | Listée sans lien, titre « Virement bancaire refusé : vérifie ton RIB » ; la liste ne casse pas |
+| N8 | Mobile | Badge sur la cloche, lien vers la page, mêmes titres |

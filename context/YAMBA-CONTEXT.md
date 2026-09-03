@@ -277,7 +277,10 @@ Ordre de demarrage : auth -> trip -> gateway.
   STRIPE_CONNECT_WEBHOOK_SECRET. Suite : vocabulaire Voyageur (PR copie), B5.
 - 03/09 : chore/vocabulaire-voyageur (A90) — « Voyageur » / « Traveler » partout dans
   l'UI, identifiants inchanges. D45 (nom du role) CLOS.
-- Plateforme de tests : 676 (trip 198, deal 402, notification 76) + auth 65.
+- 03/09 : feat/notifications-vivantes (A91) — polling 30 s, copie par evenement
+  et role avec prenom servi, cloche = menu + tout marquer lu, email d'atterrissage.
+  Suite : B5 Confiance (points a trancher).
+- Plateforme de tests : 677 (trip 198, deal 402, notification 77) + auth 65.
 - (historique) Plateforme de tests : 600 (trip 187, deal 354, notification 59) — post-B3 (#96).
 - MERGE 01/09 : toute la pile B2 est dans `dev` via la SEULE **PR #90**
   (`feat/b2-deal-front` portait la chaîne complète : jalons mobile D36,

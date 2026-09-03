@@ -9,6 +9,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   getMyNotifications,
+  markAllNotificationsRead,
   markNotificationRead,
 } from "@/components/dashboard/notifications/notifications.api";
 
@@ -20,6 +21,21 @@ export function useNotifications(options?: { enabled?: boolean }) {
     queryFn: getMyNotifications,
     enabled: options?.enabled ?? true,
     staleTime: 30_000,
+    // A91 (décision 1A) — « vivantes » : rafraîchies toutes les 30 s quand
+    // l'onglet est visible, et au retour sur l'onglet. Pas de flux temps réel.
+    refetchInterval: 30_000,
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: true,
+  });
+}
+
+export function useMarkAllNotificationsRead() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: markAllNotificationsRead,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: NOTIFICATIONS_QUERY_KEY });
+    },
   });
 }
 

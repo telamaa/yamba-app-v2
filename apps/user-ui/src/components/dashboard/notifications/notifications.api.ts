@@ -43,3 +43,9 @@ export async function markNotificationRead(
   );
   return res.data.notification;
 }
+
+/** PATCH /me/notifications/read-all — idempotent (A91). */
+export async function markAllNotificationsRead(): Promise<number> {
+  const res = await apiClient.patch<{ updatedCount: number }>("/me/notifications/read-all", {}, { requireAuth: true });
+  return res.data.updatedCount;
+}

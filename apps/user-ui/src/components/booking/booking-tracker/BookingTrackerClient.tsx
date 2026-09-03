@@ -24,6 +24,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { useRouter } from "@/i18n/navigation";
 import { getBooking } from "./booking-tracker.api";
+import { NOTIFICATIONS_QUERY_KEY } from "@/hooks/useNotifications";
 import BookingTrackerSkeleton from "./BookingTrackerSkeleton";
 import BookingAcceptedDesktop from "./views/accepted/BookingAcceptedDesktop";
 import BookingAcceptedMobile from "./views/accepted/BookingAcceptedMobile";
@@ -79,6 +80,7 @@ export default function BookingTrackerClient({ bookingId }: Props) {
   // RELIT — la vue « Envoi terminé » vient de GET /deals/:id (A71).
   const handleEarlyConfirmed = useCallback(() => {
     void queryClient.invalidateQueries({ queryKey: bookingQueryKey(bookingId) });
+    void queryClient.invalidateQueries({ queryKey: NOTIFICATIONS_QUERY_KEY }); // A91 : la cloche suit le geste
   }, [queryClient, bookingId]);
 
   if (isMobile === null || isPending) {

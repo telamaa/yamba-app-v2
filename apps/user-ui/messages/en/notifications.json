@@ -22,5 +22,223 @@
     "booking_rating_revealed": "Ratings revealed",
     "fallback": "Notification",
     "carrier_payout_failed": "Bank transfer refused: check your bank details"
+  },
+  "bellTitle": "Notifications",
+  "markAllRead": "Mark all as read",
+  "viewAll": "View all notifications",
+  "unknownName": "a member",
+  "copy": {
+    "booking_requested": {
+      "SHIPPER": {
+        "title": "New request",
+        "line": "{route}"
+      },
+      "CARRIER": {
+        "title": "New request from {name}",
+        "line": "{route} · {weight} · reply within 24h"
+      }
+    },
+    "booking_payment_authorized": {
+      "SHIPPER": {
+        "title": "Payment authorized",
+        "line": "{route} · nothing is charged before acceptance"
+      },
+      "CARRIER": {
+        "title": "Payment authorized",
+        "line": "{route}"
+      }
+    },
+    "booking_accepted": {
+      "SHIPPER": {
+        "title": "{name} accepted your request",
+        "line": "{route} · payment charged, pickup to arrange"
+      },
+      "CARRIER": {
+        "title": "Request accepted",
+        "line": "{route} · {weight}"
+      }
+    },
+    "booking_declined": {
+      "SHIPPER": {
+        "title": "{name} could not accept",
+        "line": "{route} · you are not charged"
+      },
+      "CARRIER": {
+        "title": "Request declined",
+        "line": "{route}"
+      }
+    },
+    "booking_expired": {
+      "SHIPPER": {
+        "title": "Request expired",
+        "line": "{name} did not reply · you are not charged"
+      },
+      "CARRIER": {
+        "title": "Request expired",
+        "line": "{route} · no reply within 24h"
+      }
+    },
+    "booking_cancelled": {
+      "SHIPPER": {
+        "title": "Shipment cancelled",
+        "line": "{route} · the refund is confirmed by email"
+      },
+      "CARRIER": {
+        "title": "{name} cancelled",
+        "line": "{route} · {weight} · your capacity is released"
+      }
+    },
+    "booking_refund_issued": {
+      "SHIPPER": {
+        "title": "Refund issued",
+        "line": "{amount} · {route}"
+      },
+      "CARRIER": {
+        "title": "Refund issued",
+        "line": "{route}"
+      }
+    },
+    "booking_picked_up": {
+      "SHIPPER": {
+        "title": "{name} picked up your parcel",
+        "line": "{route} · your delivery code is ready in your tracking"
+      },
+      "CARRIER": {
+        "title": "Pickup confirmed",
+        "line": "{route} · {weight}"
+      }
+    },
+    "booking_pickup_refused": {
+      "SHIPPER": {
+        "title": "{name} could not take your parcel",
+        "line": "{route} · full refund in progress"
+      },
+      "CARRIER": {
+        "title": "Pickup refused",
+        "line": "{route}"
+      }
+    },
+    "booking_tracking_event": {
+      "SHIPPER": {
+        "AT_AIRPORT": {
+          "title": "{name} is at the airport",
+          "line": "{route} · your parcel is with {name}"
+        },
+        "FLIGHT_DEPARTED": {
+          "title": "Flight departed · {name} is on the way",
+          "line": "{route}"
+        },
+        "FLIGHT_ARRIVED": {
+          "title": "{name} has landed · let the recipient know",
+          "line": "{route} · the handover is near, the code is in your tracking"
+        }
+      },
+      "CARRIER": {
+        "AT_AIRPORT": {
+          "title": "Step confirmed: at the airport",
+          "line": "{route}"
+        },
+        "FLIGHT_DEPARTED": {
+          "title": "Step confirmed: departed",
+          "line": "{route}"
+        },
+        "FLIGHT_ARRIVED": {
+          "title": "Step confirmed: landed",
+          "line": "{route} · hand the parcel over against the code"
+        }
+      }
+    },
+    "booking_code_regenerated": {
+      "SHIPPER": {
+        "title": "New delivery code",
+        "line": "{route} · the old code no longer works"
+      },
+      "CARRIER": {
+        "title": "Delivery code renewed",
+        "line": "{route}"
+      }
+    },
+    "booking_delivered": {
+      "SHIPPER": {
+        "title": "Parcel handed over · check before {date}",
+        "line": "{route} · confirm if all is well, or report an issue"
+      },
+      "CARRIER": {
+        "title": "Delivery validated",
+        "line": "{route} · payout after {name}'s verification, on {date}"
+      }
+    },
+    "booking_completed": {
+      "SHIPPER": {
+        "title": "Transaction closed · {name}'s payment released",
+        "line": "{route} · thank you for shipping with Yamba"
+      },
+      "CARRIER": {
+        "title": "Deal completed · your payout leaves",
+        "line": "{route} · {net}"
+      }
+    },
+    "booking_payout_sent": {
+      "SHIPPER": {
+        "title": "Payout sent",
+        "line": "{route}",
+        "lateTitle": "Payout sent"
+      },
+      "CARRIER": {
+        "title": "{amount} on its way to your account",
+        "line": "{route} · on your bank account within 2 to 7 days",
+        "lateTitle": "{amount} compensation on its way to your account"
+      }
+    },
+    "booking_disputed": {
+      "SHIPPER": {
+        "title": "Report {ticket} received",
+        "line": "{route} · payment frozen, reply within 48 business hours"
+      },
+      "CARRIER": {
+        "title": "Report opened by {name} · {ticket}",
+        "line": "{route} · payout on hold, we will contact you for your side"
+      }
+    },
+    "booking_verification_reminder": {
+      "SHIPPER": {
+        "title": "Last day to check your parcel",
+        "line": "{route} · without action, {name}'s payment leaves on {date}"
+      },
+      "CARRIER": {
+        "title": "Verification in progress",
+        "line": "{route}"
+      }
+    },
+    "booking_rating_reminder": {
+      "SHIPPER": {
+        "title": "Remember to rate {name}",
+        "line": "{route}"
+      },
+      "CARRIER": {
+        "title": "Remember to rate {name}",
+        "line": "{route}"
+      }
+    },
+    "booking_rating_revealed": {
+      "SHIPPER": {
+        "title": "Ratings revealed",
+        "line": "{route}"
+      },
+      "CARRIER": {
+        "title": "Ratings revealed",
+        "line": "{route}"
+      }
+    },
+    "carrier_payout_failed": {
+      "SHIPPER": {
+        "title": "Bank transfer refused",
+        "line": "Check your bank details on Stripe"
+      },
+      "CARRIER": {
+        "title": "Bank transfer refused: check your bank details",
+        "line": "Your money stays on your payment account · Finances → Stripe"
+      }
+    }
   }
 }

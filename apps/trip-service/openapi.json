@@ -11495,6 +11495,20 @@
         "additionalProperties": false,
         "description": "Finances page — both roles, totals computed server-side (A83)"
       },
+      "NotificationType": {
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/BookingEventType"
+          },
+          {
+            "type": "string",
+            "enum": [
+              "carrier.payout_failed"
+            ]
+          }
+        ],
+        "description": "Booking event key, or a system notification (A87)"
+      },
       "NotificationView": {
         "type": "object",
         "properties": {
@@ -11502,7 +11516,7 @@
             "$ref": "#/components/schemas/ObjectId"
           },
           "type": {
-            "$ref": "#/components/schemas/BookingEventType"
+            "$ref": "#/components/schemas/NotificationType"
           },
           "bookingId": {
             "anyOf": [
@@ -11520,6 +11534,16 @@
               "type": "string"
             },
             "additionalProperties": {}
+          },
+          "counterpartFirstName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "readAt": {
             "anyOf": [
@@ -11544,6 +11568,7 @@
           "type",
           "bookingId",
           "payload",
+          "counterpartFirstName",
           "readAt",
           "createdAt"
         ],
@@ -11584,6 +11609,21 @@
         ],
         "additionalProperties": false,
         "description": "PATCH /me/notifications/{id}/read — the updated notification"
+      },
+      "MarkAllNotificationsReadResponse": {
+        "type": "object",
+        "properties": {
+          "updatedCount": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "updatedCount"
+        ],
+        "additionalProperties": false,
+        "description": "PATCH /me/notifications/read-all — how many were unread"
       },
       "TripFavoriteState": {
         "type": "object",

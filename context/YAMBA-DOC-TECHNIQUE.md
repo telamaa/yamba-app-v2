@@ -1299,3 +1299,14 @@ deal-service 399 (assertions renforcées, même total) · tsc · réparation jou
 
 ### Preuves
 deal-service **402** (399 + 3 : rejeu par Voyageur, renversement, digest) · notification 76 · tsc user-ui + deal-service · miroir i18n · OpenAPI régénéré · `nx build deal-service` OK · seed rejoué (21) · pages Finances / Mes trajets en 200. Recette H1–H8 (`YAMBA-DOC-METIER.md`, RG-H-01…05).
+
+# `feat/notifications-vivantes` — la cloche et les notifications parlent (A91)
+
+## Ce qui a été fait
+
+1. **Contrat** (`notification.schema.ts`) : `NotificationTypeSchema` = clé d'événement booking **ou** notification système (`carrier.payout_failed`) — le mapper strict rejetait la notification écrite par #139 (bug latent corrigé, test) ; `counterpartFirstName` ; `MarkAllNotificationsReadResponse`.
+2. **notification-service** : `getMyNotifications` joint les prénoms des contreparties (une requête `user.findMany`, rôle du lecteur déduit du payload) ; `PATCH /me/notifications/read-all` (idempotent, `OR readAt null / isSet:false`), route déclarée AVANT `/:id/read` ; OpenAPI. Emails : règle `SHIPPER_IF_FLIGHT_ARRIVED` sur `booking.tracking_event` (4A) + builder D44 `flightArrivedShipper` ; spec (77).
+3. **Front** : `useNotifications` — `refetchInterval` 30 s (onglet visible), `refetchOnWindowFocus` ; `useMarkAllNotificationsRead` ; `buildNotificationCopy(item, role, t, locale)` + `readerRole` dans `notifications.types.ts` (clés `copy.<event>.<ROLE>.title/line`, jalons par étape, variante `lateTitle` pour la compensation) ; section Notifications : copie contextuelle + bouton « Tout marquer lu » ; **`HeaderNotificationBell`** desktop = menu (5 dernières, lu au clic, « Tout marquer lu », « Voir tout », fermeture clic dehors / Échap), mobile = lien + badge ; invalidation de la clé notifications après confirmation anticipée et livraison. `notifications.json` FR/EN : bloc `copy` complet (18 événements × 2 rôles).
+
+### Preuves
+notification-service **77** (+1) · tsc user-ui + notification-service · miroir i18n · OpenAPI régénéré · `/fr/dashboard/notifications` en 200. Recette N1–N8 (`YAMBA-DOC-METIER.md`, RG-NOT-01…05).

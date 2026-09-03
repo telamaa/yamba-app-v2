@@ -34,6 +34,7 @@ export type DisputedCarrierParams = Base & { ticketNumber: string; disputeCatego
 export type VerificationReminderParams = Base & { payoutDueAt: string; transport: string };
 
 export type SettlementEmailDictionary = {
+  flightArrivedShipper(p: Base): SettlementEmail;
   completedShipper(p: CompletedParams): SettlementEmail;
   payoutSentCarrier(p: PayoutSentParams): SettlementEmail;
   disputedShipper(p: DisputedShipperParams): SettlementEmail;
@@ -65,6 +66,24 @@ export function disputeCategoryLabel(locale: SupportedLocale, category: DisputeC
 }
 
 const fr: SettlementEmailDictionary = {
+  flightArrivedShipper: (p) => {
+    const carrier = p.counterpartFirstName ?? "ton Voyageur";
+    return {
+      subject: `${carrier} a atterri — préviens le destinataire de ton colis ${p.route}`,
+      content: {
+        preheader: `${carrier} vient d'arriver : la remise du colis approche.`,
+        title: `${carrier} a atterri`,
+        greeting: `Bonjour ${p.firstName},`,
+        paragraphs: [
+          `${carrier} vient d'atterrir avec ton colis ${p.route}. La remise au destinataire approche : préviens-le maintenant et assure-toi qu'il a bien le code de livraison à 6 chiffres.`,
+          "Le code est dans ton suivi. Il ne sera demandé qu'au moment de la remise, en main propre.",
+        ],
+        cta: { label: "Ouvrir mon suivi", url: p.ctaUrl },
+        footnotes: ["Les autres étapes du voyage restent dans tes notifications, sans email."],
+        reason: "Tu reçois cet email parce que le Voyageur de ton envoi Yamba vient d'arriver à destination.",
+      },
+    };
+  },
   completedShipper: (p) => {
     const carrier = p.counterpartFirstName ?? "ton Voyageur";
     return {
@@ -167,6 +186,24 @@ const fr: SettlementEmailDictionary = {
 };
 
 const en: SettlementEmailDictionary = {
+  flightArrivedShipper: (p) => {
+    const carrier = p.counterpartFirstName ?? "your carrier";
+    return {
+      subject: `${carrier} has landed — let the recipient of your parcel ${p.route} know`,
+      content: {
+        preheader: `${carrier} has just arrived: the handover is near.`,
+        title: `${carrier} has landed`,
+        greeting: `Hi ${p.firstName},`,
+        paragraphs: [
+          `${carrier} has just landed with your parcel ${p.route}. The handover to the recipient is near: let them know now and make sure they have the 6-digit delivery code.`,
+          "The code is in your tracking page. It is only asked at the handover, in person.",
+        ],
+        cta: { label: "Open my tracking", url: p.ctaUrl },
+        footnotes: ["The other trip steps stay in your notifications, without email."],
+        reason: "You are receiving this email because the carrier of your Yamba shipment has just arrived at destination.",
+      },
+    };
+  },
   completedShipper: (p) => {
     const carrier = p.counterpartFirstName ?? "your carrier";
     return {
