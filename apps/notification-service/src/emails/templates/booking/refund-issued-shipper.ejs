@@ -23,6 +23,13 @@
                                     ? `Le remboursement de ta demande ${route} (${weightKg} kg) est émis. Ce message vaut confirmation.`
                                     : `The refund for your request ${route} (${weightKg} kg) has been issued. This message is your confirmation.` %>
                         </p>
+                        <% if (typeof retainedForCarrier !== "undefined" && retainedForCarrier) { %>
+                        <p style="margin:0 0 16px 0;font-size:14px;line-height:1.6;color:#334155;">
+                            <%= locale === "fr"
+                                    ? `Annulation à moins de 48 h du départ : une retenue de ${retainedForCarrier} s'applique, comme prévu dans nos conditions. Elle revient au Voyageur qui avait réservé sa capacité pour toi.`
+                                    : `Cancellation less than 48h before departure: a ${retainedForCarrier} retention applies, as set out in our terms. It goes to the carrier who had reserved their capacity for you.` %>
+                        </p>
+                        <% } %>
                         <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color:#f0fdfa;border-radius:12px;margin:0 0 16px 0;">
                             <tr>
                                 <td style="padding:16px 20px;">

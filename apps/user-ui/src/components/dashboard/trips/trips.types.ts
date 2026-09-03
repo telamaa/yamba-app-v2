@@ -63,6 +63,9 @@ export type CarrierDealItem = {
   payoutSentAt?: string;
   payoutBlocker?: "ACCOUNT_NOT_READY" | "RETRYING";
   disputeTicket?: string;
+  /** D50/A82 — compensation d'annulation tardive (CANCELLED). */
+  payoutAmountCents?: number;
+  retentionDisposition?: "CARRIER" | "HELD_FOR_MEDIATION";
 };
 
 export type CarrierTripItem = {

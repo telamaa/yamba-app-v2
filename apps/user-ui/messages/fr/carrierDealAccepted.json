@@ -95,6 +95,10 @@
     "frozen": {
       "title": "{amount} en attente",
       "text": "Un signalement est en cours d'examen : le versement est mis en attente jusqu'à la décision. Ce n'est pas une décision."
+    },
+    "sentLate": {
+      "title": "{amount} de compensation partis vers ton compte",
+      "text": "L'Expéditeur a annulé à moins de 48 h du départ : une partie de la retenue te revient. Envoyés le {date}, sur ton compte bancaire sous 2 à 7 jours."
     }
   },
   "settled": {

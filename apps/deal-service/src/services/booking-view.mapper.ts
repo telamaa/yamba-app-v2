@@ -125,6 +125,8 @@ export type BookingRecord = {
   payoutSentAt?: Date | null;
   payoutFailureReason?: string | null;
   deliveryPhotoUrls?: string[] | null;
+  payoutAmountCents?: number | null;
+  retentionDisposition?: string | null;
 
   createdAt: Date;
   updatedAt: Date;
@@ -406,6 +408,9 @@ export function toCarrierBookingView(
     ),
     // A75 — cause GROSSIÈRE d'un versement bloqué (jamais le message Stripe).
     payoutBlocker: toPayoutBlocker(booking),
+    // D50/A82 — le montant réellement versé (net, ou compensation ANN-01) et le sort de la retenue.
+    payoutAmountCents: booking.payoutAmountCents ?? null,
+    retentionDisposition: (booking.retentionDisposition as CarrierBookingView["retentionDisposition"]) ?? null,
     // A68 — la catégorie seule (jamais la description ni les photos).
     disputeCategory:
       dispute && booking.status === "DISPUTED"

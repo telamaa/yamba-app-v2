@@ -258,7 +258,11 @@ Ordre de demarrage : auth -> trip -> gateway.
   rien a faire), photo optionnelle a la remise (deliveryPhotoUrls, visible
   Expediteur + mediation), litige calme + « Donner ma version » (mailto).
   Reste B4 : retenue ANN-01 (D50), portefeuille (A77) ; puis chantier C.
-- Plateforme de tests : 657 (trip 198, deal 384, notification 75) + auth 65.
+- 03/09 : feat/b4-late-cancel-payout (D50, A79–A82) — la retenue ANN-01 revient
+  au Voyageur au prorata de sa part nette, IMMEDIATEMENT a l'annulation (executeur
+  injecte), sauf annulation apres le depart (HELD_FOR_MEDIATION, chantier C) ;
+  rien de retroactif ; email variante + ecrans. B4 SOLDE hors portefeuille (A77).
+- Plateforme de tests : 664 (trip 198, deal 390, notification 76) + auth 65.
 - (historique) Plateforme de tests : 600 (trip 187, deal 354, notification 59) — post-B3 (#96).
 - MERGE 01/09 : toute la pile B2 est dans `dev` via la SEULE **PR #90**
   (`feat/b2-deal-front` portait la chaîne complète : jalons mobile D36,

@@ -297,6 +297,13 @@ export const CarrierBookingViewSchema = z
       description: "Why the shipper disputed (status DISPUTED) — the carrier sees the category, never the file (A68)",
     }),
 
+    payoutAmountCents: z.number().int().nullish().meta({
+      description: "Amount paid out to the carrier: the net at COMPLETED, the ANN-01 compensation at late CANCELLED (D50/A82)",
+    }),
+    retentionDisposition: z.enum(["CARRIER", "HELD_FOR_MEDIATION"]).nullish().meta({
+      description: "Late cancellation only: the retention went to the carrier (compensation) or is held for mediation (cancelled after departure, A81)",
+    }),
+
     payoutBlocker: z.enum(["ACCOUNT_NOT_READY", "RETRYING"]).nullable().meta({
       description:
         "Coarse cause when payoutStatus = FAILED (A75): ACCOUNT_NOT_READY → finish the Stripe onboarding (CTA) · " +

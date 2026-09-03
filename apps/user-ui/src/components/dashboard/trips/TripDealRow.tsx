@@ -109,6 +109,17 @@ export function buildDealSub(
     }
     case "DISPUTED":
       return t("deal.disputedSub", { ticket: deal.disputeTicket ?? "" });
+    case "CANCELLED": {
+      // D50/A82 — annulation tardive : la compensation (ou la retenue « à arbitrer ») se lit sur la ligne.
+      if (deal.retentionDisposition === "CARRIER" && deal.payoutAmountCents != null) {
+        const compensation = formatMoney(locale, deal.payoutAmountCents / 100);
+        if (deal.payoutStatus === "SENT") return t("deal.cancelledCompensationSentSub", { amount: compensation });
+        if (deal.payoutStatus === "FAILED" && deal.payoutBlocker === "ACCOUNT_NOT_READY") return t("deal.cancelledCompensationBlockedSub", { amount: compensation });
+        return t("deal.cancelledCompensationPendingSub", { amount: compensation });
+      }
+      if (deal.retentionDisposition === "HELD_FOR_MEDIATION") return t("deal.cancelledHeldSub");
+      return "";
+    }
     default:
       return "";
   }

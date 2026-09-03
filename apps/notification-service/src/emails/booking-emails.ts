@@ -317,6 +317,11 @@ export function buildBookingEmail(
             p.currencyCode,
             locale
           ),
+          // D50/A82 — remboursement partiel : la retenue revient au Voyageur.
+          retainedForCarrier:
+            event.payload.amountCents < p.totalShipperCents
+              ? formatMoney(p.totalShipperCents - event.payload.amountCents, p.currencyCode, locale)
+              : null,
         },
       };
     /* ── B3 (A41) — le code de livraison n'apparaît dans AUCUN de ces
@@ -386,6 +391,7 @@ export function buildBookingEmail(
       const built = SETTLEMENT_EMAILS[locale].payoutSentCarrier({
         ...base,
         amount: formatMoney(event.payload.amountCents, p.currencyCode, locale),
+        reason: event.payload.reason === "LATE_CANCELLATION" ? "LATE_CANCELLATION" : "DELIVERY", // A82
       });
       return { subject: built.subject, template: "settlement/payout-sent-carrier", data: {}, content: built.content };
     }

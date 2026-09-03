@@ -156,7 +156,8 @@
     "DECLINED": "Tu as refusé cette demande",
     "EXPIRED": "Cette demande a expiré",
     "CANCELLED": "Cette demande a été annulée",
-    "hint": "Il n'y a plus d'action à faire ici."
+    "hint": "Il n'y a plus d'action à faire ici.",
+    "retentionHeld": "Annulation après le départ : la retenue de l'Expéditeur est conservée par Yamba le temps de comprendre ce qui s'est passé. Nous te contacterons."
   },
   "errors": {
     "onboardingRequired": "Termine ton profil Voyageur et ta configuration Stripe pour pouvoir accepter un deal.",

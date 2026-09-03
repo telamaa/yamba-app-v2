@@ -25,7 +25,10 @@ export default function DealPayoutStatusCard({ deal, compact = false }: Props) {
   const locale = useLocale();
   const format = useFormatter();
   const router = useRouter();
-  const amount = new Intl.NumberFormat(locale === "fr" ? "fr-FR" : "en-US", { style: "currency", currency: "EUR" }).format(deal.earnings.netForCarrier);
+  // D50/A82 — sur une annulation tardive, le montant est la COMPENSATION, pas le net.
+  const late = deal.status === "CANCELLED";
+  const cents = late && deal.payoutAmountCents != null ? deal.payoutAmountCents : Math.round(deal.earnings.netForCarrier * 100);
+  const amount = new Intl.NumberFormat(locale === "fr" ? "fr-FR" : "en-US", { style: "currency", currency: "EUR" }).format(cents / 100);
   const day = (iso?: string) => (iso ? format.dateTime(new Date(iso), { day: "numeric", month: "long" }) : "");
 
   type Tone = "teal" | "emerald" | "amber" | "slate";
@@ -44,8 +47,8 @@ export default function DealPayoutStatusCard({ deal, compact = false }: Props) {
   } else if (status === "SENT") {
     tone = "emerald";
     Icon = CheckCircle2;
-    title = t("sent.title", { amount });
-    text = t("sent.text", { date: day(deal.payoutSentAt) });
+    title = late ? t("sentLate.title", { amount }) : t("sent.title", { amount });
+    text = late ? t("sentLate.text", { date: day(deal.payoutSentAt) }) : t("sent.text", { date: day(deal.payoutSentAt) });
   } else if (status === "FAILED" && deal.payoutBlocker === "ACCOUNT_NOT_READY") {
     tone = "amber";
     Icon = AlertTriangle;

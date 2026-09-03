@@ -154,7 +154,7 @@ export function makeDealSettlementService(
 
   async function markPayoutFailed(booking: BookingForWrite, reason: string): Promise<PayoutOutcome> {
     await prisma.booking.updateMany({
-      where: { id: booking.id, status: "COMPLETED" },
+      where: { id: booking.id, status: booking.status as never },
       data: { payoutStatus: "FAILED", payoutFailureReason: reason, payoutAttempts: { increment: 1 } },
     });
     logger.warn({ bookingId: booking.id, reason }, "Carrier payout failed — will be retried by the payout cron");
@@ -177,10 +177,15 @@ export function makeDealSettlementService(
    * écriture conditionnelle sur `payoutStatus ∈ {PENDING, FAILED}`.
    */
   async function executePayout(booking: BookingForWrite, now: Date): Promise<PayoutOutcome> {
-    if (booking.status !== "COMPLETED") {
-      throw new BookingLifecycleError("TRANSITION_NOT_ALLOWED", "A payout requires a completed deal.");
+    // INV-2 : le net à COMPLETED ; A80 : la compensation ANN-01 à CANCELLED (montant posé par l'annulation).
+    if (booking.status !== "COMPLETED" && booking.status !== "CANCELLED") {
+      throw new BookingLifecycleError("TRANSITION_NOT_ALLOWED", "A payout requires a completed or late-cancelled deal.");
     }
-    const amountCents = booking.pricing.transportCents;
+    const reason = booking.status === "CANCELLED" ? "LATE_CANCELLATION" : "DELIVERY";
+    const amountCents = booking.status === "CANCELLED" ? (booking.payoutAmountCents ?? 0) : booking.pricing.transportCents;
+    if (amountCents <= 0) {
+      throw new BookingLifecycleError("TRANSITION_NOT_ALLOWED", "Nothing to pay out for this deal.");
+    }
     const currencyCode = booking.pricing.currencyCode;
 
     const destination = await resolveDestination(booking);
@@ -192,8 +197,8 @@ export function makeDealSettlementService(
         amountCents,
         currencyCode,
         destinationAccountId: destination,
-        description: `Yamba — payout for deal ${booking.id}`,
-        metadata: { bookingId: booking.id, tripId: booking.tripId, carrierId: booking.carrierId },
+        description: reason === "DELIVERY" ? `Yamba — payout for deal ${booking.id}` : `Yamba — late cancellation compensation for deal ${booking.id}`,
+        metadata: { bookingId: booking.id, tripId: booking.tripId, carrierId: booking.carrierId, reason },
         transferGroup: booking.id,
         sourceTransactionId: booking.chargeId ?? undefined, // A69
         idempotencyKey: `payout:${booking.id}`,
@@ -207,7 +212,7 @@ export function makeDealSettlementService(
     try {
       await applyBookingTransition({
         booking,
-        from: "COMPLETED",
+        from: booking.status as BookingStatus,
         where: { payoutStatus: { in: ["PENDING", "FAILED"] } },
         data: {
           payoutStatus: "SENT",
@@ -221,7 +226,7 @@ export function makeDealSettlementService(
         events: [
           {
             eventType: "booking.payout_sent",
-            payload: { ...baseEventPayload(booking, "SYSTEM"), transferId, amountCents },
+            payload: { ...baseEventPayload(booking, "SYSTEM"), transferId, amountCents, reason },
           },
         ],
         now,
@@ -362,16 +367,18 @@ export function makeDealSettlementService(
 
     async retryFailedPayouts(batchSize = 50): Promise<number> {
       const now = clock();
+      // A80 : les compensations d'annulation tardive (CANCELLED) rejouent avec le même exécuteur ;
+      // PENDING couvre un crash entre la transition et le transfert en ligne (idempotent).
       const failed = await prisma.booking.findMany({
         where: {
-          status: "COMPLETED",
+          status: { in: ["COMPLETED", "CANCELLED"] },
           isDeleted: false,
-          payoutStatus: "FAILED",
+          payoutStatus: { in: ["PENDING", "FAILED"] },
           payoutAttempts: { lt: PAYOUT_MAX_ATTEMPTS },
         },
         select: BOOKING_WRITE_SELECT,
         take: batchSize,
-        orderBy: { completedAt: "asc" },
+        orderBy: { updatedAt: "asc" },
       });
       let sent = 0;
       for (const raw of failed) {

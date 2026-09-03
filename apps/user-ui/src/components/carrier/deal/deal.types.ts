@@ -133,6 +133,10 @@ export type DealRequest = {
   disputedAt?: string;
   /** Catégorie du signalement (A68) — jamais le dossier. */
   disputeCategory?: DealDisputeCategory;
+  /** D50/A82 — montant réellement versé : le net à COMPLETED, la compensation ANN-01 à CANCELLED tardif. */
+  payoutAmountCents?: number;
+  /** Annulation tardive : la retenue est versée (CARRIER) ou conservée « à arbitrer » (HELD_FOR_MEDIATION, A81). */
+  retentionDisposition?: "CARRIER" | "HELD_FOR_MEDIATION";
 };
 
 export type DealPayoutStatus = "PENDING" | "SENT" | "FAILED" | "FROZEN";

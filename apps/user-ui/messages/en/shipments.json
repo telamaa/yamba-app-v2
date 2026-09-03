@@ -89,7 +89,7 @@
     "dialogIntro": "Your request {route} with {carrierFirstName} will be permanently cancelled.",
     "refundLabel": "You will be refunded",
     "fullRefundNote": "Full refund: the payment has not been captured yet, or you are cancelling more than 48h before departure.",
-    "retentionNote": "A {pct}% retention ({retention}) applies because departure is less than 48h away (it compensates the Tripper).",
+    "retentionNote": "A {pct}% retention ({retention}) applies because departure is less than 48h away: it goes to the carrier, who had reserved their capacity for you.",
     "finalWarning": "This action is final",
     "keep": "Keep the shipment",
     "confirm": "Confirm cancellation",

@@ -39,11 +39,13 @@ const router = Router();
 // est exporté : le cron d'expiration et le webhook Stripe (main.ts) le
 // réutilisent — une seule instance, une seule vérité.
 const paymentProvider = createPaymentProviderFromEnv();
-export const dealLifecycleService = makeDealLifecycleService(paymentProvider);
+// A80 — l'exécuteur de versement est construit AVANT le cycle de vie : la
+// compensation d'annulation tardive part par le même chemin (D49).
+export const dealSettlementService = makeDealSettlementService(paymentProvider);
+export const dealLifecycleService = makeDealLifecycleService(paymentProvider, undefined, dealSettlementService);
 const dealRequest = makeDealRequestController(makeDealRequestService(paymentProvider));
 const dealLifecycle = makeDealLifecycleController(dealLifecycleService);
 const dealTransport = makeDealTransportController(makeDealTransportService(paymentProvider));
-export const dealSettlementService = makeDealSettlementService(paymentProvider);
 const dealSettlement = makeDealSettlementController(dealSettlementService);
 
 // Autorisation du montant (empreinte) — étape 1 de la demande (D37)

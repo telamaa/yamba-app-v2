@@ -300,9 +300,31 @@ describe("B — executePayout : le net du snapshot, rattaché à la charge, jama
     expect(outcome.payoutStatus).toBe("SENT");
   });
 
-  it("un deal non COMPLETED ne se verse pas (INV-2)", async () => {
+  it("un deal non COMPLETED ne se verse pas (INV-2) — sauf la compensation d'un CANCELLED tardif (A80)", async () => {
     await expectCode(makeService().executePayout(makeBookingRecord({ status: "DELIVERED" }) as never, NOW), "TRANSITION_NOT_ALLOWED");
     await expectCode(makeService().executePayout(makeBookingRecord({ status: "DISPUTED" }) as never, NOW), "TRANSITION_NOT_ALLOWED");
+    // CANCELLED sans montant posé (annulation avant D50, ou retenue « à arbitrer ») : rien à verser.
+    await expectCode(makeService().executePayout(makeBookingRecord({ status: "CANCELLED" }) as never, NOW), "TRANSITION_NOT_ALLOWED");
+  });
+
+  it("D50/A79–A82 : CANCELLED tardif → verse payoutAmountCents (la compensation, PAS le net), motif LATE_CANCELLATION dans l'événement et les métadonnées", async () => {
+    const fake = new FakePaymentProvider();
+    const booking = { ...makeBookingRecord({ status: "CANCELLED", payoutStatus: "PENDING" }), payoutAmountCents: 1200 } as never;
+    const outcome = await makeService(fake).executePayout(booking, NOW);
+    expect(outcome.payoutStatus).toBe("SENT");
+    expect(fake.transfers[0].amountCents).toBe(1200);
+    const [u] = updates();
+    expect(u.where).toEqual({ id: BOOKING_ID, status: "CANCELLED", payoutStatus: { in: ["PENDING", "FAILED"] } });
+    expect(u.data).toMatchObject({ payoutStatus: "SENT", payoutAmountCents: 1200 });
+    expect(writtenEvent("booking.payout_sent")!.payload).toMatchObject({ amountCents: 1200, reason: "LATE_CANCELLATION" });
+    expect(() => BookingDomainEventSchema.parse(writtenEvent("booking.payout_sent"))).not.toThrow();
+  });
+
+  it("COMPLETED → motif DELIVERY, montant = net du snapshot même si payoutAmountCents est posé", async () => {
+    const fake = new FakePaymentProvider();
+    await makeService(fake).executePayout({ ...makeBookingRecord({ status: "COMPLETED", payoutStatus: "PENDING" }), payoutAmountCents: 2400 } as never, NOW);
+    expect(fake.transfers[0].amountCents).toBe(2400);
+    expect(writtenEvent("booking.payout_sent")!.payload).toMatchObject({ reason: "DELIVERY" });
   });
 });
 
@@ -421,14 +443,14 @@ describe("D — cron de versement (A66/A70)", () => {
     expect(n).toBe(1);
   });
 
-  it("retryFailedPayouts : ne rejoue que COMPLETED + FAILED sous le plafond ; compte les SENT", async () => {
+  it("retryFailedPayouts : rejoue COMPLETED et CANCELLED (compensation A80), PENDING ou FAILED, sous le plafond ; compte les SENT", async () => {
     prismaMock.booking.findMany.mockResolvedValue([makeBookingRecord({ status: "COMPLETED", payoutStatus: "FAILED", payoutAttempts: 3 })]);
     const n = await makeService().retryFailedPayouts();
     expect(n).toBe(1);
     expect(prismaMock.booking.findMany.mock.calls[0][0].where).toEqual({
-      status: "COMPLETED",
+      status: { in: ["COMPLETED", "CANCELLED"] },
       isDeleted: false,
-      payoutStatus: "FAILED",
+      payoutStatus: { in: ["PENDING", "FAILED"] },
       payoutAttempts: { lt: PAYOUT_MAX_ATTEMPTS },
     });
     expect(updates()[0].data).toMatchObject({ payoutStatus: "SENT", payoutAttempts: 4 });

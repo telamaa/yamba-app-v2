@@ -926,3 +926,28 @@ Après la remise, le Voyageur tombait sur une ligne (« Deal terminé — paieme
 | V17 | Livraison sans photo | Comportement inchangé ; écran de succès sans bouton « Noter », texte « partiront … le {date} au plus tard, puis 2 à 7 jours » |
 | V18 | Photo trop lourde ou mauvais format | Vignette rouge « retire-la et réessaye », validation bloquée tant qu'elle reste |
 | V19 | Mobile (≤ 640 px) sur V10, V11, V15, V16 | Mêmes contenus en une colonne, carte Expéditeur en bas |
+
+# Retenue ANN-01 — l'annulation tardive dédommage le Voyageur
+
+### Le besoin
+D39 promettait que la retenue de 50 % d'une annulation tardive reviendrait au Voyageur « avec l'infrastructure payout ». Elle restait chez Yamba. Décisions utilisateur du 03/09 (1A à 6A) : prorata de la part nette, versement immédiat, pas de compensation automatique après le départ, rien de rétroactif, arrondi au centime, notification et écrans.
+
+### Règles de gestion (ANN)
+- **RG-ANN-01 — La compensation est la retenue au prorata de la part nette du Voyageur** : retenue × net ÷ total payé, arrondie au centime, sans minimum ; le reste d'arrondi et la part de commission restent à Yamba. Tant que la protection (D22) n'est pas réelle, la prime vaut 0 ; le jour où elle le sera, elle est remboursée à 100 % et sort du prorata.
+- **RG-ANN-02 — Elle part immédiatement**, dès l'annulation, par le même mécanisme que le versement d'une livraison ; un échec devient « en attente » et est rejoué automatiquement. Le Voyageur n'a rien à demander.
+- **RG-ANN-03 — Annulation après le départ sans prise en charge : pas de compensation automatique.** La retenue est conservée par Yamba « à arbitrer » ; la médiation (chantier C) décidera qui a fait défaut.
+- **RG-ANN-04 — Rien de rétroactif** : les deals annulés avant cette règle gardent leur trace, sans versement.
+- **RG-ANN-05 — Chaque compensation laisse un email** au Voyageur (« ta compensation est partie », 2 à 7 jours) ; l'Expéditeur lit dans sa confirmation de remboursement que la retenue revient au Voyageur, et déjà avant d'annuler.
+- **RG-ANN-06 — Le Voyageur voit la compensation là où il regarde** : page du deal annulé (montant, état, bouton Stripe si compte non prêt) et ligne « Mes trajets ».
+
+### Recette
+| # | Scénario | Attendu |
+|---|---|---|
+| ANN1 | Expéditrice annule un deal ACCEPTED à moins de 48 h du départ (Fake) | Remboursement 50 % ; deal CANCELLED avec `retentionDisposition CARRIER`, `payoutStatus SENT`, `payoutAmountCents` = retenue × net ÷ total ; événements `refund_issued` puis `payout_sent` (motif LATE_CANCELLATION) |
+| ANN2 | Modale d'annulation, à moins de 48 h | Note « retenue … reversée au Voyageur » |
+| ANN3 | Email Expéditrice de remboursement | Montant remboursé + phrase « la retenue revient au Voyageur » |
+| ANN4 | Email Voyageur | « Ta compensation est partie », montant de la compensation, 2 à 7 jours |
+| ANN5 | Page du deal annulé côté Voyageur ; ligne « Mes trajets » | Carte verte « {montant} de compensation partis vers ton compte » ; ligne « Annulée tardivement · … partis » |
+| ANN6 | Même chose, Stripe réel, compte Voyageur non prêt | Carte ambre « en attente : finalise ton compte Stripe », bandeau en tête de « Mes trajets », rejeu au cron après onboarding |
+| ANN7 | Annulation APRÈS le départ (pas de prise en charge) | Remboursement 50 %, `HELD_FOR_MEDIATION`, aucun versement ; côté Voyageur « retenue conservée, on te contacte » ; ligne « Annulée après le départ » |
+| ANN8 | Annulation à plus de 48 h | Remboursement intégral, aucune retenue, rien côté Voyageur |

@@ -194,6 +194,19 @@ describe("frontière carrier — liste blanche résistante au spread (A13)", () 
     expect(toCarrierBookingView(makeBooking(), SHIPPER).payoutBlocker).toBeNull();
   });
 
+  it("D50/A82 : payoutAmountCents et retentionDisposition servis au Voyageur (compensation d'annulation tardive), null sinon", () => {
+    const late = toCarrierBookingView(
+      makeBooking({ status: "CANCELLED", payoutStatus: "SENT", payoutAmountCents: 1200, retentionDisposition: "CARRIER" } as never),
+      SHIPPER
+    );
+    expect(late.payoutAmountCents).toBe(1200);
+    expect(late.retentionDisposition).toBe("CARRIER");
+    const held = toCarrierBookingView(makeBooking({ status: "CANCELLED", retentionDisposition: "HELD_FOR_MEDIATION" } as never), SHIPPER);
+    expect(held.retentionDisposition).toBe("HELD_FOR_MEDIATION");
+    expect(held.payoutAmountCents).toBeNull();
+    expect(toCarrierBookingView(makeBooking(), SHIPPER).retentionDisposition).toBeNull();
+  });
+
   it("B4/A76 : deliveryPhotoUrls servies aux deux vues, [] quand absentes (enregistrements antérieurs)", () => {
     const withPhotos = makeBooking({ status: "DELIVERED", deliveryPhotoUrls: ["https://ik.imagekit.io/yamba/deals/delivery/a.jpg"] } as never);
     expect(toShipperBookingView(withPhotos, CARRIER).deliveryPhotoUrls).toEqual(["https://ik.imagekit.io/yamba/deals/delivery/a.jpg"]);

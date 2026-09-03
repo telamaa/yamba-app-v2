@@ -407,6 +407,67 @@ describe("C — cancel Expéditeur (ANN-01, D39)", () => {
     );
     expect(writtenEventPayload("booking.refund_issued")).toMatchObject({ amountCents: 1479 });
     expect(result.refundAmountCents).toBe(1479);
+    // D50/A79 : la retenue (1478) est tracée, destinée au Voyageur au prorata de sa part nette :
+    // round(1478 × 2400 / 2957) = 1200 — posé en PENDING pour l'exécuteur (A80).
+    expect(prismaMock.booking.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          retentionCents: 1478,
+          retentionDisposition: "CARRIER",
+          payoutStatus: "PENDING",
+          payoutAmountCents: 1200,
+        }),
+      })
+    );
+  });
+
+  it("D50/A80 : la compensation part IMMÉDIATEMENT par l'exécuteur injecté (deal CANCELLED, montant = compensation) ; un échec de l'exécuteur ne casse pas l'annulation", async () => {
+    const { provider, intentId } = await makeProviderWithAuth();
+    await provider.capture(intentId);
+    prismaMock.booking.findUnique.mockResolvedValue(
+      makeBookingRecord({ status: "ACCEPTED", paymentIntentId: intentId, departureAt: hoursFromNow(12) })
+    );
+    const executor = { executePayout: jest.fn().mockResolvedValue({ payoutStatus: "SENT" }) };
+    const result = await makeDealLifecycleService(provider, () => NOW, executor).cancel(SHIPPER, BOOKING_ID, {});
+    expect(result.refundAmountCents).toBe(1479);
+    expect(executor.executePayout).toHaveBeenCalledTimes(1);
+    const [passed, when] = executor.executePayout.mock.calls[0];
+    expect(passed).toMatchObject({ id: BOOKING_ID, status: "CANCELLED", payoutStatus: "PENDING", payoutAmountCents: 1200 });
+    expect(when).toEqual(NOW);
+
+    const failing = { executePayout: jest.fn().mockRejectedValue(new Error("stripe down")) };
+    prismaMock.booking.findUnique.mockResolvedValue(
+      makeBookingRecord({ status: "ACCEPTED", paymentIntentId: intentId, departureAt: hoursFromNow(12) })
+    );
+    await expect(makeDealLifecycleService(provider, () => NOW, failing).cancel(SHIPPER, BOOKING_ID, {})).resolves.toMatchObject({ status: "CANCELLED" });
+  });
+
+  it("D50/A81 : annulation APRÈS le départ sans prise en charge → retenue conservée « à arbitrer », AUCUNE compensation, exécuteur non appelé", async () => {
+    const { provider, intentId } = await makeProviderWithAuth();
+    await provider.capture(intentId);
+    prismaMock.booking.findUnique.mockResolvedValue(
+      makeBookingRecord({ status: "ACCEPTED", paymentIntentId: intentId, departureAt: hoursFromNow(-6) })
+    );
+    const executor = { executePayout: jest.fn() };
+    await makeDealLifecycleService(provider, () => NOW, executor).cancel(SHIPPER, BOOKING_ID, {});
+    const call = prismaMock.booking.updateMany.mock.calls.find((c) => c[0].data.status === "CANCELLED")!;
+    expect(call[0].data).toMatchObject({ refundAmountCents: 1479, retentionCents: 1478, retentionDisposition: "HELD_FOR_MEDIATION" });
+    expect(call[0].data).not.toHaveProperty("payoutStatus");
+    expect(executor.executePayout).not.toHaveBeenCalled();
+  });
+
+  it("annulation à plus de 48 h : remboursement intégral, aucune retenue tracée", async () => {
+    const { provider, intentId } = await makeProviderWithAuth();
+    await provider.capture(intentId);
+    prismaMock.booking.findUnique.mockResolvedValue(
+      makeBookingRecord({ status: "ACCEPTED", paymentIntentId: intentId, departureAt: hoursFromNow(72) })
+    );
+    const executor = { executePayout: jest.fn() };
+    await makeDealLifecycleService(provider, () => NOW, executor).cancel(SHIPPER, BOOKING_ID, {});
+    const call = prismaMock.booking.updateMany.mock.calls.find((c) => c[0].data.status === "CANCELLED")!;
+    expect(call[0].data.refundAmountCents).toBe(2957);
+    expect(call[0].data).not.toHaveProperty("retentionCents");
+    expect(executor.executePayout).not.toHaveBeenCalled();
   });
 
   it("seul l'Expéditeur peut annuler (403)", async () => {

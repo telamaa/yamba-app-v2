@@ -67,6 +67,21 @@ export type BookingSnapshotsForLifecycle = {
  * Départ passé : même barème « moins de 48 h » (le pickup n'a pas eu lieu,
  * sinon la machine aurait déjà interdit l'annulation).
  */
+/**
+ * Compensation du Voyageur sur une annulation tardive (D50, A79) :
+ * la retenue au prorata de sa part nette — `round(retenue × net / total)`,
+ * arrondi au centime, reste à Yamba. 0 si rien n'est retenu.
+ */
+export function computeLateCancellationCompensationCents(args: {
+  retentionCents: number;
+  transportCents: number;
+  totalShipperCents: number;
+}): number {
+  const { retentionCents, transportCents, totalShipperCents } = args;
+  if (retentionCents <= 0 || totalShipperCents <= 0) return 0;
+  return Math.round((retentionCents * transportCents) / totalShipperCents);
+}
+
 export function computeCancellationRefundCents(args: {
   totalShipperCents: number;
   departureAt: Date;
