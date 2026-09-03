@@ -1158,3 +1158,14 @@ tsc user-ui, miroir i18n, pages login et trajet en 200 sur le serveur de dev. Re
 
 ### Preuves
 Config évaluée en Node avec et sans variable ; tsc user-ui. Recette : avec le proxy, `http://localhost:3000` ET `http://192.168.1.155:3000` doivent permettre connexion + `/me` sans changer d'environnement.
+
+# feat/follow-auth-gate — « Suivre » passe par la porte d'identité (A64)
+
+1. **`FollowSidebar`** (`apps/user-ui/src/components/users/profile/FollowSidebar.tsx`) : `handleToggleFollow` ouvre `AuthGateModal` (`gateOpen`) quand `user.follow.isFollowedByMe === null` (l'API renvoie `null` pour un visiteur, `true`/`false` pour un connecté — c'est l'indicateur de session déjà utilisé par le composant) au lieu de `router.push("/login?redirect=…")`.
+2. **Reprise du geste** : `onSignedInAction={() => follow({ slug, notifyNextTrip: true })}` — la mutation `useFollowUser` est optimiste (`isFollowedByMe: true`, `followersCount + 1`) puis `onSettled` invalide `["public-user", slug]` et `["following"]` : le profil se recharge avec la session (le bouton passe à « Suivi », le toggle de notification apparaît, et `isOwnProfile` devient vrai si le visiteur s'est connecté avec le compte du profil — la mutation est alors refusée par le serveur et le cache revient à son état précédent).
+3. **`redirect`** = `usePathname()` (repli `/u/:slug`) : le lien « Inscris-toi » de la fenêtre ramène sur le profil après OTP et connexion (chaîne A54/A58).
+4. La modale n'est rendue que si `!user.isOwnProfile` (le propre profil montre « Modifier mon profil », jamais « Suivre »).
+5. i18n : `common.authGate.follow.{title,subtitle}` FR/EN avec la variable `{firstName}` (`tGate("title", { firstName })`).
+
+### Preuves
+tsc user-ui (`tsc -p apps/user-ui`), `node scripts/check-i18n-messages.mjs` (miroir parfait). Recette S1–S4 (`YAMBA-DOC-METIER.md`).

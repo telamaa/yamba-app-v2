@@ -805,3 +805,20 @@ Se connecter ou s'inscrire en un clic avec Google, sans mot de passe ni code par
 | M4 | Visiteur, « Partager un trajet », connexion dans la fenêtre | Arrivée sur la création de trajet |
 | M5 | Mauvais mot de passe dans la fenêtre | Erreur sous le champ, fenêtre ouverte |
 | M6 | « Inscris-toi » dans la fenêtre | Page d'inscription, retour sur la page d'origine après OTP et connexion |
+
+# feat/follow-auth-gate — suivre un Voyageur sans quitter son profil
+
+### Le besoin
+Sur le profil public d'un Voyageur (`/u/:slug`), le bouton « Suivre » envoyait le visiteur non connecté vers la page de connexion, puis le ramenait sur le profil : rupture de contexte, alors que réserver et mettre en favori passent déjà par la fenêtre d'identité. Recette 03/09 : même comportement demandé sur « Suivre ».
+
+### Règle de gestion
+- **RG-C-21 — « Suivre » ouvre la fenêtre d'identité pour un visiteur** (« Connecte-toi pour suivre {prénom} », formulaire de connexion sur place, Google inclus). Après connexion, le suivi est appliqué immédiatement avec l'alerte « prochain trajet » activée, et le visiteur reste sur le profil. Le serveur reste seul juge : pas de session → 401, se suivre soi-même → refusé.
+
+### Recette
+| # | Scénario | Attendu |
+|---|---|---|
+| S1 | Visiteur, `/u/seed-ines`, clic « Suivre » | Fenêtre « Connecte-toi pour suivre Inès » par-dessus le profil, aucune navigation |
+| S2 | Connexion par e-mail dans la fenêtre | Fenêtre fermée, bouton « Suivi », toggle « M'alerter de son prochain trajet » coché, compteur d'abonnés + 1, toujours sur le profil |
+| S3 | « Plus tard » ou Échap | Fenêtre fermée, bouton « Suivre » inchangé, profil intact |
+| S4 | « Inscris-toi » dans la fenêtre, inscription, OTP, connexion | Retour sur `/u/seed-ines` |
+| S5 | Connexion dans la fenêtre avec le compte du profil lui-même | Le bouton « Suivre » laisse place à « Modifier mon profil », aucun suivi créé |

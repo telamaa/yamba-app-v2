@@ -185,6 +185,10 @@
     "favorite": {
       "title": "Sign in to save a favorite",
       "subtitle": "Your favorites are tied to your account: they follow you on every device. This trip will be waiting after sign-in."
+    },
+    "follow": {
+      "title": "Sign in to follow {firstName}",
+      "subtitle": "Following {firstName} tells you about their next trips: it is tied to your account. You stay on this profile after sign-in."
     }
   }
 }

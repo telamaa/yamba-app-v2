@@ -233,6 +233,10 @@ Ordre de demarrage : auth -> trip -> gateway.
 - 03/09 : chore/api-same-origin (D48) — proxy Next /api/* → gateway (opt-in
   API_PROXY_TARGET + NEXT_PUBLIC_API_BASE_URL=/api) : cookies first-party sur
   tout hote, fin du piege localhost/LAN. Backlog recette 03/09 : SOLDE (P1→P3).
+- 03/09 : feat/follow-auth-gate (A64) — bouton « Suivre » du profil public
+  /u/:slug → porte d'identite en modale (formulaire embarque), suivi applique
+  apres connexion sans quitter le profil ; derniere redirection /login sur un
+  geste supprimee.
 - Plateforme de tests : 600 (trip 187, deal 354, notification 59) — post-B3 (#96).
 - MERGE 01/09 : toute la pile B2 est dans `dev` via la SEULE **PR #90**
   (`feat/b2-deal-front` portait la chaîne complète : jalons mobile D36,

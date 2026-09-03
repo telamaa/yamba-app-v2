@@ -270,6 +270,14 @@ Objectif produit assumé : **solide, propre, pro, secure, long terme** — les f
 
 ---
 
+## 2bis.17 — Session `feat/follow-auth-gate` (porte d'identité sur « Suivre ») — A64
+
+| # | Arbitrage | Pourquoi | Compromis | PR |
+|---|---|---|---|---|
+| A64 | **Le bouton « Suivre » du profil public passe par la porte d'identité en modale, comme le cœur favori.** Le visiteur non connecté qui clique « Suivre » sur `/u/:slug` voit `AuthGateModal` « Connecte-toi pour suivre {prénom} » (formulaire de connexion embarqué, A63) ; après connexion, `onSignedInAction` applique le suivi immédiatement (`useFollowUser`, optimiste, `notifyNextTrip: true`) et le profil est rechargé côté connecté (`isFollowedByMe`, `isOwnProfile`). La redirection `/login?redirect=/u/:slug` disparaît — c'était la dernière porte d'identité par redirection sur un geste. Le serveur reste seul juge (401 sans session, refus de se suivre soi-même) | Troisième occurrence du même geste (réserver, favori, suivre) : la règle A60 « généraliser à la 2e occurrence » s'applique ; un visiteur qui suit un Voyageur veut rester sur son profil | La modale n'est montée que hors « propre profil » ; le libellé porte le prénom (variable i18n `{firstName}`) — à revoir si la porte devient un composant sans contexte | `feat/follow-auth-gate` |
+
+---
+
 # 3. Roadmap maîtresse
 
 ## 3.0 Les trois jalons

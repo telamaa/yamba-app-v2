@@ -185,6 +185,10 @@
     "favorite": {
       "title": "Connecte-toi pour enregistrer un favori",
       "subtitle": "Tes favoris sont liés à ton compte : ils te suivent sur tous tes appareils. Ce trajet t'attend après connexion."
+    },
+    "follow": {
+      "title": "Connecte-toi pour suivre {firstName}",
+      "subtitle": "Suivre {firstName} te prévient de ses prochains trajets : c'est lié à ton compte. Tu restes sur ce profil après connexion."
     }
   }
 }
