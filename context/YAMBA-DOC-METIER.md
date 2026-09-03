@@ -867,3 +867,34 @@ Après la remise contre code, l'argent de l'Expéditeur était capturé mais rie
 | LIT6 | Deal PICKED_UP, départ ≥ 48 h, `NOT_DELIVERED` | 200, DISPUTED, pas de gel (rien n'était programmé) |
 | LIT7 | `GET /deals/:id` en DISPUTED | Expéditrice : `dispute` complet ; Voyageur : `disputeCategory` seul, ni description ni photos |
 | LIT8 | Cron J+4 sur un deal DISPUTED | Rien : jamais de versement automatique (INV-5) |
+
+# B4-PR2 — l'Expéditeur confirme, laisse courir, ou signale : les écrans
+
+### Le besoin
+Le serveur sait clore une transaction, verser et geler (B4-PR1) ; l'Expéditeur, lui, avait encore des boutons factices, une carte « Noter » vers une page vide et un lien « Signaler » toujours actif. Décisions utilisateur du 03/09 (1A à 7A) : bouton de confirmation secondaire, vraie vue de fin, dossier de litige lisible, « Signaler » en transit désactivé avec la date, motif « non livré » verrouillé, photos envoyées à la sélection, accès direct interdit.
+
+### Règles de gestion (E = Expéditeur)
+- **RG-E-01 — La confirmation anticipée ne se présente jamais comme LE geste attendu** : bouton secondaire, confirmation en ligne qui dit « définitif », conseil d'ouvrir le colis avant. Le geste par défaut est de ne rien faire.
+- **RG-E-02 — Chaque bouton reflète `allowedActions`** : « Confirmer » n'existe que si le serveur permet `confirmEarly`, « Signaler » que s'il permet `dispute`. Le front ne calcule aucune fenêtre.
+- **RG-E-03 — En transit, « Signaler un colis non livré » est visible mais fermé avant la date servie par l'API** (départ + 48 h), avec la date affichée. Ouvert : motif verrouillé sur « non livré », le reste du formulaire inchangé.
+- **RG-E-04 — Les photos de preuve partent dès la sélection** vers le stockage des preuves de litige ; le signalement ne peut pas être envoyé tant qu'une photo est en cours ou en échec.
+- **RG-E-05 — L'écran de fin dit le sort de l'argent** (« le paiement de {prénom} est libéré », confirmé par toi ou automatiquement à J+4) et ferme la porte (« transaction close, plus de signalement possible »). L'Expéditeur ne voit jamais un échec de versement du Voyageur.
+- **RG-E-06 — L'écran de litige montre le dossier déposé** (ticket, motif, description, solution souhaitée, photos, date), les 4 étapes et le contact support avec le numéro à rappeler.
+- **RG-E-07 — Sans droit de signaler, la page de signalement renvoie au suivi** avec un message, jamais une page « impossible ».
+- **RG-E-08 — Aucun bouton « Noter » tant que la notation n'existe pas** (B5) ; une note calme annonce qu'il viendra.
+
+### Recette
+| # | Scénario | Attendu |
+|---|---|---|
+| E1 | Deal DELIVERED (seed `bzv-delivered`), écran livré | Compte à rebours J+4, carte « Tout s'est bien passé ? » avec bouton contour et conseil, carte « Signaler un problème », AUCUNE carte « Noter » |
+| E2 | Clic « Confirmer la livraison » | Confirmation en ligne « définitif », Annuler referme |
+| E3 | « Oui, tout est OK » | Toast sans emoji, écran « Envoi terminé » : bannière « Tu as confirmé le … », « le paiement de {prénom} est libéré », carte paiement « Libéré », note « bientôt noter » sans bouton |
+| E4 | Deal COMPLETED par le cron (seed `bzv-completed`) | Même écran, bannière « Période de vérification terminée le … » |
+| E5 | Deal PICKED_UP, départ < 48 h | Lien « Signaler un colis non livré » grisé avec « à partir du {date} » ; `/report` en direct → retour au suivi + toast |
+| E6 | Deal PICKED_UP, départ ≥ 48 h | Lien actif ; formulaire avec bandeau « colis encore en transit », motif « non livré » seul et coché, barre latérale « colis en transit » |
+| E7 | Deal DELIVERED, formulaire complet, ajout de 2 photos | Vignettes « envoi… » puis nettes ; bouton Envoyer inactif pendant l'envoi ; photo trop lourde → vignette rouge « retire-la » et Envoyer inactif |
+| E8 | Envoi confirmé | Écran succès avec le ticket `YAM-XXXX` du serveur ; retour au suivi → écran « Signalement en cours » |
+| E9 | Écran DISPUTED (seed `bzv-disputed`) | Bannière ticket + date, dossier complet, 4 étapes, paiement « Gelé », support `mailto:` avec le ticket |
+| E10 | Deal DELIVERED après J+4 (cron pas encore passé) | Ni « Confirmer » ni « Signaler » (allowedActions vides), compte à rebours à zéro |
+| E11 | Deux onglets : confirmer dans l'un, signaler dans l'autre | Le second reçoit « ce deal a changé » et revient au suivi à jour |
+| E12 | Mobile (≤ 640 px) sur E1, E3, E6, E9 | Mêmes contenus en une colonne, boutons pleine largeur |

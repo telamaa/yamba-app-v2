@@ -295,6 +295,17 @@ Objectif produit assumé : **solide, propre, pro, secure, long terme** — les f
 
 ---
 
+## 2bis.19 — Session B4-PR2 `feat/b4-shipper-front` (argent sortant, tracker Expéditeur) — A71→A74
+
+| # | Arbitrage | Pourquoi | Compromis | PR |
+|---|---|---|---|---|
+| A71 | **La confirmation anticipée est un bouton SECONDAIRE** (contour, pas de couleur pleine) avec confirmation en ligne « définitif » et le conseil « demande au destinataire d'ouvrir le colis avant de confirmer » ; « Signaler » reste visible à côté. Après confirmation, le suivi bascule sur la vraie vue « Envoi terminé » (COMPLETED), pas sur une carte d'état | Décisions utilisateur 03/09 (1A, 2A) : un clic trop rapide retire un droit ; l'écran de fin doit dire le sort de l'argent (RG-T-03) sans jamais exposer un échec de versement du Voyageur à l'Expéditeur | La carte « paiement libéré » de la maquette disparaît au profit de la vue COMPLETED | `feat/b4-shipper-front` |
+| A72 | **`disputeOpensAt` est SERVI par l'API** (vue Expéditeur : `trip.departureAt + 48 h` en PICKED_UP, null sinon) — le front l'affiche (« possible à partir du … ») et désactive le bouton tant que `dispute ∉ allowedActions` ; il ne calcule jamais la date | « Le front reflète, ne décide jamais » ; la constante 48 h n'a qu'un propriétaire (la machine) | Un champ de plus dans le DTO Expéditeur | `feat/b4-shipper-front` |
+| A73 | **Un seul formulaire de signalement** : depuis le transit, le motif est verrouillé sur « non livré » avec un bandeau explicatif (5A) ; les photos partent à la sélection vers `deals/dispute/` (upload direct signé D42) et l'envoi n'est possible que quand toutes sont en ligne (6A) ; un accès direct à `/report` sans droit (`dispute ∉ allowedActions`) renvoie au suivi avec un message (7A) | Une copie du formulaire divergerait (A60) ; une photo qui ne part pas doit se voir AVANT l'envoi (RG-P-13) ; une page « impossible » n'apprend rien de plus qu'un retour au suivi | Le formulaire porte une variante d'état de plus | `feat/b4-shipper-front` |
+| A74 | **La vue DISPUTED est un récapitulatif du dossier** (ticket, motif, description, photos, solution souhaitée, date), les 4 étapes du processus et l'adresse support avec le numéro à rappeler (3A) | L'Expéditeur doit retrouver ce qu'il a déclaré et savoir ce qui suit ; la médiation (chantier C) lira le même dossier | Aucun échange dans l'app avant le chantier C | `feat/b4-shipper-front` |
+
+---
+
 # 3. Roadmap maîtresse
 
 ## 3.0 Les trois jalons

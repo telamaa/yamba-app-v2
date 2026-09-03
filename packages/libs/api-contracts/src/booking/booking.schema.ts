@@ -250,6 +250,12 @@ export const ShipperBookingViewSchema = z
     dispute: ShipperDisputeViewSchema.nullish().meta({
       description: "The dispute file (status DISPUTED) — shipper only (A68); absent otherwise",
     }),
+
+    disputeOpensAt: z.iso.datetime().nullable().meta({
+      description:
+        "PICKED_UP only: when the 'not delivered' dispute becomes possible (trip departure + 48h — B4/D51). " +
+        "Served, never computed by the front (A72). null otherwise.",
+    }),
   })
   .meta({
     id: "ShipperBookingView",

@@ -11,25 +11,20 @@
  *     nouveau code est servi, puis la page RELIT GET /deals/:id — A43)
  *
  * ENCORE MOCK (basculent avec leurs endpoints — A37) :
- *   - confirmDeliveryEarly   (B4 — COMPLETED + transfert)
- *   - submitDispute          (B4 — DISPUTED + gel du payout)
+ *   - confirmDeliveryEarly   RÉEL (B4-PR2) — POST /deals/:id/confirm
+ *   - submitDispute          RÉEL (B4-PR2) — POST /deals/:id/dispute
  */
 
 import apiClient from "@/lib/api-client";
 import { MAX_CODE_REGENERATIONS, type Booking } from "./booking-tracker.types";
 import { toBooking, type ShipperBookingViewDto } from "./booking-tracker.adapter";
 
-const MOCK_DELAY_MS = 600;
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 /* ══ Erreur métier (pattern DealApiError, module carrier/deal) ═ */
 
 export type BookingApiErrorCode =
   | "CODE_REGENERATION_LIMIT" // plafond 5 atteint, ou colis plus en transit (B3)
   | "TRANSITION_NOT_ALLOWED" // deux clics : un seul gagne — relire
+  | "VALIDATION" // 400 : corps refusé par le serveur (B4 : description, pledge, catégorie en transit)
   | "NOT_FOUND"
   | "UNAUTHENTICATED"
   | "GENERIC";
@@ -53,11 +48,13 @@ function toBookingApiError(e: unknown): BookingApiError {
   const code: BookingApiErrorCode =
     detailCode === "CODE_REGENERATION_LIMIT" || detailCode === "TRANSITION_NOT_ALLOWED"
       ? detailCode
-      : status === 404 || status === 403
-        ? "NOT_FOUND" // 403 volontairement confondu (le deal existe, pas pour toi)
-        : status === 401
-          ? "UNAUTHENTICATED"
-          : "GENERIC";
+      : status === 400
+        ? "VALIDATION"
+        : status === 404 || status === 403
+          ? "NOT_FOUND" // 403 volontairement confondu (le deal existe, pas pour toi)
+          : status === 401
+            ? "UNAUTHENTICATED"
+            : "GENERIC";
   return new BookingApiError(
     code,
     status,
@@ -109,38 +106,50 @@ export async function regenerateDeliveryCode(
 }
 
 /**
- * Confirmation anticipée du Sender ("tout va bien") : libère le paiement
- * immédiatement. MOCK — bascule en B4 (Deal → COMPLETED,
- * transfers.create() Stripe, notification "Versement effectué").
- * Action DÉFINITIVE : plus de signalement possible ensuite.
+ * Confirmation anticipée (B4-PR2, réel) : le serveur passe le deal en
+ * COMPLETED puis tente le versement EN LIGNE (A67). Action DÉFINITIVE
+ * (INV-3). L'appelant RELIT le deal : la vue « Envoi terminé » vient de
+ * GET /deals/:id, jamais d'un cache local.
  */
 export async function confirmDeliveryEarly(
   bookingId: string
-): Promise<{ bookingId: string; confirmedAt: string }> {
-  await sleep(MOCK_DELAY_MS);
-  // eslint-disable-next-line no-console
-  console.info("[booking] confirmDeliveryEarly mock:", bookingId);
-  return { bookingId, confirmedAt: new Date().toISOString() };
+): Promise<{ bookingId: string; confirmedAt: string; payoutStatus: "SENT" | "FAILED" }> {
+  try {
+    const res = await apiClient.post<{ bookingId: string; completedAt: string; payoutStatus: "SENT" | "FAILED" }>(
+      `/deals/${bookingId}/confirm`,
+      {},
+      { withCredentials: true }
+    );
+    return { bookingId: res.data.bookingId, confirmedAt: res.data.completedAt, payoutStatus: res.data.payoutStatus };
+  } catch (e) {
+    throw toBookingApiError(e);
+  }
 }
 
 /**
- * Envoie un signalement de litige. MOCK — bascule en B4
- * (Deal → DISPUTED, payout gelé, ticket support, accusé email ≤48 h).
+ * Signalement (B4-PR2, réel) : DISPUTED + gel + ticket YAM-XXXX + dossier.
+ * Les photos sont DÉJÀ en ligne (upload direct D42, dossier `deals/dispute/`,
+ * A73) : seules leurs URL voyagent. Le serveur reste seul juge (fenêtre
+ * J+4, 48 h après le départ en transit, catégorie imposée, ≥ 50 caractères).
  */
 export async function submitDispute(
   bookingId: string,
   payload: import("./booking-tracker.types").SubmitDisputePayload
 ): Promise<{ bookingId: string; ticketNumber: string; submittedAt: string }> {
-  await sleep(MOCK_DELAY_MS);
-  if (!payload.pledgeAccepted) {
-    throw new Error("PLEDGE_REQUIRED");
+  try {
+    const res = await apiClient.post<{ bookingId: string; ticketNumber: string; disputedAt: string }>(
+      `/deals/${bookingId}/dispute`,
+      {
+        category: payload.category,
+        description: payload.description,
+        pledgeAccepted: payload.pledgeAccepted,
+        photoUrls: payload.photoUrls,
+        ...(payload.desiredOutcome ? { desiredOutcome: payload.desiredOutcome } : {}),
+      },
+      { withCredentials: true }
+    );
+    return { bookingId: res.data.bookingId, ticketNumber: res.data.ticketNumber, submittedAt: res.data.disputedAt };
+  } catch (e) {
+    throw toBookingApiError(e);
   }
-  if (payload.description.trim().length < 50) {
-    throw new Error("DESCRIPTION_TOO_SHORT");
-  }
-  const ticketNumber =
-    "YAM-" + Math.floor(1000 + Math.random() * 9000).toString();
-  // eslint-disable-next-line no-console
-  console.info("[booking] submitDispute mock:", { bookingId, payload, ticketNumber });
-  return { bookingId, ticketNumber, submittedAt: new Date().toISOString() };
 }

@@ -23,6 +23,7 @@
  */
 import type {
   Booking,
+  BookingDisputeFile,
   BookingLocation,
   BookingPhoto,
   BookingStatus,
@@ -90,6 +91,18 @@ export type ShipperBookingViewDto = {
   completedAt?: string | null;
   closedAt?: string | null;
   disputeTicket?: string | null;
+  disputedAt?: string | null;
+  payoutStatus?: "PENDING" | "SENT" | "FAILED" | "FROZEN" | null;
+  completedBy?: string | null;
+  disputeOpensAt?: string | null;
+  dispute?: {
+    ticketNumber: string;
+    category: string;
+    description: string;
+    desiredOutcome?: string | null;
+    photoUrls: string[];
+    createdAt: string;
+  } | null;
   deliveryCode: string | null;
   codeRegenerationsLeft: number;
   pickup?: {
@@ -150,6 +163,18 @@ function toTrackingEvents(
   return events.map((e) => ({ id: e.step, at: e.confirmedAt }));
 }
 
+function toDisputeFile(d: ShipperBookingViewDto["dispute"]): BookingDisputeFile | undefined {
+  if (!d) return undefined;
+  return {
+    ticketNumber: d.ticketNumber,
+    category: d.category as BookingDisputeFile["category"],
+    description: d.description,
+    desiredOutcome: (d.desiredOutcome ?? undefined) as BookingDisputeFile["desiredOutcome"],
+    photoUrls: d.photoUrls,
+    createdAt: d.createdAt,
+  };
+}
+
 /* ── L'adapter ───────────────────────────────────────────────── */
 
 export function toBooking(view: ShipperBookingViewDto): Booking {
@@ -164,6 +189,12 @@ export function toBooking(view: ShipperBookingViewDto): Booking {
     closedAt: view.closedAt ?? undefined,
     payoutDueAt: view.payoutDueAt ?? undefined,
     disputeTicket: view.disputeTicket ?? undefined,
+    disputedAt: view.disputedAt ?? undefined,
+    dispute: toDisputeFile(view.dispute),
+    payoutStatus: view.payoutStatus ?? undefined,
+    completedBy: view.completedBy === "SHIPPER" || view.completedBy === "SYSTEM" ? view.completedBy : undefined,
+    completedAt: view.completedAt ?? undefined,
+    disputeOpensAt: view.disputeOpensAt ?? undefined,
 
     carrier: {
       id: view.carrier.id,
@@ -225,10 +256,6 @@ export function toBooking(view: ShipperBookingViewDto): Booking {
       ? {
           deliveredAt: view.deliveredAt,
           validatedBy: "CODE",
-          confirmedEarlyAt:
-            view.status === "COMPLETED" && view.completedAt
-              ? view.completedAt
-              : undefined,
         }
       : undefined,
 

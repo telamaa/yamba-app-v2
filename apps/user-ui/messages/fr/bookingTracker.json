@@ -198,8 +198,10 @@
       "inlineYes": "Oui, tout est OK",
       "inlineCancel": "Annuler",
       "submitting": "Confirmation…",
-      "toastSuccess": "Merci ! {carrierFirstName} va recevoir son paiement. 🎉",
-      "toastError": "Erreur lors de la confirmation. Réessaye."
+      "toastSuccess": "Merci ! {carrierFirstName} va recevoir son paiement.",
+      "toastError": "Erreur lors de la confirmation. Réessaye.",
+      "tip": "Conseil : demande à {recipientFirstName} d''ouvrir le colis avant de confirmer.",
+      "toastConflict": "Ce deal a changé entre-temps — on recharge ton suivi."
     },
     "confirmedCard": {
       "title": "Paiement libéré",
@@ -282,7 +284,8 @@
       "RECIPIENT_ISSUE": "{recipientFirstName} a un autre problème avec le voyageur",
       "RECIPIENT_ISSUE_short": "Autre problème avec {carrierFirstName}",
       "OTHER": "Autre problème",
-      "OTHER_short": "Autre"
+      "OTHER_short": "Autre",
+      "lockedText": "Ton colis est encore en transit : tu peux uniquement signaler qu''il n''a pas été livré. Les autres motifs (contenu, dommage) se constatent après la remise. {carrierFirstName} sera informé."
     },
     "description": {
       "title": "Raconte-nous ce qui s''est passé",
@@ -301,7 +304,9 @@
       "add": "Ajouter",
       "remove": "Retirer cette photo",
       "tag": "Preuve",
-      "hint": "Demande à {recipientFirstName} de te transmettre des photos si elle peut. Jusqu''à {max} photos, max 10 Mo par photo."
+      "hint": "Demande à {recipientFirstName} de te transmettre des photos si elle peut. Jusqu''à {max} photos, max 10 Mo par photo.",
+      "uploading": "Envoi de la photo…",
+      "uploadError": "Échec d'envoi — retire-la et réessaye"
     },
     "outcome": {
       "title": "Ta solution souhaitée",
@@ -345,7 +350,9 @@
       "confirmText": "Le paiement de {carrierFirstName} sera gelé et notre équipe médiation prendra le relais. Cette action est irréversible.",
       "confirmYes": "Oui, envoyer",
       "confirmCancel": "Annuler",
-      "toastError": "Erreur lors de l''envoi. Réessaye."
+      "toastError": "Erreur lors de l''envoi. Réessaye.",
+      "toastConflict": "Ce deal a changé entre-temps — retour au suivi.",
+      "toastValidation": "Le serveur a refusé le signalement : vérifie la description (50 caractères minimum) et l'engagement."
     },
     "sidebar": {
       "dealLabel": "LE DEAL CONCERNÉ",
@@ -357,7 +364,8 @@
       "proofDeclared": "Tu as déclaré ces photos à la réservation",
       "proofPickup": "{carrierFirstName} a pris ces photos à la prise en charge",
       "windowLabel": "FENÊTRE DE SIGNALEMENT",
-      "windowText": "Tu peux signaler jusqu''au {date}."
+      "windowText": "Tu peux signaler jusqu''au {date}.",
+      "inTransitText": "Colis en transit : le signalement « non livré » est ouvert depuis 48 h après le départ du trajet. {carrierFirstName} n''a pas encore validé la remise."
     },
     "success": {
       "title": "Signalement envoyé",
@@ -366,7 +374,8 @@
       "frozenNote": "Le paiement de {carrierFirstName} est gelé. Aucun versement ne sera fait avant la résolution.",
       "emailNote": "Un accusé de réception vient de t''être envoyé par email.",
       "backToTracking": "Retour au suivi de mon envoi"
-    }
+    },
+    "notAllowed": "Ce deal ne peut plus être signalé."
   },
   "senderTracking": {
     "banner": {
@@ -440,7 +449,9 @@
       "coverageTitle": "Protection {amount} choisie",
       "coverageNote": "Perte, vol, casse pendant le transport."
     },
-    "report": "Signaler un problème"
+    "report": "Signaler un problème",
+    "reportNotDelivered": "Signaler un colis non livré",
+    "reportLocked": "Colis non livré ? Tu pourras le signaler à partir du {date} (48 h après le départ du trajet)."
   },
   "error": {
     "notFound": "Cette réservation n''existe pas ou a été annulée.",
@@ -479,5 +490,55 @@
       "message": "Ton signalement est enregistré : le versement au Voyageur est gelé le temps de l'examen. Notre équipe te répond sous 48 h ouvrées.",
       "dateLine": "Ouvert le {date}."
     }
+  },
+  "completed": {
+    "banner": {
+      "title": "Envoi terminé",
+      "byShipper": "Tu as confirmé la livraison le {date}.",
+      "bySystem": "Période de vérification terminée le {date}, sans signalement de ta part."
+    },
+    "h1": "Transaction close",
+    "h1Subtitle": "Tout est en ordre : le paiement de ton Voyageur est libéré et ce deal est clos.",
+    "h1SubtitleShort": "Paiement libéré, deal clos.",
+    "released": {
+      "title": "Le paiement de {carrierFirstName} est libéré",
+      "text": "Yamba verse à {carrierFirstName} le montant convenu pour ce transport. Merci d''avoir expédié avec Yamba.",
+      "closedNote": "Cette transaction est close : il n'est plus possible d'ouvrir un signalement."
+    },
+    "ratingSoon": "Bientôt, tu pourras laisser une note à {carrierFirstName} depuis cet écran.",
+    "backToShipments": "Voir mes envois"
+  },
+  "disputed": {
+    "banner": {
+      "title": "Signalement en cours · dossier {ticket}",
+      "openedAt": "Ouvert le {date}. Le paiement du Voyageur est gelé le temps de l''examen.",
+      "openedNoDate": "Le paiement du Voyageur est gelé le temps de l'examen."
+    },
+    "h1": "Ton signalement",
+    "h1Subtitle": "Voici ce que tu as déclaré et ce qui va se passer. Garde ton numéro de dossier pour tout échange avec nous.",
+    "h1SubtitleShort": "Ce que tu as déclaré, et la suite.",
+    "file": {
+      "label": "TON DOSSIER",
+      "unavailable": "Le détail du dossier n'est pas disponible pour cet envoi.",
+      "ticket": "Numéro de dossier",
+      "category": "Motif",
+      "description": "Ta description",
+      "outcome": "Solution souhaitée",
+      "openedAt": "Envoyé le",
+      "photos": "{count, plural, one {# photo jointe} other {# photos jointes}}",
+      "photoAlt": "Photo de preuve {index}"
+    },
+    "process": {
+      "title": "Ce qui va se passer"
+    },
+    "support": {
+      "title": "Une question sur ton dossier ?",
+      "text": "Écris-nous en rappelant le numéro {ticket} : on te répond sous 48 h ouvrées."
+    },
+    "payment": {
+      "stateFrozen": "Gelé",
+      "note": "Aucun versement ne sera fait à {carrierFirstName} avant la fin de l''examen. Si un remboursement s''applique, il te sera confirmé par email."
+    },
+    "backToShipments": "Voir mes envois"
   }
 }

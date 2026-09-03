@@ -8,6 +8,8 @@
 
 "use client";
 
+import DisputeInTransitLink from "../../shared/DisputeInTransitLink";
+
 import { useTranslations } from "next-intl";
 import type { Booking } from "@/components/booking/booking-tracker/booking-tracker.types";
 import DealStepper, {
@@ -101,6 +103,9 @@ export default function BookingPickedUpDesktop({
               title={t("pickedUp.nextSteps.title")}
               items={tipItems}
             />
+
+            {/* B4-PR2 (A72) : « non livré » — 48 h après le départ. */}
+            <DisputeInTransitLink booking={booking} />
           </div>
 
           {/* Sidebar */}

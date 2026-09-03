@@ -9,9 +9,6 @@
 
 import { ArrowLeft } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
-import {
-  PAYOUT_DAY,
-} from "../../booking-tracker.types";
 import type { BookingReportViewProps } from "./BookingReportClient";
 import PhotoThumbs from "@/components/shared/photos/PhotoThumbs";
 import {
@@ -32,12 +29,8 @@ export default function BookingReportDesktop(props: BookingReportViewProps) {
   const deliveredDateStr = deliveredDate
     ? formatShortDate(deliveredDate, locale)
     : "";
-  const windowEndStr = deliveredDate
-    ? formatShortDate(
-      new Date(deliveredDate.getTime() + PAYOUT_DAY * 24 * 3600 * 1000),
-      locale
-    )
-    : "";
+  // La fin de fenêtre est SERVIE (payoutDueAt) — jamais recalculée ici.
+  const windowEndStr = booking.payoutDueAt ? formatShortDate(new Date(booking.payoutDueAt), locale) : "";
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
@@ -54,7 +47,7 @@ export default function BookingReportDesktop(props: BookingReportViewProps) {
           {t("report.title")}
         </h1>
         <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-          {t("report.subtitle", {
+          {t(deliveredDate ? "report.subtitle" : "report.subtitleShort", {
             originCity: booking.trip.originCity,
             destinationCity: booking.trip.destinationCity,
             date: deliveredDateStr,
@@ -148,14 +141,16 @@ export default function BookingReportDesktop(props: BookingReportViewProps) {
                 )}
               </section>
 
-              {/* FENÊTRE */}
-              {windowEndStr && (
+              {/* FENÊTRE — servie ; en transit (5A) : « non livré » seulement */}
+              {(windowEndStr || props.lockedCategory) && (
                 <section className="rounded-2xl bg-slate-100 p-4 dark:bg-slate-900">
                   <h3 className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                     {t("report.sidebar.windowLabel")}
                   </h3>
                   <p className="mt-1.5 text-[12.5px] leading-snug text-slate-600 dark:text-slate-400">
-                    {t("report.sidebar.windowText", { date: windowEndStr })}
+                    {props.lockedCategory
+                      ? t("report.sidebar.inTransitText", { carrierFirstName })
+                      : t("report.sidebar.windowText", { date: windowEndStr })}
                   </p>
                 </section>
               )}
