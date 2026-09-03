@@ -1346,3 +1346,22 @@ deal-service **418** (+1 mapper) · notification 78 · auth 65 · tsc user-ui ·
 
 ### Reste
 Chantier C (admin-ui) : file « Signaler cet avis » réelle (remplace le mailto), masquage d'un avis sans suppression, paramètres `REPUTATION_PARAMS` servis au front (fin de la copie dupliquée A97).
+
+# C-PR1 — `feat/c1-admin-socle` : le socle de l'admin (D54, A98–A101)
+
+## Ce qui a été fait
+
+1. **Prisma** : `User` + `totpSecretEncrypted`, `totpEnabledAt`, `totpLastUsedStep`, `totpBackupCodeHashes` (liste créée `[]`) ; modèle `AdminAction` (qui, quoi, cible, avant/après, ip, userAgent ; index `createdAt`, `[targetType, targetId]`, `[adminUserId, createdAt]`). `prisma generate` + `db push` joués.
+2. **Libs** : `@packages/totp` (RFC 6238, base32, anti-rejeu, codes de secours, AES du secret — spec 8 tests sur les vecteurs officiels) ; `@packages/admin-audit` (`recordAdminAction(db, …)`, writer typé structurellement : client Prisma ou transaction). Alias ajoutés dans `tsconfig.base.json` ET les `webpack.config.js` d'auth-service et deal-service (leçon §6.2).
+3. **auth-service** : `admin-session-policy.ts` (pur, 45 min d'inactivité, 12 h de vie, 5 min de pré-auth — spec 4), `admin-session.ts` (Redis `admin_jti:`, compteur d'échecs TOTP), `cookies/adminCookies.ts` (`admin_access_token`, `admin_refresh_token`, `admin_preauth`), `admin-auth.controller.ts` (`POST /auth/admin/login` → `{next: "TOTP"|"SETUP"}` · `totp/setup` · `totp/enable` (codes de secours montrés une fois + session) · `totp/verify` (TOTP ou code de secours, anti-rejeu, 5 échecs / 15 min) · `refresh` (rotation, même `createdAt`) · `logout` · `GET /admin/me` · `GET /admin/audit` paginé par curseur), `admin.router.ts` monté dans `main.ts`.
+4. **packages/middleware** : `isAdminAuthenticated` (cookie `admin_access_token` ou Bearer, `adm` + `amr` totp, compte ADMIN non supprimé avec 2FA active).
+5. **deal-service** : contrat `admin/admin-dispute.schema.ts` (`ArbitrationQueueItem`, `ArbitrationQueueResponse`, `AdminDisputeFile`), `admin-dispute.service.ts` (`arbitrationKindOf`, `toQueueItem`, `toDisputeFile` purs — spec 6 ; `listQueue`, `getFile` journalisé `DISPUTE_VIEWED`), contrôleur, routes `GET /admin/disputes`, `GET /admin/disputes/:id` sous `isAdminAuthenticated`, OpenAPI (tag `admin`).
+6. **gateway** : `/api/admin/disputes/*` → deal-service ; le reste de `/api/admin/*` et `/api/auth/admin/*` → auth-service (catch-all).
+7. **`apps/admin-ui`** (Next 16, port 3001, sans i18n ni thème, Tailwind, proxy `/api` D48) : `/login` (mot de passe → QR + secret + premier code + codes de secours, ou TOTP / code de secours), coquille avec garde `/admin/me` et déconnexion, `/disputes` (file : dossier, motif, corridor, parties, montant, ouvert J+n en rouge à partir de J+5), `/disputes/[id]` (chronologie, argent, deux parties avec faits de réputation, colis déclaré, prise en charge + checklist, jalons, remise, signalement — photos cliquables), `/audit`. Client fetch avec UN refresh sur 401 puis retour à `/login`. `nx sync` a ajouté la référence projet dans `tsconfig.json`.
+8. **Script** `packages/libs/prisma/scripts/grant-admin.ts <email> [--revoke]` (le rôle ADMIN ne se pose que là). `.env.example` : `TOTP_ENCRYPTION_KEY`, `ADMIN_TOTP_ISSUER`, durées de session admin. CI : `TypeScript (admin-ui)` ajouté à la matrice (check non requis par la protection de branche — à ajouter dans les réglages GitHub). `npm run admin-ui`.
+
+### Preuves
+auth-service **80** (65 + 4 politique + 11 TOTP) · deal-service **424** (418 + 6 mapper) · notification 78 · trip 198 · tsc ×7 (admin-ui compris) · `nx build` auth, deal, admin-ui · OpenAPI régénéré · **smoke test réel sur les bundles construits** (ports 6091/6093, compte seed promu puis rétrogradé) : mauvais mot de passe 401 · `login → SETUP` · `/admin/me` sans session 401 · mauvais code 401 · `enable` → 8 codes + cookies `admin_*` · `/admin/me` 200 · cookie utilisateur seul 401 · file : 2 litiges du seed · dossier complet sans `deliveryCode` · refresh 200 · code de secours accepté puis rejoué 401 · même pas TOTP rejoué 401 · journal : `ADMIN_TOTP_ENABLED`, `ADMIN_LOGIN` ×3 (totp-setup, backup-code, totp), `ADMIN_BACKUP_CODE_USED`, `DISPUTE_VIEWED` · logout puis `/admin/me` 401.
+
+### Reste
+C-PR2 médiation (version du Voyageur, décisions rejet / partiel / total / compensation / restitution, argent par l'exécuteur D49, `booking.dispute_resolved`, écrans des deux rôles) → C-PR3 signalements → C-PR4 paramètres → C-PR5 billets. Rendre le check `TypeScript (admin-ui)` requis sur `dev`.

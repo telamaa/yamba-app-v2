@@ -38,6 +38,8 @@
       "@packages/pricing": [
         "packages/libs/pricing/src/index.ts"
       ],
+      "@packages/totp": ["packages/libs/totp/src/index.ts"],
+      "@packages/admin-audit": ["packages/libs/admin-audit/src/index.ts"],
       "@packages/*": [
         "packages/*"
       ]

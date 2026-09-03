@@ -24,6 +24,7 @@ Always run tasks through Nx (see also `AGENTS.md`):
 ```sh
 npm run dev                        # serve everything (all backends + frontend)
 npx nx dev user-ui                 # Next.js frontend only (port 3000)
+npx nx dev admin-ui                # back-office Next.js (port 3001, chantier C) — needs an ADMIN account: grant-admin.ts
 npx nx serve api-gateway           # gateway (port 8080)
 npx nx serve auth-service          # port 6001
 npx nx serve trip-service          # port 6002
@@ -41,7 +42,7 @@ npx prisma db push                 # sync schema to MongoDB (no migrations — M
 npm run auth-docs                  # regenerate auth swagger-output.json (swagger-autogen — legacy, conversion to Zod-OpenAPI is backlog)
 ```
 
-Test platform baseline: **694 tests** (trip-service 198, deal-service 418, notification-service 78) + auth-service 65 (also a CI check) — any deviation must be explained.
+Test platform baseline: **700 tests** (trip-service 198, deal-service 424, notification-service 78) + auth-service 80 (also a CI check) — any deviation must be explained.
 
 Manual `tsc` (when Nx typecheck target is not what you want): `npx tsc --noEmit --project apps/<service>/tsconfig.app.json` — NEVER `--project apps/<service>` (resolves the solution-style tsconfig: 0 files checked).
 
@@ -78,7 +79,12 @@ Requests flow: `user-ui (3000)` → `api-gateway (8080)` → microservices. The 
 - `packages/libs/payments` — `PaymentProvider` abstraction (D11/D38): Stripe (manual capture) + Fake (dev/tests, refused in production); factory from env
 - `packages/messaging` — `EventPublisher` interface; kafkajs isolated here (connection errors come back `retriable: false` — intercept explicitly)
 - `packages/libs/email` — shared transactional mailer (D41/D44): lazy SMTP transport, `sendTemplatedEmail` (per-service EJS files, legacy) and `sendTransactionalEmail` (ONE embedded EJS layout string + `EmailContent` data). auth-service emails are per-locale dictionaries (`apps/auth-service/src/emails/auth-emails.ts`). The locale list lives ONLY in `packages/libs/api-contracts/src/locale.ts` (`SUPPORTED_LOCALES`, `resolveLocale`); the front consumes it through the dedicated alias `@packages/api-contracts/locale`. Never write a new `fr ? … : …` — add a dictionary entry. Email language = the RECIPIENT's `User.preferredLocale`; account-less flows use the request locale (`x-locale` header sent by the API clients).
+- `packages/libs/totp` — TOTP RFC 6238 + backup codes + AES of the secret (D54, zero deps, RFC vectors in `apps/auth-service/src/utils/totp.spec.ts`). `packages/libs/admin-audit` — `recordAdminAction(db, …)`, written in the SAME transaction as the admin gesture (never best-effort).
 - `packages/libs/delivery-code` — delivery code (D43): CSPRNG 6 digits, bcrypt hash (validation) + AES-256-GCM `deliveryCodeEncrypted` (shipper re-display, `DELIVERY_CODE_ENCRYPTION_KEY`, dev key fallback outside production). Zero infra deps — also imported relatively by the seed. New `@packages/*` aliases must ALSO be added to each consuming service's `webpack.config.js` (`resolve.alias`) — tsc resolves `tsconfig.base.json`, `nx serve` does not.
+
+### Admin (chantier C, D54)
+
+`apps/admin-ui` (port 3001, FR only, no next-intl) talks to the gateway through the same `/api` proxy. Admin sessions are SEPARATE from user sessions: cookies `admin_access_token` / `admin_refresh_token` / `admin_preauth`, Redis prefix `admin_jti:`, JWT claims `adm: true` + `amr: ["pwd","totp"]`, middleware `packages/middleware/isAdminAuthenticated.ts` (never reads `access_token`). Login is two-step (`POST /auth/admin/login` → `totp/verify` or `totp/setup` + `totp/enable`). The ADMIN role is only granted by `packages/libs/prisma/scripts/grant-admin.ts`. Admin routes live in the owning service (`/admin/disputes/*` in deal-service, `/admin/me`, `/admin/audit` in auth-service); gateway proxies `/api/admin/disputes` to deal-service, the rest of `/api/admin/*` to auth-service.
 
 ### Auth flow
 

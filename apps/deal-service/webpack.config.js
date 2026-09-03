@@ -22,6 +22,8 @@ module.exports = {
         __dirname,
         "../../packages/libs/messaging/src"
       ),
+      "@packages/totp": resolve(__dirname, "../../packages/libs/totp/src"),
+      "@packages/admin-audit": resolve(__dirname, "../../packages/libs/admin-audit/src"),
       "@packages": resolve(__dirname, "../../packages"),
     },
     extensions: [".ts", ".js"],

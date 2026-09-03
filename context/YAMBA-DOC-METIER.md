@@ -1074,3 +1074,29 @@ La section Finances était une promesse : deux onglets vides et une maquette aux
 | NOTE14 | Ouvrir `/bookings/:id/rate` sur un deal déjà noté, en litige ou d'un autre compte | Écran « Ta note est envoyée » / « Ce Deal ne peut pas être noté pour le moment » + retour — jamais d'erreur brute |
 | NOTE15 | Profil public du Voyageur après révélation | Badge de niveau (info-bulle des critères), ligne de faits, « prochain niveau », avis avec pouces et « Signaler cet avis » (ouvre l'email support avec la référence) |
 | NOTE16 | Profil public de l'Expéditrice | Même chose côté « En tant qu'expéditeur » : faits, badge « Expéditeur fiable » à partir de 3 envois |
+
+# C-PR1 — un back-office qui ne s'ouvre pas sans preuve, et qui se souvient de tout
+
+### Règles de gestion (ADM)
+- **RG-ADM-01 — Le rôle ADMIN ne s'obtient que par un script sur le poste de l'opérateur**, jamais par l'inscription ni par une route.
+- **RG-ADM-02 — Aucune session admin sans double authentification.** Mot de passe puis code TOTP (application d'authentification) ; à la première connexion, l'activation est imposée avant tout accès. Un compte ADMIN sans 2FA active ne voit rien.
+- **RG-ADM-03 — Huit codes de secours, montrés une seule fois**, à usage unique chacun ; l'admin est prévenu quand il en reste deux ou moins.
+- **RG-ADM-04 — Un code ne sert jamais deux fois** : un code TOTP intercepté est refusé s'il a déjà servi dans le même pas de 30 s ; cinq échecs → quinze minutes d'attente.
+- **RG-ADM-05 — La session admin est courte** : 15 min d'accès renouvelés en silence, déconnexion après 45 min d'inactivité, 12 h de vie au plus, pas de « rester connecté ». Elle est distincte de la session utilisateur du même compte.
+- **RG-ADM-06 — Chaque geste est journalisé** (qui, quoi, sur quoi, quand, d'où), y compris ouvrir un dossier de médiation. Un geste dont le journal ne s'écrit pas n'a pas lieu.
+- **RG-ADM-07 — Une seule file « à arbitrer »** : les litiges ouverts et les retenues en attente, les plus anciens d'abord, avec l'ancienneté en jours (rouge à partir de J+5, le délai promis).
+- **RG-ADM-08 — Le dossier montre tout ce que les deux parties ont déclaré et prouvé** (photos de déclaration, prise en charge et checklist, jalons, remise, signalement) et l'état de l'argent — **jamais le code de livraison**, même à Yamba.
+
+### Recette (ADM)
+| # | Scénario | Attendu |
+|---|---|---|
+| ADM1 | `grant-admin.ts <ton email>` puis `http://localhost:3001/login`, mauvais mot de passe | « Email ou mot de passe incorrect », aucune session |
+| ADM2 | Bon mot de passe, première fois | Écran QR + secret ; scanner avec Google Authenticator / Aegis ; mauvais code → « Code invalide » ; bon code → 8 codes de secours affichés une fois → « J'ai enregistré mes codes » → file « À arbitrer » |
+| ADM3 | Se déconnecter, se reconnecter | Mot de passe puis code TOTP ; le même code saisi deux fois dans la même demi-minute est refusé la seconde fois |
+| ADM4 | Connexion avec un code de secours | Acceptée, « il te reste 7 codes » ; le même code rejoué → refusé |
+| ADM5 | Cinq codes faux d'affilée | « Trop de tentatives » pendant 15 min |
+| ADM6 | Ouvrir `http://localhost:3000` (user-ui) connecté comme utilisateur, puis `http://localhost:3001/disputes` sans connexion admin | Renvoi vers `/login` : la session utilisateur n'ouvre pas l'admin (et la connexion admin ne déconnecte pas l'utilisateur) |
+| ADM7 | File « À arbitrer » avec le seed | Les litiges YAM-XXXX du seed (motif, corridor, parties, montant payé, J+n) ; une annulation après le départ apparaît en « Retenue » avec le montant retenu |
+| ADM8 | Ouvrir un dossier | Chronologie, argent (payé, net, commission, versement gelé), Expéditeur et Voyageur avec leurs faits, colis déclaré + photos, prise en charge + checklist + photos, jalons, photos de remise, signalement (description, solution souhaitée, photos) ; aucun code de livraison nulle part |
+| ADM9 | Journal | Chaque connexion, activation 2FA, code de secours utilisé, dossier consulté, déconnexion — avec le prénom de l'admin et l'IP |
+| ADM10 | Laisser l'onglet 50 min sans rien faire, puis naviguer | Retour à `/login` (inactivité 45 min) |

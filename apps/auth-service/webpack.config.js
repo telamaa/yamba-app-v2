@@ -12,6 +12,8 @@ module.exports = {
       // Leçon §6.2 : TROIS résolveurs — tsc, webpack (PAR service), jest.
       "@packages/api-contracts": resolve(__dirname, "../../packages/libs/api-contracts/src"),
       "@packages/email": resolve(__dirname, "../../packages/libs/email/src"),
+      "@packages/totp": resolve(__dirname, "../../packages/libs/totp/src"),
+      "@packages/admin-audit": resolve(__dirname, "../../packages/libs/admin-audit/src"),
       "@packages": resolve(__dirname, "../../packages"),
     },
     extensions: [".ts", ".js"],

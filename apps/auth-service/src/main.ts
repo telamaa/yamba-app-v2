@@ -6,6 +6,7 @@ import router from "./routes/auth.router";
 import carrierRouter from "./routes/carrier.router";
 import userPublicRouter from "./routes/user-public.router";
 import savedRouteRouter from "./routes/saved-route.router";
+import adminRouter from "./routes/admin.router";
 
 const app = express();
 
@@ -33,6 +34,7 @@ app.use("/api", router);
 app.use("/api", carrierRouter);
 app.use("/api", userPublicRouter);
 app.use("/api", savedRouteRouter);
+app.use("/api", adminRouter); // chantier C (D54) — /auth/admin/*, /admin/*
 
 app.use(errorMiddleware);
 

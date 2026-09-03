@@ -1,5 +1,6 @@
 import { Router } from "express";
 import isAuthenticated from "@packages/middleware/isAuthenticated";
+import isAdminAuthenticated from "@packages/middleware/isAdminAuthenticated";
 import {
   getDeal,
   getMyBookings,
@@ -18,6 +19,8 @@ import { getMyWallet } from "../controllers/wallet.controller";
 import { makeDealRatingController } from "../controllers/deal-rating.controller";
 import { makeDealRatingService } from "../services/deal-rating.service";
 import { createPaymentProviderFromEnv } from "@packages/payments";
+import { makeAdminDisputeController } from "../controllers/admin-dispute.controller";
+import { makeAdminDisputeService } from "../services/admin-dispute.service";
 
 /**
  * deal.routes.ts — routes de lecture (PR3)
@@ -98,5 +101,10 @@ router.get("/me/deals", isAuthenticated, getMyDeals);
 
 // ── Finances (A83) : totaux calculés serveur, les deux rôles ──
 router.get("/me/wallet", isAuthenticated, getMyWallet);
+
+// ── Chantier C (D54) : file « à arbitrer » + dossier, ADMIN + 2FA seulement ──
+const adminDisputes = makeAdminDisputeController(makeAdminDisputeService());
+router.get("/admin/disputes", isAdminAuthenticated, adminDisputes.listQueue);
+router.get("/admin/disputes/:id", isAdminAuthenticated, adminDisputes.getFile);
 
 export default router;

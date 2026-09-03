@@ -20,6 +20,8 @@ jobs:
         include:
           - project: user-ui
             tsconfig: apps/user-ui
+          - project: admin-ui
+            tsconfig: apps/admin-ui
           - project: trip-service
             tsconfig: apps/trip-service/tsconfig.app.json
           - project: auth-service
