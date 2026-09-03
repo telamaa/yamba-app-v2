@@ -292,7 +292,7 @@ Ordre de demarrage : auth -> trip -> gateway.
   7A 8A) — admin-ui separee (3001), 2FA TOTP obligatoire (lib maison, codes de
   secours, anti-rejeu), cookies admin_* separes, journal AdminAction en
   transaction, file « a arbitrer » + dossier en lecture, grant-admin.ts.
-  Suite : C-PR2 mediation (decisions + argent), C-PR3 signalements, C-PR4
+  Mergee #148. Suite : C-PR2 mediation (decisions + argent), C-PR3 signalements, C-PR4
   parametres, C-PR5 billets.
 - Plateforme de tests : 700 (trip 198, deal 424, notification 78) + auth 80.
 - (historique) Plateforme de tests : 600 (trip 187, deal 354, notification 59) — post-B3 (#96).
