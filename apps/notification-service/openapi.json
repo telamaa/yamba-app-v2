@@ -3727,6 +3727,10 @@
           },
           "travelerAvatarUrl": {
             "type": "string"
+          },
+          "isFavorite": {
+            "description": "D46 — true si l'utilisateur connecté a mis ce trajet en favori (absent/false pour un visiteur)",
+            "type": "boolean"
           }
         },
         "required": [
@@ -4469,6 +4473,10 @@
                 "type": "null"
               }
             ]
+          },
+          "isFavorite": {
+            "description": "D46 — true si l'utilisateur connecté a mis ce trajet en favori (isOptionallyAuthenticated)",
+            "type": "boolean"
           }
         },
         "required": [
@@ -8974,6 +8982,45 @@
         ],
         "additionalProperties": false,
         "description": "PATCH /me/notifications/{id}/read — the updated notification"
+      },
+      "TripFavoriteState": {
+        "type": "object",
+        "properties": {
+          "tripId": {
+            "$ref": "#/components/schemas/ObjectId"
+          },
+          "isFavorite": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "tripId",
+          "isFavorite"
+        ],
+        "additionalProperties": false,
+        "description": "État du favori après l'action (idempotent)"
+      },
+      "FavoriteTripsResponse": {
+        "type": "object",
+        "properties": {
+          "trips": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/YambaTripResult"
+            }
+          },
+          "totalCount": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "trips",
+          "totalCount"
+        ],
+        "additionalProperties": false,
+        "description": "Mes favoris — du plus récent au plus ancien, trajets passés inclus"
       }
     },
     "securitySchemes": {

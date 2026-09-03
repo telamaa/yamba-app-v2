@@ -22,18 +22,31 @@ import {
   searchTripsFacets,
 } from "../controllers/trip-search.controller";
 import isAuthenticated from "@packages/middleware/isAuthenticated";
+import isOptionallyAuthenticated from "@packages/middleware/isOptionallyAuthenticated";
+import {
+  addTripFavorite,
+  listMyFavoriteTrips,
+  removeTripFavorite,
+} from "../controllers/trip-favorite.controller";
 
 const router = Router();
 
 // ─── ⭐ PUBLIC SEARCH (PAS d'authent) ────────
 // IMPORTANT : ces routes DOIVENT être déclarées AVANT /:id, sinon Express
 // match "search" comme un id et appelle getTrip avec un faux id.
-router.get("/search", searchTrips);
+// D46 : authent OPTIONNELLE — un utilisateur connecté voit ses favoris (isFavorite),
+// un visiteur reçoit la même réponse avec isFavorite = false.
+router.get("/search", isOptionallyAuthenticated, searchTrips);
 router.get("/search/facets", searchTripsFacets);
+
+// ─── ⭐ FAVORIS (D46) — AVANT /:id ────────────
+router.get("/favorites", isAuthenticated, listMyFavoriteTrips);
 
 // ─── ⭐ PUBLIC TRIP DETAIL (PAS d'authent) — PR 1.a ───
 // Idem : doit être déclaré avant /:id pour ne pas être matché comme route privée.
-router.get("/:id/public", getPublicTrip);
+router.get("/:id/public", isOptionallyAuthenticated, getPublicTrip);
+router.post("/:id/favorite", isAuthenticated, addTripFavorite);      // D46 — idempotent
+router.delete("/:id/favorite", isAuthenticated, removeTripFavorite); // D46 — idempotent
 
 // ─── Trip CRUD ───────────────────────────────
 router.post("/", isAuthenticated, createTrip);                             // Créer un trip

@@ -30,6 +30,7 @@ export default getRequestConfig(async ({ requestLocale }) => {
     myTrips, // ✨ NEW dashboard Mes trajets
     dashboardHome, // ✨ NEW dashboard home inbox
     notifications, // ✨ NEW dashboard notifications (PR5)
+    favorites, // D46 — Mes favoris
   ] = await Promise.all([
     import(`../../messages/${locale}/common.json`),
     import(`../../messages/${locale}/home.json`),
@@ -54,6 +55,7 @@ export default getRequestConfig(async ({ requestLocale }) => {
     import(`../../messages/${locale}/myTrips.json`), // ✨ NEW dashboard Mes trajets
     import(`../../messages/${locale}/dashboardHome.json`), // ✨ NEW dashboard home inbox
     import(`../../messages/${locale}/notifications.json`), // ✨ NEW dashboard notifications (PR5)
+    import(`../../messages/${locale}/favorites.json`), // D46
   ]);
   return {
     locale,
@@ -81,6 +83,7 @@ export default getRequestConfig(async ({ requestLocale }) => {
       myTrips: myTrips.default, // ✨ NEW dashboard Mes trajets
       dashboardHome: dashboardHome.default, // ✨ NEW dashboard home inbox
       notifications: notifications.default, // ✨ NEW dashboard notifications (PR5)
+      favorites: favorites.default, // D46
     },
   };
 });

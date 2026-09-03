@@ -386,6 +386,247 @@
         }
       }
     },
+    "/trips/favorites": {
+      "get": {
+        "tags": [
+          "trips-favorites"
+        ],
+        "summary": "Mes trajets favoris",
+        "description": "Cartes de recherche (YambaTripResult, isFavorite = true) des trajets mis en favori, du plus récent au plus ancien ; les trajets passés restent listés. Auth requise.",
+        "operationId": "listMyFavoriteTrips",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "locale",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/SearchLocale"
+            },
+            "description": "Locale des libellés (sinon x-locale, sinon fr)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Liste { trips, totalCount }",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FavoriteTripsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token absent, invalide, expiré, ou compte introuvable (middleware isAuthenticated)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erreur serveur non gérée",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnhandledError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/trips/{id}/favorite": {
+      "post": {
+        "tags": [
+          "trips-favorites"
+        ],
+        "summary": "Mettre un trajet en favori (idempotent)",
+        "description": "Signet privé : jamais notifié au Voyageur. 404 si le trajet n'existe pas (jamais 403 : ne pas révéler), 403 OWN_TRIP sur son propre trajet, 409 TRIP_NOT_FAVORITABLE si le trajet n'est pas PUBLISHED. Rejouer l'action renvoie le même état.",
+        "operationId": "addTripFavorite",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ObjectId"
+            },
+            "description": "Identifiant du trip"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "{ tripId, isFavorite: true }",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TripFavoriteState"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête invalide, trip introuvable, non-propriétaire, ou transition refusée par la state machine (ValidationError — voir note sémantique)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token absent, invalide, expiré, ou compte introuvable (middleware isAuthenticated)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "OWN_TRIP — details.type = favorite",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Trajet introuvable ou supprimé",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "TRIP_NOT_FAVORITABLE — trajet non publié",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erreur serveur non gérée",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnhandledError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "trips-favorites"
+        ],
+        "summary": "Retirer un trajet des favoris (idempotent)",
+        "description": "Toujours possible, même sur un trajet passé. 404 si le trajet n'existe pas.",
+        "operationId": "removeTripFavorite",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ObjectId"
+            },
+            "description": "Identifiant du trip"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "{ tripId, isFavorite: false }",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TripFavoriteState"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête invalide, trip introuvable, non-propriétaire, ou transition refusée par la state machine (ValidationError — voir note sémantique)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token absent, invalide, expiré, ou compte introuvable (middleware isAuthenticated)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Trajet introuvable ou supprimé",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erreur serveur non gérée",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnhandledError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/trips/{id}/public": {
       "get": {
         "tags": [
@@ -5210,6 +5451,10 @@
           },
           "travelerAvatarUrl": {
             "type": "string"
+          },
+          "isFavorite": {
+            "description": "D46 — true si l'utilisateur connecté a mis ce trajet en favori (absent/false pour un visiteur)",
+            "type": "boolean"
           }
         },
         "required": [
@@ -5952,6 +6197,10 @@
                 "type": "null"
               }
             ]
+          },
+          "isFavorite": {
+            "description": "D46 — true si l'utilisateur connecté a mis ce trajet en favori (isOptionallyAuthenticated)",
+            "type": "boolean"
           }
         },
         "required": [
@@ -10457,6 +10706,45 @@
         ],
         "additionalProperties": false,
         "description": "PATCH /me/notifications/{id}/read — the updated notification"
+      },
+      "TripFavoriteState": {
+        "type": "object",
+        "properties": {
+          "tripId": {
+            "$ref": "#/components/schemas/ObjectId"
+          },
+          "isFavorite": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "tripId",
+          "isFavorite"
+        ],
+        "additionalProperties": false,
+        "description": "État du favori après l'action (idempotent)"
+      },
+      "FavoriteTripsResponse": {
+        "type": "object",
+        "properties": {
+          "trips": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/YambaTripResult"
+            }
+          },
+          "totalCount": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "trips",
+          "totalCount"
+        ],
+        "additionalProperties": false,
+        "description": "Mes favoris — du plus récent au plus ancien, trajets passés inclus"
       }
     },
     "securitySchemes": {

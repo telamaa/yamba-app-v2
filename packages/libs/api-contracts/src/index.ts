@@ -24,3 +24,4 @@ export * from "./booking/booking-lifecycle.schema";
 export * from "./booking/booking-transport.schema";
 export * from "./notification/notification.schema";
 export * from "./trip/trip-pricing.schema";
+export * from "./trip/trip-favorite.schema";

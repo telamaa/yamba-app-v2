@@ -165,6 +165,8 @@ export type PublicTrip = {
   tripper: PublicTripper;
 
   publishedAt: string | null;
+  /** D46 — favori de l'utilisateur connecté (false / absent pour un visiteur) */
+  isFavorite?: boolean;
 };
 
 export type PublicTripResponse = {

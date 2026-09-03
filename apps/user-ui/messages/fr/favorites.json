@@ -1,0 +1,22 @@
+{
+  "page": {
+    "title": "Mes favoris",
+    "description": "Les trajets que tu as mis de côté. Un favori est privé : le Voyageur n'en est pas informé."
+  },
+  "list": {
+    "errorMessage": "Impossible de charger tes favoris pour le moment.",
+    "emptyTitle": "Aucun favori pour l'instant",
+    "emptyDescription": "Touche le cœur d'un trajet dans la recherche ou sur sa fiche pour le retrouver ici.",
+    "emptyCta": "Chercher un trajet",
+    "count": "{count, plural, one {# trajet} other {# trajets}}",
+    "pastTrip": "Trajet passé"
+  },
+  "button": {
+    "add": "Ajouter aux favoris",
+    "remove": "Retirer des favoris",
+    "signInRequired": "Connecte-toi pour enregistrer un favori",
+    "ownTrip": "Tu ne peux pas mettre ton propre trajet en favori",
+    "notFavoritable": "Ce trajet n'est plus disponible",
+    "error": "Impossible de modifier le favori, réessaie"
+  }
+}

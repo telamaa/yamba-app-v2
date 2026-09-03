@@ -9,6 +9,7 @@ import type { PublicTrip } from "@/lib/public-trip.types";
 import ItineraryCard from "./ItineraryCard";
 import CategoriesCard from "./CategoriesCard";
 import OfferCard from "./OfferCard";
+import FavoriteButton from "@/components/favorites/FavoriteButton";
 
 import ReviewsCard from "./ReviewsCard";
 import ConditionsCard from "./ConditionsCard";
@@ -57,17 +58,21 @@ export default function TripDetailView({ trip }: Props) {
         {t("back")}
       </button>
 
-      <header className="mb-6">
-        <h1 className="text-xl font-black tracking-tight text-slate-900 dark:text-white sm:text-2xl">
-          {trip.origin.city}{" "}
-          <span className="text-[#FF9900]">→</span> {trip.destination.city}
-        </h1>
-        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-          {t("trippedBy", {
-            firstName: trip.tripper.firstName,
-            lastInitial: trip.tripper.lastInitial,
-          })}
-        </p>
+      <header className="mb-6 flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="text-xl font-black tracking-tight text-slate-900 dark:text-white sm:text-2xl">
+            {trip.origin.city}{" "}
+            <span className="text-[#FF9900]">→</span> {trip.destination.city}
+          </h1>
+          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+            {t("trippedBy", {
+              firstName: trip.tripper.firstName,
+              lastInitial: trip.tripper.lastInitial,
+            })}
+          </p>
+        </div>
+        {/* D46 — le créateur ne met pas son propre trajet en favori (le serveur le refuse aussi) */}
+        {!isOwner && <FavoriteButton tripId={trip.id} isFavorite={trip.isFavorite} variant="detail" className="shrink-0" />}
       </header>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">

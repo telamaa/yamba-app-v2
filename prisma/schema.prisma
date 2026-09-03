@@ -57,6 +57,9 @@ model User {
   // Alertes de route
   savedRoutes SavedRoute[]
 
+  // Favoris de trajets (D46)
+  tripFavorites TripFavorite[]
+
   consentLogs ConsentLog[]
 
   // Lifecycle
@@ -223,6 +226,23 @@ model UserFollow {
 //   - expiresAt = createdAt + 6 mois (sinon)
 //   - Cron quotidien : warn à J-7, désactive à J
 // ─────────────────────────────────────────────
+
+/// D46 — Favori de trajet : signet PRIVÉ d'un utilisateur sur un trajet publié.
+/// Jamais notifié au Voyageur, jamais compté publiquement. Conservé quand le
+/// trajet passe (COMPLETED/ARCHIVED) : la page « Mes favoris » le montre comme passé.
+model TripFavorite {
+  id     String @id @default(auto()) @map("_id") @db.ObjectId
+  userId String @db.ObjectId
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tripId String @db.ObjectId
+  trip   Trip   @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, tripId])
+  @@index([userId, createdAt])
+  @@index([tripId])
+}
 
 model SavedRoute {
   id     String @id @default(auto()) @map("_id") @db.ObjectId
@@ -497,6 +517,9 @@ model Trip {
   @@index([departureAt])
   @@index([publishedAt])
   @@index([userId, status])
+  // Favoris (D46) — signet privé d'un utilisateur sur ce trajet
+  favorites TripFavorite[]
+
   @@index([userId, isDeleted]) // ⭐ Lot 1/2 — requête chaude getMyTrips
   @@index([originPlaceId])
   @@index([destinationPlaceId])

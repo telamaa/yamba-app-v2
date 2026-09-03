@@ -109,6 +109,7 @@ export const YambaTripResultSchema = z
     travelerFirstName: z.string().optional(),
     travelerLastName: z.string().optional().meta({ description: "Initiale uniquement (privacy)" }),
     travelerAvatarUrl: z.string().optional(),
+    isFavorite: z.boolean().optional().meta({ description: "D46 — true si l'utilisateur connecté a mis ce trajet en favori (absent/false pour un visiteur)" }),
   })
   .meta({ id: "YambaTripResult", description: "Carte résultat de recherche (DTO UI)" });
 export type YambaTripResult = z.infer<typeof YambaTripResultSchema>;

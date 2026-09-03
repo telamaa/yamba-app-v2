@@ -412,7 +412,7 @@ mobile-first, aucune attribution Claude, charte mango/teal/slate.
 1. `fix/auth-recette` — **#116** (cette PR).
 2. `feat/email-locale` — **FAIT, en PR** (D44 + D45 dans les emails, A55–A57 ; plateforme 610 + auth 59).
 3. `feat/booking-auth-modal` — **FAIT, en PR** (A58 ; branchée sur `feat/email-locale`).
-4. `feat/trip-favorites` — modèle, routes, cœur, page « Mes favoris » (P2).
+4. `feat/trip-favorites` — **FAIT, en PR** (D46, A59 ; trip-service 198).
 5. `feat/auth-pages-ux` — tutoiement, faux chiffres, vocabulaire du rôle à trancher, mobile natif (P2).
 6. `feat/auth-google` — avec l'écran de consentement CGU (P2).
 7. `chore/api-same-origin` — rewrite Next `/api` → gateway (P3).
@@ -421,9 +421,8 @@ mobile-first, aucune attribution Claude, charte mango/teal/slate.
 - Nom du rôle transporteur : Yamber / Tripper / Voyageur (une seule réponse, appliquée partout).
 - Facebook : garder le bouton inerte ou le retirer à la PR Google.
 
-## C bis. Fusions en attente (le classificateur de permissions de la session refuse `gh pr merge`)
-- #116 `fix/auth-recette` : 13/13 checks verts, à fusionner par l'utilisateur (merge commit, supprimer la branche).
-- `feat/email-locale` : branchée SUR `fix/auth-recette` — fusionner #116 d'abord, le diff de la 2e PR devient propre.
+## C bis. Fusions
+- Les fusions sont faites PAR L'UTILISATEUR (le classificateur de permissions de la session refuse `gh pr merge`) : #116, #117, #118 fusionnées le 03/09 (`dev` = `bb57c49`). Chaque PR suivante part de `dev` à jour.
 
 ## D. Environnement (inchangé)
 Front en LAN (`192.168.1.155`), Docker requis, `DELIVERY_CODE_ENCRYPTION_KEY` toujours à poser. Le `nx serve auth-service` en cours ne recharge PAS le code : relancer le service pour voir les correctifs de cette PR en recette.

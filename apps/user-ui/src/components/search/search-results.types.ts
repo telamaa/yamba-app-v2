@@ -98,6 +98,8 @@ export type YambaTripResult = {
   rating?: number;
   /** Nombre d'avis */
   reviewCount?: number;
+  /** D46 — favori de l'utilisateur connecté (false / absent pour un visiteur) */
+  isFavorite?: boolean;
 
   travelerFirstName?: string;
   travelerLastName?: string;

@@ -2,6 +2,7 @@ import type { Response, NextFunction, RequestHandler } from "express";
 import prisma from "@packages/libs/prisma";
 import { ValidationError } from "@packages/error-handler";
 import { AuthenticatedRequest } from "@packages/middleware/isAuthenticated";
+import { favoriteTripIds } from "../services/trip-favorite.service";
 import imagekit from "../lib/imagekit";
 import {
   computeMinPriceCents,
@@ -1217,6 +1218,8 @@ export const getPublicTrip: RequestHandler = async (req, res, next) => {
       },
 
       publishedAt: trip.publishedAt,
+      // D46 — isOptionallyAuthenticated : connecté → son favori, visiteur → false
+      isFavorite: (await favoriteTripIds((req as { user?: { id?: string } }).user?.id, [trip.id])).has(trip.id),
     };
 
     res.status(200).json({ success: true, trip: publicDto });
