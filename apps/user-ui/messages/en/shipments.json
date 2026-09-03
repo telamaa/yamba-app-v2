@@ -39,7 +39,8 @@
     "disputed": "{category} · {weight} · Yamba will reply within 48 business hours",
     "expired": "Expired on {date} · fully refunded",
     "declined": "Declined on {date} · fully refunded",
-    "cancelled": "Cancelled on {date}"
+    "cancelled": "Cancelled on {date}",
+    "completedRatedNoStars": "Delivered on {date} by {firstName}"
   },
   "trackingSteps": {
     "AT_AIRPORT": "arrived at the airport",

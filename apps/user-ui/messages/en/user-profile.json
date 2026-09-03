@@ -52,5 +52,51 @@
     "title": "Profile not found",
     "message": "This profile does not exist or has been removed.",
     "goHome": "Back to home"
+  },
+  "reputation": {
+    "carrier": {
+      "NEW": {
+        "label": "New Traveler",
+        "criteria": "Fewer than 3 completed Deals."
+      },
+      "CONFIRMED": {
+        "label": "Confirmed Traveler",
+        "criteria": "At least 3 completed Deals."
+      },
+      "TOP": {
+        "label": "Top Traveler",
+        "criteria": "At least 10 completed Deals, an average ≥ 4.8 and no late cancellation."
+      },
+      "nextConfirmed": "Next level “Confirmed Traveler”: 3 completed Deals.",
+      "nextTop": "Next level “Top Traveler”: 10 completed Deals, average ≥ 4.8, 0 late cancellation."
+    },
+    "shipper": {
+      "NEW": {
+        "label": "New Shipper",
+        "criteria": "Fewer than 3 completed shipments."
+      },
+      "CONFIRMED": {
+        "label": "Reliable Shipper",
+        "criteria": "At least 3 completed shipments."
+      },
+      "TOP": {
+        "label": "Top Shipper",
+        "criteria": "At least 5 completed shipments, an average ≥ 4.8 and no late cancellation."
+      },
+      "nextConfirmed": "Next level “Reliable Shipper”: 3 completed shipments.",
+      "nextTop": "Next level “Top Shipper”: 5 completed shipments, average ≥ 4.8, 0 late cancellation."
+    },
+    "facts": "{deals, plural, =0 {No completed Deal} one {# completed Deal} other {# completed Deals}} · {count, plural, =0 {no reviews yet} one {★ {avg} from # review} other {★ {avg} from # reviews}} · {late, plural, =0 {0 late cancellation} one {# late cancellation} other {# late cancellations}}"
+  },
+  "reviews": {
+    "criteria": {
+      "PUNCTUALITY": "Punctuality",
+      "COMMUNICATION": "Communication",
+      "PARCEL_CARE": "Parcel care",
+      "DECLARATION_CLARITY": "Clear declaration",
+      "RESPONSIVENESS": "Responsiveness"
+    },
+    "report": "Report this review",
+    "reportSubject": "Report a review (#{id})"
   }
 }

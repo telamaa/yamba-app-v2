@@ -82,7 +82,8 @@
     "cancelledCompensationSentSub": "Cancelled late · {amount} compensation sent to your account",
     "cancelledCompensationPendingSub": "Cancelled late · {amount} compensation being sent",
     "cancelledCompensationBlockedSub": "Cancelled late · {amount} compensation on hold: finish your Stripe account",
-    "cancelledHeldSub": "Cancelled after departure · retention held, we will contact you"
+    "cancelledHeldSub": "Cancelled after departure · retention held, we will contact you",
+    "rateHint": "remember to rate {firstName}"
   },
   "historyRow": {
     "title": "{origin} → {destination} · {date}",

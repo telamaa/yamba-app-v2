@@ -218,6 +218,16 @@ describe("frontière carrier — liste blanche résistante au spread (A13)", () 
     expect(toShipperBookingView(makeBooking(), CARRIER).refundAmountCents).toBeNull();
   });
 
+  it("B5/D53 : rating (état par rôle) — null hors COMPLETED ; canRate / ratedByMe / counterpartHasRated selon le rôle", () => {
+    const window = new Date(T0.getTime() + 14 * 86_400_000);
+    const b = makeBooking({ status: "COMPLETED", ratingWindowEndsAt: window, shipperRatedAt: T0, carrierRatedAt: null, ratingsRevealedAt: null } as never);
+    const shipper = toShipperBookingView(b, CARRIER, T0);
+    expect(shipper.rating).toEqual({ windowEndsAt: window.toISOString(), ratedByMe: true, counterpartHasRated: false, revealedAt: null, canRate: false });
+    const carrier = toCarrierBookingView(b, SHIPPER, null, T0);
+    expect(carrier.rating).toMatchObject({ ratedByMe: false, counterpartHasRated: true, canRate: true });
+    expect(toShipperBookingView(makeBooking(), CARRIER).rating).toBeNull();
+  });
+
   it("B4/A76 : deliveryPhotoUrls servies aux deux vues, [] quand absentes (enregistrements antérieurs)", () => {
     const withPhotos = makeBooking({ status: "DELIVERED", deliveryPhotoUrls: ["https://ik.imagekit.io/yamba/deals/delivery/a.jpg"] } as never);
     expect(toShipperBookingView(withPhotos, CARRIER).deliveryPhotoUrls).toEqual(["https://ik.imagekit.io/yamba/deals/delivery/a.jpg"]);

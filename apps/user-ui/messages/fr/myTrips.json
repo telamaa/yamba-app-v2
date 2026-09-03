@@ -82,7 +82,8 @@
     "cancelledCompensationSentSub": "Annulée tardivement · {amount} de compensation partis vers ton compte",
     "cancelledCompensationPendingSub": "Annulée tardivement · {amount} de compensation en cours d'envoi",
     "cancelledCompensationBlockedSub": "Annulée tardivement · {amount} de compensation en attente : finalise ton compte Stripe",
-    "cancelledHeldSub": "Annulée après le départ · retenue conservée, on te contacte"
+    "cancelledHeldSub": "Annulée après le départ · retenue conservée, on te contacte",
+    "rateHint": "pense à noter {firstName}"
   },
   "historyRow": {
     "title": "{origin} → {destination} · {date}",

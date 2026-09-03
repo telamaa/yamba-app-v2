@@ -30,12 +30,14 @@ export default function UserProfileView({ user }: Props) {
             <TripperBlock
               tripper={user.tripper}
               tripperRating={user.tripperRating}
+              reputation={user.reputation?.carrier ?? null}
               firstName={user.firstName}
               userSlug={user.publicSlug}
             />
           )}
 
           <ShipperBlock
+            reputation={user.reputation?.shipper ?? null}
             shipper={user.shipper}
             shipperRating={user.shipperRating}
             parcelsSentCount={user.stats.parcelsSentCount}

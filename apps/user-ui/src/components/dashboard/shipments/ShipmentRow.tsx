@@ -251,10 +251,9 @@ function buildLabels(
       if (item.hasRated) {
         return {
           badge: t("badge.completedRated"),
-          sub: t("sub.completedRated", {
+          sub: t("sub.completedRatedNoStars", {
             date: item.deliveredAt ? formatDate(locale, item.deliveredAt) : "",
             firstName,
-            stars: item.ratedStars ?? 5,
           }),
           cta: t("cta.recap"),
           role: t("roles.yourCarrier"),

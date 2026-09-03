@@ -29,10 +29,21 @@ export type PublicTripPreview = {
   currencyCode: string;
 };
 
+export type ReputationLevel = "NEW" | "CONFIRMED" | "TOP";
+export type PublicReputation = {
+  level: ReputationLevel;
+  ratingsAvg: number;
+  ratingsCount: number;
+  completedDealsCount: number;
+  lateCancellationsCount: number;
+};
+
 export type PublicReview = {
   id: string;
   rating: number;
   comment: string | null;
+  /** B5 — pouces des critères, publics comme la note. */
+  criteria?: Record<string, "UP" | "DOWN"> | null;
   createdAt: string;
   author: {
     firstName: string;
@@ -107,6 +118,12 @@ export type PublicUser = {
   // Notes séparées par rôle (architecture long terme)
   tripperRating: PublicRating | null; // null si pas tripper actif
   shipperRating: PublicRating;
+
+  /** B5 / D29① — réputation explicable : niveau + faits, calculés serveur. */
+  reputation?: {
+    carrier: PublicReputation | null;
+    shipper: PublicReputation;
+  };
 
   tripper: PublicTripperBlock | null; // null si pas tripper actif
   shipper: PublicShipperBlock;

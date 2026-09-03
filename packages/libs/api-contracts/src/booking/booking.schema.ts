@@ -182,6 +182,18 @@ const milestoneFields = {
   updatedAt: z.iso.datetime(),
 };
 
+/** B5/D53 — l'état de notation vu par CE rôle (le front reflète : bouton, « note envoyée », révélé). */
+export const BookingRatingStateSchema = z
+  .object({
+    windowEndsAt: z.iso.datetime().nullable().meta({ description: "completedAt + 14 days" }),
+    ratedByMe: z.boolean(),
+    counterpartHasRated: z.boolean(),
+    revealedAt: z.iso.datetime().nullable(),
+    canRate: z.boolean().meta({ description: "COMPLETED, window open, not rated by me — the state machine verdict (canRate)" }),
+  })
+  .meta({ id: "BookingRatingState" });
+export type BookingRatingState = z.infer<typeof BookingRatingStateSchema>;
+
 /* ══ Prévisualisation d'annulation (ANN-01 — servie, jamais
       recalculée par le front : « le front reflète, ne décide
       jamais »). Présente quand `cancel` ∈ allowedActions. ═══════ */
@@ -258,6 +270,8 @@ export const ShipperBookingViewSchema = z
       description: "The dispute file (status DISPUTED) — shipper only (A68); absent otherwise",
     }),
 
+    rating: BookingRatingStateSchema.nullable().meta({ description: "null unless COMPLETED (B5)" }),
+
     disputeOpensAt: z.iso.datetime().nullable().meta({
       description:
         "PICKED_UP only: when the 'not delivered' dispute becomes possible (trip departure + 48h — B4/D51). " +
@@ -307,6 +321,8 @@ export const CarrierBookingViewSchema = z
     retentionDisposition: z.enum(["CARRIER", "HELD_FOR_MEDIATION"]).nullish().meta({
       description: "Late cancellation only: the retention went to the carrier (compensation) or is held for mediation (cancelled after departure, A81)",
     }),
+
+    rating: BookingRatingStateSchema.nullable().meta({ description: "null unless COMPLETED (B5)" }),
 
     payoutBlocker: z.enum(["ACCOUNT_NOT_READY", "RETRYING"]).nullable().meta({
       description:

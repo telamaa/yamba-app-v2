@@ -9,7 +9,8 @@
  */
 "use client";
 
-import { CheckCircle2, Star } from "lucide-react";
+import { CheckCircle2 } from "lucide-react";
+import RatingStatusCard from "@/components/rating/RatingStatusCard";
 import { useFormatter, useTranslations } from "next-intl";
 import type { Booking } from "../../booking-tracker.types";
 
@@ -76,18 +77,15 @@ export function PaymentReleasedCard({ booking, compact = false }: { booking: Boo
   );
 }
 
+/** B5 — la notation remplace la note « bientôt » (décision 1A). */
 export function RatingSoonNote({ booking, compact = false }: { booking: Booking; compact?: boolean }) {
-  const t = useTranslations("bookingTracker.completed");
   return (
-    <section
-      className={`flex items-start gap-2.5 rounded-2xl border border-slate-200 bg-slate-50 text-left dark:border-slate-800 dark:bg-slate-900 ${
-        compact ? "p-3.5" : "p-4"
-      }`}
-    >
-      <Star size={15} className="mt-0.5 flex-shrink-0 text-amber-500" aria-hidden="true" />
-      <p className="text-[12.5px] leading-snug text-slate-600 dark:text-slate-400">
-        {t("ratingSoon", { carrierFirstName: booking.carrier.firstName })}
-      </p>
-    </section>
+    <RatingStatusCard
+      dealId={booking.id}
+      rating={booking.rating}
+      counterpartFirstName={booking.carrier.firstName}
+      rateHref={`/bookings/${booking.id}/rate`}
+      compact={compact}
+    />
   );
 }
