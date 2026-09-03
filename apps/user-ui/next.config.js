@@ -28,6 +28,19 @@ const nextConfig = {
   // localhost — la page reste figée sur son squelette SSR. Réseaux privés
   // uniquement, sans effet en production (option de dev).
   allowedDevOrigins: ["192.168.*.*", "10.*.*.*", "172.16.*.*"],
+
+  // D48 — API en MÊME ORIGINE : quand API_PROXY_TARGET est posé (ex.
+  // http://localhost:8080), Next sert /api/* en proxy vers le gateway. Le
+  // navigateur appelle alors `NEXT_PUBLIC_API_BASE_URL=/api` (relatif) : les
+  // cookies sont first-party quel que soit l'hôte (localhost, IP LAN, prod),
+  // plus de CORS ni de piège SameSite (recette 03/09 : login 200 puis /me 401
+  // avec le front sur localhost et l'API sur l'IP LAN). Sans la variable :
+  // comportement historique (URL absolue vers le gateway).
+  async rewrites() {
+    const target = (process.env.API_PROXY_TARGET || "").replace(/\/$/, "");
+    if (!target) return [];
+    return [{ source: "/api/:path*", destination: `${target}/api/:path*` }];
+  },
 };
 
 const plugins = [

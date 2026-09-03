@@ -416,7 +416,7 @@ mobile-first, aucune attribution Claude, charte mango/teal/slate.
 5. `feat/auth-pages-ux` — **FAIT, en PR** (D45 pages auth, A60 : porte « Partager un trajet » en modale, demande utilisateur 03/09). Vocabulaire du rôle toujours ouvert.
 6. `feat/auth-google` — **FAIT, en PR** (D47, A61). **Geste utilisateur** : créer l'ID client OAuth (Google Cloud → Identifiants → « Application Web », origines `http://localhost:3000` + IP LAN) et poser `GOOGLE_CLIENT_ID` + `NEXT_PUBLIC_GOOGLE_CLIENT_ID` dans `.env` / `apps/user-ui/.env.local`, puis recette J1–J8.
 7. `feat/auth-gate-inline-login` — **FAIT, en PR** (A63 : formulaire de connexion dans la fenêtre, reprise du geste — demande utilisateur 03/09).
-8. `chore/api-same-origin` — rewrite Next `/api` → gateway (P3).
+8. `chore/api-same-origin` — **FAIT, en PR** (D48, opt-in). **Backlog recette 03/09 SOLDÉ.** Suite : ⭐ B4 argent sortant (voir §E de l'addendum du 02/09).
 
 ## C. Questions encore ouvertes pour l'utilisateur
 - Nom du rôle transporteur : Yamber / Tripper / Voyageur (une seule réponse, appliquée partout).

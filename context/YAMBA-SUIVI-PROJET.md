@@ -147,7 +147,7 @@ Estimation : **2–4 sessions** au-dessus du Jalon 4 (l'essentiel du travail est
 | P2 · `feat/auth-google` — **D47 / A61** : `AuthIdentity`, `POST /auth/google` (jeton vérifié serveur, identité connue → connexion, email vérifié → rattachement, nouveau → `CONSENT_REQUIRED` puis création avec `ConsentLog`), `issueSession` partagé, bouton officiel GIS + écran « Finalise ton compte » sur login et inscription, inerte sans client ID ; 6 tests (auth 65). **À faire par l'utilisateur** : créer l'ID client OAuth dans Google Cloud et poser `GOOGLE_CLIENT_ID` + `NEXT_PUBLIC_GOOGLE_CLIENT_ID` (`.env.example`). Facebook non branché | ✅ PR ouverte |
 | Fix · `fix/session-remember-default` — **A62** : « Rester connecté » décoché par défaut + aide sur les durées (D27 inchangé : 60 min / 7 j, coché 7 j / 30 j) ; bug de recette « connecté indéfiniment » | ✅ PR ouverte |
 | UX · `feat/auth-gate-inline-login` — **A63** : la fenêtre de connexion embarque le formulaire complet (e-mail, Google, Facebook, lien inscription), reprise du geste après connexion (favori appliqué, réservation → wizard, partage → création) — demande utilisateur 03/09 | ✅ PR ouverte |
-| P3 · `chore/api-same-origin` — rewrite Next `/api/*` → gateway pour que les cookies soient toujours first-party (fin du piège localhost ↔ LAN observé le 03/09 : login 200 puis `/me` 401 quand le front est sur `localhost` et l'API sur l'IP LAN) ; URL interne absolue pour le rendu serveur | ⬜ |
+| P3 · `chore/api-same-origin` — **D48** : rewrite Next `/api/*` → gateway (opt-in `API_PROXY_TARGET`), `NEXT_PUBLIC_API_BASE_URL=/api` relatif accepté par les clients API, cookies first-party sur tout hôte (fin du piège localhost ↔ LAN du 03/09) ; `.env.example` + `CLAUDE.md` mis à jour, aucun appel API serveur Next à ce jour | ✅ PR ouverte |
 | Décisions candidates à graver : « la CI construit ce qu'elle déploie » (`next build`), règle de couleur des CTA (mango = avancer, teal = engager), D35 email provider | ⬜ |
 
 ## 8. Chiffres de suivi
@@ -155,7 +155,7 @@ Estimation : **2–4 sessions** au-dessus du Jalon 4 (l'essentiel du travail est
 | Indicateur | Valeur |
 |---|---|
 | Tests (plateforme) | 621 = trip 198 · deal 355 · notification 68 (+ auth-service 65, check CI « Tests unitaires (auth-service) ») |
-| Décisions au registre | D1 → D47 (+ arbitrages A1 → A63) |
+| Décisions au registre | D1 → D48 (+ arbitrages A1 → A63) |
 | Règles métier | ~50 (V2) + RG-B-01…35, RG-S-01…13, RG-C-01…16, RG-G-01…03, RG-D-01…16, RG-V-01…09, RG-F-01…06, RG-N-01…08, RG-T-01…06, RG-P-01…27, RG-A-01…08, RG-C-17…19, RG-FAV-01…06, RG-A-09…12 |
 | PR mergées | #1 → #95 (#90 = pile B2-PR1/2/3 · #91 = docs post-merge · #92 = B2-PR4 emails · #93 = B2-PR5 tracker · #94 = docs post-merge · #95 = B3-PR1 serveur · #96 = B3-PR2 front · #97 = docs · #98 = B3-PR3 boîte du Voyageur · #99 = docs · #100 = B3-PR4 page demande · #101 = docs · #102 = typographie Deal · #103 = docs · #104 = fix ImageKit · #105 = docs · #106 = visionneuse photos · #108 = docs · #109 = fix relay outbox · #111 = allowedDevOrigins LAN · #112 = backlog inscription · #113 = atterrissage post-OTP · #114 = redirect inscription→connexion · #116 = fix recette auth · #117 = email-locale D44/D45 · #118 = modale de réservation A58 — 13 checks comptés à chaque fois) |
 | Documents | registre, spec, règles, 5 handoffs (dernier : SESSION-2026-08-28 + addendum 29/08), fiches PR (archive), 3 docs cumulatifs (technique, métier, apprentissage), `YAMBA-MOTEUR-PRIX.md/.pdf`, ce suivi |

@@ -3,6 +3,8 @@
 import axios, { AxiosError } from "axios";
 import { getCurrentLocale } from "@/lib/current-locale";
 
+// D48 — absolu (http://…:8080/api) OU relatif (/api, proxy Next → gateway,
+// cookies first-party). Les deux formes sont acceptées telles quelles.
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ||
   "http://localhost:6001/api";

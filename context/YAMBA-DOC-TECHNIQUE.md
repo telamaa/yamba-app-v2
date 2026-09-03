@@ -1149,3 +1149,12 @@ Diagnostic avant code : `session-policy.ts` (60 min / 7 j standard, 7 j / 30 j r
 
 ### Preuves
 tsc user-ui, miroir i18n, pages login et trajet en 200 sur le serveur de dev. Recette M1–M6 (`YAMBA-DOC-METIER.md`).
+
+# chore/api-same-origin — l'API en même origine que le front (D48)
+
+- `apps/user-ui/next.config.js` : `async rewrites()` → `[{ source: "/api/:path*", destination: `${API_PROXY_TARGET}/api/:path*` }]` quand `API_PROXY_TARGET` est posé, `[]` sinon (vérifié en évaluant la config avec et sans variable).
+- Clients API : `NEXT_PUBLIC_API_BASE_URL` peut être relatif (`/api`) — axios (`baseURL`) et `fetch` l'acceptent tels quels dans le navigateur ; aucun appel API depuis un Server Component (vérifié par grep), donc pas d'URL interne nécessaire aujourd'hui (la décision D48 fixe la règle si cela change).
+- `.env.example` du front (`API_PROXY_TARGET`, `NEXT_PUBLIC_API_BASE_URL=/api`) et `CLAUDE.md` (pièges LAN) documentent les deux modes. Le `.env.local` de recette N'EST PAS modifié : bascule à la main (deux lignes) + redémarrage de user-ui.
+
+### Preuves
+Config évaluée en Node avec et sans variable ; tsc user-ui. Recette : avec le proxy, `http://localhost:3000` ET `http://192.168.1.155:3000` doivent permettre connexion + `/me` sans changer d'environnement.
