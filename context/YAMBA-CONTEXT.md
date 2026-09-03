@@ -246,7 +246,13 @@ Ordre de demarrage : auth -> trip -> gateway.
   5 emails en dictionnaire D44. Decisions utilisateur 03/09 : DISPUTED reste
   terminal, chantier C (admin) juste apres B4 ; retenue ANN-01 au prorata
   (PR dediee). Reste : PR2 front Expediteur, PR3 front Voyageur.
-- Plateforme de tests : 653 (trip 198, deal 380, notification 75) + auth 65.
+- 03/09 : B4-PR2 feat/b4-shipper-front (A71–A74) — tracker Expediteur reel :
+  confirm (bouton secondaire) et dispute branches sur l'API, vues COMPLETED et
+  DISPUTED, « Signaler un colis non livre » en transit garde par allowedActions
+  + disputeOpensAt (servi), photos de litige uploadees a la selection. Reste :
+  PR3 front Voyageur (payoutStatus, echec + CTA Stripe, disputeCategory, photo
+  optionnelle a la remise), puis retenue ANN-01, puis chantier C.
+- Plateforme de tests : 654 (trip 198, deal 381, notification 75) + auth 65.
 - (historique) Plateforme de tests : 600 (trip 187, deal 354, notification 59) — post-B3 (#96).
 - MERGE 01/09 : toute la pile B2 est dans `dev` via la SEULE **PR #90**
   (`feat/b2-deal-front` portait la chaîne complète : jalons mobile D36,

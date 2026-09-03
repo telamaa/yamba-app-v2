@@ -24,7 +24,6 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { useRouter } from "@/i18n/navigation";
 import { getBooking } from "./booking-tracker.api";
-import type { Booking } from "./booking-tracker.types";
 import BookingTrackerSkeleton from "./BookingTrackerSkeleton";
 import BookingAcceptedDesktop from "./views/accepted/BookingAcceptedDesktop";
 import BookingAcceptedMobile from "./views/accepted/BookingAcceptedMobile";
@@ -35,6 +34,10 @@ import BookingDeliveredMobile from "./views/delivered/BookingDeliveredMobile";
 import BookingInTransitDesktop from "./views/in-transit/BookingInTransitDesktop";
 import BookingInTransitMobile from "./views/in-transit/BookingInTransitMobile";
 import BookingStatusNotice from "./views/status/BookingStatusNotice";
+import BookingCompletedDesktop from "./views/completed/BookingCompletedDesktop";
+import BookingCompletedMobile from "./views/completed/BookingCompletedMobile";
+import BookingDisputedDesktop from "./views/disputed/BookingDisputedDesktop";
+import BookingDisputedMobile from "./views/disputed/BookingDisputedMobile";
 
 export const bookingQueryKey = (bookingId: string) => ["booking", bookingId];
 
@@ -72,22 +75,11 @@ export default function BookingTrackerClient({ bookingId }: Props) {
     [queryClient, bookingId]
   );
 
-  // Actions ENCORE MOCK (B4) : mise à jour du cache local, remplacée
-  // par invalidateQueries quand les endpoints réels existeront (A37).
-
-  const handleEarlyConfirmed = useCallback(
-    (confirmedAt: string) => {
-      queryClient.setQueryData<Booking>(bookingQueryKey(bookingId), (prev) =>
-        prev && prev.delivery
-          ? {
-              ...prev,
-              delivery: { ...prev.delivery, confirmedEarlyAt: confirmedAt },
-            }
-          : prev
-      );
-    },
-    [queryClient, bookingId]
-  );
+  // Confirmation anticipée RÉELLE (B4-PR2) : le serveur a clos le deal, on
+  // RELIT — la vue « Envoi terminé » vient de GET /deals/:id (A71).
+  const handleEarlyConfirmed = useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: bookingQueryKey(bookingId) });
+  }, [queryClient, bookingId]);
 
   if (isMobile === null || isPending) {
     return <BookingTrackerSkeleton />;
@@ -98,21 +90,27 @@ export default function BookingTrackerClient({ bookingId }: Props) {
   }
 
   if (booking.status === "DELIVERED") {
-    const isConfirmed = !!booking.delivery?.confirmedEarlyAt;
     return isMobile ? (
-      <BookingDeliveredMobile
-        booking={booking}
-        isConfirmed={isConfirmed}
-        onCloseAction={handleClose}
-        onConfirmedAction={handleEarlyConfirmed}
-      />
+      <BookingDeliveredMobile booking={booking} onCloseAction={handleClose} onConfirmedAction={handleEarlyConfirmed} />
     ) : (
-      <BookingDeliveredDesktop
-        booking={booking}
-        isConfirmed={isConfirmed}
-        onCloseAction={handleClose}
-        onConfirmedAction={handleEarlyConfirmed}
-      />
+      <BookingDeliveredDesktop booking={booking} onCloseAction={handleClose} onConfirmedAction={handleEarlyConfirmed} />
+    );
+  }
+
+  // B4-PR2 (A71) : la fin de transaction et le litige ont leur vraie vue.
+  if (booking.status === "VERIFIED") {
+    return isMobile ? (
+      <BookingCompletedMobile booking={booking} onCloseAction={handleClose} />
+    ) : (
+      <BookingCompletedDesktop booking={booking} onCloseAction={handleClose} />
+    );
+  }
+
+  if (booking.status === "DISPUTED") {
+    return isMobile ? (
+      <BookingDisputedMobile booking={booking} onCloseAction={handleClose} />
+    ) : (
+      <BookingDisputedDesktop booking={booking} onCloseAction={handleClose} />
     );
   }
 
@@ -160,7 +158,7 @@ export default function BookingTrackerClient({ bookingId }: Props) {
     );
   }
 
-  // AWAITING_CARRIER, DECLINED, EXPIRED, CANCELLED, VERIFIED, DISPUTED :
+  // AWAITING_CARRIER, DECLINED, EXPIRED, CANCELLED :
   // vue d'état neutre — une URL directe ne ment jamais (A37).
   return <BookingStatusNotice booking={booking} onBackAction={handleClose} />;
 }

@@ -198,8 +198,10 @@
       "inlineYes": "Yes, all good",
       "inlineCancel": "Cancel",
       "submitting": "Confirming…",
-      "toastSuccess": "Thanks! {carrierFirstName} will receive his payment. 🎉",
-      "toastError": "Error confirming. Try again."
+      "toastSuccess": "Thank you! {carrierFirstName} will receive their payment.",
+      "toastError": "Error confirming. Try again.",
+      "tip": "Tip: ask {recipientFirstName} to open the parcel before you confirm.",
+      "toastConflict": "This deal changed in the meantime — reloading your tracking."
     },
     "confirmedCard": {
       "title": "Payment released",
@@ -282,7 +284,8 @@
       "RECIPIENT_ISSUE": "{recipientFirstName} has another issue with the traveller",
       "RECIPIENT_ISSUE_short": "Another issue with {carrierFirstName}",
       "OTHER": "Other issue",
-      "OTHER_short": "Other"
+      "OTHER_short": "Other",
+      "lockedText": "Your parcel is still in transit: you can only report that it was not delivered. Other reasons (content, damage) are assessed after handover. {carrierFirstName} will be informed."
     },
     "description": {
       "title": "Tell us what happened",
@@ -301,7 +304,9 @@
       "add": "Add",
       "remove": "Remove this photo",
       "tag": "Evidence",
-      "hint": "Ask {recipientFirstName} to send you photos if she can. Up to {max} photos, max 10 MB each."
+      "hint": "Ask {recipientFirstName} to send you photos if she can. Up to {max} photos, max 10 MB each.",
+      "uploading": "Uploading photo…",
+      "uploadError": "Upload failed — remove it and try again"
     },
     "outcome": {
       "title": "Your preferred outcome",
@@ -345,7 +350,9 @@
       "confirmText": "{carrierFirstName}''s payment will be frozen and our mediation team will take over. This action is irreversible.",
       "confirmYes": "Yes, send",
       "confirmCancel": "Cancel",
-      "toastError": "Error sending. Try again."
+      "toastError": "Error sending. Try again.",
+      "toastConflict": "This deal changed in the meantime — back to tracking.",
+      "toastValidation": "The server rejected the report: check the description (50 characters minimum) and the pledge."
     },
     "sidebar": {
       "dealLabel": "THE DEAL CONCERNED",
@@ -357,7 +364,8 @@
       "proofDeclared": "You declared these photos at booking",
       "proofPickup": "{carrierFirstName} took these photos at pickup",
       "windowLabel": "REPORTING WINDOW",
-      "windowText": "You can report until {date}."
+      "windowText": "You can report until {date}.",
+      "inTransitText": "Parcel in transit: the “not delivered” report opens 48h after the trip departure. {carrierFirstName} has not validated the handover yet."
     },
     "success": {
       "title": "Report sent",
@@ -366,7 +374,8 @@
       "frozenNote": "{carrierFirstName}''s payment is frozen. Nothing will be paid out before resolution.",
       "emailNote": "A confirmation email has just been sent to you.",
       "backToTracking": "Back to my shipment tracking"
-    }
+    },
+    "notAllowed": "This deal can no longer be reported."
   },
   "senderTracking": {
     "banner": {
@@ -440,7 +449,9 @@
       "coverageTitle": "{amount} protection active",
       "coverageNote": "Loss, theft, breakage during transport."
     },
-    "report": "Report an issue"
+    "report": "Report an issue",
+    "reportNotDelivered": "Report a parcel not delivered",
+    "reportLocked": "Parcel not delivered? You can report it from {date} (48h after the trip departure)."
   },
   "error": {
     "notFound": "This booking doesn''t exist or has been cancelled.",
@@ -479,5 +490,55 @@
       "message": "Your report is recorded: the carrier payout is frozen during the review. Our team answers within 48 business hours.",
       "dateLine": "Opened on {date}."
     }
+  },
+  "completed": {
+    "banner": {
+      "title": "Shipment completed",
+      "byShipper": "You confirmed the delivery on {date}.",
+      "bySystem": "Verification period ended on {date}, with no report from you."
+    },
+    "h1": "Transaction closed",
+    "h1Subtitle": "All good: your carrier's payment has been released and this deal is closed.",
+    "h1SubtitleShort": "Payment released, deal closed.",
+    "released": {
+      "title": "{carrierFirstName}'s payment has been released",
+      "text": "Yamba pays {carrierFirstName} the agreed amount for this transport. Thank you for shipping with Yamba.",
+      "closedNote": "This transaction is closed: it is no longer possible to open a report."
+    },
+    "ratingSoon": "Soon you will be able to rate {carrierFirstName} from this screen.",
+    "backToShipments": "View my shipments"
+  },
+  "disputed": {
+    "banner": {
+      "title": "Report in progress · case {ticket}",
+      "openedAt": "Opened on {date}. The carrier's payment is frozen during the review.",
+      "openedNoDate": "The carrier's payment is frozen during the review."
+    },
+    "h1": "Your report",
+    "h1Subtitle": "Here is what you declared and what happens next. Keep your case number for any exchange with us.",
+    "h1SubtitleShort": "What you declared, and what's next.",
+    "file": {
+      "label": "YOUR CASE",
+      "unavailable": "The case details are not available for this shipment.",
+      "ticket": "Case number",
+      "category": "Reason",
+      "description": "Your description",
+      "outcome": "Desired outcome",
+      "openedAt": "Sent on",
+      "photos": "{count, plural, one {# photo attached} other {# photos attached}}",
+      "photoAlt": "Evidence photo {index}"
+    },
+    "process": {
+      "title": "What happens next"
+    },
+    "support": {
+      "title": "A question about your case?",
+      "text": "Write to us quoting case {ticket}: we reply within 48 business hours."
+    },
+    "payment": {
+      "stateFrozen": "Frozen",
+      "note": "No payout will be made to {carrierFirstName} until the review ends. If a refund applies, it will be confirmed by email."
+    },
+    "backToShipments": "View my shipments"
   }
 }

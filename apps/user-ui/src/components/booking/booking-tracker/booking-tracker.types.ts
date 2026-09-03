@@ -108,6 +108,17 @@ export type Booking = {
   payoutDueAt?: string;
   /** Ticket YAM-XXXX si un litige est ouvert. */
   disputeTicket?: string;
+  /** Ouverture du litige (ISO) — statut DISPUTED. */
+  disputedAt?: string;
+  /** Le dossier déposé (B4/A68) — servi à l'Expéditeur seul, en DISPUTED. */
+  dispute?: BookingDisputeFile;
+  /** Versement au Voyageur (B4/A68) : l'Expéditeur n'affiche JAMAIS un échec (2A). */
+  payoutStatus?: "PENDING" | "SENT" | "FAILED" | "FROZEN";
+  /** Qui a clos la transaction (COMPLETED) : confirmation anticipée ou J+4. */
+  completedBy?: "SHIPPER" | "SYSTEM";
+  completedAt?: string;
+  /** PICKED_UP : quand « signaler un colis non livré » devient possible (servi, A72). */
+  disputeOpensAt?: string;
   /** Machine d'état serveur — les CTA reflètent, ne décident jamais. */
   allowedActions?: string[];
 
@@ -150,7 +161,6 @@ export type BookingPickupInfo = {
 export type BookingDeliveryInfo = {
   deliveredAt: string; // ISO — moment de la validation du code par le Voyageur
   validatedBy: "CODE";
-  confirmedEarlyAt?: string; // ISO — si le Sender a confirmé avant J+4
 };
 
 /** Durée de la période de vérification avant versement automatique */
@@ -180,15 +190,31 @@ export type DisputePhotoDraft = {
   id: string;
   label?: string;
   previewUrl?: string;
-  file?: File; // envoyé vers R2 en PR backend
+  file?: File;
+  /** URL ImageKit une fois l'upload direct terminé (D42, dossier deals/dispute/ — A73). */
+  url?: string;
+  uploading?: boolean;
+  /** Message d'erreur d'upload (format, taille, réseau) — la photo n'est pas envoyable. */
+  error?: string;
 };
 
 export type SubmitDisputePayload = {
   category: DisputeCategory;
   description: string; // min 50 caractères
-  photos: DisputePhotoDraft[];
+  /** Photos DÉJÀ en ligne — seules les URL voyagent. */
+  photoUrls: string[];
   desiredOutcome?: DisputeDesiredOutcome;
-  pledgeAccepted: boolean;
+  pledgeAccepted: true;
+};
+
+/** Le dossier tel que déposé (lecture, vue DISPUTED — A74). */
+export type BookingDisputeFile = {
+  ticketNumber: string;
+  category: DisputeCategory;
+  description: string;
+  desiredOutcome?: DisputeDesiredOutcome;
+  photoUrls: string[];
+  createdAt: string;
 };
 
 export const DISPUTE_MIN_DESCRIPTION_LENGTH = 50;

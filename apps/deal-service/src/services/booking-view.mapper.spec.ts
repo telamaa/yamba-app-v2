@@ -178,6 +178,14 @@ describe("frontière carrier — liste blanche résistante au spread (A13)", () 
     expect(toShipperBookingView(makeBooking(), CARRIER).pickupRefusalReason).toBeNull();
   });
 
+  it("B4/A72 : disputeOpensAt = départ + 48 h en PICKED_UP seulement (servi, jamais calculé par le front)", () => {
+    const inTransit = toShipperBookingView(makeLeakyBooking({ status: "PICKED_UP", pickedUpAt: T0 }), CARRIER, T0);
+    const departure = makeBooking().trip.departureAt.getTime();
+    expect(inTransit.disputeOpensAt).toBe(new Date(departure + 48 * 3_600_000).toISOString());
+    expect(toShipperBookingView(makeBooking(), CARRIER).disputeOpensAt).toBeNull();
+    expect(toShipperBookingView(makeBooking({ status: "DELIVERED" }), CARRIER).disputeOpensAt).toBeNull();
+  });
+
   it("la vue Carrier n'expose ni commission ni total Expéditeur", () => {
     const view = toCarrierBookingView(makeBooking(), SHIPPER);
     expect(view.pricing).not.toHaveProperty("commissionPct");

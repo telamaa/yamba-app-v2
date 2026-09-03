@@ -14,22 +14,16 @@ import BookingTipList from "../../shared/BookingTipList";
 import ConfirmAllGoodCard from "./ConfirmAllGoodCard";
 import DeliveryRecapCard from "./DeliveryRecapCard";
 import PayoutCountdownCard from "./PayoutCountdownCard";
-import { DeliveredPaymentCard, RateCarrierPrompt, ReportIssuePrompt } from "./DeliveredSideCards";
+import { DeliveredPaymentCard, ReportIssuePrompt } from "./DeliveredSideCards";
 import { useRouter } from "@/i18n/navigation";
 
 type Props = {
   booking: Booking;
-  isConfirmed: boolean;
   onCloseAction: () => void;
-  onConfirmedAction: (confirmedAt: string) => void;
+  onConfirmedAction: () => void;
 };
 
-export default function BookingDeliveredMobile({
-                                                 booking,
-                                                 isConfirmed,
-                                                 onCloseAction,
-                                                 onConfirmedAction,
-                                               }: Props) {
+export default function BookingDeliveredMobile({ booking, onCloseAction, onConfirmedAction }: Props) {
   const t = useTranslations("bookingTracker");
 
   const router = useRouter();
@@ -38,6 +32,8 @@ export default function BookingDeliveredMobile({
 
   const carrierFirstName = booking.carrier.firstName;
   const recipientFirstName = booking.recipient.firstName;
+  // Le serveur décide (fenêtre J+4) : le front reflète `allowedActions`.
+  const canDispute = booking.allowedActions?.includes("dispute") ?? false;
 
   const deliveredAt = booking.delivery
     ? new Date(booking.delivery.deliveredAt)
@@ -99,14 +95,9 @@ export default function BookingDeliveredMobile({
           </p>
         </header>
 
-        {!isConfirmed && <PayoutCountdownCard booking={booking} compact />}
+        <PayoutCountdownCard booking={booking} compact />
 
-        <ConfirmAllGoodCard
-          booking={booking}
-          isConfirmed={isConfirmed}
-          onConfirmedAction={onConfirmedAction}
-          compact
-        />
+        <ConfirmAllGoodCard booking={booking} onConfirmedAction={onConfirmedAction} compact />
 
         <DeliveryRecapCard booking={booking} compact />
 
@@ -115,11 +106,10 @@ export default function BookingDeliveredMobile({
           items={tipItems}
         />
 
-        <RateCarrierPrompt booking={booking} compact />
+        {/* Notation : B5 — aucun CTA « Noter » avant (décision 10). */}
+        <DeliveredPaymentCard booking={booking} isConfirmed={false} />
 
-        <DeliveredPaymentCard booking={booking} isConfirmed={isConfirmed} />
-
-        {!isConfirmed && (
+        {canDispute && (
           <ReportIssuePrompt
             booking={booking}
             onReportAction={() =>

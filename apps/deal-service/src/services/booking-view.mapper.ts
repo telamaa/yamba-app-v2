@@ -5,6 +5,7 @@ import type {
   TrackingStep,
 } from "@packages/api-contracts";
 import {
+  DISPUTE_AFTER_DEPARTURE_HOURS,
   getAllowedActions,
   MAX_CODE_REGENERATIONS,
   MAX_DELIVERY_ATTEMPTS,
@@ -323,6 +324,12 @@ export function toShipperBookingView(
 
     allowedActions,
     cancellationPreview: toCancellationPreview(booking, allowedActions, now),
+
+    // A72 — la date d'ouverture du litige « non livré » est SERVIE (jamais calculée par le front).
+    disputeOpensAt:
+      booking.status === "PICKED_UP"
+        ? new Date(booking.trip.departureAt.getTime() + DISPUTE_AFTER_DEPARTURE_HOURS * 3_600_000).toISOString()
+        : null,
 
     // A68 — le dossier n'est servi qu'à l'Expéditeur, et seulement en DISPUTED.
     dispute:

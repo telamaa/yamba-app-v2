@@ -8,9 +8,9 @@
 
 "use client";
 
-import { AlertTriangle } from "lucide-react";
+import DisputeInTransitLink from "../../shared/DisputeInTransitLink";
+
 import { useLocale, useTranslations } from "next-intl";
-import { useRouter } from "@/i18n/navigation";
 import type { Booking } from "@/components/booking/booking-tracker/booking-tracker.types";
 import BookingAcceptedHeader from "../accepted/BookingAcceptedHeader";
 import {
@@ -35,7 +35,6 @@ export default function BookingInTransitMobile({
   const t = useTranslations("bookingTracker");
   const tBooking = useTranslations("booking");
   const locale = useLocale();
-  const router = useRouter();
 
   const insuredAmount = booking.insurance === "EXTENDED_500" ? 500 : 100;
 
@@ -97,16 +96,8 @@ export default function BookingInTransitMobile({
           </div>
         </section>
 
-        <div className="pt-1 text-center">
-          <button
-            type="button"
-            onClick={() => router.push("/bookings/" + booking.id + "/report")}
-            className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-slate-500 hover:text-red-700 dark:text-slate-400"
-          >
-            <AlertTriangle size={13} aria-hidden="true" />
-            {t("senderTracking.report")}
-          </button>
-        </div>
+        {/* B4-PR2 (A72) : « non livré » — actif 48 h après le départ, sinon désactivé avec la date servie. */}
+        <DisputeInTransitLink booking={booking} align="center" />
       </div>
     </div>
   );

@@ -17,22 +17,16 @@ import BookingTipList from "../../shared/BookingTipList";
 import ConfirmAllGoodCard from "./ConfirmAllGoodCard";
 import DeliveryRecapCard from "./DeliveryRecapCard";
 import PayoutCountdownCard from "./PayoutCountdownCard";
-import { DeliveredPaymentCard, RateCarrierPrompt, ReportIssuePrompt } from "./DeliveredSideCards";
+import { DeliveredPaymentCard, ReportIssuePrompt } from "./DeliveredSideCards";
 import { useRouter } from "@/i18n/navigation";
 
 type Props = {
   booking: Booking;
-  isConfirmed: boolean;
   onCloseAction: () => void;
-  onConfirmedAction: (confirmedAt: string) => void;
+  onConfirmedAction: () => void;
 };
 
-export default function BookingDeliveredDesktop({
-                                                  booking,
-                                                  isConfirmed,
-                                                  onCloseAction,
-                                                  onConfirmedAction,
-                                                }: Props) {
+export default function BookingDeliveredDesktop({ booking, onCloseAction, onConfirmedAction }: Props) {
   const t = useTranslations("bookingTracker");
 
   const router = useRouter();
@@ -41,6 +35,8 @@ export default function BookingDeliveredDesktop({
 
   const carrierFirstName = booking.carrier.firstName;
   const recipientFirstName = booking.recipient.firstName;
+  // Le serveur décide (fenêtre J+4) : le front reflète `allowedActions`.
+  const canDispute = booking.allowedActions?.includes("dispute") ?? false;
 
   const deliveredAt = booking.delivery
     ? new Date(booking.delivery.deliveredAt)
@@ -92,13 +88,9 @@ export default function BookingDeliveredDesktop({
               </p>
             </header>
 
-            {!isConfirmed && <PayoutCountdownCard booking={booking} />}
+            <PayoutCountdownCard booking={booking} />
 
-            <ConfirmAllGoodCard
-              booking={booking}
-              isConfirmed={isConfirmed}
-              onConfirmedAction={onConfirmedAction}
-            />
+            <ConfirmAllGoodCard booking={booking} onConfirmedAction={onConfirmedAction} />
 
             <DeliveryRecapCard booking={booking} />
 
@@ -106,28 +98,15 @@ export default function BookingDeliveredDesktop({
               title={t("delivered.howItWorks.title")}
               items={tipItems}
             />
-
-            {/*{!isConfirmed && (*/}
-            {/*  <button*/}
-            {/*    type="button"*/}
-            {/*    onClick={() => router.push("/bookings/" + booking.id + "/report")}*/}
-            {/*    className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-slate-500 transition-colors hover:text-red-700 dark:text-slate-400 dark:hover:text-red-400"*/}
-            {/*  >*/}
-            {/*    <AlertTriangle size={13} aria-hidden="true" />*/}
-            {/*    {t("delivered.report")}*/}
-            {/*  </button>*/}
-            {/*)}*/}
           </div>
 
           {/* Sidebar */}
           <aside className="hidden lg:block">
             <div className="sticky top-[88px] space-y-4">
-              <DeliveredPaymentCard booking={booking} isConfirmed={isConfirmed} />
+              <DeliveredPaymentCard booking={booking} isConfirmed={false} />
               <BookingCarrierCard booking={booking} compact />
-              <RateCarrierPrompt booking={booking} />
-
-
-              {!isConfirmed && (
+              {/* Notation : B5 — aucun CTA « Noter » avant (décision 10). */}
+              {canDispute && (
                 <ReportIssuePrompt
                   booking={booking}
                   onReportAction={() =>
