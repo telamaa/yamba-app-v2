@@ -7,14 +7,13 @@
 
 "use client";
 
-import { Check, PartyPopper, Star } from "lucide-react";
+import { Check, PartyPopper } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import type { DealRequest } from "@/components/carrier/deal/deal.types";
 
 type Props = {
   deal: DealRequest;
   deliveredAt: string;
-  onRateShipperAction: () => void;
   onBackToDealAction: () => void;
   onBackToDashboardAction: () => void;
 };
@@ -22,7 +21,6 @@ type Props = {
 export default function DeliverSuccess({
                                          deal,
                                          deliveredAt,
-                                         onRateShipperAction,
                                          onBackToDealAction,
                                          onBackToDashboardAction,
                                        }: Props) {
@@ -74,14 +72,7 @@ export default function DeliverSuccess({
 
         {/* CTAs */}
         <div className="mt-6 space-y-2.5">
-          <button
-            type="button"
-            onClick={onRateShipperAction}
-            className="inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl bg-[#FF9900] px-4 text-[14px] font-bold text-slate-950 transition-colors hover:bg-[#F08700]"
-          >
-            <Star size={14} aria-hidden="true" />
-            {t("success.rateShipper", { shipperFirstName })}
-          </button>
+          {/* Notation : B5 — aucun bouton « Noter » avant (décision 10). */}
           <button
             type="button"
             onClick={onBackToDealAction}

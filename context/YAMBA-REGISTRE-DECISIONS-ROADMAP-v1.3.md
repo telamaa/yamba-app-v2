@@ -306,6 +306,17 @@ Objectif produit assumé : **solide, propre, pro, secure, long terme** — les f
 
 ---
 
+## 2bis.20 — Session B4-PR3 `feat/b4-carrier-front` (argent sortant, côté Voyageur) — A75→A78
+
+| # | Arbitrage | Pourquoi | Compromis | PR |
+|---|---|---|---|---|
+| A75 | **La cause d'un versement bloqué est servie GROSSIÈREMENT au Voyageur** : `CarrierBookingView.payoutBlocker ∈ { ACCOUNT_NOT_READY, RETRYING, null }` dérivé de `payoutStatus = FAILED` + préfixe de `payoutFailureReason` — jamais le message Stripe. Compte non prêt → « finalise ton compte Stripe » + bouton vers l'onboarding, sur le deal ET en bandeau « Mes trajets » ; erreur fournisseur → « en cours de traitement, rien à faire » (décision utilisateur 2A) | Un CTA doit être juste (une erreur de solde ne s'arrange pas dans l'onboarding) ; le détail technique reste à Yamba | Un champ de plus, dérivé (pas stocké) | `feat/b4-carrier-front` |
+| A76 | **Photo optionnelle à la remise** (décision 3A) : `POST /deals/:id/deliver` accepte `photoUrls` (≤ 2, upload direct D42 vers `deals/delivery/`), stockées dans `Booking.deliveryPhotoUrls`, servies aux DEUX vues (récap Expéditeur, dossier médiation). Jamais obligatoire : le code prouve la remise, la photo prouve l'état — c'est l'assurance du Voyageur | Un litige « endommagé » ne se juge aujourd'hui que sur les photos de prise en charge ; une photo colis fermé dans les mains du destinataire protège le Voyageur | Friction facultative au moment du code ; pas de photo = comportement actuel | `feat/b4-carrier-front` |
+| A77 | **Le portefeuille Voyageur reste une maquette dans cette PR** (décision 4B) : l'état réel du versement est porté par la page du deal et les lignes « Mes trajets » (`payoutStatus`, `payoutSentAt`, `payoutBlocker`, `disputeTicket` ajoutés à la liste) ; le vrai portefeuille (à venir / en attente / envoyés) est une PR dédiée | Livrer d'abord l'état là où le Voyageur agit ; un portefeuille exige des agrégats qui méritent leur propre lot | La section Finances reste visuelle | `feat/b4-carrier-front` |
+| A78 | **Le Voyageur d'un deal disputé peut « donner sa version » par email** (bouton `mailto:` support, ticket en objet — décision 5A) en attendant la médiation dans l'app (chantier C) ; l'écran lui montre le ticket, la catégorie, « paiement en attente — ce n'est pas une décision » et les étapes. Copie honnête partout : « parti vers ton compte, sur ton compte bancaire sous 2 à 7 jours » remplace « virement Stripe automatique » / « virés le {date} » ; le bouton « Noter » de l'écran de succès disparaît jusqu'à B5 | Symétrie avec l'Expéditeur ; ne pas laisser le Voyageur sans voix ni sans repère temporel honnête | Un échange par email, hors app, jusqu'au chantier C | `feat/b4-carrier-front` |
+
+---
+
 # 3. Roadmap maîtresse
 
 ## 3.0 Les trois jalons
@@ -330,7 +341,7 @@ Le lancement public = **fin du jalon 2**. L'admin-ui n'est pas un confort d'apr�
 | **B1-solde** | 1 | **PR4bis notification-service :6004 + PR5 front** | Premier consumer (dédup event-id, matrice des 17), listes réelles Mes envois / deals Mes trajets (seed A14) | B1 | D2, D8 (A15, A16) |
 | **B2** | 1 | **Naissance du deal + argent entrant** | Création depuis wizard, PaymentIntent (autorisation → capture à l'acceptation), accept/decline, cron expiration 24h, remboursements, `PaymentProvider` abstrait, writers outbox EN TRANSACTION, payment-service :6008, media-service :6009 | B1-solde + transactions Atlas prouvées (§7.2) | D11, D16, D20, D21 |
 | **B3** | 1 | **Transport** | Pickup (upload R2 + code bcrypt + checklist conformité), refuse, tracking events, deliver (compare + lock serveur), régénération | B2 | D4, D9 |
-| **B4** | 1 | **Argent sortant** | **PR1 serveur faite** (D49–D52) : confirmation anticipée, cron J+4 → COMPLETED + `transfer`, dispute avec gel (aussi « non livré » depuis PICKED_UP), rappel J+3 · reste PR2/PR3 front, retenue ANN-01 (D50) ; matrice remboursements = chantier C | B3 | D21, D22, D49–D52 |
+| **B4** | 1 | **Argent sortant** | **PR1 serveur, PR2 Expéditeur, PR3 Voyageur faites** (D49–D52, A65–A78) : confirmation anticipée, cron J+4 → COMPLETED + `transfer`, dispute avec gel (aussi « non livré » depuis PICKED_UP), rappel J+3, écrans des deux côtés, photo de remise · reste retenue ANN-01 (D50), portefeuille (A77) ; matrice remboursements = chantier C | B3 | D21, D22, D49–D52 |
 | **B5** | 1 | **Confiance** | Rating double-aveugle, relances J+5/J+7, **stats de réputation visibles** (D29①) — le notification-service est déjà né en PR4bis | B4 | D2, D29 |
 | **C** | 2 | **admin-ui** | Médiation litiges (tickets YAM-XXXX), vérification billets, file des Reports, gestion users, **paramètres plateforme** (curseurs du mockup, audités), **TrustScore interne + plafonds progressifs** (D29②). Login séparé, 2FA TOTP, audit log | B4 | D6, D7, D26, D29 |
 | **E** | 2 | **Profil public Voyageur** | Page publique (stats réelles, trajets, avis) + Shop-preview équivalent | B1 (stats), B5 (avis) | — |

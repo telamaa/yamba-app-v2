@@ -116,7 +116,45 @@ export type DealRequest = {
   deliveryLockedUntil?: string;
   recipient?: DealRecipient;
   trackingEvents?: DealTrackingEvent[];
+
+  // ✨ B4-PR3 — après la remise (A75–A78) : le front reflète, ne décide jamais.
+  deliveredAt?: string;
+  /** Fin de la fenêtre de vérification de l'Expéditeur (J+4) — servie. */
+  payoutDueAt?: string;
+  /** Photos optionnelles prises à la remise (A76). */
+  deliveryPhotos: DealPhoto[];
+  completedAt?: string;
+  completedBy?: "SHIPPER" | "SYSTEM";
+  payoutStatus?: DealPayoutStatus;
+  payoutSentAt?: string;
+  /** Cause GROSSIÈRE d'un versement bloqué (A75) — jamais le message Stripe. */
+  payoutBlocker?: DealPayoutBlocker;
+  disputeTicket?: string;
+  disputedAt?: string;
+  /** Catégorie du signalement (A68) — jamais le dossier. */
+  disputeCategory?: DealDisputeCategory;
 };
+
+export type DealPayoutStatus = "PENDING" | "SENT" | "FAILED" | "FROZEN";
+export type DealPayoutBlocker = "ACCOUNT_NOT_READY" | "RETRYING";
+export type DealDisputeCategory =
+  | "NOT_DELIVERED"
+  | "CONTENT_MISSING"
+  | "DAMAGED"
+  | "SIGNIFICANT_DELAY"
+  | "RECIPIENT_ISSUE"
+  | "OTHER";
+
+/** Photo de remise en cours de saisie (A76) — même cycle que le litige : upload à la sélection. */
+export type DeliveryPhotoDraft = {
+  id: string;
+  previewUrl?: string;
+  file?: File;
+  url?: string;
+  uploading?: boolean;
+  error?: string;
+};
+export const DELIVERY_PHOTOS_MAX = 2;
 
 // ────────────────────────────────────────────────────────────
 // Décline UX

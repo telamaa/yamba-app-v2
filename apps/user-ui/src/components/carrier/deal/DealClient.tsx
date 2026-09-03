@@ -29,6 +29,7 @@ import DealRequestDesktop from "./views/request/DealRequestDesktop";
 import DealRequestMobile from "./views/request/DealRequestMobile";
 import DealAcceptedDesktop from "./views/accepted/DealAcceptedDesktop";
 import DealAcceptedMobile from "./views/accepted/DealAcceptedMobile";
+import DealSettledView from "./views/settled/DealSettledView";
 import DealTrackingClient from "./views/tracking/DealTrackingClient";
 
 type Props = {
@@ -84,8 +85,13 @@ export default function DealClient({ dealId }: Props) {
     );
   }
 
-  // Terminaux (DECLINED, EXPIRED, CANCELLED, DELIVERED, COMPLETED,
-  // DISPUTED) : plus rien à décider ici — écran de clôture sobre.
+  // B4-PR3 (A75–A78) : après la remise, le Voyageur lit l'état de SON argent.
+  if (deal.status === "DELIVERED" || deal.status === "COMPLETED" || deal.status === "DISPUTED") {
+    return <DealSettledView deal={deal} variant={isMobile ? "mobile" : "desktop"} onCloseAction={handleClose} />;
+  }
+
+  // Terminaux (DECLINED, EXPIRED, CANCELLED) : plus rien à décider ici —
+  // écran de clôture sobre.
   if (deal.status !== "PENDING") {
     return <DealClosed status={deal.status} onBackAction={handleClose} />;
   }

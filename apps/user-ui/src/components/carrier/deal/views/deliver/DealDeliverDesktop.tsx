@@ -13,6 +13,7 @@ import type { DealDeliverViewProps } from "./DealDeliverClient";
 import DeliverHelpCard from "./DeliverHelpCard";
 import { DeliverInfoBox, DeliverRecipientRow } from "./DeliverInfoBox";
 import DeliverOtpInput from "./DeliverOtpInput";
+import DeliverPhotosBlock from "./DeliverPhotosBlock";
 import PhotoThumbs from "@/components/shared/photos/PhotoThumbs";
 
 export default function DealDeliverDesktop(props: DealDeliverViewProps) {
@@ -77,6 +78,8 @@ export default function DealDeliverDesktop(props: DealDeliverViewProps) {
 
             {deal.recipient && <DeliverRecipientRow recipient={deal.recipient} />}
 
+            {/* A76 — photo optionnelle de la remise, AVANT le code (le colis est encore en main). */}
+            <DeliverPhotosBlock photos={props.photos} onAddAction={props.onAddPhotoAction} onRemoveAction={props.onRemovePhotoAction} />
             <DeliverOtpInput
               recipientFirstName={recipientFirstName}
               attemptsUsed={props.attemptsUsed}
@@ -84,7 +87,7 @@ export default function DealDeliverDesktop(props: DealDeliverViewProps) {
               errorMessage={props.errorMessage}
               isLocked={props.isLocked}
               lockCountdown={props.lockCountdown}
-              isSubmitting={props.isSubmitting}
+              isSubmitting={props.isSubmitting || !props.photosReady}
               onSubmitAction={props.onSubmitAction}
             />
 

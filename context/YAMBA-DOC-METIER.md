@@ -898,3 +898,31 @@ Le serveur sait clore une transaction, verser et geler (B4-PR1) ; l'Expéditeur,
 | E10 | Deal DELIVERED après J+4 (cron pas encore passé) | Ni « Confirmer » ni « Signaler » (allowedActions vides), compte à rebours à zéro |
 | E11 | Deux onglets : confirmer dans l'un, signaler dans l'autre | Le second reçoit « ce deal a changé » et revient au suivi à jour |
 | E12 | Mobile (≤ 640 px) sur E1, E3, E6, E9 | Mêmes contenus en une colonne, boutons pleine largeur |
+
+# B4-PR3 — le Voyageur voit son argent : versement, blocage, litige, photo de remise
+
+### Le besoin
+Après la remise, le Voyageur tombait sur une ligne (« Deal terminé — paiement libéré ») et des promesses inexactes (« virés sur ton compte Stripe le {date} »). Un versement bloqué par un compte Stripe incomplet restait invisible. Décisions utilisateur du 03/09 (1A, 2A, 3A, 4B, 5A).
+
+### Règles de gestion (VOY = Voyageur)
+- **RG-VOY-01 — L'état du versement est au centre de l'écran** après la remise : programmé après la vérification (avec la date servie), en cours, parti le … (2 à 7 jours pour arriver), en attente avec cause, gelé.
+- **RG-VOY-02 — Une cause grossière, jamais un message technique.** Compte de paiement non prêt → « finalise ton compte Stripe » avec le bouton ; toute autre erreur → « en cours de traitement, rien à faire ». Le message du fournisseur ne sort jamais du serveur.
+- **RG-VOY-03 — Un versement bloqué par le compte se voit partout** : sur le deal et en bandeau en tête de « Mes trajets » (somme des montants bloqués), tant qu'il reste un deal concerné. Une erreur fournisseur ne déclenche aucun bandeau.
+- **RG-VOY-04 — « Versement envoyé » n'est jamais « argent reçu »** (RG-PAY-08) : partout, « parti vers ton compte, sur ton compte bancaire sous 2 à 7 jours ».
+- **RG-VOY-05 — Photo de remise optionnelle, jamais obligatoire** : 2 au plus, envoyées avant la saisie du code, visibles par l'Expéditeur et par la médiation. Sans photo, rien ne change.
+- **RG-VOY-06 — Le litige est annoncé calmement** : ticket, motif (catégorie seule), « ce n'est pas une décision », les 3 étapes, et un moyen de donner sa version (email support, ticket en objet).
+- **RG-VOY-07 — Aucun bouton « Noter » avant la notation** (B5) ; une note calme l'annonce.
+
+### Recette
+| # | Scénario | Attendu |
+|---|---|---|
+| V10 | Voyageur, deal DELIVERED (seed `bzv-delivered`) | Bannière « colis remis à … », carte « {net} après la vérification » avec la date, note « {prénom} peut confirmer plus tôt ou signaler », parcours à l'étape versement |
+| V11 | Deal COMPLETED avec versement SENT (seed `bzv-completed`) | Carte verte « {net} partis vers ton compte », « envoyés le … 2 à 7 jours », bannière « terminé », note « bientôt noter » sans bouton |
+| V12 | Deal COMPLETED, versement FAILED cause compte (Stripe réel, compte incomplet) | Carte ambre « en attente : finalise ton compte Stripe » + bouton vers l'onboarding ; bandeau en tête de « Mes trajets » avec la somme ; ligne « en attente : finalise ton compte Stripe » |
+| V13 | Après onboarding complet, cron (≤ 5 min) | Carte passe à « partis vers ton compte », bandeau disparaît, ligne « partis le … » |
+| V14 | Deal COMPLETED, versement FAILED cause fournisseur | Carte « en cours de traitement, rien à faire », AUCUN bandeau |
+| V15 | Deal DISPUTED (seed `bzv-disputed`) | Ticket, motif « contenu manquant », « ce n'est pas une décision », 3 étapes, bouton « Donner ma version » ouvrant un email avec le ticket en objet, versement « en attente » |
+| V16 | Livraison : ajout d'une photo puis du code | Vignette « envoi… » puis nette ; bouton « Valider » inactif pendant l'envoi ; après validation, l'Expéditeur voit la photo dans son récap « À la livraison » |
+| V17 | Livraison sans photo | Comportement inchangé ; écran de succès sans bouton « Noter », texte « partiront … le {date} au plus tard, puis 2 à 7 jours » |
+| V18 | Photo trop lourde ou mauvais format | Vignette rouge « retire-la et réessaye », validation bloquée tant qu'elle reste |
+| V19 | Mobile (≤ 640 px) sur V10, V11, V15, V16 | Mêmes contenus en une colonne, carte Expéditeur en bas |

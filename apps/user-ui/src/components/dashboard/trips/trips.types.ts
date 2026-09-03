@@ -58,6 +58,11 @@ export type CarrierDealItem = {
   deliveredAt?: string;
   payoutAt?: string;
   hasRated?: boolean;
+  /** B4-PR3 (A75/A77) — état réel du versement, servi. */
+  payoutStatus?: "PENDING" | "SENT" | "FAILED" | "FROZEN";
+  payoutSentAt?: string;
+  payoutBlocker?: "ACCOUNT_NOT_READY" | "RETRYING";
+  disputeTicket?: string;
 };
 
 export type CarrierTripItem = {

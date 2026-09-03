@@ -92,6 +92,7 @@ export type ShipperBookingViewDto = {
   closedAt?: string | null;
   disputeTicket?: string | null;
   disputedAt?: string | null;
+  deliveryPhotoUrls?: string[] | null;
   payoutStatus?: "PENDING" | "SENT" | "FAILED" | "FROZEN" | null;
   completedBy?: string | null;
   disputeOpensAt?: string | null;
@@ -256,6 +257,7 @@ export function toBooking(view: ShipperBookingViewDto): Booking {
       ? {
           deliveredAt: view.deliveredAt,
           validatedBy: "CODE",
+          photos: toPhotos(view.deliveryPhotoUrls ?? [], "PICKUP_PACKAGED"),
         }
       : undefined,
 

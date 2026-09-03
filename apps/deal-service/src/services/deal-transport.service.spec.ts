@@ -346,13 +346,21 @@ describe("E — deliver (A38)", () => {
     hash = await hashDeliveryCode("742891");
   });
 
+  it("A76 : photos de remise optionnelles — figées avec la transition, jamais dans l'événement", async () => {
+    prismaMock.booking.findUnique.mockResolvedValue(makeBookingRecord({ status: "PICKED_UP", deliveryCodeHash: hash, deliveryAttempts: 0 }));
+    const photo = "https://ik.imagekit.io/yamba/deals/delivery/handover.jpg";
+    await makeService().deliver(CARRIER, BOOKING_ID, { code: "742891", photoUrls: [photo] });
+    expect(lastUpdate().data.deliveryPhotoUrls).toEqual([photo]);
+    expect(JSON.stringify(writtenEventPayload("booking.delivered"))).not.toContain("handover.jpg");
+  });
+
   it("bon code : PICKED_UP→DELIVERED conditionnel (statut + compteur), payoutDueAt = J+4, booking.delivered avec attemptsUsed", async () => {
     prismaMock.booking.findUnique.mockResolvedValue(makeBookingRecord({ status: "PICKED_UP", deliveryCodeHash: hash, deliveryAttempts: 1 }));
     const result = await makeService().deliver(CARRIER, BOOKING_ID, { code: "742891" });
     const { where, data } = lastUpdate();
     const payoutDueAt = new Date("2026-07-22T12:00:00.000Z");
     expect(where).toEqual({ id: BOOKING_ID, status: "PICKED_UP", deliveryAttempts: 1 });
-    expect(data).toEqual({ status: "DELIVERED", deliveredAt: NOW, payoutDueAt, deliveryAttempts: 2 });
+    expect(data).toEqual({ status: "DELIVERED", deliveredAt: NOW, payoutDueAt, deliveryAttempts: 2, deliveryPhotoUrls: [] });
     expect(writtenEventTypes()).toEqual(["booking.delivered"]);
     expect(writtenEventPayload("booking.delivered")).toMatchObject({
       actor: "CARRIER",

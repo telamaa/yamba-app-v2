@@ -2,17 +2,14 @@
   "title": "My accepted Deal",
   "back": "Back",
   "subtitle": "{originCity} → {destinationCity} · {date}",
-
   "banner": {
     "title": "You''re engaged on this Deal",
     "subtitle": "{shipperFirstName} has been notified · it''s up to you to set the pickup meeting",
     "subtitleShort": "{shipperFirstName} has been notified"
   },
-
   "h1": "What now?",
   "h1Subtitle": "Here are the next steps and what to do first.",
   "h1SubtitleMobile": "Here are the next steps.",
-
   "timeline": {
     "title": "YOUR DEAL JOURNEY",
     "titleShort": "DEAL JOURNEY",
@@ -26,7 +23,6 @@
       "payout": "Payout"
     }
   },
-
   "contactCard": {
     "title": "Contact {shipperFirstName} to set the meeting",
     "titleShort": "Contact {shipperFirstName}",
@@ -36,7 +32,6 @@
     "messageShort": "Message",
     "call": "Call"
   },
-
   "recap": {
     "title": "DEAL DETAILS",
     "shipperLabel": "SHIPPER",
@@ -47,7 +42,6 @@
     "deliveryLabel": "DELIVERY TO",
     "deliveryRecipientNote": "Phone shared to set the meeting on arrival"
   },
-
   "nextSteps": {
     "title": "How will it work?",
     "items": {
@@ -58,18 +52,16 @@
       "afterDays": "**{days} days later.** If everything goes well, your €{amount} payment is released to your Stripe account."
     }
   },
-
   "payment": {
     "title": "YOUR PAYMENT",
     "netLabel": "Net for you",
     "payoutAtLabel": "Paid out",
     "payoutAtValue": "D+{days}",
     "payoutViaLabel": "Via",
-    "payoutViaValue": "Stripe account",
-    "note": "Delay between validated delivery and actual payout. Standard to ensure smooth completion.",
+    "payoutViaValue": "Your payment account",
+    "note": "The payout leaves after the shipper's verification period, then reaches your bank account within 2 to 7 days.",
     "inlineFormat": "D+{days} on Stripe"
   },
-
   "trip": {
     "title": "YOUR TRIP",
     "route": "{originCity} → {destinationCity}",
@@ -77,6 +69,78 @@
     "arrivalLabel": "Arrival",
     "dateFormat": "{date} · {hour}:00"
   },
-
-  "dashboardLink": "View Deal in my dashboard →"
+  "dashboardLink": "View Deal in my dashboard →",
+  "payoutStatus": {
+    "scheduled": {
+      "title": "{amount} after verification",
+      "text": "The shipper has until {date} to check the parcel. Without a report, your payout leaves automatically on that date."
+    },
+    "pending": {
+      "title": "{amount} being processed",
+      "text": "The transaction is closed, the payout is being sent to your account. Nothing to do."
+    },
+    "sent": {
+      "title": "{amount} on its way to your account",
+      "text": "Sent on {date}. Depending on your bank, the money shows up on your bank account within 2 to 7 days."
+    },
+    "accountNotReady": {
+      "title": "{amount} on hold: finish your Stripe account",
+      "text": "Your payment account is not ready to receive transfers yet. Finish your Stripe onboarding: the payout will leave automatically within minutes.",
+      "cta": "Finish my Stripe account"
+    },
+    "retrying": {
+      "title": "{amount} being processed",
+      "text": "The payout is retried automatically. Nothing to do on your side; we will let you know as soon as it leaves."
+    },
+    "frozen": {
+      "title": "{amount} on hold",
+      "text": "A report is under review: the payout is on hold until the decision. This is not a decision."
+    }
+  },
+  "settled": {
+    "deliveryPhotos": "YOUR HANDOVER PHOTOS",
+    "backToTrips": "View my trips",
+    "delivered": {
+      "bannerTitle": "Parcel handed to {recipientFirstName}",
+      "bannerSub": "Validated on {date} with the delivery code.",
+      "h1": "Delivery validated",
+      "h1Subtitle": "{shipperFirstName} has a short period to check the parcel, then your payout leaves.",
+      "verificationNote": "During this period, {shipperFirstName} can confirm earlier or report an issue. Without action, your payout leaves on {date}."
+    },
+    "completed": {
+      "bannerTitle": "Deal completed",
+      "bannerSubShipper": "{shipperFirstName} confirmed the delivery on {date}.",
+      "bannerSubSystem": "Verification period ended on {date}, with no report.",
+      "h1": "Transaction closed",
+      "h1Subtitle": "Thank you for this transport. Here is where your payout stands.",
+      "ratingSoon": "Soon you will be able to rate {shipperFirstName} from this screen."
+    },
+    "disputed": {
+      "bannerTitle": "Report in progress · case {ticket}",
+      "bannerSub": "Opened on {date}. Your payout is on hold during the review.",
+      "h1": "A report has been opened",
+      "h1Subtitle": "{shipperFirstName} reported an issue with this parcel. We will collect your side before deciding.",
+      "ticketLabel": "Case",
+      "categoryLabel": "Reason",
+      "notADecision": "This is not a decision: the payout is simply on hold during the review. We hear both parties.",
+      "steps": {
+        "1": "We acknowledge the shipper's report within 48 business hours.",
+        "2": "We contact you for your side and your evidence (pickup and handover photos, exchanges).",
+        "3": "We decide within 5 business days and let you know by email."
+      },
+      "categories": {
+        "NOT_DELIVERED": "parcel not delivered",
+        "CONTENT_MISSING": "missing content",
+        "DAMAGED": "damaged parcel",
+        "SIGNIFICANT_DELAY": "significant delay",
+        "RECIPIENT_ISSUE": "issue with the recipient",
+        "OTHER": "other reason"
+      },
+      "support": {
+        "title": "Give your side right now",
+        "text": "Write to us quoting case {ticket}: your side and your photos are added to the review.",
+        "cta": "Give my side"
+      }
+    }
+  }
 }

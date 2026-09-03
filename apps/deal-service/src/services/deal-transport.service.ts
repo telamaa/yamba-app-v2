@@ -314,7 +314,8 @@ export function makeDealTransportService(provider: PaymentProvider, clock: () =>
         booking,
         from: "PICKED_UP",
         where: { deliveryAttempts: booking.deliveryAttempts },
-        data: { status: to, deliveredAt: now, payoutDueAt, deliveryAttempts: attemptsUsed },
+        // A76 — photos OPTIONNELLES de la remise (l'assurance du Voyageur), figées avec la transition.
+        data: { status: to, deliveredAt: now, payoutDueAt, deliveryAttempts: attemptsUsed, deliveryPhotoUrls: input.photoUrls ?? [] },
         releaseKg: false,
         events: [
           {

@@ -4,7 +4,6 @@
   "subtitleShort": "{city}",
   "back": "Retour",
   "help": "Aide",
-
   "banner": {
     "title": "Tu es arrivé à {city}",
     "subtitle": "Vol atterri à {time} · livraison finale du colis",
@@ -12,16 +11,12 @@
     "titleNoEvent": "Livraison finale du colis",
     "subtitleNoEvent": "Remets le colis à {recipientFirstName} contre son code"
   },
-
   "h1": "Valide la livraison",
   "h1Subtitle": "{recipientFirstName} va te donner un code à 6 chiffres. Tape-le ci-dessous pour officialiser la remise du colis.",
   "h1SubtitleShort": "Demande à {recipientFirstName} son code à 6 chiffres et saisis-le.",
-
   "infoBox": "**{recipientFirstName} est devant toi ?** Demande-lui le code de livraison qu''{shipperFirstName} lui a communiqué. Sans ce code, tu ne peux pas remettre le colis. Si elle ne le retrouve pas, propose-lui de contacter {shipperFirstName}.",
   "infoBoxShort": "**{recipientFirstName} est devant toi ?** Demande-lui le code qu''{shipperFirstName} lui a envoyé. Sans ça, pas de remise possible.",
-
   "recipientRole": "Destinataire",
-
   "otp": {
     "label": "CODE DE LIVRAISON REÇU PAR {recipientFirstName}",
     "labelShort": "CODE DE LIVRAISON",
@@ -33,7 +28,6 @@
     "locked": "Trop de tentatives. Saisie bloquée pendant {minutes} min pour des raisons de sécurité.",
     "lockedCountdown": "Réessaye dans {countdown}"
   },
-
   "helpCard": {
     "title": "{recipientFirstName} ne se souvient plus du code ?",
     "titleShort": "{recipientFirstName} ne se souvient plus du code ?",
@@ -48,7 +42,6 @@
     "callShipper": "Appeler {shipperFirstName}",
     "callShort": "Appeler"
   },
-
   "sidebar": {
     "parcelLabel": "LE COLIS À REMETTRE",
     "parcelSummary": "{category} · {weight} kg",
@@ -57,25 +50,33 @@
     "netLabel": "Net pour toi",
     "paidAtLabel": "Versé à",
     "paidAtValue": "J+4",
-    "payoutNote": "3 jours de période de vérification, puis virement Stripe automatique."
+    "payoutNote": "Période de vérification de l'Expéditeur, puis le versement part vers ton compte (2 à 7 jours pour arriver sur ton compte bancaire)."
   },
-
   "report": "Signaler un problème ({recipientFirstName} absente, refus, etc.)",
   "reportShort": "Signaler un problème",
-
   "success": {
     "title": "Livraison validée !",
     "subtitle": "Bravo, tu as remis le colis à {recipientFirstName}. {shipperFirstName} vient d''être prévenue.",
     "payoutTitle": "Ton versement arrive",
-    "payoutText": "{amount} seront virés sur ton compte Stripe le {date}, après la période de vérification de 3 jours.",
+    "payoutText": "{amount} partiront vers ton compte après la période de vérification de l''Expéditeur, le {date} au plus tard, puis arriveront sur ton compte bancaire sous 2 à 7 jours.",
     "rateShipper": "Noter {shipperFirstName}",
     "backToDeal": "Voir le récap du Deal",
     "backToDashboard": "Retour à l''accueil"
   },
-
   "error": {
     "toastGeneric": "Erreur lors de la validation. Réessaye.",
     "codeUnavailable": "Aucun code n''a été généré pour ce deal (prise en charge antérieure à la mise à jour). Contacte le support.",
     "dealChanged": "La saisie n''est pas possible pour le moment (verrou en cours ou deal modifié). On recharge."
+  },
+  "photos": {
+    "title": "Une photo de la remise ?",
+    "sub": "Optionnel, mais c'est ton assurance : le colis fermé, dans les mains du destinataire. En cas de litige « endommagé », cette photo parle pour toi.",
+    "subShort": "Optionnel — ton assurance en cas de litige.",
+    "optional": "Optionnel",
+    "add": "Ajouter",
+    "remove": "Retirer cette photo",
+    "uploading": "Envoi de la photo…",
+    "uploadError": "Échec d'envoi — retire-la et réessaye",
+    "hint": "Jusqu''à {max} photos. Elles sont visibles par l''Expéditeur dans son suivi et par Yamba en cas de litige."
   }
 }
