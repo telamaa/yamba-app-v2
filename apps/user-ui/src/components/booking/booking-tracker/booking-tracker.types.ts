@@ -161,6 +161,8 @@ export type BookingPickupInfo = {
 export type BookingDeliveryInfo = {
   deliveredAt: string; // ISO — moment de la validation du code par le Voyageur
   validatedBy: "CODE";
+  /** Photos optionnelles prises par le Voyageur à la remise (B4-PR3, A76). */
+  photos: BookingPhoto[];
 };
 
 /** Durée de la période de vérification avant versement automatique */

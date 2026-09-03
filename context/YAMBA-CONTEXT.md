@@ -252,7 +252,13 @@ Ordre de demarrage : auth -> trip -> gateway.
   + disputeOpensAt (servi), photos de litige uploadees a la selection. Reste :
   PR3 front Voyageur (payoutStatus, echec + CTA Stripe, disputeCategory, photo
   optionnelle a la remise), puis retenue ANN-01, puis chantier C.
-- Plateforme de tests : 654 (trip 198, deal 381, notification 75) + auth 65.
+- 03/09 : B4-PR3 feat/b4-carrier-front (A75–A78) — cote Voyageur : vues
+  DELIVERED / COMPLETED / DISPUTED, etat du versement (payoutBlocker servi :
+  ACCOUNT_NOT_READY → CTA onboarding Stripe + bandeau Mes trajets ; RETRYING →
+  rien a faire), photo optionnelle a la remise (deliveryPhotoUrls, visible
+  Expediteur + mediation), litige calme + « Donner ma version » (mailto).
+  Reste B4 : retenue ANN-01 (D50), portefeuille (A77) ; puis chantier C.
+- Plateforme de tests : 657 (trip 198, deal 384, notification 75) + auth 65.
 - (historique) Plateforme de tests : 600 (trip 187, deal 354, notification 59) — post-B3 (#96).
 - MERGE 01/09 : toute la pile B2 est dans `dev` via la SEULE **PR #90**
   (`feat/b2-deal-front` portait la chaîne complète : jalons mobile D36,

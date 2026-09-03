@@ -717,6 +717,7 @@ model Booking {
   pickedUpAt    DateTime?
   deliveredAt   DateTime?
   payoutDueAt   DateTime? // deliveredAt + J+4 (cron B4)
+  deliveryPhotoUrls String[] // B4-PR3 (A76) : photos OPTIONNELLES à la remise (≤ 2, ImageKit deals/delivery/) — l'assurance du Voyageur
   completedAt   DateTime?
   closedAt      DateTime? // DECLINED / EXPIRED / CANCELLED
   closedBy      BookingActor?

@@ -175,6 +175,9 @@ const milestoneFields = {
     description: "Carrier payout state (B4/A68) — both roles read it; the transfer id is served to nobody",
   }),
   payoutSentAt: z.iso.datetime().nullish(),
+  deliveryPhotoUrls: z.array(z.string()).meta({
+    description: "Optional handover photos taken by the carrier at delivery (B4-PR3/A76) — served to both parties",
+  }),
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
 };
@@ -292,6 +295,12 @@ export const CarrierBookingViewSchema = z
 
     disputeCategory: DisputeCategorySchema.nullish().meta({
       description: "Why the shipper disputed (status DISPUTED) — the carrier sees the category, never the file (A68)",
+    }),
+
+    payoutBlocker: z.enum(["ACCOUNT_NOT_READY", "RETRYING"]).nullable().meta({
+      description:
+        "Coarse cause when payoutStatus = FAILED (A75): ACCOUNT_NOT_READY → finish the Stripe onboarding (CTA) · " +
+        "RETRYING → provider-side error, retried automatically, nothing to do. Never the raw provider message. null otherwise.",
     }),
 
     allowedActions: z.array(BookingTransitionActionSchema).meta({

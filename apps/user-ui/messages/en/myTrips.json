@@ -74,7 +74,11 @@
     "badgeReady": "Ready to deliver",
     "badgeDelivered": "Delivered",
     "badgeCompleted": "Completed",
-    "badgeDisputed": "Dispute"
+    "badgeDisputed": "Dispute",
+    "completedSentSub": "{earnings} sent to your account on {date} · 2 to 7 days to arrive",
+    "completedPendingSub": "Completed · {earnings} being sent to your account",
+    "completedBlockedSub": "Completed · {earnings} on hold: finish your Stripe account",
+    "disputedSub": "Report {ticket} · payout on hold · we will contact you"
   },
   "historyRow": {
     "title": "{origin} → {destination} · {date}",
@@ -100,7 +104,6 @@
     "CABIN_BAG_12KG": "Cabin bag 12 kg"
   },
   "loadError": "Could not load your trips. Please try again shortly.",
-
   "status": {
     "DRAFT": "Draft",
     "PUBLISHED": "Active",
@@ -256,5 +259,10 @@
       "cityWide": "Whole city",
       "radius": "Within {km} km"
     }
+  },
+  "payoutBanner": {
+    "title": "{amount} on hold: finish your Stripe account",
+    "text": "Your payment account is not ready to receive transfers yet. Finish your onboarding: pending payouts leave automatically afterwards.",
+    "cta": "Finish my account"
   }
 }

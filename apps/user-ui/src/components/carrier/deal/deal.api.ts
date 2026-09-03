@@ -230,11 +230,15 @@ export type DeliverResult = {
  * 3e échec → DELIVERY_LOCKED (details.lockedUntil), verrou actif →
  * TRANSITION_NOT_ALLOWED. Aucun compteur côté client (A38).
  */
-export async function validateDeliveryCode(dealId: string, code: string): Promise<DeliverResult> {
+export async function validateDeliveryCode(
+  dealId: string,
+  code: string,
+  photoUrls: string[] = [] // A76 — photos de remise OPTIONNELLES, déjà en ligne
+): Promise<DeliverResult> {
   try {
     const res = await apiClient.post<DeliverResult>(
       `/deals/${dealId}/deliver`,
-      { code },
+      { code, photoUrls },
       { requireAuth: true }
     );
     return res.data;

@@ -80,6 +80,17 @@ export type CarrierBookingViewDto = {
   allowedActions: string[];
   deliveryAttemptsLeft?: number;
   deliveryLockedUntil?: string | null;
+  // B4-PR3
+  payoutDueAt?: string | null;
+  deliveryPhotoUrls?: string[] | null;
+  completedAt?: string | null;
+  completedBy?: string | null;
+  payoutStatus?: DealRequest["payoutStatus"] | null;
+  payoutSentAt?: string | null;
+  payoutBlocker?: DealRequest["payoutBlocker"] | null;
+  disputeTicket?: string | null;
+  disputedAt?: string | null;
+  disputeCategory?: DealRequest["disputeCategory"] | null;
 };
 
 /** J+4 : fenêtre de vérification avant versement (payoutDueAt = deliveredAt + 4j). */
@@ -195,5 +206,22 @@ export function toDealRequest(view: CarrierBookingViewDto): DealRequest {
     // A38 — le serveur compte les essais ; l'écran de saisie s'initialise ici.
     deliveryAttemptsLeft: view.deliveryAttemptsLeft,
     deliveryLockedUntil: view.deliveryLockedUntil ?? undefined,
+
+    // B4-PR3 — après la remise : tout vient du serveur (A75/A76).
+    deliveredAt: view.deliveredAt ?? undefined,
+    payoutDueAt: view.payoutDueAt ?? undefined,
+    deliveryPhotos: (view.deliveryPhotoUrls ?? []).map((url: string, i: number) => ({
+      id: `delivery-${i}`,
+      url,
+      context: "PICKUP_OTHER" as const,
+    })),
+    completedAt: view.completedAt ?? undefined,
+    completedBy: view.completedBy === "SHIPPER" || view.completedBy === "SYSTEM" ? view.completedBy : undefined,
+    payoutStatus: view.payoutStatus ?? undefined,
+    payoutSentAt: view.payoutSentAt ?? undefined,
+    payoutBlocker: view.payoutBlocker ?? undefined,
+    disputeTicket: view.disputeTicket ?? undefined,
+    disputedAt: view.disputedAt ?? undefined,
+    disputeCategory: view.disputeCategory ?? undefined,
   };
 }

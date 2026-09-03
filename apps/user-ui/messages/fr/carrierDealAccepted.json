@@ -2,17 +2,14 @@
   "title": "Mon Deal accepté",
   "back": "Retour",
   "subtitle": "{originCity} → {destinationCity} · {date}",
-
   "banner": {
     "title": "Tu es engagé sur ce Deal",
     "subtitle": "{shipperFirstName} est prévenue · à toi de fixer le rendez-vous pour le pickup",
     "subtitleShort": "{shipperFirstName} est prévenue"
   },
-
   "h1": "Et maintenant ?",
   "h1Subtitle": "Voici les étapes à venir et ce que tu dois faire en premier.",
   "h1SubtitleMobile": "Voici les étapes à venir.",
-
   "timeline": {
     "title": "PARCOURS DE TON DEAL",
     "titleShort": "PARCOURS DU DEAL",
@@ -26,7 +23,6 @@
       "payout": "Versement"
     }
   },
-
   "contactCard": {
     "title": "Contacte {shipperFirstName} pour fixer le rendez-vous",
     "titleShort": "Contacte {shipperFirstName}",
@@ -36,7 +32,6 @@
     "messageShort": "Message",
     "call": "Appeler"
   },
-
   "recap": {
     "title": "DÉTAILS DU DEAL",
     "shipperLabel": "EXPÉDITEUR",
@@ -47,7 +42,6 @@
     "deliveryLabel": "LIVRAISON À",
     "deliveryRecipientNote": "Téléphone communiqué pour fixer le rendez-vous à l''arrivée"
   },
-
   "nextSteps": {
     "title": "Comment ça va se passer ?",
     "items": {
@@ -58,18 +52,16 @@
       "afterDays": "**{days} jours après.** Si tout va bien, ton paiement de {amount} € est libéré sur ton compte Stripe."
     }
   },
-
   "payment": {
     "title": "TON PAIEMENT",
     "netLabel": "Net pour toi",
     "payoutAtLabel": "Versé à",
     "payoutAtValue": "J+{days}",
     "payoutViaLabel": "Sur",
-    "payoutViaValue": "Compte Stripe",
-    "note": "Délai entre la livraison validée et le versement effectif. Standard pour assurer le bon déroulement.",
+    "payoutViaValue": "Ton compte de paiement",
+    "note": "Le versement part après la période de vérification de l'Expéditeur, puis arrive sur ton compte bancaire sous 2 à 7 jours.",
     "inlineFormat": "J+{days} sur Stripe"
   },
-
   "trip": {
     "title": "TON VOYAGE",
     "route": "{originCity} → {destinationCity}",
@@ -77,6 +69,78 @@
     "arrivalLabel": "Date arrivée",
     "dateFormat": "{date} · {hour}h"
   },
-
-  "dashboardLink": "Voir le Deal dans mon dashboard →"
+  "dashboardLink": "Voir le Deal dans mon dashboard →",
+  "payoutStatus": {
+    "scheduled": {
+      "title": "{amount} après la vérification",
+      "text": "L'Expéditeur a jusqu'au {date} pour vérifier le colis. Sans signalement, ton versement part automatiquement à cette date."
+    },
+    "pending": {
+      "title": "{amount} en cours de traitement",
+      "text": "La transaction est close, le versement est en cours d'envoi vers ton compte. Rien à faire."
+    },
+    "sent": {
+      "title": "{amount} partis vers ton compte",
+      "text": "Envoyés le {date}. Selon ta banque, la somme apparaît sur ton compte bancaire sous 2 à 7 jours."
+    },
+    "accountNotReady": {
+      "title": "{amount} en attente : finalise ton compte Stripe",
+      "text": "Ton compte de paiement n'est pas encore prêt à recevoir des virements. Termine ton onboarding Stripe : le versement partira automatiquement dans les minutes qui suivent.",
+      "cta": "Finaliser mon compte Stripe"
+    },
+    "retrying": {
+      "title": "{amount} en cours de traitement",
+      "text": "Le versement est retenté automatiquement. Rien à faire de ton côté ; nous te préviendrons dès qu'il est parti."
+    },
+    "frozen": {
+      "title": "{amount} en attente",
+      "text": "Un signalement est en cours d'examen : le versement est mis en attente jusqu'à la décision. Ce n'est pas une décision."
+    }
+  },
+  "settled": {
+    "deliveryPhotos": "TES PHOTOS DE LA REMISE",
+    "backToTrips": "Voir mes trajets",
+    "delivered": {
+      "bannerTitle": "Colis remis à {recipientFirstName}",
+      "bannerSub": "Validé le {date} avec le code de livraison.",
+      "h1": "Livraison validée",
+      "h1Subtitle": "{shipperFirstName} a une courte période pour vérifier le colis, puis ton versement part.",
+      "verificationNote": "Pendant cette période, {shipperFirstName} peut confirmer plus tôt ou signaler un problème. Sans action de sa part, ton versement part le {date}."
+    },
+    "completed": {
+      "bannerTitle": "Deal terminé",
+      "bannerSubShipper": "{shipperFirstName} a confirmé la livraison le {date}.",
+      "bannerSubSystem": "Période de vérification terminée le {date}, sans signalement.",
+      "h1": "Transaction close",
+      "h1Subtitle": "Merci pour ce transport. Voici où en est ton versement.",
+      "ratingSoon": "Bientôt, tu pourras laisser une note à {shipperFirstName} depuis cet écran."
+    },
+    "disputed": {
+      "bannerTitle": "Signalement en cours · dossier {ticket}",
+      "bannerSub": "Ouvert le {date}. Ton versement est mis en attente le temps de l''examen.",
+      "h1": "Un signalement a été ouvert",
+      "h1Subtitle": "{shipperFirstName} a signalé un problème sur ce colis. Nous allons recueillir ta version avant de décider.",
+      "ticketLabel": "Dossier",
+      "categoryLabel": "Motif",
+      "notADecision": "Ce n'est pas une décision : le versement est simplement mis en attente pendant l'examen. Nous entendons les deux parties.",
+      "steps": {
+        "1": "Nous accusons réception à l'Expéditeur sous 48 h ouvrées.",
+        "2": "Nous te contactons pour ta version et tes éléments (photos de prise en charge, de remise, échanges).",
+        "3": "Nous décidons sous 5 jours ouvrés et te prévenons par email."
+      },
+      "categories": {
+        "NOT_DELIVERED": "colis non livré",
+        "CONTENT_MISSING": "contenu manquant",
+        "DAMAGED": "colis endommagé",
+        "SIGNIFICANT_DELAY": "retard important",
+        "RECIPIENT_ISSUE": "problème avec le destinataire",
+        "OTHER": "autre motif"
+      },
+      "support": {
+        "title": "Donne ta version dès maintenant",
+        "text": "Écris-nous en rappelant le dossier {ticket} : ta version et tes photos sont versées à l''examen.",
+        "cta": "Donner ma version"
+      }
+    }
+  }
 }

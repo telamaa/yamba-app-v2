@@ -13,6 +13,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { PHOTO_MAX_SIZE_BYTES, PHOTO_MIME_TYPES, useImageKitUpload } from "@/hooks/useImageKitUpload";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
@@ -31,6 +32,7 @@ import DealSkeleton from "../../DealSkeleton";
 import DealDeliverDesktop from "./DealDeliverDesktop";
 import DealDeliverMobile from "./DealDeliverMobile";
 import DeliverSuccess from "./DeliverSuccess";
+import type { DeliveryPhotoDraft } from "@/components/carrier/deal/deal.types";
 
 type Props = {
   dealId: string;
@@ -49,6 +51,34 @@ export default function DealDeliverClient({ dealId }: Props) {
   const [lockCountdown, setLockCountdown] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [deliveredAt, setDeliveredAt] = useState<string | null>(null);
+  // A76 — photos OPTIONNELLES de la remise : upload direct signé (D42), dossier dédié.
+  const [photos, setPhotos] = useState<DeliveryPhotoDraft[]>([]);
+  const { uploadDetailed } = useImageKitUpload("/deals/delivery", {
+    maxSizeBytes: PHOTO_MAX_SIZE_BYTES,
+    allowedMimeTypes: PHOTO_MIME_TYPES,
+  });
+  const handleAddPhoto = useCallback(
+    (photo: DeliveryPhotoDraft) => {
+      setPhotos((prev) => [...prev, { ...photo, uploading: true, error: undefined }]);
+      if (!photo.file) return;
+      void uploadDetailed(photo.file).then((result) => {
+        setPhotos((prev) =>
+          prev.map((p) =>
+            p.id !== photo.id
+              ? p
+              : result.ok
+                ? { ...p, uploading: false, url: result.file.url }
+                : { ...p, uploading: false, error: result.error.message }
+          )
+        );
+      });
+    },
+    [uploadDetailed]
+  );
+  const handleRemovePhoto = useCallback((photoId: string) => {
+    setPhotos((prev) => prev.filter((p) => p.id !== photoId));
+  }, []);
+  const photosReady = photos.every((p) => !!p.url && !p.uploading && !p.error);
 
   useEffect(() => {
     let cancelled = false;
@@ -93,11 +123,15 @@ export default function DealDeliverClient({ dealId }: Props) {
 
   const handleSubmit = useCallback(
     async (code: string) => {
-      if (!deal || isSubmitting || lockedUntil) return;
+      if (!deal || isSubmitting || lockedUntil || !photosReady) return;
       setIsSubmitting(true);
       setErrorMessage(null);
       try {
-        const result = await validateDeliveryCode(deal.id, code);
+        const result = await validateDeliveryCode(
+          deal.id,
+          code,
+          photos.map((p) => p.url).filter((u): u is string => !!u)
+        );
         setDeliveredAt(result.deliveredAt);
         // La vérité est en base : la page Deal relira DELIVERED.
         void queryClient.invalidateQueries({ queryKey: dealQueryKey(deal.id) });
@@ -141,7 +175,7 @@ export default function DealDeliverClient({ dealId }: Props) {
         setIsSubmitting(false);
       }
     },
-    [deal, isSubmitting, lockedUntil, queryClient, t]
+    [deal, isSubmitting, lockedUntil, queryClient, t, photos, photosReady]
   );
 
   if (isMobile === null || !deal) return <DealSkeleton />;
@@ -153,9 +187,6 @@ export default function DealDeliverClient({ dealId }: Props) {
       <DeliverSuccess
         deal={deal}
         deliveredAt={deliveredAt}
-        onRateShipperAction={() =>
-          router.push("/carrier/deals/" + deal.id + "/rate")
-        }
         onBackToDealAction={handleBack}
         onBackToDashboardAction={() => router.push("/")}
       />
@@ -170,6 +201,10 @@ export default function DealDeliverClient({ dealId }: Props) {
     isLocked: lockedUntil !== null,
     lockCountdown,
     isSubmitting,
+    photos,
+    photosReady,
+    onAddPhotoAction: handleAddPhoto,
+    onRemovePhotoAction: handleRemovePhoto,
     onBackAction: handleBack,
     onSubmitAction: handleSubmit,
   };
@@ -189,6 +224,11 @@ export type DealDeliverViewProps = {
   isLocked: boolean;
   lockCountdown: string;
   isSubmitting: boolean;
+  /** A76 — photos de remise (optionnelles) et leur état d'upload. */
+  photos: DeliveryPhotoDraft[];
+  photosReady: boolean;
+  onAddPhotoAction: (photo: DeliveryPhotoDraft) => void;
+  onRemovePhotoAction: (photoId: string) => void;
   onBackAction: () => void;
   onSubmitAction: (code: string) => void;
 };

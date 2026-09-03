@@ -5580,6 +5580,13 @@
               }
             ]
           },
+          "deliveryPhotoUrls": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Optional handover photos taken by the carrier at delivery (B4-PR3/A76) — served to both parties"
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time",
@@ -5678,6 +5685,7 @@
           "carrier",
           "requestedAt",
           "expiresAt",
+          "deliveryPhotoUrls",
           "createdAt",
           "updatedAt",
           "deliveryCode",
@@ -5902,6 +5910,13 @@
               }
             ]
           },
+          "deliveryPhotoUrls": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Optional handover photos taken by the carrier at delivery (B4-PR3/A76) — served to both parties"
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time",
@@ -5958,6 +5973,21 @@
               }
             ]
           },
+          "payoutBlocker": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "ACCOUNT_NOT_READY",
+                  "RETRYING"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Coarse cause when payoutStatus = FAILED (A75): ACCOUNT_NOT_READY → finish the Stripe onboarding (CTA) · RETRYING → provider-side error, retried automatically, nothing to do. Never the raw provider message. null otherwise."
+          },
           "allowedActions": {
             "type": "array",
             "items": {
@@ -5978,10 +6008,12 @@
           "shipper",
           "requestedAt",
           "expiresAt",
+          "deliveryPhotoUrls",
           "createdAt",
           "updatedAt",
           "deliveryAttemptsLeft",
           "trackingEvents",
+          "payoutBlocker",
           "allowedActions"
         ],
         "additionalProperties": false,
@@ -9260,10 +9292,21 @@
           "code": {
             "description": "Code given by the recipient — compared with bcrypt server-side",
             "$ref": "#/components/schemas/DeliveryCode"
+          },
+          "photoUrls": {
+            "default": [],
+            "description": "OPTIONAL handover photos (ImageKit, direct signed upload — D42/A76): the carrier's insurance on the parcel state",
+            "maxItems": 2,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uri"
+            }
           }
         },
         "required": [
-          "code"
+          "code",
+          "photoUrls"
         ],
         "additionalProperties": false
       },

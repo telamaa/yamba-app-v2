@@ -178,6 +178,29 @@ describe("frontière carrier — liste blanche résistante au spread (A13)", () 
     expect(toShipperBookingView(makeBooking(), CARRIER).pickupRefusalReason).toBeNull();
   });
 
+  it("B4/A75 : payoutBlocker — ACCOUNT_NOT_READY quand le compte Stripe manque, RETRYING pour toute autre erreur, null sinon ; jamais le message brut", () => {
+    const notReady = toCarrierBookingView(
+      makeBooking({ status: "COMPLETED", payoutStatus: "FAILED", payoutFailureReason: "CARRIER_ACCOUNT_NOT_READY" } as never),
+      SHIPPER
+    );
+    expect(notReady.payoutBlocker).toBe("ACCOUNT_NOT_READY");
+    const provider = toCarrierBookingView(
+      makeBooking({ status: "COMPLETED", payoutStatus: "FAILED", payoutFailureReason: "PROVIDER_ERROR:balance_insufficient" } as never),
+      SHIPPER
+    );
+    expect(provider.payoutBlocker).toBe("RETRYING");
+    expect(JSON.stringify(provider)).not.toContain("balance_insufficient");
+    expect(toCarrierBookingView(makeBooking({ status: "COMPLETED", payoutStatus: "SENT" } as never), SHIPPER).payoutBlocker).toBeNull();
+    expect(toCarrierBookingView(makeBooking(), SHIPPER).payoutBlocker).toBeNull();
+  });
+
+  it("B4/A76 : deliveryPhotoUrls servies aux deux vues, [] quand absentes (enregistrements antérieurs)", () => {
+    const withPhotos = makeBooking({ status: "DELIVERED", deliveryPhotoUrls: ["https://ik.imagekit.io/yamba/deals/delivery/a.jpg"] } as never);
+    expect(toShipperBookingView(withPhotos, CARRIER).deliveryPhotoUrls).toEqual(["https://ik.imagekit.io/yamba/deals/delivery/a.jpg"]);
+    expect(toCarrierBookingView(withPhotos, SHIPPER).deliveryPhotoUrls).toEqual(["https://ik.imagekit.io/yamba/deals/delivery/a.jpg"]);
+    expect(toShipperBookingView(makeBooking(), CARRIER).deliveryPhotoUrls).toEqual([]);
+  });
+
   it("B4/A72 : disputeOpensAt = départ + 48 h en PICKED_UP seulement (servi, jamais calculé par le front)", () => {
     const inTransit = toShipperBookingView(makeLeakyBooking({ status: "PICKED_UP", pickedUpAt: T0 }), CARRIER, T0);
     const departure = makeBooking().trip.departureAt.getTime();

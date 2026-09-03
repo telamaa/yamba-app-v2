@@ -1212,3 +1212,23 @@ B4-PR2 front Expéditeur (bascule des mocks `confirmDeliveryEarly` / `submitDisp
 
 ### Preuves
 tsc user-ui + deal-service, miroir i18n, mapper 22 tests, suite deal-service complète, OpenAPI régénéré ; pages `/fr/bookings/:id` (DISPUTED, COMPLETED) et `/report` en 200 sur le serveur de dev. Recette E1–E12 (`YAMBA-DOC-METIER.md`).
+
+# B4-PR3 — `feat/b4-carrier-front` : l'argent sortant vu du Voyageur (A75–A78)
+
+## Ce qui a été fait
+
+1. **Serveur** : `CarrierBookingView.payoutBlocker` (A75) dérivé dans `booking-view.mapper.ts` — `FAILED` + `payoutFailureReason = CARRIER_ACCOUNT_NOT_READY` → `ACCOUNT_NOT_READY`, `FAILED` + autre → `RETRYING`, sinon `null` ; le message Stripe ne sort jamais (test dédié). `POST /deals/:id/deliver` accepte `photoUrls` (≤ 2, `DELIVERY_PHOTOS_MAX`, défaut `[]`) écrites dans `Booking.deliveryPhotoUrls` avec la transition (A76) ; `deliveryPhotoUrls` servi aux deux vues (jalons). Mapper 25 tests (+2), transport 25 (+1). OpenAPI régénéré.
+2. **Types / adapter Voyageur** (`deal.types.ts`, `deal.adapter.ts`) : `deliveredAt`, `payoutDueAt`, `deliveryPhotos`, `completedAt`, `completedBy`, `payoutStatus`, `payoutSentAt`, `payoutBlocker`, `disputeTicket`, `disputedAt`, `disputeCategory` ; `DeliveryPhotoDraft` (upload à la sélection) ; `validateDeliveryCode(dealId, code, photoUrls)`.
+3. **Routage** (`DealClient.tsx`) : DELIVERED / COMPLETED / DISPUTED → `views/settled/DealSettledView.tsx` (un composant, trois états, `variant` desktop | mobile) ; l'écran de clôture d'une ligne ne sert plus qu'aux refus, expirations, annulations.
+4. **`shared/DealPayoutStatusCard.tsx`** : l'état du versement au centre — programmé (DELIVERED : « après la vérification, le {date} »), en cours (PENDING), parti le … « 2 à 7 jours » (SENT), **en attente : finalise ton compte Stripe** + bouton `/carrier/onboarding` (FAILED + ACCOUNT_NOT_READY), en cours de traitement (FAILED + RETRYING), en attente (FROZEN).
+5. **Litige vu du Voyageur** (A78) : ticket, catégorie seule (libellés dans `carrierDealAccepted.settled.disputed.categories.*`), « ce n'est pas une décision », 3 étapes, carte « Donner ma version » (`mailto:` support, ticket en objet, `NEXT_PUBLIC_SUPPORT_EMAIL`).
+6. **Photo de remise** (A76) : `views/deliver/DeliverPhotosBlock.tsx` (optionnel, 2 max, `capture="environment"`, upload à la sélection vers `deals/delivery/` via `useImageKitUpload`, vignette « envoi… » / erreur) placé AVANT la saisie du code ; la validation est bloquée tant qu'une photo est en cours ou en échec ; les URL partent avec le code. Côté Expéditeur : `BookingDeliveryInfo.photos` + adapter + vignettes dans le récap de livraison (emplacement « À la livraison » qui existait).
+7. **Écran de succès de livraison** : bouton « Noter » retiré (B5), texte du versement honnête (« partiront vers ton compte après la vérification, le {date} au plus tard, puis 2 à 7 jours »).
+8. **« Mes trajets »** (A77) : `CarrierDealItem` + `payoutStatus`, `payoutSentAt`, `payoutBlocker`, `disputeTicket`, `payoutAt` (= `payoutDueAt` servi) ; `TripDealRow` — COMPLETED : « partis vers ton compte le … · 2 à 7 jours » / « en cours d'envoi » / « en attente : finalise ton compte Stripe » ; DISPUTED : « Signalement {ticket} · versement en attente · on te contacte ». `PayoutBlockedBanner.tsx` en tête de la liste (somme des nets bloqués, CTA onboarding) — seulement `ACCOUNT_NOT_READY`, jamais `RETRYING`.
+9. **Copie** : `payment.payoutViaValue` / `payment.note`, `sidebar.payoutNote`, `success.payoutText` réécrits (fin de « virement Stripe automatique », « virés le … »). `.env.example` : `SUPPORT_EMAIL` (notification-service, oublié en PR1) et `NEXT_PUBLIC_SUPPORT_EMAIL`.
+
+### Preuves
+tsc user-ui + deal-service · miroir i18n · deal-service **384** (381 + 3) · OpenAPI régénéré · pages `/fr/carrier/deals/:id` (seed DELIVERED, COMPLETED, DISPUTED), `/deliver` et `/dashboard/trips` en 200 sur le serveur de dev. Recette V10–V19 (`YAMBA-DOC-METIER.md`, RG-VOY-01…07).
+
+### Reste (B4)
+`feat/b4-late-cancel-payout` (retenue ANN-01 au prorata, D50), portefeuille Voyageur (PR dédiée, A77), puis chantier C (admin, médiation). Photo de remise : le seed n'en crée pas (recette réelle).

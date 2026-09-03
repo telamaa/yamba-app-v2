@@ -35,7 +35,13 @@ export function toCarrierDealItem(view: CarrierBookingViewDto): CarrierDealItem 
     pickupLocationName: view.pickupPlace?.details ?? undefined,
     lastTrackingStep: last ? (last.step as CarrierTrackingStep) : undefined,
     deliveredAt: view.deliveredAt ?? undefined,
+    payoutAt: view.payoutDueAt ?? undefined,
     hasRated: true, // B5 : jamais inventé — pas d'action « Noter » dérivée
+    // B4-PR3 — l'état du versement porté par la ligne (A77).
+    payoutStatus: view.payoutStatus ?? undefined,
+    payoutSentAt: view.payoutSentAt ?? undefined,
+    payoutBlocker: view.payoutBlocker ?? undefined,
+    disputeTicket: view.disputeTicket ?? undefined,
   };
 }
 

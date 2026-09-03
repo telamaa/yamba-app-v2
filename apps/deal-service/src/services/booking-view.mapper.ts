@@ -123,6 +123,8 @@ export type BookingRecord = {
   // B4 — absents sur les enregistrements antérieurs
   payoutStatus?: string | null;
   payoutSentAt?: Date | null;
+  payoutFailureReason?: string | null;
+  deliveryPhotoUrls?: string[] | null;
 
   createdAt: Date;
   updatedAt: Date;
@@ -204,6 +206,12 @@ const toTrackingEvents = (events: BookingRecord["trackingEvents"]) =>
     confirmedAt: toIsoRequired(e.confirmedAt),
   }));
 
+/** A75 — le Voyageur apprend s'il doit agir (compte Stripe) ou attendre (rejeu automatique). */
+const toPayoutBlocker = (b: BookingRecord): CarrierBookingView["payoutBlocker"] => {
+  if (b.payoutStatus !== "FAILED") return null;
+  return b.payoutFailureReason === "CARRIER_ACCOUNT_NOT_READY" ? "ACCOUNT_NOT_READY" : "RETRYING";
+};
+
 /** Jalons communs aux deux vues. */
 const toMilestones = (b: BookingRecord) => ({
   requestedAt: toIsoRequired(b.requestedAt),
@@ -221,6 +229,7 @@ const toMilestones = (b: BookingRecord) => ({
   disputedAt: toIso(b.disputedAt),
   payoutStatus: (b.payoutStatus as ShipperBookingView["payoutStatus"]) ?? null,
   payoutSentAt: toIso(b.payoutSentAt ?? null),
+  deliveryPhotoUrls: b.deliveryPhotoUrls ?? [],
   createdAt: toIsoRequired(b.createdAt),
   updatedAt: toIsoRequired(b.updatedAt),
 });
@@ -395,6 +404,8 @@ export function toCarrierBookingView(
       { ...booking, departureAt: booking.trip.departureAt } as Parameters<typeof getAllowedActions>[0],
       "CARRIER"
     ),
+    // A75 — cause GROSSIÈRE d'un versement bloqué (jamais le message Stripe).
+    payoutBlocker: toPayoutBlocker(booking),
     // A68 — la catégorie seule (jamais la description ni les photos).
     disputeCategory:
       dispute && booking.status === "DISPUTED"

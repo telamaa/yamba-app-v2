@@ -121,13 +121,19 @@ export default function DeliveryRecapCard({ booking, compact = false }: Props) {
                     city: recipient.city,
                   })}
               </div>
-              <div
-                className="flex h-11 w-11 items-center justify-center rounded-lg text-white"
-                style={{ background: "linear-gradient(135deg, #BA7517, #EF9F27)" }}
-                aria-label={t("delivered.recap.codeValidatedBadge")}
-                title={t("delivered.recap.codeValidatedBadge")}
-              >
-                <Check size={18} strokeWidth={3} aria-hidden="true" />
+              <div className="flex items-center gap-2">
+                <div
+                  className="flex h-11 w-11 items-center justify-center rounded-lg text-white"
+                  style={{ background: "linear-gradient(135deg, #BA7517, #EF9F27)" }}
+                  aria-label={t("delivered.recap.codeValidatedBadge")}
+                  title={t("delivered.recap.codeValidatedBadge")}
+                >
+                  <Check size={18} strokeWidth={3} aria-hidden="true" />
+                </div>
+                {/* A76 — photos optionnelles prises par le Voyageur à la remise */}
+                {booking.delivery && booking.delivery.photos.length > 0 && (
+                  <PhotoThumbs photos={booking.delivery.photos} tone="amber" size="md" />
+                )}
               </div>
             </div>
           </div>

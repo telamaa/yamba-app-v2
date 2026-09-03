@@ -8,6 +8,7 @@ import SectionHeader from "@/components/dashboard/SectionHeader";
 import { EmptyState } from "@/components/dashboard/DashboardUI";
 import TripActionRow from "./TripActionRow";
 import TripCard, { TripHistoryRow } from "./TripCard";
+import PayoutBlockedBanner from "./PayoutBlockedBanner";
 import TripsSkeleton from "./TripsSkeleton";
 import { getMyTrips } from "./trips.api";
 import {
@@ -117,6 +118,7 @@ export default function TripsClient() {
     return (
       <>
         <SectionHeader title={t("title")} subtitle={" "} />
+        <PayoutBlockedBanner />
         <EmptyState
           icon={Plane}
           title={t("empty.title")}

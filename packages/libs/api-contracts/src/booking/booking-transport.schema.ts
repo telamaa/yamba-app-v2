@@ -118,9 +118,17 @@ export const RegenerateCodeResponseSchema = z
   .meta({ id: "RegenerateCodeResponse" });
 export type RegenerateCodeResponse = z.infer<typeof RegenerateCodeResponseSchema>;
 
+/** Photos optionnelles à la remise (B4-PR3, A76) : le code prouve la remise, la photo prouve l'état. */
+export const DELIVERY_PHOTOS_MAX = 2;
+
 export const DeliverDealRequestSchema = z
   .object({
     code: DeliveryCodeSchema.meta({ description: "Code given by the recipient — compared with bcrypt server-side" }),
+    photoUrls: z
+      .array(z.url())
+      .max(DELIVERY_PHOTOS_MAX, `At most ${DELIVERY_PHOTOS_MAX} photos`)
+      .default([])
+      .meta({ description: "OPTIONAL handover photos (ImageKit, direct signed upload — D42/A76): the carrier's insurance on the parcel state" }),
   })
   .meta({ id: "DeliverDealRequest" });
 export type DeliverDealRequest = z.infer<typeof DeliverDealRequestSchema>;
