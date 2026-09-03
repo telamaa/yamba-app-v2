@@ -1117,3 +1117,21 @@ Implémentation de D44 (langue des emails = langue de l'utilisateur, conçue pou
 
 ### Preuves
 tsc user-ui, miroir i18n (24 namespaces), page login 200 sur le serveur de dev. Pas de Jest user-ui : recette I1–I8 (`YAMBA-DOC-METIER.md`).
+
+# feat/auth-google — « Continuer avec Google » (D47, A61)
+
+### Serveur (auth-service)
+1. **Prisma** — `AuthIdentity { userId, provider (enum GOOGLE), providerSub, email?, createdAt, lastUsedAt, @@unique([provider, providerSub]) }` + `User.identities`. Modèle séparé : un `googleSub String? @unique` sur `User` aurait percuté les `null` sur Mongo (pitfall P2002).
+2. **`services/google-auth.service.ts`** — `googleSignIn(deps, input)` pur : 503 `GOOGLE_NOT_CONFIGURED` (pas de vérificateur), 401 `GOOGLE_TOKEN_INVALID`, 403 `GOOGLE_EMAIL_UNVERIFIED` ; identité connue → `LOGGED_IN` (+ `lastUsedAt`) ; email normalisé connu → `authIdentity.create` puis `LOGGED_IN { linked: true }` ; sinon sans `consent` → `CONSENT_REQUIRED { profile }` ; avec → `$transaction` (User `passwordHash: null`, `publicSlug`, `preferredLocale` = `resolveLocale(locale)`, `identities.create`, `recordRegistrationConsents`).
+3. **`services/google-token.verifier.ts`** — `buildGoogleTokenVerifier()` : `OAuth2Client.verifyIdToken({ audience: GOOGLE_CLIENT_ID })`, mappe `sub / email / email_verified / given_name / family_name / picture`, `null` si rejet.
+4. **Contrôleur** — `issueSession(res, user, rememberMe)` extrait de `loginUser` (cookies + record Redis D27) ; `googleSignIn` (`POST /auth/google`) : `credential` requis, consentement passé seulement complet, locale / IP / user-agent depuis la requête, email de bienvenue à la création. `oauth` ajouté aux types safe du middleware.
+5. **Dépendance** — `google-auth-library@10` (racine). `.env.example` : `GOOGLE_CLIENT_ID`, `NEXT_PUBLIC_GOOGLE_CLIENT_ID` (+ marche à suivre Google Cloud).
+6. **Tests** — `google-auth.service.spec.ts` (6) → auth-service **65**.
+
+### Front (user-ui)
+- `hooks/useGoogleIdentity.ts` — chargement unique du script GIS, `initialize` (popup, ITP), `renderButton` (outline, pilule, largeur du conteneur, locale), `configured` / `ready` / `failed` ; typage global minimal de `window.google`.
+- `components/auth/shared/GoogleSignInButton.tsx` — bouton officiel (squelette pendant le chargement, bouton inerte sans client ID ou si le script échoue) ; `POST /auth/google` ; `CONSENT_REQUIRED` → modale « Finalise ton compte » (case CGU + confidentialité, liens `/legal/terms`, `/legal/privacy`, `LEGAL_VERSIONS`) qui rejoue le même jeton ; succès → `resetAuthRefreshCircuitBreaker`, invalidation `["user"]`, toast (bienvenue / relié / content de te revoir), `router.push(redirectTo || "/")`.
+- `LoginForm` (`text="signin_with"`) et `RegisterForm` (`text="signup_with"`) remplacent le bouton Google inerte ; Facebook reste tel quel. `auth.json` : namespace `google` fr/en.
+
+### Preuves
+auth-service 65 tests, tsc auth + user-ui, miroir i18n. Le flux réel exige un ID client Google (geste utilisateur) : recette J1–J8 (`YAMBA-DOC-METIER.md`) à jouer après configuration.

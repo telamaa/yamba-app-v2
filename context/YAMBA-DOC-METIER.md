@@ -753,3 +753,26 @@ Une seule voix (tutoiement, D45) sur tout le parcours d'entrée ; un panneau d'a
 | I7 | iPhone, focus sur un champ de connexion | Pas de zoom automatique |
 | I8 | Réserver, visiteur | Fenêtre inchangée par rapport à #118 (mêmes boutons, retour wizard) |
 | I9 | Visiteur, cœur sur une carte de recherche ou sur la fiche | Fenêtre « Connecte-toi pour enregistrer un favori », la carte ne s'ouvre pas ; retour sur la même page après connexion |
+
+# feat/auth-google — entrer avec son compte Google, sans renoncer au consentement
+
+### 1. Le besoin
+Se connecter ou s'inscrire en un clic avec Google, sans mot de passe ni code par email, tout en gardant les règles de Yamba : une identité vérifiée, un consentement enregistré, un seul compte par personne.
+
+### 2. Règles de gestion (RG-A, suite)
+- **RG-A-09 — Google atteste l'identité, Yamba vérifie l'attestation.** Le serveur refuse tout jeton qu'il ne peut pas vérifier et toute adresse Google non vérifiée.
+- **RG-A-10 — Un compte existant avec la même adresse vérifiée est relié, jamais dupliqué.** La personne se connecte à son compte habituel ; elle pourra ensuite entrer par Google ou par mot de passe.
+- **RG-A-11 — Aucun compte n'est créé sans accord explicite** aux CGU et à la politique de confidentialité ; l'accord est journalisé comme pour l'inscription classique.
+- **RG-A-12 — Tant que Google n'est pas configuré, le bouton est visible mais inactif** (« bientôt disponible ») ; rien ne casse.
+
+### 3. Recette (après configuration de l'ID client Google)
+| # | Scénario | Attendu |
+|---|---|---|
+| J1 | Sans client ID | Bouton « Connexion Google bientôt disponible », inactif |
+| J2 | Nouveau, « Continuer avec Google » | Fenêtre Google, puis « Finalise ton compte » avec l'adresse confirmée ; sans cocher → « Tu dois accepter… » ; coché → compte créé, connecté, email de bienvenue, retour sur la page visée |
+| J3 | Re-connexion Google | Connexion directe, « Content de te revoir, … » |
+| J4 | Compte créé par e-mail, puis Google avec la même adresse | Connexion au compte existant, toast « relié à Google » ; les deux chemins fonctionnent ensuite |
+| J5 | Adresse Google non vérifiée | Message « adresse non vérifiée », rien créé |
+| J6 | Interface en anglais, création par Google | `preferredLocale: "en"`, email de bienvenue en anglais |
+| J7 | « Mot de passe oublié » sur un compte Google seul | Code envoyé, mot de passe créé, les deux chemins fonctionnent |
+| J8 | Annuler l'écran de consentement | Rien créé, page inchangée |
