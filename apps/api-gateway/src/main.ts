@@ -20,10 +20,13 @@ app.use(
     origin: (origin, callback) => {
       // Requêtes sans origin (curl, server-side) : autoriser
       if (!origin) return callback(null, true);
+      // 3000 = user-ui · 3001 = admin-ui (chantier C, D54). Même en proxy
+      // D48 (Next → gateway), l'en-tête Origin du navigateur est transmis :
+      // l'admin ouvert sur l'IP LAN doit donc être connu ici aussi.
       const allowed = [
-        /^http:\/\/localhost:3000$/,
-        /^http:\/\/192\.168\.\d+\.\d+:3000$/,  // Wi-Fi domestique
-        /^http:\/\/10\.\d+\.\d+\.\d+:3000$/,    // Réseau d'entreprise
+        /^http:\/\/localhost:300[01]$/,
+        /^http:\/\/192\.168\.\d+\.\d+:300[01]$/, // Wi-Fi domestique
+        /^http:\/\/10\.\d+\.\d+\.\d+:300[01]$/, // Réseau d'entreprise
       ];
       if (allowed.some((re) => re.test(origin))) return callback(null, true);
       return callback(new Error("Not allowed by CORS: " + origin));
