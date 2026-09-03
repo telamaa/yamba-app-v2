@@ -14,7 +14,6 @@
   "button": {
     "add": "Add to favorites",
     "remove": "Remove from favorites",
-    "signInRequired": "Sign in to save a favorite",
     "ownTrip": "You cannot favorite your own trip",
     "notFavoritable": "This trip is no longer available",
     "error": "Unable to update the favorite, please retry"

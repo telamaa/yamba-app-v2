@@ -36,10 +36,10 @@ export default function ForgotPasswordForm({ heroVisual }: Props) {
       trust: fr ? "Récupération sécurisée" : "Secure recovery",
       title: fr ? "Mot de passe oublié ?" : "Forgot your password?",
       subtitle: fr
-        ? "Saisissez votre e-mail. Si un compte existe, nous vous enverrons un code à 6 chiffres."
+        ? "Saisis ton e-mail. Si un compte existe, on t'envoie un code à 6 chiffres."
         : "Enter your email. If an account exists, we'll send you a 6-digit code.",
       email: fr ? "Adresse e-mail" : "Email address",
-      emailPlaceholder: fr ? "vous@email.com" : "you@email.com",
+      emailPlaceholder: fr ? "prenom@email.com" : "you@email.com",
       cta: fr ? "Envoyer le code" : "Send code",
       ctaLoading: fr ? "Envoi…" : "Sending…",
       back: fr ? "Retour à la connexion" : "Back to login",
@@ -47,7 +47,7 @@ export default function ForgotPasswordForm({ heroVisual }: Props) {
         ? "Pour des raisons de sécurité, le message est identique même si le compte n'existe pas."
         : "For security reasons, the response is the same whether the account exists or not.",
       requiredEmail: fr ? "L'e-mail est requis." : "Email is required.",
-      invalidEmail: fr ? "Veuillez saisir un e-mail valide." : "Please enter a valid email.",
+      invalidEmail: fr ? "Saisis un e-mail valide." : "Please enter a valid email.",
       genericError: fr
         ? "Envoi du code impossible pour le moment."
         : "Unable to send the code right now.",
@@ -139,7 +139,7 @@ export default function ForgotPasswordForm({ heroVisual }: Props) {
                 autoComplete="email"
                 placeholder={copy.emailPlaceholder}
                 aria-invalid={!!errors.email}
-                className={`mt-1.5 w-full rounded-lg border bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition-colors placeholder:text-slate-400 dark:bg-slate-950 dark:text-white dark:placeholder:text-slate-600 ${
+                className={`mt-1.5 w-full rounded-lg border bg-white px-3.5 py-2.5 text-base sm:text-sm text-slate-900 outline-none transition-colors placeholder:text-slate-400 dark:bg-slate-950 dark:text-white dark:placeholder:text-slate-600 ${
                   errors.email
                     ? "border-red-300 focus:border-red-400 focus:ring-4 focus:ring-red-200 dark:border-red-800"
                     : "border-slate-200 focus:border-[#FF9900] focus:ring-4 focus:ring-[#FF9900]/20 dark:border-slate-800 dark:focus:border-[#FFAE33]"

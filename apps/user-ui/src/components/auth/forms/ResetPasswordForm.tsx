@@ -80,25 +80,25 @@ function validateStrongPassword(
 
   if (!baseChecksOk) {
     return fr
-      ? "Choisissez un mot de passe d'au moins 8 caractères avec une majuscule, une minuscule, un chiffre et un caractère spécial."
+      ? "Choisis un mot de passe d'au moins 8 caractères avec une majuscule, une minuscule, un chiffre et un caractère spécial."
       : "Choose a password with at least 8 characters including uppercase, lowercase, number and special character.";
   }
 
   if (includesPersonalInfo) {
     return fr
-      ? "Pour votre sécurité, évitez d'utiliser votre e-mail dans le mot de passe."
+      ? "Pour ta sécurité, évite d'utiliser ton e-mail dans le mot de passe."
       : "For your security, avoid using your email in the password.";
   }
 
   if (looksLikeSimpleDate(password)) {
     return fr
-      ? "Pour votre sécurité, évitez un mot de passe qui ressemble à une date facile à deviner."
+      ? "Pour ta sécurité, évite un mot de passe qui ressemble à une date facile à deviner."
       : "For your security, avoid passwords that look like an easy-to-guess date.";
   }
 
   if (hasSequentialPattern(password) || hasTooManyRepeatedChars(password)) {
     return fr
-      ? "Pour votre sécurité, évitez les suites simples, répétitions ou mots de passe trop prévisibles."
+      ? "Pour ta sécurité, évite les suites simples, les répétitions et les mots de passe trop prévisibles."
       : "For your security, avoid simple sequences, repeated characters, or predictable passwords.";
   }
 
@@ -143,7 +143,7 @@ export default function ResetPasswordForm({ heroVisual }: Props) {
       trust: fr ? "Réinitialisation sécurisée" : "Secure reset",
       title: fr ? "Nouveau mot de passe" : "Set a new password",
       subtitle: fr
-        ? "Choisissez un mot de passe robuste pour sécuriser votre compte."
+        ? "Choisis un mot de passe robuste pour sécuriser ton compte."
         : "Choose a strong password to secure your account.",
       forAccount: fr ? "Pour le compte :" : "For account:",
       newPwd: fr ? "Nouveau mot de passe" : "New password",
@@ -158,11 +158,11 @@ export default function ResetPasswordForm({ heroVisual }: Props) {
       requiredPassword: fr ? "Le mot de passe est requis." : "Password is required.",
       successTitle: fr ? "Mot de passe modifié" : "Password updated",
       successMessage: fr
-        ? "Vous pouvez maintenant vous connecter avec votre nouveau mot de passe."
+        ? "Tu peux maintenant te connecter avec ton nouveau mot de passe."
         : "You can now log in with your new password.",
       sessionExpiredTitle: fr ? "Session expirée" : "Session expired",
       sessionExpired: fr
-        ? "Votre session de réinitialisation a expiré. Merci de recommencer la procédure."
+        ? "Ta session de réinitialisation a expiré. Recommence la procédure."
         : "Your reset session has expired. Please restart the recovery flow.",
       restartFlow: fr ? "Recommencer la procédure" : "Restart the recovery",
       genericError: fr
@@ -173,7 +173,7 @@ export default function ResetPasswordForm({ heroVisual }: Props) {
         : "Application configuration is incomplete.",
       pasteDisabledTitle: fr ? "Collage désactivé" : "Paste disabled",
       pasteDisabledMessage: fr
-        ? "Pour votre sécurité, veuillez ressaisir le mot de passe."
+        ? "Pour ta sécurité, ressaisis le mot de passe."
         : "For your security, please retype the password.",
       showPwd: fr ? "Afficher" : "Show",
       hidePwd: fr ? "Masquer" : "Hide",

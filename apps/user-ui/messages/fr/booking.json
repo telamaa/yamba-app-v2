@@ -240,10 +240,7 @@
   },
   "authGate": {
     "title": "Connecte-toi pour réserver",
-    "subtitle": "Une réservation engage un Voyageur : Yamba a besoin de savoir qui envoie. Ton colis et ce trajet t'attendent après connexion.",
-    "login": "Se connecter",
-    "register": "Créer un compte",
-    "later": "Plus tard"
+    "subtitle": "Une réservation engage un Voyageur : Yamba a besoin de savoir qui envoie. Ton colis et ce trajet t'attendent après connexion."
   },
   "previousStep": "Étape précédente"
 }

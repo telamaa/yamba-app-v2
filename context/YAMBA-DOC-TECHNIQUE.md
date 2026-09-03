@@ -1104,3 +1104,16 @@ Implémentation de D44 (langue des emails = langue de l'utilisateur, conçue pou
 ### Preuves
 - trip-service 198 tests, tsc ×5 Nx + user-ui, miroir i18n (24 namespaces), OpenAPI régénéré sans diff résiduel.
 - Smoke test sur `PORT=6012` (bundle, instance de recette intacte), cookie du seed Marc : recherche connectée → `isFavorite: false` partout ; `POST` sur un trajet d'Enrique → `{ isFavorite: true }`, rejoué → identique ; `GET /trips/favorites` → 1 ; la recherche montre `true` sur ce seul trajet ; fiche publique connectée `true`, visiteur `false` ; `POST` sur son propre trajet → 403 `OWN_TRIP` ; `DELETE` → `false` ; id inconnu → 404. `favorite` (et `locale`) ajoutés aux types « safe » du middleware pour que `details.code` sorte aussi en production.
+
+# feat/auth-pages-ux — tutoiement, promesses vraies, une porte d'identité pour toutes les actions (D45, A60)
+
+### Ce qui a été fait
+1. **Tutoiement** — les six formulaires de `components/auth/forms/` (copie inline `buildCopy`) et `messages/fr/auth.json` : « Connectez-vous » → « Connecte-toi », « Veuillez saisir » → « Saisis », « Réessayez » → « Réessaie », « Compte verrouillé temporairement » → « Saisie bloquée temporairement » (A50), placeholders `prenom@email.com`. Vérification : `grep -i "vous|votre|vos|veuillez"` vide sur `components/auth/`.
+2. **Panneau gauche** (`AuthHeroVisual.tsx`) — le bloc statistiques et le témoignage sont supprimés (types `Stat` / `Testimonial` retirés) ; trois promesses produit avec icônes Lucide (`UserCheck`, `CreditCard`, `ShieldCheck`) : compte vérifié, débité seulement à l'acceptation, Garantie Yamba. Accroche « Le transport, c'est toi. ».
+3. **Mobile** — `px-3.5 py-2.5 text-sm` → `text-base sm:text-sm` sur tous les champs des six formulaires : 16 px sous 640 px (iOS ne zoome plus au focus), 14 px au-dessus.
+4. **`components/auth/shared/AuthGateModal.tsx`** — la modale de #118 devient générique (`title`, `subtitle`, `redirect`, boutons `common.authGate.login/register/later`) ; `BookingAuthGateModal` n'est plus qu'un habillage (`booking.authGate.title/subtitle`, retour wizard). Les clés `booking.authGate.login/register/later` sont retirées (fr/en).
+5. **« Partager un trajet »** — `useShareTrip` expose `gateOpen` / `closeGate` / `shareRedirect` et n'envoie plus vers `/login` ; `HeaderShareTripCTA` rend `AuthGateModal` (texte `common.authGate.shareTrip`) dans ses trois variantes. Utilisateur en chargement → `/trips/create` (la page tranche).
+6. **Cœur favori** — `FavoriteButton` ouvre `AuthGateModal` (`common.authGate.favorite`, retour sur la page courante) au lieu de pousser vers `/login` ; la clé `favorites.button.signInRequired` disparaît. `AuthGateModal` est rendue par `createPortal` dans `<body>` avec `stopPropagation` : déclenchée depuis une carte-lien, rendue dans l'ancre, chaque clic aurait navigué.
+
+### Preuves
+tsc user-ui, miroir i18n (24 namespaces), page login 200 sur le serveur de dev. Pas de Jest user-ui : recette I1–I8 (`YAMBA-DOC-METIER.md`).

@@ -51,7 +51,7 @@
       "yamberVerified": "Yamber vérifié",
       "yamberPending": "Profil à compléter"
     }
-},
+  },
   "discover": {
     "sectionLabel": "Découvrir Yamba",
     "howItWorks": "Comment ça marche",
@@ -171,9 +171,22 @@
     "today": "Aujourd'hui"
   },
   "lightbox": {
-      "close": "Fermer",
-      "previous": "Photo précédente",
-      "next": "Photo suivante",
-      "counter": "{current} / {total}"
+    "close": "Fermer",
+    "previous": "Photo précédente",
+    "next": "Photo suivante",
+    "counter": "{current} / {total}"
+  },
+  "authGate": {
+    "login": "Se connecter",
+    "register": "Créer un compte",
+    "later": "Plus tard",
+    "shareTrip": {
+      "title": "Connecte-toi pour partager un trajet",
+      "subtitle": "Publier un trajet engage un Voyageur identifié : Yamba a besoin de savoir qui transporte. Ton trajet t'attend après connexion."
+    },
+    "favorite": {
+      "title": "Connecte-toi pour enregistrer un favori",
+      "subtitle": "Tes favoris sont liés à ton compte : ils te suivent sur tous tes appareils. Ce trajet t'attend après connexion."
+    }
   }
 }
