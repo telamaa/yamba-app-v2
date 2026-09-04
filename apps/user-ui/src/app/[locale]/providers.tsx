@@ -1,7 +1,6 @@
 "use client";
 import React, {useState} from 'react';
 import {QueryClient, QueryClientProvider} from "@tanstack/react-query";
-import SessionExpiredGate from "@/components/providers/SessionExpiredGate";
 
 const Providers = ({ children }: { children: React.ReactNode }) => {
   const [queryClient] = useState(
@@ -20,9 +19,8 @@ const Providers = ({ children }: { children: React.ReactNode }) => {
     <QueryClientProvider client={queryClient}>
       {/*<ProvidersWithWebSocket>{children}</ProvidersWithWebSocket>*/}
       {/*<Toaster />*/}
-
-      <SessionExpiredGate />
-
+      {/* La fenêtre « session expirée » (A89) est montée dans layout.tsx, SOUS UiPreferencesProvider et
+          ToastProvider : son formulaire de connexion (A63) en dépend — montée ici, elle plantait dès qu'un 401 l'ouvrait. */}
       {children}
     </QueryClientProvider>
   );
