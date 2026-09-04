@@ -27,6 +27,19 @@ const FINANCE: Metric[] = [
 ];
 const LINE = "#2a78d6";
 
+/* Libellés de période lisibles : « 29 juin → 5 juil. 2026 » (semaine ISO, lundi → dimanche) ou « juillet 2026 ». */
+const fmtDay = (d: Date) => d.toLocaleDateString("fr-FR", { day: "numeric", month: "short", timeZone: "UTC" });
+function periodLabel(p: { period: string; periodStart: string }, granularity: "week" | "month", short = false): string {
+  const start = new Date(p.periodStart);
+  if (granularity === "month") {
+    const m = start.toLocaleDateString("fr-FR", { month: short ? "short" : "long", year: "numeric", timeZone: "UTC" });
+    return m.charAt(0).toUpperCase() + m.slice(1);
+  }
+  const end = new Date(start.getTime() + 6 * 86_400_000);
+  if (short) return fmtDay(start);
+  return `${fmtDay(start)} → ${fmtDay(end)} ${end.getUTCFullYear()}`;
+}
+
 function valueOf(p: PilotageSeriesPoint, m: Metric, currency: string | null): number {
   if (!m.money) return p[m.key as keyof PilotageSeriesPoint] as number;
   const f = p.finance.find((x) => x.currencyCode === currency);
@@ -99,7 +112,7 @@ export default function PilotageView() {
       ) : (
         <div className="mt-3 grid gap-4 md:grid-cols-2">
           {metrics.map((m) => (
-            <LineChart key={m.key} title={m.label} hint={m.hint} points={points.map((p) => ({ x: p.period, y: valueOf(p, m, cur) }))} unit={m.money ? cur : undefined} height={220} onExpand={() => setExpanded(m.key)} />
+            <LineChart key={m.key} title={m.label} hint={m.hint} points={points.map((p) => ({ x: p.period, label: periodLabel(p, granularity), short: periodLabel(p, granularity, true), y: valueOf(p, m, cur) }))} unit={m.money ? cur : undefined} height={220} onExpand={() => setExpanded(m.key)} />
           ))}
         </div>
       )}
@@ -154,7 +167,7 @@ function Tile({ label, v }: { label: string; v: string }) {
 
 /** Vue agrandie : courbe pleine largeur, tableau dessous, clic sur un point → liste des éléments (drill-down). */
 function ExpandedChart({ metric, points, currency, granularity, onClose }: { metric: Metric; points: PilotageSeriesPoint[]; currency: string; granularity: "week" | "month"; onClose: () => void }) {
-  const data = points.map((p) => ({ x: p.period, y: valueOf(p, metric, currency) }));
+  const data = points.map((p) => ({ x: p.period, label: periodLabel(p, granularity), short: periodLabel(p, granularity, true), y: valueOf(p, metric, currency) }));
   const [selected, setSelected] = useState<string | null>(null);
   const [drill, setDrill] = useState<PilotageDrilldownResponse | null>(null);
   const [busy, setBusy] = useState(false);
@@ -186,7 +199,7 @@ function ExpandedChart({ metric, points, currency, granularity, onClose }: { met
                 const delta = prev == null ? null : d.y - prev;
                 return (
                   <tr key={d.x} onClick={() => setSelected(d.x)} className={`cursor-pointer border-t border-slate-100 hover:bg-slate-50 ${selected === d.x ? "bg-blue-50" : ""}`}>
-                    <td className="px-3 py-1.5 font-semibold">{d.x}</td>
+                    <td className="px-3 py-1.5 font-semibold">{d.label}<span className="ml-2 font-normal text-[10.5px] text-slate-400">{d.x}</span></td>
                     <td className="px-3 py-1.5 text-right tabular-nums">{fmt(d.y)}</td>
                     <td className={`px-3 py-1.5 text-right tabular-nums ${delta == null ? "text-slate-400" : delta > 0 ? "text-emerald-700" : delta < 0 ? "text-red-700" : "text-slate-400"}`}>{delta == null ? "—" : `${delta > 0 ? "+" : ""}${unit ? money(delta, unit) : delta}`}</td>
                   </tr>
@@ -196,7 +209,7 @@ function ExpandedChart({ metric, points, currency, granularity, onClose }: { met
           </table>
         </div>
         <div className="rounded-xl border border-slate-200 bg-white p-3">
-          <h3 className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">{selected ? `Éléments · ${selected}` : "Éléments de la période"}</h3>
+          <h3 className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">{selected ? `Éléments · ${data.find((d) => d.x === selected)?.label ?? selected}` : "Éléments de la période"}</h3>
           {!selected && <p className="mt-2 text-[12.5px] text-slate-500">Sélectionne un point ou une ligne du tableau.</p>}
           {busy && <p className="mt-2 text-[12.5px] text-slate-500">Chargement…</p>}
           {err && <p className="mt-2 text-[12px] text-red-700">{err}</p>}
@@ -225,7 +238,7 @@ function ExpandedChart({ metric, points, currency, granularity, onClose }: { met
 }
 
 /** Courbe à une série : marques fines, axe unique, grille discrète, survol avec repère et infobulle, dernier point étiqueté, clic = sélection. */
-function LineChart({ title, hint, points, unit, height, big, onExpand, onSelect, selected }: { title: string; hint?: string; points: Array<{ x: string; y: number }>; unit?: string; height: number; big?: boolean; onExpand?: () => void; onSelect?: (x: string) => void; selected?: string | null }) {
+function LineChart({ title, hint, points, unit, height, big, onExpand, onSelect, selected }: { title: string; hint?: string; points: Array<{ x: string; label: string; short: string; y: number }>; unit?: string; height: number; big?: boolean; onExpand?: () => void; onSelect?: (x: string) => void; selected?: string | null }) {
   const [hover, setHover] = useState<number | null>(null);
   const W = big ? 900 : 480, H = height, PL = unit ? 64 : 40, PR = 16, PT = 16, PB = 26;
   const max = Math.max(1, ...points.map((p) => p.y));
@@ -239,14 +252,14 @@ function LineChart({ title, hint, points, unit, height, big, onExpand, onSelect,
   const last = points[n - 1];
   const fs = big ? 12 : 10;
   const nearest = (clientX: number, el: SVGSVGElement) => { const r = el.getBoundingClientRect(); const x = ((clientX - r.left) / r.width) * W; let best = 0; for (let i = 0; i < n; i++) if (Math.abs(px(i) - x) < Math.abs(px(best) - x)) best = i; return best; };
-  const labelEvery = Math.max(1, Math.ceil(n / (big ? 12 : 6)));
+  const labelEvery = Math.max(1, Math.ceil(n / (big ? 6 : 6)));
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-3">
       <div className="flex items-baseline justify-between gap-2">
         <div><p className="text-[13px] font-semibold text-slate-800">{title}</p>{hint && <p className="text-[11px] text-slate-500">{hint}</p>}</div>
         <div className="flex items-center gap-2"><p className="text-[11.5px] text-slate-500">total {fmt(total)}</p>{onExpand && <button onClick={onExpand} className="rounded-md border border-slate-300 px-2 py-0.5 text-[11px]">Agrandir</button>}</div>
       </div>
-      <svg viewBox={`0 0 ${W} ${H}`} className="mt-1 w-full" style={{ minHeight: height }} role="img" aria-label={`${title} : ${points.map((p) => `${p.x} ${fmt(p.y)}`).join(", ")}`}
+      <svg viewBox={`0 0 ${W} ${H}`} className="mt-1 w-full" style={{ minHeight: height }} role="img" aria-label={`${title} : ${points.map((p) => `${p.label} ${fmt(p.y)}`).join(", ")}`}
         onMouseLeave={() => setHover(null)}
         onMouseMove={(e) => setHover(nearest(e.clientX, e.currentTarget))}
         onClick={(e) => { if (onSelect && n > 0) onSelect(points[nearest(e.clientX, e.currentTarget)].x); }}>
@@ -255,14 +268,14 @@ function LineChart({ title, hint, points, unit, height, big, onExpand, onSelect,
         {points.map((p, i) => (selected === p.x ? <circle key={p.x} cx={px(i)} cy={py(p.y)} r={6} fill="#fff" stroke={LINE} strokeWidth={2} /> : null))}
         {last && n > 0 && <circle cx={px(n - 1)} cy={py(last.y)} r={4} fill={LINE} stroke="#fff" strokeWidth={2} />}
         {last && <text x={px(n - 1)} y={py(last.y) - 8} fontSize={fs + 1} textAnchor="end" fill="#0b0b0b" fontWeight={600}>{fmt(last.y)}</text>}
-        {points.map((p, i) => (i % labelEvery === 0 || i === n - 1 ? <text key={p.x} x={px(i)} y={H - 8} fontSize={fs - 1} textAnchor={i === 0 ? "start" : i === n - 1 ? "end" : "middle"} fill="#6b7280">{p.x}</text> : null))}
+        {points.map((p, i) => (i % labelEvery === 0 || i === n - 1 ? <text key={p.x} x={px(i)} y={H - 8} fontSize={fs - 1} textAnchor={i === 0 ? "start" : i === n - 1 ? "end" : "middle"} fill="#6b7280">{big ? p.label : p.short}</text> : null))}
         {hover != null && points[hover] && (
           <g>
             <line x1={px(hover)} x2={px(hover)} y1={PT} y2={H - PB} stroke="#9ca3af" strokeWidth={1} strokeDasharray="3 3" />
             <circle cx={px(hover)} cy={py(points[hover].y)} r={5} fill={LINE} stroke="#fff" strokeWidth={2} />
-            <rect x={Math.min(px(hover) + 8, W - 150)} y={PT} width={140} height={38} rx={6} fill="#0b0b0b" opacity={0.92} />
-            <text x={Math.min(px(hover) + 14, W - 144)} y={PT + 15} fontSize={fs} fill="#fff">{points[hover].x}</text>
-            <text x={Math.min(px(hover) + 14, W - 144)} y={PT + 31} fontSize={fs + 1} fill="#fff" fontWeight={700}>{fmt(points[hover].y)}</text>
+            <rect x={Math.min(px(hover) + 8, W - 190)} y={PT} width={180} height={38} rx={6} fill="#0b0b0b" opacity={0.92} />
+            <text x={Math.min(px(hover) + 14, W - 184)} y={PT + 15} fontSize={fs} fill="#fff">{points[hover].label}</text>
+            <text x={Math.min(px(hover) + 14, W - 184)} y={PT + 31} fontSize={fs + 1} fill="#fff" fontWeight={700}>{fmt(points[hover].y)}</text>
           </g>
         )}
       </svg>
