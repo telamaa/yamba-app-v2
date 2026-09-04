@@ -57,7 +57,10 @@ function buildBaseWhere(
 ): Prisma.TripWhereInput {
   const where: Prisma.TripWhereInput = {
     status: "PUBLISHED",
-  //  cancelledAt: null,
+    // C-PR3 (D56 2A) — les trajets d'un compte SUSPENDU disparaissent de la recherche
+    // sans écriture croisée (le trip-service ne touche pas au Trip d'un autre domaine).
+    // `not` matche aussi les documents sans le champ (comptes antérieurs à C-PR3).
+    user: { is: { accountStatus: { not: "SUSPENDED" } } },
   };
 
   // ─── Date range ──────────────────────────────────

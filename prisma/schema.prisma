@@ -42,6 +42,20 @@ model User {
   shipperDisputesLostCount      Int     @default(0) // C-PR2 (D55, 4A) : litiges rejetés — INTERNE (D29②), jamais public
   parcelsSentCount    Int   @default(0)
 
+  // ── C-PR3 (D56) : profils admin et état du compte ──
+  adminRole        AdminRole? // SUPER_ADMIN | MEDIATOR | SUPPORT | FINANCE — posé par script ou par un SUPER_ADMIN (invitation)
+  invitedByAdminId String?    @db.ObjectId
+  adminInvitedAt   DateTime?
+  accountStatus    AccountStatus @default(ACTIVE) // ACTIVE | RESTRICTED (ni publier ni réserver) | SUSPENDED (connexion refusée)
+  suspensionReason         String?
+  suspensionUntil          DateTime?
+  suspendedAt              DateTime?
+  suspendedByAdminId       String?   @db.ObjectId
+  suspensionProposedLevel  String?   // proposition SUPPORT en attente d'exécution (3A : deux clics)
+  suspensionProposedReason String?
+  suspensionProposedByAdminId String? @db.ObjectId
+  suspensionProposedAt     DateTime?
+
   // ── Chantier C (D54, 8A) : 2FA TOTP obligatoire pour les sessions admin ──
   totpSecretEncrypted  String?   // AES-256-GCM (@packages/totp, clé TOTP_ENCRYPTION_KEY) — posé au setup, jamais servi
   totpEnabledAt        DateTime? // null = 2FA non activée (un ADMIN sans 2FA ne peut PAS ouvrir de session admin)
@@ -85,6 +99,8 @@ model User {
   @@index([carrierStatus])
   @@index([roles])
   @@index([phoneE164])
+  @@index([accountStatus])
+  @@index([adminRole])
 }
 
 // ─────────────────────────────────────────────
@@ -952,6 +968,21 @@ enum Role {
   SHIPPER
   CARRIER
   ADMIN
+}
+
+/// C-PR3 (D56) — profils du back-office : SUPER_ADMIN a tout ; les autres sont bornés par route.
+enum AdminRole {
+  SUPER_ADMIN
+  MEDIATOR
+  SUPPORT
+  FINANCE
+}
+
+/// C-PR3 (D56, 2A) — deux niveaux de sanction, toujours motivés, réversibles.
+enum AccountStatus {
+  ACTIVE
+  RESTRICTED
+  SUSPENDED
 }
 
 enum CarrierStatus {

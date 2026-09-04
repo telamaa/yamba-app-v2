@@ -1126,3 +1126,30 @@ La section Finances était une promesse : deux onglets vides et une maquette aux
 | MED8 | Admin, retenue `bzv-held` | Deux issues avec montants : compensation (prorata) / restitution (retenue entière) ; motif ; validation → Voyageur : compensation partie ou « retenue restituée » ; Expéditrice : « la retenue te revient, X remboursés » |
 | MED9 | Admin, remboursement total sur un litige | Deal CANCELLED, Expéditeur remboursé en entier, Voyageur « aucun versement », écrans des deux côtés |
 | MED10 | Journal | `Litige tranché` / `Retenue arbitrée` avec l'issue et les montants ; seconde tentative sur le même dossier refusée |
+
+# C-PR3 — qui peut faire quoi dans le back-office, et ce qu'une sanction change vraiment
+
+### Règles de gestion (ADM, suite)
+- **RG-ADM-09 — Quatre profils, un seul super administrateur minimum.** Super administrateur (tout, comptes admin, journal), Médiateur (tranche les litiges, applique les sanctions), Support (lit les fiches, propose une sanction), Finance (lecture, journal). Le dernier super administrateur ne peut être ni rétrogradé ni retiré ; personne n'agit sur son propre compte.
+- **RG-ADM-10 — Un compte admin créé par invitation naît sans rôle client** : il ne publie pas de trajet et n'envoie pas de colis tant qu'il ne passe pas par le parcours client. Il définit son mot de passe par le lien reçu (48 h) et active la 2FA à sa première connexion.
+- **RG-ADM-11 — Conflit d'intérêts** : un admin ne tranche jamais un deal dont il est partie et ne sanctionne jamais son contradicteur ni un autre admin (sauf super administrateur). Le serveur refuse.
+- **RG-ADM-12 — Deux niveaux de sanction, toujours motivés (20 caractères au moins), réversibles.** Restreint : ni publier ni réserver, les deals en cours continuent. Suspendu : connexion refusée, sessions fermées, trajets invisibles, deals en cours signalés au support. Durée optionnelle.
+- **RG-ADM-13 — Le Support propose, le Médiateur ou le super administrateur exécute** (deux clics, ou deux personnes).
+- **RG-ADM-14 — Le membre sanctionné reçoit un email avec le motif générique**, jamais le contenu d'un signalement, et l'adresse pour contester ; un email « compte rétabli » à la levée.
+- **RG-ADM-15 — La fiche montre tout ce qui sert à opérer, rien de secret** : identité, rôles, Stripe (identifiant masqué, encaissements et versements), réputation et compteurs internes, trajets, deals, litiges, actions admin le concernant, sessions actives. Jamais de mot de passe, de secret 2FA, de code de livraison.
+- **RG-ADM-16 — Chaque ouverture de session admin déclenche une alerte email** ; l'admin voit ses sessions et peut les révoquer.
+- **RG-ADM-17 — Les erreurs serveur remontent à Sentry** avec le service et l'identifiant de corrélation, dès qu'un DSN est posé.
+
+### Recette (ADM, suite) — `grant-admin.ts <ton email> --role SUPER_ADMIN`
+| # | Scénario | Attendu |
+|---|---|---|
+| ADM11 | Super admin, « Comptes admin », inviter `support@…` (Support) | Email d'invitation avec lien `…/invite?token=` ; le compte apparaît « invitation en attente » ; il n'a aucun rôle client |
+| ADM12 | Ouvrir le lien, mot de passe faible puis fort | Refus motivé, puis « Enregistrer et me connecter » → `/login` → mot de passe → écran QR 2FA |
+| ADM13 | Connecté en Support | Menu : À arbitrer, Utilisateurs, Mes sessions ; pas de Journal ni Comptes admin ; sur un dossier de litige, pas de formulaire de décision ; sur une fiche, bouton « Proposer » seulement |
+| ADM14 | Support propose une restriction (motif < 20 caractères puis valide) | Bouton inactif, puis « Fait » ; la fiche montre la proposition |
+| ADM15 | Médiateur ou super admin sur la même fiche | Proposition visible, boutons Appliquer ; appliquer « Restreint » → email « compte restreint » au membre ; le membre ne peut plus publier ni réserver (403), ses deals en cours continuent |
+| ADM16 | Appliquer « Suspendu » | Le membre est déconnecté partout, « Ton compte est suspendu » à la connexion, ses trajets disparaissent de la recherche, email au support s'il a des deals en cours |
+| ADM17 | Lever la sanction (motif) | Compte actif, email « rétabli », connexion possible, trajets de nouveau visibles |
+| ADM18 | Tenter d'agir sur sa propre fiche, ou de trancher un litige où l'on est partie | 403 explicite |
+| ADM19 | Super admin : rétrograder le dernier super admin, retirer son propre accès | Refus ; retirer un autre admin → sa 2FA et ses sessions admin tombent |
+| ADM20 | Mes sessions | Chaque connexion admin envoie un email d'alerte ; la liste montre les sessions ; révoquer la session courante renvoie à `/login` |

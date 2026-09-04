@@ -36,6 +36,10 @@ import {
 } from "@packages/totp";
 import type { AuthenticatedRequest } from "@packages/middleware/isAuthenticated";
 import { createRefreshJti, normalizeEmail } from "../utils/auth.helper";
+import redis from "@packages/libs/redis";
+import { resolveLocale } from "@packages/api-contracts";
+import { sendAuthEmail } from "../emails/send-auth-email";
+import { getAdminEmails } from "../emails/admin-emails";
 import { adminRemainingLifetimeMs, loadAdminSessionPolicy } from "../utils/admin-session-policy";
 import {
   clearTotpFailures,
@@ -54,6 +58,26 @@ import {
 } from "../utils/cookies/adminCookies";
 
 const TOTP_ISSUER = process.env.ADMIN_TOTP_ISSUER || "Yamba Admin";
+const ADMIN_UI_URL = (process.env.ADMIN_UI_URL || "http://localhost:3001").replace(/\/$/, "");
+const SUPPORT_EMAIL = process.env.SUPPORT_EMAIL || "support@yamba.app";
+
+/** C-PR3 (D56 6A) — alerte à chaque ouverture de session admin (best-effort). */
+async function sendLoginAlert(req: Request, user: { firstName: string; email: string; preferredLocale: string }): Promise<void> {
+  const locale = resolveLocale(user.preferredLocale);
+  const at = new Intl.DateTimeFormat(locale === "fr" ? "fr-FR" : "en-GB", { dateStyle: "long", timeStyle: "short" }).format(new Date());
+  await sendAuthEmail(
+    user.email,
+    locale,
+    getAdminEmails(locale).adminLoginAlert({
+      firstName: user.firstName,
+      at,
+      ip: req.ip ?? "?",
+      userAgent: String(req.headers["user-agent"] ?? "?").slice(0, 120),
+      sessionsUrl: `${ADMIN_UI_URL}/sessions`,
+      supportEmail: SUPPORT_EMAIL,
+    })
+  ).catch(() => undefined);
+}
 
 type PreauthPayload = { id: string; stage: "admin-preauth" };
 type AdminRefreshPayload = { id: string; jti: string; adm: true; sca: number };
@@ -74,7 +98,7 @@ async function requirePreauth(req: Request) {
   }
   if (decoded?.stage !== "admin-preauth" || !decoded.id) throw new AuthError("Admin pre-authentication invalid.");
   const user = await prisma.user.findUnique({ where: { id: decoded.id } });
-  if (!user || user.isDeleted || !user.roles.includes("ADMIN")) throw new ForbiddenError("Not an admin account.");
+  if (!user || user.isDeleted || !user.roles.includes("ADMIN") || !user.adminRole) throw new ForbiddenError("Not an admin account.");
   return user;
 }
 
@@ -85,7 +109,7 @@ async function issueAdminSession(res: Response, user: { id: string; roles: strin
   const ttl = await storeAdminSession(user.id, jti, createdAt, createdAt);
   if (ttl <= 0) throw new AuthError("Admin session could not be opened.");
   const accessToken = jwt.sign(
-    { id: user.id, roles: user.roles, adm: true, amr: ["pwd", "totp"] },
+    { id: user.id, roles: user.roles, adm: true, amr: ["pwd", "totp"], adminRole: (user as { adminRole?: string | null }).adminRole ?? null },
     process.env.ACCESS_TOKEN_SECRET as string,
     { expiresIn: "15m" }
   );
@@ -104,7 +128,8 @@ export const adminLogin = async (req: Request, res: Response, next: NextFunction
     if (!email || !password) return next(new ValidationError("Email and password are required!"));
     const user = await prisma.user.findUnique({ where: { emailNormalized: normalizeEmail(String(email)) } });
     // Même message pour « inconnu », « pas admin » et « mauvais mot de passe » : ne rien révéler.
-    if (!user || user.isDeleted || !user.roles.includes("ADMIN")) return next(new AuthError("Invalid email or password"));
+    if (!user || user.isDeleted || !user.roles.includes("ADMIN") || !user.adminRole) return next(new AuthError("Invalid email or password"));
+    if (!user.passwordHash) return next(new AuthError("Set your password with the invitation link first."));
     const ok = await bcrypt.compare(String(password), user.passwordHash ?? "");
     if (!ok) return next(new AuthError("Invalid email or password"));
 
@@ -153,6 +178,7 @@ export const adminTotpEnable = async (req: Request, res: Response, next: NextFun
       await recordAdminAction(tx, { adminUserId: user.id, action: "ADMIN_LOGIN", targetType: "SESSION", after: { method: "totp-setup" }, ...clientMeta(req) });
     });
     await issueAdminSession(res, user);
+    await sendLoginAlert(req, user);
     return res.status(200).json({ ok: true, backupCodes });
   } catch (e) {
     return next(e);
@@ -201,6 +227,7 @@ export const adminTotpVerify = async (req: Request, res: Response, next: NextFun
 
     await clearTotpFailures(user.id);
     await issueAdminSession(res, user);
+    await sendLoginAlert(req, user);
     return res.status(200).json({ ok: true, usedBackupCode: usedBackup, remainingBackupCodes });
   } catch (e) {
     return next(e);
@@ -280,6 +307,7 @@ export const getAdminMe = async (req: AuthenticatedRequest, res: Response, next:
       email: u.email,
       firstName: u.firstName,
       lastName: u.lastName,
+      adminRole: u.adminRole ?? null,
       remainingBackupCodes: (u.totpBackupCodeHashes ?? []).length,
     });
   } catch (e) {
@@ -315,6 +343,58 @@ export const listAdminAudit = async (req: AuthenticatedRequest, res: Response, n
       })),
       nextCursor: rows.length > AUDIT_PAGE ? page[page.length - 1].id : null,
     });
+  } catch (e) {
+    return next(e);
+  }
+};
+
+/* ── C-PR3 (D56 6A) — sessions admin : liste et révocation ─────────────── */
+
+function currentJti(req: Request): string | null {
+  const token = req.cookies?.[ADMIN_REFRESH_COOKIE];
+  if (!token) return null;
+  try {
+    return (jwt.verify(token, process.env.REFRESH_TOKEN_SECRET as string) as AdminRefreshPayload).jti ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export const listAdminSessions = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    const mine = currentJti(req);
+    const items: Array<{ jti: string; createdAt: string; lastActivityAt: string; current: boolean }> = [];
+    let cursor = "0";
+    do {
+      const [nextCursor, keys] = await redis.scan(cursor, "MATCH", `admin_jti:${req.user.id}:*`, "COUNT", 100);
+      cursor = nextCursor;
+      for (const key of keys) {
+        const raw = await redis.get(key);
+        if (!raw) continue;
+        try {
+          const rec = JSON.parse(raw) as { createdAt: number; lastActivityAt: number };
+          const jti = key.split(":").pop() as string;
+          items.push({ jti, createdAt: new Date(rec.createdAt).toISOString(), lastActivityAt: new Date(rec.lastActivityAt).toISOString(), current: jti === mine });
+        } catch {
+          // record illisible : ignoré
+        }
+      }
+    } while (cursor !== "0");
+    items.sort((a, b) => b.lastActivityAt.localeCompare(a.lastActivityAt));
+    return res.status(200).json({ items });
+  } catch (e) {
+    return next(e);
+  }
+};
+
+export const revokeAdminSessionById = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    const jti = String(req.params.jti ?? "");
+    if (!/^[a-f0-9]{32}$/.test(jti)) return res.status(400).json({ message: "Invalid session id." });
+    await revokeAdminSession(req.user.id, jti);
+    await recordAdminAction(prisma, { adminUserId: req.user.id, action: "ADMIN_SESSION_REVOKED", targetType: "SESSION", targetId: jti, ...clientMeta(req) });
+    if (jti === currentJti(req)) clearAdminCookies(res);
+    return res.status(200).json({ ok: true });
   } catch (e) {
     return next(e);
   }

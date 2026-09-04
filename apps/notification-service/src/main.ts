@@ -15,6 +15,9 @@
  * pino + correlation ID dès la naissance ; le handler trace le
  * correlationId PORTÉ PAR LES ÉVÉNEMENTS (gateway → outbox → Kafka).
  */
+import { initSentry } from "@packages/error-handler";
+// C-PR3 (D56 7A) — Sentry : inerte sans SENTRY_DSN ; 5xx tagués du service et de l'identifiant de corrélation.
+initSentry("notification-service");
 import express from "express";
 import cors from "cors";
 import cookieParser = require("cookie-parser");

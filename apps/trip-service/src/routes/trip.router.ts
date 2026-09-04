@@ -22,6 +22,7 @@ import {
   searchTripsFacets,
 } from "../controllers/trip-search.controller";
 import isAuthenticated from "@packages/middleware/isAuthenticated";
+import requireActiveAccount from "@packages/middleware/requireActiveAccount";
 import isOptionallyAuthenticated from "@packages/middleware/isOptionallyAuthenticated";
 import {
   addTripFavorite,
@@ -49,7 +50,7 @@ router.post("/:id/favorite", isAuthenticated, addTripFavorite);      // D46 — 
 router.delete("/:id/favorite", isAuthenticated, removeTripFavorite); // D46 — idempotent
 
 // ─── Trip CRUD ───────────────────────────────
-router.post("/", isAuthenticated, createTrip);                             // Créer un trip
+router.post("/", isAuthenticated, requireActiveAccount, createTrip); // C-PR3 (D56) : compte restreint = pas de publication                             // Créer un trip
 router.get("/my", isAuthenticated, getMyTrips);                            // Mes trips (avec filtre ?status=)
 router.get("/:id", isAuthenticated, getTrip);                              // Détail d'un trip (owner only)
 router.put("/:id", isAuthenticated, updateTrip);                           // Modifier un trip
@@ -60,7 +61,7 @@ router.put("/:id", isAuthenticated, updateTrip);                           // Mo
 router.delete("/:id", isAuthenticated, deleteTrip);
 
 // ─── Lifecycle ───────────────────────────────
-router.post("/:id/publish", isAuthenticated, publishTrip);                 // Publier un brouillon
+router.post("/:id/publish", isAuthenticated, requireActiveAccount, publishTrip);                 // Publier un brouillon
 router.post("/:id/pause", isAuthenticated, pauseTrip);                     // Mettre en pause
 router.post("/:id/resume", isAuthenticated, resumeTrip);                   // Reprendre après pause
 router.post("/:id/restore", isAuthenticated, restoreTrip);                 // Restaurer un trip annulé

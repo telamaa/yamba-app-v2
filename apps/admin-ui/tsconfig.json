@@ -20,6 +20,6 @@
     "rootDir": "../../",
     "tsBuildInfoFile": "dist/tsconfig.tsbuildinfo"
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx", ".next/types/**/*.ts", "next-env.d.ts", "index.d.ts"],
+  "include": ["src/**/*.ts", "src/**/*.tsx", "instrumentation.ts", "instrumentation-client.ts", ".next/types/**/*.ts", "next-env.d.ts", "index.d.ts"],
   "exclude": ["out-tsc", "dist", "node_modules", ".next"]
 }

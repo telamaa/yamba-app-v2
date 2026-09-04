@@ -49,6 +49,10 @@ const isAuthenticated = async (
     if (!user) {
       return res.status(401).json({ message: "Account not found." });
     }
+    // C-PR3 (D56 2A) — SUSPENDED : connexion refusée partout (les sessions sont révoquées à la suspension).
+    if ((user as { accountStatus?: string }).accountStatus === "SUSPENDED") {
+      return res.status(401).json({ message: "Account suspended.", code: "ACCOUNT_SUSPENDED" });
+    }
 
     req.user = user;
     req.roles = decoded.roles ?? user.roles ?? [];

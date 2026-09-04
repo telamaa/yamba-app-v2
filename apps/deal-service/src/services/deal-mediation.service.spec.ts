@@ -1,7 +1,7 @@
 /**
  * deal-mediation.service.spec.ts — règles PURES de la médiation (C-PR2, D55)
  */
-import { computeResolutionMoney, disputeLoser, disputeResponseDeadline, isDisputeDecidable } from "./deal-mediation.service";
+import { assertNotParty, computeResolutionMoney, disputeLoser, disputeResponseDeadline, isDisputeDecidable } from "./deal-mediation.service";
 
 const pricing = { totalShipperCents: 5100, transportCents: 4500 }; // commission 600
 
@@ -51,5 +51,16 @@ describe("disputeLoser (D55 4A)", () => {
     expect(disputeLoser("REJECTED")).toBe("SHIPPER");
     expect(disputeLoser("PARTIAL_REFUND")).toBe("CARRIER");
     expect(disputeLoser("FULL_REFUND")).toBe("CARRIER");
+  });
+});
+
+describe("assertNotParty (C-PR3, D56) — conflit d'intérêts", () => {
+  const booking = { shipperId: "s1", carrierId: "c1" };
+  it("un admin partie au deal ne tranche pas (403)", () => {
+    expect(() => assertNotParty({ id: "s1" }, booking)).toThrow(/party to this deal/);
+    expect(() => assertNotParty({ id: "c1" }, booking)).toThrow(/party to this deal/);
+  });
+  it("un tiers passe", () => {
+    expect(() => assertNotParty({ id: "admin" }, booking)).not.toThrow();
   });
 });

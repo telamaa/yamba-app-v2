@@ -11,6 +11,12 @@ import jwt from "jsonwebtoken";
 import prisma from "@packages/libs/prisma";
 import type { AuthenticatedRequest } from "./isAuthenticated";
 
+declare module "express-serve-static-core" {
+  interface Request {
+    adminRole?: string | null;
+  }
+}
+
 type AdminJwtPayload = { id: string; roles?: string[]; adm?: boolean; amr?: string[] };
 
 const extractToken = (req: Request): string | null => {
@@ -32,6 +38,8 @@ const isAdminAuthenticated = async (req: AuthenticatedRequest, res: Response, ne
     }
     req.user = user;
     req.roles = user.roles;
+    // C-PR3 (D56) — le profil admin voyage avec la requête ; requireAdminRole le lit.
+    req.adminRole = (user as { adminRole?: string | null }).adminRole ?? null;
     return next();
   } catch {
     return res.status(401).json({ message: "Unauthorized! Admin token expired or invalid." });

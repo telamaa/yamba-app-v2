@@ -1,4 +1,5 @@
 import { AppError } from "./index";
+import { captureServerError } from "./sentry";
 import { Request, Response, NextFunction } from "express";
 
 /**
@@ -59,6 +60,7 @@ export const errorMiddleware = (
 
     // Log les erreurs serveur (5xx) en plus de la réponse
     if (err.statusCode >= 500) {
+      captureServerError(err, req); // C-PR3 (D56 7A) — Sentry, tagué correlationId
       console.error("[error-handler] Server error:", {
         message: err.message,
         statusCode: err.statusCode,
@@ -71,6 +73,7 @@ export const errorMiddleware = (
   }
 
   console.log("Unhandled error: ", err);
+  captureServerError(err, req); // C-PR3 (D56 7A) — erreur non opérationnelle : toujours remontée
 
   return res.status(500).json({
     status: "error",

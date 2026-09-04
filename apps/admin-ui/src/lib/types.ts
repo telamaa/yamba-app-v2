@@ -108,7 +108,52 @@ export type AdminDisputeFile = {
   };
 };
 
-export type AdminMe = { id: string; email: string; firstName: string; lastName: string; remainingBackupCodes: number };
+export type AdminMe = { id: string; email: string; firstName: string; lastName: string; adminRole: import("./permissions").AdminRole | null; remainingBackupCodes: number };
+
+/* ── C-PR3 (D56) — utilisateurs, comptes admin, sessions ── */
+export type AccountStatus = "ACTIVE" | "RESTRICTED" | "SUSPENDED";
+export type AdminUserSummary = {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phoneE164: string | null;
+  roles: string[];
+  adminRole: import("./permissions").AdminRole | null;
+  accountStatus: AccountStatus;
+  carrierStatus: string;
+  createdAt: string;
+  matchedOn: string | null;
+};
+export type AdminUsersResponse = { items: AdminUserSummary[]; total: number };
+export type ReputationFacts = { reputationLevel: string | null; ratingsAvg: number; ratingsCount: number; completedDealsCount: number; lateCancellationsCount: number; disputesLostCount: number };
+export type AdminUserFile = {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phoneE164: string | null;
+  preferredLocale: string;
+  roles: string[];
+  adminRole: import("./permissions").AdminRole | null;
+  accountStatus: AccountStatus;
+  suspension: { level: AccountStatus; reason: string; until: string | null; at: string; byAdmin: string } | null;
+  suspensionProposal: { level: string; reason: string; byAdmin: string; at: string } | null;
+  createdAt: string;
+  isDeleted: boolean;
+  isMe: boolean;
+  carrier: (ReputationFacts & { status: string; stripeAccountId: string | null; stripeChargesEnabled: boolean; stripePayoutsEnabled: boolean }) | null;
+  shipper: ReputationFacts;
+  activity: {
+    trips: Array<{ id: string; status: string; originCity: string; destinationCity: string; departureAt: string }>;
+    deals: Array<{ id: string; status: string; role: "SHIPPER" | "CARRIER"; originCity: string; destinationCity: string; totalShipperCents: number; transportCents: number; currencyCode: string; disputeTicket: string | null; requestedAt: string }>;
+    activeDealsCount: number;
+    activeSessionsCount: number;
+  };
+  adminActions: Array<{ id: string; at: string; admin: string; action: string; after: unknown }>;
+};
+export type AdminAccount = { id: string; firstName: string; lastName: string; email: string; adminRole: import("./permissions").AdminRole; totpEnabled: boolean; inviteAccepted: boolean; createdAt: string };
+export type AdminSessionItem = { jti: string; createdAt: string; lastActivityAt: string; current: boolean };
 
 export type AuditItem = {
   id: string;
