@@ -39,4 +39,13 @@ describe("adminRoleAllows (D56)", () => {
   it("C-PR4 : kpi.read pour tous les profils, chaque compteur restant filtré par sa propre permission", () => {
     for (const r of ["MEDIATOR", "SUPPORT", "FINANCE"] as const) expect(adminRoleAllows(r, "kpi.read")).toBe(true);
   });
+  it("C-PR5 (D58 6A) : FINANCE et MEDIATOR lisent les finances et agissent sur les versements ; SUPPORT non", () => {
+    for (const r of ["FINANCE", "MEDIATOR"] as const) {
+      expect(adminRoleAllows(r, "finances.read")).toBe(true);
+      expect(adminRoleAllows(r, "payouts.retry")).toBe(true);
+      expect(adminRoleAllows(r, "payouts.resolve")).toBe(true);
+    }
+    expect(adminRoleAllows("SUPPORT", "finances.read")).toBe(false);
+    expect(adminRoleAllows("SUPPORT", "payouts.retry")).toBe(false);
+  });
 });

@@ -53,6 +53,30 @@ export const ACTION_LABEL: Record<string, string> = {
   DOCUMENT_VIEWED: "Document ouvert",
   TICKET_VERIFIED: "Billet vérifié",
   TICKET_REJECTED: "Billet rejeté",
+  DEAL_MONEY_VIEWED: "Fiche argent consultée",
+  DEAL_RECONCILED: "Rapprochement Stripe",
+  PAYOUT_RETRIED: "Versement rejoué",
+  PAYOUT_REVERSAL_RESOLVED: "Renversement clos",
+};
+
+/* C-PR5a (D58) */
+export const PAYOUT_STATUS_LABEL: Record<string, string> = { PENDING: "en attente d'envoi", SENT: "envoyé", FAILED: "en échec", FROZEN: "gelé (litige)", REVERSED: "renversé" };
+export const PAYOUT_FAILURE_LABEL: Record<string, string> = { ACCOUNT_NOT_READY: "compte Stripe du Voyageur non prêt", PROVIDER_ERROR: "refus du fournisseur", REVERSED: "transfert renversé par Stripe" };
+export const TIMELINE_LABEL: Record<string, string> = {
+  AUTHORIZED: "Empreinte posée (autorisation)", CAPTURED: "Débité (capture)", REFUNDED: "Remboursé à l'Expéditeur", DISPUTED: "Litige ouvert",
+  COMPLETED: "Deal terminé", CANCELLED: "Deal annulé", PAYOUT_SENT: "Versement envoyé au Voyageur", PAYOUT_FAILED: "Versement en échec",
+  PAYOUT_REVERSED: "Transfert renversé", REVERSAL_RESOLVED: "Renversement clos", RETENTION: "Retenue conservée", RETENTION_DECIDED: "Retenue arbitrée",
+};
+export const DIVERGENCE_LABEL: Record<string, string> = {
+  CAPTURE_NOT_RECORDED: "Débit chez Stripe, non enregistré en base",
+  CAPTURE_RECORDED_NOT_LIVE: "Débit enregistré, mais Stripe ne montre rien d'encaissé",
+  REFUND_NOT_RECORDED: "Remboursement chez Stripe supérieur à la base (remboursement parti sans écriture)",
+  REFUND_RECORDED_NOT_LIVE: "Remboursement en base absent ou échoué chez Stripe",
+  TRANSFER_MISSING: "Transfert enregistré, introuvable chez Stripe",
+  TRANSFER_AMOUNT_MISMATCH: "Montant du transfert différent du versement enregistré",
+  TRANSFER_REVERSED_NOT_MARKED: "Transfert renversé chez Stripe, toujours « envoyé » en base",
+  TRANSFER_MARKED_REVERSED_BUT_LIVE_OK: "Marqué renversé en base, pas de renversement chez Stripe",
+  INTENT_NOT_FOUND: "Paiement introuvable chez le fournisseur",
 };
 
 export const TICKET_REASON_LABEL: Record<string, string> = {

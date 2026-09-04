@@ -210,6 +210,7 @@ describe("B — refusePickup (A40)", () => {
       pickupRefusalReason: "SUSPICIOUS_CONTENT",
       refundedAt: NOW,
       refundAmountCents: 2957,
+      refundId: expect.stringMatching(/^re_fake_/), // C-PR5 (D58) — rapprochement exact
     });
     expect(prismaMock.trip.updateMany).toHaveBeenCalledWith({
       where: { id: TRIP_ID, reservedKg: { gte: 2 } },

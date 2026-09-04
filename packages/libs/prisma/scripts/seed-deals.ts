@@ -229,6 +229,10 @@ const BOOKINGS: SeedBooking[] = [
   { key: "bzv-completed", tripKey: "bzv-inflight", shipperKey: "mai", status: "COMPLETED", weightKg: 4, category: "CLOTHES", description: "Pagnes et tissus", declaredValueCents: 20000, pricing: perCategory(3500), recipient: RCP_BZV,
     milestones: { requestedAt: days(-12), expiresAt: days(-11), acceptedAt: days(-11), pickedUpAt: days(-6), deliveredAt: days(-6), payoutDueAt: days(-2), completedAt: days(-2) },
     pickup: { confirmedAt: days(-6), photoUrls: ["https://r2.seed.yamba.dev/bzv-completed-1.jpg"], notes: null } },
+  // C-PR5 (D58) — transfert renversé par Stripe après versement : file admin « Transferts renversés » (recette FIN)
+  { key: "bzv-reversed", tripKey: "bzv-inflight", shipperKey: "pauline", status: "COMPLETED", weightKg: 3, category: "COSMETICS", description: "Crèmes et parfums (transfert renversé — recette FIN04/FIN05)", declaredValueCents: 9000, pricing: perCategory(3000), recipient: RCP_BZV,
+    milestones: { requestedAt: days(-14), expiresAt: days(-13), acceptedAt: days(-13), pickedUpAt: days(-8), deliveredAt: days(-8), payoutDueAt: days(-4), completedAt: days(-4) },
+    pickup: { confirmedAt: days(-8), photoUrls: [], notes: null } },
 
   /* ── Paris → Montréal (PER_KG) ────────────────────────────── */
   { key: "yul-accepted", tripKey: "yul", shipperKey: "marieclaire", status: "ACCEPTED", weightKg: 7, category: "CLOTHES", description: "Manteaux d'hiver", declaredValueCents: 30000, pricing: perKg(600, 7, "M"), recipient: RCP_YUL,
@@ -461,6 +465,25 @@ async function main() {
           payoutFailureReason: "CARRIER_ACCOUNT_NOT_READY",
           payoutAmountCents: (booking as unknown as { pricing: { transportCents: number } }).pricing.transportCents,
           payoutAttempts: 4,
+          // C-PR5 (A111) — relance échue : le cron (ou « Relancer » dans l'admin) peut rejouer tout de suite
+          payoutLastAttemptAt: days(-1),
+          payoutNextRetryAt: days(-1),
+        },
+      });
+    } else if (b.status === "COMPLETED" && b.key.endsWith("-reversed")) {
+      // C-PR5 (D58) — versé puis renversé par Stripe (webhook transfer.reversed) : attend une décision admin.
+      await prisma.booking.update({
+        where: { id: booking.id },
+        data: {
+          completedBy: "SYSTEM",
+          payoutStatus: "REVERSED",
+          payoutFailureReason: "PROVIDER_REVERSED",
+          payoutAmountCents: (booking as unknown as { pricing: { transportCents: number } }).pricing.transportCents,
+          payoutSentAt: m.completedAt ?? NOW,
+          payoutAttempts: 1,
+          transferId: `tr_fake_seed_${b.key}`,
+          payoutReversalResolution: null,
+          payoutReversalResolvedAt: null,
         },
       });
     } else if (b.status === "COMPLETED") {

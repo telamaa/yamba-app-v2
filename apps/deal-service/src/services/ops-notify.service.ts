@@ -17,6 +17,8 @@ import type { BookingForWrite } from "./booking-write";
 
 const APP_URL = process.env.USER_APP_URL ?? "http://localhost:3000";
 const SUPPORT_EMAIL = process.env.SUPPORT_EMAIL ?? "support@yamba.app";
+// C-PR5 (D58 7A) — le digest pointe vers les files admin, pas vers l'app Voyageur
+const ADMIN_URL = (process.env.ADMIN_UI_URL ?? "http://localhost:3001").replace(/\/$/, "");
 
 const syntheticEventId = () => randomBytes(12).toString("hex");
 
@@ -64,14 +66,14 @@ export async function sendOpsDigest(
     label: `${b.trip.originCity} → ${b.trip.destinationCity} · ${b.status} · ${b.id}`,
     amount: money(amountCents, b.pricing.currencyCode, locale),
     since: (sinceDate ?? now).toLocaleDateString("fr-FR"),
-    url: `${APP_URL}/${locale}/carrier/deals/${b.id}`,
+    url: `${ADMIN_URL}/deals/${b.id}`,
   });
   const built = OPS_EMAILS[locale].opsDigest({
     date: now.toLocaleDateString("fr-FR"),
     failed: digest.failed.map((b) => line(b, b.payoutAmountCents ?? b.pricing.transportCents, b.updatedAt)),
     reversed: digest.reversed.map((b) => line(b, b.payoutAmountCents ?? b.pricing.transportCents, b.updatedAt)),
     held: digest.held.map((b) => line(b, b.retentionCents ?? 0, b.updatedAt)),
-    appUrl: `${APP_URL}/${locale}/dashboard`,
+    appUrl: `${ADMIN_URL}/finances`,
   });
   await sendTransactionalEmail({ to: SUPPORT_EMAIL, locale, subject: built.subject, content: built.content });
   return true;

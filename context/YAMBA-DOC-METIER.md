@@ -1182,3 +1182,32 @@ Avant d'avoir du volume, Yamba ne bloque rien sans billet vérifié : le badge �
 | ADM28 | Médiateur, même fiche, « Masquer » | Trajet absent de la recherche et 404 sur sa page publique ; réservation directe refusée (`TRIP_NOT_BOOKABLE`) ; réservations acceptées inchangées ; email générique au Voyageur ; bandeau rouge sur le détail du trajet côté Voyageur ; journal « Trajet masqué » avec le motif interne |
 | ADM29 | « Rétablir » (motif) | Trajet de retour dans la recherche, email « de nouveau visible », journal « Trajet rétabli » |
 | ADM30 | Admin qui est aussi Voyageur, sur son propre trajet / billet | Carte Masquage sans bouton ; API 403 |
+
+# C-PR5a — l'argent tel qu'il est : ce qui a échoué, ce qui est revenu, ce que Stripe dit vraiment
+
+## Le besoin
+L'argent réel est chez le fournisseur de paiement ; la base ne fait que le refléter. Quand un versement échoue, quand Stripe renvoie un transfert, quand un remboursement est parti sans être écrit, l'équipe finance doit le VOIR, comparer les deux mondes et agir avec un motif — sans jamais recalculer un montant ni renvoyer de l'argent par accident.
+
+### Règles de gestion (FIN, suite)
+- **RG-FIN-06 — Un versement en échec est rejoué tout seul, de plus en plus espacé, sans jamais se taire** : toutes les 5 minutes la première demi-heure, puis toutes les 30 minutes, puis toutes les 2 heures, puis chaque jour. Il reste visible dans la file « Versements en échec » tant qu'il n'est pas parti.
+- **RG-FIN-07 — « Relancer » est le même versement, pas un nouveau** : même montant figé, même clé chez le fournisseur ; un double clic ne verse pas deux fois.
+- **RG-FIN-08 — Un transfert renversé par Stripe ne repart jamais seul.** Il attend une décision motivée (20 caractères au moins) : re-verser (un nouveau transfert, tracé) ou abandonner (manque à gagner assumé, tracé).
+- **RG-FIN-09 — La fiche argent d'un deal montre tout ce qui a été posé, rien d'inféré** : prix figé, débit, remboursements, versement, retenue, avec les identifiants fournisseur en clair pour la finance et le compte Stripe du Voyageur masqué.
+- **RG-FIN-10 — Le rapprochement compare, il ne corrige pas.** Il lit l'état réel chez le fournisseur et liste les écarts (remboursement parti sans écriture, transfert introuvable, renversé non marqué…). Toute correction est un geste humain, journalisé.
+- **RG-FIN-11 — Personne n'agit sur un deal dont il est partie** ; Finance et Médiateur relancent et clôturent, le Support ne voit pas les finances.
+- **RG-FIN-12 — Chaque lecture d'une fiche argent, chaque rapprochement, chaque relance, chaque clôture laisse une ligne au journal.**
+- **RG-FIN-13 — Le message brut du fournisseur n'est lu que par l'admin** ; le Voyageur continue de ne voir que « compte à finaliser » ou « en cours ».
+
+### Recette (FIN) — `seed-deals.ts` : `bzv-completed-blocked` (échec, relance échue), `bzv-reversed` (renversé), `bzv-held` (retenue)
+| # | Scénario | Attendu |
+|---|---|---|
+| FIN01 | Connexion Finance (ou Médiateur), accueil | Tuiles « Versements en échec » = 1, « Transferts renversés » = 1 ; « Finances » dans le menu ; un Support ne voit ni la tuile ni le menu |
+| FIN02 | Finances, onglet « Versements en échec » | Ligne Paris → Brazzaville, « compte Stripe du Voyageur non prêt », 4 tentatives, badge « Stripe non prêt » |
+| FIN03 | « Relancer » | Sans Stripe réel (Fake) : « Versement envoyé », la ligne disparaît, journal « Versement rejoué » ; avec Stripe et compte non prêt : « Toujours en échec », 5 tentatives, prochaine relance affichée |
+| FIN04 | Onglet « Transferts renversés », « Décider » | Fiche argent : état « renversé », formulaire ambre ; boutons inactifs sous 20 caractères |
+| FIN05 | « Abandonner » avec motif | « Renversement abandonné, clos » ; la ligne sort de la file ; fiche : « Renversement clos : abandonné par … » ; journal « Renversement clos » |
+| FIN06 | Rejouer le seed, « Re-verser » avec motif | Nouveau transfert (Fake : envoyé), état « envoyé », journal ; un second clic → 400 « not an open reversal » |
+| FIN07 | Fiche argent d'un deal terminé, « Rapprocher maintenant » | Fake : « Base et fournisseur concordent » ou divergences libellées (un deal seedé sans intent Fake réel → « Paiement introuvable chez le fournisseur ») ; journal « Rapprochement Stripe » ; rien ne change en base |
+| FIN08 | Deal réel Stripe test : annuler après acceptation, puis rapprocher | Aucune divergence ; `refundId` visible dans « Paiement de l'Expéditeur » |
+| FIN09 | Onglet « Retenues à arbitrer », « Arbitrer » | Renvoie au dossier de médiation (C-PR2) |
+| FIN10 | Admin partie au deal (son propre deal) | Aucun bouton « Relancer » / clôture ; API 403 |

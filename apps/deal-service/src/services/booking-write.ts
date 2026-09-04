@@ -55,6 +55,9 @@ export const BOOKING_WRITE_SELECT = {
   chargeId: true,
   updatedAt: true,
   transferId: true,
+  // C-PR5 (D58) — rejeux espacés + clé d'idempotence explicite après renversement
+  payoutNextRetryAt: true,
+  payoutIdempotencyKey: true,
   retentionCents: true,
   retentionDisposition: true,
   // C-PR2 (D55) — médiation
@@ -91,6 +94,8 @@ export type BookingForWrite = {
   /** Verrou optimiste (A85) : les gardes conditionnelles qui portaient sur une liste composite passent par lui. */
   updatedAt?: Date | null;
   transferId?: string | null;
+  payoutNextRetryAt?: Date | null;
+  payoutIdempotencyKey?: string | null;
   retentionCents?: number | null;
   retentionDisposition?: string | null;
   disputedAt?: Date | null;

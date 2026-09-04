@@ -62,4 +62,21 @@ describe("createPaymentProviderFromEnv", () => {
   it("avec clé → STRIPE", () => {
     expect(createPaymentProviderFromEnv({ STRIPE_SECRET_KEY: "sk_test_x" } as NodeJS.ProcessEnv).name).toBe("STRIPE");
   });
+  it("C-PR5 (D58) : inspect reflète capture, remboursements et transfert (renversement simulable), lecture seule", async () => {
+    const p = new FakePaymentProvider();
+    const a = await p.authorize({ amountCents: 2957, currencyCode: "EUR", description: "t", metadata: {} });
+    let i = await p.inspect({ intentId: a.intentId });
+    expect(i).toMatchObject({ provider: "FAKE", status: "AUTHORIZED", amountReceivedCents: 0, refunds: [], transfer: null });
+    await p.capture(a.intentId);
+    await p.refund(a.intentId, 500);
+    const t = await p.transfer({ amountCents: 2000, currencyCode: "EUR", destinationAccountId: "acct_x", description: "t", metadata: {}, idempotencyKey: "k" });
+    i = await p.inspect({ intentId: a.intentId, transferId: t.transferId });
+    expect(i.amountReceivedCents).toBe(2957);
+    expect(i.refunds).toEqual([expect.objectContaining({ amountCents: 500, status: "succeeded" })]);
+    expect(i.transfer).toMatchObject({ id: t.transferId, amountCents: 2000, reversedCents: 0 });
+    p._reverseTransferForTest(t.transferId);
+    expect((await p.inspect({ intentId: a.intentId, transferId: t.transferId })).transfer?.reversedCents).toBe(2000);
+    expect((await p.inspect({ intentId: a.intentId, transferId: "tr_unknown" })).transfer).toBeNull();
+    await expect(p.inspect({ intentId: "pi_nope" })).rejects.toThrow(/Unknown/);
+  });
 });

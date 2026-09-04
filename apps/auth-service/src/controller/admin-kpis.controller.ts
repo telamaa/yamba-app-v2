@@ -21,7 +21,7 @@ export const getAdminKpis = async (req: AuthenticatedRequest, res: Response, nex
     const since30 = new Date(now.getTime() - 30 * 86_400_000);
     const opt = async <T,>(allowed: boolean, q: () => Promise<T>): Promise<T | null> => (allowed ? q() : null);
 
-    const [disputesToDecide, retentionsHeld, ticketsToVerify, hiddenTrips, hideProposals, suspensionProposals, restrictedUsers, suspendedUsers, publishedTrips, activeDeals, payoutsFailed, pendingAdminInvites, usersTotal, completedDeals30d] =
+    const [disputesToDecide, retentionsHeld, ticketsToVerify, hiddenTrips, hideProposals, suspensionProposals, restrictedUsers, suspendedUsers, publishedTrips, activeDeals, payoutsFailed, pendingAdminInvites, usersTotal, completedDeals30d, payoutsReversed] =
       await Promise.all([
         opt(can("disputes.read"), () => prisma.dispute.count({ where: { status: { in: ["OPEN", "CARRIER_RESPONDED"] } } })),
         opt(can("disputes.read"), () => prisma.booking.count({ where: { status: "CANCELLED", retentionDisposition: "HELD_FOR_MEDIATION", isDeleted: false } })),
@@ -33,12 +33,14 @@ export const getAdminKpis = async (req: AuthenticatedRequest, res: Response, nex
         opt(can("users.read"), () => prisma.user.count({ where: { accountStatus: "SUSPENDED", isDeleted: false } })),
         opt(can("trips.read"), () => prisma.trip.count({ where: { status: "PUBLISHED", isDeleted: false, departureAt: { gte: now } } })),
         opt(can("disputes.read"), () => prisma.booking.count({ where: { status: { in: ACTIVE_DEAL as never }, isDeleted: false } })),
-        opt(can("disputes.read"), () => prisma.booking.count({ where: { payoutStatus: "FAILED", isDeleted: false } })),
+        // C-PR5 (D58) — les files d'argent sont celles du profil FINANCE (finances.read)
+        opt(can("finances.read"), () => prisma.booking.count({ where: { payoutStatus: "FAILED", isDeleted: false } })),
         opt(can("admins.manage"), () => prisma.user.count({ where: { adminRole: { not: null }, OR: [{ passwordHash: null }, { passwordHash: { isSet: false } }], isDeleted: false } })),
         opt(can("users.read"), () => prisma.user.count({ where: { isDeleted: false } })),
         opt(can("disputes.read"), () => prisma.booking.count({ where: { status: "COMPLETED", completedAt: { gte: since30 }, isDeleted: false } })),
+        opt(can("finances.read"), () => prisma.booking.count({ where: { payoutStatus: "REVERSED", OR: [{ payoutReversalResolution: null }, { payoutReversalResolution: { isSet: false } }], isDeleted: false } })),
       ]);
-    const kpis: AdminHomeKpis = { disputesToDecide, retentionsHeld, ticketsToVerify, hiddenTrips, hideProposals, suspensionProposals, restrictedUsers, suspendedUsers, publishedTrips, activeDeals, payoutsFailed, pendingAdminInvites, usersTotal, completedDeals30d, generatedAt: now.toISOString() };
+    const kpis: AdminHomeKpis = { disputesToDecide, retentionsHeld, ticketsToVerify, hiddenTrips, hideProposals, suspensionProposals, restrictedUsers, suspendedUsers, publishedTrips, activeDeals, payoutsFailed, payoutsReversed, pendingAdminInvites, usersTotal, completedDeals30d, generatedAt: now.toISOString() };
     res.status(200).json(kpis);
   } catch (e) {
     next(e);

@@ -40,6 +40,7 @@ import type {
 import { RATING_WINDOW_DAYS, canPerform, type BookingStatus, type BookingTransitionAction } from "./booking-state-machine";
 import { recomputeBookingParties } from "./reputation.service";
 import { BookingLifecycleError, baseEventPayload } from "./booking-lifecycle";
+import { nextPayoutRetryAt, payoutRetryDueFilter } from "./admin-finance.rules";
 import {
   BOOKING_WRITE_SELECT,
   applyBookingTransition,
@@ -52,9 +53,10 @@ export type RequestingUser = { id: string };
 
 /* ══ Paramètres serveur (B4) ══════════════════════════════════ */
 
-/** Rejeux d'un versement FAILED par le cron (A65, décision 03/09 1B : 100) — au-delà, visible en base et dans le récapitulatif quotidien (A88).
- *  Le rejeu déclenché par `account.updated` (A87) ignore ce plafond. */
-export const PAYOUT_MAX_ATTEMPTS = 100;
+/** C-PR5 (D58, A111) — plus de plafond de rejeux : le cron rejoue quand `payoutNextRetryAt` est échu
+ *  (5 min ×6, 30 min ×6, 2 h ×12, puis quotidien — `payoutRetryDelayMs`). Un versement dû ne se tait jamais :
+ *  il part, ou reste dans la file admin « versements en échec ». Le rejeu par `account.updated` (A87) et
+ *  le rejeu manuel admin ignorent l'échéance. */
 /** Récapitulatif support (A88) : un versement FAILED plus vieux que ce délai est signalé. */
 export const OPS_DIGEST_FAILED_AFTER_HOURS = 24;
 /** Rappel J+3 : émis quand il reste ≤ 24 h avant `payoutDueAt` (A70). */
@@ -161,10 +163,18 @@ export function makeDealSettlementService(
 
   /* ── Le versement : l'exécuteur unique (A65) ─────────────────── */
 
-  async function markPayoutFailed(booking: BookingForWrite, reason: string): Promise<PayoutOutcome> {
+  async function markPayoutFailed(booking: BookingForWrite, reason: string, now: Date): Promise<PayoutOutcome> {
+    const attemptsDone = (booking.payoutAttempts ?? 0) + 1;
     await prisma.booking.updateMany({
       where: { id: booking.id, status: booking.status as never },
-      data: { payoutStatus: "FAILED", payoutFailureReason: reason, payoutAttempts: { increment: 1 } },
+      data: {
+        payoutStatus: "FAILED",
+        payoutFailureReason: reason,
+        // Lu puis écrit (pas d'`increment` : un champ ABSENT donnerait null — pitfall Prisma+Mongo)
+        payoutAttempts: attemptsDone,
+        payoutLastAttemptAt: now,
+        payoutNextRetryAt: nextPayoutRetryAt(attemptsDone, now), // A111
+      },
     });
     logger.warn({ bookingId: booking.id, reason }, "Carrier payout failed — will be retried by the payout cron");
     return { payoutStatus: "FAILED", transferId: null, reason };
@@ -200,7 +210,7 @@ export function makeDealSettlementService(
     const currencyCode = booking.pricing.currencyCode;
 
     const destination = await resolveDestination(booking);
-    if (!destination) return markPayoutFailed(booking, "CARRIER_ACCOUNT_NOT_READY");
+    if (!destination) return markPayoutFailed(booking, "CARRIER_ACCOUNT_NOT_READY", now);
 
     let transferId: string;
     try {
@@ -212,12 +222,13 @@ export function makeDealSettlementService(
         metadata: { bookingId: booking.id, tripId: booking.tripId, carrierId: booking.carrierId, reason },
         transferGroup: booking.id,
         sourceTransactionId: booking.chargeId ?? undefined, // A69
-        idempotencyKey: `payout:${booking.id}`,
+        // C-PR5 (D58) : après un renversement re-versé, l'admin a posé une nouvelle clé — sinon la clé historique (RG-PAY-04)
+        idempotencyKey: booking.payoutIdempotencyKey ?? `payout:${booking.id}`,
       });
       transferId = result.transferId;
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      return markPayoutFailed(booking, `PROVIDER_ERROR:${message}`.slice(0, 500));
+      return markPayoutFailed(booking, `PROVIDER_ERROR:${message}`.slice(0, 500), now);
     }
 
     try {
@@ -232,6 +243,8 @@ export function makeDealSettlementService(
           payoutAmountCents: amountCents,
           payoutAttempts: (booking.payoutAttempts ?? 0) + 1,
           payoutFailureReason: null,
+          payoutLastAttemptAt: now,
+          payoutNextRetryAt: null,
         },
         releaseKg: false,
         events: [
@@ -385,7 +398,7 @@ export function makeDealSettlementService(
           status: { in: ["COMPLETED", "CANCELLED"] },
           isDeleted: false,
           payoutStatus: { in: ["PENDING", "FAILED"] },
-          payoutAttempts: { lt: PAYOUT_MAX_ATTEMPTS },
+          ...payoutRetryDueFilter(now), // A111 — échéance posée à l'échec précédent
         },
         select: BOOKING_WRITE_SELECT,
         take: batchSize,
@@ -477,7 +490,8 @@ export function makeDealSettlementService(
     async markTransferReversed(transferId: string): Promise<boolean> {
       const written = await prisma.booking.updateMany({
         where: { transferId, payoutStatus: "SENT" },
-        data: { payoutStatus: "REVERSED", payoutFailureReason: "PROVIDER_REVERSED" },
+        // C-PR5 : la clôture (RESENT / WRITTEN_OFF) est posée à null explicitement — les lecteurs filtrent « absent OU null »
+        data: { payoutStatus: "REVERSED", payoutFailureReason: "PROVIDER_REVERSED", payoutReversalResolution: null, payoutReversalResolvedAt: null },
       });
       if (written.count > 0) logger.warn({ transferId }, "Stripe transfer reversed — payout marked REVERSED (admin review)");
       return written.count > 0;
@@ -497,7 +511,7 @@ export function makeDealSettlementService(
         prisma.booking.findMany({ where: { isDeleted: false, ...where } as never, select: BOOKING_WRITE_SELECT, take: 100, orderBy: { updatedAt: "asc" } });
       const [failed, reversed, held] = await Promise.all([
         load({ status: { in: ["COMPLETED", "CANCELLED"] }, payoutStatus: "FAILED", updatedAt: { lt: since } }),
-        load({ payoutStatus: "REVERSED" }),
+        load({ payoutStatus: "REVERSED", OR: [{ payoutReversalResolution: { isSet: false } }, { payoutReversalResolution: null }] }),
         load({ status: "CANCELLED", retentionDisposition: "HELD_FOR_MEDIATION" }),
       ]);
       const conv = (rows: unknown[]) => rows.map((r) => toBookingForWrite(r as Record<string, unknown>));

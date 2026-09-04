@@ -257,6 +257,7 @@ export function makeDealLifecycleService(
       const wasAccepted = effects.includes("REFUND_PER_CANCELLATION_POLICY");
 
       let refundAmountCents: number;
+      let refundId: string | null = null; // C-PR5 (D58)
       // D50 (A79–A81) — la retenue ANN-01 et son sort.
       let retention: {
         retentionCents: number;
@@ -275,7 +276,7 @@ export function makeDealLifecycleService(
           throw new BookingLifecycleError("PAYMENT_STATE_CONFLICT", "This deal has no payment to refund.");
         }
         try {
-          await provider.refund(booking.paymentIntentId, refundAmountCents);
+          refundId = (await provider.refund(booking.paymentIntentId, refundAmountCents)).refundId;
         } catch {
           throw new BookingLifecycleError("PAYMENT_STATE_CONFLICT", "The refund could not be issued.");
         }
@@ -312,6 +313,7 @@ export function makeDealLifecycleService(
           cancelReason: input.reason ?? null,
           refundedAt: now,
           refundAmountCents,
+          ...(refundId ? { refundId } : {}),
           ...(retention
             ? {
                 retentionCents: retention.retentionCents,
