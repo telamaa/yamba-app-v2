@@ -51,6 +51,8 @@ export const ADMIN_ACTIONS = [
   "DEAL_HISTORY_VIEWED",
   // C-PR6c (D60)
   "PILOTAGE_DRILLDOWN_VIEWED",
+  // C-PR7a (D60 2A)
+  "EXPORTED",
 ] as const;
 export type AdminActionType = (typeof ADMIN_ACTIONS)[number];
 

@@ -159,3 +159,22 @@ describe("admin-dispute.service — mapper pur (C-PR1)", () => {
     expect(file).toMatchObject({ kind: "RETENTION", dispute: null, pickup: null, money: { retentionCents: 2550, retentionDisposition: "HELD_FOR_MEDIATION" } });
   });
 });
+
+describe("C-PR7a (D60 2A) — filterQueueItems (pur)", () => {
+  const { filterQueueItems } = jest.requireActual("./admin-dispute.service") as typeof import("./admin-dispute.service");
+  const now = new Date("2026-09-04T10:00:00Z");
+  const it0 = (o: Partial<import("@packages/api-contracts").ArbitrationQueueItem>): import("@packages/api-contracts").ArbitrationQueueItem => ({
+    bookingId: "64b0000000000000000000b1", kind: "DISPUTE", ticketNumber: "YAM-1234", category: "NOT_DELIVERED", openedAt: "2026-08-28T10:00:00.000Z", originCity: "Paris", destinationCity: "Brazzaville",
+    amountCents: 2957, currencyCode: "EUR", shipperFirstName: "A", carrierFirstName: "T", carrierResponded: true, decidableAt: "2026-08-28T10:00:00.000Z", ...o,
+  });
+  it("type, villes (accents et casse ignorés), âge, décidable maintenant", () => {
+    const items = [it0({}), it0({ bookingId: "64b0000000000000000000b2", kind: "RETENTION", ticketNumber: null, category: null, openedAt: "2026-09-03T10:00:00.000Z", destinationCity: "Pointe-Noire", decidableAt: "2026-09-10T10:00:00.000Z" })];
+    expect(filterQueueItems(items, { kind: "RETENTION" }, now).map((i) => i.bookingId)).toEqual(["64b0000000000000000000b2"]);
+    expect(filterQueueItems(items, { destinationCity: "brazzaville" }, now)).toHaveLength(1);
+    expect(filterQueueItems(items, { originCity: "PÁRIS" }, now)).toHaveLength(2);
+    expect(filterQueueItems(items, { olderThanDays: 3 }, now)).toHaveLength(1);
+    expect(filterQueueItems(items, { decidable: "1" }, now).map((i) => i.kind)).toEqual(["DISPUTE"]);
+    expect(filterQueueItems(items, { decidable: "0" }, now).map((i) => i.kind)).toEqual(["RETENTION"]);
+    expect(filterQueueItems(items, {}, now)).toHaveLength(2);
+  });
+});

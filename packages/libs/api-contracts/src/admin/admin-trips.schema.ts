@@ -27,7 +27,40 @@ export const AdminTripSummarySchema = z
   })
   .meta({ id: "AdminTripSummary" });
 export type AdminTripSummary = z.infer<typeof AdminTripSummarySchema>;
-export const AdminTripsResponseSchema = z.object({ items: z.array(AdminTripSummarySchema), total: z.number().int() }).meta({ id: "AdminTripsResponse" });
+export const AdminTripsResponseSchema = z
+  .object({ items: z.array(AdminTripSummarySchema), total: z.number().int(), nextCursor: z.string().nullable().optional().meta({ description: "C-PR7a — id du dernier élément ; absent = fin" }) })
+  .meta({ id: "AdminTripsResponse" });
+
+/* ── C-PR7a (D60 2A) — filtres serveur ── */
+export const AdminTripsQuerySchema = z
+  .object({
+    q: z.string().trim().max(120).optional(),
+    status: z.string().trim().max(20).optional(),
+    hidden: z.enum(["1", "0"]).optional(),
+    ticketPending: z.enum(["1", "0"]).optional(),
+    hideProposed: z.enum(["1", "0"]).optional(),
+    carrierId: ObjectIdSchema.optional(),
+    from: z.string().datetime().optional(),
+    to: z.string().datetime().optional(),
+    originCity: z.string().trim().max(80).optional(),
+    destinationCity: z.string().trim().max(80).optional(),
+    sort: z.enum(["departureAt", "publishedAt", "createdAt"]).default("departureAt"),
+    dir: z.enum(["asc", "desc"]).default("desc"),
+    cursor: ObjectIdSchema.optional(),
+    limit: z.coerce.number().int().min(1).max(100).default(50),
+  })
+  .meta({ id: "AdminTripsQuery" });
+export type AdminTripsQuery = z.infer<typeof AdminTripsQuerySchema>;
+export const TicketQueueQuerySchema = z
+  .object({
+    originCity: z.string().trim().max(80).optional(),
+    destinationCity: z.string().trim().max(80).optional(),
+    submittedFrom: z.string().datetime().optional(),
+    submittedTo: z.string().datetime().optional(),
+    olderThanDays: z.coerce.number().int().min(0).max(365).optional(),
+  })
+  .meta({ id: "TicketQueueQuery" });
+export type TicketQueueQuery = z.infer<typeof TicketQueueQuerySchema>;
 export type AdminTripsResponse = z.infer<typeof AdminTripsResponseSchema>;
 
 export const AdminTripFileSchema = z

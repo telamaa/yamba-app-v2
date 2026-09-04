@@ -1297,3 +1297,23 @@ Savoir chaque semaine si Yamba avance (inscriptions, trajets, demandes, livraiso
 | ADM34 | Ajouter Médiateur au compte Support + Finance, se reconnecter | Le formulaire de décision apparaît sur un litige ; libellé « Médiateur + Support + Finance » |
 | ADM35 | `grant-admin.ts <email> --roles MEDIATOR,FINANCE` | Profils posés, `adminRole` = Médiateur (principal), `adminRoles` = [Médiateur, Finance] |
 | ADM36 | Compte d'avant C-PR3bis (sans liste), avant et après `backfill-admin-roles.ts` | Fonctionne dans les deux cas ; après reprise, la liste est visible et exacte |
+
+# C-PR7a — filtrer, trier, exporter — et savoir qui a exporté quoi
+
+### Règles de gestion (ADM, suite)
+- **RG-ADM-30 — Chaque liste admin se filtre côté serveur** (utilisateurs : rôle, état du compte, statut Voyageur, compte Stripe prêt, période d'inscription ; trajets : villes, statut, masqués, masquage proposé, billet à vérifier, Voyageur, période de départ ; billets : villes, période de dépôt, âge ; à arbitrer : type, villes, âge, décidables maintenant), se trie et se charge par pages. Une recherche par identifiant de deal ou ticket renvoie les deux parties, sans autre filtre.
+- **RG-ADM-31 — Un export est un fichier CSV des lignes filtrées, borné à 5 000, journalisé** (domaine, filtres, nombre de lignes, qui, quand).
+- **RG-ADM-32 — Les exports de trajets, billets et dossiers ne portent ni email ni téléphone** : identifiants seulement. Finance et Médiateur les téléchargent.
+- **RG-ADM-33 — L'export des utilisateurs est nominatif : super administrateur seul, motif de 20 caractères au moins écrit au journal.** Le tableur ne peut pas exécuter une formule glissée dans une cellule (préfixes neutralisés).
+
+### Recette (ADM, suite)
+| # | Scénario | Attendu |
+|---|---|---|
+| ADM37 | Utilisateurs : rôle Voyageur + Stripe prêt + tri nom A→Z | Liste filtrée, total affiché, « Charger la suite » si plus de 50 |
+| ADM38 | Utilisateurs : « YAM-… » avec des filtres actifs | Les deux parties du dossier, filtres ignorés |
+| ADM39 | Finance : bouton d'export sur Utilisateurs | Absent (données personnelles) ; présent sur Trajets, Billets, À arbitrer → fichier téléchargé, journal « Export CSV » avec les filtres et le nombre de lignes |
+| ADM40 | Super admin : export Utilisateurs sans motif / motif court | Bouton « Télécharger » inactif ; avec 20 caractères → fichier avec email et téléphone, journal avec le motif |
+| ADM41 | Ouvrir un export dans Excel | Accents corrects ; une cellule commençant par « = » ne s'exécute pas |
+| ADM42 | Trajets : origine « Paris », départ du 1er au 30, « masquage proposé » | Liste et export cohérents (mêmes filtres) ; le CSV n'a pas d'email |
+| ADM43 | Billets : « déposé il y a + de 3 j » | Seuls les billets anciens ; export identique |
+| ADM44 | À arbitrer : « décidables maintenant » | Seuls les dossiers tranchables ; compteurs de la file entière inchangés |

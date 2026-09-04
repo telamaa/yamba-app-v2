@@ -6,14 +6,13 @@
  * livraison, identifiants Stripe complets).
  */
 import prisma from "@packages/libs/prisma";
-import { adminRolesOf } from "@packages/api-contracts";
+import { adminRolesOf, type AdminUsersQuery } from "@packages/api-contracts";
+import { OID, TICKET, USERS_CSV_COLUMNS, buildUsersOrderBy, buildUsersWhere } from "../lib/admin-users.query";
 import redis from "@packages/libs/redis";
 import { NotFoundError } from "@packages/error-handler";
 import type { AdminUserFile, AdminUserSummary, AdminUsersResponse } from "@packages/api-contracts";
 
 const ACTIVE_DEAL = ["ACCEPTED", "PICKED_UP", "DELIVERED", "DISPUTED"];
-const OID = /^[a-f0-9]{24}$/i;
-const TICKET = /^YAM-\d{4,}$/i;
 
 function maskStripe(id: string | null | undefined): string | null {
   if (!id) return null;
@@ -78,6 +77,41 @@ function toSummary(u: SummaryRow, matchedOn: string | null): AdminUserSummary {
 
 export function makeAdminUsersService() {
   return {
+    /* ── C-PR7a (D60 2A) — recherche poussée : filtres serveur, tri, curseur ── */
+    async searchAdvanced(q: AdminUsersQuery): Promise<AdminUsersResponse> {
+      const term = (q.q ?? "").trim();
+      // Identifiant de deal ou ticket : les deux parties (comme la recherche simple), filtres ignorés
+      if (OID.test(term) || TICKET.test(term)) return this.search(term, q.limit);
+      const where = buildUsersWhere(q);
+      const [rows, total] = await Promise.all([
+        prisma.user.findMany({ where: where as never, orderBy: buildUsersOrderBy(q) as never, take: q.limit + 1, ...(q.cursor ? { cursor: { id: q.cursor }, skip: 1 } : {}), select: summarySelect }),
+        prisma.user.count({ where: where as never }),
+      ]);
+      const hasNext = rows.length > q.limit;
+      const page = hasNext ? rows.slice(0, q.limit) : rows;
+      const lower = term.toLowerCase();
+      return {
+        items: page.map((r) => toSummary(r as SummaryRow, term ? (r.email.toLowerCase().includes(lower) ? "email" : "name") : null)),
+        total,
+        nextCursor: hasNext ? page[page.length - 1].id : null,
+      };
+    },
+
+    /** Export CSV des utilisateurs (données personnelles) — SUPER_ADMIN seul, motif ≥ 20, journalisé par le contrôleur. Borné à 5 000 lignes. */
+    async exportRows(q: AdminUsersQuery): Promise<Array<Record<(typeof USERS_CSV_COLUMNS)[number], unknown>>> {
+      const rows = await prisma.user.findMany({
+        where: buildUsersWhere(q) as never,
+        orderBy: buildUsersOrderBy(q) as never,
+        take: 5000,
+        select: { ...summarySelect, suspendedAt: true, suspensionUntil: true, carrierPage: { select: { stripePayoutsEnabled: true } } },
+      });
+      return rows.map((u) => ({
+        id: u.id, firstName: u.firstName, lastName: u.lastName, email: u.email, phoneE164: u.phoneE164, roles: u.roles,
+        adminRoles: adminRolesOf(u as { adminRole?: string | null; adminRoles?: string[] | null }), accountStatus: u.accountStatus, carrierStatus: u.carrierStatus,
+        stripeReady: !!u.carrierPage?.stripePayoutsEnabled, suspendedAt: u.suspendedAt, suspensionUntil: u.suspensionUntil, createdAt: u.createdAt,
+      }));
+    },
+
     /** Recherche (5A) : email, prénom, nom, téléphone, identifiant de deal, ticket YAM. */
     async search(q: string, limit = 50): Promise<AdminUsersResponse> {
       const term = q.trim();

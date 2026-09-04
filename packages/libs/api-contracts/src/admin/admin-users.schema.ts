@@ -37,6 +37,9 @@ export const ADMIN_PERMISSIONS = {
   // C-PR6 (D59 7A)
   "pilotage.read": ["FINANCE", "MEDIATOR"],
   "deals.history.read": ["MEDIATOR", "SUPPORT", "FINANCE"],
+  // C-PR7a (D60 2A) — exports : opérationnels (sans email ni téléphone) vs personnels (SUPER_ADMIN seul, motif au journal)
+  "exports.operational": ["FINANCE", "MEDIATOR"],
+  "exports.personal": [],
 } as const;
 export type AdminPermission = keyof typeof ADMIN_PERMISSIONS;
 
@@ -93,7 +96,28 @@ export const AdminUserSummarySchema = z
   .meta({ id: "AdminUserSummary" });
 export type AdminUserSummary = z.infer<typeof AdminUserSummarySchema>;
 
-export const AdminUsersResponseSchema = z.object({ items: z.array(AdminUserSummarySchema), total: z.number().int() }).meta({ id: "AdminUsersResponse" });
+export const AdminUsersResponseSchema = z
+  .object({ items: z.array(AdminUserSummarySchema), total: z.number().int(), nextCursor: z.string().nullable().optional().meta({ description: "C-PR7a — id du dernier élément ; absent = fin" }) })
+  .meta({ id: "AdminUsersResponse" });
+
+/* ── C-PR7a (D60 2A) — recherche poussée des utilisateurs ── */
+export const EXPORT_REASON_MIN_LENGTH = 20;
+export const AdminUsersQuerySchema = z
+  .object({
+    q: z.string().trim().max(120).optional(),
+    role: z.enum(["SHIPPER", "CARRIER", "ADMIN"]).optional(),
+    accountStatus: AccountStatusSchema.optional(),
+    carrierStatus: z.string().trim().max(40).optional(),
+    stripeReady: z.enum(["1", "0"]).optional().meta({ description: "1 = compte Connect avec virements activés" }),
+    createdFrom: z.string().datetime().optional(),
+    createdTo: z.string().datetime().optional(),
+    sort: z.enum(["createdAt", "lastName"]).default("createdAt"),
+    dir: z.enum(["asc", "desc"]).default("desc"),
+    cursor: ObjectIdSchema.optional(),
+    limit: z.coerce.number().int().min(1).max(100).default(50),
+  })
+  .meta({ id: "AdminUsersQuery" });
+export type AdminUsersQuery = z.infer<typeof AdminUsersQuerySchema>;
 export type AdminUsersResponse = z.infer<typeof AdminUsersResponseSchema>;
 
 const DealLineSchema = z.object({

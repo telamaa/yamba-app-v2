@@ -68,4 +68,6 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}, opts: { 
 export const post = <T>(path: string, body?: unknown, opts?: { auth?: boolean }) =>
   apiFetch<T>(path, { method: "POST", body: body === undefined ? undefined : JSON.stringify(body) }, opts);
 export const patch = <T>(path: string, body?: unknown) => apiFetch<T>(path, { method: "PATCH", body: body === undefined ? undefined : JSON.stringify(body) });
+/** URL absolue d'un endpoint (téléchargements : le cookie admin suit par le proxy /api). */
+export const apiUrl = (path: string) => `${API_BASE}${path}`;
 export const del = <T>(path: string, body?: unknown) => apiFetch<T>(path, { method: "DELETE", body: body === undefined ? undefined : JSON.stringify(body) });

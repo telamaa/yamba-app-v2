@@ -126,7 +126,7 @@ export type AdminUserSummary = {
   createdAt: string;
   matchedOn: string | null;
 };
-export type AdminUsersResponse = { items: AdminUserSummary[]; total: number };
+export type AdminUsersResponse = { items: AdminUserSummary[]; total: number; nextCursor?: string | null };
 export type ReputationFacts = { reputationLevel: string | null; ratingsAvg: number; ratingsCount: number; completedDealsCount: number; lateCancellationsCount: number; disputesLostCount: number };
 export type AdminUserFile = {
   id: string;
@@ -176,7 +176,7 @@ export type AdminTripSummary = {
   carrier: { id: string; firstName: string; lastName: string; accountStatus: string };
   ticketVerificationStatus: string; hidden: boolean; hideProposed: boolean; activeBookingsCount: number; publishedAt: string | null;
 };
-export type AdminTripsResponse = { items: AdminTripSummary[]; total: number };
+export type AdminTripsResponse = { items: AdminTripSummary[]; total: number; nextCursor?: string | null };
 export type AdminTripFile = {
   id: string; status: string; originCity: string; destinationCity: string; departureAt: string | null; arrivalAt: string | null; transportMode: string | null;
   capacityKg: number | null; reservedKg: number | null; pricing: unknown; createdAt: string; publishedAt: string | null; cancelledAt: string | null;

@@ -160,3 +160,15 @@ export const AdminResolutionResponseSchema = z
   })
   .meta({ id: "AdminResolutionResponse" });
 export type AdminResolutionResponse = z.infer<typeof AdminResolutionResponseSchema>;
+
+/* ── C-PR7a (D60 2A) — filtres de la file « à arbitrer » ── */
+export const ArbitrationQueueQuerySchema = z
+  .object({
+    kind: ArbitrationKindSchema.optional(),
+    originCity: z.string().trim().max(80).optional(),
+    destinationCity: z.string().trim().max(80).optional(),
+    olderThanDays: z.coerce.number().int().min(0).max(365).optional(),
+    decidable: z.enum(["1", "0"]).optional().meta({ description: "1 = décision possible maintenant" }),
+  })
+  .meta({ id: "ArbitrationQueueQuery" });
+export type ArbitrationQueueQuery = z.infer<typeof ArbitrationQueueQuerySchema>;

@@ -116,6 +116,7 @@ router.get("/me/wallet", isAuthenticated, getMyWallet);
 // ── Chantier C (D54) : file « à arbitrer » + dossier, ADMIN + 2FA seulement ──
 const adminDisputes = makeAdminDisputeController(makeAdminDisputeService());
 router.get("/admin/disputes", isAdminAuthenticated, requireAdminPermission("disputes.read"), adminDisputes.listQueue);
+router.get("/admin/disputes/export", isAdminAuthenticated, requireAdminPermission("exports.operational"), adminDisputes.exportCsv); // C-PR7a (D60 2A) — avant /:id
 router.get("/admin/disputes/:id", isAdminAuthenticated, requireAdminPermission("disputes.read"), adminDisputes.getFile);
 router.post("/admin/disputes/:id/resolve", isAdminAuthenticated, requireAdminPermission("disputes.decide"), dealMediation.resolveDispute);
 router.post("/admin/disputes/:id/retention", isAdminAuthenticated, requireAdminPermission("disputes.decide"), dealMediation.resolveRetention);
