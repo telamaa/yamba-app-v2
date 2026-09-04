@@ -297,7 +297,8 @@ Ordre de demarrage : auth -> trip -> gateway.
 - 04/09 : C-PR2 feat/c2-mediation (D55, A102–A104, decisions 1A–7A) — version du
   Voyageur dans l'app (72 h), decisions rejet/partiel/total + retenue, argent
   remboursement puis executeur, pas de note apres mediation, ecrans des deux roles,
-  admin-ui decision, seed bzv-held. Suite : C-PR3 signalements.
+  admin-ui decision, seed bzv-held. Mergee #153. Suite : C-PR3 (a trancher :
+  users / trajets / finances / KPI demandes par l'utilisateur le 04/09).
 - Plateforme de tests : 716 (trip 198, deal 440, notification 78) + auth 80.
 - (historique) Plateforme de tests : 600 (trip 187, deal 354, notification 59) — post-B3 (#96).
 - MERGE 01/09 : toute la pile B2 est dans `dev` via la SEULE **PR #90**
