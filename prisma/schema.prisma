@@ -929,6 +929,106 @@ model OutboxEvent {
 // tick, expiration = reprenable par une autre instance. Permet le
 // scaling horizontal du deal-service sans double publication.
 
+/// Chantier F (D61) — coordination Expéditeur ↔ Voyageur : UNE conversation par deal.
+model Conversation {
+  id        String @id @default(auto()) @map("_id") @db.ObjectId
+  bookingId String @unique @db.ObjectId
+  shipperId String @db.ObjectId
+  carrierId String @db.ObjectId
+
+  lastMessageAt     DateTime?
+  shipperLastReadAt DateTime?
+  carrierLastReadAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  messages Message[]
+  meetups  Meetup[]
+
+  @@index([shipperId, lastMessageAt])
+  @@index([carrierId, lastMessageAt])
+}
+
+/// Un message du fil : texte d'une partie, message SYSTÈME (état du deal), ou trace d'un rendez-vous.
+model Message {
+  id             String       @id @default(auto()) @map("_id") @db.ObjectId
+  conversationId String       @db.ObjectId
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  kind       MessageKind @default(TEXT)
+  authorId   String?     @db.ObjectId // null pour SYSTEM
+  authorRole String // SHIPPER | CARRIER | SYSTEM
+  body       String
+  photoUrls  String[]    @default([])
+
+  /// Message SYSTEM / MEETUP : clé i18n + données, jamais du texte figé (D44)
+  systemKey  String?
+  systemData Json?
+
+  /// D61 5A — coordonnées détectées : on avertit sans bloquer, l'admin le voit dans le dossier
+  flaggedContact Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
+  @@index([conversationId, createdAt])
+}
+
+/// D61 1A — le rendez-vous est un OBJET, pas une conversation : proposé, accepté, contre-proposé.
+model Meetup {
+  id             String       @id @default(auto()) @map("_id") @db.ObjectId
+  conversationId String       @db.ObjectId
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  bookingId      String       @db.ObjectId
+
+  kind           MeetupKind
+  status         MeetupStatus @default(PROPOSED)
+  proposedByRole String // SHIPPER | CARRIER
+  proposedById   String       @db.ObjectId
+
+  placeLabel   String
+  placeDetails String?
+  startAt      DateTime
+  endAt        DateTime
+
+  acceptedAt  DateTime?
+  cancelledAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([conversationId, kind, status])
+  @@index([bookingId])
+}
+
+/// D61 4A — le numéro se révèle tard, entre les deux parties, et la révélation est tracée.
+model PhoneReveal {
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  conversationId String   @db.ObjectId
+  bookingId      String   @db.ObjectId
+  revealedToId   String   @db.ObjectId
+  revealedUserId String   @db.ObjectId
+  revealedAt     DateTime @default(now())
+
+  @@unique([conversationId, revealedToId])
+}
+
+enum MessageKind {
+  TEXT
+  SYSTEM
+  MEETUP
+}
+
+enum MeetupKind {
+  PICKUP
+  DELIVERY
+}
+
+enum MeetupStatus {
+  PROPOSED
+  ACCEPTED
+  CANCELLED
+}
+
 model RelayLease {
   id        String   @id @map("_id") // clé fixe : "outbox-relay" (un doc par relay)
   owner     String // identité d'instance : hostname#pid#uuid

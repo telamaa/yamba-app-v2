@@ -1,15 +1,35 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "Yamba Notification Service API",
-    "version": "0.1.0",
-    "description": "In-app notification inbox — materialized from booking-events (D2, A25/A27). Whitelist DTOs (A13)."
+    "title": "Yamba Message Service API",
+    "version": "1.0.0",
+    "description": "Coordination between shipper and carrier (chantier F, D61). One conversation per deal, opened at acceptance. The MEETING is an object (proposed / accepted), not a thread of messages; the thread carries the rest. The delivery code never travels (D43): a message containing it is refused. Contact details are detected and flagged, never blocked. The counterpart's phone number opens at most 2 hours before the pickup meeting, and every reveal is recorded."
   },
+  "servers": [
+    {
+      "url": "http://localhost:8080/api",
+      "description": "API Gateway (dev)"
+    },
+    {
+      "url": "http://localhost:6005",
+      "description": "message-service direct (debug)"
+    }
+  ],
+  "tags": [
+    {
+      "name": "messages",
+      "description": "Conversation, meetings and phone reveal (auth required, parties only)"
+    }
+  ],
   "paths": {
-    "/me/notifications": {
+    "/messages/conversations": {
       "get": {
-        "summary": "My notifications (latest first) with unread count",
-        "operationId": "listMyNotifications",
+        "tags": [
+          "messages"
+        ],
+        "summary": "My conversations, most active first",
+        "description": "Unread count per conversation, next meeting (accepted one first, otherwise the latest proposal) and write access.",
+        "operationId": "listConversations",
         "security": [
           {
             "cookieAuth": []
@@ -20,11 +40,11 @@
         ],
         "responses": {
           "200": {
-            "description": "Latest 50 notifications + unreadCount",
+            "description": "Conversations",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/MyNotificationsResponse"
+                  "$ref": "#/components/schemas/ConversationListResponse"
                 }
               }
             }
@@ -52,10 +72,14 @@
         }
       }
     },
-    "/me/notifications/read-all": {
-      "patch": {
-        "summary": "Mark ALL my notifications as read (idempotent — A91)",
-        "operationId": "markAllNotificationsRead",
+    "/messages/conversations/by-deal/{bookingId}": {
+      "get": {
+        "tags": [
+          "messages"
+        ],
+        "summary": "The thread of a deal, created on first access (D61 2A)",
+        "description": "The conversation exists from ACCEPTED onwards. Before that: 403 — the request already carries a message.",
+        "operationId": "getConversationByDeal",
         "security": [
           {
             "cookieAuth": []
@@ -64,13 +88,23 @@
             "bearerAuth": []
           }
         ],
+        "parameters": [
+          {
+            "name": "bookingId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ObjectId"
+            }
+          }
+        ],
         "responses": {
           "200": {
-            "description": "How many were unread",
+            "description": "Thread",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/MarkAllNotificationsReadResponse"
+                  "$ref": "#/components/schemas/ConversationThreadResponse"
                 }
               }
             }
@@ -81,6 +115,26 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/UnauthorizedResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated but not a party to this deal, or the deal has no conversation yet (ForbiddenError)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Conversation, deal or meeting not found (NotFoundError)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -98,10 +152,14 @@
         }
       }
     },
-    "/me/notifications/{id}/read": {
-      "patch": {
-        "summary": "Mark one notification as read (idempotent)",
-        "operationId": "markNotificationRead",
+    "/messages/conversations/{id}": {
+      "get": {
+        "tags": [
+          "messages"
+        ],
+        "summary": "The thread, oldest to newest, paginated backwards",
+        "description": "`cursor` loads OLDER messages. Includes meetings and the phone state (revealed, opensAt).",
+        "operationId": "getConversationThread",
         "security": [
           {
             "cookieAuth": []
@@ -118,22 +176,122 @@
             "schema": {
               "$ref": "#/components/schemas/ObjectId"
             },
-            "description": "Notification id"
+            "description": "Conversation id"
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/ObjectId"
+            },
+            "description": "Oldest message already loaded"
           }
         ],
         "responses": {
           "200": {
-            "description": "The updated notification",
+            "description": "Thread",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/MarkNotificationReadResponse"
+                  "$ref": "#/components/schemas/ConversationThreadResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token (isAuthenticated middleware)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated but not a party to this deal, or the deal has no conversation yet (ForbiddenError)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Conversation, deal or meeting not found (NotFoundError)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unhandled server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnhandledError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/messages/conversations/{id}/messages": {
+      "post": {
+        "tags": [
+          "messages"
+        ],
+        "summary": "Post a message (D61 3A / 4A / 5A)",
+        "description": "Text up to 2000 chars plus up to 5 photos. REFUSED (400 DELIVERY_CODE_IN_MESSAGE) when a six-digit group matches the deal's delivery code hash (D43). Contact details (email, phone) are detected and flagged on the message, never blocked. Read-only while a dispute is open and 14 days after the deal ends. One transaction: message + conversation timestamp + outbox event (D2).",
+        "operationId": "postMessage",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ObjectId"
+            },
+            "description": "Conversation id"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PostMessageRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Posted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
                 }
               }
             }
           },
           "400": {
-            "description": "Malformed notification id (ValidationError)",
+            "description": "Invalid request: empty message, bad slot, delivery code in the body (ValidationError)",
             "content": {
               "application/json": {
                 "schema": {
@@ -153,7 +311,7 @@
             }
           },
           "403": {
-            "description": "Authenticated but not the recipient (ForbiddenError — A21)",
+            "description": "Authenticated but not a party to this deal, or the deal has no conversation yet (ForbiddenError)",
             "content": {
               "application/json": {
                 "schema": {
@@ -163,11 +321,441 @@
             }
           },
           "404": {
-            "description": "Notification not found (NotFoundError)",
+            "description": "Conversation, deal or meeting not found (NotFoundError)",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unhandled server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnhandledError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/messages/conversations/{id}/read": {
+      "post": {
+        "tags": [
+          "messages"
+        ],
+        "summary": "Mark the thread as read",
+        "operationId": "markConversationRead",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ObjectId"
+            },
+            "description": "Conversation id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Read",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "readAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "readAt"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token (isAuthenticated middleware)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated but not a party to this deal, or the deal has no conversation yet (ForbiddenError)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Conversation, deal or meeting not found (NotFoundError)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unhandled server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnhandledError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/messages/conversations/{id}/meetups": {
+      "post": {
+        "tags": [
+          "messages"
+        ],
+        "summary": "Propose a meeting (D61 1A) — the meeting is an object, not a conversation",
+        "description": "Place and slot: at least 30 minutes ahead, at most 90 days, window up to 12 hours. A new proposal of the same kind replaces the open one (counter-proposal).",
+        "operationId": "proposeMeetup",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ObjectId"
+            },
+            "description": "Conversation id"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProposeMeetupRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Proposed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Meetup"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request: empty message, bad slot, delivery code in the body (ValidationError)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token (isAuthenticated middleware)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated but not a party to this deal, or the deal has no conversation yet (ForbiddenError)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Conversation, deal or meeting not found (NotFoundError)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unhandled server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnhandledError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/messages/conversations/{id}/meetups/{meetupId}/accept": {
+      "post": {
+        "tags": [
+          "messages"
+        ],
+        "summary": "Accept a meeting — the other party only",
+        "description": "Optimistic guard on PROPOSED: a concurrent change answers 400 rather than overwriting.",
+        "operationId": "acceptMeetup",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ObjectId"
+            },
+            "description": "Conversation id"
+          },
+          {
+            "name": "meetupId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ObjectId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Meetup"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request: empty message, bad slot, delivery code in the body (ValidationError)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token (isAuthenticated middleware)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated but not a party to this deal, or the deal has no conversation yet (ForbiddenError)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Conversation, deal or meeting not found (NotFoundError)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unhandled server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnhandledError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/messages/conversations/{id}/phone": {
+      "post": {
+        "tags": [
+          "messages"
+        ],
+        "summary": "Reveal the counterpart's phone number (D61 4A)",
+        "description": "Opens at most 2 hours before the accepted PICKUP meeting, otherwise before the trip departure. Recorded once per reader (PhoneReveal) and written in the thread as a system message. Rather than letting both parties trade numbers in the thread, the platform opens it late and keeps the trace.",
+        "operationId": "revealCounterpartPhone",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ObjectId"
+            },
+            "description": "Conversation id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Revealed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevealPhoneResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request: empty message, bad slot, delivery code in the body (ValidationError)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token (isAuthenticated middleware)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated but not a party to this deal, or the deal has no conversation yet (ForbiddenError)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Conversation, deal or meeting not found (NotFoundError)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unhandled server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnhandledError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/messages/quick-replies": {
+      "get": {
+        "tags": [
+          "messages"
+        ],
+        "summary": "Quick replies in the reader's language (D61 2A)",
+        "description": "Same keys in every locale; the client sends the text as an ordinary message.",
+        "operationId": "listQuickReplies",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Quick replies",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuickRepliesResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token (isAuthenticated middleware)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedResponse"
                 }
               }
             }
@@ -17264,7 +17852,7 @@
         "type": "apiKey",
         "in": "cookie",
         "name": "access_token",
-        "description": "Access JWT in cookie — takes precedence over bearer (extractToken)"
+        "description": "Access JWT in cookie — takes precedence over bearer"
       },
       "bearerAuth": {
         "type": "http",

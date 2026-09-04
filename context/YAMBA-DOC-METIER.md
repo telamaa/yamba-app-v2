@@ -1317,3 +1317,32 @@ Savoir chaque semaine si Yamba avance (inscriptions, trajets, demandes, livraiso
 | ADM42 | Trajets : origine « Paris », départ du 1er au 30, « masquage proposé » | Liste et export cohérents (mêmes filtres) ; le CSV n'a pas d'email |
 | ADM43 | Billets : « déposé il y a + de 3 j » | Seuls les billets anciens ; export identique |
 | ADM44 | À arbitrer : « décidables maintenant » | Seuls les dossiers tranchables ; compteurs de la file entière inchangés |
+
+# F-PR1 — se retrouver, pas seulement s'écrire
+
+## Le besoin
+Après l'acceptation, deux inconnus doivent se retrouver deux fois : pour la remise et pour la livraison. Souvent dans un aéroport, parfois sans données mobiles à l'arrivée. Un fil de discussion seul transfère toute la charge sur eux et produit vingt messages pour fixer un rendez-vous. Yamba structure d'abord le rendez-vous, garde le fil pour le reste, et ouvre le téléphone au bon moment.
+
+### Règles de gestion (FCH)
+- **RG-FCH-01 — Un fil par deal, ouvert à l'acceptation.** Avant, la demande porte déjà un message. Un tiers n'y accède jamais.
+- **RG-FCH-02 — Le rendez-vous est un objet, pas une phrase** : lieu, créneau, proposé par l'un, accepté par l'autre. Une nouvelle proposition du même type remplace la précédente. On n'accepte pas sa propre proposition. Chaque geste laisse une trace dans le fil.
+- **RG-FCH-03 — Un créneau se propose au moins 30 minutes à l'avance**, au plus 90 jours, et dure au maximum 12 heures.
+- **RG-FCH-04 — Le code de livraison ne s'écrit jamais** : un message qui le contient est refusé, avec l'explication. Se donne en main propre, jamais par écrit.
+- **RG-FCH-05 — Les coordonnées sont repérées, jamais bloquées** : le message part, il est signalé pour l'équipe.
+- **RG-FCH-06 — Le numéro de l'autre partie s'ouvre au plus tôt deux heures avant le rendez-vous de remise** (à défaut, avant le départ du trajet), une seule fois, et la révélation est écrite dans le fil.
+- **RG-FCH-07 — Pendant un litige, le fil passe en lecture seule** : les échanges passent par la médiation. Après la fin du deal, on peut encore écrire 14 jours, puis le fil reste consultable.
+- **RG-FCH-08 — Des réponses rapides sont proposées dans la langue du lecteur** : les mêmes idées existent en français et en anglais.
+
+### Recette (FCH) — `seed-deals.ts` pose un fil sur le deal accepté Paris → Brazzaville
+| # | Scénario | Attendu |
+|---|---|---|
+| FCH01 | Expéditeur `pauline`, ouvrir le fil du deal accepté | Deux messages et une proposition de rendez-vous du Voyageur au terminal 2E |
+| FCH02 | Accepter la proposition | Rendez-vous accepté, trace dans le fil ; le Voyageur ne peut pas accepter sa propre proposition (400) |
+| FCH03 | Écrire « le code est 742891 » sur un deal pris en charge | Refus 400 avec le motif : le code se donne en main propre |
+| FCH04 | Écrire « appelle-moi au 06 12 34 56 78 » | Message envoyé, signalé pour l'équipe |
+| FCH05 | Demander le numéro plus de deux heures avant le rendez-vous | Refus, avec l'heure d'ouverture ; après cette heure, le numéro s'affiche et le fil le note |
+| FCH06 | Un tiers tente d'ouvrir le fil | 403, pas 404 |
+| FCH07 | Fil d'un deal en litige | Lecture possible, écriture refusée |
+| FCH08 | Fil d'un deal terminé depuis plus de 14 jours | Lecture seule, date de fermeture affichée |
+| FCH09 | Réponses rapides en anglais | Mêmes clés, textes traduits |
+| FCH10 | Redpanda arrêté, écrire un message | Le message part, l'événement attend ; au redémarrage il est publié, aucun message perdu, aucun événement parqué |

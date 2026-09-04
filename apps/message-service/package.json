@@ -1,0 +1,50 @@
+{
+  "name": "@yamba-app/message-service",
+  "version": "0.0.1",
+  "private": true,
+  "nx": {
+    "targets": {
+      "prune-lockfile": {
+        "dependsOn": ["build"],
+        "cache": true,
+        "executor": "@nx/js:prune-lockfile",
+        "outputs": [
+          "{workspaceRoot}/apps/message-service/dist/package.json",
+          "{workspaceRoot}/apps/message-service/dist/package-lock.json"
+        ],
+        "options": { "buildTarget": "build" }
+      },
+      "copy-workspace-modules": {
+        "dependsOn": ["build"],
+        "cache": true,
+        "outputs": ["{workspaceRoot}/apps/message-service/dist/workspace_modules"],
+        "executor": "@nx/js:copy-workspace-modules",
+        "options": { "buildTarget": "build" }
+      },
+      "prune": {
+        "dependsOn": ["prune-lockfile", "copy-workspace-modules"],
+        "executor": "nx:noop"
+      },
+      "serve": {
+        "continuous": true,
+        "executor": "@nx/js:node",
+        "defaultConfiguration": "development",
+        "dependsOn": ["build"],
+        "options": {
+          "buildTarget": "@yamba-app/message-service:build",
+          "runBuildTargetDependencies": false
+        },
+        "configurations": {
+          "development": { "buildTarget": "@yamba-app/message-service:build:development" },
+          "production": { "buildTarget": "@yamba-app/message-service:build:production" }
+        }
+      }
+    }
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.2",
+    "express": "^4.21.2",
+    "pino": "^9.5.0",
+    "pino-http": "^10.3.0"
+  }
+}
