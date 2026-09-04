@@ -302,7 +302,7 @@ Ordre de demarrage : auth -> trip -> gateway.
 - 04/09 : C-PR3 feat/c3-admin-users (D56, A105–A107, decisions 1A–7A + invitation)
   — profils admin, invitation sans role client, conflit d'interets, fiche + recherche,
   sanctions RESTRICTED/SUSPENDED (propose/applique/leve), sessions admin + alerte,
-  Sentry. Suite : C-PR4 trajets/billets, C-PR5 finances, C-PR6 pilotage.
+  Sentry. Mergee #155. Suite : C-PR4 trajets/billets, C-PR5 finances, C-PR6 pilotage.
 - Plateforme de tests : 718 (trip 198, deal 442, notification 78) + auth 85.
 - (historique) Plateforme de tests : 600 (trip 187, deal 354, notification 59) — post-B3 (#96).
 - MERGE 01/09 : toute la pile B2 est dans `dev` via la SEULE **PR #90**
