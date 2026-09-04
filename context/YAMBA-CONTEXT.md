@@ -361,7 +361,12 @@ Ordre de demarrage : auth -> trip -> gateway.
   des ecrans de deal (tracker Expediteur, deal Voyageur) ouvrent le fil du deal via by-deal +
   ?conversation=<id> ; « Appeler » = fil avec ?focus=phone (numero ou heure d'ouverture), jamais
   un tel: direct. Aucun test serveur touche.
-- Plateforme de tests : 791 (trip 209, deal 485, notification 83, message 14) + auth 103.
+- 04/09 : F-PR3 feat/f3-messaging-admin (D61 6A/7A/8A, A138–A141) — relance email des messages
+  non lus (15 min, une par heure, verrou optimiste, email sans le texte), lecture admin d'un fil
+  journalisee (conversations.read), signalement d'un message (Report MESSAGE, file /reports,
+  reports.review, KPI d'accueil, decision + journal en transaction), purge a un an (regle pure,
+  cron nocturne). message-service 28 tests.
+- Plateforme de tests : 805 (trip 209, deal 485, notification 83, message 28) + auth 103.
 - 04/09 : C-PR6b feat/c6b-admin-alerts (D59 3A / 4A, A129–A131) — neuf regles de seuil
   (evaluateAlerts pur, instantane de dix compteurs), GET /admin/alerts sans etat (accueil
   admin), cron horaire avec dedoublonnage Redis SET NX (un email par regle et par jour, Redis

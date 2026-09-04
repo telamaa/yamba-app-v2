@@ -63,7 +63,19 @@ export const ACTION_LABEL: Record<string, string> = {
   DEAL_HISTORY_VIEWED: "Chronologie consultée",
   PILOTAGE_DRILLDOWN_VIEWED: "Liste d'inscriptions consultée (pilotage)",
   EXPORTED: "Export CSV",
+  CONVERSATION_VIEWED: "Conversation consultée",
+  MESSAGE_REPORT_REVIEWED: "Message signalé traité",
 };
+
+/* F-PR3 (D61 7A) — messages signalés */
+export const REPORT_REASON_LABEL: Record<string, string> = {
+  OFF_PLATFORM: "Veut sortir de Yamba",
+  SCAM: "Tentative d'arnaque",
+  HARASSMENT: "Propos déplacés / harcèlement",
+  OTHER: "Autre",
+};
+export const REPORT_STATUS_LABEL: Record<string, string> = { OPEN: "à traiter", REVIEWED: "traité", DISMISSED: "sans suite" };
+export const CHAT_ROLE_LABEL: Record<string, string> = { SHIPPER: "Expéditeur", CARRIER: "Voyageur", SYSTEM: "Système" };
 
 /* C-PR5a (D58) */
 export const PAYOUT_STATUS_LABEL: Record<string, string> = { PENDING: "en attente d'envoi", SENT: "envoyé", FAILED: "en échec", FROZEN: "gelé (litige)", REVERSED: "renversé" };

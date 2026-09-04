@@ -1585,3 +1585,22 @@ tsc user-ui OK · miroir i18n OK (27 namespaces) · aucun test serveur touché (
 
 ### Reste
 F-PR3 (email de relance, lecture admin depuis un dossier, signalement d'un message, purge à un an). Le numéro du destinataire dans le tracker en transit est encore un mock statique : à brancher quand le contrat Booking côté Expéditeur portera `recipient.phone`.
+
+---
+
+# F-PR3 — `feat/f3-messaging-admin` : relance email, lecture admin, signalement, purge (D61 6A/7A/8A, A138–A141)
+
+## Ce qui a été fait
+1. **Schéma** : `Conversation.lastMessageAuthorRole`, `shipperRemindedAt`, `carrierRemindedAt` (writers posent `null`) ; `ReportTargetType.MESSAGE`. Journal : `CONVERSATION_VIEWED`, `MESSAGE_REPORT_REVIEWED`. Permissions : `conversations.read` et `reports.review` (MEDIATOR + SUPPORT) dans la matrice et son miroir admin-ui.
+2. **Règles pures + tests** (`apps/message-service/src/lib/`) : `unread-reminder.rules.ts` (6 tests), `conversation-retention.rules.ts` (4), `message-report.rules.ts` (4) — message-service passe de 14 à **28** tests.
+3. **Relance email** : `services/unread-reminder.service.ts` (balayage 7 jours, verrou optimiste `updateMany`, email par locale du destinataire via `emails/messaging-emails.ts`, CTA `FRONTEND_URL/<locale>/dashboard/messages?conversation=<id>`), `cron/unread-reminder.cron.ts` (`*/5`), `MESSAGING_REMINDER_CRON_ENABLED`.
+4. **Purge** : `services/conversation-retention.service.ts` (candidats `updatedAt < 1 an`, règle sur le statut du deal, transaction de suppression), `cron/conversation-retention.cron.ts` (03:30), `MESSAGING_RETENTION_CRON_ENABLED`.
+5. **Signalement** : `conversation.service.reportMessage` (404 message hors fil, 400 message à soi / non texte, 409 doublon), route `POST /messages/conversations/:id/messages/:messageId/report`. Front : bouton drapeau sur les bulles de l'autre partie, `ReportMessageDialog.tsx`, hook `useReportMessage`, i18n `messaging.report.*`.
+6. **Admin** : `services/admin-conversation.service.ts` (`viewByDeal` journalisé, `listReports`, `reviewReport` transactionnel), `routes/admin.router.ts` monté sur `/admin/conversations`, gateway `/api/admin/conversations` → 6005, KPI `messageReportsOpen` (auth-service). admin-ui : page `/reports` (`MessageReportsQueue.tsx`), page `/conversations/[bookingId]` (`ConversationView.tsx`), lien « Lire la conversation » sur la fiche litige, entrée « Signalements » du menu, tuile d'accueil.
+7. **OpenAPI** : 4 chemins ajoutés au document du message-service (13 chemins) ; les 4 documents régénérés (schémas partagés). **Seed** : message du Voyageur signalé sur `bzv-accepted`.
+
+### Preuves
+message **28** (+14) · auth 103 · tsc ×7 + les deux fronts · miroir i18n OK · OpenAPI régénéré. Recette : FCH20–FCH26 (DOC-METIER).
+
+### Reste
+Préférence « ne plus me relancer par email » et seuils (15 min / 1 h) réglables : C-PR8 paramètres. Photos dans le fil : backlog. Notification du signalé : décision à prendre quand un premier cas réel se présentera.

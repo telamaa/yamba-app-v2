@@ -125,3 +125,93 @@ export const RevealPhoneResponseSchema = z
   .object({ phoneE164: z.string().nullable(), firstName: z.string(), revealedAt: z.string().datetime() })
   .meta({ id: "RevealPhoneResponse" });
 export type RevealPhoneResponse = z.infer<typeof RevealPhoneResponseSchema>;
+
+/* ── F-PR3 (D61 6A / 7A) — signalement d'un message, lecture admin, relance ── */
+
+export const MESSAGE_REPORT_REASONS = ["OFF_PLATFORM", "SCAM", "HARASSMENT", "OTHER"] as const;
+export const MessageReportReasonSchema = z.enum(MESSAGE_REPORT_REASONS).meta({ id: "MessageReportReason" });
+export type MessageReportReason = z.infer<typeof MessageReportReasonSchema>;
+
+export const ReportMessageRequestSchema = z
+  .object({
+    reason: MessageReportReasonSchema,
+    details: z.string().trim().max(500).optional(),
+  })
+  .meta({ id: "ReportMessageRequest" });
+export type ReportMessageRequest = z.infer<typeof ReportMessageRequestSchema>;
+
+export const ReportMessageResponseSchema = z
+  .object({ reportId: ObjectIdSchema, createdAt: z.string().datetime() })
+  .meta({ id: "ReportMessageResponse" });
+export type ReportMessageResponse = z.infer<typeof ReportMessageResponseSchema>;
+
+/** Relance email des messages non lus : 15 min sans lecture, au plus une relance par heure et par conversation. */
+export const UNREAD_REMINDER_DELAY_MINUTES = 15;
+export const UNREAD_REMINDER_MIN_INTERVAL_MINUTES = 60;
+/** Conservation d'une conversation après la fin du deal (D61 8A). */
+export const CONVERSATION_RETENTION_DAYS = 365;
+
+export const MessageReportStatusSchema = z.enum(["OPEN", "REVIEWED", "DISMISSED"]).meta({ id: "MessageReportStatus" });
+export type MessageReportStatus = z.infer<typeof MessageReportStatusSchema>;
+
+/** Vue admin d'un message : identité des auteurs (prénom + rôle), signalements rattachés. Jamais le code, jamais les numéros. */
+export const AdminMessageSchema = MessageSchema.extend({
+  reports: z.array(
+    z.object({
+      id: ObjectIdSchema,
+      reason: MessageReportReasonSchema,
+      details: z.string().nullable(),
+      status: MessageReportStatusSchema,
+      reporterRole: z.enum(["SHIPPER", "CARRIER"]),
+      createdAt: z.string().datetime(),
+    })
+  ),
+}).meta({ id: "AdminMessage" });
+export type AdminMessage = z.infer<typeof AdminMessageSchema>;
+
+export const AdminConversationResponseSchema = z
+  .object({
+    conversationId: ObjectIdSchema,
+    bookingId: ObjectIdSchema,
+    bookingStatus: z.string(),
+    corridor: z.object({ originCity: z.string(), destinationCity: z.string(), departureAt: z.string().datetime().nullable() }),
+    shipper: z.object({ id: ObjectIdSchema, firstName: z.string(), lastName: z.string() }),
+    carrier: z.object({ id: ObjectIdSchema, firstName: z.string(), lastName: z.string() }),
+    messages: z.array(AdminMessageSchema).describe("Du plus ancien au plus récent, sans pagination : un dossier se lit en entier"),
+    meetups: z.array(MeetupSchema),
+    phoneReveals: z.array(z.object({ revealedToRole: z.enum(["SHIPPER", "CARRIER"]), revealedAt: z.string().datetime() })).describe("Qui a vu le numéro de qui, quand — jamais le numéro"),
+    lastMessageAt: z.string().datetime().nullable(),
+  })
+  .meta({ id: "AdminConversationResponse" });
+export type AdminConversationResponse = z.infer<typeof AdminConversationResponseSchema>;
+
+export const AdminMessageReportItemSchema = z
+  .object({
+    id: ObjectIdSchema,
+    status: MessageReportStatusSchema,
+    reason: MessageReportReasonSchema,
+    details: z.string().nullable(),
+    createdAt: z.string().datetime(),
+    reporter: z.object({ id: ObjectIdSchema, firstName: z.string(), role: z.enum(["SHIPPER", "CARRIER"]) }),
+    author: z.object({ id: ObjectIdSchema.nullable(), firstName: z.string(), role: z.enum(["SHIPPER", "CARRIER", "SYSTEM"]) }),
+    message: z.object({ id: ObjectIdSchema, body: z.string(), createdAt: z.string().datetime() }),
+    conversationId: ObjectIdSchema,
+    bookingId: ObjectIdSchema,
+    corridor: z.object({ originCity: z.string(), destinationCity: z.string() }),
+  })
+  .meta({ id: "AdminMessageReportItem" });
+export type AdminMessageReportItem = z.infer<typeof AdminMessageReportItemSchema>;
+
+export const AdminMessageReportsQuerySchema = z
+  .object({ status: MessageReportStatusSchema.default("OPEN") })
+  .meta({ id: "AdminMessageReportsQuery" });
+
+export const AdminMessageReportsResponseSchema = z
+  .object({ items: z.array(AdminMessageReportItemSchema), total: z.number().int() })
+  .meta({ id: "AdminMessageReportsResponse" });
+export type AdminMessageReportsResponse = z.infer<typeof AdminMessageReportsResponseSchema>;
+
+export const ReviewMessageReportRequestSchema = z
+  .object({ decision: z.enum(["REVIEWED", "DISMISSED"]), note: z.string().trim().max(500).optional() })
+  .meta({ id: "ReviewMessageReportRequest" });
+export type ReviewMessageReportRequest = z.infer<typeof ReviewMessageReportRequestSchema>;

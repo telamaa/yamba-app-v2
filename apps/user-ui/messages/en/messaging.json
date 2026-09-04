@@ -61,5 +61,24 @@
   "open": {
     "failed": "The conversation could not be opened.",
     "notOpenYet": "The conversation opens once the deal is accepted."
+  },
+  "report": {
+    "action": "Report this message",
+    "title": "Report a message",
+    "intro": "Tell us what is wrong. Our team will read the conversation and get back to you if needed.",
+    "reason": "Reason",
+    "reasons": {
+      "OFF_PLATFORM": "Wants to leave Yamba (payment or shipping outside)",
+      "SCAM": "Scam attempt",
+      "HARASSMENT": "Inappropriate words or harassment",
+      "OTHER": "Other"
+    },
+    "details": "Details (optional)",
+    "detailsPlaceholder": "What alerted you…",
+    "submit": "Send the report",
+    "sending": "Sending…",
+    "done": "Thank you, the report has been sent to our team.",
+    "already": "You already reported this message.",
+    "failed": "The report could not be sent."
   }
 }

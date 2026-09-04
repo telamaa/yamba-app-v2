@@ -61,5 +61,24 @@
   "open": {
     "failed": "La conversation n'a pas pu être ouverte.",
     "notOpenYet": "La conversation s'ouvre une fois le deal accepté."
+  },
+  "report": {
+    "action": "Signaler ce message",
+    "title": "Signaler un message",
+    "intro": "Dis-nous ce qui ne va pas. Notre équipe lira la conversation et reviendra vers toi si besoin.",
+    "reason": "Motif",
+    "reasons": {
+      "OFF_PLATFORM": "Veut sortir de Yamba (paiement ou envoi en dehors)",
+      "SCAM": "Tentative d'arnaque",
+      "HARASSMENT": "Propos déplacés ou harcèlement",
+      "OTHER": "Autre"
+    },
+    "details": "Précisions (facultatif)",
+    "detailsPlaceholder": "Ce qui t'a alerté…",
+    "submit": "Envoyer le signalement",
+    "sending": "Envoi…",
+    "done": "Merci, le signalement est transmis à notre équipe.",
+    "already": "Tu as déjà signalé ce message.",
+    "failed": "Le signalement n'a pas pu être envoyé."
   }
 }

@@ -9,9 +9,10 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import { AlertTriangle, ArrowLeft, Phone, Send } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Flag, Phone, Send } from "lucide-react";
 import { useMarkConversationRead, usePostMessage, useQuickReplies, useRevealPhone, useThread } from "@/hooks/useMessaging";
 import MeetupPanel from "./MeetupPanel";
+import ReportMessageDialog from "./ReportMessageDialog";
 import type { ChatMessage } from "./messaging.types";
 
 function dayLabel(iso: string, locale: string): string {
@@ -40,6 +41,8 @@ export default function ConversationThread({
   const { data: quickReplies } = useQuickReplies({ enabled: !!data?.conversation.access.canWrite });
   const [body, setBody] = useState("");
   const [error, setError] = useState<string | null>(null);
+  // F-PR3 (D61 7A) — message en cours de signalement (bulle de l'autre partie seulement)
+  const [reporting, setReporting] = useState<ChatMessage | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const lastMessageId = data?.messages[data.messages.length - 1]?.id ?? null;
 
@@ -152,7 +155,7 @@ export default function ConversationThread({
                 }
                 const mine = m.authorRole === conversation.role;
                 return (
-                  <div key={m.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
+                  <div key={m.id} className={`group flex items-end gap-1 ${mine ? "justify-end" : "justify-start"}`}>
                     <div
                       className={`max-w-[80%] rounded-2xl px-3 py-2 text-[13.5px] ${
                         mine ? "bg-[#FF9900] text-slate-950" : "bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100"
@@ -161,6 +164,17 @@ export default function ConversationThread({
                       <p className="whitespace-pre-wrap break-words">{m.body}</p>
                       <p className={`mt-0.5 text-right text-[10.5px] ${mine ? "text-slate-800/70" : "text-slate-500 dark:text-slate-400"}`}>{timeLabel(m.createdAt, locale)}</p>
                     </div>
+                    {!mine && (
+                      <button
+                        type="button"
+                        onClick={() => setReporting(m)}
+                        aria-label={t("report.action")}
+                        title={t("report.action")}
+                        className="rounded-md p-1 text-slate-400 opacity-60 hover:bg-slate-100 hover:text-slate-600 group-hover:opacity-100 dark:hover:bg-slate-800"
+                      >
+                        <Flag size={12} />
+                      </button>
+                    )}
                   </div>
                 );
               })}
@@ -169,6 +183,8 @@ export default function ConversationThread({
         ))}
         <div ref={bottomRef} />
       </div>
+
+      {reporting && <ReportMessageDialog conversationId={conversationId} message={reporting} onCloseAction={() => setReporting(null)} />}
 
       {access.canWrite ? (
         <div className="border-t border-slate-200 p-3 dark:border-slate-800">

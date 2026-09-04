@@ -40,6 +40,9 @@ export const ADMIN_PERMISSIONS = {
   // C-PR7a (D60 2A) — exports : opérationnels (sans email ni téléphone) vs personnels (SUPER_ADMIN seul, motif au journal)
   "exports.operational": ["FINANCE", "MEDIATOR"],
   "exports.personal": [],
+  // F-PR3 (D61 7A) — lire une conversation depuis un dossier (journalisé), traiter un message signalé. FINANCE n'a rien à y lire.
+  "conversations.read": ["MEDIATOR", "SUPPORT"],
+  "reports.review": ["MEDIATOR", "SUPPORT"],
 } as const;
 export type AdminPermission = keyof typeof ADMIN_PERMISSIONS;
 

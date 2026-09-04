@@ -4,7 +4,8 @@ export type AdminPermission =
   | "disputes.read" | "disputes.decide" | "users.read" | "users.suspension.propose" | "users.suspension.apply" | "audit.read" | "admins.manage"
   | "trips.read" | "tickets.review" | "trips.hide.propose" | "trips.hide.apply" | "kpi.read"
   | "finances.read" | "payouts.retry" | "payouts.resolve" | "finances.export" | "refunds.manual.propose" | "refunds.manual.apply"
-  | "pilotage.read" | "deals.history.read" | "exports.operational" | "exports.personal";
+  | "pilotage.read" | "deals.history.read" | "exports.operational" | "exports.personal"
+  | "conversations.read" | "reports.review";
 
 const MATRIX: Record<AdminPermission, AdminRole[]> = {
   "disputes.read": ["MEDIATOR", "SUPPORT", "FINANCE"],
@@ -29,6 +30,8 @@ const MATRIX: Record<AdminPermission, AdminRole[]> = {
   "deals.history.read": ["MEDIATOR", "SUPPORT", "FINANCE"],
   "exports.operational": ["FINANCE", "MEDIATOR"],
   "exports.personal": [],
+  "conversations.read": ["MEDIATOR", "SUPPORT"],
+  "reports.review": ["MEDIATOR", "SUPPORT"],
 };
 
 /** C-PR3bis (D60 1A) — profils cumulés : l'UN des profils suffit ; accepte encore un profil seul (anciens écrans). */
