@@ -3215,6 +3215,63 @@
         }
       }
     },
+    "/admin/alerts": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Threshold alerts (D59 3A / 4A) — computed on read, no state",
+        "description": "Permission kpi.read. Rules with versioned thresholds: failed payouts > 48h, decidable disputes undecided > 72h, retentions held > 7d, open reversals > 48h, parked outbox events, relay lag > 15 min, failed emails (24h), no trip published for 7d, acceptance rate < 30% over 7d (≥ 5 requests). The hourly cron emails support once per rule and per day (Redis dedup); this endpoint always recomputes.",
+        "operationId": "adminListOpsAlerts",
+        "security": [
+          {
+            "adminCookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Alerts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpsAlertsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token missing, invalid, expired, or account not found (isAuthenticated middleware)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated caller is not a party to this deal, or does not own the trip (ForbiddenError)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unhandled server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnhandledError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/admin/deals/{id}/history": {
       "get": {
         "tags": [
@@ -20365,6 +20422,99 @@
             "$ref": "#/components/schemas/PhoneRevealedEvent"
           }
         ]
+      },
+      "OpsAlertRule": {
+        "type": "string",
+        "enum": [
+          "PAYOUT_FAILED_48H",
+          "DISPUTE_UNDECIDED_72H",
+          "RETENTION_HELD_7D",
+          "REVERSAL_OPEN_48H",
+          "OUTBOX_PARKED",
+          "OUTBOX_LAGGING_15MIN",
+          "EMAILS_FAILED_24H",
+          "NO_TRIP_PUBLISHED_7D",
+          "ACCEPTANCE_RATE_LOW_7D"
+        ]
+      },
+      "OpsAlert": {
+        "type": "object",
+        "properties": {
+          "rule": {
+            "$ref": "#/components/schemas/OpsAlertRule"
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "warning",
+              "critical"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "count": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Éléments concernés (null pour une alerte de liquidité)"
+          },
+          "href": {
+            "type": "string",
+            "description": "Chemin admin où agir"
+          }
+        },
+        "required": [
+          "rule",
+          "severity",
+          "title",
+          "detail",
+          "count",
+          "href"
+        ],
+        "additionalProperties": false
+      },
+      "OpsAlertsResponse": {
+        "type": "object",
+        "properties": {
+          "alerts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OpsAlert"
+            }
+          },
+          "evaluatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          },
+          "thresholds": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": "number"
+            }
+          }
+        },
+        "required": [
+          "alerts",
+          "evaluatedAt",
+          "thresholds"
+        ],
+        "additionalProperties": false,
+        "description": "Sans état (D59 4A) : recalculées à chaque lecture ; le cron horaire n'envoie un email qu'à la première apparition du jour"
       }
     },
     "securitySchemes": {

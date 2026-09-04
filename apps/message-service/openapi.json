@@ -17845,6 +17845,99 @@
             "$ref": "#/components/schemas/PhoneRevealedEvent"
           }
         ]
+      },
+      "OpsAlertRule": {
+        "type": "string",
+        "enum": [
+          "PAYOUT_FAILED_48H",
+          "DISPUTE_UNDECIDED_72H",
+          "RETENTION_HELD_7D",
+          "REVERSAL_OPEN_48H",
+          "OUTBOX_PARKED",
+          "OUTBOX_LAGGING_15MIN",
+          "EMAILS_FAILED_24H",
+          "NO_TRIP_PUBLISHED_7D",
+          "ACCEPTANCE_RATE_LOW_7D"
+        ]
+      },
+      "OpsAlert": {
+        "type": "object",
+        "properties": {
+          "rule": {
+            "$ref": "#/components/schemas/OpsAlertRule"
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "warning",
+              "critical"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "count": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Éléments concernés (null pour une alerte de liquidité)"
+          },
+          "href": {
+            "type": "string",
+            "description": "Chemin admin où agir"
+          }
+        },
+        "required": [
+          "rule",
+          "severity",
+          "title",
+          "detail",
+          "count",
+          "href"
+        ],
+        "additionalProperties": false
+      },
+      "OpsAlertsResponse": {
+        "type": "object",
+        "properties": {
+          "alerts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OpsAlert"
+            }
+          },
+          "evaluatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          },
+          "thresholds": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": "number"
+            }
+          }
+        },
+        "required": [
+          "alerts",
+          "evaluatedAt",
+          "thresholds"
+        ],
+        "additionalProperties": false,
+        "description": "Sans état (D59 4A) : recalculées à chaque lecture ; le cron horaire n'envoie un email qu'à la première apparition du jour"
       }
     },
     "securitySchemes": {

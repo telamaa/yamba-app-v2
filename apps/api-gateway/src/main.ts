@@ -126,6 +126,14 @@ app.use(
   })
 );
 
+// /api/admin/alerts → deal-service (C-PR6b, D59)
+app.use(
+  "/api/admin/alerts",
+  proxy("http://localhost:6003", {
+    proxyReqPathResolver: (req) => `/admin/alerts${req.url}`,
+  })
+);
+
 // /api/admin/finances/*, /api/admin/deals/* → deal-service reçoit /admin/… (C-PR5, D58)
 app.use(
   "/api/admin/finances",

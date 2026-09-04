@@ -35,3 +35,4 @@ export * from "./admin/admin-finances.schema";
 export * from "./admin/admin-pilotage.schema";
 export * from "./messaging/messaging.schema";
 export * from "./messaging/messaging-events.schema";
+export * from "./admin/admin-alerts.schema";

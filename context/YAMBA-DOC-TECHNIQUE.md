@@ -1540,3 +1540,16 @@ message **14** · deal **478** (relais filtré, spec alignée) · trip 209 · au
 
 ### Reste
 F-PR2 front des deux rôles (liste des fils, conversation, rendez-vous, réponses rapides, numéro) et notifications (in-app immédiate, email de relance à 15 min) ; F-PR3 admin (lecture depuis un dossier, signalement d'un message) et purge à un an.
+# C-PR6b — `feat/c6b-admin-alerts` : alertes de seuil (D59 3A / 4A, A129–A131)
+
+## Ce qui a été fait
+1. **Contrats** (`admin/admin-alerts.schema.ts`) : `OpsAlertRule` (9 règles), `OpsAlert` (règle, gravité, titre, détail, compteur, lien), `OpsAlertsResponse` (alertes, `evaluatedAt`, seuils).
+2. **deal-service** : `services/ops-alerts.rules.ts` (`ALERT_THRESHOLDS`, `OpsSnapshot`, `evaluateAlerts` pur, `alertSentKey` ; spec 5) ; `services/ops-alerts.service.ts` (`collectOpsSnapshot` : dix comptages Prisma dont les litiges décidables via la règle D55, `evaluate`, `notifyNewAlerts(store)` dédoublonné par `SET NX` ; spec 2 avec un Map et un email mocké) ; `cron/ops-alerts.cron.ts` (« 5 * * * * », Redis injecté depuis `main.ts`, `OPS_ALERTS_CRON_ENABLED`) ; email `opsAlerts` FR/EN dans `ops-emails.ts` ; `GET /admin/alerts` (`kpi.read`) ; OpenAPI (+1 chemin).
+3. **gateway** : `/api/admin/alerts` → deal-service. **`.env.example`** : `OPS_ALERTS_CRON_ENABLED`.
+4. **admin-ui** : bandeau « Alertes de seuil » en tête de l'accueil (critique rouge / attention ambre, lien vers la file), état vert « aucune alerte », date d'évaluation.
+
+### Preuves
+deal **485** (+7) · auth 103 · trip 209 · notification 78 · tsc ×6 + admin-ui · OpenAPI régénéré. Recette : ALR01–ALR06 (DOC-METIER).
+
+### Reste
+Chantier F chat (challenge) → C-PR8 paramètres audités (seuils réglables), RGPD, maintenance.

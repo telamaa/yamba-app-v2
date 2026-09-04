@@ -352,7 +352,12 @@ Ordre de demarrage : auth -> trip -> gateway.
   FR/EN, relais outbox dedie (topic messaging-events ; le relais deal-service filtre desormais
   aggregateType booking), OpenAPI 4e document, seed d'un fil. Suite : F-PR2 front + notifications,
   F-PR3 admin et purge.
-- Plateforme de tests : 779 (trip 209, deal 478, notification 78, message 14) + auth 103.
+- Plateforme de tests : 786 (trip 209, deal 485, notification 78, message 14) + auth 103.
+- 04/09 : C-PR6b feat/c6b-admin-alerts (D59 3A / 4A, A129–A131) — neuf regles de seuil
+  (evaluateAlerts pur, instantane de dix compteurs), GET /admin/alerts sans etat (accueil
+  admin), cron horaire avec dedoublonnage Redis SET NX (un email par regle et par jour, Redis
+  injecte), OPS_ALERTS_CRON_ENABLED. Suite : chantier F chat (challenge), C-PR8 parametres /
+  RGPD.
 - (historique) Plateforme de tests : 600 (trip 187, deal 354, notification 59) — post-B3 (#96).
 - MERGE 01/09 : toute la pile B2 est dans `dev` via la SEULE **PR #90**
   (`feat/b2-deal-front` portait la chaîne complète : jalons mobile D36,

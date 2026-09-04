@@ -1346,3 +1346,20 @@ Après l'acceptation, deux inconnus doivent se retrouver deux fois : pour la rem
 | FCH08 | Fil d'un deal terminé depuis plus de 14 jours | Lecture seule, date de fermeture affichée |
 | FCH09 | Réponses rapides en anglais | Mêmes clés, textes traduits |
 | FCH10 | Redpanda arrêté, écrire un message | Le message part, l'événement attend ; au redémarrage il est publié, aucun message perdu, aucun événement parqué |
+# C-PR6b — être prévenu avant que ça déborde
+
+### Règles de gestion (ALR)
+- **RG-ALR-01 — Neuf règles, des seuils fixes** : versement en échec depuis plus de 48 h ; litige tranchable sans décision depuis plus de 72 h ; retenue conservée depuis plus de 7 jours ; transfert renversé sans décision depuis plus de 48 h ; événement bloqué après 10 tentatives ; relais en retard de plus de 15 minutes ; emails en échec sur 24 h ; aucun trajet publié depuis 7 jours ; moins de 30 % d'acceptation sur 7 jours (au moins 5 demandes).
+- **RG-ALR-02 — Une alerte n'a pas d'état** : elle s'affiche en tête de l'accueil admin tant que sa cause existe, avec un lien vers la file où agir, et disparaît d'elle-même.
+- **RG-ALR-03 — Le support reçoit un email à la première apparition d'une règle dans la journée**, jamais plus d'une fois par règle et par jour. Le récapitulatif quotidien « argent à surveiller » continue.
+- **RG-ALR-04 — Les seuils sont versionnés dans le code** et affichés dans la réponse ; ils deviendront réglables avec les paramètres audités (C-PR8).
+
+### Recette (ALR)
+| # | Scénario | Attendu |
+|---|---|---|
+| ALR01 | Accueil admin après le seed | Bandeau « Alertes de seuil » : au moins « Versements en échec depuis plus de 48 h » (`bzv-completed-blocked`, terminé il y a 3 j) et « Transferts renversés sans décision » ; chaque ligne mène à la file concernée |
+| ALR02 | Relancer le versement en échec (Fake → envoyé), revenir à l'accueil | L'alerte a disparu |
+| ALR03 | Couper Redpanda (ou le relais), créer une réservation, attendre 16 min | « Relais outbox en retard » ; la relancer fait disparaître l'alerte |
+| ALR04 | Cron horaire (à h+5) avec SMTP configuré | Un seul email « Yamba — n alerte(s) » listant les règles nouvelles ; à l'heure suivante, rien tant qu'aucune règle nouvelle n'apparaît |
+| ALR05 | Le lendemain, même alerte toujours active | Un nouvel email (une fois par jour) |
+| ALR06 | `OPS_ALERTS_CRON_ENABLED=false` | Log « Ops alerts cron disabled » ; l'accueil continue d'afficher les alertes |
