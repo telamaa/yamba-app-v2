@@ -17,6 +17,7 @@ import HeaderMobileBottomSheet from "./header/HeaderMobileBottomSheet";
 import HeaderSkeleton from "./HeaderSkeleton";
 import useHeaderUserState from "./header/useHeaderUserState";
 import { useNotifications } from "@/hooks/useNotifications";
+import { useConversations } from "@/hooks/useMessaging";
 import {
   HEADER_COMPACT_SCROLL_THRESHOLD,
   HEADER_Z_INDEX,
@@ -46,8 +47,10 @@ export default function Header() {
     enabled: userState.isAuthenticated,
   });
   const notificationCount = notificationsData?.unreadCount ?? 0;
-  // Mock assumé jusqu'au chantier F (message-service :6005).
-  const messageCount = 3;
+  // Chantier F (D61) — la bulle dit la vérité : conversations avec messages non lus,
+  // même cache que la messagerie du tableau de bord.
+  const { data: conversationsData } = useConversations({ enabled: userState.isAuthenticated });
+  const messageCount = conversationsData?.totalUnread ?? 0;
 
   const commandActions: CommandAction[] = useMemo(() => {
     const base: CommandAction[] = [

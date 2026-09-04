@@ -1,0 +1,55 @@
+{
+  "loading": "Loading…",
+  "empty": "No message yet. Propose a meeting point to get organised.",
+  "selectOne": "Pick a conversation.",
+  "placeholder": "Write a message…",
+  "send": "Send",
+  "sendFailed": "The message could not be sent.",
+  "back": "Back",
+  "cancel": "Cancel",
+  "codeWarning": "The delivery code is given in person, never in writing.",
+  "list": {
+    "emptyTitle": "No conversations",
+    "emptyBody": "A conversation opens as soon as a Traveler accepts your parcel, or as soon as you accept a request.",
+    "you": "You:",
+    "noMessage": "No message yet",
+    "toConfirm": "to confirm"
+  },
+  "phone": {
+    "reveal": "Show number",
+    "hidden": "Number unavailable",
+    "opensAt": "Available from {time}"
+  },
+  "closed": {
+    "dispute": "A dispute is open: messages go through mediation.",
+    "window": "This conversation is closed for writing. You can still read it.",
+    "generic": "This conversation is read-only."
+  },
+  "meetup": {
+    "title": "Meeting",
+    "none": "No meeting planned yet. Propose a place and a time slot.",
+    "pickup": "Parcel handover",
+    "delivery": "Delivery",
+    "propose": "Propose",
+    "counter": "Propose another",
+    "accept": "Accept",
+    "accepted": "Confirmed",
+    "toAccept": "Waiting for you",
+    "waitingOther": "Waiting for the other person",
+    "kind": "Type",
+    "place": "Place",
+    "placePlaceholder": "Paris CDG, terminal 2E, check-in desks",
+    "details": "Details",
+    "detailsPlaceholder": "In front of the self-service kiosks, departures side.",
+    "start": "Start",
+    "end": "End",
+    "send": "Propose this meeting",
+    "sending": "Sending…",
+    "proposeFailed": "The meeting could not be proposed."
+  },
+  "system": {
+    "meetup.proposed": "A meeting has been proposed.",
+    "meetup.accepted": "The meeting is confirmed.",
+    "phone.revealed": "The phone number has been shown."
+  }
+}

@@ -1,0 +1,55 @@
+{
+  "loading": "Chargement…",
+  "empty": "Aucun message pour l'instant. Proposez un rendez-vous pour vous organiser.",
+  "selectOne": "Choisissez une conversation.",
+  "placeholder": "Écrire un message…",
+  "send": "Envoyer",
+  "sendFailed": "Le message n'a pas pu être envoyé.",
+  "back": "Retour",
+  "cancel": "Annuler",
+  "codeWarning": "Le code de livraison se donne en main propre, jamais par écrit.",
+  "list": {
+    "emptyTitle": "Aucune conversation",
+    "emptyBody": "Une conversation s'ouvre dès qu'un Voyageur accepte votre colis, ou dès que vous acceptez une demande.",
+    "you": "Vous :",
+    "noMessage": "Pas encore de message",
+    "toConfirm": "à confirmer"
+  },
+  "phone": {
+    "reveal": "Voir le numéro",
+    "hidden": "Numéro indisponible",
+    "opensAt": "Disponible à partir du {time}"
+  },
+  "closed": {
+    "dispute": "Un litige est en cours : les échanges passent par la médiation.",
+    "window": "Cette conversation est fermée à l'écriture. Vous pouvez toujours la relire.",
+    "generic": "Cette conversation est en lecture seule."
+  },
+  "meetup": {
+    "title": "Rendez-vous",
+    "none": "Aucun rendez-vous prévu. Proposez un lieu et un créneau.",
+    "pickup": "Remise du colis",
+    "delivery": "Livraison",
+    "propose": "Proposer",
+    "counter": "Proposer un autre",
+    "accept": "Accepter",
+    "accepted": "Confirmé",
+    "toAccept": "À confirmer par vous",
+    "waitingOther": "En attente de l'autre personne",
+    "kind": "Type",
+    "place": "Lieu",
+    "placePlaceholder": "Paris CDG, terminal 2E, comptoirs d'enregistrement",
+    "details": "Précisions",
+    "detailsPlaceholder": "Devant les bornes libre-service, côté départ.",
+    "start": "Début",
+    "end": "Fin",
+    "send": "Proposer ce rendez-vous",
+    "sending": "Envoi…",
+    "proposeFailed": "Le rendez-vous n'a pas pu être proposé."
+  },
+  "system": {
+    "meetup.proposed": "Un rendez-vous a été proposé.",
+    "meetup.accepted": "Le rendez-vous est confirmé.",
+    "phone.revealed": "Le numéro de téléphone a été affiché."
+  }
+}

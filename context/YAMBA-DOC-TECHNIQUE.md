@@ -1553,3 +1553,19 @@ deal **485** (+7) · auth 103 · trip 209 · notification 78 · tsc ×6 + admin-
 
 ### Reste
 Chantier F chat (challenge) → C-PR8 paramètres audités (seuils réglables), RGPD, maintenance.
+
+# F-PR2 — `feat/f2-messaging-front` : la messagerie côté membres (D61, A135–A136)
+
+## Ce qui a été fait
+1. **Couche de données** (`components/dashboard/messages/`) : `messaging.types.ts` (miroir des contrats, aucune règle recalculée), `messaging.api.ts` (les neuf appels du message-service via le gateway), `hooks/useMessaging.ts` — sondage 3 s sur un fil ouvert, 20 s sur la liste, jamais en arrière-plan ; chaque mutation invalide le fil ET la liste (le dernier message et les non-lus vivent aux deux endroits).
+2. **Écrans** : `ConversationsList.tsx` (fil le plus actif en haut, non-lus, prochain rendez-vous), `ConversationThread.tsx` (fil groupé par jour, bulles par rôle, messages système, réponses rapides, saisie fermée quand le serveur le dit avec le bon motif, bouton du numéro avec l'heure d'ouverture, avertissement sur le code de livraison), `MeetupPanel.tsx` (rendez-vous courant, accepter réservé à l'autre partie, proposer ou contre-proposer), `sections/Messages.tsx` (deux colonnes sur grand écran, une sur mobile) — le placeholder « la messagerie arrive bientôt » disparaît.
+3. **Header** : la bulle lit `totalUnread` (elle était figée à 3 depuis le lot d'origine).
+4. **i18n** : namespace `messaging` (FR/EN, 27 namespaces au total), branché dans `i18n/request.ts`.
+5. **Notifications** (A136) : `messaging-events.consumer.ts` dans le notification-service, groupe et topic dédiés, notification in-app pour l'autre partie, 5 tests (claim, doublon, payload invalide, destinataire).
+6. **Workspace** : référence du nouveau projet ajoutée au `tsconfig.json` racine (`nx sync`).
+
+### Preuves
+notification **83** (+5) · message 14 · deal 485 · trip 209 · auth 103 · tsc ×7 + les deux fronts · miroir i18n OK (27 namespaces). Recette : FCH11–FCH16 (DOC-METIER).
+
+### Reste
+F-PR3 : email de relance des messages non lus (15 min, un par heure et par conversation), lecture admin depuis un dossier de médiation, signalement d'un message, purge à un an. Puis boutons « Message » sur les écrans de deal (tracker Expéditeur, deal Voyageur) et photos dans le fil.
