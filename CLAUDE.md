@@ -42,7 +42,7 @@ npx prisma db push                 # sync schema to MongoDB (no migrations — M
 npm run auth-docs                  # regenerate auth swagger-output.json (swagger-autogen — legacy, conversion to Zod-OpenAPI is backlog)
 ```
 
-Test platform baseline: **716 tests** (trip-service 198, deal-service 440, notification-service 78) + auth-service 80 (also a CI check) — any deviation must be explained.
+Test platform baseline: **718 tests** (trip-service 198, deal-service 442, notification-service 78) + auth-service 85 (also a CI check) — any deviation must be explained.
 
 Manual `tsc` (when Nx typecheck target is not what you want): `npx tsc --noEmit --project apps/<service>/tsconfig.app.json` — NEVER `--project apps/<service>` (resolves the solution-style tsconfig: 0 files checked).
 
@@ -74,7 +74,7 @@ Requests flow: `user-ui (3000)` → `api-gateway (8080)` → microservices. The 
 - `packages/libs/prisma` — singleton PrismaClient; **one shared MongoDB across all services**, schema at root `prisma/schema.prisma`
 - `packages/libs/redis` — ioredis singleton
 - `packages/middleware` — `isAuthenticated`, `isOptionallyAuthenticated`, `authorizeRoles` (JWT from `access_token` cookie or Bearer header)
-- `packages/error-handler`
+- `packages/error-handler` — errors + `initSentry(service)` / `captureServerError` (D56 7A): every service calls `initSentry("<name>")` first thing in `main.ts`; the shared error middleware captures 5xx and unhandled errors tagged with `service` + `x-correlation-id`. Inert without `SENTRY_DSN`. Fronts: `instrumentation-client.ts` / `instrumentation.ts` (`NEXT_PUBLIC_SENTRY_DSN`).
 - `packages/api-contracts` — Zod schemas + shared status sets, single source for OpenAPI; alias declared BEFORE the `@packages/*` wildcard in `tsconfig.base.json`
 - `packages/libs/payments` — `PaymentProvider` abstraction (D11/D38): Stripe (manual capture) + Fake (dev/tests, refused in production); factory from env
 - `packages/messaging` — `EventPublisher` interface; kafkajs isolated here (connection errors come back `retriable: false` — intercept explicitly)
@@ -84,7 +84,7 @@ Requests flow: `user-ui (3000)` → `api-gateway (8080)` → microservices. The 
 
 ### Admin (chantier C, D54)
 
-`apps/admin-ui` (port 3001, FR only, no next-intl) talks to the gateway through the same `/api` proxy. Admin sessions are SEPARATE from user sessions: cookies `admin_access_token` / `admin_refresh_token` / `admin_preauth`, Redis prefix `admin_jti:`, JWT claims `adm: true` + `amr: ["pwd","totp"]`, middleware `packages/middleware/isAdminAuthenticated.ts` (never reads `access_token`). Login is two-step (`POST /auth/admin/login` → `totp/verify` or `totp/setup` + `totp/enable`). The ADMIN role is only granted by `packages/libs/prisma/scripts/grant-admin.ts`. Admin routes live in the owning service (`/admin/disputes/*` in deal-service, `/admin/me`, `/admin/audit` in auth-service); gateway proxies `/api/admin/disputes` to deal-service, the rest of `/api/admin/*` to auth-service.
+`apps/admin-ui` (port 3001, FR only, no next-intl) talks to the gateway through the same `/api` proxy. Admin sessions are SEPARATE from user sessions: cookies `admin_access_token` / `admin_refresh_token` / `admin_preauth`, Redis prefix `admin_jti:`, JWT claims `adm: true` + `amr: ["pwd","totp"]`, middleware `packages/middleware/isAdminAuthenticated.ts` (never reads `access_token`). Login is two-step (`POST /auth/admin/login` → `totp/verify` or `totp/setup` + `totp/enable`). The ADMIN role is only granted by `packages/libs/prisma/scripts/grant-admin.ts <email> --role <SUPER_ADMIN|MEDIATOR|SUPPORT|FINANCE>` or by a SUPER_ADMIN invitation (D56): `User.adminRole` is REQUIRED to open an admin session, and route permissions come from `ADMIN_PERMISSIONS` in `packages/libs/api-contracts/src/admin/admin-users.schema.ts` (middleware `requireAdminPermission`). Account sanctions (`User.accountStatus` RESTRICTED / SUSPENDED) take effect through READS only: `isAuthenticated` (suspended → 401), `requireActiveAccount` on trip/booking creation, and a search filter on `user.accountStatus` — never a cross-service write. Admin routes live in the owning service (`/admin/disputes/*` in deal-service, `/admin/me`, `/admin/audit` in auth-service); gateway proxies `/api/admin/disputes` to deal-service, the rest of `/api/admin/*` to auth-service.
 
 ### Auth flow
 

@@ -74,6 +74,13 @@ export function disputeLoser(outcome: DisputeResolutionOutcome): "SHIPPER" | "CA
   return outcome === "REJECTED" ? "SHIPPER" : "CARRIER";
 }
 
+/** C-PR3 (D56) — conflit d'intérêts : un admin ne tranche jamais un deal dont il est partie. */
+export function assertNotParty(admin: { id: string }, booking: { shipperId: string; carrierId: string }): void {
+  if (admin.id === booking.shipperId || admin.id === booking.carrierId) {
+    throw new ForbiddenError("You are a party to this deal: another admin must decide.");
+  }
+}
+
 /* ══ Service ══════════════════════════════════════════════════ */
 
 type DisputeRow = {
@@ -145,6 +152,7 @@ export function makeDealMediationService(
     async resolveDispute(admin: AdminActor, dealId: string, input: AdminResolveDisputeRequest): Promise<AdminResolutionResponse> {
       const now = clock();
       const booking = await loadBookingForWrite(dealId);
+      assertNotParty(admin, booking);
       const action = input.outcome === "FULL_REFUND" ? "resolveDisputeRefund" : "resolveDisputeKeep";
       const check = canPerform(
         { ...booking, status: booking.status as BookingStatus, departureAt: booking.trip.departureAt } as Parameters<typeof canPerform>[0],
@@ -294,6 +302,7 @@ export function makeDealMediationService(
     async resolveRetention(admin: AdminActor, dealId: string, input: AdminResolveRetentionRequest): Promise<AdminResolutionResponse> {
       const now = clock();
       const booking = await loadBookingForWrite(dealId);
+      assertNotParty(admin, booking);
       if (booking.status !== "CANCELLED" || booking.retentionDisposition !== "HELD_FOR_MEDIATION") {
         throw new BookingLifecycleError("TRANSITION_NOT_ALLOWED", "This deal has no retention awaiting arbitration.");
       }

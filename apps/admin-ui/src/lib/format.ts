@@ -36,7 +36,19 @@ export const ACTION_LABEL: Record<string, string> = {
   DISPUTE_VIEWED: "Dossier consulté",
   DISPUTE_RESOLVED: "Litige tranché",
   RETENTION_ARBITRATED: "Retenue arbitrée",
+  ADMIN_INVITED: "Admin invité",
+  ADMIN_INVITE_ACCEPTED: "Invitation acceptée",
+  ADMIN_ROLE_CHANGED: "Profil admin modifié",
+  ADMIN_REVOKED: "Accès admin retiré",
+  ADMIN_SESSION_REVOKED: "Session révoquée",
+  USER_VIEWED: "Fiche consultée",
+  USER_SUSPENSION_PROPOSED: "Suspension proposée",
+  USER_SUSPENDED: "Compte suspendu",
+  USER_RESTRICTED: "Compte restreint",
+  USER_REINSTATED: "Compte rétabli",
 };
+
+export const STATUS_LABEL: Record<string, string> = { ACTIVE: "Actif", RESTRICTED: "Restreint", SUSPENDED: "Suspendu" };
 
 export const RESOLUTION_LABEL: Record<string, string> = {
   REJECTED: "Rejet : le Voyageur est payé en entier",

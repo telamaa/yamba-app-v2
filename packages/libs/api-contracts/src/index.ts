@@ -29,3 +29,4 @@ export * from "./notification/notification.schema";
 export * from "./trip/trip-pricing.schema";
 export * from "./trip/trip-favorite.schema";
 export * from "./admin/admin-dispute.schema";
+export * from "./admin/admin-users.schema";

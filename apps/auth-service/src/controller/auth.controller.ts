@@ -392,6 +392,8 @@ export const loginUser = async (req: Request, res: Response, next: NextFunction)
 
     const isMatch = await bcrypt.compare(String(password), user.passwordHash ?? "");
     if (!isMatch) return next(new AuthError("Invalid email or password"));
+    // C-PR3 (D56 2A) — un compte suspendu ne se connecte pas ; le motif est dans l'email reçu.
+    if ((user as { accountStatus?: string }).accountStatus === "SUSPENDED") return next(new AuthError("Account suspended"));
 
     const shouldRemember = Boolean(rememberMe);
     await issueSession(res, user, shouldRemember);

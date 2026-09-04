@@ -1,6 +1,8 @@
 import { Router } from "express";
 import isAuthenticated from "@packages/middleware/isAuthenticated";
 import isAdminAuthenticated from "@packages/middleware/isAdminAuthenticated";
+import requireActiveAccount from "@packages/middleware/requireActiveAccount";
+import { requireAdminPermission } from "@packages/middleware/requireAdminRole";
 import {
   getDeal,
   getMyBookings,
@@ -59,10 +61,10 @@ export const dealRatingService = makeDealRatingService();
 const dealRating = makeDealRatingController(dealRatingService);
 
 // Autorisation du montant (empreinte) — étape 1 de la demande (D37)
-router.post("/deals/payment-intents", isAuthenticated, dealRequest.createPaymentIntent);
+router.post("/deals/payment-intents", isAuthenticated, requireActiveAccount, dealRequest.createPaymentIntent); // C-PR3 (D56)
 
 // Naissance du deal (PENDING) — étape 2 : snapshot D17 + kg + outbox en transaction
-router.post("/deals", isAuthenticated, dealRequest.createBooking);
+router.post("/deals", isAuthenticated, requireActiveAccount, dealRequest.createBooking);
 
 // B2-PR2 — transitions (booking-state-machine, jamais un controller) :
 // accept = gate D31 + capture D39 · decline = libération + CAP-02 ·
@@ -109,9 +111,9 @@ router.get("/me/wallet", isAuthenticated, getMyWallet);
 
 // ── Chantier C (D54) : file « à arbitrer » + dossier, ADMIN + 2FA seulement ──
 const adminDisputes = makeAdminDisputeController(makeAdminDisputeService());
-router.get("/admin/disputes", isAdminAuthenticated, adminDisputes.listQueue);
-router.get("/admin/disputes/:id", isAdminAuthenticated, adminDisputes.getFile);
-router.post("/admin/disputes/:id/resolve", isAdminAuthenticated, dealMediation.resolveDispute);
-router.post("/admin/disputes/:id/retention", isAdminAuthenticated, dealMediation.resolveRetention);
+router.get("/admin/disputes", isAdminAuthenticated, requireAdminPermission("disputes.read"), adminDisputes.listQueue);
+router.get("/admin/disputes/:id", isAdminAuthenticated, requireAdminPermission("disputes.read"), adminDisputes.getFile);
+router.post("/admin/disputes/:id/resolve", isAdminAuthenticated, requireAdminPermission("disputes.decide"), dealMediation.resolveDispute);
+router.post("/admin/disputes/:id/retention", isAdminAuthenticated, requireAdminPermission("disputes.decide"), dealMediation.resolveRetention);
 
 export default router;

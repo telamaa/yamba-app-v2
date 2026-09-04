@@ -101,6 +101,9 @@ function buildCopy(lang: string) {
     rateLimitError: fr
       ? "Trop de tentatives. Réessaie dans quelques instants."
       : "Too many attempts. Please try again in a moment.",
+    accountSuspended: fr
+      ? "Ton compte est suspendu. Consulte l'email reçu ou écris au support pour contester."
+      : "Your account is suspended. Check the email you received or write to support to contest.",
   };
 }
 
@@ -116,6 +119,8 @@ function normalizeMessage(message?: string | null) {
 function localizeLoginError(message: string | undefined, copy: Copy) {
   const normalized = normalizeMessage(message);
   if (!normalized) return copy.genericError;
+
+  if (normalized === "account suspended") return copy.accountSuspended;
 
   if (
     normalized === "invalid email or password" ||

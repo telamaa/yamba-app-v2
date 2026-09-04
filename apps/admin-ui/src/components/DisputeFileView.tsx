@@ -12,11 +12,18 @@ import Link from "next/link";
 import { apiFetch, ApiError } from "@/lib/api";
 import { CATEGORY_LABEL, OUTCOME_LABEL, RESOLUTION_LABEL, STEP_LABEL, dateTime, money } from "@/lib/format";
 import DecisionForm from "./DecisionForm";
+import { can } from "@/lib/permissions";
+import type { AdminMe } from "@/lib/types";
 import type { AdminDisputeFile, Party } from "@/lib/types";
 
 export default function DisputeFileView({ bookingId }: { bookingId: string }) {
   const [file, setFile] = useState<AdminDisputeFile | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [me, setMe] = useState<AdminMe | null>(null);
+
+  useEffect(() => {
+    apiFetch<AdminMe>("/admin/me").then(setMe).catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     apiFetch<AdminDisputeFile>(`/admin/disputes/${bookingId}`)
@@ -127,7 +134,7 @@ export default function DisputeFileView({ bookingId }: { bookingId: string }) {
       )}
 
       <div className="mt-5">
-        <DecisionForm file={file} />
+        <DecisionForm file={file} canDecide={can(me?.adminRole, "disputes.decide")} />
       </div>
     </div>
   );

@@ -12,6 +12,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { apiFetch, post } from "@/lib/api";
 import type { AdminMe } from "@/lib/types";
+import { ROLE_LABEL, can } from "@/lib/permissions";
 
 export default function AdminShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -32,8 +33,11 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
   if (!me) return <div className="p-8 text-[13px] text-slate-500">Vérification de la session…</div>;
 
   const nav = [
-    { href: "/disputes", label: "À arbitrer" },
-    { href: "/audit", label: "Journal" },
+    ...(can(me.adminRole, "disputes.read") ? [{ href: "/disputes", label: "À arbitrer" }] : []),
+    ...(can(me.adminRole, "users.read") ? [{ href: "/users", label: "Utilisateurs" }] : []),
+    ...(can(me.adminRole, "audit.read") ? [{ href: "/audit", label: "Journal" }] : []),
+    ...(can(me.adminRole, "admins.manage") ? [{ href: "/admins", label: "Comptes admin" }] : []),
+    { href: "/sessions", label: "Mes sessions" },
   ];
 
   return (
@@ -41,6 +45,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
       <aside className="w-56 shrink-0 border-r border-slate-200 bg-white p-4">
         <p className="text-[15px] font-bold">Yamba · Admin</p>
         <p className="mt-0.5 text-[12px] text-slate-500">{me.firstName} {me.lastName}</p>
+        <p className="text-[11px] font-semibold text-slate-700">{me.adminRole ? ROLE_LABEL[me.adminRole] : "—"}</p>
         <nav className="mt-6 space-y-1">
           {nav.map((n) => (
             <Link key={n.href} href={n.href} className={`block rounded-lg px-3 py-2 text-[13.5px] font-medium ${pathname.startsWith(n.href) ? "bg-slate-900 text-white" : "text-slate-700 hover:bg-slate-100"}`}>

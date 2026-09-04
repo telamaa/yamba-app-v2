@@ -1,3 +1,6 @@
+import { initSentry } from "@packages/error-handler";
+// C-PR3 (D56 7A) — Sentry : inerte sans SENTRY_DSN ; 5xx tagués du service et de l'identifiant de corrélation.
+initSentry("trip-service");
 import express from 'express';
 // Cron quotidien : PUBLISHED/PAUSED → COMPLETED (arrivée + 24h)
 import { startCompleteTripsCron } from "./cron/complete-trips.cron";

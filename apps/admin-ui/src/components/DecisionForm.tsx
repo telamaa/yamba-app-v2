@@ -14,7 +14,7 @@ import type { AdminDisputeFile, AdminResolutionResponse, DisputeResolutionOutcom
 
 const MIN_REASON = 50;
 
-export default function DecisionForm({ file }: { file: AdminDisputeFile }) {
+export default function DecisionForm({ file, canDecide = true }: { file: AdminDisputeFile; canDecide?: boolean }) {
   const router = useRouter();
   const cur = file.money.currencyCode;
   const total = file.money.totalShipperCents;
@@ -81,6 +81,9 @@ export default function DecisionForm({ file }: { file: AdminDisputeFile }) {
     );
   }
 
+  if (!canDecide) {
+    return <section className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-[13px] text-slate-600">Ton profil lit ce dossier mais ne tranche pas (médiateur ou super administrateur).</section>;
+  }
   if (!file.canDecide) {
     return (
       <section className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-[13px] text-slate-600">

@@ -22,6 +22,9 @@
  * naissance — chaque requête porte un id traçable de bout en bout,
  * qui suit les événements outbox → Kafka (relay PR4).
  */
+import { initSentry } from "@packages/error-handler";
+// C-PR3 (D56 7A) — Sentry : inerte sans SENTRY_DSN ; 5xx tagués du service et de l'identifiant de corrélation.
+initSentry("deal-service");
 import express from "express";
 import cors from "cors";
 import cookieParser = require("cookie-parser");

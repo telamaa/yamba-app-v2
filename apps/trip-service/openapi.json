@@ -13591,6 +13591,770 @@
           "resolvedAt"
         ],
         "additionalProperties": false
+      },
+      "AdminRole": {
+        "type": "string",
+        "enum": [
+          "SUPER_ADMIN",
+          "MEDIATOR",
+          "SUPPORT",
+          "FINANCE"
+        ]
+      },
+      "AccountStatus": {
+        "type": "string",
+        "enum": [
+          "ACTIVE",
+          "RESTRICTED",
+          "SUSPENDED"
+        ]
+      },
+      "AdminUserSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/ObjectId"
+          },
+          "firstName": {
+            "type": "string"
+          },
+          "lastName": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "phoneE164": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "adminRole": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AdminRole"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "accountStatus": {
+            "$ref": "#/components/schemas/AccountStatus"
+          },
+          "carrierStatus": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          },
+          "matchedOn": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What the search matched: email | name | phone | dealId | ticket"
+          }
+        },
+        "required": [
+          "id",
+          "firstName",
+          "lastName",
+          "email",
+          "phoneE164",
+          "roles",
+          "adminRole",
+          "accountStatus",
+          "carrierStatus",
+          "createdAt",
+          "matchedOn"
+        ],
+        "additionalProperties": false
+      },
+      "AdminUsersResponse": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminUserSummary"
+            }
+          },
+          "total": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "items",
+          "total"
+        ],
+        "additionalProperties": false
+      },
+      "AdminUserFile": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/ObjectId"
+          },
+          "firstName": {
+            "type": "string"
+          },
+          "lastName": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "phoneE164": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "preferredLocale": {
+            "type": "string"
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "adminRole": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AdminRole"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "accountStatus": {
+            "$ref": "#/components/schemas/AccountStatus"
+          },
+          "suspension": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "level": {
+                    "$ref": "#/components/schemas/AccountStatus"
+                  },
+                  "reason": {
+                    "type": "string"
+                  },
+                  "until": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "date-time",
+                        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "at": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                  },
+                  "byAdmin": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "level",
+                  "reason",
+                  "until",
+                  "at",
+                  "byAdmin"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "suspensionProposal": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "level": {
+                    "type": "string"
+                  },
+                  "reason": {
+                    "type": "string"
+                  },
+                  "byAdmin": {
+                    "type": "string"
+                  },
+                  "at": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                  }
+                },
+                "required": [
+                  "level",
+                  "reason",
+                  "byAdmin",
+                  "at"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          },
+          "isDeleted": {
+            "type": "boolean"
+          },
+          "isMe": {
+            "type": "boolean",
+            "description": "The admin reading the file IS this user (conflict of interest guard)"
+          },
+          "carrier": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string"
+                  },
+                  "stripeAccountId": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Masked (acct_…xxxx)"
+                  },
+                  "stripeChargesEnabled": {
+                    "type": "boolean"
+                  },
+                  "stripePayoutsEnabled": {
+                    "type": "boolean"
+                  },
+                  "reputationLevel": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "ratingsAvg": {
+                    "type": "number"
+                  },
+                  "ratingsCount": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "completedDealsCount": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "lateCancellationsCount": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "disputesLostCount": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "status",
+                  "stripeAccountId",
+                  "stripeChargesEnabled",
+                  "stripePayoutsEnabled",
+                  "reputationLevel",
+                  "ratingsAvg",
+                  "ratingsCount",
+                  "completedDealsCount",
+                  "lateCancellationsCount",
+                  "disputesLostCount"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "shipper": {
+            "type": "object",
+            "properties": {
+              "reputationLevel": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "ratingsAvg": {
+                "type": "number"
+              },
+              "ratingsCount": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "completedDealsCount": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "lateCancellationsCount": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "disputesLostCount": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "reputationLevel",
+              "ratingsAvg",
+              "ratingsCount",
+              "completedDealsCount",
+              "lateCancellationsCount",
+              "disputesLostCount"
+            ],
+            "additionalProperties": false
+          },
+          "activity": {
+            "type": "object",
+            "properties": {
+              "trips": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "$ref": "#/components/schemas/ObjectId"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "originCity": {
+                      "type": "string"
+                    },
+                    "destinationCity": {
+                      "type": "string"
+                    },
+                    "departureAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "status",
+                    "originCity",
+                    "destinationCity",
+                    "departureAt"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "deals": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "$ref": "#/components/schemas/ObjectId"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "role": {
+                      "type": "string",
+                      "enum": [
+                        "SHIPPER",
+                        "CARRIER"
+                      ]
+                    },
+                    "originCity": {
+                      "type": "string"
+                    },
+                    "destinationCity": {
+                      "type": "string"
+                    },
+                    "totalShipperCents": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "transportCents": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "currencyCode": {
+                      "type": "string"
+                    },
+                    "disputeTicket": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "requestedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "status",
+                    "role",
+                    "originCity",
+                    "destinationCity",
+                    "totalShipperCents",
+                    "transportCents",
+                    "currencyCode",
+                    "disputeTicket",
+                    "requestedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "activeDealsCount": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "activeSessionsCount": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "trips",
+              "deals",
+              "activeDealsCount",
+              "activeSessionsCount"
+            ],
+            "additionalProperties": false
+          },
+          "adminActions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "$ref": "#/components/schemas/ObjectId"
+                },
+                "at": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                },
+                "admin": {
+                  "type": "string"
+                },
+                "action": {
+                  "type": "string"
+                },
+                "after": {
+                  "anyOf": [
+                    {},
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "at",
+                "admin",
+                "action",
+                "after"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "id",
+          "firstName",
+          "lastName",
+          "email",
+          "phoneE164",
+          "preferredLocale",
+          "roles",
+          "adminRole",
+          "accountStatus",
+          "suspension",
+          "suspensionProposal",
+          "createdAt",
+          "isDeleted",
+          "isMe",
+          "carrier",
+          "shipper",
+          "activity",
+          "adminActions"
+        ],
+        "additionalProperties": false,
+        "description": "Everything an operator needs on a user — never a secret, never a delivery code"
+      },
+      "ProposeSuspensionRequest": {
+        "type": "object",
+        "properties": {
+          "level": {
+            "type": "string",
+            "enum": [
+              "RESTRICTED",
+              "SUSPENDED"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 20,
+            "maxLength": 2000
+          }
+        },
+        "required": [
+          "level",
+          "reason"
+        ],
+        "additionalProperties": false,
+        "description": "SUPPORT proposes; MEDIATOR / SUPER_ADMIN executes (D56 3A)"
+      },
+      "ApplySuspensionRequest": {
+        "type": "object",
+        "properties": {
+          "level": {
+            "type": "string",
+            "enum": [
+              "RESTRICTED",
+              "SUSPENDED"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 20,
+            "maxLength": 2000
+          },
+          "until": {
+            "description": "Optional end; absent = until lifted",
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          }
+        },
+        "required": [
+          "level",
+          "reason"
+        ],
+        "additionalProperties": false
+      },
+      "LiftSuspensionRequest": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "minLength": 20,
+            "maxLength": 2000
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "additionalProperties": false
+      },
+      "InviteAdminRequest": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+          },
+          "firstName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 60
+          },
+          "lastName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 60
+          },
+          "adminRole": {
+            "$ref": "#/components/schemas/AdminRole"
+          }
+        },
+        "required": [
+          "email",
+          "firstName",
+          "lastName",
+          "adminRole"
+        ],
+        "additionalProperties": false,
+        "description": "SUPER_ADMIN only. New account: no client role, password set through the emailed link (48h)."
+      },
+      "AcceptAdminInviteRequest": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "minLength": 32,
+            "maxLength": 128
+          },
+          "password": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128
+          }
+        },
+        "required": [
+          "token",
+          "password"
+        ],
+        "additionalProperties": false
+      },
+      "UpdateAdminRoleRequest": {
+        "type": "object",
+        "properties": {
+          "adminRole": {
+            "$ref": "#/components/schemas/AdminRole"
+          }
+        },
+        "required": [
+          "adminRole"
+        ],
+        "additionalProperties": false
+      },
+      "AdminAccount": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/ObjectId"
+          },
+          "firstName": {
+            "type": "string"
+          },
+          "lastName": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "adminRole": {
+            "$ref": "#/components/schemas/AdminRole"
+          },
+          "totpEnabled": {
+            "type": "boolean"
+          },
+          "inviteAccepted": {
+            "type": "boolean",
+            "description": "false while the invited account has no password yet"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          }
+        },
+        "required": [
+          "id",
+          "firstName",
+          "lastName",
+          "email",
+          "adminRole",
+          "totpEnabled",
+          "inviteAccepted",
+          "createdAt"
+        ],
+        "additionalProperties": false
+      },
+      "AdminSessionItem": {
+        "type": "object",
+        "properties": {
+          "jti": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          },
+          "lastActivityAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          },
+          "current": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "jti",
+          "createdAt",
+          "lastActivityAt",
+          "current"
+        ],
+        "additionalProperties": false
       }
     },
     "securitySchemes": {
