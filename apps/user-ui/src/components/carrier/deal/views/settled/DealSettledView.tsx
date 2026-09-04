@@ -11,7 +11,7 @@
  */
 "use client";
 
-import { CheckCircle2, LifeBuoy, PackageCheck, ShieldAlert } from "lucide-react";
+import { CheckCircle2, PackageCheck, ShieldAlert } from "lucide-react";
 import { useFormatter, useTranslations } from "next-intl";
 import type { DealRequest } from "@/components/carrier/deal/deal.types";
 import DealAcceptedHeader from "../accepted/DealAcceptedHeader";
@@ -21,8 +21,8 @@ import DealPayoutStatusCard from "../../shared/DealPayoutStatusCard";
 import DealStepper, { type StepperStep } from "../../shared/DealStepper";
 import PhotoThumbs from "@/components/shared/photos/PhotoThumbs";
 import RatingStatusCard from "@/components/rating/RatingStatusCard";
-
-const SUPPORT_EMAIL = process.env.NEXT_PUBLIC_SUPPORT_EMAIL ?? "support@yamba.app";
+import MediationDecisionCard from "@/components/shared/mediation/MediationDecisionCard";
+import DisputeStatementCard from "./DisputeStatementCard";
 
 type Props = {
   deal: DealRequest;
@@ -96,6 +96,10 @@ export default function DealSettledView({ deal, variant, onCloseAction }: Props)
       </header>
 
       {status === "DISPUTED" ? <DisputedCard deal={deal} compact={compact} /> : <DealPayoutStatusCard deal={deal} compact={compact} />}
+      {/* C-PR2 (D55 5A) — la décision, lue par le Voyageur : issue, son montant, le motif. */}
+      {deal.dispute?.resolution && (
+        <MediationDecisionCard role="CARRIER" ticket={deal.dispute.ticketNumber} resolution={deal.dispute.resolution} compact={compact} />
+      )}
 
       {status === "DELIVERED" && (
         <p className="rounded-xl bg-slate-50 px-4 py-3 text-[12.5px] leading-snug text-slate-600 dark:bg-slate-900 dark:text-slate-400">
@@ -112,7 +116,7 @@ export default function DealSettledView({ deal, variant, onCloseAction }: Props)
         </section>
       )}
 
-      {status === "DISPUTED" && <DisputeSupportCard deal={deal} compact={compact} />}
+      {status === "DISPUTED" && <DisputeStatementCard deal={deal} compact={compact} />}
 
       <DealAcceptedRecap deal={deal} />
 
@@ -192,25 +196,6 @@ function DisputedCard({ deal, compact }: { deal: DealRequest; compact: boolean }
           </li>
         ))}
       </ol>
-    </section>
-  );
-}
-
-function DisputeSupportCard({ deal, compact }: { deal: DealRequest; compact: boolean }) {
-  const t = useTranslations("carrierDealAccepted.settled.disputed");
-  const ticket = deal.disputeTicket ?? "";
-  const subject = encodeURIComponent(`Yamba — dossier ${ticket} — ma version`);
-  return (
-    <section className={`rounded-2xl border border-slate-200 bg-white text-center dark:border-slate-800 dark:bg-slate-950 ${compact ? "p-4" : "p-5"}`}>
-      <LifeBuoy size={18} className="mx-auto text-slate-500 dark:text-slate-400" aria-hidden="true" />
-      <h3 className="mt-2 text-[13.5px] font-bold text-slate-900 dark:text-white">{t("support.title")}</h3>
-      <p className="mx-auto mt-1 max-w-xs text-[12px] leading-snug text-slate-600 dark:text-slate-400">{t("support.text", { ticket })}</p>
-      <a
-        href={`mailto:${SUPPORT_EMAIL}?subject=${subject}`}
-        className="mt-3 inline-flex min-h-[40px] items-center justify-center rounded-xl bg-[#FF9900] px-4 text-[12.5px] font-bold text-slate-950 hover:bg-[#F08700]"
-      >
-        {t("support.cta")}
-      </a>
     </section>
   );
 }

@@ -16,6 +16,7 @@ import {
   CANCEL_FULL_REFUND_UNTIL_HOURS,
   CANCEL_LATE_RETENTION_PCT,
 } from "./booking-lifecycle";
+import { DISPUTE_RESPONSE_DELAY_HOURS, type DisputeResolutionView, type RetentionDecisionView } from "@packages/api-contracts";
 
 /**
  * booking-view.mapper.ts
@@ -120,6 +121,11 @@ export type BookingRecord = {
 
   disputeTicket: string | null;
   disputedAt: Date | null;
+  /** C-PR2 (D54 4B) — "ADMIN" quand le deal a été clos par médiation : aucune notation. */
+  completedBy?: string | null;
+  // C-PR2 (D55 3A) — arbitrage d'une retenue
+  retentionDecisionReason?: string | null;
+  retentionDecidedAt?: Date | null;
 
   // B4 — absents sur les enregistrements antérieurs
   payoutStatus?: string | null;
@@ -131,6 +137,7 @@ export type BookingRecord = {
   capturedAt?: Date | null;
   refundedAt?: Date | null;
   refundAmountCents?: number | null;
+  retentionCents?: number | null;
   // B5
   ratingWindowEndsAt?: Date | null;
   shipperRatedAt?: Date | null;
@@ -149,7 +156,37 @@ export type DisputeRecord = {
   desiredOutcome: string | null;
   photoUrls: string[];
   createdAt: Date;
+  // C-PR2 (D55) — état de la version du Voyageur et décision (optionnels : anciens appels)
+  status?: string | null;
+  carrierRespondedAt?: Date | null;
+  resolutionOutcome?: string | null;
+  resolutionRefundCents?: number | null;
+  resolutionCarrierPayoutCents?: number | null;
+  resolutionReason?: string | null;
+  resolvedAt?: Date | null;
 };
+
+/** C-PR2 — la décision telle que les DEUX parties la lisent (issue, montants, motif). */
+export function toDisputeResolution(d: DisputeRecord): DisputeResolutionView | null {
+  if (!d.resolvedAt || !d.resolutionOutcome) return null;
+  return {
+    outcome: d.resolutionOutcome as DisputeResolutionView["outcome"],
+    refundCents: d.resolutionRefundCents ?? 0,
+    carrierPayoutCents: d.resolutionCarrierPayoutCents ?? 0,
+    reason: d.resolutionReason ?? "",
+    resolvedAt: toIsoRequired(d.resolvedAt),
+  };
+}
+
+/** C-PR2 (3A) — l'arbitrage d'une retenue, lisible par les deux parties. */
+export function toRetentionDecision(b: Pick<BookingRecord, "retentionDisposition" | "retentionDecisionReason" | "retentionDecidedAt">): RetentionDecisionView | null {
+  if (!b.retentionDecidedAt || (b.retentionDisposition !== "CARRIER" && b.retentionDisposition !== "SHIPPER")) return null;
+  return {
+    outcome: b.retentionDisposition === "CARRIER" ? "COMPENSATE_CARRIER" : "RESTITUTE_SHIPPER",
+    reason: b.retentionDecisionReason ?? "",
+    decidedAt: toIsoRequired(b.retentionDecidedAt),
+  };
+}
 
 /** Contrepartie chargée par le controller (jointure explicite). */
 export type CounterpartRecord = {
@@ -219,6 +256,8 @@ const toTrackingEvents = (events: BookingRecord["trackingEvents"]) =>
 
 /** B5/D53 — l'état de notation pour un rôle (bouton « Noter », « note envoyée », révélé). */
 const toRatingState = (b: BookingRecord, role: "SHIPPER" | "CARRIER", now: Date): ShipperBookingView["rating"] => {
+  // C-PR2 (D54 4B) — clos par médiation : aucune surface de notation.
+  if (b.completedBy === "ADMIN") return null;
   if (b.status !== "COMPLETED") return null;
   const check = canRate(
     { status: "COMPLETED", isDeleted: false, ratingWindowEndsAt: b.ratingWindowEndsAt ?? null, shipperRatedAt: b.shipperRatedAt ?? null, carrierRatedAt: b.carrierRatedAt ?? null },
@@ -366,6 +405,7 @@ export function toShipperBookingView(
     capturedAt: toIso(booking.capturedAt ?? null),
     refundedAt: toIso(booking.refundedAt ?? null),
     refundAmountCents: booking.refundAmountCents ?? null,
+    retentionCents: booking.retentionCents ?? null,
 
     // B5 — état de notation du rôle Expéditeur.
     rating: toRatingState(booking, "SHIPPER", now),
@@ -376,9 +416,10 @@ export function toShipperBookingView(
         ? new Date(booking.trip.departureAt.getTime() + DISPUTE_AFTER_DEPARTURE_HOURS * 3_600_000).toISOString()
         : null,
 
-    // A68 — le dossier n'est servi qu'à l'Expéditeur, et seulement en DISPUTED.
+    // A68 — le dossier n'est servi qu'à l'Expéditeur ; C-PR2 : pendant le litige ET après la décision.
+    retentionDecision: toRetentionDecision(booking),
     dispute:
-      dispute && booking.status === "DISPUTED"
+      dispute
         ? {
             ticketNumber: dispute.ticketNumber,
             category: dispute.category as ShipperBookingView["dispute"] extends infer D
@@ -390,6 +431,8 @@ export function toShipperBookingView(
             desiredOutcome: (dispute.desiredOutcome as NonNullable<ShipperBookingView["dispute"]>["desiredOutcome"]) ?? null,
             photoUrls: dispute.photoUrls,
             createdAt: toIsoRequired(dispute.createdAt),
+            carrierRespondedAt: toIso(dispute.carrierRespondedAt ?? null),
+            resolution: toDisputeResolution(dispute),
           }
         : null,
   };
@@ -453,6 +496,20 @@ export function toCarrierBookingView(
       dispute && booking.status === "DISPUTED"
         ? (dispute.category as CarrierBookingView["disputeCategory"])
         : null,
+    // C-PR2 (D55) — sa version (état), l'échéance, la décision ; jamais le dossier de l'Expéditeur.
+    dispute:
+      dispute && booking.disputedAt
+        ? {
+            ticketNumber: dispute.ticketNumber,
+            category: dispute.category as NonNullable<CarrierBookingView["dispute"]>["category"],
+            disputedAt: toIsoRequired(booking.disputedAt),
+            canRespond: booking.status === "DISPUTED" && !dispute.carrierRespondedAt && !dispute.resolvedAt,
+            responseDeadlineAt: new Date(booking.disputedAt.getTime() + DISPUTE_RESPONSE_DELAY_HOURS * 3_600_000).toISOString(),
+            respondedAt: toIso(dispute.carrierRespondedAt ?? null),
+            resolution: toDisputeResolution(dispute),
+          }
+        : null,
+    retentionDecision: toRetentionDecision(booking),
   };
 }
 

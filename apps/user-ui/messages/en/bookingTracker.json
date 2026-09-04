@@ -539,6 +539,10 @@
       "stateFrozen": "Frozen",
       "note": "No payout will be made to {carrierFirstName} until the review ends. If a refund applies, it will be confirmed by email."
     },
-    "backToShipments": "View my shipments"
+    "backToShipments": "View my shipments",
+    "carrierSide": {
+      "received": "{carrierFirstName} gave their side. The decision comes within 5 business days.",
+      "pending": "We asked {carrierFirstName} for their side (72h)."
+    }
   }
 }

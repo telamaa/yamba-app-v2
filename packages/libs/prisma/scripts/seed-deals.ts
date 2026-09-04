@@ -269,6 +269,9 @@ const BOOKINGS: SeedBooking[] = [
     milestones: { requestedAt: days(-2), expiresAt: days(-1), closedAt: hours(-30), closedBy: "CARRIER", declineReason: "category_mismatch" } },
   { key: "fih-cancelled", tripKey: "fih", shipperKey: "marieclaire", status: "CANCELLED", weightKg: 3, category: "DOCUMENTS", description: "Actes de naissance", declaredValueCents: 2000, pricing: perCategory(2500), recipient: RCP_FIH,
     milestones: { requestedAt: days(-4), expiresAt: days(-3), closedAt: days(-3), closedBy: "SHIPPER" } },
+  // C-PR2 (A81/D55 3A) — annulée APRÈS le départ sans prise en charge : retenue 50 % « à arbitrer » (file admin, MED8).
+  { key: "bzv-held", tripKey: "bzv-inflight", shipperKey: "aminata", status: "CANCELLED", weightKg: 2, category: "COSMETICS", description: "Produits de beauté", declaredValueCents: 6000, pricing: perCategory(2600), recipient: RCP_BZV,
+    milestones: { requestedAt: days(-9), expiresAt: days(-8), acceptedAt: days(-8), closedAt: days(-4), closedBy: "SHIPPER", cancelReason: "Le Voyageur ne s'est pas présenté au rendez-vous" } },
 ];
 
 /* ══ Exécution ════════════════════════════════════════════════ */
@@ -451,6 +454,23 @@ async function main() {
           payoutSentAt: m.completedAt ?? NOW,
           payoutAttempts: 1,
           transferId: `tr_fake_seed_${b.key}`,
+        },
+      });
+    }
+    if (b.status === "CANCELLED" && b.key.endsWith("-held")) {
+      // A81 — paiement capturé à l'acceptation, remboursé à 50 %, retenue conservée « à arbitrer ».
+      const pricing = (booking as unknown as { pricing: { totalShipperCents: number } }).pricing;
+      const retentionCents = Math.round(pricing.totalShipperCents / 2);
+      const closedAt = (b.milestones as { closedAt?: Date }).closedAt ?? NOW;
+      await prisma.booking.update({
+        where: { id: booking.id },
+        data: {
+          capturedAt: (b.milestones as { acceptedAt?: Date }).acceptedAt ?? NOW,
+          chargeId: `ch_fake_seed_${b.key}`,
+          refundedAt: closedAt,
+          refundAmountCents: pricing.totalShipperCents - retentionCents,
+          retentionCents,
+          retentionDisposition: "HELD_FOR_MEDIATION",
         },
       });
     }

@@ -57,6 +57,10 @@ export const BOOKING_WRITE_SELECT = {
   transferId: true,
   retentionCents: true,
   retentionDisposition: true,
+  // C-PR2 (D55) — médiation
+  disputedAt: true,
+  disputeTicket: true,
+  refundAmountCents: true,
 } as const;
 
 export type BookingForWrite = {
@@ -89,6 +93,9 @@ export type BookingForWrite = {
   transferId?: string | null;
   retentionCents?: number | null;
   retentionDisposition?: string | null;
+  disputedAt?: Date | null;
+  disputeTicket?: string | null;
+  refundAmountCents?: number | null;
 } & BookingSnapshotsForLifecycle;
 
 /** Normalise un enregistrement Prisma (ou un mock de test) en BookingForWrite. */

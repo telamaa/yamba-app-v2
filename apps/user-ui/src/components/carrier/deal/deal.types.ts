@@ -137,8 +137,29 @@ export type DealRequest = {
   payoutAmountCents?: number;
   /** B5 — état de notation de MON rôle (servi). */
   rating?: { windowEndsAt: string | null; ratedByMe: boolean; counterpartHasRated: boolean; revealedAt: string | null; canRate: boolean } | null;
-  /** Annulation tardive : la retenue est versée (CARRIER) ou conservée « à arbitrer » (HELD_FOR_MEDIATION, A81). */
-  retentionDisposition?: "CARRIER" | "HELD_FOR_MEDIATION";
+  /** Annulation tardive : la retenue est versée (CARRIER), restituée (SHIPPER, C-PR2) ou conservée « à arbitrer » (HELD_FOR_MEDIATION, A81). */
+  retentionDisposition?: "CARRIER" | "SHIPPER" | "HELD_FOR_MEDIATION";
+  /** C-PR2 (D55) — ce que le Voyageur voit du litige : sa version, l'échéance, la décision. */
+  dispute?: DealDisputeView;
+  /** C-PR2 (D55 3A) — arbitrage d'une retenue. */
+  retentionDecision?: { outcome: "COMPENSATE_CARRIER" | "RESTITUTE_SHIPPER"; reason: string; decidedAt: string };
+};
+
+export type DealDisputeResolution = {
+  outcome: "REJECTED" | "PARTIAL_REFUND" | "FULL_REFUND";
+  refundCents: number;
+  carrierPayoutCents: number;
+  reason: string;
+  resolvedAt: string;
+};
+export type DealDisputeView = {
+  ticketNumber: string;
+  category: DealDisputeCategory;
+  disputedAt: string;
+  canRespond: boolean;
+  responseDeadlineAt: string;
+  respondedAt: string | null;
+  resolution: DealDisputeResolution | null;
 };
 
 export type DealPayoutStatus = "PENDING" | "SENT" | "FAILED" | "FROZEN" | "REVERSED";

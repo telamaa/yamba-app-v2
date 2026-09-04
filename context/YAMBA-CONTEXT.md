@@ -294,7 +294,11 @@ Ordre de demarrage : auth -> trip -> gateway.
   transaction, file « a arbitrer » + dossier en lecture, grant-admin.ts.
   Mergee #148. Suite : C-PR2 mediation (decisions + argent), C-PR3 signalements, C-PR4
   parametres, C-PR5 billets.
-- Plateforme de tests : 700 (trip 198, deal 424, notification 78) + auth 80.
+- 04/09 : C-PR2 feat/c2-mediation (D55, A102–A104, decisions 1A–7A) — version du
+  Voyageur dans l'app (72 h), decisions rejet/partiel/total + retenue, argent
+  remboursement puis executeur, pas de note apres mediation, ecrans des deux roles,
+  admin-ui decision, seed bzv-held. Suite : C-PR3 signalements.
+- Plateforme de tests : 716 (trip 198, deal 440, notification 78) + auth 80.
 - (historique) Plateforme de tests : 600 (trip 187, deal 354, notification 59) — post-B3 (#96).
 - MERGE 01/09 : toute la pile B2 est dans `dev` via la SEULE **PR #90**
   (`feat/b2-deal-front` portait la chaîne complète : jalons mobile D36,

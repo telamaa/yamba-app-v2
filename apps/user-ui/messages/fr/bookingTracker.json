@@ -539,6 +539,10 @@
       "stateFrozen": "Gelé",
       "note": "Aucun versement ne sera fait à {carrierFirstName} avant la fin de l''examen. Si un remboursement s''applique, il te sera confirmé par email."
     },
-    "backToShipments": "Voir mes envois"
+    "backToShipments": "Voir mes envois",
+    "carrierSide": {
+      "received": "{carrierFirstName} a donné sa version. La décision arrive sous 5 jours ouvrés.",
+      "pending": "Nous avons demandé sa version à {carrierFirstName} (72 h)."
+    }
   }
 }

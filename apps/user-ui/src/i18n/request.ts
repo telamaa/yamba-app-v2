@@ -32,6 +32,7 @@ export default getRequestConfig(async ({ requestLocale }) => {
     notifications, // ✨ NEW dashboard notifications (PR5)
     favorites, // D46 — Mes favoris
     finances, // A83 — Finances (portefeuille + paiements)
+    mediation, // C-PR2 (D55) — décision de médiation, version du Voyageur
   ] = await Promise.all([
     import(`../../messages/${locale}/common.json`),
     import(`../../messages/${locale}/home.json`),
@@ -58,6 +59,7 @@ export default getRequestConfig(async ({ requestLocale }) => {
     import(`../../messages/${locale}/notifications.json`), // ✨ NEW dashboard notifications (PR5)
     import(`../../messages/${locale}/favorites.json`), // D46
     import(`../../messages/${locale}/finances.json`), // A83
+    import(`../../messages/${locale}/mediation.json`), // C-PR2
   ]);
   return {
     locale,
@@ -87,6 +89,7 @@ export default getRequestConfig(async ({ requestLocale }) => {
       notifications: notifications.default, // ✨ NEW dashboard notifications (PR5)
       favorites: favorites.default, // D46
       finances: finances.default, // A83
+      mediation: mediation.default, // C-PR2
     },
   };
 });

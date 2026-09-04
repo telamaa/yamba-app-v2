@@ -592,6 +592,47 @@ export function buildOpenApiDocument() {
           responses: { "200": jsonResponse("AdminDisputeFile", "File"), "401": response401, "403": response403, "404": response404, "500": response500 },
         },
       },
+      "/deals/{id}/dispute/statement": {
+        post: {
+          tags: ["deals"],
+          summary: "Carrier's statement on an open dispute (C-PR2, D55) — once, ≥ 50 chars, ≤ 5 photos",
+          description:
+            "Carrier only, status DISPUTED, dispute OPEN. Writes the statement + outbox booking.dispute_carrier_responded in one " +
+            "transaction. The admin may decide as soon as the statement is in, or 72h after the dispute was filed.",
+          operationId: "submitCarrierDisputeStatement",
+          security: authSecurity,
+          parameters: [dealIdPathParam],
+          requestBody: { required: true, content: { "application/json": { schema: ref("CarrierDisputeStatementRequest") } } },
+          responses: { "201": jsonResponse("CarrierDisputeStatementResponse", "Statement recorded"), "400": response400, "401": response401, "403": response403, "404": response404, "409": response409Settlement, "500": response500 },
+        },
+      },
+      "/admin/disputes/{id}/resolve": {
+        post: {
+          tags: ["admin"],
+          summary: "Decide a dispute (C-PR2, D55) — REJECTED / PARTIAL_REFUND / FULL_REFUND, reason ≥ 50 chars, irreversible",
+          description:
+            "ADMIN session only. Refund FIRST (provider), then ONE transaction: DISPUTED → COMPLETED (rejected/partial) or → CANCELLED (full), " +
+            "dispute resolution, internal 'disputes lost' counter, AdminAction DISPUTE_RESOLVED, outbox booking.dispute_resolved. " +
+            "Then the carrier transfer through the payout executor (D49, retried by the cron on failure). 409 while the carrier still has time to answer.",
+          operationId: "adminResolveDispute",
+          security: authSecurity,
+          parameters: [dealIdPathParam],
+          requestBody: { required: true, content: { "application/json": { schema: ref("AdminResolveDisputeRequest") } } },
+          responses: { "200": jsonResponse("AdminResolutionResponse", "Decided"), "400": response400, "401": response401, "403": response403, "404": response404, "409": response409Settlement, "500": response500 },
+        },
+      },
+      "/admin/disputes/{id}/retention": {
+        post: {
+          tags: ["admin"],
+          summary: "Arbitrate a held retention (C-PR2, D55 3A) — COMPENSATE_CARRIER (pro-rata A79) or RESTITUTE_SHIPPER",
+          description: "ADMIN session only. CANCELLED + retentionDisposition HELD_FOR_MEDIATION. Amounts are server-computed. Journaled (RETENTION_ARBITRATED).",
+          operationId: "adminResolveRetention",
+          security: authSecurity,
+          parameters: [dealIdPathParam],
+          requestBody: { required: true, content: { "application/json": { schema: ref("AdminResolveRetentionRequest") } } },
+          responses: { "200": jsonResponse("AdminResolutionResponse", "Arbitrated"), "400": response400, "401": response401, "403": response403, "404": response404, "409": response409Settlement, "500": response500 },
+        },
+      },
       "/me/wallet": {
         get: {
           tags: ["me"],

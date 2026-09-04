@@ -75,6 +75,8 @@ export const EMAIL_MATRIX: Record<BookingEventKey, EmailRule> = {
   "booking.verification_reminder": "SHIPPER", // B4/A70 : J+3, dernier jour
   "booking.rating_reminder": "TARGET_ROLE", // B5 (décision 4A) : J+5 et J+7 au rôle qui n'a pas noté, puis silence
   "booking.rating_revealed": null, // JAMAIS : in-app seul
+  "booking.dispute_carrier_responded": null, // C-PR2 (D55) : l'admin le voit dans la file, personne d'autre
+  "booking.dispute_resolved": "BOTH", // C-PR2 (D55, 5A) : « Décision rendue » aux deux, chacun son montant
 };
 
 export type EmailRecipient = { userId: string; role: "SHIPPER" | "CARRIER" };
@@ -424,6 +426,20 @@ export function buildBookingEmail(
         data: {},
         content: built.content,
       };
+    }
+    case "booking.dispute_resolved": {
+      const params = {
+        ...base,
+        kind: event.payload.kind,
+        outcome: event.payload.outcome,
+        ticketNumber: event.payload.ticketNumber,
+        refund: event.payload.refundCents > 0 ? formatMoney(event.payload.refundCents, p.currencyCode, locale) : "",
+        carrierPayout: event.payload.carrierPayoutCents > 0 ? formatMoney(event.payload.carrierPayoutCents, p.currencyCode, locale) : "",
+        reason: event.payload.reason,
+        supportEmail: SUPPORT_EMAIL,
+      };
+      const built = role === "SHIPPER" ? SETTLEMENT_EMAILS[locale].disputeResolvedShipper(params) : SETTLEMENT_EMAILS[locale].disputeResolvedCarrier(params);
+      return { subject: built.subject, template: `settlement/dispute-resolved-${role.toLowerCase()}`, data: {}, content: built.content };
     }
     case "booking.rating_reminder": {
       const built = SETTLEMENT_EMAILS[locale].ratingReminder({ ...base, reminderNumber: event.payload.reminderNumber, rateUrl: `${ctaUrl}/rate` });

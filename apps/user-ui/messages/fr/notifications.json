@@ -239,6 +239,26 @@
         "title": "Virement bancaire refusé : vérifie ton RIB",
         "line": "Ton argent reste sur ton compte de paiement · Finances → Stripe"
       }
+    },
+    "booking_dispute_resolved": {
+      "SHIPPER": {
+        "title": "Décision rendue · {ticket}",
+        "line": "{route} · lis la décision et le motif sur ton envoi"
+      },
+      "CARRIER": {
+        "title": "Décision rendue · {ticket}",
+        "line": "{route} · lis la décision et le motif sur ton deal"
+      }
+    },
+    "booking_dispute_carrier_responded": {
+      "SHIPPER": {
+        "title": "—",
+        "line": "—"
+      },
+      "CARRIER": {
+        "title": "—",
+        "line": "—"
+      }
     }
   }
 }

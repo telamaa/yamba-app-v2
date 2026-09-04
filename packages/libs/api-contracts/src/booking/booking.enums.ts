@@ -65,6 +65,8 @@ export const BookingTransitionActionSchema = z
     "deliver",
     "confirmEarly",
     "autoComplete",
+    "resolveDisputeKeep", // C-PR2 (D55) — ADMIN, jamais servi dans allowedActions
+    "resolveDisputeRefund",
     "dispute",
   ])
   .meta({

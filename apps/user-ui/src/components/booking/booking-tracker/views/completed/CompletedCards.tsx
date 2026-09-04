@@ -11,6 +11,7 @@
 
 import { CheckCircle2 } from "lucide-react";
 import RatingStatusCard from "@/components/rating/RatingStatusCard";
+import MediationDecisionCard from "@/components/shared/mediation/MediationDecisionCard";
 import { useFormatter, useTranslations } from "next-intl";
 import type { Booking } from "../../booking-tracker.types";
 
@@ -85,6 +86,19 @@ export function RatingSoonNote({ booking, compact = false }: { booking: Booking;
       rating={booking.rating}
       counterpartFirstName={booking.carrier.firstName}
       rateHref={`/bookings/${booking.id}/rate`}
+      compact={compact}
+    />
+  );
+}
+
+/** C-PR2 (D55 5A) — la décision de médiation, lue par l'Expéditeur (COMPLETED après litige). */
+export function MediationDecisionNote({ booking, compact = false }: { booking: Booking; compact?: boolean }) {
+  if (!booking.dispute?.resolution) return null;
+  return (
+    <MediationDecisionCard
+      role="SHIPPER"
+      ticket={booking.dispute.ticketNumber}
+      resolution={booking.dispute.resolution}
       compact={compact}
     />
   );

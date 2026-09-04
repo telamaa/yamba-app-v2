@@ -7,7 +7,7 @@
  * Structure (196 tests) :
  *  S1  Chemins nominaux : 13 transitions → to + effets EXACTS      (13)
  *  S3  Mauvais acteur : refus par rôle, message dédié              (12)
- *  S4  ADMIN : réservé, aucune action ne lui est ouverte           (10)
+ *  S4  ADMIN : seules les résolutions de litige (C-PR2)             (13)
  *  S5  Mauvais statut : matrice générée (12 paires action×acteur)  (95)
  *  S6  Absences délibérées de la spec (assertions nommées)          (3)
  *  S7  Guards temporels & compteurs, bornes EXACTES                (15)
@@ -240,7 +240,7 @@ describe("S3 — mauvais acteur (le rôle fait partie de la transition)", () => 
 // S4 — ADMIN : réservé, rien d'ouvert (chantier C)
 // ─────────────────────────────────────────────
 
-describe("S4 — ADMIN n'a aucune transition (résolutions litige = chantier C)", () => {
+describe("S4 — ADMIN : seules les résolutions de litige lui sont ouvertes (C-PR2, D55)", () => {
   const actions: BookingTransitionAction[] = [
     "accept",
     "decline",
@@ -256,12 +256,39 @@ describe("S4 — ADMIN n'a aucune transition (résolutions litige = chantier C)"
   it.each(actions.map((a) => [a] as [BookingTransitionAction]))(
     '"%s" est refusé à ADMIN',
     (action) => {
-      // DISPUTED : là où on serait le plus tenté d'ouvrir à l'admin.
       const booking = makeBooking({ status: "DISPUTED" });
       const check = canPerform(booking, action, "ADMIN", ctx);
       expect(check.allowed).toBe(false);
     }
   );
+
+  it("resolveDisputeKeep : DISPUTED → COMPLETED (versement, stats, les deux prévenus) — ADMIN seul", () => {
+    const booking = makeBooking({ status: "DISPUTED" });
+    expect(canPerform(booking, "resolveDisputeKeep", "ADMIN", ctx)).toEqual({
+      allowed: true,
+      to: "COMPLETED",
+      effects: ["TRANSFER_PAYOUT", "UPDATE_STATS", "NOTIFY_SHIPPER", "NOTIFY_CARRIER"],
+    });
+    expect(canPerform(booking, "resolveDisputeKeep", "SHIPPER", ctx).allowed).toBe(false);
+    expect(canPerform(booking, "resolveDisputeKeep", "CARRIER", ctx).allowed).toBe(false);
+    expect(canPerform(booking, "resolveDisputeKeep", "SYSTEM", ctx).allowed).toBe(false);
+  });
+
+  it("resolveDisputeRefund : DISPUTED → CANCELLED (remboursement total) — ADMIN seul, jamais hors DISPUTED", () => {
+    expect(canPerform(makeBooking({ status: "DISPUTED" }), "resolveDisputeRefund", "ADMIN", ctx)).toEqual({
+      allowed: true,
+      to: "CANCELLED",
+      effects: ["FULL_REFUND", "RELEASE_CAPACITY", "NOTIFY_SHIPPER", "NOTIFY_CARRIER"],
+    });
+    for (const status of ["PENDING", "ACCEPTED", "PICKED_UP", "DELIVERED", "COMPLETED", "CANCELLED"] as const) {
+      expect(canPerform(makeBooking({ status }), "resolveDisputeKeep", "ADMIN", ctx).allowed).toBe(false);
+      expect(canPerform(makeBooking({ status }), "resolveDisputeRefund", "ADMIN", ctx).allowed).toBe(false);
+    }
+  });
+
+  it("getAllowedActions ne sert jamais les actions ADMIN (le front admin a son propre contrat)", () => {
+    expect(getAllowedActions(makeBooking({ status: "DISPUTED" }), "ADMIN", ctx)).toEqual([]);
+  });
 });
 
 // ─────────────────────────────────────────────
@@ -534,6 +561,11 @@ describe("S10 — getAllowedActions par rôle (source des CTAs front)", () => {
 // ─────────────────────────────────────────────
 
 describe("S12 — notation (B5/D53) : COMPLETED, fenêtre 14 j, une fois par rôle", () => {
+  it("C-PR2 (D54 4B) : un deal clos par médiation (completedBy ADMIN) ne se note jamais", () => {
+    const b = makeBooking({ status: "COMPLETED", completedBy: "ADMIN" } as never);
+    expect(canRate(b, "SHIPPER", ctx.now)).toEqual({ allowed: false, reason: "A deal closed by mediation cannot be rated." });
+    expect(canRate(b, "CARRIER", ctx.now)).toEqual({ allowed: false, reason: "A deal closed by mediation cannot be rated." });
+  });
   it("permise sur COMPLETED dans la fenêtre, par chaque rôle indépendamment", () => {
     const b = makeBooking({ status: "COMPLETED", ratingWindowEndsAt: hours(24) });
     expect(canRate(b, "SHIPPER", NOW).allowed).toBe(true);

@@ -93,6 +93,44 @@ describe("admin-dispute.service — mapper pur (C-PR1)", () => {
     expect(item).toMatchObject({ kind: "RETENTION", ticketNumber: null, category: null, amountCents: 2550, openedAt: "2026-09-02T00:00:00.000Z" });
   });
 
+  it("toQueueItem : version reçue → décidable maintenant ; sinon décidable à ouverture + 72 h", () => {
+    const silent = toQueueItem(booking(), { ...dispute, carrierRespondedAt: null }, { shipperFirstName: "a", carrierFirstName: "b" });
+    expect(silent).toMatchObject({ carrierResponded: false, decidableAt: "2026-09-06T09:00:00.000Z" });
+    const answered = toQueueItem(booking(), { ...dispute, carrierRespondedAt: D("2026-09-03T15:00:00Z") }, { shipperFirstName: "a", carrierFirstName: "b" });
+    expect(answered).toMatchObject({ carrierResponded: true, decidableAt: "2026-09-03T09:00:00.000Z" });
+  });
+
+  it("toDisputeFile : canDecide suit la réponse ou l'échéance ; la version du Voyageur et la décision sont servies", () => {
+    const shipper = party("64b000000000000000000010");
+    const carrier = party("64b000000000000000000020");
+    const early = toDisputeFile(booking(), dispute, shipper, carrier, D("2026-09-04T09:00:00Z"));
+    expect(early).toMatchObject({ canDecide: false, decidableAt: "2026-09-06T09:00:00.000Z", proposedAmounts: { rejectedCarrierPayoutCents: 4500, fullRefundCents: 5100 } });
+    const late = toDisputeFile(booking(), dispute, shipper, carrier, D("2026-09-06T09:00:00Z"));
+    expect(late?.canDecide).toBe(true);
+    const answered = toDisputeFile(
+      booking(),
+      { ...dispute, status: "CARRIER_RESPONDED", carrierStatement: "Le colis était intact à la remise, voici la photo prise devant le destinataire lui-même.", carrierStatementPhotoUrls: ["https://ik/c1.jpg"], carrierRespondedAt: D("2026-09-03T15:00:00Z") },
+      shipper,
+      carrier,
+      D("2026-09-03T16:00:00Z")
+    );
+    expect(AdminDisputeFileSchema.parse(answered)).toEqual(answered);
+    expect(answered).toMatchObject({ canDecide: true, dispute: { carrierStatement: { photoUrls: ["https://ik/c1.jpg"] } } });
+    const decided = toDisputeFile(
+      booking({ status: "COMPLETED" }),
+      { ...dispute, status: "RESOLVED", resolutionOutcome: "PARTIAL_REFUND", resolutionRefundCents: 2000, resolutionCarrierPayoutCents: 2500, resolutionReason: "x".repeat(50), resolvedAt: D("2026-09-05T09:00:00Z") },
+      shipper,
+      carrier
+    );
+    expect(decided).toBeNull(); // COMPLETED : plus dans la file
+  });
+
+  it("toDisputeFile : retenue → montants proposés calculés serveur (prorata A79 ou retenue entière)", () => {
+    const b = booking({ status: "CANCELLED", retentionDisposition: "HELD_FOR_MEDIATION", retentionCents: 2550, closedAt: D("2026-09-02T00:00:00Z"), disputedAt: null, disputeTicket: null, payoutStatus: null });
+    const file = toDisputeFile(b, null, party("64b000000000000000000010"), party("64b000000000000000000020"));
+    expect(file).toMatchObject({ canDecide: true, proposedAmounts: { compensateCarrierCents: 2250, restituteShipperCents: 2550 } });
+  });
+
   it("toQueueItem : un deal hors arbitrage → null", () => {
     expect(toQueueItem(booking({ status: "COMPLETED" }), null, { shipperFirstName: "a", carrierFirstName: "b" })).toBeNull();
   });

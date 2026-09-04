@@ -17,6 +17,8 @@ export type ArbitrationQueueItem = {
   currencyCode: string;
   shipperFirstName: string;
   carrierFirstName: string;
+  carrierResponded: boolean;
+  decidableAt: string;
 };
 export type ArbitrationQueueResponse = { items: ArbitrationQueueItem[]; counts: { disputes: number; retentions: number } };
 
@@ -27,8 +29,23 @@ export type Party = {
   email: string;
   completedDealsCount: number;
   lateCancellationsCount: number;
+  disputesLostCount: number;
   ratingsAvg: number;
   ratingsCount: number;
+};
+
+export type DisputeResolutionOutcome = "REJECTED" | "PARTIAL_REFUND" | "FULL_REFUND";
+export type RetentionArbitrationOutcome = "COMPENSATE_CARRIER" | "RESTITUTE_SHIPPER";
+export type DisputeResolution = { outcome: DisputeResolutionOutcome; refundCents: number; carrierPayoutCents: number; reason: string; resolvedAt: string };
+export type AdminResolutionResponse = {
+  bookingId: string;
+  kind: ArbitrationKind;
+  finalStatus: "COMPLETED" | "CANCELLED";
+  outcome: string;
+  refundCents: number;
+  carrierPayoutCents: number;
+  payoutStatus: string | null;
+  resolvedAt: string;
 };
 
 export type AdminDisputeFile = {
@@ -76,7 +93,19 @@ export type AdminDisputeFile = {
     photoUrls: string[];
     pledgeAcceptedAt: string;
     status: string;
+    carrierStatement: { statement: string; photoUrls: string[]; respondedAt: string } | null;
+    responseDeadlineAt: string;
+    resolution: DisputeResolution | null;
   } | null;
+  retentionDecision: { outcome: RetentionArbitrationOutcome; reason: string; decidedAt: string } | null;
+  canDecide: boolean;
+  decidableAt: string | null;
+  proposedAmounts: {
+    rejectedCarrierPayoutCents: number;
+    fullRefundCents: number;
+    compensateCarrierCents: number | null;
+    restituteShipperCents: number | null;
+  };
 };
 
 export type AdminMe = { id: string; email: string; firstName: string; lastName: string; remainingBackupCodes: number };

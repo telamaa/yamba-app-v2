@@ -17,6 +17,8 @@ export const ADMIN_ACTIONS = [
   "ADMIN_TOTP_ENABLED",
   "ADMIN_BACKUP_CODE_USED",
   "DISPUTE_VIEWED",
+  "DISPUTE_RESOLVED",
+  "RETENTION_ARBITRATED",
 ] as const;
 export type AdminActionType = (typeof ADMIN_ACTIONS)[number];
 

@@ -57,7 +57,8 @@ export function toPayoutItem(b: WalletBookingRecord, counterparts: WalletCounter
     currencyCode: b.pricing.currencyCode,
   };
   const kind: WalletPayoutItem["kind"] = b.status === "CANCELLED" ? "LATE_CANCELLATION" : "DELIVERY";
-  const amount = b.status === "CANCELLED" ? (b.payoutAmountCents ?? null) : b.pricing.transportCents;
+  // D50 : le net ; A80 : la compensation ; C-PR2 (D55) : le net ajusté par une médiation — `payoutAmountCents` d'abord.
+  const amount = b.status === "CANCELLED" ? (b.payoutAmountCents ?? null) : (b.payoutAmountCents ?? b.pricing.transportCents);
 
   if (b.status === "DELIVERED") {
     return { ...base, kind, state: "UPCOMING", amountCents: b.pricing.transportCents, date: iso(b.payoutDueAt) };

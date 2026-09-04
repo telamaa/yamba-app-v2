@@ -162,7 +162,7 @@ describe("contrat & matrice", () => {
   });
 
   it("la matrice couvre les 18 événements du contrat (17 + verification_reminder B4/A70)", () => {
-    expect(Object.keys(IN_APP_MATRIX)).toHaveLength(18);
+    expect(Object.keys(IN_APP_MATRIX)).toHaveLength(20);
   });
 
   it("route CARRIER : booking.requested → transporteur seul", () => {

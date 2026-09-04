@@ -104,7 +104,11 @@ export type ShipperBookingViewDto = {
     desiredOutcome?: string | null;
     photoUrls: string[];
     createdAt: string;
+    carrierRespondedAt?: string | null;
+    resolution?: BookingDisputeFile["resolution"];
   } | null;
+  retentionDecision?: Booking["retentionDecision"] | null;
+  retentionCents?: number | null;
   deliveryCode: string | null;
   codeRegenerationsLeft: number;
   pickup?: {
@@ -174,6 +178,8 @@ function toDisputeFile(d: ShipperBookingViewDto["dispute"]): BookingDisputeFile 
     desiredOutcome: (d.desiredOutcome ?? undefined) as BookingDisputeFile["desiredOutcome"],
     photoUrls: d.photoUrls,
     createdAt: d.createdAt,
+    carrierRespondedAt: d.carrierRespondedAt ?? null,
+    resolution: d.resolution ?? null,
   };
 }
 
@@ -193,6 +199,8 @@ export function toBooking(view: ShipperBookingViewDto): Booking {
     disputeTicket: view.disputeTicket ?? undefined,
     disputedAt: view.disputedAt ?? undefined,
     dispute: toDisputeFile(view.dispute),
+    retentionDecision: view.retentionDecision ?? undefined,
+    retentionCents: view.retentionCents ?? undefined,
     payoutStatus: view.payoutStatus ?? undefined,
     completedBy: view.completedBy === "SHIPPER" || view.completedBy === "SYSTEM" ? view.completedBy : undefined,
     completedAt: view.completedAt ?? undefined,
