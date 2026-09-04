@@ -162,6 +162,15 @@ app.use(
   })
 );
 
+// /api/messages/* → message-service :6005 (chantier F, D61). Frontière stable : le jour où
+// ce service change de forme, seule cette ligne bouge, jamais les clients.
+app.use(
+  "/api/messages",
+  proxy("http://localhost:6005", {
+    proxyReqPathResolver: (req) => `/messages${req.url}`,
+  })
+);
+
 // /api/me/wallet → deal-service reçoit /me/wallet
 // (Finances : portefeuille Voyageur + paiements Expéditeur — A83)
 app.use(

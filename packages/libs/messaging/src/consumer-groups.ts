@@ -6,4 +6,6 @@
  */
 export const CONSUMER_GROUPS = {
   NOTIFICATION_SERVICE: "notification-service",
+  /** Chantier F (D61) — notifications des messages et rendez-vous */
+  MESSAGING_NOTIFICATIONS: "messaging-notifications",
 } as const;

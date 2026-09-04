@@ -346,6 +346,15 @@ async function main() {
   });
   // C-PR4 — billets seedés (les documents suivent la cascade du Trip, mais on nettoie explicitement par fileId)
   await prisma.tripDocument.deleteMany({ where: { fileId: { startsWith: "seed-ticket-" } } });
+  // Chantier F (D61) — fils de conversation des deals seedes (Message/Meetup suivent la cascade).
+  const seedConversations = await prisma.conversation.findMany({ where: { shipperId: { in: seedIds } }, select: { id: true } });
+  if (seedConversations.length) {
+    const ids = seedConversations.map((c) => c.id);
+    await prisma.phoneReveal.deleteMany({ where: { conversationId: { in: ids } } });
+    await prisma.meetup.deleteMany({ where: { conversationId: { in: ids } } });
+    await prisma.message.deleteMany({ where: { conversationId: { in: ids } } });
+    await prisma.conversation.deleteMany({ where: { id: { in: ids } } });
+  }
   const delT = await prisma.trip.deleteMany({ where: { userId: { in: seedIds } } });
   console.log(`✓ wipe : ${delB.count} bookings, ${delD.count} disputes, ${delT.count} trips (périmètre seed)`);
 
@@ -518,6 +527,36 @@ async function main() {
           retentionDisposition: "HELD_FOR_MEDIATION",
         },
       });
+    }
+    // Chantier F (D61) — un fil vivant sur le deal accepte : recette FCH01+ sans rien creer a la main.
+    if (b.key === "bzv-accepted") {
+      const shipperId = userIds.get(b.shipperKey)!;
+      const carrierId = userIds.get(t.carrierKey)!;
+      const conversation = await prisma.conversation.create({
+        data: { bookingId: booking.id, shipperId, carrierId, lastMessageAt: days(-1), shipperLastReadAt: days(-1) },
+      });
+      await prisma.message.createMany({
+        data: [
+          { conversationId: conversation.id, kind: "TEXT", authorId: shipperId, authorRole: "SHIPPER", body: "Bonjour ! Le colis est pret, emballe et ferme. On se retrouve ou ?", photoUrls: [], createdAt: days(-2) },
+          { conversationId: conversation.id, kind: "TEXT", authorId: carrierId, authorRole: "CARRIER", body: "Bonjour, parfait. Je propose le terminal 2E, cote enregistrement.", photoUrls: [], createdAt: days(-1) },
+        ],
+      });
+      await prisma.meetup.create({
+        data: {
+          conversationId: conversation.id,
+          bookingId: booking.id,
+          kind: "PICKUP",
+          status: "PROPOSED",
+          proposedByRole: "CARRIER",
+          proposedById: carrierId,
+          placeLabel: "Paris CDG, terminal 2E, comptoirs d'enregistrement",
+          placeDetails: "Devant les bornes libre-service, cote depart.",
+          startAt: new Date(t.departureAt.getTime() - 3 * 3_600_000),
+          endAt: new Date(t.departureAt.getTime() - 2 * 3_600_000),
+          createdAt: days(-1),
+        },
+      });
+      console.log(`    · conversation seedee sur ${b.key} (2 messages, 1 rendez-vous propose)`);
     }
     if (b.status === "DISPUTED") {
       await prisma.booking.update({ where: { id: booking.id }, data: { payoutStatus: "FROZEN" } });

@@ -207,6 +207,8 @@ describe("publication nominale", () => {
 
     expect(findManyMock).toHaveBeenCalledWith({
       where: {
+        // Chantier F (D61) : ce relais ne draine que SON domaine
+        aggregateType: "booking",
         OR: [{ publishedAt: null }, { publishedAt: { isSet: false } }],
         attempts: { lt: MAX_RELAY_ATTEMPTS },
       },

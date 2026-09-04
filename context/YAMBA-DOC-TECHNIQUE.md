@@ -1524,6 +1524,22 @@ auth **103** (+4) · trip **209** (+2) · deal **478** (+1) · notification 78 �
 ### Reste
 C-PR6b alertes de seuil (D59 3A / 4A) → chantier F chat (challenge) → C-PR8 paramètres, RGPD (export / effacement d'un compte), maintenance.
 
+# F-PR1 — `feat/f1-message-service` : le message-service (D61, A132–A134)
+
+## Ce qui a été fait
+1. **Nouveau service** `apps/message-service` (port 6005, A18) : Express, Sentry en première ligne, identifiant de corrélation, middleware d'erreurs commun, `/health`, `/openapi.json`, arrêt propre. Configuration calquée sur le notification-service (package.json Nx, trois tsconfig, jest, webpack avec les alias explicites AVANT la générique).
+2. **Prisma** : `Conversation` (une par deal, dates de lecture par rôle), `Message` (TEXT / SYSTEM / MEETUP, `photoUrls` toujours posé `[]`, `systemKey` + `systemData` pour l'i18n, `flaggedContact`), `Meetup` (kind, status, proposition, créneau), `PhoneReveal` (unique par conversation et lecteur) + trois enums. `npx prisma db push` requis.
+3. **Contrats** (`messaging/messaging.schema.ts`) : `ConversationSummary`, `ConversationThreadResponse`, `Message`, `Meetup`, `ConversationAccess`, `PostMessageRequest`, `ProposeMeetupRequest`, `QuickReply`, `RevealPhoneResponse` ; (`messaging-events.schema.ts`) union discriminée des quatre événements de conversation, enveloppe identique à celle des deals.
+4. **Règles pures + tests (14)** : `conversation.rules.ts` (fenêtre d'écriture, rôle, contrepartie), `message-guard.rules.ts` (groupes de six chiffres, coordonnées, normalisation), `meetup.rules.ts` (créneau, acceptation par l'autre partie, prochain rendez-vous), `phone-reveal.rules.ts` (ancre et fenêtre de deux heures), `quick-replies.ts` (catalogue FR/EN, mêmes clés).
+5. **Service** `conversation.service.ts` : contexte (deal lu, conversation créée à la demande, 403 pour un tiers), `list`, `thread` / `threadByDeal` (pagination vers les messages plus anciens), `markRead`, `postMessage` (gardes A133 puis transaction message + horodatage + outbox), `proposeMeetup` (contre-proposition qui annule la précédente), `acceptMeetup` (verrou optimiste), `revealPhone` (fenêtre, trace, message système).
+6. **Relais dédié** `messaging-relay.ts` (A132) : bail `messaging-relay`, drain filtré `aggregateType: "conversation"`, validation au contrat, publication sur `messaging-events`, parquage à dix tentatives, backoff. **Le relais du deal-service filtre désormais sur `booking`** (une ligne, plus son test).
+7. **Gateway** : `/api/messages/*` → `:6005`. **OpenAPI** : quatrième document (9 chemins), ajouté au script de génération et au diff CI. **CI** : le service rejoint les matrices typecheck et tests. **Seed** : un fil vivant sur `bzv-accepted` (deux messages, un rendez-vous proposé).
+
+### Preuves
+message **14** · deal **478** (relais filtré, spec alignée) · trip 209 · auth 103 · notification 78 · tsc ×7 · OpenAPI ×4 régénérés. Recette : FCH01–FCH10 (DOC-METIER).
+
+### Reste
+F-PR2 front des deux rôles (liste des fils, conversation, rendez-vous, réponses rapides, numéro) et notifications (in-app immédiate, email de relance à 15 min) ; F-PR3 admin (lecture depuis un dossier, signalement d'un message) et purge à un an.
 # C-PR6b — `feat/c6b-admin-alerts` : alertes de seuil (D59 3A / 4A, A129–A131)
 
 ## Ce qui a été fait
