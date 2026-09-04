@@ -20,6 +20,12 @@ export const ADMIN_PERMISSIONS = {
   "users.suspension.apply": ["MEDIATOR"],
   "audit.read": ["FINANCE"],
   "admins.manage": [],
+  // C-PR4 (D57)
+  "trips.read": ["MEDIATOR", "SUPPORT", "FINANCE"],
+  "tickets.review": ["SUPPORT", "MEDIATOR"],
+  "trips.hide.propose": ["SUPPORT", "MEDIATOR"],
+  "trips.hide.apply": ["MEDIATOR"],
+  "kpi.read": ["MEDIATOR", "SUPPORT", "FINANCE"],
 } as const;
 export type AdminPermission = keyof typeof ADMIN_PERMISSIONS;
 

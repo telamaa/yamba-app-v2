@@ -50,6 +50,8 @@ export type TripForBooking = {
   userId: string; // le Voyageur
   status: string;
   isDeleted: boolean;
+  /** C-PR4 (D57 3A) — masqué par Yamba : invisible ET non réservable, par lecture (aucune écriture croisée). */
+  hiddenByAdminAt?: Date | null;
   departureAt: Date | null;
   originCity: string | null;
   originCountryCode: string | null;
@@ -90,12 +92,12 @@ export function resolveFamilySurcharge(trip: TripForBooking, family: ParcelFamil
   return cond.surchargePct ?? 0;
 }
 
-/** RG : PUBLISHED, non supprimé, départ futur, pas son propre trajet. */
+/** RG : PUBLISHED, non supprimé, non masqué par Yamba (D57), départ futur, pas son propre trajet. */
 export function checkTripBookable(trip: TripForBooking, shipperId: string, now: Date): void {
   if (trip.userId === shipperId) {
     throw new BookingRequestError("OWN_TRIP", "You cannot book your own trip.");
   }
-  if (trip.isDeleted || trip.status !== "PUBLISHED") {
+  if (trip.isDeleted || trip.status !== "PUBLISHED" || trip.hiddenByAdminAt) {
     throw new BookingRequestError("TRIP_NOT_BOOKABLE", "This trip is not open to requests.");
   }
   if (!trip.departureAt || trip.departureAt.getTime() <= now.getTime()) {

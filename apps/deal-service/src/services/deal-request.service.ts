@@ -53,6 +53,7 @@ const TRIP_SELECT = {
   userId: true,
   status: true,
   isDeleted: true,
+  hiddenByAdminAt: true, // C-PR4 (D57) — lecture seule
   departureAt: true,
   originCity: true,
   originCountryCode: true,

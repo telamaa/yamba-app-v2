@@ -55,6 +55,18 @@ const response500 = jsonResponse("UnhandledError", "Erreur serveur non gérée")
 /** Cookie OU bearer (sémantique OR d'OpenAPI) — miroir d'extractToken. */
 const authSecurity = [{ cookieAuth: [] }, { bearerAuth: [] }];
 
+/* ── Admin (C-PR4, D57) — session admin séparée (cookie admin_access_token, amr totp) ── */
+const adminSecurity = [{ adminCookieAuth: [] }];
+const response403 = jsonResponse("ErrorResponse", "Profil admin sans la permission requise, ou conflit d'intérêts (son propre trajet)");
+const response404 = jsonResponse("ErrorResponse", "Trajet ou document introuvable (ou supprimé)");
+const documentIdPathParam = {
+  name: "documentId",
+  in: "path",
+  required: true,
+  schema: { type: "string", pattern: "^[a-f0-9]{24}$" },
+  description: "Identifiant du TripDocument (ObjectId)",
+};
+
 const idPathParam = {
   name: "id",
   in: "path",
@@ -239,6 +251,7 @@ export function buildOpenApiDocument() {
       { name: "trips-lifecycle", description: "Transitions de la state machine (auth requise, owner)" },
       { name: "trips-documents", description: "Justificatifs du trip (auth requise, owner)" },
       { name: "uploads", description: "Upload direct navigateur → ImageKit (auth requise)" },
+      { name: "admin", description: "Back-office (chantier C, D57) — session ADMIN avec TOTP, permission par profil" },
     ],
     paths: {
       /* ── Meta ─────────────────────────────────────────────── */
@@ -576,6 +589,113 @@ export function buildOpenApiDocument() {
           },
         },
       },
+
+      /* ── Admin (C-PR4, D57) ───────────────────────────────── */
+      "/admin/trips": {
+        get: {
+          tags: ["admin"],
+          summary: "Trajets — liste filtrable (D57 5A)",
+          description:
+            "Permission trips.read. Filtres : q (ville ou ObjectId), status, hidden=1 (masqués par Yamba), ticketPending=1, carrierId, from (ISO). " +
+            "100 plus récents par départ, avec le nombre de réservations actives par trajet.",
+          operationId: "adminListTrips",
+          security: adminSecurity,
+          parameters: [
+            { name: "q", in: "query", schema: { type: "string" }, description: "Ville (origine / destination) ou identifiant du trajet" },
+            { name: "status", in: "query", schema: ref("TripStatus") },
+            boolQueryParam("hidden", "1 = masqués par Yamba seulement"),
+            boolQueryParam("ticketPending", "1 = billet en attente de vérification"),
+            { name: "carrierId", in: "query", schema: { type: "string", pattern: "^[a-f0-9]{24}$" }, description: "Trajets d'un Voyageur" },
+            { name: "from", in: "query", schema: { type: "string", format: "date-time" }, description: "Départ à partir de" },
+          ],
+          responses: { "200": jsonResponse("AdminTripsResponse", "Liste"), "401": response401, "403": response403, "500": response500 },
+        },
+      },
+      "/admin/trips/{id}": {
+        get: {
+          tags: ["admin"],
+          summary: "Fiche trajet admin (D57 4A) — Voyageur, réservations, documents, journal",
+          description: "Permission trips.read. La consultation est journalisée (AdminAction TRIP_VIEWED). Jamais de code de livraison.",
+          operationId: "adminGetTripFile",
+          security: adminSecurity,
+          parameters: [idPathParam],
+          responses: { "200": jsonResponse("AdminTripFile", "Fiche"), "401": response401, "403": response403, "404": response404, "500": response500 },
+        },
+      },
+      "/admin/trips/{id}/hide/propose": {
+        post: {
+          tags: ["admin"],
+          summary: "Proposer un masquage (D57 6A) — SUPPORT",
+          description: "Permission trips.hide.propose. Motif ≥ 20 caractères. Aucun effet sur la visibilité ; journal TRIP_HIDE_PROPOSED.",
+          operationId: "adminProposeHideTrip",
+          security: adminSecurity,
+          parameters: [idPathParam],
+          requestBody: jsonBody("HideTripRequest"),
+          responses: { "200": jsonResponse("ActionResponse", "Proposition enregistrée"), "400": response400, "401": response401, "403": response403, "404": response404, "500": response500 },
+        },
+      },
+      "/admin/trips/{id}/hide": {
+        post: {
+          tags: ["admin"],
+          summary: "Masquer un trajet (D57 3A) — MEDIATOR / SUPER_ADMIN",
+          description:
+            "Permission trips.hide.apply. Pose Trip.hiddenByAdminAt + motif (≥ 20) dans la même transaction que le journal TRIP_HIDDEN ; " +
+            "invisible en recherche, page publique 404, non réservable ; réservations en cours préservées ; email au Voyageur. Yamba n'annule jamais un trajet.",
+          operationId: "adminHideTrip",
+          security: adminSecurity,
+          parameters: [idPathParam],
+          requestBody: jsonBody("HideTripRequest"),
+          responses: { "200": jsonResponse("ActionResponse", "Trajet masqué"), "400": response400, "401": response401, "403": response403, "404": response404, "500": response500 },
+        },
+        delete: {
+          tags: ["admin"],
+          summary: "Rétablir un trajet masqué (D57 3A)",
+          description: "Permission trips.hide.apply. Motif ≥ 20 caractères, journal TRIP_UNHIDDEN, email au Voyageur.",
+          operationId: "adminUnhideTrip",
+          security: adminSecurity,
+          parameters: [idPathParam],
+          requestBody: jsonBody("HideTripRequest"),
+          responses: { "200": jsonResponse("ActionResponse", "Trajet rétabli"), "400": response400, "401": response401, "403": response403, "404": response404, "500": response500 },
+        },
+      },
+      "/admin/tickets": {
+        get: {
+          tags: ["admin"],
+          summary: "File « billets à vérifier » (D57 1A) — trajets à venir, plus anciens d'abord",
+          description:
+            "Permission tickets.review. Documents TICKET_PROOF en PENDING. Les billets de trajets déjà partis passent EXPIRED à la lecture (8A) — " +
+            "expiredNow les compte.",
+          operationId: "adminListTicketQueue",
+          security: adminSecurity,
+          responses: { "200": jsonResponse("TicketQueueResponse", "File"), "401": response401, "403": response403, "500": response500 },
+        },
+      },
+      "/admin/tickets/{documentId}": {
+        get: {
+          tags: ["admin"],
+          summary: "Ouvrir un billet (D57 7A) — consultation journalisée",
+          description: "Permission tickets.review. Renvoie l'URL ImageKit du document ; chaque ouverture écrit un AdminAction DOCUMENT_VIEWED.",
+          operationId: "adminViewTicket",
+          security: adminSecurity,
+          parameters: [documentIdPathParam],
+          responses: { "200": { description: "Document", content: { "application/json": { schema: { type: "object" } } } }, "401": response401, "403": response403, "404": response404, "500": response500 },
+        },
+      },
+      "/admin/tickets/{documentId}/review": {
+        post: {
+          tags: ["admin"],
+          summary: "Valider ou rejeter un billet (D57 1A) — motif fermé au rejet",
+          description:
+            "Permission tickets.review. decision VERIFY | REJECT (+ reason ILLEGIBLE | DATES_MISMATCH | NAME_MISMATCH | SUSPICIOUS). " +
+            "Document et Trip.ticketVerificationStatus mis à jour dans la même transaction que le journal ; email au Voyageur ; un billet rejeté peut être redéposé. " +
+            "Un billet déjà traité → 400 ; son propre billet → 403.",
+          operationId: "adminReviewTicket",
+          security: adminSecurity,
+          parameters: [documentIdPathParam],
+          requestBody: jsonBody("ReviewTicketRequest"),
+          responses: { "200": jsonResponse("ActionResponse", "Décision enregistrée"), "400": response400, "401": response401, "403": response403, "404": response404, "500": response500 },
+        },
+      },
     },
     components: {
       schemas: components,
@@ -591,6 +711,12 @@ export function buildOpenApiDocument() {
           scheme: "bearer",
           bearerFormat: "JWT",
           description: "Fallback : Authorization: Bearer <access_token>",
+        },
+        adminCookieAuth: {
+          type: "apiKey",
+          in: "cookie",
+          name: "admin_access_token",
+          description: "Session admin (D54) — JWT adm:true, amr [pwd, totp] ; jamais le cookie access_token",
         },
       },
     },

@@ -27,4 +27,16 @@ describe("adminRoleAllows (D56)", () => {
     expect(adminRoleAllows("FINANCE", "disputes.decide")).toBe(false);
     expect(adminRoleAllows("FINANCE", "users.suspension.propose")).toBe(false);
   });
+  it("C-PR4 (D57 6A) : SUPPORT vérifie les billets et propose un masquage, MEDIATOR masque, FINANCE lit seulement", () => {
+    expect(adminRoleAllows("SUPPORT", "tickets.review")).toBe(true);
+    expect(adminRoleAllows("SUPPORT", "trips.hide.propose")).toBe(true);
+    expect(adminRoleAllows("SUPPORT", "trips.hide.apply")).toBe(false);
+    expect(adminRoleAllows("MEDIATOR", "trips.hide.apply")).toBe(true);
+    expect(adminRoleAllows("FINANCE", "trips.read")).toBe(true);
+    expect(adminRoleAllows("FINANCE", "tickets.review")).toBe(false);
+    expect(adminRoleAllows("FINANCE", "trips.hide.propose")).toBe(false);
+  });
+  it("C-PR4 : kpi.read pour tous les profils, chaque compteur restant filtré par sa propre permission", () => {
+    for (const r of ["MEDIATOR", "SUPPORT", "FINANCE"] as const) expect(adminRoleAllows(r, "kpi.read")).toBe(true);
+  });
 });

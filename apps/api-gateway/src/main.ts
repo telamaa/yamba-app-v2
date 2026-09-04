@@ -126,6 +126,20 @@ app.use(
   })
 );
 
+// /api/admin/trips/*, /api/admin/tickets/* → trip-service reçoit /admin/… (C-PR4, D57)
+app.use(
+  "/api/admin/trips",
+  proxy("http://localhost:6002", {
+    proxyReqPathResolver: (req) => `/admin/trips${req.url}`,
+  })
+);
+app.use(
+  "/api/admin/tickets",
+  proxy("http://localhost:6002", {
+    proxyReqPathResolver: (req) => `/admin/tickets${req.url}`,
+  })
+);
+
 // /api/me/wallet → deal-service reçoit /me/wallet
 // (Finances : portefeuille Voyageur + paiements Expéditeur — A83)
 app.use(

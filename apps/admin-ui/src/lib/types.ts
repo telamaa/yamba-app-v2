@@ -167,3 +167,33 @@ export type AuditItem = {
   ip: string | null;
 };
 export type AuditResponse = { items: AuditItem[]; nextCursor: string | null };
+
+/* ── C-PR4 (D57) — trajets, billets, KPI ── */
+export type AdminTripSummary = {
+  id: string; status: string; originCity: string; destinationCity: string; departureAt: string | null; transportMode: string | null;
+  carrier: { id: string; firstName: string; lastName: string; accountStatus: string };
+  ticketVerificationStatus: string; hidden: boolean; hideProposed: boolean; activeBookingsCount: number; publishedAt: string | null;
+};
+export type AdminTripsResponse = { items: AdminTripSummary[]; total: number };
+export type AdminTripFile = {
+  id: string; status: string; originCity: string; destinationCity: string; departureAt: string | null; arrivalAt: string | null; transportMode: string | null;
+  capacityKg: number | null; reservedKg: number | null; pricing: unknown; createdAt: string; publishedAt: string | null; cancelledAt: string | null;
+  carrier: { id: string; firstName: string; lastName: string; email: string; accountStatus: string; carrierStatus: string };
+  ticketVerificationStatus: string;
+  hidden: { at: string; reason: string; byAdmin: string } | null;
+  hideProposal: { reason: string; byAdmin: string; at: string } | null;
+  documents: Array<{ id: string; type: string; status: string; originalName: string | null; createdAt: string; reviewedAt: string | null; rejectionReason: string | null }>;
+  bookings: Array<{ id: string; status: string; shipperFirstName: string; weightKg: number; totalShipperCents: number; transportCents: number; currencyCode: string; disputeTicket: string | null; requestedAt: string }>;
+  adminActions: Array<{ id: string; at: string; admin: string; action: string; after: unknown }>;
+};
+export type TicketQueueItem = {
+  documentId: string; tripId: string; originCity: string; destinationCity: string; departureAt: string | null; transportMode: string | null;
+  carrier: { id: string; firstName: string; lastName: string }; originalName: string | null; mimeType: string | null; submittedAt: string;
+};
+export type TicketQueueResponse = { items: TicketQueueItem[]; expiredNow: number };
+export type TicketRejectionReason = "ILLEGIBLE" | "DATES_MISMATCH" | "NAME_MISMATCH" | "SUSPICIOUS";
+export type AdminHomeKpis = {
+  disputesToDecide: number | null; retentionsHeld: number | null; ticketsToVerify: number | null; hiddenTrips: number | null; hideProposals: number | null;
+  suspensionProposals: number | null; restrictedUsers: number | null; suspendedUsers: number | null; publishedTrips: number | null; activeDeals: number | null;
+  payoutsFailed: number | null; pendingAdminInvites: number | null; usersTotal: number | null; completedDeals30d: number | null; generatedAt: string;
+};

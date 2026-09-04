@@ -1153,3 +1153,32 @@ La section Finances était une promesse : deux onglets vides et une maquette aux
 | ADM18 | Tenter d'agir sur sa propre fiche, ou de trancher un litige où l'on est partie | 403 explicite |
 | ADM19 | Super admin : rétrograder le dernier super admin, retirer son propre accès | Refus ; retirer un autre admin → sa 2FA et ses sessions admin tombent |
 | ADM20 | Mes sessions | Chaque connexion admin envoie un email d'alerte ; la liste montre les sessions ; révoquer la session courante renvoie à `/login` |
+
+# C-PR4 — vérifier un billet, masquer un trajet, compter ce qui attend
+
+## Le besoin
+Avant d'avoir du volume, Yamba ne bloque rien sans billet vérifié : le badge « billet vérifié » est un signal de confiance, pas une barrière. Mais l'équipe doit pouvoir regarder les billets déposés, dire oui ou non avec un motif clair, et retirer de la recherche un trajet douteux sans le détruire — annuler un trajet est un geste d'argent (remboursements, réservations) qui reste au Voyageur. L'accueil du back-office doit dire d'un coup d'œil ce qui attend chaque profil.
+
+### Règles de gestion (ADM, suite)
+- **RG-ADM-18 — La file des billets ne montre que des trajets à venir**, les plus anciens dépôts d'abord. Un billet resté en attente sur un trajet déjà parti sort de la file (statut « expiré ») : il n'a plus rien à prouver.
+- **RG-ADM-19 — Ouvrir un billet est journalisé** (qui, quand, quel document) : c'est une donnée personnelle du Voyageur.
+- **RG-ADM-20 — Une décision sur un billet est valider, ou rejeter avec un motif fermé** : illisible, dates différentes du trajet, nom différent du compte, document non recevable. Le Voyageur reçoit un email dans sa langue ; rejeté, il peut redéposer un billet, qui revient dans la file. Une décision est unique par document (un second clic est refusé).
+- **RG-ADM-21 — Le billet reste informatif** : aucune publication, aucune réservation n'est bloquée faute de billet vérifié (à revoir avec le volume).
+- **RG-ADM-22 — « Masqué par Yamba » n'est pas une pause ni une annulation.** Le trajet disparaît de la recherche et de sa page publique et ne peut plus être réservé, même par un appel direct ; ses réservations en cours continuent ; le Voyageur le voit toujours dans son espace avec un bandeau, et reçoit un email au motif générique (le motif interne, 20 caractères au moins, reste dans le journal). C'est réversible, avec un motif.
+- **RG-ADM-23 — Yamba n'annule jamais un trajet à la place du Voyageur.**
+- **RG-ADM-24 — Le Support vérifie les billets et propose un masquage ; le Médiateur ou le super administrateur masque et rétablit.** Personne n'agit sur son propre trajet ni son propre billet.
+- **RG-ADM-25 — L'accueil compte ce qui attend, selon le profil** : chaque compteur n'apparaît que si le profil peut ouvrir la file correspondante ; le super administrateur voit tout. Ce sont des compteurs opérationnels, pas du pilotage (courbes et finances : C-PR6).
+
+### Recette (ADM, suite) — `seed-deals.ts` pose un billet en attente sur Paris → Brazzaville (`bzv-upcoming`)
+| # | Scénario | Attendu |
+|---|---|---|
+| ADM21 | Connexion admin | Atterrissage sur `/home` : tuiles « À traiter » (ambrées si > 0) et « État de la plateforme » ; un Support ne voit ni « Invitations admin » ni « Sanctions proposées » |
+| ADM22 | Support, « Billets » | Le billet seedé apparaît ; « Ouvrir le billet » ouvre le document dans un onglet et écrit « Document ouvert » dans le journal |
+| ADM23 | Rejeter sans motif, puis avec « Les dates ne correspondent pas » | Bouton inactif sans motif ; puis email « Billet non validé » au Voyageur avec le motif en clair, fiche trajet : billet « rejeté », document REJECTED |
+| ADM24 | Le Voyageur (user-ui) redépose un billet sur ce trajet | Le trajet repasse « à vérifier » et revient dans la file |
+| ADM25 | Valider | Email « Billet vérifié », badge « vérifié » sur la page publique du trajet ; un second clic sur le même document → 400 |
+| ADM26 | Un trajet parti avec un billet en attente (`bzv-inflight` après dépôt manuel) | Absent de la file, mention « n billet(s) de trajets partis sortis de la file », document EXPIRED |
+| ADM27 | Support, fiche trajet, « Proposer » un masquage (motif < 20 puis valide) | Bouton inactif, puis bandeau « Masquage proposé par … » ; tuile « Masquages proposés » = 1 ; rien ne change pour le Voyageur |
+| ADM28 | Médiateur, même fiche, « Masquer » | Trajet absent de la recherche et 404 sur sa page publique ; réservation directe refusée (`TRIP_NOT_BOOKABLE`) ; réservations acceptées inchangées ; email générique au Voyageur ; bandeau rouge sur le détail du trajet côté Voyageur ; journal « Trajet masqué » avec le motif interne |
+| ADM29 | « Rétablir » (motif) | Trajet de retour dans la recherche, email « de nouveau visible », journal « Trajet rétabli » |
+| ADM30 | Admin qui est aussi Voyageur, sur son propre trajet / billet | Carte Masquage sans bouton ; API 403 |

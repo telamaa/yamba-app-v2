@@ -33,7 +33,10 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
   if (!me) return <div className="p-8 text-[13px] text-slate-500">Vérification de la session…</div>;
 
   const nav = [
+    { href: "/home", label: "Accueil" },
     ...(can(me.adminRole, "disputes.read") ? [{ href: "/disputes", label: "À arbitrer" }] : []),
+    ...(can(me.adminRole, "tickets.review") ? [{ href: "/tickets", label: "Billets" }] : []),
+    ...(can(me.adminRole, "trips.read") ? [{ href: "/trips", label: "Trajets" }] : []),
     ...(can(me.adminRole, "users.read") ? [{ href: "/users", label: "Utilisateurs" }] : []),
     ...(can(me.adminRole, "audit.read") ? [{ href: "/audit", label: "Journal" }] : []),
     ...(can(me.adminRole, "admins.manage") ? [{ href: "/admins", label: "Comptes admin" }] : []),

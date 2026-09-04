@@ -1,4 +1,5 @@
 import type { Request, Response, NextFunction } from "express";
+import { notHiddenFilter } from "../lib/admin-trips.rules";
 import { Prisma } from "@prisma/client";
 import { sortByPriceForWeight, totalForWeightCents, transportForWeightCents } from "../lib/price-for-weight";
 import prisma from "@packages/libs/prisma";
@@ -61,6 +62,8 @@ function buildBaseWhere(
     // sans écriture croisée (le trip-service ne touche pas au Trip d'un autre domaine).
     // `not` matche aussi les documents sans le champ (comptes antérieurs à C-PR3).
     user: { is: { accountStatus: { not: "SUSPENDED" } } },
+    // C-PR4 (D57 3A) — « masqué par Yamba » : absent OU null (pitfall Mongo).
+    ...notHiddenFilter(),
   };
 
   // ─── Date range ──────────────────────────────────

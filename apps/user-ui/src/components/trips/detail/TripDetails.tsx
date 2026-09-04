@@ -437,6 +437,14 @@ export default function TripDetails({ tripId }: { tripId: string }) {
         <StatusBadge status={status} />
       </div>
 
+      {/* C-PR4 (D57 3A) — masqué par Yamba : distinct de la pause, réversible, réservations en cours préservées */}
+      {trip.hiddenByAdminAt && (
+        <div className="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-[13px] text-red-800 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-200">
+          <p className="font-semibold">{t("detail.hiddenByAdmin.title")}</p>
+          <p className="mt-0.5">{t("detail.hiddenByAdmin.body")}</p>
+        </div>
+      )}
+
       <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
         {/* LEFT */}
         <div className="flex flex-col gap-5">

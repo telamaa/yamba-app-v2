@@ -12,6 +12,7 @@ import { requireAdminPermission } from "@packages/middleware/requireAdminRole";
 import { makeAdminUsersController } from "../controller/admin-users.controller";
 import { makeAdminUsersService } from "../services/admin-users.service";
 import { acceptAdminInvite, inviteAdmin, listAdmins, revokeAdmin, updateAdminRole } from "../controller/admin-admins.controller";
+import { getAdminKpis } from "../controller/admin-kpis.controller";
 import {
   adminLogin,
   adminLogout,
@@ -38,6 +39,7 @@ router.post("/auth/admin/invite/accept", acceptAdminInvite); // C-PR3 — jeton 
 
 router.get("/admin/me", isAdminAuthenticated, getAdminMe);
 router.get("/admin/me/sessions", isAdminAuthenticated, listAdminSessions);
+router.get("/admin/kpis", isAdminAuthenticated, requireAdminPermission("kpi.read"), getAdminKpis); // C-PR4 (D57)
 router.delete("/admin/me/sessions/:jti", isAdminAuthenticated, revokeAdminSessionById);
 router.get("/admin/audit", isAdminAuthenticated, requireAdminPermission("audit.read"), listAdminAudit);
 

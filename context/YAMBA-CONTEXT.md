@@ -303,7 +303,13 @@ Ordre de demarrage : auth -> trip -> gateway.
   — profils admin, invitation sans role client, conflit d'interets, fiche + recherche,
   sanctions RESTRICTED/SUSPENDED (propose/applique/leve), sessions admin + alerte,
   Sentry. Mergee #155. Suite : C-PR4 trajets/billets, C-PR5 finances, C-PR6 pilotage.
-- Plateforme de tests : 718 (trip 198, deal 442, notification 78) + auth 85.
+- 04/09 : C-PR4 feat/c4-admin-trips (D57, A108–A110, decisions 1A–8A + KPI par profil)
+  — file « billets a verifier » (motifs fermes, expiration a la lecture, redepot),
+  « masque par Yamba » (Trip.hiddenByAdminAt lu par recherche / page publique /
+  reservation, proposition Support, email generique), fiche et liste trajets admin,
+  KPI d'accueil par permission (/admin/kpis, /home), bandeau Voyageur, seed billet.
+  Suite : C-PR5 finances, C-PR6 pilotage, C-PR7 signalements / anti-fraude.
+- Plateforme de tests : 723 (trip 202, deal 443, notification 78) + auth 87.
 - (historique) Plateforme de tests : 600 (trip 187, deal 354, notification 59) — post-B3 (#96).
 - MERGE 01/09 : toute la pile B2 est dans `dev` via la SEULE **PR #90**
   (`feat/b2-deal-front` portait la chaîne complète : jalons mobile D36,
