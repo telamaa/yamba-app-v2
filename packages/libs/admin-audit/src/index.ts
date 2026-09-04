@@ -43,6 +43,10 @@ export const ADMIN_ACTIONS = [
   "DEAL_RECONCILED",
   "PAYOUT_RETRIED",
   "PAYOUT_REVERSAL_RESOLVED",
+  // C-PR5b (D58)
+  "FINANCE_EXPORTED",
+  "REFUND_MANUAL_PROPOSED",
+  "REFUND_MANUAL_APPLIED",
 ] as const;
 export type AdminActionType = (typeof ADMIN_ACTIONS)[number];
 

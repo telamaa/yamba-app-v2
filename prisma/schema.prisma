@@ -808,6 +808,15 @@ model Booking {
   payoutReversalReason            String?
   payoutReversalResolvedAt        DateTime?
   payoutReversalResolvedByAdminId String?   @db.ObjectId
+  // C-PR5b (D58 3A-c) — remboursement manuel (geste commercial) : proposé par FINANCE / SUPPORT, appliqué par SUPER_ADMIN seul
+  manualRefundProposedCents     Int?
+  manualRefundProposedReason    String?
+  manualRefundProposedByAdminId String?   @db.ObjectId
+  manualRefundProposedAt        DateTime?
+  manualRefundCents             Int? // dernier remboursement manuel appliqué (cumul dans refundAmountCents)
+  manualRefundReason            String?
+  manualRefundByAdminId         String?   @db.ObjectId
+  manualRefundAt                DateTime?
   completedBy         String? // "SHIPPER" (confirmation anticipée) | "SYSTEM" (J+4)
   // ─── Retenue ANN-01 (D50, A79–A81) ───
   retentionCents        Int? // total − remboursement (annulation tardive de l'Expéditeur)

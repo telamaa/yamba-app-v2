@@ -1211,3 +1211,27 @@ L'argent réel est chez le fournisseur de paiement ; la base ne fait que le refl
 | FIN08 | Deal réel Stripe test : annuler après acceptation, puis rapprocher | Aucune divergence ; `refundId` visible dans « Paiement de l'Expéditeur » |
 | FIN09 | Onglet « Retenues à arbitrer », « Arbitrer » | Renvoie au dossier de médiation (C-PR2) |
 | FIN10 | Admin partie au deal (son propre deal) | Aucun bouton « Relancer » / clôture ; API 403 |
+
+# C-PR5b — compter le mois, sortir le fichier, rendre l'argent avec un motif
+
+## Le besoin
+Chaque mois, savoir ce qui est entré, ce qui est ressorti, ce qui a été versé et ce que Yamba a gagné — par devise, sans grand livre ni tableur maison. Donner au comptable un fichier par deal avec les identifiants Stripe. Et pouvoir faire un geste commercial (rendre une partie du prix à un Expéditeur mécontent) sans passer par un litige, sans toucher au Voyageur, et sans qu'un seul clic malheureux coûte deux fois.
+
+### Règles de gestion (FIN, suite)
+- **RG-FIN-14 — Le rapport date chaque fait à sa propre date** : encaissé au débit, remboursé au remboursement, versé à l'envoi, revenu à la fin du deal, retenue à l'annulation. Un deal peut compter dans deux mois. Par devise, mois UTC.
+- **RG-FIN-15 — Le revenu reconnu est la commission plus la prime des deals terminés** ; une retenue conservée, un versement dû, un transfert renversé ou un remboursement proposé sont des passifs, jamais du revenu. Les frais du fournisseur ne sont pas dans Yamba : le comptable les rapproche avec l'export Stripe.
+- **RG-FIN-16 — L'export est réservé au profil Finance, borné à un an, et chaque export laisse une ligne au journal** (période, nombre de lignes). Une ligne par deal ayant bougé dans la période, avec les identifiants Stripe.
+- **RG-FIN-17 — Un remboursement manuel est un geste commercial, pas une décision de litige** : deal terminé ou annulé seulement, argent débité, plafond = payé − déjà remboursé, motif de 50 caractères au moins. Finance ou Support propose, seul un super administrateur applique. Le Voyageur garde son versement : Yamba porte le geste.
+- **RG-FIN-18 — L'Expéditeur est prévenu par l'email standard de remboursement et le voit dans son portefeuille** (part gardée « dépensée », part rendue « remboursée »), y compris pour un remboursement partiel décidé en médiation.
+
+### Recette (FIN, suite)
+| # | Scénario | Attendu |
+|---|---|---|
+| FIN11 | Finance, « Finances » → « Rapport mensuel et export » | Passifs du jour par devise (dû aux Voyageurs = `bzv-completed-blocked`, renversé = `bzv-reversed`, retenues = `bzv-held`) ; tableau par mois avec encaissé / remboursé / versé / revenu / retenues ; « 3 mois » et « 24 mois » changent la période |
+| FIN12 | Export CSV du mois courant | Fichier `yamba-finances-<du>-<au>.csv` téléchargé, ouvrable dans Excel (accents corrects), une ligne par deal du seed ayant bougé ; journal « Export finances » avec le nombre de lignes ; Médiateur : pas de bloc export, API 403 |
+| FIN13 | Export sur 2 ans | Refusé (400 « 366 days ») |
+| FIN14 | Support, fiche argent de `bzv-completed` (versé), carte « Remboursement manuel » | Plafond = total payé ; « Proposer » inactif sous 50 caractères ou au-dessus du plafond ; proposer 5 € → bandeau ambre, tuile « Remboursements proposés » = 1, file « Remboursements proposés » |
+| FIN15 | Médiateur sur la même fiche | Voit la proposition, aucun bouton (ni proposer ni appliquer) |
+| FIN16 | Super admin, « Rembourser maintenant » 5 € | « Remboursé 5,00 € (cumul 5,00 €) » ; la proposition disparaît ; « Dernier remboursement manuel » affiché ; chronologie : « Remboursé à l'Expéditeur » ; journal « Remboursement manuel appliqué » ; email « Remboursement émis » à l'Expéditeur (`mai`) ; portefeuille Expéditeur : ligne « partiellement remboursé » |
+| FIN17 | Rembourser de nouveau au-delà du restant | 400 « At most … cents » ; deal DISPUTED (`bzv-disputed`) : carte « Aucun remboursement manuel possible » |
+| FIN18 | Rapprocher `bzv-completed` après FIN16 (Fake) | « Paiement introuvable chez le fournisseur » (intent seedé, hors mémoire du Fake) — attendu ; sur un deal réel Stripe test : aucune divergence, le remboursement apparaît dans « Remboursements » |

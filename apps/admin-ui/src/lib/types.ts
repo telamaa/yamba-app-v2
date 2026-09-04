@@ -195,11 +195,11 @@ export type TicketRejectionReason = "ILLEGIBLE" | "DATES_MISMATCH" | "NAME_MISMA
 export type AdminHomeKpis = {
   disputesToDecide: number | null; retentionsHeld: number | null; ticketsToVerify: number | null; hiddenTrips: number | null; hideProposals: number | null;
   suspensionProposals: number | null; restrictedUsers: number | null; suspendedUsers: number | null; publishedTrips: number | null; activeDeals: number | null;
-  payoutsFailed: number | null; payoutsReversed: number | null; pendingAdminInvites: number | null; usersTotal: number | null; completedDeals30d: number | null; generatedAt: string;
+  payoutsFailed: number | null; payoutsReversed: number | null; manualRefundProposals: number | null; pendingAdminInvites: number | null; usersTotal: number | null; completedDeals30d: number | null; generatedAt: string;
 };
 
 /* ── C-PR5a (D58) — finances ── */
-export type FinanceQueueKind = "FAILED" | "REVERSED" | "HELD";
+export type FinanceQueueKind = "FAILED" | "REVERSED" | "HELD" | "PROPOSED_REFUNDS";
 export type FinanceQueueItem = {
   bookingId: string; kind: FinanceQueueKind; status: string;
   corridor: { originCity: string; destinationCity: string; departureAt: string | null };
@@ -223,8 +223,12 @@ export type AdminDealMoneyFile = {
   dates: { requestedAt: string; acceptedAt: string | null; pickedUpAt: string | null; deliveredAt: string | null; disputedAt: string | null; completedAt: string | null; completedBy: string | null; closedAt: string | null; closedBy: string | null };
   timeline: MoneyTimelineEvent[];
   adminActions: Array<{ id: string; at: string; admin: string; action: string; after: unknown }>;
-  allowedActions: { retryPayout: boolean; resolveReversal: boolean; reconcile: boolean };
+  manualRefund: { maxRefundableCents: number; proposal: { amountCents: number; reason: string; byAdmin: string; at: string } | null; last: { amountCents: number; reason: string; byAdmin: string; at: string } | null };
+  allowedActions: { retryPayout: boolean; resolveReversal: boolean; reconcile: boolean; proposeRefund: boolean; applyRefund: boolean };
 };
+export type FinanceReportMonth = { month: string; currencyCode: string; capturedCents: number; capturedCount: number; refundedCents: number; refundCount: number; paidOutCents: number; payoutCount: number; revenueCents: number; completedCount: number; retentionCents: number; cancelledCount: number };
+export type FinanceSnapshot = { currencyCode: string; pendingPayoutCents: number; frozenPayoutCents: number; reversedOpenCents: number; heldRetentionCents: number; proposedRefundCents: number };
+export type FinanceReport = { from: string; to: string; generatedAt: string; months: FinanceReportMonth[]; snapshot: FinanceSnapshot[] };
 export type PaymentReconciliation = {
   provider: string; checkedAt: string;
   live: { intentStatus: string; amountCents: number; amountReceivedCents: number; chargeId: string | null; refunds: Array<{ id: string; amountCents: number; status: string; createdAt: string | null }>; transfer: { id: string; amountCents: number; reversedCents: number; createdAt: string | null } | null } | null;

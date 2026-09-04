@@ -21,7 +21,7 @@ export const getAdminKpis = async (req: AuthenticatedRequest, res: Response, nex
     const since30 = new Date(now.getTime() - 30 * 86_400_000);
     const opt = async <T,>(allowed: boolean, q: () => Promise<T>): Promise<T | null> => (allowed ? q() : null);
 
-    const [disputesToDecide, retentionsHeld, ticketsToVerify, hiddenTrips, hideProposals, suspensionProposals, restrictedUsers, suspendedUsers, publishedTrips, activeDeals, payoutsFailed, pendingAdminInvites, usersTotal, completedDeals30d, payoutsReversed] =
+    const [disputesToDecide, retentionsHeld, ticketsToVerify, hiddenTrips, hideProposals, suspensionProposals, restrictedUsers, suspendedUsers, publishedTrips, activeDeals, payoutsFailed, pendingAdminInvites, usersTotal, completedDeals30d, payoutsReversed, manualRefundProposals] =
       await Promise.all([
         opt(can("disputes.read"), () => prisma.dispute.count({ where: { status: { in: ["OPEN", "CARRIER_RESPONDED"] } } })),
         opt(can("disputes.read"), () => prisma.booking.count({ where: { status: "CANCELLED", retentionDisposition: "HELD_FOR_MEDIATION", isDeleted: false } })),
@@ -39,8 +39,9 @@ export const getAdminKpis = async (req: AuthenticatedRequest, res: Response, nex
         opt(can("users.read"), () => prisma.user.count({ where: { isDeleted: false } })),
         opt(can("disputes.read"), () => prisma.booking.count({ where: { status: "COMPLETED", completedAt: { gte: since30 }, isDeleted: false } })),
         opt(can("finances.read"), () => prisma.booking.count({ where: { payoutStatus: "REVERSED", OR: [{ payoutReversalResolution: null }, { payoutReversalResolution: { isSet: false } }], isDeleted: false } })),
+        opt(can("finances.read"), () => prisma.booking.count({ where: { manualRefundProposedCents: { gt: 0 }, isDeleted: false } })),
       ]);
-    const kpis: AdminHomeKpis = { disputesToDecide, retentionsHeld, ticketsToVerify, hiddenTrips, hideProposals, suspensionProposals, restrictedUsers, suspendedUsers, publishedTrips, activeDeals, payoutsFailed, payoutsReversed, pendingAdminInvites, usersTotal, completedDeals30d, generatedAt: now.toISOString() };
+    const kpis: AdminHomeKpis = { disputesToDecide, retentionsHeld, ticketsToVerify, hiddenTrips, hideProposals, suspensionProposals, restrictedUsers, suspendedUsers, publishedTrips, activeDeals, payoutsFailed, payoutsReversed, manualRefundProposals, pendingAdminInvites, usersTotal, completedDeals30d, generatedAt: now.toISOString() };
     res.status(200).json(kpis);
   } catch (e) {
     next(e);

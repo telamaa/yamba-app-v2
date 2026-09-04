@@ -87,6 +87,8 @@ export default function DealMoneyView({ dealId }: { dealId: string }) {
         </Card>
       </div>
 
+      <ManualRefundCard file={file} me={me} onDone={(m) => { setMsg(m); load(); }} />
+
       <Card title="Chronologie de l'argent" className="mt-5">
         {file.timeline.length === 0 ? <p className="text-[12.5px] text-slate-500">Rien.</p> : (
           <ul className="space-y-1 text-[12.5px]">
@@ -158,6 +160,49 @@ function ReversalForm({ dealId, onDone }: { dealId: string; onDone: (msg: string
       </div>
       {err && <p className="mt-2 text-[12px] text-red-700">{err}</p>}
     </div>
+  );
+}
+const REFUND_MIN_REASON = 50;
+function ManualRefundCard({ file, me, onDone }: { file: AdminDealMoneyFile; me: AdminMe | null; onDone: (msg: string) => void }) {
+  const cur = file.pricing.currencyCode;
+  const canPropose = can(me?.adminRole, "refunds.manual.propose") && file.allowedActions.proposeRefund;
+  const canApply = can(me?.adminRole, "refunds.manual.apply") && file.allowedActions.applyRefund;
+  const [amount, setAmount] = useState(file.manualRefund.proposal ? (file.manualRefund.proposal.amountCents / 100).toFixed(2) : "");
+  const [reason, setReason] = useState(file.manualRefund.proposal?.reason ?? "");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const cents = Math.round(Number(amount.replace(",", ".")) * 100);
+  const ok = !busy && Number.isFinite(cents) && cents >= 1 && cents <= file.manualRefund.maxRefundableCents && reason.trim().length >= REFUND_MIN_REASON;
+  async function run(mode: "propose" | "apply") {
+    setBusy(true); setErr(null);
+    try {
+      if (mode === "propose") { await post(`/admin/deals/${file.id}/refund/propose`, { amountCents: cents, reason: reason.trim() }); onDone("Remboursement proposé, en attente d'un super administrateur."); }
+      else { const r = await post<{ refundedCents: number; totalRefundedCents: number }>(`/admin/deals/${file.id}/refund`, { amountCents: cents, reason: reason.trim() }); onDone(`Remboursé ${money(r.refundedCents, cur)} (cumul ${money(r.totalRefundedCents, cur)}). L'Expéditeur est prévenu par email.`); }
+    } catch (e) { setErr(e instanceof ApiError ? `${e.status} : ${e.message}` : "Action impossible."); }
+    finally { setBusy(false); }
+  }
+  return (
+    <Card title="Remboursement manuel (geste commercial)" className="mt-5">
+      <p className="text-[12px] text-slate-500">Hors litige, sur un deal fermé et débité. Le Voyageur n'est pas touché : c'est Yamba qui rend l'argent. Plafond : <b>{money(file.manualRefund.maxRefundableCents, cur)}</b> (payé − déjà remboursé). Motif de {REFUND_MIN_REASON} caractères au moins. Un super administrateur applique.</p>
+      {file.manualRefund.last && <p className="mt-2 rounded-lg bg-slate-50 px-3 py-2 text-[12.5px]">Dernier remboursement manuel : {money(file.manualRefund.last.amountCents, cur)} par {file.manualRefund.last.byAdmin} le {dateTime(file.manualRefund.last.at)} — {file.manualRefund.last.reason}</p>}
+      {file.manualRefund.proposal && <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[12.5px] text-amber-900">Proposé : {money(file.manualRefund.proposal.amountCents, cur)} par {file.manualRefund.proposal.byAdmin} le {dateTime(file.manualRefund.proposal.at)} — {file.manualRefund.proposal.reason}</p>}
+      {!canPropose && !canApply ? (
+        <p className="mt-2 text-[12.5px] text-slate-500">{file.manualRefund.maxRefundableCents <= 0 || (!file.allowedActions.proposeRefund && !file.allowedActions.applyRefund) ? "Aucun remboursement manuel possible sur ce deal (état, montant, ou tu es partie)." : "Ton profil ne propose ni n'applique de remboursement manuel."}</p>
+      ) : (
+        <div className="mt-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <input value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="Montant (ex. 12.50)" inputMode="decimal" className="w-40 rounded-lg border border-slate-300 px-3 py-1.5 text-[12.5px]" />
+            <span className="text-[12px] text-slate-500">{cur}</span>
+          </div>
+          <textarea value={reason} onChange={(e) => setReason(e.target.value.slice(0, 2000))} rows={2} placeholder={`Motif (${REFUND_MIN_REASON} caractères au moins)`} className="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2 text-[12.5px]" />
+          <div className="mt-2 flex flex-wrap gap-2">
+            {canPropose && !canApply && <button disabled={!ok} onClick={() => run("propose")} className="rounded-lg bg-amber-600 px-3 py-1.5 text-[12.5px] font-semibold text-white disabled:opacity-50">Proposer</button>}
+            {canApply && <button disabled={!ok} onClick={() => run("apply")} className="rounded-lg bg-red-700 px-3 py-1.5 text-[12.5px] font-semibold text-white disabled:opacity-50">Rembourser maintenant</button>}
+          </div>
+          {err && <p className="mt-2 text-[12px] text-red-700">{err}</p>}
+        </div>
+      )}
+    </Card>
   );
 }
 function Mono({ v }: { v: string | null }) { return v ? <span className="font-mono text-[11px]">{v}</span> : <span>—</span>; }

@@ -30,6 +30,10 @@ export const ADMIN_PERMISSIONS = {
   "finances.read": ["FINANCE", "MEDIATOR"],
   "payouts.retry": ["FINANCE", "MEDIATOR"],
   "payouts.resolve": ["FINANCE", "MEDIATOR"],
+  // C-PR5b (D58 5A, 3A-c)
+  "finances.export": ["FINANCE"],
+  "refunds.manual.propose": ["FINANCE", "SUPPORT"],
+  "refunds.manual.apply": [],
 } as const;
 export type AdminPermission = keyof typeof ADMIN_PERMISSIONS;
 

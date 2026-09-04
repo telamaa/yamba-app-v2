@@ -130,8 +130,16 @@ export function toPaymentItem(b: WalletBookingRecord, counterparts: WalletCounte
     case "DELIVERED":
     case "DISPUTED":
       return { ...base, state: "HELD", date: iso(b.payoutDueAt ?? b.requestedAt) };
-    case "COMPLETED":
+    case "COMPLETED": {
+      // C-PR5b — un remboursement APRÈS la fin du deal (décision de médiation partielle C-PR2, geste commercial C-PR5b)
+      // se lit comme une annulation partielle : la part gardée est « dépensée », le reste « remboursé ».
+      const refund = b.refundAmountCents ?? 0;
+      if (b.capturedAt && refund > 0 && refund < total) {
+        return { ...base, state: "PARTIALLY_REFUNDED", refundAmountCents: refund, retentionCents: total - refund, date: iso(b.refundedAt ?? b.completedAt) };
+      }
+      if (b.capturedAt && refund >= total) return { ...base, state: "REFUNDED", refundAmountCents: refund, date: iso(b.refundedAt ?? b.completedAt) };
       return { ...base, state: "RELEASED", date: iso(b.completedAt ?? b.updatedAt) };
+    }
     case "CANCELLED": {
       // Rien débité (annulé en PENDING) : l'empreinte a disparu, pas un remboursement.
       if (!b.capturedAt) return { ...base, state: "RELEASED_NO_CHARGE", date: iso(b.refundedAt ?? b.updatedAt) };

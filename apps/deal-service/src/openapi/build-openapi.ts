@@ -792,6 +792,67 @@ export function buildOpenApiDocument() {
           responses: { "200": jsonResponse("ResolveReversalResponse", "Outcome"), "400": response400, "401": response401, "403": response403, "404": response404, "500": response500 },
         },
       },
+      /* ── Admin finances (C-PR5b, D58) ────────────────────────── */
+      "/admin/finances/report": {
+        get: {
+          tags: ["admin"],
+          summary: "Monthly finance report per currency (D58 5A) — computed from bookings, no ledger",
+          description:
+            "Permission finances.read. months = 1..24 (default 12, UTC months). Each money fact counts in ITS month: capture → capturedAt, refund → refundedAt, " +
+            "payout → payoutSentAt, revenue (commission + premium of COMPLETED deals) → completedAt, retention → closedAt. snapshot = today's liabilities " +
+            "(pending / frozen payouts, open reversals, retentions held, proposed refunds). Provider fees are not stored: reconcile with the Stripe export.",
+          operationId: "adminGetFinanceReport",
+          security: adminSecurity,
+          parameters: [{ name: "months", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: 24, default: 12 } }],
+          responses: { "200": jsonResponse("FinanceReport", "Report"), "400": response400, "401": response401, "403": response403, "500": response500 },
+        },
+      },
+      "/admin/finances/export": {
+        get: {
+          tags: ["admin"],
+          summary: "CSV export per deal (D58 5A) — journaled, FINANCE only",
+          description:
+            "Permission finances.export. from / to ISO date-times, at most 366 days. One line per deal with a money fact in the period: frozen amounts, refund (+ refundId), " +
+            "payout (+ transferId), retention, dates, dispute ticket, paymentIntentId, chargeId. Formula-looking cells are neutralised. Journal FINANCE_EXPORTED (period, row count).",
+          operationId: "adminExportFinanceCsv",
+          security: adminSecurity,
+          parameters: [
+            { name: "from", in: "query", required: true, schema: { type: "string", format: "date-time" } },
+            { name: "to", in: "query", required: true, schema: { type: "string", format: "date-time" } },
+          ],
+          responses: {
+            "200": { description: "CSV (UTF-8 with BOM), Content-Disposition attachment, X-Row-Count", content: { "text/csv": { schema: { type: "string" } } } },
+            "400": response400, "401": response401, "403": response403, "500": response500,
+          },
+        },
+      },
+      "/admin/deals/{id}/refund/propose": {
+        post: {
+          tags: ["admin"],
+          summary: "Propose a commercial refund (D58 3A-c) — FINANCE / SUPPORT",
+          description: "Permission refunds.manual.propose. Closed deal (COMPLETED / CANCELLED) with a captured payment; amount ≤ total paid − already refunded; reason ≥ 50. No money moves. Journal REFUND_MANUAL_PROPOSED. 403 when the admin is a party.",
+          operationId: "adminProposeManualRefund",
+          security: adminSecurity,
+          parameters: [dealIdPathParam],
+          requestBody: { required: true, content: { "application/json": { schema: ref("ManualRefundRequest") } } },
+          responses: { "200": { description: "Proposed", content: { "application/json": { schema: { type: "object", properties: { ok: { type: "boolean" }, proposedAt: { type: "string", format: "date-time" } }, required: ["ok", "proposedAt"] } } } }, "400": response400, "401": response401, "403": response403, "404": response404, "500": response500 },
+        },
+      },
+      "/admin/deals/{id}/refund": {
+        post: {
+          tags: ["admin"],
+          summary: "Apply a commercial refund (D58 3A-c) — SUPER_ADMIN only, money first",
+          description:
+            "Permission refunds.manual.apply (SUPER_ADMIN). Same bounds as the proposal. D39: provider.refund FIRST, then ONE conditional transaction (optimistic lock on the refunded total — " +
+            "two admins never refund twice): refundAmountCents cumulated, refundId, manual refund fields, proposal cleared, outbox booking.refund_issued (actor ADMIN → the shipper receives the " +
+            "standard refund email), journal REFUND_MANUAL_APPLIED. The carrier's payout is untouched: Yamba bears the gesture. A refund issued without a database write shows up in the reconciliation.",
+          operationId: "adminApplyManualRefund",
+          security: adminSecurity,
+          parameters: [dealIdPathParam],
+          requestBody: { required: true, content: { "application/json": { schema: ref("ManualRefundRequest") } } },
+          responses: { "200": jsonResponse("ManualRefundResponse", "Refunded"), "400": response400, "401": response401, "403": response403, "404": response404, "409": response409, "500": response500 },
+        },
+      },
     components: {
       schemas: components,
       securitySchemes: {
