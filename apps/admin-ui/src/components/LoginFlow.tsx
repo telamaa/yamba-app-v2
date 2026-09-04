@@ -68,7 +68,7 @@ export default function LoginFlow() {
         setStage("BACKUP_CODES");
       } else {
         await post("/auth/admin/totp/verify", { code }, { auth: false });
-        router.replace("/disputes");
+        router.replace("/home");
       }
     } catch (err) {
       if (err instanceof ApiError && err.status === 401 && /expired|required/i.test(err.message)) {
@@ -140,7 +140,7 @@ export default function LoginFlow() {
             ))}
           </ul>
           <p className="mt-2 text-[12px] text-slate-500">Range-les hors de ce poste (gestionnaire de mots de passe). Chaque code ne sert qu'une fois.</p>
-          <button onClick={() => router.replace("/disputes")} className="mt-4 w-full rounded-lg bg-slate-900 py-2.5 text-[14px] font-semibold text-white">
+          <button onClick={() => router.replace("/home")} className="mt-4 w-full rounded-lg bg-slate-900 py-2.5 text-[14px] font-semibold text-white">
             J'ai enregistré mes codes
           </button>
         </div>

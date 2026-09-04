@@ -87,8 +87,8 @@ export const TripDocumentTypeSchema = z
 export type TripDocumentType = z.infer<typeof TripDocumentTypeSchema>;
 
 export const TripDocumentStatusSchema = z
-  .enum(["PENDING", "VERIFIED", "REJECTED"])
-  .meta({ id: "TripDocumentStatus", description: "Statut de modération du document" });
+  .enum(["PENDING", "VERIFIED", "REJECTED", "EXPIRED"])
+  .meta({ id: "TripDocumentStatus", description: "Statut de modération du document. EXPIRED (C-PR4, D57 8A) : billet resté en attente sur un trajet déjà parti." });
 export type TripDocumentStatus = z.infer<typeof TripDocumentStatusSchema>;
 
 /* ══ State machine (trip.lifecycle) ═══════════════════════════ */

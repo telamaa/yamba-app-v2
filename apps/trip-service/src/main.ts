@@ -1,4 +1,5 @@
 import { initSentry } from "@packages/error-handler";
+import adminRouter from "./routes/admin.router";
 // C-PR3 (D56 7A) — Sentry : inerte sans SENTRY_DSN ; 5xx tagués du service et de l'identifiant de corrélation.
 initSentry("trip-service");
 import express from 'express';
@@ -55,6 +56,7 @@ app.get("/docs", (req, res) => {
 // Routes
 app.use("/trips", tripRouter);
 app.use("/uploads", uploadRouter);
+app.use("/admin", adminRouter); // C-PR4 (D57) — trajets, masquage, billets
 
 app.use(errorMiddleware);
 

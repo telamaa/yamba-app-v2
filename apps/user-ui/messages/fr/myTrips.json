@@ -232,6 +232,10 @@
     "createdAt": "Créé le",
     "publishedAt": "Publié le",
     "cancelledAt": "Annulé le",
+    "hiddenByAdmin": {
+      "title": "Trajet masqué par Yamba",
+      "body": "Ce trajet n'apparaît plus dans la recherche ni sur sa page publique. Tes réservations en cours continuent normalement. Un email t'a été envoyé : réponds au support pour en discuter."
+    },
     "tripTypes": {
       "ONE_WAY": "Aller simple",
       "ROUND_TRIP": "Aller-retour"

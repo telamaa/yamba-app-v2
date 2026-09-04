@@ -340,11 +340,14 @@ async function main() {
   const delB = await prisma.booking.deleteMany({
     where: { OR: [{ shipperId: { in: seedIds } }, { carrierId: { in: seedIds } }] },
   });
+  // C-PR4 — billets seedés (les documents suivent la cascade du Trip, mais on nettoie explicitement par fileId)
+  await prisma.tripDocument.deleteMany({ where: { fileId: { startsWith: "seed-ticket-" } } });
   const delT = await prisma.trip.deleteMany({ where: { userId: { in: seedIds } } });
   console.log(`✓ wipe : ${delB.count} bookings, ${delD.count} disputes, ${delT.count} trips (périmètre seed)`);
 
   // 3. Trips — reservedKg = Σ poids des bookings ACTIFS (CAP-02, calculé)
   const tripIds = new Map<string, string>();
+  let ticketSeeded = false;
   for (const t of TRIPS) {
     const reservedKg = BOOKINGS
       .filter((b) => b.tripKey === t.key && ACTIVE.includes(b.status))
@@ -376,6 +379,25 @@ async function main() {
     });
     tripIds.set(t.key, trip.id);
     console.log(`  · trip ${t.key} → ${trip.id} (reservedKg=${reservedKg}/${t.capacityKg})`);
+    // C-PR4 (D57 1A) — un billet PENDING sur le premier trajet à venir : alimente la file « Billets » de l'admin en recette.
+    if (!ticketSeeded && t.departureAt.getTime() > Date.now()) {
+      ticketSeeded = true;
+      await prisma.tripDocument.create({
+        data: {
+          tripId: trip.id,
+          uploadedByUserId: userIds.get(t.carrierKey)!,
+          type: "TICKET_PROOF",
+          status: "PENDING",
+          fileId: `seed-ticket-${t.key}`,
+          url: "https://ik.imagekit.io/demo/img/image10.jpeg",
+          originalName: `billet-${t.key}.jpeg`,
+          mimeType: "image/jpeg",
+          title: "Billet (seed)",
+        },
+      });
+      await prisma.trip.update({ where: { id: trip.id }, data: { ticketVerificationStatus: "PENDING" } });
+      console.log(`    · billet PENDING seedé sur ${t.key} (file admin « Billets »)`);
+    }
   }
 
   // 4. Bookings

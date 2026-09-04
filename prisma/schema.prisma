@@ -562,6 +562,13 @@ model Trip {
 
   publishedAt DateTime?
   cancelledAt DateTime?
+  // C-PR4 (D57, 3A) — « masqué par Yamba » : réversible, distinct de PAUSED, invisible en recherche / page publique.
+  hiddenByAdminAt   DateTime?
+  hiddenReason      String?
+  hiddenByAdminId   String?   @db.ObjectId
+  hideProposedReason    String?
+  hideProposedByAdminId String?  @db.ObjectId
+  hideProposedAt        DateTime?
   archivedAt  DateTime?
 
   // ⭐ Lifecycle hardening (Lot 1/2) — soft delete des brouillons
@@ -578,6 +585,7 @@ model Trip {
   @@index([transportMode])
   @@index([departureAt])
   @@index([publishedAt])
+  @@index([hiddenByAdminAt])
   @@index([userId, status])
   // Favoris (D46) — signet privé d'un utilisateur sur ce trajet
   favorites TripFavorite[]
@@ -619,7 +627,9 @@ model TripDocument {
 
   verifiedAt      DateTime?
   rejectedAt      DateTime?
-  rejectionReason String?
+  rejectionReason String? // C-PR4 : ILLEGIBLE | DATES_MISMATCH | NAME_MISMATCH | SUSPICIOUS
+  reviewedByAdminId String? @db.ObjectId
+  expiredAt       DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1079,6 +1089,7 @@ enum TripDocumentStatus {
   PENDING
   VERIFIED
   REJECTED
+  EXPIRED // C-PR4 (D57, 8A) : en attente sur un trajet déjà parti
 }
 
 enum ReviewKind {

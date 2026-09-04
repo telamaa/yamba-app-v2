@@ -232,6 +232,10 @@
     "createdAt": "Created",
     "publishedAt": "Published",
     "cancelledAt": "Cancelled",
+    "hiddenByAdmin": {
+      "title": "Trip hidden by Yamba",
+      "body": "This trip no longer appears in search or on its public page. Your ongoing bookings continue as usual. An email was sent to you: reply to support to discuss it."
+    },
     "tripTypes": {
       "ONE_WAY": "One way",
       "ROUND_TRIP": "Round trip"

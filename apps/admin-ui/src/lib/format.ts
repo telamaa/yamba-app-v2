@@ -46,7 +46,22 @@ export const ACTION_LABEL: Record<string, string> = {
   USER_SUSPENDED: "Compte suspendu",
   USER_RESTRICTED: "Compte restreint",
   USER_REINSTATED: "Compte rétabli",
+  TRIP_VIEWED: "Trajet consulté",
+  TRIP_HIDE_PROPOSED: "Masquage proposé",
+  TRIP_HIDDEN: "Trajet masqué",
+  TRIP_UNHIDDEN: "Trajet rétabli",
+  DOCUMENT_VIEWED: "Document ouvert",
+  TICKET_VERIFIED: "Billet vérifié",
+  TICKET_REJECTED: "Billet rejeté",
 };
+
+export const TICKET_REASON_LABEL: Record<string, string> = {
+  ILLEGIBLE: "Document illisible",
+  DATES_MISMATCH: "Les dates ne correspondent pas au trajet",
+  NAME_MISMATCH: "Le nom ne correspond pas au compte",
+  SUSPICIOUS: "Document non recevable",
+};
+export const TICKET_STATUS_LABEL: Record<string, string> = { NOT_SUBMITTED: "aucun billet", PENDING: "à vérifier", VERIFIED: "vérifié", REJECTED: "rejeté" };
 
 export const STATUS_LABEL: Record<string, string> = { ACTIVE: "Actif", RESTRICTED: "Restreint", SUSPENDED: "Suspendu" };
 

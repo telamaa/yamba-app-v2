@@ -507,7 +507,8 @@ export const addTripDocuments = async (
     });
 
     const hasTicket = newDocuments.some((d) => d.type === "TICKET_PROOF");
-    if (hasTicket && trip.ticketVerificationStatus === "NOT_SUBMITTED") {
+    // C-PR4 (D57 1A) — un billet rejeté peut être redéposé : le trajet repasse en attente de vérification.
+    if (hasTicket && (trip.ticketVerificationStatus === "NOT_SUBMITTED" || trip.ticketVerificationStatus === "REJECTED")) {
       await prisma.trip.update({
         where: { id },
         data: { ticketVerificationStatus: "PENDING" },
@@ -1104,7 +1105,7 @@ export const getPublicTrip: RequestHandler = async (req, res, next) => {
     }
     // ⭐ Lot 2 — soft-deleted = introuvable (belt & suspenders : un trip
     // supprimé est forcément DRAFT, donc déjà exclu par le check suivant)
-    if (trip.isDeleted || trip.status !== "PUBLISHED") {
+    if (trip.isDeleted || trip.status !== "PUBLISHED" || (trip as { hiddenByAdminAt?: Date | null }).hiddenByAdminAt /* C-PR4 (D57) : masqué par Yamba */) {
       res.status(404).json({ success: false, message: "Trip not found." });
       return;
     }

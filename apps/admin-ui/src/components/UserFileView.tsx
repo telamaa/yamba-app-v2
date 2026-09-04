@@ -81,6 +81,7 @@ export default function UserFileView({ userId }: { userId: string }) {
       </div>
 
       <Card title={`Trajets (${file.activity.trips.length})`} className="mt-5">
+        {file.activity.trips.length > 0 && <Link href={`/trips?carrierId=${userId}`} className="text-[12px] underline">Ouvrir dans Trajets (fiches, masquage)</Link>}
         {file.activity.trips.length === 0 ? <p className="text-[12.5px] text-slate-500">Aucun trajet.</p> : (
           <table className="w-full text-[12.5px]">
             <tbody>

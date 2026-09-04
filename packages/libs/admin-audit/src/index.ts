@@ -30,13 +30,21 @@ export const ADMIN_ACTIONS = [
   "USER_SUSPENDED",
   "USER_RESTRICTED",
   "USER_REINSTATED",
+  // C-PR4 (D57)
+  "TRIP_VIEWED",
+  "TRIP_HIDE_PROPOSED",
+  "TRIP_HIDDEN",
+  "TRIP_UNHIDDEN",
+  "DOCUMENT_VIEWED",
+  "TICKET_VERIFIED",
+  "TICKET_REJECTED",
 ] as const;
 export type AdminActionType = (typeof ADMIN_ACTIONS)[number];
 
 export type AdminActionInput = {
   adminUserId: string;
   action: AdminActionType | (string & {});
-  targetType: "USER" | "BOOKING" | "DISPUTE" | "SESSION" | (string & {});
+  targetType: "USER" | "BOOKING" | "DISPUTE" | "SESSION" | "TRIP" | (string & {});
   targetId?: string | null;
   before?: unknown;
   after?: unknown;

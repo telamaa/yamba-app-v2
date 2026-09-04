@@ -100,6 +100,10 @@ describe("checkTripBookable", () => {
     expect(code(() => checkTripBookable(trip({ status: "PAUSED" }), "x", NOW))).toBe("TRIP_NOT_BOOKABLE");
     expect(code(() => checkTripBookable(trip({ isDeleted: true }), "x", NOW))).toBe("TRIP_NOT_BOOKABLE");
   });
+  it("masqué par Yamba (C-PR4, D57 3A) → TRIP_NOT_BOOKABLE même PUBLISHED, même par appel direct", () => {
+    expect(code(() => checkTripBookable(trip({ hiddenByAdminAt: new Date("2026-08-30") }), "x", NOW))).toBe("TRIP_NOT_BOOKABLE");
+    expect(() => checkTripBookable(trip({ hiddenByAdminAt: null }), "x", NOW)).not.toThrow();
+  });
   it("déjà parti → TRIP_NOT_BOOKABLE", () => {
     expect(code(() => checkTripBookable(trip({ departureAt: new Date("2026-08-01") }), "x", NOW))).toBe(
       "TRIP_NOT_BOOKABLE"
