@@ -39,7 +39,7 @@ export default function FinanceQueues() {
   }
 
   const current = KINDS.find((k) => k.kind === kind)!;
-  const canRetry = can(me?.adminRole, "payouts.retry");
+  const canRetry = can(me?.adminRoles, "payouts.retry");
   return (
     <div className="mt-4">
       <div className="flex flex-wrap items-center gap-2">

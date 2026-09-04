@@ -9,7 +9,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { ApiError, apiFetch, del, post } from "@/lib/api";
 import { ACTION_LABEL, STATUS_LABEL, dateTime, money } from "@/lib/format";
-import { ROLE_LABEL, can } from "@/lib/permissions";
+import { can, isSuperAdmin, rolesLabel } from "@/lib/permissions";
 import type { AdminMe, AdminUserFile } from "@/lib/types";
 
 const MIN_REASON = 20;
@@ -30,8 +30,9 @@ export default function UserFileView({ userId }: { userId: string }) {
   if (error) return <p className="text-[13px] text-red-700">{error}</p>;
   if (!file) return <p className="text-[13px] text-slate-500">Chargement…</p>;
 
-  const canPropose = can(me?.adminRole, "users.suspension.propose") && !file.isMe && (!file.adminRole || me?.adminRole === "SUPER_ADMIN");
-  const canApply = can(me?.adminRole, "users.suspension.apply") && !file.isMe && (!file.adminRole || me?.adminRole === "SUPER_ADMIN");
+  const isAdminTarget = file.adminRoles.length > 0 || !!file.adminRole;
+  const canPropose = can(me?.adminRoles, "users.suspension.propose") && !file.isMe && (!isAdminTarget || isSuperAdmin(me?.adminRoles));
+  const canApply = can(me?.adminRoles, "users.suspension.apply") && !file.isMe && (!isAdminTarget || isSuperAdmin(me?.adminRoles));
 
   return (
     <div className="max-w-5xl">
@@ -40,7 +41,7 @@ export default function UserFileView({ userId }: { userId: string }) {
         <h1 className="text-xl font-bold">{file.firstName} {file.lastName}</h1>
         <span className="text-[13px] text-slate-500">{file.email}{file.phoneE164 ? ` · ${file.phoneE164}` : ""} · {file.preferredLocale}</span>
         <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${file.accountStatus === "ACTIVE" ? "bg-emerald-50 text-emerald-700" : file.accountStatus === "RESTRICTED" ? "bg-amber-50 text-amber-800" : "bg-red-50 text-red-700"}`}>{STATUS_LABEL[file.accountStatus]}</span>
-        {file.adminRole && <span className="rounded-full bg-slate-900 px-2 py-0.5 text-[10px] font-semibold text-white">{ROLE_LABEL[file.adminRole]}</span>}
+        {isAdminTarget && <span className="rounded-full bg-slate-900 px-2 py-0.5 text-[10px] font-semibold text-white">{rolesLabel(file.adminRoles.length ? file.adminRoles : file.adminRole ? [file.adminRole] : [])}</span>}
         {file.isMe && <span className="text-[11px] text-slate-500">(c'est toi : aucune action possible)</span>}
       </div>
 

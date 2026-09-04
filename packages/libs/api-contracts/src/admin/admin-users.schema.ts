@@ -46,6 +46,33 @@ export function adminRoleAllows(role: AdminRole | null | undefined, permission: 
   return (ADMIN_PERMISSIONS[permission] as readonly string[]).includes(role);
 }
 
+/* ── C-PR3bis (D60 1A) — profils CUMULÉS : l'union des permissions ── */
+export const ADMIN_ROLES_ORDER: readonly AdminRole[] = ["SUPER_ADMIN", "MEDIATOR", "SUPPORT", "FINANCE"];
+export const AdminRolesSchema = z
+  .array(AdminRoleSchema)
+  .min(1)
+  .max(4)
+  .meta({ id: "AdminRoles", description: "Profils cumulés d'un compte admin (au moins un) — l'union des permissions ; normalisés côté serveur (ordre canonique, doublons ignorés)" });
+/** Ordre canonique, doublons ignorés (un `transform` Zod ne se représente pas en OpenAPI : on normalise en code). */
+export function normalizeAdminRoles(roles: readonly AdminRole[]): AdminRole[] {
+  return ADMIN_ROLES_ORDER.filter((r) => roles.includes(r));
+}
+/** true si l'UN des profils a la permission (SUPER_ADMIN passe partout). */
+export function adminRolesAllow(roles: readonly AdminRole[] | null | undefined, permission: AdminPermission): boolean {
+  return !!roles && roles.some((r) => adminRoleAllows(r, permission));
+}
+/** Profil principal (affiché, miroir `User.adminRole`) : SUPER_ADMIN d'abord, sinon le premier dans l'ordre canonique. */
+export function primaryAdminRole(roles: readonly AdminRole[] | null | undefined): AdminRole | null {
+  if (!roles || roles.length === 0) return null;
+  return ADMIN_ROLES_ORDER.find((r) => roles.includes(r)) ?? roles[0];
+}
+/** Lecture tolérante d'un enregistrement (liste absente sur les comptes d'avant C-PR3bis → le profil principal). */
+export function adminRolesOf(u: { adminRoles?: readonly string[] | null; adminRole?: string | null }): AdminRole[] {
+  const list = (u.adminRoles ?? []).filter((r): r is AdminRole => (ADMIN_ROLES_ORDER as readonly string[]).includes(r));
+  if (list.length) return ADMIN_ROLES_ORDER.filter((r) => list.includes(r));
+  return u.adminRole && (ADMIN_ROLES_ORDER as readonly string[]).includes(u.adminRole) ? [u.adminRole as AdminRole] : [];
+}
+
 export const SUSPENSION_MIN_REASON_LENGTH = 20;
 
 export const AdminUserSummarySchema = z
@@ -57,6 +84,7 @@ export const AdminUserSummarySchema = z
     phoneE164: z.string().nullable(),
     roles: z.array(z.string()),
     adminRole: AdminRoleSchema.nullable(),
+    adminRoles: z.array(AdminRoleSchema),
     accountStatus: AccountStatusSchema,
     carrierStatus: z.string(),
     createdAt: z.string().datetime(),
@@ -91,6 +119,7 @@ export const AdminUserFileSchema = z
     preferredLocale: z.string(),
     roles: z.array(z.string()),
     adminRole: AdminRoleSchema.nullable(),
+    adminRoles: z.array(AdminRoleSchema),
     accountStatus: AccountStatusSchema,
     suspension: z
       .object({ level: AccountStatusSchema, reason: z.string(), until: z.string().datetime().nullable(), at: z.string().datetime(), byAdmin: z.string() })
@@ -163,7 +192,7 @@ export const InviteAdminRequestSchema = z
     email: z.string().trim().toLowerCase().email(),
     firstName: z.string().trim().min(1).max(60),
     lastName: z.string().trim().min(1).max(60),
-    adminRole: AdminRoleSchema,
+    adminRoles: AdminRolesSchema,
   })
   .meta({ id: "InviteAdminRequest", description: "SUPER_ADMIN only. New account: no client role, password set through the emailed link (48h)." });
 export type InviteAdminRequest = z.infer<typeof InviteAdminRequestSchema>;
@@ -173,7 +202,7 @@ export const AcceptAdminInviteRequestSchema = z
   .meta({ id: "AcceptAdminInviteRequest" });
 export type AcceptAdminInviteRequest = z.infer<typeof AcceptAdminInviteRequestSchema>;
 
-export const UpdateAdminRoleRequestSchema = z.object({ adminRole: AdminRoleSchema }).meta({ id: "UpdateAdminRoleRequest" });
+export const UpdateAdminRoleRequestSchema = z.object({ adminRoles: AdminRolesSchema }).meta({ id: "UpdateAdminRoleRequest", description: "C-PR3bis : la liste complète des profils (remplace)" });
 export type UpdateAdminRoleRequest = z.infer<typeof UpdateAdminRoleRequestSchema>;
 
 export const AdminAccountSchema = z
@@ -183,6 +212,7 @@ export const AdminAccountSchema = z
     lastName: z.string(),
     email: z.string(),
     adminRole: AdminRoleSchema,
+    adminRoles: z.array(AdminRoleSchema),
     totpEnabled: z.boolean(),
     inviteAccepted: z.boolean().meta({ description: "false while the invited account has no password yet" }),
     createdAt: z.string().datetime(),

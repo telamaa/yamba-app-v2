@@ -1492,3 +1492,18 @@ auth **96** (+2) · deal 477 · trip 207 · notification 78 · tsc ×6 + admin-u
 
 ### Reste
 C-PR3bis profils cumulés (D60 1A) → C-PR7a recherches et exports (D60 2A) → C-PR6b alertes → chantier F chat.
+
+# C-PR3bis — `feat/c3bis-admin-roles` : profils admin cumulés (D60 1A, A123–A125)
+
+## Ce qui a été fait
+1. **Prisma** : `User.adminRoles AdminRole[] @default([])` + index ; `adminRole` conservé comme miroir du profil principal. `npx prisma db push` puis `backfill-admin-roles.ts` (idempotent) pour les comptes existants.
+2. **Contrats** : `AdminRolesSchema` (1..4), `normalizeAdminRoles`, `adminRolesAllow` (union), `primaryAdminRole`, `adminRolesOf` (lecture tolérante) ; `adminRoles` sur `AdminUserSummary`, `AdminUserFile`, `AdminAccount` ; `InviteAdminRequest.adminRoles`, `UpdateAdminRoleRequest.adminRoles` (liste complète, remplace). Spec permissions +3.
+3. **Middlewares** : `isAdminAuthenticated` pose `req.adminRoles` (liste vide → `[adminRole]`) ; `requireAdminPermission` lit la liste.
+4. **auth-service** : `utils/admin-roles.ts` (`adminRolesData`, `NO_ADMIN_ROLES`, `superAdminCount` liste OU miroir, `isSuperAdmin`) ; `admin-admins.controller` (invitation à plusieurs profils, email « Médiateur + Finance », changement = liste complète, garde « dernier SUPER_ADMIN » sur la liste, retrait vide la liste, liste des comptes liste OU miroir) ; JWT et `/admin/me` avec `adminRoles` ; sanctions : un compte admin (n'importe quel profil) n'est visé que par un SUPER_ADMIN ; KPI par union ; `admin-users.service` sert `adminRoles`. Script `grant-admin.ts --roles MEDIATOR,FINANCE`.
+5. **admin-ui** : `can(roles | role, permission)`, `isSuperAdmin`, `rolesLabel`, `ADMIN_ROLES` ; « Comptes admin » avec cases à cocher (invitation et modification par ligne, au moins un profil, indices par profil) ; libellés cumulés dans le menu, la fiche et la recherche utilisateurs ; garde super admin sur la fiche.
+
+### Preuves
+auth **99** (+3) · deal 477 · trip 207 · notification 78 · tsc ×6 + admin-ui · OpenAPI régénéré (A125). Recette : ADM31–ADM36 (DOC-METIER).
+
+### Reste
+C-PR7a recherches poussées et exports encadrés (D60 2A) → C-PR6b alertes de seuil → chantier F chat.

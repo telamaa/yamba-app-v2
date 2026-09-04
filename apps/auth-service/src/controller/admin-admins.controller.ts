@@ -21,6 +21,7 @@ import { localeFromHeaders, normalizeEmail, validatePasswordStrength } from "../
 import { generateUniquePublicSlug } from "../utils/slug.helper";
 import { sendAuthEmail } from "../emails/send-auth-email";
 import { adminRoleLabel, getAdminEmails } from "../emails/admin-emails";
+import { NO_ADMIN_ROLES, adminRolesData, adminRolesOf, superAdminCount } from "../utils/admin-roles";
 
 const SUPPORT_EMAIL = process.env.SUPPORT_EMAIL || "support@yamba.app";
 const ADMIN_UI_URL = (process.env.ADMIN_UI_URL || "http://localhost:3001").replace(/\/$/, "");
@@ -35,25 +36,24 @@ function zodErrors(issues: Array<{ path: PropertyKey[]; message: string }>) {
 function meta(req: Request) {
   return { ip: req.ip ?? null, userAgent: req.headers["user-agent"] ?? null };
 }
-function toAccount(u: { id: string; firstName: string; lastName: string; email: string; adminRole: string | null; totpEnabledAt: Date | null; passwordHash: string | null; createdAt: Date }): AdminAccount {
+function toAccount(u: { id: string; firstName: string; lastName: string; email: string; adminRole: string | null; adminRoles?: string[] | null; totpEnabledAt: Date | null; passwordHash: string | null; createdAt: Date }): AdminAccount {
+  const roles = adminRolesOf(u);
   return {
     id: u.id,
     firstName: u.firstName,
     lastName: u.lastName,
     email: u.email,
-    adminRole: u.adminRole as AdminAccount["adminRole"],
+    adminRole: (u.adminRole ?? roles[0]) as AdminAccount["adminRole"],
+    adminRoles: roles,
     totpEnabled: !!u.totpEnabledAt,
     inviteAccepted: !!u.passwordHash,
     createdAt: u.createdAt.toISOString(),
   };
 }
-async function superAdminCount(): Promise<number> {
-  return prisma.user.count({ where: { adminRole: "SUPER_ADMIN", isDeleted: false } });
-}
 
 export const listAdmins = async (_req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
-    const rows = await prisma.user.findMany({ where: { adminRole: { not: null }, isDeleted: false }, orderBy: { createdAt: "asc" } });
+    const rows = await prisma.user.findMany({ where: { isDeleted: false, OR: [{ adminRole: { not: null }, }, { adminRoles: { isEmpty: false } }] }, orderBy: { createdAt: "asc" } });
     res.status(200).json({ items: rows.map(toAccount) });
   } catch (e) {
     next(e);
@@ -64,7 +64,10 @@ export const inviteAdmin = async (req: AuthenticatedRequest, res: Response, next
   try {
     const parsed = InviteAdminRequestSchema.safeParse(req.body);
     if (!parsed.success) throw new ValidationError("Invalid request", { errors: zodErrors(parsed.error.issues) });
-    const { email, firstName, lastName, adminRole } = parsed.data;
+    const { email, firstName, lastName } = parsed.data;
+    const rolesData = adminRolesData(parsed.data.adminRoles);
+    const adminRoles = rolesData.adminRoles; // C-PR3bis — liste + profil principal
+    const rolesLabel = (locale: string) => adminRoles.map((r) => adminRoleLabel(locale, r)).join(" + ");
     const emailKey = normalizeEmail(email);
     const inviter = `${req.user.firstName} ${req.user.lastName}`;
     const now = new Date();
@@ -75,12 +78,12 @@ export const inviteAdmin = async (req: AuthenticatedRequest, res: Response, next
       await prisma.$transaction(async (tx) => {
         await tx.user.update({
           where: { id: existing.id },
-          data: { adminRole, roles: existing.roles.includes("ADMIN") ? existing.roles : [...existing.roles, "ADMIN"], invitedByAdminId: req.user.id, adminInvitedAt: now, totpBackupCodeHashes: existing.totpBackupCodeHashes ?? [] },
+          data: { ...rolesData, roles: existing.roles.includes("ADMIN") ? existing.roles : [...existing.roles, "ADMIN"], invitedByAdminId: req.user.id, adminInvitedAt: now, totpBackupCodeHashes: existing.totpBackupCodeHashes ?? [] },
         });
-        await recordAdminAction(tx, { adminUserId: req.user.id, action: "ADMIN_INVITED", targetType: "USER", targetId: existing.id, after: { adminRole, existingAccount: true }, ...meta(req) });
+        await recordAdminAction(tx, { adminUserId: req.user.id, action: "ADMIN_INVITED", targetType: "USER", targetId: existing.id, after: { adminRoles, existingAccount: true }, ...meta(req) });
       });
       const locale = resolveLocale(existing.preferredLocale);
-      await sendAuthEmail(existing.email, locale, getAdminEmails(locale).adminAccessGranted({ firstName: existing.firstName, invitedBy: inviter, roleLabel: adminRoleLabel(locale, adminRole), loginUrl: `${ADMIN_UI_URL}/login`, supportEmail: SUPPORT_EMAIL })).catch(() => undefined);
+      await sendAuthEmail(existing.email, locale, getAdminEmails(locale).adminAccessGranted({ firstName: existing.firstName, invitedBy: inviter, roleLabel: rolesLabel(locale), loginUrl: `${ADMIN_UI_URL}/login`, supportEmail: SUPPORT_EMAIL })).catch(() => undefined);
       return res.status(200).json({ ok: true, userId: existing.id, existingAccount: true });
     }
 
@@ -97,19 +100,19 @@ export const inviteAdmin = async (req: AuthenticatedRequest, res: Response, next
           emailNormalized: emailKey,
           publicSlug,
           roles: ["ADMIN"],
-          adminRole,
+          ...rolesData,
           preferredLocale: locale,
           invitedByAdminId: req.user.id,
           adminInvitedAt: now,
           totpBackupCodeHashes: [],
         },
       });
-      await recordAdminAction(tx, { adminUserId: req.user.id, action: "ADMIN_INVITED", targetType: "USER", targetId: u.id, after: { adminRole, existingAccount: false }, ...meta(req) });
+      await recordAdminAction(tx, { adminUserId: req.user.id, action: "ADMIN_INVITED", targetType: "USER", targetId: u.id, after: { adminRoles, existingAccount: false }, ...meta(req) });
       return u;
     });
     const token = crypto.randomBytes(32).toString("hex");
     await redis.set(inviteKey(token), created.id, "EX", INVITE_TTL_HOURS * 3600);
-    await sendAuthEmail(created.email, locale, getAdminEmails(locale).adminInvite({ firstName, invitedBy: inviter, roleLabel: adminRoleLabel(locale, adminRole), acceptUrl: `${ADMIN_UI_URL}/invite?token=${token}`, expiresInHours: INVITE_TTL_HOURS, supportEmail: SUPPORT_EMAIL })).catch(() => undefined);
+    await sendAuthEmail(created.email, locale, getAdminEmails(locale).adminInvite({ firstName, invitedBy: inviter, roleLabel: rolesLabel(locale), acceptUrl: `${ADMIN_UI_URL}/invite?token=${token}`, expiresInHours: INVITE_TTL_HOURS, supportEmail: SUPPORT_EMAIL })).catch(() => undefined);
     return res.status(201).json({ ok: true, userId: created.id, existingAccount: false, expiresInHours: INVITE_TTL_HOURS });
   } catch (e) {
     return next(e);
@@ -123,16 +126,19 @@ export const updateAdminRole = async (req: AuthenticatedRequest, res: Response, 
     const parsed = UpdateAdminRoleRequestSchema.safeParse(req.body);
     if (!parsed.success) throw new ValidationError("Invalid request", { errors: zodErrors(parsed.error.issues) });
     const target = await prisma.user.findUnique({ where: { id: id.data } });
-    if (!target || !target.adminRole) throw new NotFoundError("Admin account not found.");
+    const before = target ? adminRolesOf(target) : [];
+    if (!target || before.length === 0) throw new NotFoundError("Admin account not found.");
     if (target.id === req.user.id) throw new ForbiddenError("You cannot change your own profile.");
-    if (target.adminRole === "SUPER_ADMIN" && parsed.data.adminRole !== "SUPER_ADMIN" && (await superAdminCount()) <= 1) {
+    const next = adminRolesData(parsed.data.adminRoles).adminRoles;
+    if (before.includes("SUPER_ADMIN") && !next.includes("SUPER_ADMIN") && (await superAdminCount()) <= 1) {
       throw new ForbiddenError("The last super administrator cannot be downgraded.");
     }
+    const rolesData = adminRolesData(next);
     await prisma.$transaction(async (tx) => {
-      await tx.user.update({ where: { id: target.id }, data: { adminRole: parsed.data.adminRole } });
-      await recordAdminAction(tx, { adminUserId: req.user.id, action: "ADMIN_ROLE_CHANGED", targetType: "USER", targetId: target.id, before: { adminRole: target.adminRole }, after: { adminRole: parsed.data.adminRole }, ...meta(req) });
+      await tx.user.update({ where: { id: target.id }, data: rolesData });
+      await recordAdminAction(tx, { adminUserId: req.user.id, action: "ADMIN_ROLE_CHANGED", targetType: "USER", targetId: target.id, before: { adminRoles: before }, after: { adminRoles: next }, ...meta(req) });
     });
-    res.status(200).json({ ok: true, adminRole: parsed.data.adminRole });
+    res.status(200).json({ ok: true, adminRoles: next, adminRole: rolesData.adminRole });
   } catch (e) {
     next(e);
   }
@@ -143,15 +149,16 @@ export const revokeAdmin = async (req: AuthenticatedRequest, res: Response, next
     const id = ObjectIdSchema.safeParse(req.params.id);
     if (!id.success) throw new ValidationError("Invalid id.");
     const target = await prisma.user.findUnique({ where: { id: id.data } });
-    if (!target || !target.adminRole) throw new NotFoundError("Admin account not found.");
+    const before = target ? adminRolesOf(target) : [];
+    if (!target || before.length === 0) throw new NotFoundError("Admin account not found.");
     if (target.id === req.user.id) throw new ForbiddenError("You cannot revoke your own access.");
-    if (target.adminRole === "SUPER_ADMIN" && (await superAdminCount()) <= 1) throw new ForbiddenError("The last super administrator cannot be revoked.");
+    if (before.includes("SUPER_ADMIN") && (await superAdminCount()) <= 1) throw new ForbiddenError("The last super administrator cannot be revoked.");
     await prisma.$transaction(async (tx) => {
       await tx.user.update({
         where: { id: target.id },
-        data: { adminRole: null, roles: target.roles.filter((r) => r !== "ADMIN"), totpSecretEncrypted: null, totpEnabledAt: null, totpLastUsedStep: null, totpBackupCodeHashes: [] },
+        data: { ...NO_ADMIN_ROLES, roles: target.roles.filter((r) => r !== "ADMIN"), totpSecretEncrypted: null, totpEnabledAt: null, totpLastUsedStep: null, totpBackupCodeHashes: [] },
       });
-      await recordAdminAction(tx, { adminUserId: req.user.id, action: "ADMIN_REVOKED", targetType: "USER", targetId: target.id, before: { adminRole: target.adminRole }, ...meta(req) });
+      await recordAdminAction(tx, { adminUserId: req.user.id, action: "ADMIN_REVOKED", targetType: "USER", targetId: target.id, before: { adminRoles: before }, ...meta(req) });
     });
     // Ses sessions admin tombent avec le profil (isAdminAuthenticated relit la base).
     let cursor = "0";
@@ -174,7 +181,7 @@ export const acceptAdminInvite = async (req: Request, res: Response, next: NextF
     const userId = await redis.get(inviteKey(parsed.data.token));
     if (!userId) throw new ValidationError("This invitation link is invalid or expired.");
     const user = await prisma.user.findUnique({ where: { id: userId } });
-    if (!user || !user.adminRole) throw new ValidationError("This invitation link is invalid or expired.");
+    if (!user || adminRolesOf(user).length === 0) throw new ValidationError("This invitation link is invalid or expired.");
     validatePasswordStrength(parsed.data.password, { email: user.email, firstName: user.firstName, lastName: user.lastName });
     const passwordHash = await bcrypt.hash(parsed.data.password, 10);
     await prisma.$transaction(async (tx) => {

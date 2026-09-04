@@ -11944,6 +11944,15 @@
           "SUSPENDED"
         ]
       },
+      "AdminRoles": {
+        "minItems": 1,
+        "maxItems": 4,
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/AdminRole"
+        },
+        "description": "Profils cumulés d'un compte admin (au moins un) — l'union des permissions ; normalisés côté serveur (ordre canonique, doublons ignorés)"
+      },
       "AdminUserSummary": {
         "type": "object",
         "properties": {
@@ -11985,6 +11994,12 @@
               }
             ]
           },
+          "adminRoles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminRole"
+            }
+          },
           "accountStatus": {
             "$ref": "#/components/schemas/AccountStatus"
           },
@@ -12016,6 +12031,7 @@
           "phoneE164",
           "roles",
           "adminRole",
+          "adminRoles",
           "accountStatus",
           "carrierStatus",
           "createdAt",
@@ -12087,6 +12103,12 @@
                 "type": "null"
               }
             ]
+          },
+          "adminRoles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminRole"
+            }
           },
           "accountStatus": {
             "$ref": "#/components/schemas/AccountStatus"
@@ -12478,6 +12500,7 @@
           "preferredLocale",
           "roles",
           "adminRole",
+          "adminRoles",
           "accountStatus",
           "suspension",
           "suspensionProposal",
@@ -12575,15 +12598,15 @@
             "minLength": 1,
             "maxLength": 60
           },
-          "adminRole": {
-            "$ref": "#/components/schemas/AdminRole"
+          "adminRoles": {
+            "$ref": "#/components/schemas/AdminRoles"
           }
         },
         "required": [
           "email",
           "firstName",
           "lastName",
-          "adminRole"
+          "adminRoles"
         ],
         "additionalProperties": false,
         "description": "SUPER_ADMIN only. New account: no client role, password set through the emailed link (48h)."
@@ -12611,14 +12634,15 @@
       "UpdateAdminRoleRequest": {
         "type": "object",
         "properties": {
-          "adminRole": {
-            "$ref": "#/components/schemas/AdminRole"
+          "adminRoles": {
+            "$ref": "#/components/schemas/AdminRoles"
           }
         },
         "required": [
-          "adminRole"
+          "adminRoles"
         ],
-        "additionalProperties": false
+        "additionalProperties": false,
+        "description": "C-PR3bis : la liste complète des profils (remplace)"
       },
       "AdminAccount": {
         "type": "object",
@@ -12637,6 +12661,12 @@
           },
           "adminRole": {
             "$ref": "#/components/schemas/AdminRole"
+          },
+          "adminRoles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminRole"
+            }
           },
           "totpEnabled": {
             "type": "boolean"
@@ -12657,6 +12687,7 @@
           "lastName",
           "email",
           "adminRole",
+          "adminRoles",
           "totpEnabled",
           "inviteAccepted",
           "createdAt"

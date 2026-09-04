@@ -12,6 +12,7 @@
  */
 import type { NextFunction, Response } from "express";
 import prisma from "@packages/libs/prisma";
+import { adminRolesOf, isSuperAdmin } from "../utils/admin-roles";
 import { ForbiddenError, NotFoundError, ValidationError } from "@packages/error-handler";
 import { recordAdminAction } from "@packages/admin-audit";
 import { isEmailConfigured, sendTransactionalEmail } from "@packages/email";
@@ -48,7 +49,8 @@ export function makeAdminUsersController(service: AdminUsersService) {
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new NotFoundError("User not found.");
     // Un admin ne se sanctionne pas entre pairs sans le super admin.
-    if (user.adminRole && req.adminRole !== "SUPER_ADMIN") throw new ForbiddenError("Only a super administrator can act on an admin account.");
+    // C-PR3bis — un admin (n'importe quel profil) n'est sanctionné que par un SUPER_ADMIN (profils cumulés)
+    if (adminRolesOf(user).length > 0 && !isSuperAdmin(req.adminRoles ?? [req.adminRole ?? ""])) throw new ForbiddenError("Only a super administrator can act on an admin account.");
     return user;
   }
 

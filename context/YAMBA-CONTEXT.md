@@ -336,7 +336,11 @@ Ordre de demarrage : auth -> trip -> gateway.
   badge « Populaire » (20 vues) sur cartes et detail public. D60 grave aussi : profils
   cumules (C-PR3bis), recherches + exports encadres RGPD (C-PR7a). Suite : C-PR3bis,
   C-PR7a, C-PR6b alertes, chantier F chat.
-- Plateforme de tests : 762 (trip 207, deal 477, notification 78) + auth 96.
+- 04/09 : C-PR3bis feat/c3bis-admin-roles (D60 1A, A123–A125) — User.adminRoles (liste) +
+  adminRole miroir, adminRolesAllow (union), middleware / JWT / me, invitation et modification
+  a cases (Comptes admin), garde dernier SUPER_ADMIN sur la liste, grant-admin --roles,
+  backfill-admin-roles.ts ; sans transform Zod (OpenAPI). Suite : C-PR7a recherches / exports.
+- Plateforme de tests : 762 (trip 207, deal 477, notification 78) + auth 99.
 - (historique) Plateforme de tests : 600 (trip 187, deal 354, notification 59) — post-B3 (#96).
 - MERGE 01/09 : toute la pile B2 est dans `dev` via la SEULE **PR #90**
   (`feat/b2-deal-front` portait la chaîne complète : jalons mobile D36,

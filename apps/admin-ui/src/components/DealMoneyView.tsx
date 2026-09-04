@@ -81,9 +81,9 @@ export default function DealMoneyView({ dealId }: { dealId: string }) {
           {file.payout.reversal && <Row k="Renversement clos" v={`${file.payout.reversal.resolution === "RESENT" ? "re-versé" : "abandonné"} par ${file.payout.reversal.byAdmin} le ${dateTime(file.payout.reversal.at)} — ${file.payout.reversal.reason}`} />}
           {file.retention && <Row k="Retenue" v={`${money(file.retention.cents, cur)} · ${file.retention.disposition ?? "—"}${file.retention.decidedAt ? ` (arbitrée le ${dateTime(file.retention.decidedAt)})` : ""}`} />}
           <div className="mt-2 flex flex-wrap gap-2">
-            {file.allowedActions.retryPayout && can(me?.adminRole, "payouts.retry") && <button disabled={busy} onClick={retry} className="rounded-lg bg-slate-900 px-3 py-1.5 text-[12.5px] font-semibold text-white disabled:opacity-50">Relancer le versement</button>}
+            {file.allowedActions.retryPayout && can(me?.adminRoles, "payouts.retry") && <button disabled={busy} onClick={retry} className="rounded-lg bg-slate-900 px-3 py-1.5 text-[12.5px] font-semibold text-white disabled:opacity-50">Relancer le versement</button>}
           </div>
-          {file.allowedActions.resolveReversal && can(me?.adminRole, "payouts.resolve") && <ReversalForm dealId={dealId} onDone={(m) => { setMsg(m); load(); }} />}
+          {file.allowedActions.resolveReversal && can(me?.adminRoles, "payouts.resolve") && <ReversalForm dealId={dealId} onDone={(m) => { setMsg(m); load(); }} />}
         </Card>
       </div>
 
@@ -128,7 +128,7 @@ export default function DealMoneyView({ dealId }: { dealId: string }) {
           {file.dates.closedAt && <Row k="Clos" v={`${dateTime(file.dates.closedAt)} (${file.dates.closedBy ?? "—"})`} />}
         </div>
       </Card>
-      {can(me?.adminRole, "deals.history.read") && <DealHistoryCard dealId={dealId} />}
+      {can(me?.adminRoles, "deals.history.read") && <DealHistoryCard dealId={dealId} />}
       <Card title="Actions admin sur ce deal" className="mt-5">
         {file.adminActions.length === 0 ? <p className="text-[12.5px] text-slate-500">Aucune.</p> : (
           <ul className="space-y-1 text-[12.5px]">{file.adminActions.map((a) => <li key={a.id}>{dateTime(a.at)} · {a.admin} · <b>{ACTION_LABEL[a.action] ?? a.action}</b>{a.after ? <span className="ml-1 font-mono text-[11px] text-slate-500">{JSON.stringify(a.after)}</span> : null}</li>)}</ul>
@@ -204,8 +204,8 @@ function DealHistoryCard({ dealId }: { dealId: string }) {
 const REFUND_MIN_REASON = 50;
 function ManualRefundCard({ file, me, onDone }: { file: AdminDealMoneyFile; me: AdminMe | null; onDone: (msg: string) => void }) {
   const cur = file.pricing.currencyCode;
-  const canPropose = can(me?.adminRole, "refunds.manual.propose") && file.allowedActions.proposeRefund;
-  const canApply = can(me?.adminRole, "refunds.manual.apply") && file.allowedActions.applyRefund;
+  const canPropose = can(me?.adminRoles, "refunds.manual.propose") && file.allowedActions.proposeRefund;
+  const canApply = can(me?.adminRoles, "refunds.manual.apply") && file.allowedActions.applyRefund;
   const [amount, setAmount] = useState(file.manualRefund.proposal ? (file.manualRefund.proposal.amountCents / 100).toFixed(2) : "");
   const [reason, setReason] = useState(file.manualRefund.proposal?.reason ?? "");
   const [busy, setBusy] = useState(false);

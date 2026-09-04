@@ -6,6 +6,7 @@
  * livraison, identifiants Stripe complets).
  */
 import prisma from "@packages/libs/prisma";
+import { adminRolesOf } from "@packages/api-contracts";
 import redis from "@packages/libs/redis";
 import { NotFoundError } from "@packages/error-handler";
 import type { AdminUserFile, AdminUserSummary, AdminUsersResponse } from "@packages/api-contracts";
@@ -38,6 +39,7 @@ const summarySelect = {
   phoneE164: true,
   roles: true,
   adminRole: true,
+  adminRoles: true,
   accountStatus: true,
   carrierStatus: true,
   createdAt: true,
@@ -51,6 +53,7 @@ type SummaryRow = {
   phoneE164: string | null;
   roles: string[];
   adminRole: string | null;
+  adminRoles?: string[] | null;
   accountStatus: string;
   carrierStatus: string;
   createdAt: Date;
@@ -65,6 +68,7 @@ function toSummary(u: SummaryRow, matchedOn: string | null): AdminUserSummary {
     phoneE164: u.phoneE164,
     roles: u.roles,
     adminRole: (u.adminRole as AdminUserSummary["adminRole"]) ?? null,
+    adminRoles: adminRolesOf(u),
     accountStatus: u.accountStatus as AdminUserSummary["accountStatus"],
     carrierStatus: u.carrierStatus,
     createdAt: u.createdAt.toISOString(),
@@ -174,6 +178,7 @@ export function makeAdminUsersService() {
         preferredLocale: u.preferredLocale,
         roles: u.roles,
         adminRole: (u.adminRole as AdminUserFile["adminRole"]) ?? null,
+        adminRoles: adminRolesOf(u as { adminRole?: string | null; adminRoles?: string[] | null }),
         accountStatus: u.accountStatus as AdminUserFile["accountStatus"],
         suspension:
           u.accountStatus !== "ACTIVE" && u.suspendedAt

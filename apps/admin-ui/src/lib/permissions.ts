@@ -29,10 +29,13 @@ const MATRIX: Record<AdminPermission, AdminRole[]> = {
   "deals.history.read": ["MEDIATOR", "SUPPORT", "FINANCE"],
 };
 
-export function can(role: AdminRole | null | undefined, permission: AdminPermission): boolean {
-  if (!role) return false;
-  if (role === "SUPER_ADMIN") return true;
-  return MATRIX[permission].includes(role);
+/** C-PR3bis (D60 1A) — profils cumulés : l'UN des profils suffit ; accepte encore un profil seul (anciens écrans). */
+export function can(roles: readonly AdminRole[] | AdminRole | null | undefined, permission: AdminPermission): boolean {
+  const list = !roles ? [] : Array.isArray(roles) ? roles : [roles as AdminRole];
+  return list.some((role) => role === "SUPER_ADMIN" || MATRIX[permission].includes(role));
 }
+export const isSuperAdmin = (roles: readonly AdminRole[] | AdminRole | null | undefined): boolean => can(roles, "admins.manage");
+export const ADMIN_ROLES: AdminRole[] = ["SUPER_ADMIN", "MEDIATOR", "SUPPORT", "FINANCE"];
+export const rolesLabel = (roles: readonly AdminRole[] | null | undefined): string => (roles && roles.length ? roles.map((r) => ROLE_LABEL[r]).join(" + ") : "—");
 
 export const ROLE_LABEL: Record<AdminRole, string> = { SUPER_ADMIN: "Super administrateur", MEDIATOR: "Médiateur", SUPPORT: "Support", FINANCE: "Finance" };

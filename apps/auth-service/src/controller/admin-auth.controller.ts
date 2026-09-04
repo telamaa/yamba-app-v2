@@ -21,6 +21,7 @@ import type { NextFunction, Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import prisma from "@packages/libs/prisma";
+import { adminRolesOf } from "../utils/admin-roles";
 import { AuthError, ForbiddenError, ValidationError } from "@packages/error-handler";
 import { recordAdminAction } from "@packages/admin-audit";
 import {
@@ -109,7 +110,7 @@ async function issueAdminSession(res: Response, user: { id: string; roles: strin
   const ttl = await storeAdminSession(user.id, jti, createdAt, createdAt);
   if (ttl <= 0) throw new AuthError("Admin session could not be opened.");
   const accessToken = jwt.sign(
-    { id: user.id, roles: user.roles, adm: true, amr: ["pwd", "totp"], adminRole: (user as { adminRole?: string | null }).adminRole ?? null },
+    { id: user.id, roles: user.roles, adm: true, amr: ["pwd", "totp"], adminRole: (user as { adminRole?: string | null }).adminRole ?? null, adminRoles: adminRolesOf(user as { adminRole?: string | null; adminRoles?: string[] | null }) },
     process.env.ACCESS_TOKEN_SECRET as string,
     { expiresIn: "15m" }
   );
@@ -308,6 +309,7 @@ export const getAdminMe = async (req: AuthenticatedRequest, res: Response, next:
       firstName: u.firstName,
       lastName: u.lastName,
       adminRole: u.adminRole ?? null,
+      adminRoles: adminRolesOf(u), // C-PR3bis (D60 1A)
       remainingBackupCodes: (u.totpBackupCodeHashes ?? []).length,
     });
   } catch (e) {
