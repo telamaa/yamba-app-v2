@@ -26,6 +26,7 @@
   },
   "views": "{count, plural, =1 {1 vue} other {# vues}}",
   "badges": {
+    "popular": "Populaire",
     "profileVerified": "Profil vérifié",
     "superTripper": "Super Voyageur",
     "verifiedTicket": "Billet vérifié"

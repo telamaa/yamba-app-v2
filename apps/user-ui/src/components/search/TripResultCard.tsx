@@ -30,6 +30,7 @@ import {
 import { useTranslations, useLocale } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import FavoriteButton from "@/components/favorites/FavoriteButton";
+import { isPopular } from "@/lib/trip-signals";
 import {
   ParcelCategory,
   SearchFamily,
@@ -437,16 +438,17 @@ export default function TripResultCard({
                   {t("newTripper")}
                 </span>
               )}
-              {typeof item.viewsCount === "number" && item.viewsCount > 0 && (
-                <span className="inline-flex items-center gap-0.5 text-[11px] text-slate-400 dark:text-slate-500" title={t("views", { count: item.viewsCount })}>
-                  <Eye size={11} strokeWidth={2} />
-                  {item.viewsCount}
-                </span>
-              )}
             </div>
 
-            {(item.superTripper || item.verifiedTicket) && (
+            {(item.superTripper || item.verifiedTicket || (typeof item.viewsCount === "number" && item.viewsCount > 0)) && (
               <div className="mt-1 flex flex-wrap items-center gap-1">
+                {/* D5 / C-PR6 — signal de popularité : pastille lisible, badge « Populaire » à partir de 20 vues */}
+                {typeof item.viewsCount === "number" && item.viewsCount > 0 && (
+                  <span className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-semibold ${isPopular(item.viewsCount) ? "bg-[#FFF6E8] text-[#B45309] dark:bg-[#FF9900]/15 dark:text-[#FFB84D]" : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300"}`} title={t("views", { count: item.viewsCount })}>
+                    <Eye size={10} strokeWidth={2.5} />
+                    {isPopular(item.viewsCount) ? t("badges.popular") : t("views", { count: item.viewsCount })}
+                  </span>
+                )}
                 {item.superTripper && (
                   <span className="inline-flex items-center gap-0.5 rounded-md bg-[#FFF6E8] px-1.5 py-0.5 text-[10px] font-semibold text-[#B45309] dark:bg-[#FF9900]/15 dark:text-[#FFB84D]">
                     <Award size={9} strokeWidth={2.5} />

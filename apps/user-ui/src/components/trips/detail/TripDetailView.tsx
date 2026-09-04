@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
-import { ArrowLeft, Flag, LayoutDashboard, Pencil } from "lucide-react";
+import { ArrowLeft, Eye, Flag, LayoutDashboard, Pencil, Ticket } from "lucide-react";
+import { isPopular } from "@/lib/trip-signals";
 import { useRouter } from "@/i18n/navigation";
 import useUser from "@/hooks/useUser";
 import type { PublicTrip } from "@/lib/public-trip.types";
@@ -69,10 +70,25 @@ export default function TripDetailView({ trip }: Props) {
               firstName: trip.tripper.firstName,
               lastInitial: trip.tripper.lastInitial,
             })}
-            {typeof trip.viewsCount === "number" && trip.viewsCount > 0 && (
-              <span className="ml-2 text-xs text-slate-400 dark:text-slate-500">· {t("views", { count: trip.viewsCount })}</span>
-            )}
           </p>
+          {/* D5 / C-PR6 (D60) — signaux : vues (pastille), « Populaire » à partir de 20 vues, billet vérifié */}
+          {((typeof trip.viewsCount === "number" && trip.viewsCount > 0) || trip.ticketVerified) && (
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              {typeof trip.viewsCount === "number" && trip.viewsCount > 0 && (
+                <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold ${isPopular(trip.viewsCount) ? "bg-[#FFF6E8] text-[#B45309] dark:bg-[#FF9900]/15 dark:text-[#FFB84D]" : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300"}`}>
+                  <Eye size={12} strokeWidth={2.5} />
+                  {t("views", { count: trip.viewsCount })}
+                  {isPopular(trip.viewsCount) && <span className="ml-1 rounded-full bg-[#FF9900] px-1.5 text-[10px] text-white">{t("badges.popular")}</span>}
+                </span>
+              )}
+              {trip.ticketVerified && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-blue-700 dark:bg-blue-950/40 dark:text-blue-300">
+                  <Ticket size={12} strokeWidth={2.5} />
+                  {t("badges.verifiedTicket")}
+                </span>
+              )}
+            </div>
+          )}
         </div>
         {/* D46 — le créateur ne met pas son propre trajet en favori (le serveur le refuse aussi) */}
         {!isOwner && <FavoriteButton tripId={trip.id} isFavorite={trip.isFavorite} variant="detail" className="shrink-0" />}

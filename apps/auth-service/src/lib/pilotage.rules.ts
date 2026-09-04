@@ -33,6 +33,23 @@ export function periodKey(d: Date, g: PilotageGranularity): string {
 export function nextPeriod(start: Date, g: PilotageGranularity): Date {
   return g === "week" ? new Date(start.getTime() + 7 * DAY) : new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 1));
 }
+/** Bornes [start, end) d'une clé de période (« 2026-W36 » ou « 2026-09 ») ; null si la clé est invalide. */
+export function periodBounds(key: string, g: PilotageGranularity): { start: Date; end: Date } | null {
+  if (g === "month") {
+    const m = /^(\d{4})-(\d{2})$/.exec(key);
+    if (!m || Number(m[2]) < 1 || Number(m[2]) > 12) return null;
+    const start = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, 1));
+    return { start, end: nextPeriod(start, "month") };
+  }
+  const w = /^(\d{4})-W(\d{2})$/.exec(key);
+  if (!w) return null;
+  const year = Number(w[1]); const week = Number(w[2]);
+  const jan4 = new Date(Date.UTC(year, 0, 4));
+  const start = new Date(isoWeekStart(jan4).getTime() + (week - 1) * 7 * DAY);
+  if (isoWeekKey(start) !== key) return null;
+  return { start, end: nextPeriod(start, "week") };
+}
+
 /** Toutes les périodes de `from` (inclus) à `to` (exclu), vides comprises — une courbe sans trou. */
 export function periodsBetween(from: Date, to: Date, g: PilotageGranularity): Date[] {
   const out: Date[] = [];
@@ -51,17 +68,26 @@ export type SeriesInput = {
     closedAt?: Date | null;
     disputedAt?: Date | null;
     capturedAt?: Date | null;
+    refundedAt?: Date | null;
+    refundAmountCents?: number | null;
+    payoutStatus?: string | null;
+    payoutAmountCents?: number | null;
+    payoutSentAt?: Date | null;
+    retentionCents?: number | null;
     status: string;
-    pricing: { totalShipperCents: number; currencyCode: string };
+    pricing: { totalShipperCents: number; currencyCode: string; commissionCents?: number; premiumCents?: number };
   }>;
 };
 
+type FinanceAcc = { capturedCents: number; refundedCents: number; paidOutCents: number; revenueCents: number; retentionCents: number };
+
 /** Chaque fait compte dans la période de SA date. Périodes vides incluses. */
 export function buildSeries(input: SeriesInput, from: Date, to: Date, g: PilotageGranularity): PilotageSeriesPoint[] {
-  const points = new Map<string, PilotageSeriesPoint & { _volume: Map<string, number> }>();
+  const points = new Map<string, PilotageSeriesPoint & { _volume: Map<string, number>; _fin: Map<string, FinanceAcc> }>();
   for (const start of periodsBetween(from, to, g)) {
-    points.set(periodKey(start, g), { period: periodKey(start, g), periodStart: start.toISOString(), signups: 0, tripsPublished: 0, requests: 0, accepted: 0, delivered: 0, completed: 0, cancelled: 0, disputes: 0, volume: [], _volume: new Map() });
+    points.set(periodKey(start, g), { period: periodKey(start, g), periodStart: start.toISOString(), signups: 0, tripsPublished: 0, requests: 0, accepted: 0, delivered: 0, completed: 0, cancelled: 0, disputes: 0, volume: [], finance: [], _volume: new Map(), _fin: new Map() });
   }
+  const fin = (p: { _fin: Map<string, FinanceAcc> }, cur: string) => { let f = p._fin.get(cur); if (!f) { f = { capturedCents: 0, refundedCents: 0, paidOutCents: 0, revenueCents: 0, retentionCents: 0 }; p._fin.set(cur, f); } return f; };
   const at = (d: Date | null | undefined) => (d && d.getTime() >= from.getTime() && d.getTime() < to.getTime() ? points.get(periodKey(d, g)) : undefined);
   for (const d of input.userCreatedAts) { const p = at(d); if (p) p.signups += 1; }
   for (const d of input.tripPublishedAts) { const p = at(d); if (p) p.tripsPublished += 1; }
@@ -70,12 +96,19 @@ export function buildSeries(input: SeriesInput, from: Date, to: Date, g: Pilotag
     p = at(b.acceptedAt); if (p) p.accepted += 1;
     p = at(b.deliveredAt); if (p) p.delivered += 1;
     p = at(b.disputedAt); if (p) p.disputes += 1;
-    if (b.status === "COMPLETED") { p = at(b.completedAt); if (p) p.completed += 1; }
-    if (b.status === "CANCELLED") { p = at(b.closedAt); if (p) p.cancelled += 1; }
+    const cur = b.pricing.currencyCode;
+    if (b.status === "COMPLETED") { p = at(b.completedAt); if (p) { p.completed += 1; fin(p, cur).revenueCents += (b.pricing.commissionCents ?? 0) + (b.pricing.premiumCents ?? 0); } }
+    if (b.status === "CANCELLED") { p = at(b.closedAt); if (p) { p.cancelled += 1; fin(p, cur).retentionCents += b.retentionCents ?? 0; } }
     p = at(b.capturedAt);
-    if (p) p._volume.set(b.pricing.currencyCode, (p._volume.get(b.pricing.currencyCode) ?? 0) + b.pricing.totalShipperCents);
+    if (p) { p._volume.set(cur, (p._volume.get(cur) ?? 0) + b.pricing.totalShipperCents); fin(p, cur).capturedCents += b.pricing.totalShipperCents; }
+    if ((b.refundAmountCents ?? 0) > 0) { p = at(b.refundedAt); if (p) fin(p, cur).refundedCents += b.refundAmountCents ?? 0; }
+    if (b.payoutStatus === "SENT" || b.payoutStatus === "REVERSED") { p = at(b.payoutSentAt); if (p) fin(p, cur).paidOutCents += b.payoutAmountCents ?? 0; }
   }
-  return [...points.values()].map(({ _volume, ...pt }) => ({ ...pt, volume: [..._volume.entries()].sort().map(([currencyCode, capturedCents]) => ({ currencyCode, capturedCents })) }));
+  return [...points.values()].map(({ _volume, _fin, ...pt }) => ({
+    ...pt,
+    volume: [..._volume.entries()].sort().map(([currencyCode, capturedCents]) => ({ currencyCode, capturedCents })),
+    finance: [..._fin.entries()].sort().map(([currencyCode, f]) => ({ currencyCode, ...f })),
+  }));
 }
 
 export type CorridorInput = {

@@ -1478,3 +1478,17 @@ trip **207** (+5) · deal **477** (+2) · auth **94** (+5) · notification 78 ·
 
 ### Reste
 C-PR6b : alertes de seuil (cron horaire deal-service, règles en constantes, accueil + digest). Puis C-PR7 signalements et anti-fraude, C-PR8 paramètres, RGPD, maintenance. Backlog : événements de trajet (outbox trip-service), réparation d'un événement parqué depuis l'écran, PostHog (D5), petits multiples alignés pour comparer deux mesures.
+
+# C-PR6c — `feat/c6c-admin-pilotage-v2` : courbes agrandies, drill-down, finances du pilotage, popularité web (D60, A120–A122)
+
+## Ce qui a été fait
+1. **Contrats** : `PilotageSeriesPoint.finance[]` (par devise : encaissé, remboursé, versé, revenu, retenues), `PilotageMetric`, `PilotageDrilldownItem/Response` (200 max, `truncated`). Journal `PILOTAGE_DRILLDOWN_VIEWED`.
+2. **auth-service** : `pilotage.rules.ts` — `periodBounds` (inverse de `periodKey`, mois 1..12 validé), `buildSeries` étendu aux finances (+2 tests) ; `admin-pilotage.controller.ts` — sélection élargie (remboursement, versement, retenue), `getPilotageDrilldown` (comptes / trajets / deals selon la mesure, champ de date par mesure, filtres de statut, montant par mesure, journal pour les inscriptions) ; route `GET /admin/pilotage/drilldown` (`pilotage.read`).
+3. **admin-ui** `PilotageView` : onglets Activité / Finances (sélecteur de devise), deux courbes par ligne (220 px) avec « Agrandir », vue agrandie (360 px, tableau période / valeur / variation, panneau des éléments avec liens vers fiches), courbes avec libellés de période espacés, axe en unités monétaires sur l'onglet Finances.
+4. **user-ui** : `lib/trip-signals.ts` (`POPULAR_VIEWS` = 20, `isPopular`), pastille « n vues » dans la rangée des badges (desktop, mobile) et barre de signaux du détail public (vues, « Populaire », billet vérifié), clés `badges.popular` (search, tripDetail, FR/EN).
+
+### Preuves
+auth **96** (+2) · deal 477 · trip 207 · notification 78 · tsc ×6 + admin-ui + user-ui · miroir i18n OK · OpenAPI régénéré. Recette : PIL09–PIL14 (DOC-METIER).
+
+### Reste
+C-PR3bis profils cumulés (D60 1A) → C-PR7a recherches et exports (D60 2A) → C-PR6b alertes → chantier F chat.

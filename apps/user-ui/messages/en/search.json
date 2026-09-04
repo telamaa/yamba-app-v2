@@ -18,6 +18,7 @@
   },
   "views": "{count, plural, =1 {1 view} other {# views}}",
   "badges": {
+    "popular": "Popular",
     "superTripper": "Super Traveler",
     "instant": "Instant",
     "instantBooking": "Instant booking",
