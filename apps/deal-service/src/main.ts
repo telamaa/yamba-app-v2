@@ -34,7 +34,9 @@ import { pinoHttp } from "pino-http";
 import { errorMiddleware } from "@packages/error-handler/error-middleware";
 import { KafkaEventPublisher } from "@packages/messaging";
 import { buildOpenApiDocument } from "./openapi/build-openapi";
-import dealRouter, { dealLifecycleService, dealRatingService, dealSettlementService } from "./routes/deal.routes";
+import dealRouter, { dealLifecycleService, dealRatingService, dealSettlementService, opsAlertsService } from "./routes/deal.routes";
+import redis from "@packages/libs/redis";
+import { startOpsAlertsCron } from "./cron/ops-alerts.cron";
 import { makeStripeWebhookHandler } from "./controllers/stripe-webhook.controller";
 import { startBookingExpiryCron } from "./cron/expire-bookings.cron";
 import { startBookingPayoutCron } from "./cron/payout-bookings.cron";
@@ -183,6 +185,13 @@ if (!opsDigestEnabled) {
   logger.info("Ops digest cron disabled (OPS_DIGEST_CRON_ENABLED=false)");
 }
 
+// ── Alertes de seuil horaires (C-PR6b, D59 3A) — dédoublonnées par Redis, un email par règle et par jour ──
+const opsAlertsEnabled = process.env.OPS_ALERTS_CRON_ENABLED !== "false";
+const opsAlertsCron = opsAlertsEnabled ? startOpsAlertsCron(opsAlertsService, redis, logger.child({ module: "ops-alerts-cron" })) : null;
+if (!opsAlertsEnabled) {
+  logger.info("Ops alerts cron disabled (OPS_ALERTS_CRON_ENABLED=false)");
+}
+
 // ── Cron notation : relances J+5/J+7, révélation à 14 j (B5, D53) ─────
 const ratingCronEnabled = process.env.RATING_CRON_ENABLED !== "false";
 const ratingCron = ratingCronEnabled ? startRatingCron(dealRatingService, logger.child({ module: "rating-cron" })) : null;
@@ -209,6 +218,9 @@ function shutdown(signal: string): void {
     }
     if (opsDigestCron) {
       opsDigestCron.stop();
+    }
+    if (opsAlertsCron) {
+      opsAlertsCron.stop();
     }
     if (ratingCron) {
       ratingCron.stop();

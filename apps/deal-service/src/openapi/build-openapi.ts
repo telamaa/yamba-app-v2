@@ -852,6 +852,20 @@ export function buildOpenApiDocument() {
           responses: { "200": jsonResponse("ManualRefundResponse", "Refunded"), "400": response400, "401": response401, "403": response403, "404": response404, "409": response409, "500": response500 },
         },
       },
+      /* ── Admin alerts (C-PR6b, D59 3A / 4A) ─────────────────── */
+      "/admin/alerts": {
+        get: {
+          tags: ["admin"],
+          summary: "Threshold alerts (D59 3A / 4A) — computed on read, no state",
+          description:
+            "Permission kpi.read. Rules with versioned thresholds: failed payouts > 48h, decidable disputes undecided > 72h, retentions held > 7d, open reversals > 48h, " +
+            "parked outbox events, relay lag > 15 min, failed emails (24h), no trip published for 7d, acceptance rate < 30% over 7d (≥ 5 requests). " +
+            "The hourly cron emails support once per rule and per day (Redis dedup); this endpoint always recomputes.",
+          operationId: "adminListOpsAlerts",
+          security: adminSecurity,
+          responses: { "200": jsonResponse("OpsAlertsResponse", "Alerts"), "401": response401, "403": response403, "500": response500 },
+        },
+      },
       /* ── Admin history (C-PR6a, D59 5A) ─────────────────────── */
       "/admin/deals/{id}/history": {
         get: {

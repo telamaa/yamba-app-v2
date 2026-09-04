@@ -18,10 +18,13 @@ export type OpsEmail = { subject: string; content: EmailContent };
 export type PayoutFailedParams = { firstName: string; financesUrl: string };
 export type OpsDigestLine = { label: string; amount: string; since: string; url: string };
 export type OpsDigestParams = { date: string; failed: OpsDigestLine[]; reversed: OpsDigestLine[]; held: OpsDigestLine[]; appUrl: string };
+export type OpsAlertsParams = { date: string; alerts: Array<{ title: string; detail: string; url: string }>; adminUrl: string };
 
 type Dictionary = {
   payoutFailedCarrier(p: PayoutFailedParams): OpsEmail;
   opsDigest(p: OpsDigestParams): OpsEmail;
+  /** C-PR6b (D59 3A) — alertes de seuil nouvelles du jour, une par ligne avec le lien admin */
+  opsAlerts(p: OpsAlertsParams): OpsEmail;
 };
 
 const fr: Dictionary = {
@@ -59,6 +62,18 @@ const fr: Dictionary = {
       },
     };
   },
+  opsAlerts: (p) => ({
+    subject: `Yamba — ${p.alerts.length} alerte(s) (${p.date})`,
+    content: {
+      preheader: p.alerts.map((a) => a.title).join(" · "),
+      title: "Alertes de seuil",
+      greeting: "Bonjour,",
+      paragraphs: p.alerts.map((a) => `• ${a.title} — ${a.detail} — ${a.url}`),
+      notice: { tone: "warning", text: "Chaque alerte n'est envoyée qu'une fois par jour ; l'accueil admin la montre tant qu'elle est active." },
+      cta: { label: "Ouvrir l'admin", url: p.adminUrl },
+      reason: "Cron horaire du deal-service (C-PR6b) — désactivable avec OPS_ALERTS_CRON_ENABLED=false.",
+    },
+  }),
 };
 
 const en: Dictionary = {
@@ -96,6 +111,18 @@ const en: Dictionary = {
       },
     };
   },
+  opsAlerts: (p) => ({
+    subject: `Yamba — ${p.alerts.length} alert(s) (${p.date})`,
+    content: {
+      preheader: p.alerts.map((a) => a.title).join(" · "),
+      title: "Threshold alerts",
+      greeting: "Hello,",
+      paragraphs: p.alerts.map((a) => `• ${a.title} — ${a.detail} — ${a.url}`),
+      notice: { tone: "warning", text: "Each alert is sent once a day; the admin home shows it while it stays active." },
+      cta: { label: "Open the admin", url: p.adminUrl },
+      reason: "Hourly cron of the deal-service (C-PR6b) — disable with OPS_ALERTS_CRON_ENABLED=false.",
+    },
+  }),
 };
 
 export const OPS_EMAILS: Record<SupportedLocale, Dictionary> = { fr, en };

@@ -248,3 +248,7 @@ export type CorridorStat = { key: string; originCity: string; originCountryCode:
 export type CorridorsResponse = { periodDays: number; from: string; items: CorridorStat[]; generatedAt: string; cached: boolean };
 export type DealHistoryEvent = { at: string; source: "OUTBOX" | "ADMIN" | "NOTIFICATION" | "EMAIL"; type: string; actor: string | null; recipient: string | null; summary: Record<string, unknown>; relay: { publishedAt: string | null; attempts: number; parked: boolean; lastError: string | null } | null; status: string | null };
 export type DealHistoryResponse = { bookingId: string; events: DealHistoryEvent[]; counts: { outbox: number; admin: number; notifications: number; emails: number; parked: number }; generatedAt: string };
+
+/* ── C-PR6b (D59) — alertes de seuil ── */
+export type OpsAlert = { rule: string; severity: "warning" | "critical"; title: string; detail: string; count: number | null; href: string };
+export type OpsAlertsResponse = { alerts: OpsAlert[]; evaluatedAt: string; thresholds: Record<string, number> };

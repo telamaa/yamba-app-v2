@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { apiFetch } from "@/lib/api";
-import type { AdminHomeKpis } from "@/lib/types";
+import type { AdminHomeKpis, OpsAlertsResponse } from "@/lib/types";
 
 type Tile = { key: keyof AdminHomeKpis; label: string; href: string; tone: "act" | "info" };
 const TILES: Tile[] = [
@@ -27,9 +27,11 @@ const TILES: Tile[] = [
 
 export default function HomeKpis() {
   const [k, setK] = useState<AdminHomeKpis | null>(null);
+  const [alerts, setAlerts] = useState<OpsAlertsResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     apiFetch<AdminHomeKpis>("/admin/kpis").then(setK).catch((e) => setError(e.message));
+    apiFetch<OpsAlertsResponse>("/admin/alerts").then(setAlerts).catch(() => setAlerts(null)); // C-PR6b — sans état, recalculées à chaque lecture
   }, []);
   if (error) return <p className="mt-4 text-[13px] text-red-700">{error}</p>;
   if (!k) return <p className="mt-4 text-[13px] text-slate-500">Chargement…</p>;
@@ -54,6 +56,27 @@ export default function HomeKpis() {
   );
   return (
     <>
+      {alerts && (
+        <section className="mt-5">
+          <h2 className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Alertes de seuil</h2>
+          {alerts.alerts.length === 0 ? (
+            <p className="mt-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-[12.5px] text-emerald-800">Aucune alerte : versements, litiges, relais, emails et liquidité dans les seuils.</p>
+          ) : (
+            <ul className="mt-2 space-y-2">
+              {alerts.alerts.map((a) => (
+                <li key={a.rule}>
+                  <Link href={a.href} className={`block rounded-xl border px-3 py-2 hover:opacity-90 ${a.severity === "critical" ? "border-red-200 bg-red-50 text-red-900" : "border-amber-200 bg-amber-50 text-amber-900"}`}>
+                    <span className="mr-2 rounded-full bg-white/70 px-2 py-0.5 text-[10px] font-semibold uppercase">{a.severity === "critical" ? "critique" : "attention"}</span>
+                    <b className="text-[13px]">{a.title}</b>
+                    <span className="ml-2 text-[12px]">{a.detail}</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className="mt-1 text-[11px] text-slate-400">Évaluées le {new Date(alerts.evaluatedAt).toLocaleString("fr-FR")} · le support reçoit un email à la première apparition d'une règle dans la journée.</p>
+        </section>
+      )}
       {act.length > 0 && <Grid tiles={act} title="À traiter" />}
       {info.length > 0 && <Grid tiles={info} title="État de la plateforme" />}
       <p className="mt-4 text-[11px] text-slate-400">Calculé le {new Date(k.generatedAt).toLocaleString("fr-FR")}.</p>
