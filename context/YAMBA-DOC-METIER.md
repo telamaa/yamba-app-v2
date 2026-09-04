@@ -1267,6 +1267,7 @@ Savoir chaque semaine si Yamba avance (inscriptions, trajets, demandes, livraiso
 ### Règles de gestion (PIL, suite)
 - **RG-PIL-08 — Toute courbe s'agrandit** : en grand, le tableau des valeurs et des variations apparaît dessous, et chaque point ouvre la liste des éléments de la période (comptes, trajets ou deals) avec un lien vers leur fiche ; la liste est bornée à 200 et le dit. Ouvrir une liste d'inscriptions est journalisé.
 - **RG-PIL-09 — Le pilotage a un onglet Finances** : encaissé, remboursé, versé, revenu reconnu, retenues nées, par période et par devise, calculés par les mêmes règles que le rapport mensuel ; le rapport reste la référence comptable.
+- **RG-PIL-11 — Les périodes se lisent en dates** : une semaine s'affiche « 29 juin → 5 juil. 2026 » (lundi → dimanche), un mois « Juillet 2026 » ; le code ISO (« 2026-W27 ») reste en rappel discret dans le tableau.
 - **RG-PIL-10 — La popularité d'un trajet est un badge** : « n vues » sur les cartes et le détail, « Populaire » à partir de 20 vues ; rien n'est affiché à zéro.
 
 ### Recette (PIL, suite)
