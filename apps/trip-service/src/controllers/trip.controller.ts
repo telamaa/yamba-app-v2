@@ -1,5 +1,7 @@
 import type { Response, NextFunction, RequestHandler } from "express";
 import prisma from "@packages/libs/prisma";
+import { recordTripView, tripViews, viewerKey } from "@packages/libs/redis/trip-stats";
+import redis from "@packages/libs/redis";
 import { ValidationError } from "@packages/error-handler";
 import { AuthenticatedRequest } from "@packages/middleware/isAuthenticated";
 import { favoriteTripIds } from "../services/trip-favorite.service";
@@ -1061,6 +1063,17 @@ export const resumeTrip = async (
 /**
  * GET /trips/:id/public
  */
+/** Compte la vue (une par visiteur et par jour) puis renvoie le total ; undefined si Redis est absent. */
+async function countPublicView(req: Parameters<RequestHandler>[0], trip: { id: string; originCity: string | null; destinationCity: string | null }): Promise<number | undefined> {
+  try {
+    const userId = (req as { user?: { id?: string } }).user?.id ?? null;
+    await recordTripView(redis, { tripId: trip.id, originCity: trip.originCity, destinationCity: trip.destinationCity, viewer: viewerKey(userId, req.ip ?? null, req.headers["user-agent"] ?? null), now: new Date() });
+    return (await tripViews(redis, [trip.id])).get(trip.id) ?? 0;
+  } catch {
+    return undefined;
+  }
+}
+
 export const getPublicTrip: RequestHandler = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -1195,6 +1208,8 @@ export const getPublicTrip: RequestHandler = async (req, res, next) => {
       familyConditions: trip.familyConditions,
 
       ticketVerified: trip.ticketVerificationStatus === "VERIFIED",
+      // D5 / C-PR6 (D59) — vues dédoublonnées par visiteur et par jour ; absent si Redis indisponible (jamais un 500 pour un compteur)
+      viewsCount: await countPublicView(req, trip),
 
       tripper: {
         id: trip.user.id,

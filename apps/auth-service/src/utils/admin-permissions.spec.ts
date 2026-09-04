@@ -56,4 +56,10 @@ describe("adminRoleAllows (D56)", () => {
     for (const r of ["FINANCE", "MEDIATOR", "SUPPORT"] as const) expect(adminRoleAllows(r, "refunds.manual.apply")).toBe(false);
     expect(adminRoleAllows("SUPER_ADMIN", "refunds.manual.apply")).toBe(true);
   });
+  it("C-PR6 (D59 7A) : pilotage pour FINANCE et MEDIATOR ; chronologie d'un deal pour les trois profils", () => {
+    expect(adminRoleAllows("FINANCE", "pilotage.read")).toBe(true);
+    expect(adminRoleAllows("MEDIATOR", "pilotage.read")).toBe(true);
+    expect(adminRoleAllows("SUPPORT", "pilotage.read")).toBe(false);
+    for (const r of ["FINANCE", "MEDIATOR", "SUPPORT"] as const) expect(adminRoleAllows(r, "deals.history.read")).toBe(true);
+  });
 });

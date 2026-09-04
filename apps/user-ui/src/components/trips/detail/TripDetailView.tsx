@@ -69,6 +69,9 @@ export default function TripDetailView({ trip }: Props) {
               firstName: trip.tripper.firstName,
               lastInitial: trip.tripper.lastInitial,
             })}
+            {typeof trip.viewsCount === "number" && trip.viewsCount > 0 && (
+              <span className="ml-2 text-xs text-slate-400 dark:text-slate-500">· {t("views", { count: trip.viewsCount })}</span>
+            )}
           </p>
         </div>
         {/* D46 — le créateur ne met pas son propre trajet en favori (le serveur le refuse aussi) */}

@@ -1460,3 +1460,21 @@ deal **475** (+11 : 5 règles, 5 service, 1 portefeuille) · auth **89** (+1) ·
 
 ### Reste
 C-PR6 pilotage (courbes, corridors, alertes de seuil, cache des KPI) → C-PR7 signalements et anti-fraude → C-PR8 paramètres, RGPD, maintenance. Backlog finances : frais Stripe du `balance_transaction` (marge par deal), filtres d'export (corridor, statut), grand livre quand l'expert-comptable le demandera.
+
+# C-PR6a — `feat/c6a-admin-pilotage` : courbes, corridors, chronologie d'un deal, compteurs de demande (D59, A117–A119)
+
+## Ce qui a été fait
+
+1. **Contrats** (`admin/admin-pilotage.schema.ts`) : `PilotageGranularity`, `PilotageSeriesPoint/Response` (totaux : comptes, Voyageurs prêts, trajets à venir ; `cached`), `CorridorStat` / `CorridorsResponse` (trajets, demandes, taux d'acceptation, prix moyen au kilo, litiges, vues, recherches, sans résultat), `DealHistoryEvent/Response` (source, relais, whitelist). `viewsCount` optionnel sur `YambaTripResult` et `PublicTrip`. Permissions `pilotage.read` (FINANCE, MEDIATOR), `deals.history.read` (MEDIATOR, SUPPORT, FINANCE). Journal `DEAL_HISTORY_VIEWED`.
+2. **`packages/libs/redis/trip-stats.ts`** (A118) : `normalizeCity`, `corridorKey`, `dayKey`, clés, `viewerKey` (empreinte), `recordTripView` (SET NX + INCR), `recordSearch` (+ SET des corridors), `tripViews` (MGET), `dayKeysBack`, `corridorStats` (un MGET), `searchedCorridors`. Spec dans le trip-service (`lib/trip-stats.spec.ts`, faux Redis en Map, 5 tests).
+3. **trip-service** : `getPublicTrip` compte la vue (visiteur = utilisateur ou empreinte) et sert `viewsCount` ; la recherche pose `viewsCount` sur les cartes (MGET) et compte la recherche par corridor (`hadResults` = `totalCount > 0`). Toute erreur Redis avalée.
+4. **user-ui** : `viewsCount` sur les cartes (desktop : icône œil + nombre ; mobile : « · 👁 n ») et sous le titre du détail public (« n vues »), clés `search.views` et `tripDetail.views` (FR/EN, pluriel ICU).
+5. **auth-service** : `lib/pilotage.rules.ts` (pur, 4 tests) — semaine ISO (`isoWeekStart`, `isoWeekKey`), `periodsBetween` (périodes vides incluses), `buildSeries` (A117), `buildCorridors` (corridors des trajets + des deals + cherchés sans offre, taux, prix moyen au kilo depuis `pricePerKgCents` sinon `transportCents / weightKg`) ; `controller/admin-pilotage.controller.ts` — `GET /admin/pilotage/series?granularity&months`, `GET /admin/pilotage/corridors?days`, cache Redis 60 s (`cached` dans la réponse), lectures croisées (User, Trip, Booking, CarrierPage), compteurs Redis. Routes sous `pilotage.read`. Spec permissions +1.
+6. **deal-service** : `services/admin-history.service.ts` (A119) — `whitelistPayload`, `mergeDealHistory` (pur, 2 tests), `getDealHistory` (outbox, journal, notifications, emails, noms d'admin, rôles, journal) ; contrôleur + route `GET /admin/deals/:id/history` (`deals.history.read`). OpenAPI : chemin `history` + **correction** des 10 chemins C-PR5a/5b mal placés (34 chemins, 14 admin, 218 schémas).
+7. **admin-ui** : `/pilotage` (`PilotageView` : tuiles totaux, sélecteurs semaine / mois et durée, petits multiples SVG à une série avec survol et dernier point étiqueté, vue tableau, tableau des corridors avec badge « demande sans offre ») ; fiche argent : carte « Tout ce qui est arrivé à ce deal » chargée à la demande (sources colorées, état de relais, parqués en rouge) ; entrée « Pilotage » sous `pilotage.read`.
+
+### Preuves
+trip **207** (+5) · deal **477** (+2) · auth **94** (+5) · notification 78 · tsc ×6 + admin-ui + user-ui · miroir i18n OK · OpenAPI régénéré (deal 34 chemins). Recette : PIL01–PIL08 (DOC-METIER).
+
+### Reste
+C-PR6b : alertes de seuil (cron horaire deal-service, règles en constantes, accueil + digest). Puis C-PR7 signalements et anti-fraude, C-PR8 paramètres, RGPD, maintenance. Backlog : événements de trajet (outbox trip-service), réparation d'un événement parqué depuis l'écran, PostHog (D5), petits multiples alignés pour comparer deux mesures.

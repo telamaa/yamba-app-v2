@@ -24,6 +24,7 @@
   "car": {
     "label": "Voiture"
   },
+  "views": "{count, plural, =1 {1 vue} other {# vues}}",
   "badges": {
     "profileVerified": "Profil vérifié",
     "superTripper": "Super Voyageur",

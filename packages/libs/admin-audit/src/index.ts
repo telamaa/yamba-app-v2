@@ -47,6 +47,8 @@ export const ADMIN_ACTIONS = [
   "FINANCE_EXPORTED",
   "REFUND_MANUAL_PROPOSED",
   "REFUND_MANUAL_APPLIED",
+  // C-PR6 (D59)
+  "DEAL_HISTORY_VIEWED",
 ] as const;
 export type AdminActionType = (typeof ADMIN_ACTIONS)[number];
 

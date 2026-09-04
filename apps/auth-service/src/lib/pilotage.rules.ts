@@ -1,0 +1,139 @@
+/**
+ * pilotage.rules.ts — règles PURES du pilotage (C-PR6a, D59 1A / 2A)
+ * ===================================================================
+ * Courbes par semaine ISO ou par mois UTC, agrégats par corridor. Aucune base ni Redis ici.
+ */
+import type { CorridorStat, PilotageGranularity, PilotageSeriesPoint } from "@packages/api-contracts";
+import { corridorKey } from "@packages/libs/redis/trip-stats";
+
+const DAY = 86_400_000;
+
+/** Lundi 00:00 UTC de la semaine ISO contenant `d`. */
+export function isoWeekStart(d: Date): Date {
+  const day = (d.getUTCDay() + 6) % 7; // lundi = 0
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() - day));
+}
+/** « YYYY-Www » (ISO 8601) pour le lundi donné. */
+export function isoWeekKey(monday: Date): string {
+  const thursday = new Date(monday.getTime() + 3 * DAY);
+  const year = thursday.getUTCFullYear();
+  const jan4 = new Date(Date.UTC(year, 0, 4));
+  const week = 1 + Math.round((isoWeekStart(thursday).getTime() - isoWeekStart(jan4).getTime()) / (7 * DAY));
+  return `${year}-W${String(week).padStart(2, "0")}`;
+}
+export const monthStart = (d: Date) => new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1));
+export const monthKey = (d: Date) => `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+
+export function periodStart(d: Date, g: PilotageGranularity): Date {
+  return g === "week" ? isoWeekStart(d) : monthStart(d);
+}
+export function periodKey(d: Date, g: PilotageGranularity): string {
+  return g === "week" ? isoWeekKey(isoWeekStart(d)) : monthKey(d);
+}
+export function nextPeriod(start: Date, g: PilotageGranularity): Date {
+  return g === "week" ? new Date(start.getTime() + 7 * DAY) : new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 1));
+}
+/** Toutes les périodes de `from` (inclus) à `to` (exclu), vides comprises — une courbe sans trou. */
+export function periodsBetween(from: Date, to: Date, g: PilotageGranularity): Date[] {
+  const out: Date[] = [];
+  for (let p = periodStart(from, g); p.getTime() < to.getTime(); p = nextPeriod(p, g)) out.push(p);
+  return out;
+}
+
+export type SeriesInput = {
+  userCreatedAts: Date[];
+  tripPublishedAts: Date[];
+  bookings: Array<{
+    requestedAt: Date;
+    acceptedAt?: Date | null;
+    deliveredAt?: Date | null;
+    completedAt?: Date | null;
+    closedAt?: Date | null;
+    disputedAt?: Date | null;
+    capturedAt?: Date | null;
+    status: string;
+    pricing: { totalShipperCents: number; currencyCode: string };
+  }>;
+};
+
+/** Chaque fait compte dans la période de SA date. Périodes vides incluses. */
+export function buildSeries(input: SeriesInput, from: Date, to: Date, g: PilotageGranularity): PilotageSeriesPoint[] {
+  const points = new Map<string, PilotageSeriesPoint & { _volume: Map<string, number> }>();
+  for (const start of periodsBetween(from, to, g)) {
+    points.set(periodKey(start, g), { period: periodKey(start, g), periodStart: start.toISOString(), signups: 0, tripsPublished: 0, requests: 0, accepted: 0, delivered: 0, completed: 0, cancelled: 0, disputes: 0, volume: [], _volume: new Map() });
+  }
+  const at = (d: Date | null | undefined) => (d && d.getTime() >= from.getTime() && d.getTime() < to.getTime() ? points.get(periodKey(d, g)) : undefined);
+  for (const d of input.userCreatedAts) { const p = at(d); if (p) p.signups += 1; }
+  for (const d of input.tripPublishedAts) { const p = at(d); if (p) p.tripsPublished += 1; }
+  for (const b of input.bookings) {
+    let p = at(b.requestedAt); if (p) p.requests += 1;
+    p = at(b.acceptedAt); if (p) p.accepted += 1;
+    p = at(b.deliveredAt); if (p) p.delivered += 1;
+    p = at(b.disputedAt); if (p) p.disputes += 1;
+    if (b.status === "COMPLETED") { p = at(b.completedAt); if (p) p.completed += 1; }
+    if (b.status === "CANCELLED") { p = at(b.closedAt); if (p) p.cancelled += 1; }
+    p = at(b.capturedAt);
+    if (p) p._volume.set(b.pricing.currencyCode, (p._volume.get(b.pricing.currencyCode) ?? 0) + b.pricing.totalShipperCents);
+  }
+  return [...points.values()].map(({ _volume, ...pt }) => ({ ...pt, volume: [..._volume.entries()].sort().map(([currencyCode, capturedCents]) => ({ currencyCode, capturedCents })) }));
+}
+
+export type CorridorInput = {
+  trips: Array<{ originCity: string | null; originCountryCode: string | null; destinationCity: string | null; destinationCountryCode: string | null }>;
+  bookings: Array<{
+    trip: { originCity: string; originCountryCode: string | null; destinationCity: string; destinationCountryCode: string | null };
+    acceptedAt?: Date | null;
+    disputedAt?: Date | null;
+    pricing: { weightKg: number; transportCents: number; pricePerKgCents?: number | null; currencyCode: string };
+  }>;
+  /** Corridors demandés (recherches) sans trajet ni deal : « demande sans offre » */
+  searchedCorridors: string[];
+  stats: Map<string, { views: number; searches: number; noResult: number }>;
+};
+
+/** Agrège trajets et deals par corridor (ville → ville), puis colle les compteurs Redis. Tri : demandes puis recherches. */
+export function buildCorridors(input: CorridorInput): CorridorStat[] {
+  const rows = new Map<string, CorridorStat & { _kgPrices: number[] }>();
+  const get = (key: string, o: { originCity: string; originCountryCode: string | null; destinationCity: string; destinationCountryCode: string | null }) => {
+    let r = rows.get(key);
+    if (!r) {
+      r = { key, originCity: o.originCity, originCountryCode: o.originCountryCode, destinationCity: o.destinationCity, destinationCountryCode: o.destinationCountryCode, tripsPublished: 0, requests: 0, accepted: 0, acceptanceRatePct: null, avgPricePerKgCents: null, currencyCode: null, disputes: 0, views: 0, searches: 0, searchesNoResult: 0, _kgPrices: [] };
+      rows.set(key, r);
+    }
+    return r;
+  };
+  for (const t of input.trips) {
+    const key = corridorKey(t.originCity, t.destinationCity);
+    if (!key) continue;
+    get(key, { originCity: t.originCity ?? "", originCountryCode: t.originCountryCode, destinationCity: t.destinationCity ?? "", destinationCountryCode: t.destinationCountryCode }).tripsPublished += 1;
+  }
+  for (const b of input.bookings) {
+    const key = corridorKey(b.trip.originCity, b.trip.destinationCity);
+    if (!key) continue;
+    const r = get(key, b.trip);
+    r.requests += 1;
+    if (b.acceptedAt) r.accepted += 1;
+    if (b.disputedAt) r.disputes += 1;
+    const perKg = b.pricing.pricePerKgCents ?? (b.pricing.weightKg > 0 ? Math.round(b.pricing.transportCents / b.pricing.weightKg) : null);
+    if (perKg != null && perKg > 0) { r._kgPrices.push(perKg); r.currencyCode = r.currencyCode ?? b.pricing.currencyCode; }
+  }
+  for (const key of input.searchedCorridors) {
+    if (rows.has(key)) continue;
+    const [o, d] = key.split(">");
+    get(key, { originCity: o ?? key, originCountryCode: null, destinationCity: d ?? "", destinationCountryCode: null });
+  }
+  const out: CorridorStat[] = [];
+  for (const r of rows.values()) {
+    const s = input.stats.get(r.key);
+    const { _kgPrices, ...rest } = r;
+    out.push({
+      ...rest,
+      acceptanceRatePct: r.requests > 0 ? Math.round((r.accepted / r.requests) * 100) : null,
+      avgPricePerKgCents: _kgPrices.length ? Math.round(_kgPrices.reduce((a, b) => a + b, 0) / _kgPrices.length) : null,
+      views: s?.views ?? 0,
+      searches: s?.searches ?? 0,
+      searchesNoResult: s?.noResult ?? 0,
+    });
+  }
+  return out.sort((a, b) => b.requests - a.requests || b.searches - a.searches || b.tripsPublished - a.tripsPublished || a.key.localeCompare(b.key));
+}

@@ -16,6 +16,7 @@
     "train": "Train",
     "car": "Car"
   },
+  "views": "{count, plural, =1 {1 view} other {# views}}",
   "badges": {
     "superTripper": "Super Traveler",
     "instant": "Instant",

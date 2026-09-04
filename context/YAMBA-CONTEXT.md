@@ -320,9 +320,16 @@ Ordre de demarrage : auth -> trip -> gateway.
   (FINANCE, <= 366 j, formules neutralisees), remboursement manuel propose (FINANCE /
   SUPPORT) et applique par SUPER_ADMIN (argent d'abord, verrou sur le cumul, outbox
   refund_issued ADMIN), portefeuille Expediteur : remboursement apres COMPLETED visible,
-  file PROPOSED_REFUNDS, KPI, admin-ui /finances/report. Suite : C-PR6 pilotage,
-  C-PR7 signalements / anti-fraude, C-PR8 parametres / RGPD.
-- Plateforme de tests : 755 (trip 202, deal 475, notification 78) + auth 89.
+  file PROPOSED_REFUNDS, KPI, admin-ui /finances/report. Mergee #160.
+- 04/09 : C-PR6a feat/c6a-admin-pilotage (D59, A117–A119, « oui pour toutes les
+  recommandations » + vues affichees sur le web) — courbes serveur par semaine ISO / mois
+  (petits multiples, cache Redis 60 s), corridors (trajets, demandes, taux, €/kg, litiges,
+  vues, recherches, sans resultat, « demande sans offre »), chronologie complete d'un deal
+  (outbox + journal + notifications + emails, whitelist, journalisee), compteur de vues D5
+  (Redis, dedoublonne, affiche recherche + detail), recherches par corridor. Suite :
+  C-PR6b alertes de seuil, C-PR7 signalements / anti-fraude, C-PR8 parametres / RGPD ;
+  chantier F chat a challenger apres C.
+- Plateforme de tests : 762 (trip 207, deal 477, notification 78) + auth 94.
 - (historique) Plateforme de tests : 600 (trip 187, deal 354, notification 59) — post-B3 (#96).
 - MERGE 01/09 : toute la pile B2 est dans `dev` via la SEULE **PR #90**
   (`feat/b2-deal-front` portait la chaîne complète : jalons mobile D36,

@@ -19,6 +19,7 @@ import {
   Shirt,
   ShoppingBag,
   Star,
+  Eye,
   ToyBrick,
   Train,
   Car,
@@ -434,6 +435,12 @@ export default function TripResultCard({
               ) : (
                 <span className="text-[11px] text-slate-400 dark:text-slate-500">
                   {t("newTripper")}
+                </span>
+              )}
+              {typeof item.viewsCount === "number" && item.viewsCount > 0 && (
+                <span className="inline-flex items-center gap-0.5 text-[11px] text-slate-400 dark:text-slate-500" title={t("views", { count: item.viewsCount })}>
+                  <Eye size={11} strokeWidth={2} />
+                  {item.viewsCount}
                 </span>
               )}
             </div>

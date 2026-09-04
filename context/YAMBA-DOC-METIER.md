@@ -1235,3 +1235,29 @@ Chaque mois, savoir ce qui est entré, ce qui est ressorti, ce qui a été vers�
 | FIN16 | Super admin, « Rembourser maintenant » 5 € | « Remboursé 5,00 € (cumul 5,00 €) » ; la proposition disparaît ; « Dernier remboursement manuel » affiché ; chronologie : « Remboursé à l'Expéditeur » ; journal « Remboursement manuel appliqué » ; email « Remboursement émis » à l'Expéditeur (`mai`) ; portefeuille Expéditeur : ligne « partiellement remboursé » |
 | FIN17 | Rembourser de nouveau au-delà du restant | 400 « At most … cents » ; deal DISPUTED (`bzv-disputed`) : carte « Aucun remboursement manuel possible » |
 | FIN18 | Rapprocher `bzv-completed` après FIN16 (Fake) | « Paiement introuvable chez le fournisseur » (intent seedé, hors mémoire du Fake) — attendu ; sur un deal réel Stripe test : aucune divergence, le remboursement apparaît dans « Remboursements » |
+
+# C-PR6a — voir la plateforme bouger : courbes, corridors, et la vie d'un deal
+
+## Le besoin
+Savoir chaque semaine si Yamba avance (inscriptions, trajets, demandes, livraisons), où la demande existe sans offre (le corridor cherché qui n'a aucun trajet), et pouvoir dérouler tout ce qui est arrivé à un deal quand un membre appelle — sans passer par les logs. Et donner aux Expéditeurs un signal de popularité honnête sur chaque trajet.
+
+### Règles de gestion (PIL)
+- **RG-PIL-01 — Une courbe par mesure, chaque fait à sa date** : une inscription compte à sa date, une demande à sa demande, une livraison à sa livraison. Par semaine (lundi, UTC) ou par mois, périodes vides comprises.
+- **RG-PIL-02 — Un corridor est une ville de départ et une ville d'arrivée**, sans distinction de casse ni d'accents. Le tableau montre les trajets publiés, les demandes et leur taux d'acceptation, le prix moyen au kilo, les litiges, les vues et les recherches.
+- **RG-PIL-03 — Une recherche sans aucun trajet est comptée comme « demande sans offre »** ; un corridor cherché sans trajet apparaît dans le tableau même s'il n'a jamais eu de trajet. C'est là qu'on recrute des Voyageurs.
+- **RG-PIL-04 — Une vue de trajet compte une fois par visiteur et par jour** ; le visiteur n'est jamais identifié (compte connecté ou empreinte technique), rien n'est conservé de son adresse. Le compteur s'affiche sur les cartes de recherche et le détail du trajet ; zéro vue n'affiche rien.
+- **RG-PIL-05 — Un compteur ne casse jamais une page** : si Redis est indisponible, la recherche et le détail répondent sans compteur.
+- **RG-PIL-06 — « Tout ce qui est arrivé à ce deal » est une lecture** : événements (avec leur état d'envoi : publié, en attente, bloqué), actions admin, notifications, emails, dans l'ordre. Jamais le code de livraison, jamais une photo, jamais une adresse. Consulter est journalisé.
+- **RG-PIL-07 — Le pilotage se lit par Finance et Médiateur** ; la chronologie d'un deal par les trois profils. Les chiffres sont rafraîchis au plus toutes les 60 secondes.
+
+### Recette (PIL)
+| # | Scénario | Attendu |
+|---|---|---|
+| PIL01 | Visiteur non connecté, ouvrir deux fois la page publique d'un trajet, puis depuis un autre navigateur | « 1 vue » puis toujours « 1 vue », puis « 2 vues » ; la carte du trajet dans la recherche montre le même nombre |
+| PIL02 | Rechercher « Paris → Kinshasa » (aucun trajet) trois fois | Pilotage → Corridors (7 jours) : ligne « paris → kinshasa », 0 trajet, 3 recherches, 3 sans résultat, badge « demande sans offre » (fond ambre) |
+| PIL03 | Rechercher « Paris → Brazzaville » | Corridor Paris (FR) → Brazzaville (CG) : trajets, demandes du seed, taux d'acceptation, €/kg moyen, vues, 1 recherche, 0 sans résultat |
+| PIL04 | Pilotage, par semaine sur 3 mois | Huit courbes + une par devise ; survol : repère, période et valeur ; « Voir le tableau » : mêmes chiffres ; passer « par mois » ramène 12 mois |
+| PIL05 | Recharger dans la minute | Mention « (cache) » ; après 60 s, recalcul |
+| PIL06 | Support connecté | Ni « Pilotage » dans le menu ni accès à `/pilotage` (403) ; mais sur une fiche argent, « Charger la chronologie » fonctionne |
+| PIL07 | Fiche argent de `bzv-completed`, « Charger la chronologie » | Événements du seed dans l'ordre avec leur état, actions admin (« Fiche argent consultée »…), notifications et emails s'il y en a ; journal « Chronologie consultée » |
+| PIL08 | Couper Redis, ouvrir la recherche et un trajet | Pages normales sans compteur ; Pilotage : courbes présentes, corridors sans vues ni recherches |
