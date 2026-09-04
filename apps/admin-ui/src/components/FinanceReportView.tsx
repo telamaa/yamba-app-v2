@@ -79,7 +79,7 @@ export default function FinanceReportView() {
             </div>
             <p className="mt-1 text-[11px] text-slate-400">Du {dateTime(report.from)} au {dateTime(report.to)} · calculé le {dateTime(report.generatedAt)}. Un deal capturé en mars et terminé en avril compte dans les deux mois, chaque fait à sa date.</p>
           </section>
-          {can(me?.adminRole, "finances.export") && (
+          {can(me?.adminRoles, "finances.export") && (
             <section className="mt-5 rounded-xl border border-slate-200 bg-white p-4">
               <h2 className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Export CSV par deal (journalisé)</h2>
               <p className="mt-1 text-[12px] text-slate-500">Une ligne par deal ayant un fait d'argent dans la période (au plus 366 jours) : montants figés, remboursement, versement, retenue, identifiants Stripe pour le rapprochement comptable.</p>

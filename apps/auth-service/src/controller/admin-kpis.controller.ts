@@ -9,14 +9,15 @@
 import type { NextFunction, Response } from "express";
 import prisma from "@packages/libs/prisma";
 import type { AuthenticatedRequest } from "@packages/middleware/isAuthenticated";
-import { adminRoleAllows, type AdminHomeKpis, type AdminRole } from "@packages/api-contracts";
+import { adminRolesAllow, type AdminHomeKpis, type AdminRole } from "@packages/api-contracts";
 
 const ACTIVE_DEAL = ["ACCEPTED", "PICKED_UP", "DELIVERED", "DISPUTED"];
 
 export const getAdminKpis = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
-    const role = (req.adminRole ?? null) as AdminRole | null;
-    const can = (p: Parameters<typeof adminRoleAllows>[1]) => adminRoleAllows(role, p);
+    // C-PR3bis (D60 1A) — union des profils cumulés
+    const roles = ((req.adminRoles && req.adminRoles.length ? req.adminRoles : [req.adminRole].filter(Boolean)) ?? []) as AdminRole[];
+    const can = (p: Parameters<typeof adminRolesAllow>[1]) => adminRolesAllow(roles, p);
     const now = new Date();
     const since30 = new Date(now.getTime() - 30 * 86_400_000);
     const opt = async <T,>(allowed: boolean, q: () => Promise<T>): Promise<T | null> => (allowed ? q() : null);
@@ -35,7 +36,7 @@ export const getAdminKpis = async (req: AuthenticatedRequest, res: Response, nex
         opt(can("disputes.read"), () => prisma.booking.count({ where: { status: { in: ACTIVE_DEAL as never }, isDeleted: false } })),
         // C-PR5 (D58) — les files d'argent sont celles du profil FINANCE (finances.read)
         opt(can("finances.read"), () => prisma.booking.count({ where: { payoutStatus: "FAILED", isDeleted: false } })),
-        opt(can("admins.manage"), () => prisma.user.count({ where: { adminRole: { not: null }, OR: [{ passwordHash: null }, { passwordHash: { isSet: false } }], isDeleted: false } })),
+        opt(can("admins.manage"), () => prisma.user.count({ where: { isDeleted: false, AND: [{ OR: [{ adminRole: { not: null } }, { adminRoles: { isEmpty: false } }] }, { OR: [{ passwordHash: null }, { passwordHash: { isSet: false } }] }] } })),
         opt(can("users.read"), () => prisma.user.count({ where: { isDeleted: false } })),
         opt(can("disputes.read"), () => prisma.booking.count({ where: { status: "COMPLETED", completedAt: { gte: since30 }, isDeleted: false } })),
         opt(can("finances.read"), () => prisma.booking.count({ where: { payoutStatus: "REVERSED", OR: [{ payoutReversalResolution: null }, { payoutReversalResolution: { isSet: false } }], isDeleted: false } })),

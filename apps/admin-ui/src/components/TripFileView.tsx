@@ -49,7 +49,7 @@ export default function TripFileView({ tripId }: { tripId: string }) {
           <Row k="Compte" v={`${file.carrier.accountStatus} · Voyageur ${file.carrier.carrierStatus}`} />
           <Link href={`/users/${file.carrier.id}`} className="text-[12.5px] underline">Voir la fiche</Link>
         </Card>
-        <HideCard file={file} canPropose={can(me?.adminRole, "trips.hide.propose") && !isMine} canApply={can(me?.adminRole, "trips.hide.apply") && !isMine} onDone={load} />
+        <HideCard file={file} canPropose={can(me?.adminRoles, "trips.hide.propose") && !isMine} canApply={can(me?.adminRoles, "trips.hide.apply") && !isMine} onDone={load} />
         <Card title={`Documents (${file.documents.length})`}>
           {file.documents.length === 0 ? <p className="text-[12.5px] text-slate-500">Aucun document.</p> : file.documents.map((d) => (
             <div key={d.id} className="flex justify-between gap-2 text-[12.5px]">

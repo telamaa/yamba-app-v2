@@ -14,6 +14,8 @@ import type { AuthenticatedRequest } from "./isAuthenticated";
 declare module "express-serve-static-core" {
   interface Request {
     adminRole?: string | null;
+    /** C-PR3bis (D60 1A) — profils cumulés (liste absente sur les anciens comptes → [adminRole]) */
+    adminRoles?: string[];
   }
 }
 
@@ -39,7 +41,9 @@ const isAdminAuthenticated = async (req: AuthenticatedRequest, res: Response, ne
     req.user = user;
     req.roles = user.roles;
     // C-PR3 (D56) — le profil admin voyage avec la requête ; requireAdminRole le lit.
-    req.adminRole = (user as { adminRole?: string | null }).adminRole ?? null;
+    const u = user as { adminRole?: string | null; adminRoles?: string[] | null };
+    req.adminRoles = u.adminRoles && u.adminRoles.length ? u.adminRoles : u.adminRole ? [u.adminRole] : [];
+    req.adminRole = u.adminRole ?? req.adminRoles[0] ?? null;
     return next();
   } catch {
     return res.status(401).json({ message: "Unauthorized! Admin token expired or invalid." });

@@ -43,7 +43,9 @@ model User {
   parcelsSentCount    Int   @default(0)
 
   // ── C-PR3 (D56) : profils admin et état du compte ──
-  adminRole        AdminRole? // SUPER_ADMIN | MEDIATOR | SUPPORT | FINANCE — posé par script ou par un SUPER_ADMIN (invitation)
+  adminRole        AdminRole? // profil PRINCIPAL (miroir du premier de adminRoles) — lu par la connexion admin et l'affichage
+  // C-PR3bis (D60 1A) — profils CUMULÉS : union des permissions ; writers posent TOUJOURS la liste (jamais absente)
+  adminRoles       AdminRole[] @default([])
   invitedByAdminId String?    @db.ObjectId
   adminInvitedAt   DateTime?
   accountStatus    AccountStatus @default(ACTIVE) // ACTIVE | RESTRICTED (ni publier ni réserver) | SUSPENDED (connexion refusée)
@@ -101,6 +103,7 @@ model User {
   @@index([phoneE164])
   @@index([accountStatus])
   @@index([adminRole])
+  @@index([adminRoles])
 }
 
 // ─────────────────────────────────────────────

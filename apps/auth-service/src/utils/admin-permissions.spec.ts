@@ -1,5 +1,5 @@
 /** Matrice route → profil (C-PR3, D56 1A) — source unique dans le contrat. */
-import { ADMIN_PERMISSIONS, adminRoleAllows, type AdminPermission } from "@packages/api-contracts";
+import { ADMIN_PERMISSIONS, AdminRolesSchema, adminRoleAllows, adminRolesAllow, adminRolesOf, normalizeAdminRoles, primaryAdminRole, type AdminPermission } from "@packages/api-contracts";
 
 describe("adminRoleAllows (D56)", () => {
   const perms = Object.keys(ADMIN_PERMISSIONS) as AdminPermission[];
@@ -61,5 +61,32 @@ describe("adminRoleAllows (D56)", () => {
     expect(adminRoleAllows("MEDIATOR", "pilotage.read")).toBe(true);
     expect(adminRoleAllows("SUPPORT", "pilotage.read")).toBe(false);
     for (const r of ["FINANCE", "MEDIATOR", "SUPPORT"] as const) expect(adminRoleAllows(r, "deals.history.read")).toBe(true);
+  });
+  describe("C-PR3bis (D60 1A) — profils cumulés", () => {
+    it("adminRolesAllow : l'union des profils ; vide ou null → rien ; SUPER_ADMIN dans la liste → tout", () => {
+      expect(adminRolesAllow(["SUPPORT", "FINANCE"], "finances.export")).toBe(true);
+      expect(adminRolesAllow(["SUPPORT", "FINANCE"], "tickets.review")).toBe(true);
+      expect(adminRolesAllow(["SUPPORT", "FINANCE"], "disputes.decide")).toBe(false);
+      expect(adminRolesAllow(["MEDIATOR", "FINANCE"], "disputes.decide")).toBe(true);
+      expect(adminRolesAllow(["SUPPORT", "SUPER_ADMIN"], "admins.manage")).toBe(true);
+      expect(adminRolesAllow([], "users.read")).toBe(false);
+      expect(adminRolesAllow(null, "users.read")).toBe(false);
+    });
+    it("AdminRolesSchema : au moins un profil connu ; normalizeAdminRoles : ordre canonique, doublons ignorés", () => {
+      expect(normalizeAdminRoles(["FINANCE", "SUPPORT", "FINANCE"])).toEqual(["SUPPORT", "FINANCE"]);
+      expect(normalizeAdminRoles(["MEDIATOR", "SUPER_ADMIN"])).toEqual(["SUPER_ADMIN", "MEDIATOR"]);
+      expect(AdminRolesSchema.safeParse(["FINANCE", "SUPPORT"]).success).toBe(true);
+      expect(AdminRolesSchema.safeParse([]).success).toBe(false);
+      expect(AdminRolesSchema.safeParse(["BOSS"]).success).toBe(false);
+    });
+    it("primaryAdminRole / adminRolesOf : miroir et lecture tolérante des anciens comptes (liste absente)", () => {
+      expect(primaryAdminRole(["FINANCE", "MEDIATOR"])).toBe("MEDIATOR");
+      expect(primaryAdminRole(["SUPPORT", "SUPER_ADMIN"])).toBe("SUPER_ADMIN");
+      expect(primaryAdminRole([])).toBeNull();
+      expect(adminRolesOf({ adminRole: "SUPPORT" })).toEqual(["SUPPORT"]);
+      expect(adminRolesOf({ adminRole: "SUPPORT", adminRoles: [] })).toEqual(["SUPPORT"]);
+      expect(adminRolesOf({ adminRole: "SUPPORT", adminRoles: ["FINANCE", "SUPPORT"] })).toEqual(["SUPPORT", "FINANCE"]);
+      expect(adminRolesOf({ adminRole: null, adminRoles: null })).toEqual([]);
+    });
   });
 });

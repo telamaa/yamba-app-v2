@@ -7,14 +7,15 @@
  * route existe, c'est le profil qui manque).
  */
 import type { NextFunction, Response } from "express";
-import { adminRoleAllows, type AdminPermission, type AdminRole } from "@packages/api-contracts";
+import { adminRolesAllow, type AdminPermission, type AdminRole } from "@packages/api-contracts";
 import type { AuthenticatedRequest } from "./isAuthenticated";
 
 export const requireAdminPermission =
   (permission: AdminPermission) =>
   (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
-    const role = (req.adminRole ?? (req.user as { adminRole?: string | null } | undefined)?.adminRole ?? null) as AdminRole | null;
-    if (!adminRoleAllows(role, permission)) {
+    // C-PR3bis (D60 1A) — union des profils cumulés
+    const roles = (req.adminRoles && req.adminRoles.length ? req.adminRoles : [req.adminRole ?? (req.user as { adminRole?: string | null } | undefined)?.adminRole].filter(Boolean)) as AdminRole[];
+    if (!adminRolesAllow(roles, permission)) {
       return res.status(403).json({ message: "Your admin profile does not allow this action.", code: "ADMIN_PERMISSION_DENIED", permission });
     }
     return next();

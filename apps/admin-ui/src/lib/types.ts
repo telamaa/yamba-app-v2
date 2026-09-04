@@ -108,7 +108,7 @@ export type AdminDisputeFile = {
   };
 };
 
-export type AdminMe = { id: string; email: string; firstName: string; lastName: string; adminRole: import("./permissions").AdminRole | null; remainingBackupCodes: number };
+export type AdminMe = { id: string; email: string; firstName: string; lastName: string; adminRole: import("./permissions").AdminRole | null; adminRoles: import("./permissions").AdminRole[]; remainingBackupCodes: number };
 
 /* ── C-PR3 (D56) — utilisateurs, comptes admin, sessions ── */
 export type AccountStatus = "ACTIVE" | "RESTRICTED" | "SUSPENDED";
@@ -120,6 +120,7 @@ export type AdminUserSummary = {
   phoneE164: string | null;
   roles: string[];
   adminRole: import("./permissions").AdminRole | null;
+  adminRoles: import("./permissions").AdminRole[];
   accountStatus: AccountStatus;
   carrierStatus: string;
   createdAt: string;
@@ -136,6 +137,7 @@ export type AdminUserFile = {
   preferredLocale: string;
   roles: string[];
   adminRole: import("./permissions").AdminRole | null;
+  adminRoles: import("./permissions").AdminRole[];
   accountStatus: AccountStatus;
   suspension: { level: AccountStatus; reason: string; until: string | null; at: string; byAdmin: string } | null;
   suspensionProposal: { level: string; reason: string; byAdmin: string; at: string } | null;
@@ -152,7 +154,7 @@ export type AdminUserFile = {
   };
   adminActions: Array<{ id: string; at: string; admin: string; action: string; after: unknown }>;
 };
-export type AdminAccount = { id: string; firstName: string; lastName: string; email: string; adminRole: import("./permissions").AdminRole; totpEnabled: boolean; inviteAccepted: boolean; createdAt: string };
+export type AdminAccount = { id: string; firstName: string; lastName: string; email: string; adminRole: import("./permissions").AdminRole; adminRoles: import("./permissions").AdminRole[]; totpEnabled: boolean; inviteAccepted: boolean; createdAt: string };
 export type AdminSessionItem = { jti: string; createdAt: string; lastActivityAt: string; current: boolean };
 
 export type AuditItem = {

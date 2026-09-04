@@ -1278,3 +1278,21 @@ Savoir chaque semaine si Yamba avance (inscriptions, trajets, demandes, livraiso
 | PIL12 | Onglet « Finances » | Cinq courbes en devise (axe en euros), sélecteur de devise s'il y en a plusieurs, mêmes gestes d'agrandissement et de drill-down (deals avec montant) |
 | PIL13 | Recherche (desktop et mobile) sur un trajet vu au moins une fois | Pastille grise « n vues » (icône œil) dans la rangée des badges ; à partir de 20 vues, pastille mango « Populaire » |
 | PIL14 | Détail public du même trajet | Sous le nom du Voyageur : pastille « n vues » (+ « Populaire » à partir de 20) et « Billet vérifié » si c'est le cas |
+
+# C-PR3bis — un compte, plusieurs casquettes
+
+### Règles de gestion (ADM, suite)
+- **RG-ADM-26 — Un compte admin cumule des profils** (au moins un) : ses droits sont l'union des profils ; le super administrateur garde tout. Le profil affiché en premier est le principal (super administrateur d'abord).
+- **RG-ADM-27 — L'invitation et la modification cochent les profils** ; l'email d'accès les nomme tous (« Médiateur + Finance »). Retirer l'accès vide tous les profils.
+- **RG-ADM-28 — Les gardes ne changent pas** : jamais le dernier super administrateur rétrogradé ou retiré, jamais soi-même ; un compte admin, quel que soit son profil, n'est sanctionné que par un super administrateur.
+- **RG-ADM-29 — Les comptes d'avant continuent de fonctionner** ; la reprise pose la liste exacte une fois pour toutes.
+
+### Recette (ADM, suite)
+| # | Scénario | Attendu |
+|---|---|---|
+| ADM31 | Super admin, « Comptes admin », inviter avec Support + Finance cochés | Invitation envoyée ; l'email nomme « Support + Finance » ; la ligne montre les deux cases cochées |
+| ADM32 | Connecté avec ce compte | Menu : À arbitrer, Billets, Trajets, Finances, Pilotage, Utilisateurs, Journal ; export finances possible, décision de litige impossible (403) |
+| ADM33 | Décocher tous les profils d'une ligne | Impossible (au moins un reste coché) ; décocher SUPER_ADMIN du dernier super admin → 403 « last super administrator » |
+| ADM34 | Ajouter Médiateur au compte Support + Finance, se reconnecter | Le formulaire de décision apparaît sur un litige ; libellé « Médiateur + Support + Finance » |
+| ADM35 | `grant-admin.ts <email> --roles MEDIATOR,FINANCE` | Profils posés, `adminRole` = Médiateur (principal), `adminRoles` = [Médiateur, Finance] |
+| ADM36 | Compte d'avant C-PR3bis (sans liste), avant et après `backfill-admin-roles.ts` | Fonctionne dans les deux cas ; après reprise, la liste est visible et exacte |

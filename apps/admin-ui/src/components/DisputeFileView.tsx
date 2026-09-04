@@ -135,7 +135,7 @@ export default function DisputeFileView({ bookingId }: { bookingId: string }) {
       )}
 
       <div className="mt-5">
-        <DecisionForm file={file} canDecide={can(me?.adminRole, "disputes.decide")} />
+        <DecisionForm file={file} canDecide={can(me?.adminRoles, "disputes.decide")} />
       </div>
     </div>
   );

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { apiFetch } from "@/lib/api";
 import { STATUS_LABEL, dateTime } from "@/lib/format";
-import { ROLE_LABEL } from "@/lib/permissions";
+import { rolesLabel } from "@/lib/permissions";
 import type { AdminUsersResponse } from "@/lib/types";
 
 export default function UsersSearch() {
@@ -48,7 +48,7 @@ export default function UsersSearch() {
                 <td className="px-3 py-2">{u.email}</td>
                 <td className="px-3 py-2 text-[11.5px]">
                   {u.roles.filter((r) => r !== "ADMIN").join(" · ") || "—"}
-                  {u.adminRole && <span className="ml-1 rounded-full bg-slate-900 px-2 py-0.5 text-[10px] font-semibold text-white">{ROLE_LABEL[u.adminRole]}</span>}
+                  {(u.adminRoles.length > 0 || u.adminRole) && <span className="ml-1 rounded-full bg-slate-900 px-2 py-0.5 text-[10px] font-semibold text-white">{rolesLabel(u.adminRoles.length ? u.adminRoles : u.adminRole ? [u.adminRole] : [])}</span>}
                 </td>
                 <td className="px-3 py-2">
                   <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${u.accountStatus === "ACTIVE" ? "bg-emerald-50 text-emerald-700" : u.accountStatus === "RESTRICTED" ? "bg-amber-50 text-amber-800" : "bg-red-50 text-red-700"}`}>{STATUS_LABEL[u.accountStatus]}</span>
