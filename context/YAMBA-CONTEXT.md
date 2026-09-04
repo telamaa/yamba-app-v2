@@ -308,7 +308,10 @@ Ordre de demarrage : auth -> trip -> gateway.
   « masque par Yamba » (Trip.hiddenByAdminAt lu par recherche / page publique /
   reservation, proposition Support, email generique), fiche et liste trajets admin,
   KPI d'accueil par permission (/admin/kpis, /home), bandeau Voyageur, seed billet.
-  Suite : C-PR5 finances, C-PR6 pilotage, C-PR7 signalements / anti-fraude.
+  Mergee #157. Suite : C-PR5 finances (challenge pose le 04/09, decisions 1–8 a
+  trancher : perimetre sans grand livre, trois files, gestes rejeu / renversement /
+  remboursement manuel, fiche argent + rapprochement Stripe, rapport + export CSV,
+  permissions FINANCE, digest conserve, deux PR), C-PR6 pilotage, C-PR7 signalements.
 - Plateforme de tests : 723 (trip 202, deal 443, notification 78) + auth 87.
 - (historique) Plateforme de tests : 600 (trip 187, deal 354, notification 59) — post-B3 (#96).
 - MERGE 01/09 : toute la pile B2 est dans `dev` via la SEULE **PR #90**
