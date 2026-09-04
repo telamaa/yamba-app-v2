@@ -92,6 +92,7 @@ export default function DealDeliverDesktop(props: DealDeliverViewProps) {
             />
 
             <DeliverHelpCard
+              bookingId={deal.id}
               shipper={deal.shipper}
               recipientFirstName={recipientFirstName}
             />

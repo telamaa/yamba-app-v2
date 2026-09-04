@@ -3,9 +3,9 @@
  * ======================
  * Card "Ton Voyageur" avec avatar + nom + rating + Voir profil + Message.
  *
- * Le Voyageur est l'autre acteur du Deal. Le Sender peut le contacter
- * (Message uniquement à ce stade — pas d'appel direct, contrairement au
- * côté Voyageur où on a Message + Appel pour fixer le RDV).
+ * Le Voyageur est l'autre acteur du Deal. « Message » ouvre le fil du deal dans la
+ * messagerie (A137) ; pas d'appel direct côté Expéditeur — le numéro se révèle dans le
+ * fil, 2 h avant le rendez-vous confirmé (D61 3A).
  */
 
 "use client";
@@ -13,6 +13,7 @@
 import { MessageSquare, User } from "lucide-react";
 import { useTranslations } from "next-intl";
 import type { Booking } from "@/components/booking/booking-tracker/booking-tracker.types";
+import { useOpenDealThread } from "@/hooks/useMessaging";
 
 type Props = {
   booking: Booking;
@@ -32,11 +33,8 @@ export default function BookingCarrierCard({ booking, compact = false }: Props) 
       ? booking.carrier.rating.toFixed(1)
       : null;
 
-  const handleMessage = () => {
-    // TODO Phase backend: ouvrir le canal de messagerie avec le Voyageur
-    // eslint-disable-next-line no-console
-    console.info("[booking] open message thread with carrier", booking.carrier.id);
-  };
+  const thread = useOpenDealThread();
+  const handleMessage = () => thread.open(booking.id);
 
   const handleViewProfile = () => {
     // TODO Phase backend: naviguer vers le profil public du Voyageur
@@ -125,7 +123,8 @@ export default function BookingCarrierCard({ booking, compact = false }: Props) 
       <button
         type="button"
         onClick={handleMessage}
-        className="mt-3 inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 text-[13px] font-semibold text-slate-800 transition-colors hover:bg-slate-50 active:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:hover:bg-slate-800 sm:text-[14px]"
+        disabled={thread.isPending}
+        className="mt-3 inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 text-[13px] font-semibold text-slate-800 transition-colors hover:bg-slate-50 active:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:hover:bg-slate-800 disabled:opacity-60 sm:text-[14px]"
       >
         <MessageSquare size={14} aria-hidden="true" />
         <span>

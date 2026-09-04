@@ -1382,3 +1382,22 @@ Après l'acceptation, deux inconnus doivent se retrouver deux fois : pour la rem
 | FCH14 | Écrire un message, puis regarder l'autre compte | Le message part ; côté Voyageur, la bulle du header s'incrémente et une notification arrive dans la boîte |
 | FCH15 | Utiliser une réponse rapide, changer la langue en anglais | Le texte part comme un message ordinaire ; en anglais, les mêmes propositions sont traduites |
 | FCH16 | Écrire « le code est 742891 » | Refus affiché sous la saisie, avec l'explication ; le message n'est pas envoyé |
+
+---
+
+# F-PR2b — les écrans de deal mènent à la conversation
+
+## Le besoin
+La messagerie existait, mais rien n'y menait depuis les écrans où l'on en a besoin : les boutons « Message » et « Appeler » des écrans de deal, dessinés dès les lots B3/B4, ne faisaient rien. Un Voyageur qui vient d'accepter un colis doit pouvoir écrire à l'Expéditeur depuis la page du deal, en un geste.
+
+### Règles de gestion (FCH, suite)
+- **RG-FCH-14 — Chaque écran de deal mène à la conversation du deal** : « Message » ouvre le fil (ou le crée) et l'affiche, quel que soit le rôle et l'étape (accepté, remise, en transit, livraison, suivi).
+- **RG-FCH-15 — « Appeler » ne compose jamais un numéro depuis l'écran de deal** : il ouvre la conversation en mettant le numéro en avant s'il est révélé, ou en expliquant quand il le sera (deux heures avant le rendez-vous confirmé ou le départ). La règle de révélation ne se contourne pas par un bouton.
+- **RG-FCH-16 — Tant que le deal n'est pas accepté, le bouton explique** que la conversation s'ouvrira à l'acceptation, et l'utilisateur reste sur sa page.
+
+### Recette (FCH, suite)
+| # | Scénario | Attendu |
+|---|---|---|
+| FCH17 | En `pauline`, ouvrir le tracker du deal `bzv-accepted`, cliquer « Envoyer un message » | La messagerie s'ouvre directement sur le fil du deal, l'URL porte `?conversation=` |
+| FCH18 | En Voyageur, ouvrir le deal accepté, cliquer « Appeler » | Le fil s'ouvre avec un bandeau ambre : « Voir le numéro » si la fenêtre est ouverte, sinon l'heure d'ouverture ou l'invitation à confirmer un rendez-vous |
+| FCH19 | Une fois le numéro révélé, refaire « Appeler » | Le bandeau montre le numéro, cliquable sur mobile (`tel:`) |

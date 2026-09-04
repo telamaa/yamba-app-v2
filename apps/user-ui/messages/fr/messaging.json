@@ -18,7 +18,13 @@
   "phone": {
     "reveal": "Voir le numéro",
     "hidden": "Numéro indisponible",
-    "opensAt": "Disponible à partir du {time}"
+    "opensAt": "Disponible à partir du {time}",
+    "banner": {
+      "ready": "Numéro de {name} :",
+      "available": "Le numéro est disponible.",
+      "opensAt": "Le numéro s'affiche à partir du {time} (2 h avant le rendez-vous confirmé ou le départ).",
+      "needsMeetup": "Le numéro s'affiche 2 h avant le rendez-vous confirmé. Proposez et confirmez un rendez-vous ci-dessous."
+    }
   },
   "closed": {
     "dispute": "Un litige est en cours : les échanges passent par la médiation.",
@@ -51,5 +57,9 @@
     "meetup.proposed": "Un rendez-vous a été proposé.",
     "meetup.accepted": "Le rendez-vous est confirmé.",
     "phone.revealed": "Le numéro de téléphone a été affiché."
+  },
+  "open": {
+    "failed": "La conversation n'a pas pu être ouverte.",
+    "notOpenYet": "La conversation s'ouvre une fois le deal accepté."
   }
 }

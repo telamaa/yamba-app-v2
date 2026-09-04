@@ -20,6 +20,8 @@ export default function Messages({ copy }: { copy: DashboardCopy }) {
   const searchParams = useSearchParams();
   const { data, isLoading } = useConversations();
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // ?focus=phone (bouton « Appeler » d'un écran de deal, A137) : le fil met le numéro en avant.
+  const focusPhone = searchParams?.get("focus") === "phone";
 
   // Ouverture directe depuis un écran de deal : ?conversation=<id>
   useEffect(() => {
@@ -48,7 +50,7 @@ export default function Messages({ copy }: { copy: DashboardCopy }) {
           </div>
           <div className={selectedId ? "block" : "hidden lg:block"}>
             {selectedId ? (
-              <ConversationThread conversationId={selectedId} onBack={() => setSelectedId(null)} />
+              <ConversationThread conversationId={selectedId} focusPhone={focusPhone} onBack={() => setSelectedId(null)} />
             ) : (
               <p className="p-8 text-center text-[13px] text-slate-500 dark:text-slate-400">{t("selectOne")}</p>
             )}

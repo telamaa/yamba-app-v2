@@ -14,6 +14,7 @@ import type {
   Booking,
   BookingTrackingEventId,
 } from "@/components/booking/booking-tracker/booking-tracker.types";
+import { useOpenDealThread } from "@/hooks/useMessaging";
 
 function hasEvent(booking: Booking, id: BookingTrackingEventId): boolean {
   return (booking.trackingEvents ?? []).some((e) => e.id === id);
@@ -31,10 +32,8 @@ export function SenderCarrierContact({ booking }: { booking: Booking }) {
     ? t("senderTracking.communication.carrierInFlight")
     : t("senderTracking.communication.carrierTraveling");
 
-  const handleMessage = () => {
-    // eslint-disable-next-line no-console
-    console.info("[sender-tracking] open message thread with", carrier.id);
-  };
+  const thread = useOpenDealThread();
+  const handleMessage = () => thread.open(booking.id);
 
   return (
     <section className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950 sm:rounded-2xl sm:p-5">
@@ -58,7 +57,8 @@ export function SenderCarrierContact({ booking }: { booking: Booking }) {
       <button
         type="button"
         onClick={handleMessage}
-        className="mt-3 inline-flex min-h-[42px] w-full items-center justify-center gap-1.5 rounded-xl border border-slate-300 bg-white text-[12.5px] font-semibold text-slate-800 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:hover:bg-slate-800"
+        disabled={thread.isPending}
+        className="mt-3 inline-flex min-h-[42px] w-full items-center justify-center gap-1.5 rounded-xl border border-slate-300 bg-white text-[12.5px] font-semibold text-slate-800 transition-colors hover:bg-slate-50 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:hover:bg-slate-800"
       >
         <MessageSquare size={13} aria-hidden="true" />
         {t("senderTracking.communication.message")}

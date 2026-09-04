@@ -12,14 +12,17 @@ import { ChevronDown, HelpCircle, MessageSquare, Phone } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useState, type ReactNode } from "react";
 import type { DealShipper } from "@/components/carrier/deal/deal.types";
+import { useOpenDealThread } from "@/hooks/useMessaging";
 
 type Props = {
+  bookingId: string;
   shipper: DealShipper;
   recipientFirstName: string;
   compact?: boolean;
 };
 
 export default function DeliverHelpCard({
+                                          bookingId,
                                           shipper,
                                           recipientFirstName,
                                           compact = false,
@@ -41,14 +44,11 @@ export default function DeliverHelpCard({
       t("helpCard.tip3"),
     ];
 
-  const handleWrite = () => {
-    // eslint-disable-next-line no-console
-    console.info("[deliver] open message thread with", shipper.id);
-  };
-  const handleCall = () => {
-    // eslint-disable-next-line no-console
-    console.info("[deliver] call shipper", shipper.id);
-  };
+  // Écrire et Appeler passent tous deux par le fil du deal (A137) : le numéro se révèle
+  // dans la conversation, quand le serveur l'autorise (D61 3A).
+  const thread = useOpenDealThread();
+  const handleWrite = () => thread.open(bookingId);
+  const handleCall = () => thread.open(bookingId, "phone");
 
   return (
     <section
@@ -103,7 +103,8 @@ export default function DeliverHelpCard({
             <button
               type="button"
               onClick={handleWrite}
-              className="inline-flex min-h-[42px] flex-1 items-center justify-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 text-[12.5px] font-semibold text-slate-800 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:hover:bg-slate-800"
+              disabled={thread.isPending}
+              className="inline-flex min-h-[42px] flex-1 items-center justify-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 text-[12.5px] font-semibold text-slate-800 transition-colors hover:bg-slate-50 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:hover:bg-slate-800"
             >
               <MessageSquare size={13} aria-hidden="true" />
               {compact
@@ -113,7 +114,8 @@ export default function DeliverHelpCard({
             <button
               type="button"
               onClick={handleCall}
-              className="inline-flex min-h-[42px] flex-1 items-center justify-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 text-[12.5px] font-semibold text-slate-800 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:hover:bg-slate-800"
+              disabled={thread.isPending}
+              className="inline-flex min-h-[42px] flex-1 items-center justify-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 text-[12.5px] font-semibold text-slate-800 transition-colors hover:bg-slate-50 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:hover:bg-slate-800"
             >
               <Phone size={13} aria-hidden="true" />
               {compact

@@ -103,6 +103,7 @@ export default function DealDeliverMobile(props: DealDeliverViewProps) {
         />
 
         <DeliverHelpCard
+          bookingId={deal.id}
           shipper={deal.shipper}
           recipientFirstName={recipientFirstName}
           compact
