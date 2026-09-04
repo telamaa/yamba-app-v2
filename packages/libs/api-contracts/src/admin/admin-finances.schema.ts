@@ -7,7 +7,7 @@
 import { z } from "zod";
 import { ObjectIdSchema } from "../common";
 
-export const FinanceQueueKindSchema = z.enum(["FAILED", "REVERSED", "HELD"]).meta({ id: "FinanceQueueKind", description: "FAILED = versements en échec · REVERSED = transferts renversés non clos · HELD = retenues conservées à arbitrer" });
+export const FinanceQueueKindSchema = z.enum(["FAILED", "REVERSED", "HELD", "PROPOSED_REFUNDS"]).meta({ id: "FinanceQueueKind", description: "FAILED = versements en échec · REVERSED = transferts renversés non clos · HELD = retenues conservées à arbitrer · PROPOSED_REFUNDS = remboursements manuels proposés, à décider (C-PR5b)" });
 export type FinanceQueueKind = z.infer<typeof FinanceQueueKindSchema>;
 
 export const PayoutFailureKindSchema = z.enum(["ACCOUNT_NOT_READY", "PROVIDER_ERROR", "REVERSED"]).meta({ id: "PayoutFailureKind" });
@@ -104,7 +104,13 @@ export const AdminDealMoneyFileSchema = z
     }),
     timeline: z.array(MoneyTimelineEventSchema),
     adminActions: z.array(z.object({ id: ObjectIdSchema, at: z.string().datetime(), admin: z.string(), action: z.string(), after: z.unknown().nullable() })),
-    allowedActions: z.object({ retryPayout: z.boolean(), resolveReversal: z.boolean(), reconcile: z.boolean() }),
+    // C-PR5b (D58 3A-c) — remboursement manuel
+    manualRefund: z.object({
+      maxRefundableCents: z.number().int().describe("total payé − déjà remboursé ; 0 = plus rien à rembourser"),
+      proposal: z.object({ amountCents: z.number().int(), reason: z.string(), byAdmin: z.string(), at: z.string().datetime() }).nullable(),
+      last: z.object({ amountCents: z.number().int(), reason: z.string(), byAdmin: z.string(), at: z.string().datetime() }).nullable(),
+    }),
+    allowedActions: z.object({ retryPayout: z.boolean(), resolveReversal: z.boolean(), reconcile: z.boolean(), proposeRefund: z.boolean(), applyRefund: z.boolean() }),
   })
   .meta({ id: "AdminDealMoneyFile" });
 export type AdminDealMoneyFile = z.infer<typeof AdminDealMoneyFileSchema>;
@@ -160,3 +166,53 @@ export const ResolveReversalResponseSchema = z
   .object({ outcome: z.enum(["RESENT", "WRITTEN_OFF"]), payoutStatus: z.string().nullable(), reason: z.string().nullable() })
   .meta({ id: "ResolveReversalResponse" });
 export type ResolveReversalResponse = z.infer<typeof ResolveReversalResponseSchema>;
+
+/* ── C-PR5b (D58 5A) — rapport mensuel par devise, calculé depuis le Booking ── */
+export const FinanceReportMonthSchema = z
+  .object({
+    month: z.string().regex(/^\d{4}-\d{2}$/).describe("YYYY-MM (UTC)"),
+    currencyCode: z.string(),
+    capturedCents: z.number().int().describe("Encaissé : total payé des deals capturés ce mois"),
+    capturedCount: z.number().int(),
+    refundedCents: z.number().int().describe("Remboursé aux Expéditeurs ce mois (toutes causes, manuel compris)"),
+    refundCount: z.number().int(),
+    paidOutCents: z.number().int().describe("Versé aux Voyageurs ce mois (versements SENT, renversés inclus car partis)"),
+    payoutCount: z.number().int(),
+    revenueCents: z.number().int().describe("Revenu reconnu : commission + prime des deals terminés ce mois (COMPLETED)"),
+    completedCount: z.number().int(),
+    retentionCents: z.number().int().describe("Retenues nées ce mois (annulations tardives), quel que soit leur sort"),
+    cancelledCount: z.number().int(),
+  })
+  .meta({ id: "FinanceReportMonth" });
+export type FinanceReportMonth = z.infer<typeof FinanceReportMonthSchema>;
+
+export const FinanceSnapshotSchema = z
+  .object({
+    currencyCode: z.string(),
+    pendingPayoutCents: z.number().int().describe("Dû aux Voyageurs : PENDING + FAILED (passif)"),
+    frozenPayoutCents: z.number().int().describe("Gelé par un litige (FROZEN)"),
+    reversedOpenCents: z.number().int().describe("Transferts renversés non clos (argent revenu, à décider)"),
+    heldRetentionCents: z.number().int().describe("Retenues conservées à arbitrer (passif, pas un revenu)"),
+    proposedRefundCents: z.number().int().describe("Remboursements manuels proposés, non appliqués"),
+  })
+  .meta({ id: "FinanceSnapshot" });
+export type FinanceSnapshot = z.infer<typeof FinanceSnapshotSchema>;
+
+export const FinanceReportSchema = z
+  .object({ from: z.string().datetime(), to: z.string().datetime(), generatedAt: z.string().datetime(), months: z.array(FinanceReportMonthSchema), snapshot: z.array(FinanceSnapshotSchema) })
+  .meta({ id: "FinanceReport", description: "Aucun grand livre (D58 1A) : agrégats des champs posés par les transitions. Les frais Stripe ne sont pas en base — rapprocher avec l'export Stripe." });
+export type FinanceReport = z.infer<typeof FinanceReportSchema>;
+
+/* ── C-PR5b (D58 3A-c) — remboursement manuel ── */
+export const MANUAL_REFUND_MIN_REASON_LENGTH = 50;
+export const ManualRefundRequestSchema = z
+  .object({
+    amountCents: z.number().int().min(1),
+    reason: z.string().trim().min(MANUAL_REFUND_MIN_REASON_LENGTH).max(2000),
+  })
+  .meta({ id: "ManualRefundRequest", description: "Montant en centimes ≤ total payé − déjà remboursé ; motif ≥ 50 caractères (geste commercial, jamais une décision de litige)" });
+export type ManualRefundRequest = z.infer<typeof ManualRefundRequestSchema>;
+export const ManualRefundResponseSchema = z
+  .object({ bookingId: ObjectIdSchema, refundedCents: z.number().int(), totalRefundedCents: z.number().int(), refundId: z.string().nullable(), currencyCode: z.string() })
+  .meta({ id: "ManualRefundResponse" });
+export type ManualRefundResponse = z.infer<typeof ManualRefundResponseSchema>;

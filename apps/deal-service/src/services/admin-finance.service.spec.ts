@@ -31,7 +31,7 @@ function record(o: Record<string, unknown> = {}) {
     expiresAt: NOW, acceptedAt: NOW, pickedUpAt: NOW, paymentIntentId: "pi_1", paymentProvider: "FAKE", chargeId: "ch_1",
     trip: { originCity: "Paris", destinationCity: "Brazzaville", departureAt: NOW, originCountryCode: "FR", destinationCountryCode: "CG", originTimezone: "Europe/Paris", destinationTimezone: "Africa/Brazzaville", transportMode: "PLANE" },
     pricing: { pricingModel: "PER_KG", weightKg: 2, transportCents: 2000, commissionCents: 957, premiumCents: 0, totalShipperCents: 2957, currencyCode: "EUR" },
-    parcel: { category: "OTHER" }, pickup: null, trackingEvents: [], deliveryCodeHash: null, deliveryAttempts: 0, deliveryLockedUntil: null, codeRegenerations: 0,
+    parcel: { category: "BOOKS" }, pickup: null, trackingEvents: [], deliveryCodeHash: null, deliveryAttempts: 0, deliveryLockedUntil: null, codeRegenerations: 0,
     requestedAt: NOW, capturedAt: NOW, completedAt: NOW, completedBy: "SYSTEM", payoutStatus: "FAILED", payoutAmountCents: 2000, payoutAttempts: 3,
     payoutFailureReason: "PROVIDER_ERROR:balance insufficient", payoutLastAttemptAt: NOW, payoutNextRetryAt: NOW, updatedAt: NOW,
     ...o,
@@ -72,14 +72,14 @@ describe("getMoneyFile (4A)", () => {
     const f = await makeService().getMoneyFile(ADMIN, ID);
     expect(f.carrier.stripeAccountIdMasked).toBe("acct_…LMNO");
     expect(f.payout).toMatchObject({ status: "FAILED", failureKind: "PROVIDER_ERROR", attempts: 3 });
-    expect(f.allowedActions).toEqual({ retryPayout: true, resolveReversal: false, reconcile: true });
+    expect(f.allowedActions).toEqual({ retryPayout: true, resolveReversal: false, reconcile: true, proposeRefund: true, applyRefund: true });
     expect(f.timeline.map((e) => e.kind)).toEqual(["AUTHORIZED", "CAPTURED", "COMPLETED", "PAYOUT_FAILED"]);
     expect(recordAdminAction).toHaveBeenCalledWith(prismaMock, expect.objectContaining({ action: "DEAL_MONEY_VIEWED", targetType: "BOOKING", targetId: ID }));
   });
   it("une partie au deal ne voit aucun geste ; un renversement ouvert propose sa clôture", async () => {
     prismaMock.booking.findUnique.mockResolvedValue(record({ payoutStatus: "REVERSED", payoutFailureReason: "PROVIDER_REVERSED" }));
     const f = await makeService().getMoneyFile({ ...ADMIN, id: CARRIER_ID }, ID);
-    expect(f.allowedActions).toEqual({ retryPayout: false, resolveReversal: false, reconcile: true });
+    expect(f.allowedActions).toEqual({ retryPayout: false, resolveReversal: false, reconcile: true, proposeRefund: false, applyRefund: false });
     const g = await makeService().getMoneyFile(ADMIN, ID);
     expect(g.allowedActions.resolveReversal).toBe(true);
   });
@@ -145,5 +145,70 @@ describe("resolveReversal (3A-b)", () => {
     expect((settlement as { executePayout: jest.Mock }).executePayout).not.toHaveBeenCalled();
     prismaMock.booking.updateMany.mockResolvedValue({ count: 0 });
     await expect(makeService().resolveReversal(ADMIN, ID, { outcome: "WRITTEN_OFF", reason: "Compte fermé, Voyageur injoignable depuis 60 jours." })).rejects.toBeInstanceOf(ValidationError);
+  });
+});
+
+describe("C-PR5b — rapport, export journalisé, remboursement manuel", () => {
+  it("getReport : deux lectures (faits datés depuis le début de période, passifs du jour), agrégats purs", async () => {
+    prismaMock.booking.findMany.mockResolvedValueOnce([record({ capturedAt: new Date("2026-08-20T10:00:00Z"), completedAt: new Date("2026-09-02T10:00:00Z"), payoutStatus: "SENT", payoutSentAt: new Date("2026-09-02T10:01:00Z") })]);
+    prismaMock.booking.findMany.mockResolvedValueOnce([record({ payoutStatus: "FAILED" })]);
+    const r = await makeService().getReport(3);
+    expect(r.from).toBe("2026-07-01T00:00:00.000Z");
+    expect(r.to).toBe("2026-10-01T00:00:00.000Z");
+    expect(r.months.map((m) => m.month)).toEqual(["2026-09", "2026-08"]);
+    expect(r.months[0]).toMatchObject({ revenueCents: 957, paidOutCents: 2000 });
+    expect(r.snapshot).toEqual([{ currencyCode: "EUR", pendingPayoutCents: 2000, frozenPayoutCents: 0, reversedOpenCents: 0, heldRetentionCents: 0, proposedRefundCents: 0 }]);
+    expect(prismaMock.booking.findMany.mock.calls[0][0].where.OR[0]).toEqual({ capturedAt: { gte: new Date("2026-07-01T00:00:00.000Z") } });
+  });
+  it("exportCsv : période bornée, lignes filtrées par fait d'argent, journal FINANCE_EXPORTED avec le nombre de lignes", async () => {
+    prismaMock.booking.findMany.mockResolvedValue([
+      record({ capturedAt: new Date("2026-08-20T10:00:00Z"), completedAt: new Date("2026-09-02T10:00:00Z") }),
+      record({ id: "64b0000000000000000000b2", capturedAt: new Date("2026-05-01T10:00:00Z"), completedAt: new Date("2026-05-05T10:00:00Z") }),
+    ]);
+    const out = await makeService().exportCsv(ADMIN, new Date("2026-09-01T00:00:00Z"), new Date("2026-10-01T00:00:00Z"));
+    expect(out.rows).toBe(1);
+    expect(out.filename).toBe("yamba-finances-2026-09-01-2026-10-01.csv");
+    expect(out.csv.split("\r\n")[1]).toContain(`${ID},COMPLETED,Paris,Brazzaville`);
+    expect(recordAdminAction).toHaveBeenCalledWith(prismaMock, expect.objectContaining({ action: "FINANCE_EXPORTED", after: expect.objectContaining({ rows: 1 }) }));
+    await expect(makeService().exportCsv(ADMIN, new Date("2025-01-01T00:00:00Z"), new Date("2026-09-01T00:00:00Z"))).rejects.toBeInstanceOf(ValidationError);
+    await expect(makeService().exportCsv(ADMIN, new Date("2026-09-01T00:00:00Z"), new Date("2026-09-01T00:00:00Z"))).rejects.toBeInstanceOf(ValidationError);
+  });
+  const REASON = "Geste commercial : colis livré avec 3 jours de retard, plainte fondée de l'Expéditeur.";
+  it("proposeManualRefund : borné au restant remboursable, partie → 403, écrit la proposition + journal dans une transaction", async () => {
+    prismaMock.booking.findUnique.mockResolvedValue(record({ payoutStatus: "SENT", refundAmountCents: 1000 }));
+    prismaMock.booking.update = jest.fn().mockResolvedValue({});
+    await expect(makeService().proposeManualRefund(ADMIN, ID, { amountCents: 2000, reason: REASON })).rejects.toThrow(/At most 1957/);
+    await expect(makeService().proposeManualRefund({ ...ADMIN, id: SHIPPER_ID }, ID, { amountCents: 500, reason: REASON })).rejects.toBeInstanceOf(ForbiddenError);
+    const r = await makeService().proposeManualRefund(ADMIN, ID, { amountCents: 500, reason: REASON });
+    expect(r.proposedAt).toBe(NOW.toISOString());
+    expect((prismaMock.booking.update as jest.Mock).mock.calls[0][0].data).toMatchObject({ manualRefundProposedCents: 500, manualRefundProposedByAdminId: ADMIN.id });
+    expect(recordAdminAction).toHaveBeenCalledWith(prismaMock, expect.objectContaining({ action: "REFUND_MANUAL_PROPOSED", after: { amountCents: 500, reason: REASON } }));
+  });
+  it("applyManualRefund : l'argent d'abord (D39), puis cumul + refundId + outbox refund_issued (ADMIN) + journal dans la transaction ; verrou sur le cumul", async () => {
+    const provider = new FakePaymentProvider();
+    const a = await provider.authorize({ amountCents: 2957, currencyCode: "EUR", description: "t", metadata: {} });
+    await provider.capture(a.intentId);
+    prismaMock.booking.findUnique.mockResolvedValue(record({ paymentIntentId: a.intentId, payoutStatus: "SENT", refundAmountCents: null, expiresAt: NOW, parcel: { category: "BOOKS", categoryFamily: null } }));
+    prismaMock.booking.updateMany.mockResolvedValue({ count: 1 });
+    prismaMock.outboxEvent = { create: jest.fn().mockResolvedValue({}) } as never;
+    const r = await makeService(provider).applyManualRefund(ADMIN, ID, { amountCents: 500, reason: REASON });
+    expect(r).toMatchObject({ bookingId: ID, refundedCents: 500, totalRefundedCents: 500, currencyCode: "EUR" });
+    expect(r.refundId).toMatch(/^re_fake_/);
+    const u = prismaMock.booking.updateMany.mock.calls[0][0];
+    expect(u.where).toEqual({ id: ID, status: "COMPLETED", OR: [{ refundAmountCents: null }, { refundAmountCents: { isSet: false } }] });
+    expect(u.data).toMatchObject({ refundAmountCents: 500, manualRefundCents: 500, manualRefundByAdminId: ADMIN.id, manualRefundProposedCents: null });
+    const ev = (prismaMock.outboxEvent as { create: jest.Mock }).create.mock.calls[0][0].data;
+    expect(ev.eventType).toBe("booking.refund_issued");
+    const stored = typeof ev.payload === "string" ? JSON.parse(ev.payload) : ev.payload;
+    expect(stored.payload).toMatchObject({ actor: "ADMIN", amountCents: 500, refundedAt: NOW.toISOString() });
+    expect(recordAdminAction).toHaveBeenCalledWith(prismaMock, expect.objectContaining({ action: "REFUND_MANUAL_APPLIED", after: expect.objectContaining({ totalRefundedCents: 500 }) }));
+    expect((await provider.inspect({ intentId: a.intentId })).refunds).toHaveLength(1);
+  });
+  it("applyManualRefund : deal non fermé (DISPUTED) → 400 avant tout appel fournisseur", async () => {
+    const provider = new FakePaymentProvider();
+    const spy = jest.spyOn(provider, "refund");
+    prismaMock.booking.findUnique.mockResolvedValue(record({ status: "DISPUTED", payoutStatus: "FROZEN" }));
+    await expect(makeService(provider).applyManualRefund(ADMIN, ID, { amountCents: 100, reason: REASON })).rejects.toBeInstanceOf(ValidationError);
+    expect(spy).not.toHaveBeenCalled();
   });
 });

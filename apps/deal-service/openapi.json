@@ -2830,6 +2830,392 @@
       }
     }
   },
+  "/admin/finances/report": {
+    "get": {
+      "tags": [
+        "admin"
+      ],
+      "summary": "Monthly finance report per currency (D58 5A) — computed from bookings, no ledger",
+      "description": "Permission finances.read. months = 1..24 (default 12, UTC months). Each money fact counts in ITS month: capture → capturedAt, refund → refundedAt, payout → payoutSentAt, revenue (commission + premium of COMPLETED deals) → completedAt, retention → closedAt. snapshot = today's liabilities (pending / frozen payouts, open reversals, retentions held, proposed refunds). Provider fees are not stored: reconcile with the Stripe export.",
+      "operationId": "adminGetFinanceReport",
+      "security": [
+        {
+          "adminCookieAuth": []
+        }
+      ],
+      "parameters": [
+        {
+          "name": "months",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 24,
+            "default": 12
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Report",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FinanceReport"
+              }
+            }
+          }
+        },
+        "400": {
+          "description": "Malformed request: invalid ObjectId or unknown status value (ValidationError)",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ErrorResponse"
+              }
+            }
+          }
+        },
+        "401": {
+          "description": "Token missing, invalid, expired, or account not found (isAuthenticated middleware)",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UnauthorizedResponse"
+              }
+            }
+          }
+        },
+        "403": {
+          "description": "Authenticated caller is not a party to this deal, or does not own the trip (ForbiddenError)",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ErrorResponse"
+              }
+            }
+          }
+        },
+        "500": {
+          "description": "Unhandled server error",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UnhandledError"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "/admin/finances/export": {
+    "get": {
+      "tags": [
+        "admin"
+      ],
+      "summary": "CSV export per deal (D58 5A) — journaled, FINANCE only",
+      "description": "Permission finances.export. from / to ISO date-times, at most 366 days. One line per deal with a money fact in the period: frozen amounts, refund (+ refundId), payout (+ transferId), retention, dates, dispute ticket, paymentIntentId, chargeId. Formula-looking cells are neutralised. Journal FINANCE_EXPORTED (period, row count).",
+      "operationId": "adminExportFinanceCsv",
+      "security": [
+        {
+          "adminCookieAuth": []
+        }
+      ],
+      "parameters": [
+        {
+          "name": "from",
+          "in": "query",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        {
+          "name": "to",
+          "in": "query",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "CSV (UTF-8 with BOM), Content-Disposition attachment, X-Row-Count",
+          "content": {
+            "text/csv": {
+              "schema": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "400": {
+          "description": "Malformed request: invalid ObjectId or unknown status value (ValidationError)",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ErrorResponse"
+              }
+            }
+          }
+        },
+        "401": {
+          "description": "Token missing, invalid, expired, or account not found (isAuthenticated middleware)",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UnauthorizedResponse"
+              }
+            }
+          }
+        },
+        "403": {
+          "description": "Authenticated caller is not a party to this deal, or does not own the trip (ForbiddenError)",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ErrorResponse"
+              }
+            }
+          }
+        },
+        "500": {
+          "description": "Unhandled server error",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UnhandledError"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "/admin/deals/{id}/refund/propose": {
+    "post": {
+      "tags": [
+        "admin"
+      ],
+      "summary": "Propose a commercial refund (D58 3A-c) — FINANCE / SUPPORT",
+      "description": "Permission refunds.manual.propose. Closed deal (COMPLETED / CANCELLED) with a captured payment; amount ≤ total paid − already refunded; reason ≥ 50. No money moves. Journal REFUND_MANUAL_PROPOSED. 403 when the admin is a party.",
+      "operationId": "adminProposeManualRefund",
+      "security": [
+        {
+          "adminCookieAuth": []
+        }
+      ],
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "$ref": "#/components/schemas/ObjectId"
+          },
+          "description": "Deal (booking) identifier"
+        }
+      ],
+      "requestBody": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ManualRefundRequest"
+            }
+          }
+        }
+      },
+      "responses": {
+        "200": {
+          "description": "Proposed",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "ok": {
+                    "type": "boolean"
+                  },
+                  "proposedAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                },
+                "required": [
+                  "ok",
+                  "proposedAt"
+                ]
+              }
+            }
+          }
+        },
+        "400": {
+          "description": "Malformed request: invalid ObjectId or unknown status value (ValidationError)",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ErrorResponse"
+              }
+            }
+          }
+        },
+        "401": {
+          "description": "Token missing, invalid, expired, or account not found (isAuthenticated middleware)",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UnauthorizedResponse"
+              }
+            }
+          }
+        },
+        "403": {
+          "description": "Authenticated caller is not a party to this deal, or does not own the trip (ForbiddenError)",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ErrorResponse"
+              }
+            }
+          }
+        },
+        "404": {
+          "description": "Deal or trip not found (NotFoundError)",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ErrorResponse"
+              }
+            }
+          }
+        },
+        "500": {
+          "description": "Unhandled server error",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UnhandledError"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "/admin/deals/{id}/refund": {
+    "post": {
+      "tags": [
+        "admin"
+      ],
+      "summary": "Apply a commercial refund (D58 3A-c) — SUPER_ADMIN only, money first",
+      "description": "Permission refunds.manual.apply (SUPER_ADMIN). Same bounds as the proposal. D39: provider.refund FIRST, then ONE conditional transaction (optimistic lock on the refunded total — two admins never refund twice): refundAmountCents cumulated, refundId, manual refund fields, proposal cleared, outbox booking.refund_issued (actor ADMIN → the shipper receives the standard refund email), journal REFUND_MANUAL_APPLIED. The carrier's payout is untouched: Yamba bears the gesture. A refund issued without a database write shows up in the reconciliation.",
+      "operationId": "adminApplyManualRefund",
+      "security": [
+        {
+          "adminCookieAuth": []
+        }
+      ],
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "$ref": "#/components/schemas/ObjectId"
+          },
+          "description": "Deal (booking) identifier"
+        }
+      ],
+      "requestBody": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ManualRefundRequest"
+            }
+          }
+        }
+      },
+      "responses": {
+        "200": {
+          "description": "Refunded",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ManualRefundResponse"
+              }
+            }
+          }
+        },
+        "400": {
+          "description": "Malformed request: invalid ObjectId or unknown status value (ValidationError)",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ErrorResponse"
+              }
+            }
+          }
+        },
+        "401": {
+          "description": "Token missing, invalid, expired, or account not found (isAuthenticated middleware)",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UnauthorizedResponse"
+              }
+            }
+          }
+        },
+        "403": {
+          "description": "Authenticated caller is not a party to this deal, or does not own the trip (ForbiddenError)",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ErrorResponse"
+              }
+            }
+          }
+        },
+        "404": {
+          "description": "Deal or trip not found (NotFoundError)",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ErrorResponse"
+              }
+            }
+          }
+        },
+        "409": {
+          "description": "Business conflict — details.code ∈ QUOTE_DIVERGENCE | CAPACITY_EXCEEDED | FAMILY_REFUSED | TRIP_NOT_BOOKABLE | OWN_TRIP | PAYMENT_NOT_AUTHORIZED | PAYMENT_MISMATCH | PAYMENT_ALREADY_USED",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ErrorResponse"
+              }
+            }
+          }
+        },
+        "500": {
+          "description": "Unhandled server error",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UnhandledError"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
   "components": {
     "schemas": {
       "ObjectId": {
@@ -16142,6 +16528,18 @@
               }
             ]
           },
+          "manualRefundProposals": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "pendingAdminInvites": {
             "anyOf": [
               {
@@ -16197,6 +16595,7 @@
           "activeDeals",
           "payoutsFailed",
           "payoutsReversed",
+          "manualRefundProposals",
           "pendingAdminInvites",
           "usersTotal",
           "completedDeals30d",
@@ -16210,9 +16609,10 @@
         "enum": [
           "FAILED",
           "REVERSED",
-          "HELD"
+          "HELD",
+          "PROPOSED_REFUNDS"
         ],
-        "description": "FAILED = versements en échec · REVERSED = transferts renversés non clos · HELD = retenues conservées à arbitrer"
+        "description": "FAILED = versements en échec · REVERSED = transferts renversés non clos · HELD = retenues conservées à arbitrer · PROPOSED_REFUNDS = remboursements manuels proposés, à décider (C-PR5b)"
       },
       "PayoutFailureKind": {
         "type": "string",
@@ -17099,6 +17499,93 @@
               "additionalProperties": false
             }
           },
+          "manualRefund": {
+            "type": "object",
+            "properties": {
+              "maxRefundableCents": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991,
+                "description": "total payé − déjà remboursé ; 0 = plus rien à rembourser"
+              },
+              "proposal": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "amountCents": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      "reason": {
+                        "type": "string"
+                      },
+                      "byAdmin": {
+                        "type": "string"
+                      },
+                      "at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                      }
+                    },
+                    "required": [
+                      "amountCents",
+                      "reason",
+                      "byAdmin",
+                      "at"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "last": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "amountCents": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      "reason": {
+                        "type": "string"
+                      },
+                      "byAdmin": {
+                        "type": "string"
+                      },
+                      "at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                      }
+                    },
+                    "required": [
+                      "amountCents",
+                      "reason",
+                      "byAdmin",
+                      "at"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "maxRefundableCents",
+              "proposal",
+              "last"
+            ],
+            "additionalProperties": false
+          },
           "allowedActions": {
             "type": "object",
             "properties": {
@@ -17110,12 +17597,20 @@
               },
               "reconcile": {
                 "type": "boolean"
+              },
+              "proposeRefund": {
+                "type": "boolean"
+              },
+              "applyRefund": {
+                "type": "boolean"
               }
             },
             "required": [
               "retryPayout",
               "resolveReversal",
-              "reconcile"
+              "reconcile",
+              "proposeRefund",
+              "applyRefund"
             ],
             "additionalProperties": false
           }
@@ -17134,6 +17629,7 @@
           "dates",
           "timeline",
           "adminActions",
+          "manualRefund",
           "allowedActions"
         ],
         "additionalProperties": false
@@ -17440,6 +17936,237 @@
           "outcome",
           "payoutStatus",
           "reason"
+        ],
+        "additionalProperties": false
+      },
+      "FinanceReportMonth": {
+        "type": "object",
+        "properties": {
+          "month": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}$",
+            "description": "YYYY-MM (UTC)"
+          },
+          "currencyCode": {
+            "type": "string"
+          },
+          "capturedCents": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Encaissé : total payé des deals capturés ce mois"
+          },
+          "capturedCount": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "refundedCents": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Remboursé aux Expéditeurs ce mois (toutes causes, manuel compris)"
+          },
+          "refundCount": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "paidOutCents": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Versé aux Voyageurs ce mois (versements SENT, renversés inclus car partis)"
+          },
+          "payoutCount": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "revenueCents": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Revenu reconnu : commission + prime des deals terminés ce mois (COMPLETED)"
+          },
+          "completedCount": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "retentionCents": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Retenues nées ce mois (annulations tardives), quel que soit leur sort"
+          },
+          "cancelledCount": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "month",
+          "currencyCode",
+          "capturedCents",
+          "capturedCount",
+          "refundedCents",
+          "refundCount",
+          "paidOutCents",
+          "payoutCount",
+          "revenueCents",
+          "completedCount",
+          "retentionCents",
+          "cancelledCount"
+        ],
+        "additionalProperties": false
+      },
+      "FinanceSnapshot": {
+        "type": "object",
+        "properties": {
+          "currencyCode": {
+            "type": "string"
+          },
+          "pendingPayoutCents": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Dû aux Voyageurs : PENDING + FAILED (passif)"
+          },
+          "frozenPayoutCents": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Gelé par un litige (FROZEN)"
+          },
+          "reversedOpenCents": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Transferts renversés non clos (argent revenu, à décider)"
+          },
+          "heldRetentionCents": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Retenues conservées à arbitrer (passif, pas un revenu)"
+          },
+          "proposedRefundCents": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Remboursements manuels proposés, non appliqués"
+          }
+        },
+        "required": [
+          "currencyCode",
+          "pendingPayoutCents",
+          "frozenPayoutCents",
+          "reversedOpenCents",
+          "heldRetentionCents",
+          "proposedRefundCents"
+        ],
+        "additionalProperties": false
+      },
+      "FinanceReport": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          },
+          "to": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          },
+          "months": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FinanceReportMonth"
+            }
+          },
+          "snapshot": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FinanceSnapshot"
+            }
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "generatedAt",
+          "months",
+          "snapshot"
+        ],
+        "additionalProperties": false,
+        "description": "Aucun grand livre (D58 1A) : agrégats des champs posés par les transitions. Les frais Stripe ne sont pas en base — rapprocher avec l'export Stripe."
+      },
+      "ManualRefundRequest": {
+        "type": "object",
+        "properties": {
+          "amountCents": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 50,
+            "maxLength": 2000
+          }
+        },
+        "required": [
+          "amountCents",
+          "reason"
+        ],
+        "additionalProperties": false,
+        "description": "Montant en centimes ≤ total payé − déjà remboursé ; motif ≥ 50 caractères (geste commercial, jamais une décision de litige)"
+      },
+      "ManualRefundResponse": {
+        "type": "object",
+        "properties": {
+          "bookingId": {
+            "$ref": "#/components/schemas/ObjectId"
+          },
+          "refundedCents": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "totalRefundedCents": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "refundId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "currencyCode": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "bookingId",
+          "refundedCents",
+          "totalRefundedCents",
+          "refundId",
+          "currencyCode"
         ],
         "additionalProperties": false
       }

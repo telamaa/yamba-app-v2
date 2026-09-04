@@ -314,9 +314,15 @@ Ordre de demarrage : auth -> trip -> gateway.
   tout deal, rapprochement fournisseur lecture seule (PaymentProvider.inspect, refundId
   stocke), rejeu manuel, cloture d'un renversement (RESENT nouvelle cle / WRITTEN_OFF),
   rejeux espaces sans plafond (payoutNextRetryAt), KPI payoutsReversed, admin-ui
-  /finances + /deals/[id], seed bzv-reversed. Suite : C-PR5b (rapport mensuel par
-  devise, export CSV, remboursement manuel SUPER_ADMIN), C-PR6 pilotage.
-- Plateforme de tests : 744 (trip 202, deal 464, notification 78) + auth 88.
+  /finances + /deals/[id], seed bzv-reversed. Mergee #159.
+- 04/09 : C-PR5b feat/c5b-admin-finances-report (D58 5A / 3A-c, A114–A116) — rapport
+  mensuel par devise (chaque fait a sa date, passifs du jour), export CSV journalise
+  (FINANCE, <= 366 j, formules neutralisees), remboursement manuel propose (FINANCE /
+  SUPPORT) et applique par SUPER_ADMIN (argent d'abord, verrou sur le cumul, outbox
+  refund_issued ADMIN), portefeuille Expediteur : remboursement apres COMPLETED visible,
+  file PROPOSED_REFUNDS, KPI, admin-ui /finances/report. Suite : C-PR6 pilotage,
+  C-PR7 signalements / anti-fraude, C-PR8 parametres / RGPD.
+- Plateforme de tests : 755 (trip 202, deal 475, notification 78) + auth 89.
 - (historique) Plateforme de tests : 600 (trip 187, deal 354, notification 59) — post-B3 (#96).
 - MERGE 01/09 : toute la pile B2 est dans `dev` via la SEULE **PR #90**
   (`feat/b2-deal-front` portait la chaîne complète : jalons mobile D36,

@@ -48,4 +48,12 @@ describe("adminRoleAllows (D56)", () => {
     expect(adminRoleAllows("SUPPORT", "finances.read")).toBe(false);
     expect(adminRoleAllows("SUPPORT", "payouts.retry")).toBe(false);
   });
+  it("C-PR5b (D58) : l'export est FINANCE seul, le remboursement manuel est proposé par FINANCE / SUPPORT et appliqué par SUPER_ADMIN seul", () => {
+    expect(adminRoleAllows("FINANCE", "finances.export")).toBe(true);
+    expect(adminRoleAllows("MEDIATOR", "finances.export")).toBe(false);
+    expect(adminRoleAllows("FINANCE", "refunds.manual.propose")).toBe(true);
+    expect(adminRoleAllows("SUPPORT", "refunds.manual.propose")).toBe(true);
+    for (const r of ["FINANCE", "MEDIATOR", "SUPPORT"] as const) expect(adminRoleAllows(r, "refunds.manual.apply")).toBe(false);
+    expect(adminRoleAllows("SUPER_ADMIN", "refunds.manual.apply")).toBe(true);
+  });
 });

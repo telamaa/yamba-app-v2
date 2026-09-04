@@ -57,6 +57,9 @@ export const ACTION_LABEL: Record<string, string> = {
   DEAL_RECONCILED: "Rapprochement Stripe",
   PAYOUT_RETRIED: "Versement rejoué",
   PAYOUT_REVERSAL_RESOLVED: "Renversement clos",
+  FINANCE_EXPORTED: "Export finances",
+  REFUND_MANUAL_PROPOSED: "Remboursement manuel proposé",
+  REFUND_MANUAL_APPLIED: "Remboursement manuel appliqué",
 };
 
 /* C-PR5a (D58) */

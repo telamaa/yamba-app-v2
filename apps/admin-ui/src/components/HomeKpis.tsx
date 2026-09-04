@@ -14,6 +14,7 @@ const TILES: Tile[] = [
   { key: "suspensionProposals", label: "Sanctions proposées", href: "/users", tone: "act" },
   { key: "payoutsFailed", label: "Versements en échec", href: "/finances?kind=FAILED", tone: "act" },
   { key: "payoutsReversed", label: "Transferts renversés", href: "/finances?kind=REVERSED", tone: "act" },
+  { key: "manualRefundProposals", label: "Remboursements proposés", href: "/finances?kind=PROPOSED_REFUNDS", tone: "act" },
   { key: "pendingAdminInvites", label: "Invitations admin en attente", href: "/admins", tone: "act" },
   { key: "activeDeals", label: "Deals en cours", href: "/trips", tone: "info" },
   { key: "publishedTrips", label: "Trajets publiés à venir", href: "/trips?status=PUBLISHED", tone: "info" },

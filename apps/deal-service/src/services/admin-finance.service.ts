@@ -16,16 +16,32 @@ import type {
   FinanceQueueItem,
   FinanceQueueKind,
   FinanceQueueResponse,
+  FinanceReport,
+  ManualRefundRequest,
+  ManualRefundResponse,
   PaymentReconciliation,
   ResolveReversalRequest,
   ResolveReversalResponse,
   RetryPayoutResponse,
 } from "@packages/api-contracts";
-import { BookingLifecycleError } from "./booking-lifecycle";
-import { BOOKING_WRITE_SELECT, loadBookingForWrite } from "./booking-write";
+import { BookingLifecycleError, baseEventPayload } from "./booking-lifecycle";
+import { BOOKING_WRITE_SELECT, applyBookingTransition, loadBookingForWrite, toBookingForWrite, type BookingForWrite } from "./booking-write";
 import type { DealSettlementService } from "./deal-settlement.service";
 import { assertNotParty } from "./deal-mediation.service";
-import { buildMoneyTimeline, maskAccountId, payoutFailureDetail, payoutFailureKind, reconcile } from "./admin-finance.rules";
+import {
+  buildFinanceCsv,
+  buildFinanceReport,
+  buildFinanceSnapshot,
+  buildMoneyTimeline,
+  csvRowInRange,
+  manualRefundBounds,
+  maskAccountId,
+  monthStartUtc,
+  payoutFailureDetail,
+  payoutFailureKind,
+  reconcile,
+  type FinanceCsvRow,
+} from "./admin-finance.rules";
 
 const iso = (d: Date | null | undefined) => (d ? d.toISOString() : null);
 
@@ -52,6 +68,15 @@ const MONEY_SELECT = {
   payoutReversalResolvedByAdminId: true,
   retentionDecisionReason: true,
   retentionDecidedAt: true,
+  // C-PR5b — remboursement manuel
+  manualRefundProposedCents: true,
+  manualRefundProposedReason: true,
+  manualRefundProposedByAdminId: true,
+  manualRefundProposedAt: true,
+  manualRefundCents: true,
+  manualRefundReason: true,
+  manualRefundByAdminId: true,
+  manualRefundAt: true,
 } as const;
 
 type MoneyRecord = {
@@ -96,7 +121,18 @@ type MoneyRecord = {
   retentionDecisionReason?: string | null;
   retentionDecidedAt?: Date | null;
   updatedAt?: Date | null;
+  manualRefundProposedCents?: number | null;
+  manualRefundProposedReason?: string | null;
+  manualRefundProposedByAdminId?: string | null;
+  manualRefundProposedAt?: Date | null;
+  manualRefundCents?: number | null;
+  manualRefundReason?: string | null;
+  manualRefundByAdminId?: string | null;
+  manualRefundAt?: Date | null;
 };
+
+/** Période d'export bornée : au-delà, le comptable passe par l'export Stripe. */
+const EXPORT_MAX_DAYS = 366;
 
 const UNRESOLVED_REVERSAL = { OR: [{ payoutReversalResolution: { isSet: false } }, { payoutReversalResolution: null }] };
 
@@ -108,6 +144,8 @@ function queueWhere(kind: FinanceQueueKind): Record<string, unknown> {
       return { payoutStatus: "REVERSED", ...UNRESOLVED_REVERSAL };
     case "HELD":
       return { status: "CANCELLED", retentionDisposition: "HELD_FOR_MEDIATION" };
+    case "PROPOSED_REFUNDS":
+      return { manualRefundProposedCents: { gt: 0 } };
   }
 }
 
@@ -144,7 +182,8 @@ export function makeAdminFinanceService(provider: PaymentProvider, settlement: D
         take: 200,
         orderBy: { updatedAt: "asc" },
       })) as unknown as MoneyRecord[];
-      const [names, ready] = await Promise.all([namesOf(rows.flatMap((b) => [b.shipperId, b.carrierId])), kind === "HELD" ? Promise.resolve(new Map()) : stripeReadiness(rows.map((b) => b.carrierId))]);
+      const moneyKind = kind === "FAILED" || kind === "REVERSED";
+      const [names, ready] = await Promise.all([namesOf(rows.flatMap((b) => [b.shipperId, b.carrierId])), moneyKind ? stripeReadiness(rows.map((b) => b.carrierId)) : Promise.resolve(new Map())]);
       const items: FinanceQueueItem[] = rows.map((b) => {
         const r = ready.get(b.carrierId);
         return {
@@ -153,8 +192,8 @@ export function makeAdminFinanceService(provider: PaymentProvider, settlement: D
           status: b.status,
           corridor: { originCity: b.trip.originCity, destinationCity: b.trip.destinationCity, departureAt: iso(b.trip.departureAt) },
           shipper: { id: b.shipperId, firstName: names.get(b.shipperId)?.firstName ?? "—" },
-          carrier: { id: b.carrierId, firstName: names.get(b.carrierId)?.firstName ?? "—", stripeReady: kind === "HELD" ? null : !!(r?.accountId && r.payoutsEnabled) },
-          amountCents: kind === "HELD" ? (b.retentionCents ?? 0) : (b.payoutAmountCents ?? b.pricing.transportCents),
+          carrier: { id: b.carrierId, firstName: names.get(b.carrierId)?.firstName ?? "—", stripeReady: moneyKind ? !!(r?.accountId && r.payoutsEnabled) : null },
+          amountCents: kind === "HELD" ? (b.retentionCents ?? 0) : kind === "PROPOSED_REFUNDS" ? (b.manualRefundProposedCents ?? 0) : (b.payoutAmountCents ?? b.pricing.transportCents),
           currencyCode: b.pricing.currencyCode,
           payoutStatus: b.payoutStatus ?? null,
           payoutAttempts: b.payoutAttempts ?? 0,
@@ -163,7 +202,7 @@ export function makeAdminFinanceService(provider: PaymentProvider, settlement: D
           lastAttemptAt: iso(b.payoutLastAttemptAt),
           nextRetryAt: iso(b.payoutNextRetryAt),
           disputeTicket: b.disputeTicket ?? null,
-          since: (b.completedAt ?? b.closedAt ?? b.updatedAt ?? now).toISOString(),
+          since: ((kind === "PROPOSED_REFUNDS" ? b.manualRefundProposedAt : null) ?? b.completedAt ?? b.closedAt ?? b.updatedAt ?? now).toISOString(),
         };
       });
       return { kind, items, generatedAt: now.toISOString() };
@@ -173,7 +212,7 @@ export function makeAdminFinanceService(provider: PaymentProvider, settlement: D
     async getMoneyFile(admin: AdminActor, id: string): Promise<AdminDealMoneyFile> {
       const b = await loadMoney(id);
       const [names, ready, actions] = await Promise.all([
-        namesOf([b.shipperId, b.carrierId, b.payoutReversalResolvedByAdminId ?? ""]),
+        namesOf([b.shipperId, b.carrierId, b.payoutReversalResolvedByAdminId ?? "", b.manualRefundProposedByAdminId ?? "", b.manualRefundByAdminId ?? ""]),
         stripeReadiness([b.carrierId]),
         prisma.adminAction.findMany({ where: { targetType: "BOOKING", targetId: id }, orderBy: { createdAt: "desc" }, take: 50 }),
       ]);
@@ -185,6 +224,7 @@ export function makeAdminFinanceService(provider: PaymentProvider, settlement: D
       const r = ready.get(b.carrierId);
       const isParty = admin.id === b.shipperId || admin.id === b.carrierId;
       const reversalOpen = b.payoutStatus === "REVERSED" && !b.payoutReversalResolution;
+      const refundBounds = manualRefundBounds(b);
       const file: AdminDealMoneyFile = {
         id: b.id,
         status: b.status,
@@ -246,10 +286,23 @@ export function makeAdminFinanceService(provider: PaymentProvider, settlement: D
         },
         timeline: buildMoneyTimeline(b),
         adminActions: actions.map((a) => ({ id: a.id, at: a.createdAt.toISOString(), admin: nameOf(a.adminUserId), action: a.action, after: a.after ?? null })),
+        manualRefund: {
+          maxRefundableCents: refundBounds.maxRefundableCents,
+          proposal:
+            (b.manualRefundProposedCents ?? 0) > 0 && b.manualRefundProposedAt
+              ? { amountCents: b.manualRefundProposedCents ?? 0, reason: b.manualRefundProposedReason ?? "", byAdmin: nameOf(b.manualRefundProposedByAdminId), at: b.manualRefundProposedAt.toISOString() }
+              : null,
+          last:
+            (b.manualRefundCents ?? 0) > 0 && b.manualRefundAt
+              ? { amountCents: b.manualRefundCents ?? 0, reason: b.manualRefundReason ?? "", byAdmin: nameOf(b.manualRefundByAdminId), at: b.manualRefundAt.toISOString() }
+              : null,
+        },
         allowedActions: {
           retryPayout: !isParty && (b.status === "COMPLETED" || b.status === "CANCELLED") && (b.payoutStatus === "FAILED" || b.payoutStatus === "PENDING"),
           resolveReversal: !isParty && reversalOpen,
           reconcile: !!b.paymentIntentId,
+          proposeRefund: !isParty && refundBounds.allowed,
+          applyRefund: !isParty && refundBounds.allowed,
         },
       };
       await recordAdminAction(prisma, audit(admin, "DEAL_MONEY_VIEWED", id));
@@ -335,6 +388,121 @@ export function makeAdminFinanceService(provider: PaymentProvider, settlement: D
       const fresh = await loadBookingForWrite(id);
       const outcome = await settlement.executePayout(fresh, now);
       return { outcome: "RESENT", payoutStatus: outcome.payoutStatus, reason: outcome.reason };
+    },
+
+    /* ── C-PR5b — rapport mensuel par devise (5A) ────────────── */
+    async getReport(monthsBack = 12): Promise<FinanceReport> {
+      const now = clock();
+      const months = Math.min(24, Math.max(1, Math.floor(monthsBack)));
+      const from = monthStartUtc(now, months - 1);
+      const to = monthStartUtc(now, -1);
+      const gte = { gte: from };
+      const [rows, live] = await Promise.all([
+        prisma.booking.findMany({
+          where: { isDeleted: false, OR: [{ capturedAt: gte }, { refundedAt: gte }, { payoutSentAt: gte }, { completedAt: gte }, { closedAt: gte }] } as never,
+          select: MONEY_SELECT,
+        }),
+        prisma.booking.findMany({
+          where: {
+            isDeleted: false,
+            OR: [{ payoutStatus: { in: ["PENDING", "FAILED", "FROZEN", "REVERSED"] } }, { status: "CANCELLED", retentionDisposition: "HELD_FOR_MEDIATION" }, { manualRefundProposedCents: { gt: 0 } }],
+          } as never,
+          select: MONEY_SELECT,
+        }),
+      ]);
+      return {
+        from: from.toISOString(),
+        to: to.toISOString(),
+        generatedAt: now.toISOString(),
+        months: buildFinanceReport(rows as unknown as MoneyRecord[], from, to),
+        snapshot: buildFinanceSnapshot(live as unknown as MoneyRecord[]),
+      };
+    },
+
+    /* ── C-PR5b — export CSV par deal, journalisé (5A) ───────── */
+    async exportCsv(admin: AdminActor, from: Date, to: Date): Promise<{ csv: string; rows: number; filename: string }> {
+      if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime()) || to.getTime() <= from.getTime()) throw new ValidationError("Invalid period.");
+      if (to.getTime() - from.getTime() > EXPORT_MAX_DAYS * 86_400_000) throw new ValidationError(`The period cannot exceed ${EXPORT_MAX_DAYS} days.`);
+      const gte = { gte: from };
+      const rows = (await prisma.booking.findMany({
+        where: { isDeleted: false, OR: [{ capturedAt: gte }, { refundedAt: gte }, { payoutSentAt: gte }, { completedAt: gte }, { closedAt: gte }] } as never,
+        select: MONEY_SELECT,
+        orderBy: { requestedAt: "asc" },
+      })) as unknown as FinanceCsvRow[];
+      const kept = rows.filter((r) => csvRowInRange(r, from, to));
+      const filename = `yamba-finances-${from.toISOString().slice(0, 10)}-${to.toISOString().slice(0, 10)}.csv`;
+      // L'export porte des identifiants (personnes, paiements) : chaque export est journalisé.
+      await recordAdminAction(prisma, audit(admin, "FINANCE_EXPORTED", null as unknown as string, { from: from.toISOString(), to: to.toISOString(), rows: kept.length, filename }));
+      return { csv: buildFinanceCsv(kept), rows: kept.length, filename };
+    },
+
+    /* ── C-PR5b — remboursement manuel : proposer (3A-c) ─────── */
+    async proposeManualRefund(admin: AdminActor, id: string, input: ManualRefundRequest): Promise<{ ok: true; proposedAt: string }> {
+      const b = await loadMoney(id);
+      assertNotParty(admin, b);
+      const bounds = manualRefundBounds(b);
+      if (!bounds.allowed) throw new ValidationError(bounds.reason ?? "This deal cannot be refunded.");
+      if (input.amountCents > bounds.maxRefundableCents) throw new ValidationError(`At most ${bounds.maxRefundableCents} cents can still be refunded on this deal.`);
+      const now = clock();
+      await prisma.$transaction(async (tx) => {
+        await tx.booking.update({
+          where: { id },
+          data: { manualRefundProposedCents: input.amountCents, manualRefundProposedReason: input.reason, manualRefundProposedByAdminId: admin.id, manualRefundProposedAt: now },
+        });
+        await recordAdminAction(tx, audit(admin, "REFUND_MANUAL_PROPOSED", id, { amountCents: input.amountCents, reason: input.reason }));
+      });
+      return { ok: true, proposedAt: now.toISOString() };
+    },
+
+    /* ── C-PR5b — remboursement manuel : appliquer (SUPER_ADMIN) ─ */
+    /**
+     * D39 : l'argent d'abord (provider.refund), la base ensuite dans UNE transaction conditionnelle
+     * (verrou sur le cumul déjà remboursé — deux admins ne remboursent pas deux fois), avec l'outbox
+     * `booking.refund_issued` (l'Expéditeur reçoit l'email standard de remboursement) et le journal.
+     * Un remboursement parti puis une base non écrite est visible au rapprochement (REFUND_NOT_RECORDED).
+     */
+    async applyManualRefund(admin: AdminActor, id: string, input: ManualRefundRequest): Promise<ManualRefundResponse> {
+      const raw = await loadMoney(id);
+      assertNotParty(admin, raw);
+      const bounds = manualRefundBounds(raw);
+      if (!bounds.allowed) throw new ValidationError(bounds.reason ?? "This deal cannot be refunded.");
+      if (input.amountCents > bounds.maxRefundableCents) throw new ValidationError(`At most ${bounds.maxRefundableCents} cents can still be refunded on this deal.`);
+      const booking: BookingForWrite = toBookingForWrite(raw as unknown as Record<string, unknown>);
+      const now = clock();
+      let refundId: string | null = null;
+      try {
+        refundId = (await provider.refund(raw.paymentIntentId!, input.amountCents)).refundId;
+      } catch {
+        throw new ValidationError("The refund could not be issued by the payment provider.");
+      }
+      const previous = raw.refundAmountCents ?? 0;
+      const total = previous + input.amountCents;
+      await applyBookingTransition({
+        booking,
+        from: raw.status as never,
+        where: previous > 0 ? { refundAmountCents: previous } : { OR: [{ refundAmountCents: null }, { refundAmountCents: { isSet: false } }] },
+        data: {
+          refundAmountCents: total,
+          refundedAt: now,
+          refundId,
+          manualRefundCents: input.amountCents,
+          manualRefundReason: input.reason,
+          manualRefundByAdminId: admin.id,
+          manualRefundAt: now,
+          manualRefundProposedCents: null,
+          manualRefundProposedReason: null,
+          manualRefundProposedByAdminId: null,
+          manualRefundProposedAt: null,
+        },
+        releaseKg: false,
+        events: [{ eventType: "booking.refund_issued", payload: { ...baseEventPayload(booking, "ADMIN"), amountCents: input.amountCents, refundedAt: now.toISOString() } }],
+        now,
+        conflictMessage: "This deal was refunded concurrently — check the money file before retrying.",
+        within: async (tx) => {
+          await recordAdminAction(tx, audit(admin, "REFUND_MANUAL_APPLIED", id, { amountCents: input.amountCents, totalRefundedCents: total, refundId, reason: input.reason }));
+        },
+      });
+      return { bookingId: id, refundedCents: input.amountCents, totalRefundedCents: total, refundId, currencyCode: raw.pricing.currencyCode };
     },
   };
 }

@@ -122,6 +122,7 @@ export const AdminHomeKpisSchema = z
     activeDeals: z.number().int().nullable(),
     payoutsFailed: z.number().int().nullable(),
     payoutsReversed: z.number().int().nullable(), // C-PR5 (D58)
+    manualRefundProposals: z.number().int().nullable(), // C-PR5b (D58)
     pendingAdminInvites: z.number().int().nullable(),
     usersTotal: z.number().int().nullable(),
     completedDeals30d: z.number().int().nullable(),

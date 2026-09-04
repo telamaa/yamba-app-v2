@@ -125,5 +125,10 @@ router.get("/admin/deals/:id/money", isAdminAuthenticated, requireAdminPermissio
 router.post("/admin/deals/:id/money/reconcile", isAdminAuthenticated, requireAdminPermission("finances.read"), adminFinance.reconcile);
 router.post("/admin/deals/:id/payout/retry", isAdminAuthenticated, requireAdminPermission("payouts.retry"), adminFinance.retryPayout);
 router.post("/admin/deals/:id/payout/reversal", isAdminAuthenticated, requireAdminPermission("payouts.resolve"), adminFinance.resolveReversal);
+// C-PR5b (D58 5A, 3A-c) : rapport mensuel, export CSV journalisé, remboursement manuel (proposé / appliqué par SUPER_ADMIN)
+router.get("/admin/finances/report", isAdminAuthenticated, requireAdminPermission("finances.read"), adminFinance.getReport);
+router.get("/admin/finances/export", isAdminAuthenticated, requireAdminPermission("finances.export"), adminFinance.exportCsv);
+router.post("/admin/deals/:id/refund/propose", isAdminAuthenticated, requireAdminPermission("refunds.manual.propose"), adminFinance.proposeRefund);
+router.post("/admin/deals/:id/refund", isAdminAuthenticated, requireAdminPermission("refunds.manual.apply"), adminFinance.applyRefund);
 
 export default router;

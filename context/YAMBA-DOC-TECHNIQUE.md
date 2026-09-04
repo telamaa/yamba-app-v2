@@ -1443,3 +1443,20 @@ deal **464** (+10 règles, +10 service, +1 Fake `inspect`, 5 assertions adaptée
 
 ### Reste
 C-PR5b : rapport mensuel par devise, export CSV journalisé (`finances.export`), remboursement manuel (`refunds.manual.propose` / `apply`, SUPER_ADMIN). Backlog : frais Stripe du `balance_transaction` (deals à marge négative), cache Redis des KPI, `x-permission` OpenAPI.
+
+# C-PR5b — `feat/c5b-admin-finances-report` : rapport mensuel, export CSV, remboursement manuel (D58, A114–A116)
+
+## Ce qui a été fait
+
+1. **Prisma** (`Booking`) : `manualRefundProposedCents / Reason / ByAdminId / At` (proposition), `manualRefundCents / Reason / ByAdminId / At` (dernier appliqué ; le cumul reste `refundAmountCents`). `npx prisma db push` requis.
+2. **Contrats** : `FinanceQueueKind` + `PROPOSED_REFUNDS` ; `AdminDealMoneyFile.manualRefund` (plafond, proposition, dernier) et `allowedActions.proposeRefund / applyRefund` ; `FinanceReportMonth`, `FinanceSnapshot`, `FinanceReport` ; `ManualRefundRequest` (montant ≥ 1, motif ≥ 50) / `ManualRefundResponse` ; `AdminHomeKpis.manualRefundProposals`. Permissions : `finances.export` (FINANCE), `refunds.manual.propose` (FINANCE, SUPPORT), `refunds.manual.apply` (aucun profil : SUPER_ADMIN seul). Journal : `FINANCE_EXPORTED`, `REFUND_MANUAL_PROPOSED`, `REFUND_MANUAL_APPLIED`.
+3. **deal-service** — `admin-finance.rules.ts` (+5 tests) : `monthStartUtc`, `monthKey`, `buildFinanceReport` (A114), `buildFinanceSnapshot`, `csvCell` / `csvRowInRange` / `buildFinanceCsv` (A115), `manualRefundBounds` (A116). `admin-finance.service.ts` (+5 tests) : `getReport` (deux lectures : faits datés depuis le début de période, passifs du jour), `exportCsv` (borne 366 j, filtre par fait, journal), `proposeManualRefund` (transaction proposition + journal), `applyManualRefund` (D39 : `provider.refund` puis `applyBookingTransition` conditionnel sur le cumul, `refundId`, outbox `booking.refund_issued` acteur ADMIN, journal `within`) ; file `PROPOSED_REFUNDS`. Contrôleur : `getReport`, `exportCsv` (`text/csv`, BOM, `Content-Disposition`, `X-Row-Count`), `proposeRefund`, `applyRefund`. Routes `/admin/finances/report`, `/admin/finances/export`, `/admin/deals/:id/refund/propose`, `/admin/deals/:id/refund`. **Portefeuille** (`wallet.service.ts`, +1 test) : COMPLETED avec remboursement → `PARTIALLY_REFUNDED` / `REFUNDED` (médiation partielle C-PR2 et geste C-PR5b visibles par l'Expéditeur).
+4. **auth-service** : KPI `manualRefundProposals` (`finances.read`). Spec permissions +1.
+5. **admin-ui** : `/finances` + onglet « Remboursements proposés » et lien « Rapport mensuel et export » ; `/finances/report` (`FinanceReportView` : passifs du jour, tableau par mois et devise, export CSV par période sous `finances.export`, téléchargement direct via `/api`) ; fiche argent : carte « Remboursement manuel » (plafond, proposition, dernier ; « Proposer » sous `refunds.manual.propose`, « Rembourser maintenant » sous `refunds.manual.apply`) ; tuile « Remboursements proposés » ; libellés du journal.
+6. **OpenAPI** deal-service : 4 chemins (24 au total, 210 schémas), régénéré.
+
+### Preuves
+deal **475** (+11 : 5 règles, 5 service, 1 portefeuille) · auth **89** (+1) · trip 202 · notification 78 · tsc ×6 + admin-ui · miroir i18n OK · OpenAPI régénéré. Recette : FIN11–FIN18 (DOC-METIER).
+
+### Reste
+C-PR6 pilotage (courbes, corridors, alertes de seuil, cache des KPI) → C-PR7 signalements et anti-fraude → C-PR8 paramètres, RGPD, maintenance. Backlog finances : frais Stripe du `balance_transaction` (marge par deal), filtres d'export (corridor, statut), grand livre quand l'expert-comptable le demandera.

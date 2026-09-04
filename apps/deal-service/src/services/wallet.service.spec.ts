@@ -87,6 +87,12 @@ describe("Voyageur — buildCarrierWallet", () => {
 });
 
 describe("Expéditeur — toPaymentItem / buildShipperWallet", () => {
+  it("C-PR5b : un remboursement APRÈS la fin du deal (médiation partielle, geste commercial) se lit comme une annulation partielle", () => {
+    const partial = toPaymentItem(rec({ status: "COMPLETED", capturedAt: days(-5), completedAt: days(-2), refundedAt: days(-1), refundAmountCents: 1000 }), counterparts);
+    expect(partial).toMatchObject({ state: "PARTIALLY_REFUNDED", refundAmountCents: 1000, retentionCents: 2957 - 1000, date: days(-1).toISOString() });
+    expect(toPaymentItem(rec({ status: "COMPLETED", capturedAt: days(-5), completedAt: days(-2), refundAmountCents: 2957 }), counterparts)).toMatchObject({ state: "REFUNDED" });
+    expect(toPaymentItem(rec({ status: "COMPLETED", capturedAt: days(-5), completedAt: days(-2) }), counterparts)).toMatchObject({ state: "RELEASED" });
+  });
   it("chaque statut a son état : AUTHORIZED, HELD, RELEASED, RELEASED_NO_CHARGE, REFUNDED, PARTIALLY_REFUNDED", () => {
     expect(toPaymentItem(rec({ status: "PENDING" }), counterparts)).toMatchObject({ state: "AUTHORIZED", amountCents: 2957, counterpartFirstName: "Thomas" });
     expect(toPaymentItem(rec({ status: "PICKED_UP", capturedAt: days(-5) }), counterparts)).toMatchObject({ state: "HELD" });
