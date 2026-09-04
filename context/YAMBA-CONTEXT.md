@@ -329,7 +329,14 @@ Ordre de demarrage : auth -> trip -> gateway.
   (Redis, dedoublonne, affiche recherche + detail), recherches par corridor. Suite :
   C-PR6b alertes de seuil, C-PR7 signalements / anti-fraude, C-PR8 parametres / RGPD ;
   chantier F chat a challenger apres C.
-- Plateforme de tests : 762 (trip 207, deal 477, notification 78) + auth 94.
+- 04/09 : C-PR6c feat/c6c-admin-pilotage-v2 (D60 3A / 4A, A120–A122 ; retours recette
+  « OK pour toutes les recommandations GO ») — courbes deux par ligne et agrandissables
+  (tableau + drill-down par point vers comptes / trajets / deals, borne 200, inscriptions
+  journalisees), onglet Finances du pilotage (meme buildSeries), pastille « n vues » et
+  badge « Populaire » (20 vues) sur cartes et detail public. D60 grave aussi : profils
+  cumules (C-PR3bis), recherches + exports encadres RGPD (C-PR7a). Suite : C-PR3bis,
+  C-PR7a, C-PR6b alertes, chantier F chat.
+- Plateforme de tests : 762 (trip 207, deal 477, notification 78) + auth 96.
 - (historique) Plateforme de tests : 600 (trip 187, deal 354, notification 59) — post-B3 (#96).
 - MERGE 01/09 : toute la pile B2 est dans `dev` via la SEULE **PR #90**
   (`feat/b2-deal-front` portait la chaîne complète : jalons mobile D36,

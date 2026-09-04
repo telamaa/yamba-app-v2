@@ -18341,6 +18341,53 @@
               "additionalProperties": false
             },
             "description": "Encaissé (capture) par devise"
+          },
+          "finance": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "currencyCode": {
+                  "type": "string"
+                },
+                "capturedCents": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "refundedCents": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "paidOutCents": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "revenueCents": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991,
+                  "description": "Commission + prime des deals terminés dans la période"
+                },
+                "retentionCents": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991,
+                  "description": "Retenues nées dans la période"
+                }
+              },
+              "required": [
+                "currencyCode",
+                "capturedCents",
+                "refundedCents",
+                "paidOutCents",
+                "revenueCents",
+                "retentionCents"
+              ],
+              "additionalProperties": false
+            }
           }
         },
         "required": [
@@ -18354,7 +18401,8 @@
           "completed",
           "cancelled",
           "disputes",
-          "volume"
+          "volume",
+          "finance"
         ],
         "additionalProperties": false
       },
@@ -18780,6 +18828,143 @@
         ],
         "additionalProperties": false,
         "description": "Tout ce qui est arrivé à ce deal (D59 5A), lecture seule, consultation journalisée"
+      },
+      "PilotageMetric": {
+        "type": "string",
+        "enum": [
+          "signups",
+          "tripsPublished",
+          "requests",
+          "accepted",
+          "delivered",
+          "completed",
+          "cancelled",
+          "disputes",
+          "captured",
+          "refunded",
+          "paidOut",
+          "revenue",
+          "retention"
+        ]
+      },
+      "PilotageDrilldownItem": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "USER",
+              "TRIP",
+              "DEAL"
+            ]
+          },
+          "id": {
+            "$ref": "#/components/schemas/ObjectId"
+          },
+          "label": {
+            "type": "string",
+            "description": "Prénom + initiale, ou corridor"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+            "description": "La date du fait pour cette mesure"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "amountCents": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "currencyCode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "id",
+          "label",
+          "at",
+          "status",
+          "amountCents",
+          "currencyCode"
+        ],
+        "additionalProperties": false
+      },
+      "PilotageDrilldownResponse": {
+        "type": "object",
+        "properties": {
+          "metric": {
+            "$ref": "#/components/schemas/PilotageMetric"
+          },
+          "granularity": {
+            "$ref": "#/components/schemas/PilotageGranularity"
+          },
+          "period": {
+            "type": "string"
+          },
+          "periodStart": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          },
+          "periodEnd": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PilotageDrilldownItem"
+            }
+          },
+          "total": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "truncated": {
+            "type": "boolean",
+            "description": "true si plus de 200 éléments (liste bornée)"
+          }
+        },
+        "required": [
+          "metric",
+          "granularity",
+          "period",
+          "periodStart",
+          "periodEnd",
+          "items",
+          "total",
+          "truncated"
+        ],
+        "additionalProperties": false,
+        "description": "Consultation journalisée quand la mesure porte des personnes (inscriptions)"
       }
     },
     "securitySchemes": {

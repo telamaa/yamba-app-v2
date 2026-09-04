@@ -49,6 +49,8 @@ export const ADMIN_ACTIONS = [
   "REFUND_MANUAL_APPLIED",
   // C-PR6 (D59)
   "DEAL_HISTORY_VIEWED",
+  // C-PR6c (D60)
+  "PILOTAGE_DRILLDOWN_VIEWED",
 ] as const;
 export type AdminActionType = (typeof ADMIN_ACTIONS)[number];
 

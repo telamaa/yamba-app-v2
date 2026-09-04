@@ -1,4 +1,4 @@
-import { buildCorridors, buildSeries, isoWeekKey, isoWeekStart, periodsBetween } from "./pilotage.rules";
+import { buildCorridors, buildSeries, isoWeekKey, isoWeekStart, periodBounds, periodsBetween } from "./pilotage.rules";
 
 const d = (s: string) => new Date(s);
 describe("pilotage.rules (C-PR6a, D59)", () => {
@@ -47,5 +47,24 @@ describe("pilotage.rules (C-PR6a, D59)", () => {
     expect(out[0]).toMatchObject({ tripsPublished: 2, requests: 2, accepted: 1, acceptanceRatePct: 50, avgPricePerKgCents: 1100, currencyCode: "EUR", disputes: 0, views: 12, searches: 30, searchesNoResult: 0 });
     expect(out[1]).toMatchObject({ tripsPublished: 1, requests: 1, acceptanceRatePct: 100, avgPricePerKgCents: 1500, disputes: 1 });
     expect(out[2]).toMatchObject({ originCity: "paris", destinationCity: "kinshasa", tripsPublished: 0, requests: 0, acceptanceRatePct: null, avgPricePerKgCents: null, searches: 9, searchesNoResult: 9 });
+  });
+  it("C-PR6c : periodBounds inverse periodKey (semaine ISO, mois) ; clé invalide → null", () => {
+    expect(periodBounds("2026-W36", "week")).toEqual({ start: d("2026-08-31T00:00:00Z"), end: d("2026-09-07T00:00:00Z") });
+    expect(periodBounds("2026-W53", "week")?.start.toISOString()).toBe("2026-12-28T00:00:00.000Z");
+    expect(periodBounds("2026-09", "month")).toEqual({ start: d("2026-09-01T00:00:00Z"), end: d("2026-10-01T00:00:00Z") });
+    expect(periodBounds("2026-W60", "week")).toBeNull();
+    expect(periodBounds("2026-13", "month")).toBeNull();
+    expect(periodBounds("x", "week")).toBeNull();
+  });
+  it("C-PR6c (D60 4A) : finances par période et devise — encaissé, remboursé, versé, revenu, retenues, chaque fait à sa date", () => {
+    const pts = buildSeries(
+      { userCreatedAts: [], tripPublishedAts: [], bookings: [
+        { requestedAt: d("2026-09-01T10:00:00Z"), capturedAt: d("2026-09-01T12:00:00Z"), completedAt: d("2026-09-09T10:00:00Z"), payoutStatus: "SENT", payoutAmountCents: 2000, payoutSentAt: d("2026-09-09T10:01:00Z"), status: "COMPLETED", pricing: { totalShipperCents: 2957, currencyCode: "EUR", commissionCents: 957, premiumCents: 0 } },
+        { requestedAt: d("2026-09-02T10:00:00Z"), capturedAt: d("2026-09-02T12:00:00Z"), closedAt: d("2026-09-03T10:00:00Z"), refundedAt: d("2026-09-03T10:00:00Z"), refundAmountCents: 1479, retentionCents: 1478, status: "CANCELLED", pricing: { totalShipperCents: 2957, currencyCode: "EUR", commissionCents: 957, premiumCents: 0 } },
+      ] },
+      d("2026-08-31T00:00:00Z"), d("2026-09-14T00:00:00Z"), "week"
+    );
+    expect(pts[0].finance).toEqual([{ currencyCode: "EUR", capturedCents: 5914, refundedCents: 1479, paidOutCents: 0, revenueCents: 0, retentionCents: 1478 }]);
+    expect(pts[1].finance).toEqual([{ currencyCode: "EUR", capturedCents: 0, refundedCents: 0, paidOutCents: 2000, revenueCents: 957, retentionCents: 0 }]);
   });
 });

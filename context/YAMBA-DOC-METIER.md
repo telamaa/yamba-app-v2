@@ -1261,3 +1261,20 @@ Savoir chaque semaine si Yamba avance (inscriptions, trajets, demandes, livraiso
 | PIL06 | Support connecté | Ni « Pilotage » dans le menu ni accès à `/pilotage` (403) ; mais sur une fiche argent, « Charger la chronologie » fonctionne |
 | PIL07 | Fiche argent de `bzv-completed`, « Charger la chronologie » | Événements du seed dans l'ordre avec leur état, actions admin (« Fiche argent consultée »…), notifications et emails s'il y en a ; journal « Chronologie consultée » |
 | PIL08 | Couper Redis, ouvrir la recherche et un trajet | Pages normales sans compteur ; Pilotage : courbes présentes, corridors sans vues ni recherches |
+
+# C-PR6c — des courbes qu'on ouvre, des finances qu'on voit, une popularité qu'on lit
+
+### Règles de gestion (PIL, suite)
+- **RG-PIL-08 — Toute courbe s'agrandit** : en grand, le tableau des valeurs et des variations apparaît dessous, et chaque point ouvre la liste des éléments de la période (comptes, trajets ou deals) avec un lien vers leur fiche ; la liste est bornée à 200 et le dit. Ouvrir une liste d'inscriptions est journalisé.
+- **RG-PIL-09 — Le pilotage a un onglet Finances** : encaissé, remboursé, versé, revenu reconnu, retenues nées, par période et par devise, calculés par les mêmes règles que le rapport mensuel ; le rapport reste la référence comptable.
+- **RG-PIL-10 — La popularité d'un trajet est un badge** : « n vues » sur les cartes et le détail, « Populaire » à partir de 20 vues ; rien n'est affiché à zéro.
+
+### Recette (PIL, suite)
+| # | Scénario | Attendu |
+|---|---|---|
+| PIL09 | Pilotage, courbe « Demandes », « Agrandir » | Courbe pleine largeur, tableau période / valeur / variation dessous, message « Clique un point » |
+| PIL10 | Cliquer un point (ou une ligne du tableau) | Panneau « Éléments · 2026-W36 » : deals de la semaine avec statut, montant, date, lien vers la fiche argent ; ligne « n élément(s) » |
+| PIL11 | Même geste sur « Inscriptions » | Liste des comptes (prénom + initiale, statut) avec lien vers la fiche ; journal « Liste d'inscriptions consultée (pilotage) » |
+| PIL12 | Onglet « Finances » | Cinq courbes en devise (axe en euros), sélecteur de devise s'il y en a plusieurs, mêmes gestes d'agrandissement et de drill-down (deals avec montant) |
+| PIL13 | Recherche (desktop et mobile) sur un trajet vu au moins une fois | Pastille grise « n vues » (icône œil) dans la rangée des badges ; à partir de 20 vues, pastille mango « Populaire » |
+| PIL14 | Détail public du même trajet | Sous le nom du Voyageur : pastille « n vues » (+ « Populaire » à partir de 20) et « Billet vérifié » si c'est le cas |

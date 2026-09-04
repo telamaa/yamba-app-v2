@@ -236,7 +236,11 @@ export type PaymentReconciliation = {
 };
 
 /* ── C-PR6a (D59) — pilotage ── */
-export type PilotageSeriesPoint = { period: string; periodStart: string; signups: number; tripsPublished: number; requests: number; accepted: number; delivered: number; completed: number; cancelled: number; disputes: number; volume: Array<{ currencyCode: string; capturedCents: number }> };
+export type PilotageFinancePoint = { currencyCode: string; capturedCents: number; refundedCents: number; paidOutCents: number; revenueCents: number; retentionCents: number };
+export type PilotageSeriesPoint = { period: string; periodStart: string; signups: number; tripsPublished: number; requests: number; accepted: number; delivered: number; completed: number; cancelled: number; disputes: number; volume: Array<{ currencyCode: string; capturedCents: number }>; finance: PilotageFinancePoint[] };
+export type PilotageMetric = "signups" | "tripsPublished" | "requests" | "accepted" | "delivered" | "completed" | "cancelled" | "disputes" | "captured" | "refunded" | "paidOut" | "revenue" | "retention";
+export type PilotageDrilldownItem = { kind: "USER" | "TRIP" | "DEAL"; id: string; label: string; at: string; status: string | null; amountCents: number | null; currencyCode: string | null };
+export type PilotageDrilldownResponse = { metric: PilotageMetric; granularity: "week" | "month"; period: string; periodStart: string; periodEnd: string; items: PilotageDrilldownItem[]; total: number; truncated: boolean };
 export type PilotageSeriesResponse = { granularity: "week" | "month"; from: string; to: string; points: PilotageSeriesPoint[]; totals: { users: number; carriersReady: number; tripsPublishedOpen: number }; generatedAt: string; cached: boolean };
 export type CorridorStat = { key: string; originCity: string; originCountryCode: string | null; destinationCity: string; destinationCountryCode: string | null; tripsPublished: number; requests: number; accepted: number; acceptanceRatePct: number | null; avgPricePerKgCents: number | null; currencyCode: string | null; disputes: number; views: number; searches: number; searchesNoResult: number };
 export type CorridorsResponse = { periodDays: number; from: string; items: CorridorStat[]; generatedAt: string; cached: boolean };

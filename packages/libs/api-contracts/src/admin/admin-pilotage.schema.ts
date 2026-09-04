@@ -23,6 +23,17 @@ export const PilotageSeriesPointSchema = z
     cancelled: z.number().int(),
     disputes: z.number().int(),
     volume: z.array(z.object({ currencyCode: z.string(), capturedCents: z.number().int() })).describe("Encaissé (capture) par devise"),
+    // C-PR6c (D60 4A) — finances par période et par devise, mêmes règles que le rapport (A114)
+    finance: z.array(
+      z.object({
+        currencyCode: z.string(),
+        capturedCents: z.number().int(),
+        refundedCents: z.number().int(),
+        paidOutCents: z.number().int(),
+        revenueCents: z.number().int().describe("Commission + prime des deals terminés dans la période"),
+        retentionCents: z.number().int().describe("Retenues nées dans la période"),
+      })
+    ),
   })
   .meta({ id: "PilotageSeriesPoint" });
 export type PilotageSeriesPoint = z.infer<typeof PilotageSeriesPointSchema>;
@@ -83,3 +94,34 @@ export const DealHistoryResponseSchema = z
   .object({ bookingId: ObjectIdSchema, events: z.array(DealHistoryEventSchema), counts: z.object({ outbox: z.number().int(), admin: z.number().int(), notifications: z.number().int(), emails: z.number().int(), parked: z.number().int() }), generatedAt: z.string().datetime() })
   .meta({ id: "DealHistoryResponse", description: "Tout ce qui est arrivé à ce deal (D59 5A), lecture seule, consultation journalisée" });
 export type DealHistoryResponse = z.infer<typeof DealHistoryResponseSchema>;
+
+/* ── C-PR6c (D60 3A) — drill-down : les éléments derrière un point ── */
+export const PilotageMetricSchema = z
+  .enum(["signups", "tripsPublished", "requests", "accepted", "delivered", "completed", "cancelled", "disputes", "captured", "refunded", "paidOut", "revenue", "retention"])
+  .meta({ id: "PilotageMetric" });
+export type PilotageMetric = z.infer<typeof PilotageMetricSchema>;
+export const PilotageDrilldownItemSchema = z
+  .object({
+    kind: z.enum(["USER", "TRIP", "DEAL"]),
+    id: ObjectIdSchema,
+    label: z.string().describe("Prénom + initiale, ou corridor"),
+    at: z.string().datetime().describe("La date du fait pour cette mesure"),
+    status: z.string().nullable(),
+    amountCents: z.number().int().nullable(),
+    currencyCode: z.string().nullable(),
+  })
+  .meta({ id: "PilotageDrilldownItem" });
+export type PilotageDrilldownItem = z.infer<typeof PilotageDrilldownItemSchema>;
+export const PilotageDrilldownResponseSchema = z
+  .object({
+    metric: PilotageMetricSchema,
+    granularity: PilotageGranularitySchema,
+    period: z.string(),
+    periodStart: z.string().datetime(),
+    periodEnd: z.string().datetime(),
+    items: z.array(PilotageDrilldownItemSchema),
+    total: z.number().int(),
+    truncated: z.boolean().describe("true si plus de 200 éléments (liste bornée)"),
+  })
+  .meta({ id: "PilotageDrilldownResponse", description: "Consultation journalisée quand la mesure porte des personnes (inscriptions)" });
+export type PilotageDrilldownResponse = z.infer<typeof PilotageDrilldownResponseSchema>;

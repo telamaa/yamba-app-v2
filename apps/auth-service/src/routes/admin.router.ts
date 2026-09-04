@@ -13,7 +13,7 @@ import { makeAdminUsersController } from "../controller/admin-users.controller";
 import { makeAdminUsersService } from "../services/admin-users.service";
 import { acceptAdminInvite, inviteAdmin, listAdmins, revokeAdmin, updateAdminRole } from "../controller/admin-admins.controller";
 import { getAdminKpis } from "../controller/admin-kpis.controller";
-import { getPilotageCorridors, getPilotageSeries } from "../controller/admin-pilotage.controller";
+import { getPilotageCorridors, getPilotageDrilldown, getPilotageSeries } from "../controller/admin-pilotage.controller";
 import {
   adminLogin,
   adminLogout,
@@ -43,6 +43,7 @@ router.get("/admin/me/sessions", isAdminAuthenticated, listAdminSessions);
 router.get("/admin/kpis", isAdminAuthenticated, requireAdminPermission("kpi.read"), getAdminKpis); // C-PR4 (D57)
 router.get("/admin/pilotage/series", isAdminAuthenticated, requireAdminPermission("pilotage.read"), getPilotageSeries); // C-PR6a (D59)
 router.get("/admin/pilotage/corridors", isAdminAuthenticated, requireAdminPermission("pilotage.read"), getPilotageCorridors);
+router.get("/admin/pilotage/drilldown", isAdminAuthenticated, requireAdminPermission("pilotage.read"), getPilotageDrilldown); // C-PR6c (D60 3A)
 router.delete("/admin/me/sessions/:jti", isAdminAuthenticated, revokeAdminSessionById);
 router.get("/admin/audit", isAdminAuthenticated, requireAdminPermission("audit.read"), listAdminAudit);
 

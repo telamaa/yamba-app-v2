@@ -61,6 +61,7 @@ export const ACTION_LABEL: Record<string, string> = {
   REFUND_MANUAL_PROPOSED: "Remboursement manuel proposé",
   REFUND_MANUAL_APPLIED: "Remboursement manuel appliqué",
   DEAL_HISTORY_VIEWED: "Chronologie consultée",
+  PILOTAGE_DRILLDOWN_VIEWED: "Liste d'inscriptions consultée (pilotage)",
 };
 
 /* C-PR5a (D58) */

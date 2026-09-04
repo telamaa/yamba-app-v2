@@ -1,7 +1,8 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { ChevronRight, AlertCircle, HelpCircle } from "lucide-react";
+import { ChevronRight, AlertCircle, HelpCircle, Eye } from "lucide-react";
+import { isPopular } from "@/lib/trip-signals";
 import { Link } from "@/i18n/navigation";
 import FavoriteButton from "@/components/favorites/FavoriteButton";
 import { useBottomSheet } from "@/hooks/useBottomSheet";
@@ -199,9 +200,7 @@ export default function YambaTripResultCardMobile({
                         ({item.reviewCount})
                       </span>
                     )}
-                    {typeof item.viewsCount === "number" && item.viewsCount > 0 && (
-                      <span className="ml-1 text-slate-400 dark:text-slate-500">· 👁 {item.viewsCount}</span>
-                    )}
+
                   </>
                 ) : (
                   t("card.newTripper")
@@ -211,6 +210,13 @@ export default function YambaTripResultCardMobile({
           </div>
 
           <div className="flex shrink-0 items-center gap-1">
+            {/* D5 / C-PR6 — signal de popularité : pastille « n vues », « Populaire » à partir de 20 vues */}
+            {typeof item.viewsCount === "number" && item.viewsCount > 0 && (
+              <span className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-semibold ${isPopular(item.viewsCount) ? "bg-[#FFF6E8] text-[#B45309] dark:bg-[#FF9900]/15 dark:text-[#FFB84D]" : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300"}`}>
+                <Eye size={10} strokeWidth={2.5} />
+                {isPopular(item.viewsCount) ? t("badges.popular") : item.viewsCount}
+              </span>
+            )}
             <CategoryPreview categories={item.allowedCategories} />
             <ChevronRight
               size={14}
