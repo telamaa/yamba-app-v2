@@ -13,6 +13,9 @@
 import type { NextFunction, Response } from "express";
 import prisma from "@packages/libs/prisma";
 import { adminRolesOf, isSuperAdmin } from "../utils/admin-roles";
+import { AdminUsersQuerySchema, EXPORT_REASON_MIN_LENGTH } from "@packages/api-contracts";
+import { CSV_BOM, buildCsv, csvFilename } from "@packages/libs/csv";
+import { USERS_CSV_COLUMNS } from "../lib/admin-users.query";
 import { ForbiddenError, NotFoundError, ValidationError } from "@packages/error-handler";
 import { recordAdminAction } from "@packages/admin-audit";
 import { isEmailConfigured, sendTransactionalEmail } from "@packages/email";
@@ -75,9 +78,31 @@ export function makeAdminUsersController(service: AdminUsersService) {
   }
 
   return {
+    /** C-PR7a (D60 2A) — export CSV nominatif : SUPER_ADMIN (exports.personal), motif ≥ 20 caractères, journal EXPORTED avec filtres et nombre de lignes. */
+    async exportCsv(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+      try {
+        const parsed = AdminUsersQuerySchema.safeParse(req.query);
+        if (!parsed.success) throw new ValidationError("Invalid query.");
+        const reason = typeof req.query.reason === "string" ? req.query.reason.trim() : "";
+        if (reason.length < EXPORT_REASON_MIN_LENGTH) throw new ValidationError(`A reason of at least ${EXPORT_REASON_MIN_LENGTH} characters is required for a personal-data export.`);
+        const rows = await service.exportRows(parsed.data);
+        const now = new Date();
+        const { cursor: _c, limit: _l, ...filters } = parsed.data;
+        await recordAdminAction(prisma, { adminUserId: req.user.id, action: "EXPORTED", targetType: "USER", after: { domain: "users", personal: true, reason, filters, rows: rows.length }, ip: req.ip ?? null, userAgent: req.headers["user-agent"] ?? null });
+        res.setHeader("Content-Type", "text/csv; charset=utf-8");
+        res.setHeader("Content-Disposition", `attachment; filename="${csvFilename("utilisateurs", now)}"`);
+        res.setHeader("X-Row-Count", String(rows.length));
+        res.status(200).send(CSV_BOM + buildCsv(USERS_CSV_COLUMNS, rows));
+      } catch (e) {
+        next(e);
+      }
+    },
     async search(req: AuthenticatedRequest, res: Response, next: NextFunction) {
       try {
-        res.status(200).json(await service.search(typeof req.query.q === "string" ? req.query.q : ""));
+        // C-PR7a — filtres, tri, curseur (la recherche simple reste le cas « q seul »)
+        const parsed = AdminUsersQuerySchema.safeParse(req.query);
+        if (!parsed.success) throw new ValidationError("Invalid query.");
+        res.status(200).json(await service.searchAdvanced(parsed.data));
       } catch (e) {
         next(e);
       }

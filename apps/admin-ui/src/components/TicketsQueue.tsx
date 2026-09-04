@@ -4,15 +4,21 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { ApiError, apiFetch, post } from "@/lib/api";
 import { TICKET_REASON_LABEL, dateTime } from "@/lib/format";
-import type { TicketQueueItem, TicketQueueResponse, TicketRejectionReason } from "@/lib/types";
+import type { AdminMe, TicketQueueItem, TicketQueueResponse, TicketRejectionReason } from "@/lib/types";
+import ExportButton from "./ExportButton";
 
 export default function TicketsQueue() {
   const [data, setData] = useState<TicketQueueResponse | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
+  // C-PR7a (D60 2A) — filtres serveur + export
+  const [f, setF] = useState({ originCity: "", destinationCity: "", olderThanDays: "" });
+  const [me, setMe] = useState<AdminMe | null>(null);
+  useEffect(() => { apiFetch<AdminMe>("/admin/me").then(setMe).catch(() => undefined); }, []);
+  const params = useCallback(() => { const p = new URLSearchParams(); if (f.originCity) p.set("originCity", f.originCity); if (f.destinationCity) p.set("destinationCity", f.destinationCity); if (f.olderThanDays) p.set("olderThanDays", f.olderThanDays); return p; }, [f]);
   const load = useCallback(() => {
-    apiFetch<TicketQueueResponse>("/admin/tickets").then(setData).catch((e) => setMsg(e.message));
-  }, []);
-  useEffect(load, [load]);
+    apiFetch<TicketQueueResponse>(`/admin/tickets?${params().toString()}`).then(setData).catch((e) => setMsg(e.message));
+  }, [params]);
+  useEffect(() => { const h = setTimeout(load, 250); return () => clearTimeout(h); }, [load]);
 
   async function open(item: TicketQueueItem) {
     try {
@@ -32,9 +38,16 @@ export default function TicketsQueue() {
     }
   }
 
-  if (!data) return <p className="mt-4 text-[13px] text-slate-500">Chargement…</p>;
   return (
     <div className="mt-4">
+      <div className="flex flex-wrap items-center gap-2 text-[12.5px]">
+        <input value={f.originCity} onChange={(e) => setF({ ...f, originCity: e.target.value })} placeholder="origine" className="w-32 rounded-lg border border-slate-300 px-3 py-1.5" />
+        <input value={f.destinationCity} onChange={(e) => setF({ ...f, destinationCity: e.target.value })} placeholder="destination" className="w-32 rounded-lg border border-slate-300 px-3 py-1.5" />
+        <select value={f.olderThanDays} onChange={(e) => setF({ ...f, olderThanDays: e.target.value })} className="rounded-lg border border-slate-300 px-2 py-1.5"><option value="">tout âge</option><option value="1">déposé il y a + de 1 j</option><option value="3">+ de 3 j</option><option value="7">+ de 7 j</option></select>
+        <span className="ml-auto"><ExportButton me={me} path="/admin/tickets/export" params={params()} /></span>
+      </div>
+      {!data && <p className="mt-4 text-[13px] text-slate-500">Chargement…</p>}
+      {data && (<>
       {msg && <p className="mb-2 text-[12.5px] text-slate-600">{msg}</p>}
       {data.expiredNow > 0 && <p className="mb-2 text-[12px] text-slate-400">{data.expiredNow} billet(s) de trajets partis sortis de la file.</p>}
       {data.items.length === 0 ? <p className="rounded-xl border border-dashed border-slate-300 p-6 text-center text-[13px] text-slate-500">Rien à vérifier.</p> : (
@@ -57,6 +70,7 @@ export default function TicketsQueue() {
           ))}
         </ul>
       )}
+      </>)}
     </div>
   );
 }

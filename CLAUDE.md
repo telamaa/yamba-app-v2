@@ -42,7 +42,7 @@ npx prisma db push                 # sync schema to MongoDB (no migrations — M
 npm run auth-docs                  # regenerate auth swagger-output.json (swagger-autogen — legacy, conversion to Zod-OpenAPI is backlog)
 ```
 
-Test platform baseline: **762 tests** (trip-service 207, deal-service 477, notification-service 78) + auth-service 99 (also a CI check) — any deviation must be explained.
+Test platform baseline: **765 tests** (trip-service 209, deal-service 478, notification-service 78) + auth-service 103 (also a CI check) — any deviation must be explained.
 
 Manual `tsc` (when Nx typecheck target is not what you want): `npx tsc --noEmit --project apps/<service>/tsconfig.app.json` — NEVER `--project apps/<service>` (resolves the solution-style tsconfig: 0 files checked).
 
@@ -80,6 +80,7 @@ Requests flow: `user-ui (3000)` → `api-gateway (8080)` → microservices. The 
 - `packages/messaging` — `EventPublisher` interface; kafkajs isolated here (connection errors come back `retriable: false` — intercept explicitly)
 - `packages/libs/email` — shared transactional mailer (D41/D44): lazy SMTP transport, `sendTemplatedEmail` (per-service EJS files, legacy) and `sendTransactionalEmail` (ONE embedded EJS layout string + `EmailContent` data). auth-service emails are per-locale dictionaries (`apps/auth-service/src/emails/auth-emails.ts`). The locale list lives ONLY in `packages/libs/api-contracts/src/locale.ts` (`SUPPORTED_LOCALES`, `resolveLocale`); the front consumes it through the dedicated alias `@packages/api-contracts/locale`. Never write a new `fr ? … : …` — add a dictionary entry. Email language = the RECIPIENT's `User.preferredLocale`; account-less flows use the request locale (`x-locale` header sent by the API clients).
 - `packages/libs/totp` — TOTP RFC 6238 + backup codes + AES of the secret (D54, zero deps, RFC vectors in `apps/auth-service/src/utils/totp.spec.ts`). `packages/libs/admin-audit` — `recordAdminAction(db, …)`, written in the SAME transaction as the admin gesture (never best-effort).
+- `packages/libs/csv` — safe CSV export (C-PR7a, D60 2A): `csvCell` (RFC 4180 + formula-prefix neutralisation), `buildCsv(columns, rows)`, `CSV_BOM`; every admin export is journaled (`EXPORTED`), personal-data exports (users) are SUPER_ADMIN-only (`exports.personal`) with a ≥ 20-char reason, operational exports (`exports.operational`: trips, tickets, arbitration) carry ids only, never email/phone.
 - `packages/libs/delivery-code` — delivery code (D43): CSPRNG 6 digits, bcrypt hash (validation) + AES-256-GCM `deliveryCodeEncrypted` (shipper re-display, `DELIVERY_CODE_ENCRYPTION_KEY`, dev key fallback outside production). Zero infra deps — also imported relatively by the seed. New `@packages/*` aliases must ALSO be added to each consuming service's `webpack.config.js` (`resolve.alias`) — tsc resolves `tsconfig.base.json`, `nx serve` does not.
 
 ### Admin (chantier C, D54)

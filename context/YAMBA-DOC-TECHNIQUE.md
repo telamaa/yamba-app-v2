@@ -1507,3 +1507,19 @@ auth **99** (+3) · deal 477 · trip 207 · notification 78 · tsc ×6 + admin-u
 
 ### Reste
 C-PR7a recherches poussées et exports encadrés (D60 2A) → C-PR6b alertes de seuil → chantier F chat.
+
+# C-PR7a — `feat/c7a-admin-search-exports` : recherches poussées et exports encadrés (D60 2A, A126–A128)
+
+## Ce qui a été fait
+1. **`packages/libs/csv`** (A127) : `csvCell`, `buildCsv(columns, rows)`, `CSV_BOM`, `csvFilename`. **Contrats** : `AdminUsersQuery` (q, role, accountStatus, carrierStatus, stripeReady, createdFrom/To, sort, dir, cursor, limit ≤ 100), `AdminTripsQuery` (+ to, originCity, destinationCity, hideProposed, sort createdAt/publishedAt/departureAt, cursor), `TicketQueueQuery` (villes, période de dépôt, olderThanDays), `ArbitrationQueueQuery` (kind, villes, olderThanDays, decidable) ; `nextCursor` sur les réponses listes ; permissions `exports.operational` (FINANCE, MEDIATOR), `exports.personal` (SUPER_ADMIN) ; journal `EXPORTED` ; `EXPORT_REASON_MIN_LENGTH` = 20.
+2. **auth-service** : `lib/admin-users.query.ts` (`buildUsersWhere`, `buildUsersOrderBy`, `USERS_CSV_COLUMNS` ; spec 4) ; `searchAdvanced` (curseur, total) et `exportRows` (5 000, Stripe prêt via `carrierPage`) ; `GET /admin/users` filtré, `GET /admin/users/export` (motif, journal) déclaré avant `/:id`.
+3. **trip-service** : `admin-trips.rules.ts` + `buildTripsWhere` / `buildTripsOrderBy` / `buildTicketsWhere` (spec +2) ; `listTrips` validé par contrat avec curseur ; `listTickets` filtré ; `exportTrips`, `exportTickets` (identifiants seulement) ; routes `/trips/export`, `/tickets/export` avant `/:id`.
+4. **deal-service** : `filterQueueItems` (pur, spec +1) appliqué par `listQueue(q)` (compteurs de la file entière conservés) ; `exportRows` (ids des parties) ; `GET /admin/disputes/export` avant `/:id`.
+5. **admin-ui** : `ExportButton` (opérationnel : téléchargement direct ; personnel : panneau avec motif ≥ 20, SUPER_ADMIN seul), `apiUrl` ; `UsersSearch` (rôle, état, Stripe prêt, période d'inscription, tri, « Charger la suite »), `TripsList` (origine, destination, période de départ, masquage proposé, tri, curseur), `TicketsQueue` (villes, âge), `QueueTable` (type, villes, âge, décidables), permissions miroir, libellé `EXPORTED`.
+6. **user-ui** : plugin Tailwind `line-clamp` retiré (avertissement au démarrage).
+
+### Preuves
+auth **103** (+4) · trip **209** (+2) · deal **478** (+1) · notification 78 · tsc ×6 + admin-ui · miroir i18n OK · OpenAPI régénéré. Recette : ADM37–ADM44 (DOC-METIER).
+
+### Reste
+C-PR6b alertes de seuil (D59 3A / 4A) → chantier F chat (challenge) → C-PR8 paramètres, RGPD (export / effacement d'un compte), maintenance.

@@ -10,7 +10,7 @@
 import prisma from "@packages/libs/prisma";
 import { NotFoundError } from "@packages/error-handler";
 import { recordAdminAction } from "@packages/admin-audit";
-import { DISPUTE_RESPONSE_DELAY_HOURS, type AdminDisputeFile, type ArbitrationQueueItem, type ArbitrationQueueResponse } from "@packages/api-contracts";
+import { DISPUTE_RESPONSE_DELAY_HOURS, type AdminDisputeFile, type ArbitrationQueueItem, type ArbitrationQueueQuery, type ArbitrationQueueResponse } from "@packages/api-contracts";
 import { computeLateCancellationCompensationCents } from "./booking-lifecycle";
 
 const iso = (d: Date | null | undefined) => (d ? d.toISOString() : null);
@@ -66,6 +66,22 @@ export type AdminDisputeRecord = {
   resolutionReason?: string | null;
   resolvedAt?: Date | null;
 };
+
+/* ── C-PR7a (D60 2A) — filtre PUR de la file « à arbitrer » (sur les items déjà calculés) ── */
+export function filterQueueItems(items: ArbitrationQueueItem[], q: ArbitrationQueueQuery, now: Date): ArbitrationQueueItem[] {
+  const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  return items.filter((it) => {
+    if (q.kind && it.kind !== q.kind) return false;
+    if (q.originCity && !norm(it.originCity).includes(norm(q.originCity))) return false;
+    if (q.destinationCity && !norm(it.destinationCity).includes(norm(q.destinationCity))) return false;
+    if (q.olderThanDays != null && new Date(it.openedAt).getTime() > now.getTime() - q.olderThanDays * 86_400_000) return false;
+    if (q.decidable === "1" && new Date(it.decidableAt).getTime() > now.getTime()) return false;
+    if (q.decidable === "0" && new Date(it.decidableAt).getTime() <= now.getTime()) return false;
+    return true;
+  });
+}
+/** Export opérationnel : identifiants des parties, jamais un nom, un email ni un téléphone (D60 2A). */
+export const ARBITRATION_CSV_COLUMNS = ["bookingId", "kind", "ticketNumber", "category", "openedAt", "originCity", "destinationCity", "amountCents", "currencyCode", "shipperId", "carrierId", "carrierResponded", "decidableAt"] as const;
 
 function responseDeadline(disputedAt: Date): Date {
   return new Date(disputedAt.getTime() + DISPUTE_RESPONSE_DELAY_HOURS * 3_600_000);
@@ -258,7 +274,19 @@ const partySelect = {
 
 export function makeAdminDisputeService() {
   return {
-    async listQueue(): Promise<ArbitrationQueueResponse> {
+    /** C-PR7a — lignes d'export (ids des parties) : mêmes filtres que la file. */
+    async exportRows(q: ArbitrationQueueQuery, now = new Date()): Promise<Array<Record<(typeof ARBITRATION_CSV_COLUMNS)[number], unknown>>> {
+      const { items } = await this.listQueue(q, now);
+      const ids = items.map((i) => i.bookingId);
+      const parties = ids.length ? await prisma.booking.findMany({ where: { id: { in: ids } }, select: { id: true, shipperId: true, carrierId: true } }) : [];
+      const byId = new Map(parties.map((p) => [p.id, p]));
+      return items.map((i) => ({
+        bookingId: i.bookingId, kind: i.kind, ticketNumber: i.ticketNumber, category: i.category, openedAt: i.openedAt, originCity: i.originCity, destinationCity: i.destinationCity,
+        amountCents: i.amountCents, currencyCode: i.currencyCode, shipperId: byId.get(i.bookingId)?.shipperId ?? "", carrierId: byId.get(i.bookingId)?.carrierId ?? "", carrierResponded: i.carrierResponded, decidableAt: i.decidableAt,
+      }));
+    },
+
+    async listQueue(q: ArbitrationQueueQuery = {}, now = new Date()): Promise<ArbitrationQueueResponse> {
       const bookings = (await prisma.booking.findMany({
         where: {
           isDeleted: false,
@@ -287,8 +315,9 @@ export function makeAdminDisputeService() {
         .filter((x): x is ArbitrationQueueItem => x !== null)
         // Les plus anciens d'abord : un dossier qui attend est prioritaire.
         .sort((a, b) => a.openedAt.localeCompare(b.openedAt));
+      const filtered = filterQueueItems(items, q, now); // C-PR7a — les compteurs restent ceux de la file entière
       return {
-        items,
+        items: filtered,
         counts: { disputes: items.filter((i) => i.kind === "DISPUTE").length, retentions: items.filter((i) => i.kind === "RETENTION").length },
       };
     },

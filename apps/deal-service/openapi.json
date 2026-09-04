@@ -15035,6 +15035,36 @@
         ],
         "additionalProperties": false
       },
+      "ArbitrationQueueQuery": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/ArbitrationKind"
+          },
+          "originCity": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "destinationCity": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "olderThanDays": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 365
+          },
+          "decidable": {
+            "description": "1 = décision possible maintenant",
+            "type": "string",
+            "enum": [
+              "0",
+              "1"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
       "AdminRole": {
         "type": "string",
         "enum": [
@@ -15160,11 +15190,95 @@
             "type": "integer",
             "minimum": -9007199254740991,
             "maximum": 9007199254740991
+          },
+          "nextCursor": {
+            "description": "C-PR7a — id du dernier élément ; absent = fin",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
           "items",
           "total"
+        ],
+        "additionalProperties": false
+      },
+      "AdminUsersQuery": {
+        "type": "object",
+        "properties": {
+          "q": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "SHIPPER",
+              "CARRIER",
+              "ADMIN"
+            ]
+          },
+          "accountStatus": {
+            "$ref": "#/components/schemas/AccountStatus"
+          },
+          "carrierStatus": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "stripeReady": {
+            "description": "1 = compte Connect avec virements activés",
+            "type": "string",
+            "enum": [
+              "0",
+              "1"
+            ]
+          },
+          "createdFrom": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          },
+          "createdTo": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          },
+          "sort": {
+            "default": "createdAt",
+            "type": "string",
+            "enum": [
+              "createdAt",
+              "lastName"
+            ]
+          },
+          "dir": {
+            "default": "desc",
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ]
+          },
+          "cursor": {
+            "$ref": "#/components/schemas/ObjectId"
+          },
+          "limit": {
+            "default": 50,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          }
+        },
+        "required": [
+          "sort",
+          "dir",
+          "limit"
         ],
         "additionalProperties": false
       },
@@ -15956,12 +16070,139 @@
             "type": "integer",
             "minimum": -9007199254740991,
             "maximum": 9007199254740991
+          },
+          "nextCursor": {
+            "description": "C-PR7a — id du dernier élément ; absent = fin",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
           "items",
           "total"
         ],
+        "additionalProperties": false
+      },
+      "AdminTripsQuery": {
+        "type": "object",
+        "properties": {
+          "q": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "status": {
+            "type": "string",
+            "maxLength": 20
+          },
+          "hidden": {
+            "type": "string",
+            "enum": [
+              "0",
+              "1"
+            ]
+          },
+          "ticketPending": {
+            "type": "string",
+            "enum": [
+              "0",
+              "1"
+            ]
+          },
+          "hideProposed": {
+            "type": "string",
+            "enum": [
+              "0",
+              "1"
+            ]
+          },
+          "carrierId": {
+            "$ref": "#/components/schemas/ObjectId"
+          },
+          "from": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          },
+          "to": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          },
+          "originCity": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "destinationCity": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "sort": {
+            "default": "departureAt",
+            "type": "string",
+            "enum": [
+              "departureAt",
+              "publishedAt",
+              "createdAt"
+            ]
+          },
+          "dir": {
+            "default": "desc",
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ]
+          },
+          "cursor": {
+            "$ref": "#/components/schemas/ObjectId"
+          },
+          "limit": {
+            "default": 50,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          }
+        },
+        "required": [
+          "sort",
+          "dir",
+          "limit"
+        ],
+        "additionalProperties": false
+      },
+      "TicketQueueQuery": {
+        "type": "object",
+        "properties": {
+          "originCity": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "destinationCity": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "submittedFrom": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          },
+          "submittedTo": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          },
+          "olderThanDays": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 365
+          }
+        },
         "additionalProperties": false
       },
       "AdminTripFile": {

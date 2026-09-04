@@ -15,9 +15,10 @@ import { ForbiddenError, NotFoundError, ValidationError } from "@packages/error-
 import { recordAdminAction } from "@packages/admin-audit";
 import { isEmailConfigured, sendTransactionalEmail } from "@packages/email";
 import type { AuthenticatedRequest } from "@packages/middleware/isAuthenticated";
-import { HideTripRequestSchema, ObjectIdSchema, ReviewTicketRequestSchema, resolveLocale, type AdminTripFile, type AdminTripSummary, type TicketQueueItem } from "@packages/api-contracts";
+import { AdminTripsQuerySchema, HideTripRequestSchema, ObjectIdSchema, ReviewTicketRequestSchema, TicketQueueQuerySchema, resolveLocale, type AdminTripFile, type AdminTripSummary, type TicketQueueItem } from "@packages/api-contracts";
+import { CSV_BOM, buildCsv, csvFilename } from "@packages/libs/csv";
 import { getTripAdminEmails } from "../emails/admin-trip-emails";
-import { TICKET_REJECTION_LABELS, isTicketExpired, ticketReviewOutcome } from "../lib/admin-trips.rules";
+import { TICKETS_CSV_COLUMNS, TICKET_REJECTION_LABELS, TRIPS_CSV_COLUMNS, buildTicketsWhere, buildTripsOrderBy, buildTripsWhere, isTicketExpired, ticketReviewOutcome } from "../lib/admin-trips.rules";
 
 const SUPPORT_EMAIL = process.env.SUPPORT_EMAIL || "support@yamba.app";
 const USER_APP_URL = (process.env.USER_APP_URL || "http://localhost:3000").replace(/\/$/, "");
@@ -60,28 +61,17 @@ async function adminNames(ids: Array<string | null | undefined>) {
 /* ── Liste ──────────────────────────────────────────────────── */
 export const listTrips = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
-    const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
-    const status = typeof req.query.status === "string" && req.query.status ? req.query.status : null;
-    const hidden = req.query.hidden === "1";
-    const ticketPending = req.query.ticketPending === "1";
-    const carrierId = typeof req.query.carrierId === "string" && /^[a-f0-9]{24}$/i.test(req.query.carrierId) ? req.query.carrierId : null;
-    const from = typeof req.query.from === "string" && req.query.from ? new Date(req.query.from) : null;
-
-    const where: Record<string, unknown> = { isDeleted: false };
-    if (status) where.status = status;
-    if (hidden) where.hiddenByAdminAt = { not: null };
-    if (ticketPending) where.ticketVerificationStatus = "PENDING";
-    if (carrierId) where.userId = carrierId;
-    if (from && !Number.isNaN(from.getTime())) where.departureAt = { gte: from };
-    if (q) {
-      if (/^[a-f0-9]{24}$/i.test(q)) where.id = q;
-      else where.OR = [{ originCity: { contains: q, mode: "insensitive" } }, { destinationCity: { contains: q, mode: "insensitive" } }];
-    }
+    // C-PR7a (D60 2A) — filtres serveur validés, tri, curseur (l'id en second : stable)
+    const parsed = AdminTripsQuerySchema.safeParse(req.query);
+    if (!parsed.success) throw new ValidationError("Invalid query.");
+    const q = parsed.data;
+    const where = buildTripsWhere(q);
     const [rows, total] = await Promise.all([
       prisma.trip.findMany({
         where: where as never,
-        orderBy: { departureAt: "desc" },
-        take: 100,
+        orderBy: buildTripsOrderBy(q) as never,
+        take: q.limit + 1,
+        ...(q.cursor ? { cursor: { id: q.cursor }, skip: 1 } : {}),
         select: {
           id: true, status: true, originCity: true, destinationCity: true, departureAt: true, transportMode: true, userId: true,
           ticketVerificationStatus: true, hiddenByAdminAt: true, hideProposedAt: true, publishedAt: true,
@@ -90,12 +80,14 @@ export const listTrips = async (req: AuthenticatedRequest, res: Response, next: 
       }),
       prisma.trip.count({ where: where as never }),
     ]);
-    const ids = rows.map((r) => r.id);
+    const hasNext = rows.length > q.limit;
+    const page = hasNext ? rows.slice(0, q.limit) : rows;
+    const ids = page.map((r) => r.id);
     const active = ids.length
       ? await prisma.booking.groupBy({ by: ["tripId"], where: { tripId: { in: ids }, status: { in: ACTIVE_BOOKING as never }, isDeleted: false }, _count: { _all: true } })
       : [];
     const activeBy = new Map(active.map((a) => [a.tripId, a._count._all]));
-    const items: AdminTripSummary[] = rows.map((t) => ({
+    const items: AdminTripSummary[] = page.map((t) => ({
       id: t.id,
       status: String(t.status),
       originCity: t.originCity ?? "—",
@@ -109,7 +101,31 @@ export const listTrips = async (req: AuthenticatedRequest, res: Response, next: 
       activeBookingsCount: activeBy.get(t.id) ?? 0,
       publishedAt: iso(t.publishedAt),
     }));
-    res.status(200).json({ items, total });
+    res.status(200).json({ items, total, nextCursor: hasNext ? page[page.length - 1].id : null });
+  } catch (e) {
+    next(e);
+  }
+};
+
+/** C-PR7a (D60 2A) — export CSV opérationnel des trajets : identifiants seulement, journalisé, 5 000 lignes max. */
+export const exportTrips = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    const parsed = AdminTripsQuerySchema.safeParse(req.query);
+    if (!parsed.success) throw new ValidationError("Invalid query.");
+    const q = parsed.data;
+    const rows = await prisma.trip.findMany({
+      where: buildTripsWhere(q) as never,
+      orderBy: buildTripsOrderBy(q) as never,
+      take: 5000,
+      select: { id: true, status: true, originCity: true, originCountryCode: true, destinationCity: true, destinationCountryCode: true, departureAt: true, publishedAt: true, cancelledAt: true, userId: true, transportMode: true, capacityKg: true, reservedKg: true, pricePerKgCents: true, ticketVerificationStatus: true, hiddenByAdminAt: true, createdAt: true },
+    });
+    const now = new Date();
+    const { cursor: _c, limit: _l, ...filters } = q;
+    await recordAdminAction(prisma, { adminUserId: req.user.id, action: "EXPORTED", targetType: "TRIP", after: { domain: "trips", personal: false, filters, rows: rows.length }, ...meta(req) });
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="${csvFilename("trajets", now)}"`);
+    res.setHeader("X-Row-Count", String(rows.length));
+    res.status(200).send(CSV_BOM + buildCsv(TRIPS_CSV_COLUMNS, rows.map((t) => ({ ...t, carrierId: t.userId, status: String(t.status), transportMode: t.transportMode ? String(t.transportMode) : null, ticketVerificationStatus: String(t.ticketVerificationStatus) }))));
   } catch (e) {
     next(e);
   }
@@ -243,11 +259,14 @@ export const unhideTrip = async (req: AuthenticatedRequest, res: Response, next:
 };
 
 /* ── Billets ────────────────────────────────────────────────── */
-export const listTickets = async (_req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+export const listTickets = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const now = new Date();
+    // C-PR7a (D60 2A) — filtres : villes, période de dépôt, « plus vieux que N jours »
+    const parsedQ = TicketQueueQuerySchema.safeParse(req.query);
+    if (!parsedQ.success) throw new ValidationError("Invalid query.");
     const pending = await prisma.tripDocument.findMany({
-      where: { type: "TICKET_PROOF", status: "PENDING" },
+      where: buildTicketsWhere(parsedQ.data, now) as never,
       orderBy: { createdAt: "asc" },
       take: 200,
       include: { trip: { select: { id: true, originCity: true, destinationCity: true, departureAt: true, transportMode: true, isDeleted: true, user: { select: { id: true, firstName: true, lastName: true } } } } },
@@ -270,6 +289,28 @@ export const listTickets = async (_req: AuthenticatedRequest, res: Response, nex
         submittedAt: d.createdAt.toISOString(),
       }));
     res.status(200).json({ items, expiredNow: expiredIds.length });
+  } catch (e) {
+    next(e);
+  }
+};
+
+/** C-PR7a (D60 2A) — export CSV de la file des billets : identifiants seulement, journalisé. */
+export const exportTickets = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    const now = new Date();
+    const parsedQ = TicketQueueQuerySchema.safeParse(req.query);
+    if (!parsedQ.success) throw new ValidationError("Invalid query.");
+    const rows = await prisma.tripDocument.findMany({
+      where: buildTicketsWhere(parsedQ.data, now) as never,
+      orderBy: { createdAt: "asc" },
+      take: 5000,
+      include: { trip: { select: { id: true, originCity: true, destinationCity: true, departureAt: true, userId: true } } },
+    });
+    await recordAdminAction(prisma, { adminUserId: req.user.id, action: "EXPORTED", targetType: "TRIP", after: { domain: "tickets", personal: false, filters: parsedQ.data, rows: rows.length }, ...meta(req) });
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="${csvFilename("billets", now)}"`);
+    res.setHeader("X-Row-Count", String(rows.length));
+    res.status(200).send(CSV_BOM + buildCsv(TICKETS_CSV_COLUMNS, rows.map((d) => ({ documentId: d.id, tripId: d.trip.id, originCity: d.trip.originCity, destinationCity: d.trip.destinationCity, departureAt: d.trip.departureAt, carrierId: d.trip.userId, originalName: d.originalName, mimeType: d.mimeType, status: String(d.status), submittedAt: d.createdAt }))));
   } catch (e) {
     next(e);
   }
