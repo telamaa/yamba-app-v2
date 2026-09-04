@@ -352,7 +352,12 @@ Ordre de demarrage : auth -> trip -> gateway.
   FR/EN, relais outbox dedie (topic messaging-events ; le relais deal-service filtre desormais
   aggregateType booking), OpenAPI 4e document, seed d'un fil. Suite : F-PR2 front + notifications,
   F-PR3 admin et purge.
-- Plateforme de tests : 786 (trip 209, deal 485, notification 78, message 14) + auth 103.
+- 04/09 : F-PR2 feat/f2-messaging-front (D61, A135–A136) — messagerie du tableau de bord
+  (liste, fil, rendez-vous, reponses rapides, numero), bulle du header sur le vrai compteur,
+  namespace i18n messaging FR/EN, sondage adaptatif 3 s / 20 s (pas de temps reel), second
+  consumer notification (topic et groupe dedies) pour la notification in-app. Reste F-PR3 :
+  email de relance, admin, purge.
+- Plateforme de tests : 791 (trip 209, deal 485, notification 83, message 14) + auth 103.
 - 04/09 : C-PR6b feat/c6b-admin-alerts (D59 3A / 4A, A129–A131) — neuf regles de seuil
   (evaluateAlerts pur, instantane de dix compteurs), GET /admin/alerts sans etat (accueil
   admin), cron horaire avec dedoublonnage Redis SET NX (un email par regle et par jour, Redis

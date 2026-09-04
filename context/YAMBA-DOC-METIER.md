@@ -1363,3 +1363,22 @@ Après l'acceptation, deux inconnus doivent se retrouver deux fois : pour la rem
 | ALR04 | Cron horaire (à h+5) avec SMTP configuré | Un seul email « Yamba — n alerte(s) » listant les règles nouvelles ; à l'heure suivante, rien tant qu'aucune règle nouvelle n'apparaît |
 | ALR05 | Le lendemain, même alerte toujours active | Un nouvel email (une fois par jour) |
 | ALR06 | `OPS_ALERTS_CRON_ENABLED=false` | Log « Ops alerts cron disabled » ; l'accueil continue d'afficher les alertes |
+
+# F-PR2 — la messagerie, côté membres
+
+### Règles de gestion (FCH, suite)
+- **RG-FCH-09 — La messagerie vit dans le tableau de bord** : la liste des conversations à gauche, le fil à droite, une seule colonne sur mobile.
+- **RG-FCH-10 — La bulle du header compte les conversations non lues**, pas les messages : ce qui compte est le nombre d'échanges qui attendent une réponse.
+- **RG-FCH-11 — Le fil s'actualise tout seul** pendant qu'on le lit, et s'arrête quand l'onglet passe en arrière-plan.
+- **RG-FCH-12 — Quand l'écriture est fermée, l'écran dit pourquoi** : litige en cours, ou fenêtre de quatorze jours écoulée.
+- **RG-FCH-13 — Le destinataire reçoit une notification dans l'application dès qu'un message arrive** ; l'email de relance des messages non lus arrive avec le lot suivant.
+
+### Recette (FCH, suite)
+| # | Scénario | Attendu |
+|---|---|---|
+| FCH11 | Se connecter en `pauline`, ouvrir Tableau de bord puis Messages | Le fil seedé apparaît avec le Voyageur, le corridor, le dernier message et le rendez-vous proposé |
+| FCH12 | Ouvrir le fil | Deux messages groupés par jour, le panneau « Rendez-vous » en haut avec « À confirmer par vous » |
+| FCH13 | Accepter le rendez-vous | Le panneau passe en « Confirmé », une ligne apparaît dans le fil |
+| FCH14 | Écrire un message, puis regarder l'autre compte | Le message part ; côté Voyageur, la bulle du header s'incrémente et une notification arrive dans la boîte |
+| FCH15 | Utiliser une réponse rapide, changer la langue en anglais | Le texte part comme un message ordinaire ; en anglais, les mêmes propositions sont traduites |
+| FCH16 | Écrire « le code est 742891 » | Refus affiché sous la saisie, avec l'explication ; le message n'est pas envoyé |
