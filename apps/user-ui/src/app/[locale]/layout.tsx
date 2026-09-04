@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { setRequestLocale } from "next-intl/server";
 import Header from "@/components/layout/Header";
 import { UiPreferencesProvider } from "@/components/providers/UiPreferencesProvider";
+import SessionExpiredGate from "@/components/providers/SessionExpiredGate";
 import { ToastProvider } from "@/components/ui/Toast";
 import { routing } from "@/i18n/routing";
 import Providers from "@/app/[locale]/providers";
@@ -61,6 +62,8 @@ export default async function LocaleLayout({
         {/* ThemeProvider : dans app/layout.tsx (root) — voir la note là-bas */}
         <UiPreferencesProvider>
           <ToastProvider>
+            {/* A89 — « Ta session a expiré » : ici, sous UiPreferencesProvider + ToastProvider (LoginForm en dépend) */}
+            <SessionExpiredGate />
             <Header />
             <div className="min-h-screen bg-slate-50 pt-[78px] dark:bg-slate-950">
               {children}
