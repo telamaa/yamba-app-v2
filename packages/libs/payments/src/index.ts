@@ -87,6 +87,20 @@ export type TransferResult = {
   currencyCode: string;
 };
 
+/** Rapprochement (C-PR5, D58 4A) — l'état RÉEL chez le fournisseur, lecture seule. */
+export type PaymentInspection = {
+  provider: PaymentProviderName;
+  intentId: string;
+  status: PaymentAuthorizationStatus;
+  amountCents: number;
+  /** Montant effectivement encaissé (Stripe `amount_received`) — 0 tant que rien n'est capturé */
+  amountReceivedCents: number;
+  chargeId: string | null;
+  refunds: Array<{ id: string; amountCents: number; status: string; createdAt: string | null }>;
+  /** Transfert connu par son id (Booking.transferId) ; null si aucun id ou introuvable */
+  transfer: { id: string; amountCents: number; reversedCents: number; createdAt: string | null } | null;
+};
+
 export interface PaymentProvider {
   readonly name: PaymentProviderName;
   authorize(input: AuthorizeInput): Promise<PaymentAuthorization>;
@@ -95,6 +109,8 @@ export interface PaymentProvider {
   cancel(intentId: string, reason?: string): Promise<PaymentAuthorization>;
   refund(intentId: string, amountCents?: number): Promise<{ refundId: string; amountCents: number }>;
   transfer(input: TransferInput): Promise<TransferResult>;
+  /** Lecture seule : intent + remboursements + transfert (C-PR5). Jette si l'intent est inconnu. */
+  inspect(input: { intentId: string; transferId?: string | null }): Promise<PaymentInspection>;
 }
 
 /* ══ Stripe ═══════════════════════════════════════════════════ */
@@ -195,6 +211,30 @@ export class StripePaymentProvider implements PaymentProvider {
     );
     return { provider: "STRIPE", transferId: t.id, amountCents: t.amount, currencyCode: t.currency.toUpperCase() };
   }
+
+  async inspect(input: { intentId: string; transferId?: string | null }): Promise<PaymentInspection> {
+    const pi = await this.stripe.paymentIntents.retrieve(input.intentId);
+    const refunds = await this.stripe.refunds.list({ payment_intent: input.intentId, limit: 100 });
+    let transfer: PaymentInspection["transfer"] = null;
+    if (input.transferId) {
+      try {
+        const t = await this.stripe.transfers.retrieve(input.transferId);
+        transfer = { id: t.id, amountCents: t.amount, reversedCents: t.amount_reversed, createdAt: new Date(t.created * 1000).toISOString() };
+      } catch {
+        transfer = null; // introuvable = divergence signalée par le rapprochement, pas une erreur
+      }
+    }
+    return {
+      provider: "STRIPE",
+      intentId: pi.id,
+      status: mapStripeStatus(pi.status),
+      amountCents: pi.amount,
+      amountReceivedCents: pi.amount_received,
+      chargeId: typeof pi.latest_charge === "string" ? pi.latest_charge : pi.latest_charge?.id ?? null,
+      refunds: refunds.data.map((r) => ({ id: r.id, amountCents: r.amount, status: r.status ?? "unknown", createdAt: new Date(r.created * 1000).toISOString() })),
+      transfer,
+    };
+  }
 }
 
 /* ══ Fake (dev sans clés + tests) ═════════════════════════════ */
@@ -271,9 +311,17 @@ export class FakePaymentProvider implements PaymentProvider {
     return this.setStatus(intentId, "CANCELED");
   }
 
+  /** Remboursements émis (observables par les tests et par `inspect`). */
+  private readonly refundsByIntent = new Map<string, Array<{ id: string; amountCents: number; status: string; createdAt: string | null }>>();
+
   async refund(intentId: string, amountCents?: number) {
     const a = await this.retrieve(intentId);
-    return { refundId: `re_fake_${intentId}`, amountCents: amountCents ?? a.amountCents };
+    const amount = amountCents ?? a.amountCents;
+    const list = this.refundsByIntent.get(intentId) ?? [];
+    const refundId = `re_fake_${intentId}_${list.length + 1}`;
+    list.push({ id: refundId, amountCents: amount, status: "succeeded", createdAt: new Date().toISOString() });
+    this.refundsByIntent.set(intentId, list);
+    return { refundId, amountCents: amount };
   }
 
   /** Transferts effectués (observables par les tests) — la clé
@@ -297,9 +345,31 @@ export class FakePaymentProvider implements PaymentProvider {
     return result;
   }
 
+  private readonly reversedByTransfer = new Map<string, number>();
+
+  async inspect(input: { intentId: string; transferId?: string | null }): Promise<PaymentInspection> {
+    const a = await this.retrieve(input.intentId);
+    const t = input.transferId ? this.transfers.find((x) => x.transferId === input.transferId) ?? null : null;
+    return {
+      provider: "FAKE",
+      intentId: a.intentId,
+      status: a.status,
+      amountCents: a.amountCents,
+      amountReceivedCents: a.status === "CAPTURED" ? a.amountCents : 0,
+      chargeId: a.chargeId,
+      refunds: [...(this.refundsByIntent.get(input.intentId) ?? [])],
+      transfer: t ? { id: t.transferId, amountCents: t.amountCents, reversedCents: this.reversedByTransfer.get(t.transferId) ?? 0, createdAt: null } : null,
+    };
+  }
+
   /** aide aux tests : forcer un état (ex. simuler une autorisation non confirmée) */
   _setStatusForTest(intentId: string, status: PaymentAuthorizationStatus) {
     this.setStatus(intentId, status);
+  }
+  /** aide aux tests : simuler un `transfer.reversed` (C-PR5) */
+  _reverseTransferForTest(transferId: string, amountCents?: number) {
+    const t = this.transfers.find((x) => x.transferId === transferId);
+    this.reversedByTransfer.set(transferId, amountCents ?? t?.amountCents ?? 0);
   }
 }
 

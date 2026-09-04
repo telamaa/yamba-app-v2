@@ -87,6 +87,15 @@ const response409Settlement = jsonResponse(
 
 /** Cookie OR bearer (OpenAPI OR semantics) — mirror of extractToken. */
 const authSecurity = [{ cookieAuth: [] }, { bearerAuth: [] }];
+/* C-PR5 (D58) — session admin séparée (cookie admin_access_token, amr totp) */
+const adminSecurity = [{ adminCookieAuth: [] }];
+const queueKindQueryParam = {
+  name: "kind",
+  in: "query",
+  required: false,
+  schema: ref("FinanceQueueKind"),
+  description: "FAILED (défaut) · REVERSED · HELD",
+};
 
 const dealIdPathParam = {
   name: "id",
@@ -720,6 +729,69 @@ export function buildOpenApiDocument() {
         },
       },
     },
+      /* ── Admin finances (C-PR5a, D58) ────────────────────────── */
+      "/admin/finances/queue": {
+        get: {
+          tags: ["admin"],
+          summary: "Exception queues (D58 2A) — failed payouts, reversed transfers, retentions held",
+          description:
+            "Permission finances.read. FAILED = payoutStatus FAILED on COMPLETED / CANCELLED deals (reason kind, attempts, next retry — A111); " +
+            "REVERSED = transfer.reversed not yet resolved by an admin; HELD = retention HELD_FOR_MEDIATION. Amounts come from the booking, never recomputed.",
+          operationId: "adminListFinanceQueue",
+          security: adminSecurity,
+          parameters: [queueKindQueryParam],
+          responses: { "200": jsonResponse("FinanceQueueResponse", "Queue"), "400": response400, "401": response401, "403": response403, "500": response500 },
+        },
+      },
+      "/admin/deals/{id}/money": {
+        get: {
+          tags: ["admin"],
+          summary: "Money file of any deal (D58 4A) — snapshot, payment, payout, retention, timeline, journal",
+          description: "Permission finances.read. Provider identifiers in clear (finance needs them). Reading is journaled (AdminAction DEAL_MONEY_VIEWED). allowedActions reflects state AND conflict of interest.",
+          operationId: "adminGetDealMoneyFile",
+          security: adminSecurity,
+          parameters: [dealIdPathParam],
+          responses: { "200": jsonResponse("AdminDealMoneyFile", "File"), "401": response401, "403": response403, "404": response404, "500": response500 },
+        },
+      },
+      "/admin/deals/{id}/money/reconcile": {
+        post: {
+          tags: ["admin"],
+          summary: "Reconcile with the payment provider (D58 4A, A112) — read-only, journaled",
+          description:
+            "Permission finances.read. Calls PaymentProvider.inspect (intent, refunds, transfer) and lists divergences with the database " +
+            "(REFUND_NOT_RECORDED = a refund left the provider without a database write, D39). Never modifies the deal. Journal DEAL_RECONCILED.",
+          operationId: "adminReconcileDeal",
+          security: adminSecurity,
+          parameters: [dealIdPathParam],
+          responses: { "200": jsonResponse("PaymentReconciliation", "Reconciliation"), "400": response400, "401": response401, "403": response403, "404": response404, "500": response500 },
+        },
+      },
+      "/admin/deals/{id}/payout/retry": {
+        post: {
+          tags: ["admin"],
+          summary: "Retry a payout now (D58 3A) — same executor, idempotent",
+          description: "Permission payouts.retry. Deal COMPLETED or CANCELLED with payoutStatus FAILED or PENDING; 403 when the admin is a party. Runs the unique payout executor (A65) without waiting for the retry schedule. Journal PAYOUT_RETRIED.",
+          operationId: "adminRetryPayout",
+          security: adminSecurity,
+          parameters: [dealIdPathParam],
+          responses: { "200": jsonResponse("RetryPayoutResponse", "Outcome"), "400": response400, "401": response401, "403": response403, "404": response404, "500": response500 },
+        },
+      },
+      "/admin/deals/{id}/payout/reversal": {
+        post: {
+          tags: ["admin"],
+          summary: "Resolve a reversed transfer (D58 3A) — RESENT or WRITTEN_OFF, reason ≥ 20",
+          description:
+            "Permission payouts.resolve. Only on payoutStatus REVERSED not yet resolved (optimistic guard). RESENT: PENDING + a NEW idempotency key, then the executor sends a new transfer; " +
+            "WRITTEN_OFF: closed, nothing is sent. Resolution + journal PAYOUT_REVERSAL_RESOLVED in one transaction.",
+          operationId: "adminResolvePayoutReversal",
+          security: adminSecurity,
+          parameters: [dealIdPathParam],
+          requestBody: { required: true, content: { "application/json": { schema: ref("ResolveReversalRequest") } } },
+          responses: { "200": jsonResponse("ResolveReversalResponse", "Outcome"), "400": response400, "401": response401, "403": response403, "404": response404, "500": response500 },
+        },
+      },
     components: {
       schemas: components,
       securitySchemes: {
@@ -734,6 +806,12 @@ export function buildOpenApiDocument() {
           scheme: "bearer",
           bearerFormat: "JWT",
           description: "Fallback: Authorization: Bearer <access_token>",
+        },
+        adminCookieAuth: {
+          type: "apiKey",
+          in: "cookie",
+          name: "admin_access_token",
+          description: "Admin session (D54) — JWT adm:true, amr [pwd, totp]; never the access_token cookie",
         },
       },
     },

@@ -24,6 +24,8 @@ import { createPaymentProviderFromEnv } from "@packages/payments";
 import { makeAdminDisputeController } from "../controllers/admin-dispute.controller";
 import { makeAdminDisputeService } from "../services/admin-dispute.service";
 import { makeDealMediationController } from "../controllers/deal-mediation.controller";
+import { makeAdminFinanceController } from "../controllers/admin-finance.controller";
+import { makeAdminFinanceService } from "../services/admin-finance.service";
 import { makeDealMediationService } from "../services/deal-mediation.service";
 
 /**
@@ -115,5 +117,13 @@ router.get("/admin/disputes", isAdminAuthenticated, requireAdminPermission("disp
 router.get("/admin/disputes/:id", isAdminAuthenticated, requireAdminPermission("disputes.read"), adminDisputes.getFile);
 router.post("/admin/disputes/:id/resolve", isAdminAuthenticated, requireAdminPermission("disputes.decide"), dealMediation.resolveDispute);
 router.post("/admin/disputes/:id/retention", isAdminAuthenticated, requireAdminPermission("disputes.decide"), dealMediation.resolveRetention);
+
+// ── C-PR5a (D58) : finances — files d'exception, fiche argent, rapprochement, rejeu, renversements ──
+const adminFinance = makeAdminFinanceController(makeAdminFinanceService(paymentProvider, dealSettlementService));
+router.get("/admin/finances/queue", isAdminAuthenticated, requireAdminPermission("finances.read"), adminFinance.listQueue);
+router.get("/admin/deals/:id/money", isAdminAuthenticated, requireAdminPermission("finances.read"), adminFinance.getMoneyFile);
+router.post("/admin/deals/:id/money/reconcile", isAdminAuthenticated, requireAdminPermission("finances.read"), adminFinance.reconcile);
+router.post("/admin/deals/:id/payout/retry", isAdminAuthenticated, requireAdminPermission("payouts.retry"), adminFinance.retryPayout);
+router.post("/admin/deals/:id/payout/reversal", isAdminAuthenticated, requireAdminPermission("payouts.resolve"), adminFinance.resolveReversal);
 
 export default router;

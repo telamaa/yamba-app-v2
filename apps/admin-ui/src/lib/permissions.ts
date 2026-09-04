@@ -2,7 +2,8 @@
 export type AdminRole = "SUPER_ADMIN" | "MEDIATOR" | "SUPPORT" | "FINANCE";
 export type AdminPermission =
   | "disputes.read" | "disputes.decide" | "users.read" | "users.suspension.propose" | "users.suspension.apply" | "audit.read" | "admins.manage"
-  | "trips.read" | "tickets.review" | "trips.hide.propose" | "trips.hide.apply" | "kpi.read";
+  | "trips.read" | "tickets.review" | "trips.hide.propose" | "trips.hide.apply" | "kpi.read"
+  | "finances.read" | "payouts.retry" | "payouts.resolve";
 
 const MATRIX: Record<AdminPermission, AdminRole[]> = {
   "disputes.read": ["MEDIATOR", "SUPPORT", "FINANCE"],
@@ -17,6 +18,9 @@ const MATRIX: Record<AdminPermission, AdminRole[]> = {
   "trips.hide.propose": ["SUPPORT", "MEDIATOR"],
   "trips.hide.apply": ["MEDIATOR"],
   "kpi.read": ["MEDIATOR", "SUPPORT", "FINANCE"],
+  "finances.read": ["FINANCE", "MEDIATOR"],
+  "payouts.retry": ["FINANCE", "MEDIATOR"],
+  "payouts.resolve": ["FINANCE", "MEDIATOR"],
 };
 
 export function can(role: AdminRole | null | undefined, permission: AdminPermission): boolean {

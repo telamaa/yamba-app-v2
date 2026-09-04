@@ -38,6 +38,11 @@ export const ADMIN_ACTIONS = [
   "DOCUMENT_VIEWED",
   "TICKET_VERIFIED",
   "TICKET_REJECTED",
+  // C-PR5 (D58)
+  "DEAL_MONEY_VIEWED",
+  "DEAL_RECONCILED",
+  "PAYOUT_RETRIED",
+  "PAYOUT_REVERSAL_RESOLVED",
 ] as const;
 export type AdminActionType = (typeof ADMIN_ACTIONS)[number];
 

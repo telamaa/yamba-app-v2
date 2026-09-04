@@ -173,10 +173,11 @@ export function makeDealMediationService(
       const money = computeResolutionMoney(input.outcome, input.refundCents, booking.pricing);
 
       // D39 — l'argent d'abord : le remboursement part avant la base (comme l'annulation).
+      let refundId: string | null = null; // C-PR5 (D58)
       if (money.refundCents > 0) {
         if (!booking.paymentIntentId) throw new BookingLifecycleError("PAYMENT_STATE_CONFLICT", "This deal has no payment to refund.");
         try {
-          await provider.refund(booking.paymentIntentId, money.refundCents);
+          refundId = (await provider.refund(booking.paymentIntentId, money.refundCents)).refundId;
         } catch {
           throw new BookingLifecycleError("PAYMENT_STATE_CONFLICT", "The refund could not be issued.");
         }
@@ -197,7 +198,7 @@ export function makeDealMediationService(
                 payoutStatus: money.carrierPayoutCents > 0 ? "PENDING" : null,
                 payoutAmountCents: money.carrierPayoutCents,
                 payoutFailureReason: null,
-                ...(money.refundCents > 0 ? { refundedAt: now, refundAmountCents: previousRefund + money.refundCents } : {}),
+                ...(money.refundCents > 0 ? { refundedAt: now, refundAmountCents: previousRefund + money.refundCents, refundId } : {}),
                 // D54 4B — aucune fenêtre de notation après un litige.
                 ratingWindowEndsAt: null,
               }
@@ -210,6 +211,7 @@ export function makeDealMediationService(
                 payoutAmountCents: 0,
                 refundedAt: now,
                 refundAmountCents: previousRefund + money.refundCents,
+                refundId,
               },
         releaseKg: finalStatus === "CANCELLED",
         events: [
@@ -319,10 +321,11 @@ export function makeDealMediationService(
           : 0;
       const restituteCents = input.outcome === "RESTITUTE_SHIPPER" ? retentionCents : 0;
 
+      let restituteRefundId: string | null = null; // C-PR5 (D58)
       if (restituteCents > 0) {
         if (!booking.paymentIntentId) throw new BookingLifecycleError("PAYMENT_STATE_CONFLICT", "This deal has no payment to refund.");
         try {
-          await provider.refund(booking.paymentIntentId, restituteCents);
+          restituteRefundId = (await provider.refund(booking.paymentIntentId, restituteCents)).refundId;
         } catch {
           throw new BookingLifecycleError("PAYMENT_STATE_CONFLICT", "The refund could not be issued.");
         }
@@ -339,7 +342,7 @@ export function makeDealMediationService(
           retentionDecidedAt: now,
           retentionDecidedByAdminId: admin.id,
           ...(compensateCents > 0 ? { payoutStatus: "PENDING", payoutAmountCents: compensateCents, payoutFailureReason: null } : {}),
-          ...(restituteCents > 0 ? { refundedAt: now, refundAmountCents: previousRefund + restituteCents } : {}),
+          ...(restituteCents > 0 ? { refundedAt: now, refundAmountCents: previousRefund + restituteCents, refundId: restituteRefundId } : {}),
         },
         releaseKg: false,
         events: [

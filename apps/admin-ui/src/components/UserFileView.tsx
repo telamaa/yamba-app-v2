@@ -103,7 +103,7 @@ export default function UserFileView({ userId }: { userId: string }) {
                   <td className="py-1 font-mono text-[11px]">{d.status}{d.disputeTicket ? ` · ${d.disputeTicket}` : ""}</td>
                   <td className="py-1 text-right tabular-nums">{d.role === "SHIPPER" ? money(d.totalShipperCents, d.currencyCode) : money(d.transportCents, d.currencyCode)}</td>
                   <td className="py-1 whitespace-nowrap">{dateTime(d.requestedAt)}</td>
-                  <td className="py-1">{d.disputeTicket ? <Link href={`/disputes/${d.id}`} className="underline">dossier</Link> : ""}</td>
+                  <td className="py-1 whitespace-nowrap">{d.disputeTicket ? <Link href={`/disputes/${d.id}`} className="underline">dossier</Link> : ""} <Link href={`/deals/${d.id}`} className="underline">argent</Link></td>
                 </tr>
               ))}
             </tbody>

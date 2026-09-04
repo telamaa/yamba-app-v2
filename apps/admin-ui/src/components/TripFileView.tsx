@@ -68,7 +68,7 @@ export default function TripFileView({ tripId }: { tripId: string }) {
                 <tr key={b.id} className="border-t border-slate-100">
                   <td className="py-1">{b.shipperFirstName}</td><td className="py-1">{b.weightKg} kg</td><td className="py-1 font-mono text-[11px]">{b.status}{b.disputeTicket ? ` · ${b.disputeTicket}` : ""}</td>
                   <td className="py-1 text-right tabular-nums">{money(b.totalShipperCents, b.currencyCode)} / net {money(b.transportCents, b.currencyCode)}</td><td className="py-1 whitespace-nowrap">{dateTime(b.requestedAt)}</td>
-                  <td className="py-1">{b.disputeTicket ? <Link href={`/disputes/${b.id}`} className="underline">dossier</Link> : ""}</td>
+                  <td className="py-1 whitespace-nowrap">{b.disputeTicket ? <Link href={`/disputes/${b.id}`} className="underline">dossier</Link> : ""} <Link href={`/deals/${b.id}`} className="underline">argent</Link></td>
                 </tr>
               ))}
             </tbody>

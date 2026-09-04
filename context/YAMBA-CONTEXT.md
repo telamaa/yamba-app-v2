@@ -308,11 +308,15 @@ Ordre de demarrage : auth -> trip -> gateway.
   « masque par Yamba » (Trip.hiddenByAdminAt lu par recherche / page publique /
   reservation, proposition Support, email generique), fiche et liste trajets admin,
   KPI d'accueil par permission (/admin/kpis, /home), bandeau Voyageur, seed billet.
-  Mergee #157. Suite : C-PR5 finances (challenge pose le 04/09, decisions 1–8 a
-  trancher : perimetre sans grand livre, trois files, gestes rejeu / renversement /
-  remboursement manuel, fiche argent + rapprochement Stripe, rapport + export CSV,
-  permissions FINANCE, digest conserve, deux PR), C-PR6 pilotage, C-PR7 signalements.
-- Plateforme de tests : 723 (trip 202, deal 443, notification 78) + auth 87.
+  Mergee #157. Suite : C-PR5 finances.
+- 04/09 : C-PR5a feat/c5a-admin-finances (D58, A111–A113, decisions 1A–8A « go avec tes
+  recommandations ») — files d'exception (echecs, renverses, retenues), fiche argent de
+  tout deal, rapprochement fournisseur lecture seule (PaymentProvider.inspect, refundId
+  stocke), rejeu manuel, cloture d'un renversement (RESENT nouvelle cle / WRITTEN_OFF),
+  rejeux espaces sans plafond (payoutNextRetryAt), KPI payoutsReversed, admin-ui
+  /finances + /deals/[id], seed bzv-reversed. Suite : C-PR5b (rapport mensuel par
+  devise, export CSV, remboursement manuel SUPER_ADMIN), C-PR6 pilotage.
+- Plateforme de tests : 744 (trip 202, deal 464, notification 78) + auth 88.
 - (historique) Plateforme de tests : 600 (trip 187, deal 354, notification 59) — post-B3 (#96).
 - MERGE 01/09 : toute la pile B2 est dans `dev` via la SEULE **PR #90**
   (`feat/b2-deal-front` portait la chaîne complète : jalons mobile D36,

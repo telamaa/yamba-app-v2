@@ -195,5 +195,38 @@ export type TicketRejectionReason = "ILLEGIBLE" | "DATES_MISMATCH" | "NAME_MISMA
 export type AdminHomeKpis = {
   disputesToDecide: number | null; retentionsHeld: number | null; ticketsToVerify: number | null; hiddenTrips: number | null; hideProposals: number | null;
   suspensionProposals: number | null; restrictedUsers: number | null; suspendedUsers: number | null; publishedTrips: number | null; activeDeals: number | null;
-  payoutsFailed: number | null; pendingAdminInvites: number | null; usersTotal: number | null; completedDeals30d: number | null; generatedAt: string;
+  payoutsFailed: number | null; payoutsReversed: number | null; pendingAdminInvites: number | null; usersTotal: number | null; completedDeals30d: number | null; generatedAt: string;
+};
+
+/* ── C-PR5a (D58) — finances ── */
+export type FinanceQueueKind = "FAILED" | "REVERSED" | "HELD";
+export type FinanceQueueItem = {
+  bookingId: string; kind: FinanceQueueKind; status: string;
+  corridor: { originCity: string; destinationCity: string; departureAt: string | null };
+  shipper: { id: string; firstName: string };
+  carrier: { id: string; firstName: string; stripeReady: boolean | null };
+  amountCents: number; currencyCode: string; payoutStatus: string | null; payoutAttempts: number;
+  payoutFailureKind: "ACCOUNT_NOT_READY" | "PROVIDER_ERROR" | "REVERSED" | null; payoutFailureDetail: string | null;
+  lastAttemptAt: string | null; nextRetryAt: string | null; disputeTicket: string | null; since: string;
+};
+export type FinanceQueueResponse = { kind: FinanceQueueKind; items: FinanceQueueItem[]; generatedAt: string };
+export type MoneyTimelineEvent = { at: string; kind: string; amountCents: number | null; detail: string | null };
+export type AdminDealMoneyFile = {
+  id: string; status: string; disputeTicket: string | null;
+  corridor: { originCity: string; destinationCity: string; departureAt: string | null };
+  shipper: { id: string; firstName: string; lastName: string };
+  carrier: { id: string; firstName: string; lastName: string; stripeAccountIdMasked: string | null; stripePayoutsEnabled: boolean | null };
+  pricing: { pricingModel: string; weightKg: number; transportCents: number; commissionCents: number; premiumCents: number; totalShipperCents: number; currencyCode: string };
+  payment: { provider: string | null; intentId: string | null; chargeId: string | null; capturedAt: string | null; refundedAt: string | null; refundAmountCents: number | null; refundId: string | null };
+  payout: { status: string | null; amountCents: number | null; sentAt: string | null; attempts: number; failureKind: string | null; failureDetail: string | null; lastAttemptAt: string | null; nextRetryAt: string | null; transferId: string | null; reversal: { resolution: string; reason: string; at: string; byAdmin: string } | null };
+  retention: { cents: number; disposition: string | null; decisionReason: string | null; decidedAt: string | null } | null;
+  dates: { requestedAt: string; acceptedAt: string | null; pickedUpAt: string | null; deliveredAt: string | null; disputedAt: string | null; completedAt: string | null; completedBy: string | null; closedAt: string | null; closedBy: string | null };
+  timeline: MoneyTimelineEvent[];
+  adminActions: Array<{ id: string; at: string; admin: string; action: string; after: unknown }>;
+  allowedActions: { retryPayout: boolean; resolveReversal: boolean; reconcile: boolean };
+};
+export type PaymentReconciliation = {
+  provider: string; checkedAt: string;
+  live: { intentStatus: string; amountCents: number; amountReceivedCents: number; chargeId: string | null; refunds: Array<{ id: string; amountCents: number; status: string; createdAt: string | null }>; transfer: { id: string; amountCents: number; reversedCents: number; createdAt: string | null } | null } | null;
+  divergences: Array<{ code: string; message: string; dbCents: number | null; liveCents: number | null }>;
 };

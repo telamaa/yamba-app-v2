@@ -28,7 +28,6 @@ import { BookingDomainEventSchema } from "@packages/api-contracts";
 import {
   DISPUTE_TICKET_ATTEMPTS,
   FAKE_CARRIER_ACCOUNT,
-  PAYOUT_MAX_ATTEMPTS,
   generateDisputeTicket,
   makeDealSettlementService,
 } from "./deal-settlement.service";
@@ -268,7 +267,14 @@ describe("B — executePayout : le net du snapshot, rattaché à la charge, jama
     expect(provider.calls).toHaveLength(0);
     const last = updates().pop()!;
     expect(last.where).toEqual({ id: BOOKING_ID, status: "COMPLETED" });
-    expect(last.data).toEqual({ payoutStatus: "FAILED", payoutFailureReason: "CARRIER_ACCOUNT_NOT_READY", payoutAttempts: { increment: 1 } });
+    // C-PR5 (A111) : compteur lu puis écrit (pas d'increment — pitfall Mongo), horodatage et prochaine relance espacée
+    expect(last.data).toEqual({
+      payoutStatus: "FAILED",
+      payoutFailureReason: "CARRIER_ACCOUNT_NOT_READY",
+      payoutAttempts: 1,
+      payoutLastAttemptAt: NOW,
+      payoutNextRetryAt: new Date(NOW.getTime() + 5 * 60_000),
+    });
     expect(writtenEventTypes()).toEqual([]);
   });
 
@@ -443,7 +449,7 @@ describe("D — cron de versement (A66/A70)", () => {
     expect(n).toBe(1);
   });
 
-  it("retryFailedPayouts : rejoue COMPLETED et CANCELLED (compensation A80), PENDING ou FAILED, sous le plafond ; compte les SENT", async () => {
+  it("retryFailedPayouts : rejoue COMPLETED et CANCELLED (compensation A80), PENDING ou FAILED, dont la relance est échue (A111, sans plafond) ; compte les SENT", async () => {
     prismaMock.booking.findMany.mockResolvedValue([makeBookingRecord({ status: "COMPLETED", payoutStatus: "FAILED", payoutAttempts: 3 })]);
     const n = await makeService().retryFailedPayouts();
     expect(n).toBe(1);
@@ -451,7 +457,7 @@ describe("D — cron de versement (A66/A70)", () => {
       status: { in: ["COMPLETED", "CANCELLED"] },
       isDeleted: false,
       payoutStatus: { in: ["PENDING", "FAILED"] },
-      payoutAttempts: { lt: PAYOUT_MAX_ATTEMPTS },
+      OR: [{ payoutNextRetryAt: { isSet: false } }, { payoutNextRetryAt: null }, { payoutNextRetryAt: { lte: NOW } }],
     });
     expect(updates()[0].data).toMatchObject({ payoutStatus: "SENT", payoutAttempts: 4 });
     expect(writtenEventTypes()).toEqual(["booking.payout_sent"]);
@@ -495,7 +501,7 @@ describe("D — cron de versement (A66/A70)", () => {
     expect(await makeService().markTransferReversed("tr_1")).toBe(true);
     expect(prismaMock.booking.updateMany).toHaveBeenCalledWith({
       where: { transferId: "tr_1", payoutStatus: "SENT" },
-      data: { payoutStatus: "REVERSED", payoutFailureReason: "PROVIDER_REVERSED" },
+      data: { payoutStatus: "REVERSED", payoutFailureReason: "PROVIDER_REVERSED", payoutReversalResolution: null, payoutReversalResolvedAt: null },
     });
     prismaMock.booking.updateMany.mockResolvedValueOnce({ count: 0 });
     expect(await makeService().markTransferReversed("tr_x")).toBe(false);
@@ -507,9 +513,9 @@ describe("D — cron de versement (A66/A70)", () => {
     expect(digest).toEqual({ failed: [], reversed: [], held: [] });
     const wheres = prismaMock.booking.findMany.mock.calls.map((c) => c[0].where);
     expect(wheres[0]).toMatchObject({ status: { in: ["COMPLETED", "CANCELLED"] }, payoutStatus: "FAILED", updatedAt: { lt: hoursFromNow(-24) } });
-    expect(wheres[1]).toMatchObject({ payoutStatus: "REVERSED" });
+    // C-PR5 : un renversement clos (RESENT / WRITTEN_OFF) sort du digest — absent OU null
+    expect(wheres[1]).toMatchObject({ payoutStatus: "REVERSED", OR: [{ payoutReversalResolution: { isSet: false } }, { payoutReversalResolution: null }] });
     expect(wheres[2]).toMatchObject({ status: "CANCELLED", retentionDisposition: "HELD_FOR_MEDIATION" });
-    expect(PAYOUT_MAX_ATTEMPTS).toBe(100); // décision 03/09 (1B)
   });
 
   it("sendVerificationReminders : course (déjà rappelé) → sauté sans erreur", async () => {

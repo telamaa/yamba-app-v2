@@ -63,6 +63,7 @@ export default function DisputeFileView({ bookingId }: { bookingId: string }) {
         </Card>
 
         <Card title="Argent">
+          <Link href={`/deals/${bookingId}`} className="text-[12px] underline">Fiche argent complète (chronologie, rapprochement Stripe)</Link>
           <Row k="Payé par l'Expéditeur" v={money(file.money.totalShipperCents, cur)} />
           <Row k="Net Voyageur" v={money(file.money.transportCents, cur)} />
           <Row k="Commission Yamba" v={money(file.money.commissionCents, cur)} />

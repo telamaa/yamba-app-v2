@@ -789,6 +789,7 @@ model Booking {
   chargeId          String? // charge Stripe de la capture (A69) — `source_transaction` du transfert B4
   refundedAt        DateTime?
   refundAmountCents Int?
+  refundId          String? // C-PR5 (D58) — dernier remboursement fournisseur (rapprochement exact)
   transferId        String?
 
   // ─── Versement Voyageur (B4, D49) ───
@@ -797,6 +798,16 @@ model Booking {
   payoutSentAt        DateTime?
   payoutAttempts      Int     @default(0) // rejeux du cron (A65/A66), borné
   payoutFailureReason String? // CARRIER_ACCOUNT_NOT_READY | PROVIDER_ERROR:<message>
+  // C-PR5 (D58, A111) — rejeux espacés : posé à chaque échec, lu par le cron (absent OU null OU <= now)
+  payoutNextRetryAt    DateTime?
+  payoutLastAttemptAt  DateTime?
+  // C-PR5 (D58) — clé d'idempotence fournisseur explicite après un renversement re-versé (défaut : payout:<id>)
+  payoutIdempotencyKey String?
+  // C-PR5 (D58 3A) — clôture d'un transfert renversé : "RESENT" | "WRITTEN_OFF"
+  payoutReversalResolution        String?
+  payoutReversalReason            String?
+  payoutReversalResolvedAt        DateTime?
+  payoutReversalResolvedByAdminId String?   @db.ObjectId
   completedBy         String? // "SHIPPER" (confirmation anticipée) | "SYSTEM" (J+4)
   // ─── Retenue ANN-01 (D50, A79–A81) ───
   retentionCents        Int? // total − remboursement (annulation tardive de l'Expéditeur)

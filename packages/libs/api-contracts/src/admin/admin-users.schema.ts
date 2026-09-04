@@ -26,6 +26,10 @@ export const ADMIN_PERMISSIONS = {
   "trips.hide.propose": ["SUPPORT", "MEDIATOR"],
   "trips.hide.apply": ["MEDIATOR"],
   "kpi.read": ["MEDIATOR", "SUPPORT", "FINANCE"],
+  // C-PR5 (D58 6A)
+  "finances.read": ["FINANCE", "MEDIATOR"],
+  "payouts.retry": ["FINANCE", "MEDIATOR"],
+  "payouts.resolve": ["FINANCE", "MEDIATOR"],
 } as const;
 export type AdminPermission = keyof typeof ADMIN_PERMISSIONS;
 

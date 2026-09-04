@@ -145,8 +145,9 @@ export function makeDealTransportService(provider: PaymentProvider, clock: () =>
       if (!booking.paymentIntentId) {
         throw new BookingLifecycleError("PAYMENT_STATE_CONFLICT", "This deal has no payment to refund.");
       }
+      let refundId: string | null = null;
       try {
-        await provider.refund(booking.paymentIntentId, total);
+        refundId = (await provider.refund(booking.paymentIntentId, total)).refundId;
       } catch {
         throw new BookingLifecycleError("PAYMENT_STATE_CONFLICT", "The refund could not be issued.");
       }
@@ -161,6 +162,7 @@ export function makeDealTransportService(provider: PaymentProvider, clock: () =>
           pickupRefusalReason: input.reason ?? null,
           refundedAt: now,
           refundAmountCents: total,
+          refundId, // C-PR5 (D58) — rapprochement exact
         },
         releaseKg: true,
         events: [

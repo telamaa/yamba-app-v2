@@ -126,6 +126,20 @@ app.use(
   })
 );
 
+// /api/admin/finances/*, /api/admin/deals/* → deal-service reçoit /admin/… (C-PR5, D58)
+app.use(
+  "/api/admin/finances",
+  proxy("http://localhost:6003", {
+    proxyReqPathResolver: (req) => `/admin/finances${req.url}`,
+  })
+);
+app.use(
+  "/api/admin/deals",
+  proxy("http://localhost:6003", {
+    proxyReqPathResolver: (req) => `/admin/deals${req.url}`,
+  })
+);
+
 // /api/admin/trips/*, /api/admin/tickets/* → trip-service reçoit /admin/… (C-PR4, D57)
 app.use(
   "/api/admin/trips",
