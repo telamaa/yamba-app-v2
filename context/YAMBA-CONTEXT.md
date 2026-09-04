@@ -320,7 +320,7 @@ Ordre de demarrage : auth -> trip -> gateway.
   (FINANCE, <= 366 j, formules neutralisees), remboursement manuel propose (FINANCE /
   SUPPORT) et applique par SUPER_ADMIN (argent d'abord, verrou sur le cumul, outbox
   refund_issued ADMIN), portefeuille Expediteur : remboursement apres COMPLETED visible,
-  file PROPOSED_REFUNDS, KPI, admin-ui /finances/report. Suite : C-PR6 pilotage,
+  file PROPOSED_REFUNDS, KPI, admin-ui /finances/report. Mergee #160. Suite : C-PR6 pilotage,
   C-PR7 signalements / anti-fraude, C-PR8 parametres / RGPD.
 - Plateforme de tests : 755 (trip 202, deal 475, notification 78) + auth 89.
 - (historique) Plateforme de tests : 600 (trip 187, deal 354, notification 59) — post-B3 (#96).
