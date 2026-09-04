@@ -728,7 +728,6 @@ export function buildOpenApiDocument() {
           },
         },
       },
-    },
       /* ── Admin finances (C-PR5a, D58) ────────────────────────── */
       "/admin/finances/queue": {
         get: {
@@ -853,6 +852,21 @@ export function buildOpenApiDocument() {
           responses: { "200": jsonResponse("ManualRefundResponse", "Refunded"), "400": response400, "401": response401, "403": response403, "404": response404, "409": response409, "500": response500 },
         },
       },
+      /* ── Admin history (C-PR6a, D59 5A) ─────────────────────── */
+      "/admin/deals/{id}/history": {
+        get: {
+          tags: ["admin"],
+          summary: "Everything that happened to this deal (D59 5A) — outbox, admin journal, notifications, emails",
+          description:
+            "Permission deals.history.read (MEDIATOR, SUPPORT, FINANCE). Read-only merge of the outbox (with relay state: published / pending / parked), the admin journal, in-app notifications " +
+            "and email deliveries, sorted by time. Outbox payloads are reduced to a whitelist — never a delivery code, a photo or an address. Reading is journaled (DEAL_HISTORY_VIEWED).",
+          operationId: "adminGetDealHistory",
+          security: adminSecurity,
+          parameters: [dealIdPathParam],
+          responses: { "200": jsonResponse("DealHistoryResponse", "History"), "401": response401, "403": response403, "404": response404, "500": response500 },
+        },
+      },
+    },
     components: {
       schemas: components,
       securitySchemes: {

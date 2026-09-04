@@ -199,6 +199,9 @@ export default function YambaTripResultCardMobile({
                         ({item.reviewCount})
                       </span>
                     )}
+                    {typeof item.viewsCount === "number" && item.viewsCount > 0 && (
+                      <span className="ml-1 text-slate-400 dark:text-slate-500">· 👁 {item.viewsCount}</span>
+                    )}
                   </>
                 ) : (
                   t("card.newTripper")

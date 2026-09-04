@@ -5,7 +5,7 @@ import Link from "next/link";
 import { ApiError, apiFetch, post } from "@/lib/api";
 import { ACTION_LABEL, DIVERGENCE_LABEL, PAYOUT_FAILURE_LABEL, PAYOUT_STATUS_LABEL, TIMELINE_LABEL, dateTime, money } from "@/lib/format";
 import { can } from "@/lib/permissions";
-import type { AdminDealMoneyFile, AdminMe, PaymentReconciliation } from "@/lib/types";
+import type { AdminDealMoneyFile, AdminMe, DealHistoryResponse, PaymentReconciliation } from "@/lib/types";
 
 const MIN_REASON = 20;
 
@@ -128,6 +128,7 @@ export default function DealMoneyView({ dealId }: { dealId: string }) {
           {file.dates.closedAt && <Row k="Clos" v={`${dateTime(file.dates.closedAt)} (${file.dates.closedBy ?? "—"})`} />}
         </div>
       </Card>
+      {can(me?.adminRole, "deals.history.read") && <DealHistoryCard dealId={dealId} />}
       <Card title="Actions admin sur ce deal" className="mt-5">
         {file.adminActions.length === 0 ? <p className="text-[12.5px] text-slate-500">Aucune.</p> : (
           <ul className="space-y-1 text-[12.5px]">{file.adminActions.map((a) => <li key={a.id}>{dateTime(a.at)} · {a.admin} · <b>{ACTION_LABEL[a.action] ?? a.action}</b>{a.after ? <span className="ml-1 font-mono text-[11px] text-slate-500">{JSON.stringify(a.after)}</span> : null}</li>)}</ul>
@@ -160,6 +161,44 @@ function ReversalForm({ dealId, onDone }: { dealId: string; onDone: (msg: string
       </div>
       {err && <p className="mt-2 text-[12px] text-red-700">{err}</p>}
     </div>
+  );
+}
+const SOURCE_LABEL: Record<string, string> = { OUTBOX: "événement", ADMIN: "admin", NOTIFICATION: "notification", EMAIL: "email" };
+function DealHistoryCard({ dealId }: { dealId: string }) {
+  const [h, setH] = useState<DealHistoryResponse | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  async function load() {
+    setBusy(true); setErr(null);
+    try { setH(await apiFetch<DealHistoryResponse>(`/admin/deals/${dealId}/history`)); }
+    catch (e) { setErr(e instanceof ApiError ? `${e.status} : ${e.message}` : "Chargement impossible."); }
+    finally { setBusy(false); }
+  }
+  return (
+    <Card title="Tout ce qui est arrivé à ce deal" className="mt-5">
+      <p className="text-[12px] text-slate-500">Événements (avec leur état de relais), actions admin, notifications et emails, dans l'ordre. Lecture seule, consultation journalisée. Jamais le code de livraison.</p>
+      {!h && <button disabled={busy} onClick={load} className="mt-2 rounded-lg border border-slate-300 px-3 py-1.5 text-[12.5px] disabled:opacity-50">Charger la chronologie</button>}
+      {err && <p className="mt-2 text-[12px] text-red-700">{err}</p>}
+      {h && (
+        <>
+          <p className="mt-2 text-[11.5px] text-slate-500">{h.counts.outbox} événement(s) · {h.counts.admin} action(s) admin · {h.counts.notifications} notification(s) · {h.counts.emails} email(s){h.counts.parked > 0 && <span className="ml-1 rounded-full bg-red-50 px-2 py-0.5 font-semibold text-red-700">{h.counts.parked} parqué(s) — relais à réparer</span>}</p>
+          <ol className="mt-2 space-y-1 text-[12.5px]">
+            {h.events.map((e, i) => (
+              <li key={i} className="flex flex-wrap gap-x-2">
+                <span className="w-32 shrink-0 text-slate-500">{dateTime(e.at)}</span>
+                <span className={`rounded px-1.5 text-[10.5px] font-semibold uppercase ${e.source === "OUTBOX" ? "bg-slate-100" : e.source === "ADMIN" ? "bg-amber-50 text-amber-800" : e.source === "EMAIL" ? "bg-sky-50 text-sky-800" : "bg-emerald-50 text-emerald-800"}`}>{SOURCE_LABEL[e.source]}</span>
+                <b>{e.type}</b>
+                {e.actor && <span className="text-slate-500">par {e.actor}</span>}
+                {e.recipient && <span className="text-slate-500">→ {e.recipient === "SHIPPER" ? "Expéditeur" : "Voyageur"}</span>}
+                {e.status && <span className={`text-[11px] ${e.status === "PARKED" || e.status === "FAILED" ? "font-semibold text-red-700" : "text-slate-400"}`}>{e.status.toLowerCase()}{e.relay && e.relay.attempts > 1 ? ` · ${e.relay.attempts} essais` : ""}</span>}
+                {Object.keys(e.summary).length > 0 && <span className="font-mono text-[11px] text-slate-500">{JSON.stringify(e.summary)}</span>}
+                {e.relay?.lastError && <span className="text-[11px] text-red-700">{e.relay.lastError}</span>}
+              </li>
+            ))}
+          </ol>
+        </>
+      )}
+    </Card>
   );
 }
 const REFUND_MIN_REASON = 50;

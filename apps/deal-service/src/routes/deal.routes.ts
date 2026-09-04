@@ -26,6 +26,8 @@ import { makeAdminDisputeService } from "../services/admin-dispute.service";
 import { makeDealMediationController } from "../controllers/deal-mediation.controller";
 import { makeAdminFinanceController } from "../controllers/admin-finance.controller";
 import { makeAdminFinanceService } from "../services/admin-finance.service";
+import { makeAdminHistoryController } from "../controllers/admin-history.controller";
+import { makeAdminHistoryService } from "../services/admin-history.service";
 import { makeDealMediationService } from "../services/deal-mediation.service";
 
 /**
@@ -130,5 +132,8 @@ router.get("/admin/finances/report", isAdminAuthenticated, requireAdminPermissio
 router.get("/admin/finances/export", isAdminAuthenticated, requireAdminPermission("finances.export"), adminFinance.exportCsv);
 router.post("/admin/deals/:id/refund/propose", isAdminAuthenticated, requireAdminPermission("refunds.manual.propose"), adminFinance.proposeRefund);
 router.post("/admin/deals/:id/refund", isAdminAuthenticated, requireAdminPermission("refunds.manual.apply"), adminFinance.applyRefund);
+// C-PR6a (D59 5A) : tout ce qui est arrivé à ce deal — lecture seule, journalisée
+const adminHistory = makeAdminHistoryController(makeAdminHistoryService());
+router.get("/admin/deals/:id/history", isAdminAuthenticated, requireAdminPermission("deals.history.read"), adminHistory.getHistory);
 
 export default router;

@@ -234,3 +234,11 @@ export type PaymentReconciliation = {
   live: { intentStatus: string; amountCents: number; amountReceivedCents: number; chargeId: string | null; refunds: Array<{ id: string; amountCents: number; status: string; createdAt: string | null }>; transfer: { id: string; amountCents: number; reversedCents: number; createdAt: string | null } | null } | null;
   divergences: Array<{ code: string; message: string; dbCents: number | null; liveCents: number | null }>;
 };
+
+/* ── C-PR6a (D59) — pilotage ── */
+export type PilotageSeriesPoint = { period: string; periodStart: string; signups: number; tripsPublished: number; requests: number; accepted: number; delivered: number; completed: number; cancelled: number; disputes: number; volume: Array<{ currencyCode: string; capturedCents: number }> };
+export type PilotageSeriesResponse = { granularity: "week" | "month"; from: string; to: string; points: PilotageSeriesPoint[]; totals: { users: number; carriersReady: number; tripsPublishedOpen: number }; generatedAt: string; cached: boolean };
+export type CorridorStat = { key: string; originCity: string; originCountryCode: string | null; destinationCity: string; destinationCountryCode: string | null; tripsPublished: number; requests: number; accepted: number; acceptanceRatePct: number | null; avgPricePerKgCents: number | null; currencyCode: string | null; disputes: number; views: number; searches: number; searchesNoResult: number };
+export type CorridorsResponse = { periodDays: number; from: string; items: CorridorStat[]; generatedAt: string; cached: boolean };
+export type DealHistoryEvent = { at: string; source: "OUTBOX" | "ADMIN" | "NOTIFICATION" | "EMAIL"; type: string; actor: string | null; recipient: string | null; summary: Record<string, unknown>; relay: { publishedAt: string | null; attempts: number; parked: boolean; lastError: string | null } | null; status: string | null };
+export type DealHistoryResponse = { bookingId: string; events: DealHistoryEvent[]; counts: { outbox: number; admin: number; notifications: number; emails: number; parked: number }; generatedAt: string };

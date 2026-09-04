@@ -24,6 +24,7 @@
   "car": {
     "label": "Car"
   },
+  "views": "{count, plural, =1 {1 view} other {# views}}",
   "badges": {
     "profileVerified": "Verified profile",
     "superTripper": "Super Traveler",

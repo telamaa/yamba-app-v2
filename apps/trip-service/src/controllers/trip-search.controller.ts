@@ -1,5 +1,7 @@
 import type { Request, Response, NextFunction } from "express";
 import { notHiddenFilter } from "../lib/admin-trips.rules";
+import { recordSearch, tripViews } from "@packages/libs/redis/trip-stats";
+import redis from "@packages/libs/redis";
 import { Prisma } from "@prisma/client";
 import { sortByPriceForWeight, totalForWeightCents, transportForWeightCents } from "../lib/price-for-weight";
 import prisma from "@packages/libs/prisma";
@@ -150,6 +152,17 @@ function buildBaseWhere(
   return where;
 }
 
+/** D5 / C-PR6 (D59) — vues sur les cartes + compteur de recherches par corridor (demande, dont sans résultat). Jamais un 500 pour un compteur. */
+async function markViewsAndCountSearch(mapped: Array<{ id: string; viewsCount?: number }>, params: { from?: string | null; to?: string | null }, totalCount: number): Promise<void> {
+  try {
+    const views = await tripViews(redis, mapped.map((m) => m.id));
+    for (const m of mapped) m.viewsCount = views.get(m.id) ?? 0;
+    await recordSearch(redis, { from: params.from, to: params.to, hadResults: totalCount > 0, now: new Date() });
+  } catch {
+    /* Redis absent : les cartes restent sans compteur */
+  }
+}
+
 /** D33 V2 — prix de CE colis sur cette carte (euros, tout compris). */
 function enrichForWeight(
   dto: YambaTripResultDto,
@@ -268,6 +281,7 @@ export const searchTrips = async (
         }
       }
       await markFavorites((req as { user?: { id?: string } }).user?.id, mapped); // D46
+      await markViewsAndCountSearch(mapped, params, totalCount); // D5 / C-PR6
       return res.status(200).json({ trips: mapped, nextCursor, totalCount: Math.min(totalCount, sorted.length) });
     }
 
@@ -308,6 +322,7 @@ export const searchTrips = async (
     }
 
     await markFavorites((req as { user?: { id?: string } }).user?.id, mapped); // D46 — visiteur → false
+    await markViewsAndCountSearch(mapped, params, totalCount); // D5 / C-PR6 — vues sur les cartes, demande par corridor
 
     return res.status(200).json({
       trips: mapped,

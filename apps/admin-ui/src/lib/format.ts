@@ -60,6 +60,7 @@ export const ACTION_LABEL: Record<string, string> = {
   FINANCE_EXPORTED: "Export finances",
   REFUND_MANUAL_PROPOSED: "Remboursement manuel proposé",
   REFUND_MANUAL_APPLIED: "Remboursement manuel appliqué",
+  DEAL_HISTORY_VIEWED: "Chronologie consultée",
 };
 
 /* C-PR5a (D58) */

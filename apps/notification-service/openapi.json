@@ -3778,6 +3778,12 @@
           "isFavorite": {
             "description": "D46 — true si l'utilisateur connecté a mis ce trajet en favori (absent/false pour un visiteur)",
             "type": "boolean"
+          },
+          "viewsCount": {
+            "description": "D5 / C-PR6 — vues de la page publique, dédoublonnées par visiteur et par jour (Redis) ; absent si Redis indisponible",
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
           }
         },
         "required": [
@@ -4524,6 +4530,12 @@
           "isFavorite": {
             "description": "D46 — true si l'utilisateur connecté a mis ce trajet en favori (isOptionallyAuthenticated)",
             "type": "boolean"
+          },
+          "viewsCount": {
+            "description": "D5 / C-PR6 — vues dédoublonnées par visiteur et par jour (Redis), cette vue comprise ; absent si Redis indisponible",
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
           }
         },
         "required": [
@@ -15139,6 +15151,527 @@
           "currencyCode"
         ],
         "additionalProperties": false
+      },
+      "PilotageGranularity": {
+        "type": "string",
+        "enum": [
+          "week",
+          "month"
+        ],
+        "description": "Semaines ISO (lundi, UTC) ou mois UTC"
+      },
+      "PilotageSeriesPoint": {
+        "type": "object",
+        "properties": {
+          "period": {
+            "type": "string",
+            "description": "YYYY-MM (mois) ou YYYY-Www (semaine ISO)"
+          },
+          "periodStart": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          },
+          "signups": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "tripsPublished": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "requests": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "accepted": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "delivered": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "completed": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "cancelled": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "disputes": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "volume": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "currencyCode": {
+                  "type": "string"
+                },
+                "capturedCents": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "currencyCode",
+                "capturedCents"
+              ],
+              "additionalProperties": false
+            },
+            "description": "Encaissé (capture) par devise"
+          }
+        },
+        "required": [
+          "period",
+          "periodStart",
+          "signups",
+          "tripsPublished",
+          "requests",
+          "accepted",
+          "delivered",
+          "completed",
+          "cancelled",
+          "disputes",
+          "volume"
+        ],
+        "additionalProperties": false
+      },
+      "PilotageSeriesResponse": {
+        "type": "object",
+        "properties": {
+          "granularity": {
+            "$ref": "#/components/schemas/PilotageGranularity"
+          },
+          "from": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          },
+          "to": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          },
+          "points": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PilotageSeriesPoint"
+            },
+            "description": "Du plus ancien au plus récent, périodes vides incluses"
+          },
+          "totals": {
+            "type": "object",
+            "properties": {
+              "users": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "carriersReady": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991,
+                "description": "Comptes Stripe avec virements activés"
+              },
+              "tripsPublishedOpen": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "users",
+              "carriersReady",
+              "tripsPublishedOpen"
+            ],
+            "additionalProperties": false
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          },
+          "cached": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "granularity",
+          "from",
+          "to",
+          "points",
+          "totals",
+          "generatedAt",
+          "cached"
+        ],
+        "additionalProperties": false
+      },
+      "CorridorStat": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "description": "ville>ville normalisées"
+          },
+          "originCity": {
+            "type": "string"
+          },
+          "originCountryCode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "destinationCity": {
+            "type": "string"
+          },
+          "destinationCountryCode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "tripsPublished": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "requests": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "accepted": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "acceptanceRatePct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "avgPricePerKgCents": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "currencyCode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "disputes": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "views": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Vues des pages de trajets du corridor sur la période (Redis)"
+          },
+          "searches": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Recherches sur ce corridor (Redis)"
+          },
+          "searchesNoResult": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Recherches sans aucun trajet (Redis) — demande sans offre"
+          }
+        },
+        "required": [
+          "key",
+          "originCity",
+          "originCountryCode",
+          "destinationCity",
+          "destinationCountryCode",
+          "tripsPublished",
+          "requests",
+          "accepted",
+          "acceptanceRatePct",
+          "avgPricePerKgCents",
+          "currencyCode",
+          "disputes",
+          "views",
+          "searches",
+          "searchesNoResult"
+        ],
+        "additionalProperties": false
+      },
+      "CorridorsResponse": {
+        "type": "object",
+        "properties": {
+          "periodDays": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "from": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CorridorStat"
+            }
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          },
+          "cached": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "periodDays",
+          "from",
+          "items",
+          "generatedAt",
+          "cached"
+        ],
+        "additionalProperties": false
+      },
+      "DealHistorySource": {
+        "type": "string",
+        "enum": [
+          "OUTBOX",
+          "ADMIN",
+          "NOTIFICATION",
+          "EMAIL"
+        ]
+      },
+      "DealHistoryEvent": {
+        "type": "object",
+        "properties": {
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          },
+          "source": {
+            "$ref": "#/components/schemas/DealHistorySource"
+          },
+          "type": {
+            "type": "string",
+            "description": "eventType outbox, action admin, type de notification ou template d'email"
+          },
+          "actor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "SHIPPER / CARRIER / SYSTEM / ADMIN, ou le nom court de l'admin"
+          },
+          "recipient": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Notification / email : SHIPPER ou CARRIER"
+          },
+          "summary": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {},
+            "description": "Sous-ensemble WHITELISTÉ du payload — jamais un code, un secret ou une photo"
+          },
+          "relay": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "publishedAt": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "date-time",
+                        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "attempts": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "parked": {
+                    "type": "boolean"
+                  },
+                  "lastError": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "publishedAt",
+                  "attempts",
+                  "parked",
+                  "lastError"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Outbox seulement"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Email : PENDING / SENT / FAILED · notification : lue ou non"
+          }
+        },
+        "required": [
+          "at",
+          "source",
+          "type",
+          "actor",
+          "recipient",
+          "summary",
+          "relay",
+          "status"
+        ],
+        "additionalProperties": false
+      },
+      "DealHistoryResponse": {
+        "type": "object",
+        "properties": {
+          "bookingId": {
+            "$ref": "#/components/schemas/ObjectId"
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DealHistoryEvent"
+            }
+          },
+          "counts": {
+            "type": "object",
+            "properties": {
+              "outbox": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "admin": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "notifications": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "emails": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "parked": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "outbox",
+              "admin",
+              "notifications",
+              "emails",
+              "parked"
+            ],
+            "additionalProperties": false
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          }
+        },
+        "required": [
+          "bookingId",
+          "events",
+          "counts",
+          "generatedAt"
+        ],
+        "additionalProperties": false,
+        "description": "Tout ce qui est arrivé à ce deal (D59 5A), lecture seule, consultation journalisée"
       }
     },
     "securitySchemes": {
