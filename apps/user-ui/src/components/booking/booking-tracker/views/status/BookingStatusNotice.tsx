@@ -12,6 +12,8 @@
  */
 "use client";
 
+import MediationDecisionCard from "@/components/shared/mediation/MediationDecisionCard";
+
 import { useFormatter, useTranslations } from "next-intl";
 import { CheckCircle2, Clock3, Info, ShieldAlert, XCircle } from "lucide-react";
 import type { Booking, BookingStatus } from "../../booking-tracker.types";
@@ -99,6 +101,19 @@ export default function BookingStatusNotice({ booking, onBackAction }: Props) {
           <p className="mt-2 text-[13px] font-bold text-slate-700 dark:text-slate-300">
             {t("ticketLine", { ticket: booking.disputeTicket })}
           </p>
+        ) : null}
+        {/* C-PR2 (D55) — annulé par décision de médiation, ou retenue arbitrée : la décision se lit ici. */}
+        {status === "CANCELLED" && (booking.dispute?.resolution || booking.retentionDecision) ? (
+          <div className="mt-5 text-left">
+            <MediationDecisionCard
+              role="SHIPPER"
+              ticket={booking.dispute?.ticketNumber ?? null}
+              resolution={booking.dispute?.resolution ?? null}
+              retentionDecision={booking.retentionDecision ?? null}
+              retentionCents={booking.retentionCents ?? null}
+              compact
+            />
+          </div>
         ) : null}
         <button
           type="button"

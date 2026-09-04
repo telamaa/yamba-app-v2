@@ -45,6 +45,8 @@ export const BOOKING_EVENT_TYPES = [
   "booking.verification_reminder",
   "booking.rating_reminder",
   "booking.rating_revealed",
+  "booking.dispute_carrier_responded",
+  "booking.dispute_resolved",
 ] as const;
 
 export const BookingEventTypeSchema = z
@@ -307,6 +309,34 @@ export const BookingRatingRevealedEventSchema = z
   })
   .meta({ id: "BookingRatingRevealedEvent", description: "Double-blind reviews revealed → in-app notification to both" });
 
+export const BookingDisputeCarrierRespondedEventSchema = z
+  .object({
+    ...envelope,
+    eventType: z.literal("booking.dispute_carrier_responded"),
+    payload: BookingEventBasePayloadSchema.extend({
+      ticketNumber: z.string(),
+      respondedAt: z.iso.datetime(),
+    }),
+  })
+  .meta({ id: "BookingDisputeCarrierRespondedEvent", description: "The carrier gave their side in the app (C-PR2, D55) — no notification, the admin queue shows it" });
+
+export const BookingDisputeResolvedEventSchema = z
+  .object({
+    ...envelope,
+    eventType: z.literal("booking.dispute_resolved"),
+    payload: BookingEventBasePayloadSchema.extend({
+      kind: z.enum(["DISPUTE", "RETENTION"]),
+      ticketNumber: z.string().nullable(),
+      outcome: z.enum(["REJECTED", "PARTIAL_REFUND", "FULL_REFUND", "COMPENSATE_CARRIER", "RESTITUTE_SHIPPER"]),
+      refundCents: z.number().int(),
+      carrierPayoutCents: z.number().int(),
+      reason: z.string(),
+      finalStatus: z.enum(["COMPLETED", "CANCELLED"]),
+      resolvedAt: z.iso.datetime(),
+    }),
+  })
+  .meta({ id: "BookingDisputeResolvedEvent", description: "Admin decision (C-PR2, D55) → both parties notified with the outcome, their amount and the reason" });
+
 /* ══ Union discriminée (consommateurs) ════════════════════════ */
 
 export const BookingDomainEventSchema = z
@@ -329,6 +359,8 @@ export const BookingDomainEventSchema = z
     BookingVerificationReminderEventSchema,
     BookingRatingReminderEventSchema,
     BookingRatingRevealedEventSchema,
+    BookingDisputeCarrierRespondedEventSchema,
+    BookingDisputeResolvedEventSchema,
   ])
   .meta({
     id: "BookingDomainEvent",

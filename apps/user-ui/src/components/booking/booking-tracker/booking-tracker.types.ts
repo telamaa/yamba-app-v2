@@ -123,6 +123,10 @@ export type Booking = {
   rating?: { windowEndsAt: string | null; ratedByMe: boolean; counterpartHasRated: boolean; revealedAt: string | null; canRate: boolean } | null;
   /** Machine d'état serveur — les CTA reflètent, ne décident jamais. */
   allowedActions?: string[];
+  /** C-PR2 (D55 3A) — arbitrage d'une retenue d'annulation. */
+  retentionDecision?: { outcome: "COMPENSATE_CARRIER" | "RESTITUTE_SHIPPER"; reason: string; decidedAt: string };
+  /** Retenue d'annulation (centimes) — servie avec l'arbitrage. */
+  retentionCents?: number;
 
   carrier: BookingCarrier;
   trip: BookingTrip;
@@ -219,6 +223,10 @@ export type BookingDisputeFile = {
   desiredOutcome?: DisputeDesiredOutcome;
   photoUrls: string[];
   createdAt: string;
+  /** C-PR2 (D55) — le Voyageur a donné sa version (contenu jamais servi à l'Expéditeur). */
+  carrierRespondedAt?: string | null;
+  /** C-PR2 (D55 5A) — la décision : issue, montants, motif. */
+  resolution?: { outcome: "REJECTED" | "PARTIAL_REFUND" | "FULL_REFUND"; refundCents: number; carrierPayoutCents: number; reason: string; resolvedAt: string } | null;
 };
 
 export const DISPUTE_MIN_DESCRIPTION_LENGTH = 50;

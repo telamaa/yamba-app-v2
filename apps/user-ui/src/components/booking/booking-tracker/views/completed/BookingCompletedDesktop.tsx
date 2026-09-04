@@ -9,7 +9,7 @@ import BookingAcceptedHeader from "../accepted/BookingAcceptedHeader";
 import BookingCarrierCard from "../accepted/BookingCarrierCard";
 import DeliveryRecapCard from "../delivered/DeliveryRecapCard";
 import { DeliveredPaymentCard } from "../delivered/DeliveredSideCards";
-import { CompletedBanner, PaymentReleasedCard, RatingSoonNote } from "./CompletedCards";
+import { CompletedBanner, MediationDecisionNote, PaymentReleasedCard, RatingSoonNote } from "./CompletedCards";
 
 type Props = {
   booking: Booking;
@@ -30,6 +30,7 @@ export default function BookingCompletedDesktop({ booking, onCloseAction }: Prop
               <h2 className="text-xl font-black tracking-tight text-slate-900 dark:text-white sm:text-2xl">{t("h1")}</h2>
               <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{t("h1Subtitle")}</p>
             </header>
+            <MediationDecisionNote booking={booking} />
             <PaymentReleasedCard booking={booking} />
             <DeliveryRecapCard booking={booking} />
             <RatingSoonNote booking={booking} />

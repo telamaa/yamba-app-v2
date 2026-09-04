@@ -42,7 +42,7 @@ npx prisma db push                 # sync schema to MongoDB (no migrations — M
 npm run auth-docs                  # regenerate auth swagger-output.json (swagger-autogen — legacy, conversion to Zod-OpenAPI is backlog)
 ```
 
-Test platform baseline: **700 tests** (trip-service 198, deal-service 424, notification-service 78) + auth-service 80 (also a CI check) — any deviation must be explained.
+Test platform baseline: **716 tests** (trip-service 198, deal-service 440, notification-service 78) + auth-service 80 (also a CI check) — any deviation must be explained.
 
 Manual `tsc` (when Nx typecheck target is not what you want): `npx tsc --noEmit --project apps/<service>/tsconfig.app.json` — NEVER `--project apps/<service>` (resolves the solution-style tsconfig: 0 files checked).
 
@@ -113,8 +113,9 @@ JWT `access_token` + `refresh_token` set as cookies by auth-service. Frontend `a
 
 ## Known pitfalls (paid once, never twice)
 
-- Prisma+Mongo: `field: null` in a `where` misses ABSENT fields → `OR: [{field: null}, {field: {isSet: false}}]` — for EVERY nullable filter (`readAt`, `publishedAt`…), and writers must set `null` explicitly. Paid FOUR times (readAt, reservedKg A34, outbox relay A49, trackingEvents A85): a fixture that sets the field proves nothing about the real writer. **Composite/scalar LISTS are worse: no Prisma filter (`none`, `some`, `isEmpty`, `equals: []`) matches an ABSENT list** — writers must create lists as `[]` (booking-request.ts does), concurrency guards go through `updatedAt` (optimistic lock), and `packages/libs/prisma/scripts/repair-absent-lists.ts` back-fills existing documents.
+- Prisma+Mongo: `field: null` in a `where` misses ABSENT fields → `OR: [{field: null}, {field: {isSet: false}}]` — for EVERY nullable filter (`readAt`, `publishedAt`…), and writers must set `null` explicitly. Paid FIVE times (readAt, reservedKg A34, outbox relay A49, trackingEvents A85, Dispute.resolvedAt C-PR2): a fixture that sets the field proves nothing about the real writer. **Composite/scalar LISTS are worse: no Prisma filter (`none`, `some`, `isEmpty`, `equals: []`) matches an ABSENT list** — writers must create lists as `[]` (booking-request.ts does), concurrency guards go through `updatedAt` (optimistic lock), and `packages/libs/prisma/scripts/repair-absent-lists.ts` back-fills existing documents.
 - Nullable unique fields on Mongo collide on null (P2002).
+- Prisma+Mongo `{ increment: 1 }` on an ABSENT numeric field yields null, not 1 (pipeline `$add` with a missing operand). For counters added after the documents exist, read then write the value explicitly (C-PR2 `disputesLostCount`).
 - Atlas shared tiers cap aggregation pipelines at 50 stages; Prisma emits one `$set` stage per field on updates touching composite types → `P2010 Pipeline length greater than 50`. Chunk wide updates with `apps/trip-service/src/lib/mongo-update-chunks.ts` (transition fields last).
 - macOS FS is case-insensitive, CI Linux is not → exact-case imports.
 - A nested `apps/<service>/node_modules/<pkg>` (version drift between the service `package.json` and the root) shadows the root copy: `npm ls <pkg>` must say « deduped ». `imagekit` is pinned exact (6.0.0) in BOTH package.json files — 1.5.0 was a 2016 fossil with another API (A47).

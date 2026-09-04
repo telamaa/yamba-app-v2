@@ -1100,3 +1100,29 @@ La section Finances était une promesse : deux onglets vides et une maquette aux
 | ADM8 | Ouvrir un dossier | Chronologie, argent (payé, net, commission, versement gelé), Expéditeur et Voyageur avec leurs faits, colis déclaré + photos, prise en charge + checklist + photos, jalons, photos de remise, signalement (description, solution souhaitée, photos) ; aucun code de livraison nulle part |
 | ADM9 | Journal | Chaque connexion, activation 2FA, code de secours utilisé, dossier consulté, déconnexion — avec le prénom de l'admin et l'IP |
 | ADM10 | Laisser l'onglet 50 min sans rien faire, puis naviguer | Retour à `/login` (inactivité 45 min) |
+
+# C-PR2 — la médiation : entendre les deux, trancher une fois, laisser une trace
+
+### Règles de gestion (MED)
+- **RG-MED-01 — Le Voyageur donne sa version dans l'application, une seule fois**, tant que le dossier est ouvert : texte d'au moins 50 caractères, jusqu'à 5 photos. L'Expéditeur apprend qu'une version a été donnée, jamais son contenu.
+- **RG-MED-02 — Une décision n'est possible qu'après la version du Voyageur, ou 72 h après l'ouverture.** Le dossier affiche l'échéance ; l'API refuse avant (409 avec la date).
+- **RG-MED-03 — Trois issues pour un litige** : rejet (Voyageur payé en entier), remboursement partiel (montant libre entre 1 centime et le total moins 1, le Voyageur reçoit son net moins ce montant, plancher zéro, Yamba conserve le reste), remboursement total (commission comprise, Voyageur rien).
+- **RG-MED-04 — Deux issues pour une retenue à arbitrer**, aux montants calculés par le serveur : compensation au Voyageur (prorata de sa part nette) ou restitution à l'Expéditeur.
+- **RG-MED-05 — Toute décision porte un motif d'au moins 50 caractères, lu par les deux parties**, et passe par un récapitulatif des flux avant validation. Elle est définitive dans l'application ; le recours est la médiation conventionnelle par email.
+- **RG-MED-06 — L'argent suit l'ordre remboursement puis versement** ; un versement qui échoue est rejoué par le cron, jamais bloquant pour la décision.
+- **RG-MED-07 — Un deal clos par médiation ne se note pas.** Le litige tranché incrémente un compteur interne « litiges perdus » sur la partie condamnée (Expéditeur si rejet, Voyageur dès qu'il y a remboursement), visible de l'admin seul.
+- **RG-MED-08 — Les deux parties sont prévenues de la décision** (écran, notification, email) avec l'issue, le montant qui les concerne et le motif.
+
+### Recette (MED) — rejouer `seed-deals.ts` avant (deux litiges YAM-2041 / YAM-2042 et une retenue « à arbitrer »)
+| # | Scénario | Attendu |
+|---|---|---|
+| MED1 | Voyageur (Thomas), deal YAM-2041 | Carte « Donne ta version » avec l'échéance ; texte < 50 → bouton inactif ; photos jusqu'à 5 ; envoi → « Version envoyée le … » ; le bouton ne revient pas |
+| MED2 | Expéditrice (Chinwe), même deal | Processus : « Thomas a donné sa version » ; jamais son texte ni ses photos |
+| MED3 | Admin, file | YAM-2041 « version reçue · à trancher », YAM-2042 « attend le Voyageur · N h », retenue « à trancher » |
+| MED4 | Admin, YAM-2042 sans version | Dossier : « décision possible à partir du … » ; formulaire absent |
+| MED5 | Admin, YAM-2041, partiel 15,00 € | Récapitulatif : remboursé 15 €, versé (net − 15 €), conservé (commission) ; validation → « Décision enregistrée », dossier sorti de la file |
+| MED6 | Expéditrice après | Écran « Envoi terminé » avec « Décision rendue » : remboursement partiel, 15 € sous 5 à 10 jours, motif ; aucune carte « Noter » ; email et notification reçus |
+| MED7 | Voyageur après | Écran terminé : « Décision rendue », versement net − 15 € parti, motif ; portefeuille au bon montant ; aucune carte « Noter » |
+| MED8 | Admin, retenue `bzv-held` | Deux issues avec montants : compensation (prorata) / restitution (retenue entière) ; motif ; validation → Voyageur : compensation partie ou « retenue restituée » ; Expéditrice : « la retenue te revient, X remboursés » |
+| MED9 | Admin, remboursement total sur un litige | Deal CANCELLED, Expéditeur remboursé en entier, Voyageur « aucun versement », écrans des deux côtés |
+| MED10 | Journal | `Litige tranché` / `Retenue arbitrée` avec l'issue et les montants ; seconde tentative sur le même dossier refusée |

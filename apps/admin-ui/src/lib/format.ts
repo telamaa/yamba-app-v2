@@ -34,7 +34,21 @@ export const ACTION_LABEL: Record<string, string> = {
   ADMIN_TOTP_ENABLED: "2FA activée",
   ADMIN_BACKUP_CODE_USED: "Code de secours utilisé",
   DISPUTE_VIEWED: "Dossier consulté",
+  DISPUTE_RESOLVED: "Litige tranché",
+  RETENTION_ARBITRATED: "Retenue arbitrée",
 };
+
+export const RESOLUTION_LABEL: Record<string, string> = {
+  REJECTED: "Rejet : le Voyageur est payé en entier",
+  PARTIAL_REFUND: "Remboursement partiel",
+  FULL_REFUND: "Remboursement total : le Voyageur ne reçoit rien",
+  COMPENSATE_CARRIER: "Compensation au Voyageur (prorata)",
+  RESTITUTE_SHIPPER: "Restitution de la retenue à l'Expéditeur",
+};
+
+export function hoursUntil(iso: string): number {
+  return Math.ceil((new Date(iso).getTime() - Date.now()) / 3_600_000);
+}
 
 export const STEP_LABEL: Record<string, string> = {
   AT_AIRPORT: "À l'aéroport",

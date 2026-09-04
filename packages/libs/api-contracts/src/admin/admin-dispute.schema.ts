@@ -10,6 +10,7 @@
 import { z } from "zod";
 import { ObjectIdSchema } from "../common";
 import { DisputeCategorySchema, DisputeDesiredOutcomeSchema } from "../booking/booking.enums";
+import { DisputeResolutionOutcomeSchema, DisputeResolutionViewSchema, RetentionArbitrationOutcomeSchema } from "../booking/booking-settlement.schema";
 
 export const ArbitrationKindSchema = z.enum(["DISPUTE", "RETENTION"]).meta({ id: "ArbitrationKind" });
 export type ArbitrationKind = z.infer<typeof ArbitrationKindSchema>;
@@ -21,6 +22,7 @@ const PartySchema = z.object({
   email: z.string(),
   completedDealsCount: z.number().int(),
   lateCancellationsCount: z.number().int(),
+  disputesLostCount: z.number().int().meta({ description: "Internal reputation fact (D29②, D55 4A) — never public" }),
   ratingsAvg: z.number(),
   ratingsCount: z.number().int(),
 });
@@ -38,6 +40,8 @@ export const ArbitrationQueueItemSchema = z
     currencyCode: z.string(),
     shipperFirstName: z.string(),
     carrierFirstName: z.string(),
+    carrierResponded: z.boolean().meta({ description: "DISPUTE: the carrier gave their side" }),
+    decidableAt: z.string().datetime().meta({ description: "When a decision becomes possible: now if responded / RETENTION, else disputedAt + 72h" }),
   })
   .meta({ id: "ArbitrationQueueItem" });
 export type ArbitrationQueueItem = z.infer<typeof ArbitrationQueueItemSchema>;
@@ -102,8 +106,57 @@ export const AdminDisputeFileSchema = z
         photoUrls: z.array(z.string()),
         pledgeAcceptedAt: z.string().datetime(),
         status: z.string(),
+        carrierStatement: z
+          .object({ statement: z.string(), photoUrls: z.array(z.string()), respondedAt: z.string().datetime() })
+          .nullable(),
+        responseDeadlineAt: z.string().datetime(),
+        resolution: DisputeResolutionViewSchema.nullable(),
       })
       .nullable(),
+    retentionDecision: z.object({ outcome: RetentionArbitrationOutcomeSchema, reason: z.string(), decidedAt: z.string().datetime() }).nullable(),
+    canDecide: z.boolean().meta({ description: "A decision is possible now (responded, or 72h elapsed, or RETENTION) and none was taken yet" }),
+    decidableAt: z.string().datetime().nullable(),
+    proposedAmounts: z
+      .object({
+        rejectedCarrierPayoutCents: z.number().int(),
+        fullRefundCents: z.number().int(),
+        compensateCarrierCents: z.number().int().nullable(),
+        restituteShipperCents: z.number().int().nullable(),
+      })
+      .meta({ description: "Server-computed amounts shown in the admin recap (D55 2A/3A)" }),
   })
   .meta({ id: "AdminDisputeFile", description: "Full mediation file for an admin — never the delivery code (D43)" });
 export type AdminDisputeFile = z.infer<typeof AdminDisputeFileSchema>;
+
+/* ══ C-PR2 (D55) — décisions ══════════════════════════════════ */
+
+export const AdminResolveDisputeRequestSchema = z
+  .object({
+    outcome: DisputeResolutionOutcomeSchema,
+    refundCents: z.number().int().positive().optional().meta({ description: "PARTIAL_REFUND only: 1 ≤ amount ≤ totalShipperCents − 1" }),
+    reason: z.string().trim().min(50, "Reason must be at least 50 characters").max(2000),
+  })
+  .meta({ id: "AdminResolveDisputeRequest", description: "Irreversible. Refund first, then the carrier transfer through the payout executor (D49)." });
+export type AdminResolveDisputeRequest = z.infer<typeof AdminResolveDisputeRequestSchema>;
+
+export const AdminResolveRetentionRequestSchema = z
+  .object({
+    outcome: RetentionArbitrationOutcomeSchema,
+    reason: z.string().trim().min(50, "Reason must be at least 50 characters").max(2000),
+  })
+  .meta({ id: "AdminResolveRetentionRequest", description: "Amounts are computed server-side (pro-rata A79 or the retained amount)" });
+export type AdminResolveRetentionRequest = z.infer<typeof AdminResolveRetentionRequestSchema>;
+
+export const AdminResolutionResponseSchema = z
+  .object({
+    bookingId: ObjectIdSchema,
+    kind: ArbitrationKindSchema,
+    finalStatus: z.enum(["COMPLETED", "CANCELLED"]),
+    outcome: z.string(),
+    refundCents: z.number().int(),
+    carrierPayoutCents: z.number().int(),
+    payoutStatus: z.string().nullable().meta({ description: "SENT / FAILED (retried by the cron) / null when nothing is owed to the carrier" }),
+    resolvedAt: z.iso.datetime(),
+  })
+  .meta({ id: "AdminResolutionResponse" });
+export type AdminResolutionResponse = z.infer<typeof AdminResolutionResponseSchema>;

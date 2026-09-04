@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { apiFetch } from "@/lib/api";
-import { CATEGORY_LABEL, dateTime, daysSince, money } from "@/lib/format";
+import { CATEGORY_LABEL, dateTime, daysSince, hoursUntil, money } from "@/lib/format";
 import type { ArbitrationQueueResponse } from "@/lib/types";
 
 export default function QueueTable() {
@@ -31,6 +31,7 @@ export default function QueueTable() {
               <th className="px-3 py-2">Parties</th>
               <th className="px-3 py-2 text-right">Montant</th>
               <th className="px-3 py-2">Ouvert</th>
+              <th className="px-3 py-2">Décision</th>
             </tr>
           </thead>
           <tbody>
@@ -53,6 +54,17 @@ export default function QueueTable() {
                   <td className="px-3 py-2">
                     {dateTime(it.openedAt)}
                     <span className={`ml-2 text-[11px] ${age >= 5 ? "font-semibold text-red-600" : "text-slate-400"}`}>J+{age}</span>
+                  </td>
+                  <td className="px-3 py-2">
+                    {it.kind === "RETENTION" ? (
+                      <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">à trancher</span>
+                    ) : it.carrierResponded ? (
+                      <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">version reçue · à trancher</span>
+                    ) : hoursUntil(it.decidableAt) <= 0 ? (
+                      <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-800">sans réponse · à trancher</span>
+                    ) : (
+                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">attend le Voyageur · {hoursUntil(it.decidableAt)} h</span>
+                    )}
                   </td>
                 </tr>
               );

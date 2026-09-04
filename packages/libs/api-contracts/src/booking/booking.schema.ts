@@ -11,7 +11,7 @@ import {
   PayoutStatusSchema,
   DisputeCategorySchema,
 } from "./booking.enums";
-import { ShipperDisputeViewSchema } from "./booking-settlement.schema";
+import { CarrierDisputeViewSchema, RetentionDecisionViewSchema, ShipperDisputeViewSchema } from "./booking-settlement.schema";
 
 /**
  * @packages/api-contracts — booking schemas (surface deal, PR3)
@@ -264,10 +264,12 @@ export const ShipperBookingViewSchema = z
 
     capturedAt: z.iso.datetime().nullish().meta({ description: "When the shipper's card was actually charged (at acceptance, D39)" }),
     refundedAt: z.iso.datetime().nullish(),
-    refundAmountCents: z.number().int().nullish().meta({ description: "Amount returned (ANN-01 scale); null when nothing was refunded" }),
+    refundAmountCents: z.number().int().nullish().meta({ description: "Amount returned (ANN-01 scale, plus a mediation refund or restitution); null when nothing was refunded" }),
+    retentionDecision: RetentionDecisionViewSchema.nullish().meta({ description: "C-PR2 (D55 3A): how a held retention was arbitrated" }),
+    retentionCents: z.number().int().nullish().meta({ description: "Late cancellation: amount retained (ANN-01), null otherwise" }),
 
     dispute: ShipperDisputeViewSchema.nullish().meta({
-      description: "The dispute file (status DISPUTED) — shipper only (A68); absent otherwise",
+      description: "The dispute file — shipper only (A68); served while DISPUTED and after the decision (resolution), absent otherwise",
     }),
 
     rating: BookingRatingStateSchema.nullable().meta({ description: "null unless COMPLETED (B5)" }),
@@ -314,12 +316,16 @@ export const CarrierBookingViewSchema = z
     disputeCategory: DisputeCategorySchema.nullish().meta({
       description: "Why the shipper disputed (status DISPUTED) — the carrier sees the category, never the file (A68)",
     }),
+    dispute: CarrierDisputeViewSchema.nullish().meta({
+      description: "C-PR2 (D55): the carrier's view of the dispute — statement state, deadline, decision. Served while DISPUTED and after the decision.",
+    }),
+    retentionDecision: RetentionDecisionViewSchema.nullish().meta({ description: "C-PR2 (D55 3A): how a held retention was arbitrated" }),
 
     payoutAmountCents: z.number().int().nullish().meta({
       description: "Amount paid out to the carrier: the net at COMPLETED, the ANN-01 compensation at late CANCELLED (D50/A82)",
     }),
-    retentionDisposition: z.enum(["CARRIER", "HELD_FOR_MEDIATION"]).nullish().meta({
-      description: "Late cancellation only: the retention went to the carrier (compensation) or is held for mediation (cancelled after departure, A81)",
+    retentionDisposition: z.enum(["CARRIER", "SHIPPER", "HELD_FOR_MEDIATION"]).nullish().meta({
+      description: "Late cancellation only: the retention went to the carrier (compensation), back to the shipper (mediation, C-PR2) or is held for mediation (cancelled after departure, A81)",
     }),
 
     rating: BookingRatingStateSchema.nullable().meta({ description: "null unless COMPLETED (B5)" }),

@@ -33,6 +33,16 @@ export type PayoutSentParams = Base & { amount: string; reason: "DELIVERY" | "LA
 export type DisputedShipperParams = Base & { ticketNumber: string; supportEmail: string };
 export type DisputedCarrierParams = Base & { ticketNumber: string; disputeCategory: DisputeCategory | null; supportEmail: string };
 export type VerificationReminderParams = Base & { payoutDueAt: string; transport: string };
+/** C-PR2 (D55) — décision de médiation : montants déjà formatés ("" = rien), motif de l'admin. */
+export type DisputeResolvedParams = Base & {
+  kind: "DISPUTE" | "RETENTION";
+  outcome: "REJECTED" | "PARTIAL_REFUND" | "FULL_REFUND" | "COMPENSATE_CARRIER" | "RESTITUTE_SHIPPER";
+  ticketNumber: string | null;
+  refund: string;
+  carrierPayout: string;
+  reason: string;
+  supportEmail: string;
+};
 
 export type SettlementEmailDictionary = {
   flightArrivedShipper(p: Base): SettlementEmail;
@@ -42,6 +52,8 @@ export type SettlementEmailDictionary = {
   disputedShipper(p: DisputedShipperParams): SettlementEmail;
   disputedCarrier(p: DisputedCarrierParams): SettlementEmail;
   verificationReminderShipper(p: VerificationReminderParams): SettlementEmail;
+  disputeResolvedShipper(p: DisputeResolvedParams): SettlementEmail;
+  disputeResolvedCarrier(p: DisputeResolvedParams): SettlementEmail;
 };
 
 const DISPUTE_CATEGORY_LABELS: Record<SupportedLocale, Record<DisputeCategory, string>> = {
@@ -175,13 +187,73 @@ const fr: SettlementEmailDictionary = {
         greeting: `Bonjour ${p.firstName},`,
         paragraphs: [
           `${shipper} a ouvert un signalement sur le colis ${p.route}${label ? ` (motif : ${label})` : ""}. Le dossier porte le numéro ${p.ticketNumber}.`,
-          "Ton paiement pour ce transport est mis en attente pendant l'examen. Ce n'est pas une décision : nous allons te contacter pour recueillir ta version et tes éléments (photos de prise en charge, échanges).",
-          "Nous décidons sous 5 jours ouvrés après avoir entendu les deux parties.",
+          "Ton paiement pour ce transport est mis en attente pendant l'examen. Ce n'est pas une décision : donne ta version dans l'application, avec tes photos (prise en charge, remise). Tu as 72 h.",
+          "Nous décidons ensuite sous 5 jours ouvrés, après avoir lu les deux versions.",
         ],
         notice: { tone: "info", text: `Dossier ${p.ticketNumber} — garde ce numéro pour nos échanges.` },
-        cta: { label: "Voir le deal", url: p.ctaUrl },
+        cta: { label: "Donner ma version", url: p.ctaUrl },
         footnotes: [`Tu peux nous écrire dès maintenant à ${p.supportEmail} en rappelant le numéro ${p.ticketNumber}.`],
         reason: "Tu reçois cet email parce qu'un signalement concerne un transport que tu as effectué avec Yamba.",
+      },
+    };
+  },
+  disputeResolvedShipper: (p) => {
+    const ticket = p.ticketNumber ? `Dossier ${p.ticketNumber} — ` : "";
+    const outcomeLine =
+      p.outcome === "REJECTED"
+        ? "Après examen des deux versions et des preuves, nous n'avons pas retenu ton signalement : le Voyageur est payé en entier."
+        : p.outcome === "PARTIAL_REFUND"
+          ? `Après examen des deux versions et des preuves, nous te remboursons ${p.refund}. Le reste est versé au Voyageur.`
+          : p.outcome === "FULL_REFUND"
+            ? `Après examen des deux versions et des preuves, nous te remboursons la totalité : ${p.refund}.`
+            : p.outcome === "RESTITUTE_SHIPPER"
+              ? `La retenue d'annulation te revient : ${p.refund} sont remboursés.`
+              : "La retenue d'annulation est versée au Voyageur : personne n'a pu attester de la prise en charge, et il s'était déplacé.";
+    return {
+      subject: `Décision rendue sur ton envoi ${p.route}`,
+      content: {
+        preheader: `${ticket}la médiation est terminée.`,
+        title: "Décision rendue",
+        greeting: `Bonjour ${p.firstName},`,
+        paragraphs: [
+          outcomeLine,
+          `Motif de la décision : ${p.reason}`,
+          ...(p.refund !== "" && p.outcome !== "REJECTED" && p.outcome !== "COMPENSATE_CARRIER" ? ["Le remboursement apparaît sur ta carte sous 5 à 10 jours."] : []),
+          "Cette décision est définitive dans l'application.",
+        ],
+        notice: { tone: "info", text: `Désaccord ? Une médiation conventionnelle est possible : écris-nous à ${p.supportEmail}${p.ticketNumber ? ` en rappelant ${p.ticketNumber}` : ""}.` },
+        cta: { label: "Voir l'envoi", url: p.ctaUrl },
+        reason: "Tu reçois cet email parce qu'une médiation Yamba concernant ton envoi vient d'être tranchée.",
+      },
+    };
+  },
+  disputeResolvedCarrier: (p) => {
+    const ticket = p.ticketNumber ? `Dossier ${p.ticketNumber} — ` : "";
+    const outcomeLine =
+      p.outcome === "REJECTED"
+        ? `Après examen des deux versions et des preuves, le signalement n'a pas été retenu : ton versement de ${p.carrierPayout} part vers ton compte.`
+        : p.outcome === "PARTIAL_REFUND"
+          ? `Après examen des deux versions et des preuves, une partie du prix est remboursée à l'Expéditeur. ${p.carrierPayout === "" ? "Aucun versement ne te revient sur ce deal." : `Ton versement est de ${p.carrierPayout}.`}`
+          : p.outcome === "FULL_REFUND"
+            ? "Après examen des deux versions et des preuves, l'Expéditeur est remboursé en totalité : aucun versement ne te revient sur ce deal."
+            : p.outcome === "COMPENSATE_CARRIER"
+              ? `La retenue d'annulation te revient : ${p.carrierPayout} partent vers ton compte.`
+              : "La retenue d'annulation est restituée à l'Expéditeur : aucun versement ne te revient sur ce deal.";
+    return {
+      subject: `Décision rendue sur ton transport ${p.route}`,
+      content: {
+        preheader: `${ticket}la médiation est terminée.`,
+        title: "Décision rendue",
+        greeting: `Bonjour ${p.firstName},`,
+        paragraphs: [
+          outcomeLine,
+          `Motif de la décision : ${p.reason}`,
+          ...(p.carrierPayout !== "" ? ["Le versement arrive sur ton compte bancaire sous 2 à 7 jours."] : []),
+          "Cette décision est définitive dans l'application.",
+        ],
+        notice: { tone: "info", text: `Désaccord ? Une médiation conventionnelle est possible : écris-nous à ${p.supportEmail}${p.ticketNumber ? ` en rappelant ${p.ticketNumber}` : ""}.` },
+        cta: { label: "Voir le deal", url: p.ctaUrl },
+        reason: "Tu reçois cet email parce qu'une médiation Yamba concernant ton transport vient d'être tranchée.",
       },
     };
   },
@@ -313,13 +385,73 @@ const en: SettlementEmailDictionary = {
         greeting: `Hi ${p.firstName},`,
         paragraphs: [
           `${shipper} opened a report on the parcel ${p.route}${label ? ` (reason: ${label})` : ""}. The case number is ${p.ticketNumber}.`,
-          "Your payment for this transport is on hold during the review. This is not a decision: we will contact you to collect your side and your evidence (pickup photos, exchanges).",
-          "We decide within 5 business days after hearing both parties.",
+          "Your payment for this transport is on hold during the review. This is not a decision: give your side in the app, with your photos (pickup, hand-over). You have 72 hours.",
+          "We then decide within 5 business days, after reading both sides.",
         ],
         notice: { tone: "info", text: `Case ${p.ticketNumber} — keep this number for our exchanges.` },
-        cta: { label: "View the deal", url: p.ctaUrl },
+        cta: { label: "Give my side", url: p.ctaUrl },
         footnotes: [`You can write to us right away at ${p.supportEmail} quoting ${p.ticketNumber}.`],
         reason: "You are receiving this email because a report concerns a transport you carried out with Yamba.",
+      },
+    };
+  },
+  disputeResolvedShipper: (p) => {
+    const ticket = p.ticketNumber ? `Case ${p.ticketNumber} — ` : "";
+    const outcomeLine =
+      p.outcome === "REJECTED"
+        ? "After reviewing both sides and the evidence, we did not uphold your report: the carrier is paid in full."
+        : p.outcome === "PARTIAL_REFUND"
+          ? `After reviewing both sides and the evidence, we refund you ${p.refund}. The rest goes to the carrier.`
+          : p.outcome === "FULL_REFUND"
+            ? `After reviewing both sides and the evidence, we refund you in full: ${p.refund}.`
+            : p.outcome === "RESTITUTE_SHIPPER"
+              ? `The cancellation retention comes back to you: ${p.refund} refunded.`
+              : "The cancellation retention goes to the carrier: nobody could attest the pickup, and they had travelled.";
+    return {
+      subject: `Decision on your shipment ${p.route}`,
+      content: {
+        preheader: `${ticket}mediation is over.`,
+        title: "Decision made",
+        greeting: `Hi ${p.firstName},`,
+        paragraphs: [
+          outcomeLine,
+          `Reason: ${p.reason}`,
+          ...(p.refund !== "" && p.outcome !== "REJECTED" && p.outcome !== "COMPENSATE_CARRIER" ? ["The refund shows on your card within 5 to 10 days."] : []),
+          "This decision is final in the app.",
+        ],
+        notice: { tone: "info", text: `Disagree? Conventional mediation is possible: write to ${p.supportEmail}${p.ticketNumber ? ` quoting ${p.ticketNumber}` : ""}.` },
+        cta: { label: "View the shipment", url: p.ctaUrl },
+        reason: "You receive this email because a Yamba mediation about your shipment has just been decided.",
+      },
+    };
+  },
+  disputeResolvedCarrier: (p) => {
+    const ticket = p.ticketNumber ? `Case ${p.ticketNumber} — ` : "";
+    const outcomeLine =
+      p.outcome === "REJECTED"
+        ? `After reviewing both sides and the evidence, the report was not upheld: your payout of ${p.carrierPayout} is on its way.`
+        : p.outcome === "PARTIAL_REFUND"
+          ? `After reviewing both sides and the evidence, part of the price is refunded to the shipper. ${p.carrierPayout === "" ? "No payout is owed to you on this deal." : `Your payout is ${p.carrierPayout}.`}`
+          : p.outcome === "FULL_REFUND"
+            ? "After reviewing both sides and the evidence, the shipper is refunded in full: no payout is owed to you on this deal."
+            : p.outcome === "COMPENSATE_CARRIER"
+              ? `The cancellation retention comes to you: ${p.carrierPayout} is on its way.`
+              : "The cancellation retention goes back to the shipper: no payout is owed to you on this deal.";
+    return {
+      subject: `Decision on your transport ${p.route}`,
+      content: {
+        preheader: `${ticket}mediation is over.`,
+        title: "Decision made",
+        greeting: `Hi ${p.firstName},`,
+        paragraphs: [
+          outcomeLine,
+          `Reason: ${p.reason}`,
+          ...(p.carrierPayout !== "" ? ["The payout reaches your bank account within 2 to 7 days."] : []),
+          "This decision is final in the app.",
+        ],
+        notice: { tone: "info", text: `Disagree? Conventional mediation is possible: write to ${p.supportEmail}${p.ticketNumber ? ` quoting ${p.ticketNumber}` : ""}.` },
+        cta: { label: "View the deal", url: p.ctaUrl },
+        reason: "You receive this email because a Yamba mediation about your transport has just been decided.",
       },
     };
   },

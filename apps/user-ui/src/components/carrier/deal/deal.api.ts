@@ -246,3 +246,18 @@ export async function validateDeliveryCode(
     throw toDealApiError(e);
   }
 }
+
+/* ── C-PR2 (D55 1A) — la version du Voyageur sur un litige ouvert ──────── */
+export type DisputeStatementResult = { bookingId: string; ticketNumber: string; respondedAt: string };
+
+export async function submitDisputeStatement(
+  dealId: string,
+  input: { statement: string; photoUrls: string[] }
+): Promise<DisputeStatementResult> {
+  try {
+    const res = await apiClient.post<DisputeStatementResult>(`/deals/${dealId}/dispute/statement`, input, { requireAuth: true });
+    return res.data;
+  } catch (e) {
+    throw toDealApiError(e);
+  }
+}

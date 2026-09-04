@@ -39,6 +39,7 @@ model User {
   shipperReputationLevel        String? // "NEW" | "CONFIRMED" | "TOP"
   shipperCompletedDealsCount    Int     @default(0)
   shipperLateCancellationsCount Int     @default(0) // annulations tardives ANN-01 (retenue > 0)
+  shipperDisputesLostCount      Int     @default(0) // C-PR2 (D55, 4A) : litiges rejetés — INTERNE (D29②), jamais public
   parcelsSentCount    Int   @default(0)
 
   // ── Chantier C (D54, 8A) : 2FA TOTP obligatoire pour les sessions admin ──
@@ -158,6 +159,7 @@ model CarrierPage {
   reputationLevel        String? // "NEW" | "CONFIRMED" | "TOP"
   completedDealsCount    Int     @default(0)
   lateCancellationsCount Int     @default(0) // annulations Voyageur après acceptation (ANN-02)
+  disputesLostCount      Int @default(0) // C-PR2 (D55, 4A) : litiges perdus (remboursement décidé) — INTERNE, jamais public
 
   // Relations
   trips Trip[]
@@ -772,7 +774,11 @@ model Booking {
   completedBy         String? // "SHIPPER" (confirmation anticipée) | "SYSTEM" (J+4)
   // ─── Retenue ANN-01 (D50, A79–A81) ───
   retentionCents        Int? // total − remboursement (annulation tardive de l'Expéditeur)
-  retentionDisposition  String? // "CARRIER" (compensation versée, payoutAmountCents) | "HELD_FOR_MEDIATION" (annulation après le départ, chantier C)
+  // C-PR2 (D55, 3A) : arbitrage d'une retenue HELD_FOR_MEDIATION → CARRIER (compensation) ou SHIPPER (restitution).
+  retentionDecisionReason   String?
+  retentionDecidedAt        DateTime?
+  retentionDecidedByAdminId String?   @db.ObjectId
+  retentionDisposition  String? // "CARRIER" (compensation versée, payoutAmountCents) | "SHIPPER" (restituée, C-PR2) | "HELD_FOR_MEDIATION" (annulation après le départ, chantier C)
   verificationReminderSentAt DateTime? // rappel J+3 émis (A70) — jamais deux fois
 
   // ─── Litige (B4, D51 — le dossier est dans Dispute) ───
@@ -824,6 +830,19 @@ model Dispute {
   pledgeAcceptedAt DateTime // engagement sur l'honneur horodaté (anti-abus)
 
   status DisputeStatus @default(OPEN)
+
+  // ── C-PR2 (D55, 1A) : la version du Voyageur, une seule fois, dans l'app ──
+  carrierStatement         String?
+  carrierStatementPhotoUrls String[] // ≤ 5, ImageKit deals/dispute/ (liste créée [] — pitfall Mongo)
+  carrierRespondedAt       DateTime?
+
+  // ── C-PR2 (D55, 2A/7A) : la décision, gravée sur le dossier ──
+  resolutionOutcome            String?   // REJECTED | PARTIAL_REFUND | FULL_REFUND
+  resolutionRefundCents        Int?      // remboursé à l'Expéditeur
+  resolutionCarrierPayoutCents Int?      // versé au Voyageur (net − remboursement, plancher 0)
+  resolutionReason             String?   // ≥ 50 caractères, lu par les deux parties
+  resolvedByAdminId            String?   @db.ObjectId
+  resolvedAt                   DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1077,9 +1096,11 @@ enum DisputeDesiredOutcome {
   YAMBA_DECIDES
 }
 
-/// OPEN seul en v1 — les résolutions (médiation) arrivent avec l'admin-ui (chantier C).
+/// C-PR2 (D55) : OPEN → CARRIER_RESPONDED (version du Voyageur) → RESOLVED (décision admin).
 enum DisputeStatus {
   OPEN
+  CARRIER_RESPONDED
+  RESOLVED
 }
 
 enum BookingActor {

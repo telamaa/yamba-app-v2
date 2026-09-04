@@ -10,7 +10,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { apiFetch, ApiError } from "@/lib/api";
-import { CATEGORY_LABEL, OUTCOME_LABEL, STEP_LABEL, dateTime, money } from "@/lib/format";
+import { CATEGORY_LABEL, OUTCOME_LABEL, RESOLUTION_LABEL, STEP_LABEL, dateTime, money } from "@/lib/format";
+import DecisionForm from "./DecisionForm";
 import type { AdminDisputeFile, Party } from "@/lib/types";
 
 export default function DisputeFileView({ bookingId }: { bookingId: string }) {
@@ -34,7 +35,13 @@ export default function DisputeFileView({ bookingId }: { bookingId: string }) {
         <h1 className="text-xl font-bold">{file.kind === "DISPUTE" ? file.dispute?.ticketNumber ?? "Litige" : "Retenue à arbitrer"}</h1>
         <span className="text-[13px] text-slate-500">{file.corridor.originCity} → {file.corridor.destinationCity} · {file.status}</span>
       </div>
-      <p className="mt-1 rounded-lg bg-slate-100 px-3 py-2 text-[12.5px] text-slate-600">Lecture seule en C-PR1. La décision (rejet, remboursement partiel ou total, compensation ou restitution de la retenue) arrive avec C-PR2.</p>
+      {file.dispute && !file.dispute.resolution && (
+        <p className={`mt-1 rounded-lg px-3 py-2 text-[12.5px] ${file.dispute.carrierStatement ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-800"}`}>
+          {file.dispute.carrierStatement
+            ? `Version du Voyageur reçue le ${dateTime(file.dispute.carrierStatement.respondedAt)} — décision possible.`
+            : `Version du Voyageur attendue jusqu'au ${dateTime(file.dispute.responseDeadlineAt)} — ${file.canDecide ? "délai passé, décision possible sans sa version." : "décision possible dès sa réponse ou à l'échéance."}`}
+        </p>
+      )}
 
       <div className="mt-6 grid gap-5 md:grid-cols-2">
         <Card title="Chronologie">
@@ -102,6 +109,26 @@ export default function DisputeFileView({ bookingId }: { bookingId: string }) {
           <Photos urls={file.dispute.photoUrls} label="Photos du litige" />
         </Card>
       )}
+
+      {file.dispute?.carrierStatement && (
+        <Card title={`Version du Voyageur · ${dateTime(file.dispute.carrierStatement.respondedAt)}`} className="mt-5 border-emerald-200">
+          <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-slate-800">{file.dispute.carrierStatement.statement}</p>
+          <Photos urls={file.dispute.carrierStatement.photoUrls} label="Photos du Voyageur" />
+        </Card>
+      )}
+
+      {(file.dispute?.resolution || file.retentionDecision) && (
+        <Card title="Décision rendue" className="mt-5 border-slate-900">
+          <Row k="Issue" v={RESOLUTION_LABEL[file.dispute?.resolution?.outcome ?? file.retentionDecision!.outcome] ?? ""} />
+          {file.dispute?.resolution && <Row k="Remboursé / versé" v={`${money(file.dispute.resolution.refundCents, cur)} / ${money(file.dispute.resolution.carrierPayoutCents, cur)}`} />}
+          <Row k="Le" v={dateTime(file.dispute?.resolution?.resolvedAt ?? file.retentionDecision!.decidedAt)} />
+          <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-slate-800">{file.dispute?.resolution?.reason ?? file.retentionDecision!.reason}</p>
+        </Card>
+      )}
+
+      <div className="mt-5">
+        <DecisionForm file={file} />
+      </div>
     </div>
   );
 }
@@ -131,6 +158,7 @@ function PartyCard({ title, p, unit }: { title: string; p: Party; unit: string }
       <Row k="Email" v={p.email} />
       <Row k={`${unit} terminés`} v={String(p.completedDealsCount)} />
       <Row k="Annulations tardives" v={String(p.lateCancellationsCount)} />
+      <Row k="Litiges perdus (interne)" v={String(p.disputesLostCount)} />
       <Row k="Avis révélés" v={p.ratingsCount > 0 ? `${p.ratingsAvg.toFixed(1)} sur ${p.ratingsCount}` : "aucun"} />
     </Card>
   );

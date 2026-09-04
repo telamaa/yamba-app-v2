@@ -191,7 +191,9 @@ export function makeDealSettlementService(
       throw new BookingLifecycleError("TRANSITION_NOT_ALLOWED", "A payout requires a completed or late-cancelled deal.");
     }
     const reason = booking.status === "CANCELLED" ? "LATE_CANCELLATION" : "DELIVERY";
-    const amountCents = booking.status === "CANCELLED" ? (booking.payoutAmountCents ?? 0) : booking.pricing.transportCents;
+    // D50 : le net à COMPLETED ; A80 : la compensation à CANCELLED ; C-PR2 (D55) : le net ajusté
+    // par une décision de médiation (net − remboursement partiel) — toujours `payoutAmountCents` quand il est posé.
+    const amountCents = booking.payoutAmountCents ?? (booking.status === "COMPLETED" ? booking.pricing.transportCents : 0);
     if (amountCents <= 0) {
       throw new BookingLifecycleError("TRANSITION_NOT_ALLOWED", "Nothing to pay out for this deal.");
     }

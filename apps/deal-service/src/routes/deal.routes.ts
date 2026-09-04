@@ -21,6 +21,8 @@ import { makeDealRatingService } from "../services/deal-rating.service";
 import { createPaymentProviderFromEnv } from "@packages/payments";
 import { makeAdminDisputeController } from "../controllers/admin-dispute.controller";
 import { makeAdminDisputeService } from "../services/admin-dispute.service";
+import { makeDealMediationController } from "../controllers/deal-mediation.controller";
+import { makeDealMediationService } from "../services/deal-mediation.service";
 
 /**
  * deal.routes.ts — routes de lecture (PR3)
@@ -84,6 +86,9 @@ router.post("/deals/:id/confirm", isAuthenticated, dealSettlement.confirm);
 router.post("/deals/:id/dispute", isAuthenticated, dealSettlement.dispute);
 
 // ── B5 : notation mutuelle double-aveugle (D53) ──────────────
+// C-PR2 (D55) — la version du Voyageur, une fois, pendant que le dossier est ouvert.
+const dealMediation = makeDealMediationController(makeDealMediationService(paymentProvider, dealSettlementService));
+router.post("/deals/:id/dispute/statement", isAuthenticated, dealMediation.respond);
 router.get("/deals/:id/rating", isAuthenticated, dealRating.getContext);
 router.post("/deals/:id/rating", isAuthenticated, dealRating.submit);
 
@@ -106,5 +111,7 @@ router.get("/me/wallet", isAuthenticated, getMyWallet);
 const adminDisputes = makeAdminDisputeController(makeAdminDisputeService());
 router.get("/admin/disputes", isAdminAuthenticated, adminDisputes.listQueue);
 router.get("/admin/disputes/:id", isAdminAuthenticated, adminDisputes.getFile);
+router.post("/admin/disputes/:id/resolve", isAdminAuthenticated, dealMediation.resolveDispute);
+router.post("/admin/disputes/:id/retention", isAdminAuthenticated, dealMediation.resolveRetention);
 
 export default router;

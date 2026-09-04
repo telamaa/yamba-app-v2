@@ -18,6 +18,7 @@
 
 "use client";
 
+import MediationDecisionCard from "@/components/shared/mediation/MediationDecisionCard";
 import { useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
@@ -158,6 +159,19 @@ function DealClosed({
         {lateCancel && deal.retentionDisposition === "CARRIER" && (
           <div className="mt-5 text-left">
             <DealPayoutStatusCard deal={deal} compact />
+          </div>
+        )}
+        {/* C-PR2 (D55) — annulé par décision (remboursement total), ou retenue arbitrée : la décision se lit ici. */}
+        {status === "CANCELLED" && (deal.dispute?.resolution || deal.retentionDecision) && (
+          <div className="mt-5 text-left">
+            <MediationDecisionCard
+              role="CARRIER"
+              ticket={deal.dispute?.ticketNumber ?? null}
+              resolution={deal.dispute?.resolution ?? null}
+              retentionDecision={deal.retentionDecision ?? null}
+              compensationCents={deal.payoutAmountCents ?? null}
+              compact
+            />
           </div>
         )}
         {lateCancel && deal.retentionDisposition === "HELD_FOR_MEDIATION" && (

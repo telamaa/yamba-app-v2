@@ -125,8 +125,9 @@ export const getDeal = async (
 
     // B4/A68 — le dossier de litige n'est lu qu'en DISPUTED ; le mapper
     // n'en sert que ce que le rôle a le droit de voir.
+    // C-PR2 (D55) — le dossier est servi pendant le litige ET après la décision (résolution).
     const dispute =
-      booking.status === "DISPUTED"
+      booking.status === "DISPUTED" || booking.disputeTicket
         ? await prisma.dispute.findUnique({
             where: { bookingId: booking.id },
             select: {
@@ -136,6 +137,13 @@ export const getDeal = async (
               desiredOutcome: true,
               photoUrls: true,
               createdAt: true,
+              status: true,
+              carrierRespondedAt: true,
+              resolutionOutcome: true,
+              resolutionRefundCents: true,
+              resolutionCarrierPayoutCents: true,
+              resolutionReason: true,
+              resolvedAt: true,
             },
           })
         : null;

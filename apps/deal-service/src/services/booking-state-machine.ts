@@ -29,8 +29,9 @@
  * - Événements de tracking : séquenceur canConfirmTrackingStep ci-bas.
  * - Régénération du code : canRegenerateCode ci-bas.
  *
- * Résolutions ADMIN du chantier C (médiation DISPUTED → COMPLETED ou
- * remboursement) : l'acteur ADMIN est réservé dans le type mais AUCUNE
+ * Résolutions ADMIN (chantier C-PR2, D55) : DISPUTED → COMPLETED
+ * (resolveDisputeKeep) ou → CANCELLED (resolveDisputeRefund). Avant C-PR2 :
+ * l'acteur ADMIN était réservé dans le type mais AUCUNE
  * transition ne l'utilise encore — la matrice de remboursement
  * médiation n'est pas spécifiée. DISPUTED est terminal dans cette v1.
  */
@@ -70,7 +71,10 @@ export type BookingTransitionAction =
   | "deliver"
   | "confirmEarly"
   | "autoComplete"
-  | "dispute";
+  | "dispute"
+  // C-PR2 (D55, 7A) — résolutions ADMIN d'un litige
+  | "resolveDisputeKeep" // rejet ou remboursement partiel → COMPLETED
+  | "resolveDisputeRefund"; // remboursement total → CANCELLED
 
 /** Opérations gardées SANS transition de statut */
 export type BookingGuardedOperation = "regenerateCode" | "confirmTrackingStep" | "rate";
@@ -144,6 +148,8 @@ export type BookingLike = {
   ratingWindowEndsAt?: Date | string | null;
   shipperRatedAt?: Date | string | null;
   carrierRatedAt?: Date | string | null;
+  /** C-PR2 (D54 4B) : un deal clos par médiation ("ADMIN") ne se note pas. */
+  completedBy?: string | null;
   deliveryLockedUntil?: Date | string | null;
   deliveryAttempts?: number | null;
   codeRegenerations?: number | null;
@@ -392,6 +398,25 @@ const TRANSITIONS: readonly TransitionDef[] = [
     effects: ["FREEZE_PAYOUT", "CREATE_TICKET", "NOTIFY_CARRIER"],
     guard: beforePayoutDue,
   },
+
+  // ── DISPUTED (chantier C, D55 7A) ─────────
+  // Seul ADMIN sort d'un litige. Le service vérifie en plus que le Voyageur a
+  // répondu ou que 72 h se sont écoulées (1A) — une règle de DOSSIER, pas de
+  // machine. Aucune fenêtre de notation ne s'ouvre (D54 4B).
+  {
+    from: "DISPUTED",
+    action: "resolveDisputeKeep",
+    actor: "ADMIN",
+    to: "COMPLETED",
+    effects: ["TRANSFER_PAYOUT", "UPDATE_STATS", "NOTIFY_SHIPPER", "NOTIFY_CARRIER"],
+  },
+  {
+    from: "DISPUTED",
+    action: "resolveDisputeRefund",
+    actor: "ADMIN",
+    to: "CANCELLED",
+    effects: ["FULL_REFUND", "RELEASE_CAPACITY", "NOTIFY_SHIPPER", "NOTIFY_CARRIER"],
+  },
 ];
 
 // ─────────────────────────────────────────────
@@ -544,6 +569,10 @@ export function canRate(
   }
   if (booking.status !== "COMPLETED") {
     return { allowed: false, reason: "Only a completed deal can be rated." };
+  }
+  if (booking.completedBy === "ADMIN") {
+    // D54 4B — une note après litige est une note de vengeance : le litige tranché est un fait interne.
+    return { allowed: false, reason: "A deal closed by mediation cannot be rated." };
   }
   const windowEnd = toDate(booking.ratingWindowEndsAt);
   if (windowEnd !== null && windowEnd <= now) {

@@ -240,7 +240,7 @@ describe("matrice email (A35)", () => {
   });
 
   it("la matrice couvre les 18 événements du contrat (17 + verification_reminder B4/A70)", () => {
-    expect(Object.keys(EMAIL_MATRIX)).toHaveLength(18);
+    expect(Object.keys(EMAIL_MATRIX)).toHaveLength(20);
   });
 
   it("requested → CARRIER seul ; payment_authorized → SHIPPER seul (email-only)", () => {
@@ -351,6 +351,19 @@ describe("matrice email (A35)", () => {
         "booking.verification_reminder": verificationReminderEvent(),
         // B5 : rappel de notation au rôle cible
         "booking.rating_reminder": envelope("booking.rating_reminder", { ...basePayload(), actor: "SYSTEM" as const, reminderNumber: 1, targetRole: "CARRIER" }),
+        // C-PR2 (D55) : décision de médiation aux deux parties
+        "booking.dispute_resolved": envelope("booking.dispute_resolved", {
+          ...basePayload(),
+          actor: "ADMIN" as const,
+          kind: "DISPUTE",
+          ticketNumber: "YAM-2041",
+          outcome: "PARTIAL_REFUND",
+          refundCents: 1500,
+          carrierPayoutCents: 1500,
+          reason: "Le colis est arrivé avec un coin écrasé, sans perte de contenu : remboursement partiel équitable.",
+          finalStatus: "COMPLETED",
+          resolvedAt: "2026-07-21T10:00:00.000Z",
+        }),
         // 4A : la règle n'est non-null que pour l'atterrissage
         "booking.tracking_event": envelope("booking.tracking_event", { ...basePayload(), actor: "CARRIER" as const, step: "FLIGHT_ARRIVED", confirmedAt: "2026-07-19T12:00:00.000Z" }),
       };

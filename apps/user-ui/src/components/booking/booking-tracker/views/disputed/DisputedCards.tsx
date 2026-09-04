@@ -117,6 +117,10 @@ export function DisputeProcessCard({ booking, compact = false }: { booking: Book
   return (
     <section className={`rounded-2xl border border-blue-200 bg-blue-50 dark:border-blue-900/40 dark:bg-blue-950/25 ${compact ? "p-4" : "p-5"}`}>
       <h3 className="text-[13.5px] font-bold text-blue-950 dark:text-blue-100">{t("disputed.process.title")}</h3>
+      {/* C-PR2 (D55) — la version du Voyageur : reçue ou attendue (jamais son contenu). */}
+      <p className="mt-1.5 text-[12px] font-semibold text-blue-900 dark:text-blue-200">
+        {booking.dispute?.carrierRespondedAt ? t("disputed.carrierSide.received", { carrierFirstName }) : t("disputed.carrierSide.pending", { carrierFirstName })}
+      </p>
       <ol className="mt-2.5 space-y-2">
         {steps.map((step, i) => (
           <li key={i} className="flex items-start gap-2.5 text-[12.5px] leading-snug text-blue-900 dark:text-blue-200">

@@ -56,6 +56,8 @@ export const IN_APP_MATRIX: Record<BookingEventKey, RecipientRule> = {
   "booking.verification_reminder": "SHIPPER", // B4/A70 : J+3, dernier jour pour vérifier ou signaler
   "booking.rating_reminder": "TARGET_ROLE",
   "booking.rating_revealed": "BOTH",
+  "booking.dispute_carrier_responded": "NONE", // C-PR2 (D55) : file admin seulement
+  "booking.dispute_resolved": "BOTH", // C-PR2 (D55, 5A)
 };
 
 export function resolveRecipients(event: BookingDomainEvent): string[] {

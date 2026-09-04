@@ -6316,6 +6316,8 @@
           "deliver",
           "confirmEarly",
           "autoComplete",
+          "resolveDisputeKeep",
+          "resolveDisputeRefund",
           "dispute"
         ],
         "description": "Actions of the booking state machine (canPerform/getAllowedActions). Returned in allowedActions to drive frontend CTAs — the frontend reflects, never decides."
@@ -6470,6 +6472,188 @@
         "additionalProperties": false,
         "description": "Dispute opened — payout frozen, ticket issued (INV-4/INV-5)"
       },
+      "DisputeResolutionOutcome": {
+        "type": "string",
+        "enum": [
+          "REJECTED",
+          "PARTIAL_REFUND",
+          "FULL_REFUND"
+        ],
+        "description": "REJECTED: carrier paid in full · PARTIAL_REFUND: free amount · FULL_REFUND: shipper refunded everything (D54 3A)"
+      },
+      "RetentionArbitrationOutcome": {
+        "type": "string",
+        "enum": [
+          "COMPENSATE_CARRIER",
+          "RESTITUTE_SHIPPER"
+        ],
+        "description": "Late cancellation after departure (A81): retention goes to the carrier (pro-rata A79) or back to the shipper"
+      },
+      "DisputeResolutionView": {
+        "type": "object",
+        "properties": {
+          "outcome": {
+            "$ref": "#/components/schemas/DisputeResolutionOutcome"
+          },
+          "refundCents": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Refunded to the shipper"
+          },
+          "carrierPayoutCents": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Paid out to the carrier (net − refund, floor 0)"
+          },
+          "reason": {
+            "type": "string",
+            "description": "Admin's written reason — read by BOTH parties"
+          },
+          "resolvedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          }
+        },
+        "required": [
+          "outcome",
+          "refundCents",
+          "carrierPayoutCents",
+          "reason",
+          "resolvedAt"
+        ],
+        "additionalProperties": false
+      },
+      "CarrierDisputeStatementRequest": {
+        "type": "object",
+        "properties": {
+          "statement": {
+            "type": "string",
+            "minLength": 50,
+            "maxLength": 2000
+          },
+          "photoUrls": {
+            "default": [],
+            "maxItems": 5,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uri"
+            }
+          }
+        },
+        "required": [
+          "statement",
+          "photoUrls"
+        ],
+        "additionalProperties": false,
+        "description": "The carrier's side of the story — once, while the dispute is open (D55 1A)"
+      },
+      "CarrierDisputeStatementResponse": {
+        "type": "object",
+        "properties": {
+          "bookingId": {
+            "$ref": "#/components/schemas/ObjectId"
+          },
+          "ticketNumber": {
+            "type": "string"
+          },
+          "respondedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          }
+        },
+        "required": [
+          "bookingId",
+          "ticketNumber",
+          "respondedAt"
+        ],
+        "additionalProperties": false
+      },
+      "CarrierDisputeView": {
+        "type": "object",
+        "properties": {
+          "ticketNumber": {
+            "type": "string"
+          },
+          "category": {
+            "$ref": "#/components/schemas/DisputeCategory"
+          },
+          "disputedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          },
+          "canRespond": {
+            "type": "boolean",
+            "description": "DISPUTED, no statement yet — the front reflects, never decides"
+          },
+          "responseDeadlineAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+            "description": "disputedAt + 72h: after that the admin may decide without the carrier's statement"
+          },
+          "respondedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "resolution": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DisputeResolutionView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "ticketNumber",
+          "category",
+          "disputedAt",
+          "canRespond",
+          "responseDeadlineAt",
+          "respondedAt",
+          "resolution"
+        ],
+        "additionalProperties": false,
+        "description": "What the carrier sees of a dispute: ticket, category, its own statement state, the decision — never the shipper's file (A68)"
+      },
+      "RetentionDecisionView": {
+        "type": "object",
+        "properties": {
+          "outcome": {
+            "$ref": "#/components/schemas/RetentionArbitrationOutcome"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "decidedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          }
+        },
+        "required": [
+          "outcome",
+          "reason",
+          "decidedAt"
+        ],
+        "additionalProperties": false
+      },
       "ShipperDisputeView": {
         "type": "object",
         "properties": {
@@ -6502,6 +6686,29 @@
             "type": "string",
             "format": "date-time",
             "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          },
+          "carrierRespondedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The carrier gave their side (content never served to the shipper — D55 5A)"
+          },
+          "resolution": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DisputeResolutionView"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -6510,7 +6717,9 @@
           "description",
           "desiredOutcome",
           "photoUrls",
-          "createdAt"
+          "createdAt",
+          "carrierRespondedAt",
+          "resolution"
         ],
         "additionalProperties": false,
         "description": "The dispute file as filed by the shipper (never served to the carrier)"
@@ -7447,7 +7656,31 @@
             ]
           },
           "refundAmountCents": {
-            "description": "Amount returned (ANN-01 scale); null when nothing was refunded",
+            "description": "Amount returned (ANN-01 scale, plus a mediation refund or restitution); null when nothing was refunded",
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "retentionDecision": {
+            "description": "C-PR2 (D55 3A): how a held retention was arbitrated",
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RetentionDecisionView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "retentionCents": {
+            "description": "Late cancellation: amount retained (ANN-01), null otherwise",
             "anyOf": [
               {
                 "type": "integer",
@@ -7460,7 +7693,7 @@
             ]
           },
           "dispute": {
-            "description": "The dispute file (status DISPUTED) — shipper only (A68); absent otherwise",
+            "description": "The dispute file — shipper only (A68); served while DISPUTED and after the decision (resolution), absent otherwise",
             "anyOf": [
               {
                 "$ref": "#/components/schemas/ShipperDisputeView"
@@ -7796,6 +8029,28 @@
               }
             ]
           },
+          "dispute": {
+            "description": "C-PR2 (D55): the carrier's view of the dispute — statement state, deadline, decision. Served while DISPUTED and after the decision.",
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CarrierDisputeView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "retentionDecision": {
+            "description": "C-PR2 (D55 3A): how a held retention was arbitrated",
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RetentionDecisionView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "payoutAmountCents": {
             "description": "Amount paid out to the carrier: the net at COMPLETED, the ANN-01 compensation at late CANCELLED (D50/A82)",
             "anyOf": [
@@ -7810,12 +8065,13 @@
             ]
           },
           "retentionDisposition": {
-            "description": "Late cancellation only: the retention went to the carrier (compensation) or is held for mediation (cancelled after departure, A81)",
+            "description": "Late cancellation only: the retention went to the carrier (compensation), back to the shipper (mediation, C-PR2) or is held for mediation (cancelled after departure, A81)",
             "anyOf": [
               {
                 "type": "string",
                 "enum": [
                   "CARRIER",
+                  "SHIPPER",
                   "HELD_FOR_MEDIATION"
                 ]
               },
@@ -8035,7 +8291,9 @@
           "booking.disputed",
           "booking.verification_reminder",
           "booking.rating_reminder",
-          "booking.rating_revealed"
+          "booking.rating_revealed",
+          "booking.dispute_carrier_responded",
+          "booking.dispute_resolved"
         ],
         "description": "All booking domain event keys (outbox → Kafka topics)"
       },
@@ -10477,6 +10735,306 @@
         "additionalProperties": false,
         "description": "Double-blind reviews revealed → in-app notification to both"
       },
+      "BookingDisputeCarrierRespondedEvent": {
+        "type": "object",
+        "properties": {
+          "aggregateType": {
+            "type": "string",
+            "const": "booking"
+          },
+          "aggregateId": {
+            "$ref": "#/components/schemas/ObjectId"
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+            "description": "Server clock at transition time"
+          },
+          "correlationId": {
+            "description": "Propagated request correlation ID (gateway-born)",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "schemaVersion": {
+            "type": "number",
+            "const": 1
+          },
+          "eventType": {
+            "type": "string",
+            "const": "booking.dispute_carrier_responded"
+          },
+          "payload": {
+            "type": "object",
+            "properties": {
+              "bookingId": {
+                "$ref": "#/components/schemas/ObjectId"
+              },
+              "tripId": {
+                "$ref": "#/components/schemas/ObjectId"
+              },
+              "shipperId": {
+                "$ref": "#/components/schemas/ObjectId"
+              },
+              "carrierId": {
+                "$ref": "#/components/schemas/ObjectId"
+              },
+              "corridor": {
+                "$ref": "#/components/schemas/BookingEventCorridor"
+              },
+              "category": {
+                "$ref": "#/components/schemas/ParcelCategory"
+              },
+              "categoryFamily": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "weightKg": {
+                "type": "number"
+              },
+              "transportCents": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991,
+                "description": "Carrier net (integer cents, A2)"
+              },
+              "totalShipperCents": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "currencyCode": {
+                "type": "string"
+              },
+              "actor": {
+                "description": "Who triggered the event",
+                "$ref": "#/components/schemas/BookingActor"
+              },
+              "ticketNumber": {
+                "type": "string"
+              },
+              "respondedAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              }
+            },
+            "required": [
+              "bookingId",
+              "tripId",
+              "shipperId",
+              "carrierId",
+              "corridor",
+              "category",
+              "weightKg",
+              "transportCents",
+              "totalShipperCents",
+              "currencyCode",
+              "actor",
+              "ticketNumber",
+              "respondedAt"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "aggregateType",
+          "aggregateId",
+          "occurredAt",
+          "schemaVersion",
+          "eventType",
+          "payload"
+        ],
+        "additionalProperties": false,
+        "description": "The carrier gave their side in the app (C-PR2, D55) — no notification, the admin queue shows it"
+      },
+      "BookingDisputeResolvedEvent": {
+        "type": "object",
+        "properties": {
+          "aggregateType": {
+            "type": "string",
+            "const": "booking"
+          },
+          "aggregateId": {
+            "$ref": "#/components/schemas/ObjectId"
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+            "description": "Server clock at transition time"
+          },
+          "correlationId": {
+            "description": "Propagated request correlation ID (gateway-born)",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "schemaVersion": {
+            "type": "number",
+            "const": 1
+          },
+          "eventType": {
+            "type": "string",
+            "const": "booking.dispute_resolved"
+          },
+          "payload": {
+            "type": "object",
+            "properties": {
+              "bookingId": {
+                "$ref": "#/components/schemas/ObjectId"
+              },
+              "tripId": {
+                "$ref": "#/components/schemas/ObjectId"
+              },
+              "shipperId": {
+                "$ref": "#/components/schemas/ObjectId"
+              },
+              "carrierId": {
+                "$ref": "#/components/schemas/ObjectId"
+              },
+              "corridor": {
+                "$ref": "#/components/schemas/BookingEventCorridor"
+              },
+              "category": {
+                "$ref": "#/components/schemas/ParcelCategory"
+              },
+              "categoryFamily": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "weightKg": {
+                "type": "number"
+              },
+              "transportCents": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991,
+                "description": "Carrier net (integer cents, A2)"
+              },
+              "totalShipperCents": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "currencyCode": {
+                "type": "string"
+              },
+              "actor": {
+                "description": "Who triggered the event",
+                "$ref": "#/components/schemas/BookingActor"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "DISPUTE",
+                  "RETENTION"
+                ]
+              },
+              "ticketNumber": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "outcome": {
+                "type": "string",
+                "enum": [
+                  "REJECTED",
+                  "PARTIAL_REFUND",
+                  "FULL_REFUND",
+                  "COMPENSATE_CARRIER",
+                  "RESTITUTE_SHIPPER"
+                ]
+              },
+              "refundCents": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "carrierPayoutCents": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "reason": {
+                "type": "string"
+              },
+              "finalStatus": {
+                "type": "string",
+                "enum": [
+                  "COMPLETED",
+                  "CANCELLED"
+                ]
+              },
+              "resolvedAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              }
+            },
+            "required": [
+              "bookingId",
+              "tripId",
+              "shipperId",
+              "carrierId",
+              "corridor",
+              "category",
+              "weightKg",
+              "transportCents",
+              "totalShipperCents",
+              "currencyCode",
+              "actor",
+              "kind",
+              "ticketNumber",
+              "outcome",
+              "refundCents",
+              "carrierPayoutCents",
+              "reason",
+              "finalStatus",
+              "resolvedAt"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "aggregateType",
+          "aggregateId",
+          "occurredAt",
+          "schemaVersion",
+          "eventType",
+          "payload"
+        ],
+        "additionalProperties": false,
+        "description": "Admin decision (C-PR2, D55) → both parties notified with the outcome, their amount and the reason"
+      },
       "BookingDomainEvent": {
         "oneOf": [
           {
@@ -10532,6 +11090,12 @@
           },
           {
             "$ref": "#/components/schemas/BookingRatingRevealedEvent"
+          },
+          {
+            "$ref": "#/components/schemas/BookingDisputeCarrierRespondedEvent"
+          },
+          {
+            "$ref": "#/components/schemas/BookingDisputeResolvedEvent"
           }
         ],
         "description": "Any booking domain event — the parsing contract for every consumer (notifications, analytics, replay)"
@@ -12142,6 +12706,16 @@
           },
           "carrierFirstName": {
             "type": "string"
+          },
+          "carrierResponded": {
+            "type": "boolean",
+            "description": "DISPUTE: the carrier gave their side"
+          },
+          "decidableAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+            "description": "When a decision becomes possible: now if responded / RETENTION, else disputedAt + 72h"
           }
         },
         "required": [
@@ -12155,7 +12729,9 @@
           "amountCents",
           "currencyCode",
           "shipperFirstName",
-          "carrierFirstName"
+          "carrierFirstName",
+          "carrierResponded",
+          "decidableAt"
         ],
         "additionalProperties": false
       },
@@ -12539,6 +13115,12 @@
                 "minimum": -9007199254740991,
                 "maximum": 9007199254740991
               },
+              "disputesLostCount": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991,
+                "description": "Internal reputation fact (D29②, D55 4A) — never public"
+              },
               "ratingsAvg": {
                 "type": "number"
               },
@@ -12555,6 +13137,7 @@
               "email",
               "completedDealsCount",
               "lateCancellationsCount",
+              "disputesLostCount",
               "ratingsAvg",
               "ratingsCount"
             ],
@@ -12585,6 +13168,12 @@
                 "minimum": -9007199254740991,
                 "maximum": 9007199254740991
               },
+              "disputesLostCount": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991,
+                "description": "Internal reputation fact (D29②, D55 4A) — never public"
+              },
               "ratingsAvg": {
                 "type": "number"
               },
@@ -12601,6 +13190,7 @@
               "email",
               "completedDealsCount",
               "lateCancellationsCount",
+              "disputesLostCount",
               "ratingsAvg",
               "ratingsCount"
             ],
@@ -12716,6 +13306,53 @@
                   },
                   "status": {
                     "type": "string"
+                  },
+                  "carrierStatement": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "statement": {
+                            "type": "string"
+                          },
+                          "photoUrls": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "respondedAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                          }
+                        },
+                        "required": [
+                          "statement",
+                          "photoUrls",
+                          "respondedAt"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "responseDeadlineAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                  },
+                  "resolution": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/components/schemas/DisputeResolutionView"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
                   }
                 },
                 "required": [
@@ -12725,7 +13362,10 @@
                   "desiredOutcome",
                   "photoUrls",
                   "pledgeAcceptedAt",
-                  "status"
+                  "status",
+                  "carrierStatement",
+                  "responseDeadlineAt",
+                  "resolution"
                 ],
                 "additionalProperties": false
               },
@@ -12733,6 +13373,98 @@
                 "type": "null"
               }
             ]
+          },
+          "retentionDecision": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "outcome": {
+                    "$ref": "#/components/schemas/RetentionArbitrationOutcome"
+                  },
+                  "reason": {
+                    "type": "string"
+                  },
+                  "decidedAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                  }
+                },
+                "required": [
+                  "outcome",
+                  "reason",
+                  "decidedAt"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "canDecide": {
+            "type": "boolean",
+            "description": "A decision is possible now (responded, or 72h elapsed, or RETENTION) and none was taken yet"
+          },
+          "decidableAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "proposedAmounts": {
+            "type": "object",
+            "properties": {
+              "rejectedCarrierPayoutCents": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "fullRefundCents": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "compensateCarrierCents": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "restituteShipperCents": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "rejectedCarrierPayoutCents",
+              "fullRefundCents",
+              "compensateCarrierCents",
+              "restituteShipperCents"
+            ],
+            "additionalProperties": false,
+            "description": "Server-computed amounts shown in the admin recap (D55 2A/3A)"
           }
         },
         "required": [
@@ -12749,10 +13481,116 @@
           "pickup",
           "trackingEvents",
           "deliveryPhotoUrls",
-          "dispute"
+          "dispute",
+          "retentionDecision",
+          "canDecide",
+          "decidableAt",
+          "proposedAmounts"
         ],
         "additionalProperties": false,
         "description": "Full mediation file for an admin — never the delivery code (D43)"
+      },
+      "AdminResolveDisputeRequest": {
+        "type": "object",
+        "properties": {
+          "outcome": {
+            "$ref": "#/components/schemas/DisputeResolutionOutcome"
+          },
+          "refundCents": {
+            "description": "PARTIAL_REFUND only: 1 ≤ amount ≤ totalShipperCents − 1",
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 50,
+            "maxLength": 2000
+          }
+        },
+        "required": [
+          "outcome",
+          "reason"
+        ],
+        "additionalProperties": false,
+        "description": "Irreversible. Refund first, then the carrier transfer through the payout executor (D49)."
+      },
+      "AdminResolveRetentionRequest": {
+        "type": "object",
+        "properties": {
+          "outcome": {
+            "$ref": "#/components/schemas/RetentionArbitrationOutcome"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 50,
+            "maxLength": 2000
+          }
+        },
+        "required": [
+          "outcome",
+          "reason"
+        ],
+        "additionalProperties": false,
+        "description": "Amounts are computed server-side (pro-rata A79 or the retained amount)"
+      },
+      "AdminResolutionResponse": {
+        "type": "object",
+        "properties": {
+          "bookingId": {
+            "$ref": "#/components/schemas/ObjectId"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ArbitrationKind"
+          },
+          "finalStatus": {
+            "type": "string",
+            "enum": [
+              "COMPLETED",
+              "CANCELLED"
+            ]
+          },
+          "outcome": {
+            "type": "string"
+          },
+          "refundCents": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "carrierPayoutCents": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "payoutStatus": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "SENT / FAILED (retried by the cron) / null when nothing is owed to the carrier"
+          },
+          "resolvedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          }
+        },
+        "required": [
+          "bookingId",
+          "kind",
+          "finalStatus",
+          "outcome",
+          "refundCents",
+          "carrierPayoutCents",
+          "payoutStatus",
+          "resolvedAt"
+        ],
+        "additionalProperties": false
       }
     },
     "securitySchemes": {

@@ -239,6 +239,26 @@
         "title": "Bank transfer refused: check your bank details",
         "line": "Your money stays on your payment account · Finances → Stripe"
       }
+    },
+    "booking_dispute_resolved": {
+      "SHIPPER": {
+        "title": "Decision made · {ticket}",
+        "line": "{route} · read the decision and the reason on your shipment"
+      },
+      "CARRIER": {
+        "title": "Decision made · {ticket}",
+        "line": "{route} · read the decision and the reason on your deal"
+      }
+    },
+    "booking_dispute_carrier_responded": {
+      "SHIPPER": {
+        "title": "—",
+        "line": "—"
+      },
+      "CARRIER": {
+        "title": "—",
+        "line": "—"
+      }
     }
   }
 }

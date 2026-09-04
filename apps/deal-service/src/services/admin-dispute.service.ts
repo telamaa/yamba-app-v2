@@ -10,7 +10,8 @@
 import prisma from "@packages/libs/prisma";
 import { NotFoundError } from "@packages/error-handler";
 import { recordAdminAction } from "@packages/admin-audit";
-import type { AdminDisputeFile, ArbitrationQueueItem, ArbitrationQueueResponse } from "@packages/api-contracts";
+import { DISPUTE_RESPONSE_DELAY_HOURS, type AdminDisputeFile, type ArbitrationQueueItem, type ArbitrationQueueResponse } from "@packages/api-contracts";
+import { computeLateCancellationCompensationCents } from "./booking-lifecycle";
 
 const iso = (d: Date | null | undefined) => (d ? d.toISOString() : null);
 
@@ -39,6 +40,8 @@ export type AdminBookingRecord = {
   retentionCents: number | null;
   retentionDisposition: string | null;
   disputeTicket: string | null;
+  retentionDecisionReason?: string | null;
+  retentionDecidedAt?: Date | null;
   pickup: { confirmedAt: Date; photoUrls: string[]; checklist: string[]; notes: string | null } | null;
   trackingEvents: Array<{ step: string; confirmedAt: Date }>;
   deliveryPhotoUrls: string[];
@@ -53,7 +56,20 @@ export type AdminDisputeRecord = {
   pledgeAcceptedAt: Date;
   status: string;
   createdAt: Date;
+  // C-PR2 (D55)
+  carrierStatement?: string | null;
+  carrierStatementPhotoUrls?: string[] | null;
+  carrierRespondedAt?: Date | null;
+  resolutionOutcome?: string | null;
+  resolutionRefundCents?: number | null;
+  resolutionCarrierPayoutCents?: number | null;
+  resolutionReason?: string | null;
+  resolvedAt?: Date | null;
 };
+
+function responseDeadline(disputedAt: Date): Date {
+  return new Date(disputedAt.getTime() + DISPUTE_RESPONSE_DELAY_HOURS * 3_600_000);
+}
 
 export type AdminPartyRecord = {
   id: string;
@@ -64,7 +80,8 @@ export type AdminPartyRecord = {
   shipperRatingsCount: number;
   shipperCompletedDealsCount: number;
   shipperLateCancellationsCount: number;
-  carrierPage: { ratingsAvg: number; ratingsCount: number; completedDealsCount: number; lateCancellationsCount: number } | null;
+  shipperDisputesLostCount?: number | null;
+  carrierPage: { ratingsAvg: number; ratingsCount: number; completedDealsCount: number; lateCancellationsCount: number; disputesLostCount?: number | null } | null;
 };
 
 export function arbitrationKindOf(b: Pick<AdminBookingRecord, "status" | "retentionDisposition">): "DISPUTE" | "RETENTION" | null {
@@ -76,12 +93,17 @@ export function arbitrationKindOf(b: Pick<AdminBookingRecord, "status" | "retent
 /** Pur : une ligne de la file. */
 export function toQueueItem(
   b: AdminBookingRecord,
-  dispute: Pick<AdminDisputeRecord, "ticketNumber" | "category"> | null,
+  dispute: Pick<AdminDisputeRecord, "ticketNumber" | "category" | "carrierRespondedAt"> | null,
   names: { shipperFirstName: string; carrierFirstName: string }
 ): ArbitrationQueueItem | null {
   const kind = arbitrationKindOf(b);
   if (!kind) return null;
+  const responded = kind === "DISPUTE" && !!dispute?.carrierRespondedAt;
+  const decidableAt =
+    kind === "RETENTION" || responded || !b.disputedAt ? (b.closedAt ?? b.disputedAt ?? b.requestedAt) : responseDeadline(b.disputedAt);
   return {
+    carrierResponded: responded,
+    decidableAt: decidableAt.toISOString(),
     bookingId: b.id,
     kind,
     ticketNumber: kind === "DISPUTE" ? (dispute?.ticketNumber ?? b.disputeTicket) : null,
@@ -105,16 +127,56 @@ function toParty(u: AdminPartyRecord, role: "SHIPPER" | "CARRIER"): AdminDispute
     email: u.email,
     completedDealsCount: asCarrier ? u.carrierPage!.completedDealsCount : u.shipperCompletedDealsCount,
     lateCancellationsCount: asCarrier ? u.carrierPage!.lateCancellationsCount : u.shipperLateCancellationsCount,
+    disputesLostCount: (asCarrier ? u.carrierPage!.disputesLostCount : u.shipperDisputesLostCount) ?? 0,
     ratingsAvg: asCarrier ? u.carrierPage!.ratingsAvg : u.shipperRatingsAvg,
     ratingsCount: asCarrier ? u.carrierPage!.ratingsCount : u.shipperRatingsCount,
   };
 }
 
 /** Pur : le dossier complet — JAMAIS le code de livraison (D43). */
-export function toDisputeFile(b: AdminBookingRecord, dispute: AdminDisputeRecord | null, shipper: AdminPartyRecord, carrier: AdminPartyRecord): AdminDisputeFile | null {
+export function toDisputeFile(
+  b: AdminBookingRecord,
+  dispute: AdminDisputeRecord | null,
+  shipper: AdminPartyRecord,
+  carrier: AdminPartyRecord,
+  now: Date = new Date()
+): AdminDisputeFile | null {
   const kind = arbitrationKindOf(b);
   if (!kind) return null;
+  const resolution =
+    dispute?.resolvedAt && dispute.resolutionOutcome
+      ? {
+          outcome: dispute.resolutionOutcome as NonNullable<NonNullable<AdminDisputeFile["dispute"]>["resolution"]>["outcome"],
+          refundCents: dispute.resolutionRefundCents ?? 0,
+          carrierPayoutCents: dispute.resolutionCarrierPayoutCents ?? 0,
+          reason: dispute.resolutionReason ?? "",
+          resolvedAt: dispute.resolvedAt.toISOString(),
+        }
+      : null;
+  const retentionDecision =
+    b.retentionDecidedAt && (b.retentionDisposition === "CARRIER" || b.retentionDisposition === "SHIPPER")
+      ? { outcome: (b.retentionDisposition === "CARRIER" ? "COMPENSATE_CARRIER" : "RESTITUTE_SHIPPER") as "COMPENSATE_CARRIER" | "RESTITUTE_SHIPPER", reason: b.retentionDecisionReason ?? "", decidedAt: b.retentionDecidedAt.toISOString() }
+      : null;
+  const decidableAt =
+    kind === "DISPUTE" && b.disputedAt ? (dispute?.carrierRespondedAt ? b.disputedAt : responseDeadline(b.disputedAt)) : null;
+  const canDecide =
+    kind === "RETENTION"
+      ? b.retentionDisposition === "HELD_FOR_MEDIATION"
+      : !resolution && !!b.disputedAt && (!!dispute?.carrierRespondedAt || now.getTime() >= responseDeadline(b.disputedAt).getTime());
+  const retentionCents = b.retentionCents ?? 0;
   return {
+    retentionDecision,
+    canDecide,
+    decidableAt: decidableAt ? decidableAt.toISOString() : null,
+    proposedAmounts: {
+      rejectedCarrierPayoutCents: b.pricing.transportCents,
+      fullRefundCents: b.pricing.totalShipperCents,
+      compensateCarrierCents:
+        kind === "RETENTION" && retentionCents > 0
+          ? computeLateCancellationCompensationCents({ retentionCents, transportCents: b.pricing.transportCents, totalShipperCents: b.pricing.totalShipperCents })
+          : null,
+      restituteShipperCents: kind === "RETENTION" && retentionCents > 0 ? retentionCents : null,
+    },
     bookingId: b.id,
     kind,
     status: b.status,
@@ -169,6 +231,12 @@ export function toDisputeFile(b: AdminBookingRecord, dispute: AdminDisputeRecord
             photoUrls: dispute.photoUrls ?? [],
             pledgeAcceptedAt: dispute.pledgeAcceptedAt.toISOString(),
             status: dispute.status,
+            carrierStatement:
+              dispute.carrierRespondedAt && dispute.carrierStatement
+                ? { statement: dispute.carrierStatement, photoUrls: dispute.carrierStatementPhotoUrls ?? [], respondedAt: dispute.carrierRespondedAt.toISOString() }
+                : null,
+            responseDeadlineAt: responseDeadline(b.disputedAt ?? b.requestedAt).toISOString(),
+            resolution,
           }
         : null,
   };
@@ -184,7 +252,8 @@ const partySelect = {
   shipperRatingsCount: true,
   shipperCompletedDealsCount: true,
   shipperLateCancellationsCount: true,
-  carrierPage: { select: { ratingsAvg: true, ratingsCount: true, completedDealsCount: true, lateCancellationsCount: true } },
+  shipperDisputesLostCount: true,
+  carrierPage: { select: { ratingsAvg: true, ratingsCount: true, completedDealsCount: true, lateCancellationsCount: true, disputesLostCount: true } },
 } as const;
 
 export function makeAdminDisputeService() {
@@ -202,7 +271,7 @@ export function makeAdminDisputeService() {
       const ids = bookings.map((b) => b.id);
       const userIds = [...new Set(bookings.flatMap((b) => [b.shipperId, b.carrierId]))];
       const [disputes, users] = await Promise.all([
-        prisma.dispute.findMany({ where: { bookingId: { in: ids } }, select: { bookingId: true, ticketNumber: true, category: true } }),
+        prisma.dispute.findMany({ where: { bookingId: { in: ids } }, select: { bookingId: true, ticketNumber: true, category: true, carrierRespondedAt: true } }),
         prisma.user.findMany({ where: { id: { in: userIds } }, select: { id: true, firstName: true } }),
       ]);
       const disputeBy = new Map(disputes.map((d) => [d.bookingId, d]));
@@ -233,7 +302,7 @@ export function makeAdminDisputeService() {
         prisma.user.findUnique({ where: { id: booking.carrierId }, select: partySelect }),
       ]);
       if (!shipper || !carrier) throw new NotFoundError("No arbitration file for this deal.");
-      const file = toDisputeFile(booking, dispute as unknown as AdminDisputeRecord | null, shipper as AdminPartyRecord, carrier as AdminPartyRecord);
+      const file = toDisputeFile(booking, dispute as unknown as AdminDisputeRecord | null, shipper as AdminPartyRecord, carrier as AdminPartyRecord, new Date());
       if (!file) throw new NotFoundError("No arbitration file for this deal.");
       // Journal : l'admin a ouvert un dossier (identités, photos, montants).
       await recordAdminAction(prisma, {
