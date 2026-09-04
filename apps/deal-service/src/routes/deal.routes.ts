@@ -28,6 +28,8 @@ import { makeAdminFinanceController } from "../controllers/admin-finance.control
 import { makeAdminFinanceService } from "../services/admin-finance.service";
 import { makeAdminHistoryController } from "../controllers/admin-history.controller";
 import { makeAdminHistoryService } from "../services/admin-history.service";
+import { makeOpsAlertsController } from "../controllers/ops-alerts.controller";
+import { makeOpsAlertsService } from "../services/ops-alerts.service";
 import { makeDealMediationService } from "../services/deal-mediation.service";
 
 /**
@@ -136,5 +138,8 @@ router.post("/admin/deals/:id/refund", isAdminAuthenticated, requireAdminPermiss
 // C-PR6a (D59 5A) : tout ce qui est arrivé à ce deal — lecture seule, journalisée
 const adminHistory = makeAdminHistoryController(makeAdminHistoryService());
 router.get("/admin/deals/:id/history", isAdminAuthenticated, requireAdminPermission("deals.history.read"), adminHistory.getHistory);
+// C-PR6b (D59 3A / 4A) : alertes de seuil, calculées à la lecture — le cron horaire (main.ts) réutilise le même service
+export const opsAlertsService = makeOpsAlertsService();
+router.get("/admin/alerts", isAdminAuthenticated, requireAdminPermission("kpi.read"), makeOpsAlertsController(opsAlertsService).list);
 
 export default router;

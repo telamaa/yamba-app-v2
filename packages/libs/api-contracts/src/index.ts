@@ -33,3 +33,4 @@ export * from "./admin/admin-users.schema";
 export * from "./admin/admin-trips.schema";
 export * from "./admin/admin-finances.schema";
 export * from "./admin/admin-pilotage.schema";
+export * from "./admin/admin-alerts.schema";
