@@ -10,7 +10,7 @@ import Link from "next/link";
 import { ApiError, apiFetch, del, post } from "@/lib/api";
 import { ACTION_LABEL, STATUS_LABEL, dateTime, money } from "@/lib/format";
 import { can, isSuperAdmin, rolesLabel } from "@/lib/permissions";
-import type { AdminMe, AdminUserFile } from "@/lib/types";
+import type { AdminMe, AdminUserFile, ErasureBlocker } from "@/lib/types";
 
 const MIN_REASON = 20;
 
@@ -33,6 +33,7 @@ export default function UserFileView({ userId }: { userId: string }) {
   const isAdminTarget = file.adminRoles.length > 0 || !!file.adminRole;
   const canPropose = can(me?.adminRoles, "users.suspension.propose") && !file.isMe && (!isAdminTarget || isSuperAdmin(me?.adminRoles));
   const canApply = can(me?.adminRoles, "users.suspension.apply") && !file.isMe && (!isAdminTarget || isSuperAdmin(me?.adminRoles));
+  const canErase = can(me?.adminRoles, "users.erase") && !file.isMe && !file.isDeleted; // C-PR8b (D63 6A)
 
   return (
     <div className="max-w-5xl">
@@ -79,6 +80,7 @@ export default function UserFileView({ userId }: { userId: string }) {
           <Facts f={file.shipper} />
         </Card>
         <SuspensionCard file={file} canPropose={canPropose} canApply={canApply} onDone={load} />
+        {canErase && <EraseCard file={file} onDone={load} />}
       </div>
 
       <Card title={`Trajets (${file.activity.trips.length})`} className="mt-5">
@@ -195,5 +197,54 @@ function Card({ title, children, className = "" }: { title: string; children: Re
 function Row({ k, v }: { k: string; v: string }) {
   return (
     <div className="flex justify-between gap-4 text-[13px]"><span className="text-slate-500">{k}</span><span className="text-right font-medium">{v}</span></div>
+  );
+}
+
+/** C-PR8b (D63 6A) — effacement à la demande d'un membre (reçue par email) : mêmes garde-fous que côté membre, motif au journal. */
+function EraseCard({ file, onDone }: { file: AdminUserFile; onDone: () => void }) {
+  const [reason, setReason] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  const [blockers, setBlockers] = useState<ErasureBlocker[] | null>(null);
+  const LABEL: Record<ErasureBlocker, string> = {
+    ACTIVE_DEAL: "un deal en cours",
+    PENDING_REQUEST: "une demande en attente",
+    PAYOUT_PENDING: "un versement dû ou en échec",
+    RETENTION_HELD: "une retenue en médiation",
+    PUBLISHED_TRIP: "un trajet publié ou en pause",
+    ADMIN_ACCOUNT: "un profil admin (à révoquer d'abord)",
+  };
+  async function run() {
+    setBusy(true);
+    setMsg(null);
+    setBlockers(null);
+    try {
+      await post(`/admin/users/${file.id}/erase`, { reason: reason.trim() });
+      setMsg("Compte effacé : identité et coordonnées supprimées, réservations conservées sans nom, journal écrit, email de confirmation envoyé à l'ancienne adresse.");
+      onDone();
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 409 && (e.data as { blockers?: ErasureBlocker[] })?.blockers) setBlockers((e.data as { blockers: ErasureBlocker[] }).blockers);
+      else setMsg(e instanceof ApiError ? `${e.status} : ${e.message}` : "Effacement impossible.");
+    } finally {
+      setBusy(false);
+    }
+  }
+  const ok = reason.trim().length >= MIN_REASON && confirm === "EFFACER" && !busy;
+  return (
+    <Card title="Effacer ce compte (RGPD)">
+      <p className="text-[12.5px] text-slate-600">Immédiat et irréversible. Anonymise l'identité et les coordonnées, supprime adresses, alertes, favoris, justificatifs ; conserve réservations, litiges, avis et messages sans le nom. Refusé tant qu'un deal vit. Le motif (demande reçue le…, canal) part au journal et au registre des demandes.</p>
+      <textarea value={reason} onChange={(e) => setReason(e.target.value.slice(0, 500))} rows={2} placeholder={`Motif (${MIN_REASON} caractères au moins) : demande reçue par email le …`} className="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2 text-[12.5px]" />
+      <label className="mt-2 block text-[12px] text-slate-600">Tape EFFACER pour confirmer <input value={confirm} onChange={(e) => setConfirm(e.target.value.toUpperCase())} className="ml-2 w-32 rounded border border-slate-300 px-2 py-1" /></label>
+      {blockers && (
+        <div className="mt-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-[12.5px] text-amber-900">
+          Refusé pour l'instant : {blockers.map((b) => LABEL[b]).join(", ")}.
+        </div>
+      )}
+      <div className="mt-3">
+        <button disabled={!ok} onClick={run} className="rounded-lg bg-red-800 px-3 py-1.5 text-[12.5px] font-semibold text-white disabled:opacity-50">Effacer définitivement</button>
+      </div>
+      {msg && <p className="mt-2 text-[12px] text-slate-600">{msg}</p>}
+    </Card>
   );
 }

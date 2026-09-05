@@ -30,8 +30,8 @@ export type AdminEmailDictionary = {
 };
 
 export const ADMIN_ROLE_LABELS: Record<SupportedLocale, Record<string, string>> = {
-  fr: { SUPER_ADMIN: "Super administrateur", MEDIATOR: "Médiateur", SUPPORT: "Support", FINANCE: "Finance", OPS: "Exploitation" },
-  en: { SUPER_ADMIN: "Super administrator", MEDIATOR: "Mediator", SUPPORT: "Support", FINANCE: "Finance", OPS: "Operations" },
+  fr: { SUPER_ADMIN: "Super administrateur", MEDIATOR: "Médiateur", SUPPORT: "Support", FINANCE: "Finance", OPS: "Exploitation", PRIVACY: "Données personnelles" },
+  en: { SUPER_ADMIN: "Super administrator", MEDIATOR: "Mediator", SUPPORT: "Support", FINANCE: "Finance", OPS: "Operations", PRIVACY: "Privacy" },
 };
 
 const fr: AdminEmailDictionary = {

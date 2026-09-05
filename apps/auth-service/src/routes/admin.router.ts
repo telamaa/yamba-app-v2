@@ -14,6 +14,7 @@ import { makeAdminUsersService } from "../services/admin-users.service";
 import { acceptAdminInvite, inviteAdmin, listAdmins, revokeAdmin, updateAdminRole } from "../controller/admin-admins.controller";
 import { getAdminKpis } from "../controller/admin-kpis.controller";
 import { getSettings, getSettingsHistory, resetSettings, updateSettings } from "../controller/admin-settings.controller"; // C-PR8a (D62)
+import { adminEraseUser, listDataRequests } from "../controller/privacy.controller"; // C-PR8b (D63)
 import { getPilotageCorridors, getPilotageDrilldown, getPilotageSeries } from "../controller/admin-pilotage.controller";
 import {
   adminLogin,
@@ -68,5 +69,8 @@ router.get("/admin/users/:id", isAdminAuthenticated, requireAdminPermission("use
 router.post("/admin/users/:id/suspension/propose", isAdminAuthenticated, requireAdminPermission("users.suspension.propose"), adminUsers.propose);
 router.post("/admin/users/:id/suspension", isAdminAuthenticated, requireAdminPermission("users.suspension.apply"), adminUsers.apply);
 router.delete("/admin/users/:id/suspension", isAdminAuthenticated, requireAdminPermission("users.suspension.apply"), adminUsers.lift);
+// C-PR8b (D63 6A) — données personnelles : effacement à la demande, registre des demandes
+router.post("/admin/users/:id/erase", isAdminAuthenticated, requireAdminPermission("users.erase"), adminEraseUser);
+router.get("/admin/privacy/requests", isAdminAuthenticated, requireAdminPermission("privacy.requests.read"), listDataRequests);
 
 export default router;

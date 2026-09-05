@@ -388,7 +388,15 @@ Ordre de demarrage : auth -> trip -> gateway.
   /settings/docs, seed-settings.ts, npm run settings-doc → context/YAMBA-PARAMETRES.md,
   SiteConfig supprime. MERGE 05/09 : **#178** (17 checks comptes). Suite : C-PR8b RGPD (PRIVACY),
   C-PR8c maintenance / etat des services.
-- Plateforme de tests : 814 (trip 209, deal 489, notification 83, message 33) + auth 121.
+- 05/09 : C-PR8b feat/c8b-gdpr (D63, A143) — sudo par code email (portee OTP « sudo »), export JSON
+  de ce qui appartient au membre (une fois par 24 h), effacement immediat bloque par tout deal vivant
+  (409 typee, liste fermee de motifs), anonymisation champ par champ en UNE transaction auth-service
+  (exception assumee a D54 2A), ErasedAccount (Stripe id), DataRequest (registre), isAuthenticated et
+  emails filtrent isDeleted, tiers destinataire efface a 30 j (cron deal-service, parametre
+  privacy.recipientRetentionDays), profil PRIVACY (registre, users.erase, exports.personal A143),
+  preference messagingReminderEmails (A138), user-ui « Mes donnees », admin-ui /privacy + carte
+  d'effacement, @packages/libs/imagekit partage. Suite : C-PR8c.
+- Plateforme de tests : 822 (trip 209, deal 494, notification 83, message 36) + auth 130.
 - 04/09 : C-PR6b feat/c6b-admin-alerts (D59 3A / 4A, A129–A131) — neuf regles de seuil
   (evaluateAlerts pur, instantane de dix compteurs), GET /admin/alerts sans etat (accueil
   admin), cron horaire avec dedoublonnage Redis SET NX (un email par regle et par jour, Redis

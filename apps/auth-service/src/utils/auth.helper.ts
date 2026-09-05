@@ -97,7 +97,7 @@ export type PendingRegistration = {
   preferredLocale?: string;
 };
 
-type OtpScope = "register" | "forgot";
+type OtpScope = "register" | "forgot" | "sudo"; // sudo : C-PR8b (D63 1A) — geste sensible d'un membre connecté
 
 /**
  * Type du contexte enrichi pour les erreurs OTP.
@@ -278,7 +278,7 @@ const sendOtpScoped = async (
   const otp = crypto.randomInt(100000, 1000000).toString();
   const emails = getAuthEmails(locale);
   const params = { firstName, otp, expiresInMinutes: OTP_TTL_MINUTES };
-  const email = scope === "register" ? emails.verifyEmail(params) : emails.resetPassword(params);
+  const email = scope === "register" ? emails.verifyEmail(params) : scope === "sudo" ? emails.sudoCode(params) : emails.resetPassword(params);
   await sendAuthEmail(emailKey, locale, email);
   await redis.set(keys.otp(scope, emailKey), otp, "EX", OTP_TTL_SECONDS);
   await redis.set(
@@ -452,6 +452,12 @@ export const verifyForgotPasswordOtpCode = async (
   otp: string,
   locale: string | null | undefined
 ) => verifyOtpScoped("forgot", emailKey, otp, locale);
+
+/** ---------- Sudo (C-PR8b, D63 1A) : export / effacement — mêmes paliers que l'OTP ---------- */
+export const checkSudoOtpRestrictions = async (emailKey: string) => checkOtpRestrictionsScoped("sudo", emailKey);
+export const trackSudoOtpRequests = async (emailKey: string) => trackOtpRequestsScoped("sudo", emailKey);
+export const sendSudoOtp = async (firstName: string, emailKey: string, locale: string | null | undefined) => sendOtpScoped("sudo", firstName, emailKey, locale);
+export const verifySudoOtp = async (emailKey: string, otp: string, locale: string | null | undefined) => verifyOtpScoped("sudo", emailKey, otp, locale);
 
 /** ---------- Pending Registration ---------- */
 export const storePendingRegistration = async (

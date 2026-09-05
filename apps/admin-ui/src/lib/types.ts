@@ -301,3 +301,11 @@ export type AdminSettingsResponse = {
 };
 export type SettingsWriteResponse = { version: number; changed: { key: string; before: number; after: number }[] };
 export type SettingsHistoryItem = { id: string; at: string; admin: string; action: string; key: string | null; before: number | null; after: number | null; reason: string | null; version: number | null };
+
+/* ── C-PR8b (D63) — données personnelles ── */
+export type ErasureBlocker = "ACTIVE_DEAL" | "PENDING_REQUEST" | "PAYOUT_PENDING" | "RETENTION_HELD" | "PUBLISHED_TRIP" | "ADMIN_ACCOUNT";
+export type DataRequestItem = {
+  id: string; userId: string; userLabel: string; type: "EXPORT" | "ERASURE"; channel: "MEMBER" | "ADMIN"; status: "DONE" | "REFUSED";
+  refusalReasons: string[]; requestedByAdmin: string | null; reason: string | null; requestedAt: string; completedAt: string | null;
+};
+export type DataRequestsResponse = { items: DataRequestItem[]; nextCursor: string | null };

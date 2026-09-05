@@ -1494,3 +1494,37 @@ Le jalon 2 dit « Telama peut ajuster un paramètre seul ». Jusqu'ici, la commi
 | PAR10 | « Tout réinitialiser » | La liste exacte des clés qui vont changer, motif, confirmation ; Journal : `SETTINGS_RESET` par clé ; « toutes les valeurs sont celles par défaut » |
 | PAR11 | Commission à 15 % ; côté membre, ouvrir le wizard sur un trajet au kilo | Le récapitulatif affiche 15 % (le total change) ; `GET /api/trips/pricing/params` répond `commissionPct: 15, version: n` |
 | PAR12 | Relance messagerie à 5 min / intervalle 10 min ; envoyer un message et ne pas le lire | L'email de relance part entre 5 et 10 min (cron 5 min) au lieu de 15–20 |
+
+---
+
+# C-PR8b — mes données : télécharger, supprimer, être oublié (D63)
+
+## Le besoin
+Le règlement donne à chaque membre le droit de récupérer ses données et de faire effacer son compte ; Yamba doit y répondre dans le mois, avec une preuve. Mais un compte n'est pas une page blanche : il porte des réservations payées, des litiges, des avis et des messages qui appartiennent aussi à d'autres. Et le destinataire d'un colis, qui n'a jamais eu de compte, ne doit pas rester dans la base indéfiniment.
+
+### Règles de gestion (RGP)
+- **RG-RGP-01 — Un geste sensible se confirme par un code reçu par email** (export, suppression), valable dix minutes, avec les mêmes blocages progressifs qu'un code d'inscription. Il marche pour tous les comptes, avec ou sans mot de passe.
+- **RG-RGP-02 — Le membre télécharge un fichier de ce qui lui appartient** : profil, adresses, consentements, préférences, trajets, réservations (son rôle et ses montants), avis donnés et avis reçus révélés, messages écrits, rendez-vous, révélations de numéro, alertes, favoris, abonnements, notifications, signalements faits. Jamais les coordonnées de l'autre partie, jamais le code de livraison, jamais les signalements qui le visent ni les dossiers de médiation. Une fois par 24 heures.
+- **RG-RGP-03 — La suppression est immédiate et irréversible**, après le code et le mot SUPPRIMER tapé. Elle est refusée tant qu'un deal vit (accepté, en transit, livré, en litige), qu'une demande attend une réponse, qu'un versement est dû ou en échec, qu'une retenue est en médiation, qu'un trajet est publié ou en pause, ou que le compte porte un profil administrateur. Les motifs sont dits au membre.
+- **RG-RGP-04 — Supprimer, c'est anonymiser sans casser le dossier** : identité, coordonnées, mot de passe, date de naissance, adresses, avatar, connexions Google, alertes, favoris, abonnements, notifications et justificatifs sont effacés ; les réservations, litiges, avis, messages, rendez-vous, signalements et le journal admin restent, l'auteur devenant « Membre supprimé ». Le compte Stripe Connect n'est pas supprimé par Yamba (obligations comptables) ; son identifiant est conservé à part, sans nom.
+- **RG-RGP-05 — Après la suppression, plus rien ne part** : aucune session, aucun email, aucune relance. Un email de confirmation, sans lien ni code, est envoyé à l'ancienne adresse.
+- **RG-RGP-06 — Le destinataire d'un colis est oublié 30 jours après la fin du deal** (nom, téléphone, email effacés de la réservation), jamais avant : un litige ou une preuve de remise peut en avoir besoin. Le délai est un paramètre d'exploitation.
+- **RG-RGP-07 — Chaque demande est inscrite au registre** (export ou effacement, par le membre ou par l'admin, faite ou refusée avec ses motifs, date, adresse IP) : c'est la preuve du délai légal.
+- **RG-RGP-08 — Le profil Données personnelles** lit le registre, efface un compte à la demande d'un membre reçue par email (motif au journal, mêmes refus) et fait l'export nominatif (au lieu du super administrateur seul, A143). Il se confie comme un super administrateur. Personne n'efface son propre compte depuis le back-office.
+- **RG-RGP-09 — Le membre choisit de ne plus recevoir la relance email** des messages non lus (bascule dans Sécurité) ; la notification in-app reste.
+
+### Recette (RGP)
+| # | Scénario | Attendu |
+|---|---|---|
+| RGP1 | Membre : Sécurité → « Télécharger mes données » → « M'envoyer le code » | Email « Ton code de confirmation Yamba » ; saisir le code → un fichier `yamba-mes-donnees-<date>.json` se télécharge |
+| RGP2 | Ouvrir le fichier | `format: yamba-data-export/1` ; ses réservations avec `role` ; côté Voyageur aucune clé `recipient` ; aucun `deliveryCode` ; ses messages seulement |
+| RGP3 | Recommencer dans l'heure | Refus « One export per 24 hours » |
+| RGP4 | Membre avec un deal accepté : « Supprimer mon compte » | Bandeau ambre « Impossible pour l'instant » avec « Un deal est en cours » ; pas de saisie de code |
+| RGP5 | Membre sans deal vivant : code + SUPPRIMER | Déconnexion immédiate, retour à l'accueil ; la connexion avec l'ancien email/mot de passe échoue ; email « Ton compte Yamba a été supprimé » |
+| RGP6 | Admin : fiche du membre effacé | Nom « Membre supprimé », email `erased+…@anonymised.invalid`, aucune adresse ni justificatif ; ses deals toujours listés |
+| RGP7 | L'autre partie ouvre la conversation du deal | Le fil est intact, la contrepartie s'affiche « Membre supprimé » ; « Voir le numéro » n'a plus de numéro à montrer |
+| RGP8 | Admin PRIVACY (`grant-admin.ts <email> --role PRIVACY`) : menu « Données personnelles » | Registre avec l'export (faite), l'effacement refusé (deal en cours) et l'effacement fait ; Journal : « Registre RGPD consulté » |
+| RGP9 | PRIVACY : fiche d'un membre, carte « Effacer ce compte (RGPD) », motif + EFFACER | Effacé ; Journal « Compte effacé (RGPD) » avec le motif ; registre : canal « par l'admin (Prénom I.) » |
+| RGP10 | PRIVACY : Utilisateurs → export nominatif | Autorisé (A143), motif au journal ; FINANCE : refusé |
+| RGP11 | Sécurité → bascule « Relance par email » désactivée ; recevoir un message et ne pas le lire 20 min | Aucun email de relance ; la notification in-app est là |
+| RGP12 | `seed-deals.ts` puis passer `privacy.recipientRetentionDays` à 7 j et lancer le cron (ou attendre 03:40) | Les deals terminés depuis plus de 7 j ont `recipient` = « — / — / +00000000000 » et `recipientRedactedAt` ; les deals vivants sont intacts |

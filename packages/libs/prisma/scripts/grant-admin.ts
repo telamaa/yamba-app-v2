@@ -5,7 +5,7 @@
  * uniquement par ce script, sur le poste de l'opérateur.
  *
  *   npx tsx --env-file=.env packages/libs/prisma/scripts/grant-admin.ts <email>                 (SUPER_ADMIN)
- *   npx tsx --env-file=.env packages/libs/prisma/scripts/grant-admin.ts <email> --role MEDIATOR (C-PR3 : SUPER_ADMIN | MEDIATOR | SUPPORT | FINANCE | OPS)
+ *   npx tsx --env-file=.env packages/libs/prisma/scripts/grant-admin.ts <email> --role MEDIATOR (C-PR3 : SUPER_ADMIN | MEDIATOR | SUPPORT | FINANCE | OPS | PRIVACY)
  *   npx tsx --env-file=.env packages/libs/prisma/scripts/grant-admin.ts <email> --roles MEDIATOR,FINANCE (C-PR3bis, D60 1A : profils cumulés)
  *   npx tsx --env-file=.env packages/libs/prisma/scripts/grant-admin.ts <email> --revoke
  *
@@ -18,7 +18,7 @@ const prisma = new PrismaClient();
 
 async function main() {
   const [email, flag, roleArg] = process.argv.slice(2);
-  const ROLES = ["SUPER_ADMIN", "MEDIATOR", "SUPPORT", "FINANCE", "OPS"] as const; // OPS : C-PR8a (D62 3A)
+  const ROLES = ["SUPER_ADMIN", "MEDIATOR", "SUPPORT", "FINANCE", "OPS", "PRIVACY"] as const; // OPS : C-PR8a (D62 3A) · PRIVACY : C-PR8b (D63 6A)
   type Role = (typeof ROLES)[number];
   const wanted = flag === "--role" ? [roleArg] : flag === "--roles" ? (roleArg ?? "").split(",").map((r) => r.trim()).filter(Boolean) : ["SUPER_ADMIN"];
   const roles = ROLES.filter((r) => wanted.includes(r)) as Role[]; // ordre canonique, doublons ignorés

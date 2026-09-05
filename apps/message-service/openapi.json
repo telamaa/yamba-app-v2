@@ -12943,7 +12943,8 @@
           "MEDIATOR",
           "SUPPORT",
           "FINANCE",
-          "OPS"
+          "OPS",
+          "PRIVACY"
         ]
       },
       "AccountStatus": {
@@ -12956,7 +12957,7 @@
       },
       "AdminRoles": {
         "minItems": 1,
-        "maxItems": 5,
+        "maxItems": 6,
         "type": "array",
         "items": {
           "$ref": "#/components/schemas/AdminRole"
@@ -19110,6 +19111,12 @@
             "minimum": 1,
             "maximum": 25,
             "description": "Taille maximale d'un document (mb) — ex-SiteConfig"
+          },
+          "privacy.recipientRetentionDays": {
+            "type": "number",
+            "minimum": 7,
+            "maximum": 365,
+            "description": "Effacement du destinataire après (days) — D63 5A · RGP-02"
           }
         },
         "required": [
@@ -19152,7 +19159,8 @@
           "alerts.acceptanceRateMinPct",
           "alerts.acceptanceRateMinRequests",
           "documents.maxDocsPerTrip",
-          "documents.maxDocSizeMb"
+          "documents.maxDocSizeMb",
+          "privacy.recipientRetentionDays"
         ],
         "additionalProperties": false
       },
@@ -19173,7 +19181,8 @@
               "reputation",
               "messaging",
               "alerts",
-              "documents"
+              "documents",
+              "privacy"
             ]
           },
           "label": {
@@ -19575,6 +19584,442 @@
         ],
         "additionalProperties": false,
         "description": "Server pricing parameters (D62 7A) — the wizard quotes with the single engine and these values"
+      },
+      "ErasureBlocker": {
+        "type": "string",
+        "enum": [
+          "ACTIVE_DEAL",
+          "PENDING_REQUEST",
+          "PAYOUT_PENDING",
+          "RETENTION_HELD",
+          "PUBLISHED_TRIP",
+          "ADMIN_ACCOUNT"
+        ],
+        "description": "Why an account cannot be erased yet (D63 3A) — closed list, translated by the client"
+      },
+      "ErasureBlockedResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "const": "ERASURE_BLOCKED"
+          },
+          "blockers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ErasureBlocker"
+            }
+          },
+          "counts": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            }
+          }
+        },
+        "required": [
+          "code",
+          "blockers",
+          "counts"
+        ],
+        "additionalProperties": false
+      },
+      "SudoCodeRequest": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "pattern": "^\\d{6}$"
+          }
+        },
+        "required": [
+          "code"
+        ],
+        "additionalProperties": false,
+        "description": "Six-digit code sent to the account email (SES-03 sudo, D63 1A)"
+      },
+      "EraseMyAccountRequest": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "pattern": "^\\d{6}$"
+          },
+          "confirmation": {
+            "type": "string",
+            "const": "SUPPRIMER"
+          }
+        },
+        "required": [
+          "code",
+          "confirmation"
+        ],
+        "additionalProperties": false
+      },
+      "UpdateMyPreferencesRequest": {
+        "type": "object",
+        "properties": {
+          "messagingReminderEmails": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Member preferences (D63 8A)"
+      },
+      "AdminEraseUserRequest": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "minLength": 20,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "additionalProperties": false,
+        "description": "Erasure on behalf of a member (request received by email) — PRIVACY or SUPER_ADMIN, journaled"
+      },
+      "DataRequestItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "string"
+          },
+          "userLabel": {
+            "type": "string",
+            "description": "First name + initial, or « Membre supprimé »"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "EXPORT",
+              "ERASURE"
+            ]
+          },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "MEMBER",
+              "ADMIN"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "DONE",
+              "REFUSED"
+            ]
+          },
+          "refusalReasons": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "requestedByAdmin": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "requestedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          },
+          "completedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "userLabel",
+          "type",
+          "channel",
+          "status",
+          "refusalReasons",
+          "requestedByAdmin",
+          "reason",
+          "requestedAt",
+          "completedAt"
+        ],
+        "additionalProperties": false
+      },
+      "DataRequestsResponse": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DataRequestItem"
+            }
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "DataExport": {
+        "type": "object",
+        "properties": {
+          "exportedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          },
+          "format": {
+            "type": "string",
+            "const": "yamba-data-export/1"
+          },
+          "profile": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          },
+          "preferences": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          },
+          "addresses": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {}
+            }
+          },
+          "consents": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {}
+            }
+          },
+          "carrierProfile": {
+            "anyOf": [
+              {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {}
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "trips": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {}
+            }
+          },
+          "bookings": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {}
+            }
+          },
+          "reviewsGiven": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {}
+            }
+          },
+          "reviewsReceived": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {}
+            }
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {}
+            }
+          },
+          "meetups": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {}
+            }
+          },
+          "phoneReveals": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {}
+            }
+          },
+          "savedRoutes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {}
+            }
+          },
+          "favorites": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {}
+            }
+          },
+          "following": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {}
+            }
+          },
+          "notifications": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {}
+            }
+          },
+          "reportsMade": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {}
+            }
+          },
+          "dataRequests": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {}
+            }
+          }
+        },
+        "required": [
+          "exportedAt",
+          "format",
+          "profile",
+          "preferences",
+          "addresses",
+          "consents",
+          "carrierProfile",
+          "trips",
+          "bookings",
+          "reviewsGiven",
+          "reviewsReceived",
+          "messages",
+          "meetups",
+          "phoneReveals",
+          "savedRoutes",
+          "favorites",
+          "following",
+          "notifications",
+          "reportsMade",
+          "dataRequests"
+        ],
+        "additionalProperties": false,
+        "description": "What belongs to the member (D63 2A): never the counterpart's contact details, the delivery code, reports targeting the member, internal notes or mediation files"
       }
     },
     "securitySchemes": {

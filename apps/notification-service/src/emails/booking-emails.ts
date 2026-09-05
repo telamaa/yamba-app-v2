@@ -497,13 +497,14 @@ export async function dispatchBookingEmails(
   );
   const users = await prisma.user.findMany({
     where: { id: { in: partyIds } },
-    select: { id: true, email: true, firstName: true, preferredLocale: true },
+    select: { id: true, email: true, firstName: true, preferredLocale: true, isDeleted: true },
   });
   const byId = new Map(users.map((u) => [u.id, u]));
 
   for (const recipient of recipients) {
     const user = byId.get(recipient.userId);
-    if (!user?.email) {
+    // D63 4A — un compte effacé garde une adresse technique unique : c'est `isDeleted` qui fait foi.
+    if (!user?.email || user.isDeleted) {
       // RGPD (GHOST_COUNTERPART) ou donnée absente : sauté, tracé.
       logger.warn(
         { eventId, userId: recipient.userId, eventType: event.eventType },
