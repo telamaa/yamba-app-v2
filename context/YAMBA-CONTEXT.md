@@ -54,9 +54,10 @@ Ordre de demarrage : auth -> trip -> gateway.
 
 ## Ce qui est FAIT (aout 2026)
 
-- CI GitHub Actions : 16 required checks sur dev (TypeScript x9 dont admin-ui et
+- CI GitHub Actions : 17 required checks sur dev (TypeScript x9 dont admin-ui et
   message-service, Tests unitaires x5 : auth, deal, notification, trip, message,
-  i18n, Anti-fuite, Contrats OpenAPI). A AJOUTER :
+  Build des services (webpack, six services — 05/09), i18n (parse, miroir FR/EN,
+  pas de point dans une cle), Anti-fuite, Contrats OpenAPI). A AJOUTER :
   `next build` user-ui (le build prod a casse sans que la CI le voie, #81).
 - Session auth (D27) : inactivite serveur + duree absolue (solde au jalon 2).
 - Chantier 0 OpenAPI : @packages/api-contracts (Zod), OAS trip-service

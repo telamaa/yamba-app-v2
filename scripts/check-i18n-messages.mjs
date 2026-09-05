@@ -8,6 +8,10 @@
  * 3. Chaque fichier doit avoir exactement le même arbre de clés que
  *    son homologue fr (miroir bidirectionnel) — toute clé manquante
  *    en EN fait planter useTranslations au runtime.
+ * 4. Aucune clé ne contient de point ni n'est vide : next-intl réserve
+ *    le point à l'imbrication et refuse TOUT le namespace au rendu
+ *    (INVALID_KEY, #174) — la CI ne charge pas next-intl, elle applique
+ *    la même règle à la source.
  *
  * Usage : node scripts/check-i18n-messages.mjs
  * Sort avec le code 1 et un rapport détaillé à la moindre divergence.
@@ -22,6 +26,17 @@ import { join } from "node:path";
 
 const MESSAGES_DIR = "apps/user-ui/messages";
 const REFERENCE_LOCALE = "fr";
+
+/** Clés interdites par next-intl (règle 4) : point ou clé vide, à tous les niveaux. */
+function invalidKeys(obj, prefix = "") {
+  const out = [];
+  for (const [k, v] of Object.entries(obj)) {
+    const path = prefix ? `${prefix}.${k}` : k;
+    if (k === "" || k.includes(".")) out.push(path);
+    if (v !== null && typeof v === "object" && !Array.isArray(v)) out.push(...invalidKeys(v, path));
+  }
+  return out;
+}
 
 /** Aplati l'arbre de clés d'un objet JSON en chemins pointés. */
 function keyPaths(obj, prefix = "") {
@@ -65,7 +80,9 @@ const refTrees = new Map();
 for (const file of refFiles) {
   const p = join(refDir, file);
   try {
-    refTrees.set(file, JSON.parse(readFileSync(p, "utf8")));
+    const tree = JSON.parse(readFileSync(p, "utf8"));
+    refTrees.set(file, tree);
+    for (const key of invalidKeys(tree)) fail(`Clé refusée par next-intl (point ou vide) : ${p} → "${key}"`);
   } catch (e) {
     fail(`JSON invalide : ${p} — ${e.message}`);
   }
