@@ -453,8 +453,8 @@ Ordre de demarrage : auth -> trip -> gateway.
   Reste hors chantier : TrustScore interne + plafonds progressifs (D29-2),
   moniteur externe de disponibilite (candidat D64).
 - D35 email, D65 sessions, D66 PostHog, D67 profil editable (chantier E), D68 signalement +
-  wording D28, D69 page destinataire + glossaire A144, D70 moniteur externe : FAITS le 05/09. Reste
-  Jalon 2 : OpenAPI auth, sauvegardes Atlas, TrustScore D29-2, puis deps + recette globale.
+  wording D28, D69 page destinataire + glossaire A144, D70 moniteur externe, A145 OpenAPI auth :
+  FAITS le 05/09. Reste Jalon 2 : sauvegardes Atlas, TrustScore D29-2, puis deps + recette globale.
 - Solde sessions auth : FAIT (D65) — reste le cleanup des sessions legacy (30 j post-prod).
 - API : conversion OpenAPI auth-service (contrats Zod), page /docs Scalar
   auth, page /docs index gateway, audit anglais OAS trip-service.
@@ -561,6 +561,11 @@ Ordre de demarrage : auth -> trip -> gateway.
   (CRON_HEARTBEAT_PING_URLS, GET best effort dans withHeartbeat). A TA MAIN : compte Better Stack,
   3 moniteurs HTTP, 4 battements (payout, expire, unread-reminder, ops-alerts), contacts d'alerte —
   runbook dans DOC-TECHNIQUE. MERGE 05/09 : **#197** (17 checks comptes).
+- A145 FAIT le 05/09 (feat/auth-openapi) : auth-service dans l'OpenAPI 3.1 (D3, dernier service) —
+  86 operations, contrats de la surface membre decrits au reel (member-auth.schema.ts), x-permission
+  sur les routes admin, /openapi.json + /docs sur :6001, cinquieme cible de generate:openapi diffee
+  en CI, test qui exige chaque route montee et refuse toute route inventee. Porte : safeParse dans
+  les controleurs historiques au chantier mobile D36.
 - Backlog parametre serveur : classe C du catalogue D62 (tolerance de poids,
   plafonds comptes neufs, plafond express, seuil de trois signalements…).
 - Photos hors TripDocument chez ImageKit sans fileId (colis, pickup, livraison, litige,

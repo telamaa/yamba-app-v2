@@ -43,3 +43,4 @@ export * from "./admin/member-sessions.schema"; // D65
 export * from "./admin/member-profile.schema"; // D67
 export * from "./admin/reports.schema"; // D68
 export * from "./booking/tracking-link.schema"; // D69
+export * from "./auth/member-auth.schema"; // A145 — surface membre d'auth-service (OpenAPI)

@@ -1751,3 +1751,24 @@ La page d'état admin dit comment vont les services à qui la regarde. Personne 
 | MON4 | Activer la maintenance depuis l'admin, service arrêté ou non | 200, `status: "maintenance"` |
 | MON5 | `curl -i http://localhost:3000/api/health` et `:3001/api/health` | 200, `app` = user-ui / admin-ui |
 | MON6 | `CRON_HEARTBEAT_PING_URLS` vers une URL de test (webhook.site), attendre un tick de `expire-bookings` | Un GET reçu à chaque tour ; sans la variable, aucun appel sortant |
+
+---
+
+# A145 — le contrat d'auth-service, écrit et vérifié
+
+## Le besoin
+Quatre services sur cinq publiaient leur contrat OpenAPI depuis les schémas Zod ; auth-service, le premier que tout client appelle (inscription, connexion, session), n'avait plus rien depuis le retrait du Swagger historique. Le chantier mobile (D36) se construira sur un client généré : sans ce contrat, il ne démarre pas, et un partenaire ou un nouveau développeur devait lire les contrôleurs.
+
+### Règles de gestion (API)
+- **RG-API-01 — Chaque route montée est documentée, aucune route documentée n'est inventée** : un test lit les routeurs et refuse l'écart dans les deux sens.
+- **RG-API-02 — Le contrat dit la vérité des erreurs** : 401 session, 403 sudo requis ou permission manquante, 404 qui ne révèle rien (page masquée, membre effacé), 409 conflit typé, 429 verrou OTP.
+- **RG-API-03 — Chaque route admin porte sa permission** (`x-permission`), la même que la matrice qui la garde.
+- **RG-API-04 — Le document est généré, jamais édité** : `npm run generate:openapi`, et la CI refuse un document en retard.
+
+### Recette (API)
+| # | Scénario | Attendu |
+|---|---|---|
+| API1 | Ouvrir `http://localhost:6001/docs` | Visionneuse Scalar, huit groupes (auth, me, carrier, saved-routes, users, reports, admin-auth, admin), 86 opérations |
+| API2 | `curl :6001/openapi.json \| jq '.paths \| length'` | 75 |
+| API3 | Ajouter une route dans un routeur sans la documenter, lancer les tests | Le test « documente chaque route montée » échoue en nommant la route |
+| API4 | Modifier un schéma sans régénérer, pousser | Le check « OpenAPI contracts generate+diff » échoue |
