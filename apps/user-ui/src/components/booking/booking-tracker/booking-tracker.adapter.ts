@@ -74,6 +74,7 @@ export type ShipperBookingViewDto = {
   recipient: {
     firstName: string;
     lastName: string;
+    phoneE164?: string | null; // D69 — saisi par l'Expéditeur
   };
   pickupPlace?: PlaceSnapshotDto | null;
   carrier: {
@@ -232,6 +233,7 @@ export function toBooking(view: ShipperBookingViewDto): Booking {
     recipient: {
       firstName: view.recipient.firstName,
       lastName: view.recipient.lastName,
+      phoneE164: view.recipient.phoneE164 ?? null, // D69
       // La ville du destinataire n'est pas snapshotée : la remise a
       // lieu dans la ville d'arrivée du trajet.
       city: view.trip.destinationCity,

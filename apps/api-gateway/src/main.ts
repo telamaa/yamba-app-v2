@@ -123,6 +123,14 @@ app.use(
   })
 );
 
+// /api/track/:token → deal-service reçoit /track/:token (D69 — page destinataire, SANS session, limiteur anonyme)
+app.use(
+  "/api/track",
+  proxy("http://localhost:6003", {
+    proxyReqPathResolver: (req) => `/track${req.url}`,
+  })
+);
+
 // /api/admin/disputes/* → deal-service reçoit /admin/disputes/* (chantier C, D54)
 // Le reste de /api/admin/* (me, audit) et /api/auth/admin/* → auth-service (catch-all).
 app.use(

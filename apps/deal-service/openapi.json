@@ -1452,6 +1452,159 @@
         }
       }
     },
+    "/deals/{id}/tracking-link": {
+      "post": {
+        "tags": [
+          "deals"
+        ],
+        "summary": "Recipient tracking link (D69) — shipper only, one per deal, created on demand",
+        "description": "Returns the public tracking token and path (/track/{token}) plus the recipient contact the shipper entered. 403 for the carrier, 409 TRACKING_NOT_AVAILABLE before acceptance or after a closure without delivery.",
+        "operationId": "issueTrackingLink",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ObjectId"
+            },
+            "description": "Deal (booking) identifier"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Tracking link",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrackingLinkResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token missing, invalid, expired, or account not found (isAuthenticated middleware)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated caller is not a party to this deal, or does not own the trip (ForbiddenError)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Deal or trip not found (NotFoundError)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Business conflict — details.code ∈ QUOTE_DIVERGENCE | CAPACITY_EXCEEDED | FAMILY_REFUSED | TRIP_NOT_BOOKABLE | OWN_TRIP | PAYMENT_NOT_AUTHORIZED | PAYMENT_MISMATCH | PAYMENT_ALREADY_USED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unhandled server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnhandledError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/track/{token}": {
+      "get": {
+        "tags": [
+          "deals"
+        ],
+        "summary": "Recipient tracking page (D69) — public, minimal content",
+        "description": "No session. Milestones (accepted → picked up → in transit → arrived → delivered, or closed), first names, corridor and dates. Never an address, a phone number, the delivery code, photos or amounts. 404 once the recipient snapshot is redacted (D63 5A), the link revoked or the deal deleted.",
+        "operationId": "getPublicTracking",
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Tracking view",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicTrackingResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed request: invalid ObjectId or unknown status value (ValidationError)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Deal or trip not found (NotFoundError)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unhandled server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnhandledError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/deals/{id}/rating": {
       "get": {
         "tags": [
@@ -23218,6 +23371,151 @@
           "decision"
         ],
         "additionalProperties": false
+      },
+      "TrackingLinkResponse": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "recipientFirstName": {
+            "type": "string"
+          },
+          "recipientPhoneE164": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "token",
+          "path",
+          "recipientFirstName",
+          "recipientPhoneE164"
+        ],
+        "additionalProperties": false
+      },
+      "TrackingMilestone": {
+        "type": "string",
+        "enum": [
+          "ACCEPTED",
+          "PICKED_UP",
+          "IN_TRANSIT",
+          "ARRIVED",
+          "DELIVERED",
+          "CLOSED"
+        ]
+      },
+      "PublicTrackingResponse": {
+        "type": "object",
+        "properties": {
+          "milestone": {
+            "$ref": "#/components/schemas/TrackingMilestone"
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "$ref": "#/components/schemas/TrackingMilestone"
+                },
+                "at": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                }
+              },
+              "required": [
+                "key",
+                "at"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "recipientFirstName": {
+            "type": "string"
+          },
+          "shipperFirstName": {
+            "type": "string"
+          },
+          "carrier": {
+            "type": "object",
+            "properties": {
+              "firstName": {
+                "type": "string"
+              },
+              "lastInitial": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "firstName",
+              "lastInitial"
+            ],
+            "additionalProperties": false
+          },
+          "corridor": {
+            "type": "object",
+            "properties": {
+              "originCity": {
+                "type": "string"
+              },
+              "destinationCity": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "originCity",
+              "destinationCity"
+            ],
+            "additionalProperties": false
+          },
+          "departureAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "arrivalAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "milestone",
+          "steps",
+          "recipientFirstName",
+          "shipperFirstName",
+          "carrier",
+          "corridor",
+          "departureAt",
+          "arrivalAt"
+        ],
+        "additionalProperties": false,
+        "description": "D69 — recipient tracking page: minimal content, no address, no phone, no delivery code"
       }
     },
     "securitySchemes": {

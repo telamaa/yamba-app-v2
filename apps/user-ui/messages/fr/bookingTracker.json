@@ -544,5 +544,15 @@
       "received": "{carrierFirstName} a donné sa version. La décision arrive sous 5 jours ouvrés.",
       "pending": "Nous avons demandé sa version à {carrierFirstName} (72 h)."
     }
+  },
+  "trackingLink": {
+    "title": "Partage le suivi à {recipientFirstName}",
+    "subtitle": "Un lien sans compte : {recipientFirstName} voit où en est le colis, sans ton adresse ni le code.",
+    "whatsapp": "WhatsApp",
+    "sms": "SMS",
+    "copy": "Copier le message",
+    "copied": "Copié !",
+    "failed": "Impossible de créer le lien pour le moment.",
+    "messageTemplate": "Bonjour {recipientFirstName} ! Ton colis arrive avec {carrierFirstName}. Suis-le ici : {url}"
   }
 }

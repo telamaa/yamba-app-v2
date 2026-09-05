@@ -539,6 +539,32 @@ export function buildOpenApiDocument() {
           },
         },
       },
+      "/deals/{id}/tracking-link": {
+        post: {
+          tags: ["deals"],
+          summary: "Recipient tracking link (D69) — shipper only, one per deal, created on demand",
+          description:
+            "Returns the public tracking token and path (/track/{token}) plus the recipient contact the shipper entered. " +
+            "403 for the carrier, 409 TRACKING_NOT_AVAILABLE before acceptance or after a closure without delivery.",
+          operationId: "issueTrackingLink",
+          security: authSecurity,
+          parameters: [dealIdPathParam],
+          responses: { "200": jsonResponse("TrackingLinkResponse", "Tracking link"), "401": response401, "403": response403, "404": response404, "409": response409, "500": response500 },
+        },
+      },
+      "/track/{token}": {
+        get: {
+          tags: ["deals"],
+          summary: "Recipient tracking page (D69) — public, minimal content",
+          description:
+            "No session. Milestones (accepted → picked up → in transit → arrived → delivered, or closed), first names, corridor and dates. " +
+            "Never an address, a phone number, the delivery code, photos or amounts. 404 once the recipient snapshot is redacted (D63 5A), " +
+            "the link revoked or the deal deleted.",
+          operationId: "getPublicTracking",
+          parameters: [{ name: "token", in: "path", required: true, schema: { type: "string" } }],
+          responses: { "200": jsonResponse("PublicTrackingResponse", "Tracking view"), "400": response400, "404": response404, "500": response500 },
+        },
+      },
       "/deals/{id}/rating": {
         get: {
           tags: ["deals"],

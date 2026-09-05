@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-Yamba is a crowdshipping app: **shippers** (expéditeurs) book parcel deliveries with **carriers** (voyageurs — "Yamber"/"Tripper" in UI copy) who publish trips. Nx monorepo (npm workspaces), TypeScript strict, comments/docs/i18n primarily in **French** — keep new comments and docs in French. Public API surfaces (OpenAPI, API error messages, event keys) are in **English**.
+Yamba is a crowdshipping app: **shippers** (expéditeurs) book parcel deliveries with **carriers** (voyageurs — « Voyageur » FR / « Traveler » EN in every visible string, A144; code identifiers such as `becomeYamber` / `superTripper` are untouched) who publish trips. Nx monorepo (npm workspaces), TypeScript strict, comments/docs/i18n primarily in **French** — keep new comments and docs in French. Public API surfaces (OpenAPI, API error messages, event keys) are in **English**.
 
 ## Read first (governance)
 
@@ -43,7 +43,7 @@ npx prisma db push                 # sync schema to MongoDB (no migrations — M
 npm run auth-docs                  # regenerate auth swagger-output.json (swagger-autogen — legacy, conversion to Zod-OpenAPI is backlog)
 ```
 
-Test platform baseline: **838 tests** (trip-service 209, deal-service 494, notification-service 99, message-service 36) + auth-service 153 (also a CI check) — any deviation must be explained.
+Test platform baseline: **846 tests** (trip-service 209, deal-service 502, notification-service 99, message-service 36) + auth-service 153 (also a CI check) — any deviation must be explained.
 
 Manual `tsc` (when Nx typecheck target is not what you want): `npx tsc --noEmit --project apps/<service>/tsconfig.app.json` — NEVER `--project apps/<service>` (resolves the solution-style tsconfig: 0 files checked).
 

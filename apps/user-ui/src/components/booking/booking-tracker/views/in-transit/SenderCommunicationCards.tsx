@@ -3,12 +3,13 @@
  * ============================
  * Section COMMUNICATION côté Expéditrice :
  *  - SenderCarrierContact : Thomas ("en vol actuellement") + Message
- *  - SenderRecipientContact : Marie (Appeler / WhatsApp)
+ *  - SenderRecipientContact : Marie (Appeler / WhatsApp / suivi) — numéro réel (D69, fin du mock A137)
  */
 
 "use client";
 
 import { MessageSquare, Phone } from "lucide-react";
+import BookingTrackingLinkCard from "../../shared/BookingTrackingLinkCard"; // D69
 import { useTranslations } from "next-intl";
 import type {
   Booking,
@@ -74,10 +75,8 @@ export function SenderRecipientContact({ booking }: { booking: Booking }) {
     (recipient.firstName[0] ?? "") + (recipient.lastName[0] ?? "")
   ).toUpperCase();
 
-  // Le téléphone de Marie n'est pas dans le type Booking côté Sender
-  // (Aminata l'a fourni à la réservation) — mock statique cohérent.
-  const phone = "+242 06 421 88 12";
-  const phoneDigits = phone.replace(/[^\d+]/g, "");
+  // D69 — le numéro que l'Expéditeur a saisi à la réservation (servi par la vue Shipper).
+  const phoneDigits = (recipient.phoneE164 ?? "").replace(/[^\d+]/g, "");
   const telHref = "tel:" + phoneDigits;
 
   const handleWhatsApp = () => {
@@ -107,15 +106,20 @@ export function SenderRecipientContact({ booking }: { booking: Booking }) {
           </div>
         </div>
       </div>
-      <div className="mt-3 flex gap-2">
-        <a href={telHref} className={actionClass}>
-          <Phone size={13} aria-hidden="true" />
-          {t("senderTracking.communication.call")}
-        </a>
-        <button type="button" onClick={handleWhatsApp} className={actionClass}>
-          <MessageSquare size={13} aria-hidden="true" />
-          {t("senderTracking.communication.whatsapp")}
-        </button>
+      {phoneDigits && (
+        <div className="mt-3 flex gap-2">
+          <a href={telHref} className={actionClass}>
+            <Phone size={13} aria-hidden="true" />
+            {t("senderTracking.communication.call")}
+          </a>
+          <button type="button" onClick={handleWhatsApp} className={actionClass}>
+            <MessageSquare size={13} aria-hidden="true" />
+            {t("senderTracking.communication.whatsapp")}
+          </button>
+        </div>
+      )}
+      <div className="mt-3">
+        <BookingTrackingLinkCard booking={booking} compact />
       </div>
     </section>
   );

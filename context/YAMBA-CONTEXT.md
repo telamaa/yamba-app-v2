@@ -453,8 +453,8 @@ Ordre de demarrage : auth -> trip -> gateway.
   Reste hors chantier : TrustScore interne + plafonds progressifs (D29-2),
   moniteur externe de disponibilite (candidat D64).
 - D35 email, D65 sessions, D66 PostHog, D67 profil editable (chantier E), D68 signalement +
-  wording D28 : FAITS le 05/09. Reste Jalon 2 : page destinataire (D69, lot 2), moniteur externe
-  (candidat D64), OpenAPI auth, sauvegardes Atlas, TrustScore D29-2.
+  wording D28, D69 page destinataire + glossaire A144 : FAITS le 05/09. Reste Jalon 2 : moniteur
+  externe (candidat D64), OpenAPI auth, sauvegardes Atlas, TrustScore D29-2, puis deps + recette globale.
 - Solde sessions auth : FAIT (D65) — reste le cleanup des sessions legacy (30 j post-prod).
 - API : conversion OpenAPI auth-service (contrats Zod), page /docs Scalar
   auth, page /docs index gateway, audit anglais OAS trip-service.
@@ -546,7 +546,14 @@ Ordre de demarrage : auth -> trip -> gateway.
   REPORT_REVIEWED, prioritaire a 3 ouverts, jamais de sanction automatique), page /reports a deux
   files, KPI reportsOpen, modale generique branchee sur les deux boutons inertes (porte de connexion
   pour un visiteur), wording D28 applique, namespace i18n `trips` mort retire. CTA alertes : deja en
-  place, constate. MERGE 05/09 : **#193** (17 checks comptes). Lot 2 = page destinataire (D69).
+  place, constate. MERGE 05/09 : **#193** (17 checks comptes).
+- D69 + A144 FAITS le 05/09 (feat/recipient-page, micro-PR confiance lot 2) : TrackingLink (un
+  jeton CSPRNG par reservation), POST /deals/:id/tracking-link (Expediteur seul, 409 avant
+  acceptation), GET /track/:token SANS session (contenu minimal : jalons, prenoms, corridor, dates ;
+  404 uniforme aligne sur recipientRedactedAt), page /track/[token] (RGP-02, bloc acquisition,
+  noindex), carte « Partage le suivi » (WhatsApp / SMS / copie, Yamba n'envoie rien — SMS sortant en
+  porte), vrai numero du destinataire dans le tracker (fin du mock A137), glossaire un mot par role
+  (Voyageur / Traveler partout, emails compris).
 - Backlog parametre serveur : classe C du catalogue D62 (tolerance de poids,
   plafonds comptes neufs, plafond express, seuil de trois signalements…).
 - Photos hors TripDocument chez ImageKit sans fileId (colis, pickup, livraison, litige,

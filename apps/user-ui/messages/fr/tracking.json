@@ -1,0 +1,35 @@
+{
+  "title": "Ton colis arrive, {recipientFirstName}",
+  "subtitle": "{shipperFirstName} t'envoie un colis avec {carrierFirstName} {carrierInitial}., Voyageur Yamba, de {originCity} à {destinationCity}.",
+  "departure": "Départ",
+  "arrival": "Arrivée prévue",
+  "current": "Où en est le colis",
+  "milestones": {
+    "ACCEPTED": "Colis pris en charge",
+    "PICKED_UP": "Colis récupéré par {carrierFirstName}",
+    "IN_TRANSIT": "En route",
+    "ARRIVED": "Arrivé à {destinationCity}",
+    "DELIVERED": "Colis remis",
+    "CLOSED": "Envoi annulé"
+  },
+  "hints": {
+    "ACCEPTED": "{carrierFirstName} récupère le colis chez {shipperFirstName} avant le départ.",
+    "PICKED_UP": "Le colis voyage avec {carrierFirstName}.",
+    "IN_TRANSIT": "{carrierFirstName} est en route vers {destinationCity}.",
+    "ARRIVED": "{carrierFirstName} est arrivé. Il te contacte pour convenir de la remise : prépare le code que {shipperFirstName} t'a donné.",
+    "DELIVERED": "Le colis t'a été remis. Bonne réception !",
+    "CLOSED": "Cet envoi n'a pas eu lieu. Rapproche-toi de {shipperFirstName}."
+  },
+  "privacy": "{shipperFirstName} a confié ton prénom et ton numéro à Yamba pour cette livraison, et à personne d'autre. Ils sont effacés après la remise.",
+  "privacyLink": "Politique de confidentialité",
+  "notFound": {
+    "title": "Ce lien de suivi n'est plus valide",
+    "text": "Le colis a été remis il y a un moment, ou le lien a été retiré. Rapproche-toi de la personne qui te l'a envoyé."
+  },
+  "acquisition": {
+    "title": "Toi aussi, envoie ou transporte avec Yamba",
+    "text": "Des colis qui voyagent avec des personnes de confiance, moins cher et plus vite qu'un transporteur classique.",
+    "send": "Envoyer un colis",
+    "carry": "Devenir Voyageur"
+  }
+}

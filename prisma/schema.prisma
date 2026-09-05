@@ -1061,6 +1061,16 @@ model RelayLease {
 // REPORT (signalements — scope B1, registre)
 // ─────────────────────────────────────────────
 
+/// D69 — lien de suivi public d'une réservation, partagé par l'Expéditeur au destinataire (tiers sans compte).
+/// Un seul par réservation ; 404 dès que le tiers est effacé (recipientRedactedAt) ou le lien révoqué.
+model TrackingLink {
+  id        String    @id @default(auto()) @map("_id") @db.ObjectId
+  bookingId String    @unique @db.ObjectId
+  token     String    @unique
+  createdAt DateTime  @default(now())
+  revokedAt DateTime?
+}
+
 model Report {
   id             String @id @default(auto()) @map("_id") @db.ObjectId
   reporterUserId String @db.ObjectId

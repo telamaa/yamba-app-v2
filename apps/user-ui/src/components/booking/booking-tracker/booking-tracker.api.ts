@@ -19,6 +19,13 @@ import apiClient from "@/lib/api-client";
 import { MAX_CODE_REGENERATIONS, type Booking } from "./booking-tracker.types";
 import { toBooking, type ShipperBookingViewDto } from "./booking-tracker.adapter";
 
+/** D69 — lien de suivi du destinataire : POST /deals/:id/tracking-link (créé une fois, Expéditeur seul). */
+export type TrackingLinkDto = { token: string; path: string; recipientFirstName: string; recipientPhoneE164: string | null };
+export async function issueTrackingLink(bookingId: string): Promise<TrackingLinkDto> {
+  const res = await apiClient.post<TrackingLinkDto>(`/deals/${bookingId}/tracking-link`, undefined, { requireAuth: true });
+  return res.data;
+}
+
 /* ══ Erreur métier (pattern DealApiError, module carrier/deal) ═ */
 
 export type BookingApiErrorCode =

@@ -8,6 +8,7 @@
 "use client";
 
 import DisputeInTransitLink from "../../shared/DisputeInTransitLink";
+import BookingTrackingLinkCard from "@/components/booking/booking-tracker/shared/BookingTrackingLinkCard"; // D69
 
 import { useTranslations } from "next-intl";
 import type { Booking } from "@/components/booking/booking-tracker/booking-tracker.types";
@@ -85,6 +86,8 @@ export default function BookingPickedUpMobile({
         />
 
         <BookingShareCode booking={booking} compact />
+
+        <BookingTrackingLinkCard booking={booking} compact />
 
         <DealStepper
           steps={steps}

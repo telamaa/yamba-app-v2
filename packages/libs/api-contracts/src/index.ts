@@ -42,3 +42,4 @@ export * from "./admin/admin-status.schema"; // C-PR8c (D64)
 export * from "./admin/member-sessions.schema"; // D65
 export * from "./admin/member-profile.schema"; // D67
 export * from "./admin/reports.schema"; // D68
+export * from "./booking/tracking-link.schema"; // D69
