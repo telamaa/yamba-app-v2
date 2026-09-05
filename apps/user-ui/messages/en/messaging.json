@@ -18,7 +18,13 @@
   "phone": {
     "reveal": "Show number",
     "hidden": "Number unavailable",
-    "opensAt": "Available from {time}"
+    "opensAt": "Available from {time}",
+    "banner": {
+      "ready": "{name}'s number:",
+      "available": "The number is available.",
+      "opensAt": "The number shows from {time} (2 h before the confirmed meeting or the departure).",
+      "needsMeetup": "The number shows 2 h before the confirmed meeting. Propose and confirm a meeting below."
+    }
   },
   "closed": {
     "dispute": "A dispute is open: messages go through mediation.",
@@ -51,5 +57,9 @@
     "meetup.proposed": "A meeting has been proposed.",
     "meetup.accepted": "The meeting is confirmed.",
     "phone.revealed": "The phone number has been shown."
+  },
+  "open": {
+    "failed": "The conversation could not be opened.",
+    "notOpenYet": "The conversation opens once the deal is accepted."
   }
 }

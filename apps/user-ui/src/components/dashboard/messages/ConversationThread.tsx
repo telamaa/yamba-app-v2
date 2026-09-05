@@ -21,7 +21,16 @@ function timeLabel(iso: string, locale: string): string {
   return new Date(iso).toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" });
 }
 
-export default function ConversationThread({ conversationId, onBack }: { conversationId: string; onBack?: () => void }) {
+export default function ConversationThread({
+  conversationId,
+  focusPhone = false,
+  onBack,
+}: {
+  conversationId: string;
+  /** Vrai quand on arrive par « Appeler » (A137) : le numéro, ou son heure d'ouverture, est mis en avant. */
+  focusPhone?: boolean;
+  onBack?: () => void;
+}) {
   const t = useTranslations("messaging");
   const locale = useLocale();
   const { data, isLoading } = useThread(conversationId);
@@ -97,6 +106,31 @@ export default function ConversationThread({ conversationId, onBack }: { convers
           {phone.revealed ? phone.phoneE164 ?? t("phone.hidden") : t("phone.reveal")}
         </button>
       </header>
+
+      {focusPhone && (
+        <div className="flex flex-wrap items-center gap-2 border-b border-amber-200 bg-amber-50 px-3 py-2 text-[12.5px] text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-100">
+          <Phone size={13} className="shrink-0" />
+          {phone.revealed && phone.phoneE164 ? (
+            <>
+              <span>{t("phone.banner.ready", { name: conversation.counterpart.firstName })}</span>
+              <a href={`tel:${phone.phoneE164}`} className="font-semibold underline">
+                {phone.phoneE164}
+              </a>
+            </>
+          ) : phone.opensAt && new Date(phone.opensAt).getTime() <= Date.now() ? (
+            <>
+              <span>{t("phone.banner.available")}</span>
+              <button onClick={() => reveal.mutate()} disabled={reveal.isPending} className="font-semibold underline disabled:opacity-60">
+                {t("phone.reveal")}
+              </button>
+            </>
+          ) : phone.opensAt ? (
+            <span>{t("phone.banner.opensAt", { time: `${dayLabel(phone.opensAt, locale)} ${timeLabel(phone.opensAt, locale)}` })}</span>
+          ) : (
+            <span>{t("phone.banner.needsMeetup")}</span>
+          )}
+        </div>
+      )}
 
       <div className="border-b border-slate-200 p-3 dark:border-slate-800">
         <MeetupPanel thread={data} />

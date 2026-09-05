@@ -357,6 +357,10 @@ Ordre de demarrage : auth -> trip -> gateway.
   namespace i18n messaging FR/EN, sondage adaptatif 3 s / 20 s (pas de temps reel), second
   consumer notification (topic et groupe dedies) pour la notification in-app. Reste F-PR3 :
   email de relance, admin, purge.
+- 04/09 : F-PR2b feat/f2b-deal-message-entry (A137) — les sept boutons « Message » / « Appeler »
+  des ecrans de deal (tracker Expediteur, deal Voyageur) ouvrent le fil du deal via by-deal +
+  ?conversation=<id> ; « Appeler » = fil avec ?focus=phone (numero ou heure d'ouverture), jamais
+  un tel: direct. Aucun test serveur touche.
 - Plateforme de tests : 791 (trip 209, deal 485, notification 83, message 14) + auth 103.
 - 04/09 : C-PR6b feat/c6b-admin-alerts (D59 3A / 4A, A129–A131) — neuf regles de seuil
   (evaluateAlerts pur, instantane de dix compteurs), GET /admin/alerts sans etat (accueil

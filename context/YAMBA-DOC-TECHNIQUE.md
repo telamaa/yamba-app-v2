@@ -1568,4 +1568,20 @@ Chantier F chat (challenge) → C-PR8 paramètres audités (seuils réglables), 
 notification **83** (+5) · message 14 · deal 485 · trip 209 · auth 103 · tsc ×7 + les deux fronts · miroir i18n OK (27 namespaces). Recette : FCH11–FCH16 (DOC-METIER).
 
 ### Reste
-F-PR3 : email de relance des messages non lus (15 min, un par heure et par conversation), lecture admin depuis un dossier de médiation, signalement d'un message, purge à un an. Puis boutons « Message » sur les écrans de deal (tracker Expéditeur, deal Voyageur) et photos dans le fil.
+F-PR3 : email de relance des messages non lus (15 min, un par heure et par conversation), lecture admin depuis un dossier de médiation, signalement d'un message, purge à un an. Boutons « Message » des écrans de deal : F-PR2b ci-dessous. Photos dans le fil : backlog.
+
+---
+
+# F-PR2b — `feat/f2b-deal-message-entry` : les écrans de deal mènent au fil (A137)
+
+## Ce qui a été fait
+1. **Un hook, sept boutons** : `useOpenDealThread()` (`apps/user-ui/src/hooks/useMessaging.ts`) expose `open(bookingId, focus?)`. Il appelle `getThreadByDeal` (le serveur crée le fil s'il manque), dépose la réponse dans le cache TanStack sous la clé du fil, puis navigue vers `/dashboard/messages?conversation=<id>` (`useRouter` de `@/i18n/navigation`, la locale est conservée). En cas d'erreur : toast, l'utilisateur reste sur sa page (403 → « la conversation s'ouvre une fois le deal accepté »).
+2. **Les sept points d'appel** ne font plus un `console.info` : côté Expéditeur `BookingCarrierCard` (accepté, remis, livré, litige, terminé) et `SenderCarrierContact` (en transit) ; côté Voyageur `DealContactShipperCard` (accepté, Message + Appeler), `PickupContactCard` (remise, Message + Appeler), `TrackingShipperCard` (suivi), `DeliverHelpCard` (livraison, Écrire + Appeler — reçoit désormais `bookingId`). Les boutons se désactivent pendant l'appel.
+3. **« Appeler » = le fil avec `?focus=phone`** : `Messages.tsx` lit le paramètre et `ConversationThread` affiche un bandeau ambre sous l'en-tête : numéro cliquable (`tel:`) s'il est révélé, bouton « Voir le numéro » si la fenêtre est ouverte, heure d'ouverture sinon, ou invitation à confirmer un rendez-vous s'il n'y a aucun ancrage (ni rendez-vous accepté, ni départ).
+4. **i18n** : `messaging.open.*` et `messaging.phone.banner.*` (FR/EN, miroir vérifié).
+
+### Preuves
+tsc user-ui OK · miroir i18n OK (27 namespaces) · aucun test serveur touché (791 + 103 inchangés). Recette : FCH17–FCH19 (DOC-METIER).
+
+### Reste
+F-PR3 (email de relance, lecture admin depuis un dossier, signalement d'un message, purge à un an). Le numéro du destinataire dans le tracker en transit est encore un mock statique : à brancher quand le contrat Booking côté Expéditeur portera `recipient.phone`.

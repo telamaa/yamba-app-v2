@@ -13,6 +13,7 @@ import { MessageSquare } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import type { DealRequest } from "@/components/carrier/deal/deal.types";
 import PhotoThumbs from "@/components/shared/photos/PhotoThumbs";
+import { useOpenDealThread } from "@/hooks/useMessaging";
 
 // ── TON PAIEMENT ──────────────────────────────────────────
 
@@ -85,10 +86,8 @@ export function TrackingShipperCard({ deal }: { deal: DealRequest }) {
   const { shipper } = deal;
   const initials = `${shipper.firstName[0] ?? ""}${shipper.lastInitial}`.toUpperCase();
 
-  const handleMessage = () => {
-    // eslint-disable-next-line no-console
-    console.info("[tracking] open message thread with", shipper.id);
-  };
+  const thread = useOpenDealThread();
+  const handleMessage = () => thread.open(deal.id);
 
   return (
     <section className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950">
@@ -117,7 +116,8 @@ export function TrackingShipperCard({ deal }: { deal: DealRequest }) {
       <button
         type="button"
         onClick={handleMessage}
-        className="mt-3 inline-flex min-h-[42px] w-full items-center justify-center gap-1.5 rounded-xl border border-slate-300 bg-white text-[12.5px] font-semibold text-slate-800 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:hover:bg-slate-800"
+        disabled={thread.isPending}
+        className="mt-3 inline-flex min-h-[42px] w-full items-center justify-center gap-1.5 rounded-xl border border-slate-300 bg-white text-[12.5px] font-semibold text-slate-800 transition-colors hover:bg-slate-50 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:hover:bg-slate-800"
       >
         <MessageSquare size={13} aria-hidden="true" />
         {t("shipperCard.message")}
