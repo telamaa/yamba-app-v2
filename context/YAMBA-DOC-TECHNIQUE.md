@@ -1635,3 +1635,19 @@ tsc user-ui OK · aucun test serveur touché (805 + 103 inchangés) · aucune cl
 
 ### Reste
 Rien. Suite : C-PR8 paramètres / RGPD.
+
+---
+
+# CI — `chore/ci-build-i18n` : la CI construit les services et refuse les clés à point
+
+## Ce qui a été fait
+Les deux angles morts vus à la recette du 05/09 (#174) sont fermés avant C-PR8.
+1. **Job « Build des services (webpack) »** (`.github/workflows/ci.yml`) : `nx run-many -t build` sur les six services (gateway, auth, trip, deal, notification, message), après `prisma generate`, sans cache Nx. Un seul check (pas une matrice) : 20 s en local, et l'échec dit quel projet. C'est ce que `nx serve` et le déploiement exécutent — un `src/assets` absent ou un alias `@packages/*` manquant dans `webpack.config.js` casse désormais la PR, pas la recette.
+2. **Règle 4 du script i18n** (`scripts/check-i18n-messages.mjs`) : aucune clé ne contient de point ni n'est vide, à tous les niveaux (`invalidKeys`, récursif, zéro dépendance). C'est la règle que next-intl applique au rendu (`INVALID_KEY`) ; le script l'applique à la source, dans le job déjà existant. Test négatif joué à la main sur un catalogue temporaire : « Clé refusée par next-intl (point ou vide) : … → "a.b.c" », sortie 1.
+3. **17 checks requis** au lieu de 16 (`CLAUDE.md`, `YAMBA-CONTEXT.md`), le nouveau contexte ajouté à la protection de `dev` par l'API GitHub.
+
+### Preuves
+Script vert sur les 54 fichiers actuels ; rouge sur le cas #174 reconstitué. Build des six services vert en local et en CI.
+
+### Reste
+`next build` des deux fronts en CI (« la CI construit ce qu'elle déploie », candidat au registre) : coûteux (plusieurs minutes), à décider avant le lancement.
