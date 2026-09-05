@@ -553,7 +553,7 @@ Ordre de demarrage : auth -> trip -> gateway.
   404 uniforme aligne sur recipientRedactedAt), page /track/[token] (RGP-02, bloc acquisition,
   noindex), carte « Partage le suivi » (WhatsApp / SMS / copie, Yamba n'envoie rien — SMS sortant en
   porte), vrai numero du destinataire dans le tracker (fin du mock A137), glossaire un mot par role
-  (Voyageur / Traveler partout, emails compris).
+  (Voyageur / Traveler partout, emails compris). MERGE 05/09 : **#195** (17 checks comptes).
 - Backlog parametre serveur : classe C du catalogue D62 (tolerance de poids,
   plafonds comptes neufs, plafond express, seuil de trois signalements…).
 - Photos hors TripDocument chez ImageKit sans fileId (colis, pickup, livraison, litige,
