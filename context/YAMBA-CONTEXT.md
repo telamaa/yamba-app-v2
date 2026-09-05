@@ -405,7 +405,7 @@ Ordre de demarrage : auth -> trip -> gateway.
   GET /api/maintenance public, bandeaux sur les deux fronts), page admin « Etat des services »
   (GET /admin/status, sondage 30 s, editeur de maintenance). Gateway aligne (alias @packages,
   tsconfig). Chantier C : SOLDE (C-PR1 → C-PR8c). Candidat registre : moniteur externe de
-  disponibilite avant le lancement.
+  disponibilite avant le lancement. MERGE 05/09 : **#182** (17 checks comptes).
 - Plateforme de tests : 826 (trip 209, deal 494, notification 87, message 36) + auth 134.
 - 04/09 : C-PR6b feat/c6b-admin-alerts (D59 3A / 4A, A129–A131) — neuf regles de seuil
   (evaluateAlerts pur, instantane de dix compteurs), GET /admin/alerts sans etat (accueil
@@ -438,10 +438,9 @@ Ordre de demarrage : auth -> trip -> gateway.
   Yamba (GAR-02). RESTE pour B2 : POST /deals + snapshot D17 via le meme
   moteur + reservedKg atomique ; migration enums deprecies
   (maxSlots/bookedSlots).
-- PR « parametres serveur » : GET /pricing/params (commission, plancher,
-  poids de reference, table corridors) — aujourd'hui dupliques en
-  constantes front/serveur (pricing-example, comparable-price,
-  price-for-weight, pricing-corridors).
+- PR « parametres serveur » : FAITE dans C-PR8a (D62) — GET /trips/pricing/params,
+  catalogue unique, comparable-price et price-for-weight rebranches ; reste la
+  table corridors (pricing-corridors) en constante, sa propre page plus tard.
 - UX restantes : step 1 (aeroport -> ville de rattachement + lieu de
   pickup, arrivee repliee, justificatif en step 3), lieux en chips + apercu
   sticky (create-trip), cleanup legacy PER_CATEGORY + instantBooking.
@@ -465,12 +464,14 @@ Ordre de demarrage : auth -> trip -> gateway.
 
 ## Ce qui RESTE — Jalon 2 (constitutif du lancement public)
 
-- Chantier C admin-ui : mediation litiges (tickets YAM-XXXX), verification
-  billets, file des Reports, gestion users, parametres plateforme audites
-  (les curseurs du mockup), TrustScore interne + plafonds (D29-2), login
-  separe, 2FA TOTP, audit log.
+- Chantier C admin-ui : SOLDE le 05/09 (C-PR1 #148 → C-PR8c #182 : mediation,
+  billets, signalements, users, finances, pilotage, alertes, recherches / exports,
+  parametres D62, RGPD D63, maintenance / etat des services / conservation D64).
+  Reste hors chantier : TrustScore interne + plafonds progressifs (D29-2),
+  moniteur externe de disponibilite (candidat D64).
 - Chantier E : profil public Voyageur (stats reelles, trajets, avis).
-- Solde sessions auth : SES-03 sudo mode, SES-04 modal expiration,
+- Solde sessions auth : SES-03 sudo mode (FAIT pour export / effacement par code
+  email, D63 1A ; reste : email, mot de passe, IBAN), SES-04 modal expiration,
   SES-05 liste des sessions, cleanup sessions legacy (30j post-prod).
 - API : conversion OpenAPI auth-service (contrats Zod), page /docs Scalar
   auth, page /docs index gateway, audit anglais OAS trip-service.
