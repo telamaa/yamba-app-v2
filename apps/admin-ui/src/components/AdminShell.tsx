@@ -13,6 +13,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { apiFetch, post } from "@/lib/api";
 import type { AdminMe } from "@/lib/types";
 import { can, rolesLabel } from "@/lib/permissions";
+import MaintenanceBanner from "@/components/MaintenanceBanner";
 
 export default function AdminShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -44,6 +45,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
     ...(can(me.adminRoles, "audit.read") ? [{ href: "/audit", label: "Journal" }] : []),
     ...(can(me.adminRoles, "settings.read") ? [{ href: "/settings", label: "Paramètres" }] : []),
     ...(can(me.adminRoles, "privacy.requests.read") ? [{ href: "/privacy", label: "Données personnelles" }] : []),
+    ...(can(me.adminRoles, "status.read") ? [{ href: "/status", label: "État des services" }] : []),
     ...(can(me.adminRoles, "admins.manage") ? [{ href: "/admins", label: "Comptes admin" }] : []),
     { href: "/sessions", label: "Mes sessions" },
   ];
@@ -66,7 +68,10 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
         )}
         <button onClick={logout} className="mt-6 text-[12.5px] text-slate-500 underline-offset-2 hover:underline">Se déconnecter</button>
       </aside>
-      <main className="min-w-0 flex-1 p-6">{children}</main>
+      <main className="min-w-0 flex-1 p-6">
+        <MaintenanceBanner />
+        {children}
+      </main>
     </div>
   );
 }

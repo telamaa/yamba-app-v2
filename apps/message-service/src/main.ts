@@ -11,6 +11,10 @@
 import { initSentry } from "@packages/error-handler";
 initSentry("message-service");
 import express from "express";
+import { healthHandler, mongoCheck, redisCheck } from "@packages/libs/health";
+import prisma from "@packages/libs/prisma";
+import redis from "@packages/libs/redis";
+
 import cors from "cors";
 import cookieParser = require("cookie-parser");
 import { randomUUID } from "crypto";
@@ -24,6 +28,7 @@ import { makeUnreadReminderService } from "./services/unread-reminder.service";
 import { makeConversationRetentionService } from "./services/conversation-retention.service";
 import { startUnreadReminderCron } from "./cron/unread-reminder.cron";
 import { startConversationRetentionCron } from "./cron/conversation-retention.cron";
+import { startOutboxRetentionCron } from "./cron/outbox-retention.cron";
 import { MessagingOutboxRelay } from "./relay/messaging-relay";
 import { buildOpenApiDocument } from "./openapi/build-openapi";
 
@@ -41,9 +46,7 @@ app.use(cors({ origin: true, credentials: true }));
 app.use(express.json({ limit: "1mb" }));
 app.use(cookieParser());
 
-app.get("/health", (_req, res) => {
-  res.json({ status: "ok", service: "message-service" });
-});
+app.get("/health", healthHandler("message-service", { mongo: mongoCheck(prisma), redis: redisCheck(redis) })); // D64 3A
 app.get("/openapi.json", (_req, res) => {
   res.json(buildOpenApiDocument());
 });
@@ -75,6 +78,9 @@ const reminderCron = reminderEnabled ? startUnreadReminderCron(makeUnreadReminde
 if (!reminderEnabled) logger.info("Unread reminder cron disabled (MESSAGING_REMINDER_CRON_ENABLED=false)");
 
 // F-PR3 (D61 8A) — purge nocturne des conversations un an après la fin du deal.
+// C-PR8c (D64 6A) — purge des événements `conversation` publiés
+const outboxRetentionCron = process.env.OUTBOX_RETENTION_CRON_ENABLED !== "false" ? startOutboxRetentionCron("conversation", "message-service", logger.child({ module: "outbox-retention-cron" })) : null;
+
 const retentionEnabled = process.env.MESSAGING_RETENTION_CRON_ENABLED !== "false";
 const retentionCron = retentionEnabled ? startConversationRetentionCron(makeConversationRetentionService(), logger.child({ module: "conversation-retention-cron" })) : null;
 if (!retentionEnabled) logger.info("Conversation retention cron disabled (MESSAGING_RETENTION_CRON_ENABLED=false)");
@@ -83,6 +89,7 @@ async function shutdown(signal: string): Promise<void> {
   logger.info({ signal }, "message-service shutting down");
   reminderCron?.stop();
   retentionCron?.stop();
+  outboxRetentionCron?.stop();
   if (relay) await relay.stop().catch((err) => logger.error({ err }, "Relay stop failed"));
   server.close(() => process.exit(0));
   setTimeout(() => process.exit(0), 5_000).unref();

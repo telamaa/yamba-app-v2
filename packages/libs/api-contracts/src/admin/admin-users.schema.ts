@@ -52,6 +52,9 @@ export const ADMIN_PERMISSIONS = {
   // C-PR8b (D63 6A) — données personnelles
   "privacy.requests.read": ["PRIVACY"],
   "users.erase": ["PRIVACY"],
+  // C-PR8c (D64) — état des services (lecture pour tous), maintenance (OPS ou SUPER_ADMIN)
+  "status.read": ["MEDIATOR", "SUPPORT", "FINANCE", "OPS", "PRIVACY"],
+  "maintenance.write": ["OPS"],
 } as const;
 export type AdminPermission = keyof typeof ADMIN_PERMISSIONS;
 

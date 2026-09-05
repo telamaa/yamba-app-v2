@@ -21303,6 +21303,30 @@
             "minimum": 7,
             "maximum": 365,
             "description": "Effacement du destinataire après (days) — D63 5A · RGP-02"
+          },
+          "retention.notificationsDays": {
+            "type": "number",
+            "minimum": 30,
+            "maximum": 1095,
+            "description": "Notifications in-app (days) — D64 6A · RGP-01"
+          },
+          "retention.emailDeliveriesDays": {
+            "type": "number",
+            "minimum": 30,
+            "maximum": 1095,
+            "description": "Traces d'envoi d'emails (days) — D64 6A · RGP-01"
+          },
+          "retention.consumedEventsDays": {
+            "type": "number",
+            "minimum": 7,
+            "maximum": 365,
+            "description": "Registre des événements consommés (days) — D64 6A"
+          },
+          "retention.outboxPublishedDays": {
+            "type": "number",
+            "minimum": 7,
+            "maximum": 365,
+            "description": "Événements d'outbox publiés (days) — D64 6A"
           }
         },
         "required": [
@@ -21346,7 +21370,11 @@
           "alerts.acceptanceRateMinRequests",
           "documents.maxDocsPerTrip",
           "documents.maxDocSizeMb",
-          "privacy.recipientRetentionDays"
+          "privacy.recipientRetentionDays",
+          "retention.notificationsDays",
+          "retention.emailDeliveriesDays",
+          "retention.consumedEventsDays",
+          "retention.outboxPublishedDays"
         ],
         "additionalProperties": false
       },
@@ -21368,7 +21396,8 @@
               "messaging",
               "alerts",
               "documents",
-              "privacy"
+              "privacy",
+              "retention"
             ]
           },
           "label": {
@@ -22206,6 +22235,451 @@
         ],
         "additionalProperties": false,
         "description": "What belongs to the member (D63 2A): never the counterpart's contact details, the delivery code, reports targeting the member, internal notes or mediation files"
+      },
+      "MaintenanceState": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "messageFr": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "messageEn": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "scheduledAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Annonce affichée avant la coupure (bandeau), null = aucune"
+          },
+          "updatedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "updatedBy": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "version": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "envOverride": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled",
+          "messageFr",
+          "messageEn",
+          "scheduledAt",
+          "updatedAt",
+          "updatedBy",
+          "version"
+        ],
+        "additionalProperties": false
+      },
+      "UpdateMaintenanceRequest": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "messageFr": {
+            "default": "",
+            "type": "string",
+            "maxLength": 300
+          },
+          "messageEn": {
+            "default": "",
+            "type": "string",
+            "maxLength": 300
+          },
+          "scheduledAt": {
+            "default": null,
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 20,
+            "maxLength": 500
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "enabled",
+          "messageFr",
+          "messageEn",
+          "scheduledAt",
+          "reason",
+          "expectedVersion"
+        ],
+        "additionalProperties": false
+      },
+      "PublicMaintenance": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "object",
+            "properties": {
+              "fr": {
+                "type": "string"
+              },
+              "en": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "fr",
+              "en"
+            ],
+            "additionalProperties": false
+          },
+          "scheduledAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "enabled",
+          "message",
+          "scheduledAt"
+        ],
+        "additionalProperties": false
+      },
+      "HealthCheck": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "ms": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "ok",
+          "ms",
+          "error"
+        ],
+        "additionalProperties": false
+      },
+      "HealthReport": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "degraded"
+            ]
+          },
+          "service": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "uptimeSeconds": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "checks": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "$ref": "#/components/schemas/HealthCheck"
+            }
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          }
+        },
+        "required": [
+          "status",
+          "service",
+          "version",
+          "uptimeSeconds",
+          "checks",
+          "at"
+        ],
+        "additionalProperties": false,
+        "description": "Uniform /health of every service (D64 3A)"
+      },
+      "CronRun": {
+        "type": "object",
+        "properties": {
+          "service": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "ranAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          },
+          "durationMs": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "ok": {
+            "type": "boolean"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "schedule": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "service",
+          "name",
+          "ranAt",
+          "durationMs",
+          "ok",
+          "summary",
+          "error",
+          "schedule"
+        ],
+        "additionalProperties": false,
+        "description": "Last heartbeat of a cron (Redis, 7 days) — D64 4A"
+      },
+      "ServiceStatus": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "reachable": {
+            "type": "boolean"
+          },
+          "ms": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "report": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HealthReport"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "url",
+          "reachable",
+          "ms",
+          "report",
+          "error"
+        ],
+        "additionalProperties": false
+      },
+      "AdminStatusResponse": {
+        "type": "object",
+        "properties": {
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          },
+          "services": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ServiceStatus"
+            }
+          },
+          "crons": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CronRun"
+            }
+          },
+          "outbox": {
+            "type": "object",
+            "properties": {
+              "unpublished": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "oldestUnpublishedAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "parked": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "parkedThreshold": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "unpublished",
+              "oldestUnpublishedAt",
+              "parked",
+              "parkedThreshold"
+            ],
+            "additionalProperties": false
+          },
+          "emails": {
+            "type": "object",
+            "properties": {
+              "failedLast24h": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "sentLast24h": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "failedLast24h",
+              "sentLast24h"
+            ],
+            "additionalProperties": false
+          },
+          "maintenance": {
+            "$ref": "#/components/schemas/MaintenanceState"
+          }
+        },
+        "required": [
+          "at",
+          "services",
+          "crons",
+          "outbox",
+          "emails",
+          "maintenance"
+        ],
+        "additionalProperties": false,
+        "description": "Service status page (D64 5A) — not a monitoring tool"
       }
     },
     "securitySchemes": {

@@ -16,6 +16,9 @@
 import cron, { type ScheduledTask } from "node-cron";
 import type { Logger } from "pino";
 import type { DealSettlementService } from "../services/deal-settlement.service";
+import redis from "@packages/libs/redis";
+import { withHeartbeat } from "@packages/libs/redis/cron-heartbeat";
+
 
 export const BOOKING_PAYOUT_CRON_SCHEDULE = "*/5 * * * *";
 
@@ -35,7 +38,7 @@ export function startBookingPayoutCron(service: DealSettlementService, logger: L
     if (running) return; // fournée précédente encore en vol
     running = true;
     try {
-      await runPayoutPasses(service, logger);
+      await withHeartbeat(redis, { service: "deal-service", name: "payout-bookings", schedule: BOOKING_PAYOUT_CRON_SCHEDULE }, () => runPayoutPasses(service, logger));
     } catch (err) {
       logger.error({ err }, "Booking payout cron failed");
     } finally {

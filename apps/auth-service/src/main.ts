@@ -10,6 +10,9 @@ import carrierRouter from "./routes/carrier.router";
 import userPublicRouter from "./routes/user-public.router";
 import savedRouteRouter from "./routes/saved-route.router";
 import adminRouter from "./routes/admin.router";
+import { healthHandler, mongoCheck, redisCheck } from "@packages/libs/health";
+import prisma from "@packages/libs/prisma";
+import redis from "@packages/libs/redis";
 
 const app = express();
 
@@ -27,6 +30,7 @@ app.use(cookieParser());
 app.get('/', (req, res) => {
   res.send({ 'message': 'Hello Auth API'});
 });
+app.get("/health", healthHandler("auth-service", { mongo: mongoCheck(prisma), redis: redisCheck(redis) })); // D64 3A
 
 // Le Swagger legacy (swagger-autogen, /api-docs, /docs-json) a été retiré
 // avec la session D27 — la conversion OpenAPI 3.1 d'auth-service (contrats

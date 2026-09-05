@@ -7,6 +7,7 @@ import SessionExpiredGate from "@/components/providers/SessionExpiredGate";
 import { ToastProvider } from "@/components/ui/Toast";
 import { routing } from "@/i18n/routing";
 import Providers from "@/app/[locale]/providers";
+import MaintenanceBanner from "@/components/layout/MaintenanceBanner";
 
 // Generate static params for all supported locales at build time
 export function generateStaticParams() {
@@ -66,6 +67,8 @@ export default async function LocaleLayout({
             <SessionExpiredGate />
             <Header />
             <div className="min-h-screen bg-slate-50 pt-[78px] dark:bg-slate-950">
+              {/* C-PR8c (D64) — annonce / lecture seule, lu sur le gateway toutes les 60 s */}
+              <MaintenanceBanner />
               {children}
             </div>
           </ToastProvider>

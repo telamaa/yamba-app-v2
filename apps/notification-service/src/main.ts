@@ -19,6 +19,9 @@ import { initSentry } from "@packages/error-handler";
 // C-PR3 (D56 7A) — Sentry : inerte sans SENTRY_DSN ; 5xx tagués du service et de l'identifiant de corrélation.
 initSentry("notification-service");
 import express from "express";
+import { healthHandler, mongoCheck, redisCheck } from "@packages/libs/health";
+import prisma from "@packages/libs/prisma";
+import redis from "@packages/libs/redis";
 import cors from "cors";
 import cookieParser = require("cookie-parser");
 import { randomUUID } from "crypto";
@@ -34,6 +37,7 @@ import { handleBookingEventMessage } from "./consumer/booking-events.consumer";
 import { handleMessagingEventMessage } from "./consumer/messaging-events.consumer";
 import { buildOpenApiDocument } from "./openapi/build-openapi";
 import notificationRouter from "./routes/notification.routes";
+import { makeRetentionService, startRetentionCron } from "./cron/retention.cron";
 
 const logger = pino({
   name: "notification-service",
@@ -73,9 +77,7 @@ app.get("/", (req, res) => {
 
 // Health check — utilisé par le gateway et les smoke tests CI.
 // Volontairement AVANT les routes authentifiées et sans dépendance DB.
-app.get("/health", (req, res) => {
-  res.json({ status: "ok", service: "notification-service" });
-});
+app.get("/health", healthHandler("notification-service", { mongo: mongoCheck(prisma), redis: redisCheck(redis) })); // D64 3A
 
 // OpenAPI 3.1 GÉNÉRÉ depuis les schémas Zod (D3) — pattern deal.
 const openApiDocument = buildOpenApiDocument();
@@ -106,8 +108,11 @@ app.use(notificationRouter);
 app.use(errorMiddleware);
 
 const port = Number(process.env.NOTIFICATION_SERVICE_PORT ?? 6004);
+let retentionCron: import("node-cron").ScheduledTask | null = null;
 const server = app.listen(port, () => {
   logger.info(`notification-service listening on :${port}`);
+  // C-PR8c (D64 6A) — purge nocturne : notifications, traces d'emails, registre consommé
+  if (process.env.RETENTION_CRON_ENABLED !== "false") retentionCron = startRetentionCron(makeRetentionService(), logger.child({ module: "retention-cron" }));
 });
 
 server.on("error", (err) => {
@@ -195,6 +200,7 @@ if (consumerEnabled) void startMessagingConsumer();
 let shuttingDown = false;
 
 async function shutdown(signal: string): Promise<void> {
+  retentionCron?.stop();
   if (shuttingDown) return;
   shuttingDown = true;
   logger.info({ signal }, "Shutting down");

@@ -21,6 +21,9 @@
 import cron, { type ScheduledTask } from "node-cron";
 import type { Logger } from "pino";
 import type { DealLifecycleService } from "../services/deal-lifecycle.service";
+import redis from "@packages/libs/redis";
+import { withHeartbeat } from "@packages/libs/redis/cron-heartbeat";
+
 
 export const BOOKING_EXPIRY_CRON_SCHEDULE = "*/5 * * * *";
 
@@ -34,7 +37,7 @@ export function startBookingExpiryCron(
     if (running) return; // fournée précédente encore en vol
     running = true;
     try {
-      const expired = await service.expireDueBookings();
+      const expired = await withHeartbeat(redis, { service: "deal-service", name: "expire-bookings", schedule: BOOKING_EXPIRY_CRON_SCHEDULE }, () => service.expireDueBookings(), (n) => `${n} expirée(s)`);
       if (expired > 0) {
         logger.info({ expired }, "Expired overdue booking requests (24h window)");
       }

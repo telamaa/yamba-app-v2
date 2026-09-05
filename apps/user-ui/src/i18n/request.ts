@@ -34,6 +34,7 @@ export default getRequestConfig(async ({ requestLocale }) => {
     finances, // A83 — Finances (portefeuille + paiements)
     mediation, // C-PR2 (D55) — décision de médiation, version du Voyageur
     messaging, // F-PR2 (D61) — conversation, rendez-vous, numéro
+    maintenance, // C-PR8c (D64) — annonce / lecture seule
   ] = await Promise.all([
     import(`../../messages/${locale}/common.json`),
     import(`../../messages/${locale}/home.json`),
@@ -62,6 +63,7 @@ export default getRequestConfig(async ({ requestLocale }) => {
     import(`../../messages/${locale}/finances.json`), // A83
     import(`../../messages/${locale}/mediation.json`), // C-PR2
     import(`../../messages/${locale}/messaging.json`), // F-PR2 (D61)
+    import(`../../messages/${locale}/maintenance.json`), // C-PR8c (D64)
   ]);
   return {
     locale,
@@ -93,6 +95,7 @@ export default getRequestConfig(async ({ requestLocale }) => {
       finances: finances.default, // A83
       mediation: mediation.default, // C-PR2
       messaging: messaging.default, // F-PR2 (D61)
+      maintenance: maintenance.default, // C-PR8c (D64)
     },
   };
 });

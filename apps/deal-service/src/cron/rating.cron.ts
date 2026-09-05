@@ -8,6 +8,9 @@
 import cron, { type ScheduledTask } from "node-cron";
 import type { Logger } from "pino";
 import type { DealRatingService } from "../services/deal-rating.service";
+import redis from "@packages/libs/redis";
+import { withHeartbeat } from "@packages/libs/redis/cron-heartbeat";
+
 
 export const RATING_CRON_SCHEDULE = "17 * * * *";
 
@@ -17,8 +20,7 @@ export function startRatingCron(service: DealRatingService, logger: Logger): Sch
     if (running) return;
     running = true;
     try {
-      const reminded = await service.sendRatingReminders();
-      const revealed = await service.revealElapsed();
+      const { reminded, revealed } = await withHeartbeat(redis, { service: "deal-service", name: "rating", schedule: RATING_CRON_SCHEDULE }, async () => ({ reminded: await service.sendRatingReminders(), revealed: await service.revealElapsed() }), (r) => `${r.reminded} relance(s), ${r.revealed} révélation(s)`);
       if (reminded > 0 || revealed > 0) logger.info({ reminded, revealed }, "Rating cron run");
     } catch (err) {
       logger.error({ err }, "Rating cron failed");

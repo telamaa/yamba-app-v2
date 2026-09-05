@@ -286,7 +286,7 @@ export type AdminMessageReportsResponse = { items: AdminMessageReportItem[]; tot
 /* ── C-PR8a (D62) — paramètres de la plateforme ── */
 export type SettingScope = "BUSINESS" | "OPERATIONS";
 export type SettingUnit = "percent" | "cents" | "kg" | "coef" | "hours" | "days" | "minutes" | "count" | "rating" | "mb";
-export type SettingGroup = "pricing" | "protection" | "cancellation" | "rating" | "dispute" | "reputation" | "messaging" | "alerts" | "documents";
+export type SettingGroup = "pricing" | "protection" | "cancellation" | "rating" | "dispute" | "reputation" | "messaging" | "alerts" | "documents" | "privacy" | "retention";
 export type SettingDefinition = {
   key: string; group: SettingGroup; label: string; description: string; rule: string; unit: SettingUnit;
   default: number; min: number; max: number; step: number; scope: SettingScope; contractual?: boolean; consumers: string[]; example?: string;
@@ -309,3 +309,17 @@ export type DataRequestItem = {
   refusalReasons: string[]; requestedByAdmin: string | null; reason: string | null; requestedAt: string; completedAt: string | null;
 };
 export type DataRequestsResponse = { items: DataRequestItem[]; nextCursor: string | null };
+
+/* ── C-PR8c (D64) — maintenance et état des services ── */
+export type MaintenanceState = { enabled: boolean; messageFr: string; messageEn: string; scheduledAt: string | null; updatedAt: string | null; updatedBy: string | null; version: number; envOverride?: boolean };
+export type HealthCheck = { ok: boolean; ms: number; error: string | null };
+export type HealthReport = { status: "ok" | "degraded"; service: string; version: string; uptimeSeconds: number; checks: Record<string, HealthCheck>; at: string };
+export type ServiceStatus = { name: string; url: string; reachable: boolean; ms: number; report: HealthReport | null; error: string | null };
+export type CronRun = { service: string; name: string; ranAt: string; durationMs: number; ok: boolean; summary: string | null; error: string | null; schedule: string | null };
+export type AdminStatusResponse = {
+  at: string; services: ServiceStatus[]; crons: CronRun[];
+  outbox: { unpublished: number; oldestUnpublishedAt: string | null; parked: number; parkedThreshold: number };
+  emails: { failedLast24h: number; sentLast24h: number };
+  maintenance: MaintenanceState;
+};
+export type PublicMaintenance = { enabled: boolean; message: { fr: string; en: string }; scheduledAt: string | null };

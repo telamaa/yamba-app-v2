@@ -11,14 +11,16 @@ import cron, { type ScheduledTask } from "node-cron";
 import type { Logger } from "pino";
 import type { DealSettlementService } from "../services/deal-settlement.service";
 import { sendOpsDigest } from "../services/ops-notify.service";
+import redis from "@packages/libs/redis";
+import { withHeartbeat } from "@packages/libs/redis/cron-heartbeat";
+
 
 export const OPS_DIGEST_CRON_SCHEDULE = "0 8 * * *";
 
 export function startOpsDigestCron(service: DealSettlementService, logger: Logger): ScheduledTask {
   const task = cron.schedule(OPS_DIGEST_CRON_SCHEDULE, async () => {
     try {
-      const digest = await service.collectOpsDigest();
-      const sent = await sendOpsDigest(digest, new Date());
+      const { digest, sent } = await withHeartbeat(redis, { service: "deal-service", name: "ops-digest", schedule: OPS_DIGEST_CRON_SCHEDULE }, async () => { const digest = await service.collectOpsDigest(); const sent = await sendOpsDigest(digest, new Date()); return { digest, sent }; }, (r) => `${r.digest.failed.length} échec(s), ${r.digest.reversed.length} renversé(s), ${r.digest.held.length} retenue(s)${r.sent ? ", email envoyé" : ""}`);
       logger.info({ failed: digest.failed.length, reversed: digest.reversed.length, held: digest.held.length, sent }, "Ops digest run");
     } catch (err) {
       logger.error({ err }, "Ops digest cron failed");

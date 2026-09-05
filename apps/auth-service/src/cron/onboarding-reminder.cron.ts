@@ -18,6 +18,9 @@
 
 import cron from "node-cron";
 import prisma from "@packages/libs/prisma";
+import redis from "@packages/libs/redis";
+import { withHeartbeat } from "@packages/libs/redis/cron-heartbeat";
+
 import {
   sendOnboardingReminderEmail,
   REMINDER_SCHEDULE,
@@ -88,7 +91,7 @@ export function startOnboardingReminderCron() {
   // Run every hour at minute :00
   cron.schedule("0 * * * *", () => {
     console.log("[reminder-cron] Running onboarding reminder check...");
-    processOnboardingReminders();
+    void withHeartbeat(redis, { service: "auth-service", name: "onboarding-reminder", schedule: "0 * * * *" }, () => processOnboardingReminders()).catch(() => undefined); // D64 4A
   });
 
   console.log("[reminder-cron] Onboarding reminder cron started (every hour)");

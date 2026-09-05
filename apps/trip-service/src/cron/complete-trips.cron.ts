@@ -28,6 +28,9 @@
 
 import cron from "node-cron";
 import prisma from "@packages/libs/prisma";
+import redis from "@packages/libs/redis";
+import { withHeartbeat } from "@packages/libs/redis/cron-heartbeat";
+
 import {
   canPerform,
   getCarrierStatDeltas,
@@ -140,7 +143,7 @@ export function startCompleteTripsCron(): void {
   started = true;
 
   cron.schedule(SCHEDULE, () => {
-    runCompleteTripsOnce().catch((err) => {
+    withHeartbeat(redis, { service: "trip-service", name: "complete-trips", schedule: SCHEDULE }, () => runCompleteTripsOnce(), (r) => `${r.completed} terminé(s), ${r.skipped} ignoré(s) sur ${r.scanned}`).catch((err) => {
       console.error("[complete-trips] Run failed:", err?.message ?? err);
     });
   });

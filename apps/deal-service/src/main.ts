@@ -36,8 +36,11 @@ import { KafkaEventPublisher } from "@packages/messaging";
 import { buildOpenApiDocument } from "./openapi/build-openapi";
 import dealRouter, { dealLifecycleService, dealRatingService, dealSettlementService, opsAlertsService } from "./routes/deal.routes";
 import redis from "@packages/libs/redis";
+import prisma from "@packages/libs/prisma";
+import { healthHandler, mongoCheck, redisCheck } from "@packages/libs/health";
 import { startOpsAlertsCron } from "./cron/ops-alerts.cron";
 import { startRecipientRedactionCron } from "./cron/recipient-redaction.cron";
+import { startOutboxRetentionCron } from "./cron/outbox-retention.cron";
 import { makeRecipientRedactionService } from "./services/recipient-redaction.service";
 import { makeStripeWebhookHandler } from "./controllers/stripe-webhook.controller";
 import { startBookingExpiryCron } from "./cron/expire-bookings.cron";
@@ -92,9 +95,8 @@ app.get("/", (req, res) => {
 
 // Health check — utilisé par le gateway et les smoke tests CI.
 // Volontairement AVANT les routes authentifiées et sans dépendance DB.
-app.get("/health", (req, res) => {
-  res.json({ status: "ok", service: "deal-service" });
-});
+// D64 3A — santé uniforme : Mongo + Redis, 2 s chacun, toujours 200 (le corps dit « ok » ou « degraded »).
+app.get("/health", healthHandler("deal-service", { mongo: mongoCheck(prisma), redis: redisCheck(redis) }));
 
 // OpenAPI 3.1 GÉNÉRÉ depuis les schémas Zod (D3) — construit une fois
 // au boot : le document ne peut pas diverger des contrats importés.
@@ -199,6 +201,11 @@ const recipientRedactionEnabled = process.env.RECIPIENT_REDACTION_CRON_ENABLED !
 const recipientRedactionCron = recipientRedactionEnabled ? startRecipientRedactionCron(makeRecipientRedactionService(), logger.child({ module: "recipient-redaction-cron" })) : null;
 if (!recipientRedactionEnabled) logger.info("Recipient redaction cron disabled (RECIPIENT_REDACTION_CRON_ENABLED=false)");
 
+// ── C-PR8c (D64 6A) — purge des événements `booking` publiés depuis retention.outboxPublishedDays ──
+const outboxRetentionEnabled = process.env.OUTBOX_RETENTION_CRON_ENABLED !== "false";
+const outboxRetentionCron = outboxRetentionEnabled ? startOutboxRetentionCron("booking", "deal-service", logger.child({ module: "outbox-retention-cron" })) : null;
+if (!outboxRetentionEnabled) logger.info("Outbox retention cron disabled (OUTBOX_RETENTION_CRON_ENABLED=false)");
+
 // ── Cron notation : relances J+5/J+7, révélation à 14 j (B5, D53) ─────
 const ratingCronEnabled = process.env.RATING_CRON_ENABLED !== "false";
 const ratingCron = ratingCronEnabled ? startRatingCron(dealRatingService, logger.child({ module: "rating-cron" })) : null;
@@ -234,6 +241,9 @@ function shutdown(signal: string): void {
     }
     if (recipientRedactionCron) {
       recipientRedactionCron.stop();
+    }
+    if (outboxRetentionCron) {
+      outboxRetentionCron.stop();
     }
     if (relay) {
       await relay.stop().catch((err) => logger.error({ err }, "Relay stop failed"));
