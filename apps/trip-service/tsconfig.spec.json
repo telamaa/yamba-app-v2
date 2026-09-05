@@ -6,7 +6,8 @@
     "rootDir": "../../",
     "module": "commonjs",
     "moduleResolution": "node10",
-    "esModuleInterop": true
+    "esModuleInterop": true,
+    "ignoreDeprecations": "6.0"
   },
   "include": [
     "jest.config.ts",

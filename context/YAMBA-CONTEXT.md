@@ -574,6 +574,8 @@ Ordre de demarrage : auth -> trip -> gateway.
   (carte Risque interne), file des signalements (niveau du membre vise, HIGH_RISK prioritaire).
   Jamais servi a un membre, jamais une sanction automatique. Portes : poids reel au pickup, KYC,
   instantane dans le journal. MERGE 05/09 : **#201** (17 checks comptes).
+- chore/deps FAIT le 05/09 : npm audit fix, migration Nx 23.2 (TypeScript 6.0.3), postcss / esbuild,
+  overrides uuid / deepmerge-ts / qs → 0 vulnerabilite. Portes : Prisma 7, Express 5.
 - Backlog parametre serveur : classe C du catalogue D62 (tolerance de poids,
   plafonds comptes neufs, plafond express, seuil de trois signalements…).
 - Photos hors TripDocument chez ImageKit sans fileId (colis, pickup, livraison, litige,

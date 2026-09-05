@@ -55,7 +55,7 @@ No linter is configured (Nx generators use `linter: none`). Root `.env` holds al
 - "CI OK" is verified by COUNTING checks, not by their color alone.
 - Tests live in the SAME PR as their logic (decision D30). PR number is recorded at merge time.
 - `git status --short` before staging; `git add` always WITH an explicit pathspec; `git log --oneline -1` right after each commit.
-- Never `npm audit fix --force` inside a feature PR (dedicated `chore/deps` PR).
+- Never `npm audit fix --force` inside a feature PR (dedicated `chore/deps` PR). Toolchain since 05/09/2026: Nx 23.2, TypeScript 6.0 (`ignoreDeprecations: "6.0"` in every tsconfig), `overrides` in the root package.json for `uuid` / `deepmerge-ts` / `qs` — `npm audit` is expected at 0; `imagekit` stays 6.0.0 (the audit's "fix" downgrades it to the 2016 fossil, refuse it).
 
 ## Architecture
 
