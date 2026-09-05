@@ -1828,3 +1828,30 @@ deal **502** (+8) · auth 153 (spec des emails : miroir et rendu inchangés) · 
 
 ### Reste
 SMS sortant par Yamba (fournisseur, coût, consentement) : porte. Révocation du lien par l'Expéditeur (le champ existe, pas d'écran) : porte.
+
+---
+
+# D70 — `feat/d70-uptime-monitor` : le moniteur externe de disponibilité (Jalon 2)
+
+## Ce qui a été fait
+1. **Sonde publique** `GET /api/status` au gateway (`apps/api-gateway/src/main.ts`), déclarée **avant** le limiteur : sonde les cinq services par leur `/health` (2 s chacun) et lit l'état de maintenance, agrège, répond **200** pour `ok` et `maintenance`, **503** pour `degraded` et `down`. Cache mémoire de 10 s. Corps : `{ status, services: [{ name, reachable, status, ms }], at }` — jamais une URL interne ni une erreur brute.
+2. **Lib partagée** `packages/libs/health/status.ts` : `serviceEntries(env)` (mêmes variables `*_SERVICE_URL` que la page d'état), `probeService(entry, timeout, fetch)` (jamais d'exception), `aggregateStatus(probes, maintenance)` (règle pure), `toPublicBody`. La page d'état admin (`admin-status.controller.ts`, D64 5A) réutilise `serviceEntries` et `probeService` : une seule façon de sonder.
+3. **Fronts** : `GET /api/health` sur user-ui et admin-ui (`src/app/api/health/route.ts`, `force-dynamic`, `no-store`) → `{ status: "ok", app, at }`.
+4. **Battement externe des crons** (`packages/libs/redis/cron-heartbeat.ts`) : `resolveHeartbeatPingUrl(raw, service, name)` (carte JSON `{ "<service>:<cron>": url }`, http(s) seulement, JSON invalide → aucune), `pingExternalHeartbeat` (GET best effort, 3 s, jamais d'exception), appelé sans attente par `withHeartbeat` après chaque tick réussi. Onze crons sont déjà enveloppés (auth `onboarding-reminder` ; deal `expire-bookings`, `payout-bookings`, `ops-alerts`, `ops-digest`, `rating`, `recipient-redaction` ; message `unread-reminder`, `conversation-retention` ; notification `retention` ; trip `complete-trips`).
+5. **Env** : `CRON_HEARTBEAT_PING_URLS` documentée dans `.env.example` (vide = aucun envoi).
+
+### Runbook — mettre en place le moniteur (à ta main)
+| Étape | Quoi |
+|---|---|
+| 1 | Créer un compte **Better Stack** (Uptime, offre gratuite : 10 moniteurs, sondes à 3 min, battements, page de statut) — UptimeRobot convient aussi |
+| 2 | Trois moniteurs HTTP : `https://api.<domaine>/api/status` (attendu 200 ; alerte sur 503 ou absence de réponse, 2 échecs consécutifs), `https://<domaine>/api/health`, `https://admin.<domaine>/api/health` |
+| 3 | Quatre battements (heartbeats), période = fréquence du cron + marge : `deal-service:payout-bookings` (toutes les heures → 2 h), `deal-service:expire-bookings` (5 min → 15 min), `message-service:unread-reminder` (5 min → 15 min), `deal-service:ops-alerts` (1 h → 2 h). Coller les URLs dans `CRON_HEARTBEAT_PING_URLS` du `.env` de production, redémarrer les services |
+| 4 | Contacts d'alerte : email + push de l'application mobile du fournisseur ; escalade SMS si tu le souhaites (payant) |
+| 5 | Page de statut publique du fournisseur (optionnel) : `status.<domaine>` |
+| 6 | Conduite à tenir : `503 down` → un service ne répond pas (redémarrage, logs) ; `503 degraded` → Mongo ou Redis manquent à un service (Atlas / Redis) ; battement manquant → le cron ne tourne plus (service arrêté ou `*_CRON_ENABLED=false`) ; `maintenance` → normal, planifié par l'admin |
+
+### Preuves
+auth **159** (+6 : agrégation, corps public sans URL ni erreur, lecture du `/health`, carte des battements, ping best effort) · tsc auth + gateway + user-ui + admin-ui · build ×6. Recette : MON1–MON6 (DOC-METIER) — dans la recette globale, et le vrai test est la première alerte reçue.
+
+### Reste
+Compte, moniteurs, battements et contacts : à ta main (runbook ci-dessus). Porte : battement « échec » (`/fail`) quand un tick échoue, pour distinguer « cron mort » de « cron en erreur ».

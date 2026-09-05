@@ -1726,3 +1726,28 @@ Le destinataire d'un colis n'a pas de compte : il apprend l'arrivée par l'Expé
 | DES7 | Après le cron d'effacement du tiers (ou `recipientRedactedAt` posé à la main) | « Ce lien de suivi n'est plus valide », bloc « Toi aussi » conservé |
 | DES8 | Tracker en transit, carte destinataire | Le vrai numéro saisi à la réservation (Appeler / WhatsApp), plus le numéro factice |
 | VOC1 | Email « profil actif » d'un Voyageur, parcours de réservation en anglais, Mes trajets | « Voyageur » / « traveler » partout, plus aucun « Tripper », « traveller » ni « transporteur » |
+
+---
+
+# D70 — savoir que Yamba est tombé (moniteur externe)
+
+## Le besoin
+La page d'état admin dit comment vont les services à qui la regarde. Personne ne la regarde à 3 h du matin, et Sentry ne voit que les erreurs, pas le silence. Avant le lancement, il faut qu'un tiers sonde Yamba en permanence et prévienne quand elle ne répond plus, quand un service a perdu sa base, ou quand un cron qui verse l'argent s'est arrêté sans bruit.
+
+### Règles de gestion (MON)
+- **RG-MON-01 — Une adresse publique dit si Yamba va bien** : `/api/status` répond « ok », « maintenance », « dégradé » ou « en panne ». Les deux premiers valent 200, les deux derniers 503 : le moniteur alerte sur le code, pas sur le texte.
+- **RG-MON-02 — Une maintenance planifiée n'est pas une panne** : pendant la lecture seule décidée par l'admin, la sonde répond 200 « maintenance » et personne n'est réveillé.
+- **RG-MON-03 — La sonde ne révèle rien** : ni adresse interne, ni message d'erreur, ni quelle dépendance manque. Elle est publique et mise en cache 10 secondes.
+- **RG-MON-04 — Les fronts comptent aussi** : le site et l'admin répondent chacun à `/api/health`.
+- **RG-MON-05 — Un cron mort se voit** : chaque cron enveloppé peut envoyer un battement au moniteur après un tour réussi ; l'absence de battement déclenche l'alerte. Quatre crons sont prioritaires : versement J+4, expiration 24 h, relance des messages non lus, alertes de seuil.
+- **RG-MON-06 — Le compte et les alertes sont à la main du fondateur** ; Yamba fournit les adresses, les codes attendus et le runbook.
+
+### Recette (MON)
+| # | Scénario | Attendu |
+|---|---|---|
+| MON1 | `curl -i http://localhost:8080/api/status`, tout tourne | 200, `status: "ok"`, cinq services `reachable: true`, aucun champ `url` ni `error` |
+| MON2 | Arrêter message-service, rappeler après 10 s | 503, `status: "down"`, `message-service.reachable: false` |
+| MON3 | Couper Redis (ou `REDIS_DATABASE_URI` faux) sur un service | 503, `status: "degraded"` |
+| MON4 | Activer la maintenance depuis l'admin, service arrêté ou non | 200, `status: "maintenance"` |
+| MON5 | `curl -i http://localhost:3000/api/health` et `:3001/api/health` | 200, `app` = user-ui / admin-ui |
+| MON6 | `CRON_HEARTBEAT_PING_URLS` vers une URL de test (webhook.site), attendre un tick de `expire-bookings` | Un GET reçu à chaque tour ; sans la variable, aucun appel sortant |
