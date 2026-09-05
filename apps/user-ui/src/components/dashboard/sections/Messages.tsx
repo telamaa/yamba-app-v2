@@ -40,15 +40,17 @@ export default function Messages({ copy }: { copy: DashboardCopy }) {
     <>
       <SectionHeader title={copy.messages.title} subtitle={copy.messages.sub} />
       <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900/50">
-        <div className="grid lg:grid-cols-[320px_minmax(0,1fr)]">
-          <div className={`border-slate-200 dark:border-slate-800 lg:border-r ${selectedId ? "hidden lg:block" : "block"}`}>
+        {/* minmax(0,1fr) aussi sur mobile : une colonne `auto` prend la largeur min-content du fil (titre du rendez-vous,
+            puces) et déborde de l'écran — les bulles alignées à droite deviennent invisibles (recette 05/09). */}
+        <div className="grid grid-cols-[minmax(0,1fr)] lg:grid-cols-[320px_minmax(0,1fr)]">
+          <div className={`min-w-0 border-slate-200 dark:border-slate-800 lg:border-r ${selectedId ? "hidden lg:block" : "block"}`}>
             {isLoading ? (
               <p className="p-6 text-[13px] text-slate-500 dark:text-slate-400">{t("loading")}</p>
             ) : (
               <ConversationsList items={data?.items ?? []} selectedId={selectedId} onSelectAction={setSelectedId} />
             )}
           </div>
-          <div className={selectedId ? "block" : "hidden lg:block"}>
+          <div className={`min-w-0 ${selectedId ? "block" : "hidden lg:block"}`}>
             {selectedId ? (
               <ConversationThread conversationId={selectedId} focusPhone={focusPhone} onBack={() => setSelectedId(null)} />
             ) : (

@@ -44,6 +44,8 @@ export default function ConversationThread({
   // F-PR3 (D61 7A) — message en cours de signalement (bulle de l'autre partie seulement)
   const [reporting, setReporting] = useState<ChatMessage | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  // A142 — la réponse rapide remplit la saisie, elle n'envoie jamais : le geste d'envoi reste à l'utilisateur.
+  const composerRef = useRef<HTMLTextAreaElement>(null);
   const lastMessageId = data?.messages[data.messages.length - 1]?.id ?? null;
 
   // Marque lu à l'ouverture et à chaque nouveau message reçu.
@@ -193,7 +195,11 @@ export default function ConversationThread({
               {quickReplies.map((q) => (
                 <button
                   key={q.key}
-                  onClick={() => void send(q.text)}
+                  type="button"
+                  onClick={() => {
+                    setBody(q.text.slice(0, 2000));
+                    composerRef.current?.focus();
+                  }}
                   className="shrink-0 rounded-full border border-slate-300 px-2.5 py-1 text-[12px] text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
                 >
                   {q.text}
@@ -215,6 +221,7 @@ export default function ConversationThread({
             className="flex items-end gap-2"
           >
             <textarea
+              ref={composerRef}
               value={body}
               onChange={(e) => setBody(e.target.value.slice(0, 2000))}
               onKeyDown={(e) => {

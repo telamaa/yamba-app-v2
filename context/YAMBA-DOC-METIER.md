@@ -1427,3 +1427,22 @@ Un message non lu doit finir par atteindre son destinataire même s'il n'a pas l
 | FCH24 | Admin SUPPORT : accueil | Tuile « Messages signalés » ≥ 1 (le seed en crée un) ; menu « Signalements » ; la file montre le message, le motif, l'auteur |
 | FCH25 | Cliquer « Lire la conversation » | Le fil entier, les noms, le rendez-vous, « Personne n'a encore vu le numéro » ; le Journal porte « Conversation consultée » |
 | FCH26 | Traiter le signalement avec une note, puis relire la file | Il disparaît de « à traiter », apparaît dans « traité » ; le Journal porte « Message signalé traité » avec la note ; admin FINANCE : ni menu ni tuile |
+
+---
+
+# F-PR3b — la réponse rapide se relit avant de partir (A142)
+
+## Le besoin
+En recette, choisir une réponse rapide envoyait le message aussitôt : un clic sur la mauvaise puce, et le message était parti. Le membre doit rester maître du dernier geste. La question de la suppression d'un message envoyé (« pour moi » / « pour tout le monde ») a été posée en même temps et tranchée : non retenue, le fil est une pièce du dossier de médiation.
+
+### Règles de gestion (FCH, suite)
+- **RG-FCH-23 — Aucun message ne part sans un geste d'envoi explicite** : une réponse rapide remplit la zone de saisie (et lui donne le focus) ; le membre relit, modifie s'il veut, puis envoie par le bouton ou la touche Entrée.
+- **RG-FCH-24 — Un message envoyé ne se supprime pas**, ni pour soi ni pour l'autre partie : ce qui a été écrit reste lisible par les deux membres, le support et la médiation. Si un retrait est un jour introduit, il sera limité à deux minutes, en effacement logique, sans jamais retirer le texte au dossier (A142).
+
+### Recette (FCH, suite)
+| # | Scénario | Attendu |
+|---|---|---|
+| FCH27 | Dans un fil ouvert, cliquer une réponse rapide | Le texte apparaît dans la zone de saisie, le curseur y est, rien n'est envoyé ; le compteur de l'autre partie ne bouge pas |
+| FCH28 | Modifier le texte proposé puis Entrée (ou le bouton) | Le message modifié part ; la zone se vide |
+| FCH29 | Cliquer une réponse rapide alors que la zone contient déjà un brouillon | Le brouillon est remplacé par la réponse rapide (pas concaténé) |
+| FCH30 | Sur téléphone (ou fenêtre < 1024 px), ouvrir un fil où l'on a écrit | Ses propres bulles (mango, à droite) sont visibles ; le titre du rendez-vous passe à la ligne ; le bouton « Voir le numéro » est dans l'écran ; rien ne déborde à droite |
