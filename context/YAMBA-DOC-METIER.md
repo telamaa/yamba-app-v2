@@ -1614,3 +1614,30 @@ Un membre doit voir où son compte est connecté, couper un appareil qu'il ne re
 | SES8 | Mot de passe identique à l'actuel, ou trop faible | Refus explicite (code A51) |
 | SES9 | Finances → « Ouvrir Stripe Dashboard » après 15 minutes | La porte s'ouvre ; après le code, le tableau de bord s'ouvre dans un nouvel onglet |
 | SES10 | Mes données → « Télécharger » | Même porte ; plus de saisie de code dans le formulaire lui-même |
+
+---
+
+# D66 — mesurer l'usage, avec l'accord du membre (met en œuvre D5)
+
+## Le besoin
+Le jalon 2 et le chantier H attendent des chiffres réels : où les visiteurs abandonnent entre la recherche et le paiement, quels corridors sont regardés, combien de trajets publiés aboutissent. Le pilotage admin (D59) donne l'exploitation, pas le funnel. Il faut une mesure d'audience — et elle ne se fait qu'avec l'accord de la personne, sans jamais transmettre qui elle est.
+
+### Règles de gestion (ANA)
+- **RG-ANA-01 — Rien ne se mesure sans accord.** Une bannière propose « Accepter » et « Refuser » à égalité, avec un lien vers la politique de confidentialité. Le choix vaut six mois sur l'appareil ; pour un membre, il est écrit sur son compte et tracé (accord et retrait).
+- **RG-ANA-02 — Refuser ne coûte rien** : aucun script de mesure n'est chargé, aucune requête ne part, le site fonctionne à l'identique.
+- **RG-ANA-03 — Le membre change d'avis quand il veut** dans Sécurité › Mes données ; le retrait est tracé comme l'accord.
+- **RG-ANA-04 — Jamais une donnée personnelle** : le membre est désigné par son identifiant technique, jamais par son nom, son email ou son téléphone ; les événements portent des corridors, des montants, des statuts. Le destinataire d'un colis et le code de livraison n'y figurent jamais.
+- **RG-ANA-05 — Deux sources, deux usages** : les chiffres d'exploitation (pilotage admin) sont calculés par Yamba ; la mesure d'audience sert aux funnels, à la rétention et aux cohortes. On ne compare pas l'un à l'autre.
+- **RG-ANA-06 — Données en Europe** (PostHog Cloud EU), sans enregistrement de session ni carte de chaleur.
+
+### Recette (ANA)
+| # | Scénario | Attendu |
+|---|---|---|
+| ANA1 | Navigateur neuf, `NEXT_PUBLIC_POSTHOG_KEY` posée, ouvrir le site | Bannière « Mesure d'audience » en bas, deux boutons de même poids, lien « En savoir plus » |
+| ANA2 | « Refuser » puis naviguer, rechercher | Aucune requête vers `eu.i.posthog.com` (onglet réseau), bannière disparue |
+| ANA3 | Vider le stockage, « Accepter », rechercher Paris → Dakar, ouvrir un trajet, commencer une réservation | Requêtes vers PostHog : `$pageview`, `search_performed` (origine, destination, nombre de résultats), `trip_viewed`, `booking_step_viewed` ; aucune propriété ne contient un nom ou un email |
+| ANA4 | Se connecter (membre ayant accepté) | `identify` avec l'identifiant du compte uniquement ; le compte porte `analyticsOptIn: true` et une ligne ConsentLog COOKIES |
+| ANA5 | Sécurité › Mes données → bascule « Mesure d'audience » désactivée | Plus aucune requête ; le compte passe à `false`, la ligne COOKIES est révoquée |
+| ANA6 | Membre ayant accepté, sur un autre appareil neuf | Pas de bannière : le choix du compte est repris |
+| ANA7 | Serveur avec `POSTHOG_API_KEY` : accepter un deal dont l'Expéditeur a consenti et le Voyageur non | Un seul événement `booking.accepted` (rôle SHIPPER) chez PostHog ; rejouer l'événement outbox ne crée pas de doublon |
+| ANA8 | Sans clé PostHog | Aucune bannière, aucun envoi, aucun log d'erreur |

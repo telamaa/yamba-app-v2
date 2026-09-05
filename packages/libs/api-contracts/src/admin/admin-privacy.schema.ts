@@ -27,8 +27,8 @@ export const EraseMyAccountRequestSchema = z
 export type EraseMyAccountRequest = z.infer<typeof EraseMyAccountRequestSchema>;
 
 export const UpdateMyPreferencesRequestSchema = z
-  .object({ messagingReminderEmails: z.boolean().optional() })
-  .meta({ id: "UpdateMyPreferencesRequest", description: "Member preferences (D63 8A)" });
+  .object({ messagingReminderEmails: z.boolean().optional(), analyticsOptIn: z.boolean().optional().meta({ description: "D66 2A — audience measurement consent (written to ConsentLog COOKIES)" }) })
+  .meta({ id: "UpdateMyPreferencesRequest", description: "Member preferences (D63 8A, D66 2A)" });
 export type UpdateMyPreferencesRequest = z.infer<typeof UpdateMyPreferencesRequestSchema>;
 
 export const AdminEraseUserRequestSchema = z

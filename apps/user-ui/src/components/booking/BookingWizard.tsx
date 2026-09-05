@@ -29,6 +29,7 @@ const StepPayment = dynamic(() => import("./steps/StepPayment"), {
 });
 import StepRecipient from "./steps/StepRecipient";
 import { usePricingParams } from "@/hooks/usePricingParams";
+import { track } from "@/lib/analytics";
 
 const EMPTY_ERRORS: ValidationErrors = {};
 
@@ -62,7 +63,8 @@ export default function BookingWizard({ trip, onCloseAction }: Props) {
 
   useEffect(() => {
     setShowErrors(false);
-  }, [step]);
+    void track("booking_step_viewed", { step, tripId: trip.tripId }); // D66 3A
+  }, [step, trip.tripId]);
 
   const pricingParams = usePricingParams(); // D62 7A — valeurs du serveur, défauts du moteur en attendant
   const price = useMemo(() => computeTotal(draft, trip, pricingParams), [draft, trip, pricingParams]);

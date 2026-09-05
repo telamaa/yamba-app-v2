@@ -26,6 +26,7 @@ import { requireSudo } from "../utils/sudo";
 import { sendAuthEmail } from "../emails/send-auth-email";
 import { getAuthEmails } from "../emails/auth-emails";
 import { ErasureBlockedError, makePrivacyService, type EraseResult, type PrivacyDb } from "../services/privacy.service";
+import { recordCookiesConsent } from "../utils/consent/consent.helper";
 
 const SUPPORT_EMAIL = process.env.SUPPORT_EMAIL || "support@yamba.app";
 const REQUESTS_PAGE = 50;
@@ -126,8 +127,13 @@ export const updateMyPreferences = async (req: AuthenticatedRequest, res: Respon
     if (!parsed.success) throw new ValidationError("Invalid request", { errors: zodErrors(parsed.error.issues) });
     const data: Record<string, unknown> = {};
     if (typeof parsed.data.messagingReminderEmails === "boolean") data.messagingReminderEmails = parsed.data.messagingReminderEmails;
+    if (typeof parsed.data.analyticsOptIn === "boolean") data.analyticsOptIn = parsed.data.analyticsOptIn;
     if (Object.keys(data).length === 0) throw new ValidationError("Nothing to update.");
-    const user = await prisma.user.update({ where: { id: req.user.id }, data, select: { messagingReminderEmails: true, preferredLocale: true } });
+    const user = await prisma.user.update({ where: { id: req.user.id }, data, select: { messagingReminderEmails: true, preferredLocale: true, analyticsOptIn: true } });
+    // D66 2A — le choix cookies est tracé (accepté : ligne COOKIES ; refusé : révocation de la dernière)
+    if (typeof parsed.data.analyticsOptIn === "boolean" && parsed.data.analyticsOptIn !== req.user.analyticsOptIn) {
+      await recordCookiesConsent(req.user.id, parsed.data.analyticsOptIn, { ipAddress: req.ip ?? null, userAgent: (req.headers["user-agent"] as string | undefined) ?? null, locale: req.user.preferredLocale }).catch(() => undefined);
+    }
     return res.status(200).json({ success: true, preferences: user });
   } catch (e) {
     return next(e);

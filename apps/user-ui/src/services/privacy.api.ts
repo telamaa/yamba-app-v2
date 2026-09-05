@@ -45,7 +45,7 @@ export async function eraseMyAccount(confirmation: string): Promise<void> {
   }
 }
 
-export async function updateMyPreferences(prefs: { messagingReminderEmails?: boolean }): Promise<{ messagingReminderEmails: boolean }> {
-  const res = await apiClient.patch<{ preferences: { messagingReminderEmails: boolean } }>("/auth/me/preferences", prefs, { requireAuth: true });
+export async function updateMyPreferences(prefs: { messagingReminderEmails?: boolean; analyticsOptIn?: boolean }): Promise<{ messagingReminderEmails: boolean; analyticsOptIn?: boolean | null }> {
+  const res = await apiClient.patch<{ preferences: { messagingReminderEmails: boolean; analyticsOptIn?: boolean | null } }>("/auth/me/preferences", prefs, { requireAuth: true });
   return res.data.preferences;
 }

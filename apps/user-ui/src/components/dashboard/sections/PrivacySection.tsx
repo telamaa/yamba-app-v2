@@ -16,6 +16,7 @@ import useUser from "@/hooks/useUser";
 import { ErasureBlockedError, downloadMyData, eraseMyAccount, fetchErasureBlockers, updateMyPreferences, type ErasureBlocker } from "@/services/privacy.api";
 import { isSudoRequired } from "@/services/account.api";
 import SudoGate from "@/components/dashboard/sections/SudoGate";
+import { analyticsConfigured, disableAnalytics, ensureAnalytics, readConsent, writeConsent } from "@/lib/analytics";
 
 type Flow = "idle" | "export" | "erase";
 
@@ -31,10 +32,12 @@ export default function PrivacySection({ copy }: { copy: DashboardCopy }) {
   const [msg, setMsg] = useState<{ tone: "ok" | "err"; text: string } | null>(null);
   const [blockers, setBlockers] = useState<ErasureBlocker[] | null>(null);
   const [reminders, setReminders] = useState<boolean>(true);
+  const [analytics, setAnalytics] = useState<boolean>(false); // D66
 
   useEffect(() => {
     if (user && typeof (user as { messagingReminderEmails?: boolean }).messagingReminderEmails === "boolean") setReminders((user as { messagingReminderEmails?: boolean }).messagingReminderEmails as boolean);
   }, [user]);
+  useEffect(() => { setAnalytics(readConsent() === "granted"); }, [user]);
 
   async function start(next: Flow) {
     setFlow(next);
@@ -87,6 +90,13 @@ export default function PrivacySection({ copy }: { copy: DashboardCopy }) {
     }
   }
 
+  async function toggleAnalytics() {
+    const next = !analytics;
+    setAnalytics(next);
+    writeConsent(next ? "granted" : "denied");
+    if (next) void ensureAnalytics(); else disableAnalytics();
+    updateMyPreferences({ analyticsOptIn: next }).catch(() => undefined);
+  }
   async function toggleReminders() {
     const next = !reminders;
     setReminders(next);
@@ -116,6 +126,17 @@ export default function PrivacySection({ copy }: { copy: DashboardCopy }) {
             <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition ${reminders ? "left-[22px]" : "left-0.5"}`} />
           </button>
         </div>
+        {analyticsConfigured() && (
+          <div className="flex items-center justify-between gap-3 border-t border-slate-100 px-4 py-3 dark:border-slate-800">
+            <div>
+              <p className="text-[13.5px] font-medium text-slate-900 dark:text-white">{p.analytics}</p>
+              <p className="text-[12px] text-slate-500 dark:text-slate-400">{p.analyticsSub}</p>
+            </div>
+            <button type="button" role="switch" aria-checked={analytics} onClick={toggleAnalytics} className={`relative h-6 w-11 shrink-0 rounded-full transition ${analytics ? "bg-[#0F766E]" : "bg-slate-300 dark:bg-slate-700"}`}>
+              <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition ${analytics ? "left-[22px]" : "left-0.5"}`} />
+            </button>
+          </div>
+        )}
         <div className="flex items-center justify-between gap-3 border-t border-slate-100 px-4 py-3 dark:border-slate-800">
           <div>
             <p className="text-[13.5px] font-medium text-slate-900 dark:text-white">{p.export}</p>

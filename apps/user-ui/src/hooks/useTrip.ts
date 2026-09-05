@@ -4,6 +4,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import apiClient from "@/lib/api-client";
+import { track } from "@/lib/analytics";
 import type { Draft } from "@/components/trips/create/create-trip.types";
 import { mapDraftToPayload } from "@/components/trips/create/create-trip.mapper";
 
@@ -46,8 +47,9 @@ export function useCreateTrip() {
 
       return res.data;
     },
-    onSuccess: () => {
+    onSuccess: (data, variables) => {
       void qc.invalidateQueries({ queryKey: ["my-trips"] });
+      void track(variables.publish ? "trip_published" : "trip_drafted", { tripId: (data as { trip?: { id?: string } })?.trip?.id ?? null }); // D66 3A
     },
   });
 }

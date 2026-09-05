@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { useRouter } from "@/i18n/navigation";
 import { PHOTO_MAX_SIZE_BYTES, PHOTO_MIME_TYPES, useImageKitUpload } from "@/hooks/useImageKitUpload";
 import { BookingApiError, createDeal, createPaymentIntent } from "@/services/booking.api";
+import { track } from "@/lib/analytics";
 import type { Draft, PaymentIntentInfo, Step, TripContext } from "./booking.types";
 
 /** Ce que l'étape 4 enregistre : « confirme le paiement, dis-moi si c'est bon ». */
@@ -66,6 +67,7 @@ export function useBookingCheckout(args: { draft: Draft; trip: TripContext; step
     setIntentError(null);
     try {
       const created = await createPaymentIntent(draft, trip);
+      void track("booking_payment_started", { tripId: trip.tripId, amountCents: created.amountCents }); // D66 3A
       authorizedTotalRef.current = created.amountCents;
       setIntent(created);
     } catch (e) {
@@ -125,6 +127,7 @@ export function useBookingCheckout(args: { draft: Draft; trip: TripContext; step
         }
       }
       const result = await createDeal(draft, trip, intent.paymentIntentId, photoUrls);
+      void track("booking_created", { tripId: trip.tripId, bookingId: result.bookingId }); // D66 3A
       toast.success(t("step4.requestSent"), { duration: 3500 });
       clear();
       router.push(`/bookings/${result.bookingId}`);

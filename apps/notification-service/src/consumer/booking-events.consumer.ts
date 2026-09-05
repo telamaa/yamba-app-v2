@@ -26,6 +26,7 @@ import {
   type ConsumedEventMessage,
 } from "@packages/messaging";
 import { dispatchBookingEmails } from "../emails/booking-emails";
+import { sinkToAnalytics } from "../lib/analytics-sink";
 
 type BookingDomainEvent = z.infer<typeof BookingDomainEventSchema>;
 type BookingEventKey = BookingDomainEvent["eventType"];
@@ -164,6 +165,8 @@ export async function handleBookingEventMessage(
   // d'ENVOI (une erreur transitoire de claim, elle, remonte — la
   // re-livraison retrouvera les claims posés).
   await dispatchBookingEmails(eventId, event, logger);
+  // D66 4A — mesure d'audience côté serveur, pour les parties qui ont consenti (best effort)
+  await sinkToAnalytics({ eventId, eventType: event.eventType, occurredAt: event.occurredAt, payload: event.payload as never }, logger);
 
   // 4. PROCESSED — la row garde la trace du passage.
   await prisma.consumedEvent.update({

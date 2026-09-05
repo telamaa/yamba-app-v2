@@ -14,6 +14,7 @@ import { Prisma } from "@prisma/client";
 import prisma from "@packages/libs/prisma";
 import { MessagingDomainEventSchema, type MessagingDomainEvent } from "@packages/api-contracts";
 import { CONSUMER_GROUPS, type ConsumedEventMessage } from "@packages/messaging";
+import { sinkToAnalytics } from "../lib/analytics-sink";
 
 const GROUP = CONSUMER_GROUPS.MESSAGING_NOTIFICATIONS;
 
@@ -80,5 +81,6 @@ export async function handleMessagingEventMessage(message: ConsumedEventMessage,
     data: { status: "PROCESSED", processedAt: new Date(), lastError: null },
   });
 
+  await sinkToAnalytics({ eventId, eventType: event.eventType, occurredAt: event.occurredAt, payload: event.payload as never }, logger); // D66 4A
   logger.info({ eventId, eventType: event.eventType, userId, correlationId: event.correlationId }, "Messaging event materialized");
 }
