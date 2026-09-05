@@ -53,12 +53,12 @@ export function makeUnreadReminderService(deps: { send?: typeof sendTransactiona
     const recipientId = role === "SHIPPER" ? conversation.shipperId : conversation.carrierId;
     const counterpartId = role === "SHIPPER" ? conversation.carrierId : conversation.shipperId;
     const [recipient, counterpart, booking] = await Promise.all([
-      prisma.user.findUnique({ where: { id: recipientId }, select: { email: true, firstName: true, preferredLocale: true, isDeleted: true, messagingReminderEmails: true } }),
+      prisma.user.findUnique({ where: { id: recipientId }, select: { email: true, firstName: true, preferredLocale: true, isDeleted: true, messagingReminderEmails: true, emailSuppressedAt: true } }),
       prisma.user.findUnique({ where: { id: counterpartId }, select: { firstName: true } }),
       prisma.booking.findUnique({ where: { id: conversation.bookingId }, select: { trip: { select: { originCity: true, destinationCity: true } } } }),
     ]);
     // D63 8A — préférence membre « ne plus me relancer par email » (A138) : le verrou est posé, rien ne part.
-    if (!recipient?.email || recipient.isDeleted || recipient.messagingReminderEmails === false || !booking) return;
+    if (!recipient?.email || recipient.isDeleted || recipient.emailSuppressedAt || recipient.messagingReminderEmails === false || !booking) return; // D35 4A : adresse supprimée
     const { locale, dictionary } = messagingEmailsFor(recipient.preferredLocale);
     const built = dictionary.unreadReminder({
       firstName: recipient.firstName,

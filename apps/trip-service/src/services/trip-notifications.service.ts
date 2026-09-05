@@ -50,7 +50,7 @@ export async function dispatchTripPublishedNotifications(
       where: { followedId: trip.userId, notifyNextTrip: true },
       select: {
         follower: {
-          select: { id: true, firstName: true, emailNormalized: true, isDeleted: true, preferredLocale: true },
+          select: { id: true, firstName: true, emailNormalized: true, isDeleted: true, emailSuppressedAt: true, preferredLocale: true },
         },
       },
     });
@@ -72,7 +72,7 @@ export async function dispatchTripPublishedNotifications(
       where: baseWhere,
       include: {
         user: {
-          select: { id: true, firstName: true, emailNormalized: true, isDeleted: true, preferredLocale: true },
+          select: { id: true, firstName: true, emailNormalized: true, isDeleted: true, emailSuppressedAt: true, preferredLocale: true },
         },
       },
     });
@@ -110,7 +110,7 @@ export async function dispatchTripPublishedNotifications(
           console.log(`[trip-notifications]   ⏭ SR ${sr.id} score=${sr.matchScore} skipped (includeNearby=false)`);
           return false;
         }
-        if (sr.user.isDeleted) return false;
+        if (sr.user.isDeleted || sr.user.emailSuppressedAt) return false; // D35 4A
         if (trip.departureAt) {
           if (sr.earliestDate && trip.departureAt < sr.earliestDate) {
             console.log(`[trip-notifications]   📅 SR ${sr.id} skipped (departure before earliestDate)`);
@@ -131,7 +131,7 @@ export async function dispatchTripPublishedNotifications(
 
     for (const row of followRows) {
       const follower = row.follower;
-      if (!follower || follower.isDeleted) continue;
+      if (!follower || follower.isDeleted || follower.emailSuppressedAt) continue; // D35 4A
       if (follower.id === trip.userId) continue;
       recipientsMap.set(follower.id, {
         userId: follower.id,

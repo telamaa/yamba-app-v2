@@ -55,6 +55,8 @@ export const ADMIN_PERMISSIONS = {
   // C-PR8c (D64) — état des services (lecture pour tous), maintenance (OPS ou SUPER_ADMIN)
   "status.read": ["MEDIATOR", "SUPPORT", "FINANCE", "OPS", "PRIVACY"],
   "maintenance.write": ["OPS"],
+  // D35 4A — lever une suppression d'adresse (rebond dur / plainte) après correction
+  "users.email.unsuppress": ["SUPPORT", "MEDIATOR", "PRIVACY"],
 } as const;
 export type AdminPermission = keyof typeof ADMIN_PERMISSIONS;
 
@@ -156,6 +158,8 @@ export const AdminUserFileSchema = z
     email: z.string(),
     phoneE164: z.string().nullable(),
     preferredLocale: z.string(),
+    /** D35 4A — adresse sur la liste de suppression (rebond dur / plainte) */
+    emailSuppression: z.object({ at: z.string().datetime(), reason: z.string() }).nullable(),
     roles: z.array(z.string()),
     adminRole: AdminRoleSchema.nullable(),
     adminRoles: z.array(AdminRoleSchema),

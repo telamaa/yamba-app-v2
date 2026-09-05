@@ -30,7 +30,7 @@ function money(cents: number, currency: string, locale: "fr" | "en"): string {
 export async function notifyCarrierPayoutFailed(stripeAccountId: string, stripeEventId: string): Promise<boolean> {
   const page = await prisma.carrierPage.findFirst({ where: { stripeAccountId }, select: { userId: true } });
   if (!page) return false;
-  const user = await prisma.user.findUnique({ where: { id: page.userId }, select: { id: true, email: true, firstName: true, preferredLocale: true } });
+  const user = await prisma.user.findUnique({ where: { id: page.userId }, select: { id: true, email: true, firstName: true, preferredLocale: true, isDeleted: true, emailSuppressedAt: true } });
   if (!user) return false;
   const locale = resolveLocale(user.preferredLocale);
 
@@ -47,7 +47,7 @@ export async function notifyCarrierPayoutFailed(stripeAccountId: string, stripeE
     update: {},
   });
 
-  if (user.email && isEmailConfigured()) {
+  if (user.email && !user.isDeleted && !user.emailSuppressedAt && isEmailConfigured()) { // D35 4A / D63 4A
     const built = OPS_EMAILS[locale].payoutFailedCarrier({ firstName: user.firstName, financesUrl: `${APP_URL}/${locale}/dashboard/finances` });
     await sendTransactionalEmail({ to: user.email, locale, subject: built.subject, content: built.content });
   }

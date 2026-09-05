@@ -35,5 +35,17 @@ services:
       timeout: 5s
       retries: 10
 
+  # D35 6A — Mailpit : la boîte de recette locale. EMAIL_PROVIDER=smtp, SMTP_HOST=localhost, SMTP_PORT=1025
+  # (sans auth) ; les emails se lisent sur http://localhost:8025.
+  mailpit:
+    image: axllent/mailpit:v1.21
+    container_name: yamba-mailpit
+    ports:
+      - "1025:1025" # SMTP
+      - "8025:8025" # interface web
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: "1"
+      MP_SMTP_AUTH_ALLOW_INSECURE: "1"
+
 volumes:
   redpanda-data:

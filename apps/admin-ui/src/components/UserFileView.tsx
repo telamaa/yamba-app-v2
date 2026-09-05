@@ -46,6 +46,12 @@ export default function UserFileView({ userId }: { userId: string }) {
         {file.isMe && <span className="text-[11px] text-slate-500">(c'est toi : aucune action possible)</span>}
       </div>
 
+      {file.emailSuppression && (
+        <div className="mt-3 flex flex-wrap items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[12.5px] text-amber-900">
+          <span>Adresse sur la liste de suppression depuis le {dateTime(file.emailSuppression.at)} ({file.emailSuppression.reason === "COMPLAINT" ? "plainte" : "rebond dur"}) : aucun email ne lui est envoyé.</span>
+          {can(me?.adminRoles, "users.email.unsuppress") && !file.isMe && <UnsuppressButton userId={file.id} onDone={load} />}
+        </div>
+      )}
       {file.suspension && (
         <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[12.5px] text-red-800">
           {STATUS_LABEL[file.suspension.level]} depuis le {dateTime(file.suspension.at)} par {file.suspension.byAdmin}{file.suspension.until ? `, jusqu'au ${dateTime(file.suspension.until)}` : ""} — motif : {file.suspension.reason}
@@ -246,5 +252,22 @@ function EraseCard({ file, onDone }: { file: AdminUserFile; onDone: () => void }
       </div>
       {msg && <p className="mt-2 text-[12px] text-slate-600">{msg}</p>}
     </Card>
+  );
+}
+
+/** D35 4A — lever la suppression après correction de l'adresse (journalisé). */
+function UnsuppressButton({ userId, onDone }: { userId: string; onDone: () => void }) {
+  const [busy, setBusy] = useState(false);
+  return (
+    <button
+      disabled={busy}
+      onClick={async () => {
+        setBusy(true);
+        try { await del(`/admin/users/${userId}/email-suppression`); onDone(); } finally { setBusy(false); }
+      }}
+      className="rounded-lg border border-amber-400 bg-white px-2.5 py-1 text-[12px] font-medium disabled:opacity-50"
+    >
+      Lever (adresse corrigée)
+    </button>
   );
 }

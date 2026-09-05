@@ -210,6 +210,7 @@ export function makeAdminUsersService() {
         email: u.email,
         phoneE164: u.phoneE164,
         preferredLocale: u.preferredLocale,
+        emailSuppression: u.emailSuppressedAt ? { at: u.emailSuppressedAt.toISOString(), reason: u.emailSuppressedReason ?? "UNKNOWN" } : null, // D35 4A
         roles: u.roles,
         adminRole: (u.adminRole as AdminUserFile["adminRole"]) ?? null,
         adminRoles: adminRolesOf(u as { adminRole?: string | null; adminRoles?: string[] | null }),

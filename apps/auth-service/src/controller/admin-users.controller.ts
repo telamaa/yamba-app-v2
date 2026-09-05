@@ -177,7 +177,7 @@ export function makeAdminUsersController(service: AdminUsersService) {
         const locale = resolveLocale(user.preferredLocale);
         const dict = getAdminEmails(locale);
         const params = { firstName: user.firstName, reason, until: fmtDate(until, locale), supportEmail: SUPPORT_EMAIL };
-        await sendAuthEmail(user.email, locale, level === "SUSPENDED" ? dict.accountSuspended(params) : dict.accountRestricted(params)).catch(() => undefined);
+        if (!user.emailSuppressedAt) await sendAuthEmail(user.email, locale, level === "SUSPENDED" ? dict.accountSuspended(params) : dict.accountRestricted(params)).catch(() => undefined); // D35 4A
         await notifySupportOfActiveDeals(user, level);
         res.status(200).json({ ok: true, accountStatus: level, at: now.toISOString() });
       } catch (e) {
@@ -185,6 +185,21 @@ export function makeAdminUsersController(service: AdminUsersService) {
       }
     },
 
+    /** D35 4A — lever la suppression d'une adresse après correction (journal EMAIL_SUPPRESSION_LIFTED). */
+    async unsuppressEmail(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+      try {
+        const user = await loadTarget(req);
+        const suppressedAt = user.emailSuppressedAt;
+        if (!suppressedAt) throw new ValidationError("This address is not suppressed.");
+        await prisma.$transaction(async (tx) => {
+          await tx.user.update({ where: { id: user.id }, data: { emailSuppressedAt: null, emailSuppressedReason: null } });
+          await recordAdminAction(tx, { adminUserId: req.user.id, action: "EMAIL_SUPPRESSION_LIFTED", targetType: "USER", targetId: user.id, before: { emailSuppressedAt: suppressedAt.toISOString(), reason: user.emailSuppressedReason }, after: { emailSuppressedAt: null }, ...meta(req) });
+        });
+        return res.status(200).json({ ok: true });
+      } catch (e) {
+        return next(e);
+      }
+    },
     async lift(req: AuthenticatedRequest, res: Response, next: NextFunction) {
       try {
         const user = await loadTarget(req);
@@ -199,7 +214,7 @@ export function makeAdminUsersController(service: AdminUsersService) {
           await recordAdminAction(tx, { adminUserId: req.user.id, action: "USER_REINSTATED", targetType: "USER", targetId: user.id, before: { accountStatus: user.accountStatus }, after: { accountStatus: "ACTIVE", reason: parsed.data.reason }, ...meta(req) });
         });
         const locale = resolveLocale(user.preferredLocale);
-        await sendAuthEmail(user.email, locale, getAdminEmails(locale).accountReinstated({ firstName: user.firstName, supportEmail: SUPPORT_EMAIL })).catch(() => undefined);
+        if (!user.emailSuppressedAt) await sendAuthEmail(user.email, locale, getAdminEmails(locale).accountReinstated({ firstName: user.firstName, supportEmail: SUPPORT_EMAIL })).catch(() => undefined); // D35 4A
         res.status(200).json({ ok: true, accountStatus: "ACTIVE" });
       } catch (e) {
         next(e);
