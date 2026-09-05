@@ -565,7 +565,7 @@ Ordre de demarrage : auth -> trip -> gateway.
   86 operations, contrats de la surface membre decrits au reel (member-auth.schema.ts), x-permission
   sur les routes admin, /openapi.json + /docs sur :6001, cinquieme cible de generate:openapi diffee
   en CI, test qui exige chaque route montee et refuse toute route inventee. Porte : safeParse dans
-  les controleurs historiques au chantier mobile D36.
+  les controleurs historiques au chantier mobile D36. MERGE 05/09 : **#199** (17 checks comptes).
 - Backlog parametre serveur : classe C du catalogue D62 (tolerance de poids,
   plafonds comptes neufs, plafond express, seuil de trois signalements…).
 - Photos hors TripDocument chez ImageKit sans fileId (colis, pickup, livraison, litige,
