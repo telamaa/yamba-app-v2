@@ -534,7 +534,7 @@ Ordre de demarrage : auth -> trip -> gateway.
   accord, pages vues et funnel (search, trip, etapes, paiement, publication), identify par id,
   serveur par les evenements outbox (lib @packages/libs/analytics, liste blanche, uuid stable,
   fire-and-forget) pour les parties consentantes. A ta main : compte PostHog, cles, paragraphe
-  de la politique de confidentialite.
+  de la politique de confidentialite. MERGE 05/09 : **#189** (17 checks comptes).
 - Backlog parametre serveur : classe C du catalogue D62 (tolerance de poids,
   plafonds comptes neufs, plafond express, seuil de trois signalements…).
 - Photos hors TripDocument chez ImageKit sans fileId (colis, pickup, livraison, litige,
