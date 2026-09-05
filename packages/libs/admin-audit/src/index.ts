@@ -62,6 +62,8 @@ export const ADMIN_ACTIONS = [
   // C-PR8b (D63 6A)
   "ACCOUNT_ERASED",
   "DATA_REQUESTS_VIEWED",
+  // C-PR8c (D64 1A)
+  "MAINTENANCE_CHANGED",
 ] as const;
 export type AdminActionType = (typeof ADMIN_ACTIONS)[number];
 

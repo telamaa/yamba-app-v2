@@ -397,7 +397,16 @@ Ordre de demarrage : auth -> trip -> gateway.
   preference messagingReminderEmails (A138), user-ui « Mes donnees », admin-ui /privacy + carte
   d'effacement, @packages/libs/imagekit partage. MERGE 05/09 : **#180** (17 checks comptes).
   Suite : C-PR8c maintenance / etat des services / conservation.
-- Plateforme de tests : 822 (trip 209, deal 494, notification 83, message 36) + auth 130.
+- 05/09 : C-PR8c feat/c8c-maintenance (D64) — sante uniforme (@packages/libs/health, /health sur les
+  cinq services + gateway), battement des crons dans Redis (withHeartbeat, onze crons), conservation
+  chiffree (retention.* : notifications, emails, evenements consommes, outbox publie ; crons
+  nocturnes par proprietaire, un parque n'est jamais purge), maintenance a deux interrupteurs
+  (base journalisee + MAINTENANCE_MODE au gateway, 503 sur les ecritures hors auth / admin,
+  GET /api/maintenance public, bandeaux sur les deux fronts), page admin « Etat des services »
+  (GET /admin/status, sondage 30 s, editeur de maintenance). Gateway aligne (alias @packages,
+  tsconfig). Chantier C : SOLDE (C-PR1 → C-PR8c). Candidat registre : moniteur externe de
+  disponibilite avant le lancement.
+- Plateforme de tests : 826 (trip 209, deal 494, notification 87, message 36) + auth 134.
 - 04/09 : C-PR6b feat/c6b-admin-alerts (D59 3A / 4A, A129–A131) — neuf regles de seuil
   (evaluateAlerts pur, instantane de dix compteurs), GET /admin/alerts sans etat (accueil
   admin), cron horaire avec dedoublonnage Redis SET NX (un email par regle et par jour, Redis

@@ -6,12 +6,15 @@
       "node",
       "express"
     ],
-    "rootDir": "src",
     "tsBuildInfoFile": "dist/tsconfig.app.tsbuildinfo",
-    "allowSyntheticDefaultImports": true
+    "allowSyntheticDefaultImports": true,
+    "rootDir": "../../"
   },
   "include": [
-    "src/**/*.ts"
+    "src/**/*.ts",
+    "../../packages/**/*.ts"
   ],
-  "exclude": []
+  "exclude": [
+    "../../packages/**/*.spec.ts"
+  ]
 }

@@ -17,6 +17,7 @@ export type AdminAccessGrantedParams = { firstName: string; invitedBy: string; r
 export type AdminLoginAlertParams = { firstName: string; at: string; ip: string; userAgent: string; sessionsUrl: string; supportEmail: string };
 export type AccountStatusParams = { firstName: string; reason: string; until: string | null; supportEmail: string };
 /** C-PR8a (D62 5A) — chaque modification de paramètre est annoncée à tous les SUPER_ADMIN. */
+export type MaintenanceChangedParams = { firstName: string; byName: string; enabled: boolean; scheduledAt: string | null; message: string; reason: string; statusUrl: string };
 export type SettingsChangedParams = { firstName: string; byName: string; at: string; reason: string; changes: Array<{ label: string; before: string; after: string }>; settingsUrl: string; reset: boolean };
 
 export type AdminEmailDictionary = {
@@ -27,6 +28,7 @@ export type AdminEmailDictionary = {
   accountSuspended(p: AccountStatusParams): AdminEmail;
   accountReinstated(p: Pick<AccountStatusParams, "firstName" | "supportEmail">): AdminEmail;
   settingsChanged(p: SettingsChangedParams): AdminEmail;
+  maintenanceChanged(p: MaintenanceChangedParams): AdminEmail;
 };
 
 export const ADMIN_ROLE_LABELS: Record<SupportedLocale, Record<string, string>> = {
@@ -119,6 +121,21 @@ const fr: AdminEmailDictionary = {
       reason: "Tu reçois cet email parce que tu es super administrateur Yamba : chaque modification de paramètre est annoncée à tous les super administrateurs (D62).",
     },
   }),
+  maintenanceChanged: (p) => ({
+    subject: p.enabled ? "Maintenance activée sur Yamba" : p.scheduledAt ? "Maintenance planifiée sur Yamba" : "Maintenance levée sur Yamba",
+    content: {
+      preheader: `${p.byName} a modifié l'état de maintenance.`,
+      title: p.enabled ? "Plateforme en lecture seule" : p.scheduledAt ? "Maintenance annoncée" : "Retour à la normale",
+      greeting: `Bonjour ${p.firstName},`,
+      paragraphs: [
+        p.enabled ? `${p.byName} a passé la plateforme en lecture seule : les membres lisent, aucune écriture ne passe (sauf connexion et back-office).` : p.scheduledAt ? `${p.byName} a annoncé une maintenance pour le ${new Date(p.scheduledAt).toLocaleString("fr-FR", { timeZone: "Europe/Paris" })} : le bandeau est affiché sur les deux fronts.` : `${p.byName} a levé la maintenance : la plateforme est de nouveau ouverte aux écritures.`,
+        p.message ? `Message affiché : « ${p.message} »` : "Aucun message personnalisé.",
+        `Motif : ${p.reason}`,
+      ],
+      cta: { label: "Voir l'état des services", url: p.statusUrl },
+      reason: "Tu reçois cet email parce que tu es super administrateur Yamba : chaque changement d'état de maintenance est annoncé à tous les super administrateurs (D64).",
+    },
+  }),
   accountReinstated: (p) => ({
     subject: "Ton compte Yamba est rétabli",
     content: {
@@ -209,6 +226,21 @@ const en: AdminEmailDictionary = {
       ],
       cta: { label: "Open the settings", url: p.settingsUrl },
       reason: "You receive this email because you are a Yamba super administrator: every settings change is announced to all super administrators (D62).",
+    },
+  }),
+  maintenanceChanged: (p) => ({
+    subject: p.enabled ? "Maintenance enabled on Yamba" : p.scheduledAt ? "Maintenance scheduled on Yamba" : "Maintenance lifted on Yamba",
+    content: {
+      preheader: `${p.byName} changed the maintenance state.`,
+      title: p.enabled ? "Platform in read-only mode" : p.scheduledAt ? "Maintenance announced" : "Back to normal",
+      greeting: `Hello ${p.firstName},`,
+      paragraphs: [
+        p.enabled ? `${p.byName} switched the platform to read-only: members can read, no write goes through (except sign-in and the back-office).` : p.scheduledAt ? `${p.byName} announced a maintenance for ${new Date(p.scheduledAt).toLocaleString("en-GB", { timeZone: "Europe/Paris" })}: the banner is shown on both fronts.` : `${p.byName} lifted the maintenance: the platform is open to writes again.`,
+        p.message ? `Displayed message: “${p.message}”` : "No custom message.",
+        `Reason: ${p.reason}`,
+      ],
+      cta: { label: "Open the service status", url: p.statusUrl },
+      reason: "You receive this email because you are a Yamba super administrator: every maintenance change is announced to all super administrators (D64).",
     },
   }),
   accountReinstated: (p) => ({

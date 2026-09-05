@@ -10,6 +10,9 @@ import cookieParser = require("cookie-parser");
 import { errorMiddleware } from "@packages/error-handler/error-middleware";
 import tripRouter from "./routes/trip.router";
 import uploadRouter from "./routes/upload.routes";
+import { healthHandler, mongoCheck, redisCheck } from "@packages/libs/health";
+import prisma from "@packages/libs/prisma";
+import redis from "@packages/libs/redis";
 // Chantier 0 (D3) — OAS 3.1 généré depuis @packages/api-contracts
 import { buildOpenApiDocument } from "./openapi/build-openapi";
 
@@ -28,6 +31,7 @@ app.use(cookieParser());
 app.get("/", (req, res) => {
   res.send({ message: "Hello Trip API" });
 });
+app.get("/health", healthHandler("trip-service", { mongo: mongoCheck(prisma), redis: redisCheck(redis) })); // D64 3A
 
 // OpenAPI 3.1 (source de vérité : Zod) — construit une fois au démarrage.
 const openApiDocument = buildOpenApiDocument();

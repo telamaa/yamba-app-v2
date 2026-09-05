@@ -1528,3 +1528,33 @@ Le règlement donne à chaque membre le droit de récupérer ses données et de 
 | RGP10 | PRIVACY : Utilisateurs → export nominatif | Autorisé (A143), motif au journal ; FINANCE : refusé |
 | RGP11 | Sécurité → bascule « Relance par email » désactivée ; recevoir un message et ne pas le lire 20 min | Aucun email de relance ; la notification in-app est là |
 | RGP12 | `seed-deals.ts` puis passer `privacy.recipientRetentionDays` à 7 j et lancer le cron (ou attendre 03:40) | Les deals terminés depuis plus de 7 j ont `recipient` = « — / — / +00000000000 » et `recipientRedactedAt` ; les deals vivants sont intacts |
+
+---
+
+# C-PR8c — voir une panne avant l'utilisateur, fermer proprement, ne rien garder pour rien (D64)
+
+## Le besoin
+Le jalon 2 dit « voir une erreur avant l'utilisateur » et « opérer seul ». Il manquait trois choses : savoir en un coup d'œil si les services et leurs crons vivent, pouvoir fermer la plateforme proprement le temps d'une intervention (sans couper la lecture ni le back-office), et enfin chiffrer ce qu'on garde et combien de temps.
+
+### Règles de gestion (MNT)
+- **RG-MNT-01 — Deux interrupteurs de maintenance.** L'état planifié se règle dans l'admin (profil Exploitation ou super administrateur, motif au journal, email aux super administrateurs) ; l'environnement du gateway l'emporte le jour où la base elle-même est en panne.
+- **RG-MNT-02 — La maintenance est une lecture seule.** Les membres consultent, rien ne s'écrit (réservation, publication, message : refus « réessaie dans quelques minutes ») ; la connexion et le back-office restent ouverts pour pouvoir la lever.
+- **RG-MNT-03 — Une maintenance s'annonce.** Une date d'annonce affiche un bandeau sur les deux fronts avant la coupure, sans rien bloquer.
+- **RG-MNT-04 — Chaque service dit s'il est en forme** : joignable, base et Redis accessibles, version, démarré depuis. Un service qui répond « dégradé » est vivant mais à surveiller.
+- **RG-MNT-05 — Un cron laisse une trace de chaque passage** (quand, combien de temps, ce qu'il a fait, ou l'erreur). Un cron sans battement depuis deux fois son intervalle est signalé « en retard ».
+- **RG-MNT-06 — La page d'état n'est pas une supervision.** Elle répond à « est-ce nous, et où » quand on l'a sous les yeux ; un moniteur externe reste nécessaire avant le lancement pour être prévenu quand personne ne regarde.
+- **RG-MNT-07 — Conservation chiffrée** : notifications in-app 1 an, traces d'emails 1 an, événements consommés 90 jours, événements d'outbox publiés 90 jours (jamais un événement parqué), conversations 1 an (D61), tiers destinataire 30 jours (D63), journal admin jamais. Toutes réglables par le profil Exploitation.
+
+### Recette (MNT)
+| # | Scénario | Attendu |
+|---|---|---|
+| MNT1 | Admin : menu « État des services » | Six cartes vertes (gateway, auth, trip, deal, notification, message) avec Mongo et Redis « ✓ », version, démarré depuis ; outbox et emails 24 h ; relu toutes les 30 s |
+| MNT2 | Arrêter le message-service, attendre 30 s | Sa carte passe rouge « Injoignable », le bandeau du haut liste le service |
+| MNT3 | Couper Redis, attendre 30 s | Les cartes passent ambre « Dégradé » avec « ✗ redis » |
+| MNT4 | Après un passage de cron (ex. relance à H:00 ou H:05) | Ligne dans « Crons — dernier battement » avec la durée et le résumé (« 0 relance(s), 0 échec ») |
+| MNT5 | OPS : annoncer une maintenance pour dans 1 h avec un message FR/EN et un motif | Les deux fronts affichent le bandeau ambre avec la date et le message ; rien n'est bloqué ; Journal « État de maintenance modifié » ; email aux super administrateurs |
+| MNT6 | OPS : activer la lecture seule | Bandeau rouge côté membres ; un membre peut chercher et lire un fil, mais réserver / envoyer un message répond « La plateforme est en maintenance » (503) ; la connexion marche ; l'admin fonctionne |
+| MNT7 | Lever la maintenance | Écritures possibles dans les 10 s, bandeau disparu |
+| MNT8 | `MAINTENANCE_MODE=on` dans l'environnement du gateway, redémarrer le gateway | Lecture seule immédiate, badge « forcée par l'environnement » sur la page d'état, l'admin ne peut pas la lever depuis la page |
+| MNT9 | FINANCE : page « État des services » | Visible ; l'éditeur de maintenance dit « Profil Exploitation ou super administrateur pour modifier » |
+| MNT10 | Paramètres : `retention.notificationsDays` à 30, puis lancer le cron du notification-service (03:50) | Les notifications de plus de 30 jours disparaissent ; les événements d'outbox parqués sont intacts ; battement « retention » avec les trois compteurs |

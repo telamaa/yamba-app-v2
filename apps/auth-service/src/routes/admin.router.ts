@@ -15,6 +15,7 @@ import { acceptAdminInvite, inviteAdmin, listAdmins, revokeAdmin, updateAdminRol
 import { getAdminKpis } from "../controller/admin-kpis.controller";
 import { getSettings, getSettingsHistory, resetSettings, updateSettings } from "../controller/admin-settings.controller"; // C-PR8a (D62)
 import { adminEraseUser, listDataRequests } from "../controller/privacy.controller"; // C-PR8b (D63)
+import { getMaintenance, getStatus, updateMaintenance } from "../controller/admin-status.controller"; // C-PR8c (D64)
 import { getPilotageCorridors, getPilotageDrilldown, getPilotageSeries } from "../controller/admin-pilotage.controller";
 import {
   adminLogin,
@@ -54,6 +55,11 @@ router.get("/admin/settings", isAdminAuthenticated, requireAdminPermission("sett
 router.get("/admin/settings/history", isAdminAuthenticated, requireAdminPermission("settings.read"), getSettingsHistory);
 router.patch("/admin/settings", isAdminAuthenticated, requireAdminPermission("settings.read"), updateSettings);
 router.post("/admin/settings/reset", isAdminAuthenticated, requireAdminPermission("settings.read"), resetSettings);
+
+// C-PR8c (D64) — état des services (tous les profils), maintenance (OPS ou SUPER_ADMIN)
+router.get("/admin/status", isAdminAuthenticated, requireAdminPermission("status.read"), getStatus);
+router.get("/admin/maintenance", isAdminAuthenticated, requireAdminPermission("status.read"), getMaintenance);
+router.put("/admin/maintenance", isAdminAuthenticated, requireAdminPermission("maintenance.write"), updateMaintenance);
 
 // C-PR3 (D56) — comptes du back-office (SUPER_ADMIN)
 router.get("/admin/admins", isAdminAuthenticated, requireAdminPermission("admins.manage"), listAdmins);

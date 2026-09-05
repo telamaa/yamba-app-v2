@@ -31,6 +31,7 @@ export const OUTCOME_LABEL: Record<string, string> = {
 export const ACTION_LABEL: Record<string, string> = {
   SETTING_CHANGED: "Paramètre modifié",
   ACCOUNT_ERASED: "Compte effacé (RGPD)",
+  MAINTENANCE_CHANGED: "État de maintenance modifié",
   DATA_REQUESTS_VIEWED: "Registre RGPD consulté",
   SETTINGS_RESET: "Paramètre réinitialisé",
   ADMIN_LOGIN: "Connexion admin",

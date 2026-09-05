@@ -11,8 +11,10 @@ export const SETTING_GROUP_LABEL: Record<SettingGroup, string> = {
   messaging: "Messagerie",
   alerts: "Alertes d'exploitation",
   documents: "Documents",
+  privacy: "Données personnelles",
+  retention: "Conservation",
 };
-export const SETTING_GROUP_ORDER: SettingGroup[] = ["pricing", "protection", "cancellation", "rating", "dispute", "reputation", "messaging", "alerts", "documents"];
+export const SETTING_GROUP_ORDER: SettingGroup[] = ["pricing", "protection", "cancellation", "rating", "dispute", "reputation", "messaging", "alerts", "documents", "privacy", "retention"];
 
 export function formatSetting(def: Pick<SettingDefinition, "unit">, v: number): string {
   switch (def.unit) {

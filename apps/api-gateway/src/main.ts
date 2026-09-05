@@ -3,6 +3,7 @@ import cors from 'cors';
 import proxy from "express-http-proxy";
 import morgan from "morgan";
 import rateLimit from "express-rate-limit";
+import { currentMaintenance, maintenanceMiddleware, publicMaintenanceHandler } from "./libs/maintenance";
 import cookieParser from "cookie-parser";
 import { randomUUID } from "crypto";
 
@@ -66,9 +67,14 @@ const limiter = rateLimit({
 
 app.use(limiter);
 
-app.get('/gateway-health', (req, res) => {
-  res.send({ message: 'Welcome to api-gateway!' });
+// C-PR8c (D64) — santé du gateway (même forme que les services) et mode maintenance
+app.get('/gateway-health', async (_req, res) => {
+  const state = await currentMaintenance();
+  res.setHeader('Cache-Control', 'no-store');
+  res.status(200).json({ status: 'ok', service: 'api-gateway', version: process.env.APP_VERSION ?? process.env.GIT_SHA ?? 'dev', uptimeSeconds: Math.floor(process.uptime()), checks: { maintenance: { ok: !state.enabled, ms: 0, error: state.enabled ? `maintenance (${state.source})` : null } }, at: new Date().toISOString() });
 });
+app.get('/api/maintenance', publicMaintenanceHandler());
+app.use(maintenanceMiddleware());
 
 // ─── Trip Service (port 6002) ────────────────
 // /api/trips/* → trip-service reçoit /trips/*

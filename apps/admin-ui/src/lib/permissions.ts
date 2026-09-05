@@ -7,7 +7,8 @@ export type AdminPermission =
   | "pilotage.read" | "deals.history.read" | "exports.operational" | "exports.personal"
   | "conversations.read" | "reports.review"
   | "settings.read" | "settings.business.write" | "settings.operations.write"
-  | "privacy.requests.read" | "users.erase";
+  | "privacy.requests.read" | "users.erase"
+  | "status.read" | "maintenance.write";
 
 const MATRIX: Record<AdminPermission, AdminRole[]> = {
   "disputes.read": ["MEDIATOR", "SUPPORT", "FINANCE"],
@@ -41,6 +42,9 @@ const MATRIX: Record<AdminPermission, AdminRole[]> = {
   // C-PR8b (D63 6A)
   "privacy.requests.read": ["PRIVACY"],
   "users.erase": ["PRIVACY"],
+  // C-PR8c (D64)
+  "status.read": ["MEDIATOR", "SUPPORT", "FINANCE", "OPS", "PRIVACY"],
+  "maintenance.write": ["OPS"],
 };
 
 /** C-PR3bis (D60 1A) — profils cumulés : l'UN des profils suffit ; accepte encore un profil seul (anciens écrans). */

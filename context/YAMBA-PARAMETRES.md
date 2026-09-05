@@ -8,7 +8,7 @@
 
 ## Trois classes (D62 2A)
 
-- **A — réglable en ligne** : 41 clés ci-dessous. Portée **métier** = super administrateur seul ; portée **exploitation** = profil Exploitation (OPS) ou super administrateur. Lecture ouverte à tous les profils.
+- **A — réglable en ligne** : 45 clés ci-dessous. Portée **métier** = super administrateur seul ; portée **exploitation** = profil Exploitation (OPS) ou super administrateur. Lecture ouverte à tous les profils.
 - **B — modifiable par déploiement seulement** : les invariants de sécurité (liste en fin de document).
 - **C — prévue, pas encore lue par le code** : nommée au §13 des règles métier, absente de la page tant qu'aucun consommateur n'existe.
 

@@ -20,7 +20,7 @@ import { z } from "zod";
 
 export type SettingScope = "BUSINESS" | "OPERATIONS";
 export type SettingUnit = "percent" | "cents" | "kg" | "coef" | "hours" | "days" | "minutes" | "count" | "rating" | "mb";
-export type SettingGroup = "pricing" | "protection" | "cancellation" | "rating" | "dispute" | "reputation" | "messaging" | "alerts" | "documents" | "privacy";
+export type SettingGroup = "pricing" | "protection" | "cancellation" | "rating" | "dispute" | "reputation" | "messaging" | "alerts" | "documents" | "privacy" | "retention";
 
 export const SETTING_GROUP_LABEL: Record<SettingGroup, string> = {
   pricing: "Prix et commission",
@@ -33,6 +33,7 @@ export const SETTING_GROUP_LABEL: Record<SettingGroup, string> = {
   alerts: "Alertes d'exploitation",
   documents: "Documents",
   privacy: "Données personnelles",
+  retention: "Conservation",
 };
 
 export type SettingDefinition = {
@@ -111,6 +112,11 @@ export const SETTINGS_CATALOG = [
   { key: "documents.maxDocSizeMb", group: "documents", label: "Taille maximale d'un document", description: "Taille maximale (Mo) d'un justificatif de trajet, vérifiée côté serveur.", rule: "ex-SiteConfig", unit: "mb", default: 5, min: 1, max: 25, step: 1, scope: "OPERATIONS", consumers: ["trip-service"] },
   /* ── Données personnelles ── */
   { key: "privacy.recipientRetentionDays", group: "privacy", label: "Effacement du destinataire après", description: "Jours après la fin d'un deal au bout desquels le nom, le téléphone et l'email du destinataire (un tiers sans compte) sont effacés de la réservation. Jamais avant : un litige ou une preuve de remise peut en avoir besoin.", rule: "D63 5A · RGP-02", unit: "days", default: 30, min: 7, max: 365, step: 1, scope: "OPERATIONS", consumers: ["deal-service"] },
+  /* ── Conservation (D64 6A, RGP-01) ── */
+  { key: "retention.notificationsDays", group: "retention", label: "Notifications in-app", description: "Jours après lesquels une notification du tableau de bord est supprimée (lue ou non).", rule: "D64 6A · RGP-01", unit: "days", default: 365, min: 30, max: 1095, step: 1, scope: "OPERATIONS", consumers: ["notification-service"] },
+  { key: "retention.emailDeliveriesDays", group: "retention", label: "Traces d'envoi d'emails", description: "Jours de conservation des traces d'emails (statut, erreur) — jamais le contenu, qui n'est pas stocké.", rule: "D64 6A · RGP-01", unit: "days", default: 365, min: 30, max: 1095, step: 1, scope: "OPERATIONS", consumers: ["notification-service"] },
+  { key: "retention.consumedEventsDays", group: "retention", label: "Registre des événements consommés", description: "Jours de conservation du registre d'idempotence des consumers (dédoublonnage) ; au-delà, un événement rejoué serait retraité.", rule: "D64 6A", unit: "days", default: 90, min: 7, max: 365, step: 1, scope: "OPERATIONS", consumers: ["notification-service"] },
+  { key: "retention.outboxPublishedDays", group: "retention", label: "Événements d'outbox publiés", description: "Jours de conservation des événements déjà publiés sur Redpanda ; un événement jamais publié (parqué) n'est jamais supprimé.", rule: "D64 6A", unit: "days", default: 90, min: 7, max: 365, step: 1, scope: "OPERATIONS", consumers: ["deal-service", "message-service"] },
 ] as const satisfies readonly SettingDefinition[];
 
 export type SettingKey = (typeof SETTINGS_CATALOG)[number]["key"];
@@ -230,7 +236,7 @@ export const SETTINGS_REASON_MIN_LENGTH = 20;
 const SettingDefinitionSchema = z
   .object({
     key: z.string(),
-    group: z.enum(["pricing", "protection", "cancellation", "rating", "dispute", "reputation", "messaging", "alerts", "documents", "privacy"]),
+    group: z.enum(["pricing", "protection", "cancellation", "rating", "dispute", "reputation", "messaging", "alerts", "documents", "privacy", "retention"]),
     label: z.string(),
     description: z.string(),
     rule: z.string(),
