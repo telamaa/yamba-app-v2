@@ -16,7 +16,8 @@ const TILES: Tile[] = [
   { key: "payoutsReversed", label: "Transferts renversés", href: "/finances?kind=REVERSED", tone: "act" },
   { key: "manualRefundProposals", label: "Remboursements proposés", href: "/finances?kind=PROPOSED_REFUNDS", tone: "act" },
   { key: "pendingAdminInvites", label: "Invitations admin en attente", href: "/admins", tone: "act" },
-  { key: "messageReportsOpen", label: "Messages signalés", href: "/reports", tone: "act" },
+  { key: "reportsOpen", label: "Trajets et membres signalés", href: "/reports", tone: "act" }, // D68
+  { key: "messageReportsOpen", label: "Messages signalés", href: "/reports#messages", tone: "act" },
   { key: "activeDeals", label: "Deals en cours", href: "/trips", tone: "info" },
   { key: "publishedTrips", label: "Trajets publiés à venir", href: "/trips?status=PUBLISHED", tone: "info" },
   { key: "hiddenTrips", label: "Trajets masqués", href: "/trips?hidden=1", tone: "info" },

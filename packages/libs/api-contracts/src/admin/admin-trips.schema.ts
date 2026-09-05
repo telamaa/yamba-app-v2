@@ -161,6 +161,8 @@ export const AdminHomeKpisSchema = z
     completedDeals30d: z.number().int().nullable(),
     /** F-PR3 (D61 7A) — messages signalés en attente (reports.review). */
     messageReportsOpen: z.number().int().nullable().optional(),
+    /** D68 3A — trajets et membres signalés en attente (reports.review). */
+    reportsOpen: z.number().int().nullable().optional(),
     generatedAt: z.string().datetime(),
   })
   .meta({ id: "AdminHomeKpis", description: "Operational counters; null = not visible to this profile (D57)" });

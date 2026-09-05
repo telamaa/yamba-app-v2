@@ -79,7 +79,12 @@ export const REPORT_REASON_LABEL: Record<string, string> = {
   SCAM: "Tentative d'arnaque",
   HARASSMENT: "Propos déplacés / harcèlement",
   OTHER: "Autre",
+  // D68 — trajets et membres
+  ILLEGAL_CONTENT: "Contenu illicite",
+  INAPPROPRIATE: "Comportement inapproprié",
+  IMPERSONATION: "Usurpation d'identité",
 };
+export const REPORT_TARGET_LABEL: Record<string, string> = { TRIP: "Trajet", USER: "Membre" };
 export const REPORT_STATUS_LABEL: Record<string, string> = { OPEN: "à traiter", REVIEWED: "traité", DISMISSED: "sans suite" };
 export const CHAT_ROLE_LABEL: Record<string, string> = { SHIPPER: "Expéditeur", CARRIER: "Voyageur", SYSTEM: "Système" };
 

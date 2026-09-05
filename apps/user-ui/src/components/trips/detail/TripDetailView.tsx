@@ -18,6 +18,7 @@ import BookingSummaryCard from "./BookingSummaryCard";
 import BookingMobileBar from "./BookingMobileBar";
 import LocationsCard from "@/components/trips/detail/LocationsCard";
 import { track } from "@/lib/analytics";
+import ReportDialog from "@/components/shared/ReportDialog"; // D68
 
 
 type Props = {
@@ -46,9 +47,10 @@ export default function TripDetailView({ trip }: Props) {
   const showReviews =
     !!trip.tripper.carrier && trip.tripper.carrier.ratingsCount > 0;
 
-  const handleReport = () => {
-    // TODO: ouvrir une modal de signalement (PR future)
-  };
+  // D68 — signaler cette annonce : modale générique (porte de connexion si visiteur)
+  const [reportOpen, setReportOpen] = useState(false);
+  const handleReport = () => setReportOpen(true);
+  const reportTarget = { type: "TRIP" as const, ref: trip.id, label: `${trip.origin?.city ?? "?"} → ${trip.destination?.city ?? "?"}` };
 
   return (
     <div className="mx-auto max-w-7xl px-4 pb-32 pt-4 sm:px-6 sm:pt-6 lg:pb-12">
@@ -125,7 +127,7 @@ export default function TripDetailView({ trip }: Props) {
             </div>
 
             {/* Signaler cette annonce — desktop, sous la card sticky */}
-            <div className="mt-5 flex justify-center">
+            {!isOwner && <div className="mt-5 flex justify-center">
               <button
                 type="button"
                 onClick={handleReport}
@@ -134,13 +136,15 @@ export default function TripDetailView({ trip }: Props) {
                 <Flag size={12} />
                 {t("reportListing")}
               </button>
-            </div>
+            </div>}
           </div>
         </aside>
       </div>
 
+      {reportOpen && <ReportDialog target={reportTarget} onCloseAction={() => setReportOpen(false)} />}
+
       {/* Signaler cette annonce — mobile uniquement, en bas de page */}
-      <div className="mt-8 flex justify-center lg:hidden">
+      {!isOwner && <div className="mt-8 flex justify-center lg:hidden">
         <button
           type="button"
           onClick={handleReport}
@@ -149,7 +153,7 @@ export default function TripDetailView({ trip }: Props) {
           <Flag size={12} />
           {t("reportListing")}
         </button>
-      </div>
+      </div>}
 
       {isOwner ? (
         <div className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-950 lg:hidden">

@@ -194,5 +194,30 @@
       "title": "Your session has expired",
       "subtitle": "For safety, a session closes after one hour without activity (tick “Stay signed in” for 7 days). Sign in again: you stay on this page."
     }
+  },
+  "report": {
+    "title": { "TRIP": "Report this listing", "USER": "Report this profile" },
+    "intro": "Tell us what's wrong. Our team reviews every report; the person concerned will never know who reported them.",
+    "reason": "Reason",
+    "reasons": {
+      "ILLEGAL_CONTENT": "Illegal or prohibited content",
+      "SCAM": "Suspected scam",
+      "INAPPROPRIATE": "Inappropriate behaviour",
+      "IMPERSONATION": "Impersonation",
+      "OTHER": "Other"
+    },
+    "details": "Details (optional)",
+    "detailsPlaceholder": "What you saw, when…",
+    "submit": "Send the report",
+    "sending": "Sending…",
+    "cancel": "Cancel",
+    "back": "Close",
+    "done": "Thank you, your report has been received.",
+    "doneHint": "A confirmation email has been sent. We don't share the outcome.",
+    "already": "You already reported this; our team is on it.",
+    "ownTarget": "You can't report your own content.",
+    "failed": "The report couldn't be sent. Please try again.",
+    "gateTitle": "Sign in to report",
+    "gateSubtitle": "A report is always signed: it protects everyone from abuse."
   }
 }

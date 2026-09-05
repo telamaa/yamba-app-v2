@@ -16,6 +16,7 @@ import { getAdminKpis } from "../controller/admin-kpis.controller";
 import { getSettings, getSettingsHistory, resetSettings, updateSettings } from "../controller/admin-settings.controller"; // C-PR8a (D62)
 import { adminEraseUser, listDataRequests } from "../controller/privacy.controller"; // C-PR8b (D63)
 import { getMaintenance, getStatus, updateMaintenance } from "../controller/admin-status.controller"; // C-PR8c (D64)
+import { makeReportController } from "../controller/report.controller"; // D68
 import { getPilotageCorridors, getPilotageDrilldown, getPilotageSeries } from "../controller/admin-pilotage.controller";
 import {
   adminLogin,
@@ -79,5 +80,9 @@ router.delete("/admin/users/:id/email-suppression", isAdminAuthenticated, requir
 // C-PR8b (D63 6A) — données personnelles : effacement à la demande, registre des demandes
 router.post("/admin/users/:id/erase", isAdminAuthenticated, requireAdminPermission("users.erase"), adminEraseUser);
 router.get("/admin/privacy/requests", isAdminAuthenticated, requireAdminPermission("privacy.requests.read"), listDataRequests);
+// D68 3A — file des trajets et membres signalés (les messages restent dans message-service)
+const reports = makeReportController();
+router.get("/admin/reports", isAdminAuthenticated, requireAdminPermission("reports.review"), reports.adminList);
+router.patch("/admin/reports/:id", isAdminAuthenticated, requireAdminPermission("reports.review"), reports.adminReview);
 
 export default router;

@@ -198,7 +198,7 @@ export type TicketRejectionReason = "ILLEGIBLE" | "DATES_MISMATCH" | "NAME_MISMA
 export type AdminHomeKpis = {
   disputesToDecide: number | null; retentionsHeld: number | null; ticketsToVerify: number | null; hiddenTrips: number | null; hideProposals: number | null;
   suspensionProposals: number | null; restrictedUsers: number | null; suspendedUsers: number | null; publishedTrips: number | null; activeDeals: number | null;
-  payoutsFailed: number | null; payoutsReversed: number | null; manualRefundProposals: number | null; pendingAdminInvites: number | null; usersTotal: number | null; completedDeals30d: number | null; messageReportsOpen?: number | null; generatedAt: string;
+  payoutsFailed: number | null; payoutsReversed: number | null; manualRefundProposals: number | null; pendingAdminInvites: number | null; usersTotal: number | null; completedDeals30d: number | null; messageReportsOpen?: number | null; reportsOpen?: number | null; generatedAt: string;
 };
 
 /* ── C-PR5a (D58) — finances ── */
@@ -283,6 +283,16 @@ export type AdminMessageReportItem = {
   conversationId: string; bookingId: string; corridor: { originCity: string; destinationCity: string };
 };
 export type AdminMessageReportsResponse = { items: AdminMessageReportItem[]; total: number };
+
+/* ── D68 — trajets et membres signalés ── */
+export type ReportTargetType = "TRIP" | "USER";
+export type ReportReason = "ILLEGAL_CONTENT" | "SCAM" | "INAPPROPRIATE" | "IMPERSONATION" | "OTHER";
+export type AdminReportItem = {
+  id: string; targetType: ReportTargetType; targetId: string; targetLabel: string; targetOwner: { id: string; firstName: string } | null;
+  status: MessageReportStatus; reason: ReportReason; details: string | null; createdAt: string;
+  reporter: { id: string; firstName: string }; openCountOnTarget: number; priority: boolean;
+};
+export type AdminReportsResponse = { items: AdminReportItem[]; total: number };
 
 /* ── C-PR8a (D62) — paramètres de la plateforme ── */
 export type SettingScope = "BUSINESS" | "OPERATIONS";

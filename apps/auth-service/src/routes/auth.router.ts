@@ -2,6 +2,7 @@ import express, { Router } from "express";
 import { eraseMyAccount, exportMyData, getMyErasureBlockers, requestSudoCode, updateMyPreferences } from "../controller/privacy.controller"; // C-PR8b (D63)
 import { changeMyPassword, confirmEmailChange, getSudoStatus, listMySessions, requestEmailChange, revokeMyOtherSessions, revokeMySession, verifySudo } from "../controller/account.controller"; // D65
 import { deleteMyAvatar, getMyProfile, setMyAvatar, updateMyProfile } from "../controller/profile.controller"; // D67
+import { makeReportController } from "../controller/report.controller"; // D68
 import {
   cancelRegistration,
   getMe,
@@ -55,6 +56,9 @@ router.get("/auth/me/profile", isAuthenticated, getMyProfile);
 router.patch("/auth/me/profile", isAuthenticated, updateMyProfile);
 router.post("/auth/me/avatar", isAuthenticated, setMyAvatar);
 router.delete("/auth/me/avatar", isAuthenticated, deleteMyAvatar);
+// D68 — signaler un trajet ou un membre (un seul endpoint, SIG-02)
+const reports = makeReportController();
+router.post("/reports", isAuthenticated, reports.createReport);
 
 // ─── Mot de passe oublié ───────────────────────────────
 router.post("/auth/password/forgot", requestPasswordResetOtp);

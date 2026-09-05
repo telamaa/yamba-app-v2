@@ -56,6 +56,8 @@ export type AuthEmailDictionary = {
   verifyNewEmail(p: OtpEmailParams): AuthEmail;
   /** D65 4A — l'ANCIENNE adresse est prévenue, sans lien ni code */
   emailChanged(p: { firstName: string; newEmailMasked: string; supportEmail: string }): AuthEmail;
+  /** D68 2A — accusé de réception d'un signalement : merci, on regarde ; jamais la suite */
+  reportReceived(p: { firstName: string; supportEmail: string }): AuthEmail;
 };
 
 export const AUTH_EMAIL_KEYS = [
@@ -70,6 +72,7 @@ export const AUTH_EMAIL_KEYS = [
   "accountErased",
   "verifyNewEmail",
   "emailChanged",
+  "reportReceived",
 ] as const satisfies ReadonlyArray<keyof AuthEmailDictionary>;
 
 function greet(firstName: string | undefined, fr: boolean): string {
@@ -300,6 +303,20 @@ const fr: AuthEmailDictionary = {
       },
     };
   },
+  reportReceived: ({ firstName, supportEmail }) => ({
+    subject: "Ton signalement a bien été reçu",
+    content: {
+      preheader: "Merci : notre équipe regarde.",
+      title: "Signalement reçu",
+      greeting: greet(firstName, true),
+      paragraphs: [
+        "Merci d'avoir pris le temps de nous signaler ce qui ne va pas. Notre équipe va regarder et prendra les mesures qui s'imposent.",
+        "Pour protéger tout le monde, nous ne communiquons pas la suite donnée à un signalement, et la personne concernée ne saura jamais qui l'a signalée.",
+      ],
+      reason: "Cet email confirme la réception d'un signalement envoyé depuis ton compte Yamba.",
+      help: { label: `Une question ? ${supportEmail}`, url: `mailto:${supportEmail}` },
+    },
+  }),
 };
 
 /* ══ EN ═══════════════════════════════════════════════════════ */
@@ -514,6 +531,20 @@ const en: AuthEmailDictionary = {
       },
     };
   },
+  reportReceived: ({ firstName, supportEmail }) => ({
+    subject: "We received your report",
+    content: {
+      preheader: "Thank you: our team is looking into it.",
+      title: "Report received",
+      greeting: greet(firstName, false),
+      paragraphs: [
+        "Thank you for taking the time to tell us what's wrong. Our team will look into it and take the appropriate action.",
+        "To protect everyone, we don't share the outcome of a report, and the person concerned will never know who reported them.",
+      ],
+      reason: "This email confirms a report sent from your Yamba account.",
+      help: { label: `A question? ${supportEmail}`, url: `mailto:${supportEmail}` },
+    },
+  }),
 };
 
 export const AUTH_EMAILS: Record<SupportedLocale, AuthEmailDictionary> = { fr, en };
