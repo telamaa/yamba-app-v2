@@ -1607,6 +1607,21 @@ Préférence « ne plus me relancer par email » et seuils (15 min / 1 h) régla
 
 ---
 
+# Fix recette messagerie — `fix/messaging-recette-i18n-assets` (#174)
+
+## Ce qui a été fait
+Première recette de la messagerie sur `dev` après le merge de F-PR3 (05/09) : deux pannes qui n'avaient rien à voir l'une avec l'autre, aucune ligne de code métier.
+1. **next-intl refusait tout le namespace `messaging`** (`INVALID_KEY: Namespace keys cannot contain the character "."`) : les trois clés de `messaging.system` (`meetup.proposed`, `meetup.accepted`, `phone.revealed`) contenaient un point, réservé à l'imbrication. Elles sont imbriquées dans les deux JSON (`system.meetup.proposed`…). Le consommateur `ConversationThread` appelle déjà `t(\`system.${systemKey}\`)` : la notation pointée résout l'imbrication, donc aucun changement de code, et les valeurs `systemKey` du serveur restent telles quelles. Le script CI `scripts/check-i18n-messages.mjs` ne vérifie que le parse et le miroir FR/EN : il ne pouvait pas voir l'erreur (next-intl ne valide qu'au rendu).
+2. **Le message-service ne démarrait pas** : `src/assets` n'existait pas (les autres services ont un `.gitkeep` versionné), la cible `build` du `project.json` (`assets: ["./src/assets"]`) échouait en `ENOENT`, Nx sautait le `serve` et le gateway répondait 500 (`AggregateError` ECONNREFUSED) sur `/api/messages/*`. Ajout du `.gitkeep`. La CI n'a rien vu non plus : elle fait `tsc` et `jest`, pas `nx build`.
+
+### Preuves
+`node scripts/check-i18n-messages.mjs` OK · `nx build message-service` OK · 16 checks. Recette : FCH31–FCH32 (DOC-METIER).
+
+### Reste
+Deux angles morts de la CI notés au backlog : un `nx build` des services (le webpack voit les `assets`), et une validation des catalogues par next-intl (`createTranslator` sur chaque namespace).
+
+---
+
 # F-PR3b — `fix/messaging-quick-reply-draft` : la réponse rapide remplit la saisie (A142)
 
 ## Ce qui a été fait

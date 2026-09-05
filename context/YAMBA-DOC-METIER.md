@@ -1430,6 +1430,19 @@ Un message non lu doit finir par atteindre son destinataire même s'il n'a pas l
 
 ---
 
+# Fix recette messagerie (#174)
+
+## Le besoin
+Première recette de la messagerie sur `dev` : la page des messages ne s'ouvrait pas (erreur de catalogue de traductions) et le service ne démarrait pas (dossier manquant au build). Aucune règle métier nouvelle ; deux lignes de recette pour ne plus repartir sans les vérifier.
+
+### Recette (FCH, suite)
+| # | Scénario | Attendu |
+|---|---|---|
+| FCH31 | Après `npm run dev`, ouvrir `/fr/dashboard/messages` puis `/en/dashboard/messages` | La page s'affiche dans les deux langues, aucun `INVALID_KEY` dans la console |
+| FCH32 | Dans le terminal Nx, vérifier la ligne `message-service:build` | ✔ (jamais ✖) et `GET /api/messages/conversations` répond 200 dans le gateway |
+
+---
+
 # F-PR3b — la réponse rapide se relit avant de partir (A142)
 
 ## Le besoin
