@@ -1641,3 +1641,31 @@ Le jalon 2 et le chantier H attendent des chiffres réels : où les visiteurs ab
 | ANA6 | Membre ayant accepté, sur un autre appareil neuf | Pas de bannière : le choix du compte est repris |
 | ANA7 | Serveur avec `POSTHOG_API_KEY` : accepter un deal dont l'Expéditeur a consenti et le Voyageur non | Un seul événement `booking.accepted` (rôle SHIPPER) chez PostHog ; rejouer l'événement outbox ne crée pas de doublon |
 | ANA8 | Sans clé PostHog | Aucune bannière, aucun envoi, aucun log d'erreur |
+
+---
+
+# D67 — le membre tient son profil (chantier E)
+
+## Le besoin
+La page publique d'un membre (D28) est lue par les autres avant de réserver ou d'accepter un deal, mais son propriétaire ne pouvait rien y changer : l'écran « Profil » du tableau de bord était une maquette. Le membre doit pouvoir mettre une photo, corriger son nom, se présenter s'il voyage, et décider ce qu'il montre — sans jamais pouvoir se faire passer pour un autre ni casser les liens vers sa page.
+
+### Règles de gestion (PRO)
+- **RG-PRO-01 — Le membre modifie prénom et nom** (2 à 40 caractères chacun). Son adresse de page (`/u/<slug>`) ne change jamais : les liens partagés restent valides (D28).
+- **RG-PRO-02 — Nom affiché et présentation sont réservés aux Voyageurs** : ils décrivent la page Voyageur (présentation de 300 caractères au plus). Un Expéditeur pur n'a pas ces champs.
+- **RG-PRO-03 — La date de naissance est privée** : jamais affichée, elle doit être passée et donner 16 ans au moins ; elle pré-remplit l'identité Stripe du Voyageur.
+- **RG-PRO-04 — La photo est la sienne** : image de 2 Mo au plus (JPEG, PNG, WebP), hébergée chez Yamba ; une URL étrangère est refusée ; changer ou retirer la photo supprime l'ancien fichier ; l'effacement RGPD la supprime aussi.
+- **RG-PRO-05 — Page masquée** : le membre peut rendre sa page invisible ; les autres reçoivent « page introuvable », lui la voit avec la mention « masquée ». Ses trajets publiés restent visibles avec son prénom — masquer sa page n'est pas se cacher d'un deal.
+- **RG-PRO-06 — Ville facultative** : le membre choisit d'afficher ou non sa ville sur sa page.
+- **RG-PRO-07 — Le membre voit ce que les autres voient** : « Voir mon profil public » ouvre sa page telle qu'elle est servie.
+
+### Recette (PRO)
+| # | Scénario | Attendu |
+|---|---|---|
+| PRO1 | Tableau de bord › Profil, Expéditeur pur | Avatar (initiale), prénom, nom, date de naissance, deux bascules ; pas de « nom affiché » ni de « présentation » |
+| PRO2 | Même écran, Voyageur avec page | Champs « nom affiché » et « présentation » (compteur /300) en plus, bouton « Voir mon profil public » |
+| PRO3 | Prénom « A » puis Enregistrer | Erreur sous le champ, rien n'est écrit |
+| PRO4 | Date de naissance il y a 12 ans | « Il faut avoir 16 ans au moins », rien n'est écrit |
+| PRO5 | Ajouter une photo de 3 Mo | « Photo trop lourde », aucune requête serveur ; une photo de 500 Ko → avatar affiché ici, sur la page publique et dans le header |
+| PRO6 | Changer la photo puis la retirer | L'ancien fichier n'existe plus chez ImageKit ; l'initiale revient |
+| PRO7 | Désactiver « Page publique », ouvrir `/u/<slug>` depuis un autre compte et depuis le sien | Autre compte : « page introuvable » (404) ; soi-même : page avec la mention « masquée » ; un trajet publié reste ouvrable |
+| PRO8 | Désactiver « Afficher ma ville » | La ville disparaît de la page publique ; réactiver la remet |

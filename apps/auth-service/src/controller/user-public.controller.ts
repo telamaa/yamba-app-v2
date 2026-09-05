@@ -196,7 +196,8 @@ export const getUserPublic: RequestHandler = async (
       },
     });
 
-    if (!user || user.isDeleted) {
+    // D67 1A — profil masqué : 404 pour tout le monde sauf le propriétaire (qui le voit marqué « masqué »)
+    if (!user || user.isDeleted || (user.profilePublic === false && currentUserId !== user.id)) {
       res.status(404).json({ success: false, message: "User not found." });
       return;
     }
@@ -327,10 +328,12 @@ export const getUserPublic: RequestHandler = async (
       avatarUrl: user.avatar?.url ?? null,
       memberSince: user.createdAt,
 
+      isMe: currentUserId === user.id,
+      hidden: user.profilePublic === false, // D67 — seul le propriétaire arrive ici avec hidden=true
       location: {
-        city: primaryAddress?.city ?? null,
-        country: primaryAddress?.country ?? null,
-        countryCode: primaryAddress?.countryCode ?? null,
+        city: user.showCity === false ? null : primaryAddress?.city ?? null,
+        country: user.showCity === false ? null : primaryAddress?.country ?? null,
+        countryCode: user.showCity === false ? null : primaryAddress?.countryCode ?? null,
       },
 
       stats: {
@@ -432,10 +435,10 @@ export const listUserPublicReviews: RequestHandler = async (req, res, next) => {
 
     const user = await prisma.user.findUnique({
       where: { publicSlug: slug },
-      select: { id: true, isDeleted: true },
+      select: { id: true, isDeleted: true, profilePublic: true },
     });
 
-    if (!user || user.isDeleted) {
+    if (!user || user.isDeleted || (user.profilePublic === false && (req as { user?: { id?: string } }).user?.id !== user.id)) { // D67 1A
       res.status(404).json({ success: false, message: "User not found." });
       return;
     }
@@ -491,10 +494,10 @@ export const listUserPublicTrips: RequestHandler = async (req, res, next) => {
 
     const user = await prisma.user.findUnique({
       where: { publicSlug: slug },
-      select: { id: true, isDeleted: true, carrierStatus: true },
+      select: { id: true, isDeleted: true, carrierStatus: true, profilePublic: true },
     });
 
-    if (!user || user.isDeleted) {
+    if (!user || user.isDeleted || (user.profilePublic === false && (req as { user?: { id?: string } }).user?.id !== user.id)) { // D67 1A
       res.status(404).json({ success: false, message: "User not found." });
       return;
     }
@@ -568,7 +571,7 @@ export const followUser = async (
 
     const followed = await prisma.user.findUnique({
       where: { publicSlug: slug },
-      select: { id: true, isDeleted: true },
+      select: { id: true, isDeleted: true, profilePublic: true },
     });
     console.log(`[${ts()}] [followUser] 👤 followed user:`, followed);
 
