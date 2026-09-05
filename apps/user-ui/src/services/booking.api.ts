@@ -22,6 +22,8 @@ import type {
   PriceBreakdown,
   TripContext,
 } from "@/components/booking/booking.types";
+import type { PricingParams } from "@packages/pricing";
+import { fetchPricingParams } from "@/hooks/usePricingParams";
 
 const KIND_TO_API: Record<string, "AIRPORT" | "TRAIN_STATION" | "CITY_AREA"> = {
   AIRPORT: "AIRPORT",
@@ -69,8 +71,8 @@ function placeOf(options: TripContext["pickupOptions"], id: string | null) {
   return p ? { kind: KIND_TO_API[p.kind] ?? "CITY_AREA", details: p.subLabel ?? null } : null;
 }
 
-export async function createPaymentIntent(draft: Draft, trip: TripContext): Promise<PaymentIntentInfo> {
-  const price = computeTotal(draft, trip);
+export async function createPaymentIntent(draft: Draft, trip: TripContext, params?: PricingParams): Promise<PaymentIntentInfo> {
+  const price = computeTotal(draft, trip, params ?? (await fetchPricingParams().catch(() => undefined))); // D62 7A — le total attendu suit les paramètres du serveur
   try {
     const res = await axiosInstance.post<PaymentIntentInfo>("/deals/payment-intents", quoteFields(draft, trip, price));
     return res.data;
@@ -83,9 +85,10 @@ export async function createDeal(
   draft: Draft,
   trip: TripContext,
   paymentIntentId: string,
-  photoUrls: string[] = []
+  photoUrls: string[] = [],
+  params?: PricingParams
 ): Promise<CreateDealResponse> {
-  const price = computeTotal(draft, trip);
+  const price = computeTotal(draft, trip, params ?? (await fetchPricingParams().catch(() => undefined)));
   const phoneE164 = recipientPhoneE164(draft);
   if (!phoneE164) throw new BookingApiError("GENERIC", 0, "Invalid recipient phone");
   const body = {
@@ -117,6 +120,6 @@ export async function createDeal(
 }
 
 /** Devis pour le récap — pur, même moteur que le serveur (D34). */
-export function computePrice(draft: Draft, trip: TripContext): PriceBreakdown {
-  return computeTotal(draft, trip);
+export function computePrice(draft: Draft, trip: TripContext, params?: PricingParams): PriceBreakdown {
+  return computeTotal(draft, trip, params);
 }

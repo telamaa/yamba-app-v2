@@ -56,13 +56,16 @@ export const ADMIN_ACTIONS = [
   // F-PR3 (D61 7A)
   "CONVERSATION_VIEWED",
   "MESSAGE_REPORT_REVIEWED",
+  // C-PR8a (D62 5A) — une ligne PAR clé : before / after = { key, before, after, reason, version }
+  "SETTING_CHANGED",
+  "SETTINGS_RESET",
 ] as const;
 export type AdminActionType = (typeof ADMIN_ACTIONS)[number];
 
 export type AdminActionInput = {
   adminUserId: string;
   action: AdminActionType | (string & {});
-  targetType: "USER" | "BOOKING" | "DISPUTE" | "SESSION" | "TRIP" | (string & {});
+  targetType: "USER" | "BOOKING" | "DISPUTE" | "SESSION" | "TRIP" | "SETTINGS" | (string & {});
   targetId?: string | null;
   before?: unknown;
   after?: unknown;

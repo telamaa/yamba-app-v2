@@ -17,13 +17,14 @@
  */
 
 import prisma from "@packages/libs/prisma";
-import { REPUTATION_PARAMS, type ReputationLevel } from "@packages/api-contracts";
+import { REPUTATION_PARAMS, reputationParamsFromSettings, type ReputationLevel, type ReputationParams } from "@packages/api-contracts";
+import { platformSettings } from "@packages/libs/settings/default";
 
 export type ReputationFacts = { ratingsAvg: number; ratingsCount: number; completedDealsCount: number; lateCancellationsCount: number };
 
 /** Pur : les faits → le niveau (critères REP-03, seuils = paramètres serveur). */
-export function computeReputationLevel(role: "CARRIER" | "SHIPPER", f: ReputationFacts): ReputationLevel {
-  const p = REPUTATION_PARAMS[role === "CARRIER" ? "carrier" : "shipper"];
+export function computeReputationLevel(role: "CARRIER" | "SHIPPER", f: ReputationFacts, params: ReputationParams = REPUTATION_PARAMS): ReputationLevel {
+  const p = params[role === "CARRIER" ? "carrier" : "shipper"];
   if (f.completedDealsCount >= p.topMinDeals && f.ratingsCount > 0 && f.ratingsAvg >= p.topMinRating && f.lateCancellationsCount <= p.topMaxLateCancellations) {
     return "TOP";
   }
@@ -61,7 +62,7 @@ export async function recomputeReputation(userId: string, role: "CARRIER" | "SHI
     const page = await prisma.carrierPage.findUnique({ where: { userId }, select: { id: true } });
     if (!page) return null; // pas de page Voyageur : rien à afficher
     const f = await carrierFacts(userId);
-    const level = computeReputationLevel("CARRIER", f);
+    const level = computeReputationLevel("CARRIER", f, reputationParamsFromSettings(await platformSettings().get())); // D62
     await prisma.carrierPage.update({
       where: { userId },
       data: {
@@ -76,7 +77,7 @@ export async function recomputeReputation(userId: string, role: "CARRIER" | "SHI
     return level;
   }
   const f = await shipperFacts(userId);
-  const level = computeReputationLevel("SHIPPER", f);
+  const level = computeReputationLevel("SHIPPER", f, reputationParamsFromSettings(await platformSettings().get())); // D62
   await prisma.user.update({
     where: { id: userId },
     data: {

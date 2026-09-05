@@ -26,15 +26,19 @@ export type ReminderVerdict =
 
 const MIN = 60_000;
 
-export function unreadReminderDue(input: ReminderInput, now: Date): ReminderVerdict {
+export type ReminderParams = { delayMinutes: number; minIntervalMinutes: number };
+export const DEFAULT_REMINDER_PARAMS: ReminderParams = { delayMinutes: UNREAD_REMINDER_DELAY_MINUTES, minIntervalMinutes: UNREAD_REMINDER_MIN_INTERVAL_MINUTES };
+
+/** `p` : paramètres `messaging.reminderDelayMinutes` / `reminderMinIntervalMinutes` (D62). */
+export function unreadReminderDue(input: ReminderInput, now: Date, p: ReminderParams = DEFAULT_REMINDER_PARAMS): ReminderVerdict {
   if (!input.lastMessageAt) return { due: false, reason: "NO_MESSAGE" };
   const counterpart: ReminderRole = input.recipientRole === "SHIPPER" ? "CARRIER" : "SHIPPER";
   if (input.lastMessageAuthorRole !== counterpart) return { due: false, reason: "NOT_FROM_COUNTERPART" };
-  if (input.lastMessageAt.getTime() > now.getTime() - UNREAD_REMINDER_DELAY_MINUTES * MIN) return { due: false, reason: "TOO_RECENT" };
+  if (input.lastMessageAt.getTime() > now.getTime() - p.delayMinutes * MIN) return { due: false, reason: "TOO_RECENT" };
   if (input.recipientLastReadAt && input.recipientLastReadAt.getTime() >= input.lastMessageAt.getTime()) return { due: false, reason: "ALREADY_READ" };
   if (input.recipientRemindedAt) {
     if (input.recipientRemindedAt.getTime() >= input.lastMessageAt.getTime()) return { due: false, reason: "ALREADY_REMINDED" };
-    if (input.recipientRemindedAt.getTime() > now.getTime() - UNREAD_REMINDER_MIN_INTERVAL_MINUTES * MIN) return { due: false, reason: "RATE_LIMITED" };
+    if (input.recipientRemindedAt.getTime() > now.getTime() - p.minIntervalMinutes * MIN) return { due: false, reason: "RATE_LIMITED" };
   }
   return { due: true, reason: null };
 }

@@ -13,6 +13,7 @@ import { makeAdminUsersController } from "../controller/admin-users.controller";
 import { makeAdminUsersService } from "../services/admin-users.service";
 import { acceptAdminInvite, inviteAdmin, listAdmins, revokeAdmin, updateAdminRole } from "../controller/admin-admins.controller";
 import { getAdminKpis } from "../controller/admin-kpis.controller";
+import { getSettings, getSettingsHistory, resetSettings, updateSettings } from "../controller/admin-settings.controller"; // C-PR8a (D62)
 import { getPilotageCorridors, getPilotageDrilldown, getPilotageSeries } from "../controller/admin-pilotage.controller";
 import {
   adminLogin,
@@ -46,6 +47,12 @@ router.get("/admin/pilotage/corridors", isAdminAuthenticated, requireAdminPermis
 router.get("/admin/pilotage/drilldown", isAdminAuthenticated, requireAdminPermission("pilotage.read"), getPilotageDrilldown); // C-PR6c (D60 3A)
 router.delete("/admin/me/sessions/:jti", isAdminAuthenticated, revokeAdminSessionById);
 router.get("/admin/audit", isAdminAuthenticated, requireAdminPermission("audit.read"), listAdminAudit);
+
+// C-PR8a (D62) — paramètres : lecture pour tous les profils, écriture bornée par portée DANS le service (une requête peut mêler métier et exploitation).
+router.get("/admin/settings", isAdminAuthenticated, requireAdminPermission("settings.read"), getSettings);
+router.get("/admin/settings/history", isAdminAuthenticated, requireAdminPermission("settings.read"), getSettingsHistory);
+router.patch("/admin/settings", isAdminAuthenticated, requireAdminPermission("settings.read"), updateSettings);
+router.post("/admin/settings/reset", isAdminAuthenticated, requireAdminPermission("settings.read"), resetSettings);
 
 // C-PR3 (D56) — comptes du back-office (SUPER_ADMIN)
 router.get("/admin/admins", isAdminAuthenticated, requireAdminPermission("admins.manage"), listAdmins);

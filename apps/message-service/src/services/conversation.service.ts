@@ -32,6 +32,8 @@ import { conversationAccess, conversationExists, counterpartIdOf, roleOf } from 
 import { detectContactInfo, normalizeBody, sixDigitCandidates } from "../lib/message-guard.rules";
 import { canAcceptMeetup, nextMeetupOf, validateMeetupSlot } from "../lib/meetup.rules";
 import { phoneRevealWindow } from "../lib/phone-reveal.rules";
+import { platformSettings } from "@packages/libs/settings/default";
+import type { SettingsReader } from "@packages/libs/settings";
 import { canReportMessage } from "../lib/message-report.rules";
 
 export const MESSAGES_PAGE_SIZE = 50;
@@ -124,7 +126,7 @@ function envelopeFor(conversationId: string, now: Date) {
   return { aggregateType: "conversation" as const, aggregateId: conversationId, occurredAt: now.toISOString(), correlationId: null, schemaVersion: 1 as const };
 }
 
-export function makeConversationService(clock: () => Date = () => new Date()) {
+export function makeConversationService(clock: () => Date = () => new Date(), settings: SettingsReader = platformSettings()) {
   /** Charge le deal, la conversation (créée à la demande) et le rôle de l'appelant. */
   async function loadContext(userId: string, by: { bookingId?: string; conversationId?: string }) {
     let bookingId = by.bookingId ?? null;
@@ -151,7 +153,7 @@ export function makeConversationService(clock: () => Date = () => new Date()) {
           select: { id: true, bookingId: true, shipperLastReadAt: true, carrierLastReadAt: true },
         }));
     }
-    return { booking, conversation, role, access: conversationAccess(booking, clock()) };
+    return { booking, conversation, role, access: conversationAccess(booking, clock(), (await settings.get())["messaging.writeDaysAfterEnd"]) };
   }
 
   /**
@@ -236,6 +238,7 @@ export function makeConversationService(clock: () => Date = () => new Date()) {
         })
       );
 
+      const writeDays = (await settings.get())["messaging.writeDaysAfterEnd"]; // D62
       const items: ConversationSummary[] = [];
       rows.forEach((r, i) => {
         const booking = bookingBy.get(r.bookingId);
@@ -255,7 +258,7 @@ export function makeConversationService(clock: () => Date = () => new Date()) {
           lastMessage: last ? { body: last.body.slice(0, 140), authorRole: last.authorRole as MessageDto["authorRole"], createdAt: last.createdAt.toISOString() } : null,
           unreadCount: unreadCounts[i],
           nextMeetup: next ? toMeetupDto(next) : null,
-          access: conversationAccess(booking, now),
+          access: conversationAccess(booking, now, writeDays),
         });
       });
       return { items, totalUnread: items.reduce((a, i) => a + i.unreadCount, 0) };
@@ -280,7 +283,7 @@ export function makeConversationService(clock: () => Date = () => new Date()) {
       const page = hasMore ? rawMessages.slice(0, MESSAGES_PAGE_SIZE) : rawMessages;
       const meetups = meetupRows as unknown as MeetupRow[];
       const acceptedPickup = meetups.find((m) => m.kind === "PICKUP" && m.status === "ACCEPTED") ?? null;
-      const window = phoneRevealWindow({ pickupStartAt: acceptedPickup?.startAt ?? null, departureAt: booking.trip.departureAt }, now);
+      const window = phoneRevealWindow({ pickupStartAt: acceptedPickup?.startAt ?? null, departureAt: booking.trip.departureAt }, now, (await settings.get())["messaging.phoneRevealLeadHours"]);
       const next = nextMeetupOf(meetups, now);
 
       return {
@@ -440,7 +443,7 @@ export function makeConversationService(clock: () => Date = () => new Date()) {
       const now = clock();
       const { booking, conversation, role } = await loadContext(userId, { conversationId });
       const meetups = (await prisma.meetup.findMany({ where: { conversationId: conversation.id, kind: "PICKUP", status: "ACCEPTED" } })) as unknown as MeetupRow[];
-      const window = phoneRevealWindow({ pickupStartAt: meetups[0]?.startAt ?? null, departureAt: booking.trip.departureAt }, now);
+      const window = phoneRevealWindow({ pickupStartAt: meetups[0]?.startAt ?? null, departureAt: booking.trip.departureAt }, now, (await settings.get())["messaging.phoneRevealLeadHours"]);
       if (!window.allowed) {
         throw new ValidationError(
           window.reason === "TOO_EARLY" ? `The phone number opens ${window.opensAt?.toISOString() ?? "later"}.` : "No meeting or departure date to open the phone number.",

@@ -9,7 +9,8 @@
  */
 import prisma from "@packages/libs/prisma";
 import { sendTransactionalEmail } from "@packages/email";
-import { UNREAD_REMINDER_DELAY_MINUTES } from "@packages/api-contracts";
+import { platformSettings } from "@packages/libs/settings/default";
+import type { SettingsReader } from "@packages/libs/settings";
 import { unreadReminderDue, type ReminderRole } from "../lib/unread-reminder.rules";
 import { messagingEmailsFor } from "../emails/messaging-emails";
 
@@ -34,9 +35,10 @@ type ConversationRow = {
 
 export type UnreadReminderService = ReturnType<typeof makeUnreadReminderService>;
 
-export function makeUnreadReminderService(deps: { send?: typeof sendTransactionalEmail; clock?: () => Date } = {}) {
+export function makeUnreadReminderService(deps: { send?: typeof sendTransactionalEmail; clock?: () => Date; settings?: SettingsReader } = {}) {
   const send = deps.send ?? sendTransactionalEmail;
   const clock = deps.clock ?? (() => new Date());
+  const settings = deps.settings ?? platformSettings();
 
   /** Réclame la relance : ne gagne que si `<role>RemindedAt` vaut encore ce qu'on a lu. */
   async function claim(conversation: ConversationRow, role: ReminderRole, now: Date): Promise<boolean> {
@@ -69,8 +71,11 @@ export function makeUnreadReminderService(deps: { send?: typeof sendTransactiona
   return {
     /** Un passage : renvoie le nombre de relances envoyées. Les erreurs d'envoi ne bloquent pas les autres fils. */
     async runOnce(now: Date = clock()): Promise<{ scanned: number; sent: number; failed: number }> {
+      // D62 — délais lus dans les paramètres (défauts = les anciennes constantes).
+      const v = await settings.get();
+      const params = { delayMinutes: v["messaging.reminderDelayMinutes"], minIntervalMinutes: v["messaging.reminderMinIntervalMinutes"] };
       const rows = (await prisma.conversation.findMany({
-        where: { lastMessageAt: { lte: new Date(now.getTime() - UNREAD_REMINDER_DELAY_MINUTES * MIN), gte: new Date(now.getTime() - SCAN_WINDOW_DAYS * DAY) } },
+        where: { lastMessageAt: { lte: new Date(now.getTime() - params.delayMinutes * MIN), gte: new Date(now.getTime() - SCAN_WINDOW_DAYS * DAY) } },
         orderBy: { lastMessageAt: "asc" },
         take: BATCH,
       })) as ConversationRow[];
@@ -86,7 +91,8 @@ export function makeUnreadReminderService(deps: { send?: typeof sendTransactiona
               recipientLastReadAt: role === "SHIPPER" ? conversation.shipperLastReadAt : conversation.carrierLastReadAt,
               recipientRemindedAt: role === "SHIPPER" ? conversation.shipperRemindedAt : conversation.carrierRemindedAt,
             },
-            now
+            now,
+            params
           );
           if (!verdict.due) continue;
           if (!(await claim(conversation, role, now))) continue;

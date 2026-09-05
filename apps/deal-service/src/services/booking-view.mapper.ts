@@ -13,10 +13,18 @@ import {
 } from "./booking-state-machine";
 import {
   computeCancellationRefundCents,
-  CANCEL_FULL_REFUND_UNTIL_HOURS,
-  CANCEL_LATE_RETENTION_PCT,
+  DEFAULT_CANCELLATION_PARAMS,
+  cancellationParamsFromSettings,
+  type CancellationParams,
 } from "./booking-lifecycle";
-import { DISPUTE_RESPONSE_DELAY_HOURS, type DisputeResolutionView, type RetentionDecisionView } from "@packages/api-contracts";
+import { DISPUTE_RESPONSE_DELAY_HOURS, type DisputeResolutionView, type PlatformSettingsValues, type RetentionDecisionView } from "@packages/api-contracts";
+
+/** D62 — ce que les vues lisent dans les paramètres (défauts = les anciennes constantes). */
+export type ViewParams = { cancellation: CancellationParams; disputeResponseDelayHours: number };
+export const DEFAULT_VIEW_PARAMS: ViewParams = { cancellation: DEFAULT_CANCELLATION_PARAMS, disputeResponseDelayHours: DISPUTE_RESPONSE_DELAY_HOURS };
+export function viewParamsFromSettings(v: PlatformSettingsValues): ViewParams {
+  return { cancellation: cancellationParamsFromSettings(v), disputeResponseDelayHours: v["dispute.responseDelayHours"] };
+}
 
 /**
  * booking-view.mapper.ts
@@ -308,7 +316,8 @@ const toMilestones = (b: BookingRecord) => ({
 const toCancellationPreview = (
   b: BookingRecord,
   allowed: readonly string[],
-  now: Date
+  now: Date,
+  params: CancellationParams = DEFAULT_CANCELLATION_PARAMS
 ): ShipperBookingView["cancellationPreview"] => {
   if (!allowed.includes("cancel")) return null;
   const total = b.pricing.totalShipperCents;
@@ -318,14 +327,15 @@ const toCancellationPreview = (
         totalShipperCents: total,
         departureAt: b.trip.departureAt,
         now,
+        params,
       })
       : total;
   return {
     refundCents,
     retentionCents: total - refundCents,
-    retentionPct: CANCEL_LATE_RETENTION_PCT,
+    retentionPct: params.lateRetentionPct,
     fullRefundUntil: new Date(
-      b.trip.departureAt.getTime() - CANCEL_FULL_REFUND_UNTIL_HOURS * 3_600_000
+      b.trip.departureAt.getTime() - params.fullRefundUntilHours * 3_600_000
     ).toISOString(),
     currencyCode: b.pricing.currencyCode,
   };
@@ -344,7 +354,8 @@ export function toShipperBookingView(
   carrier: CounterpartRecord,
   now: Date = new Date(),
   deliveryCode: string | null = null,
-  dispute: DisputeRecord | null = null
+  dispute: DisputeRecord | null = null,
+  params: ViewParams = DEFAULT_VIEW_PARAMS
 ): ShipperBookingView {
   const allowedActions = getAllowedActions(
     { ...booking, departureAt: booking.trip.departureAt } as Parameters<typeof getAllowedActions>[0],
@@ -399,7 +410,7 @@ export function toShipperBookingView(
     trackingEvents: toTrackingEvents(booking.trackingEvents),
 
     allowedActions,
-    cancellationPreview: toCancellationPreview(booking, allowedActions, now),
+    cancellationPreview: toCancellationPreview(booking, allowedActions, now, params.cancellation),
 
     // A83 — le sort de l'argent de l'Expéditeur (Finances) ; jamais servi au Voyageur (A13).
     capturedAt: toIso(booking.capturedAt ?? null),
@@ -442,7 +453,8 @@ export function toCarrierBookingView(
   booking: BookingRecord,
   shipper: CounterpartRecord,
   dispute: DisputeRecord | null = null,
-  now: Date = new Date()
+  now: Date = new Date(),
+  params: ViewParams = DEFAULT_VIEW_PARAMS
 ): CarrierBookingView {
   return {
     id: booking.id,
@@ -504,7 +516,7 @@ export function toCarrierBookingView(
             category: dispute.category as NonNullable<CarrierBookingView["dispute"]>["category"],
             disputedAt: toIsoRequired(booking.disputedAt),
             canRespond: booking.status === "DISPUTED" && !dispute.carrierRespondedAt && !dispute.resolvedAt,
-            responseDeadlineAt: new Date(booking.disputedAt.getTime() + DISPUTE_RESPONSE_DELAY_HOURS * 3_600_000).toISOString(),
+            responseDeadlineAt: new Date(booking.disputedAt.getTime() + params.disputeResponseDelayHours * 3_600_000).toISOString(),
             respondedAt: toIso(dispute.carrierRespondedAt ?? null),
             resolution: toDisputeResolution(dispute),
           }
@@ -519,9 +531,10 @@ export function toBookingView(
   role: BookingViewerRole,
   counterpart: CounterpartRecord,
   deliveryCode: string | null = null,
-  dispute: DisputeRecord | null = null
+  dispute: DisputeRecord | null = null,
+  params: ViewParams = DEFAULT_VIEW_PARAMS
 ): ShipperBookingView | CarrierBookingView {
   return role === "SHIPPER"
-    ? toShipperBookingView(booking, counterpart, new Date(), deliveryCode, dispute)
-    : toCarrierBookingView(booking, counterpart, dispute);
+    ? toShipperBookingView(booking, counterpart, new Date(), deliveryCode, dispute, params)
+    : toCarrierBookingView(booking, counterpart, dispute, new Date(), params);
 }

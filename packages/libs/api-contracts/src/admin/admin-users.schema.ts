@@ -5,7 +5,8 @@
 import { z } from "zod";
 import { ObjectIdSchema } from "../common";
 
-export const AdminRoleSchema = z.enum(["SUPER_ADMIN", "MEDIATOR", "SUPPORT", "FINANCE"]).meta({ id: "AdminRole" });
+/** C-PR8a (D62 3A) — OPS : exploitation technique (paramètres d'exploitation, état des services, maintenance), jamais l'argent ni les comptes. */
+export const AdminRoleSchema = z.enum(["SUPER_ADMIN", "MEDIATOR", "SUPPORT", "FINANCE", "OPS"]).meta({ id: "AdminRole" });
 export type AdminRole = z.infer<typeof AdminRoleSchema>;
 
 export const AccountStatusSchema = z.enum(["ACTIVE", "RESTRICTED", "SUSPENDED"]).meta({ id: "AccountStatus" });
@@ -25,7 +26,7 @@ export const ADMIN_PERMISSIONS = {
   "tickets.review": ["SUPPORT", "MEDIATOR"],
   "trips.hide.propose": ["SUPPORT", "MEDIATOR"],
   "trips.hide.apply": ["MEDIATOR"],
-  "kpi.read": ["MEDIATOR", "SUPPORT", "FINANCE"],
+  "kpi.read": ["MEDIATOR", "SUPPORT", "FINANCE", "OPS"],
   // C-PR5 (D58 6A)
   "finances.read": ["FINANCE", "MEDIATOR"],
   "payouts.retry": ["FINANCE", "MEDIATOR"],
@@ -43,6 +44,10 @@ export const ADMIN_PERMISSIONS = {
   // F-PR3 (D61 7A) — lire une conversation depuis un dossier (journalisé), traiter un message signalé. FINANCE n'a rien à y lire.
   "conversations.read": ["MEDIATOR", "SUPPORT"],
   "reports.review": ["MEDIATOR", "SUPPORT"],
+  // C-PR8a (D62 3A) — paramètres : lecture ouverte à tous les profils ; portée métier SUPER_ADMIN seul ; portée exploitation OPS.
+  "settings.read": ["MEDIATOR", "SUPPORT", "FINANCE", "OPS"],
+  "settings.business.write": [],
+  "settings.operations.write": ["OPS"],
 } as const;
 export type AdminPermission = keyof typeof ADMIN_PERMISSIONS;
 
@@ -53,11 +58,11 @@ export function adminRoleAllows(role: AdminRole | null | undefined, permission: 
 }
 
 /* ── C-PR3bis (D60 1A) — profils CUMULÉS : l'union des permissions ── */
-export const ADMIN_ROLES_ORDER: readonly AdminRole[] = ["SUPER_ADMIN", "MEDIATOR", "SUPPORT", "FINANCE"];
+export const ADMIN_ROLES_ORDER: readonly AdminRole[] = ["SUPER_ADMIN", "MEDIATOR", "SUPPORT", "FINANCE", "OPS"];
 export const AdminRolesSchema = z
   .array(AdminRoleSchema)
   .min(1)
-  .max(4)
+  .max(5)
   .meta({ id: "AdminRoles", description: "Profils cumulés d'un compte admin (au moins un) — l'union des permissions ; normalisés côté serveur (ordre canonique, doublons ignorés)" });
 /** Ordre canonique, doublons ignorés (un `transform` Zod ne se représente pas en OpenAPI : on normalise en code). */
 export function normalizeAdminRoles(roles: readonly AdminRole[]): AdminRole[] {

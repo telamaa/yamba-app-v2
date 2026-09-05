@@ -1,11 +1,12 @@
 /** Miroir de ADMIN_PERMISSIONS (packages/libs/api-contracts/src/admin/admin-users.schema.ts) — SUPER_ADMIN passe partout. */
-export type AdminRole = "SUPER_ADMIN" | "MEDIATOR" | "SUPPORT" | "FINANCE";
+export type AdminRole = "SUPER_ADMIN" | "MEDIATOR" | "SUPPORT" | "FINANCE" | "OPS";
 export type AdminPermission =
   | "disputes.read" | "disputes.decide" | "users.read" | "users.suspension.propose" | "users.suspension.apply" | "audit.read" | "admins.manage"
   | "trips.read" | "tickets.review" | "trips.hide.propose" | "trips.hide.apply" | "kpi.read"
   | "finances.read" | "payouts.retry" | "payouts.resolve" | "finances.export" | "refunds.manual.propose" | "refunds.manual.apply"
   | "pilotage.read" | "deals.history.read" | "exports.operational" | "exports.personal"
-  | "conversations.read" | "reports.review";
+  | "conversations.read" | "reports.review"
+  | "settings.read" | "settings.business.write" | "settings.operations.write";
 
 const MATRIX: Record<AdminPermission, AdminRole[]> = {
   "disputes.read": ["MEDIATOR", "SUPPORT", "FINANCE"],
@@ -19,7 +20,7 @@ const MATRIX: Record<AdminPermission, AdminRole[]> = {
   "tickets.review": ["SUPPORT", "MEDIATOR"],
   "trips.hide.propose": ["SUPPORT", "MEDIATOR"],
   "trips.hide.apply": ["MEDIATOR"],
-  "kpi.read": ["MEDIATOR", "SUPPORT", "FINANCE"],
+  "kpi.read": ["MEDIATOR", "SUPPORT", "FINANCE", "OPS"],
   "finances.read": ["FINANCE", "MEDIATOR"],
   "payouts.retry": ["FINANCE", "MEDIATOR"],
   "payouts.resolve": ["FINANCE", "MEDIATOR"],
@@ -32,6 +33,10 @@ const MATRIX: Record<AdminPermission, AdminRole[]> = {
   "exports.personal": [],
   "conversations.read": ["MEDIATOR", "SUPPORT"],
   "reports.review": ["MEDIATOR", "SUPPORT"],
+  // C-PR8a (D62 3A)
+  "settings.read": ["MEDIATOR", "SUPPORT", "FINANCE", "OPS"],
+  "settings.business.write": [],
+  "settings.operations.write": ["OPS"],
 };
 
 /** C-PR3bis (D60 1A) — profils cumulés : l'UN des profils suffit ; accepte encore un profil seul (anciens écrans). */
@@ -40,7 +45,7 @@ export function can(roles: readonly AdminRole[] | AdminRole | null | undefined, 
   return list.some((role) => role === "SUPER_ADMIN" || MATRIX[permission].includes(role));
 }
 export const isSuperAdmin = (roles: readonly AdminRole[] | AdminRole | null | undefined): boolean => can(roles, "admins.manage");
-export const ADMIN_ROLES: AdminRole[] = ["SUPER_ADMIN", "MEDIATOR", "SUPPORT", "FINANCE"];
+export const ADMIN_ROLES: AdminRole[] = ["SUPER_ADMIN", "MEDIATOR", "SUPPORT", "FINANCE", "OPS"];
 export const rolesLabel = (roles: readonly AdminRole[] | null | undefined): string => (roles && roles.length ? roles.map((r) => ROLE_LABEL[r]).join(" + ") : "—");
 
-export const ROLE_LABEL: Record<AdminRole, string> = { SUPER_ADMIN: "Super administrateur", MEDIATOR: "Médiateur", SUPPORT: "Support", FINANCE: "Finance" };
+export const ROLE_LABEL: Record<AdminRole, string> = { SUPER_ADMIN: "Super administrateur", MEDIATOR: "Médiateur", SUPPORT: "Support", FINANCE: "Finance", OPS: "Exploitation" };

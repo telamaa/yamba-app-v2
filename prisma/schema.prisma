@@ -1116,6 +1116,7 @@ enum AdminRole {
   MEDIATOR
   SUPPORT
   FINANCE
+  OPS // C-PR8a (D62 3A) — exploitation technique
 }
 
 /// C-PR3 (D56, 2A) — deux niveaux de sanction, toujours motivés, réversibles.
@@ -1300,17 +1301,17 @@ enum ReportStatus {
   DISMISSED
 }
 
-model SiteConfig {
-  id String @id @default(auto()) @map("_id") @db.ObjectId
+/// C-PR8a (D62 4A) — UN document (`key` = "current") : les paramètres de classe A,
+/// `values` = { clé du catalogue → nombre }, `version` = verrou optimiste. Absent ou
+/// illisible → les services repartent sur les défauts du catalogue (repli sûr).
+/// Remplace `SiteConfig` (dormant, commission 0,10 contraire à D16 — A11).
+model PlatformSettings {
+  id      String @id @default(auto()) @map("_id") @db.ObjectId
+  key     String @unique
+  values  Json
+  version Int    @default(0)
 
-  logo   String?
-  banner String?
-
-  commissionRate Float @default(0.10)
-
-  maxDocSizeMb   Int @default(5)
-  maxDocsPerTrip Int @default(5)
-
+  updatedByAdminId String? @db.ObjectId
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }

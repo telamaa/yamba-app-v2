@@ -21,6 +21,7 @@ import {
   searchTrips,
   searchTripsFacets,
 } from "../controllers/trip-search.controller";
+import { getPricingParams } from "../controllers/pricing-params.controller";
 import isAuthenticated from "@packages/middleware/isAuthenticated";
 import requireActiveAccount from "@packages/middleware/requireActiveAccount";
 import isOptionallyAuthenticated from "@packages/middleware/isOptionallyAuthenticated";
@@ -42,6 +43,7 @@ router.get("/search/facets", searchTripsFacets);
 
 // ─── ⭐ FAVORIS (D46) — AVANT /:id ────────────
 router.get("/favorites", isAuthenticated, listMyFavoriteTrips);
+router.get("/pricing/params", getPricingParams); // C-PR8a (D62 7A) — public, déclaré AVANT /:id (A128)
 
 // ─── ⭐ PUBLIC TRIP DETAIL (PAS d'authent) — PR 1.a ───
 // Idem : doit être déclaré avant /:id pour ne pas être matché comme route privée.

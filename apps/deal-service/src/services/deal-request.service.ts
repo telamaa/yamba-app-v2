@@ -26,7 +26,10 @@
 import prisma from "@packages/libs/prisma";
 import { NotFoundError, ValidationError } from "@packages/error-handler";
 import type { PaymentProvider } from "@packages/payments";
-import { QuoteError, type ShipperQuote } from "@packages/pricing";
+import { QuoteError, type PricingParams, type ShipperQuote } from "@packages/pricing";
+import { pricingParamsFromSettings } from "@packages/api-contracts";
+import { platformSettings } from "@packages/libs/settings/default";
+import type { SettingsReader } from "@packages/libs/settings";
 import {
   BookingDomainEventSchema,
   type CreateBookingRequest,
@@ -85,9 +88,9 @@ async function loadTrip(tripId: string): Promise<TripForBooking> {
   };
 }
 
-function quoteOr400(trip: TripForBooking, input: CreatePaymentIntentRequest | CreateBookingRequest): ShipperQuote {
+function quoteOr400(trip: TripForBooking, input: CreatePaymentIntentRequest | CreateBookingRequest, params: PricingParams): ShipperQuote {
   try {
-    return quoteForTrip(trip, input);
+    return quoteForTrip(trip, input, params);
   } catch (e) {
     if (e instanceof QuoteError) throw new ValidationError(e.message, { errors: { quote: e.code } });
     throw e;
@@ -120,7 +123,7 @@ function toShipperPricing(quote: ShipperQuote) {
   };
 }
 
-export function makeDealRequestService(provider: PaymentProvider, clock: () => Date = () => new Date()) {
+export function makeDealRequestService(provider: PaymentProvider, clock: () => Date = () => new Date(), settings: SettingsReader = platformSettings()) {
   return {
     async createPaymentIntent(
       user: RequestingUser,
@@ -129,7 +132,7 @@ export function makeDealRequestService(provider: PaymentProvider, clock: () => D
       const now = clock();
       const trip = await loadTrip(input.tripId);
       checkTripBookable(trip, user.id, now);
-      const quote = quoteOr400(trip, input);
+      const quote = quoteOr400(trip, input, pricingParamsFromSettings(await settings.get())); // D62
       assertQuoteMatches(quote, input.expectedTotalCents);
       checkCapacity(trip, kgToReserve(quote)); // refus précoce, avant de poser une empreinte
 
@@ -160,7 +163,7 @@ export function makeDealRequestService(provider: PaymentProvider, clock: () => D
       const now = clock();
       const trip = await loadTrip(input.tripId);
       checkTripBookable(trip, user.id, now);
-      const quote = quoteOr400(trip, input);
+      const quote = quoteOr400(trip, input, pricingParamsFromSettings(await settings.get())); // D62
       assertQuoteMatches(quote, input.expectedTotalCents);
       const kg = kgToReserve(quote);
       checkCapacity(trip, kg);

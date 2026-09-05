@@ -282,3 +282,22 @@ export type AdminMessageReportItem = {
   conversationId: string; bookingId: string; corridor: { originCity: string; destinationCity: string };
 };
 export type AdminMessageReportsResponse = { items: AdminMessageReportItem[]; total: number };
+
+/* ── C-PR8a (D62) — paramètres de la plateforme ── */
+export type SettingScope = "BUSINESS" | "OPERATIONS";
+export type SettingUnit = "percent" | "cents" | "kg" | "coef" | "hours" | "days" | "minutes" | "count" | "rating" | "mb";
+export type SettingGroup = "pricing" | "protection" | "cancellation" | "rating" | "dispute" | "reputation" | "messaging" | "alerts" | "documents";
+export type SettingDefinition = {
+  key: string; group: SettingGroup; label: string; description: string; rule: string; unit: SettingUnit;
+  default: number; min: number; max: number; step: number; scope: SettingScope; contractual?: boolean; consumers: string[]; example?: string;
+};
+export type AdminSettingsResponse = {
+  values: Record<string, number>; defaults: Record<string, number>; version: number;
+  updatedAt: string | null; updatedBy: { id: string; firstName: string; lastName: string } | null;
+  lastChange: { at: string; byName: string; keys: string[] } | null;
+  catalog: SettingDefinition[];
+  fixed: { key: string; label: string; value: string; rule: string }[];
+  planned: { key: string; rule: string }[];
+};
+export type SettingsWriteResponse = { version: number; changed: { key: string; before: number; after: number }[] };
+export type SettingsHistoryItem = { id: string; at: string; admin: string; action: string; key: string | null; before: number | null; after: number | null; reason: string | null; version: number | null };

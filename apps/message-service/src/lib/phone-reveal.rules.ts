@@ -15,10 +15,11 @@ export function revealAnchorOf(a: RevealAnchor): Date | null {
   return a.pickupStartAt ?? a.departureAt ?? null;
 }
 
-export function phoneRevealWindow(a: RevealAnchor, now: Date): RevealWindow {
+/** `leadHours` : paramètre `messaging.phoneRevealLeadHours` (D62). */
+export function phoneRevealWindow(a: RevealAnchor, now: Date, leadHours: number = PHONE_REVEAL_LEAD_HOURS): RevealWindow {
   const anchor = revealAnchorOf(a);
   if (!anchor) return { allowed: false, opensAt: null, reason: "NO_ANCHOR" };
-  const opensAt = new Date(anchor.getTime() - PHONE_REVEAL_LEAD_HOURS * 3_600_000);
+  const opensAt = new Date(anchor.getTime() - leadHours * 3_600_000);
   return now.getTime() >= opensAt.getTime()
     ? { allowed: true, opensAt, reason: null }
     : { allowed: false, opensAt, reason: "TOO_EARLY" };

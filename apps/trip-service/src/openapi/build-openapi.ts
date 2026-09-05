@@ -268,6 +268,22 @@ export function buildOpenApiDocument() {
         },
       },
 
+      /* ── Paramètres de prix (C-PR8a, D62 7A) ─────────────── */
+      "/trips/pricing/params": {
+        get: {
+          tags: ["trips-search"],
+          summary: "Paramètres de prix de la plateforme (public)",
+          description:
+            "Commission, planchers, coefficients de taille, Garantie étendue, kilo de référence : " +
+            "les valeurs en vigueur, réglées par l'admin (D62). Le wizard calcule le devis avec le moteur unique (D34) et ces valeurs ; " +
+            "le serveur refait le calcul à la création. `version` change à chaque modification.",
+          operationId: "getPricingParams",
+          responses: {
+            "200": jsonResponse("PricingParamsResponse", "Paramètres de prix en vigueur"),
+          },
+        },
+      },
+
       /* ── Recherche publique ───────────────────────────────── */
       "/trips/search": {
         get: {

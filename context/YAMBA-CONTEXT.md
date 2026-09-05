@@ -377,7 +377,17 @@ Ordre de demarrage : auth -> trip -> gateway.
   consignee) ; bulles invisibles sur telephone (grille sans minmax(0,1fr) sous lg → colonne
   plus large que l'ecran, reproduit en Chrome headless). Email de relance des non-lus confirme a 15 min (decision utilisateur 05/09).
   Suite : C-PR8 parametres / RGPD.
-- Plateforme de tests : 805 (trip 209, deal 485, notification 83, message 28) + auth 103.
+- 05/09 : chore/ci-build-i18n (#177) — job « Build des services (webpack) » + regle « pas de
+  point dans une cle » du script i18n ; 17 checks requis.
+- 05/09 : C-PR8a feat/c8a-platform-settings (D62) — catalogue de 40 parametres (classes A/B/C,
+  portees metier / exploitation), document PlatformSettings versionne, lib @packages/libs/settings
+  (cache 30 s, repli sur les defauts), rebranchement de deal / trip / message (la constante n'est
+  que le defaut d'argument), ecriture auth-service /admin/settings (bornes, coherence, 403 par
+  portee, 409 version, journal SETTING_CHANGED par cle, email aux SUPER_ADMIN, reset avec diff),
+  profil OPS, GET /trips/pricing/params + wizard sur les valeurs serveur, admin-ui /settings +
+  /settings/docs, seed-settings.ts, npm run settings-doc → context/YAMBA-PARAMETRES.md,
+  SiteConfig supprime. Suite : C-PR8b RGPD (PRIVACY), C-PR8c maintenance / etat des services.
+- Plateforme de tests : 814 (trip 209, deal 489, notification 83, message 33) + auth 121.
 - 04/09 : C-PR6b feat/c6b-admin-alerts (D59 3A / 4A, A129–A131) — neuf regles de seuil
   (evaluateAlerts pur, instantane de dix compteurs), GET /admin/alerts sans etat (accueil
   admin), cron horaire avec dedoublonnage Redis SET NX (un email par regle et par jour, Redis

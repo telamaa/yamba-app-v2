@@ -32,7 +32,8 @@ import {
   pickPerKgFields,
 } from "../services/pricing-gate";
 import { chunkUpdateData } from "../lib/mongo-update-chunks";
-import { computeComparablePriceCents } from "../lib/comparable-price";
+import { computeComparablePriceCents, comparableParamsFromSettings, DEFAULT_COMPARABLE_PARAMS, type ComparableParams } from "../lib/comparable-price";
+import { platformSettings } from "@packages/libs/settings/default";
 
 // ─────────────────────────────────────────────
 // Helper interne : recalcule les champs dénormalisés
@@ -43,7 +44,7 @@ function computeDenormalizedFields(input: {
   pricePerKgCents?: number | null;
   departureAt?: Date | null;
   originTimezone?: string | null;
-}): { minPriceCents: number | null; comparablePriceCents: number | null; departureHourLocal: number | null } {
+}, comparable: ComparableParams = DEFAULT_COMPARABLE_PARAMS): { minPriceCents: number | null; comparablePriceCents: number | null; departureHourLocal: number | null } {
   const minPriceCents = computeMinPriceCents(
     (input.categoryConditions ?? []) as any
   );
@@ -51,7 +52,7 @@ function computeDenormalizedFields(input: {
   const comparablePriceCents = computeComparablePriceCents({
     pricePerKgCents: input.pricePerKgCents,
     minPriceCents,
-  });
+  }, comparable);
   const departureHourLocal =
     input.departureAt && input.originTimezone
       ? computeHourLocal(input.departureAt, input.originTimezone)
@@ -170,7 +171,7 @@ export const createTrip = async (
       pricePerKgCents: data.pricePerKgCents,
       departureAt: data.departureAt ?? null,
       originTimezone: data.originTimezone ?? null,
-    });
+    }, comparableParamsFromSettings(await platformSettings().get())); // D62
 
     const carrierRatingSnapshot =
       shouldPublish && carrierPage && carrierPage.ratingsCount > 0
@@ -329,7 +330,7 @@ export const updateTrip = async (
         pricePerKgCents: updateData.pricePerKgCents ?? trip.pricePerKgCents,
         departureAt: updateData.departureAt ?? trip.departureAt,
         originTimezone: updateData.originTimezone ?? trip.originTimezone,
-      });
+      }, comparableParamsFromSettings(await platformSettings().get())); // D62
       if (willRecomputePrice) {
         updateData.minPriceCents = recomputed.minPriceCents;
         updateData.comparablePriceCents = recomputed.comparablePriceCents;
@@ -474,15 +475,15 @@ export const addTripDocuments = async (
       });
     }
 
-    const siteConfig = await prisma.siteConfig.findFirst();
-    const maxDocs = siteConfig?.maxDocsPerTrip ?? 5;
+    const settings = await platformSettings().get(); // D62 — ex-SiteConfig
+    const maxDocs = settings["documents.maxDocsPerTrip"];
     const currentCount = trip.documents.length;
 
     if (currentCount + newDocuments.length > maxDocs) {
       return next(new ValidationError(`Maximum ${maxDocs} documents per trip. Currently ${currentCount}.`));
     }
 
-    const maxSizeMb = siteConfig?.maxDocSizeMb ?? 5;
+    const maxSizeMb = settings["documents.maxDocSizeMb"];
     for (const doc of newDocuments) {
       if (!doc.type || !doc.fileId || !doc.url) {
         return next(new ValidationError("Each document must have type, fileId, and url."));

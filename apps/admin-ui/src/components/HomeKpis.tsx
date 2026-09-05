@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { apiFetch } from "@/lib/api";
-import type { AdminHomeKpis, OpsAlertsResponse } from "@/lib/types";
+import type { AdminHomeKpis, OpsAlertsResponse, AdminSettingsResponse } from "@/lib/types";
 
 type Tile = { key: keyof AdminHomeKpis; label: string; href: string; tone: "act" | "info" };
 const TILES: Tile[] = [
@@ -29,10 +29,12 @@ const TILES: Tile[] = [
 export default function HomeKpis() {
   const [k, setK] = useState<AdminHomeKpis | null>(null);
   const [alerts, setAlerts] = useState<OpsAlertsResponse | null>(null);
+  const [settings, setSettings] = useState<AdminSettingsResponse | null>(null); // C-PR8a (D62 5A) — dernière modification de paramètre
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     apiFetch<AdminHomeKpis>("/admin/kpis").then(setK).catch((e) => setError(e.message));
     apiFetch<OpsAlertsResponse>("/admin/alerts").then(setAlerts).catch(() => setAlerts(null)); // C-PR6b — sans état, recalculées à chaque lecture
+    apiFetch<AdminSettingsResponse>("/admin/settings").then(setSettings).catch(() => setSettings(null));
   }, []);
   if (error) return <p className="mt-4 text-[13px] text-red-700">{error}</p>;
   if (!k) return <p className="mt-4 text-[13px] text-slate-500">Chargement…</p>;
@@ -77,6 +79,12 @@ export default function HomeKpis() {
           )}
           <p className="mt-1 text-[11px] text-slate-400">Évaluées le {new Date(alerts.evaluatedAt).toLocaleString("fr-FR")} · le support reçoit un email à la première apparition d'une règle dans la journée.</p>
         </section>
+      )}
+      {settings?.lastChange && (
+        <p className="mt-5 rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-[12.5px] text-slate-800">
+          <b>Paramètres modifiés</b> le {new Date(settings.lastChange.at).toLocaleString("fr-FR")} par {settings.lastChange.byName} : {settings.lastChange.keys.join(", ")} —{" "}
+          <Link href="/settings" className="underline">voir les paramètres</Link>
+        </p>
       )}
       {act.length > 0 && <Grid tiles={act} title="À traiter" />}
       {info.length > 0 && <Grid tiles={info} title="État de la plateforme" />}

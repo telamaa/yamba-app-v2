@@ -21,6 +21,8 @@
 import { AppError } from "@packages/error-handler";
 import {
   quoteShipperPrice,
+  PRICING_PARAMS,
+  type PricingParams,
   type QuoteInput,
   type ShipperQuote,
 } from "@packages/pricing";
@@ -120,8 +122,8 @@ export function buildQuoteInput(trip: TripForBooking, input: BookingQuoteInput):
 }
 
 /** Devis serveur — QuoteError (moteur) remontée telle quelle : le contrôleur la traduit en 400. */
-export function quoteForTrip(trip: TripForBooking, input: BookingQuoteInput): ShipperQuote {
-  return quoteShipperPrice(buildQuoteInput(trip, input));
+export function quoteForTrip(trip: TripForBooking, input: BookingQuoteInput, params: PricingParams = PRICING_PARAMS): ShipperQuote {
+  return quoteShipperPrice(buildQuoteInput(trip, input), params);
 }
 
 /** D17 — le total vu par l'Expéditeur DOIT être celui que l'on figera. */

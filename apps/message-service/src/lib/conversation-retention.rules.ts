@@ -22,7 +22,8 @@ export function retentionAnchor(input: RetentionInput): Date {
   return new Date(Math.max(ended, input.conversationUpdatedAt.getTime()));
 }
 
-export function isPurgeable(input: RetentionInput, now: Date): boolean {
+/** `retentionDays` : paramètre `messaging.retentionDays` (D62). */
+export function isPurgeable(input: RetentionInput, now: Date, retentionDays: number = CONVERSATION_RETENTION_DAYS): boolean {
   if (!BOOKING_TERMINAL_STATUSES.includes(input.bookingStatus as BookingStatus)) return false;
-  return retentionAnchor(input).getTime() < now.getTime() - CONVERSATION_RETENTION_DAYS * DAY;
+  return retentionAnchor(input).getTime() < now.getTime() - retentionDays * DAY;
 }

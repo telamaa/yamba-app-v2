@@ -4,7 +4,7 @@
  * Validation, pricing and step-progression logic. Pure functions.
  */
 
-import { PRICING_PARAMS, QuoteError, quoteShipperPrice } from "@packages/pricing";
+import { PRICING_PARAMS, QuoteError, quoteShipperPrice, type PricingParams } from "@packages/pricing";
 import type {
   Draft,
   ParcelCategory,
@@ -25,7 +25,8 @@ export function parseWeight(s: string): number | null {
  * serveur) ; les euros ne servent qu'à l'affichage. Trajet legacy (sans
  * €/kg) : on retombe sur le prix par catégorie, sans devis figé.
  */
-export function computeTotal(draft: Draft, trip: TripContext): PriceBreakdown {
+/** `params` : les valeurs servies par `GET /trips/pricing/params` (D62 7A) — défauts du moteur tant qu'elles ne sont pas là. */
+export function computeTotal(draft: Draft, trip: TripContext, params: PricingParams = PRICING_PARAMS): PriceBreakdown {
   const isPerKg = typeof trip.pricePerKgCents === "number" && trip.pricePerKgCents > 0;
   if (isPerKg || draft.product !== "PARCEL") {
     try {
@@ -39,7 +40,7 @@ export function computeTotal(draft: Draft, trip: TripContext): PriceBreakdown {
         familySurchargePct:
           trip.familyStances[draft.family]?.mode === "SURCHARGE" ? trip.familyStances[draft.family].surchargePct : 0,
         protection: draft.insurance,
-      });
+      }, params);
       return {
         transport: quote.transportCents / 100,
         serviceFee: quote.commissionCents / 100,
@@ -55,8 +56,8 @@ export function computeTotal(draft: Draft, trip: TripContext): PriceBreakdown {
   }
   // legacy PER_CATEGORY
   const transport = trip.categoryPrices[draft.category] ?? 0;
-  const serviceFee = round2(Math.max(transport * (PRICING_PARAMS.commissionPct / 100), PRICING_PARAMS.commissionFloorCents / 100));
-  const insurance = draft.insurance === "EXTENDED_500" ? PRICING_PARAMS.protectionExtendedPremiumCents / 100 : 0;
+  const serviceFee = round2(Math.max(transport * (params.commissionPct / 100), params.commissionFloorCents / 100));
+  const insurance = draft.insurance === "EXTENDED_500" ? params.protectionExtendedPremiumCents / 100 : 0;
   return { transport, serviceFee, insurance, total: round2(transport + serviceFee + insurance), currency: "EUR", quote: null, quoteError: null };
 }
 

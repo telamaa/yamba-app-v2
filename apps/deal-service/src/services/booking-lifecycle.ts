@@ -36,6 +36,13 @@ export class BookingLifecycleError extends AppError {
 export const CANCEL_FULL_REFUND_UNTIL_HOURS = 48;
 export const CANCEL_LATE_RETENTION_PCT = 50;
 
+/** D62 — les deux curseurs ANN-01 viennent des paramètres ; les constantes ci-dessus sont les défauts. */
+export type CancellationParams = { fullRefundUntilHours: number; lateRetentionPct: number };
+export const DEFAULT_CANCELLATION_PARAMS: CancellationParams = { fullRefundUntilHours: CANCEL_FULL_REFUND_UNTIL_HOURS, lateRetentionPct: CANCEL_LATE_RETENTION_PCT };
+export function cancellationParamsFromSettings(v: { "cancellation.fullRefundUntilHours": number; "cancellation.lateRetentionPct": number }): CancellationParams {
+  return { fullRefundUntilHours: v["cancellation.fullRefundUntilHours"], lateRetentionPct: v["cancellation.lateRetentionPct"] };
+}
+
 /* ══ Vue minimale du Booking nécessaire ici ═══════════════════ */
 
 export type BookingSnapshotsForLifecycle = {
@@ -86,11 +93,13 @@ export function computeCancellationRefundCents(args: {
   totalShipperCents: number;
   departureAt: Date;
   now: Date;
+  params?: CancellationParams;
 }): number {
   const { totalShipperCents, departureAt, now } = args;
+  const p = args.params ?? DEFAULT_CANCELLATION_PARAMS;
   const hoursUntilDeparture = (departureAt.getTime() - now.getTime()) / 3_600_000;
-  if (hoursUntilDeparture >= CANCEL_FULL_REFUND_UNTIL_HOURS) return totalShipperCents;
-  return Math.round((totalShipperCents * (100 - CANCEL_LATE_RETENTION_PCT)) / 100);
+  if (hoursUntilDeparture >= p.fullRefundUntilHours) return totalShipperCents;
+  return Math.round((totalShipperCents * (100 - p.lateRetentionPct)) / 100);
 }
 
 /* ══ Kg à restituer (CAP-02) ══════════════════════════════════ */

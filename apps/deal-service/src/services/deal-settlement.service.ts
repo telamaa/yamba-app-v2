@@ -37,7 +37,9 @@ import type {
   DisputeDealRequest,
   DisputeDealResponse,
 } from "@packages/api-contracts";
-import { RATING_WINDOW_DAYS, canPerform, type BookingStatus, type BookingTransitionAction } from "./booking-state-machine";
+import { canPerform, type BookingStatus, type BookingTransitionAction } from "./booking-state-machine";
+import { platformSettings } from "@packages/libs/settings/default";
+import type { SettingsReader } from "@packages/libs/settings";
 import { recomputeBookingParties } from "./reputation.service";
 import { BookingLifecycleError, baseEventPayload } from "./booking-lifecycle";
 import { nextPayoutRetryAt, payoutRetryDueFilter } from "./admin-finance.rules";
@@ -109,7 +111,8 @@ function machineView(booking: BookingForWrite) {
 export function makeDealSettlementService(
   provider: PaymentProvider,
   clock: () => Date = () => new Date(),
-  logger: SettlementLogger = silentLogger
+  logger: SettlementLogger = silentLogger,
+  settings: SettingsReader = platformSettings()
 ) {
   function assertTransition(
     booking: BookingForWrite,
@@ -134,6 +137,7 @@ export function makeDealSettlementService(
   /* ── COMPLETED : la transaction (D49, étape 1) ───────────────── */
 
   async function completeBooking(booking: BookingForWrite, by: "SHIPPER" | "SYSTEM", now: Date): Promise<void> {
+    const ratingWindowDays = (await settings.get())["rating.windowDays"]; // D62 — défaut RATING_WINDOW_DAYS
     await applyBookingTransition({
       booking,
       from: "DELIVERED",
@@ -145,7 +149,7 @@ export function makeDealSettlementService(
         payoutAmountCents: booking.pricing.transportCents, // D50 — le net du snapshot
         payoutFailureReason: null,
         // B5/D53 — la fenêtre de notation s'ouvre à la fin de transaction.
-        ratingWindowEndsAt: new Date(now.getTime() + RATING_WINDOW_DAYS * 86_400_000),
+        ratingWindowEndsAt: new Date(now.getTime() + ratingWindowDays * 86_400_000),
         ratingRemindersSent: 0,
       },
       releaseKg: false,

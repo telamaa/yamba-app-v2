@@ -1459,3 +1459,38 @@ En recette, choisir une réponse rapide envoyait le message aussitôt : un clic 
 | FCH28 | Modifier le texte proposé puis Entrée (ou le bouton) | Le message modifié part ; la zone se vide |
 | FCH29 | Cliquer une réponse rapide alors que la zone contient déjà un brouillon | Le brouillon est remplacé par la réponse rapide (pas concaténé) |
 | FCH30 | Sur téléphone (ou fenêtre < 1024 px), ouvrir un fil où l'on a écrit | Ses propres bulles (mango, à droite) sont visibles ; le titre du rendez-vous passe à la ligne ; le bouton « Voir le numéro » est dans l'écran ; rien ne déborde à droite |
+
+---
+
+# C-PR8a — les paramètres de la plateforme (D62)
+
+## Le besoin
+Le jalon 2 dit « Telama peut ajuster un paramètre seul ». Jusqu'ici, la commission, les planchers, les fenêtres d'annulation et de notation, les délais de la messagerie et les seuils d'alerte étaient des constantes dans le code : chaque réglage était un déploiement. Le back-office doit permettre de régler ce qui est un curseur métier, avec des explications qui évitent les erreurs, sans jamais exposer ce qui protège la plateforme, et sans faux boutons.
+
+### Règles de gestion (PAR)
+- **RG-PAR-01 — Trois classes de paramètres.** A : réglable en ligne (les curseurs métier lus par le code et figés dans un snapshot). B : visible dans l'admin mais modifiable par déploiement seulement (sessions, blocages OTP / 2FA / code de livraison, longueurs de motif). C : absent de la page tant que le code ne le lit pas. Un curseur n'existe que si le code le lit.
+- **RG-PAR-02 — Deux portées.** Métier (commission, planchers, coefficients, Garantie, annulation, notation, litige, réputation, fenêtres du fil) : super administrateur seul. Exploitation (seuils d'alerte, relance email, conservation des conversations, documents) : profil Exploitation ou super administrateur. La lecture est ouverte à tous les profils.
+- **RG-PAR-03 — Les bornes et la cohérence sont refusées par le serveur**, quel que soit le profil : commission 5 à 20 %, plancher 1 à 10 €, S ≤ M ≤ L, plafond de Garantie ≥ prime, niveau top ≥ niveau confirmé, intervalle de relance ≥ délai de relance.
+- **RG-PAR-04 — Chaque modification porte un motif de 20 caractères au moins**, s'écrit au journal clé par clé (avant, après, motif, version), et est annoncée par email à tous les super administrateurs. Rien ne se change en silence.
+- **RG-PAR-05 — Jamais rétroactif.** Une réservation garde le prix figé à sa création ; un litige ouvert garde son échéance calculée ; le prix comparable d'un trajet déjà publié se recalcule par script.
+- **RG-PAR-06 — Le défaut est la valeur du code.** Remettre par défaut, clé par clé ou globalement, est une modification comme une autre (diff affiché, motif, journal, email). Une base de paramètres vide ou illisible reproduit exactement le comportement d'origine.
+- **RG-PAR-07 — Une modification se voit dans les 30 secondes** sur tous les services ; deux administrateurs qui écrivent en même temps : le second relit (verrou de version).
+- **RG-PAR-08 — Le wizard de réservation calcule avec les valeurs du serveur** ; si un paramètre change entre l'affichage et le paiement, le total attendu ne correspond plus et l'Expéditeur revoit le prix.
+- **RG-PAR-09 — Le profil Exploitation** règle les paramètres d'exploitation, lit les indicateurs, et ne touche jamais un paramètre d'argent ni un compte.
+- **RG-PAR-10 — Les paramètres qui figurent dans les CGU** (retenue et fenêtre d'annulation, prime et plafond de Garantie, commission, fenêtre de notation) sont marqués : la page prévient qu'il faut mettre le texte à jour.
+
+### Recette (PAR)
+| # | Scénario | Attendu |
+|---|---|---|
+| PAR1 | Super administrateur : menu « Paramètres » | Neuf groupes, chaque ligne avec valeur en vigueur, défaut, portée ; tout est « par défaut » sur une base neuve (version 0) |
+| PAR2 | Cliquer le libellé « Commission Yamba » | Panneau d'explication : texte, exemple, bornes, services lecteurs, mention CGU |
+| PAR3 | Saisir 15 pour la commission, 4 € pour le plancher | Panneau « À valider » avec le diff (12 % → 15 %, 3,00 € → 4,00 €) et l'aperçu chiffré ; bouton inactif tant que le motif fait moins de 20 caractères |
+| PAR4 | Enregistrer avec un motif | « 2 paramètre(s) modifié(s) — version 1 » ; Journal : deux lignes `SETTING_CHANGED` (avant / après / motif) ; chaque super administrateur reçoit l'email « Paramètres de la plateforme modifiés » ; l'accueil admin affiche « Paramètres modifiés le … » |
+| PAR5 | Saisir 25 % de commission | Refus 400 « entre 5 et 20 » ; rien n'est écrit |
+| PAR6 | Mettre S = 1,5 avec M = 1,1 | Refus 400 « S ≤ M ≤ L » ; rien n'est écrit |
+| PAR7 | Deux onglets : modifier dans l'un, puis dans l'autre sans recharger | Le second reçoit 409, la page se recharge, la modification est à refaire |
+| PAR8 | Compte OPS (`grant-admin.ts <email> --role OPS`) : page Paramètres | Les lignes métier sont en lecture seule (« super administrateur seul ») ; le seuil « Relais en retard depuis » est modifiable ; enregistrer → version +1, journal |
+| PAR9 | Compte FINANCE : page Paramètres | Visible, aucune saisie possible |
+| PAR10 | « Tout réinitialiser » | La liste exacte des clés qui vont changer, motif, confirmation ; Journal : `SETTINGS_RESET` par clé ; « toutes les valeurs sont celles par défaut » |
+| PAR11 | Commission à 15 % ; côté membre, ouvrir le wizard sur un trajet au kilo | Le récapitulatif affiche 15 % (le total change) ; `GET /api/trips/pricing/params` répond `commissionPct: 15, version: n` |
+| PAR12 | Relance messagerie à 5 min / intervalle 10 min ; envoyer un message et ne pas le lire | L'email de relance part entre 5 et 10 min (cron 5 min) au lieu de 15–20 |

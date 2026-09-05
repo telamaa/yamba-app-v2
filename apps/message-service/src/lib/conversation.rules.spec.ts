@@ -35,3 +35,12 @@ describe("conversation.rules (chantier F, D61 2A)", () => {
     expect(counterpartIdOf("CARRIER", parties)).toBe("s1");
   });
 });
+
+describe("conversationAccess — paramètre messaging.writeDaysAfterEnd (D62)", () => {
+  it("7 jours ferme un fil que 14 jours laissait ouvert", () => {
+    const b = { status: "COMPLETED", completedAt: days(-10) };
+    expect(conversationAccess(b, NOW).canWrite).toBe(true);
+    expect(conversationAccess(b, NOW, 7)).toMatchObject({ canWrite: false, reason: "WRITE_WINDOW_OVER" });
+    expect(conversationAccess(b, NOW, 30).canWrite).toBe(true);
+  });
+});
