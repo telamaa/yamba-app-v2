@@ -288,7 +288,9 @@ async function main() {
   for (const u of USERS) {
     const user = await prisma.user.upsert({
       where: { emailNormalized: u.email.toLowerCase() },
-      update: { firstName: u.firstName, lastName: u.lastName, roles: u.roles, passwordHash: SEED_PASSWORD_HASH },
+      // D71 — un compte de moins de 30 jours est « neuf » (plafonds CNF-06) : les membres du seed ont 90 jours,
+      // sauf pour la grille TrustScore qui utilise un compte fraîchement inscrit.
+      update: { firstName: u.firstName, lastName: u.lastName, roles: u.roles, passwordHash: SEED_PASSWORD_HASH, createdAt: days(-90) },
       create: {
         firstName: u.firstName,
         lastName: u.lastName,
@@ -299,6 +301,7 @@ async function main() {
         phoneE164: u.phoneE164 ?? null,
         roles: u.roles,
         carrierStatus: u.carrier ? "ACTIVE" : "NONE",
+        createdAt: days(-90),
       },
     });
     userIds.set(u.key, user.id);
