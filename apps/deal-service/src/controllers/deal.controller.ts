@@ -13,10 +13,12 @@ import {
   type BookingViewerRole,
 } from "@packages/api-contracts";
 import { revealDeliveryCode } from "@packages/delivery-code";
+import { platformSettings } from "@packages/libs/settings/default";
 import {
   toBookingView,
   toShipperBookingView,
   toCarrierBookingView,
+  viewParamsFromSettings,
   type BookingRecord,
   type CounterpartRecord,
 } from "../services/booking-view.mapper";
@@ -148,10 +150,11 @@ export const getDeal = async (
           })
         : null;
 
+    const viewParams = viewParamsFromSettings(await platformSettings().get()); // D62
     return res.status(200).json({
       success: true,
       viewerRole,
-      deal: toBookingView(booking, viewerRole, counterpart, deliveryCode, dispute),
+      deal: toBookingView(booking, viewerRole, counterpart, deliveryCode, dispute, viewParams),
     });
   } catch (error) {
     return next(error);
@@ -185,10 +188,15 @@ export const getMyBookings = async (
       bookings.map((b) => b.carrierId)
     );
 
+    const viewParams = viewParamsFromSettings(await platformSettings().get()); // D62
     const views = bookings.map((b) =>
       toShipperBookingView(
         b,
-        counterparts.get(b.carrierId) ?? GHOST_COUNTERPART(b.carrierId)
+        counterparts.get(b.carrierId) ?? GHOST_COUNTERPART(b.carrierId),
+        new Date(),
+        null,
+        null,
+        viewParams
       )
     );
 
@@ -244,10 +252,14 @@ export const getTripDeals = async (
       bookings.map((b) => b.shipperId)
     );
 
+    const viewParams = viewParamsFromSettings(await platformSettings().get()); // D62
     const views = bookings.map((b) =>
       toCarrierBookingView(
         b,
-        counterparts.get(b.shipperId) ?? GHOST_COUNTERPART(b.shipperId)
+        counterparts.get(b.shipperId) ?? GHOST_COUNTERPART(b.shipperId),
+        null,
+        new Date(),
+        viewParams
       )
     );
 
@@ -293,8 +305,9 @@ export const getMyDeals = async (
 
     const counterparts = await loadCounterparts(bookings.map((b) => b.shipperId));
 
+    const viewParams = viewParamsFromSettings(await platformSettings().get()); // D62
     const deals = bookings.map((b) =>
-      toCarrierBookingView(b, counterparts.get(b.shipperId) ?? GHOST_COUNTERPART(b.shipperId))
+      toCarrierBookingView(b, counterparts.get(b.shipperId) ?? GHOST_COUNTERPART(b.shipperId), null, new Date(), viewParams)
     );
 
     return res.status(200).json({ success: true, deals, count: deals.length });

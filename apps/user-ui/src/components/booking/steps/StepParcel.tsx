@@ -4,7 +4,7 @@ import { Lightbulb } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback } from "react";
 import { MAX_PHOTOS, isPerKgTrip } from "../booking.config";
-import { PRICING_PARAMS } from "@packages/pricing";
+import { usePricingParams } from "@/hooks/usePricingParams";
 import { Backpack, Luggage, ShoppingBag } from "lucide-react";
 import {
   FormField,
@@ -86,6 +86,7 @@ export default function StepParcel({
                                      errors,
                                      hideInsurance,
                                    }: Props) {
+  const pricingParams = usePricingParams(); // D62 7A
   const t = useTranslations("booking");
 
   const hasMultiplePickup = trip.pickupOptions.length > 1;
@@ -363,7 +364,7 @@ export default function StepParcel({
                         <Icon size={18} strokeWidth={1.75} className={active ? "text-[#B45309] dark:text-[#FFB84D]" : "text-slate-500"} />
                         <span className="text-[13px] font-bold text-slate-900 dark:text-white">{sz}</span>
                         <span className="text-[10px] leading-tight text-slate-500 dark:text-slate-400">{t(`step1.size.${sz}`)}</span>
-                        <span className="text-[10px] text-slate-400 dark:text-slate-500">×{PRICING_PARAMS.sizeCoef[sz].toLocaleString("fr-FR")}</span>
+                        <span className="text-[10px] text-slate-400 dark:text-slate-500">×{pricingParams.sizeCoef[sz].toLocaleString("fr-FR")}</span>
                       </button>
                     );
                   })}

@@ -16,6 +16,8 @@ export type AdminInviteParams = { firstName: string; invitedBy: string; roleLabe
 export type AdminAccessGrantedParams = { firstName: string; invitedBy: string; roleLabel: string; loginUrl: string; supportEmail: string };
 export type AdminLoginAlertParams = { firstName: string; at: string; ip: string; userAgent: string; sessionsUrl: string; supportEmail: string };
 export type AccountStatusParams = { firstName: string; reason: string; until: string | null; supportEmail: string };
+/** C-PR8a (D62 5A) — chaque modification de paramètre est annoncée à tous les SUPER_ADMIN. */
+export type SettingsChangedParams = { firstName: string; byName: string; at: string; reason: string; changes: Array<{ label: string; before: string; after: string }>; settingsUrl: string; reset: boolean };
 
 export type AdminEmailDictionary = {
   adminInvite(p: AdminInviteParams): AdminEmail;
@@ -24,11 +26,12 @@ export type AdminEmailDictionary = {
   accountRestricted(p: AccountStatusParams): AdminEmail;
   accountSuspended(p: AccountStatusParams): AdminEmail;
   accountReinstated(p: Pick<AccountStatusParams, "firstName" | "supportEmail">): AdminEmail;
+  settingsChanged(p: SettingsChangedParams): AdminEmail;
 };
 
 export const ADMIN_ROLE_LABELS: Record<SupportedLocale, Record<string, string>> = {
-  fr: { SUPER_ADMIN: "Super administrateur", MEDIATOR: "Médiateur", SUPPORT: "Support", FINANCE: "Finance" },
-  en: { SUPER_ADMIN: "Super administrator", MEDIATOR: "Mediator", SUPPORT: "Support", FINANCE: "Finance" },
+  fr: { SUPER_ADMIN: "Super administrateur", MEDIATOR: "Médiateur", SUPPORT: "Support", FINANCE: "Finance", OPS: "Exploitation" },
+  en: { SUPER_ADMIN: "Super administrator", MEDIATOR: "Mediator", SUPPORT: "Support", FINANCE: "Finance", OPS: "Operations" },
 };
 
 const fr: AdminEmailDictionary = {
@@ -98,6 +101,22 @@ const fr: AdminEmailDictionary = {
       ],
       notice: { tone: "warning", text: `Pour contester, écris-nous à ${p.supportEmail}.` },
       reason: "Tu reçois cet email parce qu'une décision a été prise sur ton compte Yamba.",
+    },
+  }),
+  settingsChanged: (p) => ({
+    subject: p.reset ? "Paramètres de la plateforme réinitialisés" : "Paramètres de la plateforme modifiés",
+    content: {
+      preheader: `${p.byName} a ${p.reset ? "réinitialisé" : "modifié"} ${p.changes.length} paramètre(s).`,
+      title: p.reset ? "Réinitialisation de paramètres" : "Modification de paramètres",
+      greeting: `Bonjour ${p.firstName},`,
+      paragraphs: [
+        `${p.byName} a ${p.reset ? "remis par défaut" : "modifié"} ${p.changes.length} paramètre(s) le ${p.at} :`,
+        ...p.changes.map((c) => `• ${c.label} : ${c.before} → ${c.after}`),
+        `Motif : ${p.reason}`,
+        "Les réservations déjà faites ne changent pas. Si tu n'es pas à l'origine de ce changement, vérifie les sessions admin et le journal.",
+      ],
+      cta: { label: "Voir les paramètres", url: p.settingsUrl },
+      reason: "Tu reçois cet email parce que tu es super administrateur Yamba : chaque modification de paramètre est annoncée à tous les super administrateurs (D62).",
     },
   }),
   accountReinstated: (p) => ({
@@ -174,6 +193,22 @@ const en: AdminEmailDictionary = {
       paragraphs: [`Your account is suspended${p.until ? ` until ${p.until}` : ", until further notice"}: sign-in is refused and your trips are hidden. Reason: ${p.reason}`, "Your ongoing deals are handled by our team."],
       notice: { tone: "warning", text: `To contest, write to ${p.supportEmail}.` },
       reason: "You receive this email because a decision was made on your Yamba account.",
+    },
+  }),
+  settingsChanged: (p) => ({
+    subject: p.reset ? "Platform settings reset" : "Platform settings changed",
+    content: {
+      preheader: `${p.byName} ${p.reset ? "reset" : "changed"} ${p.changes.length} setting(s).`,
+      title: p.reset ? "Settings reset" : "Settings changed",
+      greeting: `Hello ${p.firstName},`,
+      paragraphs: [
+        `${p.byName} ${p.reset ? "reset to default" : "changed"} ${p.changes.length} setting(s) on ${p.at}:`,
+        ...p.changes.map((c) => `• ${c.label}: ${c.before} → ${c.after}`),
+        `Reason: ${p.reason}`,
+        "Existing bookings do not change. If this was not you, check the admin sessions and the audit log.",
+      ],
+      cta: { label: "Open the settings", url: p.settingsUrl },
+      reason: "You receive this email because you are a Yamba super administrator: every settings change is announced to all super administrators (D62).",
     },
   }),
   accountReinstated: (p) => ({

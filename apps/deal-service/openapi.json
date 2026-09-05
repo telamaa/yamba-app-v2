@@ -6629,7 +6629,7 @@
               ],
               "additionalProperties": false
             },
-            "description": "Maximum côté serveur : siteConfig.maxDocsPerTrip (défaut 5) · taille max par doc : siteConfig.maxDocSizeMb (défaut 5 Mo)"
+            "description": "Maximum côté serveur : paramètre documents.maxDocsPerTrip (défaut 5) · taille max par doc : documents.maxDocSizeMb (défaut 5 Mo) — D62"
           }
         },
         "required": [
@@ -15128,7 +15128,8 @@
           "SUPER_ADMIN",
           "MEDIATOR",
           "SUPPORT",
-          "FINANCE"
+          "FINANCE",
+          "OPS"
         ]
       },
       "AccountStatus": {
@@ -15141,7 +15142,7 @@
       },
       "AdminRoles": {
         "minItems": 1,
-        "maxItems": 4,
+        "maxItems": 5,
         "type": "array",
         "items": {
           "$ref": "#/components/schemas/AdminRole"
@@ -21052,6 +21053,714 @@
         ],
         "additionalProperties": false,
         "description": "Sans état (D59 4A) : recalculées à chaque lecture ; le cron horaire n'envoie un email qu'à la première apparition du jour"
+      },
+      "PlatformSettingsValues": {
+        "type": "object",
+        "properties": {
+          "pricing.commissionPct": {
+            "type": "number",
+            "minimum": 5,
+            "maximum": 20,
+            "description": "Commission Yamba (percent) — D16 · COM-01"
+          },
+          "pricing.commissionFloorCents": {
+            "type": "number",
+            "minimum": 100,
+            "maximum": 1000,
+            "description": "Plancher de commission (cents) — D16 · COM-02"
+          },
+          "pricing.minBillableKg": {
+            "type": "number",
+            "minimum": 0.1,
+            "maximum": 2,
+            "description": "Poids facturable minimum (kg) — D32 · PRC-06"
+          },
+          "pricing.minTransportCents": {
+            "type": "number",
+            "minimum": 100,
+            "maximum": 3000,
+            "description": "Prix minimum par colis (cents) — D32 · PRC-06"
+          },
+          "pricing.referenceKg": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 10,
+            "description": "Colis de référence (comparabilité) (kg) — D33"
+          },
+          "pricing.sizeCoefS": {
+            "type": "number",
+            "minimum": 0.5,
+            "maximum": 2,
+            "description": "Coefficient taille S (coef) — PRC-03"
+          },
+          "pricing.sizeCoefM": {
+            "type": "number",
+            "minimum": 0.5,
+            "maximum": 2,
+            "description": "Coefficient taille M (coef) — PRC-03"
+          },
+          "pricing.sizeCoefL": {
+            "type": "number",
+            "minimum": 0.5,
+            "maximum": 2,
+            "description": "Coefficient taille L (coef) — PRC-03"
+          },
+          "protection.extendedPremiumCents": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 5000,
+            "description": "Prime Garantie étendue (cents) — D22 · GAR-06"
+          },
+          "protection.extendedCapCents": {
+            "type": "number",
+            "minimum": 10000,
+            "maximum": 200000,
+            "description": "Plafond Garantie étendue (cents) — D22 · GAR-03"
+          },
+          "cancellation.fullRefundUntilHours": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 168,
+            "description": "Remboursement intégral jusqu'à (hours) — ANN-01 · D21"
+          },
+          "cancellation.lateRetentionPct": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "Retenue d'annulation tardive (percent) — ANN-01 · D39 · D50"
+          },
+          "rating.windowDays": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 60,
+            "description": "Fenêtre de notation (days) — D53 · RG-NOTE-01"
+          },
+          "dispute.responseDelayHours": {
+            "type": "number",
+            "minimum": 12,
+            "maximum": 336,
+            "description": "Délai de réponse au litige (hours) — D55 1A · RG-MED-02"
+          },
+          "reputation.carrier.confirmedMinDeals": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 50,
+            "description": "Voyageur confirmé : deals minimum (count) — D29① · REP-03"
+          },
+          "reputation.carrier.topMinDeals": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 200,
+            "description": "Voyageur top : deals minimum (count) — REP-03"
+          },
+          "reputation.carrier.topMinRating": {
+            "type": "number",
+            "minimum": 3,
+            "maximum": 5,
+            "description": "Voyageur top : note minimale (rating) — REP-03"
+          },
+          "reputation.carrier.topMaxLateCancellations": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 10,
+            "description": "Voyageur top : annulations tolérées (count) — REP-03"
+          },
+          "reputation.shipper.confirmedMinDeals": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 50,
+            "description": "Expéditeur fiable : deals minimum (count) — REP-03"
+          },
+          "reputation.shipper.topMinDeals": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 200,
+            "description": "Expéditeur top : deals minimum (count) — REP-03"
+          },
+          "reputation.shipper.topMinRating": {
+            "type": "number",
+            "minimum": 3,
+            "maximum": 5,
+            "description": "Expéditeur top : note minimale (rating) — REP-03"
+          },
+          "reputation.shipper.topMaxLateCancellations": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 10,
+            "description": "Expéditeur top : annulations tardives tolérées (count) — REP-03"
+          },
+          "messaging.writeDaysAfterEnd": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 90,
+            "description": "Fil ouvert après la fin du deal (days) — D61 2A · RG-FCH-07"
+          },
+          "messaging.phoneRevealLeadHours": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 72,
+            "description": "Numéro révélé avant le rendez-vous (hours) — D61 4A"
+          },
+          "messaging.retentionDays": {
+            "type": "number",
+            "minimum": 30,
+            "maximum": 1095,
+            "description": "Conservation des conversations (days) — D61 8A · RG-FCH-22"
+          },
+          "messaging.reminderDelayMinutes": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 1440,
+            "description": "Relance email après (minutes) — D61 6A · RG-FCH-17"
+          },
+          "messaging.reminderMinIntervalMinutes": {
+            "type": "number",
+            "minimum": 5,
+            "maximum": 1440,
+            "description": "Au plus une relance toutes les (minutes) — D61 6A · RG-FCH-17"
+          },
+          "alerts.payoutFailedHours": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 336,
+            "description": "Versement en échec depuis (hours) — D59 3A"
+          },
+          "alerts.disputeUndecidedHours": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 336,
+            "description": "Litige décidable sans décision depuis (hours) — D59 3A · A131"
+          },
+          "alerts.retentionHeldDays": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 60,
+            "description": "Retenue non arbitrée depuis (days) — D59 3A"
+          },
+          "alerts.reversalOpenHours": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 336,
+            "description": "Renversement ouvert depuis (hours) — D59 3A"
+          },
+          "alerts.outboxParkedAttempts": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Événement parqué après (count) — D59 3A"
+          },
+          "alerts.outboxLagMinutes": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 1440,
+            "description": "Relais en retard depuis (minutes) — D59 3A"
+          },
+          "alerts.emailsFailedWindowHours": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 168,
+            "description": "Emails en échec : fenêtre (hours) — D59 3A"
+          },
+          "alerts.noTripPublishedDays": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 90,
+            "description": "Aucun trajet publié depuis (days) — D59 3A"
+          },
+          "alerts.acceptanceRateWindowDays": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 90,
+            "description": "Taux d'acceptation : fenêtre (days) — D59 3A"
+          },
+          "alerts.acceptanceRateMinPct": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "Taux d'acceptation minimum (percent) — D59 3A"
+          },
+          "alerts.acceptanceRateMinRequests": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "Taux d'acceptation : demandes minimum (count) — D59 3A"
+          },
+          "documents.maxDocsPerTrip": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 20,
+            "description": "Documents par trajet (count) — ex-SiteConfig"
+          },
+          "documents.maxDocSizeMb": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 25,
+            "description": "Taille maximale d'un document (mb) — ex-SiteConfig"
+          }
+        },
+        "required": [
+          "pricing.commissionPct",
+          "pricing.commissionFloorCents",
+          "pricing.minBillableKg",
+          "pricing.minTransportCents",
+          "pricing.referenceKg",
+          "pricing.sizeCoefS",
+          "pricing.sizeCoefM",
+          "pricing.sizeCoefL",
+          "protection.extendedPremiumCents",
+          "protection.extendedCapCents",
+          "cancellation.fullRefundUntilHours",
+          "cancellation.lateRetentionPct",
+          "rating.windowDays",
+          "dispute.responseDelayHours",
+          "reputation.carrier.confirmedMinDeals",
+          "reputation.carrier.topMinDeals",
+          "reputation.carrier.topMinRating",
+          "reputation.carrier.topMaxLateCancellations",
+          "reputation.shipper.confirmedMinDeals",
+          "reputation.shipper.topMinDeals",
+          "reputation.shipper.topMinRating",
+          "reputation.shipper.topMaxLateCancellations",
+          "messaging.writeDaysAfterEnd",
+          "messaging.phoneRevealLeadHours",
+          "messaging.retentionDays",
+          "messaging.reminderDelayMinutes",
+          "messaging.reminderMinIntervalMinutes",
+          "alerts.payoutFailedHours",
+          "alerts.disputeUndecidedHours",
+          "alerts.retentionHeldDays",
+          "alerts.reversalOpenHours",
+          "alerts.outboxParkedAttempts",
+          "alerts.outboxLagMinutes",
+          "alerts.emailsFailedWindowHours",
+          "alerts.noTripPublishedDays",
+          "alerts.acceptanceRateWindowDays",
+          "alerts.acceptanceRateMinPct",
+          "alerts.acceptanceRateMinRequests",
+          "documents.maxDocsPerTrip",
+          "documents.maxDocSizeMb"
+        ],
+        "additionalProperties": false
+      },
+      "SettingDefinition": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "group": {
+            "type": "string",
+            "enum": [
+              "pricing",
+              "protection",
+              "cancellation",
+              "rating",
+              "dispute",
+              "reputation",
+              "messaging",
+              "alerts",
+              "documents"
+            ]
+          },
+          "label": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "rule": {
+            "type": "string"
+          },
+          "unit": {
+            "type": "string",
+            "enum": [
+              "percent",
+              "cents",
+              "kg",
+              "coef",
+              "hours",
+              "days",
+              "minutes",
+              "count",
+              "rating",
+              "mb"
+            ]
+          },
+          "default": {
+            "type": "number"
+          },
+          "min": {
+            "type": "number"
+          },
+          "max": {
+            "type": "number"
+          },
+          "step": {
+            "type": "number"
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "BUSINESS",
+              "OPERATIONS"
+            ]
+          },
+          "contractual": {
+            "type": "boolean"
+          },
+          "consumers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "example": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "group",
+          "label",
+          "description",
+          "rule",
+          "unit",
+          "default",
+          "min",
+          "max",
+          "step",
+          "scope",
+          "consumers"
+        ],
+        "additionalProperties": false
+      },
+      "SettingsLastChange": {
+        "type": "object",
+        "properties": {
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          },
+          "byName": {
+            "type": "string"
+          },
+          "keys": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "at",
+          "byName",
+          "keys"
+        ],
+        "additionalProperties": false,
+        "description": "Dernière modification (7 jours) — affichée sur l'accueil admin (D62 5A)"
+      },
+      "AdminSettingsResponse": {
+        "type": "object",
+        "properties": {
+          "values": {
+            "$ref": "#/components/schemas/PlatformSettingsValues"
+          },
+          "defaults": {
+            "$ref": "#/components/schemas/PlatformSettingsValues"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "updatedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "updatedBy": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "firstName": {
+                    "type": "string"
+                  },
+                  "lastName": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "firstName",
+                  "lastName"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "lastChange": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SettingsLastChange"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "catalog": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SettingDefinition"
+            }
+          },
+          "fixed": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "value": {
+                  "type": "string"
+                },
+                "rule": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "key",
+                "label",
+                "value",
+                "rule"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "planned": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string"
+                },
+                "rule": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "key",
+                "rule"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "values",
+          "defaults",
+          "version",
+          "updatedAt",
+          "updatedBy",
+          "lastChange",
+          "catalog",
+          "fixed",
+          "planned"
+        ],
+        "additionalProperties": false
+      },
+      "UpdateSettingsRequest": {
+        "type": "object",
+        "properties": {
+          "changes": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": "number"
+            },
+            "description": "Clés du catalogue → nouvelle valeur (seules les clés modifiées)"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 20,
+            "maxLength": 500
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991,
+            "description": "Verrou optimiste : la version lue ; 409 si elle a bougé"
+          }
+        },
+        "required": [
+          "changes",
+          "reason",
+          "expectedVersion"
+        ],
+        "additionalProperties": false
+      },
+      "ResetSettingsRequest": {
+        "type": "object",
+        "properties": {
+          "keys": {
+            "description": "Clés à remettre par défaut ; absent ou vide = toutes",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 20,
+            "maxLength": 500
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "reason",
+          "expectedVersion"
+        ],
+        "additionalProperties": false
+      },
+      "SettingsWriteResponse": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "changed": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string"
+                },
+                "before": {
+                  "type": "number"
+                },
+                "after": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "key",
+                "before",
+                "after"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "version",
+          "changed"
+        ],
+        "additionalProperties": false
+      },
+      "PricingParamsResponse": {
+        "type": "object",
+        "properties": {
+          "sizeCoef": {
+            "type": "object",
+            "properties": {
+              "S": {
+                "type": "number"
+              },
+              "M": {
+                "type": "number"
+              },
+              "L": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "S",
+              "M",
+              "L"
+            ],
+            "additionalProperties": false
+          },
+          "minBillableKg": {
+            "type": "number"
+          },
+          "minTransportCents": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "commissionPct": {
+            "type": "number"
+          },
+          "commissionFloorCents": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "protectionExtendedPremiumCents": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "protectionExtendedCapCents": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "weightTolerancePct": {
+            "type": "number"
+          },
+          "referenceKg": {
+            "type": "number"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "sizeCoef",
+          "minBillableKg",
+          "minTransportCents",
+          "commissionPct",
+          "commissionFloorCents",
+          "protectionExtendedPremiumCents",
+          "protectionExtendedCapCents",
+          "weightTolerancePct",
+          "referenceKg",
+          "version"
+        ],
+        "additionalProperties": false,
+        "description": "Server pricing parameters (D62 7A) — the wizard quotes with the single engine and these values"
       }
     },
     "securitySchemes": {

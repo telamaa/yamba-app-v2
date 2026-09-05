@@ -57,6 +57,9 @@ import {
   type BookingForWrite,
 } from "./booking-write";
 import { recomputeBookingParties } from "./reputation.service";
+import { cancellationParamsFromSettings } from "./booking-lifecycle";
+import { platformSettings } from "@packages/libs/settings/default";
+import type { SettingsReader } from "@packages/libs/settings";
 
 export type RequestingUser = { id: string };
 
@@ -75,7 +78,8 @@ export type PayoutExecutor = {
 export function makeDealLifecycleService(
   provider: PaymentProvider,
   clock: () => Date = () => new Date(),
-  payoutExecutor: PayoutExecutor | null = null
+  payoutExecutor: PayoutExecutor | null = null,
+  settings: SettingsReader = platformSettings()
 ) {
   /** La machine a-t-elle dit oui ? Sinon 409 avec SA raison. */
   function assertTransition(
@@ -271,6 +275,7 @@ export function makeDealLifecycleService(
           totalShipperCents: booking.pricing.totalShipperCents,
           departureAt: booking.trip.departureAt,
           now,
+          params: cancellationParamsFromSettings(await settings.get()), // D62
         });
         if (!booking.paymentIntentId) {
           throw new BookingLifecycleError("PAYMENT_STATE_CONFLICT", "This deal has no payment to refund.");

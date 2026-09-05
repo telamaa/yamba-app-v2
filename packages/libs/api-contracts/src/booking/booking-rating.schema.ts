@@ -94,10 +94,13 @@ export const ReputationLevelSchema = z
   });
 export type ReputationLevel = z.infer<typeof ReputationLevelSchema>;
 
-export const REPUTATION_PARAMS = {
+export type ReputationThresholds = { confirmedMinDeals: number; topMinDeals: number; topMinRating: number; topMaxLateCancellations: number };
+export type ReputationParams = { carrier: ReputationThresholds; shipper: ReputationThresholds };
+/** Défauts — servis par les paramètres de la plateforme depuis D62 (`reputation.*`). */
+export const REPUTATION_PARAMS: ReputationParams = {
   carrier: { confirmedMinDeals: 3, topMinDeals: 10, topMinRating: 4.8, topMaxLateCancellations: 0 },
   shipper: { confirmedMinDeals: 3, topMinDeals: 5, topMinRating: 4.8, topMaxLateCancellations: 0 },
-} as const;
+};
 
 export const ReputationSummarySchema = z
   .object({

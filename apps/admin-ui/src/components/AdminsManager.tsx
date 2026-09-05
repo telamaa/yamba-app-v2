@@ -11,6 +11,7 @@ const ROLE_HINT: Record<AdminRole, string> = {
   MEDIATOR: "litiges, sanctions, masquage, versements",
   SUPPORT: "fiches, billets, propositions",
   FINANCE: "finances, exports, pilotage, journal",
+  OPS: "paramètres d'exploitation (seuils, relances), état des services, maintenance — jamais l'argent ni les comptes",
 };
 
 /** C-PR3bis (D60 1A) — profils cumulés : cases à cocher, au moins un profil. */

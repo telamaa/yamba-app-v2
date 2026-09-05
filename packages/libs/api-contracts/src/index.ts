@@ -36,3 +36,4 @@ export * from "./admin/admin-pilotage.schema";
 export * from "./messaging/messaging.schema";
 export * from "./messaging/messaging-events.schema";
 export * from "./admin/admin-alerts.schema";
+export * from "./admin/platform-settings.schema"; // C-PR8a (D62)

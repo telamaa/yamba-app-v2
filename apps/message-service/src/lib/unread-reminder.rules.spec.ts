@@ -43,3 +43,15 @@ describe("unreadReminderDue (D61 6A)", () => {
     expect(unreadReminderDue({ ...base, recipientRemindedAt: min(61) }, now).due).toBe(true);
   });
 });
+
+describe("unreadReminderDue — paramètres D62 (la constante n'est plus lue)", () => {
+  it("un délai de 30 min rend « trop récent » un message vieux de 20 min ; 5 min le rend dû", () => {
+    expect(unreadReminderDue(base, now, { delayMinutes: 30, minIntervalMinutes: 60 })).toEqual({ due: false, reason: "TOO_RECENT" });
+    expect(unreadReminderDue(base, now, { delayMinutes: 5, minIntervalMinutes: 60 })).toEqual({ due: true, reason: null });
+  });
+  it("l'intervalle minimal vient des paramètres : rappel il y a 30 min, message il y a 20 min", () => {
+    const input = { ...base, lastMessageAt: min(20), recipientRemindedAt: min(30) };
+    expect(unreadReminderDue(input, now, { delayMinutes: 15, minIntervalMinutes: 60 })).toEqual({ due: false, reason: "RATE_LIMITED" });
+    expect(unreadReminderDue(input, now, { delayMinutes: 15, minIntervalMinutes: 25 })).toEqual({ due: true, reason: null });
+  });
+});

@@ -25,3 +25,12 @@ describe("conversation retention (D61 8A)", () => {
     expect(isPurgeable({ bookingStatus: "COMPLETED", bookingEndedAt: days(364), conversationUpdatedAt: days(364) }, now)).toBe(false);
   });
 });
+
+describe("isPurgeable — paramètre messaging.retentionDays (D62)", () => {
+  it("90 jours purge un fil de 100 jours que 365 jours conservait", () => {
+    const now = new Date("2026-09-05T00:00:00.000Z");
+    const input = { bookingStatus: "COMPLETED", bookingEndedAt: new Date("2026-05-28T00:00:00.000Z"), conversationUpdatedAt: new Date("2026-05-28T00:00:00.000Z") };
+    expect(isPurgeable(input, now)).toBe(false);
+    expect(isPurgeable(input, now, 90)).toBe(true);
+  });
+});

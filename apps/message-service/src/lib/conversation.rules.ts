@@ -23,7 +23,8 @@ export function conversationExists(b: BookingForConversation): boolean {
   return (CONVERSATION_OPEN_STATUSES as readonly string[]).includes(b.status);
 }
 
-export function conversationAccess(b: BookingForConversation, now: Date): ConversationAccess {
+/** `writeDaysAfterEnd` : paramètre `messaging.writeDaysAfterEnd` (D62) — la constante n'est que le défaut. */
+export function conversationAccess(b: BookingForConversation, now: Date, writeDaysAfterEnd: number = CONVERSATION_WRITE_DAYS_AFTER_END): ConversationAccess {
   if (!conversationExists(b)) {
     return { canRead: false, canWrite: false, reason: "NOT_ACCEPTED_YET", writeClosesAt: null };
   }
@@ -34,7 +35,7 @@ export function conversationAccess(b: BookingForConversation, now: Date): Conver
   if (b.status === "COMPLETED" || b.status === "CANCELLED") {
     const end = b.completedAt ?? b.closedAt ?? null;
     if (!end) return { canRead: true, canWrite: false, reason: "DEAL_CLOSED", writeClosesAt: null };
-    const closesAt = new Date(end.getTime() + CONVERSATION_WRITE_DAYS_AFTER_END * 86_400_000);
+    const closesAt = new Date(end.getTime() + writeDaysAfterEnd * 86_400_000);
     return now.getTime() < closesAt.getTime()
       ? { canRead: true, canWrite: true, reason: null, writeClosesAt: closesAt.toISOString() }
       : { canRead: true, canWrite: false, reason: "WRITE_WINDOW_OVER", writeClosesAt: closesAt.toISOString() };

@@ -218,6 +218,9 @@ Migration : mapping ci-dessus livré avec la refonte pricing (front + JSON i18n 
 | `SIZE_MODIFIER_S / M / L` | 1,0 / 1,1 / 1,25 | PRC-03 |
 | `WEIGHT_TOLERANCE_PCT` | 10 % | PRC-07 |
 | `COMMISSION_PCT` / `COMMISSION_FLOOR_CENTS` | **12 % / 300** *(acté mockup)* | COM-01/02 |
+| `MIN_BILLABLE_KG` / `MIN_TRANSPORT_CENTS` | **0,5 kg / 800** *(gravé D32)* | PRC-06 |
+| `REFERENCE_KG` | 2 kg *(gravé D33)* | comparabilité |
+| `PROTECTION_EXTENDED_PREMIUM_CENTS` / `PROTECTION_EXTENDED_CAP_CENTS` | 600 / 50 000 *(D22)* | GAR-03/06 |
 | `BAG_FORFAIT_DISCOUNT` | 0,9 | PRC-09 |
 | `SUGGESTION_EXPRESS_CAP_PCT` | à fixer (étude corridor) | PRC-10 |
 | `REPUTATION_TOP_MIN_DEALS / MIN_RATING / MAX_LATE_CANCEL` | 10 / 4,8 / 0 | REP-03 |
@@ -233,5 +236,7 @@ Migration : mapping ci-dessus livré avec la refonte pricing (front + JSON i18n 
 | `REPORT_REVIEW_THRESHOLD` | 3 signalements distincts | SIG-03 |
 
 ---
+
+*Depuis D62 (05/09/2026), chaque paramètre a une **classe** : **A** réglable en ligne par l'admin (catalogue `platform-settings.schema.ts`, portée métier = SUPER_ADMIN, portée exploitation = OPS), **B** visible mais modifiable par déploiement (`SESSION_*`, blocages OTP / TOTP / code de livraison), **C** absente de la page tant que le code ne la lit pas (`SUGGESTION_EXPRESS_CAP_PCT`, `NEW_ACCOUNT_*`, `IDENTITY_REQUIRED_FROM`, `PROTECTION_BASIC_CAP`, `PROTECTION_PROVIDER`, `REPORT_REVIEW_THRESHOLD`, `BAG_FORFAIT_DISCOUNT`, `CATEGORY_SURCHARGE_MAX_PCT`). Le document de référence des valeurs en vigueur est `context/YAMBA-PARAMETRES.md`, généré depuis le catalogue.*
 
 *Toute règle marquée « paramètre serveur » vit en configuration, pas en dur dans le code. Toute évolution d'une règle de ce document se fait par mise à jour du document PUIS du code — jamais l'inverse.*

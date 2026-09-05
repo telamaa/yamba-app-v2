@@ -33,8 +33,10 @@ export type OpsSnapshot = {
   acceptedInWindow: number;
 };
 
-export function evaluateAlerts(s: OpsSnapshot, now: Date): OpsAlert[] {
-  const T = ALERT_THRESHOLDS;
+export type AlertThresholds = { [K in keyof typeof ALERT_THRESHOLDS]: number };
+
+/** `T` : seuils lus dans les paramètres (`alerts.*`, D62) — les constantes ne sont que les défauts. */
+export function evaluateAlerts(s: OpsSnapshot, now: Date, T: AlertThresholds = ALERT_THRESHOLDS): OpsAlert[] {
   const out: OpsAlert[] = [];
   if (s.failedPayoutsOverThreshold > 0) out.push({ rule: "PAYOUT_FAILED_48H", severity: "critical", title: "Versements en échec depuis plus de 48 h", detail: `${s.failedPayoutsOverThreshold} versement(s) rejoué(s) sans succès depuis plus de ${T.payoutFailedHours} h.`, count: s.failedPayoutsOverThreshold, href: "/finances?kind=FAILED" });
   if (s.undecidedDisputesOverThreshold > 0) out.push({ rule: "DISPUTE_UNDECIDED_72H", severity: "critical", title: "Litiges décidables sans décision", detail: `${s.undecidedDisputesOverThreshold} litige(s) tranchable(s) depuis plus de ${T.disputeUndecidedHours} h.`, count: s.undecidedDisputesOverThreshold, href: "/disputes?decidable=1" });

@@ -8,7 +8,10 @@ import prisma from "@packages/libs/prisma";
 import { isEmailConfigured, sendTransactionalEmail } from "@packages/email";
 import type { OpsAlert, OpsAlertsResponse } from "@packages/api-contracts";
 import { OPS_EMAILS } from "../emails/ops-emails";
-import { ALERT_SENT_TTL_SECONDS, ALERT_THRESHOLDS, alertSentKey, evaluateAlerts, type OpsSnapshot } from "./ops-alerts.rules";
+import { ALERT_SENT_TTL_SECONDS, ALERT_THRESHOLDS, alertSentKey, evaluateAlerts, type AlertThresholds, type OpsSnapshot } from "./ops-alerts.rules";
+import { alertThresholdsFromSettings } from "@packages/api-contracts";
+import { platformSettings } from "@packages/libs/settings/default";
+import type { SettingsReader } from "@packages/libs/settings";
 
 const SUPPORT_EMAIL = process.env.SUPPORT_EMAIL ?? "support@yamba.app";
 const ADMIN_URL = (process.env.ADMIN_UI_URL ?? "http://localhost:3001").replace(/\/$/, "");
@@ -18,8 +21,7 @@ export type AlertDedupStore = { set(key: string, value: string, mode: "EX", seco
 
 const H = 3_600_000; const D = 86_400_000;
 
-export async function collectOpsSnapshot(now: Date): Promise<OpsSnapshot> {
-  const T = ALERT_THRESHOLDS;
+export async function collectOpsSnapshot(now: Date, T: AlertThresholds = ALERT_THRESHOLDS): Promise<OpsSnapshot> {
   const unresolvedReversal = { OR: [{ payoutReversalResolution: { isSet: false } }, { payoutReversalResolution: null }] };
   const [failedPayouts, disputes, held, reversals, parked, oldestUnpublished, failedEmails, lastTrip, requests, accepted] = await Promise.all([
     prisma.booking.count({ where: { isDeleted: false, payoutStatus: "FAILED", status: { in: ["COMPLETED", "CANCELLED"] }, OR: [{ completedAt: { lt: new Date(now.getTime() - T.payoutFailedHours * H) } }, { closedAt: { lt: new Date(now.getTime() - T.payoutFailedHours * H) } }] } as never }),
@@ -50,17 +52,19 @@ export async function collectOpsSnapshot(now: Date): Promise<OpsSnapshot> {
   };
 }
 
-export function makeOpsAlertsService(clock: () => Date = () => new Date()) {
+export function makeOpsAlertsService(clock: () => Date = () => new Date(), settings: SettingsReader = platformSettings()) {
   return {
     async evaluate(): Promise<OpsAlertsResponse> {
       const now = clock();
-      const alerts = evaluateAlerts(await collectOpsSnapshot(now), now);
-      return { alerts, evaluatedAt: now.toISOString(), thresholds: { ...ALERT_THRESHOLDS } };
+      const T = alertThresholdsFromSettings(await settings.get()); // D62
+      const alerts = evaluateAlerts(await collectOpsSnapshot(now, T), now, T);
+      return { alerts, evaluatedAt: now.toISOString(), thresholds: { ...T } };
     },
     /** Cron horaire : email au support pour les alertes qui apparaissent pour la première fois aujourd'hui. Retourne les règles envoyées. */
     async notifyNewAlerts(store: AlertDedupStore, alerts?: OpsAlert[]): Promise<string[]> {
       const now = clock();
-      const active = alerts ?? evaluateAlerts(await collectOpsSnapshot(now), now);
+      const T = alertThresholdsFromSettings(await settings.get()); // D62
+      const active = alerts ?? evaluateAlerts(await collectOpsSnapshot(now, T), now, T);
       const fresh: OpsAlert[] = [];
       for (const a of active) {
         const first = await store.set(alertSentKey(a.rule, now), "1", "EX", ALERT_SENT_TTL_SECONDS, "NX");

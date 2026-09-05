@@ -3,7 +3,8 @@ import { notHiddenFilter } from "../lib/admin-trips.rules";
 import { recordSearch, tripViews } from "@packages/libs/redis/trip-stats";
 import redis from "@packages/libs/redis";
 import { Prisma } from "@prisma/client";
-import { sortByPriceForWeight, totalForWeightCents, transportForWeightCents } from "../lib/price-for-weight";
+import { sortByPriceForWeight, totalForWeightCents, transportForWeightCents, weightPricingFromSettings, type WeightPricingParams } from "../lib/price-for-weight";
+import { platformSettings } from "@packages/libs/settings/default";
 import prisma from "@packages/libs/prisma";
 import { markFavorites } from "../services/trip-favorite.service";
 import { ValidationError } from "@packages/error-handler";
@@ -167,10 +168,11 @@ async function markViewsAndCountSearch(mapped: Array<{ id: string; viewsCount?: 
 function enrichForWeight(
   dto: YambaTripResultDto,
   trip: { pricePerKgCents?: number | null; minPriceCents?: number | null },
-  weightKg: number
+  weightKg: number,
+  pricing: WeightPricingParams
 ): YambaTripResultDto {
-  const transport = transportForWeightCents(trip, weightKg);
-  const total = totalForWeightCents(trip, weightKg);
+  const transport = transportForWeightCents(trip, weightKg, pricing);
+  const total = totalForWeightCents(trip, weightKg, pricing);
   return {
     ...dto,
     weightKg,
@@ -262,6 +264,7 @@ export const searchTrips = async (
     // (crossover legacy/PER_KG), donc pas d'index possible → tri en mémoire
     // sur une fenêtre bornée (WEIGHT_SORT_WINDOW) avec un curseur-offset
     // « o:<n> ». Assumé v1 (volumes faibles) ; documenté dans la fiche.
+    const pricing = weightPricingFromSettings(await platformSettings().get()); // D62
     if (params.sort === "lowestPrice" && params.weightKg) {
       const WEIGHT_SORT_WINDOW = 200;
       const offset = params.cursor?.startsWith("o:") ? Number(params.cursor.slice(2)) || 0 : 0;
@@ -269,13 +272,13 @@ export const searchTrips = async (
         prisma.trip.findMany({ where, take: WEIGHT_SORT_WINDOW, include: TRIP_SEARCH_INCLUDE }),
         prisma.trip.count({ where }),
       ]);
-      const sorted = sortByPriceForWeight(all, params.weightKg);
+      const sorted = sortByPriceForWeight(all, params.weightKg, pricing);
       const page = sorted.slice(offset, offset + params.limit);
       const nextCursor = offset + params.limit < sorted.length ? `o:${offset + params.limit}` : null;
       const mapped: YambaTripResultDto[] = [];
       for (const t of page) {
         try {
-          mapped.push(enrichForWeight(mapTripToYambaResult(t as any, params.locale), t, params.weightKg));
+          mapped.push(enrichForWeight(mapTripToYambaResult(t as any, params.locale), t, params.weightKg, pricing));
         } catch (err) {
           console.warn(`[search] Skipping invalid trip ${t.id}: ${(err as Error).message}`);
         }
@@ -313,7 +316,7 @@ export const searchTrips = async (
     for (const t of trips) {
       try {
         const dto = mapTripToYambaResult(t as any, params.locale);
-        mapped.push(params.weightKg ? enrichForWeight(dto, t, params.weightKg) : dto);
+        mapped.push(params.weightKg ? enrichForWeight(dto, t, params.weightKg, pricing) : dto);
       } catch (err) {
         console.warn(
           `[search] Skipping invalid trip ${t.id}: ${(err as Error).message}`

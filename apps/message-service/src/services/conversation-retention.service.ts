@@ -7,7 +7,8 @@
  * sont des dossiers de modération, pas des propos) — ils perdent seulement leur corps.
  */
 import prisma from "@packages/libs/prisma";
-import { CONVERSATION_RETENTION_DAYS } from "@packages/api-contracts";
+import { platformSettings } from "@packages/libs/settings/default";
+import type { SettingsReader } from "@packages/libs/settings";
 import { isPurgeable } from "../lib/conversation-retention.rules";
 
 const DAY = 86_400_000;
@@ -15,12 +16,13 @@ const BATCH = 100;
 
 export type ConversationRetentionService = ReturnType<typeof makeConversationRetentionService>;
 
-export function makeConversationRetentionService(clock: () => Date = () => new Date()) {
+export function makeConversationRetentionService(clock: () => Date = () => new Date(), settings: SettingsReader = platformSettings()) {
   return {
     /** Un passage : renvoie le nombre de conversations purgées. */
     async purgeOnce(now: Date = clock()): Promise<{ examined: number; purged: number }> {
+      const retentionDays = (await settings.get())["messaging.retentionDays"]; // D62
       const candidates = await prisma.conversation.findMany({
-        where: { updatedAt: { lt: new Date(now.getTime() - CONVERSATION_RETENTION_DAYS * DAY) } },
+        where: { updatedAt: { lt: new Date(now.getTime() - retentionDays * DAY) } },
         select: { id: true, bookingId: true, updatedAt: true },
         orderBy: { updatedAt: "asc" },
         take: BATCH,
@@ -38,7 +40,7 @@ export function makeConversationRetentionService(clock: () => Date = () => new D
         const input = booking
           ? { bookingStatus: booking.status, bookingEndedAt: booking.completedAt ?? booking.closedAt ?? null, conversationUpdatedAt: c.updatedAt }
           : { bookingStatus: "CANCELLED", bookingEndedAt: null, conversationUpdatedAt: c.updatedAt };
-        if (!isPurgeable(input, now)) continue;
+        if (!isPurgeable(input, now, retentionDays)) continue;
         await prisma.$transaction([
           prisma.phoneReveal.deleteMany({ where: { conversationId: c.id } }),
           prisma.meetup.deleteMany({ where: { conversationId: c.id } }),

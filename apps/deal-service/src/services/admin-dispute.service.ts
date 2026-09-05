@@ -12,6 +12,8 @@ import { NotFoundError } from "@packages/error-handler";
 import { recordAdminAction } from "@packages/admin-audit";
 import { DISPUTE_RESPONSE_DELAY_HOURS, type AdminDisputeFile, type ArbitrationQueueItem, type ArbitrationQueueQuery, type ArbitrationQueueResponse } from "@packages/api-contracts";
 import { computeLateCancellationCompensationCents } from "./booking-lifecycle";
+import { platformSettings } from "@packages/libs/settings/default";
+import type { SettingsReader } from "@packages/libs/settings";
 
 const iso = (d: Date | null | undefined) => (d ? d.toISOString() : null);
 
@@ -83,8 +85,8 @@ export function filterQueueItems(items: ArbitrationQueueItem[], q: ArbitrationQu
 /** Export opérationnel : identifiants des parties, jamais un nom, un email ni un téléphone (D60 2A). */
 export const ARBITRATION_CSV_COLUMNS = ["bookingId", "kind", "ticketNumber", "category", "openedAt", "originCity", "destinationCity", "amountCents", "currencyCode", "shipperId", "carrierId", "carrierResponded", "decidableAt"] as const;
 
-function responseDeadline(disputedAt: Date): Date {
-  return new Date(disputedAt.getTime() + DISPUTE_RESPONSE_DELAY_HOURS * 3_600_000);
+function responseDeadline(disputedAt: Date, delayHours: number = DISPUTE_RESPONSE_DELAY_HOURS): Date {
+  return new Date(disputedAt.getTime() + delayHours * 3_600_000);
 }
 
 export type AdminPartyRecord = {
@@ -110,13 +112,14 @@ export function arbitrationKindOf(b: Pick<AdminBookingRecord, "status" | "retent
 export function toQueueItem(
   b: AdminBookingRecord,
   dispute: Pick<AdminDisputeRecord, "ticketNumber" | "category" | "carrierRespondedAt"> | null,
-  names: { shipperFirstName: string; carrierFirstName: string }
+  names: { shipperFirstName: string; carrierFirstName: string },
+  delayHours: number = DISPUTE_RESPONSE_DELAY_HOURS
 ): ArbitrationQueueItem | null {
   const kind = arbitrationKindOf(b);
   if (!kind) return null;
   const responded = kind === "DISPUTE" && !!dispute?.carrierRespondedAt;
   const decidableAt =
-    kind === "RETENTION" || responded || !b.disputedAt ? (b.closedAt ?? b.disputedAt ?? b.requestedAt) : responseDeadline(b.disputedAt);
+    kind === "RETENTION" || responded || !b.disputedAt ? (b.closedAt ?? b.disputedAt ?? b.requestedAt) : responseDeadline(b.disputedAt, delayHours);
   return {
     carrierResponded: responded,
     decidableAt: decidableAt.toISOString(),
@@ -155,7 +158,8 @@ export function toDisputeFile(
   dispute: AdminDisputeRecord | null,
   shipper: AdminPartyRecord,
   carrier: AdminPartyRecord,
-  now: Date = new Date()
+  now: Date = new Date(),
+  delayHours: number = DISPUTE_RESPONSE_DELAY_HOURS
 ): AdminDisputeFile | null {
   const kind = arbitrationKindOf(b);
   if (!kind) return null;
@@ -174,11 +178,11 @@ export function toDisputeFile(
       ? { outcome: (b.retentionDisposition === "CARRIER" ? "COMPENSATE_CARRIER" : "RESTITUTE_SHIPPER") as "COMPENSATE_CARRIER" | "RESTITUTE_SHIPPER", reason: b.retentionDecisionReason ?? "", decidedAt: b.retentionDecidedAt.toISOString() }
       : null;
   const decidableAt =
-    kind === "DISPUTE" && b.disputedAt ? (dispute?.carrierRespondedAt ? b.disputedAt : responseDeadline(b.disputedAt)) : null;
+    kind === "DISPUTE" && b.disputedAt ? (dispute?.carrierRespondedAt ? b.disputedAt : responseDeadline(b.disputedAt, delayHours)) : null;
   const canDecide =
     kind === "RETENTION"
       ? b.retentionDisposition === "HELD_FOR_MEDIATION"
-      : !resolution && !!b.disputedAt && (!!dispute?.carrierRespondedAt || now.getTime() >= responseDeadline(b.disputedAt).getTime());
+      : !resolution && !!b.disputedAt && (!!dispute?.carrierRespondedAt || now.getTime() >= responseDeadline(b.disputedAt, delayHours).getTime());
   const retentionCents = b.retentionCents ?? 0;
   return {
     retentionDecision,
@@ -251,7 +255,7 @@ export function toDisputeFile(
               dispute.carrierRespondedAt && dispute.carrierStatement
                 ? { statement: dispute.carrierStatement, photoUrls: dispute.carrierStatementPhotoUrls ?? [], respondedAt: dispute.carrierRespondedAt.toISOString() }
                 : null,
-            responseDeadlineAt: responseDeadline(b.disputedAt ?? b.requestedAt).toISOString(),
+            responseDeadlineAt: responseDeadline(b.disputedAt ?? b.requestedAt, delayHours).toISOString(),
             resolution,
           }
         : null,
@@ -272,7 +276,7 @@ const partySelect = {
   carrierPage: { select: { ratingsAvg: true, ratingsCount: true, completedDealsCount: true, lateCancellationsCount: true, disputesLostCount: true } },
 } as const;
 
-export function makeAdminDisputeService() {
+export function makeAdminDisputeService(settings: SettingsReader = platformSettings()) {
   return {
     /** C-PR7a — lignes d'export (ids des parties) : mêmes filtres que la file. */
     async exportRows(q: ArbitrationQueueQuery, now = new Date()): Promise<Array<Record<(typeof ARBITRATION_CSV_COLUMNS)[number], unknown>>> {
@@ -305,12 +309,13 @@ export function makeAdminDisputeService() {
       const disputeBy = new Map(disputes.map((d) => [d.bookingId, d]));
       const nameBy = new Map(users.map((u) => [u.id, u.firstName]));
 
+      const delayHours = (await settings.get())["dispute.responseDelayHours"]; // D62
       const items = bookings
         .map((b) =>
           toQueueItem(b, disputeBy.get(b.id) ?? null, {
             shipperFirstName: nameBy.get(b.shipperId) ?? "—",
             carrierFirstName: nameBy.get(b.carrierId) ?? "—",
-          })
+          }, delayHours)
         )
         .filter((x): x is ArbitrationQueueItem => x !== null)
         // Les plus anciens d'abord : un dossier qui attend est prioritaire.
@@ -331,7 +336,7 @@ export function makeAdminDisputeService() {
         prisma.user.findUnique({ where: { id: booking.carrierId }, select: partySelect }),
       ]);
       if (!shipper || !carrier) throw new NotFoundError("No arbitration file for this deal.");
-      const file = toDisputeFile(booking, dispute as unknown as AdminDisputeRecord | null, shipper as AdminPartyRecord, carrier as AdminPartyRecord, new Date());
+      const file = toDisputeFile(booking, dispute as unknown as AdminDisputeRecord | null, shipper as AdminPartyRecord, carrier as AdminPartyRecord, new Date(), (await settings.get())["dispute.responseDelayHours"]);
       if (!file) throw new NotFoundError("No arbitration file for this deal.");
       // Journal : l'admin a ouvert un dossier (identités, photos, montants).
       await recordAdminAction(prisma, {

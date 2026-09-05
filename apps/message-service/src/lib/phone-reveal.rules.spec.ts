@@ -29,3 +29,13 @@ describe("quick-replies (D61 2A)", () => {
     expect(fr.filter((r) => r.kind === "PICKUP").length).toBeGreaterThan(2);
   });
 });
+
+describe("phoneRevealWindow — paramètre messaging.phoneRevealLeadHours (D62)", () => {
+  it("avec 6 h d'avance, le numéro s'ouvre 6 h avant la remise ; avec 0 h, à l'heure de la remise", () => {
+    const now = new Date("2026-09-10T08:00:00.000Z");
+    const pickupStartAt = new Date("2026-09-10T12:00:00.000Z");
+    expect(phoneRevealWindow({ pickupStartAt, departureAt: null }, now).allowed).toBe(false);
+    expect(phoneRevealWindow({ pickupStartAt, departureAt: null }, now, 6)).toMatchObject({ allowed: true, opensAt: new Date("2026-09-10T06:00:00.000Z") });
+    expect(phoneRevealWindow({ pickupStartAt, departureAt: null }, pickupStartAt, 0).allowed).toBe(true);
+  });
+});

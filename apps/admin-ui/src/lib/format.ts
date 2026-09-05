@@ -29,6 +29,8 @@ export const OUTCOME_LABEL: Record<string, string> = {
 };
 
 export const ACTION_LABEL: Record<string, string> = {
+  SETTING_CHANGED: "Paramètre modifié",
+  SETTINGS_RESET: "Paramètre réinitialisé",
   ADMIN_LOGIN: "Connexion admin",
   ADMIN_LOGOUT: "Déconnexion",
   ADMIN_TOTP_ENABLED: "2FA activée",

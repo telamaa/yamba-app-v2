@@ -24,6 +24,8 @@ import {
   type DisputeResolutionOutcome,
 } from "@packages/api-contracts";
 import { canPerform, type BookingStatus } from "./booking-state-machine";
+import { platformSettings } from "@packages/libs/settings/default";
+import type { SettingsReader } from "@packages/libs/settings";
 import { BookingLifecycleError, baseEventPayload, computeLateCancellationCompensationCents } from "./booking-lifecycle";
 import { applyBookingTransition, loadBookingForWrite, makeEnvelope, type BookingForWrite } from "./booking-write";
 import { recomputeBookingParties } from "./reputation.service";
@@ -60,13 +62,14 @@ export function computeResolutionMoney(
   return { refundCents, carrierPayoutCents, yambaKeepsCents: total - refundCents - carrierPayoutCents };
 }
 
-export function disputeResponseDeadline(disputedAt: Date): Date {
-  return new Date(disputedAt.getTime() + DISPUTE_RESPONSE_DELAY_HOURS * 3_600_000);
+/** `delayHours` : paramètre `dispute.responseDelayHours` (D62) — la constante n'est que le défaut. */
+export function disputeResponseDeadline(disputedAt: Date, delayHours: number = DISPUTE_RESPONSE_DELAY_HOURS): Date {
+  return new Date(disputedAt.getTime() + delayHours * 3_600_000);
 }
 
 /** Décision possible : le Voyageur a répondu, ou le délai est passé (D55 1A). */
-export function isDisputeDecidable(d: { disputedAt: Date; carrierRespondedAt: Date | null }, now: Date): boolean {
-  return d.carrierRespondedAt !== null || now.getTime() >= disputeResponseDeadline(d.disputedAt).getTime();
+export function isDisputeDecidable(d: { disputedAt: Date; carrierRespondedAt: Date | null }, now: Date, delayHours: number = DISPUTE_RESPONSE_DELAY_HOURS): boolean {
+  return d.carrierRespondedAt !== null || now.getTime() >= disputeResponseDeadline(d.disputedAt, delayHours).getTime();
 }
 
 /** Qui « perd » un litige (D55 4A) : l'Expéditeur si rejet, le Voyageur dès qu'il y a remboursement. */
@@ -95,7 +98,8 @@ type DisputeRow = {
 export function makeDealMediationService(
   provider: PaymentProvider,
   payoutExecutor: PayoutExecutor | null = null,
-  clock: () => Date = () => new Date()
+  clock: () => Date = () => new Date(),
+  settings: SettingsReader = platformSettings()
 ) {
   async function loadDispute(bookingId: string): Promise<DisputeRow> {
     const d = await prisma.dispute.findUnique({
@@ -164,9 +168,10 @@ export function makeDealMediationService(
       const dispute = await loadDispute(booking.id);
       if (dispute.resolvedAt) throw new BookingLifecycleError("TRANSITION_NOT_ALLOWED", "This dispute was already decided.");
       if (!booking.disputedAt) throw new BookingLifecycleError("TRANSITION_NOT_ALLOWED", "This dispute has no opening date.");
-      if (!isDisputeDecidable({ disputedAt: booking.disputedAt, carrierRespondedAt: dispute.carrierRespondedAt }, now)) {
-        throw new BookingLifecycleError("TRANSITION_NOT_ALLOWED", "The carrier still has time to answer (72h after the dispute was filed).", {
-          decidableAt: disputeResponseDeadline(booking.disputedAt).toISOString(),
+      const delayHours = (await settings.get())["dispute.responseDelayHours"]; // D62
+      if (!isDisputeDecidable({ disputedAt: booking.disputedAt, carrierRespondedAt: dispute.carrierRespondedAt }, now, delayHours)) {
+        throw new BookingLifecycleError("TRANSITION_NOT_ALLOWED", `The carrier still has time to answer (${delayHours}h after the dispute was filed).`, {
+          decidableAt: disputeResponseDeadline(booking.disputedAt, delayHours).toISOString(),
         });
       }
 
