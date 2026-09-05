@@ -560,7 +560,7 @@ Ordre de demarrage : auth -> trip -> gateway.
   la reutilise), GET /api/health sur user-ui et admin-ui, battement externe des crons
   (CRON_HEARTBEAT_PING_URLS, GET best effort dans withHeartbeat). A TA MAIN : compte Better Stack,
   3 moniteurs HTTP, 4 battements (payout, expire, unread-reminder, ops-alerts), contacts d'alerte —
-  runbook dans DOC-TECHNIQUE.
+  runbook dans DOC-TECHNIQUE. MERGE 05/09 : **#197** (17 checks comptes).
 - Backlog parametre serveur : classe C du catalogue D62 (tolerance de poids,
   plafonds comptes neufs, plafond express, seuil de trois signalements…).
 - Photos hors TripDocument chez ImageKit sans fileId (colis, pickup, livraison, litige,
