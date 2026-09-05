@@ -164,6 +164,7 @@
       "FAMILY_REFUSED": "The traveler does not accept this kind of parcel on this trip.",
       "TRIP_NOT_BOOKABLE": "This trip no longer accepts requests.",
       "OWN_TRIP": "You cannot book your own trip.",
+      "NEW_ACCOUNT_CAP": "Your account is recent: for now your shipments are capped (declared value, weight and number per month). The cap lifts with your first completed shipments.",
       "PAYMENT_NOT_AUTHORIZED": "The payment has not been authorized yet. Please try again.",
       "PAYMENT_MISMATCH": "The authorization no longer matches your request. A new one is being prepared.",
       "PAYMENT_ALREADY_USED": "This payment is already attached to a request.",

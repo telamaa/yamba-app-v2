@@ -6,6 +6,7 @@
  * (le DTO public d'un membre ne porte pas son id) — le serveur le résout.
  */
 import { z } from "zod";
+import { TrustLevelSchema } from "./trust.schema"; // D71
 
 export const REPORT_TARGET_TYPES = ["TRIP", "USER"] as const;
 export const ReportTargetTypeSchema = z.enum(REPORT_TARGET_TYPES).meta({ id: "ReportTargetType" });
@@ -56,8 +57,10 @@ export const AdminReportItemSchema = z
     reporter: z.object({ id: z.string(), firstName: z.string() }),
     /** Signalements OUVERTS sur la même cible (tous auteurs). */
     openCountOnTarget: z.number().int(),
-    /** SIG-03 — openCountOnTarget ≥ REPORT_REVIEW_THRESHOLD. */
+    /** SIG-03 — openCountOnTarget ≥ REPORT_REVIEW_THRESHOLD, ou membre visé à risque (D71). */
     priority: z.boolean(),
+    /** D71 — niveau de risque interne du membre visé (ou du propriétaire du trajet). */
+    targetTrustLevel: TrustLevelSchema.nullable(),
   })
   .meta({ id: "AdminReportItem" });
 export type AdminReportItem = z.infer<typeof AdminReportItemSchema>;

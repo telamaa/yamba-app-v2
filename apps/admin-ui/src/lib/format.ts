@@ -84,6 +84,7 @@ export const REPORT_REASON_LABEL: Record<string, string> = {
   INAPPROPRIATE: "Comportement inapproprié",
   IMPERSONATION: "Usurpation d'identité",
 };
+export const TRUST_LEVEL_LABEL: Record<string, string> = { NEW: "Compte neuf", STANDARD: "Standard", WATCH: "À surveiller", HIGH_RISK: "À risque" }; // D71
 export const REPORT_TARGET_LABEL: Record<string, string> = { TRIP: "Trajet", USER: "Membre" };
 export const REPORT_STATUS_LABEL: Record<string, string> = { OPEN: "à traiter", REVIEWED: "traité", DISMISSED: "sans suite" };
 export const CHAT_ROLE_LABEL: Record<string, string> = { SHIPPER: "Expéditeur", CARRIER: "Voyageur", SYSTEM: "Système" };

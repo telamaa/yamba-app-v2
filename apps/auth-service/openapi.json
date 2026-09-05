@@ -17906,6 +17906,175 @@
         },
         "additionalProperties": false
       },
+      "TrustLevel": {
+        "type": "string",
+        "enum": [
+          "NEW",
+          "STANDARD",
+          "WATCH",
+          "HIGH_RISK"
+        ]
+      },
+      "TrustAssessment": {
+        "type": "object",
+        "properties": {
+          "score": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "0 = no risk signal, 100 = maximum; higher is riskier"
+          },
+          "level": {
+            "$ref": "#/components/schemas/TrustLevel"
+          },
+          "factors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string"
+                },
+                "points": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "detail": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "key",
+                "points",
+                "detail"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "caps": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "maxDeclaredValueCents": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "maxWeightKg": {
+                    "type": "number"
+                  },
+                  "maxShipmentsPerMonth": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "maxDeclaredValueCents",
+                  "maxWeightKg",
+                  "maxShipmentsPerMonth"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "capsReason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "NEW_ACCOUNT",
+                  "HIGH_RISK"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "signals": {
+            "type": "object",
+            "properties": {
+              "accountAgeDays": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "disputesLost": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "lateCancellations": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "completedDeals": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "ratingsAvg": {
+                "type": "number"
+              },
+              "ratingsCount": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "reportsOpen": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "reportsUpheld": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "bookingsLast24h": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "bookingsThisMonth": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "accountAgeDays",
+              "disputesLost",
+              "lateCancellations",
+              "completedDeals",
+              "ratingsAvg",
+              "ratingsCount",
+              "reportsOpen",
+              "reportsUpheld",
+              "bookingsLast24h",
+              "bookingsThisMonth"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "score",
+          "level",
+          "factors",
+          "caps",
+          "capsReason",
+          "signals"
+        ],
+        "additionalProperties": false,
+        "description": "Internal risk score (D29 ②, REP-04): decision support and progressive caps only — never an automatic sanction, never shown to members"
+      },
       "AdminRole": {
         "type": "string",
         "enum": [
@@ -18579,6 +18748,16 @@
               ],
               "additionalProperties": false
             }
+          },
+          "trust": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TrustAssessment"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -18601,7 +18780,8 @@
           "carrier",
           "shipper",
           "activity",
-          "adminActions"
+          "adminActions",
+          "trust"
         ],
         "additionalProperties": false,
         "description": "Everything an operator needs on a user — never a secret, never a delivery code"
@@ -24120,6 +24300,30 @@
             "maximum": 25,
             "description": "Taille maximale d'un document (mb) — ex-SiteConfig"
           },
+          "trust.newAccountDays": {
+            "type": "number",
+            "minimum": 7,
+            "maximum": 180,
+            "description": "Compte neuf pendant (days) — D71 · CNF-06 · REP-04"
+          },
+          "trust.newAccount.maxDeclaredValueCents": {
+            "type": "number",
+            "minimum": 5000,
+            "maximum": 500000,
+            "description": "Compte neuf : valeur déclarée max par colis (cents) — D71 · CNF-06"
+          },
+          "trust.newAccount.maxWeightKg": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 30,
+            "description": "Compte neuf : poids max par colis (kg) — D71 · CNF-06"
+          },
+          "trust.newAccount.maxShipmentsPerMonth": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 50,
+            "description": "Compte neuf : envois par mois civil (count) — D71 · CNF-06"
+          },
           "privacy.recipientRetentionDays": {
             "type": "number",
             "minimum": 7,
@@ -24192,6 +24396,10 @@
           "alerts.acceptanceRateMinRequests",
           "documents.maxDocsPerTrip",
           "documents.maxDocSizeMb",
+          "trust.newAccountDays",
+          "trust.newAccount.maxDeclaredValueCents",
+          "trust.newAccount.maxWeightKg",
+          "trust.newAccount.maxShipmentsPerMonth",
           "privacy.recipientRetentionDays",
           "retention.notificationsDays",
           "retention.emailDeliveriesDays",
@@ -24219,7 +24427,8 @@
               "alerts",
               "documents",
               "privacy",
-              "retention"
+              "retention",
+              "trust"
             ]
           },
           "label": {
@@ -25944,6 +26153,16 @@
           },
           "priority": {
             "type": "boolean"
+          },
+          "targetTrustLevel": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TrustLevel"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -25958,7 +26177,8 @@
           "createdAt",
           "reporter",
           "openCountOnTarget",
-          "priority"
+          "priority",
+          "targetTrustLevel"
         ],
         "additionalProperties": false
       },

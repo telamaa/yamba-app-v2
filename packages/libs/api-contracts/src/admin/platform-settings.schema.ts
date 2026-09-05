@@ -20,7 +20,7 @@ import { z } from "zod";
 
 export type SettingScope = "BUSINESS" | "OPERATIONS";
 export type SettingUnit = "percent" | "cents" | "kg" | "coef" | "hours" | "days" | "minutes" | "count" | "rating" | "mb";
-export type SettingGroup = "pricing" | "protection" | "cancellation" | "rating" | "dispute" | "reputation" | "messaging" | "alerts" | "documents" | "privacy" | "retention";
+export type SettingGroup = "pricing" | "protection" | "cancellation" | "rating" | "dispute" | "reputation" | "messaging" | "alerts" | "documents" | "privacy" | "retention" | "trust";
 
 export const SETTING_GROUP_LABEL: Record<SettingGroup, string> = {
   pricing: "Prix et commission",
@@ -34,6 +34,7 @@ export const SETTING_GROUP_LABEL: Record<SettingGroup, string> = {
   documents: "Documents",
   privacy: "Données personnelles",
   retention: "Conservation",
+  trust: "Confiance (TrustScore interne)",
 };
 
 export type SettingDefinition = {
@@ -111,6 +112,11 @@ export const SETTINGS_CATALOG = [
   { key: "documents.maxDocsPerTrip", group: "documents", label: "Documents par trajet", description: "Nombre maximal de justificatifs (billets…) attachés à un trajet.", rule: "ex-SiteConfig", unit: "count", default: 5, min: 1, max: 20, step: 1, scope: "OPERATIONS", consumers: ["trip-service"] },
   { key: "documents.maxDocSizeMb", group: "documents", label: "Taille maximale d'un document", description: "Taille maximale (Mo) d'un justificatif de trajet, vérifiée côté serveur.", rule: "ex-SiteConfig", unit: "mb", default: 5, min: 1, max: 25, step: 1, scope: "OPERATIONS", consumers: ["trip-service"] },
   /* ── Données personnelles ── */
+  // D71 — TrustScore interne : plafonds progressifs d'un compte neuf ou à risque (CNF-06)
+  { key: "trust.newAccountDays", group: "trust", label: "Compte neuf pendant", description: "Âge du compte (jours) en dessous duquel un membre sans historique (moins de 3 deals terminés) est « neuf » : ses réservations sont plafonnées et sa vélocité est surveillée.", rule: "D71 · CNF-06 · REP-04", unit: "days", default: 30, min: 7, max: 180, step: 1, scope: "OPERATIONS", consumers: ["deal-service", "auth-service"] },
+  { key: "trust.newAccount.maxDeclaredValueCents", group: "trust", label: "Compte neuf : valeur déclarée max par colis", description: "Au-delà, la réservation est refusée (409 NEW_ACCOUNT_CAP) tant que le compte est neuf ou à risque. Le membre lit le plafond dans le message.", rule: "D71 · CNF-06", unit: "cents", default: 30000, min: 5000, max: 500000, step: 1000, scope: "BUSINESS", consumers: ["deal-service"], example: "300 € : un colis de 450 € déclarés est refusé pour un compte de 10 jours" },
+  { key: "trust.newAccount.maxWeightKg", group: "trust", label: "Compte neuf : poids max par colis", description: "Même refus 409 NEW_ACCOUNT_CAP au-delà, pour les colis PARCEL.", rule: "D71 · CNF-06", unit: "kg", default: 10, min: 1, max: 30, step: 1, scope: "BUSINESS", consumers: ["deal-service"] },
+  { key: "trust.newAccount.maxShipmentsPerMonth", group: "trust", label: "Compte neuf : envois par mois civil", description: "Nombre de demandes de réservation créées depuis le 1er du mois à partir duquel une nouvelle demande est refusée.", rule: "D71 · CNF-06", unit: "count", default: 5, min: 1, max: 50, step: 1, scope: "OPERATIONS", consumers: ["deal-service"] },
   { key: "privacy.recipientRetentionDays", group: "privacy", label: "Effacement du destinataire après", description: "Jours après la fin d'un deal au bout desquels le nom, le téléphone et l'email du destinataire (un tiers sans compte) sont effacés de la réservation. Jamais avant : un litige ou une preuve de remise peut en avoir besoin.", rule: "D63 5A · RGP-02", unit: "days", default: 30, min: 7, max: 365, step: 1, scope: "OPERATIONS", consumers: ["deal-service"] },
   /* ── Conservation (D64 6A, RGP-01) ── */
   { key: "retention.notificationsDays", group: "retention", label: "Notifications in-app", description: "Jours après lesquels une notification du tableau de bord est supprimée (lue ou non).", rule: "D64 6A · RGP-01", unit: "days", default: 365, min: 30, max: 1095, step: 1, scope: "OPERATIONS", consumers: ["notification-service"] },
@@ -146,7 +152,6 @@ export const FIXED_PARAMETERS = [
 export const PLANNED_PARAMETERS = [
   { key: "WEIGHT_TOLERANCE_PCT", rule: "PRC-07 · RG-B-11" },
   { key: "SUGGESTION_EXPRESS_CAP_PCT", rule: "PRC-10" },
-  { key: "NEW_ACCOUNT_MAX_DECLARED_VALUE / MAX_WEIGHT / MAX_SHIPMENTS_PER_MONTH", rule: "CNF-06" },
   { key: "IDENTITY_REQUIRED_FROM", rule: "CNF-05" },
   { key: "PROTECTION_BASIC_CAP / PROTECTION_PROVIDER", rule: "GAR-01/03" },
   { key: "REPORT_REVIEW_THRESHOLD", rule: "SIG-03" },
@@ -236,7 +241,7 @@ export const SETTINGS_REASON_MIN_LENGTH = 20;
 const SettingDefinitionSchema = z
   .object({
     key: z.string(),
-    group: z.enum(["pricing", "protection", "cancellation", "rating", "dispute", "reputation", "messaging", "alerts", "documents", "privacy", "retention"]),
+    group: z.enum(["pricing", "protection", "cancellation", "rating", "dispute", "reputation", "messaging", "alerts", "documents", "privacy", "retention", "trust"]),
     label: z.string(),
     description: z.string(),
     rule: z.string(),

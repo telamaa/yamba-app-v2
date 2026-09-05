@@ -8,7 +8,7 @@
 
 ## Trois classes (D62 2A)
 
-- **A — réglable en ligne** : 45 clés ci-dessous. Portée **métier** = super administrateur seul ; portée **exploitation** = profil Exploitation (OPS) ou super administrateur. Lecture ouverte à tous les profils.
+- **A — réglable en ligne** : 49 clés ci-dessous. Portée **métier** = super administrateur seul ; portée **exploitation** = profil Exploitation (OPS) ou super administrateur. Lecture ouverte à tous les profils.
 - **B — modifiable par déploiement seulement** : les invariants de sécurité (liste en fin de document).
 - **C — prévue, pas encore lue par le code** : nommée au §13 des règles métier, absente de la page tant qu'aucun consommateur n'existe.
 
@@ -148,6 +148,42 @@ Règles communes : motif ≥ 20 caractères, une ligne de journal par clé (avan
 - **Documents par trajet** (`documents.maxDocsPerTrip`) — Nombre maximal de justificatifs (billets…) attachés à un trajet.
 - **Taille maximale d'un document** (`documents.maxDocSizeMb`) — Taille maximale (Mo) d'un justificatif de trajet, vérifiée côté serveur.
 
+## Données personnelles
+
+| Clé | Libellé | Défaut | Bornes | Portée | Règle | Lu par |
+|---|---|---|---|---|---|---|
+| `privacy.recipientRetentionDays` | Effacement du destinataire après | **30 j** | 7 j → 365 j | exploitation | D63 5A · RGP-02 | deal-service |
+
+- **Effacement du destinataire après** (`privacy.recipientRetentionDays`) — Jours après la fin d'un deal au bout desquels le nom, le téléphone et l'email du destinataire (un tiers sans compte) sont effacés de la réservation. Jamais avant : un litige ou une preuve de remise peut en avoir besoin.
+
+## Conservation
+
+| Clé | Libellé | Défaut | Bornes | Portée | Règle | Lu par |
+|---|---|---|---|---|---|---|
+| `retention.notificationsDays` | Notifications in-app | **365 j** | 30 j → 1095 j | exploitation | D64 6A · RGP-01 | notification-service |
+| `retention.emailDeliveriesDays` | Traces d'envoi d'emails | **365 j** | 30 j → 1095 j | exploitation | D64 6A · RGP-01 | notification-service |
+| `retention.consumedEventsDays` | Registre des événements consommés | **90 j** | 7 j → 365 j | exploitation | D64 6A | notification-service |
+| `retention.outboxPublishedDays` | Événements d'outbox publiés | **90 j** | 7 j → 365 j | exploitation | D64 6A | deal-service, message-service |
+
+- **Notifications in-app** (`retention.notificationsDays`) — Jours après lesquels une notification du tableau de bord est supprimée (lue ou non).
+- **Traces d'envoi d'emails** (`retention.emailDeliveriesDays`) — Jours de conservation des traces d'emails (statut, erreur) — jamais le contenu, qui n'est pas stocké.
+- **Registre des événements consommés** (`retention.consumedEventsDays`) — Jours de conservation du registre d'idempotence des consumers (dédoublonnage) ; au-delà, un événement rejoué serait retraité.
+- **Événements d'outbox publiés** (`retention.outboxPublishedDays`) — Jours de conservation des événements déjà publiés sur Redpanda ; un événement jamais publié (parqué) n'est jamais supprimé.
+
+## Confiance (TrustScore interne)
+
+| Clé | Libellé | Défaut | Bornes | Portée | Règle | Lu par |
+|---|---|---|---|---|---|---|
+| `trust.newAccountDays` | Compte neuf pendant | **30 j** | 7 j → 180 j | exploitation | D71 · CNF-06 · REP-04 | deal-service, auth-service |
+| `trust.newAccount.maxDeclaredValueCents` | Compte neuf : valeur déclarée max par colis | **300,00 €** | 50,00 € → 5000,00 € | métier | D71 · CNF-06 | deal-service |
+| `trust.newAccount.maxWeightKg` | Compte neuf : poids max par colis | **10 kg** | 1 kg → 30 kg | métier | D71 · CNF-06 | deal-service |
+| `trust.newAccount.maxShipmentsPerMonth` | Compte neuf : envois par mois civil | **5** | 1 → 50 | exploitation | D71 · CNF-06 | deal-service |
+
+- **Compte neuf pendant** (`trust.newAccountDays`) — Âge du compte (jours) en dessous duquel un membre sans historique (moins de 3 deals terminés) est « neuf » : ses réservations sont plafonnées et sa vélocité est surveillée.
+- **Compte neuf : valeur déclarée max par colis** (`trust.newAccount.maxDeclaredValueCents`) — Au-delà, la réservation est refusée (409 NEW_ACCOUNT_CAP) tant que le compte est neuf ou à risque. Le membre lit le plafond dans le message. *Exemple : 300 € : un colis de 450 € déclarés est refusé pour un compte de 10 jours*
+- **Compte neuf : poids max par colis** (`trust.newAccount.maxWeightKg`) — Même refus 409 NEW_ACCOUNT_CAP au-delà, pour les colis PARCEL.
+- **Compte neuf : envois par mois civil** (`trust.newAccount.maxShipmentsPerMonth`) — Nombre de demandes de réservation créées depuis le 1er du mois à partir duquel une nouvelle demande est refusée.
+
 ## Classe B — modifiables par déploiement seulement
 
 | Paramètre | Valeur | Règle |
@@ -167,7 +203,6 @@ Règles communes : motif ≥ 20 caractères, une ligne de journal par clé (avan
 |---|---|
 | `WEIGHT_TOLERANCE_PCT` | PRC-07 · RG-B-11 |
 | `SUGGESTION_EXPRESS_CAP_PCT` | PRC-10 |
-| `NEW_ACCOUNT_MAX_DECLARED_VALUE / MAX_WEIGHT / MAX_SHIPMENTS_PER_MONTH` | CNF-06 |
 | `IDENTITY_REQUIRED_FROM` | CNF-05 |
 | `PROTECTION_BASIC_CAP / PROTECTION_PROVIDER` | GAR-01/03 |
 | `REPORT_REVIEW_THRESHOLD` | SIG-03 |

@@ -8,7 +8,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { ApiError, apiFetch, del, post } from "@/lib/api";
-import { ACTION_LABEL, STATUS_LABEL, dateTime, money } from "@/lib/format";
+import { ACTION_LABEL, STATUS_LABEL, TRUST_LEVEL_LABEL, dateTime, money } from "@/lib/format";
 import { can, isSuperAdmin, rolesLabel } from "@/lib/permissions";
 import type { AdminMe, AdminUserFile, ErasureBlocker } from "@/lib/types";
 
@@ -85,6 +85,7 @@ export default function UserFileView({ userId }: { userId: string }) {
         <Card title="Expéditeur">
           <Facts f={file.shipper} />
         </Card>
+        <TrustCard t={file.trust} />
         <SuspensionCard file={file} canPropose={canPropose} canApply={canApply} onDone={load} />
         {canErase && <EraseCard file={file} onDone={load} />}
       </div>
@@ -181,6 +182,19 @@ function SuspensionCard({ file, canPropose, canApply, onDone }: { file: AdminUse
   );
 }
 
+/** D71 — TrustScore interne : aide à la décision, jamais une sanction automatique (REP-04). */
+function TrustCard({ t }: { t: AdminUserFile["trust"] }) {
+  if (!t) return null;
+  return (
+    <Card title="Risque interne (D29 ②) — invisible du membre">
+      <Row k="Niveau" v={`${TRUST_LEVEL_LABEL[t.level] ?? t.level} · score ${t.score}/100${t.level === "HIGH_RISK" ? " ⚠" : ""}`} />
+      {t.factors.length === 0 ? <Row k="Facteurs" v="aucun signal" /> : t.factors.map((f) => <Row key={f.key} k={f.detail} v={`${f.points > 0 ? "+" : ""}${f.points}`} />)}
+      <Row k="Plafonds CNF-06" v={t.caps ? `${(t.caps.maxDeclaredValueCents / 100).toLocaleString("fr-FR")} € · ${t.caps.maxWeightKg} kg · ${t.caps.maxShipmentsPerMonth} envois / mois (${t.capsReason === "NEW_ACCOUNT" ? "compte neuf" : "à risque"})` : "aucun"} />
+      <Row k="Ce mois" v={`${t.signals.bookingsThisMonth} demande(s), ${t.signals.bookingsLast24h} sur 24 h · compte de ${t.signals.accountAgeDays} j`} />
+      <p className="pt-1 text-[11.5px] text-slate-500">Un score ne sanctionne rien : il éclaire une décision humaine (masquage, sanction) qui reste journalisée.</p>
+    </Card>
+  );
+}
 function Facts({ f }: { f: AdminUserFile["shipper"] }) {
   return (
     <>

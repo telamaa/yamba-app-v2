@@ -1772,3 +1772,29 @@ Quatre services sur cinq publiaient leur contrat OpenAPI depuis les schémas Zod
 | API2 | `curl :6001/openapi.json \| jq '.paths \| length'` | 75 |
 | API3 | Ajouter une route dans un routeur sans la documenter, lancer les tests | Le test « documente chaque route montée » échoue en nommant la route |
 | API4 | Modifier un schéma sans régénérer, pousser | Le check « OpenAPI contracts generate+diff » échoue |
+
+---
+
+# D71 — le TrustScore interne : contrôler le risque sans juger les membres
+
+## Le besoin
+La réputation visible (D29 ①) dit aux membres à qui faire confiance. Elle ne dit rien à Yamba sur le risque qu'un compte fait courir à la plateforme : un compte créé hier qui déclare 2 000 € de colis, un membre qui perd ses médiations, un profil signalé plusieurs fois. Il faut un signal interne, explicable, qui plafonne les comptes neufs ou à risque et qui éclaire le support, sans jamais sanctionner tout seul.
+
+### Règles de gestion (TRU)
+- **RG-TRU-01 — Deux objets, jamais fusionnés** (REP-01) : le score interne n'apparaît sur aucun écran membre, aucun email, aucune page publique.
+- **RG-TRU-02 — Un score explicable** : chaque point vient d'un fait nommé (litige perdu, annulation tardive, signalement ouvert ou retenu, vélocité, ancienneté ; deals terminés et bons avis en sens inverse). Ni fréquence de connexion ni volume de trajets (REP-05).
+- **RG-TRU-03 — Compte neuf** : moins de 30 jours et moins de trois deals terminés. Il est plafonné : 300 € déclarés, 10 kg, 5 envois par mois civil (paramètres, groupe « Confiance »).
+- **RG-TRU-04 — Compte à risque** : un score de 60 ou plus garde les mêmes plafonds quel que soit l'âge du compte. Entre 30 et 59 : « à surveiller », sans plafond.
+- **RG-TRU-05 — Le refus est expliqué** : une réservation au-delà d'un plafond est refusée avant tout paiement, avec un message qui dit que le plafond se lève avec les premiers envois terminés.
+- **RG-TRU-06 — Aucune sanction automatique** : le score éclaire la fiche membre et la file des signalements (un membre à risque y passe en priorité). Masquer, restreindre ou suspendre reste un geste humain, journalisé.
+
+### Recette (TRU)
+| # | Scénario | Attendu |
+|---|---|---|
+| TRU1 | Compte créé aujourd'hui, réserver un colis de 450 € déclarés | Refus « Ton compte est récent … » avant paiement ; à 250 € la demande passe |
+| TRU2 | Même compte, 5 demandes ce mois, en tenter une sixième | Refus (plafond envois / mois) |
+| TRU3 | Même compte, colis de 12 kg | Refus (plafond poids) ; 8 kg passe |
+| TRU4 | Compte de 6 mois avec 3 deals terminés, colis de 450 € et 12 kg | Aucun plafond |
+| TRU5 | Admin › fiche membre | Carte « Risque interne » : niveau, score, facteurs avec leurs points, plafonds et raison, rappel « ne sanctionne rien » |
+| TRU6 | Membre avec 3 litiges perdus (via seed ou médiation), signalé une fois | Fiche « À risque » ; file des signalements : badge « À risque », ligne prioritaire avec un seul signalement |
+| TRU7 | Paramètres › Confiance : passer les envois par mois à 2, réessayer TRU2 avec 2 demandes | Refus au troisième envoi dans les 30 s |

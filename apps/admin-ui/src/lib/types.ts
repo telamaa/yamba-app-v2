@@ -154,6 +154,7 @@ export type AdminUserFile = {
     activeSessionsCount: number;
   };
   adminActions: Array<{ id: string; at: string; admin: string; action: string; after: unknown }>;
+  trust: TrustAssessment | null; // D71
 };
 export type AdminAccount = { id: string; firstName: string; lastName: string; email: string; adminRole: import("./permissions").AdminRole; adminRoles: import("./permissions").AdminRole[]; totpEnabled: boolean; inviteAccepted: boolean; createdAt: string };
 export type AdminSessionItem = { jti: string; createdAt: string; lastActivityAt: string; current: boolean };
@@ -284,20 +285,28 @@ export type AdminMessageReportItem = {
 };
 export type AdminMessageReportsResponse = { items: AdminMessageReportItem[]; total: number };
 
+/* ── D71 — TrustScore interne ── */
+export type TrustLevel = "NEW" | "STANDARD" | "WATCH" | "HIGH_RISK";
+export type TrustAssessment = {
+  score: number; level: TrustLevel; factors: { key: string; points: number; detail: string }[];
+  caps: { maxDeclaredValueCents: number; maxWeightKg: number; maxShipmentsPerMonth: number } | null; capsReason: "NEW_ACCOUNT" | "HIGH_RISK" | null;
+  signals: { accountAgeDays: number; disputesLost: number; lateCancellations: number; completedDeals: number; ratingsAvg: number; ratingsCount: number; reportsOpen: number; reportsUpheld: number; bookingsLast24h: number; bookingsThisMonth: number };
+};
+
 /* ── D68 — trajets et membres signalés ── */
 export type ReportTargetType = "TRIP" | "USER";
 export type ReportReason = "ILLEGAL_CONTENT" | "SCAM" | "INAPPROPRIATE" | "IMPERSONATION" | "OTHER";
 export type AdminReportItem = {
   id: string; targetType: ReportTargetType; targetId: string; targetLabel: string; targetOwner: { id: string; firstName: string } | null;
   status: MessageReportStatus; reason: ReportReason; details: string | null; createdAt: string;
-  reporter: { id: string; firstName: string }; openCountOnTarget: number; priority: boolean;
+  reporter: { id: string; firstName: string }; openCountOnTarget: number; priority: boolean; targetTrustLevel: TrustLevel | null;
 };
 export type AdminReportsResponse = { items: AdminReportItem[]; total: number };
 
 /* ── C-PR8a (D62) — paramètres de la plateforme ── */
 export type SettingScope = "BUSINESS" | "OPERATIONS";
 export type SettingUnit = "percent" | "cents" | "kg" | "coef" | "hours" | "days" | "minutes" | "count" | "rating" | "mb";
-export type SettingGroup = "pricing" | "protection" | "cancellation" | "rating" | "dispute" | "reputation" | "messaging" | "alerts" | "documents" | "privacy" | "retention";
+export type SettingGroup = "pricing" | "protection" | "cancellation" | "rating" | "dispute" | "reputation" | "messaging" | "alerts" | "documents" | "privacy" | "retention" | "trust";
 export type SettingDefinition = {
   key: string; group: SettingGroup; label: string; description: string; rule: string; unit: SettingUnit;
   default: number; min: number; max: number; step: number; scope: SettingScope; contractual?: boolean; consumers: string[]; example?: string;
