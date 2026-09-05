@@ -527,7 +527,7 @@ Ordre de demarrage : auth -> trip -> gateway.
   liee a la session (403 SUDO_REQUIRED, D63 migre), appareils connectes (libelle, IP, revocation
   unitaire et des autres), changement de mot de passe (autres sessions revoquees) et d'email
   (code a la nouvelle adresse, ancienne prevenue), tableau de bord Stripe sous sudo, ecran
-  Securite reel.
+  Securite reel. MERGE 05/09 : **#187** (17 checks comptes).
 - Backlog parametre serveur : classe C du catalogue D62 (tolerance de poids,
   plafonds comptes neufs, plafond express, seuil de trois signalements…).
 - Photos hors TripDocument chez ImageKit sans fileId (colis, pickup, livraison, litige,
