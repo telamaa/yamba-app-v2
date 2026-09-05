@@ -240,6 +240,7 @@ export type BookingApiErrorCode =
   | "PAYMENT_NOT_AUTHORIZED"
   | "PAYMENT_MISMATCH"
   | "PAYMENT_ALREADY_USED"
+  | "NEW_ACCOUNT_CAP" // D71 — plafond progressif d'un compte neuf
   | "UNAUTHENTICATED"
   | "QUOTE_UNAVAILABLE"
   | "GENERIC";

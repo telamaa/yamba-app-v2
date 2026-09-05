@@ -10,7 +10,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { ApiError, apiFetch, patch } from "@/lib/api";
-import { REPORT_REASON_LABEL, REPORT_STATUS_LABEL, REPORT_TARGET_LABEL, dateTime } from "@/lib/format";
+import { REPORT_REASON_LABEL, REPORT_STATUS_LABEL, REPORT_TARGET_LABEL, TRUST_LEVEL_LABEL, dateTime } from "@/lib/format";
 import type { AdminReportItem, AdminReportsResponse, MessageReportStatus } from "@/lib/types";
 
 export default function ReportsQueue() {
@@ -60,7 +60,10 @@ export default function ReportsQueue() {
                   {item.priority && <span className="mr-2 rounded bg-red-100 px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-red-700">Prioritaire · {item.openCountOnTarget} ouverts</span>}
                   <span className="font-semibold text-red-700">{REPORT_REASON_LABEL[item.reason] ?? item.reason}</span> · signalé par {item.reporter.firstName} le {dateTime(item.createdAt)}
                 </span>
-                <span>{REPORT_TARGET_LABEL[item.targetType]}</span>
+                <span>
+                  {REPORT_TARGET_LABEL[item.targetType]}
+                  {item.targetTrustLevel && item.targetTrustLevel !== "STANDARD" && <span className={`ml-2 rounded px-1.5 py-0.5 text-[11px] ${item.targetTrustLevel === "HIGH_RISK" ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-800"}`}>{TRUST_LEVEL_LABEL[item.targetTrustLevel]}</span>}
+                </span>
               </div>
               <p className="mt-2 text-[13.5px] font-medium text-slate-900">
                 <Link href={targetHref(item)} className="text-[#185FA5] hover:underline">

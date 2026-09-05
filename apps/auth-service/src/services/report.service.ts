@@ -9,8 +9,9 @@
 import prisma from "@packages/libs/prisma";
 import { ConflictError, NotFoundError, ValidationError } from "@packages/error-handler";
 import { recordAdminAction } from "@packages/admin-audit";
-import type { AdminReportItem, AdminReportsResponse, CreateReportRequest, CreateReportResponse, ReportStatus, ReportTargetType, ReviewReportRequest } from "@packages/api-contracts";
+import type { AdminReportItem, AdminReportsResponse, CreateReportRequest, CreateReportResponse, ReportStatus, ReportTargetType, ReviewReportRequest, TrustLevel } from "@packages/api-contracts";
 import { canReport, needsPriorityReview } from "../utils/report.rules";
+import { assessTrust } from "./admin-users.service"; // D71
 import { getAuthEmails } from "../emails/auth-emails";
 import { sendAuthEmail } from "../emails/send-auth-email";
 
@@ -26,9 +27,10 @@ export type ReportDb = {
 
 const SUPPORT_EMAIL = process.env.SUPPORT_EMAIL || "support@yamba.com";
 
-export function makeReportService(deps: { db?: ReportDb; sendEmail?: typeof sendAuthEmail } = {}) {
+export function makeReportService(deps: { db?: ReportDb; sendEmail?: typeof sendAuthEmail; trustFor?: (userId: string) => Promise<{ level: TrustLevel } | null> } = {}) {
   const db = deps.db ?? (prisma as unknown as ReportDb);
   const sendEmail = deps.sendEmail ?? sendAuthEmail;
+  const trustFor = deps.trustFor ?? assessTrust;
 
   /** Résout la cible depuis son identifiant public : { id, ownerId } ou 404 si invisible. */
   async function resolveTarget(targetType: ReportTargetType, targetRef: string): Promise<{ id: string; ownerId: string }> {
@@ -79,6 +81,9 @@ export function makeReportService(deps: { db?: ReportDb; sendEmail?: typeof send
       const userIds = new Set<string>([...userTargetIds, ...reports.map((r) => r.reporterUserId as string), ...trips.map((t) => t.userId as string)]);
       const users = await db.user.findMany({ where: { id: { in: [...userIds] } }, select: { id: true, firstName: true, lastName: true } });
       const byUser = new Map(users.map((u) => [u.id as string, u]));
+      // D71 — niveau de risque du membre visé (ou du propriétaire du trajet) : un HIGH_RISK passe en priorité
+      const trustTargets = [...new Set([...userTargetIds, ...trips.map((t) => t.userId as string)])];
+      const trustOf = new Map(await Promise.all(trustTargets.map(async (id) => [id, (await trustFor(id))?.level ?? null] as const)));
       const items: AdminReportItem[] = [];
       for (const r of reports) {
         const targetId = r.targetId as string;
@@ -98,6 +103,7 @@ export function makeReportService(deps: { db?: ReportDb; sendEmail?: typeof send
         }
         const reporter = byUser.get(r.reporterUserId as string);
         const count = openCount.get(targetId) ?? 0;
+        const targetTrustLevel = trustOf.get(type === "TRIP" ? (byTrip.get(targetId)?.userId as string) : targetId) ?? null;
         items.push({
           id: r.id as string,
           targetType: type,
@@ -110,7 +116,8 @@ export function makeReportService(deps: { db?: ReportDb; sendEmail?: typeof send
           createdAt: (r.createdAt as Date).toISOString(),
           reporter: { id: r.reporterUserId as string, firstName: (reporter?.firstName as string) ?? "—" },
           openCountOnTarget: count,
-          priority: needsPriorityReview(count),
+          priority: needsPriorityReview(count) || targetTrustLevel === "HIGH_RISK",
+          targetTrustLevel,
         });
       }
       return { items, total: items.length };

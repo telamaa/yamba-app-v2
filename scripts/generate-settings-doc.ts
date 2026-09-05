@@ -8,7 +8,7 @@
 import { writeFileSync } from "node:fs";
 import { FIXED_PARAMETERS, PLANNED_PARAMETERS, SETTINGS_CATALOG, SETTING_GROUP_LABEL, type SettingGroup } from "../packages/libs/api-contracts/src/admin/platform-settings.schema";
 
-const ORDER: SettingGroup[] = ["pricing", "protection", "cancellation", "rating", "dispute", "reputation", "messaging", "alerts", "documents"];
+const ORDER: SettingGroup[] = ["pricing", "protection", "cancellation", "rating", "dispute", "reputation", "messaging", "alerts", "documents", "privacy", "retention", "trust"];
 
 function fmt(unit: string, v: number): string {
   if (unit === "cents") return `${(v / 100).toFixed(2).replace(".", ",")} €`;

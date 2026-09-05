@@ -3,6 +3,7 @@
  * ======================================================================================
  */
 import { z } from "zod";
+import { TrustAssessmentSchema } from "./trust.schema"; // D71
 import { ObjectIdSchema } from "../common";
 
 /** C-PR8a (D62 3A) — OPS : exploitation technique (paramètres d'exploitation, état des services, maintenance), jamais l'argent ni les comptes. */
@@ -204,6 +205,8 @@ export const AdminUserFileSchema = z
     adminActions: z.array(
       z.object({ id: ObjectIdSchema, at: z.string().datetime(), admin: z.string(), action: z.string(), after: z.unknown().nullable() })
     ),
+    /** D71 — TrustScore interne (aide à la décision, jamais une sanction automatique). */
+    trust: TrustAssessmentSchema.nullable(),
   })
   .meta({ id: "AdminUserFile", description: "Everything an operator needs on a user — never a secret, never a delivery code" });
 export type AdminUserFile = z.infer<typeof AdminUserFileSchema>;

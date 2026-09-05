@@ -13,8 +13,9 @@ export const SETTING_GROUP_LABEL: Record<SettingGroup, string> = {
   documents: "Documents",
   privacy: "Données personnelles",
   retention: "Conservation",
+  trust: "Confiance (TrustScore interne)",
 };
-export const SETTING_GROUP_ORDER: SettingGroup[] = ["pricing", "protection", "cancellation", "rating", "dispute", "reputation", "messaging", "alerts", "documents", "privacy", "retention"];
+export const SETTING_GROUP_ORDER: SettingGroup[] = ["pricing", "protection", "cancellation", "rating", "dispute", "reputation", "messaging", "alerts", "documents", "privacy", "retention", "trust"];
 
 export function formatSetting(def: Pick<SettingDefinition, "unit">, v: number): string {
   switch (def.unit) {

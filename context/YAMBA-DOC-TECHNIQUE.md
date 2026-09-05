@@ -1871,3 +1871,22 @@ auth 162 · tsc auth · `npm run generate:openapi` ×5 · build ×6. Le document
 
 ### Reste
 Porte A145 : brancher les schémas membre en `safeParse` dans les contrôleurs historiques au chantier mobile D36 (le client généré en dépendra) ; d'ici là un champ renommé côté contrôleur n'est pas attrapé par le test de couverture (qui attrape une route, pas un champ).
+
+---
+
+# D71 — `feat/d71-trust-score` : le TrustScore interne et les plafonds progressifs (Jalon 2)
+
+## Ce qui a été fait
+1. **Lib pure** `packages/libs/trust/index.ts` : `TrustSignals`, `computeTrustScore(signals, params)` → `{ score, level, factors, caps, capsReason }` (pondérations `TRUST_WEIGHTS`, seuils 30 / 60, statut neuf = âge < `newAccountDays` et < 3 deals), `checkCaps(assessment, { declaredValueCents, weightKg, bookingsThisMonth })` → violation ou null (envois du mois d'abord, puis valeur, puis poids), `trustParamsFromSettings(values)` (les constantes restent le défaut). `load.ts` : `loadTrustSignals(db, userId, now)` — User + CarrierPage (compteurs D29 ① et C-PR2 des deux rôles additionnés), trajets du membre, quatre `count` (demandes 24 h et mois civil UTC, signalements OPEN et REVIEWED visant le membre ou ses trajets), Prisma injecté par une interface minimale.
+2. **Catalogue D62** : groupe `trust` (libellé, ordre, doc régénérée `YAMBA-PARAMETRES.md`) avec `trust.newAccountDays` (30, OPERATIONS), `trust.newAccount.maxDeclaredValueCents` (30 000, BUSINESS), `trust.newAccount.maxWeightKg` (10, BUSINESS), `trust.newAccount.maxShipmentsPerMonth` (5, OPERATIONS) ; CNF-06 sort de `PLANNED_PARAMETERS`.
+3. **deal-service** : `services/trust.service.ts` (`assertWithinCaps` → 409 `NEW_ACCOUNT_CAP` typé `{ type: "booking", code, cap, limit, value }`), branché dans `deal-request.service.ts` **aux deux étapes** : `createPaymentIntent` (poids, envois du mois — avant d'autoriser l'argent) et `createBooking` (valeur déclarée comprise). Code ajouté à `BOOKING_REQUEST_ERROR_CODES` et à la description 409 de l'OpenAPI. Le service est injecté dans `makeDealRequestService` (défaut construit avec les mêmes `settings` et `clock`).
+4. **Contrat** `admin/trust.schema.ts` (`TrustLevel`, `TrustAssessment` avec `signals`) ; `AdminUserFile.trust` ; `AdminReportItem.targetTrustLevel`, `priority` = seuil de 3 **ou** membre visé `HIGH_RISK`.
+5. **auth-service** : `assessTrust(userId)` (dans `admin-users.service.ts`, réutilisé par la fiche et la file), `report.service.ts` reçoit `trustFor` injectable (spec mise à jour : un `HIGH_RISK` est prioritaire avec un seul signalement).
+6. **admin-ui** : carte « Risque interne (D29 ②) — invisible du membre » sur la fiche (niveau, score, facteurs avec leurs points, plafonds et leur raison, activité du mois, rappel « un score ne sanctionne rien »), badge de niveau sur la file des signalements, groupe « Confiance » sur la page Paramètres.
+7. **user-ui** : `NEW_ACCOUNT_CAP` dans les codes connus du parcours de réservation et le message FR/EN (« le plafond se lève avec tes premiers envois terminés »).
+
+### Preuves
+deal **513** (+11 : règle pure ×5, plafonds ×2, chargement des signaux ×2, service ×2) · auth 162 (spec des signalements mise à jour) · tsc deal + auth + admin-ui + user-ui · miroir i18n · `settings-doc` · OpenAPI ×5 · build ×6. Recette : TRU1–TRU7 (DOC-METIER) — dans la recette globale.
+
+### Reste
+Portes D71 : poids réel au pickup (PRC-07) quand la remise le saisira, identité vérifiée (KYC), instantané du score dans le journal d'une sanction. Les pondérations se revoient sur les chiffres réels (PostHog + pilotage).

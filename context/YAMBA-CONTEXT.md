@@ -450,11 +450,12 @@ Ordre de demarrage : auth -> trip -> gateway.
 - Chantier C admin-ui : SOLDE le 05/09 (C-PR1 #148 → C-PR8c #182 : mediation,
   billets, signalements, users, finances, pilotage, alertes, recherches / exports,
   parametres D62, RGPD D63, maintenance / etat des services / conservation D64).
-  Reste hors chantier : TrustScore interne + plafonds progressifs (D29-2),
+  Reste hors chantier : ~~TrustScore interne + plafonds progressifs (D29-2)~~ FAIT (D71),
   moniteur externe de disponibilite (candidat D64).
 - D35 email, D65 sessions, D66 PostHog, D67 profil editable (chantier E), D68 signalement +
-  wording D28, D69 page destinataire + glossaire A144, D70 moniteur externe, A145 OpenAPI auth :
-  FAITS le 05/09. Reste Jalon 2 : sauvegardes Atlas, TrustScore D29-2, puis deps + recette globale.
+  wording D28, D69 page destinataire + glossaire A144, D70 moniteur externe, A145 OpenAPI auth,
+  D71 TrustScore interne : FAITS le 05/09. Reste Jalon 2 : sauvegardes Atlas (a ta main), puis deps
+  + recette globale, puis le chantier mobile (D36).
 - Solde sessions auth : FAIT (D65) — reste le cleanup des sessions legacy (30 j post-prod).
 - API : conversion OpenAPI auth-service (contrats Zod), page /docs Scalar
   auth, page /docs index gateway, audit anglais OAS trip-service.
@@ -566,6 +567,13 @@ Ordre de demarrage : auth -> trip -> gateway.
   sur les routes admin, /openapi.json + /docs sur :6001, cinquieme cible de generate:openapi diffee
   en CI, test qui exige chaque route montee et refuse toute route inventee. Porte : safeParse dans
   les controleurs historiques au chantier mobile D36. MERGE 05/09 : **#199** (17 checks comptes).
+- D71 FAIT le 05/09 (feat/d71-trust-score, met en oeuvre D29 (2), REP-04, CNF-06) : lib pure
+  packages/libs/trust (score 0..100 sur lecture, niveaux NEW / STANDARD / WATCH / HIGH_RISK, facteurs
+  lisibles, Prisma injecte), plafonds progressifs a la reservation (409 NEW_ACCOUNT_CAP, aux deux
+  etapes), quatre cles au catalogue (groupe trust, CNF-06 sort de la classe C), fiche membre admin
+  (carte Risque interne), file des signalements (niveau du membre vise, HIGH_RISK prioritaire).
+  Jamais servi a un membre, jamais une sanction automatique. Portes : poids reel au pickup, KYC,
+  instantane dans le journal.
 - Backlog parametre serveur : classe C du catalogue D62 (tolerance de poids,
   plafonds comptes neufs, plafond express, seuil de trois signalements…).
 - Photos hors TripDocument chez ImageKit sans fileId (colis, pickup, livraison, litige,

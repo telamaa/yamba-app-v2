@@ -37,7 +37,7 @@ describe("createReport (D68 1A/2A)", () => {
   it("trajet d'un autre membre → OPEN, targetId = id du trajet, accusé de réception dans la langue de l'auteur", async () => {
     const sent: string[] = [];
     const db = fakeDb({ user: [awa, moussa], trip: [trip] });
-    const svc = makeReportService({ db, sendEmail: async (to, locale, email) => { sent.push(`${to}|${locale}|${email.subject}`); return true; } });
+    const svc = makeReportService({ db, sendEmail: async (to, locale, email) => { sent.push(`${to}|${locale}|${email.subject}`); return true; }, trustFor: async () => null });
     const r = await svc.createReport("u-awa", { targetType: "TRIP", targetRef: "t1", reason: "SCAM", details: "  paie hors Yamba " });
     expect(r.reportId).toBe("report-1");
     expect(db.tables.report[0]).toMatchObject({ reporterUserId: "u-awa", targetType: "TRIP", targetId: "t1", reason: "SCAM", details: "paie hors Yamba", status: "OPEN" });
@@ -45,7 +45,7 @@ describe("createReport (D68 1A/2A)", () => {
   });
   it("membre par son slug → targetId = id du membre ; page masquée ou compte effacé → 404", async () => {
     const db = fakeDb({ user: [awa, moussa, { ...awa, id: "u-hidden", publicSlug: "hidden", profilePublic: false }] });
-    const svc = makeReportService({ db, sendEmail: async () => true });
+    const svc = makeReportService({ db, sendEmail: async () => true, trustFor: async () => null });
     const r = await svc.createReport("u-awa", { targetType: "USER", targetRef: "moussa-ba", reason: "IMPERSONATION" });
     expect(r.reportId).toBe("report-1");
     expect(db.tables.report[0]).toMatchObject({ targetType: "USER", targetId: "u-moussa" });
@@ -54,7 +54,7 @@ describe("createReport (D68 1A/2A)", () => {
   });
   it("sa propre cible → 400 OWN_TARGET ; motif hors liste → 400 ; doublon ouvert → 409, doublon traité → accepté", async () => {
     const db = fakeDb({ user: [awa, moussa], trip: [trip], report: [{ id: "r0", reporterUserId: "u-awa", targetType: "TRIP", targetId: "t1", status: "REVIEWED", reason: "SCAM", createdAt: new Date() }] });
-    const svc = makeReportService({ db, sendEmail: async () => true });
+    const svc = makeReportService({ db, sendEmail: async () => true, trustFor: async () => null });
     await expect(svc.createReport("u-moussa", { targetType: "TRIP", targetRef: "t1", reason: "SCAM" })).rejects.toMatchObject({ statusCode: 400, details: { code: "OWN_TARGET" } });
     await expect(svc.createReport("u-awa", { targetType: "USER", targetRef: "moussa-ba", reason: "ILLEGAL_CONTENT" })).rejects.toMatchObject({ statusCode: 400, details: { code: "REASON_NOT_ALLOWED" } });
     await svc.createReport("u-awa", { targetType: "TRIP", targetRef: "t1", reason: "SCAM" }); // l'ancien est traité : un nouveau est possible
@@ -63,7 +63,7 @@ describe("createReport (D68 1A/2A)", () => {
   it("auteur en suppression email → pas d'envoi, le signalement est quand même écrit", async () => {
     const sent: string[] = [];
     const db = fakeDb({ user: [{ ...awa, emailSuppressedAt: new Date() }, moussa], trip: [trip] });
-    const svc = makeReportService({ db, sendEmail: async (to) => { sent.push(to); return true; } });
+    const svc = makeReportService({ db, sendEmail: async (to) => { sent.push(to); return true; }, trustFor: async () => null });
     await svc.createReport("u-awa", { targetType: "TRIP", targetRef: "t1", reason: "SCAM" });
     expect(db.tables.report).toHaveLength(1);
     expect(sent).toEqual([]);
@@ -78,15 +78,16 @@ describe("listReports / reviewReport (D68 3A)", () => {
       trip: [trip],
       report: [open("r1", "u-awa", "TRIP", "t1"), open("r2", "u-3", "TRIP", "t1"), open("r3", "u-4", "TRIP", "t1"), open("r4", "u-awa", "USER", "u-moussa"), open("r5", "u-awa", "MESSAGE", "m1")],
     });
-    const svc = makeReportService({ db, sendEmail: async () => true });
+    const svc = makeReportService({ db, sendEmail: async () => true, trustFor: async (id) => (id === "u-moussa" ? { level: "HIGH_RISK" as const } : null) });
     const list = await svc.listReports("OPEN");
     expect(list.total).toBe(4);
     expect(list.items[0]).toMatchObject({ targetType: "TRIP", targetLabel: "Paris → Dakar", targetOwner: { id: "u-moussa", firstName: "Moussa" }, reporter: { firstName: "Awa" }, openCountOnTarget: 3, priority: true });
-    expect(list.items[3]).toMatchObject({ targetType: "USER", targetId: "u-moussa", targetLabel: "Moussa Ba", targetOwner: null, openCountOnTarget: 1, priority: false });
+    expect(list.items[0].targetTrustLevel).toBe("HIGH_RISK");
+    expect(list.items[3]).toMatchObject({ targetType: "USER", targetId: "u-moussa", targetLabel: "Moussa Ba", targetOwner: null, openCountOnTarget: 1, priority: true, targetTrustLevel: "HIGH_RISK" }); // D71 : à risque → prioritaire malgré un seul signalement
   });
   it("décision + journal dans la transaction ; deuxième décision → 409 ; un signalement de message n'est pas traité ici", async () => {
     const db = fakeDb({ user: [awa, moussa], trip: [trip], report: [open("r1", "u-awa", "TRIP", "t1"), open("r5", "u-awa", "MESSAGE", "m1")] });
-    const svc = makeReportService({ db, sendEmail: async () => true });
+    const svc = makeReportService({ db, sendEmail: async () => true, trustFor: async () => null });
     await expect(svc.reviewReport(actor, "r1", { decision: "DISMISSED", note: "rien à voir" })).resolves.toEqual({ id: "r1", status: "DISMISSED" });
     expect(db.tables.report[0].status).toBe("DISMISSED");
     expect(db.tables.adminAction[0]).toMatchObject({ action: "REPORT_REVIEWED", targetType: "REPORT", targetId: "r1", adminUserId: "adm" });

@@ -122,5 +122,6 @@ export const BOOKING_REQUEST_ERROR_CODES = [
   "PAYMENT_NOT_AUTHORIZED",
   "PAYMENT_MISMATCH",
   "PAYMENT_ALREADY_USED",
+  "NEW_ACCOUNT_CAP", // D71 — plafond progressif CNF-06 (details.cap, limit, value)
 ] as const;
 export type BookingRequestErrorCode = (typeof BOOKING_REQUEST_ERROR_CODES)[number];

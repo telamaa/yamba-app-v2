@@ -164,6 +164,7 @@
       "FAMILY_REFUSED": "Le voyageur n''accepte pas ce type de colis sur ce trajet.",
       "TRIP_NOT_BOOKABLE": "Ce trajet n''accepte plus de demandes.",
       "OWN_TRIP": "Tu ne peux pas réserver ton propre trajet.",
+      "NEW_ACCOUNT_CAP": "Ton compte est récent : pour l'instant, tes envois sont plafonnés (valeur déclarée, poids et nombre par mois). Le plafond se lève avec tes premiers envois terminés.",
       "PAYMENT_NOT_AUTHORIZED": "Le paiement n''a pas encore été autorisé. Réessaie.",
       "PAYMENT_MISMATCH": "L''autorisation ne correspond plus à ta demande. Une nouvelle autorisation est en cours.",
       "PAYMENT_ALREADY_USED": "Ce paiement est déjà rattaché à une demande.",

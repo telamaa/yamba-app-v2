@@ -30,6 +30,7 @@ import { QuoteError, type PricingParams, type ShipperQuote } from "@packages/pri
 import { pricingParamsFromSettings } from "@packages/api-contracts";
 import { platformSettings } from "@packages/libs/settings/default";
 import type { SettingsReader } from "@packages/libs/settings";
+import { makeTrustService, type TrustService } from "./trust.service"; // D71
 import {
   BookingDomainEventSchema,
   type CreateBookingRequest,
@@ -123,7 +124,7 @@ function toShipperPricing(quote: ShipperQuote) {
   };
 }
 
-export function makeDealRequestService(provider: PaymentProvider, clock: () => Date = () => new Date(), settings: SettingsReader = platformSettings()) {
+export function makeDealRequestService(provider: PaymentProvider, clock: () => Date = () => new Date(), settings: SettingsReader = platformSettings(), trust: TrustService = makeTrustService({ settings, clock })){
   return {
     async createPaymentIntent(
       user: RequestingUser,
@@ -132,6 +133,7 @@ export function makeDealRequestService(provider: PaymentProvider, clock: () => D
       const now = clock();
       const trip = await loadTrip(input.tripId);
       checkTripBookable(trip, user.id, now);
+      await trust.assertWithinCaps(user.id, { declaredValueCents: 0, weightKg: input.product === "PARCEL" ? input.weightKg ?? null : null }); // D71 — plafonds CNF-06 (poids, envois du mois) avant d'autoriser l'argent
       const quote = quoteOr400(trip, input, pricingParamsFromSettings(await settings.get())); // D62
       assertQuoteMatches(quote, input.expectedTotalCents);
       checkCapacity(trip, kgToReserve(quote)); // refus précoce, avant de poser une empreinte
@@ -163,6 +165,7 @@ export function makeDealRequestService(provider: PaymentProvider, clock: () => D
       const now = clock();
       const trip = await loadTrip(input.tripId);
       checkTripBookable(trip, user.id, now);
+      await trust.assertWithinCaps(user.id, { declaredValueCents: input.declaredValueCents, weightKg: input.product === "PARCEL" ? input.weightKg ?? null : null }); // D71 — plafonds CNF-06 (valeur déclarée comprise)
       const quote = quoteOr400(trip, input, pricingParamsFromSettings(await settings.get())); // D62
       assertQuoteMatches(quote, input.expectedTotalCents);
       const kg = kgToReserve(quote);

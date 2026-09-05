@@ -11,6 +11,8 @@ import { OID, TICKET, USERS_CSV_COLUMNS, buildUsersOrderBy, buildUsersWhere } fr
 import redis from "@packages/libs/redis";
 import { NotFoundError } from "@packages/error-handler";
 import type { AdminUserFile, AdminUserSummary, AdminUsersResponse } from "@packages/api-contracts";
+import { platformSettings } from "@packages/libs/settings/default";
+import { computeTrustScore, loadTrustSignals, trustParamsFromSettings, type TrustDb } from "@packages/libs/trust"; // D71
 
 const ACTIVE_DEAL = ["ACCEPTED", "PICKED_UP", "DELIVERED", "DISPUTED"];
 
@@ -73,6 +75,14 @@ function toSummary(u: SummaryRow, matchedOn: string | null): AdminUserSummary {
     createdAt: u.createdAt.toISOString(),
     matchedOn,
   };
+}
+
+/** D71 — le TrustScore interne d'un membre (règle pure sur des faits + comptages), null si inconnu. */
+export async function assessTrust(userId: string, now: Date = new Date()): Promise<AdminUserFile["trust"]> {
+  const signals = await loadTrustSignals(prisma as unknown as TrustDb, userId, now);
+  if (!signals) return null;
+  const a = computeTrustScore(signals, trustParamsFromSettings((await platformSettings().get()) as unknown as Record<string, number>));
+  return { ...a, signals };
 }
 
 export function makeAdminUsersService() {
@@ -278,6 +288,7 @@ export function makeAdminUsersService() {
           activeSessionsCount,
         },
         adminActions: actions.map((a) => ({ id: a.id, at: a.createdAt.toISOString(), admin: nameOf(a.adminUserId), action: a.action, after: a.after ?? null })),
+        trust: await assessTrust(u.id), // D71 — aide à la décision, jamais une sanction
       };
     },
 
