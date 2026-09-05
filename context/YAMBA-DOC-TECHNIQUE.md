@@ -1736,3 +1736,22 @@ notification **95** (+8 : fabrique, Resend — charge, en-têtes, idempotence, e
 
 ### Reste
 Compte Resend, domaine (SPF, DKIM), `RESEND_API_KEY` et `RESEND_WEBHOOK_SECRET` en production : à ta main. Dette D44 (gabarits EJS FR/EN du trip-service et du notification-service) inchangée. Portes : file de retry côté Yamba, suivi des ouvertures (non retenus).
+
+---
+
+# D65 — `feat/d65-member-sessions` : sudo à fenêtre, appareils connectés, mot de passe et email (solde D27)
+
+## Ce qui a été fait
+1. **Sudo à fenêtre** (`apps/auth-service/src/utils/sudo.ts`, D65 1A) : `POST /auth/me/sudo/verify { code }` vérifie le code (portée OTP `sudo`, D63) et ouvre `sudo:<userId>:<jti>` en Redis pour 15 min (`SUDO_WINDOW_MINUTES`, contrats) ; `GET /auth/me/sudo` renvoie `{ active, expiresAt }` ; `requireSudo(req)` lit le jti du cookie refresh (`currentMemberJti`, même secret que la rotation) et lève un 403 `ForbiddenError` avec `details.code = "SUDO_REQUIRED"`. Store injectable (`SudoStore`), spec sur un faux Redis à horloge (fermée par défaut, une autre session du même membre n'en profite pas, expiration, fermeture explicite). **D63 migre** : export et effacement ne prennent plus de code dans le corps (`EraseMyAccountRequest` = confirmation seule), `assertSudo` = `requireSudo`.
+2. **Sessions visibles** (D65 2A) : `SessionRecord` gagne `ip`, `userAgent` (tronqué à 200), `device` (`describeUserAgent`, pur : navigateur + système, « Appareil inconnu » sinon — spec sur cinq user-agents) ; `issueSession` reçoit `sessionMetaOf(req)` (connexion, Google), la rotation conserve l'appareil de la connexion et rafraîchit l'IP (`session === "legacy"` → méta du refresh). `account.controller.ts` : `GET /auth/me/sessions` (SCAN + MGET, la courante marquée, tri courante puis activité), `DELETE /auth/me/sessions/:jti` (une autre, ou la sienne → cookies effacés), `DELETE /auth/me/sessions` (toutes les autres, `revokeOtherSessions` garde le jti courant).
+3. **Mot de passe** (3A) : `POST /auth/me/password { newPassword }` sous sudo — `validatePasswordStrength` avec le contexte (email, prénom, nom), refus du mot de passe actuel, hash bcrypt, **autres sessions révoquées**, fenêtre sudo fermée, email « mot de passe modifié » (existant) avec date, IP, navigateur, lien Sécurité. Un compte Google sans mot de passe en pose un.
+4. **Email** (4A) : `POST /auth/me/email/request { newEmail }` sous sudo — même adresse refusée, unicité (409), portée OTP `email_change` clé = nouvelle adresse (mêmes paliers, alerte de sécurité), demande gardée 10 min en Redis (`email_change:<userId>`), email `verifyNewEmail` à la NOUVELLE adresse ; `POST /auth/me/email/confirm { code }` — vérifie, re-teste l'unicité, met `email` / `emailNormalized` à jour et lève une éventuelle suppression D35, révoque les autres sessions, ferme la fenêtre, prévient l'ANCIENNE adresse (`emailChanged`, adresse masquée `a***@…`, sans lien). Emails FR/EN + clés + spec.
+5. **Stripe** : `POST /carrier/stripe/dashboard-link` sous sudo (l'IBAN vit chez Stripe, SES-03).
+6. **user-ui** : `services/account.api.ts` (sudo, sessions, identifiants, `isSudoRequired`) ; `SudoGate` (un composant : envoyer, saisir, vérifier, puis rejouer le geste via `onVerifiedAction`) ; `Security.tsx` réel — mot de passe, email en deux temps, liste des appareils avec révocation unitaire et « Déconnecter les autres appareils », plus « Mes données » (D63) ; `PrivacySection` et `FinancesSection` (tableau de bord Stripe) rejouent le geste après la porte sur 403 `SUDO_REQUIRED` ; copies FR/EN `sudo.*` et `securityPage.*` dans `dashboard.copy.ts`.
+7. **Contrats** (`member-sessions.schema.ts`) : `SudoStatus`, `SudoVerifyRequest`, `MemberSessionItem` / `MemberSessionsResponse`, `ChangePasswordRequest`, `RequestEmailChange`, `ConfirmEmailChange` ; OpenAPI ×4 régénérés.
+
+### Preuves
+auth **138** (+4 : libellé d'appareil sur cinq user-agents + inconnu + troncature ; fenêtre sudo — fermée, ouverte pour une session seulement, expirée, fermée explicitement) · les specs d'emails couvrent les deux nouveaux gabarits · tsc ×7 · build ×6 · OpenAPI ×4. Recette : SES1–SES10 (DOC-METIER) — dans la recette globale.
+
+### Reste
+SES-04 : compte à rebours avant expiration non retenu (la porte « session expirée » A89 suffit). Alerte email à chaque nouvelle connexion : porte. Le mobile réutilisera ces routes avec des jetons (D36).

@@ -97,7 +97,7 @@ export type PendingRegistration = {
   preferredLocale?: string;
 };
 
-type OtpScope = "register" | "forgot" | "sudo"; // sudo : C-PR8b (D63 1A) — geste sensible d'un membre connecté
+type OtpScope = "register" | "forgot" | "sudo" | "email_change"; // sudo : D63 1A ; email_change : D65 4A (clé = NOUVELLE adresse)
 
 /**
  * Type du contexte enrichi pour les erreurs OTP.
@@ -278,7 +278,7 @@ const sendOtpScoped = async (
   const otp = crypto.randomInt(100000, 1000000).toString();
   const emails = getAuthEmails(locale);
   const params = { firstName, otp, expiresInMinutes: OTP_TTL_MINUTES };
-  const email = scope === "register" ? emails.verifyEmail(params) : scope === "sudo" ? emails.sudoCode(params) : emails.resetPassword(params);
+  const email = scope === "register" ? emails.verifyEmail(params) : scope === "sudo" ? emails.sudoCode(params) : scope === "email_change" ? emails.verifyNewEmail(params) : emails.resetPassword(params);
   await sendAuthEmail(emailKey, locale, email);
   await redis.set(keys.otp(scope, emailKey), otp, "EX", OTP_TTL_SECONDS);
   await redis.set(
@@ -459,6 +459,12 @@ export const trackSudoOtpRequests = async (emailKey: string) => trackOtpRequests
 export const sendSudoOtp = async (firstName: string, emailKey: string, locale: string | null | undefined) => sendOtpScoped("sudo", firstName, emailKey, locale);
 export const verifySudoOtp = async (emailKey: string, otp: string, locale: string | null | undefined) => verifyOtpScoped("sudo", emailKey, otp, locale);
 
+/** ---------- Changement d'email (D65 4A) : code à la NOUVELLE adresse ---------- */
+export const checkEmailChangeOtpRestrictions = async (newEmailKey: string) => checkOtpRestrictionsScoped("email_change", newEmailKey);
+export const trackEmailChangeOtpRequests = async (newEmailKey: string) => trackOtpRequestsScoped("email_change", newEmailKey);
+export const sendEmailChangeOtp = async (firstName: string, newEmailKey: string, locale: string | null | undefined) => sendOtpScoped("email_change", firstName, newEmailKey, locale);
+export const verifyEmailChangeOtp = async (newEmailKey: string, otp: string, locale: string | null | undefined) => verifyOtpScoped("email_change", newEmailKey, otp, locale);
+
 /** ---------- Pending Registration ---------- */
 export const storePendingRegistration = async (
   emailKey: string,
@@ -556,7 +562,12 @@ export type SessionRecord = {
   createdAt: number;      // epoch ms — création de la SESSION (pas du jti)
   lastActivityAt: number; // epoch ms — dernier refresh/login
   rememberMe: boolean;
+  /** D65 2A — posés à la connexion, conservés à la rotation (jamais une empreinte) */
+  ip?: string | null;
+  userAgent?: string | null;
+  device?: string | null;
 };
+export type SessionMeta = Pick<SessionRecord, "ip" | "userAgent" | "device">;
 
 /**
  * Crée/rotate une clé de session. TTL = min(fenêtre d'inactivité,
@@ -569,14 +580,15 @@ export const storeRefreshSession = async (
   userId: string,
   jti: string,
   rememberMe: boolean,
-  createdAt: number = Date.now()
+  createdAt: number = Date.now(),
+  meta: SessionMeta = {}
 ): Promise<number> => {
   const now = Date.now();
   const policy = loadSessionPolicy();
   const ttlSeconds = computeSessionTtlSeconds(createdAt, rememberMe, policy, now);
   if (ttlSeconds <= 0) return 0;
 
-  const record: SessionRecord = { createdAt, lastActivityAt: now, rememberMe };
+  const record: SessionRecord = { createdAt, lastActivityAt: now, rememberMe, ip: meta.ip ?? null, userAgent: meta.userAgent ?? null, device: meta.device ?? null };
   await redis.set(
     `refresh_jti:${userId}:${jti}`,
     JSON.stringify(record),

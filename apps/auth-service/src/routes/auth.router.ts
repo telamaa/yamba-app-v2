@@ -1,5 +1,6 @@
 import express, { Router } from "express";
 import { eraseMyAccount, exportMyData, getMyErasureBlockers, requestSudoCode, updateMyPreferences } from "../controller/privacy.controller"; // C-PR8b (D63)
+import { changeMyPassword, confirmEmailChange, getSudoStatus, listMySessions, requestEmailChange, revokeMyOtherSessions, revokeMySession, verifySudo } from "../controller/account.controller"; // D65
 import {
   cancelRegistration,
   getMe,
@@ -39,6 +40,15 @@ router.post("/auth/me/data-export", isAuthenticated, exportMyData);
 router.get("/auth/me/erasure/blockers", isAuthenticated, getMyErasureBlockers);
 router.post("/auth/me/erasure", isAuthenticated, eraseMyAccount);
 router.patch("/auth/me/preferences", isAuthenticated, updateMyPreferences);
+// D65 — sudo à fenêtre, sessions, identifiants
+router.post("/auth/me/sudo/verify", isAuthenticated, verifySudo);
+router.get("/auth/me/sudo", isAuthenticated, getSudoStatus);
+router.get("/auth/me/sessions", isAuthenticated, listMySessions);
+router.delete("/auth/me/sessions", isAuthenticated, revokeMyOtherSessions);
+router.delete("/auth/me/sessions/:jti", isAuthenticated, revokeMySession);
+router.post("/auth/me/password", isAuthenticated, changeMyPassword);
+router.post("/auth/me/email/request", isAuthenticated, requestEmailChange);
+router.post("/auth/me/email/confirm", isAuthenticated, confirmEmailChange);
 
 // ─── Mot de passe oublié ───────────────────────────────
 router.post("/auth/password/forgot", requestPasswordResetOtp);

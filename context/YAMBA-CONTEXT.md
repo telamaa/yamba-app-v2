@@ -406,7 +406,7 @@ Ordre de demarrage : auth -> trip -> gateway.
   (GET /admin/status, sondage 30 s, editeur de maintenance). Gateway aligne (alias @packages,
   tsconfig). Chantier C : SOLDE (C-PR1 → C-PR8c). Candidat registre : moniteur externe de
   disponibilite avant le lancement. MERGE 05/09 : **#182** (17 checks comptes).
-- Plateforme de tests : 834 (trip 209, deal 494, notification 95, message 36) + auth 134.
+- Plateforme de tests : 834 (trip 209, deal 494, notification 95, message 36) + auth 138.
 - 04/09 : C-PR6b feat/c6b-admin-alerts (D59 3A / 4A, A129–A131) — neuf regles de seuil
   (evaluateAlerts pur, instantane de dix compteurs), GET /admin/alerts sans etat (accueil
   admin), cron horaire avec dedoublonnage Redis SET NX (un email par regle et par jour, Redis
@@ -456,9 +456,7 @@ Ordre de demarrage : auth -> trip -> gateway.
   externe, sessions (SES-04/05, sudo etendu), chantier E, micro-PR confiance, OpenAPI auth,
   sauvegardes Atlas, TrustScore D29-2.
 - Chantier E : profil public Voyageur (stats reelles, trajets, avis).
-- Solde sessions auth : SES-03 sudo mode (FAIT pour export / effacement par code
-  email, D63 1A ; reste : email, mot de passe, IBAN), SES-04 modal expiration,
-  SES-05 liste des sessions, cleanup sessions legacy (30j post-prod).
+- Solde sessions auth : FAIT (D65) — reste le cleanup des sessions legacy (30 j post-prod).
 - API : conversion OpenAPI auth-service (contrats Zod), page /docs Scalar
   auth, page /docs index gateway, audit anglais OAS trip-service.
 - Micro-PRs confiance : wording statuts D28, bouton Signaler (trajet +
@@ -525,6 +523,11 @@ Ordre de demarrage : auth -> trip -> gateway.
   respectee par tous les resolveurs, trip-service sur la lib partagee, Mailpit en local.
   Reste a ta main : compte Resend, domaine (SPF, DKIM), cles en production. MERGE 05/09 :
   **#185** (17 checks comptes).
+- D65 FAIT le 05/09 (feat/d65-member-sessions, solde D27 SES-03/04/05) : sudo a fenetre de 15 min
+  liee a la session (403 SUDO_REQUIRED, D63 migre), appareils connectes (libelle, IP, revocation
+  unitaire et des autres), changement de mot de passe (autres sessions revoquees) et d'email
+  (code a la nouvelle adresse, ancienne prevenue), tableau de bord Stripe sous sudo, ecran
+  Securite reel.
 - Backlog parametre serveur : classe C du catalogue D62 (tolerance de poids,
   plafonds comptes neufs, plafond express, seuil de trois signalements…).
 - Photos hors TripDocument chez ImageKit sans fileId (colis, pickup, livraison, litige,

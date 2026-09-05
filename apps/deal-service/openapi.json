@@ -21870,34 +21870,15 @@
         ],
         "additionalProperties": false
       },
-      "SudoCodeRequest": {
-        "type": "object",
-        "properties": {
-          "code": {
-            "type": "string",
-            "pattern": "^\\d{6}$"
-          }
-        },
-        "required": [
-          "code"
-        ],
-        "additionalProperties": false,
-        "description": "Six-digit code sent to the account email (SES-03 sudo, D63 1A)"
-      },
       "EraseMyAccountRequest": {
         "type": "object",
         "properties": {
-          "code": {
-            "type": "string",
-            "pattern": "^\\d{6}$"
-          },
           "confirmation": {
             "type": "string",
             "const": "SUPPRIMER"
           }
         },
         "required": [
-          "code",
           "confirmation"
         ],
         "additionalProperties": false
@@ -22706,6 +22687,152 @@
         ],
         "additionalProperties": false,
         "description": "Service status page (D64 5A) — not a monitoring tool"
+      },
+      "SudoStatus": {
+        "type": "object",
+        "properties": {
+          "active": {
+            "type": "boolean"
+          },
+          "expiresAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "active",
+          "expiresAt"
+        ],
+        "additionalProperties": false,
+        "description": "Sudo window bound to the current session (D65 1A)"
+      },
+      "SudoVerifyRequest": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "pattern": "^\\d{6}$"
+          }
+        },
+        "required": [
+          "code"
+        ],
+        "additionalProperties": false
+      },
+      "MemberSessionItem": {
+        "type": "object",
+        "properties": {
+          "jti": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          },
+          "lastActivityAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          },
+          "rememberMe": {
+            "type": "boolean"
+          },
+          "device": {
+            "type": "string",
+            "description": "Browser + OS derived from the user agent, or « Appareil inconnu »"
+          },
+          "ip": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "current": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "jti",
+          "createdAt",
+          "lastActivityAt",
+          "rememberMe",
+          "device",
+          "ip",
+          "current"
+        ],
+        "additionalProperties": false
+      },
+      "MemberSessionsResponse": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MemberSessionItem"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "additionalProperties": false
+      },
+      "ChangePasswordRequest": {
+        "type": "object",
+        "properties": {
+          "newPassword": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "newPassword"
+        ],
+        "additionalProperties": false,
+        "description": "Under sudo (D65 3A); every other session is revoked"
+      },
+      "RequestEmailChange": {
+        "type": "object",
+        "properties": {
+          "newEmail": {
+            "type": "string",
+            "maxLength": 254,
+            "format": "email",
+            "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+          }
+        },
+        "required": [
+          "newEmail"
+        ],
+        "additionalProperties": false,
+        "description": "Under sudo (D65 4A); a code is sent to the NEW address"
+      },
+      "ConfirmEmailChange": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "pattern": "^\\d{6}$"
+          }
+        },
+        "required": [
+          "code"
+        ],
+        "additionalProperties": false
       }
     },
     "securitySchemes": {

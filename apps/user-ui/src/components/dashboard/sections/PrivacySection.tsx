@@ -3,7 +3,7 @@
 /**
  * PrivacySection.tsx — « Mes données » (C-PR8b, D63) : télécharger, supprimer, préférence de relance
  * ==================================================================================================
- * Deux gestes sensibles derrière un code envoyé par email (sudo, SES-03). L'effacement est immédiat
+ * Deux gestes sensibles derrière la porte sudo (D65 : SudoGate, fenêtre de 15 min). L'effacement est immédiat
  * et irréversible : on le dit, on fait taper SUPPRIMER, et le serveur refuse tant qu'un deal vit
  * (liste fermée de motifs, traduite ici).
  */
@@ -13,7 +13,9 @@ import { useQueryClient } from "@tanstack/react-query";
 import type { DashboardCopy } from "@/app/[locale]/dashboard/dashboard.copy";
 import { CardSection } from "@/components/dashboard/DashboardUI";
 import useUser from "@/hooks/useUser";
-import { ErasureBlockedError, downloadMyData, eraseMyAccount, fetchErasureBlockers, requestSudoCode, updateMyPreferences, type ErasureBlocker } from "@/services/privacy.api";
+import { ErasureBlockedError, downloadMyData, eraseMyAccount, fetchErasureBlockers, updateMyPreferences, type ErasureBlocker } from "@/services/privacy.api";
+import { isSudoRequired } from "@/services/account.api";
+import SudoGate from "@/components/dashboard/sections/SudoGate";
 
 type Flow = "idle" | "export" | "erase";
 
@@ -23,8 +25,7 @@ export default function PrivacySection({ copy }: { copy: DashboardCopy }) {
   const qc = useQueryClient();
   const { user } = useUser();
   const [flow, setFlow] = useState<Flow>("idle");
-  const [codeSent, setCodeSent] = useState(false);
-  const [code, setCode] = useState("");
+  const [gate, setGate] = useState(false);
   const [confirmation, setConfirmation] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ tone: "ok" | "err"; text: string } | null>(null);
@@ -38,9 +39,8 @@ export default function PrivacySection({ copy }: { copy: DashboardCopy }) {
   async function start(next: Flow) {
     setFlow(next);
     setMsg(null);
-    setCode("");
     setConfirmation("");
-    setCodeSent(false);
+    setGate(false);
     if (next === "erase") {
       try {
         const check = await fetchErasureBlockers();
@@ -51,29 +51,16 @@ export default function PrivacySection({ copy }: { copy: DashboardCopy }) {
     }
   }
 
-  async function sendCode() {
-    setBusy(true);
-    setMsg(null);
-    try {
-      await requestSudoCode();
-      setCodeSent(true);
-      setMsg({ tone: "ok", text: p.codeSent });
-    } catch (e) {
-      setMsg({ tone: "err", text: errorText(e) ?? p.error });
-    } finally {
-      setBusy(false);
-    }
-  }
-
   async function runExport() {
     setBusy(true);
     setMsg(null);
     try {
-      const { filename } = await downloadMyData(code);
+      const { filename } = await downloadMyData();
       setMsg({ tone: "ok", text: `${p.exportDone} (${filename})` });
       setFlow("idle");
     } catch (e) {
-      setMsg({ tone: "err", text: errorText(e) ?? p.error });
+      if (isSudoRequired(e)) setGate(true);
+      else setMsg({ tone: "err", text: errorText(e) ?? p.error });
     } finally {
       setBusy(false);
     }
@@ -83,11 +70,13 @@ export default function PrivacySection({ copy }: { copy: DashboardCopy }) {
     setBusy(true);
     setMsg(null);
     try {
-      await eraseMyAccount(code, confirmation);
+      await eraseMyAccount(confirmation);
       qc.clear();
       router.replace("/");
     } catch (e) {
-      if (e instanceof ErasureBlockedError) {
+      if (isSudoRequired(e)) {
+        setGate(true);
+      } else if (e instanceof ErasureBlockedError) {
         setBlockers(e.check.blockers);
         setMsg({ tone: "err", text: p.blocked });
       } else {
@@ -160,22 +149,18 @@ export default function PrivacySection({ copy }: { copy: DashboardCopy }) {
                 )}
               </>
             )}
-            {!blocked && (
+            {!blocked && gate && <SudoGate copy={copy.sudo} onVerifiedAction={() => { setGate(false); return flow === "export" ? runExport() : runErase(); }} onCancelAction={() => setGate(false)} />}
+            {!blocked && !gate && (
               <>
-                <p className="text-slate-600 dark:text-slate-400">{p.codeExplain}</p>
-                <div className="flex flex-wrap items-center gap-2">
-                  <button type="button" disabled={busy} onClick={sendCode} className="rounded-lg border border-slate-300 px-3 py-1.5 text-[12.5px] font-medium disabled:opacity-50 dark:border-slate-700">{codeSent ? p.codeResend : p.codeSend}</button>
-                  {codeSent && <input inputMode="numeric" pattern="\d{6}" maxLength={6} value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="000000" className="w-32 rounded-lg border border-slate-300 px-3 py-1.5 tracking-widest dark:border-slate-700 dark:bg-slate-900" aria-label={p.codeLabel} />}
-                </div>
-                {flow === "erase" && codeSent && (
+                {flow === "erase" && (
                   <label className="block">
                     <span className="text-slate-700 dark:text-slate-300">{p.confirmLabel}</span>
                     <input value={confirmation} onChange={(e) => setConfirmation(e.target.value.toUpperCase())} placeholder="SUPPRIMER" className="mt-1 w-48 rounded-lg border border-slate-300 px-3 py-1.5 dark:border-slate-700 dark:bg-slate-900" />
                   </label>
                 )}
                 <div className="flex gap-2">
-                  {flow === "export" && <button type="button" disabled={busy || code.length !== 6} onClick={runExport} className="rounded-lg bg-slate-900 px-3 py-1.5 text-[12.5px] font-semibold text-white disabled:opacity-40 dark:bg-white dark:text-slate-900">{p.exportConfirm}</button>}
-                  {flow === "erase" && <button type="button" disabled={busy || code.length !== 6 || confirmation !== "SUPPRIMER"} onClick={runErase} className="rounded-lg bg-red-700 px-3 py-1.5 text-[12.5px] font-semibold text-white disabled:opacity-40">{p.eraseConfirm}</button>}
+                  {flow === "export" && <button type="button" disabled={busy} onClick={runExport} className="rounded-lg bg-slate-900 px-3 py-1.5 text-[12.5px] font-semibold text-white disabled:opacity-40 dark:bg-white dark:text-slate-900">{p.exportConfirm}</button>}
+                  {flow === "erase" && <button type="button" disabled={busy || confirmation !== "SUPPRIMER"} onClick={runErase} className="rounded-lg bg-red-700 px-3 py-1.5 text-[12.5px] font-semibold text-white disabled:opacity-40">{p.eraseConfirm}</button>}
                   <button type="button" onClick={() => setFlow("idle")} className="rounded-lg border border-slate-300 px-3 py-1.5 text-[12.5px] dark:border-slate-700">{p.cancel}</button>
                 </div>
               </>

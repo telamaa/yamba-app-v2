@@ -20,10 +20,9 @@ export const ErasureBlockedResponseSchema = z
   .meta({ id: "ErasureBlockedResponse" });
 export type ErasureBlockedResponse = z.infer<typeof ErasureBlockedResponseSchema>;
 
-export const SudoCodeRequestSchema = z.object({ code: z.string().regex(/^\d{6}$/) }).meta({ id: "SudoCodeRequest", description: "Six-digit code sent to the account email (SES-03 sudo, D63 1A)" });
-
+/** D65 : les gestes sensibles passent par la fenêtre sudo (`POST /auth/me/sudo/verify`), plus de code dans le corps. */
 export const EraseMyAccountRequestSchema = z
-  .object({ code: z.string().regex(/^\d{6}$/), confirmation: z.literal(ERASURE_CONFIRMATION_WORD) })
+  .object({ confirmation: z.literal(ERASURE_CONFIRMATION_WORD) })
   .meta({ id: "EraseMyAccountRequest" });
 export type EraseMyAccountRequest = z.infer<typeof EraseMyAccountRequestSchema>;
 

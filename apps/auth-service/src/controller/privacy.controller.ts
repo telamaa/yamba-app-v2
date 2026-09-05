@@ -12,7 +12,6 @@ import {
   DATA_EXPORT_MIN_INTERVAL_HOURS,
   EraseMyAccountRequestSchema,
   ObjectIdSchema,
-  SudoCodeRequestSchema,
   UpdateMyPreferencesRequestSchema,
   resolveLocale,
   type DataRequestsResponse,
@@ -22,7 +21,8 @@ import { AuthError, ForbiddenError, NotFoundError, ValidationError } from "@pack
 import { recordAdminAction } from "@packages/admin-audit";
 import type { AuthenticatedRequest } from "@packages/middleware/isAuthenticated";
 import { deleteImageKitFile } from "@packages/libs/imagekit";
-import { checkSudoOtpRestrictions, revokeRefreshJti, sendSudoOtp, trackSudoOtpRequests, verifySudoOtp } from "../utils/auth.helper";
+import { checkSudoOtpRestrictions, revokeRefreshJti, sendSudoOtp, trackSudoOtpRequests } from "../utils/auth.helper";
+import { requireSudo } from "../utils/sudo";
 import { sendAuthEmail } from "../emails/send-auth-email";
 import { getAuthEmails } from "../emails/auth-emails";
 import { ErasureBlockedError, makePrivacyService, type EraseResult, type PrivacyDb } from "../services/privacy.service";
@@ -69,21 +69,17 @@ export const requestSudoCode = async (req: AuthenticatedRequest, res: Response, 
   }
 };
 
-async function assertSudo(req: AuthenticatedRequest, code: string): Promise<void> {
-  const emailKey = req.user.emailNormalized ?? req.user.email.toLowerCase();
-  await verifySudoOtp(emailKey, code, req.user.preferredLocale);
-}
+/** D65 1A — la fenêtre sudo (code vérifié par `POST /auth/me/sudo/verify`) remplace le code dans le corps. */
+const assertSudo = (req: AuthenticatedRequest) => requireSudo(req);
 
 export const exportMyData = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     if (!req.user) return next(new AuthError("Unauthorized"));
-    const parsed = SudoCodeRequestSchema.safeParse(req.body);
-    if (!parsed.success) throw new ValidationError("Invalid request", { errors: zodErrors(parsed.error.issues) });
     const last = await privacyService.lastExportAt(req.user.id);
     if (last && Date.now() - last.getTime() < DATA_EXPORT_MIN_INTERVAL_HOURS * 3_600_000) {
       throw new ValidationError(`One export per ${DATA_EXPORT_MIN_INTERVAL_HOURS} hours.`, { code: "EXPORT_RATE_LIMITED", nextAt: new Date(last.getTime() + DATA_EXPORT_MIN_INTERVAL_HOURS * 3_600_000).toISOString() });
     }
-    await assertSudo(req, parsed.data.code);
+    await assertSudo(req);
     const data = await privacyService.buildDataExport(req.user.id);
     await privacyService.recordExport(req.user.id, "MEMBER", meta(req));
     res.setHeader("Content-Type", "application/json; charset=utf-8");
@@ -108,7 +104,7 @@ export const eraseMyAccount = async (req: AuthenticatedRequest, res: Response, n
     if (!req.user) return next(new AuthError("Unauthorized"));
     const parsed = EraseMyAccountRequestSchema.safeParse(req.body);
     if (!parsed.success) throw new ValidationError("Invalid request", { errors: zodErrors(parsed.error.issues) });
-    await assertSudo(req, parsed.data.code);
+    await assertSudo(req);
     try {
       await privacyService.eraseAccount({ userId: req.user.id, channel: "MEMBER", ...meta(req) });
     } catch (e) {
