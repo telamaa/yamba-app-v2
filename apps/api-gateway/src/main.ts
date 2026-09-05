@@ -162,6 +162,14 @@ app.use(
   })
 );
 
+// /api/admin/conversations/* → message-service reçoit /admin/conversations/* (F-PR3, D61 7A)
+app.use(
+  "/api/admin/conversations",
+  proxy("http://localhost:6005", {
+    proxyReqPathResolver: (req) => `/admin/conversations${req.url}`,
+  })
+);
+
 // /api/messages/* → message-service :6005 (chantier F, D61). Frontière stable : le jour où
 // ce service change de forme, seule cette ligne bouge, jamais les clients.
 app.use(

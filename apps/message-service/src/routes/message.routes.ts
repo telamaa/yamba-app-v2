@@ -12,6 +12,7 @@
  *  POST   /messages/conversations/:id/meetups           proposer un rendez-vous
  *  POST   /messages/conversations/:id/meetups/:mid/accept
  *  POST   /messages/conversations/:id/phone             révéler le numéro (2 h avant)
+ *  POST   /messages/conversations/:id/messages/:mid/report   signaler un message (F-PR3)
  *  GET    /messages/quick-replies                       réponses rapides dans la langue du lecteur
  */
 import { Router } from "express";
@@ -33,5 +34,6 @@ router.post("/conversations/:id/read", isAuthenticated, controller.markRead);
 router.post("/conversations/:id/meetups", isAuthenticated, controller.proposeMeetup);
 router.post("/conversations/:id/meetups/:meetupId/accept", isAuthenticated, controller.acceptMeetup);
 router.post("/conversations/:id/phone", isAuthenticated, controller.revealPhone);
+router.post("/conversations/:id/messages/:messageId/report", isAuthenticated, controller.reportMessage);
 
 export default router;

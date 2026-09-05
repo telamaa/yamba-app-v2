@@ -19,8 +19,10 @@ import {
   markConversationRead,
   postMessage,
   proposeMeetup,
+  reportMessage,
   revealPhone,
   type ProposeMeetupInput,
+  type ReportMessageInput,
 } from "@/components/dashboard/messages/messaging.api";
 
 export const CONVERSATIONS_QUERY_KEY = ["me", "conversations"] as const;
@@ -91,6 +93,11 @@ export function useProposeMeetup(conversationId: string) {
 export function useAcceptMeetup(conversationId: string) {
   const refresh = useRefreshBoth(conversationId);
   return useMutation({ mutationFn: (meetupId: string) => acceptMeetup(conversationId, meetupId), onSuccess: refresh });
+}
+
+/** F-PR3 (D61 7A) — signaler un message : rien à rafraîchir, le fil ne change pas. */
+export function useReportMessage(conversationId: string) {
+  return useMutation({ mutationFn: (input: { messageId: string } & ReportMessageInput) => reportMessage(conversationId, input.messageId, { reason: input.reason, details: input.details }) });
 }
 
 export function useRevealPhone(conversationId: string) {

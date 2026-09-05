@@ -7,7 +7,7 @@
 import type { NextFunction, Response } from "express";
 import { ValidationError } from "@packages/error-handler";
 import type { AuthenticatedRequest } from "@packages/middleware/isAuthenticated";
-import { ObjectIdSchema, PostMessageRequestSchema, ProposeMeetupRequestSchema } from "@packages/api-contracts";
+import { ObjectIdSchema, PostMessageRequestSchema, ProposeMeetupRequestSchema, ReportMessageRequestSchema } from "@packages/api-contracts";
 import { quickRepliesFor } from "../lib/quick-replies";
 import type { ConversationService } from "../services/conversation.service";
 
@@ -28,6 +28,16 @@ export function makeMessageController(service: ConversationService) {
       try {
         const locale = (req.user as { preferredLocale?: string | null } | undefined)?.preferredLocale ?? (req.headers["x-locale"] as string | undefined) ?? null;
         res.status(200).json({ items: quickRepliesFor(locale) });
+      } catch (e) {
+        next(e);
+      }
+    },
+    /** F-PR3 (D61 7A) — signaler un message de l'autre partie. */
+    async reportMessage(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+      try {
+        const parsed = ReportMessageRequestSchema.safeParse(req.body);
+        if (!parsed.success) throw new ValidationError("Invalid report.", zodErrors(parsed.error.issues));
+        res.status(201).json(await service.reportMessage(req.user.id, id(req.params.id, "conversation id"), id(req.params.messageId, "message id"), parsed.data));
       } catch (e) {
         next(e);
       }

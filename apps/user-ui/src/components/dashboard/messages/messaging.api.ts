@@ -52,6 +52,14 @@ export async function revealPhone(conversationId: string): Promise<{ phoneE164: 
   return res.data;
 }
 
+export type ReportMessageInput = { reason: "OFF_PLATFORM" | "SCAM" | "HARASSMENT" | "OTHER"; details?: string };
+
+/** F-PR3 (D61 7A) — signaler un message de l'autre partie. 409 si déjà signalé. */
+export async function reportMessage(conversationId: string, messageId: string, input: ReportMessageInput): Promise<{ reportId: string; createdAt: string }> {
+  const res = await apiClient.post<{ reportId: string; createdAt: string }>(`/messages/conversations/${conversationId}/messages/${messageId}/report`, input, { requireAuth: true });
+  return res.data;
+}
+
 export async function getQuickReplies(): Promise<QuickReply[]> {
   const res = await apiClient.get<{ items: QuickReply[] }>("/messages/quick-replies", { requireAuth: true });
   return res.data.items;

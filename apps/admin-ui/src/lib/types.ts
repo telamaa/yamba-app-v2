@@ -197,7 +197,7 @@ export type TicketRejectionReason = "ILLEGIBLE" | "DATES_MISMATCH" | "NAME_MISMA
 export type AdminHomeKpis = {
   disputesToDecide: number | null; retentionsHeld: number | null; ticketsToVerify: number | null; hiddenTrips: number | null; hideProposals: number | null;
   suspensionProposals: number | null; restrictedUsers: number | null; suspendedUsers: number | null; publishedTrips: number | null; activeDeals: number | null;
-  payoutsFailed: number | null; payoutsReversed: number | null; manualRefundProposals: number | null; pendingAdminInvites: number | null; usersTotal: number | null; completedDeals30d: number | null; generatedAt: string;
+  payoutsFailed: number | null; payoutsReversed: number | null; manualRefundProposals: number | null; pendingAdminInvites: number | null; usersTotal: number | null; completedDeals30d: number | null; messageReportsOpen?: number | null; generatedAt: string;
 };
 
 /* ── C-PR5a (D58) — finances ── */
@@ -252,3 +252,33 @@ export type DealHistoryResponse = { bookingId: string; events: DealHistoryEvent[
 /* ── C-PR6b (D59) — alertes de seuil ── */
 export type OpsAlert = { rule: string; severity: "warning" | "critical"; title: string; detail: string; count: number | null; href: string };
 export type OpsAlertsResponse = { alerts: OpsAlert[]; evaluatedAt: string; thresholds: Record<string, number> };
+
+/* ── F-PR3 (D61 7A) — conversations et messages signalés ── */
+export type MessageReportReason = "OFF_PLATFORM" | "SCAM" | "HARASSMENT" | "OTHER";
+export type MessageReportStatus = "OPEN" | "REVIEWED" | "DISMISSED";
+export type AdminChatMeetup = {
+  id: string; kind: "PICKUP" | "DELIVERY"; status: "PROPOSED" | "ACCEPTED" | "CANCELLED"; proposedByRole: "SHIPPER" | "CARRIER";
+  placeLabel: string; placeDetails: string | null; startAt: string; endAt: string; acceptedAt: string | null; cancelledAt: string | null; createdAt: string;
+};
+export type AdminChatMessage = {
+  id: string; kind: "TEXT" | "SYSTEM" | "MEETUP"; authorRole: "SHIPPER" | "CARRIER" | "SYSTEM"; authorId: string | null; body: string; photoUrls: string[];
+  systemKey: string | null; systemData: Record<string, unknown> | null; flaggedContact: boolean; createdAt: string;
+  reports: { id: string; reason: MessageReportReason; details: string | null; status: MessageReportStatus; reporterRole: "SHIPPER" | "CARRIER"; createdAt: string }[];
+};
+export type AdminConversation = {
+  conversationId: string; bookingId: string; bookingStatus: string;
+  corridor: { originCity: string; destinationCity: string; departureAt: string | null };
+  shipper: { id: string; firstName: string; lastName: string };
+  carrier: { id: string; firstName: string; lastName: string };
+  messages: AdminChatMessage[]; meetups: AdminChatMeetup[];
+  phoneReveals: { revealedToRole: "SHIPPER" | "CARRIER"; revealedAt: string }[];
+  lastMessageAt: string | null;
+};
+export type AdminMessageReportItem = {
+  id: string; status: MessageReportStatus; reason: MessageReportReason; details: string | null; createdAt: string;
+  reporter: { id: string; firstName: string; role: "SHIPPER" | "CARRIER" };
+  author: { id: string | null; firstName: string; role: "SHIPPER" | "CARRIER" | "SYSTEM" };
+  message: { id: string; body: string; createdAt: string };
+  conversationId: string; bookingId: string; corridor: { originCity: string; destinationCity: string };
+};
+export type AdminMessageReportsResponse = { items: AdminMessageReportItem[]; total: number };

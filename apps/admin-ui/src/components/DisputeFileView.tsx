@@ -76,6 +76,13 @@ export default function DisputeFileView({ bookingId }: { bookingId: string }) {
 
         <PartyCard title="Expéditeur" p={file.shipper} unit="envois" />
         <PartyCard title="Voyageur" p={file.carrier} unit="Deals" />
+        {me && can(me.adminRoles, "conversations.read") && (
+          <p className="text-[13px] md:col-span-2">
+            {/* F-PR3 (D61 7A) — la lecture est un geste volontaire et journalisé : un lien, pas un panneau chargé d'office */}
+            <Link href={`/conversations/${bookingId}`} className="font-medium text-[#185FA5] hover:underline">Lire la conversation des deux parties →</Link>
+            <span className="ml-2 text-slate-500">Lecture journalisée.</span>
+          </p>
+        )}
       </div>
 
       <Card title="Colis déclaré" className="mt-5">

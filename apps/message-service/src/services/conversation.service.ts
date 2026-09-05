@@ -13,7 +13,7 @@
  */
 import bcrypt from "bcryptjs";
 import prisma from "@packages/libs/prisma";
-import { ForbiddenError, NotFoundError, ValidationError } from "@packages/error-handler";
+import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "@packages/error-handler";
 import {
   MessagingDomainEventSchema,
   type ConversationListResponse,
@@ -24,12 +24,15 @@ import {
   type MessagingDomainEvent,
   type PostMessageRequest,
   type ProposeMeetupRequest,
+  type ReportMessageRequest,
+  type ReportMessageResponse,
   type RevealPhoneResponse,
 } from "@packages/api-contracts";
 import { conversationAccess, conversationExists, counterpartIdOf, roleOf } from "../lib/conversation.rules";
 import { detectContactInfo, normalizeBody, sixDigitCandidates } from "../lib/message-guard.rules";
 import { canAcceptMeetup, nextMeetupOf, validateMeetupSlot } from "../lib/meetup.rules";
 import { phoneRevealWindow } from "../lib/phone-reveal.rules";
+import { canReportMessage } from "../lib/message-report.rules";
 
 export const MESSAGES_PAGE_SIZE = 50;
 
@@ -144,7 +147,7 @@ export function makeConversationService(clock: () => Date = () => new Date()) {
       conversation =
         (await prisma.conversation.findUnique({ where: { bookingId }, select: { id: true, bookingId: true, shipperLastReadAt: true, carrierLastReadAt: true } })) ??
         (await prisma.conversation.create({
-          data: { bookingId, shipperId: booking.shipperId, carrierId: booking.carrierId },
+          data: { bookingId, shipperId: booking.shipperId, carrierId: booking.carrierId, lastMessageAt: null, lastMessageAuthorRole: null, shipperRemindedAt: null, carrierRemindedAt: null },
           select: { id: true, bookingId: true, shipperLastReadAt: true, carrierLastReadAt: true },
         }));
     }
@@ -178,7 +181,8 @@ export function makeConversationService(clock: () => Date = () => new Date()) {
         },
         select: { id: true },
       });
-      await tx.conversation.update({ where: { id: conversationId }, data: { lastMessageAt: now } });
+      // F-PR3 (D61 6A) — l'auteur du dernier message décide QUI reçoit la relance email.
+      await tx.conversation.update({ where: { id: conversationId }, data: { lastMessageAt: now, lastMessageAuthorRole: data.authorRole } });
       if (buildEvent) {
         const parsed = MessagingDomainEventSchema.parse(buildEvent(message.id));
         await tx.outboxEvent.create({
@@ -303,6 +307,27 @@ export function makeConversationService(clock: () => Date = () => new Date()) {
     async threadByDeal(userId: string, bookingId: string): Promise<ConversationThreadResponse> {
       const { conversation } = await loadContext(userId, { bookingId });
       return this.thread(userId, conversation.id);
+    },
+
+    /**
+     * Signaler un message de l'autre partie (D61 7A). Un enregistrement de modération, pas une
+     * transition du fil : pas d'événement outbox (A140), le support le voit dans sa file et sur l'accueil.
+     */
+    async reportMessage(userId: string, conversationId: string, messageId: string, input: ReportMessageRequest): Promise<ReportMessageResponse> {
+      const { conversation, role } = await loadContext(userId, { conversationId });
+      const message = await prisma.message.findFirst({ where: { id: messageId, conversationId: conversation.id }, select: { id: true, kind: true, authorRole: true } });
+      if (!message) throw new NotFoundError("Message not found.");
+      const existing = await prisma.report.findFirst({ where: { targetType: "MESSAGE", targetId: message.id, reporterUserId: userId }, select: { id: true } });
+      const verdict = canReportMessage(role, message, !!existing);
+      if (!verdict.allowed) {
+        if (verdict.reason === "ALREADY_REPORTED") throw new ConflictError("You already reported this message.");
+        throw new ValidationError(verdict.reason === "OWN_MESSAGE" ? "You cannot report your own message." : "Only text messages can be reported.", { code: verdict.reason });
+      }
+      const report = await prisma.report.create({
+        data: { reporterUserId: userId, targetType: "MESSAGE", targetId: message.id, reason: input.reason, details: input.details?.trim() || null, status: "OPEN" },
+        select: { id: true, createdAt: true },
+      });
+      return { reportId: report.id, createdAt: report.createdAt.toISOString() };
     },
 
     /** Marque le fil comme lu jusqu'à maintenant. */

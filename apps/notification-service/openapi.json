@@ -13830,6 +13830,18 @@
               }
             ]
           },
+          "messageReportsOpen": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "generatedAt": {
             "type": "string",
             "format": "date-time",
@@ -16732,6 +16744,531 @@
           "phoneE164",
           "firstName",
           "revealedAt"
+        ],
+        "additionalProperties": false
+      },
+      "MessageReportReason": {
+        "type": "string",
+        "enum": [
+          "OFF_PLATFORM",
+          "SCAM",
+          "HARASSMENT",
+          "OTHER"
+        ]
+      },
+      "ReportMessageRequest": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "$ref": "#/components/schemas/MessageReportReason"
+          },
+          "details": {
+            "type": "string",
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "additionalProperties": false
+      },
+      "ReportMessageResponse": {
+        "type": "object",
+        "properties": {
+          "reportId": {
+            "$ref": "#/components/schemas/ObjectId"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          }
+        },
+        "required": [
+          "reportId",
+          "createdAt"
+        ],
+        "additionalProperties": false
+      },
+      "MessageReportStatus": {
+        "type": "string",
+        "enum": [
+          "OPEN",
+          "REVIEWED",
+          "DISMISSED"
+        ]
+      },
+      "AdminMessage": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/ObjectId"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/MessageKind"
+          },
+          "authorRole": {
+            "$ref": "#/components/schemas/MessageAuthorRole"
+          },
+          "authorId": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ObjectId"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "body": {
+            "type": "string",
+            "description": "Texte de l'auteur, ou libellé de repli d'un message système"
+          },
+          "photoUrls": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "systemKey": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Clé i18n d'un message SYSTEM / MEETUP — le client affiche sa propre copie"
+          },
+          "systemData": {
+            "anyOf": [
+              {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {}
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "flaggedContact": {
+            "type": "boolean",
+            "description": "D61 5A — coordonnées détectées : averti, jamais bloqué"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          },
+          "reports": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "$ref": "#/components/schemas/ObjectId"
+                },
+                "reason": {
+                  "$ref": "#/components/schemas/MessageReportReason"
+                },
+                "details": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "status": {
+                  "$ref": "#/components/schemas/MessageReportStatus"
+                },
+                "reporterRole": {
+                  "type": "string",
+                  "enum": [
+                    "SHIPPER",
+                    "CARRIER"
+                  ]
+                },
+                "createdAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                }
+              },
+              "required": [
+                "id",
+                "reason",
+                "details",
+                "status",
+                "reporterRole",
+                "createdAt"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "authorRole",
+          "authorId",
+          "body",
+          "photoUrls",
+          "systemKey",
+          "systemData",
+          "flaggedContact",
+          "createdAt",
+          "reports"
+        ],
+        "additionalProperties": false
+      },
+      "AdminConversationResponse": {
+        "type": "object",
+        "properties": {
+          "conversationId": {
+            "$ref": "#/components/schemas/ObjectId"
+          },
+          "bookingId": {
+            "$ref": "#/components/schemas/ObjectId"
+          },
+          "bookingStatus": {
+            "type": "string"
+          },
+          "corridor": {
+            "type": "object",
+            "properties": {
+              "originCity": {
+                "type": "string"
+              },
+              "destinationCity": {
+                "type": "string"
+              },
+              "departureAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "originCity",
+              "destinationCity",
+              "departureAt"
+            ],
+            "additionalProperties": false
+          },
+          "shipper": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "$ref": "#/components/schemas/ObjectId"
+              },
+              "firstName": {
+                "type": "string"
+              },
+              "lastName": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "firstName",
+              "lastName"
+            ],
+            "additionalProperties": false
+          },
+          "carrier": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "$ref": "#/components/schemas/ObjectId"
+              },
+              "firstName": {
+                "type": "string"
+              },
+              "lastName": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "firstName",
+              "lastName"
+            ],
+            "additionalProperties": false
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminMessage"
+            },
+            "description": "Du plus ancien au plus récent, sans pagination : un dossier se lit en entier"
+          },
+          "meetups": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Meetup"
+            }
+          },
+          "phoneReveals": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "revealedToRole": {
+                  "type": "string",
+                  "enum": [
+                    "SHIPPER",
+                    "CARRIER"
+                  ]
+                },
+                "revealedAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                }
+              },
+              "required": [
+                "revealedToRole",
+                "revealedAt"
+              ],
+              "additionalProperties": false
+            },
+            "description": "Qui a vu le numéro de qui, quand — jamais le numéro"
+          },
+          "lastMessageAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "conversationId",
+          "bookingId",
+          "bookingStatus",
+          "corridor",
+          "shipper",
+          "carrier",
+          "messages",
+          "meetups",
+          "phoneReveals",
+          "lastMessageAt"
+        ],
+        "additionalProperties": false
+      },
+      "AdminMessageReportItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/ObjectId"
+          },
+          "status": {
+            "$ref": "#/components/schemas/MessageReportStatus"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/MessageReportReason"
+          },
+          "details": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          },
+          "reporter": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "$ref": "#/components/schemas/ObjectId"
+              },
+              "firstName": {
+                "type": "string"
+              },
+              "role": {
+                "type": "string",
+                "enum": [
+                  "SHIPPER",
+                  "CARRIER"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "firstName",
+              "role"
+            ],
+            "additionalProperties": false
+          },
+          "author": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/ObjectId"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "firstName": {
+                "type": "string"
+              },
+              "role": {
+                "type": "string",
+                "enum": [
+                  "SHIPPER",
+                  "CARRIER",
+                  "SYSTEM"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "firstName",
+              "role"
+            ],
+            "additionalProperties": false
+          },
+          "message": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "$ref": "#/components/schemas/ObjectId"
+              },
+              "body": {
+                "type": "string"
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              }
+            },
+            "required": [
+              "id",
+              "body",
+              "createdAt"
+            ],
+            "additionalProperties": false
+          },
+          "conversationId": {
+            "$ref": "#/components/schemas/ObjectId"
+          },
+          "bookingId": {
+            "$ref": "#/components/schemas/ObjectId"
+          },
+          "corridor": {
+            "type": "object",
+            "properties": {
+              "originCity": {
+                "type": "string"
+              },
+              "destinationCity": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "originCity",
+              "destinationCity"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "reason",
+          "details",
+          "createdAt",
+          "reporter",
+          "author",
+          "message",
+          "conversationId",
+          "bookingId",
+          "corridor"
+        ],
+        "additionalProperties": false
+      },
+      "AdminMessageReportsQuery": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "default": "OPEN",
+            "$ref": "#/components/schemas/MessageReportStatus"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "additionalProperties": false
+      },
+      "AdminMessageReportsResponse": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminMessageReportItem"
+            }
+          },
+          "total": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "items",
+          "total"
+        ],
+        "additionalProperties": false
+      },
+      "ReviewMessageReportRequest": {
+        "type": "object",
+        "properties": {
+          "decision": {
+            "type": "string",
+            "enum": [
+              "REVIEWED",
+              "DISMISSED"
+            ]
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "decision"
         ],
         "additionalProperties": false
       },

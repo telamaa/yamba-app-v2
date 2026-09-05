@@ -19,6 +19,11 @@ import { pinoHttp } from "pino-http";
 import { errorMiddleware } from "@packages/error-handler/error-middleware";
 import { KafkaEventPublisher } from "@packages/messaging";
 import messageRouter from "./routes/message.routes";
+import adminRouter from "./routes/admin.router";
+import { makeUnreadReminderService } from "./services/unread-reminder.service";
+import { makeConversationRetentionService } from "./services/conversation-retention.service";
+import { startUnreadReminderCron } from "./cron/unread-reminder.cron";
+import { startConversationRetentionCron } from "./cron/conversation-retention.cron";
 import { MessagingOutboxRelay } from "./relay/messaging-relay";
 import { buildOpenApiDocument } from "./openapi/build-openapi";
 
@@ -44,6 +49,8 @@ app.get("/openapi.json", (_req, res) => {
 });
 
 app.use("/messages", messageRouter);
+// F-PR3 (D61 7A) — lecture admin depuis un dossier, file des signalements (session admin seulement).
+app.use("/admin/conversations", adminRouter);
 app.use(errorMiddleware);
 
 const port = Number(process.env.MESSAGE_SERVICE_PORT ?? 6005);
@@ -62,8 +69,20 @@ const relay = relayEnabled
 relay?.start();
 if (!relayEnabled) logger.info("Messaging outbox relay disabled (MESSAGING_RELAY_ENABLED=false)");
 
+// F-PR3 (D61 6A) — relance email des messages non lus (15 min, une par heure et par conversation).
+const reminderEnabled = process.env.MESSAGING_REMINDER_CRON_ENABLED !== "false";
+const reminderCron = reminderEnabled ? startUnreadReminderCron(makeUnreadReminderService(), logger.child({ module: "unread-reminder-cron" })) : null;
+if (!reminderEnabled) logger.info("Unread reminder cron disabled (MESSAGING_REMINDER_CRON_ENABLED=false)");
+
+// F-PR3 (D61 8A) — purge nocturne des conversations un an après la fin du deal.
+const retentionEnabled = process.env.MESSAGING_RETENTION_CRON_ENABLED !== "false";
+const retentionCron = retentionEnabled ? startConversationRetentionCron(makeConversationRetentionService(), logger.child({ module: "conversation-retention-cron" })) : null;
+if (!retentionEnabled) logger.info("Conversation retention cron disabled (MESSAGING_RETENTION_CRON_ENABLED=false)");
+
 async function shutdown(signal: string): Promise<void> {
   logger.info({ signal }, "message-service shutting down");
+  reminderCron?.stop();
+  retentionCron?.stop();
   if (relay) await relay.stop().catch((err) => logger.error({ err }, "Relay stop failed"));
   server.close(() => process.exit(0));
   setTimeout(() => process.exit(0), 5_000).unref();

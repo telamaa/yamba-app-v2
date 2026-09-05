@@ -1401,3 +1401,29 @@ La messagerie existait, mais rien n'y menait depuis les écrans où l'on en a be
 | FCH17 | En `pauline`, ouvrir le tracker du deal `bzv-accepted`, cliquer « Envoyer un message » | La messagerie s'ouvre directement sur le fil du deal, l'URL porte `?conversation=` |
 | FCH18 | En Voyageur, ouvrir le deal accepté, cliquer « Appeler » | Le fil s'ouvre avec un bandeau ambre : « Voir le numéro » si la fenêtre est ouverte, sinon l'heure d'ouverture ou l'invitation à confirmer un rendez-vous |
 | FCH19 | Une fois le numéro révélé, refaire « Appeler » | Le bandeau montre le numéro, cliquable sur mobile (`tel:`) |
+
+---
+
+# F-PR3 — relance, modération et durée de vie de la messagerie
+
+## Le besoin
+Un message non lu doit finir par atteindre son destinataire même s'il n'a pas l'application ouverte ; le support doit pouvoir lire une conversation quand un dossier l'exige, et être alerté quand un membre signale un propos ; et une conversation ne doit pas vivre éternellement.
+
+### Règles de gestion (FCH, suite)
+- **RG-FCH-17 — Un message non lu depuis quinze minutes déclenche un email de relance à son destinataire**, au plus un par heure et par conversation, jamais deux fois pour le même message, jamais pour l'auteur ni pour un message automatique.
+- **RG-FCH-18 — L'email de relance ne cite jamais le message** : il dit qui a écrit, sur quel trajet, et mène à la conversation.
+- **RG-FCH-19 — Un membre peut signaler un message texte de l'autre partie**, une seule fois par message, avec un motif (sortie de Yamba, arnaque, propos déplacés, autre) et des précisions.
+- **RG-FCH-20 — Le support et le médiateur peuvent lire une conversation entière depuis un dossier** ; chaque lecture est journalisée ; le numéro de téléphone n'y apparaît jamais, seules les révélations sont tracées.
+- **RG-FCH-21 — Un signalement se traite** (« Traité » ou « Sans suite », avec une note) ; la décision est journalisée et un signalement traité ne se retraite pas.
+- **RG-FCH-22 — Une conversation est effacée un an après la fin du deal** ou la dernière activité du fil, la plus tardive des deux ; un deal en cours ou en litige n'est jamais purgé ; les signalements survivent à la purge.
+
+### Recette (FCH, suite)
+| # | Scénario | Attendu |
+|---|---|---|
+| FCH20 | En Voyageur (`thomas`), écrire à `pauline` ; ne pas ouvrir le fil côté `pauline` ; attendre 15 à 20 min (cron 5 min, SMTP configuré) | `pauline` reçoit un email « Thomas t'a écrit à propos de Brazzaville → Paris » sans le texte du message, avec un bouton vers le fil |
+| FCH21 | Ouvrir le fil côté `pauline` avant les 15 minutes | Aucun email |
+| FCH22 | Après l'email, laisser 30 min sans lire, puis Thomas écrit encore | Pas de second email avant une heure après le premier |
+| FCH23 | En `pauline`, survoler le message du Voyageur, cliquer le drapeau, choisir « Veut sortir de Yamba », envoyer | « Merci, le signalement est transmis » ; second envoi sur le même message → « Tu as déjà signalé ce message » |
+| FCH24 | Admin SUPPORT : accueil | Tuile « Messages signalés » ≥ 1 (le seed en crée un) ; menu « Signalements » ; la file montre le message, le motif, l'auteur |
+| FCH25 | Cliquer « Lire la conversation » | Le fil entier, les noms, le rendez-vous, « Personne n'a encore vu le numéro » ; le Journal porte « Conversation consultée » |
+| FCH26 | Traiter le signalement avec une note, puis relire la file | Il disparaît de « à traiter », apparaît dans « traité » ; le Journal porte « Message signalé traité » avec la note ; admin FINANCE : ni menu ni tuile |

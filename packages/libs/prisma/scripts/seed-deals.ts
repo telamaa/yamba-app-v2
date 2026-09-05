@@ -348,6 +348,11 @@ async function main() {
   await prisma.tripDocument.deleteMany({ where: { fileId: { startsWith: "seed-ticket-" } } });
   // Chantier F (D61) — fils de conversation des deals seedes (Message/Meetup suivent la cascade).
   const seedConversations = await prisma.conversation.findMany({ where: { shipperId: { in: seedIds } }, select: { id: true } });
+  // F-PR3 — les signalements des messages de ces fils partent avec eux (Report.targetType MESSAGE).
+  if (seedConversations.length) {
+    const seedMessages = await prisma.message.findMany({ where: { conversationId: { in: seedConversations.map((c) => c.id) } }, select: { id: true } });
+    if (seedMessages.length) await prisma.report.deleteMany({ where: { targetType: "MESSAGE", targetId: { in: seedMessages.map((m) => m.id) } } });
+  }
   if (seedConversations.length) {
     const ids = seedConversations.map((c) => c.id);
     await prisma.phoneReveal.deleteMany({ where: { conversationId: { in: ids } } });
@@ -535,12 +540,17 @@ async function main() {
       const conversation = await prisma.conversation.create({
         data: { bookingId: booking.id, shipperId, carrierId, lastMessageAt: days(-1), shipperLastReadAt: days(-1) },
       });
-      await prisma.message.createMany({
-        data: [
-          { conversationId: conversation.id, kind: "TEXT", authorId: shipperId, authorRole: "SHIPPER", body: "Bonjour ! Le colis est pret, emballe et ferme. On se retrouve ou ?", photoUrls: [], createdAt: days(-2) },
-          { conversationId: conversation.id, kind: "TEXT", authorId: carrierId, authorRole: "CARRIER", body: "Bonjour, parfait. Je propose le terminal 2E, cote enregistrement.", photoUrls: [], createdAt: days(-1) },
-        ],
+      await prisma.message.create({
+        data: { conversationId: conversation.id, kind: "TEXT", authorId: shipperId, authorRole: "SHIPPER", body: "Bonjour ! Le colis est pret, emballe et ferme. On se retrouve ou ?", photoUrls: [], createdAt: days(-2) },
       });
+      const carrierMessage = await prisma.message.create({
+        data: { conversationId: conversation.id, kind: "TEXT", authorId: carrierId, authorRole: "CARRIER", body: "Bonjour, parfait. Je propose le terminal 2E, cote enregistrement. Sinon on peut regler ca directement entre nous, hors appli ?", photoUrls: [], createdAt: days(-1) },
+      });
+      // F-PR3 (D61 7A) — un message signale par l'Expediteur, a traiter dans l'admin (file « Signalements »).
+      await prisma.report.create({
+        data: { reporterUserId: shipperId, targetType: "MESSAGE", targetId: carrierMessage.id, reason: "OFF_PLATFORM", details: "Il propose de regler hors de Yamba.", status: "OPEN", createdAt: days(-1) },
+      });
+      await prisma.conversation.update({ where: { id: conversation.id }, data: { lastMessageAuthorRole: "CARRIER", shipperRemindedAt: null, carrierRemindedAt: null } });
       await prisma.meetup.create({
         data: {
           conversationId: conversation.id,
@@ -556,7 +566,7 @@ async function main() {
           createdAt: days(-1),
         },
       });
-      console.log(`    · conversation seedee sur ${b.key} (2 messages, 1 rendez-vous propose)`);
+      console.log(`    · conversation seedee sur ${b.key} (2 messages, 1 rendez-vous propose, 1 message signale)`);
     }
     if (b.status === "DISPUTED") {
       await prisma.booking.update({ where: { id: booking.id }, data: { payoutStatus: "FROZEN" } });

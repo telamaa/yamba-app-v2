@@ -940,6 +940,13 @@ model Conversation {
   shipperLastReadAt DateTime?
   carrierLastReadAt DateTime?
 
+  // F-PR3 (D61 6A) — relance email des messages non lus : auteur du dernier message
+  // (une relance ne part qu'à l'AUTRE partie) et dernière relance envoyée par rôle
+  // (au plus une par heure et par conversation). Les writers posent null explicitement.
+  lastMessageAuthorRole String?
+  shipperRemindedAt     DateTime?
+  carrierRemindedAt     DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1284,6 +1291,7 @@ enum ReportTargetType {
   TRIP
   USER
   BOOKING
+  MESSAGE
 }
 
 enum ReportStatus {

@@ -50,7 +50,10 @@ export function buildOpenApiDocument() {
       { url: "http://localhost:8080/api", description: "API Gateway (dev)" },
       { url: "http://localhost:6005", description: "message-service direct (debug)" },
     ],
-    tags: [{ name: "messages", description: "Conversation, meetings and phone reveal (auth required, parties only)" }],
+    tags: [
+      { name: "messages", description: "Conversation, meetings and phone reveal (auth required, parties only)" },
+      { name: "admin", description: "ADMIN session only (F-PR3, D61 7A): read a thread from a file (journaled), review reported messages" },
+    ],
     paths: {
       "/messages/conversations": {
         get: {
@@ -143,6 +146,52 @@ export function buildOpenApiDocument() {
           security: authSecurity,
           parameters: [conversationIdParam],
           responses: { "200": jsonResponse("RevealPhoneResponse", "Revealed"), "400": response400, "401": response401, "403": response403, "404": response404, "500": response500 },
+        },
+      },
+      "/messages/conversations/{id}/messages/{messageId}/report": {
+        post: {
+          tags: ["messages"],
+          summary: "Report a message from the counterpart (F-PR3, D61 7A)",
+          description:
+            "Only a TEXT message written by the OTHER party can be reported, once per reporter. A moderation record, not a thread transition: " +
+            "no outbox event; support sees it in its queue and on the admin home. 409 when already reported by this user.",
+          operationId: "reportMessage",
+          security: authSecurity,
+          parameters: [conversationIdParam, { name: "messageId", in: "path", required: true, schema: ref("ObjectId") }],
+          requestBody: jsonBody("ReportMessageRequest"),
+          responses: { "201": jsonResponse("ReportMessageResponse", "Report recorded"), "400": response400, "401": response401, "403": response403, "404": response404, "409": jsonResponse("ErrorResponse", "Already reported by this user (ConflictError)"), "500": response500 },
+        },
+      },
+      "/admin/conversations/by-deal/{bookingId}": {
+        get: {
+          tags: ["admin"],
+          summary: "Read a deal's whole conversation (conversations.read) — journaled CONVERSATION_VIEWED",
+          description: "Both parties' names, every message with its reports, meetings and phone-reveal traces (who saw the number, when — never the number). 404 when the deal has no conversation.",
+          operationId: "adminGetConversationByDeal",
+          security: authSecurity,
+          parameters: [{ name: "bookingId", in: "path", required: true, schema: ref("ObjectId") }],
+          responses: { "200": jsonResponse("AdminConversationResponse", "Conversation"), "401": response401, "403": jsonResponse("ErrorResponse", "Admin profile without this permission"), "404": response404, "500": response500 },
+        },
+      },
+      "/admin/conversations/reports": {
+        get: {
+          tags: ["admin"],
+          summary: "Reported messages queue (reports.review)",
+          operationId: "adminListMessageReports",
+          security: authSecurity,
+          parameters: [{ name: "status", in: "query", required: false, schema: ref("MessageReportStatus"), description: "OPEN by default" }],
+          responses: { "200": jsonResponse("AdminMessageReportsResponse", "Reports"), "401": response401, "403": jsonResponse("ErrorResponse", "Admin profile without this permission"), "500": response500 },
+        },
+      },
+      "/admin/conversations/reports/{id}": {
+        patch: {
+          tags: ["admin"],
+          summary: "Review a reported message (reports.review) — decision + journal in ONE transaction",
+          operationId: "adminReviewMessageReport",
+          security: authSecurity,
+          parameters: [{ name: "id", in: "path", required: true, schema: ref("ObjectId"), description: "Report id" }],
+          requestBody: jsonBody("ReviewMessageReportRequest"),
+          responses: { "200": { description: "Reviewed", content: { "application/json": { schema: { type: "object", properties: { id: ref("ObjectId"), status: ref("MessageReportStatus") } } } } }, "400": response400, "401": response401, "403": jsonResponse("ErrorResponse", "Admin profile without this permission"), "404": response404, "409": jsonResponse("ErrorResponse", "Already reviewed (ConflictError)"), "500": response500 },
         },
       },
       "/messages/quick-replies": {
