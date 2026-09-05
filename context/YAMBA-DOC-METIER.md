@@ -1445,3 +1445,4 @@ En recette, choisir une réponse rapide envoyait le message aussitôt : un clic 
 | FCH27 | Dans un fil ouvert, cliquer une réponse rapide | Le texte apparaît dans la zone de saisie, le curseur y est, rien n'est envoyé ; le compteur de l'autre partie ne bouge pas |
 | FCH28 | Modifier le texte proposé puis Entrée (ou le bouton) | Le message modifié part ; la zone se vide |
 | FCH29 | Cliquer une réponse rapide alors que la zone contient déjà un brouillon | Le brouillon est remplacé par la réponse rapide (pas concaténé) |
+| FCH30 | Sur téléphone (ou fenêtre < 1024 px), ouvrir un fil où l'on a écrit | Ses propres bulles (mango, à droite) sont visibles ; le titre du rendez-vous passe à la ligne ; le bouton « Voir le numéro » est dans l'écran ; rien ne déborde à droite |

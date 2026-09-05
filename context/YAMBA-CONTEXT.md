@@ -373,7 +373,8 @@ Ordre de demarrage : auth -> trip -> gateway.
   message-service, sans lui le build webpack echouait et le service ne demarrait pas → 500
   gateway). Puis fix/messaging-quick-reply-draft (A142) : la reponse rapide remplit la saisie
   sans envoyer (RG-FCH-23) ; suppression d'un message NON retenue (RG-FCH-24, forme acceptable
-  consignee). Email de relance des non-lus confirme a 15 min (decision utilisateur 05/09).
+  consignee) ; bulles invisibles sur telephone (grille sans minmax(0,1fr) sous lg → colonne
+  plus large que l'ecran, reproduit en Chrome headless). Email de relance des non-lus confirme a 15 min (decision utilisateur 05/09).
   Suite : C-PR8 parametres / RGPD.
 - Plateforme de tests : 805 (trip 209, deal 485, notification 83, message 28) + auth 103.
 - 04/09 : C-PR6b feat/c6b-admin-alerts (D59 3A / 4A, A129–A131) — neuf regles de seuil
