@@ -386,7 +386,8 @@ Ordre de demarrage : auth -> trip -> gateway.
   portee, 409 version, journal SETTING_CHANGED par cle, email aux SUPER_ADMIN, reset avec diff),
   profil OPS, GET /trips/pricing/params + wizard sur les valeurs serveur, admin-ui /settings +
   /settings/docs, seed-settings.ts, npm run settings-doc → context/YAMBA-PARAMETRES.md,
-  SiteConfig supprime. Suite : C-PR8b RGPD (PRIVACY), C-PR8c maintenance / etat des services.
+  SiteConfig supprime. MERGE 05/09 : **#178** (17 checks comptes). Suite : C-PR8b RGPD (PRIVACY),
+  C-PR8c maintenance / etat des services.
 - Plateforme de tests : 814 (trip 209, deal 489, notification 83, message 33) + auth 121.
 - 04/09 : C-PR6b feat/c6b-admin-alerts (D59 3A / 4A, A129–A131) — neuf regles de seuil
   (evaluateAlerts pur, instantane de dix compteurs), GET /admin/alerts sans etat (accueil
