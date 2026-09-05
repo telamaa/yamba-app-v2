@@ -40,10 +40,10 @@ npx nx test <project> -- --testPathPatterns=<pattern>   # single test file (jest
 npx prisma generate                # after editing prisma/schema.prisma (schema at repo ROOT)
 npx prisma db push                 # sync schema to MongoDB (no migrations — Mongo provider)
 
-npm run auth-docs                  # regenerate auth swagger-output.json (swagger-autogen — legacy, conversion to Zod-OpenAPI is backlog)
+npm run generate:openapi           # regenerate the FIVE openapi.json (trip, deal, notification, message, auth — A145) from the global Zod registry; CI diffs them
 ```
 
-Test platform baseline: **846 tests** (trip-service 209, deal-service 502, notification-service 99, message-service 36) + auth-service 159 (also a CI check) — any deviation must be explained.
+Test platform baseline: **846 tests** (trip-service 209, deal-service 502, notification-service 99, message-service 36) + auth-service 162 (also a CI check) — any deviation must be explained.
 
 Manual `tsc` (when Nx typecheck target is not what you want): `npx tsc --noEmit --project apps/<service>/tsconfig.app.json` — NEVER `--project apps/<service>` (resolves the solution-style tsconfig: 0 files checked).
 
@@ -68,7 +68,7 @@ Requests flow: `user-ui (3000)` → `api-gateway (8080)` → microservices. The 
 - deal-service routes → `:6003` (VERIFY exact gateway prefix in `apps/api-gateway/src/main.ts` before relying on it)
 - everything else → auth-service `:6001` (catch-all)
 
-**auth-service**: auth (register/login/refresh), carrier onboarding + Stripe, saved routes, public user profiles, cron jobs (`src/cron/`), nodemailer emails. **trip-service**: trips CRUD + search + lifecycle state machine + pricing gate (zod schemas in `src/schemas/`), uploads, OpenAPI 3.1 generated from Zod (99 paths, Scalar viewer at `:6002/docs`). **deal-service**: Booking model, server-side state machine (9 statuses, 12 actor-bound transitions — mirror of `SPECIFICATIONS-WORKFLOW-BOOKING-YAMBA.md` §2.2), role-scoped DTOs, transactional outbox + Redpanda relay. **notification-service**: first Kafka consumer (event-id dedup, offsets committed post-processing). **message-service** (chantier F, D61): shipper/carrier coordination on port 6005 — one `Conversation` per deal opened at ACCEPTED, `Meetup` as a first-class object (propose/accept, not a thread of messages), thread messages with two guards (delivery code refused via bcrypt compare on six-digit groups, contact details flagged not blocked), phone number revealed at most 2h before the pickup meeting and recorded; own outbox relay on topic `messaging-events` (each relay drains ONLY its `aggregateType` — the deal-service relay now filters on `booking`). All follow `routes/ → controller(s)/ → service(s)/`.
+**auth-service**: auth (register/login/refresh), carrier onboarding + Stripe, saved routes, public user profiles, cron jobs (`src/cron/`), nodemailer emails; OpenAPI 3.1 at `:6001/docs` (A145: `src/openapi/build-openapi.ts`, member-facing contracts in `packages/libs/api-contracts/src/auth/member-auth.schema.ts` DESCRIBE the legacy controllers, they do not guard them yet; a spec refuses any mounted route left undocumented). **trip-service**: trips CRUD + search + lifecycle state machine + pricing gate (zod schemas in `src/schemas/`), uploads, OpenAPI 3.1 generated from Zod (99 paths, Scalar viewer at `:6002/docs`). **deal-service**: Booking model, server-side state machine (9 statuses, 12 actor-bound transitions — mirror of `SPECIFICATIONS-WORKFLOW-BOOKING-YAMBA.md` §2.2), role-scoped DTOs, transactional outbox + Redpanda relay. **notification-service**: first Kafka consumer (event-id dedup, offsets committed post-processing). **message-service** (chantier F, D61): shipper/carrier coordination on port 6005 — one `Conversation` per deal opened at ACCEPTED, `Meetup` as a first-class object (propose/accept, not a thread of messages), thread messages with two guards (delivery code refused via bcrypt compare on six-digit groups, contact details flagged not blocked), phone number revealed at most 2h before the pickup meeting and recorded; own outbox relay on topic `messaging-events` (each relay drains ONLY its `aggregateType` — the deal-service relay now filters on `booking`). All follow `routes/ → controller(s)/ → service(s)/`.
 
 ### Shared code — `packages/` via `@packages/*` alias
 

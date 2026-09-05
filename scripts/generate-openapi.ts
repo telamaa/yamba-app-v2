@@ -18,11 +18,13 @@ import { buildOpenApiDocument as buildTripDocument } from "../apps/trip-service/
 import { buildOpenApiDocument as buildDealDocument } from "../apps/deal-service/src/openapi/build-openapi";
 import { buildOpenApiDocument as buildNotificationDocument } from "../apps/notification-service/src/openapi/build-openapi";
 import { buildOpenApiDocument as buildMessageDocument } from "../apps/message-service/src/openapi/build-openapi";
+import { buildOpenApiDocument as buildAuthDocument } from "../apps/auth-service/src/openapi/build-openapi"; // A145
 const TARGETS = [
   { name: "trip-service", out: "../apps/trip-service/openapi.json", build: buildTripDocument },
   { name: "deal-service", out: "../apps/deal-service/openapi.json", build: buildDealDocument },
   { name: "notification-service", out: "../apps/notification-service/openapi.json", build: buildNotificationDocument },
   { name: "message-service", out: "../apps/message-service/openapi.json", build: buildMessageDocument },
+  { name: "auth-service", out: "../apps/auth-service/openapi.json", build: buildAuthDocument },
 ];
 for (const t of TARGETS) {
   const outPath = resolve(__dirname, t.out);

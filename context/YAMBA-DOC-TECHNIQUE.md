@@ -1855,3 +1855,19 @@ auth **159** (+6 : agrégation, corps public sans URL ni erreur, lecture du `/he
 
 ### Reste
 Compte, moniteurs, battements et contacts : à ta main (runbook ci-dessus). Porte : battement « échec » (`/fail`) quand un tick échoue, pour distinguer « cron mort » de « cron en erreur ».
+
+---
+
+# A145 — `feat/auth-openapi` : auth-service entre dans l'OpenAPI 3.1 (Jalon 2)
+
+## Ce qui a été fait
+1. **Contrats de la surface membre** (`packages/libs/api-contracts/src/auth/member-auth.schema.ts`, exportés par l'index) : inscription OTP (`MemberRegisterRequest`, `RegistrationStartedResponse`, `VerifyRegistrationRequest`…), connexion (`MemberLoginRequest/Response`, `SessionUser`), Google (`GoogleSignInRequest/Response` avec `CONSENT_REQUIRED`), `MeResponse` (User sans `passwordHash`, champs supplémentaires admis), locale, mot de passe oublié (forgot / verify / reset), réponses du compte D63/D65 sans schéma dédié (`SudoWindowResponse`, `PasswordChangedResponse`, `EmailChange*Response`, `PreferencesResponse`, `ErasedResponse`), onboarding Voyageur (`CarrierProfileRequest`, `CarrierPageDto`, `StripeLinkResponse`, `StripeStatusResponse`), alertes de route (`SavedRouteRequest/Dto/Response(s)`), profil public (`PublicUserProfile` miroir du DTO servi — `hidden` / `isMe` de D67 —, `PublicReview`, `PublicTripPreview`, `PublicReputation`, listes paginées), abonnement (`Follow*`), connexion admin à deux étapes (`AdminLogin*`, `AdminTotp*`), journal (`AdminAuditResponse`), historique des paramètres, réponses de sanction. Tous `.meta({ id })` : ils entrent dans le registre global et donc dans les cinq documents.
+2. **Document** (`apps/auth-service/src/openapi/build-openapi.ts`) : 75 chemins, **86 opérations**, 365 schémas ; trois schémas de sécurité (`cookieAuth`, `bearerAuth` pour le mobile, `adminCookieAuth`), `x-permission` sur chaque route admin (la matrice `ADMIN_PERMISSIONS`), sémantique d'erreurs au réel (403 `SUDO_REQUIRED`, 409 `ERASURE_BLOCKED` avec la liste fermée, 429 verrou OTP, 404 « page masquée »). Monté sur `:6001/openapi.json` et `:6001/docs` (Scalar) à la place du commentaire « Swagger legacy retiré ».
+3. **Garde** (`build-openapi.spec.ts`) : lit les cinq routeurs au format source (`router.get("…")`), convertit `:param` en `{param}`, exige chaque paire méthode + chemin dans `paths` **et** refuse toute opération documentée sans route ; vérifie que chaque `$ref` résout et que les `operationId` sont uniques. Auth **162** (+3).
+4. **Génération et CI** : `scripts/generate-openapi.ts` produit `apps/auth-service/openapi.json` (cinquième cible) ; le job « OpenAPI contracts generate+diff » le compare comme les quatre autres. Les quatre autres `openapi.json` bougent aussi : le registre est commun, leurs `components.schemas` gagnent les schémas auth.
+
+### Preuves
+auth 162 · tsc auth · `npm run generate:openapi` ×5 · build ×6. Le document se lit sur `http://localhost:6001/docs`.
+
+### Reste
+Porte A145 : brancher les schémas membre en `safeParse` dans les contrôleurs historiques au chantier mobile D36 (le client généré en dépendra) ; d'ici là un champ renommé côté contrôleur n'est pas attrapé par le test de couverture (qui attrape une route, pas un champ).

@@ -21177,6 +21177,2632 @@
         ],
         "additionalProperties": false,
         "description": "D69 — recipient tracking page: minimal content, no address, no phone, no delivery code"
+      },
+      "MemberRegisterRequest": {
+        "type": "object",
+        "properties": {
+          "firstName": {
+            "type": "string",
+            "minLength": 1
+          },
+          "lastName": {
+            "type": "string",
+            "minLength": 1
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+          },
+          "password": {
+            "type": "string",
+            "minLength": 8
+          },
+          "termsAccepted": {
+            "type": "boolean",
+            "const": true
+          },
+          "termsVersion": {
+            "type": "string",
+            "minLength": 1
+          },
+          "privacyVersion": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "firstName",
+          "lastName",
+          "email",
+          "password",
+          "termsAccepted",
+          "termsVersion",
+          "privacyVersion"
+        ],
+        "additionalProperties": false,
+        "description": "Consent is mandatory (ConsentLog written at verification)"
+      },
+      "RegistrationStartedResponse": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string"
+          },
+          "verificationToken": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "message",
+          "verificationToken"
+        ],
+        "additionalProperties": false,
+        "description": "OTP sent; the token identifies the pending registration (Redis, 10 min)"
+      },
+      "VerificationTokenRequest": {
+        "type": "object",
+        "properties": {
+          "verificationToken": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "verificationToken"
+        ],
+        "additionalProperties": false
+      },
+      "VerifyRegistrationRequest": {
+        "type": "object",
+        "properties": {
+          "verificationToken": {
+            "type": "string"
+          },
+          "otp": {
+            "type": "string",
+            "minLength": 6,
+            "maxLength": 6
+          }
+        },
+        "required": [
+          "verificationToken",
+          "otp"
+        ],
+        "additionalProperties": false
+      },
+      "SuccessMessageResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "message"
+        ],
+        "additionalProperties": false,
+        "description": "Generic { success, message } acknowledgement"
+      },
+      "MemberLoginRequest": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+          },
+          "password": {
+            "type": "string"
+          },
+          "rememberMe": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "email",
+          "password"
+        ],
+        "additionalProperties": false,
+        "description": "rememberMe = 30-day refresh cookie (A62)"
+      },
+      "SessionUser": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/ObjectId"
+          },
+          "email": {
+            "type": "string"
+          },
+          "firstName": {
+            "type": "string"
+          },
+          "lastName": {
+            "type": "string"
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "firstName",
+          "lastName",
+          "roles"
+        ],
+        "additionalProperties": false
+      },
+      "MemberLoginResponse": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string"
+          },
+          "user": {
+            "$ref": "#/components/schemas/SessionUser"
+          }
+        },
+        "required": [
+          "message",
+          "user"
+        ],
+        "additionalProperties": false,
+        "description": "Cookies access_token / refresh_token are set on the response"
+      },
+      "GoogleSignInRequest": {
+        "type": "object",
+        "properties": {
+          "credential": {
+            "type": "string",
+            "minLength": 1
+          },
+          "rememberMe": {
+            "type": "boolean"
+          },
+          "consent": {
+            "type": "object",
+            "properties": {
+              "termsVersion": {
+                "type": "string"
+              },
+              "privacyVersion": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "termsVersion",
+              "privacyVersion"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "credential"
+        ],
+        "additionalProperties": false,
+        "description": "Google ID token (D47). A new account needs consent, otherwise CONSENT_REQUIRED"
+      },
+      "GoogleSignInResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "LOGGED_IN",
+              "CONSENT_REQUIRED"
+            ]
+          },
+          "created": {
+            "type": "boolean"
+          },
+          "linked": {
+            "type": "boolean"
+          },
+          "user": {
+            "$ref": "#/components/schemas/SessionUser"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "additionalProperties": false
+      },
+      "MeResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true
+          },
+          "user": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "$ref": "#/components/schemas/ObjectId"
+              },
+              "email": {
+                "type": "string"
+              },
+              "firstName": {
+                "type": "string"
+              },
+              "lastName": {
+                "type": "string"
+              },
+              "roles": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "preferredLocale": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "phoneE164": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "publicSlug": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "accountStatus": {
+                "type": "string"
+              },
+              "carrierStatus": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "analyticsOptIn": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "profilePublic": {
+                "type": "boolean"
+              },
+              "showCity": {
+                "type": "boolean"
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              }
+            },
+            "required": [
+              "id",
+              "email",
+              "firstName",
+              "lastName",
+              "roles"
+            ],
+            "additionalProperties": {}
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "success",
+          "user",
+          "roles"
+        ],
+        "additionalProperties": false,
+        "description": "The User record without passwordHash (additional fields allowed)"
+      },
+      "UpdateLocaleRequest": {
+        "type": "object",
+        "properties": {
+          "locale": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "locale"
+        ],
+        "additionalProperties": false,
+        "description": "One of SUPPORTED_LOCALES (D44)"
+      },
+      "UpdateLocaleResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true
+          },
+          "preferredLocale": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "success",
+          "preferredLocale"
+        ],
+        "additionalProperties": false
+      },
+      "PasswordForgotRequest": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+          }
+        },
+        "required": [
+          "email"
+        ],
+        "additionalProperties": false,
+        "description": "Always 200: never reveals whether the account exists"
+      },
+      "PasswordVerifyRequest": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+          },
+          "otp": {
+            "type": "string",
+            "minLength": 6,
+            "maxLength": 6
+          }
+        },
+        "required": [
+          "email",
+          "otp"
+        ],
+        "additionalProperties": false
+      },
+      "PasswordVerifyResponse": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string"
+          },
+          "passwordResetToken": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "message",
+          "passwordResetToken"
+        ],
+        "additionalProperties": false
+      },
+      "PasswordResetRequest": {
+        "type": "object",
+        "properties": {
+          "passwordResetToken": {
+            "type": "string"
+          },
+          "newPassword": {
+            "type": "string",
+            "minLength": 8
+          }
+        },
+        "required": [
+          "passwordResetToken",
+          "newPassword"
+        ],
+        "additionalProperties": false
+      },
+      "MessageResponse": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "message"
+        ],
+        "additionalProperties": false
+      },
+      "SudoWindowResponse": {
+        "type": "object",
+        "properties": {
+          "active": {
+            "type": "boolean",
+            "const": true
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          }
+        },
+        "required": [
+          "active",
+          "expiresAt"
+        ],
+        "additionalProperties": false,
+        "description": "Sudo window opened for this session (15 min, D65)"
+      },
+      "RevokeSessionResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          },
+          "current": {
+            "type": "boolean"
+          },
+          "revoked": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      },
+      "PasswordChangedResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          },
+          "revokedSessions": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "hadPassword": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "revokedSessions",
+          "hadPassword"
+        ],
+        "additionalProperties": false
+      },
+      "EmailChangeRequestedResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          },
+          "pendingEmail": {
+            "type": "string"
+          },
+          "expiresInMinutes": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "ok",
+          "pendingEmail",
+          "expiresInMinutes"
+        ],
+        "additionalProperties": false
+      },
+      "EmailChangeConfirmedResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          },
+          "email": {
+            "type": "string"
+          },
+          "revokedSessions": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "ok",
+          "email",
+          "revokedSessions"
+        ],
+        "additionalProperties": false
+      },
+      "PreferencesResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true
+          },
+          "preferences": {
+            "type": "object",
+            "properties": {
+              "messagingReminderEmails": {
+                "type": "boolean"
+              },
+              "preferredLocale": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "analyticsOptIn": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "messagingReminderEmails",
+              "preferredLocale",
+              "analyticsOptIn"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "success",
+          "preferences"
+        ],
+        "additionalProperties": false
+      },
+      "ErasedResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true
+          },
+          "erased": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "success",
+          "erased"
+        ],
+        "additionalProperties": false
+      },
+      "CarrierProfileRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "bio": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "phoneE164": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "address": {
+            "type": "object",
+            "properties": {
+              "formattedAddress": {
+                "type": "string"
+              },
+              "placeId": {
+                "type": "string"
+              },
+              "city": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "country": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "countryCode": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "lat": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "lng": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "formattedAddress"
+            ],
+            "additionalProperties": {}
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "additionalProperties": false,
+        "description": "Step PROFILE of the carrier onboarding"
+      },
+      "CarrierPageDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/ObjectId"
+          },
+          "userId": {
+            "$ref": "#/components/schemas/ObjectId"
+          },
+          "name": {
+            "type": "string"
+          },
+          "bio": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "phoneE164": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "onboardingStep": {
+            "type": "string"
+          },
+          "stripeOnboardingComplete": {
+            "type": "boolean"
+          },
+          "stripeChargesEnabled": {
+            "type": "boolean"
+          },
+          "stripePayoutsEnabled": {
+            "type": "boolean"
+          },
+          "isVerified": {
+            "type": "boolean"
+          },
+          "isSuperCarrier": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "name",
+          "bio",
+          "phoneE164",
+          "onboardingStep",
+          "stripeOnboardingComplete",
+          "stripeChargesEnabled",
+          "stripePayoutsEnabled",
+          "isVerified",
+          "isSuperCarrier"
+        ],
+        "additionalProperties": {}
+      },
+      "CarrierProfileResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true
+          },
+          "message": {
+            "type": "string"
+          },
+          "carrierPage": {
+            "$ref": "#/components/schemas/CarrierPageDto"
+          }
+        },
+        "required": [
+          "success",
+          "message",
+          "carrierPage"
+        ],
+        "additionalProperties": false
+      },
+      "StripeLinkResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          }
+        },
+        "required": [
+          "success",
+          "url"
+        ],
+        "additionalProperties": false,
+        "description": "Single-use Stripe URL (onboarding or Express dashboard), never stored"
+      },
+      "StripeStatusResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "not_started",
+              "pending",
+              "complete"
+            ]
+          },
+          "chargesEnabled": {
+            "type": "boolean"
+          },
+          "payoutsEnabled": {
+            "type": "boolean"
+          },
+          "detailsSubmitted": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "success",
+          "status",
+          "chargesEnabled",
+          "payoutsEnabled"
+        ],
+        "additionalProperties": false
+      },
+      "SavedRouteRequest": {
+        "type": "object",
+        "properties": {
+          "originCity": {
+            "type": "string",
+            "minLength": 1
+          },
+          "originCountry": {
+            "type": "string",
+            "minLength": 1
+          },
+          "originCountryCode": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 2
+          },
+          "originCityCode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "originRegion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "originRegionCode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "originPlaceId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "originLat": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "originLng": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "destinationCity": {
+            "type": "string",
+            "minLength": 1
+          },
+          "destinationCountry": {
+            "type": "string",
+            "minLength": 1
+          },
+          "destinationCountryCode": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 2
+          },
+          "destinationCityCode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "destinationRegion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "destinationRegionCode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "destinationPlaceId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "destinationLat": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "destinationLng": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "earliestDate": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "latestDate": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "emailEnabled": {
+            "type": "boolean"
+          },
+          "inAppEnabled": {
+            "type": "boolean"
+          },
+          "includeNearby": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "originCity",
+          "originCountry",
+          "originCountryCode",
+          "destinationCity",
+          "destinationCountry",
+          "destinationCountryCode"
+        ],
+        "additionalProperties": false,
+        "description": "Origin and destination are Google Places snapshots; same city+country on both sides is refused. Max 20 alerts per member"
+      },
+      "SavedRouteDto": {
+        "type": "object",
+        "properties": {
+          "originCity": {
+            "type": "string",
+            "minLength": 1
+          },
+          "originCountry": {
+            "type": "string",
+            "minLength": 1
+          },
+          "originCountryCode": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 2
+          },
+          "originCityCode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "originRegion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "originRegionCode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "originPlaceId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "originLat": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "originLng": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "destinationCity": {
+            "type": "string",
+            "minLength": 1
+          },
+          "destinationCountry": {
+            "type": "string",
+            "minLength": 1
+          },
+          "destinationCountryCode": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 2
+          },
+          "destinationCityCode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "destinationRegion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "destinationRegionCode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "destinationPlaceId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "destinationLat": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "destinationLng": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "earliestDate": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "latestDate": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "emailEnabled": {
+            "type": "boolean"
+          },
+          "inAppEnabled": {
+            "type": "boolean"
+          },
+          "includeNearby": {
+            "type": "boolean"
+          },
+          "id": {
+            "$ref": "#/components/schemas/ObjectId"
+          },
+          "userId": {
+            "$ref": "#/components/schemas/ObjectId"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "lastNotifiedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          }
+        },
+        "required": [
+          "originCity",
+          "originCountry",
+          "originCountryCode",
+          "destinationCity",
+          "destinationCountry",
+          "destinationCountryCode",
+          "id",
+          "userId",
+          "expiresAt",
+          "isActive",
+          "createdAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      },
+      "SavedRouteResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true
+          },
+          "message": {
+            "type": "string"
+          },
+          "savedRoute": {
+            "$ref": "#/components/schemas/SavedRouteDto"
+          }
+        },
+        "required": [
+          "success",
+          "savedRoute"
+        ],
+        "additionalProperties": false
+      },
+      "SavedRoutesResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true
+          },
+          "savedRoutes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SavedRouteDto"
+            }
+          },
+          "count": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "success",
+          "savedRoutes",
+          "count"
+        ],
+        "additionalProperties": false
+      },
+      "PublicReview": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/ObjectId"
+          },
+          "rating": {
+            "type": "number"
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "criteria": {
+            "anyOf": [
+              {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "type": "string",
+                  "enum": [
+                    "UP",
+                    "DOWN"
+                  ]
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          },
+          "author": {
+            "type": "object",
+            "properties": {
+              "firstName": {
+                "type": "string"
+              },
+              "lastInitial": {
+                "type": "string"
+              },
+              "avatarUrl": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "firstName",
+              "lastInitial",
+              "avatarUrl"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "id",
+          "rating",
+          "comment",
+          "createdAt",
+          "author"
+        ],
+        "additionalProperties": false
+      },
+      "PublicTripPreview": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/ObjectId"
+          },
+          "transportMode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "originCity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "destinationCity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "departureAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "flightType": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "trainTripType": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "carTripFlexibility": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "minPriceCents": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "currencyCode": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "transportMode",
+          "originCity",
+          "destinationCity",
+          "departureAt",
+          "flightType",
+          "trainTripType",
+          "carTripFlexibility",
+          "minPriceCents",
+          "currencyCode"
+        ],
+        "additionalProperties": false
+      },
+      "PublicReputation": {
+        "type": "object",
+        "properties": {
+          "level": {
+            "type": "string",
+            "enum": [
+              "NEW",
+              "CONFIRMED",
+              "TOP"
+            ]
+          },
+          "ratingsAvg": {
+            "type": "number"
+          },
+          "ratingsCount": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "completedDealsCount": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "lateCancellationsCount": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "level",
+          "ratingsAvg",
+          "ratingsCount",
+          "completedDealsCount",
+          "lateCancellationsCount"
+        ],
+        "additionalProperties": false
+      },
+      "PublicUserProfile": {
+        "type": "object",
+        "properties": {
+          "publicSlug": {
+            "type": "string"
+          },
+          "firstName": {
+            "type": "string"
+          },
+          "lastInitial": {
+            "type": "string"
+          },
+          "avatarUrl": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "memberSince": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          },
+          "location": {
+            "type": "object",
+            "properties": {
+              "city": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "country": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "countryCode": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "city",
+              "country",
+              "countryCode"
+            ],
+            "additionalProperties": false
+          },
+          "stats": {
+            "type": "object",
+            "properties": {
+              "tripsPublishedCount": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "parcelsCarriedCount": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "parcelsSentCount": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "tripsPublishedCount",
+              "parcelsCarriedCount",
+              "parcelsSentCount"
+            ],
+            "additionalProperties": false
+          },
+          "tripperRating": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "average": {
+                    "type": "number"
+                  },
+                  "count": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "average",
+                  "count"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "shipperRating": {
+            "type": "object",
+            "properties": {
+              "average": {
+                "type": "number"
+              },
+              "count": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "average",
+              "count"
+            ],
+            "additionalProperties": false
+          },
+          "reputation": {
+            "type": "object",
+            "properties": {
+              "carrier": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/PublicReputation"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "shipper": {
+                "$ref": "#/components/schemas/PublicReputation"
+              }
+            },
+            "required": [
+              "carrier",
+              "shipper"
+            ],
+            "additionalProperties": false
+          },
+          "tripper": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "bio": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "badges": {
+                    "type": "object",
+                    "properties": {
+                      "isVerified": {
+                        "type": "boolean"
+                      },
+                      "isSuperCarrier": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "isVerified",
+                      "isSuperCarrier"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "topRoutes": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "originCity": {
+                          "type": "string"
+                        },
+                        "destinationCity": {
+                          "type": "string"
+                        },
+                        "count": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        }
+                      },
+                      "required": [
+                        "originCity",
+                        "destinationCity",
+                        "count"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "availableTripsPreview": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/PublicTripPreview"
+                    }
+                  },
+                  "availableTripsCount": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "reviewsPreview": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/PublicReview"
+                    }
+                  },
+                  "reviewsCount": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "bio",
+                  "badges",
+                  "topRoutes",
+                  "availableTripsPreview",
+                  "availableTripsCount",
+                  "reviewsPreview",
+                  "reviewsCount"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "shipper": {
+            "type": "object",
+            "properties": {
+              "reviewsPreview": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/PublicReview"
+                }
+              },
+              "reviewsCount": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "reviewsPreview",
+              "reviewsCount"
+            ],
+            "additionalProperties": false
+          },
+          "follow": {
+            "type": "object",
+            "properties": {
+              "followersCount": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "followingCount": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "isFollowedByMe": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "notifyNextTrip": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "followersCount",
+              "followingCount",
+              "isFollowedByMe",
+              "notifyNextTrip"
+            ],
+            "additionalProperties": false
+          },
+          "isOwnProfile": {
+            "type": "boolean"
+          },
+          "isMe": {
+            "type": "boolean"
+          },
+          "hidden": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "publicSlug",
+          "firstName",
+          "lastInitial",
+          "avatarUrl",
+          "memberSince",
+          "location",
+          "stats",
+          "tripperRating",
+          "shipperRating",
+          "tripper",
+          "shipper",
+          "follow",
+          "isOwnProfile"
+        ],
+        "additionalProperties": false,
+        "description": "D28 / D29 / D67: location nulled when showCity is off; 404 to others when profilePublic is off (owner sees hidden: true)"
+      },
+      "PublicUserResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true
+          },
+          "user": {
+            "$ref": "#/components/schemas/PublicUserProfile"
+          }
+        },
+        "required": [
+          "success",
+          "user"
+        ],
+        "additionalProperties": false
+      },
+      "PublicReviewsResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true
+          },
+          "reviews": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PublicReview"
+            }
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "success",
+          "reviews",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "PublicTripsResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true
+          },
+          "trips": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PublicTripPreview"
+            }
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "success",
+          "trips",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "FollowPreferencesRequest": {
+        "type": "object",
+        "properties": {
+          "notifyNextTrip": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "notifyNextTrip"
+        ],
+        "additionalProperties": false
+      },
+      "FollowResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true
+          },
+          "message": {
+            "type": "string"
+          },
+          "follow": {
+            "type": "object",
+            "properties": {
+              "notifyNextTrip": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "notifyNextTrip"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "success",
+          "follow"
+        ],
+        "additionalProperties": false
+      },
+      "FollowingResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true
+          },
+          "count": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "following": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "user": {
+                  "type": "object",
+                  "properties": {
+                    "publicSlug": {
+                      "type": "string"
+                    },
+                    "firstName": {
+                      "type": "string"
+                    },
+                    "lastInitial": {
+                      "type": "string"
+                    },
+                    "avatarUrl": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "carrierRatingAvg": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "carrierRatingCount": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "totalTripsPublished": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "nextUpcomingTrip": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/components/schemas/PublicTripPreview"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "publicSlug",
+                    "firstName",
+                    "lastInitial",
+                    "avatarUrl",
+                    "carrierRatingCount",
+                    "totalTripsPublished",
+                    "nextUpcomingTrip"
+                  ],
+                  "additionalProperties": {}
+                },
+                "followedAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                },
+                "notifyNextTrip": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "user",
+                "followedAt",
+                "notifyNextTrip"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "success",
+          "count",
+          "following"
+        ],
+        "additionalProperties": false,
+        "description": "Members with an upcoming trip first"
+      },
+      "AdminLoginRequest": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+          },
+          "password": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "email",
+          "password"
+        ],
+        "additionalProperties": false
+      },
+      "AdminLoginResponse": {
+        "type": "object",
+        "properties": {
+          "next": {
+            "type": "string",
+            "enum": [
+              "TOTP",
+              "SETUP"
+            ]
+          }
+        },
+        "required": [
+          "next"
+        ],
+        "additionalProperties": false,
+        "description": "admin_preauth cookie set; then totp/verify (TOTP) or totp/setup + totp/enable (SETUP)"
+      },
+      "AdminTotpSetupResponse": {
+        "type": "object",
+        "properties": {
+          "secret": {
+            "type": "string"
+          },
+          "otpauthUrl": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "secret",
+          "otpauthUrl"
+        ],
+        "additionalProperties": false
+      },
+      "AdminTotpCodeRequest": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code"
+        ],
+        "additionalProperties": false,
+        "description": "6-digit TOTP or a backup code (verify)"
+      },
+      "AdminTotpEnableResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          },
+          "backupCodes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "ok",
+          "backupCodes"
+        ],
+        "additionalProperties": false,
+        "description": "Backup codes shown ONCE"
+      },
+      "AdminTotpVerifyResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          },
+          "usedBackupCode": {
+            "type": "boolean"
+          },
+          "remainingBackupCodes": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "ok",
+          "usedBackupCode",
+          "remainingBackupCodes"
+        ],
+        "additionalProperties": false,
+        "description": "admin_access_token / admin_refresh_token cookies set"
+      },
+      "OkResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      },
+      "AdminMeResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/ObjectId"
+          },
+          "email": {
+            "type": "string"
+          },
+          "firstName": {
+            "type": "string"
+          },
+          "lastName": {
+            "type": "string"
+          },
+          "adminRole": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "adminRoles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "remainingBackupCodes": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "firstName",
+          "lastName",
+          "adminRole",
+          "adminRoles",
+          "remainingBackupCodes"
+        ],
+        "additionalProperties": false
+      },
+      "AdminAuditItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/ObjectId"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          },
+          "admin": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string"
+          },
+          "targetType": {
+            "type": "string"
+          },
+          "targetId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "before": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "after": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "ip": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "at",
+          "admin",
+          "action",
+          "targetType",
+          "targetId",
+          "before",
+          "after",
+          "ip"
+        ],
+        "additionalProperties": false
+      },
+      "AdminAuditResponse": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminAuditItem"
+            }
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ObjectId"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "InviteAdminResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          },
+          "userId": {
+            "$ref": "#/components/schemas/ObjectId"
+          },
+          "existingAccount": {
+            "type": "boolean"
+          },
+          "expiresInHours": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "ok",
+          "userId",
+          "existingAccount"
+        ],
+        "additionalProperties": false
+      },
+      "UpdateAdminRoleResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          },
+          "adminRoles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "adminRole": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "ok",
+          "adminRoles",
+          "adminRole"
+        ],
+        "additionalProperties": false
+      },
+      "SettingsHistoryItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/ObjectId"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          },
+          "admin": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string"
+          },
+          "key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "before": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "after": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "at",
+          "admin",
+          "action",
+          "key",
+          "before",
+          "after",
+          "reason",
+          "version"
+        ],
+        "additionalProperties": false
+      },
+      "SettingsHistoryResponse": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SettingsHistoryItem"
+            }
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ObjectId"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "SuspensionProposedResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          },
+          "proposedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          }
+        },
+        "required": [
+          "ok",
+          "proposedAt"
+        ],
+        "additionalProperties": false
+      },
+      "SuspensionAppliedResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          },
+          "accountStatus": {
+            "type": "string"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          }
+        },
+        "required": [
+          "ok",
+          "accountStatus"
+        ],
+        "additionalProperties": false
       }
     },
     "securitySchemes": {

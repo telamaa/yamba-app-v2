@@ -11,6 +11,7 @@ import userPublicRouter from "./routes/user-public.router";
 import savedRouteRouter from "./routes/saved-route.router";
 import adminRouter from "./routes/admin.router";
 import { healthHandler, mongoCheck, redisCheck } from "@packages/libs/health";
+import { buildOpenApiDocument } from "./openapi/build-openapi"; // A145
 import prisma from "@packages/libs/prisma";
 import redis from "@packages/libs/redis";
 
@@ -32,9 +33,19 @@ app.get('/', (req, res) => {
 });
 app.get("/health", healthHandler("auth-service", { mongo: mongoCheck(prisma), redis: redisCheck(redis) })); // D64 3A
 
-// Le Swagger legacy (swagger-autogen, /api-docs, /docs-json) a été retiré
-// avec la session D27 — la conversion OpenAPI 3.1 d'auth-service (contrats
-// Zod dans @packages/api-contracts) est un chantier ultérieur.
+// A145 — OpenAPI 3.1 GÉNÉRÉ depuis les schémas Zod (D3), construit une fois au boot ;
+// un test exige que chaque route montée soit documentée. Visionneuse Scalar (CDN).
+const openApiDocument = buildOpenApiDocument();
+app.get("/openapi.json", (_req, res) => {
+  res.json(openApiDocument);
+});
+app.get("/docs", (_req, res) => {
+  res.type("html").send(`<!doctype html>
+<html>
+<head><title>Yamba — Auth Service API</title><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /></head>
+<body><script id="api-reference" data-url="/openapi.json"></script><script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script></body>
+</html>`);
+});
 
 // Routes
 app.use("/api", router);
