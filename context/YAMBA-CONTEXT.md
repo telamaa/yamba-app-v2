@@ -573,7 +573,7 @@ Ordre de demarrage : auth -> trip -> gateway.
   etapes), quatre cles au catalogue (groupe trust, CNF-06 sort de la classe C), fiche membre admin
   (carte Risque interne), file des signalements (niveau du membre vise, HIGH_RISK prioritaire).
   Jamais servi a un membre, jamais une sanction automatique. Portes : poids reel au pickup, KYC,
-  instantane dans le journal.
+  instantane dans le journal. MERGE 05/09 : **#201** (17 checks comptes).
 - Backlog parametre serveur : classe C du catalogue D62 (tolerance de poids,
   plafonds comptes neufs, plafond express, seuil de trois signalements…).
 - Photos hors TripDocument chez ImageKit sans fileId (colis, pickup, livraison, litige,
