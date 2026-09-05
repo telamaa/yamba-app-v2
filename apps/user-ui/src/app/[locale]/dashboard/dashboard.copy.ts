@@ -13,7 +13,7 @@ export function getDashboardCopy(isFr: boolean) {
     },
     shipments: {
       title: isFr ? "Mes envois" : "My shipments",
-      sub: isFr ? "Suivez vos colis confiés aux transporteurs" : "Track parcels entrusted to carriers",
+      sub: isFr ? "Suis tes colis confiés aux Voyageurs" : "Track parcels entrusted to travelers",
     },
     create: {
       title: isFr ? "Créer un trajet" : "Create a trip",
@@ -36,8 +36,8 @@ export function getDashboardCopy(isFr: boolean) {
     following: {
       title: isFr ? "Voyageurs suivis" : "Followed travelers",
       sub: isFr
-        ? "Restez à l'affût des publications de vos trippers favoris"
-        : "Stay tuned for posts from your favorite trippers",
+        ? "Restez à l'affût des publications de vos Voyageurs favoris"
+        : "Stay tuned for posts from your favorite travelers",
     },
     payments: {
       title: isFr ? "Paiements" : "Payments",

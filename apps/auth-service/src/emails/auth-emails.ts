@@ -7,7 +7,7 @@
  * (tsc casse si une entrée manque — `Record<SupportedLocale, …>`).
  *
  * Registre de marque (D45) : tutoiement, prénom réel, aucun emoji dans les
- * sujets. Le mot « Tripper » des emails carrier est conservé tel quel en
+ * sujets. Le mot « Voyageur (A144 : un mot par rôle, partout — ex-« Voyageur ») » des emails carrier est conservé tel quel en
  * attendant la décision sur le nom du rôle (D45, ouvert).
  */
 import type { EmailContent } from "@packages/email";
@@ -209,7 +209,7 @@ const fr: AuthEmailDictionary = {
       greeting: greet(firstName, true),
       paragraphs: [
         "Ton compte Yamba a bien été créé. Tu fais maintenant partie d'une communauté qui rend le transport de colis plus simple et plus humain.",
-        "Envoyer un colis : trouve un Voyageur sur un trajet qui te convient. Devenir Tripper : publie tes trajets et gagne de l'argent en transportant des colis. Explorer : découvre les trajets disponibles près de chez toi.",
+        "Envoyer un colis : trouve un Voyageur sur un trajet qui te convient. Devenir Voyageur : publie tes trajets et gagne de l'argent en transportant des colis. Explorer : découvre les trajets disponibles près de chez toi.",
       ],
       notice: {
         tone: "info",
@@ -244,13 +244,13 @@ const fr: AuthEmailDictionary = {
     };
   },
   carrierOnboardingComplete: ({ name, city, stripeReady, appUrl }) => ({
-    subject: "Ton profil Tripper est actif",
+    subject: "Ton profil Voyageur est actif",
     content: {
-      preheader: "Ton profil Tripper est actif : tu peux recevoir des propositions de transport.",
-      title: "Bienvenue chez les Trippers",
+      preheader: "Ton profil Voyageur est actif : tu peux recevoir des propositions de transport.",
+      title: "Bienvenue chez les Voyageurs",
       greeting: greet(name, true),
       paragraphs: [
-        "Ton profil de Tripper est maintenant actif. Tu peux dès à présent recevoir des propositions de transport de colis sur tes trajets.",
+        "Ton profil de Voyageur est maintenant actif. Tu peux dès à présent recevoir des propositions de transport de colis sur tes trajets.",
         `Adresse principale : ${city}.`,
         "Prochaines étapes : publie ton premier trajet pour que les expéditeurs puissent te trouver, accepte des propositions, et configure Stripe pour recevoir tes paiements.",
       ],
@@ -258,28 +258,28 @@ const fr: AuthEmailDictionary = {
         ? { tone: "success", text: "Paiements Stripe : connectés." }
         : { tone: "warning", text: "Stripe n'est pas encore configuré : tu pourras le faire plus tard depuis ton espace." },
       cta: { label: "Publier mon premier trajet", url: `${appUrl}/trips/create` },
-      reason: "Tu reçois cet email car tu as créé un profil Tripper sur Yamba.",
+      reason: "Tu reçois cet email car tu as créé un profil Voyageur sur Yamba.",
       help: { label: "Gérer mes notifications", url: `${appUrl}/settings/notifications` },
     },
   }),
   carrierOnboardingReminder: ({ name, step, currentStep, appUrl }) => {
     const titles = {
-      1: "Plus qu'une étape pour devenir Tripper",
-      2: "Ton profil Tripper t'attend",
+      1: "Plus qu'une étape pour devenir Voyageur",
+      2: "Ton profil Voyageur t'attend",
       3: "Dernière chance de finaliser ton profil",
     } as const;
     const body = {
       1: [
-        "Tu as commencé à créer ton profil Tripper sur Yamba, mais tu n'as pas encore terminé. Ça ne prend que 2 minutes.",
+        "Tu as commencé à créer ton profil Voyageur sur Yamba, mais tu n'as pas encore terminé. Ça ne prend que 2 minutes.",
         currentStep === "PROFILE"
           ? "Il te reste à remplir ton profil (bio, adresse, téléphone) pour être visible des expéditeurs."
           : "Ton profil est prêt : il ne reste plus qu'à connecter Stripe pour recevoir tes paiements.",
       ],
       2: [
-        "Tu as commencé ton inscription comme Tripper il y a quelques jours. Voici ce que tu rates : de l'argent gagné sur tes trajets quotidiens, un service rendu à ta communauté, un transport plus durable.",
+        "Tu as commencé ton inscription comme Voyageur il y a quelques jours. Voici ce que tu rates : de l'argent gagné sur tes trajets quotidiens, un service rendu à ta communauté, un transport plus durable.",
       ],
       3: [
-        "C'est notre dernier rappel. Ton profil Tripper est toujours en attente de finalisation.",
+        "C'est notre dernier rappel. Ton profil Voyageur est toujours en attente de finalisation.",
         "Si tu changes d'avis, tu pourras toujours reprendre ton inscription depuis ton espace Yamba. On ne t'enverra plus de rappels à ce sujet.",
       ],
     } as const;
@@ -298,7 +298,7 @@ const fr: AuthEmailDictionary = {
         reason:
           step === 3
             ? "Ceci est notre dernier rappel : tu ne recevras plus d'emails à ce sujet."
-            : "Tu reçois cet email car tu as commencé l'inscription Tripper sur Yamba.",
+            : "Tu reçois cet email car tu as commencé l'inscription Voyageur sur Yamba.",
         help: { label: "Se désabonner", url: `${appUrl}/settings/notifications` },
       },
     };
@@ -437,7 +437,7 @@ const en: AuthEmailDictionary = {
       greeting: greet(firstName, false),
       paragraphs: [
         "Your Yamba account has been created. You are now part of a community that makes parcel delivery simpler and more human.",
-        "Send a parcel: find a carrier on a trip that suits you. Become a Tripper: publish your trips and earn money carrying parcels. Explore: discover trips available near you.",
+        "Send a parcel: find a traveler on a trip that suits you. Become a Traveler: publish your trips and earn money carrying parcels. Explore: discover trips available near you.",
       ],
       notice: {
         tone: "info",
@@ -472,13 +472,13 @@ const en: AuthEmailDictionary = {
     };
   },
   carrierOnboardingComplete: ({ name, city, stripeReady, appUrl }) => ({
-    subject: "Your Tripper profile is live",
+    subject: "Your Traveler profile is live",
     content: {
-      preheader: "Your Tripper profile is live: you can now receive transport requests.",
-      title: "Welcome among the Trippers",
+      preheader: "Your Traveler profile is live: you can now receive transport requests.",
+      title: "Welcome among the Travelers",
       greeting: greet(name, false),
       paragraphs: [
-        "Your Tripper profile is now active. You can start receiving parcel transport requests on your trips.",
+        "Your Traveler profile is now active. You can start receiving parcel transport requests on your trips.",
         `Primary address: ${city}.`,
         "Next steps: publish your first trip so shippers can find you, accept requests, and set up Stripe to receive your payouts.",
       ],
@@ -486,28 +486,28 @@ const en: AuthEmailDictionary = {
         ? { tone: "success", text: "Stripe payouts: connected." }
         : { tone: "warning", text: "Stripe is not set up yet: you can do it later from your dashboard." },
       cta: { label: "Publish my first trip", url: `${appUrl}/trips/create` },
-      reason: "You are receiving this email because you created a Tripper profile on Yamba.",
+      reason: "You are receiving this email because you created a Traveler profile on Yamba.",
       help: { label: "Manage my notifications", url: `${appUrl}/settings/notifications` },
     },
   }),
   carrierOnboardingReminder: ({ name, step, currentStep, appUrl }) => {
     const titles = {
-      1: "One step left to become a Tripper",
-      2: "Your Tripper profile is waiting",
+      1: "One step left to become a Traveler",
+      2: "Your Traveler profile is waiting",
       3: "Last chance to complete your profile",
     } as const;
     const body = {
       1: [
-        "You started creating your Tripper profile on Yamba but did not finish. It only takes 2 minutes.",
+        "You started creating your Traveler profile on Yamba but did not finish. It only takes 2 minutes.",
         currentStep === "PROFILE"
           ? "You still need to fill in your profile (bio, address, phone) to be visible to shippers."
           : "Your profile is ready: all that is left is connecting Stripe to receive your payouts.",
       ],
       2: [
-        "You started your Tripper sign-up a few days ago. Here is what you are missing: money earned on your everyday trips, a service to your community, more sustainable transport.",
+        "You started your Traveler sign-up a few days ago. Here is what you are missing: money earned on your everyday trips, a service to your community, more sustainable transport.",
       ],
       3: [
-        "This is our last reminder. Your Tripper profile is still waiting to be completed.",
+        "This is our last reminder. Your Traveler profile is still waiting to be completed.",
         "If you change your mind, you can always resume your sign-up from your Yamba dashboard. We will not send further reminders about this.",
       ],
     } as const;
@@ -526,7 +526,7 @@ const en: AuthEmailDictionary = {
         reason:
           step === 3
             ? "This is our last reminder: you will not receive further emails about this."
-            : "You are receiving this email because you started the Tripper sign-up on Yamba.",
+            : "You are receiving this email because you started the Traveler sign-up on Yamba.",
         help: { label: "Unsubscribe", url: `${appUrl}/settings/notifications` },
       },
     };

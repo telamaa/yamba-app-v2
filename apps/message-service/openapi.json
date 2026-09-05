@@ -21032,6 +21032,151 @@
           "decision"
         ],
         "additionalProperties": false
+      },
+      "TrackingLinkResponse": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "recipientFirstName": {
+            "type": "string"
+          },
+          "recipientPhoneE164": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "token",
+          "path",
+          "recipientFirstName",
+          "recipientPhoneE164"
+        ],
+        "additionalProperties": false
+      },
+      "TrackingMilestone": {
+        "type": "string",
+        "enum": [
+          "ACCEPTED",
+          "PICKED_UP",
+          "IN_TRANSIT",
+          "ARRIVED",
+          "DELIVERED",
+          "CLOSED"
+        ]
+      },
+      "PublicTrackingResponse": {
+        "type": "object",
+        "properties": {
+          "milestone": {
+            "$ref": "#/components/schemas/TrackingMilestone"
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "$ref": "#/components/schemas/TrackingMilestone"
+                },
+                "at": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                }
+              },
+              "required": [
+                "key",
+                "at"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "recipientFirstName": {
+            "type": "string"
+          },
+          "shipperFirstName": {
+            "type": "string"
+          },
+          "carrier": {
+            "type": "object",
+            "properties": {
+              "firstName": {
+                "type": "string"
+              },
+              "lastInitial": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "firstName",
+              "lastInitial"
+            ],
+            "additionalProperties": false
+          },
+          "corridor": {
+            "type": "object",
+            "properties": {
+              "originCity": {
+                "type": "string"
+              },
+              "destinationCity": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "originCity",
+              "destinationCity"
+            ],
+            "additionalProperties": false
+          },
+          "departureAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "arrivalAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "milestone",
+          "steps",
+          "recipientFirstName",
+          "shipperFirstName",
+          "carrier",
+          "corridor",
+          "departureAt",
+          "arrivalAt"
+        ],
+        "additionalProperties": false,
+        "description": "D69 — recipient tracking page: minimal content, no address, no phone, no delivery code"
       }
     },
     "securitySchemes": {

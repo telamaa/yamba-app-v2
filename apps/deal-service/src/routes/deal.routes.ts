@@ -31,6 +31,8 @@ import { makeAdminHistoryService } from "../services/admin-history.service";
 import { makeOpsAlertsController } from "../controllers/ops-alerts.controller";
 import { makeOpsAlertsService } from "../services/ops-alerts.service";
 import { makeDealMediationService } from "../services/deal-mediation.service";
+import { makeTrackingLinkController } from "../controllers/tracking-link.controller"; // D69
+import { makeTrackingLinkService } from "../services/tracking-link.service";
 
 /**
  * deal.routes.ts — routes de lecture (PR3)
@@ -97,6 +99,10 @@ router.post("/deals/:id/dispute", isAuthenticated, dealSettlement.dispute);
 // C-PR2 (D55) — la version du Voyageur, une fois, pendant que le dossier est ouvert.
 const dealMediation = makeDealMediationController(makeDealMediationService(paymentProvider, dealSettlementService));
 router.post("/deals/:id/dispute/statement", isAuthenticated, dealMediation.respond);
+// D69 — page destinataire : lien de suivi (Expéditeur) et lecture publique (sans session)
+const trackingLink = makeTrackingLinkController(makeTrackingLinkService());
+router.post("/deals/:id/tracking-link", isAuthenticated, trackingLink.issue);
+router.get("/track/:token", trackingLink.publicView);
 router.get("/deals/:id/rating", isAuthenticated, dealRating.getContext);
 router.post("/deals/:id/rating", isAuthenticated, dealRating.submit);
 

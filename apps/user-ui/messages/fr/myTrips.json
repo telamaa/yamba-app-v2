@@ -162,7 +162,7 @@
     }
   },
   "gates": {
-    "onboardingToast": "Complétez votre profil transporteur pour activer ce trajet",
+    "onboardingToast": "Complète ton profil Voyageur pour activer ce trajet",
     "onboardingCta": "Configurer",
     "stripeToast": "Configurez Stripe pour activer ce trajet et recevoir des paiements",
     "stripeCta": "Configurer Stripe"
@@ -195,7 +195,7 @@
   },
   "banner": {
     "title": "Vous avez {count, plural, =1 {1 brouillon en attente} other {# brouillons en attente}} de publication",
-    "subtitle": "Configurez votre espace transporteur pour activer vos trajets et recevoir des demandes.",
+    "subtitle": "Configure ton espace Voyageur pour activer tes trajets et recevoir des demandes.",
     "cta": "Configurer maintenant"
   },
   "detail": {

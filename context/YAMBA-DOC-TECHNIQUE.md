@@ -1808,3 +1808,23 @@ auth **153** (+11 : règles pures ×5, service ×6 — cible résolue, 404 page 
 
 ### Reste
 Lot 2 : page destinataire (D69). Signalement d'un avis (bouton inerte conservé). Seuil de revue au catalogue D62 quand un second consommateur apparaît.
+
+---
+
+# D69 + A144 — `feat/recipient-page` : la page destinataire et le glossaire (micro-PR confiance, lot 2)
+
+## Ce qui a été fait
+1. **Modèle** `TrackingLink { bookingId @unique, token @unique, createdAt, revokedAt? }` (un lien par réservation ; `revokedAt` écrit à `null`, jamais absent). Jeton : 32 octets CSPRNG en base64url, non devinable.
+2. **Contrat** (`packages/libs/api-contracts/src/booking/tracking-link.schema.ts`) : `TrackingLinkResponse { token, path, recipientFirstName, recipientPhoneE164 }` (le numéro est celui que l'Expéditeur a saisi lui-même), `PublicTrackingResponse` (jalon courant, jalons atteints avec date, prénoms, prénom + initiale du Voyageur, corridor, dates du trajet) — **jamais** l'adresse, un numéro, le code, des photos ou des montants.
+3. **Règles pures** (`apps/deal-service/src/lib/tracking-link.rules.ts`) : `canIssueTrackingLink` (ACCEPTED, PICKED_UP, DELIVERED, COMPLETED, DISPUTED — rien à suivre avant l'acceptation, plus rien après une fin sans livraison), `isTrackingVisible` (un seul interrupteur : suppression, `recipientRedactedAt`, révocation), `publicMilestones` (statut + jalons de transit → accepté, récupéré, en route, arrivé, livré, ou clôturé). Spec : 4 tests.
+4. **Service** (`services/tracking-link.service.ts`, Prisma injectable) : `issue(userId, bookingId)` — 404 réservation inconnue, 403 Voyageur ou tiers, 409 `TRACKING_NOT_AVAILABLE` (AppError 409 typé `{ type: "booking", code }` comme les autres conflits du service), get-or-create du lien ; `publicView(token)` — 404 uniforme (jeton inconnu, révoqué, tiers effacé, réservation supprimée). Spec : 4 tests sur faux Prisma (le même lien au second appel, aucune fuite de numéro dans la réponse publique).
+5. **Routes** : `POST /deals/:id/tracking-link` (`isAuthenticated`), `GET /track/:token` (**sans session**, format du jeton vérifié, `Cache-Control: no-store`) ; gateway `/api/track` → deal-service (limiteur anonyme du gateway) ; OpenAPI : deux chemins documentés.
+6. **user-ui** : page publique `/track/[token]` (`TrackingClient.tsx`, `robots: noindex`) — titre au prénom du destinataire, corridor et dates, jalon courant avec son conseil (« prépare le code que {Expéditeur} t'a donné » à l'arrivée), frise des cinq jalons, mention RGP-02 avec lien vers la politique de confidentialité, bloc d'acquisition (recherche, devenir Voyageur) ; page « lien plus valide » sur 404. Namespace `tracking` FR/EN (29 namespaces).
+7. **Tracker Expéditeur** : `shared/BookingTrackingLinkCard.tsx` (« Partage le suivi à {destinataire} » : WhatsApp vers le numéro saisi, SMS natif, copie du message ; le lien est créé au premier clic et réutilisé ; événement `tracking_link_shared` avec le canal) placé dans les vues accepté, récupéré et en transit. La vue Shipper servait déjà `recipient.phoneE164` : le type et l'adaptateur le reprennent, **fin du numéro factice** de la carte destinataire (A137).
+8. **Glossaire A144** : emails Voyageur d'auth-service (« Ton profil Voyageur est actif », EN « Traveler »), copie EN du parcours de réservation (14 « tripper » → « traveler »), orthographe EN unique « traveler », « espace / profil Voyageur » dans Mes trajets, « Voyageurs favoris », « colis confiés aux Voyageurs ». Identifiants de code inchangés (A90).
+
+### Preuves
+deal **502** (+8) · auth 153 (spec des emails : miroir et rendu inchangés) · tsc deal + user-ui · miroir i18n 29 namespaces · build ×6 · OpenAPI ×4. Recette : DES1–DES8 (DOC-METIER) — dans la recette globale.
+
+### Reste
+SMS sortant par Yamba (fournisseur, coût, consentement) : porte. Révocation du lien par l'Expéditeur (le champ existe, pas d'écran) : porte.

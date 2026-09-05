@@ -1697,3 +1697,32 @@ Les règles SIG-01 à SIG-04 existaient depuis D26, la file admin depuis D61 pou
 | SIG7 | Trois membres différents signalent la même annonce | La ligne porte « Prioritaire · 3 ouverts » ; l'annonce reste en ligne tant que le support ne la masque pas |
 | SIG8 | « Sans suite » avec une note, puis retenter | Journal `REPORT_REVIEWED` avec la note ; deuxième décision refusée (409) |
 | PRO9 | Mes trajets, un trajet publié puis masqué | Badges « En ligne » puis « Masqué », actions « Masquer » / « Remettre en ligne », toasts « Trajet masqué » / « Trajet remis en ligne » (EN : Online / Hidden) |
+
+---
+
+# D69 — la page destinataire (micro-PR confiance, lot 2)
+
+## Le besoin
+Le destinataire d'un colis n'a pas de compte : il apprend l'arrivée par l'Expéditeur, souvent par un message improvisé, et Yamba ne lui dit jamais d'où viennent son prénom et son numéro alors que RGP-02 l'exige. Il faut un lien de suivi que l'Expéditeur partage, qui montre la progression sans rien révéler de sensible, qui meurt avec l'effacement du tiers, et qui présente Yamba à quelqu'un qui ne la connaît pas encore.
+
+### Règles de gestion (DES)
+- **RG-DES-01 — Un lien par envoi, créé par l'Expéditeur** dès l'acceptation, jusqu'à la fin du deal. Le Voyageur ne le crée pas. Avant l'acceptation ou après une annulation, il n'y a rien à suivre.
+- **RG-DES-02 — Le destinataire voit peu** : les prénoms, le prénom et l'initiale du Voyageur, le corridor, les dates, et où en est le colis (pris en charge, récupéré, en route, arrivé, remis, ou annulé). Jamais une adresse, un numéro, le code de livraison, une photo ou un montant.
+- **RG-DES-03 — Le lien meurt avec l'effacement** : dès que le tiers est effacé de la réservation (30 jours après la fin, paramètre `privacy.recipientRetentionDays`), le lien répond « plus valide ». Même réponse pour une réservation supprimée ou un lien retiré : on ne distingue pas.
+- **RG-DES-04 — Yamba n'envoie rien au destinataire** : l'Expéditeur partage lui-même (WhatsApp vers le numéro qu'il a saisi, SMS, copie). Un SMS sortant par Yamba est une porte.
+- **RG-DES-05 — La page dit d'où viennent les données** (RGP-02) : « {Expéditeur} a confié ton prénom et ton numéro à Yamba pour cette livraison, et à personne d'autre », avec le lien vers la politique de confidentialité.
+- **RG-DES-06 — La page présente Yamba** : elle se termine par « Toi aussi, envoie ou transporte » vers la recherche et l'inscription Voyageur. Elle n'est pas indexée par les moteurs.
+- **RG-VOC-01 (A144) — Un mot par rôle, partout** : Voyageur et Expéditeur en français, Traveler et Shipper en anglais, écrans, emails et messages pré-remplis compris.
+
+### Recette (DES)
+| # | Scénario | Attendu |
+|---|---|---|
+| DES1 | Expéditeur, deal accepté, carte « Partage le suivi à {prénom} », « Copier le message » | Message avec le lien `/track/…` copié ; le même lien au second clic |
+| DES2 | « WhatsApp » | WhatsApp s'ouvre sur le numéro saisi à la réservation, message pré-rempli |
+| DES3 | Ouvrir le lien dans une fenêtre privée (aucun compte) | Page « Ton colis arrive, {prénom} », corridor, dates, jalon « Colis pris en charge », frise, mention RGP-02, bloc « Toi aussi » |
+| DES4 | Voyageur : récupération, puis jalons de transit, puis remise avec le code | La page passe à « récupéré », « en route », « arrivé » (avec le conseil du code), « remis », avec les heures |
+| DES5 | Le Voyageur appelle `POST /deals/:id/tracking-link` | 403 ; un deal en attente → 409 `TRACKING_NOT_AVAILABLE` |
+| DES6 | Chercher dans la page une adresse, un numéro, le code | Absents de la page et de la réponse API |
+| DES7 | Après le cron d'effacement du tiers (ou `recipientRedactedAt` posé à la main) | « Ce lien de suivi n'est plus valide », bloc « Toi aussi » conservé |
+| DES8 | Tracker en transit, carte destinataire | Le vrai numéro saisi à la réservation (Appeler / WhatsApp), plus le numéro factice |
+| VOC1 | Email « profil actif » d'un Voyageur, parcours de réservation en anglais, Mes trajets | « Voyageur » / « traveler » partout, plus aucun « Tripper », « traveller » ni « transporteur » |

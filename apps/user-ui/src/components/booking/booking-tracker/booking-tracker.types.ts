@@ -73,7 +73,8 @@ export type BookingRecipient = {
   firstName: string;
   lastName: string;
   city: string;
-  // Pas de téléphone côté Sender : c'est elle qui le saisit, donc le connaît déjà
+  /** D69 — le numéro que l'Expéditeur a saisi lui-même (servi par la vue Shipper) ; fin du mock A137. */
+  phoneE164: string | null;
 };
 
 export type BookingInsurance = "BASIC" | "EXTENDED_500";

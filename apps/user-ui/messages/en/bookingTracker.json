@@ -281,7 +281,7 @@
       "DAMAGED_short": "Parcel or content damaged",
       "SIGNIFICANT_DELAY": "Significantly late delivery",
       "SIGNIFICANT_DELAY_short": "Significantly late delivery",
-      "RECIPIENT_ISSUE": "{recipientFirstName} has another issue with the traveller",
+      "RECIPIENT_ISSUE": "{recipientFirstName} has another issue with the traveler",
       "RECIPIENT_ISSUE_short": "Another issue with {carrierFirstName}",
       "OTHER": "Other issue",
       "OTHER_short": "Other",
@@ -357,7 +357,7 @@
     "sidebar": {
       "dealLabel": "THE DEAL CONCERNED",
       "deliveredAt": "Delivered on {date} at {time}",
-      "carrierLabel": "Traveller",
+      "carrierLabel": "Traveler",
       "recipientLabel": "Recipient",
       "totalLabel": "Total paid",
       "proofLabel": "PHOTOS ALREADY ON FILE",
@@ -544,5 +544,15 @@
       "received": "{carrierFirstName} gave their side. The decision comes within 5 business days.",
       "pending": "We asked {carrierFirstName} for their side (72h)."
     }
+  },
+  "trackingLink": {
+    "title": "Share the tracking with {recipientFirstName}",
+    "subtitle": "A link with no account needed: {recipientFirstName} sees where the parcel is, without your address or the code.",
+    "whatsapp": "WhatsApp",
+    "sms": "SMS",
+    "copy": "Copy the message",
+    "copied": "Copied!",
+    "failed": "The link can't be created right now.",
+    "messageTemplate": "Hi {recipientFirstName}! Your parcel is on its way with {carrierFirstName}. Track it here: {url}"
   }
 }
