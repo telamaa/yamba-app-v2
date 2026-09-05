@@ -395,7 +395,8 @@ Ordre de demarrage : auth -> trip -> gateway.
   emails filtrent isDeleted, tiers destinataire efface a 30 j (cron deal-service, parametre
   privacy.recipientRetentionDays), profil PRIVACY (registre, users.erase, exports.personal A143),
   preference messagingReminderEmails (A138), user-ui « Mes donnees », admin-ui /privacy + carte
-  d'effacement, @packages/libs/imagekit partage. Suite : C-PR8c.
+  d'effacement, @packages/libs/imagekit partage. MERGE 05/09 : **#180** (17 checks comptes).
+  Suite : C-PR8c maintenance / etat des services / conservation.
 - Plateforme de tests : 822 (trip 209, deal 494, notification 83, message 36) + auth 130.
 - 04/09 : C-PR6b feat/c6b-admin-alerts (D59 3A / 4A, A129–A131) — neuf regles de seuil
   (evaluateAlerts pur, instantane de dix compteurs), GET /admin/alerts sans etat (accueil
