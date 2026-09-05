@@ -118,7 +118,8 @@ export function makePrivacyService(deps: {
         // Capturés AVANT l'anonymisation : l'email de confirmation part à l'ancienne adresse.
         const identity = { email: String(user.email), firstName: String(user.firstName), locale: (user.preferredLocale as string | null) ?? null, stripeAccountId: (user.carrierPage?.stripeAccountId as string | null) ?? null, carrierPageId: (user.carrierPage?.id as string | null) ?? null };
         const docs = await tx.tripDocument.findMany({ where: { trip: { userId: input.userId } }, select: { id: true, fileId: true } });
-        const fileIds = docs.map((d: { fileId: string | null }) => d.fileId).filter((f: string | null): f is string => !!f);
+        const avatar = await tx.image.findFirst!({ where: { userId: input.userId }, select: { fileId: true } });
+        const fileIds = [...docs.map((d: { fileId: string | null }) => d.fileId), avatar?.fileId ?? null].filter((f: string | null): f is string => !!f); // D67 : l'avatar aussi
         await tx.user.update!({ where: { id: input.userId }, data: anonymizedUserData(input.userId, now) });
         if (identity.carrierPageId) await tx.carrierPage.update!({ where: { id: identity.carrierPageId }, data: anonymizedCarrierPageData() });
         await tx.address.deleteMany!({ where: { userId: input.userId } });

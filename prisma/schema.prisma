@@ -100,6 +100,9 @@ model User {
 
   /// C-PR8b (D63 8A) — préférence membre : relance email des messages non lus (A138)
   messagingReminderEmails Boolean @default(true)
+  /// D67 1A — visibilités du profil public : la page (404 aux autres si false) et la ville
+  profilePublic Boolean @default(true)
+  showCity      Boolean @default(true)
   /// D66 2A — mesure d'audience : null = pas encore choisi, true = consenti (ConsentLog COOKIES), false = refusé
   analyticsOptIn Boolean?
   /// D35 4A — liste de suppression : rebond dur ou plainte ; levée par le support après correction de l'adresse

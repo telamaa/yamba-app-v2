@@ -1771,3 +1771,20 @@ notification **99** (+4 : liste blanche et parties consentantes, uuid stable, `/
 
 ### Reste
 Compte PostHog Cloud EU, projet, clés (front et serveur) : à ta main. Politique de confidentialité : ajouter le paragraphe « mesure d'audience » (texte légal, hors code). Portes : autocapture, session replay, feature flags, auto-hébergement.
+
+---
+
+# D67 — `feat/e-profile-editable` : le profil que le membre tient lui-même (chantier E)
+
+## Ce qui a été fait
+1. **Contrat** (`packages/libs/api-contracts/src/admin/member-profile.schema.ts`) : `UpdateMyProfileRequest` (prénom / nom 2–40, `displayName` 2–40, `bio` ≤ 300 nullable, `birthDate` `AAAA-MM-JJ` nullable, `profilePublic`, `showCity`, tous optionnels), `SetMyAvatarRequest { fileId, url }`, `MyProfileResponse` (identité, `publicSlug`, `avatarUrl`, `birthDate`, visibilités, bloc `carrier` nul pour un Expéditeur pur). Deux champs Prisma : `User.profilePublic` et `User.showCity` (défaut `true`).
+2. **Règle pure** (`apps/auth-service/src/utils/profile.rules.ts`) : `normalizeProfileUpdate(input, { hasCarrierPage, now })` rend `{ errors, user, carrier }` — noms nettoyés (espaces réduits), `validateBirthDate` (`INVALID_DATE` / `IN_THE_FUTURE` / `TOO_YOUNG` sous 16 ans, calcul par `now` injecté), `displayName` / `bio` refusés (`NO_CARRIER_PAGE`) sans page Voyageur, `isImageKitUrl(url, endpoint)` pour n'accepter qu'un fichier de notre compte (D42). Spec : `profile.rules.spec.ts` (auth **142**, +4).
+3. **Routes membre** (`profile.controller.ts`, montées dans `auth.router.ts`) : `GET /auth/me/profile`, `PATCH /auth/me/profile` (400 `VALIDATION_ERROR` avec `details.errors` par champ ; User + CarrierPage écrits dans **une** transaction), `POST /auth/me/avatar` (URL vérifiée contre `IMAGEKIT_URL_ENDPOINT`, `Image` upsert par `userId` avec `fileId`, l'ancien fichier supprimé chez ImageKit via `@packages/libs/imagekit`), `DELETE /auth/me/avatar`. Le `publicSlug` n'est jamais accepté en entrée (immuable, D28).
+4. **Visibilité** (`user-public.controller.ts`) : `profilePublic: false` → **404** pour tout autre appelant (le propriétaire voit sa page avec `hidden: true` et `isMe: true`) sur la page publique et les deux listes ; `showCity: false` → `location.*` à null dans la réponse publique. L'effacement RGPD (D63) collecte désormais aussi le `fileId` de l'avatar pour le supprimer chez ImageKit.
+5. **Front** (`apps/user-ui`) : `services/profile.api.ts` ; `components/dashboard/sections/Profile.tsx` remplace la maquette : avatar téléversé par `useImageKitUpload("/avatars", 2 Mo, JPEG/PNG/WebP)` puis déclaré au serveur, formulaire (prénom, nom, date de naissance, nom affiché et présentation pour un Voyageur) qui n'envoie que les champs modifiés, erreurs par champ traduites, deux bascules (page publique, ville), bouton « Voir mon profil public » vers `/u/<slug>` ; copies `profilePage.*` dans `dashboard.copy.ts`. Le bouton « Modifier mon profil » de la page publique menait déjà à `/dashboard/profile`.
+
+### Preuves
+auth **142** (+4 : noms, date de naissance, champs Voyageur refusés sans page, URL ImageKit) · tsc auth + user-ui · build ×6 · OpenAPI ×4 (auth-service reste hors OpenAPI — backlog). Recette : PRO1–PRO8 (DOC-METIER) — dans la recette globale.
+
+### Reste
+Non retenus (D67) : bio d'Expéditeur, bannière et réseaux sociaux (`coverUrl`, `socialLinks` restent vides), changement de slug. Recadrage de l'avatar côté navigateur : porte.

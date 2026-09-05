@@ -452,10 +452,9 @@ Ordre de demarrage : auth -> trip -> gateway.
   parametres D62, RGPD D63, maintenance / etat des services / conservation D64).
   Reste hors chantier : TrustScore interne + plafonds progressifs (D29-2),
   moniteur externe de disponibilite (candidat D64).
-- D35 email, D65 sessions, D66 PostHog : FAITS le 05/09. Reste Jalon 2 : moniteur externe
-  (candidat D64), chantier E profil public, micro-PR confiance (wording D28, Signaler trajet /
-  membre, CTA alertes, page destinataire), OpenAPI auth, sauvegardes Atlas, TrustScore D29-2.
-- Chantier E : profil public Voyageur (stats reelles, trajets, avis).
+- D35 email, D65 sessions, D66 PostHog, D67 profil editable (chantier E) : FAITS le 05/09.
+  Reste Jalon 2 : moniteur externe (candidat D64), micro-PR confiance (wording D28, Signaler
+  trajet / membre, CTA alertes, page destinataire), OpenAPI auth, sauvegardes Atlas, TrustScore D29-2.
 - Solde sessions auth : FAIT (D65) — reste le cleanup des sessions legacy (30 j post-prod).
 - API : conversion OpenAPI auth-service (contrats Zod), page /docs Scalar
   auth, page /docs index gateway, audit anglais OAS trip-service.
@@ -535,6 +534,12 @@ Ordre de demarrage : auth -> trip -> gateway.
   serveur par les evenements outbox (lib @packages/libs/analytics, liste blanche, uuid stable,
   fire-and-forget) pour les parties consentantes. A ta main : compte PostHog, cles, paragraphe
   de la politique de confidentialite. MERGE 05/09 : **#189** (17 checks comptes).
+- D67 FAIT le 05/09 (feat/e-profile-editable, chantier E) : GET/PATCH /auth/me/profile,
+  POST/DELETE /auth/me/avatar (ImageKit /avatars, fileId garde, ancien fichier supprime, URL
+  verifiee), regle pure profile.rules.ts (noms 2-40, date de naissance >= 16 ans, displayName /
+  bio reserves au Voyageur), User.profilePublic (404 aux autres, hidden pour soi) et showCity,
+  ecran Profil reel du tableau de bord + « Voir mon profil public ». Slug immuable. Non retenus :
+  bio Expediteur, coverUrl / socialLinks, changement de slug.
 - Backlog parametre serveur : classe C du catalogue D62 (tolerance de poids,
   plafonds comptes neufs, plafond express, seuil de trois signalements…).
 - Photos hors TripDocument chez ImageKit sans fileId (colis, pickup, livraison, litige,
