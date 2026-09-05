@@ -453,8 +453,8 @@ Ordre de demarrage : auth -> trip -> gateway.
   Reste hors chantier : TrustScore interne + plafonds progressifs (D29-2),
   moniteur externe de disponibilite (candidat D64).
 - D35 email, D65 sessions, D66 PostHog, D67 profil editable (chantier E), D68 signalement +
-  wording D28, D69 page destinataire + glossaire A144 : FAITS le 05/09. Reste Jalon 2 : moniteur
-  externe (candidat D64), OpenAPI auth, sauvegardes Atlas, TrustScore D29-2, puis deps + recette globale.
+  wording D28, D69 page destinataire + glossaire A144, D70 moniteur externe : FAITS le 05/09. Reste
+  Jalon 2 : OpenAPI auth, sauvegardes Atlas, TrustScore D29-2, puis deps + recette globale.
 - Solde sessions auth : FAIT (D65) — reste le cleanup des sessions legacy (30 j post-prod).
 - API : conversion OpenAPI auth-service (contrats Zod), page /docs Scalar
   auth, page /docs index gateway, audit anglais OAS trip-service.
@@ -554,6 +554,13 @@ Ordre de demarrage : auth -> trip -> gateway.
   noindex), carte « Partage le suivi » (WhatsApp / SMS / copie, Yamba n'envoie rien — SMS sortant en
   porte), vrai numero du destinataire dans le tracker (fin du mock A137), glossaire un mot par role
   (Voyageur / Traveler partout, emails compris). MERGE 05/09 : **#195** (17 checks comptes).
+- D70 FAIT le 05/09 (feat/d70-uptime-monitor) : sonde publique GET /api/status au gateway (avant le
+  limiteur, cache 10 s, 200 ok|maintenance / 503 degraded|down, corps minimal), lib partagee
+  packages/libs/health/status.ts (serviceEntries, probeService, aggregateStatus — la page d'etat admin
+  la reutilise), GET /api/health sur user-ui et admin-ui, battement externe des crons
+  (CRON_HEARTBEAT_PING_URLS, GET best effort dans withHeartbeat). A TA MAIN : compte Better Stack,
+  3 moniteurs HTTP, 4 battements (payout, expire, unread-reminder, ops-alerts), contacts d'alerte —
+  runbook dans DOC-TECHNIQUE.
 - Backlog parametre serveur : classe C du catalogue D62 (tolerance de poids,
   plafonds comptes neufs, plafond express, seuil de trois signalements…).
 - Photos hors TripDocument chez ImageKit sans fileId (colis, pickup, livraison, litige,

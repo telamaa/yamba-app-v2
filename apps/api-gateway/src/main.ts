@@ -4,6 +4,7 @@ import proxy from "express-http-proxy";
 import morgan from "morgan";
 import rateLimit from "express-rate-limit";
 import { currentMaintenance, maintenanceMiddleware, publicMaintenanceHandler } from "./libs/maintenance";
+import { aggregateStatus, probeService, serviceEntries, toPublicBody, type PublicStatusBody } from "@packages/libs/health"; // D70
 import cookieParser from "cookie-parser";
 import { randomUUID } from "crypto";
 
@@ -54,6 +55,19 @@ app.use(express.json({ limit: "100mb" }));
 app.use(express.urlencoded({ limit: "100mb", extended: true }));
 app.use(cookieParser());
 app.set("trust proxy", 1);
+
+// D70 1A — sonde publique du moniteur externe : AVANT le limiteur (cache 10 s à la place).
+// 200 = ok / maintenance planifiée ; 503 = degraded (un service sans Mongo ou Redis) / down (un service muet).
+const STATUS_CACHE_MS = 10_000;
+let statusCache: { at: number; body: PublicStatusBody; httpStatus: 200 | 503 } | null = null;
+app.get("/api/status", async (_req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  if (statusCache && Date.now() - statusCache.at < STATUS_CACHE_MS) return res.status(statusCache.httpStatus).json(statusCache.body);
+  const [probes, maintenance] = await Promise.all([Promise.all(serviceEntries().map((e) => probeService(e))), currentMaintenance()]);
+  const verdict = aggregateStatus(probes, maintenance.enabled);
+  statusCache = { at: Date.now(), body: toPublicBody(verdict.status, probes), httpStatus: verdict.httpStatus };
+  return res.status(statusCache.httpStatus).json(statusCache.body);
+});
 
 // Apply rate limiting
 const limiter = rateLimit({

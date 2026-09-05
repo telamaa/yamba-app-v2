@@ -9,8 +9,9 @@ import type { NextFunction, Response } from "express";
 import prisma from "@packages/libs/prisma";
 import redis from "@packages/libs/redis";
 import { listCronRuns } from "@packages/libs/redis/cron-heartbeat";
+import { probeService, serviceEntries } from "@packages/libs/health"; // D70
 import { platformSettings } from "@packages/libs/settings/default";
-import { UpdateMaintenanceRequestSchema, resolveLocale, type AdminStatusResponse, type HealthReport } from "@packages/api-contracts";
+import { UpdateMaintenanceRequestSchema, resolveLocale, type AdminStatusResponse } from "@packages/api-contracts";
 import { ValidationError } from "@packages/error-handler";
 import type { AuthenticatedRequest } from "@packages/middleware/isAuthenticated";
 import { sendAuthEmail } from "../emails/send-auth-email";
@@ -20,14 +21,10 @@ import { makeMaintenanceService, type MaintenanceDb } from "../services/maintena
 const ADMIN_UI_URL = process.env.ADMIN_UI_URL || "http://localhost:3001";
 const HEALTH_TIMEOUT_MS = 2_500;
 
-/** Les six services, ports par défaut du poste, surchargeables par l'environnement. */
+/** Les six services : le gateway, puis les cinq services de la sonde partagée (D70 1A — mêmes variables d'environnement). */
 export const SERVICE_URLS: Array<{ name: string; url: string; path: string }> = [
   { name: "api-gateway", url: process.env.GATEWAY_URL ?? "http://localhost:8080", path: "/gateway-health" },
-  { name: "auth-service", url: process.env.AUTH_SERVICE_URL ?? `http://localhost:${process.env.AUTH_SERVICE_PORT ?? 6001}`, path: "/health" },
-  { name: "trip-service", url: process.env.TRIP_SERVICE_URL ?? "http://localhost:6002", path: "/health" },
-  { name: "deal-service", url: process.env.DEAL_SERVICE_URL ?? "http://localhost:6003", path: "/health" },
-  { name: "notification-service", url: process.env.NOTIFICATION_SERVICE_URL ?? "http://localhost:6004", path: "/health" },
-  { name: "message-service", url: process.env.MESSAGE_SERVICE_URL ?? "http://localhost:6005", path: "/health" },
+  ...serviceEntries(),
 ];
 
 function zodErrors(issues: Array<{ path: PropertyKey[]; message: string }>) {
@@ -71,14 +68,8 @@ export const updateMaintenance = async (req: AuthenticatedRequest, res: Response
 };
 
 async function probe(entry: { name: string; url: string; path: string }): Promise<AdminStatusResponse["services"][number]> {
-  const t0 = Date.now();
-  try {
-    const r = await fetch(`${entry.url}${entry.path}`, { signal: AbortSignal.timeout(HEALTH_TIMEOUT_MS) });
-    const body = (await r.json().catch(() => null)) as HealthReport | null;
-    return { name: entry.name, url: entry.url, reachable: r.ok, ms: Date.now() - t0, report: body && typeof body === "object" && "status" in body ? body : null, error: r.ok ? null : `HTTP ${r.status}` };
-  } catch (err) {
-    return { name: entry.name, url: entry.url, reachable: false, ms: Date.now() - t0, report: null, error: err instanceof Error ? err.message : String(err) };
-  }
+  const p = await probeService(entry, HEALTH_TIMEOUT_MS);
+  return { name: entry.name, url: entry.url, reachable: p.reachable, ms: p.ms, report: p.report, error: p.error };
 }
 
 export const getStatus = async (_req: AuthenticatedRequest, res: Response, next: NextFunction) => {

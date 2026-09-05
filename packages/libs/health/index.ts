@@ -55,3 +55,4 @@ export const redisCheck = (redis: { ping(): Promise<string> }): HealthCheck => a
   const r = await redis.ping();
   if (r !== "PONG") throw new Error(`unexpected reply ${r}`);
 };
+export * from "./status"; // D70
