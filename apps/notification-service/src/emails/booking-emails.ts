@@ -497,14 +497,14 @@ export async function dispatchBookingEmails(
   );
   const users = await prisma.user.findMany({
     where: { id: { in: partyIds } },
-    select: { id: true, email: true, firstName: true, preferredLocale: true, isDeleted: true },
+    select: { id: true, email: true, firstName: true, preferredLocale: true, isDeleted: true, emailSuppressedAt: true },
   });
   const byId = new Map(users.map((u) => [u.id, u]));
 
   for (const recipient of recipients) {
     const user = byId.get(recipient.userId);
     // D63 4A — un compte effacé garde une adresse technique unique : c'est `isDeleted` qui fait foi.
-    if (!user?.email || user.isDeleted) {
+    if (!user?.email || user.isDeleted || user.emailSuppressedAt) {
       // RGPD (GHOST_COUNTERPART) ou donnée absente : sauté, tracé.
       logger.warn(
         { eventId, userId: recipient.userId, eventType: event.eventType },
@@ -544,29 +544,33 @@ export async function dispatchBookingEmails(
     }
 
     try {
-      if (built.content) {
-        // D44 — gabarit partagé, contenu en données (emails B4).
-        await sendTransactionalEmail({
-          to: user.email,
-          locale: resolveLocale(user.preferredLocale),
-          subject: built.subject,
-          content: built.content,
-        });
-      } else {
-        await sendTemplatedEmail({
-          to: user.email,
-          subject: built.subject,
-          templatesDir: TEMPLATES_DIR,
-          template: built.template,
-          // subject injecté : les gabarits le reprennent dans <title>.
-          data: { ...built.data, subject: built.subject },
-        });
-      }
+      // D35 — clé d'idempotence = (événement, destinataire) : un rejeu ne renvoie jamais deux fois.
+      const idempotencyKey = `${eventId}:${recipient.userId}`;
+      const sent = built.content
+        ? // D44 — gabarit partagé, contenu en données (emails B4).
+          await sendTransactionalEmail({
+            to: user.email,
+            locale: resolveLocale(user.preferredLocale),
+            subject: built.subject,
+            content: built.content,
+            tags: { template: built.template, service: "notification-service" },
+            idempotencyKey,
+          })
+        : await sendTemplatedEmail({
+            to: user.email,
+            subject: built.subject,
+            templatesDir: TEMPLATES_DIR,
+            template: built.template,
+            // subject injecté : les gabarits le reprennent dans <title>.
+            data: { ...built.data, subject: built.subject },
+            tags: { service: "notification-service" },
+            idempotencyKey,
+          });
       await prisma.emailDelivery.update({
         where: {
           eventId_userId: { eventId, userId: recipient.userId },
         },
-        data: { status: "SENT", sentAt: new Date() },
+        data: { status: "SENT", sentAt: new Date(), provider: sent?.provider ?? null, providerMessageId: sent?.providerMessageId ?? null },
       });
       logger.info(
         { eventId, userId: recipient.userId, template: built.template },

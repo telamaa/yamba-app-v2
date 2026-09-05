@@ -406,7 +406,7 @@ Ordre de demarrage : auth -> trip -> gateway.
   (GET /admin/status, sondage 30 s, editeur de maintenance). Gateway aligne (alias @packages,
   tsconfig). Chantier C : SOLDE (C-PR1 → C-PR8c). Candidat registre : moniteur externe de
   disponibilite avant le lancement. MERGE 05/09 : **#182** (17 checks comptes).
-- Plateforme de tests : 826 (trip 209, deal 494, notification 87, message 36) + auth 134.
+- Plateforme de tests : 834 (trip 209, deal 494, notification 95, message 36) + auth 134.
 - 04/09 : C-PR6b feat/c6b-admin-alerts (D59 3A / 4A, A129–A131) — neuf regles de seuil
   (evaluateAlerts pur, instantane de dix compteurs), GET /admin/alerts sans etat (accueil
   admin), cron horaire avec dedoublonnage Redis SET NX (un email par regle et par jour, Redis
@@ -452,6 +452,9 @@ Ordre de demarrage : auth -> trip -> gateway.
   parametres D62, RGPD D63, maintenance / etat des services / conservation D64).
   Reste hors chantier : TrustScore interne + plafonds progressifs (D29-2),
   moniteur externe de disponibilite (candidat D64).
+- D35 fournisseur d'email : FAIT le 05/09 (voir dettes). Reste Jalon 2 : PostHog, moniteur
+  externe, sessions (SES-04/05, sudo etendu), chantier E, micro-PR confiance, OpenAPI auth,
+  sauvegardes Atlas, TrustScore D29-2.
 - Chantier E : profil public Voyageur (stats reelles, trajets, avis).
 - Solde sessions auth : SES-03 sudo mode (FAIT pour export / effacement par code
   email, D63 1A ; reste : email, mot de passe, IBAN), SES-04 modal expiration,
@@ -517,8 +520,10 @@ Ordre de demarrage : auth -> trip -> gateway.
 - Dette D44 : templates trip-service et notification-service encore en ternaires
   fr/en (.ejs) — a migrer sur le gabarit partage + dictionnaires quand une 3e langue
   arrive (ou avant lancement) ; trip-service garde son propre transport Nodemailer.
-- Candidat D35 : provider email transactionnel (Resend/Postmark/SES) derriere
-  @packages/email, avant lancement. MailHog docker-compose local candidat.
+- D35 FAIT le 05/09 (feat/d35-email-provider) : EmailProvider (Resend par fetch, SMTP, faux
+  refuse en production), webhook Svix (livre / rebond / plainte), liste de suppression
+  respectee par tous les resolveurs, trip-service sur la lib partagee, Mailpit en local.
+  Reste a ta main : compte Resend, domaine (SPF, DKIM), cles en production.
 - Backlog parametre serveur : classe C du catalogue D62 (tolerance de poids,
   plafonds comptes neufs, plafond express, seuil de trois signalements…).
 - Photos hors TripDocument chez ImageKit sans fileId (colis, pickup, livraison, litige,

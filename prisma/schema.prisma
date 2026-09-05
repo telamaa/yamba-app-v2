@@ -100,6 +100,9 @@ model User {
 
   /// C-PR8b (D63 8A) — préférence membre : relance email des messages non lus (A138)
   messagingReminderEmails Boolean @default(true)
+  /// D35 4A — liste de suppression : rebond dur ou plainte ; levée par le support après correction de l'adresse
+  emailSuppressedAt     DateTime?
+  emailSuppressedReason String?
 
   @@index([carrierStatus])
   @@index([roles])
@@ -1428,6 +1431,9 @@ enum EmailDeliveryStatus {
   PENDING
   SENT
   FAILED
+  DELIVERED // D35 3A — webhook du fournisseur
+  BOUNCED
+  COMPLAINED
 }
 
 /// Marqueur d'envoi email PAR DESTINATAIRE (A36 — at-most-once).
@@ -1446,9 +1452,16 @@ model EmailDelivery {
   status    EmailDeliveryStatus @default(PENDING)
   lastError String?
   sentAt    DateTime?
+  /// D35 — fournisseur et identifiant du message (rapprochement des webhooks) ; jamais unique (nullable sur Mongo)
+  provider          String?
+  providerMessageId String?
+  deliveredAt DateTime?
+  bouncedAt   DateTime?
+  bounceType  String?
   claimedAt DateTime            @default(now())
 
   @@unique([eventId, userId])
+  @@index([providerMessageId])
 }
 
 // ─── D14 / CAT-02 — les 8 familles de risque (PR pricing socle, A28) ───

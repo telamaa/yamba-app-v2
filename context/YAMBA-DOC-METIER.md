@@ -1558,3 +1558,31 @@ Le jalon 2 dit « voir une erreur avant l'utilisateur » et « opérer seul ». 
 | MNT8 | `MAINTENANCE_MODE=on` dans l'environnement du gateway, redémarrer le gateway | Lecture seule immédiate, badge « forcée par l'environnement » sur la page d'état, l'admin ne peut pas la lever depuis la page |
 | MNT9 | FINANCE : page « État des services » | Visible ; l'éditeur de maintenance dit « Profil Exploitation ou super administrateur pour modifier » |
 | MNT10 | Paramètres : `retention.notificationsDays` à 30, puis lancer le cron du notification-service (03:50) | Les notifications de plus de 30 jours disparaissent ; les événements d'outbox parqués sont intacts ; battement « retention » avec les trois compteurs |
+
+---
+
+# D35 — un fournisseur d'email, et savoir quand un email n'arrive pas
+
+## Le besoin
+Jusqu'ici Yamba envoyait ses emails par un serveur SMTP nu (Gmail en recette) et n'apprenait jamais qu'une adresse était morte ou qu'un membre s'était plaint : on continuait d'écrire dans le vide, au détriment de la réputation d'envoi. Pour le lancement, il faut un fournisseur transactionnel qui livre, qui dit ce qu'il advient de chaque email, et une règle pour cesser d'écrire à qui ne veut plus ou ne peut plus lire.
+
+### Règles de gestion (EML)
+- **RG-EML-01 — Un fournisseur derrière une interface** : Resend en production (Europe), un serveur SMTP si l'entreprise en impose un, un faux en développement et en tests. Le faux est refusé en production : la plateforme ne démarre pas sans fournisseur réel.
+- **RG-EML-02 — Chaque email envoyé garde l'identifiant du fournisseur** et une clé d'idempotence : un événement rejoué n'envoie jamais deux fois.
+- **RG-EML-03 — Le fournisseur nous dit ce qu'il advient** : livré, rebondi, plainte. Un message signé et daté ; un message non signé ou de plus de cinq minutes est refusé ; un message inconnu ou déjà appliqué est accepté sans effet.
+- **RG-EML-04 — Un rebond dur ou une plainte met l'adresse sur la liste de suppression** : plus aucun email ne part vers ce compte (notifications de deal, relance de messages, alertes route, versements, sanctions), la notification in-app continue. Un rebond transitoire (boîte pleine) ne supprime rien.
+- **RG-EML-05 — Le support lève une suppression** après correction de l'adresse, geste journalisé. Une adresse supprimée se voit sur la fiche du membre avec son motif.
+- **RG-EML-06 — Les rebonds comptent dans l'alerte « emails en échec »** (D59) : une vague de rebonds est un incident, pas un bruit.
+- **RG-EML-07 — En recette, les emails se lisent dans Mailpit**, jamais sur une vraie boîte.
+
+### Recette (EML)
+| # | Scénario | Attendu |
+|---|---|---|
+| EML1 | `docker compose up -d`, `EMAIL_PROVIDER=smtp`, `SMTP_HOST=localhost`, `SMTP_PORT=1025` ; s'inscrire | Le code OTP apparaît dans http://localhost:8025 |
+| EML2 | Sans variable email, en développement, accepter un deal | Le service log « [email:fake] → … » ; `EmailDelivery` en SENT avec `provider: FAKE` |
+| EML3 | `NODE_ENV=production` sans `RESEND_API_KEY` ni `SMTP_HOST` | Le service refuse de démarrer (« FAKE provider is refused in production ») |
+| EML4 | `EMAIL_PROVIDER=resend` avec une clé de test ; accepter un deal | L'email arrive à l'adresse du compte Resend ; `EmailDelivery` porte `provider: RESEND` et `providerMessageId` |
+| EML5 | Depuis le tableau Resend, rejouer le webhook `email.delivered` | `EmailDelivery` passe DELIVERED avec `deliveredAt` ; rejouer une seconde fois → 200 sans changement |
+| EML6 | Envoyer à `bounced@resend.dev` (adresse de test) | Webhook `email.bounced` : trace BOUNCED, `User.emailSuppressedAt` posé, fiche admin avec le bandeau ambre « rebond dur » |
+| EML7 | Relancer un message non lu vers ce membre | Aucun email ; la notification in-app est là |
+| EML8 | Fiche admin (SUPPORT) : « Lever (adresse corrigée) » | Bandeau disparu, Journal « Suppression d'adresse levée », les emails repartent |

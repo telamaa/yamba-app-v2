@@ -75,6 +75,7 @@ router.get("/admin/users/:id", isAdminAuthenticated, requireAdminPermission("use
 router.post("/admin/users/:id/suspension/propose", isAdminAuthenticated, requireAdminPermission("users.suspension.propose"), adminUsers.propose);
 router.post("/admin/users/:id/suspension", isAdminAuthenticated, requireAdminPermission("users.suspension.apply"), adminUsers.apply);
 router.delete("/admin/users/:id/suspension", isAdminAuthenticated, requireAdminPermission("users.suspension.apply"), adminUsers.lift);
+router.delete("/admin/users/:id/email-suppression", isAdminAuthenticated, requireAdminPermission("users.email.unsuppress"), adminUsers.unsuppressEmail); // D35 4A
 // C-PR8b (D63 6A) — données personnelles : effacement à la demande, registre des demandes
 router.post("/admin/users/:id/erase", isAdminAuthenticated, requireAdminPermission("users.erase"), adminEraseUser);
 router.get("/admin/privacy/requests", isAdminAuthenticated, requireAdminPermission("privacy.requests.read"), listDataRequests);

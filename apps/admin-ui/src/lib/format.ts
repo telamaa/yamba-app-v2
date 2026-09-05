@@ -32,6 +32,7 @@ export const ACTION_LABEL: Record<string, string> = {
   SETTING_CHANGED: "Paramètre modifié",
   ACCOUNT_ERASED: "Compte effacé (RGPD)",
   MAINTENANCE_CHANGED: "État de maintenance modifié",
+  EMAIL_SUPPRESSION_LIFTED: "Suppression d'adresse levée",
   DATA_REQUESTS_VIEWED: "Registre RGPD consulté",
   SETTINGS_RESET: "Paramètre réinitialisé",
   ADMIN_LOGIN: "Connexion admin",

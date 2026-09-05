@@ -135,6 +135,7 @@ export type AdminUserFile = {
   email: string;
   phoneE164: string | null;
   preferredLocale: string;
+  emailSuppression: { at: string; reason: string } | null; // D35 4A
   roles: string[];
   adminRole: import("./permissions").AdminRole | null;
   adminRoles: import("./permissions").AdminRole[];

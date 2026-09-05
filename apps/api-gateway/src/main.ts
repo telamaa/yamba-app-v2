@@ -204,6 +204,14 @@ app.use(
   })
 );
 
+// D35 3A — webhooks du fournisseur d'email → notification-service (reçoit /webhooks/email/*)
+app.use(
+  "/api/webhooks/email",
+  proxy("http://localhost:6004", {
+    proxyReqPathResolver: (req) => `/webhooks/email${req.url}`,
+  })
+);
+
 // ─── Auth Service (port 6001) — catch-all ────
 // /api/auth/*, /api/carrier/* → auth-service
 app.use("/", proxy("http://localhost:6001"));

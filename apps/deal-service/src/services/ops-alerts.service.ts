@@ -30,7 +30,7 @@ export async function collectOpsSnapshot(now: Date, T: AlertThresholds = ALERT_T
     prisma.booking.count({ where: { isDeleted: false, payoutStatus: "REVERSED", updatedAt: { lt: new Date(now.getTime() - T.reversalOpenHours * H) }, ...unresolvedReversal } as never }),
     prisma.outboxEvent.count({ where: { OR: [{ publishedAt: null }, { publishedAt: { isSet: false } }], attempts: { gte: T.outboxParkedAttempts } } as never }),
     prisma.outboxEvent.findFirst({ where: { OR: [{ publishedAt: null }, { publishedAt: { isSet: false } }], attempts: { lt: T.outboxParkedAttempts } } as never, orderBy: { occurredAt: "asc" }, select: { occurredAt: true } }),
-    prisma.emailDelivery.count({ where: { status: "FAILED", claimedAt: { gte: new Date(now.getTime() - T.emailsFailedWindowHours * H) } } }),
+    prisma.emailDelivery.count({ where: { status: { in: ["FAILED", "BOUNCED", "COMPLAINED"] }, claimedAt: { gte: new Date(now.getTime() - T.emailsFailedWindowHours * H) } } }), // D35 : les rebonds comptent
     prisma.trip.findFirst({ where: { isDeleted: false, publishedAt: { not: null } }, orderBy: { publishedAt: "desc" }, select: { publishedAt: true } }),
     prisma.booking.count({ where: { isDeleted: false, requestedAt: { gte: new Date(now.getTime() - T.acceptanceRateWindowDays * D) } } }),
     prisma.booking.count({ where: { isDeleted: false, requestedAt: { gte: new Date(now.getTime() - T.acceptanceRateWindowDays * D) }, acceptedAt: { not: null } } }),

@@ -68,7 +68,8 @@ app.use(
     credentials: true,
   })
 );
-app.use(express.json({ limit: "10mb" }));
+// D35 3A — le corps brut est conservé pour vérifier la signature du webhook email.
+app.use(express.json({ limit: "10mb", verify: (req, _res, buf) => { (req as express.Request & { rawBody?: string }).rawBody = buf.toString("utf8"); } }));
 app.use(cookieParser());
 
 app.get("/", (req, res) => {

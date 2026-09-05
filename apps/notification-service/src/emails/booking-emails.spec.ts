@@ -223,7 +223,7 @@ const SHIPPER_USER = {
 beforeEach(() => {
   jest.clearAllMocks();
   emailMock.isEmailConfigured.mockReturnValue(true);
-  emailMock.sendTemplatedEmail.mockResolvedValue(undefined);
+  emailMock.sendTemplatedEmail.mockResolvedValue({ provider: "FAKE", providerMessageId: "fake_1" }); // D35 : le fournisseur renvoie l'identifiant du message
   prismaMock.user.findMany.mockResolvedValue([CARRIER_USER, SHIPPER_USER]);
   prismaMock.emailDelivery.create.mockResolvedValue({});
   prismaMock.emailDelivery.update.mockResolvedValue({});
