@@ -54,8 +54,9 @@ Ordre de demarrage : auth -> trip -> gateway.
 
 ## Ce qui est FAIT (aout 2026)
 
-- CI GitHub Actions : 13 required checks sur dev (TypeScript x6, Tests
-  unitaires x3, i18n, Anti-fuite, Contrats OpenAPI, build). A AJOUTER :
+- CI GitHub Actions : 16 required checks sur dev (TypeScript x9 dont admin-ui et
+  message-service, Tests unitaires x5 : auth, deal, notification, trip, message,
+  i18n, Anti-fuite, Contrats OpenAPI). A AJOUTER :
   `next build` user-ui (le build prod a casse sans que la CI le voie, #81).
 - Session auth (D27) : inactivite serveur + duree absolue (solde au jalon 2).
 - Chantier 0 OpenAPI : @packages/api-contracts (Zod), OAS trip-service
@@ -365,7 +366,8 @@ Ordre de demarrage : auth -> trip -> gateway.
   non lus (15 min, une par heure, verrou optimiste, email sans le texte), lecture admin d'un fil
   journalisee (conversations.read), signalement d'un message (Report MESSAGE, file /reports,
   reports.review, KPI d'accueil, decision + journal en transaction), purge a un an (regle pure,
-  cron nocturne). message-service 28 tests.
+  cron nocturne). message-service 28 tests. MERGE 05/09 : **#171** (F-PR2b) puis
+  **#172** (F-PR3) — 16 checks comptes a chaque fois. Chantier F : lots 1 a 3 SOLDES.
 - Plateforme de tests : 805 (trip 209, deal 485, notification 83, message 28) + auth 103.
 - 04/09 : C-PR6b feat/c6b-admin-alerts (D59 3A / 4A, A129–A131) — neuf regles de seuil
   (evaluateAlerts pur, instantane de dix compteurs), GET /admin/alerts sans etat (accueil
