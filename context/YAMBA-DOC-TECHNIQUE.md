@@ -1755,3 +1755,19 @@ auth **138** (+4 : libellé d'appareil sur cinq user-agents + inconnu + troncatu
 
 ### Reste
 SES-04 : compte à rebours avant expiration non retenu (la porte « session expirée » A89 suffit). Alerte email à chaque nouvelle connexion : porte. Le mobile réutilisera ces routes avec des jetons (D36).
+
+---
+
+# D66 — `feat/d66-posthog` : la mesure d'audience, avec consentement, sans donnée personnelle (met en œuvre D5)
+
+## Ce qui a été fait
+1. **Consentement** (D66 2A) : `User.analyticsOptIn Boolean?` (null = pas choisi) ; `PATCH /auth/me/preferences { analyticsOptIn }` écrit le champ et **trace** le choix dans `ConsentLog` (`recordCookiesConsent` : accepté → ligne COOKIES version `cookies-2026-09` avec IP / user-agent / locale ; refusé → `revokedAt` sur la dernière ligne non révoquée). Front : `lib/analytics.ts` — choix dans `localStorage` (`yamba.analytics.consent`, six mois), `ConsentBanner` (deux boutons de même poids, lien vers la politique de confidentialité, namespace `consent` FR/EN) ; un membre qui a déjà choisi sur un autre appareil ne revoit pas la bannière (son choix est repris depuis `/auth/me`). Bascule « Mesure d'audience » dans « Mes données » (`PrivacySection`).
+2. **Navigateur** (3A) : `posthog-js` (dépendance ajoutée) chargé par `import()` **seulement** après acceptation et si `NEXT_PUBLIC_POSTHOG_KEY` est posée ; `autocapture: false`, `capture_pageview: false` (pages vues envoyées à la main par `AnalyticsProvider` sur `usePathname`), pas d'enregistrement de session, `person_profiles: "identified_only"`, `respect_dnt`. `identify(user.id)` quand le membre est chargé (id seul), `reset()` quand il disparaît, `disableAnalytics()` sur refus a posteriori. Événements du funnel : `search_performed` (première page : origine, destination, poids, nombre de résultats), `trip_viewed`, `booking_step_viewed`, `booking_payment_started`, `booking_created`, `trip_published` / `trip_drafted`.
+3. **Serveur** (4A, `@packages/libs/analytics`, zéro dépendance) : `captureServerEvents` → `POST {POSTHOG_HOST}/batch` par `fetch`, inerte sans `POSTHOG_API_KEY`, **jamais d'exception** (un analytics qui casse un consumer serait une faute) ; `analyticsEventsFor(event, consentants)` pure : un événement produit par partie consentante, `distinct_id` = userId, `uuid` déterministe (SHA-1 de `eventId:userId`, forme v5) pour le dédoublonnage, propriétés sur **liste blanche** (`ALLOWED_EVENT_PROPERTIES` + corridor) — le destinataire, le code, les emails et téléphones du payload ne passent jamais (spec). `analytics-sink.ts` (notification-service) : après la matérialisation de chaque `booking.*` et `conversation.*`, charge les parties avec `analyticsOptIn: true` et envoie.
+4. **Env** : `NEXT_PUBLIC_POSTHOG_KEY` / `_HOST` (front), `POSTHOG_API_KEY` / `POSTHOG_HOST` (serveur), défaut `https://eu.i.posthog.com` (Cloud EU, 1A).
+
+### Preuves
+notification **99** (+4 : liste blanche et parties consentantes, uuid stable, `/batch` avec `api_key`, inerte sans clé et jamais d'exception) · auth 138 · tsc user-ui + notification + auth · build ×6 · OpenAPI ×4 · miroir i18n (29 namespaces). Recette : ANA1–ANA8 (DOC-METIER) — dans la recette globale.
+
+### Reste
+Compte PostHog Cloud EU, projet, clés (front et serveur) : à ta main. Politique de confidentialité : ajouter le paragraphe « mesure d'audience » (texte légal, hors code). Portes : autocapture, session replay, feature flags, auto-hébergement.

@@ -35,6 +35,7 @@ export default getRequestConfig(async ({ requestLocale }) => {
     mediation, // C-PR2 (D55) — décision de médiation, version du Voyageur
     messaging, // F-PR2 (D61) — conversation, rendez-vous, numéro
     maintenance, // C-PR8c (D64) — annonce / lecture seule
+    consent, // D66 — mesure d'audience
   ] = await Promise.all([
     import(`../../messages/${locale}/common.json`),
     import(`../../messages/${locale}/home.json`),
@@ -64,6 +65,7 @@ export default getRequestConfig(async ({ requestLocale }) => {
     import(`../../messages/${locale}/mediation.json`), // C-PR2
     import(`../../messages/${locale}/messaging.json`), // F-PR2 (D61)
     import(`../../messages/${locale}/maintenance.json`), // C-PR8c (D64)
+    import(`../../messages/${locale}/consent.json`), // D66
   ]);
   return {
     locale,
@@ -96,6 +98,7 @@ export default getRequestConfig(async ({ requestLocale }) => {
       mediation: mediation.default, // C-PR2
       messaging: messaging.default, // F-PR2 (D61)
       maintenance: maintenance.default, // C-PR8c (D64)
+      consent: consent.default, // D66
     },
   };
 });

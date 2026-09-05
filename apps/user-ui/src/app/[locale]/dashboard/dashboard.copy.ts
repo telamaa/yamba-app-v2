@@ -172,6 +172,8 @@ export function getDashboardCopy(isFr: boolean) {
       sub: isFr ? "Ce que Yamba garde, ce que tu peux télécharger ou supprimer" : "What Yamba keeps, what you can download or delete",
       reminders: isFr ? "Relance par email des messages non lus" : "Email reminders for unread messages",
       remindersSub: isFr ? "Un email si un message reste sans lecture 15 minutes, au plus un par heure" : "An email if a message stays unread for 15 minutes, at most one per hour",
+      analytics: isFr ? "Mesure d'audience" : "Audience measurement",
+      analyticsSub: isFr ? "Pages vues, recherches, étapes de réservation — pour améliorer Yamba, jamais pour la publicité" : "Page views, searches, booking steps — to improve Yamba, never for advertising",
       export: isFr ? "Télécharger mes données" : "Download my data",
       exportSub: isFr ? "Un fichier JSON avec ton profil, tes trajets, tes réservations, tes messages… Une fois par 24 h." : "A JSON file with your profile, trips, bookings, messages… Once per 24 hours.",
       exportAction: isFr ? "Télécharger" : "Download",

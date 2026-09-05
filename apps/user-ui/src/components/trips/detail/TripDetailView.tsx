@@ -17,6 +17,7 @@ import ConditionsCard from "./ConditionsCard";
 import BookingSummaryCard from "./BookingSummaryCard";
 import BookingMobileBar from "./BookingMobileBar";
 import LocationsCard from "@/components/trips/detail/LocationsCard";
+import { track } from "@/lib/analytics";
 
 
 type Props = {
@@ -32,6 +33,7 @@ export default function TripDetailView({ trip }: Props) {
 
   // Poids du colis saisi en recherche (même clé) → continuité recherche → détail → réservation
   const [weightKg, setWeightKg] = useState<number | null>(null);
+  useEffect(() => { void track("trip_viewed", { tripId: trip.id, origin: trip.origin?.city ?? null, destination: trip.destination?.city ?? null, isOwner }); }, [trip.id, trip.origin?.city, trip.destination?.city, isOwner]); // D66 3A
   useEffect(() => {
     try {
       const v = Number(window.localStorage.getItem("yamba.search.weightKg"));

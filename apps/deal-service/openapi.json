@@ -21888,10 +21888,14 @@
         "properties": {
           "messagingReminderEmails": {
             "type": "boolean"
+          },
+          "analyticsOptIn": {
+            "description": "D66 2A — audience measurement consent (written to ConsentLog COOKIES)",
+            "type": "boolean"
           }
         },
         "additionalProperties": false,
-        "description": "Member preferences (D63 8A)"
+        "description": "Member preferences (D63 8A, D66 2A)"
       },
       "AdminEraseUserRequest": {
         "type": "object",

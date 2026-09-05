@@ -406,7 +406,7 @@ Ordre de demarrage : auth -> trip -> gateway.
   (GET /admin/status, sondage 30 s, editeur de maintenance). Gateway aligne (alias @packages,
   tsconfig). Chantier C : SOLDE (C-PR1 → C-PR8c). Candidat registre : moniteur externe de
   disponibilite avant le lancement. MERGE 05/09 : **#182** (17 checks comptes).
-- Plateforme de tests : 834 (trip 209, deal 494, notification 95, message 36) + auth 138.
+- Plateforme de tests : 838 (trip 209, deal 494, notification 99, message 36) + auth 138.
 - 04/09 : C-PR6b feat/c6b-admin-alerts (D59 3A / 4A, A129–A131) — neuf regles de seuil
   (evaluateAlerts pur, instantane de dix compteurs), GET /admin/alerts sans etat (accueil
   admin), cron horaire avec dedoublonnage Redis SET NX (un email par regle et par jour, Redis
@@ -452,16 +452,17 @@ Ordre de demarrage : auth -> trip -> gateway.
   parametres D62, RGPD D63, maintenance / etat des services / conservation D64).
   Reste hors chantier : TrustScore interne + plafonds progressifs (D29-2),
   moniteur externe de disponibilite (candidat D64).
-- D35 fournisseur d'email : FAIT le 05/09 (voir dettes). Reste Jalon 2 : PostHog, moniteur
-  externe, sessions (SES-04/05, sudo etendu), chantier E, micro-PR confiance, OpenAPI auth,
-  sauvegardes Atlas, TrustScore D29-2.
+- D35 email, D65 sessions, D66 PostHog : FAITS le 05/09. Reste Jalon 2 : moniteur externe
+  (candidat D64), chantier E profil public, micro-PR confiance (wording D28, Signaler trajet /
+  membre, CTA alertes, page destinataire), OpenAPI auth, sauvegardes Atlas, TrustScore D29-2.
 - Chantier E : profil public Voyageur (stats reelles, trajets, avis).
 - Solde sessions auth : FAIT (D65) — reste le cleanup des sessions legacy (30 j post-prod).
 - API : conversion OpenAPI auth-service (contrats Zod), page /docs Scalar
   auth, page /docs index gateway, audit anglais OAS trip-service.
 - Micro-PRs confiance : wording statuts D28, bouton Signaler (trajet +
   membre), CTA alertes, page destinataire.
-- Integrations : Sentry front+back, PostHog, verification backups Atlas.
+- Integrations : Sentry front+back FAIT (D56 7A), PostHog FAIT (D66) ; reste la verification
+  des backups Atlas.
 
 ## Ce qui RESTE — Jalon 3
 
@@ -528,6 +529,12 @@ Ordre de demarrage : auth -> trip -> gateway.
   unitaire et des autres), changement de mot de passe (autres sessions revoquees) et d'email
   (code a la nouvelle adresse, ancienne prevenue), tableau de bord Stripe sous sudo, ecran
   Securite reel. MERGE 05/09 : **#187** (17 checks comptes).
+- D66 FAIT le 05/09 (feat/d66-posthog, met en oeuvre D5) : PostHog Cloud EU, banniere opt-in
+  (choix navigateur 6 mois + User.analyticsOptIn + ConsentLog COOKIES), SDK charge seulement apres
+  accord, pages vues et funnel (search, trip, etapes, paiement, publication), identify par id,
+  serveur par les evenements outbox (lib @packages/libs/analytics, liste blanche, uuid stable,
+  fire-and-forget) pour les parties consentantes. A ta main : compte PostHog, cles, paragraphe
+  de la politique de confidentialite.
 - Backlog parametre serveur : classe C du catalogue D62 (tolerance de poids,
   plafonds comptes neufs, plafond express, seuil de trois signalements…).
 - Photos hors TripDocument chez ImageKit sans fileId (colis, pickup, livraison, litige,
