@@ -24,6 +24,8 @@ const PARAMS = {
   carrierOnboardingReminder: { name: "Thomas", step: 1 as const, currentStep: "PROFILE", appUrl: "https://app.test" },
   sudoCode: { firstName: "Awa", otp: "990011", expiresInMinutes: 10 },
   accountErased: { firstName: "Awa", supportEmail: "support@yamba.com" },
+  verifyNewEmail: { firstName: "Awa", otp: "445566", expiresInMinutes: 10 },
+  emailChanged: { firstName: "Awa", newEmailMasked: "a***@example.com", supportEmail: "support@yamba.com" },
 };
 
 const EMOJI = /\p{Extended_Pictographic}/u;

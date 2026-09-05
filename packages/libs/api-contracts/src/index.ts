@@ -39,3 +39,4 @@ export * from "./admin/admin-alerts.schema";
 export * from "./admin/platform-settings.schema"; // C-PR8a (D62)
 export * from "./admin/admin-privacy.schema"; // C-PR8b (D63)
 export * from "./admin/admin-status.schema"; // C-PR8c (D64)
+export * from "./admin/member-sessions.schema"; // D65

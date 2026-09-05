@@ -30,7 +30,7 @@ export type PasswordChangedParams = {
 };
 export type AccountCreatedParams = { firstName?: string; loginUrl?: string; supportEmail: string };
 export type SecurityAlertParams = {
-  scope: "register" | "forgot" | "sudo"; // sudo : C-PR8b (D63 1A) — même texte « compte » que forgot
+  scope: "register" | "forgot" | "sudo" | "email_change"; // sudo : D63 1A · email_change : D65 4A — même texte « compte » que forgot
   attemptCount: number;
   /** Durée du verrou déclenché, en secondes (barème A50). */
   lockSeconds: number;
@@ -52,6 +52,10 @@ export type AuthEmailDictionary = {
   sudoCode(p: OtpEmailParams): AuthEmail;
   /** C-PR8b (D63 4A) — confirmation envoyée à l'ancienne adresse, sans lien ni code */
   accountErased(p: { firstName: string; supportEmail: string }): AuthEmail;
+  /** D65 4A — code envoyé à la NOUVELLE adresse */
+  verifyNewEmail(p: OtpEmailParams): AuthEmail;
+  /** D65 4A — l'ANCIENNE adresse est prévenue, sans lien ni code */
+  emailChanged(p: { firstName: string; newEmailMasked: string; supportEmail: string }): AuthEmail;
 };
 
 export const AUTH_EMAIL_KEYS = [
@@ -64,6 +68,8 @@ export const AUTH_EMAIL_KEYS = [
   "carrierOnboardingReminder",
   "sudoCode",
   "accountErased",
+  "verifyNewEmail",
+  "emailChanged",
 ] as const satisfies ReadonlyArray<keyof AuthEmailDictionary>;
 
 function greet(firstName: string | undefined, fr: boolean): string {
@@ -85,6 +91,32 @@ export function formatLockDurationLocalized(seconds: number, locale: SupportedLo
 /* ══ FR ═══════════════════════════════════════════════════════ */
 
 const fr: AuthEmailDictionary = {
+  verifyNewEmail: ({ firstName, otp, expiresInMinutes }) => ({
+    subject: "Confirme ta nouvelle adresse email Yamba",
+    content: {
+      preheader: `Ton code de confirmation Yamba : ${otp}`,
+      title: "Nouvelle adresse email",
+      greeting: greet(firstName, true),
+      paragraphs: ["Tu as demandé à utiliser cette adresse pour ton compte Yamba. Saisis le code ci-dessous pour la confirmer :"],
+      code: { label: "Code de confirmation", value: otp },
+      notice: { tone: "warning", text: `Ce code expire dans ${expiresInMinutes} minutes. Si tu n'es pas à l'origine de cette demande, ignore cet email : rien ne change.` },
+      reason: "Tu reçois cet email car cette adresse a été proposée comme nouvelle adresse d'un compte Yamba.",
+    },
+  }),
+  emailChanged: ({ firstName, newEmailMasked, supportEmail }) => ({
+    subject: "L'adresse email de ton compte Yamba a changé",
+    content: {
+      preheader: "Ton adresse de connexion vient d'être remplacée.",
+      title: "Adresse email modifiée",
+      greeting: greet(firstName, true),
+      paragraphs: [
+        `L'adresse de ton compte Yamba vient d'être remplacée par ${newEmailMasked}. Cette ancienne adresse ne sert plus à te connecter.`,
+        "Toutes tes autres sessions ont été fermées.",
+      ],
+      notice: { tone: "warning", text: `Si tu n'es pas à l'origine de ce changement, écris tout de suite à ${supportEmail} depuis cette adresse.` },
+      reason: "Tu reçois cet email parce que l'adresse de ton compte Yamba vient de changer.",
+    },
+  }),
   sudoCode: ({ firstName, otp, expiresInMinutes }) => ({
     subject: "Ton code de confirmation Yamba",
     content: {
@@ -273,6 +305,32 @@ const fr: AuthEmailDictionary = {
 /* ══ EN ═══════════════════════════════════════════════════════ */
 
 const en: AuthEmailDictionary = {
+  verifyNewEmail: ({ firstName, otp, expiresInMinutes }) => ({
+    subject: "Confirm your new Yamba email address",
+    content: {
+      preheader: `Your Yamba confirmation code: ${otp}`,
+      title: "New email address",
+      greeting: greet(firstName, false),
+      paragraphs: ["You asked to use this address for your Yamba account. Enter the code below to confirm it:"],
+      code: { label: "Confirmation code", value: otp },
+      notice: { tone: "warning", text: `This code expires in ${expiresInMinutes} minutes. If you did not request this, ignore this email: nothing changes.` },
+      reason: "You receive this email because this address was proposed as the new address of a Yamba account.",
+    },
+  }),
+  emailChanged: ({ firstName, newEmailMasked, supportEmail }) => ({
+    subject: "The email address of your Yamba account has changed",
+    content: {
+      preheader: "Your sign-in address has just been replaced.",
+      title: "Email address changed",
+      greeting: greet(firstName, false),
+      paragraphs: [
+        `The address of your Yamba account has just been replaced by ${newEmailMasked}. This old address no longer signs you in.`,
+        "All your other sessions have been closed.",
+      ],
+      notice: { tone: "warning", text: `If this was not you, write to ${supportEmail} right away from this address.` },
+      reason: "You receive this email because the address of your Yamba account has just changed.",
+    },
+  }),
   sudoCode: ({ firstName, otp, expiresInMinutes }) => ({
     subject: "Your Yamba confirmation code",
     content: {

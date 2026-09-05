@@ -42,6 +42,14 @@ import {
   remainingLifetimeMs,
 } from "../utils/session-policy";
 import { recordRegistrationConsents } from "../utils/consent/consent.helper";
+import { describeUserAgent, shortUserAgent } from "../utils/session-device";
+import type { SessionMeta } from "../utils/auth.helper";
+
+/** D65 2A — ce qu'une session retient de l'appareil (jamais une empreinte). */
+function sessionMetaOf(req: Request): SessionMeta {
+  const ua = (req.headers["user-agent"] as string | undefined) ?? null;
+  return { ip: req.ip ?? null, userAgent: shortUserAgent(ua), device: describeUserAgent(ua) };
+}
 import { googleSignIn as googleSignInService } from "../services/google-auth.service";
 import { buildGoogleTokenVerifier } from "../services/google-token.verifier";
 import { clearAuthCookies, setCookie } from "../utils/cookies/setCookie";
@@ -341,7 +349,8 @@ export const verifyRegistrationOtp = async (
 async function issueSession(
   res: Response,
   user: { id: string; roles: string[] },
-  shouldRemember: boolean
+  shouldRemember: boolean,
+  meta: SessionMeta = {}
 ): Promise<void> {
   clearAuthCookies(res);
 
@@ -354,7 +363,7 @@ async function issueSession(
   // D27 — nouvelle session : createdAt = now, TTL = min(inactivité, vie absolue)
   const sessionCreatedAt = Date.now();
   const jti = createRefreshJti();
-  await storeRefreshSession(user.id, jti, shouldRemember, sessionCreatedAt);
+  await storeRefreshSession(user.id, jti, shouldRemember, sessionCreatedAt, meta);
 
   // Le JWT refresh est borné à la vie absolue de la session (SES-02) —
   // plus jamais un "30d" plein pot re-signé à chaque rotation.
@@ -396,7 +405,7 @@ export const loginUser = async (req: Request, res: Response, next: NextFunction)
     if ((user as { accountStatus?: string }).accountStatus === "SUSPENDED") return next(new AuthError("Account suspended"));
 
     const shouldRemember = Boolean(rememberMe);
-    await issueSession(res, user, shouldRemember);
+    await issueSession(res, user, shouldRemember, sessionMetaOf(req)); // D65 2A
 
     return res.status(200).json({
       message: "Login successful!",
@@ -497,7 +506,9 @@ export const refreshAuthTokens = async (
       user.id,
       newJti,
       shouldRemember,
-      sessionCreatedAt
+      sessionCreatedAt,
+      // D65 2A — la rotation garde l'appareil de la connexion, rafraîchit l'IP
+      session === "legacy" ? sessionMetaOf(req) : { ip: req.ip ?? session.ip ?? null, userAgent: session.userAgent ?? null, device: session.device ?? null }
     );
     if (ttlSet <= 0) {
       // La vie absolue s'est éteinte entre le check et l'écriture (course
@@ -830,7 +841,7 @@ export const googleSignIn = async (req: Request, res: Response, next: NextFuncti
       return res.status(200).json(result);
     }
 
-    await issueSession(res, result.user, Boolean(rememberMe));
+    await issueSession(res, result.user, Boolean(rememberMe), sessionMetaOf(req)); // D65 2A
 
     if (result.created) {
       sendAccountCreatedEmail(result.user.firstName, result.user.email, result.user.preferredLocale, {

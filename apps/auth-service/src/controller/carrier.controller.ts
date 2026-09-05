@@ -1,5 +1,6 @@
 import type { Response, NextFunction } from "express";
 import prisma from "@packages/libs/prisma";
+import { requireSudo } from "../utils/sudo";
 import { ValidationError } from "@packages/error-handler";
 import { AuthenticatedRequest } from "@packages/middleware/isAuthenticated";
 import { Role } from "@prisma/client";
@@ -453,6 +454,7 @@ export const createStripeDashboardLink = async (
     if (!req.user) {
       return next(new ValidationError("Unauthorized"));
     }
+    await requireSudo(req); // D65 1A — l'IBAN vit chez Stripe : geste sensible (SES-03)
     const carrierPage = await prisma.carrierPage.findUnique({
       where: { userId: req.user.id },
       select: { stripeAccountId: true },

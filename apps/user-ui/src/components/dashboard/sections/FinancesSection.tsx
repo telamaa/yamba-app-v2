@@ -22,12 +22,13 @@ import { DashboardCopy } from "@/app/[locale]/dashboard/dashboard.copy";
 import SectionHeader from "@/components/dashboard/SectionHeader";
 import { EmptyState, StatCard } from "@/components/dashboard/DashboardUI";
 import PayoutBlockedBanner from "@/components/dashboard/trips/PayoutBlockedBanner";
+import SudoGate from "@/components/dashboard/sections/SudoGate";
+import { isSudoRequired } from "@/services/account.api";
 import { PaymentRow, PayoutRow, formatCents } from "@/components/dashboard/finances/WalletRows";
 
 type FinancesTab = "payments" | "wallet";
 
 export default function FinancesSection({ copy }: { copy: DashboardCopy }) {
-  void copy; // signature conservée pour le renderer
   const t = useTranslations("finances");
   const locale = useLocale();
   const router = useRouter();
@@ -61,7 +62,7 @@ export default function FinancesSection({ copy }: { copy: DashboardCopy }) {
           </button>
         </div>
       ) : tab === "wallet" ? (
-        <WalletTab data={data.carrier} isCarrier={isCarrier} locale={locale} onBecomeCarrierAction={() => router.push("/carrier/onboarding")} />
+        <WalletTab data={data.carrier} isCarrier={isCarrier} locale={locale} sudoCopy={copy.sudo} onBecomeCarrierAction={() => router.push("/carrier/onboarding")} />
       ) : (
         <PaymentsTab data={data.shipper} locale={locale} onSearchAction={() => router.push("/search")} />
       )}
@@ -71,7 +72,8 @@ export default function FinancesSection({ copy }: { copy: DashboardCopy }) {
 
 /* ── Portefeuille Voyageur ───────────────────────────────────── */
 
-function WalletTab({ data, isCarrier, locale, onBecomeCarrierAction }: {
+function WalletTab({ data, isCarrier, locale, sudoCopy, onBecomeCarrierAction }: {
+  sudoCopy: DashboardCopy["sudo"];
   data: { upcomingCents: number; pendingCents: number; blockedCents: number; sentCents: number; sentThisMonthCents: number; currencyCode: string; items: Parameters<typeof PayoutRow>[0]["item"][] };
   isCarrier: boolean;
   locale: string;
@@ -83,14 +85,17 @@ function WalletTab({ data, isCarrier, locale, onBecomeCarrierAction }: {
   const [opening, setOpening] = useState(false);
   const cur = data.currencyCode;
 
+  const [stripeGate, setStripeGate] = useState(false); // D65 1A — l'IBAN vit chez Stripe : geste sensible
   const openStripe = async () => {
     if (opening) return;
     setOpening(true);
     try {
       const res = await apiClient.post<{ success: boolean; url: string }>("/carrier/stripe/dashboard-link", {}, { requireAuth: true });
+      setStripeGate(false);
       window.open(res.data.url, "_blank", "noopener,noreferrer");
-    } catch {
-      toast.error(t("stripeError"));
+    } catch (e) {
+      if (isSudoRequired(e)) setStripeGate(true);
+      else toast.error(t("stripeError"));
     } finally {
       setOpening(false);
     }
@@ -112,6 +117,7 @@ function WalletTab({ data, isCarrier, locale, onBecomeCarrierAction }: {
     <div className="space-y-5">
       <PayoutBlockedBanner />
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        {stripeGate && <div className="md:col-span-3"><SudoGate copy={sudoCopy} onVerifiedAction={openStripe} onCancelAction={() => setStripeGate(false)} /></div>}
         <StatCard label={t("stats.upcoming")} value={formatCents(data.upcomingCents, cur, locale)} change={t("stats.upcomingHint")} />
         <StatCard
           label={t("stats.sent")}

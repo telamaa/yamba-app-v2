@@ -1586,3 +1586,31 @@ Jusqu'ici Yamba envoyait ses emails par un serveur SMTP nu (Gmail en recette) et
 | EML6 | Envoyer à `bounced@resend.dev` (adresse de test) | Webhook `email.bounced` : trace BOUNCED, `User.emailSuppressedAt` posé, fiche admin avec le bandeau ambre « rebond dur » |
 | EML7 | Relancer un message non lu vers ce membre | Aucun email ; la notification in-app est là |
 | EML8 | Fiche admin (SUPPORT) : « Lever (adresse corrigée) » | Bandeau disparu, Journal « Suppression d'adresse levée », les emails repartent |
+
+---
+
+# D65 — mes appareils, mon mot de passe, mon adresse (solde D27)
+
+## Le besoin
+Un membre doit voir où son compte est connecté, couper un appareil qu'il ne reconnaît pas, et changer son mot de passe ou son adresse sans passer par le support — mais un geste aussi sensible ne doit jamais être possible à quelqu'un qui aurait simplement trouvé une session ouverte. D27 l'avait décidé (sudo, visibilité des sessions) ; l'écran Sécurité était encore une maquette.
+
+### Règles de gestion (SES)
+- **RG-SES-01 — Un geste sensible exige un code reçu par email**, même en session active : changer le mot de passe, changer l'adresse, ouvrir le tableau de bord Stripe (IBAN), télécharger ses données, supprimer son compte. Le code ouvre une fenêtre de 15 minutes sur cet appareil seulement.
+- **RG-SES-02 — Le membre voit ses appareils** : navigateur et système, dernière activité, adresse IP, « connexion mémorisée », celui en cours. Il en déconnecte un, ou tous les autres. Un appareil déconnecté doit se reconnecter.
+- **RG-SES-03 — Changer de mot de passe ferme tous les autres appareils** et envoie un email de confirmation. Le nouveau mot de passe respecte les règles de force et diffère de l'actuel. Un compte créé avec Google peut se donner un mot de passe.
+- **RG-SES-04 — Changer d'adresse se fait en deux temps** : la nouvelle adresse reçoit un code (valable 10 minutes), la confirmation applique le changement, ferme les autres appareils et prévient l'ancienne adresse. Une adresse déjà utilisée par un autre compte est refusée. La connexion Google, si elle existe, continue de fonctionner.
+- **RG-SES-05 — Les appareils connectés avant ce lot** apparaissent « Appareil inconnu » jusqu'à leur prochaine connexion.
+
+### Recette (SES)
+| # | Scénario | Attendu |
+|---|---|---|
+| SES1 | Sécurité → « Appareils connectés » | Cet appareil est listé (navigateur · système, dernière activité, « cet appareil ») |
+| SES2 | Se connecter depuis un second navigateur, revenir sur le premier | Deux appareils ; « Déconnecter » sur le second → il est renvoyé à la connexion à sa prochaine action |
+| SES3 | « Déconnecter les autres appareils » | Message « n appareil(s) déconnecté(s) » ; seul cet appareil reste |
+| SES4 | Mot de passe → « Changer » sans code | La porte s'ouvre : « M'envoyer le code » ; email « Ton code de confirmation Yamba » ; le code accepté ouvre la fenêtre et le changement passe |
+| SES5 | Dans les 15 minutes, changer l'adresse email | Aucun nouveau code demandé (fenêtre ouverte) ; la nouvelle adresse reçoit « Confirme ta nouvelle adresse » |
+| SES6 | Saisir le code reçu sur la nouvelle adresse | Adresse changée, `/auth/me` renvoie la nouvelle ; l'ancienne reçoit « L'adresse email de ton compte a changé » ; les autres appareils sont déconnectés |
+| SES7 | Demander une adresse déjà prise par un autre compte | Refus « déjà utilisée par un autre compte » |
+| SES8 | Mot de passe identique à l'actuel, ou trop faible | Refus explicite (code A51) |
+| SES9 | Finances → « Ouvrir Stripe Dashboard » après 15 minutes | La porte s'ouvre ; après le code, le tableau de bord s'ouvre dans un nouvel onglet |
+| SES10 | Mes données → « Télécharger » | Même porte ; plus de saisie de code dans le formulaire lui-même |

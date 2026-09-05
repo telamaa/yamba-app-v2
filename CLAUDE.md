@@ -43,7 +43,7 @@ npx prisma db push                 # sync schema to MongoDB (no migrations — M
 npm run auth-docs                  # regenerate auth swagger-output.json (swagger-autogen — legacy, conversion to Zod-OpenAPI is backlog)
 ```
 
-Test platform baseline: **834 tests** (trip-service 209, deal-service 494, notification-service 95, message-service 36) + auth-service 134 (also a CI check) — any deviation must be explained.
+Test platform baseline: **834 tests** (trip-service 209, deal-service 494, notification-service 95, message-service 36) + auth-service 138 (also a CI check) — any deviation must be explained.
 
 Manual `tsc` (when Nx typecheck target is not what you want): `npx tsc --noEmit --project apps/<service>/tsconfig.app.json` — NEVER `--project apps/<service>` (resolves the solution-style tsconfig: 0 files checked).
 
@@ -93,7 +93,7 @@ Requests flow: `user-ui (3000)` → `api-gateway (8080)` → microservices. The 
 
 ### Auth flow
 
-JWT `access_token` + `refresh_token` set as cookies by auth-service. Frontend `apps/user-ui/src/lib/api-client.ts` (axios, `withCredentials`) auto-refreshes on 401 with a request queue **and a 30s circuit breaker** — read its header comment before touching it. `lib/api.ts` (`apiFetch`) is the lighter fetch wrapper; base URL comes from `NEXT_PUBLIC_API_BASE_URL`.
+JWT `access_token` + `refresh_token` set as cookies by auth-service. Sensitive member actions (password, email, Stripe dashboard link, data export, erasure) go through the **sudo window** (D65): `POST /auth/me/sudo/request` + `/verify` open `sudo:<userId>:<jti>` in Redis for 15 min; a protected route calls `requireSudo(req)` (`apps/auth-service/src/utils/sudo.ts`) and answers 403 with `details.code = "SUDO_REQUIRED"`; the front replays the action after `SudoGate`. Every session record carries `device` / `ip` / `userAgent` (`describeUserAgent`) and members list/revoke their sessions under `/auth/me/sessions`. Frontend `apps/user-ui/src/lib/api-client.ts` (axios, `withCredentials`) auto-refreshes on 401 with a request queue **and a 30s circuit breaker** — read its header comment before touching it. `lib/api.ts` (`apiFetch`) is the lighter fetch wrapper; base URL comes from `NEXT_PUBLIC_API_BASE_URL`.
 
 ### Frontend — `apps/user-ui` (Next.js 16 App Router)
 
