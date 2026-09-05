@@ -539,7 +539,7 @@ Ordre de demarrage : auth -> trip -> gateway.
   verifiee), regle pure profile.rules.ts (noms 2-40, date de naissance >= 16 ans, displayName /
   bio reserves au Voyageur), User.profilePublic (404 aux autres, hidden pour soi) et showCity,
   ecran Profil reel du tableau de bord + « Voir mon profil public ». Slug immuable. Non retenus :
-  bio Expediteur, coverUrl / socialLinks, changement de slug.
+  bio Expediteur, coverUrl / socialLinks, changement de slug. MERGE 05/09 : **#191** (17 checks comptes).
 - Backlog parametre serveur : classe C du catalogue D62 (tolerance de poids,
   plafonds comptes neufs, plafond express, seuil de trois signalements…).
 - Photos hors TripDocument chez ImageKit sans fileId (colis, pickup, livraison, litige,
