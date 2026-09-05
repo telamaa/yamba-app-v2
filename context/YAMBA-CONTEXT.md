@@ -430,37 +430,20 @@ Ordre de demarrage : auth -> trip -> gateway.
   Tout autre clone : `git fetch && git reset --hard origin/dev`. Les anciennes
   branches distantes mergees peuvent etre supprimees (contenu dans dev).
 
-## Ce qui RESTE — Jalon 1
+## Ce qui RESTE — Jalon 1 (boucle transactionnelle) — SOLDE
 
-- PR-C (#85) : FAIT cote front — D34
-  @packages/pricing (moteur unique, 7 specs), wizard sur le vrai trajet,
-  etape 1 PER_KG (produit/famille/poids/S-M-L), recap COM-03, Garantie
-  Yamba (GAR-02). RESTE pour B2 : POST /deals + snapshot D17 via le meme
-  moteur + reservedKg atomique ; migration enums deprecies
-  (maxSlots/bookedSlots).
-- PR « parametres serveur » : FAITE dans C-PR8a (D62) — GET /trips/pricing/params,
-  catalogue unique, comparable-price et price-for-weight rebranches ; reste la
-  table corridors (pricing-corridors) en constante, sa propre page plus tard.
-- UX restantes : step 1 (aeroport -> ville de rattachement + lieu de
-  pickup, arrivee repliee, justificatif en step 3), lieux en chips + apercu
-  sticky (create-trip), cleanup legacy PER_CATEGORY + instantBooking.
-- B2 (suite) : PR2 (cycle de vie), PR3 (front des transitions + seed),
-  PR4 (emails transactionnels booking.*) et PR5 (tracker Expediteur)
-  FAITES — voir « fait » ci-dessus. RESTE (avec B3) : photos du colis via
-  media-service :6009, AES-256-GCM re-affichage code livraison, SiteConfig
-  commissionRate (D16). payment-service :6008 : NON (D38).
-- B3 transport : PR1 serveur (#95) et PR2 front FAITES (voir « fait »).
-  Dettes rattachees : URLs signees / fichiers prives ImageKit et
-  verification du domaine des URLs photo (D42), procedure de rotation de
-  cle AES (format v1 pret), vue DELIVERED persistante cote Voyageur
-  (spec §11, hors v1), actions tracker confirmer/litige (B4). Docker/Redpanda
-  DOIT tourner pour les notifications et emails (relay outbox + consumer).
-- B4 argent sortant : confirmation anticipee, cron J+4 -> COMPLETED +
-  transfers.create(), dispute avec gel, matrice remboursements.
-- B5 confiance : rating double-aveugle, relances J+5/J+7, stats de
-  reputation visibles (D29-1). Attention review : unicite
-  (bookingId, authorUserId) avec bookingId nullable = index partiel raw ou
-  unicite service, jamais de @@unique naif sur Mongo.
+- B1 → B5 SOLDES (voir « fait ») ; PR « parametres serveur » FAITE dans C-PR8a (D62) ;
+  commission SiteConfig soldee (SiteConfig supprime, D62 8A) ; code de livraison AES
+  re-affiche (D43) ; photos par URLs ImageKit (D42, pas de media-service) ;
+  payment-service : NON (D38).
+- Reste rattache, hors lancement : table des corridors (pricing-corridors) en constante
+  (sa page admin plus tard), URLs signees / fichiers prives ImageKit et verification du
+  domaine des URLs photo (D42), rotation de la cle AES (format v1 pret), vue DELIVERED
+  persistante cote Voyageur (spec §11, hors v1).
+- UX differees (quand le funnel reel donne des chiffres) : step 1 (aeroport -> ville de
+  rattachement + lieu de pickup, arrivee repliee, justificatif en step 3), lieux en chips +
+  apercu sticky (create-trip), cleanup legacy PER_CATEGORY + instantBooking.
+- Docker/Redpanda DOIT tourner pour les notifications et emails (relay outbox + consumer).
 
 ## Ce qui RESTE — Jalon 2 (constitutif du lancement public)
 
@@ -481,9 +464,12 @@ Ordre de demarrage : auth -> trip -> gateway.
 
 ## Ce qui RESTE — Jalon 3
 
-- F message-service :6005 (chat Socket.io, coordination pickup).
-- Fin i18n : PR feat/locale-es (critere de fin), puis PT.
-- H recommandations ML (replay outbox + PostHog).
+- F messagerie : FAITE en sondage (D61, F-PR1 → F-PR3) ; bascule evenements serveur puis
+  Socket.io aux seuils graves (10 000 messages / jour, 300 conversations simultanees,
+  p95 degrade de 20 %).
+- Fin i18n : PR feat/locale-es (critere de fin), puis PT — declenche la dette D44 (gabarits
+  trip-service et notification-service encore en ternaires FR/EN).
+- H recommandations ML (replay outbox + PostHog) — apres PostHog.
 
 ## Ce qui RESTE — Jalon 4 (mobile : socle + Android)
 
@@ -512,40 +498,31 @@ Ordre de demarrage : auth -> trip -> gateway.
 - PRs i18n restantes : dissolution dashboard.copy.ts (sections dashboard),
   booking, trips/create, page publique (LocationsCard -> namespace
   tripDetail), divers, puis suppression du UiPreferencesProvider deprecie.
-- viewsCount Redis (D5).
+- Recette des lots livres sans recette : C-PR8a (PAR1–PAR12), C-PR8b (RGP1–RGP12),
+  C-PR8c (MNT1–MNT10).
 
 ## Dettes techniques et TODO vivants (registre §7.2-7.3)
 
-- chore/deps : 43 vulnerabilites npm dont 6 critiques (PR dediee, jamais
+- chore/deps : 49 vulnerabilites npm dont 40 hautes au 05/09 (PR dediee, jamais
   npm audit fix --force en pleine PR) · Prisma 6->7.
 - fix/error-semantics trip-service (400-partout -> 404/401/403).
 - Cleanup post-pricing : maxSlots/bookedSlots, WITH_INTERMEDIATE_STOPS,
   handoffMoments/pickupMoments, dark:bg-slate-950 -> 900.
-- Front haute priorite : Toaster (Sonner) au layout racine ·
-  OnboardingBanner apres Header · cron onboarding-reminder (node-cron a
-  installer, branchement main.ts auth) · page carrier settings (Stripe).
-- Redaction pino-http (cookie + authorization) · getImageKit() paresseux ·
-  AddDocumentsBody en Zod dedie · harmonisation noms projets Nx ·
-  idempotence seed-deals · bug seed shipperId === carrierId a trancher ·
-  git config user.email.
-- Inscription : messages d'erreur explicites — FAIT le 03/09 (fix/auth-recette,
-  A51) pour le mot de passe, l'email deja pris et les erreurs OTP ; reste :
-  telephone et champs requis (memes codes, a faire quand le formulaire les aura).
-- Backlog recette 03/09 (priorise, decisions utilisateur prises) : P1
-  feat/email-locale (D44 : preferredLocale N langues, x-locale, gabarit partage,
-  prenom reel D45, migration des 3 mailers) · P1 feat/booking-auth-modal (modale
-  sur la page trajet + redirect header) · P2 feat/trip-favorites · P2
-  feat/auth-pages-ux (tutoiement, faux chiffres, vocabulaire du role a trancher)
-  · P2 feat/auth-google (ecran consentement CGU) · P3 chore/api-same-origin
-  (rewrite Next /api → gateway, fin du piege localhost/LAN). Mode LAN conserve,
-  boutons Google/Facebook laisses tels quels jusqu'a leur PR.
+- CI : `next build` des deux fronts (« la CI construit ce qu'elle deploie »), candidat.
+- Redaction pino-http (cookie + authorization) · AddDocumentsBody en Zod dedie ·
+  harmonisation noms projets Nx · idempotence seed-deals · bug seed
+  shipperId === carrierId a trancher.
+- Inscription : reste telephone et champs requis (memes codes que A51, quand le
+  formulaire les aura).
 - Dette D44 : templates trip-service et notification-service encore en ternaires
   fr/en (.ejs) — a migrer sur le gabarit partage + dictionnaires quand une 3e langue
   arrive (ou avant lancement) ; trip-service garde son propre transport Nodemailer.
-- Candidat D35 (ex-« D32 » avant que D32 = plancher par colis) : provider email transactionnel (Resend/Postmark/SES)
-  derriere @packages/email, avant lancement. MailHog docker-compose local
-  candidat.
-- Backlog parametre serveur candidat : prix plancher par colis (note A28).
+- Candidat D35 : provider email transactionnel (Resend/Postmark/SES) derriere
+  @packages/email, avant lancement. MailHog docker-compose local candidat.
+- Backlog parametre serveur : classe C du catalogue D62 (tolerance de poids,
+  plafonds comptes neufs, plafond express, seuil de trois signalements…).
+- Photos hors TripDocument chez ImageKit sans fileId (colis, pickup, livraison, litige,
+  message) : non effacables — a traiter avec la conservation des deals.
 
 ## Flux "Telama seul" (hors code — chemin critique potentiel)
 
