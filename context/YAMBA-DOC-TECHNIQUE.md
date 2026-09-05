@@ -1890,3 +1890,16 @@ deal **513** (+11 : règle pure ×5, plafonds ×2, chargement des signaux ×2, s
 
 ### Reste
 Portes D71 : poids réel au pickup (PRC-07) quand la remise le saisira, identité vérifiée (KYC), instantané du score dans le journal d'une sanction. Les pondérations se revoient sur les chiffres réels (PostHog + pilotage).
+
+---
+
+# `chore/deps` — dépendances : 49 vulnérabilités → 0, Nx 23, TypeScript 6 (préparation de la recette globale)
+
+## Ce qui a été fait
+1. **Correctifs non cassants** (`npm audit fix`, jamais `--force`) : 49 → 33. Puis **migration Nx officielle** `npx nx migrate 23.2.0` + `npm install` + `nx migrate --run-migrations` (25 migrations, aucune n'a touché le code : elles ont posé `ignoreDeprecations: "6.0"` dans les tsconfig et `.nx/migrate-runs` dans `.gitignore`) ; le guide `tools/ai-migrations` généré est retiré. La migration monte **TypeScript à 6.0.3**, `webpack` 5.110 et `webpack-cli` 7.2. Résultat : 33 → 16.
+2. **Directs** : `postcss` 8.4.38 → ^8.5.28 (XSS), `esbuild` ^0.28.2, `@pmmmwh/react-refresh-webpack-plugin` ^0.6.3.
+3. **Overrides** (`package.json`) pour les transitives qu'aucun paquet direct ne peut monter sans majeure : `uuid ^11.1.1` (via `imagekit` 6.0.0 — que l'audit propose de « corriger » en le rétrogradant à 1.5.0, le fossile de 2016 de A47 : refusé), `deepmerge-ts ^8.0.0` (via `@prisma/config` — l'alternative était Prisma 7, une majeure avec son propre chantier de configuration : porte), `qs ^6.15.4` (via `express` 4 / `body-parser`). Résultat : **0 vulnérabilité**. `npx prisma validate` + `generate` passent avec l'override.
+4. **Preuves** : tsc ×8 (six services, user-ui, admin-ui) sous TypeScript 6, tests ×5 (auth 162, trip 209, deal 513, notification 99, message 36), build webpack ×6, `next build` d'admin-ui sous l'exécuteur Nx 23, OpenAPI ×5 régénérés sans diff, miroir i18n. `npm ls imagekit` toujours dédupliqué ; les copies `pino` imbriquées des services sont à la même version (pas de dérive).
+
+### Reste
+Portes : Prisma 7 (majeure : `prisma.config.ts`, adaptateurs), Express 5 (majeure : routage asynchrone, `req.query` en lecture seule), Next 16.3 suivi par `^`. À relancer à chaque chantier : `npm audit` doit rester à 0 avant une recette.

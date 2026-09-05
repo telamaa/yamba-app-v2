@@ -8,7 +8,8 @@
     ],
     "tsBuildInfoFile": "dist/tsconfig.app.tsbuildinfo",
     "allowSyntheticDefaultImports": true,
-    "rootDir": "../../"
+    "rootDir": "../../",
+    "ignoreDeprecations": "6.0"
   },
   "include": [
     "src/**/*.ts",

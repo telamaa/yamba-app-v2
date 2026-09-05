@@ -71,3 +71,5 @@ packages/libs/prisma/scripts/seed-output.json
 
 # Captures de revue : locales, jamais versionnées (canal de communication seulement)
 context/**/captures/
+
+.nx/migrate-runs

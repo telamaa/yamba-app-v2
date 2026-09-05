@@ -18,7 +18,8 @@
     "paths": { "@/*": ["src/*"] },
     "outDir": "dist",
     "rootDir": "../../",
-    "tsBuildInfoFile": "dist/tsconfig.tsbuildinfo"
+    "tsBuildInfoFile": "dist/tsconfig.tsbuildinfo",
+    "ignoreDeprecations": "6.0"
   },
   "include": ["src/**/*.ts", "src/**/*.tsx", "instrumentation.ts", "instrumentation-client.ts", ".next/types/**/*.ts", "next-env.d.ts", "index.d.ts"],
   "exclude": ["out-tsc", "dist", "node_modules", ".next"]

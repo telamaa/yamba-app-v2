@@ -33,5 +33,8 @@
     {
       "path": "./apps/message-service"
     }
-  ]
+  ],
+  "compilerOptions": {
+    "ignoreDeprecations": "6.0"
+  }
 }
