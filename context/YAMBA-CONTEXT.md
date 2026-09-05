@@ -452,9 +452,9 @@ Ordre de demarrage : auth -> trip -> gateway.
   parametres D62, RGPD D63, maintenance / etat des services / conservation D64).
   Reste hors chantier : TrustScore interne + plafonds progressifs (D29-2),
   moniteur externe de disponibilite (candidat D64).
-- D35 email, D65 sessions, D66 PostHog, D67 profil editable (chantier E) : FAITS le 05/09.
-  Reste Jalon 2 : moniteur externe (candidat D64), micro-PR confiance (wording D28, Signaler
-  trajet / membre, CTA alertes, page destinataire), OpenAPI auth, sauvegardes Atlas, TrustScore D29-2.
+- D35 email, D65 sessions, D66 PostHog, D67 profil editable (chantier E), D68 signalement +
+  wording D28 : FAITS le 05/09. Reste Jalon 2 : page destinataire (D69, lot 2), moniteur externe
+  (candidat D64), OpenAPI auth, sauvegardes Atlas, TrustScore D29-2.
 - Solde sessions auth : FAIT (D65) — reste le cleanup des sessions legacy (30 j post-prod).
 - API : conversion OpenAPI auth-service (contrats Zod), page /docs Scalar
   auth, page /docs index gateway, audit anglais OAS trip-service.
@@ -540,6 +540,13 @@ Ordre de demarrage : auth -> trip -> gateway.
   bio reserves au Voyageur), User.profilePublic (404 aux autres, hidden pour soi) et showCity,
   ecran Profil reel du tableau de bord + « Voir mon profil public ». Slug immuable. Non retenus :
   bio Expediteur, coverUrl / socialLinks, changement de slug. MERGE 05/09 : **#191** (17 checks comptes).
+- D68 FAIT le 05/09 (feat/trust-report-wording, micro-PR confiance lot 1) : POST /reports (TRIP /
+  USER par identifiant public, motifs fermes par cible, OWN_TARGET / doublon 409 / cible invisible
+  404), accuse de reception email, file admin /admin/reports (reports.review, decision + journal
+  REPORT_REVIEWED, prioritaire a 3 ouverts, jamais de sanction automatique), page /reports a deux
+  files, KPI reportsOpen, modale generique branchee sur les deux boutons inertes (porte de connexion
+  pour un visiteur), wording D28 applique, namespace i18n `trips` mort retire. CTA alertes : deja en
+  place, constate. Lot 2 = page destinataire (D69 a graver).
 - Backlog parametre serveur : classe C du catalogue D62 (tolerance de poids,
   plafonds comptes neufs, plafond express, seuil de trois signalements…).
 - Photos hors TripDocument chez ImageKit sans fileId (colis, pickup, livraison, litige,

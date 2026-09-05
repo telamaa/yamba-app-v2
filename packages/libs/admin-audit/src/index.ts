@@ -66,6 +66,8 @@ export const ADMIN_ACTIONS = [
   "MAINTENANCE_CHANGED",
   // D35 4A
   "EMAIL_SUPPRESSION_LIFTED",
+  // D68 3A — décision sur un signalement de trajet ou de membre
+  "REPORT_REVIEWED",
 ] as const;
 export type AdminActionType = (typeof ADMIN_ACTIONS)[number];
 

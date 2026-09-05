@@ -35,7 +35,7 @@
     "rate": "Rate {firstName}"
   },
   "trip": {
-    "statusPublished": "Published",
+    "statusPublished": "Online",
     "statusDeparted": "In flight",
     "statusArrived": "Arrived",
     "statusCompleted": "Completed",
@@ -111,8 +111,8 @@
   "loadError": "Could not load your trips. Please try again shortly.",
   "status": {
     "DRAFT": "Draft",
-    "PUBLISHED": "Active",
-    "PAUSED": "Paused",
+    "PUBLISHED": "Online",
+    "PAUSED": "Hidden",
     "COMPLETED": "Completed",
     "CANCELLED": "Cancelled",
     "ARCHIVED": "Archived"
@@ -127,8 +127,8 @@
     "viewPublic": "View as shipper",
     "edit": "Edit",
     "activate": "Activate",
-    "resume": "Resume",
-    "pause": "Pause",
+    "resume": "Put back online",
+    "pause": "Hide",
     "revertToDraft": "Revert to draft",
     "duplicate": "Duplicate",
     "archive": "Archive",
@@ -170,8 +170,8 @@
   "toasts": {
     "activated": "Trip activated",
     "activationFailed": "Failed to activate",
-    "resumed": "Trip resumed",
-    "paused": "Trip paused",
+    "resumed": "Trip back online",
+    "paused": "Trip hidden",
     "reverted": "Trip reverted to draft",
     "restored": "Trip restored as draft",
     "archived": "Trip archived",

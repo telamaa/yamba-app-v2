@@ -1788,3 +1788,23 @@ auth **142** (+4 : noms, date de naissance, champs Voyageur refusés sans page, 
 
 ### Reste
 Non retenus (D67) : bio d'Expéditeur, bannière et réseaux sociaux (`coverUrl`, `socialLinks` restent vides), changement de slug. Recadrage de l'avatar côté navigateur : porte.
+
+---
+
+# D68 — `feat/trust-report-wording` : signaler un trajet ou un membre, wording D28 (micro-PR confiance, lot 1)
+
+## Ce qui a été fait
+1. **Contrat** (`packages/libs/api-contracts/src/admin/reports.schema.ts`) : `REPORT_TARGET_TYPES` (TRIP, USER), `REPORT_REASONS` et `REPORT_REASONS_BY_TARGET` (motifs fermés par cible, SIG-01), `REPORT_REVIEW_THRESHOLD = 3`, `CreateReportRequest { targetType, targetRef, reason, details? }` — `targetRef` est l'identifiant **public** de la cible (id du trajet, slug du membre : le DTO public d'un membre ne porte pas son id), `AdminReportItem` (cible lisible, propriétaire d'un trajet, auteur, `openCountOnTarget`, `priority`), `ReviewReportRequest`.
+2. **Règles pures** (`apps/auth-service/src/utils/report.rules.ts`) : `canReport` (sa propre cible → `OWN_TARGET`, motif hors liste → `REASON_NOT_ALLOWED`, doublon ouvert → `ALREADY_REPORTED`), `needsPriorityReview(openCount, threshold = 3)` — la constante reste l'argument par défaut (classe C du catalogue D62).
+3. **Service** (`services/report.service.ts`, Prisma injectable) : `createReport` résout la cible (trajet non supprimé ; membre non effacé **et** page publique, sinon 404), écrit le `Report` puis envoie l'accusé `reportReceived` à l'auteur (best effort, résolveur qui saute `isDeleted` et `emailSuppressedAt`) ; `listReports(status)` enrichit (corridor + propriétaire d'un trajet, prénom + nom d'un membre, auteur), compte les signalements ouverts par cible et pose `priority` ; `reviewReport` = `updateMany` conditionnel + `recordAdminAction("REPORT_REVIEWED")` dans une transaction, 409 si déjà traité, 404 pour un signalement de message (il reste dans message-service).
+4. **Routes** : `POST /reports` (auth.router, `isAuthenticated`, 201), `GET /admin/reports?status=` et `PATCH /admin/reports/:id` (admin.router, `reports.review`) — aucune route gateway à ajouter (catch-all auth-service). KPI d'accueil `reportsOpen` (trajets et membres) à côté de `messageReportsOpen`. Email FR/EN `reportReceived` dans `auth-emails.ts` (miroir vérifié par la spec).
+5. **admin-ui** : `ReportsQueue.tsx` (file trajets et membres, cible cliquable vers `/trips/:id` ou `/users/:id`, propriétaire du trajet, badge « Prioritaire · N ouverts », note + Traité / Sans suite) ; la page `/reports` devient « Signalements » avec les deux files ; libellés des motifs et cibles dans `lib/format.ts` ; carte d'accueil « Trajets et membres signalés ».
+6. **user-ui** : `services/report.api.ts`, `components/shared/ReportDialog.tsx` (motifs par cible, porte de connexion `AuthGateModal` si visiteur, 409 → « déjà signalé », 400 → « ton propre contenu ») branché sur les deux boutons inertes de `TripDetailView.tsx` (masqués pour le propriétaire) et `FollowSidebar.tsx` ; namespace `common.report` FR/EN.
+7. **Wording D28** : `myTrips.json` FR/EN — `PUBLISHED` « En ligne » / « Online », `PAUSED` « Masqué » / « Hidden », actions « Masquer » / « Remettre en ligne », toasts alignés. Le namespace `trips` (chargé dans `i18n/request.ts`, jamais consommé) est retiré avec ses deux JSON : 28 namespaces.
+8. **CTA alertes** : constaté déjà en place (page Alertes vide et non vide, état vide de la recherche, bannière de fin de liste). La modale ne peut pas recevoir un lieu structuré : la barre de recherche ne manipule que des noms de villes → porte.
+
+### Preuves
+auth **153** (+11 : règles pures ×5, service ×6 — cible résolue, 404 page masquée, OWN_TARGET / motif / doublon, suppression email, file enrichie et priorité, décision journalisée + 409) · tsc auth + user-ui + admin-ui · miroir i18n 28 namespaces · build ×6 · OpenAPI ×4. Recette : SIG1–SIG8 (DOC-METIER) — dans la recette globale.
+
+### Reste
+Lot 2 : page destinataire (D69). Signalement d'un avis (bouton inerte conservé). Seuil de revue au catalogue D62 quand un second consommateur apparaît.

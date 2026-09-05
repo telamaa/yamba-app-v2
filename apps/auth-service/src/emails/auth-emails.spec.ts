@@ -26,6 +26,7 @@ const PARAMS = {
   accountErased: { firstName: "Awa", supportEmail: "support@yamba.com" },
   verifyNewEmail: { firstName: "Awa", otp: "445566", expiresInMinutes: 10 },
   emailChanged: { firstName: "Awa", newEmailMasked: "a***@example.com", supportEmail: "support@yamba.com" },
+  reportReceived: { firstName: "Awa", supportEmail: "support@yamba.com" },
 };
 
 const EMOJI = /\p{Extended_Pictographic}/u;

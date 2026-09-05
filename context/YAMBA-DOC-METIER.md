@@ -1669,3 +1669,31 @@ La page publique d'un membre (D28) est lue par les autres avant de réserver ou 
 | PRO6 | Changer la photo puis la retirer | L'ancien fichier n'existe plus chez ImageKit ; l'initiale revient |
 | PRO7 | Désactiver « Page publique », ouvrir `/u/<slug>` depuis un autre compte et depuis le sien | Autre compte : « page introuvable » (404) ; soi-même : page avec la mention « masquée » ; un trajet publié reste ouvrable |
 | PRO8 | Désactiver « Afficher ma ville » | La ville disparaît de la page publique ; réactiver la remet |
+
+---
+
+# D68 — signaler un trajet ou un membre (micro-PR confiance, lot 1)
+
+## Le besoin
+Les règles SIG-01 à SIG-04 existaient depuis D26, la file admin depuis D61 pour les messages, mais un membre qui tombait sur une annonce louche ou un profil douteux cliquait « Signaler » dans le vide. Il faut que le geste existe, qu'il soit signé, qu'il n'ait aucun effet automatique et que le support le voie avec ce qu'il faut pour décider.
+
+### Règles de gestion (SIG, complétées)
+- **RG-SIG-05 — Un seul geste, deux cibles** : depuis une annonce ou un profil public, un membre connecté signale avec un motif fermé propre à la cible (annonce : contenu illicite, arnaque, inapproprié, autre ; profil : arnaque, inapproprié, usurpation, autre) et des précisions facultatives. Un visiteur est invité à se connecter : un signalement est toujours signé.
+- **RG-SIG-06 — Pas de signalement contre soi-même**, et pas deux signalements ouverts du même auteur sur la même cible. Une cible invisible (annonce supprimée, membre effacé ou page masquée) est « introuvable ».
+- **RG-SIG-07 — Accusé de réception, jamais la suite** : l'auteur reçoit un email « merci, on regarde » ; il n'apprend pas la décision, et la personne signalée n'apprend jamais qui l'a signalée.
+- **RG-SIG-08 — Revue prioritaire à trois** : à partir de trois signalements ouverts sur une même cible, la ligne est marquée prioritaire dans la file. Aucune sanction automatique : masquer l'annonce ou sanctionner le compte reste une décision du support, journalisée.
+- **RG-SIG-09 — Le support décide en deux gestes** : « Traité » quand il a agi, « Sans suite » sinon, avec une note au journal. Un signalement traité ne se retraite pas.
+- **RG-PRO-08 (D28) — Les statuts d'un trajet disent son effet** : « En ligne » (visible des Expéditeurs) et « Masqué » (invisible), actions « Masquer » et « Remettre en ligne ».
+
+### Recette (SIG)
+| # | Scénario | Attendu |
+|---|---|---|
+| SIG1 | Visiteur non connecté, annonce publique, « Signaler cette annonce » | Porte « Connecte-toi pour signaler » ; après connexion, retour sur l'annonce |
+| SIG2 | Membre connecté, annonce d'un autre, motif « Arnaque suspectée » + précisions, envoyer | « Merci, ton signalement est bien reçu », email « Ton signalement a bien été reçu » dans sa langue ; rien ne change sur l'annonce |
+| SIG3 | Même membre, même annonce, signaler à nouveau | « Tu as déjà signalé cet élément » |
+| SIG4 | Propriétaire de l'annonce | Aucun bouton « Signaler » sur sa propre annonce ; sur son propre profil non plus |
+| SIG5 | Profil public d'un membre, « Signaler ce profil », motif « Usurpation d'identité » | Reçu ; le profil signalé ne voit rien, aucune notification pour lui |
+| SIG6 | Admin SUPPORT, `/reports` | Deux files : « Trajets et membres » (corridor cliquable, « publié par … », auteur, motif) et « Messages » ; carte d'accueil « Trajets et membres signalés » |
+| SIG7 | Trois membres différents signalent la même annonce | La ligne porte « Prioritaire · 3 ouverts » ; l'annonce reste en ligne tant que le support ne la masque pas |
+| SIG8 | « Sans suite » avec une note, puis retenter | Journal `REPORT_REVIEWED` avec la note ; deuxième décision refusée (409) |
+| PRO9 | Mes trajets, un trajet publié puis masqué | Badges « En ligne » puis « Masqué », actions « Masquer » / « Remettre en ligne », toasts « Trajet masqué » / « Trajet remis en ligne » (EN : Online / Hidden) |

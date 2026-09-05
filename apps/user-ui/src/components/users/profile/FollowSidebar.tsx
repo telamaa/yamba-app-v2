@@ -26,6 +26,7 @@ import {
   useUnfollowUser,
   useUpdateFollowPreferences,
 } from "@/hooks/useFollowMutations";
+import ReportDialog from "@/components/shared/ReportDialog"; // D68
 import AuthGateModal from "@/components/auth/shared/AuthGateModal";
 
 type Props = {
@@ -68,9 +69,9 @@ export default function FollowSidebar({ user }: Props) {
     router.push("/dashboard/profile");
   };
 
-  const handleReport = () => {
-    // TODO: ouvrir modal de signalement (PR future)
-  };
+  // D68 — signaler ce profil : modale générique (porte de connexion si visiteur)
+  const [reportOpen, setReportOpen] = useState(false);
+  const handleReport = () => setReportOpen(true);
 
   return (
     <div className="space-y-3">
@@ -187,6 +188,7 @@ export default function FollowSidebar({ user }: Props) {
           </button>
         </div>
       )}
+      {reportOpen && <ReportDialog target={{ type: "USER", ref: user.publicSlug, label: `${user.firstName} ${user.lastInitial}.` }} onCloseAction={() => setReportOpen(false)} />}
     </div>
   );
 }

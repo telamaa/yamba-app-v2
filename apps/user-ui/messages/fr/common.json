@@ -194,5 +194,30 @@
       "title": "Ta session a expiré",
       "subtitle": "Par sécurité, une session se ferme après une heure sans activité (coche « Rester connecté » pour 7 jours). Reconnecte-toi : tu restes sur cette page."
     }
+  },
+  "report": {
+    "title": { "TRIP": "Signaler cette annonce", "USER": "Signaler ce profil" },
+    "intro": "Dis-nous ce qui ne va pas. Notre équipe regarde chaque signalement ; la personne concernée ne saura jamais qui l'a signalée.",
+    "reason": "Motif",
+    "reasons": {
+      "ILLEGAL_CONTENT": "Contenu illicite ou interdit",
+      "SCAM": "Arnaque suspectée",
+      "INAPPROPRIATE": "Comportement inapproprié",
+      "IMPERSONATION": "Usurpation d'identité",
+      "OTHER": "Autre"
+    },
+    "details": "Précisions (facultatif)",
+    "detailsPlaceholder": "Ce que tu as vu, quand…",
+    "submit": "Envoyer le signalement",
+    "sending": "Envoi…",
+    "cancel": "Annuler",
+    "back": "Fermer",
+    "done": "Merci, ton signalement est bien reçu.",
+    "doneHint": "Un email de confirmation t'a été envoyé. Nous ne communiquons pas la suite donnée.",
+    "already": "Tu as déjà signalé cet élément, notre équipe s'en occupe.",
+    "ownTarget": "Tu ne peux pas signaler ton propre contenu.",
+    "failed": "Le signalement n'a pas pu être envoyé. Réessaie.",
+    "gateTitle": "Connecte-toi pour signaler",
+    "gateSubtitle": "Un signalement est toujours signé : cela protège tout le monde des abus."
   }
 }

@@ -35,7 +35,7 @@
     "rate": "Noter {firstName}"
   },
   "trip": {
-    "statusPublished": "Publié",
+    "statusPublished": "En ligne",
     "statusDeparted": "En vol",
     "statusArrived": "Arrivé",
     "statusCompleted": "Terminé",
@@ -111,8 +111,8 @@
   "loadError": "Impossible de charger tes trajets. Réessaie dans un instant.",
   "status": {
     "DRAFT": "Brouillon",
-    "PUBLISHED": "Actif",
-    "PAUSED": "En pause",
+    "PUBLISHED": "En ligne",
+    "PAUSED": "Masqué",
     "COMPLETED": "Terminé",
     "CANCELLED": "Annulé",
     "ARCHIVED": "Archivé"
@@ -127,8 +127,8 @@
     "viewPublic": "Voir en tant qu'expéditeur",
     "edit": "Modifier",
     "activate": "Activer",
-    "resume": "Reprendre",
-    "pause": "Mettre en pause",
+    "resume": "Remettre en ligne",
+    "pause": "Masquer",
     "revertToDraft": "Repasser en brouillon",
     "duplicate": "Dupliquer",
     "archive": "Archiver",
@@ -170,8 +170,8 @@
   "toasts": {
     "activated": "Trajet activé",
     "activationFailed": "Erreur lors de l''activation",
-    "resumed": "Trajet republié",
-    "paused": "Trajet mis en pause",
+    "resumed": "Trajet remis en ligne",
+    "paused": "Trajet masqué",
     "reverted": "Trajet repassé en brouillon",
     "restored": "Trajet restauré en brouillon",
     "archived": "Trajet archivé",
