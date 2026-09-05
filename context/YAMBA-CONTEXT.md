@@ -546,7 +546,7 @@ Ordre de demarrage : auth -> trip -> gateway.
   REPORT_REVIEWED, prioritaire a 3 ouverts, jamais de sanction automatique), page /reports a deux
   files, KPI reportsOpen, modale generique branchee sur les deux boutons inertes (porte de connexion
   pour un visiteur), wording D28 applique, namespace i18n `trips` mort retire. CTA alertes : deja en
-  place, constate. Lot 2 = page destinataire (D69 a graver).
+  place, constate. MERGE 05/09 : **#193** (17 checks comptes). Lot 2 = page destinataire (D69).
 - Backlog parametre serveur : classe C du catalogue D62 (tolerance de poids,
   plafonds comptes neufs, plafond express, seuil de trois signalements…).
 - Photos hors TripDocument chez ImageKit sans fileId (colis, pickup, livraison, litige,
