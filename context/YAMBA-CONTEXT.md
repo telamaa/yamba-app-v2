@@ -575,7 +575,11 @@ Ordre de demarrage : auth -> trip -> gateway.
   Jamais servi a un membre, jamais une sanction automatique. Portes : poids reel au pickup, KYC,
   instantane dans le journal. MERGE 05/09 : **#201** (17 checks comptes).
 - chore/deps FAIT le 05/09 : npm audit fix, migration Nx 23.2 (TypeScript 6.0.3), postcss / esbuild,
-  overrides uuid / deepmerge-ts / qs → 0 vulnerabilite. Portes : Prisma 7, Express 5.
+  overrides uuid / deepmerge-ts / qs → 0 vulnerabilite. Portes : Prisma 7, Express 5. MERGE 05/09 :
+  **#203** (17 checks comptes) — `npm ci` obligatoire apres pull.
+- Recette globale : fiche context/YAMBA-RECETTE-GLOBALE-2026-09.md (103 scenarios + 8 E2E + Atlas +
+  moniteur), seed-deals date les membres de 90 jours (plafonds D71). MERGE 05/09 : **#204**. Le plan
+  de session se fait avec l'utilisateur, puis la recette, puis le chantier mobile (D36).
 - Backlog parametre serveur : classe C du catalogue D62 (tolerance de poids,
   plafonds comptes neufs, plafond express, seuil de trois signalements…).
 - Photos hors TripDocument chez ImageKit sans fileId (colis, pickup, livraison, litige,
