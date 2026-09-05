@@ -37,6 +37,8 @@ import { buildOpenApiDocument } from "./openapi/build-openapi";
 import dealRouter, { dealLifecycleService, dealRatingService, dealSettlementService, opsAlertsService } from "./routes/deal.routes";
 import redis from "@packages/libs/redis";
 import { startOpsAlertsCron } from "./cron/ops-alerts.cron";
+import { startRecipientRedactionCron } from "./cron/recipient-redaction.cron";
+import { makeRecipientRedactionService } from "./services/recipient-redaction.service";
 import { makeStripeWebhookHandler } from "./controllers/stripe-webhook.controller";
 import { startBookingExpiryCron } from "./cron/expire-bookings.cron";
 import { startBookingPayoutCron } from "./cron/payout-bookings.cron";
@@ -192,6 +194,11 @@ if (!opsAlertsEnabled) {
   logger.info("Ops alerts cron disabled (OPS_ALERTS_CRON_ENABLED=false)");
 }
 
+// ── C-PR8b (D63 5A) — le tiers destinataire s'efface N jours après la fin du deal ──
+const recipientRedactionEnabled = process.env.RECIPIENT_REDACTION_CRON_ENABLED !== "false";
+const recipientRedactionCron = recipientRedactionEnabled ? startRecipientRedactionCron(makeRecipientRedactionService(), logger.child({ module: "recipient-redaction-cron" })) : null;
+if (!recipientRedactionEnabled) logger.info("Recipient redaction cron disabled (RECIPIENT_REDACTION_CRON_ENABLED=false)");
+
 // ── Cron notation : relances J+5/J+7, révélation à 14 j (B5, D53) ─────
 const ratingCronEnabled = process.env.RATING_CRON_ENABLED !== "false";
 const ratingCron = ratingCronEnabled ? startRatingCron(dealRatingService, logger.child({ module: "rating-cron" })) : null;
@@ -224,6 +231,9 @@ function shutdown(signal: string): void {
     }
     if (ratingCron) {
       ratingCron.stop();
+    }
+    if (recipientRedactionCron) {
+      recipientRedactionCron.stop();
     }
     if (relay) {
       await relay.stop().catch((err) => logger.error({ err }, "Relay stop failed"));

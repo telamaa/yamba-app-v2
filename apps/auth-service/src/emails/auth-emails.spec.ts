@@ -22,6 +22,8 @@ const PARAMS = {
   securityAlert: { scope: "forgot" as const, attemptCount: 10, lockSeconds: 1800, supportEmail: "support@yamba.com" },
   carrierOnboardingComplete: { name: "Thomas", city: "Dakar", stripeReady: false, appUrl: "https://app.test" },
   carrierOnboardingReminder: { name: "Thomas", step: 1 as const, currentStep: "PROFILE", appUrl: "https://app.test" },
+  sudoCode: { firstName: "Awa", otp: "990011", expiresInMinutes: 10 },
+  accountErased: { firstName: "Awa", supportEmail: "support@yamba.com" },
 };
 
 const EMOJI = /\p{Extended_Pictographic}/u;

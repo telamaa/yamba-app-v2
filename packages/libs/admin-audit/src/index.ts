@@ -59,6 +59,9 @@ export const ADMIN_ACTIONS = [
   // C-PR8a (D62 5A) — une ligne PAR clé : before / after = { key, before, after, reason, version }
   "SETTING_CHANGED",
   "SETTINGS_RESET",
+  // C-PR8b (D63 6A)
+  "ACCOUNT_ERASED",
+  "DATA_REQUESTS_VIEWED",
 ] as const;
 export type AdminActionType = (typeof ADMIN_ACTIONS)[number];
 

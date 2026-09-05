@@ -30,7 +30,7 @@ export type PasswordChangedParams = {
 };
 export type AccountCreatedParams = { firstName?: string; loginUrl?: string; supportEmail: string };
 export type SecurityAlertParams = {
-  scope: "register" | "forgot";
+  scope: "register" | "forgot" | "sudo"; // sudo : C-PR8b (D63 1A) — même texte « compte » que forgot
   attemptCount: number;
   /** Durée du verrou déclenché, en secondes (barème A50). */
   lockSeconds: number;
@@ -48,6 +48,10 @@ export type AuthEmailDictionary = {
   securityAlert(p: SecurityAlertParams): AuthEmail;
   carrierOnboardingComplete(p: OnboardingCompleteParams): AuthEmail;
   carrierOnboardingReminder(p: OnboardingReminderParams): AuthEmail;
+  /** C-PR8b (D63 1A) — code sudo pour un geste sensible (export, effacement) */
+  sudoCode(p: OtpEmailParams): AuthEmail;
+  /** C-PR8b (D63 4A) — confirmation envoyée à l'ancienne adresse, sans lien ni code */
+  accountErased(p: { firstName: string; supportEmail: string }): AuthEmail;
 };
 
 export const AUTH_EMAIL_KEYS = [
@@ -58,6 +62,8 @@ export const AUTH_EMAIL_KEYS = [
   "securityAlert",
   "carrierOnboardingComplete",
   "carrierOnboardingReminder",
+  "sudoCode",
+  "accountErased",
 ] as const satisfies ReadonlyArray<keyof AuthEmailDictionary>;
 
 function greet(firstName: string | undefined, fr: boolean): string {
@@ -79,6 +85,33 @@ export function formatLockDurationLocalized(seconds: number, locale: SupportedLo
 /* ══ FR ═══════════════════════════════════════════════════════ */
 
 const fr: AuthEmailDictionary = {
+  sudoCode: ({ firstName, otp, expiresInMinutes }) => ({
+    subject: "Ton code de confirmation Yamba",
+    content: {
+      preheader: `Ton code de confirmation Yamba : ${otp}`,
+      title: "Confirme une action sensible",
+      greeting: greet(firstName, true),
+      paragraphs: ["Tu as demandé à télécharger tes données ou à supprimer ton compte. Saisis le code ci-dessous pour confirmer :"],
+      code: { label: "Code de confirmation", value: otp },
+      notice: { tone: "warning", text: `Ce code expire dans ${expiresInMinutes} minutes. Si tu n'es pas à l'origine de cette demande, change ton mot de passe : quelqu'un a accès à ta session.` },
+      footnotes: ["Conseil sécurité : ne partage jamais ce code, même avec le support Yamba."],
+      reason: "Tu reçois cet email car une action sensible a été demandée depuis ton compte Yamba.",
+    },
+  }),
+  accountErased: ({ firstName, supportEmail }) => ({
+    subject: "Ton compte Yamba a été supprimé",
+    content: {
+      preheader: "Tes données personnelles ont été effacées.",
+      title: "Compte supprimé",
+      greeting: greet(firstName, true),
+      paragraphs: [
+        "Ton compte Yamba a été supprimé et tes données personnelles effacées : identité, coordonnées, adresses, alertes, favoris, justificatifs.",
+        "Ce qui reste, sans ton nom : l'historique des réservations et des litiges (obligations comptables), les avis et les messages déjà échangés avec d'autres membres.",
+        "Ton compte de versement Stripe n'est pas supprimé par Yamba : tu peux le clôturer depuis Stripe.",
+      ],
+      reason: `Tu reçois cet email parce qu'un compte Yamba lié à cette adresse vient d'être supprimé. Une question ? ${supportEmail}`,
+    },
+  }),
   verifyEmail: ({ firstName, otp, expiresInMinutes }) => ({
     subject: "Ton code d'activation Yamba",
     content: {
@@ -240,6 +273,33 @@ const fr: AuthEmailDictionary = {
 /* ══ EN ═══════════════════════════════════════════════════════ */
 
 const en: AuthEmailDictionary = {
+  sudoCode: ({ firstName, otp, expiresInMinutes }) => ({
+    subject: "Your Yamba confirmation code",
+    content: {
+      preheader: `Your Yamba confirmation code: ${otp}`,
+      title: "Confirm a sensitive action",
+      greeting: greet(firstName, false),
+      paragraphs: ["You asked to download your data or to delete your account. Enter the code below to confirm:"],
+      code: { label: "Confirmation code", value: otp },
+      notice: { tone: "warning", text: `This code expires in ${expiresInMinutes} minutes. If you did not request this, change your password: someone has access to your session.` },
+      footnotes: ["Security tip: never share this code, not even with Yamba support."],
+      reason: "You receive this email because a sensitive action was requested from your Yamba account.",
+    },
+  }),
+  accountErased: ({ firstName, supportEmail }) => ({
+    subject: "Your Yamba account has been deleted",
+    content: {
+      preheader: "Your personal data has been erased.",
+      title: "Account deleted",
+      greeting: greet(firstName, false),
+      paragraphs: [
+        "Your Yamba account has been deleted and your personal data erased: identity, contact details, addresses, alerts, favourites, documents.",
+        "What remains, without your name: the history of bookings and disputes (accounting obligations), and the reviews and messages already exchanged with other members.",
+        "Your Stripe payout account is not deleted by Yamba: you can close it from Stripe.",
+      ],
+      reason: `You receive this email because a Yamba account linked to this address has just been deleted. Questions? ${supportEmail}`,
+    },
+  }),
   verifyEmail: ({ firstName, otp, expiresInMinutes }) => ({
     subject: "Your Yamba activation code",
     content: {

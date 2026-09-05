@@ -123,6 +123,42 @@ export function getDashboardCopy(isFr: boolean) {
     pushNotif: isFr ? "Notifications push" : "Push notifications",
     pushNotifSub: isFr ? "Alertes en temps réel" : "Real-time alerts",
     thisMonth: isFr ? "ce mois" : "this month",
+    // C-PR8b (D63) — mes données
+    privacy: {
+      title: isFr ? "Mes données" : "My data",
+      sub: isFr ? "Ce que Yamba garde, ce que tu peux télécharger ou supprimer" : "What Yamba keeps, what you can download or delete",
+      reminders: isFr ? "Relance par email des messages non lus" : "Email reminders for unread messages",
+      remindersSub: isFr ? "Un email si un message reste sans lecture 15 minutes, au plus un par heure" : "An email if a message stays unread for 15 minutes, at most one per hour",
+      export: isFr ? "Télécharger mes données" : "Download my data",
+      exportSub: isFr ? "Un fichier JSON avec ton profil, tes trajets, tes réservations, tes messages… Une fois par 24 h." : "A JSON file with your profile, trips, bookings, messages… Once per 24 hours.",
+      exportAction: isFr ? "Télécharger" : "Download",
+      exportConfirm: isFr ? "Télécharger le fichier" : "Download the file",
+      exportDone: isFr ? "Ton fichier est téléchargé." : "Your file has been downloaded.",
+      erase: isFr ? "Supprimer mon compte" : "Delete my account",
+      eraseSub: isFr ? "Immédiat et irréversible. Tes réservations et litiges restent, sans ton nom." : "Immediate and irreversible. Your bookings and disputes remain, without your name.",
+      eraseAction: isFr ? "Supprimer" : "Delete",
+      eraseConfirm: isFr ? "Supprimer définitivement mon compte" : "Permanently delete my account",
+      eraseExplain: isFr
+        ? "Ton identité, tes coordonnées, tes adresses, tes alertes, tes favoris et tes justificatifs seront effacés. L'historique de tes réservations et de tes litiges reste (obligations comptables), ainsi que les avis et les messages déjà échangés, sans ton nom. Ton compte Stripe n'est pas supprimé par Yamba."
+        : "Your identity, contact details, addresses, alerts, favourites and documents will be erased. Your booking and dispute history remains (accounting obligations), as do reviews and messages already exchanged, without your name. Your Stripe account is not deleted by Yamba.",
+      blocked: isFr ? "Impossible pour l'instant : termine d'abord ce qui est en cours." : "Not possible yet: finish what is in progress first.",
+      blockers: {
+        ACTIVE_DEAL: isFr ? "Un deal est en cours (accepté, en transit, livré ou en litige)." : "A deal is in progress (accepted, in transit, delivered or disputed).",
+        PENDING_REQUEST: isFr ? "Une demande de réservation attend une réponse." : "A booking request is awaiting an answer.",
+        PAYOUT_PENDING: isFr ? "Un versement t'est encore dû ou a échoué." : "A payout is still owed to you or has failed.",
+        RETENTION_HELD: isFr ? "Une retenue d'annulation est en médiation." : "A cancellation retention is under mediation.",
+        PUBLISHED_TRIP: isFr ? "Un trajet est encore publié ou en pause : annule-le d'abord." : "A trip is still published or paused: cancel it first.",
+        ADMIN_ACCOUNT: isFr ? "Ce compte porte un profil administrateur : demande sa révocation." : "This account holds an admin profile: ask for it to be revoked.",
+      } as Record<string, string>,
+      codeExplain: isFr ? "Par sécurité, on t'envoie un code à six chiffres par email." : "For security, we send you a six-digit code by email.",
+      codeSend: isFr ? "M'envoyer le code" : "Send me the code",
+      codeResend: isFr ? "Renvoyer le code" : "Resend the code",
+      codeSent: isFr ? "Code envoyé : regarde ta boîte mail (et les spams)." : "Code sent: check your inbox (and spam).",
+      codeLabel: isFr ? "Code reçu par email" : "Code received by email",
+      confirmLabel: isFr ? "Tape SUPPRIMER pour confirmer" : "Type SUPPRIMER to confirm",
+      cancel: isFr ? "Annuler" : "Cancel",
+      error: isFr ? "Impossible pour le moment, réessaie." : "Not possible right now, try again.",
+    },
   };
 }
 

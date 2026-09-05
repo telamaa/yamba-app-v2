@@ -6,7 +6,8 @@ import { z } from "zod";
 import { ObjectIdSchema } from "../common";
 
 /** C-PR8a (D62 3A) — OPS : exploitation technique (paramètres d'exploitation, état des services, maintenance), jamais l'argent ni les comptes. */
-export const AdminRoleSchema = z.enum(["SUPER_ADMIN", "MEDIATOR", "SUPPORT", "FINANCE", "OPS"]).meta({ id: "AdminRole" });
+/** C-PR8b (D63 6A) — PRIVACY : données personnelles (registre des demandes, effacement, export nominatif). */
+export const AdminRoleSchema = z.enum(["SUPER_ADMIN", "MEDIATOR", "SUPPORT", "FINANCE", "OPS", "PRIVACY"]).meta({ id: "AdminRole" });
 export type AdminRole = z.infer<typeof AdminRoleSchema>;
 
 export const AccountStatusSchema = z.enum(["ACTIVE", "RESTRICTED", "SUSPENDED"]).meta({ id: "AccountStatus" });
@@ -40,7 +41,7 @@ export const ADMIN_PERMISSIONS = {
   "deals.history.read": ["MEDIATOR", "SUPPORT", "FINANCE"],
   // C-PR7a (D60 2A) — exports : opérationnels (sans email ni téléphone) vs personnels (SUPER_ADMIN seul, motif au journal)
   "exports.operational": ["FINANCE", "MEDIATOR"],
-  "exports.personal": [],
+  "exports.personal": ["PRIVACY"], // A143 (D63 6A) — révise D60 2A : SUPER_ADMIN ou PRIVACY
   // F-PR3 (D61 7A) — lire une conversation depuis un dossier (journalisé), traiter un message signalé. FINANCE n'a rien à y lire.
   "conversations.read": ["MEDIATOR", "SUPPORT"],
   "reports.review": ["MEDIATOR", "SUPPORT"],
@@ -48,6 +49,9 @@ export const ADMIN_PERMISSIONS = {
   "settings.read": ["MEDIATOR", "SUPPORT", "FINANCE", "OPS"],
   "settings.business.write": [],
   "settings.operations.write": ["OPS"],
+  // C-PR8b (D63 6A) — données personnelles
+  "privacy.requests.read": ["PRIVACY"],
+  "users.erase": ["PRIVACY"],
 } as const;
 export type AdminPermission = keyof typeof ADMIN_PERMISSIONS;
 
@@ -58,11 +62,11 @@ export function adminRoleAllows(role: AdminRole | null | undefined, permission: 
 }
 
 /* ── C-PR3bis (D60 1A) — profils CUMULÉS : l'union des permissions ── */
-export const ADMIN_ROLES_ORDER: readonly AdminRole[] = ["SUPER_ADMIN", "MEDIATOR", "SUPPORT", "FINANCE", "OPS"];
+export const ADMIN_ROLES_ORDER: readonly AdminRole[] = ["SUPER_ADMIN", "MEDIATOR", "SUPPORT", "FINANCE", "OPS", "PRIVACY"];
 export const AdminRolesSchema = z
   .array(AdminRoleSchema)
   .min(1)
-  .max(5)
+  .max(6)
   .meta({ id: "AdminRoles", description: "Profils cumulés d'un compte admin (au moins un) — l'union des permissions ; normalisés côté serveur (ordre canonique, doublons ignorés)" });
 /** Ordre canonique, doublons ignorés (un `transform` Zod ne se représente pas en OpenAPI : on normalise en code). */
 export function normalizeAdminRoles(roles: readonly AdminRole[]): AdminRole[] {

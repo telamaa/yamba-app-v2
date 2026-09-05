@@ -5,6 +5,7 @@
 import {DashboardCopy} from "@/app/[locale]/dashboard/dashboard.copy";
 import SectionHeader from "@/components/dashboard/SectionHeader";
 import {CardSection, SettingRow, ToggleRow} from "@/components/dashboard/DashboardUI";
+import PrivacySection from "@/components/dashboard/sections/PrivacySection";
 
 export default function Security({ copy }: { copy: DashboardCopy }) {
   return (
@@ -29,6 +30,9 @@ export default function Security({ copy }: { copy: DashboardCopy }) {
         <ToggleRow label={copy.publicProfile} description={copy.publicProfileSub} defaultOn />
         <ToggleRow label={copy.showCity} description={copy.showCitySub} defaultOn />
       </CardSection>
+
+      {/* C-PR8b (D63) — mes données : relance, export, effacement */}
+      <PrivacySection copy={copy} />
     </>
   );
 }

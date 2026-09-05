@@ -1,4 +1,5 @@
 import express, { Router } from "express";
+import { eraseMyAccount, exportMyData, getMyErasureBlockers, requestSudoCode, updateMyPreferences } from "../controller/privacy.controller"; // C-PR8b (D63)
 import {
   cancelRegistration,
   getMe,
@@ -32,6 +33,12 @@ router.post("/auth/refresh", refreshAuthTokens);
 router.post("/auth/logout", logoutUser);
 router.get("/auth/me", isAuthenticated, getMe);
 router.patch("/auth/me/locale", isAuthenticated, updateMyLocale); // D44
+// C-PR8b (D63) — droits sur les données : sudo par code email, export, effacement, préférences
+router.post("/auth/me/sudo/request", isAuthenticated, requestSudoCode);
+router.post("/auth/me/data-export", isAuthenticated, exportMyData);
+router.get("/auth/me/erasure/blockers", isAuthenticated, getMyErasureBlockers);
+router.post("/auth/me/erasure", isAuthenticated, eraseMyAccount);
+router.patch("/auth/me/preferences", isAuthenticated, updateMyPreferences);
 
 // ─── Mot de passe oublié ───────────────────────────────
 router.post("/auth/password/forgot", requestPasswordResetOtp);

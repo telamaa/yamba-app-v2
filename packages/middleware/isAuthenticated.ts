@@ -49,6 +49,10 @@ const isAuthenticated = async (
     if (!user) {
       return res.status(401).json({ message: "Account not found." });
     }
+    // C-PR8b (D63 4A) — compte effacé : plus aucune session, plus aucun email.
+    if ((user as { isDeleted?: boolean }).isDeleted) {
+      return res.status(401).json({ message: "Account deleted.", code: "ACCOUNT_DELETED" });
+    }
     // C-PR3 (D56 2A) — SUSPENDED : connexion refusée partout (les sessions sont révoquées à la suspension).
     if ((user as { accountStatus?: string }).accountStatus === "SUSPENDED") {
       return res.status(401).json({ message: "Account suspended.", code: "ACCOUNT_SUSPENDED" });

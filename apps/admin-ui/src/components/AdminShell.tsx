@@ -43,6 +43,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
     ...(can(me.adminRoles, "users.read") ? [{ href: "/users", label: "Utilisateurs" }] : []),
     ...(can(me.adminRoles, "audit.read") ? [{ href: "/audit", label: "Journal" }] : []),
     ...(can(me.adminRoles, "settings.read") ? [{ href: "/settings", label: "Paramètres" }] : []),
+    ...(can(me.adminRoles, "privacy.requests.read") ? [{ href: "/privacy", label: "Données personnelles" }] : []),
     ...(can(me.adminRoles, "admins.manage") ? [{ href: "/admins", label: "Comptes admin" }] : []),
     { href: "/sessions", label: "Mes sessions" },
   ];

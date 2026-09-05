@@ -12,6 +12,7 @@ const ROLE_HINT: Record<AdminRole, string> = {
   SUPPORT: "fiches, billets, propositions",
   FINANCE: "finances, exports, pilotage, journal",
   OPS: "paramètres d'exploitation (seuils, relances), état des services, maintenance — jamais l'argent ni les comptes",
+  PRIVACY: "demandes RGPD, effacement d'un compte à la demande, export nominatif — se confie comme un super administrateur",
 };
 
 /** C-PR3bis (D60 1A) — profils cumulés : cases à cocher, au moins un profil. */

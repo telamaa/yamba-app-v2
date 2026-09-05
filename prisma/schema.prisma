@@ -98,6 +98,9 @@ model User {
   isDeleted Boolean   @default(false)
   deletedAt DateTime?
 
+  /// C-PR8b (D63 8A) — préférence membre : relance email des messages non lus (A138)
+  messagingReminderEmails Boolean @default(true)
+
   @@index([carrierStatus])
   @@index([roles])
   @@index([phoneE164])
@@ -767,6 +770,8 @@ model Booking {
   pickedUpAt    DateTime?
   deliveredAt   DateTime?
   payoutDueAt   DateTime? // deliveredAt + J+4 (cron B4)
+  /// C-PR8b (D63 5A) — tiers destinataire effacé (nom, téléphone, email) après la fin du deal
+  recipientRedactedAt DateTime?
   deliveryPhotoUrls String[] // B4-PR3 (A76) : photos OPTIONNELLES à la remise (≤ 2, ImageKit deals/delivery/) — l'assurance du Voyageur
   completedAt   DateTime?
   closedAt      DateTime? // DECLINED / EXPIRED / CANCELLED
@@ -1117,6 +1122,7 @@ enum AdminRole {
   SUPPORT
   FINANCE
   OPS // C-PR8a (D62 3A) — exploitation technique
+  PRIVACY // C-PR8b (D63 6A) — données personnelles : registre des demandes, effacement, export nominatif
 }
 
 /// C-PR3 (D56, 2A) — deux niveaux de sanction, toujours motivés, réversibles.
@@ -1305,6 +1311,51 @@ enum ReportStatus {
 /// `values` = { clé du catalogue → nombre }, `version` = verrou optimiste. Absent ou
 /// illisible → les services repartent sur les défauts du catalogue (repli sûr).
 /// Remplace `SiteConfig` (dormant, commission 0,10 contraire à D16 — A11).
+/// C-PR8b (D63 7A) — le registre des demandes RGPD : la preuve du délai légal.
+model DataRequest {
+  id      String @id @default(auto()) @map("_id") @db.ObjectId
+  userId  String @db.ObjectId
+  type    DataRequestType
+  channel DataRequestChannel
+  status  DataRequestStatus
+  /// Motifs de refus (deal vivant, versement en attente…), vides si faite
+  refusalReasons String[] @default([])
+  /// Canal admin : qui, pourquoi (motif ≥ 20)
+  requestedByAdminId String? @db.ObjectId
+  reason             String?
+  ip        String?
+  userAgent String?
+  requestedAt DateTime @default(now())
+  completedAt DateTime?
+
+  @@index([userId, requestedAt])
+  @@index([type, requestedAt])
+}
+enum DataRequestType {
+  EXPORT
+  ERASURE
+}
+enum DataRequestChannel {
+  MEMBER
+  ADMIN
+}
+enum DataRequestStatus {
+  DONE
+  REFUSED
+}
+
+/// C-PR8b (D63 4A) — ce qui survit à un compte effacé : l'identifiant Stripe Connect (obligations comptables,
+/// litiges de paiement) et la trace de l'effacement. Jamais de nom, d'email ni de téléphone ici.
+model ErasedAccount {
+  id     String @id @default(auto()) @map("_id") @db.ObjectId
+  userId String @unique @db.ObjectId
+  channel DataRequestChannel
+  requestedByAdminId String? @db.ObjectId
+  reason             String?
+  stripeAccountId    String?
+  erasedAt DateTime @default(now())
+}
+
 model PlatformSettings {
   id      String @id @default(auto()) @map("_id") @db.ObjectId
   key     String @unique
