@@ -523,7 +523,8 @@ Ordre de demarrage : auth -> trip -> gateway.
 - D35 FAIT le 05/09 (feat/d35-email-provider) : EmailProvider (Resend par fetch, SMTP, faux
   refuse en production), webhook Svix (livre / rebond / plainte), liste de suppression
   respectee par tous les resolveurs, trip-service sur la lib partagee, Mailpit en local.
-  Reste a ta main : compte Resend, domaine (SPF, DKIM), cles en production.
+  Reste a ta main : compte Resend, domaine (SPF, DKIM), cles en production. MERGE 05/09 :
+  **#185** (17 checks comptes).
 - Backlog parametre serveur : classe C du catalogue D62 (tolerance de poids,
   plafonds comptes neufs, plafond express, seuil de trois signalements…).
 - Photos hors TripDocument chez ImageKit sans fileId (colis, pickup, livraison, litige,
