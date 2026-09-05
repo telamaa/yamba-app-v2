@@ -54,9 +54,13 @@
     "proposeFailed": "Le rendez-vous n'a pas pu être proposé."
   },
   "system": {
-    "meetup.proposed": "Un rendez-vous a été proposé.",
-    "meetup.accepted": "Le rendez-vous est confirmé.",
-    "phone.revealed": "Le numéro de téléphone a été affiché."
+    "meetup": {
+      "proposed": "Un rendez-vous a été proposé.",
+      "accepted": "Le rendez-vous est confirmé."
+    },
+    "phone": {
+      "revealed": "Le numéro de téléphone a été affiché."
+    }
   },
   "open": {
     "failed": "La conversation n'a pas pu être ouverte.",

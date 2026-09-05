@@ -54,9 +54,13 @@
     "proposeFailed": "The meeting could not be proposed."
   },
   "system": {
-    "meetup.proposed": "A meeting has been proposed.",
-    "meetup.accepted": "The meeting is confirmed.",
-    "phone.revealed": "The phone number has been shown."
+    "meetup": {
+      "proposed": "A meeting has been proposed.",
+      "accepted": "The meeting is confirmed."
+    },
+    "phone": {
+      "revealed": "The phone number has been shown."
+    }
   },
   "open": {
     "failed": "The conversation could not be opened.",
