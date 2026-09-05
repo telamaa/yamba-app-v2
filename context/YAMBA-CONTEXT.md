@@ -368,6 +368,13 @@ Ordre de demarrage : auth -> trip -> gateway.
   reports.review, KPI d'accueil, decision + journal en transaction), purge a un an (regle pure,
   cron nocturne). message-service 28 tests. MERGE 05/09 : **#171** (F-PR2b) puis
   **#172** (F-PR3) — 16 checks comptes a chaque fois. Chantier F : lots 1 a 3 SOLDES.
+- 05/09 : recette dev post-merge — **#174** fix/messaging-recette-i18n-assets (cles systeme
+  i18n imbriquees : next-intl refuse les points dans une cle ; src/assets/.gitkeep du
+  message-service, sans lui le build webpack echouait et le service ne demarrait pas → 500
+  gateway). Puis fix/messaging-quick-reply-draft (A142) : la reponse rapide remplit la saisie
+  sans envoyer (RG-FCH-23) ; suppression d'un message NON retenue (RG-FCH-24, forme acceptable
+  consignee). Email de relance des non-lus confirme a 15 min (decision utilisateur 05/09).
+  Suite : C-PR8 parametres / RGPD.
 - Plateforme de tests : 805 (trip 209, deal 485, notification 83, message 28) + auth 103.
 - 04/09 : C-PR6b feat/c6b-admin-alerts (D59 3A / 4A, A129–A131) — neuf regles de seuil
   (evaluateAlerts pur, instantane de dix compteurs), GET /admin/alerts sans etat (accueil

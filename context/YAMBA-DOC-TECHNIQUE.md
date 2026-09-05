@@ -1604,3 +1604,18 @@ message **28** (+14) · auth 103 · tsc ×7 + les deux fronts · miroir i18n OK 
 
 ### Reste
 Préférence « ne plus me relancer par email » et seuils (15 min / 1 h) réglables : C-PR8 paramètres. Photos dans le fil : backlog. Notification du signalé : décision à prendre quand un premier cas réel se présentera.
+
+---
+
+# F-PR3b — `fix/messaging-quick-reply-draft` : la réponse rapide remplit la saisie (A142)
+
+## Ce qui a été fait
+1. **Un seul composant touché** : `apps/user-ui/src/components/dashboard/messages/ConversationThread.tsx`. Les puces de réponse rapide appelaient `send(q.text)` (envoi immédiat). Elles font désormais `setBody(q.text)` puis `composerRef.current?.focus()` : le texte atterrit dans le `textarea` (nouveau `useRef<HTMLTextAreaElement>`), le membre relit et envoie par le bouton ou Entrée. Les puces portent `type="button"` pour ne pas soumettre le formulaire par accident. Le brouillon existant est remplacé, pas concaténé (une puce est une phrase entière, pas un fragment).
+2. **Rien côté serveur** : `POST /messages/conversations/:id/messages` et `GET /messages/quick-replies` sont inchangés. Le serveur n'a jamais su qu'un message venait d'une puce, et c'est voulu : un message est un message.
+3. **Suppression d'un message : non retenue** (A142, RG-FCH-24). Aucun champ, aucune route, aucun menu. La forme compatible avec la médiation est consignée au registre si le besoin revient.
+
+### Preuves
+tsc user-ui OK · aucun test serveur touché (805 + 103 inchangés) · aucune clé i18n ajoutée. Recette : FCH27–FCH29 (DOC-METIER).
+
+### Reste
+Rien. Suite : C-PR8 paramètres / RGPD.
