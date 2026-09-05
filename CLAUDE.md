@@ -51,7 +51,7 @@ No linter is configured (Nx generators use `linter: none`). Root `.env` holds al
 
 ## Git & CI
 
-- Base branch `dev`, protected by **13 required status checks** (TypeScript ×6, unit tests ×4: auth/deal/notification/trip, i18n FR/EN mirror, secrets anti-leak, OpenAPI contracts generate+diff). Never commit directly to `dev`: `feat/*` or `chore/*` branch + PR.
+- Base branch `dev`, protected by **16 required status checks** (TypeScript ×9 incl. admin-ui and message-service, unit tests ×5: auth/deal/notification/trip/message, i18n FR/EN mirror, secrets anti-leak, OpenAPI contracts generate+diff). Never commit directly to `dev`: `feat/*` or `chore/*` branch + PR.
 - "CI OK" is verified by COUNTING checks, not by their color alone.
 - Tests live in the SAME PR as their logic (decision D30). PR number is recorded at merge time.
 - `git status --short` before staging; `git add` always WITH an explicit pathspec; `git log --oneline -1` right after each commit.
