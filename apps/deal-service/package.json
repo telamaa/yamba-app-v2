@@ -47,7 +47,8 @@
         ],
         "options": {
           "buildTarget": "@yamba-app/deal-service:build",
-          "runBuildTargetDependencies": false
+          "runBuildTargetDependencies": false,
+          "port": 9233
         },
         "configurations": {
           "development": {
