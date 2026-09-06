@@ -21,6 +21,7 @@
     "pickupBlockTitle": "You hand the parcel to {carrierFirstName}",
     "deliveryBlockTitle": "The recipient picks up the parcel",
     "locationSingleHint": "Set by the traveler",
+      "locationMissing": "The traveler didn't specify a place for this trip: you will agree on the meeting point together in the conversation, once the request is accepted.",
     "goldenRules": {
       "title": "Golden rules for a smooth shipment",
       "pack": "**Pack carefully.** Sturdy bag or box, bubble wrap if fragile, properly taped.",

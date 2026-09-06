@@ -390,6 +390,11 @@ async function main() {
         destinationTimezone: t.destinationTimezone,
         destinationLabel: `${t.destinationCity} (${t.destinationCountryCode})`,
         departureAt: t.departureAt,
+        // Sans lieu de remise ni de livraison, l'écran de réservation n'avait rien à afficher
+        // (il lisait `pickupOptions[0]` et plantait). Un aéroport de part et d'autre : c'est
+        // le cas courant d'un trajet en avion, et cela rend le parcours de recette réaliste.
+        pickupLocations: [{ kind: "AIRPORT", details: `Terminal départ · ${t.originCity}`, flexibility: "EXACT" }] as never,
+        deliveryLocations: [{ kind: "AIRPORT", details: `Hall d'arrivée · ${t.destinationCity}`, flexibility: "EXACT" }] as never,
         // Sans arrivalAt, la carte de recherche n'a aucune heure d'arrivée à afficher.
         arrivalAt: new Date(t.departureAt.getTime() + t.flightHours * 3_600_000),
         capacityKg: t.capacityKg,

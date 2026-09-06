@@ -607,11 +607,23 @@ export function LocationOption({
 }
 
 type LocationDisplayProps = {
-  location: LocationPoint;
+  location: LocationPoint | undefined;
   hint?: string;
 };
 
+/** Le Voyageur n'a pas précisé de lieu : la réservation reste possible, le lieu se convient au fil. */
+export function LocationMissing({ text }: { text: string }) {
+  return (
+    <div className="flex items-start gap-3 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-3 text-[12.5px] text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">
+      <MapPin size={18} className="mt-0.5 flex-shrink-0 text-slate-400" />
+      <span>{text}</span>
+    </div>
+  );
+}
+
 export function LocationDisplay({ location, hint }: LocationDisplayProps) {
+  // Défense : un trajet publié sans lieu passait ici avec `undefined` et cassait l'écran.
+  if (!location) return null;
   const Icon = getLocationIcon(location.kind);
   return (
     <div className="flex items-start gap-3 rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">

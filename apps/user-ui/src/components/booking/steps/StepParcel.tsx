@@ -14,6 +14,7 @@ import {
   InfoTooltip,
   InsuranceOption,
   LocationDisplay,
+  LocationMissing,
   LocationOption,
   PhotoGrid,
   RequiredBadge,
@@ -194,11 +195,15 @@ export default function StepParcel({
                 </div>
               )}
             </div>
-          ) : (
+          ) : trip.pickupOptions.length > 0 ? (
             <LocationDisplay
               location={trip.pickupOptions[0]}
               hint={t("step1.locationSingleHint")}
             />
+          ) : (
+            // Un trajet publié sans lieu de remise faisait planter l'écran (lecture de
+            // `pickupOptions[0].kind`). Le lieu n'est pas exigé par la réservation : on le dit.
+            <LocationMissing text={t("step1.locationMissing")} />
           )}
         </div>
 
@@ -223,11 +228,13 @@ export default function StepParcel({
                 </div>
               )}
             </div>
-          ) : (
+          ) : trip.deliveryOptions.length > 0 ? (
             <LocationDisplay
               location={trip.deliveryOptions[0]}
               hint={t("step1.locationSingleHint")}
             />
+          ) : (
+            <LocationMissing text={t("step1.locationMissing")} />
           )}
         </div>
       </div>

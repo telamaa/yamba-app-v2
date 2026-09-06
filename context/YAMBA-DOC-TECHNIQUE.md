@@ -2022,3 +2022,18 @@ Les neuf règles s'affichaient toutes sur l'accueil : à trois alertes ouvertes,
 
 ### Preuves
 auth **180** (+5 : filtres du journal) · tsc auth + admin-ui · `next build` admin-ui · OpenAPI ×5 (les six paramètres documentés) · index Prisma ajouté.
+
+---
+
+# `fix/booking-location-undefined` — l'écran de réservation plantait sur un trajet sans lieu
+
+**Symptôme.** `Cannot read properties of undefined (reading 'kind')` dans `LocationDisplay`, à l'ouverture de l'étape 1 de la réservation : écran blanc, réservation impossible.
+
+**Cause.** `StepParcel` traite deux cas seulement — plusieurs lieux (une liste de choix) ou **un** lieu (`trip.pickupOptions[0]`). Un trajet **sans aucun lieu** tombe dans le second et passe `undefined`. La garde de publication exige au moins un lieu de remise et un de livraison, mais le seed écrit en base et la contourne : les trajets de recette n'en avaient aucun. Même famille que le tiret d'heure d'arrivée et le prix à zéro corrigés la veille — trois symptômes, une seule cause : un jeu d'essai incomplet, et des écrans qui supposaient des données complètes.
+
+**Correctif, en deux temps.**
+1. **L'écran ne suppose plus.** `LocationDisplay` rend `null` sur une entrée absente ; `StepParcel` distingue désormais trois cas et affiche, quand la liste est vide, « le Voyageur n'a pas précisé de lieu : vous conviendrez du point de rendez-vous dans la conversation ». C'est exact : `pickupPlace` est facultatif dans la demande de réservation, le rendez-vous se convient dans le fil (D61). Nouveau composant `LocationMissing`, clé `step1.locationMissing` FR/EN.
+2. **Le seed pose des lieux réalistes** : un terminal de départ et un hall d'arrivée sur chaque trajet, ce qui correspond au cas courant d'un vol.
+
+### Preuves
+tsc user-ui · miroir i18n 29 namespaces · seed rejoué · trajet public vérifié en direct : les deux lieux sont servis.
