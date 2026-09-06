@@ -1496,10 +1496,10 @@ Chaque service démarre ses propres tâches dans son `main.ts`, après le `liste
 | deal | `ops-digest.cron.ts` | `0 8 * * *` | `ops-digest` | `OPS_DIGEST_CRON_ENABLED` | Récapitulatif quotidien « argent à surveiller » au support |
 | message | `unread-reminder.cron.ts` | `*/5 * * * *` | `unread-reminder` | `MESSAGING_REMINDER_CRON_ENABLED` | Relance par email des messages non lus depuis 15 minutes |
 | message | `conversation-retention.cron.ts` | `30 3 * * *` | `conversation-retention` | `MESSAGING_RETENTION_CRON_ENABLED` | Purge des conversations un an après la fin du deal |
-| trip / deal / message | `outbox-retention.cron.ts` | `55 3 * * *` | `outbox-retention` | `OUTBOX_RETENTION_CRON_ENABLED` | Suppression des événements publiés au-delà de la durée de conservation, chaque service ne purgeant que son propre type |
+| deal / message | `outbox-retention.cron.ts` | `55 3 * * *` | `outbox-retention` | `OUTBOX_RETENTION_CRON_ENABLED` | Suppression des événements publiés au-delà de la durée de conservation, chaque service ne purgeant que son propre type |
 | deal | `recipient-redaction.cron.ts` | `40 3 * * *` | `recipient-redaction` | `RECIPIENT_REDACTION_CRON_ENABLED` | Effacement du destinataire des deals terminés depuis la durée paramétrée |
 | notification | `retention.cron.ts` | `50 3 * * *` | `retention` | `RETENTION_CRON_ENABLED` | Purge des notifications, des traces d'emails et des événements consommés |
-| auth | `onboarding-reminder.cron.ts` | `0 * * * *` | `onboarding-reminder` | aucun | **Défini mais jamais démarré** : la fonction n'est appelée nulle part (voir § 4.1). Aucun rappel d'onboarding ne part aujourd'hui. |
+| auth | `onboarding-reminder.cron.ts` | `0 * * * *` | `onboarding-reminder` | `ONBOARDING_REMINDER_CRON_ENABLED` | Rappels d'inscription Voyageur à 24 h, 72 h et 7 jours. **Démarré depuis A148** — il ne l'était nulle part, aucun rappel n'était jamais parti. |
 
 Trois remarques d'exploitation. Les tâches nocturnes sont décalées de cinq minutes les unes des autres pour ne pas se disputer la base au même instant. Un interrupteur absent signifie que la tâche ne peut pas être coupée sans redéploiement. Une tâche qui ne bat plus est invisible dans les journaux : c'est le moniteur externe qui doit lever l'alerte, ce qui suppose d'avoir déclaré son adresse de battement.
 

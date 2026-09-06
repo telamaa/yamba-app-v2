@@ -594,6 +594,10 @@ Ordre de demarrage : auth -> trip -> gateway.
   ANN-03 recrite (D72), REP-03 informatif, RGP-02 par la page de suivi, six profils admin, seuils
   d'alerte reglables — plus un avertissement en tete des quatre specifications historiques et les
   ecrans admin perimes. La file d'arbitrage lit enfin ses filtres d'URL.
+- Cahiers de recette (06/09, docs/recette/, .md + .pdf) : 01-WEB (344 scenarios), 02-ADMIN (125),
+  03-API (146), 04-CRONS (90) + README (ordre conseille : API, web, admin, crons). Ecrits depuis les
+  livrables et le code. Trois defauts corriges au passage, dont redpanda-bootstrap.sh qui ne creait
+  pas le sujet messaging-events.
 - Guide de configuration : docs/livrables/05-YAMBA-CONFIGURATION.md (toutes les variables, les dix
   services externes, secrets, diagnostic, etat reel de l'installation). A TA MAIN : cles ImageKit
   (absentes du .env — tout televersement echoue), PostHog, identifiant Google, Sentry, webhooks Stripe.
