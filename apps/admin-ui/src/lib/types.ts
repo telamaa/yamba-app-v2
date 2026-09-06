@@ -170,7 +170,7 @@ export type AuditItem = {
   after: unknown;
   ip: string | null;
 };
-export type AuditResponse = { items: AuditItem[]; nextCursor: string | null };
+export type AuditResponse = { items: AuditItem[]; nextCursor: string | null; appliedFilters?: string[] };
 
 /* ── C-PR4 (D57) — trajets, billets, KPI ── */
 export type AdminTripSummary = {

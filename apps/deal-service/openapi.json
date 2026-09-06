@@ -26148,6 +26148,13 @@
                 "type": "null"
               }
             ]
+          },
+          "appliedFilters": {
+            "description": "A149 — filtres réellement appliqués (une valeur mal formée est ignorée)",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "required": [

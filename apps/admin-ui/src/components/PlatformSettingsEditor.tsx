@@ -9,7 +9,7 @@
  * version lue → 409 si elle a bougé). « Tout réinitialiser » montre son diff avant de partir.
  * L'écriture est bornée par portée : métier = super admin, exploitation = Exploitation.
  */
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { ApiError, apiFetch, patch, post } from "@/lib/api";
 import { can } from "@/lib/permissions";
 import { dateTime } from "@/lib/format";
@@ -167,8 +167,9 @@ export default function PlatformSettingsEditor() {
                   const { min, max } = inputBounds(def);
                   const preview = previewOf(def.key, { ...data.values, ...pending });
                   return (
-                    <>
-                      <tr key={def.key} className={`border-t border-slate-100 align-top ${pendingValue !== undefined && pendingValue !== current ? "bg-amber-50/60" : ""}`}>
+                    // La clé va sur le FRAGMENT (l'enfant de la liste), pas sur le <tr> qu'il contient.
+                    <Fragment key={def.key}>
+                      <tr className={`border-t border-slate-100 align-top ${pendingValue !== undefined && pendingValue !== current ? "bg-amber-50/60" : ""}`}>
                         <td className="px-3 py-2">
                           <div className="flex items-start gap-1.5">
                             <div>
@@ -209,7 +210,7 @@ export default function PlatformSettingsEditor() {
                         <td className="px-3 py-2"><button type="button" onClick={() => showHistory(def.key)} className="text-[11px] text-slate-500 underline">historique</button></td>
                       </tr>
                       {history?.key === def.key && (
-                        <tr key={`${def.key}-h`} className="bg-slate-50">
+                        <tr className="bg-slate-50">
                           <td colSpan={6} className="px-3 py-2 text-[12px] text-slate-700">
                             {history.items.length === 0 ? "Jamais modifié." : (
                               <ul className="space-y-0.5">
@@ -221,7 +222,7 @@ export default function PlatformSettingsEditor() {
                           </td>
                         </tr>
                       )}
-                    </>
+                    </Fragment>
                   );
                 })}
               </tbody>
