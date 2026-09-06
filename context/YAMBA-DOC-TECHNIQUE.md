@@ -2070,3 +2070,27 @@ tsc user-ui + admin-ui · `next build` des deux · miroir i18n 30 namespaces.
 
 ### Limite
 Une référence d'incident n'a de valeur que si Sentry est configuré. Sans `NEXT_PUBLIC_SENTRY_DSN`, seul le `digest` de Next s'affiche, moins parlant. Voir le guide de configuration.
+
+---
+
+# `docs/cahiers-recette` — quatre cahiers de recette de bout en bout
+
+La fiche `context/YAMBA-RECETTE-GLOBALE-2026-09.md` consignait 103 scénarios extraits des grilles par lot. Elle ne disait pas **comment** jouer un scénario. Ces quatre cahiers le disent : préconditions, étapes numérotées, résultat attendu mot pour mot, vérification complémentaire.
+
+| Cahier | Scénarios | Mots | Particularité |
+|---|---|---|---|
+| `RECETTE-01-WEB.md` | 344 sur 32 domaines, 6 parcours longs, 12 non-régressions | 47 400 | Devis calculés d'avance (32,20 €, 40,25 €, 257,60 €…) : le testeur tranche sans interpréter |
+| `RECETTE-02-ADMIN.md` | 125 | 36 100 | Chaque geste se vérifie **deux fois** : à l'écran et dans le journal, y compris les cas où aucune ligne ne doit être écrite |
+| `RECETTE-03-API.md` | 146 | 27 300 | Entièrement en ligne de commande ; prouve que les gardes sont serveur, pas seulement d'interface |
+| `RECETTE-04-CRONS.md` | 90 | 24 900 | Pour chaque tâche : comment rendre un élément éligible, comment forcer un passage, quelle preuve regarder |
+
+## Trois défauts trouvés en les écrivant, corrigés ici
+
+1. **`scripts/redpanda-bootstrap.sh` ne créait qu'un sujet sur deux.** `messaging-events` manquait alors que le relais du message-service en dépend, et l'auto-création est coupée au niveau du cluster. Sur une machine neuve, ce relais **parquait des événements pourtant sains** — panne silencieuse, difficile à relier à sa cause. Le script crée désormais les deux sujets, en restant relançable.
+2. **L'en-tête du cron de versement annonçait un plafond de dix essais**, supprimé avec D58 : le rejeu est espacé, sans limite.
+3. **Le sous-titre de la page Pilotage** annonçait encore l'arrivée des alertes de seuil, qui ont leur page depuis A150. Trois sous-titres périmés avaient été corrigés, celui-là avait échappé.
+
+Le tableau transverse des tâches planifiées est également corrigé : le cron de purge des événements tourne dans deux services et non trois, et le rappel d'inscription n'est plus « jamais démarré » depuis A148.
+
+## Ce que les cahiers signalent sans le corriger
+Deux tâches — le récapitulatif quotidien et le rappel d'inscription — n'ont ni bail ni verrou : deux instances enverraient deux fois. Sans objet aujourd'hui, à traiter avant un déploiement multi-instances. Une carte de battements mal formée désarme la surveillance en silence. Enfin, plusieurs écrans portent encore des données de maquette (un nom, un IBAN partiel, un montant) et une seconde source de textes de réservation emploie un vocabulaire dépassé : chaque point est un scénario de contrôle, pas une correction de ce lot.
