@@ -2037,3 +2037,36 @@ auth **180** (+5 : filtres du journal) · tsc auth + admin-ui · `next build` ad
 
 ### Preuves
 tsc user-ui · miroir i18n 29 namespaces · seed rejoué · trajet public vérifié en direct : les deux lieux sont servis.
+
+---
+
+# A152 — `feat/error-pages` : les deux fronts ont des pages d'erreur
+
+Constat de recette : un plantage affichait au membre `BookingFormUi.tsx (615:41)` et la trace de Next. Ni le site ni le back-office n'avaient de frontière d'erreur, de page « introuvable » ni de filet global.
+
+## Ce qui est livré
+
+| Fichier | Rôle |
+|---|---|
+| `apps/user-ui/src/app/[locale]/error.tsx` | Frontière de toutes les pages du site |
+| `apps/user-ui/src/app/[locale]/not-found.tsx` | Page introuvable du site |
+| `apps/user-ui/src/app/global-error.tsx` | Filet quand le layout racine casse |
+| `apps/admin-ui/src/app/error.tsx`, `not-found.tsx`, `global-error.tsx` | Les mêmes pour le back-office |
+| `messages/{fr,en}/errors.json` | Namespace `errors` (30 namespaces) |
+
+## Les trois décisions de conception
+1. **Jamais la trace au membre.** On affiche une **référence d'incident** de huit caractères, copiable, qui est l'identifiant de l'événement Sentry : le support la retrouve en une recherche. Un lien d'email au support la reprend en objet.
+2. **Répondre à la question réelle.** Un plantage dans le tunnel de réservation ne pose qu'une question : « ai-je été débité ? ». La réponse arrive avant tout le reste, en vert, et elle est exacte — l'autorisation de paiement n'a lieu qu'à la création de la demande. La détection se fait sur le chemin (`/book`, `/bookings`).
+3. **La bonne action.** « Réessayer » appelle `reset()` et relance le rendu. Mais si l'erreur est un `ChunkLoadError`, c'est qu'une version a été publiée pendant la navigation : réessayer ne peut pas marcher, seul un rechargement récupère le nouveau code. Le message et le bouton changent alors.
+
+La page introuvable ne propose pas un lien d'accueil mais les deux gestes du produit — chercher un trajet, en publier un — et nomme les causes fréquentes : trajet supprimé, profil masqué (D67). Le membre comprend que le lien n'est pas cassé de son fait.
+
+Côté back-office, le public change : un opérateur veut savoir quoi faire et quoi transmettre. La référence **et** le message technique court sont affichés. La page introuvable rappelle qu'un écran absent du menu peut simplement manquer à son profil.
+
+`global-error` ne se déclenche que si le layout racine lui-même casse : ni traductions, ni thème, ni police. Il porte donc ses propres `<html><body>`, un texte court écrit en dur dans les deux langues, et un seul bouton.
+
+### Preuves
+tsc user-ui + admin-ui · `next build` des deux · miroir i18n 30 namespaces.
+
+### Limite
+Une référence d'incident n'a de valeur que si Sentry est configuré. Sans `NEXT_PUBLIC_SENTRY_DSN`, seul le `digest` de Next s'affiche, moins parlant. Voir le guide de configuration.
