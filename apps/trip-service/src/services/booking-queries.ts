@@ -37,6 +37,13 @@ export async function hasActiveBookings(tripId: string): Promise<boolean> {
   return count > 0;
 }
 
+/** D72 — combien de deals vivants sur ce trajet (message de refus de l'annulation). */
+export async function countActiveBookings(tripId: string): Promise<number> {
+  return prisma.booking.count({
+    where: { tripId, isDeleted: false, status: { in: [...BOOKING_ACTIVE_STATUSES] } },
+  });
+}
+
 /** Bookings bloquant la complétion (A20 : actifs − DISPUTED). */
 export async function hasBookingsInProgress(tripId: string): Promise<boolean> {
   const count = await prisma.booking.count({

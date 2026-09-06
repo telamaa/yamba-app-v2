@@ -458,7 +458,15 @@ export default function MyTripsList() {
     } else if (modal.type === "cancel") {
       cancelTrip.mutate(modal.trip.id, {
         onSuccess: () => ok(t("toasts.cancelled")),
-        onError: ko,
+        // D72 — un trajet ne s'annule pas tant qu'un deal est vivant : on dit pourquoi.
+        onError: (err: unknown) => {
+          const details = (err as { response?: { data?: { details?: { code?: string; activeDeals?: number } } } })?.response?.data?.details;
+          if (details?.code === "TRIP_HAS_ACTIVE_DEALS") {
+            toast.error(t("toasts.cancelBlocked", { count: details.activeDeals ?? 1 }), toastOpts);
+            return;
+          }
+          ko();
+        },
       });
     } else if (modal.type === "revertToDraft") {
       revertToDraft.mutate(modal.trip.id, {

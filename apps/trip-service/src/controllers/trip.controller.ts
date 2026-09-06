@@ -2,7 +2,7 @@ import type { Response, NextFunction, RequestHandler } from "express";
 import prisma from "@packages/libs/prisma";
 import { recordTripView, tripViews, viewerKey } from "@packages/libs/redis/trip-stats";
 import redis from "@packages/libs/redis";
-import { ValidationError } from "@packages/error-handler";
+import { AppError, ValidationError } from "@packages/error-handler";
 import { AuthenticatedRequest } from "@packages/middleware/isAuthenticated";
 import { favoriteTripIds } from "../services/trip-favorite.service";
 import imagekit from "../lib/imagekit";
@@ -23,7 +23,7 @@ import {
   getCarrierStatDeltas,
   type TripStatus,
 } from "../services/trip-state-machine";
-import { hasActiveBookings } from "../services/booking-queries";
+import { countActiveBookings, hasActiveBookings } from "../services/booking-queries";
 // ⭐ A28 — gate de publication bi-moteur (D13/D14)
 import {
   resolvePricingEngine,
@@ -606,10 +606,21 @@ async function performCancel(
 
   const ctx = await buildLifecycleCtx(trip.id);
   const check = canPerform(trip, "cancel", ctx);
-  if (!check.allowed) return next(new ValidationError(check.reason));
-
-  // NOTE chantier Booking : si hasActiveBookings, déclencher ici les
-  // side-effects (remboursements Stripe, notifications expéditeurs).
+  if (!check.allowed) {
+    // D72 — le refus dû à un deal vivant est un conflit métier typé : le front
+    // affiche « annule d'abord tes deals » avec leur nombre, pas une erreur de saisie.
+    if (ctx.hasActiveBookings) {
+      const activeDeals = await countActiveBookings(trip.id);
+      return next(
+        new AppError(check.reason ?? "This trip still has active deals.", 409, true, {
+          type: "trip",
+          code: "TRIP_HAS_ACTIVE_DEALS",
+          activeDeals,
+        })
+      );
+    }
+    return next(new ValidationError(check.reason));
+  }
 
   await prisma.trip.update({
     where: { id },

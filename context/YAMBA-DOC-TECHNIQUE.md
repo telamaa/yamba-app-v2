@@ -1906,3 +1906,43 @@ Portes : Prisma 7 (majeure : `prisma.config.ts`, adaptateurs), Express 5 (majeur
 
 ### Correctif du 06/09 — `fix/ts6-esmoduleinterop` (régression de démarrage)
 Les six services démarraient puis plantaient : `TypeError: (0, express_1.default) is not a function` dans `dist/main.js`. Cause : la migration TypeScript 6 a écrit `"esModuleInterop": false` dans `tsconfig.base.json` pour « conserver » l'ancien défaut — or sous `module: nodenext` la valeur effective de TS 5 était `true`. Le typecheck passait, les tests aussi (leurs `tsconfig.spec.json` posent `true`), les builds webpack aussi (bundler sans exécuter) : seul le boot révélait l'absence de l'aide `__importDefault`. Correctif : `esModuleInterop: true` dans `tsconfig.base.json` (57 `__importDefault` réapparaissent dans le bundle deal-service), bundle lancé à blanc et `/health` → `ok`. Au passage : Nx 23 (`@nx/js:node`) ouvre l'inspecteur Node sur 9229 pour chaque service (« address already in use » ×5, sans conséquence) → un `port` d'inspecteur par service dans `apps/*/package.json` (9230 → 9235). Leçon (CLAUDE.md) : après une montée d'outillage, un build vert n'est pas un service démarré — lancer un bundle et l'interroger. Outillé depuis : `scripts/smoke-services.sh` démarre les six bundles sur des ports décalés de +900 (aucun conflit avec `npm run dev`), coupe les crons et les relais, lit `/health` (ou `/gateway-health`) et sort en erreur si l'un d'eux ne répond pas. Piège au passage : la variable de port n'est pas la même partout (`PORT` pour le gateway, auth, trip et deal ; `NOTIFICATION_SERVICE_PORT` ; `MESSAGE_SERVICE_PORT`) — le premier essai a démarré notification-service sur le port réel et affiché `EADDRINUSE`.
+
+---
+
+# D72 + A146 → A148 — `fix/anomalies-documentation` : les quatre anomalies trouvées en écrivant la documentation
+
+Écrire les quatre livrables de documentation a obligé à relire le code ligne à ligne. Quatre écarts en sont sortis, tous vérifiés avant correction.
+
+## 1. Un trajet s'annulait en laissant ses deals derrière lui (D72)
+
+**Symptôme.** `POST /trips/:id/cancel` n'avait aucune garde : le trajet passait à CANCELLED, les réservations restaient ACCEPTED ou PICKED_UP, personne n'était remboursé ni prévenu. Le code portait la trace de l'oubli depuis le début : « NOTE chantier Booking : si hasActiveBookings, déclencher ici les side-effects ». Conséquence sur l'argent : l'Expéditeur qui annulait ensuite lui-même subissait le barème ANN-01 (retenue) alors que la défaillance venait du Voyageur.
+
+**Correctif.** La transition `cancel` reçoit le garde `noActiveBookings`, déjà porté par `edit` et `unpublish`. Le contrôleur distingue ce refus des autres : 409 typé `{ type: "trip", code: "TRIP_HAS_ACTIVE_DEALS", activeDeals }` (nouveau `countActiveBookings`), et « Mes trajets » affiche « annule-les d'abord », avec le nombre. Le Voyageur passe donc par `POST /deals/:id/cancel` deal par deal : chemin existant, testé, qui applique la vraie règle ANN-02 (remboursement intégral, annulation imputée au Voyageur, réputation). La cascade automatique a été écartée : elle exigerait que trip-service exécute la machine d'état qui vit dans deal-service avec l'argent.
+
+**Fichiers.** `apps/trip-service/src/services/trip-state-machine.ts`, `services/booking-queries.ts`, `controllers/trip.controller.ts`, `openapi/build-openapi.ts` (409 documenté), `apps/user-ui/src/components/trips/list/MyTripsList.tsx`, `messages/{fr,en}/myTrips.json`. Deux tests de la machine mis à jour : `cancel` disparaît des actions offertes quand un deal est vivant.
+
+## 2. Trois portes cassées en production par un code d'erreur muet (A146)
+
+**Symptôme.** Le middleware d'erreurs n'exposait `details` en production que si `details.type` figurait dans une liste de sept types sûrs. Or plusieurs erreurs posent un `code` **sans** `type` : `SUDO_REQUIRED` (la porte du mode sensible, D65), `EXPORT_RATE_LIMITED` (D63), les refus de la messagerie (`DELIVERY_CODE_IN_MESSAGE`, `OWN_MESSAGE`, `NOT_A_TEXT`, D61) et de signalement (D68). En développement tout marchait ; en production le front recevait un 403 sans code, donc n'ouvrait jamais la porte sudo — une fonctionnalité entière morte sans erreur visible.
+
+**Correctif.** Un `code` est public par contrat : c'est ce que le client lit et traduit. Le middleware expose désormais `details` dès que `details.code` est une chaîne, en production comme ailleurs. La liste des types sûrs reste pour les détails sans code (elle gagne `"trip"`). Quatre tests couvrent les quatre chemins, dont le cas « ni code ni type sûr reste caché en production ».
+
+**Fichiers.** `packages/error-handler/error-middleware.ts`, `apps/auth-service/src/utils/error-details.spec.ts`.
+
+## 3. Le limiteur du gateway ne voyait jamais personne (A147)
+
+**Symptôme.** `max: (req) => (req.user ? 1000 : 100)` : aucune authentification ne tourne au gateway, `req.user` n'y existe jamais. La branche « membre connecté » était morte et **tout le monde** vivait avec 100 requêtes par quart d'heure — qu'une navigation normale atteint.
+
+**Correctif.** Le gateway vérifie la **signature** du jeton (cookie membre, cookie admin, puis Bearer) avant d'accorder le plafond haut. Se fier à la présence d'un cookie aurait suffi à l'offrir à qui pose un cookie bidon ; une vérification HMAC coûte une empreinte et ne se contrefait pas. La règle vit dans `packages/middleware/rate-limit-tier.ts` (pure, vérificateur injecté) et se teste depuis auth-service, comme la bibliothèque TOTP.
+
+## 4. Les rappels d'onboarding n'étaient jamais partis (A148)
+
+**Symptôme.** `startOnboardingReminderCron()` était écrit, correct, enveloppé d'un battement — et appelé nulle part. Depuis la création du projet, aucun Voyageur bloqué en cours d'inscription n'a reçu de rappel.
+
+**Correctif.** Démarré dans `main.ts` (`ONBOARDING_REMINDER_CRON_ENABLED=false` pour le couper), avec deux garde-fous absents : le destinataire saute `isDeleted` **et** `emailSuppressedAt` (règle générale D35 que ce cron ignorait), et un âge maximum de 30 jours évite de réveiller un compte abandonné depuis des mois avec un « dernière chance ». La sélection devient une règle pure testée (`utils/onboarding-reminder.rules.ts`, cinq tests). Les sujets disaient encore « Tripper » : corrigé (A144).
+
+### Preuves
+trip 209 · auth **175** (+13 : plafond du limiteur ×3, rappel d'onboarding ×5, exposition des codes ×4, plus l'existant) · deal 513 · notification 99 · message 36 · tsc ×8 · miroir i18n · OpenAPI ×5 · build ×6 · `scripts/smoke-services.sh` : six services démarrés.
+
+### À surveiller à la mise en production
+Le premier tour du cron de rappel enverra un email à chaque Voyageur bloqué depuis moins de 30 jours. Vérifier le volume avant de l'activer, ou le laisser coupé le temps d'un premier passage.

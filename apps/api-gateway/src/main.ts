@@ -7,6 +7,8 @@ import { currentMaintenance, maintenanceMiddleware, publicMaintenanceHandler } f
 import { aggregateStatus, probeService, serviceEntries, toPublicBody, type PublicStatusBody } from "@packages/libs/health"; // D70
 import cookieParser from "cookie-parser";
 import { randomUUID } from "crypto";
+import jwt from "jsonwebtoken";
+import { rateLimitMax } from "@packages/middleware/rate-limit-tier"; // A147
 
 const app = express();
 
@@ -70,9 +72,23 @@ app.get("/api/status", async (_req, res) => {
 });
 
 // Apply rate limiting
+// A147 — `req.user` n'existe JAMAIS au gateway (aucune authentification n'y tourne) :
+// la branche « connecté » était morte et tout le monde subissait le plafond anonyme.
+// On vérifie la signature du jeton de session : une empreinte HMAC, non falsifiable.
+const verifySessionToken = (token: string): boolean => {
+  const secret = process.env.ACCESS_TOKEN_SECRET;
+  if (!secret) return false;
+  try {
+    jwt.verify(token, secret);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: (req: any) => (req.user ? 1000 : 100),
+  max: (req: any) => rateLimitMax(req, verifySessionToken),
   message: { error: "Too many requests, please try again later!" },
   standardHeaders: true,
   skipFailedRequests: true,

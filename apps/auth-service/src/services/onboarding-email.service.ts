@@ -16,8 +16,8 @@ const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
 // ─── Reminder schedule config ────────────────────────────────────
 export const REMINDER_SCHEDULE = [
-  { step: 1, delayHours: 24, subject: "Plus qu'une étape pour devenir Tripper !" },
-  { step: 2, delayHours: 72, subject: "Ton profil Tripper t'attend…" },
+  { step: 1, delayHours: 24, subject: "Plus qu'une étape pour devenir Voyageur !" }, // A144
+  { step: 2, delayHours: 72, subject: "Ton profil Voyageur t'attend…" },
   { step: 3, delayHours: 168, subject: "Dernière chance de finaliser ton profil" }, // 7 days
 ] as const;
 

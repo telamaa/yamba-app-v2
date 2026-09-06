@@ -47,10 +47,15 @@ export const errorMiddleware = (
       // Liste des types safe : "otp" (exponential backoff), à étendre selon les besoins
       // "booking" : codes métier 409 du deal-service (B2) · "password" / "register" :
       // codes de règle (auth-service, recette 03/09) traduits par le front
-      const safeTypes = ["otp", "booking", "password", "register", "locale", "favorite", "oauth"];
+      const safeTypes = ["otp", "booking", "password", "register", "locale", "favorite", "oauth", "trip"];
       const detailsType = detailsObj.type as string | undefined;
 
-      if (detailsType && safeTypes.includes(detailsType)) {
+      // A146 — un `code` est PUBLIC par contrat : le client le lit et le traduit.
+      // Avant, un code posé sans `type` disparaissait en production et cassait la
+      // fonctionnalité qui en dépendait (SUDO_REQUIRED, refus de la messagerie…).
+      const hasPublicCode = typeof detailsObj.code === "string" && detailsObj.code.length > 0;
+
+      if (hasPublicCode || (detailsType && safeTypes.includes(detailsType))) {
         payload.details = err.details;
       } else if (!isProd) {
         // Cas 3 : details non typé ou type inconnu → exposé seulement hors prod (debug)

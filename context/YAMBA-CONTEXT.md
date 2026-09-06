@@ -580,6 +580,14 @@ Ordre de demarrage : auth -> trip -> gateway.
 - Recette globale : fiche context/YAMBA-RECETTE-GLOBALE-2026-09.md (103 scenarios + 8 E2E + Atlas +
   moniteur), seed-deals date les membres de 90 jours (plafonds D71). MERGE 05/09 : **#204**. Le plan
   de session se fait avec l'utilisateur, puis la recette, puis le chantier mobile (D36).
+- D72 + A146/A147/A148 FAITS le 06/09 (fix/anomalies-documentation) : les quatre anomalies trouvees
+  en ecrivant la documentation. (1) L'annulation d'un trajet est REFUSEE tant qu'un deal est vivant
+  (409 TRIP_HAS_ACTIVE_DEALS) : le Voyageur annule ses deals d'abord (ANN-02, remboursement integral).
+  (2) Un details porteur d'un code passe desormais en production (SUDO_REQUIRED, messagerie,
+  signalement etaient muets). (3) Le limiteur du gateway verifie la signature du jeton : la branche
+  « connecte » etait morte, tout le monde subissait 100 req / 15 min. (4) Le cron de rappel
+  d'onboarding est enfin demarre, avec filtre isDeleted / emailSuppressedAt et age max 30 j.
+  A surveiller en production : volume du premier tour du cron de rappel.
 - Livrables de documentation (06/09, une PR par document, .md + .pdf dans docs/livrables/) : lot 1
   metier / fonctionnel membres, lot 2 Admin, lot 3 API de bout en bout (reference des 173 endpoints
   generee), lot 4 technique de transmission. Outillage : scripts/build-doc-pdf.py (python-markdown +

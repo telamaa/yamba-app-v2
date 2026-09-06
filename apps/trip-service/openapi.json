@@ -1379,7 +1379,7 @@
           "trips-lifecycle"
         ],
         "summary": "Annuler",
-        "description": "→ CANCELLED (cancelledAt posé). Décrémente les stats carrier, y compris depuis PAUSED. Transition refusée → 400 avec le message machine de canPerform. Auth requise (owner uniquement).",
+        "description": "→ CANCELLED (cancelledAt posé). Décrémente les stats carrier, y compris depuis PAUSED. **D72** : REFUSÉ (409 `{ type: \"trip\", code: \"TRIP_HAS_ACTIVE_DEALS\", activeDeals }`) tant qu'un deal est vivant — le Voyageur annule chaque deal (`POST /deals/:id/cancel`, remboursement intégral ANN-02) avant d'annuler le trajet. Transition refusée → 400 avec le message machine de canPerform. Auth requise (owner uniquement).",
         "operationId": "cancelTrip",
         "security": [
           {
@@ -1427,6 +1427,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/UnauthorizedResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "D72 — le trajet porte encore des deals vivants : details.code = TRIP_HAS_ACTIVE_DEALS, details.activeDeals = combien",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
