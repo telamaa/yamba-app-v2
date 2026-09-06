@@ -8,6 +8,7 @@ Quatre documents de transmission, chacun en Markdown (source) et en PDF (génér
 | 2 | Documentation métier et fonctionnelle — back-office Admin | opérateurs, développeurs | `02-YAMBA-DOCUMENTATION-ADMIN.md` | `.pdf` |
 | 3 | Documentation d'utilisation de l'API de bout en bout | intégrateurs, mobile, développeurs | `03-YAMBA-DOCUMENTATION-API.md` | `.pdf` |
 | 4 | Documentation technique de bout en bout | développeurs (junior compris) | `04-YAMBA-DOCUMENTATION-TECHNIQUE.md` | `.pdf` |
+| 5 | Guide de configuration complet | qui installe ou déploie | `05-YAMBA-CONFIGURATION.md` | `.pdf` |
 
 ## Régénérer
 
