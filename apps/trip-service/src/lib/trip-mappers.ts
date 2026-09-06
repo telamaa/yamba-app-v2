@@ -48,7 +48,7 @@ export type YambaTripResultDto = {
   toCountry?: string;
   travelDate: string;            // "12 juin 2026" / "June 12, 2026"
   departureTime: string;         // "08:00"
-  arrivalTime: string;           // "14:30"
+  arrivalTime?: string;          // "14:30" — ABSENT quand le trajet n'a pas d'heure d'arrivée
   nextDay?: boolean;
   durationMinutes?: number;
   stopovers?: number;
@@ -295,9 +295,11 @@ export function mapTripToYambaResult(
     trip.departureTimeLocal ||
     formatTripTime(trip.departureAt, trip.originTimezone);
 
+  // Un trajet sans heure d'arrivée renvoyait le tiret « — », que la carte affichait
+  // comme une heure : le champ est simplement ABSENT, la ligne disparaît côté front.
   const arrivalTime = trip.arrivalAt
     ? trip.arrivalTimeLocal || formatTripTime(trip.arrivalAt, trip.destinationTimezone)
-    : "—";
+    : undefined;
 
   // ─── Date affichage ────────────────────────────────
   const travelDate = formatTripDate(trip.departureAt, trip.originTimezone, locale);

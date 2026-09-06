@@ -114,7 +114,7 @@ export default function YambaTripResultCardMobile({
             {/* To */}
             <div className="min-w-0 text-right">
               <div className="text-[18px] font-semibold leading-tight tabular-nums text-slate-900 dark:text-white">
-                {item.arrivalTime}
+                {item.arrivalTime ?? ""}
                 {item.nextDay && (
                   <sup className="ml-1 inline-block rounded bg-[#FFEDD5] px-1 py-px align-super text-[9px] font-medium text-[#9A3412] dark:bg-[#FF9900]/20 dark:text-[#FFB84D]">
                     +1

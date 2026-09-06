@@ -1971,3 +1971,25 @@ Les quatre livrables ont relevé 29 écarts entre ce que disent les documents et
 
 ### Écarts laissés tels quels, et pourquoi
 Les paramètres de classe C (tolérance de poids, plafond de la protection de base, supplément de catégorie) restent nommés sans consommateur : c'est la règle de D62, un paramètre n'entre au catalogue que lorsqu'un code le lit. Les noms de règles d'alerte gardent leur seuil d'origine (`PAYOUT_FAILED_48H`) : les renommer casserait le dédoublonnage quotidien qui s'appuie sur la clé. RG-20 (filet de complétion à 7 jours) reste non implémenté : le cron d'arrivée plus 24 heures fait le travail.
+
+---
+
+# `fix/recette-affichage` — trois retours de recette et un seed qui ne passait plus
+
+## 1. Pas de croix pour fermer la porte de connexion sur mobile
+`AuthGateModal` affichait la croix **seulement** sur grand écran ; sur téléphone, la poignée de glissement seule n'indique pas comment fermer, et le lien « Plus tard » est au bas d'un panneau qui défile. La croix est désormais rendue dans les deux cas (plus petite et plus proche du bord sur mobile), la poignée reste. Fichier : `apps/user-ui/src/components/auth/shared/AuthGateModal.tsx`.
+
+## 2. Le tiret sous la ville d'arrivée, dans les cartes de recherche
+`mapTripToYambaResult` renvoyait **le caractère « — »** comme heure d'arrivée quand le trajet n'en a pas (`arrivalAt` absent) ; la carte l'affichait à la place d'une heure. Le champ est maintenant **absent** (`arrivalTime?: string` dans le contrat de recherche et dans le mapper) : la ligne disparaît, ce que la carte savait déjà faire. La carte mobile ne rend plus rien non plus. Le séparateur en pointillés au-dessus de l'exemple de prix devient un filet clair : c'est la même information, moins bruyante.
+
+## 3. Ce que ces cartes révélaient vraiment : des trajets de seed incomplets
+Les trajets créés par `seed-deals.ts` n'avaient **ni heure d'arrivée ni prix** : d'où le tiret et le « à partir de 0,00 € » sur des annonces pourtant publiées (un trajet sans prix n'est pas réservable ; en production la garde de publication l'interdit, le seed écrit en base et la contourne). Le seed pose désormais `arrivalAt` (départ + durée de vol déclarée par trajet, de 6 à 12 h) et un prix au kilo par défaut de 9,50 € quand le trajet n'en déclare pas.
+
+## 4. Le seed ne passait plus du tout
+Découvert en le rejouant : `seed-deals.ts` échouait sur `prisma.booking.create()` — `category: "COSMETICS"` n'existe pas dans `ParcelCategory` (c'est `COSMETICS_CARE`, et c'est une **famille**, pas une catégorie). Deux réservations concernées, corrigées en `OTHER_ACCESSORIES`. L'échec est antérieur à ce lot (vérifié en rejouant le seed sur `dev`) : la remise à zéro de recette était cassée, ce qui aurait bloqué l'étape P3 de la fiche de recette globale.
+
+## 5. Connexion Google : le code est là, la configuration manque
+`GOOGLE_CLIENT_ID` et `NEXT_PUBLIC_GOOGLE_CLIENT_ID` sont vides dans le `.env` racine et absents de `apps/user-ui/.env.local`. Sans identifiant public, le bouton affiche « Connexion Google bientôt disponible » — comportement voulu (D47), pas une régression. Il faut créer un identifiant OAuth dans la console Google, autoriser les origines de développement, renseigner les deux variables, puis redémarrer le front.
+
+### Preuves
+trip **209** (spec du mapper mise à jour : plus de tiret) · tsc user-ui + trip · build · miroir i18n · OpenAPI ×5 · seed rejoué de bout en bout (22 réservations) · recherche vérifiée en direct : heures d'arrivée servies, prix au kilo présents.

@@ -34,9 +34,10 @@ function fixture(overrides: Record<string, unknown> = {}): TripWithRelations {
 }
 
 describe("mapTripToYambaResult — tolérance et moteur PER_KG", () => {
-  it("un trajet SANS arrivalAt n'est plus écarté : arrivée « — », pas de durée", () => {
+  it("un trajet SANS arrivalAt n'est plus écarté : AUCUNE heure d'arrivée servie, pas de durée", () => {
     const dto = mapTripToYambaResult(fixture(), "fr");
-    expect(dto.arrivalTime).toBe("—");
+    // Le mapper renvoyait le tiret « — », que la carte affichait comme une heure.
+    expect(dto.arrivalTime).toBeUndefined();
     expect(dto.durationMinutes).toBeUndefined();
     expect(dto.nextDay).toBeUndefined();
     expect(dto.fromCity).toBe("Paris");

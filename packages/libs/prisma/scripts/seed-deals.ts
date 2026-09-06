@@ -101,6 +101,8 @@ type SeedTrip = {
   destinationCountryCode: string;
   destinationTimezone: string;
   departureAt: Date;
+  /** Durée de vol en heures — sert à poser arrivalAt (sans quoi la carte de recherche n'affiche aucune heure d'arrivée). */
+  flightHours: number;
   transportMode: "PLANE";
   capacityKg: number;
   // A28 — moteur PER_KG (optionnel : seuls les trips nouvelle formule)
@@ -112,17 +114,17 @@ type SeedTrip = {
 
 const TRIPS: SeedTrip[] = [
   // Colonne vertébrale — 2 trips (états "avant départ" vs "en cours/finis")
-  { key: "bzv-upcoming", carrierKey: "thomas", originCity: "Paris", originCountryCode: "FR", originTimezone: "Europe/Paris", destinationCity: "Brazzaville", destinationCountryCode: "CG", destinationTimezone: "Africa/Brazzaville", departureAt: days(10), transportMode: "PLANE", capacityKg: 23 },
-  { key: "bzv-inflight", carrierKey: "thomas", originCity: "Paris", originCountryCode: "FR", originTimezone: "Europe/Paris", destinationCity: "Brazzaville", destinationCountryCode: "CG", destinationTimezone: "Africa/Brazzaville", departureAt: days(-6), transportMode: "PLANE", capacityKg: 23 },
-  { key: "yul", carrierKey: "marc", originCity: "Paris", originCountryCode: "FR", originTimezone: "Europe/Paris", destinationCity: "Montréal", destinationCountryCode: "CA", destinationTimezone: "America/Toronto", departureAt: days(3), transportMode: "PLANE", capacityKg: 20 },
-  { key: "gru", carrierKey: "ines", originCity: "Lisbonne", originCountryCode: "PT", originTimezone: "Europe/Lisbon", destinationCity: "São Paulo", destinationCountryCode: "BR", destinationTimezone: "America/Sao_Paulo", departureAt: days(5), transportMode: "PLANE", capacityKg: 18 },
-  { key: "los", carrierKey: "adebayo", originCity: "Londres", originCountryCode: "GB", originTimezone: "Europe/London", destinationCity: "Lagos", destinationCountryCode: "NG", destinationTimezone: "Africa/Lagos", departureAt: days(-2), transportMode: "PLANE", capacityKg: 23 },
-  { key: "sgn", carrierKey: "linh", originCity: "Paris", originCountryCode: "FR", originTimezone: "Europe/Paris", destinationCity: "Hô Chi Minh-Ville", destinationCountryCode: "VN", destinationTimezone: "Asia/Ho_Chi_Minh", departureAt: days(-1), transportMode: "PLANE", capacityKg: 15 },
-  { key: "fih", carrierKey: "josephine", originCity: "Bruxelles", originCountryCode: "BE", originTimezone: "Europe/Brussels", destinationCity: "Kinshasa", destinationCountryCode: "CD", destinationTimezone: "Africa/Kinshasa", departureAt: days(7), transportMode: "PLANE", capacityKg: 23 },
+  { key: "bzv-upcoming", carrierKey: "thomas", originCity: "Paris", originCountryCode: "FR", originTimezone: "Europe/Paris", destinationCity: "Brazzaville", destinationCountryCode: "CG", destinationTimezone: "Africa/Brazzaville", departureAt: days(10), flightHours: 7, transportMode: "PLANE", capacityKg: 23 },
+  { key: "bzv-inflight", carrierKey: "thomas", originCity: "Paris", originCountryCode: "FR", originTimezone: "Europe/Paris", destinationCity: "Brazzaville", destinationCountryCode: "CG", destinationTimezone: "Africa/Brazzaville", departureAt: days(-6), flightHours: 7, transportMode: "PLANE", capacityKg: 23 },
+  { key: "yul", carrierKey: "marc", originCity: "Paris", originCountryCode: "FR", originTimezone: "Europe/Paris", destinationCity: "Montréal", destinationCountryCode: "CA", destinationTimezone: "America/Toronto", departureAt: days(3), flightHours: 8, transportMode: "PLANE", capacityKg: 20 },
+  { key: "gru", carrierKey: "ines", originCity: "Lisbonne", originCountryCode: "PT", originTimezone: "Europe/Lisbon", destinationCity: "São Paulo", destinationCountryCode: "BR", destinationTimezone: "America/Sao_Paulo", departureAt: days(5), flightHours: 11, transportMode: "PLANE", capacityKg: 18 },
+  { key: "los", carrierKey: "adebayo", originCity: "Londres", originCountryCode: "GB", originTimezone: "Europe/London", destinationCity: "Lagos", destinationCountryCode: "NG", destinationTimezone: "Africa/Lagos", departureAt: days(-2), flightHours: 6, transportMode: "PLANE", capacityKg: 23 },
+  { key: "sgn", carrierKey: "linh", originCity: "Paris", originCountryCode: "FR", originTimezone: "Europe/Paris", destinationCity: "Hô Chi Minh-Ville", destinationCountryCode: "VN", destinationTimezone: "Asia/Ho_Chi_Minh", departureAt: days(-1), flightHours: 12, transportMode: "PLANE", capacityKg: 15 },
+  { key: "fih", carrierKey: "josephine", originCity: "Bruxelles", originCountryCode: "BE", originTimezone: "Europe/Brussels", destinationCity: "Kinshasa", destinationCountryCode: "CD", destinationTimezone: "Africa/Kinshasa", departureAt: days(7), flightHours: 8, transportMode: "PLANE", capacityKg: 23 },
   // ⭐ A28 — LE trip PER_KG de demonstration (QA de la PR-B) :
   // 11,50 €/kg · 23 kg · electronique +20 % · alimentaire REFUSE ·
   // bagage soute 23 kg a 230 € forfaitaire.
-  { key: "bzv-perkg", carrierKey: "thomas", originCity: "Paris", originCountryCode: "FR", originTimezone: "Europe/Paris", destinationCity: "Brazzaville", destinationCountryCode: "CG", destinationTimezone: "Africa/Brazzaville", departureAt: days(15), transportMode: "PLANE", capacityKg: 23, pricePerKgCents: 1150, checkedBag23PriceCents: 23000, familyConditions: [{ familyKey: "ELECTRONICS_DEVICES", mode: "SURCHARGE", surchargePct: 20 }, { familyKey: "FOOD_DRY_SEALED", mode: "REFUSE" }] },
+  { key: "bzv-perkg", carrierKey: "thomas", originCity: "Paris", originCountryCode: "FR", originTimezone: "Europe/Paris", destinationCity: "Brazzaville", destinationCountryCode: "CG", destinationTimezone: "Africa/Brazzaville", departureAt: days(15), flightHours: 7, transportMode: "PLANE", capacityKg: 23, pricePerKgCents: 1150, checkedBag23PriceCents: 23000, familyConditions: [{ familyKey: "ELECTRONICS_DEVICES", mode: "SURCHARGE", surchargePct: 20 }, { familyKey: "FOOD_DRY_SEALED", mode: "REFUSE" }] },
 ];
 
 /* ══ Pricing helpers (centimes entiers — A2, commission 15 %) ═ */
@@ -230,7 +232,7 @@ const BOOKINGS: SeedBooking[] = [
     milestones: { requestedAt: days(-12), expiresAt: days(-11), acceptedAt: days(-11), pickedUpAt: days(-6), deliveredAt: days(-6), payoutDueAt: days(-2), completedAt: days(-2) },
     pickup: { confirmedAt: days(-6), photoUrls: ["https://r2.seed.yamba.dev/bzv-completed-1.jpg"], notes: null } },
   // C-PR5 (D58) — transfert renversé par Stripe après versement : file admin « Transferts renversés » (recette FIN)
-  { key: "bzv-reversed", tripKey: "bzv-inflight", shipperKey: "pauline", status: "COMPLETED", weightKg: 3, category: "COSMETICS", description: "Crèmes et parfums (transfert renversé — recette FIN04/FIN05)", declaredValueCents: 9000, pricing: perCategory(3000), recipient: RCP_BZV,
+  { key: "bzv-reversed", tripKey: "bzv-inflight", shipperKey: "pauline", status: "COMPLETED", weightKg: 3, category: "OTHER_ACCESSORIES", description: "Crèmes et parfums (transfert renversé — recette FIN04/FIN05)", declaredValueCents: 9000, pricing: perCategory(3000), recipient: RCP_BZV,
     milestones: { requestedAt: days(-14), expiresAt: days(-13), acceptedAt: days(-13), pickedUpAt: days(-8), deliveredAt: days(-8), payoutDueAt: days(-4), completedAt: days(-4) },
     pickup: { confirmedAt: days(-8), photoUrls: [], notes: null } },
 
@@ -274,7 +276,7 @@ const BOOKINGS: SeedBooking[] = [
   { key: "fih-cancelled", tripKey: "fih", shipperKey: "marieclaire", status: "CANCELLED", weightKg: 3, category: "DOCUMENTS", description: "Actes de naissance", declaredValueCents: 2000, pricing: perCategory(2500), recipient: RCP_FIH,
     milestones: { requestedAt: days(-4), expiresAt: days(-3), closedAt: days(-3), closedBy: "SHIPPER" } },
   // C-PR2 (A81/D55 3A) — annulée APRÈS le départ sans prise en charge : retenue 50 % « à arbitrer » (file admin, MED8).
-  { key: "bzv-held", tripKey: "bzv-inflight", shipperKey: "aminata", status: "CANCELLED", weightKg: 2, category: "COSMETICS", description: "Produits de beauté", declaredValueCents: 6000, pricing: perCategory(2600), recipient: RCP_BZV,
+  { key: "bzv-held", tripKey: "bzv-inflight", shipperKey: "aminata", status: "CANCELLED", weightKg: 2, category: "OTHER_ACCESSORIES", description: "Produits de beauté", declaredValueCents: 6000, pricing: perCategory(2600), recipient: RCP_BZV,
     milestones: { requestedAt: days(-9), expiresAt: days(-8), acceptedAt: days(-8), closedAt: days(-4), closedBy: "SHIPPER", cancelReason: "Le Voyageur ne s'est pas présenté au rendez-vous" } },
 ];
 
@@ -388,10 +390,13 @@ async function main() {
         destinationTimezone: t.destinationTimezone,
         destinationLabel: `${t.destinationCity} (${t.destinationCountryCode})`,
         departureAt: t.departureAt,
+        // Sans arrivalAt, la carte de recherche n'a aucune heure d'arrivée à afficher.
+        arrivalAt: new Date(t.departureAt.getTime() + t.flightHours * 3_600_000),
         capacityKg: t.capacityKg,
         reservedKg,
-        // A28 — pass-through PER_KG (undefined = champ absent, trips legacy intacts)
-        pricePerKgCents: t.pricePerKgCents,
+        // A28 — pass-through PER_KG. Défaut 9,50 €/kg : un trajet publié sans prix
+        // s'affichait « à partir de 0,00 € » en recherche (il n'est pas réservable).
+        pricePerKgCents: t.pricePerKgCents ?? 950,
         checkedBag23PriceCents: t.checkedBag23PriceCents,
         cabinBag12PriceCents: t.cabinBag12PriceCents,
         familyConditions: (t.familyConditions ?? []) as never,
