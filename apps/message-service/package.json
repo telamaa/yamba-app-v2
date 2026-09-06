@@ -5,38 +5,58 @@
   "nx": {
     "targets": {
       "prune-lockfile": {
-        "dependsOn": ["build"],
+        "dependsOn": [
+          "build"
+        ],
         "cache": true,
         "executor": "@nx/js:prune-lockfile",
         "outputs": [
           "{workspaceRoot}/apps/message-service/dist/package.json",
           "{workspaceRoot}/apps/message-service/dist/package-lock.json"
         ],
-        "options": { "buildTarget": "build" }
+        "options": {
+          "buildTarget": "build"
+        }
       },
       "copy-workspace-modules": {
-        "dependsOn": ["build"],
+        "dependsOn": [
+          "build"
+        ],
         "cache": true,
-        "outputs": ["{workspaceRoot}/apps/message-service/dist/workspace_modules"],
+        "outputs": [
+          "{workspaceRoot}/apps/message-service/dist/workspace_modules"
+        ],
         "executor": "@nx/js:copy-workspace-modules",
-        "options": { "buildTarget": "build" }
+        "options": {
+          "buildTarget": "build"
+        }
       },
       "prune": {
-        "dependsOn": ["prune-lockfile", "copy-workspace-modules"],
+        "dependsOn": [
+          "prune-lockfile",
+          "copy-workspace-modules"
+        ],
         "executor": "nx:noop"
       },
       "serve": {
         "continuous": true,
         "executor": "@nx/js:node",
         "defaultConfiguration": "development",
-        "dependsOn": ["build"],
+        "dependsOn": [
+          "build"
+        ],
         "options": {
           "buildTarget": "@yamba-app/message-service:build",
-          "runBuildTargetDependencies": false
+          "runBuildTargetDependencies": false,
+          "port": 9235
         },
         "configurations": {
-          "development": { "buildTarget": "@yamba-app/message-service:build:development" },
-          "production": { "buildTarget": "@yamba-app/message-service:build:production" }
+          "development": {
+            "buildTarget": "@yamba-app/message-service:build:development"
+          },
+          "production": {
+            "buildTarget": "@yamba-app/message-service:build:production"
+          }
         }
       }
     }

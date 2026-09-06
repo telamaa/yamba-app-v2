@@ -47,7 +47,8 @@
         ],
         "options": {
           "buildTarget": "@yamba-app/trip-service:build",
-          "runBuildTargetDependencies": false
+          "runBuildTargetDependencies": false,
+          "port": 9232
         },
         "configurations": {
           "development": {
