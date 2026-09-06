@@ -9,7 +9,7 @@ const REASON_MIN = 20;
 
 /**
  * Bouton d'export CSV (C-PR7a, D60 2A). Téléchargement direct (le cookie admin suit par /api) ; l'export est journalisé côté serveur.
- * `personal` = données nominatives : SUPER_ADMIN seul, motif obligatoire (≥ 20) envoyé au journal.
+ * `personal` = données nominatives : SUPER_ADMIN ou PRIVACY (A143), motif obligatoire (≥ 20) envoyé au journal.
  */
 export default function ExportButton({ me, path, params, personal, label = "Exporter en CSV" }: { me: AdminMe | null; path: string; params: URLSearchParams; personal?: boolean; label?: string }) {
   const [open, setOpen] = useState(false);

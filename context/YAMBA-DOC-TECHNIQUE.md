@@ -1946,3 +1946,28 @@ trip 209 · auth **175** (+13 : plafond du limiteur ×3, rappel d'onboarding ×5
 
 ### À surveiller à la mise en production
 Le premier tour du cron de rappel enverra un email à chaque Voyageur bloqué depuis moins de 30 jours. Vérifier le volume avant de l'activer, ou le laisser coupé le temps d'un premier passage.
+
+---
+
+# `fix/divergences-documentation` — aligner les documents de gouvernance et les écrans sur le code
+
+Les quatre livrables ont relevé 29 écarts entre ce que disent les documents et ce que fait le code. Le code fait foi (règle de précédence de `CLAUDE.md`) : ce lot corrige les documents, et les quelques écrans qui promettaient autre chose que le comportement réel.
+
+## Documents corrigés
+| Document | Correction |
+|---|---|
+| `CLAUDE.md` | « 9 statuts, 12 transitions » → **16 transitions** (annulation SYSTEM, litige depuis PICKED_UP, deux résolutions ADMIN de D55) ; export nominatif « SUPER_ADMIN seul » → SUPER_ADMIN **ou PRIVACY** (A143) |
+| `YAMBA-REGLES-METIER-V2.md` | ANN-03 récrite (D72 : refus au lieu de cascade, avec la rédaction d'origine conservée) ; REP-03 : les niveaux sont informatifs, le modificateur réputation du prix n'a jamais été branché (D53 6A) ; RGP-02 : l'information du destinataire passe par la page de suivi (D69), le SMS reste une porte ; SES-01 : deux profils de session, plus un pour l'admin |
+| `YAMBA-SPECIFICATION-COMPLETE.md` | Encadré de révision : pas de `payment-service` ni de `media-service` (D38, D42), 16 transitions dont deux ADMIN, DISPUTED non terminal, D72 |
+| `YAMBA-DOC-METIER.md` | RG-ADM-09 « quatre profils » → six ; RG-ALR-01 et RG-ALR-04 : les seuils sont réglables depuis D62 |
+| `docs/SPECIFICATIONS-WORKFLOW-BOOKING-YAMBA.md`, `docs/DOC-METIER-TRIP-LIFECYCLE.md`, les deux documents fonctionnels de mai 2026 | Avertissement en tête : ce qui a changé, où lire l'état réel. Documents conservés pour l'intention, jamais supprimés |
+
+## Écrans corrigés
+- Accueil, Finances : les sous-titres annonçaient encore des lots livrés depuis (« arrivent avec C-PR6 », « avec C-PR5b »).
+- À arbitrer : « 72 h après l'ouverture » écrit en dur alors que le délai est réglable ; le texte renvoie au paramètre, la date exacte reste affichée par dossier. Même correction dans le formulaire de décision.
+- **La file d'arbitrage lit enfin ses filtres depuis l'URL** : les tuiles d'accueil et les alertes pointent vers `/disputes?decidable=1` ou `?kind=RETENTION`, et ces liens ne filtraient rien. La page est enveloppée d'une frontière `Suspense`, comme Next 16 l'exige avec `useSearchParams`.
+- Journal : `REPORT_REVIEWED` (D68) n'avait pas de libellé, le journal affichait le code brut.
+- Le commentaire du bouton d'export disait « SUPER_ADMIN seul ».
+
+### Écarts laissés tels quels, et pourquoi
+Les paramètres de classe C (tolérance de poids, plafond de la protection de base, supplément de catégorie) restent nommés sans consommateur : c'est la règle de D62, un paramètre n'entre au catalogue que lorsqu'un code le lit. Les noms de règles d'alerte gardent leur seuil d'origine (`PAYOUT_FAILED_48H`) : les renommer casserait le dédoublonnage quotidien qui s'appuie sur la clé. RG-20 (filet de complétion à 7 jours) reste non implémenté : le cron d'arrivée plus 24 heures fait le travail.

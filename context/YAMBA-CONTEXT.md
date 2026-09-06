@@ -589,6 +589,11 @@ Ordre de demarrage : auth -> trip -> gateway.
   d'onboarding est enfin demarre, avec filtre isDeleted / emailSuppressedAt et age max 30 j.
   A surveiller en production : volume du premier tour du cron de rappel. MERGE 06/09 : **#212**
   (17 checks comptes).
+- Divergences documents / code (06/09, fix/divergences-documentation) : les 29 ecarts releves par
+  les livrables sont corriges dans les documents (le code fait foi) — 16 transitions dans CLAUDE.md,
+  ANN-03 recrite (D72), REP-03 informatif, RGP-02 par la page de suivi, six profils admin, seuils
+  d'alerte reglables — plus un avertissement en tete des quatre specifications historiques et les
+  ecrans admin perimes. La file d'arbitrage lit enfin ses filtres d'URL.
 - Livrables de documentation FAITS le 06/09 (une PR par document, .md + .pdf dans docs/livrables/,
   ~121 000 mots) : lot 1 metier / fonctionnel membres (36 135), lot 2 Admin (26 925), lot 3 API de
   bout en bout (16 134 + reference generee des 173 endpoints), lot 4 technique de transmission

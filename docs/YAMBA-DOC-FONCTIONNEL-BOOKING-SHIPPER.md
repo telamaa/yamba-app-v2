@@ -1,5 +1,8 @@
 # Yamba — Document fonctionnel : workflow de réservation côté Expéditeur
 
+
+> **Avertissement — document historique de mai 2026 (relu le 06/09/2026).** Il décrit un produit antérieur : prix par catégorie (le prix est **au kilo**, D13), service à 15 % (**12 % avec un plancher de 3 €**), assurance à 5 € (**Garantie Yamba à 6 €**), code de livraison « envoyé après acceptation » (**généré à la récupération**, D43), numéro du destinataire donné à l'acceptation (**au plus tôt 2 h avant le rendez-vous**, D61). Pour l'état réel du parcours, lire `docs/livrables/01-YAMBA-DOCUMENTATION-METIER-FONCTIONNELLE.md`.
+
 > **Audience** : Product Owner, designer, stakeholder métier, support client.
 > **Version** : 1.0 — Mai 2026
 > **Périmètre** : workflow de réservation d'un transport de colis par un expéditeur, depuis la page détail d'un trajet jusqu'à la confirmation de la demande envoyée au voyageur.

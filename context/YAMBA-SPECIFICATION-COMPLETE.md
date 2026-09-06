@@ -282,6 +282,7 @@ n'est qu'indicatif (D4).
 - **SES** sessions (D27) : inactivité serveur + durée absolue livrées ;
   SES-03 sudo mode, SES-04 modal expiration, SES-05 liste des sessions au
   jalon 2.
+- **Révisions constatées le 06/09/2026** (le code fait foi) : pas de `payment-service` ni de `media-service` — l'abstraction de paiement est une bibliothèque (`@packages/payments`, D38) et les images partent directement chez ImageKit depuis le navigateur (D42) ; la machine des réservations porte **16 transitions** dont deux ADMIN (D55), DISPUTED n'est donc pas terminal ; l'annulation d'un trajet est refusée tant qu'un deal est vivant (D72).
 - **REP** réputation (D29) : ① stats visibles explicables (badges,
   niveaux publics) ≠ ② TrustScore interne (plafonds CNF-06, priorisation
   revue, humain dans la boucle, traçabilité Kafka). Signaux exclus :

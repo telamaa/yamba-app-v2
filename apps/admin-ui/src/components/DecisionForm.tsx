@@ -87,7 +87,7 @@ export default function DecisionForm({ file, canDecide = true }: { file: AdminDi
   if (!file.canDecide) {
     return (
       <section className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-[13px] text-slate-600">
-        {file.dispute?.resolution || file.retentionDecision ? "Ce dossier est déjà tranché." : `Décision possible à partir du ${file.decidableAt ? new Date(file.decidableAt).toLocaleString("fr-FR") : "—"} (72 h laissées au Voyageur), ou dès sa réponse.`}
+        {file.dispute?.resolution || file.retentionDecision ? "Ce dossier est déjà tranché." : `Décision possible à partir du ${file.decidableAt ? new Date(file.decidableAt).toLocaleString("fr-FR") : "—"} (délai de réponse laissé au Voyageur), ou dès sa réponse.`}
       </section>
     );
   }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { apiFetch } from "@/lib/api";
 import { CATEGORY_LABEL, dateTime, daysSince, hoursUntil, money } from "@/lib/format";
@@ -10,8 +11,17 @@ import ExportButton from "./ExportButton";
 export default function QueueTable() {
   const [data, setData] = useState<ArbitrationQueueResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
-  // C-PR7a (D60 2A) — filtres serveur + export
-  const [f, setF] = useState({ kind: "", originCity: "", destinationCity: "", olderThanDays: "", decidable: "" });
+  // C-PR7a (D60 2A) — filtres serveur + export. Les tuiles d'accueil et les alertes
+  // pointent vers /disputes?decidable=1 ou ?kind=RETENTION : le filtre doit partir de l'URL,
+  // sinon le lien promet un tri qui n'arrive jamais (divergence relevée par la documentation).
+  const search = useSearchParams();
+  const [f, setF] = useState({
+    kind: search.get("kind") ?? "",
+    originCity: search.get("originCity") ?? "",
+    destinationCity: search.get("destinationCity") ?? "",
+    olderThanDays: search.get("olderThanDays") ?? "",
+    decidable: search.get("decidable") ?? "",
+  });
   const [me, setMe] = useState<AdminMe | null>(null);
   const params = () => { const p = new URLSearchParams(); for (const [k, v] of Object.entries(f)) if (v) p.set(k, v); return p; };
   useEffect(() => { apiFetch<AdminMe>("/admin/me").then(setMe).catch(() => undefined); }, []);

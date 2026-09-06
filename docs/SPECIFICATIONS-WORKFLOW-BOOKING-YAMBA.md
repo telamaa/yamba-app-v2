@@ -1,4 +1,7 @@
 # 📘 Yamba — Cahier de spécifications fonctionnelles & techniques
+
+> **Avertissement — document historique (relu le 06/09/2026).** La machine d'état livrée fait foi : `apps/deal-service/src/services/booking-state-machine.ts` et sa spec. Ont changé depuis la rédaction : **16 transitions** et non 12 (annulation SYSTEM, litige ouvrable depuis PICKED_UP, deux résolutions ADMIN — D55), donc DISPUTED n'est pas terminal ; l'argent est **autorisé à la demande et capturé à l'acceptation** (D37, D39) et non débité à la réservation ; la commission est de **12 % avec un plancher de 3 €** (D13) et les frais du prestataire de paiement ne sont jamais montrés au membre ; le code de livraison est généré **à la récupération** (D43) ; l'annulation d'un jalon est un retour arrière côté navigateur seulement (A39) ; l'annulation d'un trajet est refusée tant qu'un deal est vivant (D72). Le reste du document reste utile pour l'intention.
+
 ## Workflow de transport de colis de bout en bout (Deal lifecycle)
 
 > **Version** 1.0 · 5 juillet 2026

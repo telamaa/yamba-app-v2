@@ -1130,7 +1130,7 @@ La section Finances était une promesse : deux onglets vides et une maquette aux
 # C-PR3 — qui peut faire quoi dans le back-office, et ce qu'une sanction change vraiment
 
 ### Règles de gestion (ADM, suite)
-- **RG-ADM-09 — Quatre profils, un seul super administrateur minimum.** Super administrateur (tout, comptes admin, journal), Médiateur (tranche les litiges, applique les sanctions), Support (lit les fiches, propose une sanction), Finance (lecture, journal). Le dernier super administrateur ne peut être ni rétrogradé ni retiré ; personne n'agit sur son propre compte.
+- **RG-ADM-09 — Quatre profils à l'origine, six aujourd'hui** *(révisée le 06/09/2026 : Exploitation (OPS) est arrivé avec les paramètres et l'état des services — D62, D64 —, Données personnelles (PRIVACY) avec le RGPD — D63)*, **un seul super administrateur minimum.** Super administrateur (tout, comptes admin, journal), Médiateur (tranche les litiges, applique les sanctions), Support (lit les fiches, propose une sanction), Finance (lecture, journal). Le dernier super administrateur ne peut être ni rétrogradé ni retiré ; personne n'agit sur son propre compte.
 - **RG-ADM-10 — Un compte admin créé par invitation naît sans rôle client** : il ne publie pas de trajet et n'envoie pas de colis tant qu'il ne passe pas par le parcours client. Il définit son mot de passe par le lien reçu (48 h) et active la 2FA à sa première connexion.
 - **RG-ADM-11 — Conflit d'intérêts** : un admin ne tranche jamais un deal dont il est partie et ne sanctionne jamais son contradicteur ni un autre admin (sauf super administrateur). Le serveur refuse.
 - **RG-ADM-12 — Deux niveaux de sanction, toujours motivés (20 caractères au moins), réversibles.** Restreint : ni publier ni réserver, les deals en cours continuent. Suspendu : connexion refusée, sessions fermées, trajets invisibles, deals en cours signalés au support. Durée optionnelle.
@@ -1349,10 +1349,10 @@ Après l'acceptation, deux inconnus doivent se retrouver deux fois : pour la rem
 # C-PR6b — être prévenu avant que ça déborde
 
 ### Règles de gestion (ALR)
-- **RG-ALR-01 — Neuf règles, des seuils fixes** : versement en échec depuis plus de 48 h ; litige tranchable sans décision depuis plus de 72 h ; retenue conservée depuis plus de 7 jours ; transfert renversé sans décision depuis plus de 48 h ; événement bloqué après 10 tentatives ; relais en retard de plus de 15 minutes ; emails en échec sur 24 h ; aucun trajet publié depuis 7 jours ; moins de 30 % d'acceptation sur 7 jours (au moins 5 demandes).
+- **RG-ALR-01 — Neuf règles** *(seuils réglables depuis D62, valeurs d'origine ci-dessous)* : versement en échec depuis plus de 48 h ; litige tranchable sans décision depuis plus de 72 h ; retenue conservée depuis plus de 7 jours ; transfert renversé sans décision depuis plus de 48 h ; événement bloqué après 10 tentatives ; relais en retard de plus de 15 minutes ; emails en échec sur 24 h ; aucun trajet publié depuis 7 jours ; moins de 30 % d'acceptation sur 7 jours (au moins 5 demandes).
 - **RG-ALR-02 — Une alerte n'a pas d'état** : elle s'affiche en tête de l'accueil admin tant que sa cause existe, avec un lien vers la file où agir, et disparaît d'elle-même.
 - **RG-ALR-03 — Le support reçoit un email à la première apparition d'une règle dans la journée**, jamais plus d'une fois par règle et par jour. Le récapitulatif quotidien « argent à surveiller » continue.
-- **RG-ALR-04 — Les seuils sont versionnés dans le code** et affichés dans la réponse ; ils deviendront réglables avec les paramètres audités (C-PR8).
+- **RG-ALR-04 — Les seuils sont affichés dans la réponse.** *(Révisée le 06/09/2026 : ils étaient versionnés dans le code ; ils sont **réglables** depuis D62, groupe « Alertes d'exploitation » de la page Paramètres. Les identifiants de règle gardent leur seuil d'origine dans leur nom — `PAYOUT_FAILED_48H` — même après un changement de valeur.)*
 
 ### Recette (ALR)
 | # | Scénario | Attendu |
