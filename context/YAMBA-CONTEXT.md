@@ -580,6 +580,10 @@ Ordre de demarrage : auth -> trip -> gateway.
 - Recette globale : fiche context/YAMBA-RECETTE-GLOBALE-2026-09.md (103 scenarios + 8 E2E + Atlas +
   moniteur), seed-deals date les membres de 90 jours (plafonds D71). MERGE 05/09 : **#204**. Le plan
   de session se fait avec l'utilisateur, puis la recette, puis le chantier mobile (D36).
+- Livrables de documentation (06/09, une PR par document, .md + .pdf dans docs/livrables/) : lot 1
+  metier / fonctionnel membres, lot 2 Admin, lot 3 API de bout en bout (reference des 173 endpoints
+  generee), lot 4 technique de transmission. Outillage : scripts/build-doc-pdf.py (python-markdown +
+  Chrome headless), scripts/build-api-reference.py.
 - Backlog parametre serveur : classe C du catalogue D62 (tolerance de poids,
   plafonds comptes neufs, plafond express, seuil de trois signalements…).
 - Photos hors TripDocument chez ImageKit sans fileId (colis, pickup, livraison, litige,
