@@ -94,18 +94,17 @@ export default function AuthGateModal({ open, onCloseAction, title, subtitle, re
       />
 
       <div ref={panelRef} className={`relative ${panelBase}`}>
-        {isMobile ? (
-          <div className="mx-auto mb-3 h-1.5 w-10 rounded-full bg-slate-300 dark:bg-slate-700" aria-hidden />
-        ) : (
-          <button
-            type="button"
-            onClick={onCloseAction}
-            aria-label={t("later")}
-            className="absolute right-4 top-4 inline-flex h-9 w-9 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
-          >
-            <X size={18} />
-          </button>
-        )}
+        {isMobile && <div className="mx-auto mb-3 h-1.5 w-10 rounded-full bg-slate-300 dark:bg-slate-700" aria-hidden />}
+        {/* La croix manquait sur mobile : la poignée seule n'indique pas comment fermer,
+            et le lien « plus tard » est en bas d'un panneau qui défile. */}
+        <button
+          type="button"
+          onClick={onCloseAction}
+          aria-label={t("later")}
+          className={`absolute inline-flex items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100 ${isMobile ? "right-3 top-2 h-8 w-8" : "right-4 top-4 h-9 w-9"}`}
+        >
+          <X size={isMobile ? 17 : 18} />
+        </button>
 
         <div className="flex items-start gap-3">
           <span className="mt-0.5 inline-flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl bg-[#FF9900]/15 text-[#B45309] dark:bg-[#FF9900]/20 dark:text-[#FFAE33]">

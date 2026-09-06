@@ -3605,8 +3605,9 @@
             "example": "08:00"
           },
           "arrivalTime": {
-            "type": "string",
-            "example": "14:30"
+            "example": "14:30",
+            "description": "Absent quand le trajet n'a pas d'heure d'arrivée : le front n'affiche alors rien",
+            "type": "string"
           },
           "nextDay": {
             "description": "Arrivée le lendemain (absent si false)",
@@ -3792,7 +3793,6 @@
           "toCity",
           "travelDate",
           "departureTime",
-          "arrivalTime",
           "minPrice",
           "pricesByCategory",
           "currency",

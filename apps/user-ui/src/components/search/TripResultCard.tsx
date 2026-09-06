@@ -342,14 +342,14 @@ export default function TripResultCard({
             </div>
           )}
           {weightKg && typeof item.totalForWeight === "number" ? (
-            <div className="mt-2 border-t border-dashed border-slate-200 pt-1.5 text-[10px] leading-snug text-slate-600 dark:border-slate-700 dark:text-slate-300">
+            <div className="mt-2 border-t border-slate-100 pt-1.5 text-[10px] leading-snug text-slate-600 dark:border-slate-800 dark:text-slate-300">
               {t("card.exampleForWeight", {
                 kg: weightKg,
                 price: item.totalForWeight.toLocaleString(localeTag, { maximumFractionDigits: 0 }),
               })}
             </div>
           ) : isPerKg && (
-            <div className="mt-2 border-t border-dashed border-slate-200 pt-1.5 text-[10px] leading-snug text-slate-400 dark:border-slate-700 dark:text-slate-500">
+            <div className="mt-2 border-t border-slate-100 pt-1.5 text-[10px] leading-snug text-slate-400 dark:border-slate-800 dark:text-slate-500">
               {t("card.example", {
                 kg: 2,
                 price: (estimateShipperTotalCents(Math.round((item.pricePerKg as number) * 100)).totalCents / 100).toLocaleString(localeTag, { maximumFractionDigits: 0 }),

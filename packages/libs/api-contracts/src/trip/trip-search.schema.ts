@@ -72,7 +72,7 @@ export const YambaTripResultSchema = z
     toCountry: z.string().optional(),
     travelDate: z.string().meta({ example: "12 juin 2026", description: "Formaté serveur selon locale" }),
     departureTime: z.string().meta({ example: "08:00" }),
-    arrivalTime: z.string().meta({ example: "14:30" }),
+    arrivalTime: z.string().optional().meta({ example: "14:30", description: "Absent quand le trajet n'a pas d'heure d'arrivée : le front n'affiche alors rien" }),
     nextDay: z.boolean().optional().meta({ description: "Arrivée le lendemain (absent si false)" }),
     durationMinutes: z.number().int().optional(),
     stopovers: z.number().int().optional(),
