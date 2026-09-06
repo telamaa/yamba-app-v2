@@ -5,7 +5,8 @@
  *
  * Toutes les 5 minutes, trois passes dans l'ordre :
  *   1. DELIVERED dont `payoutDueAt` est passé → COMPLETED (SYSTEM) + transfert (D49).
- *   2. COMPLETED dont le versement est FAILED (< 10 essais) → nouveau transfert.
+ *   2. COMPLETED dont le versement est FAILED → nouveau transfert. Le plafond de 10
+ *      essais a disparu avec D58 : le rejeu est espacé (payoutNextRetryAt), sans limite.
  *   3. DELIVERED à ≤ 24 h de l'échéance, sans rappel → `booking.verification_reminder`.
  *
  * Même patron que expire-bookings.cron.ts : un run en vol saute le tick
