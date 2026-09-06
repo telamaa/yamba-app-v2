@@ -29,6 +29,24 @@ Deux fichiers, jamais versionnés, et une règle simple pour savoir lequel utili
 
 **Conséquence pratique** : changer une variable `NEXT_PUBLIC_` demande de **reconstruire** le front. Un simple rechargement de page ne suffit pas. Coupez `npm run dev` et relancez-le.
 
+### Un piège : Nx lit aussi un `.env` par projet
+
+Nx charge les variables depuis **deux** endroits : le `.env` de la racine, et un éventuel `.env` placé dans le dossier d'un service, par exemple `apps/trip-service/.env`. Les deux sont fusionnés au démarrage.
+
+C'est commode et c'est un piège. Une clé posée uniquement dans le dossier d'un service **fonctionne pour ce service et pour lui seul**. Les autres ne la voient pas, et rien ne le signale : le service concerné marche, un autre échoue en silence.
+
+Le cas s'est produit avec ImageKit. Les trois clés vivaient dans `apps/trip-service/.env` : le téléversement d'une photo de colis fonctionnait, mais la **suppression** d'un avatar remplacé ou des justificatifs d'un compte effacé, qui appartient à auth-service, ne fonctionnait pas. Deux autres chemins étaient également aveugles : un bundle lancé directement avec `node --env-file=../../.env`, et le script `scripts/smoke-services.sh`.
+
+**La règle à retenir** : toute variable de service va dans le `.env` de la racine, même si un seul service la lit aujourd'hui. Un `.env` dans un dossier de service est un vestige à supprimer, jamais un endroit où ajouter quelque chose.
+
+Pour vérifier qu'aucun fichier ne traîne :
+
+```sh
+ls apps/*/.env apps/*/.env.local 2>/dev/null   # ne doivent rester que les .env.local des deux fronts
+git ls-files | grep -E "\.env" | grep -v example   # doit être vide : aucun secret versionné
+```
+
+
 Un même identifiant peut apparaître des deux côtés. C'est le cas de Google et de PostHog : le navigateur en a besoin pour initialiser le service, le serveur pour vérifier ce qui lui revient.
 
 ### Ce que fait Yamba quand une variable manque
@@ -334,7 +352,8 @@ Le back-office offre une page « État des services » qui affiche la même chos
 |---|---|
 | Connexion réussie puis session perdue | Front et API sur des hôtes différents : utilisez le relais |
 | Aucun email reçu | Aucun fournisseur configuré : les envois sont en mémoire |
-| Téléversement de photo en échec | Clés ImageKit absentes côté serveur |
+| Téléversement de photo en échec | Clés ImageKit absentes du `.env` de la racine |
+| Le téléversement marche mais la suppression non | Clés posées dans `apps/trip-service/.env` seulement : auth-service ne les voit pas |
 | Bouton Google inerte | Identifiant public absent, ou origine non déclarée |
 | Pas de bannière de consentement | Clé PostHog absente |
 | Notification jamais reçue | Redpanda arrêté, ou sujets non créés |
@@ -352,7 +371,7 @@ Constaté le 06/09/2026 sur le poste de développement.
 
 | Manque | Conséquence |
 |---|---|
-| Les trois clés ImageKit | **Tout téléversement de photo échoue** : colis, justificatifs, avatars. À traiter en premier, plusieurs scénarios de recette en dépendent |
+| ~~Les trois clés ImageKit~~ | **Réglé le 06/09** : elles vivaient dans `apps/trip-service/.env` et ont été recopiées à la racine. Chaîne vérifiée de bout en bout — signature du serveur, téléversement réel, image servie, suppression effective |
 | `DELIVERY_CODE_ENCRYPTION_KEY`, `TOTP_ENCRYPTION_KEY` | Clés de développement dérivées, avec avertissement. Bloquant pour la production |
 | `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`, les deux secrets de webhook | Pas de saisie de carte, webhooks inactifs |
 | Identifiant Google | Bouton « bientôt disponible » |
@@ -361,6 +380,8 @@ Constaté le 06/09/2026 sur le poste de développement.
 | `SUPPORT_EMAIL`, `ADMIN_UI_URL` | Valeurs par défaut, suffisantes en développement |
 
 Ces trois variables ImageKit ne figuraient pas non plus dans `.env.example` alors que le code les lit : elles y ont été ajoutées.
+
+**Vestiges à supprimer** : `apps/trip-service/.env` et `apps/user-ui/.env` datent de mai et font désormais doublon avec la racine. Deux sources pour une même valeur finissent toujours par diverger.
 
 ---
 
