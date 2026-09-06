@@ -587,11 +587,13 @@ Ordre de demarrage : auth -> trip -> gateway.
   signalement etaient muets). (3) Le limiteur du gateway verifie la signature du jeton : la branche
   « connecte » etait morte, tout le monde subissait 100 req / 15 min. (4) Le cron de rappel
   d'onboarding est enfin demarre, avec filtre isDeleted / emailSuppressedAt et age max 30 j.
-  A surveiller en production : volume du premier tour du cron de rappel.
-- Livrables de documentation (06/09, une PR par document, .md + .pdf dans docs/livrables/) : lot 1
-  metier / fonctionnel membres, lot 2 Admin, lot 3 API de bout en bout (reference des 173 endpoints
-  generee), lot 4 technique de transmission. Outillage : scripts/build-doc-pdf.py (python-markdown +
-  Chrome headless), scripts/build-api-reference.py.
+  A surveiller en production : volume du premier tour du cron de rappel. MERGE 06/09 : **#212**
+  (17 checks comptes).
+- Livrables de documentation FAITS le 06/09 (une PR par document, .md + .pdf dans docs/livrables/,
+  ~121 000 mots) : lot 1 metier / fonctionnel membres (36 135), lot 2 Admin (26 925), lot 3 API de
+  bout en bout (16 134 + reference generee des 173 endpoints), lot 4 technique de transmission
+  (41 578). Outillage : scripts/build-doc-pdf.py (python-markdown + Chrome headless),
+  scripts/build-api-reference.py. MERGES 06/09 : **#208 a #211**.
 - Backlog parametre serveur : classe C du catalogue D62 (tolerance de poids,
   plafonds comptes neufs, plafond express, seuil de trois signalements…).
 - Photos hors TripDocument chez ImageKit sans fileId (colis, pickup, livraison, litige,
