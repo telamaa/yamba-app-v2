@@ -1,5 +1,8 @@
 # Yamba — Doc Fonctionnel : Écran de Réception d'une Demande de Deal (Voyageur)
 
+
+> **Avertissement — document historique de mai 2026 (relu le 06/09/2026).** Il décrit un produit antérieur : décomposition affichant les frais du prestataire de paiement, accès au numéro du destinataire dès l'acceptation, champs de refus qui ont changé. Pour l'état réel, lire `docs/livrables/01-YAMBA-DOCUMENTATION-METIER-FONCTIONNELLE.md`.
+
 > **Version** : 1.0
 > **Date** : 17 mai 2026
 > **Branche Git** : `feat/carrier-deal-wizard`

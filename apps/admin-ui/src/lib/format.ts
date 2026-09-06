@@ -71,6 +71,7 @@ export const ACTION_LABEL: Record<string, string> = {
   EXPORTED: "Export CSV",
   CONVERSATION_VIEWED: "Conversation consultée",
   MESSAGE_REPORT_REVIEWED: "Message signalé traité",
+  REPORT_REVIEWED: "Signalement traité", // D68
 };
 
 /* F-PR3 (D61 7A) — messages signalés */

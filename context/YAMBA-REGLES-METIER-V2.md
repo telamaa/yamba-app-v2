@@ -93,7 +93,7 @@ Migration : mapping ci-dessus livré avec la refonte pricing (front + JSON i18n 
 
 **ANN-02 — Annulation par le Voyageur après acceptation** : remboursement **intégral** de l'Expéditeur, quel que soit le moment + impact sur la réputation du Voyageur (compteur d'annulations visible / effet sur badge). C'est lui qui fait défaut.
 
-**ANN-03 — Annulation d'un trajet avec deals actifs** : l'annulation du Trip (RG lifecycle) déclenche l'annulation en cascade de tous ses deals non terminaux selon ANN-02 (défaut Voyageur).
+**ANN-03 — Annulation d'un trajet avec deals actifs** *(révisée le 06/09/2026 — D72)* : l'annulation du Trip est **refusée** tant qu'un deal non terminal y est rattaché (409 `TRIP_HAS_ACTIVE_DEALS`). Le Voyageur annule chaque deal, ce qui applique ANN-02 (défaut Voyageur : remboursement intégral de l'Expéditeur, annulation imputée au Voyageur), puis annule le trajet. *Rédaction d'origine, jamais implémentée : « déclenche l'annulation en cascade de tous ses deals non terminaux » — la cascade depuis trip-service ferait exécuter à ce service la machine d'état qui vit avec l'argent dans deal-service.*
 
 **ANN-04 — Remboursements automatiques.** DECLINED et EXPIRED remboursent intégralement et automatiquement (déjà spécifié §2.2 workflow) ; les remboursements ANN-01/02 sont exécutés par le serveur sans intervention manuelle, avec trace dans l'audit trail.
 
@@ -149,7 +149,7 @@ Migration : mapping ci-dessus livré avec la refonte pricing (front + JSON i18n 
 
 # 9. SES — Sessions & authentification *(D27)*
 
-**SES-01 — Timeout d'inactivité côté serveur.** Chaque session porte un `lastActivityAt` (Redis). Le renouvellement (`/auth/refresh`) est refusé si l'inactivité dépasse le seuil (paramètre env ; cible 30-60 min). La rotation du refresh token ne prolonge plus indéfiniment la session.
+**SES-01 — Timeout d'inactivité côté serveur.** *(Précisé le 06/09/2026 : il y a **deux** profils de session membre — 60 min d'inactivité et 7 jours de vie, ou 7 jours et 30 jours quand « Rester connecté » est coché ; la session admin a les siens, 45 min et 12 h.)* Chaque session porte un `lastActivityAt` (Redis). Le renouvellement (`/auth/refresh`) est refusé si l'inactivité dépasse le seuil (paramètre env ; cible 30-60 min). La rotation du refresh token ne prolonge plus indéfiniment la session.
 
 **SES-02 — Durée de vie absolue.** Une session expire au plus tard N jours après sa création (paramètre ; cible 30 jours), indépendamment de l'activité.
 
@@ -179,7 +179,7 @@ Migration : mapping ci-dessus livré avec la refonte pricing (front + JSON i18n 
 
 **REP-02 — La réputation visible est explicable.** Elle n'agrège que des faits que l'utilisateur contrôle et peut vérifier : note moyenne (B5), deals complétés, taux d'annulation post-acceptation, délai de réponse médian, ancienneté, identité vérifiée. Présentation en **badges + statistiques** (« ★ 4,9 · 27 deals · 0 annulation ») — jamais de note globale opaque.
 
-**REP-03 — Niveaux publics à critères affichés.** Nouveau (< 3 deals) · Confirmé · Top Yamber (≥ 10 deals, note ≥ 4,8, 0 annulation tardive — seuils = paramètres serveur). Ces niveaux alimentent le modificateur réputation du moteur de prix (PRC-05). Miroir côté Expéditeur : badge « Expéditeur fiable » (deals sans litige perdu, poids conformes au pickup).
+**REP-03 — Niveaux publics à critères affichés.** *(Révisée le 06/09/2026 : les niveaux sont **informatifs**. Le modificateur réputation du moteur de prix n'a jamais été branché — D53 6A —, PRC-05 s'applique sans lui.)* Nouveau (< 3 deals) · Confirmé · Top Yamber (≥ 10 deals, note ≥ 4,8, 0 annulation tardive — seuils = paramètres serveur). Ces niveaux alimentent le modificateur réputation du moteur de prix (PRC-05). Miroir côté Expéditeur : badge « Expéditeur fiable » (deals sans litige perdu, poids conformes au pickup).
 
 **REP-04 — TrustScore interne.** Invisible des membres. Signaux : litiges perdus en médiation, écarts de poids répétés au pickup (PRC-07 = signal de fraude), annulations tardives, vélocité anormale (envois/jour d'un compte neuf), signalements reçus (SIG), identité, ancienneté. Usages exclusifs : pilotage des **plafonds progressifs** (CNF-06), **priorisation** de la file de revue admin, aide à la décision. **Garde-fous** : aucune sanction automatique — un humain décide (cohérent SIG-03 et RGPD sur les décisions automatisées) ; chaque variation du score référence l'événement source (journal Kafka D2).
 
@@ -203,7 +203,7 @@ Migration : mapping ci-dessus livré avec la refonte pricing (front + JSON i18n 
 
 **RGP-01 — Rétention définie par type de donnée** (paramètres à figer dans POLITIQUE-CONFORMITE) : données de compte (durée de vie du compte + délai légal), photos de deals (durée de contestation + délai), attestations CNF-02 (délai légal long — valeur probatoire), sessions (SES-02), logs (durée courte).
 
-**RGP-02 — Le destinataire est un tiers protégé.** Son téléphone et son nom sont fournis par l'Expéditeur : minimisation (révélé au Voyageur uniquement après PICKED_UP — règle existante), information du destinataire au premier SMS (lien de suivi + mention d'origine des données), effacement à la clôture du deal + délai.
+**RGP-02 — Le destinataire est un tiers protégé.** Son téléphone et son nom sont fournis par l'Expéditeur : minimisation (révélé au Voyageur uniquement après PICKED_UP — règle existante), information du destinataire **par la page de suivi que l'Expéditeur lui partage** (lien sans compte, mention d'origine des données — D69 ; un SMS envoyé par Yamba reste une porte : rédaction d'origine « au premier SMS »), effacement à la clôture du deal + délai.
 
 **RGP-03 — Consentements tracés** : attestation conformité, charte Voyageur, CGU, information précontractuelle de protection (GAR-05) — chacun avec version du texte + horodatage serveur.
 
