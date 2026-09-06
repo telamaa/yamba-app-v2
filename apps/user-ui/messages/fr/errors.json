@@ -1,0 +1,27 @@
+{
+  "boundary": {
+    "title": "Cette page n'a pas pu s'afficher",
+    "message": "Un incident technique est survenu de notre côté. Rien de ce que tu as fait n'est perdu : ni ton compte, ni tes envois, ni tes trajets.",
+    "booking": "Aucun paiement n'a été effectué. Ta carte n'a pas été débitée et aucune demande n'a été envoyée au Voyageur.",
+    "outdated": "Une nouvelle version de Yamba vient d'être publiée. Recharge la page pour la récupérer.",
+    "retry": "Réessayer",
+    "reload": "Recharger la page",
+    "home": "Retour à l'accueil",
+    "referenceLabel": "Référence de l'incident",
+    "referenceHelp": "Communique-la au support si le problème se répète.",
+    "copied": "Référence copiée",
+    "support": "Écrire au support"
+  },
+  "notFound": {
+    "title": "Cette page n'existe pas",
+    "message": "Le lien est peut-être erroné, ou la page a été retirée. Un trajet supprimé ou un profil masqué donne le même résultat.",
+    "search": "Chercher un trajet",
+    "publish": "Publier un trajet",
+    "home": "Retour à l'accueil"
+  },
+  "fatal": {
+    "title": "Yamba est momentanément indisponible",
+    "message": "Une erreur inattendue empêche l'affichage. Recharge la page dans quelques instants.",
+    "reload": "Recharger"
+  }
+}

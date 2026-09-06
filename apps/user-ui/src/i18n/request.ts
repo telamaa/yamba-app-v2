@@ -36,6 +36,7 @@ export default getRequestConfig(async ({ requestLocale }) => {
     maintenance, // C-PR8c (D64) — annonce / lecture seule
     consent, // D66 — mesure d'audience
     tracking, // D69 — page destinataire
+    errors, // pages d'erreur et page introuvable
   ] = await Promise.all([
     import(`../../messages/${locale}/common.json`),
     import(`../../messages/${locale}/home.json`),
@@ -66,6 +67,7 @@ export default getRequestConfig(async ({ requestLocale }) => {
     import(`../../messages/${locale}/maintenance.json`), // C-PR8c (D64)
     import(`../../messages/${locale}/consent.json`), // D66
     import(`../../messages/${locale}/tracking.json`), // D69
+    import(`../../messages/${locale}/errors.json`),
   ]);
   return {
     locale,
@@ -99,6 +101,7 @@ export default getRequestConfig(async ({ requestLocale }) => {
       maintenance: maintenance.default, // C-PR8c (D64)
       consent: consent.default, // D66
       tracking: tracking.default, // D69
+      errors: errors.default,
     },
   };
 });
