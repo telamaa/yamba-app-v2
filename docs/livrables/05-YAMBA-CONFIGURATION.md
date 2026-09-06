@@ -12,6 +12,7 @@
 6. Vérifier que tout fonctionne
 7. État actuel de votre installation
 8. Avant la production
+9. Préparer le poste pour le chantier mobile
 
 ---
 
@@ -397,3 +398,59 @@ Ces trois variables ImageKit ne figuraient pas non plus dans `.env.example` alor
 - Chaque secret est stocké dans un gestionnaire de secrets, pas dans un fichier sur la machine.
 
 Le premier démarrage en production activera les rappels d'inscription : vérifiez le volume attendu, ou laissez la tâche coupée le temps d'un premier passage.
+
+---
+
+## 9. Préparer le poste pour le chantier mobile (D36, D73)
+
+Relevé fait sur le poste de développement le 06/09/2026 : **Mac Intel, macOS 13.7.8 (Ventura), Xcode 15.2**.
+
+### Déjà installé, rien à faire
+
+| Outil | Version constatée | Rôle |
+|---|---|---|
+| Node et npm | 22.23 et 10.9 | Socle commun |
+| Xcode | 15.2 | Compilation et simulateur iOS |
+| Android Studio et son kit | présent | Émulateur et compilation Android |
+| Outils de débogage Android | 1.0.41 | Installation sur un téléphone réel |
+| Docker | 27.4 | Déjà utilisé par la plateforme |
+
+### À installer avant de commencer
+
+| Outil | Pourquoi | Commande |
+|---|---|---|
+| Watchman | Surveillance de fichiers, sans lui le rechargement est lent et parfois muet | `brew install watchman` |
+| Java 17 | L'outil de compilation Android vise cette version ; le poste a Java 20 et 19, connus pour casser certaines compilations | `brew install --cask temurin@17` |
+| CocoaPods à jour | Le poste a la 1.11, les versions récentes de React Native attendent 1.15 ou plus | `sudo gem install cocoapods` |
+| Interface de compilation distante | Compile dans le nuage, indispensable ici (voir ci-dessous) | `npm install -g eas-cli` |
+
+### Le point bloquant, à connaître maintenant
+
+**Ce Mac ne pourra pas déposer sur l'App Store en local.** Apple impose de compiler avec une version récente de son environnement, laquelle réclame une version de macOS plus récente que Ventura. Sur cette machine, la dernière version installable reste celle qui s'y trouve.
+
+Trois conséquences, dans l'ordre de gravité :
+
+1. **Le développement iOS n'est pas bloqué.** Le simulateur fonctionne, les écrans se testent, l'adaptation idiomatique se fait normalement.
+2. **La compilation de production et le dépôt passeront par la compilation distante.** Le service compile sur des machines à jour et dépose directement. C'est la solution recommandée, et elle évite d'immobiliser le poste pendant des compilations longues.
+3. **Tester sur un iPhone réel** demandera soit une compilation distante avec profil de développement, soit une mise à jour de macOS.
+
+Deux remarques complémentaires. Ce Mac est à processeur Intel : les deux émulateurs fonctionnent mais restent lents, et les budgets de performance exigés par D36 devront être mesurés sur un téléphone réel, jamais sur l'émulateur. Une machine Apple Silicon diviserait les temps de compilation, sans être indispensable puisque la compilation de production est distante.
+
+### Comptes à ouvrir
+
+| Compte | Coût | Quand |
+|---|---|---|
+| Console Google Play | 25 dollars, une fois | Avant le premier dépôt Android |
+| Programme développeur Apple | 99 dollars par an | Avant les premiers essais sur iPhone réel, et obligatoire pour le dépôt |
+| Compilation distante | offre gratuite au départ | Dès le socle |
+
+### Vérifier après installation
+
+```sh
+watchman --version
+/usr/libexec/java_home -v 17     # doit répondre un chemin
+pod --version                    # 1.15 ou plus
+eas --version
+xcrun simctl list devices | head # au moins un simulateur iOS
+emulator -list-avds              # au moins un appareil Android virtuel
+```
