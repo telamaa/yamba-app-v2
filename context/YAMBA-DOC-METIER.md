@@ -1798,3 +1798,26 @@ La réputation visible (D29 ①) dit aux membres à qui faire confiance. Elle ne
 | TRU5 | Admin › fiche membre | Carte « Risque interne » : niveau, score, facteurs avec leurs points, plafonds et raison, rappel « ne sanctionne rien » |
 | TRU6 | Membre avec 3 litiges perdus (via seed ou médiation), signalé une fois | Fiche « À risque » ; file des signalements : badge « À risque », ligne prioritaire avec un seul signalement |
 | TRU7 | Paramètres › Confiance : passer les envois par mois à 2, réessayer TRU2 avec 2 demandes | Refus au troisième envoi dans les 30 s |
+
+---
+
+# D72 — annuler un trajet sans abandonner ses colis
+
+## Le besoin
+Un Voyageur dont le vol est annulé doit pouvoir retirer son trajet. Jusqu'ici, l'annulation passait sans condition : le trajet disparaissait, mais les colis déjà acceptés restaient attachés à un trajet mort. Personne n'était remboursé, personne n'était prévenu, et l'Expéditeur qui finissait par annuler lui-même se voyait appliquer la retenue prévue pour une annulation de sa part. La règle métier existait depuis l'origine ; le code ne l'avait jamais portée.
+
+### Règles de gestion
+- **RG-ANN-10 — Un trajet ne s'annule pas tant qu'un deal y est vivant.** Le Voyageur annule d'abord chaque deal, puis le trajet. Le refus indique combien de deals restent.
+- **RG-ANN-11 — Annuler un deal reste imputé au Voyageur** : l'Expéditeur est remboursé intégralement, l'annulation compte dans la réputation du Voyageur. C'est la règle ANN-02, désormais réellement empruntée.
+- **RG-ANN-12 — Un colis déjà récupéré ne bloque pas éternellement** : le Voyageur ne peut plus l'annuler, et le trajet se termine tout seul un jour après l'arrivée prévue.
+- **RG-ERR-01 — Un code d'erreur est fait pour être lu** : tout refus métier porteur d'un code le transmet au client, en production comme ailleurs, pour que celui-ci l'explique dans la langue du membre.
+
+### Recette (ANN, suite)
+| # | Scénario | Attendu |
+|---|---|---|
+| ANN20 | Trajet publié sans aucune demande, « Annuler le trajet » | Trajet annulé, message de confirmation |
+| ANN21 | Trajet portant une demande en attente, « Annuler le trajet » | Refus expliqué : « Ce trajet porte encore un deal en cours », le trajet reste publié |
+| ANN22 | Refuser la demande, puis annuler le trajet | Annulation acceptée |
+| ANN23 | Trajet portant un deal accepté, annuler le deal depuis « Mes deals », puis le trajet | Expéditeur remboursé intégralement, annulation comptée au Voyageur, puis trajet annulé |
+| ANN24 | Trajet portant un colis déjà récupéré | L'annulation du trajet reste refusée ; le trajet se termine seul après l'arrivée |
+| ERR1 | En production, déclencher un geste sensible sans fenêtre ouverte (changer son mot de passe) | La porte de confirmation s'ouvre, au lieu d'une erreur muette |

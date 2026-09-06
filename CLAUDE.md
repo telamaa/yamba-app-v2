@@ -44,7 +44,7 @@ npx prisma db push                 # sync schema to MongoDB (no migrations — M
 npm run generate:openapi           # regenerate the FIVE openapi.json (trip, deal, notification, message, auth — A145) from the global Zod registry; CI diffs them
 ```
 
-Test platform baseline: **857 tests** (trip-service 209, deal-service 513, notification-service 99, message-service 36) + auth-service 162 (also a CI check) — any deviation must be explained.
+Test platform baseline: **857 tests** (trip-service 209, deal-service 513, notification-service 99, message-service 36) + auth-service 175 (also a CI check) — any deviation must be explained.
 
 Manual `tsc` (when Nx typecheck target is not what you want): `npx tsc --noEmit --project apps/<service>/tsconfig.app.json` — NEVER `--project apps/<service>` (resolves the solution-style tsconfig: 0 files checked).
 
@@ -115,6 +115,8 @@ JWT `access_token` + `refresh_token` set as cookies by auth-service. Sensitive m
 - No state change without an outbox event written in the SAME Mongo transaction.
 - Pricing snapshot in a Booking is immutable — never recomputed from the Trip.
 - 403 vs 404 semantics respected (don't reveal resource existence).
+- A business refusal carries a `details.code`, and that code REACHES the client in production (A146: the error middleware exposes `details` as soon as `details.code` is a string). Never put anything in a `details` next to a code that is not meant for the client.
+- A trip cannot be cancelled while a deal is alive (D72): 409 `{ type: "trip", code: "TRIP_HAS_ACTIVE_DEALS", activeDeals }` — the carrier cancels each deal first (ANN-02: full refund, cancellation charged to the carrier).
 - Every business limit is enforced server-side; the front only reflects `allowedActions` from the API — it never decides.
 - State machines are executable mirrors of the spec: any divergence is a bug in the machine or the spec, never an "interpretation" in a controller.
 - Any new architecture decision made during a task must be proposed as a registre entry (D-next), not left implicit in code.

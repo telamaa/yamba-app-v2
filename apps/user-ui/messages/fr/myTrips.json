@@ -168,6 +168,7 @@
     "stripeCta": "Configurer Stripe"
   },
   "toasts": {
+    "cancelBlocked": "Ce trajet porte encore {count, plural, =1 {un deal en cours} other {# deals en cours}} : annule-les d'abord depuis « Mes deals ». Chaque Expéditeur sera remboursé intégralement.",
     "activated": "Trajet activé",
     "activationFailed": "Erreur lors de l''activation",
     "resumed": "Trajet remis en ligne",

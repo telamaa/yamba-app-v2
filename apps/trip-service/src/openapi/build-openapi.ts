@@ -184,7 +184,7 @@ const TRANSITIONS: Array<{ action: string; summary: string; detail: string }> = 
   { action: "unpublish", summary: "Repasser en brouillon", detail: "PUBLISHED/PAUSED → DRAFT. Interdit avec réservations actives (guard prêt pour le chantier Booking). Décrémente les stats carrier." },
   { action: "pause", summary: "Mettre en pause", detail: "PUBLISHED → PAUSED. Le trip reste dans le pool public." },
   { action: "resume", summary: "Reprendre", detail: "PAUSED → PUBLISHED. Date de départ non passée requise." },
-  { action: "cancel", summary: "Annuler", detail: "→ CANCELLED (cancelledAt posé). Décrémente les stats carrier, y compris depuis PAUSED." },
+  { action: "cancel", summary: "Annuler", detail: "→ CANCELLED (cancelledAt posé). Décrémente les stats carrier, y compris depuis PAUSED. **D72** : REFUSÉ (409 `{ type: \"trip\", code: \"TRIP_HAS_ACTIVE_DEALS\", activeDeals }`) tant qu'un deal est vivant — le Voyageur annule chaque deal (`POST /deals/:id/cancel`, remboursement intégral ANN-02) avant d'annuler le trajet." },
   { action: "restore", summary: "Restaurer en brouillon", detail: "CANCELLED → DRAFT (cancelledAt effacé). Date de départ non passée requise." },
   { action: "archive", summary: "Archiver", detail: "COMPLETED/CANCELLED → ARCHIVED (one-way, pas de désarchivage MVP)." },
 ];
@@ -202,6 +202,9 @@ function transitionPath(action: string, summary: string, detail: string) {
         "200": jsonResponse("ActionResponse", `Transition ${action} effectuée`),
         "400": response400,
         "401": response401,
+        ...(action === "cancel"
+          ? { "409": jsonResponse("ErrorResponse", "D72 — le trajet porte encore des deals vivants : details.code = TRIP_HAS_ACTIVE_DEALS, details.activeDeals = combien") }
+          : {}),
         "500": response500,
       },
     },

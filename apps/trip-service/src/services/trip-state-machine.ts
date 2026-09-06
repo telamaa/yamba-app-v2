@@ -227,11 +227,16 @@ const TRANSITIONS: Record<TripAction, TransitionDef> = {
     guard: notPastDeparture,
   },
   cancel: {
-    // Autorisé même avec réservations actives — mais dans ce cas le
-    // controller devra déclencher les side-effects (remboursements,
-    // notifications expéditeurs) au chantier Booking.
+    // D72 — REFUSÉ tant qu'un deal est vivant. Annuler le trajet ne remboursait
+    // personne et ne prévenait personne : l'Expéditeur qui annulait ensuite
+    // subissait le barème ANN-01 pour une défaillance du Voyageur. Le Voyageur
+    // annule d'abord chaque deal (POST /deals/:id/cancel → ANN-02 : remboursement
+    // intégral, annulation imputée au Voyageur), puis le trajet.
     from: ["PUBLISHED", "PAUSED"],
     to: "CANCELLED",
+    guard: noActiveBookings(
+      "Cannot cancel this trip: it still has active deals. Cancel each deal first."
+    ),
   },
   delete: {
     // Soft delete — réservé aux brouillons. Le controller pose
