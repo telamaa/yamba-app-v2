@@ -1,3 +1,7 @@
+import { initSentry } from "@packages/error-handler";
+import adminRouter from "./routes/admin.router";
+// C-PR3 (D56 7A) — Sentry : inerte sans SENTRY_DSN ; 5xx tagués du service et de l'identifiant de corrélation.
+initSentry("trip-service");
 import express from 'express';
 // Cron quotidien : PUBLISHED/PAUSED → COMPLETED (arrivée + 24h)
 import { startCompleteTripsCron } from "./cron/complete-trips.cron";
@@ -6,6 +10,9 @@ import cookieParser = require("cookie-parser");
 import { errorMiddleware } from "@packages/error-handler/error-middleware";
 import tripRouter from "./routes/trip.router";
 import uploadRouter from "./routes/upload.routes";
+import { healthHandler, mongoCheck, redisCheck } from "@packages/libs/health";
+import prisma from "@packages/libs/prisma";
+import redis from "@packages/libs/redis";
 // Chantier 0 (D3) — OAS 3.1 généré depuis @packages/api-contracts
 import { buildOpenApiDocument } from "./openapi/build-openapi";
 
@@ -24,6 +31,7 @@ app.use(cookieParser());
 app.get("/", (req, res) => {
   res.send({ message: "Hello Trip API" });
 });
+app.get("/health", healthHandler("trip-service", { mongo: mongoCheck(prisma), redis: redisCheck(redis) })); // D64 3A
 
 // OpenAPI 3.1 (source de vérité : Zod) — construit une fois au démarrage.
 const openApiDocument = buildOpenApiDocument();
@@ -52,6 +60,7 @@ app.get("/docs", (req, res) => {
 // Routes
 app.use("/trips", tripRouter);
 app.use("/uploads", uploadRouter);
+app.use("/admin", adminRouter); // C-PR4 (D57) — trajets, masquage, billets
 
 app.use(errorMiddleware);
 

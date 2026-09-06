@@ -29,8 +29,9 @@
  * - Événements de tracking : séquenceur canConfirmTrackingStep ci-bas.
  * - Régénération du code : canRegenerateCode ci-bas.
  *
- * Résolutions ADMIN du chantier C (médiation DISPUTED → COMPLETED ou
- * remboursement) : l'acteur ADMIN est réservé dans le type mais AUCUNE
+ * Résolutions ADMIN (chantier C-PR2, D55) : DISPUTED → COMPLETED
+ * (resolveDisputeKeep) ou → CANCELLED (resolveDisputeRefund). Avant C-PR2 :
+ * l'acteur ADMIN était réservé dans le type mais AUCUNE
  * transition ne l'utilise encore — la matrice de remboursement
  * médiation n'est pas spécifiée. DISPUTED est terminal dans cette v1.
  */
@@ -70,10 +71,13 @@ export type BookingTransitionAction =
   | "deliver"
   | "confirmEarly"
   | "autoComplete"
-  | "dispute";
+  | "dispute"
+  // C-PR2 (D55, 7A) — résolutions ADMIN d'un litige
+  | "resolveDisputeKeep" // rejet ou remboursement partiel → COMPLETED
+  | "resolveDisputeRefund"; // remboursement total → CANCELLED
 
 /** Opérations gardées SANS transition de statut */
-export type BookingGuardedOperation = "regenerateCode" | "confirmTrackingStep";
+export type BookingGuardedOperation = "regenerateCode" | "confirmTrackingStep" | "rate";
 
 // ─────────────────────────────────────────────
 // Constantes serveur (spec §5.4)
@@ -82,6 +86,12 @@ export type BookingGuardedOperation = "regenerateCode" | "confirmTrackingStep";
 export const MAX_CODE_REGENERATIONS = 5;
 export const MAX_DELIVERY_ATTEMPTS = 3;
 export const DELIVERY_LOCK_MINUTES = 15;
+/** J+4 : payoutDueAt = deliveredAt + PAYOUT_DELAY_DAYS (spec §3.5 — cron B4). */
+export const PAYOUT_DELAY_DAYS = 4;
+/** B4/D51 — litige « non livré » depuis PICKED_UP : dès que le départ du trajet est dépassé de 48 h. */
+export const DISPUTE_AFTER_DEPARTURE_HOURS = 48;
+/** B5/D53 — fenêtre de notation après COMPLETED ; à son terme, les avis sont révélés même si un seul a noté. */
+export const RATING_WINDOW_DAYS = 14;
 
 /** Séquence stricte des jalons de tracking (dans PICKED_UP) */
 export const TRACKING_SEQUENCE = [
@@ -108,6 +118,7 @@ export { BOOKING_ACTIVE_STATUSES, BOOKING_TERMINAL_STATUSES };
 
 export type BookingEffect =
   | "RELEASE_CAPACITY" // CAP-02 — décrémenter Trip.reservedKg (exécuté dès B1/PR3)
+  | "CAPTURE_PAYMENT" // D39 — capture de l'empreinte à l'acceptation (B2)
   | "FULL_REFUND" // remboursement 100 % transport + prime (B2)
   | "REFUND_PER_CANCELLATION_POLICY" // ANN-01 — barème J-2 calculé au moment T (B2)
   | "PENALIZE_CARRIER" // ANN-02 — impact réputation Voyageur (B5)
@@ -131,6 +142,14 @@ export type BookingLike = {
   isDeleted?: boolean | null;
   expiresAt?: Date | string | null;
   payoutDueAt?: Date | string | null;
+  /** Départ du trajet (snapshot `trip.departureAt`, UTC — FUS-03) : guard du litige « non livré » (B4/D51). */
+  departureAt?: Date | string | null;
+  /** B5 — notation : fenêtre et notes déjà déposées par rôle. */
+  ratingWindowEndsAt?: Date | string | null;
+  shipperRatedAt?: Date | string | null;
+  carrierRatedAt?: Date | string | null;
+  /** C-PR2 (D54 4B) : un deal clos par médiation ("ADMIN") ne se note pas. */
+  completedBy?: string | null;
   deliveryLockedUntil?: Date | string | null;
   deliveryAttempts?: number | null;
   codeRegenerations?: number | null;
@@ -168,6 +187,12 @@ export function isExpired(booking: BookingLike, now: Date = new Date()): boolean
 export function isPayoutDue(booking: BookingLike, now: Date = new Date()): boolean {
   const due = toDate(booking.payoutDueAt);
   return due !== null && due <= now;
+}
+
+/** Colis en transit dont le trajet est parti depuis ≥ 48 h : le litige « non livré » s'ouvre (B4/D51). Sans date : refus (conservatif). */
+export function isDepartureLongPast(booking: BookingLike, now: Date = new Date()): boolean {
+  const departure = toDate(booking.departureAt);
+  return departure !== null && departure.getTime() + DISPUTE_AFTER_DEPARTURE_HOURS * 3_600_000 <= now.getTime();
 }
 
 export function isDeliveryLocked(
@@ -216,6 +241,11 @@ const beforePayoutDue: GuardFn = (booking, ctx) =>
     ? "The verification period has ended; this deal can no longer be disputed."
     : null;
 
+const departureLongPast: GuardFn = (booking, ctx) =>
+  isDepartureLongPast(booking, ctx.now)
+    ? null
+    : `A parcel in transit can only be reported as not delivered ${DISPUTE_AFTER_DEPARTURE_HOURS} hours after the trip departure.`;
+
 const deliveryAllowed: GuardFn = (booking, ctx) => {
   if (isDeliveryLocked(booking, ctx.now)) {
     return "Delivery confirmation is temporarily locked. Please try again later.";
@@ -232,7 +262,8 @@ const deliveryAllowed: GuardFn = (booking, ctx) => {
  *
  * Absences DÉLIBÉRÉES (testées par assertion explicite) :
  * - Aucun `cancel` depuis PICKED_UP ni DELIVERED (ANN-01 : après
- *   remise du colis, la seule voie de sortie est `dispute`).
+ *   remise du colis, la seule voie de sortie est `dispute` — depuis
+ *   PICKED_UP seulement 48 h après le départ du trajet, B4/D51).
  * - Aucune transition ADMIN (résolutions de litige : chantier C).
  * - Aucune transition depuis COMPLETED / DECLINED / EXPIRED /
  *   CANCELLED (terminaux) ni depuis DISPUTED (terminal v1).
@@ -244,7 +275,10 @@ const TRANSITIONS: readonly TransitionDef[] = [
     action: "accept",
     actor: "CARRIER",
     to: "ACCEPTED",
-    effects: ["NOTIFY_SHIPPER"],
+    // D39 — la capture a lieu À l'acceptation (jamais à J-1 : une
+    // empreinte carte expire ~7 jours). Le gate D31 (profil + Stripe)
+    // est une validation de service, pas une transition.
+    effects: ["CAPTURE_PAYMENT", "NOTIFY_SHIPPER"],
     guard: notExpired,
   },
   {
@@ -269,6 +303,17 @@ const TRANSITIONS: readonly TransitionDef[] = [
     actor: "SHIPPER",
     to: "CANCELLED",
     effects: ["FULL_REFUND", "RELEASE_CAPACITY", "NOTIFY_CARRIER"],
+  },
+  {
+    from: "PENDING",
+    action: "cancel",
+    actor: "SYSTEM",
+    to: "CANCELLED",
+    // D40 — l'empreinte de paiement est morte SEULE (expiration ~7 j,
+    // annulation côté fournisseur, webhook payment_intent.canceled) :
+    // plus d'argent à libérer, seulement les kg et l'information.
+    // Pas de guard d'expiration : l'événement Stripe fait foi.
+    effects: ["RELEASE_CAPACITY", "NOTIFY_SHIPPER"],
   },
 
   // ── ACCEPTED ─────────────────────────────
@@ -318,6 +363,16 @@ const TRANSITIONS: readonly TransitionDef[] = [
     effects: ["SCHEDULE_PAYOUT", "NOTIFY_SHIPPER"],
     guard: deliveryAllowed,
   },
+  {
+    from: "PICKED_UP",
+    action: "dispute",
+    actor: "SHIPPER",
+    to: "DISPUTED",
+    // B4/D51 — colis jamais livré (catégorie NOT_DELIVERED imposée par le
+    // service) : aucun versement n'était programmé, rien à geler.
+    effects: ["CREATE_TICKET", "NOTIFY_CARRIER"],
+    guard: departureLongPast,
+  },
 
   // ── DELIVERED ────────────────────────────
   {
@@ -342,6 +397,25 @@ const TRANSITIONS: readonly TransitionDef[] = [
     to: "DISPUTED",
     effects: ["FREEZE_PAYOUT", "CREATE_TICKET", "NOTIFY_CARRIER"],
     guard: beforePayoutDue,
+  },
+
+  // ── DISPUTED (chantier C, D55 7A) ─────────
+  // Seul ADMIN sort d'un litige. Le service vérifie en plus que le Voyageur a
+  // répondu ou que 72 h se sont écoulées (1A) — une règle de DOSSIER, pas de
+  // machine. Aucune fenêtre de notation ne s'ouvre (D54 4B).
+  {
+    from: "DISPUTED",
+    action: "resolveDisputeKeep",
+    actor: "ADMIN",
+    to: "COMPLETED",
+    effects: ["TRANSFER_PAYOUT", "UPDATE_STATS", "NOTIFY_SHIPPER", "NOTIFY_CARRIER"],
+  },
+  {
+    from: "DISPUTED",
+    action: "resolveDisputeRefund",
+    actor: "ADMIN",
+    to: "CANCELLED",
+    effects: ["FULL_REFUND", "RELEASE_CAPACITY", "NOTIFY_SHIPPER", "NOTIFY_CARRIER"],
   },
 ];
 
@@ -475,6 +549,38 @@ export function canConfirmTrackingStep(
       allowed: false,
       reason: `Tracking steps must be confirmed in order. Next expected step: "${expected}".`,
     };
+  }
+  return { allowed: true };
+}
+
+/**
+ * B5/D53 — noter l'autre partie (opération gardée SANS transition, comme la
+ * régénération du code) : deal COMPLETED, fenêtre de 14 jours ouverte, pas
+ * encore noté par CE rôle. Les deals annulés ou en litige ne se notent pas
+ * (la médiation tranche d'abord — chantier C).
+ */
+export function canRate(
+  booking: BookingLike,
+  role: "SHIPPER" | "CARRIER",
+  now: Date = new Date()
+): BookingOperationCheck {
+  if (booking.isDeleted) {
+    return { allowed: false, reason: "Booking not found." };
+  }
+  if (booking.status !== "COMPLETED") {
+    return { allowed: false, reason: "Only a completed deal can be rated." };
+  }
+  if (booking.completedBy === "ADMIN") {
+    // D54 4B — une note après litige est une note de vengeance : le litige tranché est un fait interne.
+    return { allowed: false, reason: "A deal closed by mediation cannot be rated." };
+  }
+  const windowEnd = toDate(booking.ratingWindowEndsAt);
+  if (windowEnd !== null && windowEnd <= now) {
+    return { allowed: false, reason: "The rating window (14 days) has closed." };
+  }
+  const already = role === "SHIPPER" ? toDate(booking.shipperRatedAt) : toDate(booking.carrierRatedAt);
+  if (already !== null) {
+    return { allowed: false, reason: "You have already rated this deal." };
   }
   return { allowed: true };
 }

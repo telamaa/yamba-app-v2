@@ -14,6 +14,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
+import BookingTrackingLinkCard from "@/components/booking/booking-tracker/shared/BookingTrackingLinkCard"; // D69
 import type { Booking } from "@/components/booking/booking-tracker/booking-tracker.types";
 import DealStepper, {
   type StepperStep,
@@ -81,6 +82,8 @@ export default function BookingAcceptedMobile({ booking, onCloseAction }: Props)
         <BookingParcelChecklist booking={booking} compact />
 
         <BookingCarrierCard booking={booking} compact />
+
+        <BookingTrackingLinkCard booking={booking} compact />
 
         <BookingAcceptedRecap booking={booking} compact />
 

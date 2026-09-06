@@ -1,77 +1,82 @@
 /**
- * rating.api.ts
- * =============
- * Mock API du module de notation. Backend futur : persistance de l'avis,
- * règle du double-aveugle (révélation quand les 2 ont noté ou après 14j),
- * mise à jour de la moyenne du profil public.
+ * rating.api.ts — GET/POST /deals/:id/rating, réels (B5-PR2)
+ * ============================================================
+ * Le serveur reste seul juge (`canRate`, fenêtre, double-aveugle) ; le front
+ * reflète le contexte servi et affiche les refus traduits.
  */
-
+import apiClient from "@/lib/api-client";
 import type { RatingContext, SubmitRatingPayload } from "./rating.types";
 
-const MOCK_DELAY_MS = 600;
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+export type RatingApiErrorCode = "TRANSITION_NOT_ALLOWED" | "VALIDATION" | "NOT_FOUND" | "UNAUTHENTICATED" | "GENERIC";
+export class RatingApiError extends Error {
+  readonly code: RatingApiErrorCode;
+  constructor(code: RatingApiErrorCode, message: string) {
+    super(message);
+    this.code = code;
+  }
+}
+function toRatingApiError(e: unknown): RatingApiError {
+  const err = e as { response?: { status?: number; data?: { message?: string; details?: { code?: string } } } };
+  const status = err.response?.status ?? 0;
+  const code: RatingApiErrorCode =
+    err.response?.data?.details?.code === "TRANSITION_NOT_ALLOWED"
+      ? "TRANSITION_NOT_ALLOWED"
+      : status === 400
+        ? "VALIDATION"
+        : status === 404 || status === 403
+          ? "NOT_FOUND"
+          : status === 401
+            ? "UNAUTHENTICATED"
+            : "GENERIC";
+  return new RatingApiError(code, err.response?.data?.message ?? "Rating request failed");
 }
 
-/**
- * Charge le contexte de notation.
- * Mock : rôle noté déduit de l'id — un dealId contenant "shipper" charge
- * le contexte "le Voyageur note Aminata", sinon "l'Expéditrice note Thomas".
- *  - /fr/bookings/completed123/rate       → noter Thomas (CARRIER)
- *  - /fr/carrier/deals/shipper123/rate    → noter Aminata (SHIPPER)
- */
+type ContextDto = Omit<RatingContext, "dealId" | "originCity" | "destinationCity"> & {
+  bookingId: string;
+  corridor: { originCity: string; destinationCity: string };
+};
+
 export async function getRatingContext(dealId: string): Promise<RatingContext> {
-  await sleep(MOCK_DELAY_MS);
-
-  if (dealId.includes("shipper")) {
+  try {
+    const res = await apiClient.get<ContextDto>(`/deals/${dealId}/rating`, { requireAuth: true });
+    const d = res.data;
     return {
-      dealId,
-      ratedRole: "SHIPPER",
-      person: {
-        id: "user_aminata",
-        firstName: "Aminata",
-        lastInitial: "T",
-        rating: 4.8,
-        dealCount: 12,
-        isVerified: true,
-      },
-      originCity: "Paris",
-      destinationCity: "Brazzaville",
-      completedAt: new Date().toISOString(),
-      raterName: "Thomas M.",
-      amountEur: 89.30,
+      dealId: d.bookingId,
+      viewerRole: d.viewerRole,
+      ratedRole: d.ratedRole,
+      person: d.person,
+      originCity: d.corridor.originCity,
+      destinationCity: d.corridor.destinationCity,
+      completedAt: d.completedAt,
+      windowEndsAt: d.windowEndsAt,
+      canRate: d.canRate,
+      cannotRateReason: d.cannotRateReason,
+      myRating: d.myRating,
+      counterpartHasRated: d.counterpartHasRated,
+      revealedAt: d.revealedAt,
+      counterpartRating: d.counterpartRating,
     };
+  } catch (e) {
+    throw toRatingApiError(e);
   }
-
-  return {
-    dealId,
-    ratedRole: "CARRIER",
-    person: {
-      id: "user_thomas",
-      firstName: "Thomas",
-      lastInitial: "M",
-      rating: 4.9,
-      dealCount: 23,
-      isVerified: true,
-    },
-    originCity: "Paris",
-    destinationCity: "Brazzaville",
-    completedAt: new Date().toISOString(),
-    raterName: "Aminata T.",
-    amountEur: 103.75,
-  };
 }
 
 export async function submitRating(
   dealId: string,
   payload: SubmitRatingPayload
-): Promise<{ dealId: string; submittedAt: string }> {
-  await sleep(MOCK_DELAY_MS);
-  if (payload.overallStars < 1 || payload.overallStars > 5) {
-    throw new Error("INVALID_STARS");
+): Promise<{ submittedAt: string; revealed: boolean; revealedAt: string | null }> {
+  try {
+    const res = await apiClient.post<{ bookingId: string; submittedAt: string; revealed: boolean; revealedAt: string | null }>(
+      `/deals/${dealId}/rating`,
+      {
+        rating: payload.rating,
+        ...(Object.keys(payload.criteria).length ? { criteria: payload.criteria } : {}),
+        ...(payload.comment ? { comment: payload.comment } : {}),
+      },
+      { requireAuth: true }
+    );
+    return { submittedAt: res.data.submittedAt, revealed: res.data.revealed, revealedAt: res.data.revealedAt };
+  } catch (e) {
+    throw toRatingApiError(e);
   }
-  // eslint-disable-next-line no-console
-  console.info("[rating] submitRating mock:", { dealId, payload });
-  return { dealId, submittedAt: new Date().toISOString() };
 }

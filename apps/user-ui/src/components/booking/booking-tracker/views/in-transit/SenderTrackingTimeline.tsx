@@ -8,9 +8,10 @@
 
 "use client";
 
-import { Check, ImageIcon, Package, Plane } from "lucide-react";
+import { Check, Plane } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import type { ReactNode } from "react";
+import PhotoThumbs from "@/components/shared/photos/PhotoThumbs";
 import type {
   Booking,
   BookingTrackingEventId,
@@ -112,22 +113,7 @@ export default function SenderTrackingTimeline({
         : undefined,
       extra:
         booking.pickup && booking.pickup.photos.length > 0 ? (
-          <div className="mt-2 flex gap-1.5">
-            {booking.pickup.photos.map((photo) => (
-              <div
-                key={photo.id}
-                className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md text-white"
-                style={{ background: "linear-gradient(135deg, #BA7517, #EF9F27)" }}
-                aria-label={photo.label}
-              >
-                {photo.context === "PICKUP_PACKAGED" ? (
-                  <Package size={13} aria-hidden="true" />
-                ) : (
-                  <ImageIcon size={13} aria-hidden="true" />
-                )}
-              </div>
-            ))}
-          </div>
+          <PhotoThumbs photos={booking.pickup.photos} tone="amber" size="sm" className="mt-2" />
         ) : null,
     },
     {

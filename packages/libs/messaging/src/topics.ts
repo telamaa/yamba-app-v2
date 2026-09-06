@@ -15,6 +15,8 @@
 export const TOPICS = {
   /** Les 17 événements booking (BookingDomainEventSchema). Clé = aggregateId. */
   BOOKING_EVENTS: "booking-events",
+  /** Chantier F (D61) — événements de conversation (MessagingDomainEventSchema). Clé = conversationId. */
+  MESSAGING_EVENTS: "messaging-events",
 } as const;
 
 export type TopicName = (typeof TOPICS)[keyof typeof TOPICS];

@@ -1,8 +1,11 @@
 "use client";
 
+import { useState } from "react";
 import { useTranslations, useLocale } from "next-intl";
 import { Lock, Shield, Leaf } from "lucide-react";
 import { useRouter } from "@/i18n/navigation";
+import useUser from "@/hooks/useUser";
+import BookingAuthGateModal from "./BookingAuthGateModal";
 import type { PublicTrip } from "@/lib/public-trip.types";
 import {
   getMinPriceCents,
@@ -28,11 +31,22 @@ export default function BookingSummaryCard({ trip, weightKg = null }: Props) {
   const formattedPrice = formatPrice(perKgCents ?? minPriceCents, trip.currencyCode, locale);
   const co2Saved = calculateCO2SavedKg(trip);
 
+  const { user, isLoading: userLoading } = useUser();
+  const [gateOpen, setGateOpen] = useState(false);
+
+  // A58 — visiteur non connecté : la porte s'ouvre ICI, au-dessus du trajet.
+  // Utilisateur inconnu (chargement) : on laisse la page /book trancher.
   const handleReserve = () => {
+    if (!user && !userLoading) {
+      setGateOpen(true);
+      return;
+    }
     router.push(`/trips/${trip.id}/book`);
   };
 
   return (
+    <>
+    <BookingAuthGateModal open={gateOpen} tripId={trip.id} onCloseAction={() => setGateOpen(false)} />
     <div
       className="
         overflow-hidden rounded-2xl border border-slate-200 bg-white
@@ -115,5 +129,6 @@ export default function BookingSummaryCard({ trip, weightKg = null }: Props) {
         )}
       </div>
     </div>
+  </>
   );
 }

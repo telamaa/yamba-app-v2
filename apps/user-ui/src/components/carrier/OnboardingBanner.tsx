@@ -50,7 +50,7 @@ export function OnboardingBanner() {
               </svg>
             </span>
             <p className="text-sm font-medium text-white">
-              Ton profil Tripper n'est pas encore finalisé.{" "}
+              Ton profil Voyageur n'est pas encore finalisé.{" "}
               <span className="hidden sm:inline">
                 Termine ton inscription pour recevoir des propositions de transport.
               </span>

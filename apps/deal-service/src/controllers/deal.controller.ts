@@ -12,10 +12,13 @@ import {
   TripDealsQuerySchema,
   type BookingViewerRole,
 } from "@packages/api-contracts";
+import { revealDeliveryCode } from "@packages/delivery-code";
+import { platformSettings } from "@packages/libs/settings/default";
 import {
   toBookingView,
   toShipperBookingView,
   toCarrierBookingView,
+  viewParamsFromSettings,
   type BookingRecord,
   type CounterpartRecord,
 } from "../services/booking-view.mapper";
@@ -52,6 +55,7 @@ async function loadCounterparts(
       id: true,
       firstName: true,
       lastName: true,
+      publicSlug: true,
       avatar: { select: { url: true } },
     },
   });
@@ -64,6 +68,7 @@ async function loadCounterparts(
         firstName: u.firstName ?? null,
         lastName: u.lastName ?? null,
         avatarUrl: u.avatar?.url ?? null,
+        publicSlug: u.publicSlug ?? null,
       },
     ])
   );
@@ -75,6 +80,7 @@ const GHOST_COUNTERPART = (id: string): CounterpartRecord => ({
   firstName: null,
   lastName: null,
   avatarUrl: null,
+  publicSlug: null,
 });
 
 /* ══ GET /deals/:id — vue par rôle ════════════════════════════ */
@@ -115,10 +121,40 @@ export const getDeal = async (
     const counterpart =
       counterparts.get(counterpartId) ?? GHOST_COUNTERPART(counterpartId);
 
+    // D43 — le code en clair n'existe que pour l'Expéditeur, en PICKED_UP,
+    // sur cette route (jamais dans les listes) ; null si indéchiffrable.
+    const deliveryCode = viewerRole === "SHIPPER" ? revealDeliveryCode(booking) : null;
+
+    // B4/A68 — le dossier de litige n'est lu qu'en DISPUTED ; le mapper
+    // n'en sert que ce que le rôle a le droit de voir.
+    // C-PR2 (D55) — le dossier est servi pendant le litige ET après la décision (résolution).
+    const dispute =
+      booking.status === "DISPUTED" || booking.disputeTicket
+        ? await prisma.dispute.findUnique({
+            where: { bookingId: booking.id },
+            select: {
+              ticketNumber: true,
+              category: true,
+              description: true,
+              desiredOutcome: true,
+              photoUrls: true,
+              createdAt: true,
+              status: true,
+              carrierRespondedAt: true,
+              resolutionOutcome: true,
+              resolutionRefundCents: true,
+              resolutionCarrierPayoutCents: true,
+              resolutionReason: true,
+              resolvedAt: true,
+            },
+          })
+        : null;
+
+    const viewParams = viewParamsFromSettings(await platformSettings().get()); // D62
     return res.status(200).json({
       success: true,
       viewerRole,
-      deal: toBookingView(booking, viewerRole, counterpart),
+      deal: toBookingView(booking, viewerRole, counterpart, deliveryCode, dispute, viewParams),
     });
   } catch (error) {
     return next(error);
@@ -152,10 +188,15 @@ export const getMyBookings = async (
       bookings.map((b) => b.carrierId)
     );
 
+    const viewParams = viewParamsFromSettings(await platformSettings().get()); // D62
     const views = bookings.map((b) =>
       toShipperBookingView(
         b,
-        counterparts.get(b.carrierId) ?? GHOST_COUNTERPART(b.carrierId)
+        counterparts.get(b.carrierId) ?? GHOST_COUNTERPART(b.carrierId),
+        new Date(),
+        null,
+        null,
+        viewParams
       )
     );
 
@@ -211,10 +252,14 @@ export const getTripDeals = async (
       bookings.map((b) => b.shipperId)
     );
 
+    const viewParams = viewParamsFromSettings(await platformSettings().get()); // D62
     const views = bookings.map((b) =>
       toCarrierBookingView(
         b,
-        counterparts.get(b.shipperId) ?? GHOST_COUNTERPART(b.shipperId)
+        counterparts.get(b.shipperId) ?? GHOST_COUNTERPART(b.shipperId),
+        null,
+        new Date(),
+        viewParams
       )
     );
 
@@ -227,3 +272,47 @@ export const getTripDeals = async (
     return next(error);
   }
 };
+
+/* ══ GET /me/deals — mes deals reçus (vue Carrier, tous trajets — A44) ══ */
+
+/**
+ * Tous les deals dont l'appelant est le VOYAGEUR, tous trajets confondus,
+ * les plus récents d'abord (`?status=` optionnel). Vue Carrier stricte
+ * (A13 : jamais de code, de hash ni de compteur de régénérations).
+ * Le front en dérive la bande « À traiter », les demandes par trajet et
+ * le badge de la sidebar — une seule lecture, jamais un appel par trajet.
+ */
+export const getMyDeals = async (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const parsedQuery = MyBookingsQuerySchema.safeParse(req.query);
+    if (!parsedQuery.success) {
+      return next(new ValidationError("Invalid query: unknown status value."));
+    }
+    const { status } = parsedQuery.data;
+
+    const bookings = (await prisma.booking.findMany({
+      where: {
+        carrierId: req.user.id,
+        isDeleted: false,
+        ...(status ? { status } : {}),
+      },
+      orderBy: { requestedAt: "desc" },
+    })) as unknown as BookingRecord[];
+
+    const counterparts = await loadCounterparts(bookings.map((b) => b.shipperId));
+
+    const viewParams = viewParamsFromSettings(await platformSettings().get()); // D62
+    const deals = bookings.map((b) =>
+      toCarrierBookingView(b, counterparts.get(b.shipperId) ?? GHOST_COUNTERPART(b.shipperId), null, new Date(), viewParams)
+    );
+
+    return res.status(200).json({ success: true, deals, count: deals.length });
+  } catch (error) {
+    return next(error);
+  }
+};
+

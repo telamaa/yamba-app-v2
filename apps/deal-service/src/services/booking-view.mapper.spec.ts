@@ -99,10 +99,13 @@ function makeBooking(overrides: Partial<BookingRecord> = {}): BookingRecord {
 }
 
 /** Record "à la Prisma" : AVEC les secrets, comme en base. */
+const SECRET_ENCRYPTED = "v1.aaaaaaaaaaaaaaaa.bbbbbbbbbbbbbbbbbbbbbb.cccccccc";
+
 function makeLeakyBooking(overrides: Partial<BookingRecord> = {}): BookingRecord {
   return {
     ...makeBooking(overrides),
     deliveryCodeHash: SECRET_HASH,
+    deliveryCodeEncrypted: SECRET_ENCRYPTED,
     deliveryCode: SECRET_CODE,
   } as unknown as BookingRecord;
 }
@@ -129,16 +132,115 @@ describe("frontière carrier — liste blanche résistante au spread (A13)", () 
     const json = JSON.stringify(view);
     expect(json).not.toContain(SECRET_HASH);
     expect(json).not.toContain(SECRET_CODE);
+    expect(json).not.toContain(SECRET_ENCRYPTED);
     expect(view).not.toHaveProperty("deliveryCode");
+    expect(view).not.toHaveProperty("deliveryCodeEncrypted");
     expect(view).not.toHaveProperty("deliveryCodeHash");
     expect(view).not.toHaveProperty("codeRegenerationsLeft");
     expect(view).not.toHaveProperty("codeRegenerations");
   });
 
-  it("le hash injecté ne traverse pas non plus la vue Shipper (seul le code y a une place, null en B1)", () => {
+  it("ni le hash ni le chiffré ne traversent la vue Shipper ; sans paramètre, deliveryCode = null (listes)", () => {
     const view = toShipperBookingView(makeLeakyBooking(), CARRIER);
-    expect(JSON.stringify(view)).not.toContain(SECRET_HASH);
+    const json = JSON.stringify(view);
+    expect(json).not.toContain(SECRET_HASH);
+    expect(json).not.toContain(SECRET_ENCRYPTED);
     expect(view.deliveryCode).toBeNull();
+    expect(view).not.toHaveProperty("deliveryCodeEncrypted");
+  });
+
+  it("D43 : le code en clair n'apparaît que s'il est PASSÉ par l'appelant (GET /deals/:id, Shipper) — le mapper ne déchiffre rien", () => {
+    const view = toShipperBookingView(makeLeakyBooking({ status: "PICKED_UP", pickedUpAt: T0 }), CARRIER, T0, "742891");
+    expect(view.deliveryCode).toBe("742891");
+    expect(JSON.stringify(view)).not.toContain(SECRET_ENCRYPTED);
+    // Le paramètre est ignoré par la vue Carrier (elle ne l'accepte même pas).
+    const carrierView = toCarrierBookingView(makeLeakyBooking({ status: "PICKED_UP", pickedUpAt: T0 }), SHIPPER);
+    expect(JSON.stringify(carrierView)).not.toContain("742891");
+  });
+
+  it("B3 : la checklist du pickup est exposée (vide sur un enregistrement antérieur) et pickupRefusalReason suit les jalons", () => {
+    const withChecklist = toShipperBookingView(
+      makeBooking({
+        status: "PICKED_UP",
+        pickedUpAt: T0,
+        pickup: { confirmedAt: T0, photoUrls: ["https://ik.imagekit.io/yamba/p.jpg"], notes: null, checklist: ["CONTENT_MATCHES"] },
+      }),
+      CARRIER
+    );
+    expect(withChecklist.pickup?.checklist).toEqual(["CONTENT_MATCHES"]);
+    const legacy = toCarrierBookingView(
+      makeBooking({ status: "PICKED_UP", pickedUpAt: T0, pickup: { confirmedAt: T0, photoUrls: [], notes: null } }),
+      SHIPPER
+    );
+    expect(legacy.pickup?.checklist).toEqual([]);
+    const refused = toShipperBookingView(makeBooking({ status: "CANCELLED", pickupRefusalReason: "OVERWEIGHT" }), CARRIER);
+    expect(refused.pickupRefusalReason).toBe("OVERWEIGHT");
+    expect(toShipperBookingView(makeBooking(), CARRIER).pickupRefusalReason).toBeNull();
+  });
+
+  it("B4/A75 : payoutBlocker — ACCOUNT_NOT_READY quand le compte Stripe manque, RETRYING pour toute autre erreur, null sinon ; jamais le message brut", () => {
+    const notReady = toCarrierBookingView(
+      makeBooking({ status: "COMPLETED", payoutStatus: "FAILED", payoutFailureReason: "CARRIER_ACCOUNT_NOT_READY" } as never),
+      SHIPPER
+    );
+    expect(notReady.payoutBlocker).toBe("ACCOUNT_NOT_READY");
+    const provider = toCarrierBookingView(
+      makeBooking({ status: "COMPLETED", payoutStatus: "FAILED", payoutFailureReason: "PROVIDER_ERROR:balance_insufficient" } as never),
+      SHIPPER
+    );
+    expect(provider.payoutBlocker).toBe("RETRYING");
+    expect(JSON.stringify(provider)).not.toContain("balance_insufficient");
+    expect(toCarrierBookingView(makeBooking({ status: "COMPLETED", payoutStatus: "SENT" } as never), SHIPPER).payoutBlocker).toBeNull();
+    expect(toCarrierBookingView(makeBooking(), SHIPPER).payoutBlocker).toBeNull();
+  });
+
+  it("D50/A82 : payoutAmountCents et retentionDisposition servis au Voyageur (compensation d'annulation tardive), null sinon", () => {
+    const late = toCarrierBookingView(
+      makeBooking({ status: "CANCELLED", payoutStatus: "SENT", payoutAmountCents: 1200, retentionDisposition: "CARRIER" } as never),
+      SHIPPER
+    );
+    expect(late.payoutAmountCents).toBe(1200);
+    expect(late.retentionDisposition).toBe("CARRIER");
+    const held = toCarrierBookingView(makeBooking({ status: "CANCELLED", retentionDisposition: "HELD_FOR_MEDIATION" } as never), SHIPPER);
+    expect(held.retentionDisposition).toBe("HELD_FOR_MEDIATION");
+    expect(held.payoutAmountCents).toBeNull();
+    expect(toCarrierBookingView(makeBooking(), SHIPPER).retentionDisposition).toBeNull();
+  });
+
+  it("A83 : capturedAt / refundedAt / refundAmountCents servis à l'Expéditeur, JAMAIS au Voyageur (A13)", () => {
+    const b = makeBooking({ status: "CANCELLED", capturedAt: T0, refundedAt: T0, refundAmountCents: 1479 } as never);
+    const shipper = toShipperBookingView(b, CARRIER);
+    expect(shipper.refundAmountCents).toBe(1479);
+    expect(shipper.capturedAt).toBe(T0.toISOString());
+    const carrier = toCarrierBookingView(b, SHIPPER) as unknown as Record<string, unknown>;
+    expect(carrier).not.toHaveProperty("refundAmountCents");
+    expect(carrier).not.toHaveProperty("capturedAt");
+    expect(toShipperBookingView(makeBooking(), CARRIER).refundAmountCents).toBeNull();
+  });
+
+  it("B5/D53 : rating (état par rôle) — null hors COMPLETED ; canRate / ratedByMe / counterpartHasRated selon le rôle", () => {
+    const window = new Date(T0.getTime() + 14 * 86_400_000);
+    const b = makeBooking({ status: "COMPLETED", ratingWindowEndsAt: window, shipperRatedAt: T0, carrierRatedAt: null, ratingsRevealedAt: null } as never);
+    const shipper = toShipperBookingView(b, CARRIER, T0);
+    expect(shipper.rating).toEqual({ windowEndsAt: window.toISOString(), ratedByMe: true, counterpartHasRated: false, revealedAt: null, canRate: false });
+    const carrier = toCarrierBookingView(b, SHIPPER, null, T0);
+    expect(carrier.rating).toMatchObject({ ratedByMe: false, counterpartHasRated: true, canRate: true });
+    expect(toShipperBookingView(makeBooking(), CARRIER).rating).toBeNull();
+  });
+
+  it("B4/A76 : deliveryPhotoUrls servies aux deux vues, [] quand absentes (enregistrements antérieurs)", () => {
+    const withPhotos = makeBooking({ status: "DELIVERED", deliveryPhotoUrls: ["https://ik.imagekit.io/yamba/deals/delivery/a.jpg"] } as never);
+    expect(toShipperBookingView(withPhotos, CARRIER).deliveryPhotoUrls).toEqual(["https://ik.imagekit.io/yamba/deals/delivery/a.jpg"]);
+    expect(toCarrierBookingView(withPhotos, SHIPPER).deliveryPhotoUrls).toEqual(["https://ik.imagekit.io/yamba/deals/delivery/a.jpg"]);
+    expect(toShipperBookingView(makeBooking(), CARRIER).deliveryPhotoUrls).toEqual([]);
+  });
+
+  it("B4/A72 : disputeOpensAt = départ + 48 h en PICKED_UP seulement (servi, jamais calculé par le front)", () => {
+    const inTransit = toShipperBookingView(makeLeakyBooking({ status: "PICKED_UP", pickedUpAt: T0 }), CARRIER, T0);
+    const departure = makeBooking().trip.departureAt.getTime();
+    expect(inTransit.disputeOpensAt).toBe(new Date(departure + 48 * 3_600_000).toISOString());
+    expect(toShipperBookingView(makeBooking(), CARRIER).disputeOpensAt).toBeNull();
+    expect(toShipperBookingView(makeBooking({ status: "DELIVERED" }), CARRIER).disputeOpensAt).toBeNull();
   });
 
   it("la vue Carrier n'expose ni commission ni total Expéditeur", () => {
@@ -202,6 +304,45 @@ describe("allowedActions — le front reflète, ne décide jamais", () => {
   });
 });
 
+/* ══ cancellationPreview — ANN-01 servie, jamais recalculée front ═ */
+
+describe("cancellationPreview — le serveur annonce le remboursement (ANN-01/D39)", () => {
+  // Départ fixture : 2026-08-02T14:00Z → seuil 100 % = 2026-07-31T14:00Z.
+  const WELL_BEFORE = new Date("2026-07-20T10:00:00.000Z"); // ≥ 48 h avant
+  const LATE = new Date("2026-08-01T10:00:00.000Z"); // < 48 h avant
+
+  it("PENDING : libération intégrale — refund = total, retenue 0", () => {
+    const pending = makeBooking({ status: "PENDING", acceptedAt: null });
+    const view = toShipperBookingView(pending, CARRIER, LATE); // même tardif : l'empreinte n'est pas capturée
+    expect(view.cancellationPreview).toEqual({
+      refundCents: 3000,
+      retentionCents: 0,
+      retentionPct: 50,
+      fullRefundUntil: "2026-07-31T14:00:00.000Z",
+      currencyCode: "EUR",
+    });
+  });
+
+  it("ACCEPTED à J-2 ou plus : 100 %", () => {
+    const view = toShipperBookingView(makeBooking(), CARRIER, WELL_BEFORE);
+    expect(view.cancellationPreview?.refundCents).toBe(3000);
+    expect(view.cancellationPreview?.retentionCents).toBe(0);
+  });
+
+  it("ACCEPTED sous 48 h : retenue 50 %", () => {
+    const view = toShipperBookingView(makeBooking(), CARRIER, LATE);
+    expect(view.cancellationPreview?.refundCents).toBe(1500);
+    expect(view.cancellationPreview?.retentionCents).toBe(1500);
+  });
+
+  it("null dès que cancel n'est plus permis (PICKED_UP), et jamais côté Carrier", () => {
+    const picked = makeBooking({ status: "PICKED_UP", pickedUpAt: T0 });
+    expect(toShipperBookingView(picked, CARRIER, WELL_BEFORE).cancellationPreview).toBeNull();
+    const carrierView = toCarrierBookingView(makeBooking(), SHIPPER) as unknown as Record<string, unknown>;
+    expect("cancellationPreview" in carrierView).toBe(false);
+  });
+});
+
 /* ══ Sérialisation & privacy ══════════════════════════════════ */
 
 describe("sérialisation et privacy", () => {
@@ -220,8 +361,15 @@ describe("sérialisation et privacy", () => {
       firstName: "Thomas",
       lastInitial: "N",
       avatarUrl: null,
+      publicSlug: null,
     });
     expect(JSON.stringify(view.carrier)).not.toContain("Nkounkou");
+  });
+
+  it("A45 : le slug public traverse (lien « Voir profil »), null quand absent", () => {
+    const withSlug = toCarrierBookingView(makeBooking(), { ...SHIPPER, publicSlug: "aminata-d" });
+    expect(withSlug.shipper.publicSlug).toBe("aminata-d");
+    expect(toCarrierBookingView(makeBooking(), SHIPPER).shipper.publicSlug).toBeNull();
   });
 
   it("contrepartie sans nom : lastInitial = '' (jamais undefined)", () => {

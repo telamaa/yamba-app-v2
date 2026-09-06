@@ -2,11 +2,9 @@
 
 import { ArrowLeft } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
-import { useRouter } from "@/i18n/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { toast } from "sonner";
 import { useBookingDraft } from "@/hooks/useBookingDraft";
-import { createDeal } from "@/services/booking.api";
+import { useBookingCheckout } from "./useBookingCheckout";
 import {
   canContinueStep,
   computeTotal,
@@ -30,6 +28,8 @@ const StepPayment = dynamic(() => import("./steps/StepPayment"), {
   ),
 });
 import StepRecipient from "./steps/StepRecipient";
+import { usePricingParams } from "@/hooks/usePricingParams";
+import { track } from "@/lib/analytics";
 
 const EMPTY_ERRORS: ValidationErrors = {};
 
@@ -44,9 +44,9 @@ export default function BookingWizard({ trip, onCloseAction }: Props) {
   const isFr = locale === "fr";
 
   const { draft, setDraft, step, setStep, clear } = useBookingDraft();
-  const router = useRouter();
   const [showErrors, setShowErrors] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const checkout = useBookingCheckout({ draft, trip, step, clear });
+  const isSubmitting = checkout.isSubmitting;
 
   // Normalize category if not accepted by this trip
   useEffect(() => {
@@ -63,9 +63,11 @@ export default function BookingWizard({ trip, onCloseAction }: Props) {
 
   useEffect(() => {
     setShowErrors(false);
-  }, [step]);
+    void track("booking_step_viewed", { step, tripId: trip.tripId }); // D66 3A
+  }, [step, trip.tripId]);
 
-  const price = useMemo(() => computeTotal(draft, trip), [draft, trip]);
+  const pricingParams = usePricingParams(); // D62 7A — valeurs du serveur, défauts du moteur en attendant
+  const price = useMemo(() => computeTotal(draft, trip, pricingParams), [draft, trip, pricingParams]);
 
   const goToStep = (target: Step) => {
     setShowErrors(false);
@@ -85,25 +87,7 @@ export default function BookingWizard({ trip, onCloseAction }: Props) {
     setStep((s) => (s > 1 ? ((s - 1) as Step) : s));
   };
 
-  const handleSubmit = async () => {
-    if (isSubmitting) return;
-    setIsSubmitting(true);
-    try {
-      const result = await createDeal(draft, trip);
-      toast.success(
-        isFr ? "Paiement confirmé !" : "Payment confirmed!",
-        { duration: 3000 }
-      );
-      clear();
-      // Phase 4: redirection vers le tracker post-confirmation paiement
-      // En mock, dealId = bookingId. Plus tard, l'API renverra les 2.
-      router.push(`/bookings/${result.dealId}`);
-    } catch {
-      toast.error(isFr ? "Erreur lors du paiement" : "Payment failed");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+  const handleSubmit = checkout.submit;
 
   const subtitle = `${trip.originCity} → ${trip.destinationCity} · ${formatDate(
     trip.departureDate,
@@ -170,9 +154,12 @@ export default function BookingWizard({ trip, onCloseAction }: Props) {
           )}
           {step === 4 && (
             <StepPayment
-              draft={draft}
-              setDraftAction={setDraft}
               price={price}
+              intent={checkout.intent}
+              intentLoading={checkout.intentLoading}
+              intentError={checkout.intentError}
+              onRetryAction={checkout.refreshIntent}
+              registerConfirmAction={checkout.registerConfirm}
             />
           )}
         </div>

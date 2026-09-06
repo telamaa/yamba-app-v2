@@ -17,9 +17,24 @@
  * Bagage entier (PRC-04) : transport = forfait du Voyageur, ni poids ni taille.
  */
 
-export const PRICING_PARAMS = {
+export type SizeClass = "S" | "M" | "L";
+
+/** Forme des paramètres du moteur — servis par les paramètres de la plateforme (D62), `PRICING_PARAMS` n'est que le défaut. */
+export type PricingParams = {
+  sizeCoef: Record<SizeClass, number>;
+  minBillableKg: number;
+  minTransportCents: number;
+  commissionPct: number;
+  commissionFloorCents: number;
+  protectionExtendedPremiumCents: number;
+  protectionExtendedCapCents: number;
+  weightTolerancePct: number;
+  referenceKg: number;
+};
+
+export const PRICING_PARAMS: PricingParams = {
   /** PRC-03 — classes de taille visuelles */
-  sizeCoef: { S: 1, M: 1.1, L: 1.25 } as const,
+  sizeCoef: { S: 1, M: 1.1, L: 1.25 },
   /** D32 */
   minBillableKg: 0.5,
   minTransportCents: 800,
@@ -33,10 +48,8 @@ export const PRICING_PARAMS = {
   weightTolerancePct: 10,
   /** D33 — colis de référence pour la comparabilité */
   referenceKg: 2,
-} as const;
+};
 
-export type PricingParams = typeof PRICING_PARAMS;
-export type SizeClass = "S" | "M" | "L";
 export type ProtectionTier = "BASIC" | "EXTENDED_500";
 export type ParcelProduct = "PARCEL" | "CHECKED_BAG_23KG" | "CABIN_BAG_12KG";
 

@@ -4,11 +4,11 @@
  * Miroir TESTÉ de SPECIFICATIONS-WORKFLOW-YAMBA.md §2.2 et des
  * matrices ANN-01 / ANN-02 / CAP-02.
  *
- * Structure (188 tests) :
- *  S1  Chemins nominaux : 12 transitions → to + effets EXACTS      (12)
- *  S3  Mauvais acteur : refus par rôle, message dédié              (13)
- *  S4  ADMIN : réservé, aucune action ne lui est ouverte           (10)
- *  S5  Mauvais statut : matrice générée (11 paires action×acteur)  (87)
+ * Structure (196 tests) :
+ *  S1  Chemins nominaux : 13 transitions → to + effets EXACTS      (13)
+ *  S3  Mauvais acteur : refus par rôle, message dédié              (12)
+ *  S4  ADMIN : seules les résolutions de litige (C-PR2)             (13)
+ *  S5  Mauvais statut : matrice générée (12 paires action×acteur)  (95)
  *  S6  Absences délibérées de la spec (assertions nommées)          (3)
  *  S7  Guards temporels & compteurs, bornes EXACTES                (15)
  *  S8  Soft delete : mort pour tout                                 (3)
@@ -19,6 +19,7 @@
  *  S13 Partition ACTIVE/TERMINAL + constantes §5.4                  (3)
  */
 import {
+  canRate,
   BOOKING_ACTIVE_STATUSES,
   BOOKING_TERMINAL_STATUSES,
   BookingActor,
@@ -91,7 +92,7 @@ describe("S1 — chemins nominaux (12 transitions du §2.2)", () => {
       "accept",
       "CARRIER",
       "ACCEPTED",
-      ["NOTIFY_SHIPPER"],
+      ["CAPTURE_PAYMENT", "NOTIFY_SHIPPER"],
     ],
     [
       "PENDING --decline(CARRIER)--> DECLINED",
@@ -116,6 +117,14 @@ describe("S1 — chemins nominaux (12 transitions du §2.2)", () => {
       "SHIPPER",
       "CANCELLED",
       ["FULL_REFUND", "RELEASE_CAPACITY", "NOTIFY_CARRIER"],
+    ],
+    [
+      "PENDING --cancel(SYSTEM)--> CANCELLED (empreinte morte — D40)",
+      makeBooking(),
+      "cancel",
+      "SYSTEM",
+      "CANCELLED",
+      ["RELEASE_CAPACITY", "NOTIFY_SHIPPER"],
     ],
     [
       "ACCEPTED --cancel(SHIPPER)--> CANCELLED (barème ANN-01)",
@@ -181,6 +190,14 @@ describe("S1 — chemins nominaux (12 transitions du §2.2)", () => {
       "DISPUTED",
       ["FREEZE_PAYOUT", "CREATE_TICKET", "NOTIFY_CARRIER"],
     ],
+    [
+      "PICKED_UP --dispute(SHIPPER)--> DISPUTED (non livré, départ + 48 h — B4/D51)",
+      makeBooking({ status: "PICKED_UP", departureAt: hours(-48) }),
+      "dispute",
+      "SHIPPER",
+      "DISPUTED",
+      ["CREATE_TICKET", "NOTIFY_CARRIER"],
+    ],
   ];
 
   it.each(rows)("%s", (_label, booking, action, actor, to, effects) => {
@@ -201,7 +218,6 @@ describe("S3 — mauvais acteur (le rôle fait partie de la transition)", () => 
     ["decline", "SHIPPER", makeBooking()],
     ["expire", "CARRIER", makeBooking({ expiresAt: minutes(-1) })],
     ["expire", "SHIPPER", makeBooking({ expiresAt: minutes(-1) })],
-    ["cancel", "SYSTEM", makeBooking()],
     ["pickup", "SHIPPER", makeBooking({ status: "ACCEPTED" })],
     ["refusePickup", "SHIPPER", makeBooking({ status: "ACCEPTED" })],
     ["deliver", "SHIPPER", makeBooking({ status: "PICKED_UP" })],
@@ -224,7 +240,7 @@ describe("S3 — mauvais acteur (le rôle fait partie de la transition)", () => 
 // S4 — ADMIN : réservé, rien d'ouvert (chantier C)
 // ─────────────────────────────────────────────
 
-describe("S4 — ADMIN n'a aucune transition (résolutions litige = chantier C)", () => {
+describe("S4 — ADMIN : seules les résolutions de litige lui sont ouvertes (C-PR2, D55)", () => {
   const actions: BookingTransitionAction[] = [
     "accept",
     "decline",
@@ -240,12 +256,39 @@ describe("S4 — ADMIN n'a aucune transition (résolutions litige = chantier C)"
   it.each(actions.map((a) => [a] as [BookingTransitionAction]))(
     '"%s" est refusé à ADMIN',
     (action) => {
-      // DISPUTED : là où on serait le plus tenté d'ouvrir à l'admin.
       const booking = makeBooking({ status: "DISPUTED" });
       const check = canPerform(booking, action, "ADMIN", ctx);
       expect(check.allowed).toBe(false);
     }
   );
+
+  it("resolveDisputeKeep : DISPUTED → COMPLETED (versement, stats, les deux prévenus) — ADMIN seul", () => {
+    const booking = makeBooking({ status: "DISPUTED" });
+    expect(canPerform(booking, "resolveDisputeKeep", "ADMIN", ctx)).toEqual({
+      allowed: true,
+      to: "COMPLETED",
+      effects: ["TRANSFER_PAYOUT", "UPDATE_STATS", "NOTIFY_SHIPPER", "NOTIFY_CARRIER"],
+    });
+    expect(canPerform(booking, "resolveDisputeKeep", "SHIPPER", ctx).allowed).toBe(false);
+    expect(canPerform(booking, "resolveDisputeKeep", "CARRIER", ctx).allowed).toBe(false);
+    expect(canPerform(booking, "resolveDisputeKeep", "SYSTEM", ctx).allowed).toBe(false);
+  });
+
+  it("resolveDisputeRefund : DISPUTED → CANCELLED (remboursement total) — ADMIN seul, jamais hors DISPUTED", () => {
+    expect(canPerform(makeBooking({ status: "DISPUTED" }), "resolveDisputeRefund", "ADMIN", ctx)).toEqual({
+      allowed: true,
+      to: "CANCELLED",
+      effects: ["FULL_REFUND", "RELEASE_CAPACITY", "NOTIFY_SHIPPER", "NOTIFY_CARRIER"],
+    });
+    for (const status of ["PENDING", "ACCEPTED", "PICKED_UP", "DELIVERED", "COMPLETED", "CANCELLED"] as const) {
+      expect(canPerform(makeBooking({ status }), "resolveDisputeKeep", "ADMIN", ctx).allowed).toBe(false);
+      expect(canPerform(makeBooking({ status }), "resolveDisputeRefund", "ADMIN", ctx).allowed).toBe(false);
+    }
+  });
+
+  it("getAllowedActions ne sert jamais les actions ADMIN (le front admin a son propre contrat)", () => {
+    expect(getAllowedActions(makeBooking({ status: "DISPUTED" }), "ADMIN", ctx)).toEqual([]);
+  });
 });
 
 // ─────────────────────────────────────────────
@@ -265,12 +308,13 @@ describe("S5 — mauvais statut (matrice action×acteur × statuts illégaux)", 
     { action: "expire", actor: "SYSTEM", legal: ["PENDING"] },
     { action: "cancel", actor: "SHIPPER", legal: ["PENDING", "ACCEPTED"] },
     { action: "cancel", actor: "CARRIER", legal: ["ACCEPTED"] },
+    { action: "cancel", actor: "SYSTEM", legal: ["PENDING"] },
     { action: "pickup", actor: "CARRIER", legal: ["ACCEPTED"] },
     { action: "refusePickup", actor: "CARRIER", legal: ["ACCEPTED"] },
     { action: "deliver", actor: "CARRIER", legal: ["PICKED_UP"] },
     { action: "confirmEarly", actor: "SHIPPER", legal: ["DELIVERED"] },
     { action: "autoComplete", actor: "SYSTEM", legal: ["DELIVERED"] },
-    { action: "dispute", actor: "SHIPPER", legal: ["DELIVERED"] },
+    { action: "dispute", actor: "SHIPPER", legal: ["DELIVERED", "PICKED_UP"] },
   ];
 
   pairs.forEach(({ action, actor, legal }) => {
@@ -292,10 +336,22 @@ describe("S5 — mauvais statut (matrice action×acteur × statuts illégaux)", 
 // ─────────────────────────────────────────────
 
 describe("S6 — absences délibérées (ANN-01 : plus d'annulation après remise)", () => {
-  it("aucune annulation depuis PICKED_UP, ni Shipper ni Carrier — seule voie : dispute", () => {
-    const booking = makeBooking({ status: "PICKED_UP" });
+  it("aucune annulation depuis PICKED_UP, ni Shipper ni Carrier — seule voie : dispute (48 h après le départ)", () => {
+    const booking = makeBooking({ status: "PICKED_UP", departureAt: hours(-48) });
     expect(canPerform(booking, "cancel", "SHIPPER", ctx).allowed).toBe(false);
     expect(canPerform(booking, "cancel", "CARRIER", ctx).allowed).toBe(false);
+    expect(canPerform(booking, "dispute", "SHIPPER", ctx).allowed).toBe(true);
+    expect(canPerform(booking, "dispute", "CARRIER", ctx).allowed).toBe(false);
+  });
+
+  // B4/D51 — « non livré » : la fenêtre s'ouvre à départ + 48 h, jamais avant, jamais sans date.
+  it("dispute depuis PICKED_UP est refusé avant départ + 48 h, et sans date de départ (conservatif)", () => {
+    const early = canPerform(makeBooking({ status: "PICKED_UP", departureAt: hours(-47) }), "dispute", "SHIPPER", ctx);
+    expect(early.allowed).toBe(false);
+    if (!early.allowed) expect(early.reason).toContain("48 hours after the trip departure");
+    expect(canPerform(makeBooking({ status: "PICKED_UP", departureAt: hours(2) }), "dispute", "SHIPPER", ctx).allowed).toBe(false);
+    expect(canPerform(makeBooking({ status: "PICKED_UP" }), "dispute", "SHIPPER", ctx).allowed).toBe(false);
+    expect(canPerform(makeBooking({ status: "PICKED_UP", departureAt: hours(-48) }), "dispute", "SHIPPER", ctx).allowed).toBe(true);
   });
 
   it("aucune annulation depuis DELIVERED — seule voie : dispute (avant J+4)", () => {
@@ -460,7 +516,7 @@ describe("S10 — getAllowedActions par rôle (source des CTAs front)", () => {
     ["PENDING", "CARRIER", ["accept", "decline"]],
     ["ACCEPTED", "SHIPPER", ["cancel"]],
     ["ACCEPTED", "CARRIER", ["cancel", "pickup", "refusePickup"]],
-    ["PICKED_UP", "SHIPPER", []],
+    ["PICKED_UP", "SHIPPER", []], // sans départ dépassé : rien (le guard 48 h ferme `dispute`)
     ["PICKED_UP", "CARRIER", ["deliver"]],
     ["DELIVERED", "SHIPPER", ["confirmEarly", "dispute"]],
     ["DELIVERED", "CARRIER", []],
@@ -503,6 +559,29 @@ describe("S10 — getAllowedActions par rôle (source des CTAs front)", () => {
 // ─────────────────────────────────────────────
 // S11 — canRegenerateCode
 // ─────────────────────────────────────────────
+
+describe("S12 — notation (B5/D53) : COMPLETED, fenêtre 14 j, une fois par rôle", () => {
+  it("C-PR2 (D54 4B) : un deal clos par médiation (completedBy ADMIN) ne se note jamais", () => {
+    const b = makeBooking({ status: "COMPLETED", completedBy: "ADMIN" } as never);
+    expect(canRate(b, "SHIPPER", ctx.now)).toEqual({ allowed: false, reason: "A deal closed by mediation cannot be rated." });
+    expect(canRate(b, "CARRIER", ctx.now)).toEqual({ allowed: false, reason: "A deal closed by mediation cannot be rated." });
+  });
+  it("permise sur COMPLETED dans la fenêtre, par chaque rôle indépendamment", () => {
+    const b = makeBooking({ status: "COMPLETED", ratingWindowEndsAt: hours(24) });
+    expect(canRate(b, "SHIPPER", NOW).allowed).toBe(true);
+    expect(canRate(b, "CARRIER", NOW).allowed).toBe(true);
+    expect(canRate({ ...b, shipperRatedAt: hours(-1) }, "SHIPPER", NOW).allowed).toBe(false);
+    expect(canRate({ ...b, shipperRatedAt: hours(-1) }, "CARRIER", NOW).allowed).toBe(true);
+  });
+  it("refusée hors COMPLETED, après la fenêtre, sur un booking effacé", () => {
+    expect(canRate(makeBooking({ status: "DISPUTED" }), "SHIPPER", NOW).allowed).toBe(false);
+    expect(canRate(makeBooking({ status: "CANCELLED" }), "SHIPPER", NOW).allowed).toBe(false);
+    const closed = canRate(makeBooking({ status: "COMPLETED", ratingWindowEndsAt: NOW }), "SHIPPER", NOW);
+    expect(closed.allowed).toBe(false);
+    if (!closed.allowed) expect(closed.reason).toContain("14 days");
+    expect(canRate(makeBooking({ status: "COMPLETED", isDeleted: true }), "SHIPPER", NOW).allowed).toBe(false);
+  });
+});
 
 describe("S11 — régénération du code (Expéditeur, PICKED_UP, ≤ 5)", () => {
   it("permise en PICKED_UP, compteur à 0", () => {

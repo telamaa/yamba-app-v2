@@ -77,13 +77,28 @@ export function ReportFormBody(
         sub={compact ? undefined : t("report.category.sub")}
         compact={compact}
       >
-        <ReportRadioGroup
-          name={t("report.category.title")}
-          options={categoryOptions}
-          selectedId={props.category}
-          onSelectAction={props.onCategoryAction}
-          compact={compact}
-        />
+        {props.lockedCategory ? (
+          <div className="space-y-2.5">
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-3 text-[12.5px] leading-snug text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/25 dark:text-amber-200">
+              {t("report.category.lockedText", { carrierFirstName })}
+            </div>
+            <ReportRadioGroup
+              name={t("report.category.title")}
+              options={categoryOptions.filter((o) => o.id === "NOT_DELIVERED")}
+              selectedId="NOT_DELIVERED"
+              onSelectAction={() => undefined}
+              compact={compact}
+            />
+          </div>
+        ) : (
+          <ReportRadioGroup
+            name={t("report.category.title")}
+            options={categoryOptions}
+            selectedId={props.category}
+            onSelectAction={props.onCategoryAction}
+            compact={compact}
+          />
+        )}
       </ReportBlock>
 
       {/* Bloc 2 — Description */}

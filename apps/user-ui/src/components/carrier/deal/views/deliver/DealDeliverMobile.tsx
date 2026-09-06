@@ -13,6 +13,7 @@ import type { DealDeliverViewProps } from "./DealDeliverClient";
 import DeliverHelpCard from "./DeliverHelpCard";
 import { DeliverInfoBox, DeliverRecipientRow } from "./DeliverInfoBox";
 import DeliverOtpInput from "./DeliverOtpInput";
+import DeliverPhotosBlock from "./DeliverPhotosBlock";
 
 export default function DealDeliverMobile(props: DealDeliverViewProps) {
   const t = useTranslations("carrierDealDeliver");
@@ -69,7 +70,7 @@ export default function DealDeliverMobile(props: DealDeliverViewProps) {
 
       <div className="flex-1 space-y-3 px-4 pb-10 pt-4">
         <header>
-          <h2 className="text-[19px] font-black tracking-tight text-slate-900 dark:text-white">
+          <h2 className="text-[17px] font-semibold tracking-tight text-slate-900 dark:text-white">
             {t("h1")}
           </h2>
           <p className="mt-0.5 text-[13px] text-slate-500 dark:text-slate-400">
@@ -87,6 +88,8 @@ export default function DealDeliverMobile(props: DealDeliverViewProps) {
           <DeliverRecipientRow recipient={deal.recipient} compact />
         )}
 
+        {/* A76 — photo optionnelle de la remise, AVANT le code. */}
+        <DeliverPhotosBlock photos={props.photos} onAddAction={props.onAddPhotoAction} onRemoveAction={props.onRemovePhotoAction} compact />
         <DeliverOtpInput
           recipientFirstName={recipientFirstName}
           attemptsUsed={props.attemptsUsed}
@@ -94,12 +97,13 @@ export default function DealDeliverMobile(props: DealDeliverViewProps) {
           errorMessage={props.errorMessage}
           isLocked={props.isLocked}
           lockCountdown={props.lockCountdown}
-          isSubmitting={props.isSubmitting}
+          isSubmitting={props.isSubmitting || !props.photosReady}
           onSubmitAction={props.onSubmitAction}
           compact
         />
 
         <DeliverHelpCard
+          bookingId={deal.id}
           shipper={deal.shipper}
           recipientFirstName={recipientFirstName}
           compact

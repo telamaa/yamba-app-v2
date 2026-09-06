@@ -9,9 +9,11 @@
 
 "use client";
 
-import { ImageIcon, MessageSquare, Package } from "lucide-react";
+import { MessageSquare } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import type { DealRequest } from "@/components/carrier/deal/deal.types";
+import PhotoThumbs from "@/components/shared/photos/PhotoThumbs";
+import { useOpenDealThread } from "@/hooks/useMessaging";
 
 // ── TON PAIEMENT ──────────────────────────────────────────
 
@@ -71,22 +73,7 @@ export function TrackingParcelCard({ deal }: { deal: DealRequest }) {
         {deal.parcel.description}
       </p>
       {deal.pickup && deal.pickup.photos.length > 0 && (
-        <div className="mt-3 flex gap-2">
-          {deal.pickup.photos.map((photo) => (
-            <div
-              key={photo.id}
-              className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg text-white"
-              style={{ background: "linear-gradient(135deg, #BA7517, #EF9F27)" }}
-              aria-label={photo.label}
-            >
-              {photo.context === "PICKUP_PACKAGED" ? (
-                <Package size={15} aria-hidden="true" />
-              ) : (
-                <ImageIcon size={15} aria-hidden="true" />
-              )}
-            </div>
-          ))}
-        </div>
+        <PhotoThumbs photos={deal.pickup.photos} tone="amber" size="md" className="mt-3" />
       )}
     </section>
   );
@@ -99,10 +86,8 @@ export function TrackingShipperCard({ deal }: { deal: DealRequest }) {
   const { shipper } = deal;
   const initials = `${shipper.firstName[0] ?? ""}${shipper.lastInitial}`.toUpperCase();
 
-  const handleMessage = () => {
-    // eslint-disable-next-line no-console
-    console.info("[tracking] open message thread with", shipper.id);
-  };
+  const thread = useOpenDealThread();
+  const handleMessage = () => thread.open(deal.id);
 
   return (
     <section className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950">
@@ -122,14 +107,17 @@ export function TrackingShipperCard({ deal }: { deal: DealRequest }) {
             {shipper.firstName} {shipper.lastInitial}.
           </div>
           <div className="text-[11px] text-slate-500 dark:text-slate-400">
-            ⭐ {shipper.rating.toFixed(1)} · {t("shipperCard.subtitle")}
+            {/* rating absent de l'API réelle — masqué alors */}
+            {shipper.rating != null && <>⭐ {shipper.rating.toFixed(1)} · </>}
+            {t("shipperCard.subtitle")}
           </div>
         </div>
       </div>
       <button
         type="button"
         onClick={handleMessage}
-        className="mt-3 inline-flex min-h-[42px] w-full items-center justify-center gap-1.5 rounded-xl border border-slate-300 bg-white text-[12.5px] font-semibold text-slate-800 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:hover:bg-slate-800"
+        disabled={thread.isPending}
+        className="mt-3 inline-flex min-h-[42px] w-full items-center justify-center gap-1.5 rounded-xl border border-slate-300 bg-white text-[12.5px] font-semibold text-slate-800 transition-colors hover:bg-slate-50 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:hover:bg-slate-800"
       >
         <MessageSquare size={13} aria-hidden="true" />
         {t("shipperCard.message")}

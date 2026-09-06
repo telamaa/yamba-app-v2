@@ -15,7 +15,13 @@
  * pino + correlation ID dès la naissance ; le handler trace le
  * correlationId PORTÉ PAR LES ÉVÉNEMENTS (gateway → outbox → Kafka).
  */
+import { initSentry } from "@packages/error-handler";
+// C-PR3 (D56 7A) — Sentry : inerte sans SENTRY_DSN ; 5xx tagués du service et de l'identifiant de corrélation.
+initSentry("notification-service");
 import express from "express";
+import { healthHandler, mongoCheck, redisCheck } from "@packages/libs/health";
+import prisma from "@packages/libs/prisma";
+import redis from "@packages/libs/redis";
 import cors from "cors";
 import cookieParser = require("cookie-parser");
 import { randomUUID } from "crypto";
@@ -28,8 +34,10 @@ import {
   TOPICS,
 } from "@packages/messaging";
 import { handleBookingEventMessage } from "./consumer/booking-events.consumer";
+import { handleMessagingEventMessage } from "./consumer/messaging-events.consumer";
 import { buildOpenApiDocument } from "./openapi/build-openapi";
 import notificationRouter from "./routes/notification.routes";
+import { makeRetentionService, startRetentionCron } from "./cron/retention.cron";
 
 const logger = pino({
   name: "notification-service",
@@ -60,7 +68,8 @@ app.use(
     credentials: true,
   })
 );
-app.use(express.json({ limit: "10mb" }));
+// D35 3A — le corps brut est conservé pour vérifier la signature du webhook email.
+app.use(express.json({ limit: "10mb", verify: (req, _res, buf) => { (req as express.Request & { rawBody?: string }).rawBody = buf.toString("utf8"); } }));
 app.use(cookieParser());
 
 app.get("/", (req, res) => {
@@ -69,9 +78,7 @@ app.get("/", (req, res) => {
 
 // Health check — utilisé par le gateway et les smoke tests CI.
 // Volontairement AVANT les routes authentifiées et sans dépendance DB.
-app.get("/health", (req, res) => {
-  res.json({ status: "ok", service: "notification-service" });
-});
+app.get("/health", healthHandler("notification-service", { mongo: mongoCheck(prisma), redis: redisCheck(redis) })); // D64 3A
 
 // OpenAPI 3.1 GÉNÉRÉ depuis les schémas Zod (D3) — pattern deal.
 const openApiDocument = buildOpenApiDocument();
@@ -102,8 +109,11 @@ app.use(notificationRouter);
 app.use(errorMiddleware);
 
 const port = Number(process.env.NOTIFICATION_SERVICE_PORT ?? 6004);
+let retentionCron: import("node-cron").ScheduledTask | null = null;
 const server = app.listen(port, () => {
   logger.info(`notification-service listening on :${port}`);
+  // C-PR8c (D64 6A) — purge nocturne : notifications, traces d'emails, registre consommé
+  if (process.env.RETENTION_CRON_ENABLED !== "false") retentionCron = startRetentionCron(makeRetentionService(), logger.child({ module: "retention-cron" }));
 });
 
 server.on("error", (err) => {
@@ -157,10 +167,41 @@ if (consumerEnabled) {
   logger.info("Consumer disabled (NOTIFICATION_CONSUMER_ENABLED=false)");
 }
 
+// ── Consumer messaging-events (F-PR2, D61 6A) ───────────────────────
+// Groupe et topic SÉPARÉS : un incident sur le chat ne bloque jamais les
+// événements d'argent, et chaque flux garde ses propres offsets.
+const messagingLogger = logger.child({ module: "messaging-events-consumer" });
+const messagingConsumer = new KafkaEventConsumer({
+  brokers: (process.env.KAFKA_BROKERS || "localhost:9092").split(",").map((broker) => broker.trim()),
+  clientId: "notification-service-messaging",
+  groupId: CONSUMER_GROUPS.MESSAGING_NOTIFICATIONS,
+});
+let messagingConsumerRunning = false;
+let messagingRetryTimer: NodeJS.Timeout | null = null;
+
+async function startMessagingConsumer(): Promise<void> {
+  try {
+    await messagingConsumer.connect();
+    await messagingConsumer.subscribe(TOPICS.MESSAGING_EVENTS);
+    await messagingConsumer.run((message) => handleMessagingEventMessage(message, messagingLogger));
+    messagingConsumerRunning = true;
+    messagingLogger.info({ topic: TOPICS.MESSAGING_EVENTS, groupId: CONSUMER_GROUPS.MESSAGING_NOTIFICATIONS }, "Messaging consumer running");
+  } catch (err) {
+    messagingLogger.error({ err, nextRetryMs: CONSUMER_RETRY_MS }, "Messaging consumer start failed — retrying");
+    messagingRetryTimer = setTimeout(() => {
+      void startMessagingConsumer();
+    }, CONSUMER_RETRY_MS);
+    messagingRetryTimer.unref();
+  }
+}
+
+if (consumerEnabled) void startMessagingConsumer();
+
 // ── Arrêt propre — gardé contre les SIGINT répétés (leçon PR4) ──────
 let shuttingDown = false;
 
 async function shutdown(signal: string): Promise<void> {
+  retentionCron?.stop();
   if (shuttingDown) return;
   shuttingDown = true;
   logger.info({ signal }, "Shutting down");
@@ -168,6 +209,15 @@ async function shutdown(signal: string): Promise<void> {
   const belt = setTimeout(() => process.exit(0), 5_000);
   belt.unref();
   if (retryTimer) clearTimeout(retryTimer);
+  if (messagingRetryTimer) clearTimeout(messagingRetryTimer);
+  if (messagingConsumerRunning || consumerEnabled) {
+    try {
+      await messagingConsumer.disconnect();
+      messagingLogger.info("Messaging consumer disconnected");
+    } catch (err) {
+      messagingLogger.error({ err }, "Messaging consumer disconnect failed");
+    }
+  }
   if (consumerRunning || consumerEnabled) {
     try {
       await consumer.disconnect();

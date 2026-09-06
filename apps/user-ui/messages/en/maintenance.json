@@ -1,0 +1,5 @@
+{
+  "readOnly": "Maintenance in progress: the platform is read-only, you can browse but not book, publish or write.",
+  "scheduled": "Maintenance scheduled on {date}: the platform will be read-only during the operation.",
+  "writeRefused": "The platform is under maintenance: try again in a few minutes."
+}

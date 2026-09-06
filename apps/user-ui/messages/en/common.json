@@ -30,6 +30,7 @@
   "userMenu": {
     "myAccount": "My account",
     "myTrips": "My trips",
+    "myFavorites": "My favorites",
     "notifications": "Notifications",
     "help": "Help",
     "logout": "Sign out",
@@ -46,15 +47,15 @@
       "theme": "Appearance"
     },
     "badges": {
-      "yamberActive": "Active Yamber",
-      "yamberVerified": "Verified Yamber",
+      "yamberActive": "Active Traveler",
+      "yamberVerified": "Verified Traveler",
       "yamberPending": "Profile incomplete"
     }
   },
   "discover": {
     "sectionLabel": "Discover Yamba",
     "howItWorks": "How it works",
-    "becomeYamber": "Become a Yamber",
+    "becomeYamber": "Become a Traveler",
     "helpFaq": "Help & FAQ"
   },
   "footer": {
@@ -67,7 +68,7 @@
     },
     "discover": {
       "howItWorks": "How it works",
-      "becomeYamber": "Become a Yamber",
+      "becomeYamber": "Become a Traveler",
       "helpFaq": "Help & FAQ"
     },
     "company": {
@@ -168,5 +169,55 @@
   },
   "dates": {
     "today": "Today"
+  },
+  "lightbox": {
+    "close": "Close",
+    "previous": "Previous photo",
+    "next": "Next photo",
+    "counter": "{current} / {total}"
+  },
+  "authGate": {
+    "later": "Not now",
+    "shareTrip": {
+      "title": "Sign in to share a trip",
+      "subtitle": "Publishing a trip commits an identified carrier: Yamba needs to know who is carrying. Your trip will be waiting after sign-in."
+    },
+    "favorite": {
+      "title": "Sign in to save a favorite",
+      "subtitle": "Your favorites are tied to your account: they follow you on every device. This trip will be waiting after sign-in."
+    },
+    "follow": {
+      "title": "Sign in to follow {firstName}",
+      "subtitle": "Following {firstName} tells you about their next trips: it is tied to your account. You stay on this profile after sign-in."
+    },
+    "sessionExpired": {
+      "title": "Your session has expired",
+      "subtitle": "For safety, a session closes after one hour without activity (tick “Stay signed in” for 7 days). Sign in again: you stay on this page."
+    }
+  },
+  "report": {
+    "title": { "TRIP": "Report this listing", "USER": "Report this profile" },
+    "intro": "Tell us what's wrong. Our team reviews every report; the person concerned will never know who reported them.",
+    "reason": "Reason",
+    "reasons": {
+      "ILLEGAL_CONTENT": "Illegal or prohibited content",
+      "SCAM": "Suspected scam",
+      "INAPPROPRIATE": "Inappropriate behaviour",
+      "IMPERSONATION": "Impersonation",
+      "OTHER": "Other"
+    },
+    "details": "Details (optional)",
+    "detailsPlaceholder": "What you saw, when…",
+    "submit": "Send the report",
+    "sending": "Sending…",
+    "cancel": "Cancel",
+    "back": "Close",
+    "done": "Thank you, your report has been received.",
+    "doneHint": "A confirmation email has been sent. We don't share the outcome.",
+    "already": "You already reported this; our team is on it.",
+    "ownTarget": "You can't report your own content.",
+    "failed": "The report couldn't be sent. Please try again.",
+    "gateTitle": "Sign in to report",
+    "gateSubtitle": "A report is always signed: it protects everyone from abuse."
   }
 }

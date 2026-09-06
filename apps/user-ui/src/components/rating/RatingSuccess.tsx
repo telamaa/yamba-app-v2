@@ -2,21 +2,26 @@
  * RatingSuccess.tsx
  * =================
  * "Merci pour ton retour !" + rappel réciprocité (double-aveugle 14j)
- * + retour à l'accueil.
+ * + retour au Deal (B5-PR2). Si l'autre avait déjà noté, on le dit : les avis sont révélés.
  */
 
 "use client";
 
 import { Star } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { useFormatter, useTranslations } from "next-intl";
 
 type Props = {
   ratedFirstName: string;
-  onBackHomeAction: () => void;
+  /** L'autre avait déjà noté : les deux avis viennent d'être révélés. */
+  revealed: boolean;
+  windowEndsAt: string | null;
+  onBackAction: () => void;
 };
 
-export default function RatingSuccess({ ratedFirstName, onBackHomeAction }: Props) {
+export default function RatingSuccess({ ratedFirstName, revealed, windowEndsAt, onBackAction }: Props) {
   const t = useTranslations("rating");
+  const format = useFormatter();
+  const windowEnd = windowEndsAt ? format.dateTime(new Date(windowEndsAt), { day: "numeric", month: "long" }) : "";
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-10 dark:bg-slate-950">
@@ -34,16 +39,16 @@ export default function RatingSuccess({ ratedFirstName, onBackHomeAction }: Prop
 
         <div className="mt-6 rounded-2xl bg-slate-100 px-5 py-4 text-left dark:bg-slate-900">
           <p className="text-[12.5px] leading-relaxed text-slate-600 dark:text-slate-400">
-            {t("success.reciprocity", { firstName: ratedFirstName })}
+            {revealed ? t("success.revealedNow", { firstName: ratedFirstName }) : t("success.reciprocity", { firstName: ratedFirstName, date: windowEnd })}
           </p>
         </div>
 
         <button
           type="button"
-          onClick={onBackHomeAction}
+          onClick={onBackAction}
           className="mt-6 inline-flex min-h-[48px] w-full items-center justify-center rounded-xl bg-[#FF9900] px-4 text-[14px] font-bold text-slate-950 transition-colors hover:bg-[#F08700]"
         >
-          {t("success.backHome")}
+          {t("success.backToDeal")}
         </button>
       </div>
     </div>

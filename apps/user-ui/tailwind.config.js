@@ -14,5 +14,6 @@ module.exports = {
   darkMode: "class",
   content: ["./src/**/*.{js,ts,jsx,tsx,mdx}"],
   theme: { extend: {} },
-  plugins: [require("@tailwindcss/line-clamp")],
+  // `@tailwindcss/line-clamp` est intégré à Tailwind ≥ 3.3 (le plugin avertissait à chaque démarrage)
+  plugins: [],
 };

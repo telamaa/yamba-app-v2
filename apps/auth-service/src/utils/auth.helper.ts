@@ -2,7 +2,19 @@
 import { ValidationError } from "@packages/error-handler";
 import crypto from "node:crypto";
 import redis from "@packages/libs/redis";
-import { sendEmail } from "./sendMail";
+import { sendAuthEmail } from "../emails/send-auth-email";
+import { getAuthEmails } from "../emails/auth-emails";
+import { resolveLocale } from "@packages/api-contracts";
+import { getOtpFailurePolicy, formatLockDuration } from "./otp-policy";
+import { validatePasswordStrength } from "./password-rules";
+
+// Ré-exports : les contrôleurs continuent d'importer depuis auth.helper.
+export { validatePasswordStrength };
+export type {
+  PasswordValidationContext,
+  PasswordRuleCode,
+  PasswordErrorDetails,
+} from "./password-rules";
 import {
   loadSessionPolicy,
   computeSessionTtlSeconds,
@@ -13,6 +25,8 @@ const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // OTP lifecycle
 const OTP_TTL_SECONDS = 600;                 // 10 min (était 5 min, aligné avec OTP 6 chiffres)
+/** Durée affichée dans les emails OTP — TOUJOURS dérivée du TTL réel (recette 03/09 : « 5 minutes » en dur vs 10 réelles). */
+export const OTP_TTL_MINUTES = OTP_TTL_SECONDS / 60;
 const OTP_COOLDOWN_SECONDS = 60;             // Entre 2 demandes d'OTP
 const OTP_REQUEST_WINDOW_SECONDS = 3600;     // Fenêtre 1h pour rate limiting des resend
 const OTP_SPAM_LOCK_SECONDS = 3600;          // Lock anti-spam 1h
@@ -22,7 +36,9 @@ const OTP_MAX_REQUESTS_PER_WINDOW = 6;       // Max 6 resend par heure
 const OTP_FAILED_COUNTER_TTL = 86400;
 
 // Pending registration & verify token
-const PENDING_REG_TTL_SECONDS = 900;
+// 30 min (était 15) : doit couvrir l'OTP (10 min) + au moins un renvoi, et le
+// renvoi PROLONGE la fenêtre (refreshPendingRegistration) — recette 03/09.
+const PENDING_REG_TTL_SECONDS = 1800;
 const VERIFY_TOKEN_TTL_SECONDS = 900;
 
 // Forgot password
@@ -77,24 +93,36 @@ export type PendingRegistration = {
   consentIp?: string;
   consentUserAgent?: string;
   consentLocale?: string;
+  /** D44 — locale résolue à l'inscription (x-locale), copiée sur User.preferredLocale. */
+  preferredLocale?: string;
 };
 
-type OtpScope = "register" | "forgot";
+type OtpScope = "register" | "forgot" | "sudo" | "email_change"; // sudo : D63 1A ; email_change : D65 4A (clé = NOUVELLE adresse)
 
 /**
  * Type du contexte enrichi pour les erreurs OTP.
- * Transmis via le paramètre `details` de ValidationError.
+ * Transmis via le paramètre `details` de ValidationError (type « safe »,
+ * exposé même en production par error-middleware).
  *
- * Le frontend lit ces infos pour afficher un warning progressif :
- *  - orange à ≤2 tentatives restantes
- *  - rouge à 1 tentative restante
- *  - banner lock + timer décompte
+ * Le frontend construit SES messages (dans la langue de l'utilisateur) à
+ * partir de `code`, `attemptsLeft` et `lockUntilSeconds` — jamais à partir
+ * du `message` anglais de l'API.
  */
+export type OtpErrorCode =
+  | "OTP_INCORRECT"
+  | "OTP_INVALIDATED"
+  | "OTP_LOCKED"
+  | "OTP_EXPIRED";
+
 export type OtpErrorDetails = {
   type: "otp";
+  code: OtpErrorCode;
+  /** Essais restants avant le prochain palier (voir otp-policy.ts). */
   attemptsLeft?: number;
   locked: boolean;
   lockUntilSeconds?: number;
+  /** Le code saisi ne sera plus jamais accepté : il faut en redemander un. */
+  otpInvalidated?: boolean;
 };
 
 /** ---------- Redis Keys ---------- */
@@ -119,112 +147,7 @@ const keys = {
 /** ---------- Utils ---------- */
 export const normalizeEmail = (email: string) => email.trim().toLowerCase();
 
-/**
- * Calcule la durée de lock en secondes selon le numéro d'échec cumulé.
- *
- * Barème exponential backoff Yamba :
- *  - 1er-2ème échec : 0s (pas de pénalité, juste warning visuel)
- *  - 3ème échec : 60s (1 min)
- *  - 4ème échec : 300s (5 min)
- *  - 5ème échec : 1800s (30 min)
- *  - 6ème échec et plus : 86400s (24h) + alerte sécurité par email
- */
-function getLockDurationForAttempt(attemptNumber: number): number {
-  if (attemptNumber <= 2) return 0;
-  if (attemptNumber === 3) return 60;
-  if (attemptNumber === 4) return 300;
-  if (attemptNumber === 5) return 1800;
-  return 86400; // 6 et plus
-}
-
-/**
- * Formatte une durée en secondes en string lisible pour l'utilisateur final.
- */
-function formatLockDuration(seconds: number): string {
-  if (seconds < 60) return `${seconds} second(s)`;
-  if (seconds < 3600) return `${Math.ceil(seconds / 60)} minute(s)`;
-  return `${Math.ceil(seconds / 3600)} hour(s)`;
-}
-
 /** ---------- Validation ---------- */
-function normalizeForComparison(value: string) {
-  return value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .trim();
-}
-
-function looksLikeSimpleDate(password: string) {
-  const digits = password.replace(/\D/g, "");
-  return /^\d{6}$/.test(digits) || /^\d{8}$/.test(digits);
-}
-
-function hasSequentialPattern(password: string) {
-  const lower = password.toLowerCase();
-  const patterns = [
-    "1234", "2345", "3456", "4567", "5678", "6789",
-    "abcd", "azerty", "qwerty", "password", "motdepasse",
-  ];
-  return patterns.some((pattern) => lower.includes(pattern));
-}
-
-function hasTooManyRepeatedChars(password: string) {
-  return /(.)\1{2,}/.test(password);
-}
-
-type PasswordValidationContext = {
-  firstName?: string;
-  lastName?: string;
-  email?: string;
-};
-
-export const validatePasswordStrength = (
-  password: string,
-  context?: PasswordValidationContext
-) => {
-  if (!password) {
-    throw new ValidationError("Password is required!");
-  }
-
-  const commonRuleMessage =
-    "Choose a stronger password with at least 8 characters, including an uppercase letter, a lowercase letter, a number and a special character.";
-
-  if (password.length < 8) throw new ValidationError(commonRuleMessage);
-  if (!/[a-z]/.test(password)) throw new ValidationError(commonRuleMessage);
-  if (!/[A-Z]/.test(password)) throw new ValidationError(commonRuleMessage);
-  if (!/\d/.test(password)) throw new ValidationError(commonRuleMessage);
-  if (!/[^A-Za-z0-9]/.test(password)) throw new ValidationError(commonRuleMessage);
-
-  if (looksLikeSimpleDate(password)) {
-    throw new ValidationError(
-      "For your security, avoid passwords that look like an easy-to-guess date."
-    );
-  }
-
-  if (hasSequentialPattern(password) || hasTooManyRepeatedChars(password)) {
-    throw new ValidationError(
-      "For your security, avoid simple sequences, repeated characters, or overly predictable passwords."
-    );
-  }
-
-  const firstName = normalizeForComparison(context?.firstName ?? "");
-  const lastName = normalizeForComparison(context?.lastName ?? "");
-  const emailLocalPart = normalizeForComparison(context?.email ?? "").split("@")[0] ?? "";
-  const normalizedPassword = normalizeForComparison(password);
-
-  const forbiddenParts = [firstName, lastName, emailLocalPart].filter(
-    (value) => value.length >= 3
-  );
-
-  for (const item of forbiddenParts) {
-    if (normalizedPassword.includes(item)) {
-      throw new ValidationError(
-        "For your security, do not use your first name, last name, or email address in your password."
-      );
-    }
-  }
-};
 
 export const validateRegistrationData = (
   data: RegistrationInput
@@ -306,6 +229,7 @@ const checkOtpRestrictionsScoped = async (scope: OtpScope, emailKey: string) => 
       `Account temporarily locked. Try again in ${formatLockDuration(lockTtl)}.`,
       {
         type: "otp",
+        code: "OTP_LOCKED",
         locked: true,
         lockUntilSeconds: lockTtl,
       } satisfies OtpErrorDetails
@@ -348,12 +272,14 @@ const sendOtpScoped = async (
   scope: OtpScope,
   firstName: string,
   emailKey: string,
-  template: string,
-  subject: string
+  locale: string | null | undefined
 ) => {
   // 🔒 OTP 6 chiffres (standard 2026)
   const otp = crypto.randomInt(100000, 1000000).toString();
-  await sendEmail(emailKey, subject, template, { firstName, otp });
+  const emails = getAuthEmails(locale);
+  const params = { firstName, otp, expiresInMinutes: OTP_TTL_MINUTES };
+  const email = scope === "register" ? emails.verifyEmail(params) : scope === "sudo" ? emails.sudoCode(params) : scope === "email_change" ? emails.verifyNewEmail(params) : emails.resetPassword(params);
+  await sendAuthEmail(emailKey, locale, email);
   await redis.set(keys.otp(scope, emailKey), otp, "EX", OTP_TTL_SECONDS);
   await redis.set(
     keys.otpCooldown(scope, emailKey),
@@ -364,18 +290,19 @@ const sendOtpScoped = async (
 };
 
 /**
- * Vérifie un OTP avec exponential backoff Yamba.
+ * Vérifie un OTP avec le barème par paliers de Yamba (otp-policy.ts) :
+ *  - échecs 1 → 4 : essais restants annoncés, pas de verrou
+ *  - 5e : code invalidé + 1 min · 10e : invalidé + 30 min + alerte · 15e+ : invalidé + 24 h
  *
- * Barème :
- *  - 1er-2ème échec : pas de pénalité (warning visuel front uniquement)
- *  - 3ème : 1 min lock
- *  - 4ème : 5 min lock
- *  - 5ème : 30 min lock
- *  - 6ème+ : 24h lock + email d'alerte sécurité
- *
- * Le compteur d'échecs persiste 24h. Le resend ne reset PAS le compteur (Option B - sécurité Stripe).
+ * Le compteur d'échecs persiste 24 h. Le renvoi ne remet PAS le compteur à zéro
+ * (sécurité) — il fournit seulement un nouveau code.
  */
-const verifyOtpScoped = async (scope: OtpScope, emailKey: string, otp: string) => {
+const verifyOtpScoped = async (
+  scope: OtpScope,
+  emailKey: string,
+  otp: string,
+  locale: string | null | undefined
+) => {
   // 1. Vérifier si lock actif
   const existingLockTtl = await redis.ttl(keys.otpLock(scope, emailKey));
   if (existingLockTtl > 0) {
@@ -383,6 +310,7 @@ const verifyOtpScoped = async (scope: OtpScope, emailKey: string, otp: string) =
       `Account temporarily locked. Try again in ${formatLockDuration(existingLockTtl)}.`,
       {
         type: "otp",
+        code: "OTP_LOCKED",
         locked: true,
         lockUntilSeconds: existingLockTtl,
       } satisfies OtpErrorDetails
@@ -394,6 +322,7 @@ const verifyOtpScoped = async (scope: OtpScope, emailKey: string, otp: string) =
   if (!storedOtp) {
     throw new ValidationError("Code expired. Please request a new one.", {
       type: "otp",
+      code: "OTP_EXPIRED",
       locked: false,
     } satisfies OtpErrorDetails);
   }
@@ -409,78 +338,82 @@ const verifyOtpScoped = async (scope: OtpScope, emailKey: string, otp: string) =
     return;
   }
 
-  // 4. Échec : incrémenter le compteur (TTL 24h)
+  // 4. Échec : incrémenter le compteur cumulé (TTL 24h, jamais remis à zéro par un renvoi)
   const attemptsKey = keys.otpAttempts(scope, emailKey);
   const previousAttempts = Number.parseInt((await redis.get(attemptsKey)) || "0", 10);
   const currentAttempt = previousAttempts + 1;
 
   await redis.set(attemptsKey, String(currentAttempt), "EX", OTP_FAILED_COUNTER_TTL);
 
-  // 5. Calculer la durée de lock selon le palier
-  const lockDuration = getLockDurationForAttempt(currentAttempt);
+  // 5. Politique du palier (otp-policy.ts) : verrou ? code invalidé ? alerte ?
+  const policy = getOtpFailurePolicy(currentAttempt);
 
-  if (lockDuration > 0) {
-    await redis.set(keys.otpLock(scope, emailKey), "locked", "EX", lockDuration);
+  if (policy.invalidateOtp) {
+    // Le code courant ne sera plus jamais accepté : brute-force impossible
+    // au-delà de 5 essais sur un même code. L'utilisateur en redemande un
+    // (cooldown 60 s) une fois le verrou levé.
+    await redis.del(keys.otp(scope, emailKey));
+  }
 
-    // 6. Alerte sécurité au 6ème échec (une seule fois par session)
-    if (currentAttempt >= 6) {
-      await maybeSendSecurityAlert(scope, emailKey);
+  if (policy.lockSeconds > 0) {
+    await redis.set(keys.otpLock(scope, emailKey), "locked", "EX", policy.lockSeconds);
+
+    if (policy.securityAlert) {
+      await maybeSendSecurityAlert(scope, emailKey, locale, currentAttempt, policy.lockSeconds);
     }
 
     throw new ValidationError(
-      `Incorrect code. Account locked for ${formatLockDuration(lockDuration)}.`,
+      `Incorrect code. This code is no longer valid — request a new one in ${formatLockDuration(policy.lockSeconds)}.`,
       {
         type: "otp",
+        code: "OTP_INVALIDATED",
         locked: true,
-        lockUntilSeconds: lockDuration,
+        lockUntilSeconds: policy.lockSeconds,
+        otpInvalidated: true,
+        attemptsLeft: 0,
       } satisfies OtpErrorDetails
     );
   }
 
-  // 7. Pas de lock encore : informer du nombre de tentatives restantes avant lock
-  const attemptsBeforeLock = 2 - currentAttempt;
-
+  // 6. Pas de palier atteint : informer du nombre d'essais restants
   throw new ValidationError(
-    `Incorrect code. ${attemptsBeforeLock} attempt(s) left before temporary lock.`,
+    `Incorrect code. ${policy.attemptsLeft} attempt(s) left before this code is invalidated.`,
     {
       type: "otp",
-      attemptsLeft: attemptsBeforeLock,
+      code: "OTP_INCORRECT",
+      attemptsLeft: policy.attemptsLeft,
       locked: false,
     } satisfies OtpErrorDetails
   );
 };
 
 /**
- * Envoie un email d'alerte sécurité au 6ème échec OTP.
+ * Envoie un email d'alerte sécurité à partir du 10e échec OTP (palier 2, A50).
  * Une seule alerte par session de tentatives (pour ne pas spammer).
  */
-async function maybeSendSecurityAlert(scope: OtpScope, emailKey: string) {
+async function maybeSendSecurityAlert(
+  scope: OtpScope,
+  emailKey: string,
+  locale: string | null | undefined,
+  attemptCount: number,
+  lockSeconds: number
+) {
   const alertedKey = keys.otpSecurityAlerted(scope, emailKey);
   const alreadySent = await redis.get(alertedKey);
   if (alreadySent) return;
 
   await redis.set(alertedKey, "1", "EX", OTP_FAILED_COUNTER_TTL);
 
-  const isRegister = scope === "register";
-
-  try {
-    await sendEmail(
-      emailKey,
-      isRegister
-        ? "Activité suspecte sur votre inscription Yamba"
-        : "Activité suspecte sur votre compte Yamba",
-      "security-alert-mail",
-      {
-        scope,
-        scopeLabel: isRegister ? "inscription" : "réinitialisation de mot de passe",
-        attemptCount: 6,
-        lockDuration: "24 heures",
-        supportEmail: "support@yamba.com",
-      }
-    );
-  } catch (error) {
-    console.error("[security-alert] Failed to send alert email:", error);
-  }
+  await sendAuthEmail(
+    emailKey,
+    locale,
+    getAuthEmails(locale).securityAlert({
+      scope,
+      attemptCount,
+      lockSeconds,
+      supportEmail: "support@yamba.com",
+    })
+  );
 }
 
 // ─── Exports backward-compatible ──────────────────────────
@@ -490,11 +423,17 @@ export const checkOtpRestrictions = async (emailKey: string) =>
 export const trackOtpRequests = async (emailKey: string) =>
   trackOtpRequestsScoped("register", emailKey);
 
-export const sendOtp = async (firstName: string, emailKey: string, template: string) =>
-  sendOtpScoped("register", firstName, emailKey, template, "Verify Your Email");
+export const sendOtp = async (
+  firstName: string,
+  emailKey: string,
+  locale: string | null | undefined
+) => sendOtpScoped("register", firstName, emailKey, locale);
 
-export const verifyOtp = async (emailKey: string, otp: string) =>
-  verifyOtpScoped("register", emailKey, otp);
+export const verifyOtp = async (
+  emailKey: string,
+  otp: string,
+  locale: string | null | undefined
+) => verifyOtpScoped("register", emailKey, otp, locale);
 
 export const checkForgotPasswordOtpRestrictions = async (emailKey: string) =>
   checkOtpRestrictionsScoped("forgot", emailKey);
@@ -505,11 +444,26 @@ export const trackForgotPasswordOtpRequests = async (emailKey: string) =>
 export const sendForgotPasswordOtp = async (
   firstName: string,
   emailKey: string,
-  template: string
-) => sendOtpScoped("forgot", firstName, emailKey, template, "Reset Your Password");
+  locale: string | null | undefined
+) => sendOtpScoped("forgot", firstName, emailKey, locale);
 
-export const verifyForgotPasswordOtpCode = async (emailKey: string, otp: string) =>
-  verifyOtpScoped("forgot", emailKey, otp);
+export const verifyForgotPasswordOtpCode = async (
+  emailKey: string,
+  otp: string,
+  locale: string | null | undefined
+) => verifyOtpScoped("forgot", emailKey, otp, locale);
+
+/** ---------- Sudo (C-PR8b, D63 1A) : export / effacement — mêmes paliers que l'OTP ---------- */
+export const checkSudoOtpRestrictions = async (emailKey: string) => checkOtpRestrictionsScoped("sudo", emailKey);
+export const trackSudoOtpRequests = async (emailKey: string) => trackOtpRequestsScoped("sudo", emailKey);
+export const sendSudoOtp = async (firstName: string, emailKey: string, locale: string | null | undefined) => sendOtpScoped("sudo", firstName, emailKey, locale);
+export const verifySudoOtp = async (emailKey: string, otp: string, locale: string | null | undefined) => verifyOtpScoped("sudo", emailKey, otp, locale);
+
+/** ---------- Changement d'email (D65 4A) : code à la NOUVELLE adresse ---------- */
+export const checkEmailChangeOtpRestrictions = async (newEmailKey: string) => checkOtpRestrictionsScoped("email_change", newEmailKey);
+export const trackEmailChangeOtpRequests = async (newEmailKey: string) => trackOtpRequestsScoped("email_change", newEmailKey);
+export const sendEmailChangeOtp = async (firstName: string, newEmailKey: string, locale: string | null | undefined) => sendOtpScoped("email_change", firstName, newEmailKey, locale);
+export const verifyEmailChangeOtp = async (newEmailKey: string, otp: string, locale: string | null | undefined) => verifyOtpScoped("email_change", newEmailKey, otp, locale);
 
 /** ---------- Pending Registration ---------- */
 export const storePendingRegistration = async (
@@ -522,6 +476,16 @@ export const storePendingRegistration = async (
     "EX",
     PENDING_REG_TTL_SECONDS
   );
+};
+
+/**
+ * Prolonge la fenêtre d'inscription en attente (appelé à chaque renvoi d'OTP) :
+ * sans cela, un code renvoyé à la 10e minute restait valable jusqu'à la 20e
+ * alors que l'inscription mourait à la 15e (« session expirée » avec un code
+ * valide en main — recette 03/09).
+ */
+export const refreshPendingRegistration = async (emailKey: string) => {
+  await redis.expire(keys.pendingUser(emailKey), PENDING_REG_TTL_SECONDS);
 };
 
 export const getPendingRegistration = async (
@@ -598,7 +562,12 @@ export type SessionRecord = {
   createdAt: number;      // epoch ms — création de la SESSION (pas du jti)
   lastActivityAt: number; // epoch ms — dernier refresh/login
   rememberMe: boolean;
+  /** D65 2A — posés à la connexion, conservés à la rotation (jamais une empreinte) */
+  ip?: string | null;
+  userAgent?: string | null;
+  device?: string | null;
 };
+export type SessionMeta = Pick<SessionRecord, "ip" | "userAgent" | "device">;
 
 /**
  * Crée/rotate une clé de session. TTL = min(fenêtre d'inactivité,
@@ -611,14 +580,15 @@ export const storeRefreshSession = async (
   userId: string,
   jti: string,
   rememberMe: boolean,
-  createdAt: number = Date.now()
+  createdAt: number = Date.now(),
+  meta: SessionMeta = {}
 ): Promise<number> => {
   const now = Date.now();
   const policy = loadSessionPolicy();
   const ttlSeconds = computeSessionTtlSeconds(createdAt, rememberMe, policy, now);
   if (ttlSeconds <= 0) return 0;
 
-  const record: SessionRecord = { createdAt, lastActivityAt: now, rememberMe };
+  const record: SessionRecord = { createdAt, lastActivityAt: now, rememberMe, ip: meta.ip ?? null, userAgent: meta.userAgent ?? null, device: meta.device ?? null };
   await redis.set(
     `refresh_jti:${userId}:${jti}`,
     JSON.stringify(record),
@@ -682,10 +652,8 @@ export const revokeRefreshJti = async (userId: string, jti?: string) => {
   }
 };
 
-/** ---------- Email helpers ---------- */
+/** ---------- Email helpers (D44 : locale du destinataire) ---------- */
 type PasswordChangedEmailPayload = {
-  firstName?: string;
-  name?: string;
   changedAt?: string;
   ip?: string;
   userAgent?: string;
@@ -695,18 +663,21 @@ type PasswordChangedEmailPayload = {
 export const sendPasswordChangedEmail = async (
   firstName: string | undefined,
   emailKey: string,
-  payload?: Omit<PasswordChangedEmailPayload, "firstName">
+  locale: string | null | undefined,
+  payload?: PasswordChangedEmailPayload
 ) => {
-  return sendEmail(
+  return sendAuthEmail(
     emailKey,
-    "Mot de passe modifié - Yamba",
-    "password-changed-mail",
-    { firstName, ...(payload ?? {}) }
+    locale,
+    getAuthEmails(locale).passwordChanged({
+      firstName,
+      ...(payload ?? {}),
+      supportEmail: "support@yamba.com",
+    })
   );
 };
 
 type AccountCreatedEmailPayload = {
-  firstName?: string;
   loginUrl?: string;
   supportEmail?: string;
 };
@@ -714,16 +685,24 @@ type AccountCreatedEmailPayload = {
 export const sendAccountCreatedEmail = async (
   firstName: string | undefined,
   emailKey: string,
-  payload?: Omit<AccountCreatedEmailPayload, "firstName">
+  locale: string | null | undefined,
+  payload?: AccountCreatedEmailPayload
 ) => {
-  return sendEmail(
+  return sendAuthEmail(
     emailKey,
-    "Bienvenue sur Yamba 🎉",
-    "account-created-mail",
-    {
+    locale,
+    getAuthEmails(locale).accountCreated({
       firstName,
       loginUrl: payload?.loginUrl,
       supportEmail: payload?.supportEmail ?? "support@yamba.com",
-    }
+    })
   );
+};
+
+/** Locale d'une requête HTTP (x-locale, sinon Accept-Language) — résolue. */
+export const localeFromHeaders = (headers: Record<string, unknown>): string => {
+  const x = headers["x-locale"];
+  if (typeof x === "string" && x) return resolveLocale(x);
+  const accept = headers["accept-language"];
+  return resolveLocale(typeof accept === "string" ? accept : undefined);
 };

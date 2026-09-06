@@ -35,7 +35,7 @@
     "rate": "Rate {firstName}"
   },
   "trip": {
-    "statusPublished": "Published",
+    "statusPublished": "Online",
     "statusDeparted": "In flight",
     "statusArrived": "Arrived",
     "statusCompleted": "Completed",
@@ -74,7 +74,16 @@
     "badgeReady": "Ready to deliver",
     "badgeDelivered": "Delivered",
     "badgeCompleted": "Completed",
-    "badgeDisputed": "Dispute"
+    "badgeDisputed": "Dispute",
+    "completedSentSub": "{earnings} sent to your account on {date} · 2 to 7 days to arrive",
+    "completedPendingSub": "Completed · {earnings} being sent to your account",
+    "completedBlockedSub": "Completed · {earnings} on hold: finish your Stripe account",
+    "disputedSub": "Report {ticket} · payout on hold · we will contact you",
+    "cancelledCompensationSentSub": "Cancelled late · {amount} compensation sent to your account",
+    "cancelledCompensationPendingSub": "Cancelled late · {amount} compensation being sent",
+    "cancelledCompensationBlockedSub": "Cancelled late · {amount} compensation on hold: finish your Stripe account",
+    "cancelledHeldSub": "Cancelled after departure · retention held, we will contact you",
+    "rateHint": "remember to rate {firstName}"
   },
   "historyRow": {
     "title": "{origin} → {destination} · {date}",
@@ -100,11 +109,10 @@
     "CABIN_BAG_12KG": "Cabin bag 12 kg"
   },
   "loadError": "Could not load your trips. Please try again shortly.",
-
   "status": {
     "DRAFT": "Draft",
-    "PUBLISHED": "Active",
-    "PAUSED": "Paused",
+    "PUBLISHED": "Online",
+    "PAUSED": "Hidden",
     "COMPLETED": "Completed",
     "CANCELLED": "Cancelled",
     "ARCHIVED": "Archived"
@@ -119,8 +127,8 @@
     "viewPublic": "View as shipper",
     "edit": "Edit",
     "activate": "Activate",
-    "resume": "Resume",
-    "pause": "Pause",
+    "resume": "Put back online",
+    "pause": "Hide",
     "revertToDraft": "Revert to draft",
     "duplicate": "Duplicate",
     "archive": "Archive",
@@ -145,7 +153,13 @@
     "demands": "{count, plural, =1 {1 request} other {# requests}}",
     "setupRequired": "Setup required",
     "errorTitle": "Unable to load your trips.",
-    "retry": "Retry"
+    "retry": "Retry",
+    "subtitle": "{actions, plural, =0 {Nothing to handle} =1 {1 action to handle} other {# actions to handle}} · {upcoming, plural, =0 {no upcoming trip} =1 {1 upcoming trip} other {# upcoming trips}}",
+    "deals": {
+      "title": "Requests and parcels",
+      "empty": "No request for this trip yet.",
+      "toggle": "{count, plural, =1 {1 parcel} other {# parcels}}"
+    }
   },
   "gates": {
     "onboardingToast": "Complete your carrier profile to activate this trip",
@@ -154,10 +168,11 @@
     "stripeCta": "Configure Stripe"
   },
   "toasts": {
+    "cancelBlocked": "This trip still has {count, plural, =1 {one deal in progress} other {# deals in progress}}: cancel them first from « My deals ». Each shipper is then refunded in full.",
     "activated": "Trip activated",
     "activationFailed": "Failed to activate",
-    "resumed": "Trip resumed",
-    "paused": "Trip paused",
+    "resumed": "Trip back online",
+    "paused": "Trip hidden",
     "reverted": "Trip reverted to draft",
     "restored": "Trip restored as draft",
     "archived": "Trip archived",
@@ -218,6 +233,10 @@
     "createdAt": "Created",
     "publishedAt": "Published",
     "cancelledAt": "Cancelled",
+    "hiddenByAdmin": {
+      "title": "Trip hidden by Yamba",
+      "body": "This trip no longer appears in search or on its public page. Your ongoing bookings continue as usual. An email was sent to you: reply to support to discuss it."
+    },
     "tripTypes": {
       "ONE_WAY": "One way",
       "ROUND_TRIP": "Round trip"
@@ -250,5 +269,10 @@
       "cityWide": "Whole city",
       "radius": "Within {km} km"
     }
+  },
+  "payoutBanner": {
+    "title": "{amount} on hold: finish your Stripe account",
+    "text": "Your payment account is not ready to receive transfers yet. Finish your onboarding: pending payouts leave automatically afterwards.",
+    "cta": "Finish my account"
   }
 }

@@ -10,16 +10,20 @@
  *   service   = max(12 % du transport, 3 €)                     (D16)
  *   total     = transport + service
  *
- * Les paramètres sont ceux du mockup §13 — même source que
- * comparable-price.ts ; à centraliser dans la PR « paramètres serveur ».
+ * D62 — les paramètres viennent de la plateforme (`pricing.*`) : chaque fonction les
+ * reçoit en argument, `PRICING_PARAMS` n'est que le défaut (les anciennes constantes).
  */
 
-export const PRICING_PARAMS = {
+export type WeightPricingParams = { minBillableKg: number; minTransportCents: number; commissionPct: number; commissionFloorCents: number };
+export const PRICING_PARAMS: WeightPricingParams = {
   minBillableKg: 0.5,
   minTransportCents: 800,
   commissionPct: 12,
   commissionFloorCents: 300,
-} as const;
+};
+export function weightPricingFromSettings(v: { "pricing.minBillableKg": number; "pricing.minTransportCents": number; "pricing.commissionPct": number; "pricing.commissionFloorCents": number }): WeightPricingParams {
+  return { minBillableKg: v["pricing.minBillableKg"], minTransportCents: v["pricing.minTransportCents"], commissionPct: v["pricing.commissionPct"], commissionFloorCents: v["pricing.commissionFloorCents"] };
+}
 
 export type WeightPriceInput = {
   pricePerKgCents?: number | null;
@@ -27,8 +31,7 @@ export type WeightPriceInput = {
 };
 
 /** Transport (net Voyageur) pour ce poids, ou null si aucun moteur. */
-export function transportForWeightCents(trip: WeightPriceInput, weightKg: number): number | null {
-  const p = PRICING_PARAMS;
+export function transportForWeightCents(trip: WeightPriceInput, weightKg: number, p: WeightPricingParams = PRICING_PARAMS): number | null {
   if (typeof trip.pricePerKgCents === "number" && trip.pricePerKgCents > 0) {
     const billable = Math.max(weightKg, p.minBillableKg);
     return Math.max(Math.round(trip.pricePerKgCents * billable), p.minTransportCents);
@@ -39,14 +42,13 @@ export function transportForWeightCents(trip: WeightPriceInput, weightKg: number
   return null;
 }
 
-export function serviceCents(transportCents: number): number {
-  const p = PRICING_PARAMS;
+export function serviceCents(transportCents: number, p: WeightPricingParams = PRICING_PARAMS): number {
   return Math.max(Math.round((transportCents * p.commissionPct) / 100), p.commissionFloorCents);
 }
 
-export function totalForWeightCents(trip: WeightPriceInput, weightKg: number): number | null {
-  const transport = transportForWeightCents(trip, weightKg);
-  return transport === null ? null : transport + serviceCents(transport);
+export function totalForWeightCents(trip: WeightPriceInput, weightKg: number, p: WeightPricingParams = PRICING_PARAMS): number | null {
+  const transport = transportForWeightCents(trip, weightKg, p);
+  return transport === null ? null : transport + serviceCents(transport, p);
 }
 
 /**
@@ -55,11 +57,12 @@ export function totalForWeightCents(trip: WeightPriceInput, weightKg: number): n
  */
 export function sortByPriceForWeight<T extends WeightPriceInput & { id: string }>(
   trips: T[],
-  weightKg: number
+  weightKg: number,
+  p: WeightPricingParams = PRICING_PARAMS
 ): T[] {
   return [...trips].sort((a, b) => {
-    const ka = transportForWeightCents(a, weightKg) ?? Number.POSITIVE_INFINITY;
-    const kb = transportForWeightCents(b, weightKg) ?? Number.POSITIVE_INFINITY;
+    const ka = transportForWeightCents(a, weightKg, p) ?? Number.POSITIVE_INFINITY;
+    const kb = transportForWeightCents(b, weightKg, p) ?? Number.POSITIVE_INFINITY;
     if (ka !== kb) return ka - kb;
     return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
   });

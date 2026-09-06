@@ -5,6 +5,7 @@ import {
   MessageSquare,
   Bell,
   BellRing,
+  Heart,
   Wallet,
   User,
   UserPlus,
@@ -24,6 +25,7 @@ export type SectionKey =
   | "notifications"
   | "savedRoutes"
   | "following"
+  | "favorites" // D46
   | "finances" // ✨ fusion Paiements + Portefeuille (chantier Stripe backend)
   | "payments" // ⚠️ deprecated — segment aliasé vers finances
   | "wallet" // ⚠️ deprecated — segment aliasé vers finances
@@ -74,6 +76,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { key: "trips", icon: Zap, labelKey: "trips" },
       { key: "shipments", icon: Package, labelKey: "shipments" },
+      { key: "favorites", icon: Heart, labelKey: "favorites" }, // D46
     ],
   },
   {
@@ -149,7 +152,7 @@ export const MOBILE_TABS: {
 
 export const MOBILE_TAB_SECTIONS: Record<MobileTab, SectionKey[]> = {
   home: ["home"],
-  activity: ["trips", "shipments", "savedRoutes", "following"],
+  activity: ["trips", "shipments", "favorites", "savedRoutes", "following"],
   messages: ["messages"],
   finances: ["finances", "payments", "wallet"],
   more: ["security", "settings", "help", "notifications", "profile", "yamber"],

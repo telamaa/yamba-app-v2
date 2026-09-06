@@ -10,6 +10,7 @@ import {
 } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useUiPreferences } from "@/components/providers/UiPreferencesProvider";
+import { otpCodeMessage, type OtpErrorCode } from "@/lib/auth/auth-error-codes";
 import { useForm } from "react-hook-form";
 import { useMutation } from "@tanstack/react-query";
 import { AlertTriangle, Clock, Loader2, ShieldCheck } from "lucide-react";
@@ -38,9 +39,11 @@ type VerifyFormData = {
 
 type OtpErrorDetails = {
   type?: string;
+  code?: OtpErrorCode;
   attemptsLeft?: number;
   locked?: boolean;
   lockUntilSeconds?: number;
+  otpInvalidated?: boolean;
 };
 
 type ErrorContext = {
@@ -84,14 +87,14 @@ function buildCopy(lang: string) {
       : "We've sent a 6-digit code to:",
     timerLabel: fr ? "Code valable" : "Code valid for",
     timerExpired: fr ? "Code expiré" : "Code expired",
-    otpLabel: fr ? "Saisissez votre code" : "Enter your code",
+    otpLabel: fr ? "Saisis ton code" : "Enter your code",
     otpHelp: fr
-      ? "Astuce : vous pouvez coller le code directement."
+      ? "Astuce : tu peux coller le code directement."
       : "Tip: you can paste the full code at once.",
     cta: fr ? "Valider mon code" : "Verify my code",
     ctaLoading: fr ? "Vérification…" : "Verifying…",
     resendText: fr
-      ? "Pas reçu le code ? Vérifiez vos spams ou"
+      ? "Pas reçu le code ? Vérifie tes spams ou"
       : "Didn't get the code? Check your spam or",
     resendCta: fr ? "Renvoyer le code" : "Resend code",
     resendCooldown: fr ? "Renvoyer dans" : "Resend in",
@@ -103,9 +106,9 @@ function buildCopy(lang: string) {
     wrongEmailQuestion: fr ? "Trompé d'adresse e-mail ?" : "Wrong email?",
     startOver: fr ? "Recommencer" : "Start over",
     missingEmail: fr
-      ? "Session expirée. Merci de recommencer la procédure."
+      ? "Session expirée. Recommence la procédure."
       : "Session expired. Please restart the recovery flow.",
-    incomplete: fr ? "Veuillez saisir le code complet." : "Please enter the full code.",
+    incomplete: fr ? "Saisis le code complet." : "Please enter the full code.",
     invalidOtp: fr ? "Code invalide ou expiré." : "Invalid or expired code.",
     genericError: fr
       ? "Validation impossible pour le moment."
@@ -115,16 +118,16 @@ function buildCopy(lang: string) {
       : "Application configuration is incomplete.",
     // Exponential backoff
     attemptsLeftSingular: fr
-      ? "tentative restante avant verrouillage temporaire"
-      : "attempt left before temporary lock",
+      ? "essai restant avant invalidation du code"
+      : "attempt left before the code is invalidated",
     attemptsLeftPlural: fr
-      ? "tentatives restantes avant verrouillage temporaire"
-      : "attempts left before temporary lock",
+      ? "essais restants avant invalidation du code"
+      : "attempts left before the code is invalidated",
     incorrectCode: fr ? "Code incorrect." : "Incorrect code.",
-    locked: fr ? "Compte verrouillé temporairement." : "Account temporarily locked.",
-    lockedRetryIn: fr ? "Réessayez dans" : "Try again in",
+    locked: fr ? "Saisie bloquée temporairement." : "Account temporarily locked.",
+    lockedRetryIn: fr ? "Réessaie dans" : "Try again in",
     lockedTip: fr
-      ? "Pour votre sécurité, votre compte est verrouillé suite à plusieurs tentatives incorrectes."
+      ? "Pour ta sécurité, la saisie est bloquée après plusieurs tentatives incorrectes."
       : "For your security, your account has been locked due to multiple incorrect attempts.",
   };
 }
@@ -286,10 +289,12 @@ export default function ResetVerifyForm({ heroVisual }: Props) {
           startLockTimer(details.lockUntilSeconds);
         }
 
-        if (data?.message) {
-          setError("otp", { type: "server", message: data.message });
-          return;
-        }
+        // Jamais le message anglais brut de l'API : phrase construite du code
+        setError("otp", {
+          type: "server",
+          message: otpCodeMessage(fr, { ...details, type: "otp" }),
+        });
+        return;
       }
 
       if (data?.errors?.otp) {

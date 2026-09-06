@@ -93,11 +93,15 @@ export type YambaTripResult = {
   profileVerified?: boolean;
   instantBooking?: boolean;
   verifiedTicket?: boolean;
+  /** D5 / C-PR6 — vues dédoublonnées de la page du trajet (absent si indisponible) */
+  viewsCount?: number;
 
   /** Note moyenne du tripper (sur 5) */
   rating?: number;
   /** Nombre d'avis */
   reviewCount?: number;
+  /** D46 — favori de l'utilisateur connecté (false / absent pour un visiteur) */
+  isFavorite?: boolean;
 
   travelerFirstName?: string;
   travelerLastName?: string;

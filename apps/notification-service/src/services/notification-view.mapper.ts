@@ -16,13 +16,15 @@ import {
 export type NotificationRecord = Notification;
 
 export function toNotificationView(
-  record: NotificationRecord
+  record: NotificationRecord,
+  counterpartFirstName: string | null = null
 ): NotificationView {
   return NotificationViewSchema.parse({
     id: record.id,
     type: record.type,
     bookingId: record.bookingId,
     payload: record.payload as Record<string, unknown>,
+    counterpartFirstName,
     readAt: record.readAt ? record.readAt.toISOString() : null,
     createdAt: record.createdAt.toISOString(),
   });

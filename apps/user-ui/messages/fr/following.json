@@ -1,10 +1,10 @@
 {
   "page": {
-    "title": "Trippers suivis",
-    "description": "Reste à l'affût des publications de tes trippers favoris."
+    "title": "Voyageurs suivis",
+    "description": "Reste à l'affût des publications de tes voyageurs favoris."
   },
   "card": {
-    "tripperBadge": "Tripper",
+    "tripperBadge": "Voyageur",
     "tripsPublished": "{count, plural, =0 {Aucun trajet publié} one {1 trajet publié} other {# trajets publiés}}",
     "nextTripLabel": "Prochain trajet à venir",
     "noUpcomingTrip": "Aucun trajet à venir pour l'instant",
@@ -12,15 +12,15 @@
     "notifyOff": "Notifications désactivées",
     "unfollow": "Ne plus suivre",
     "confirmUnfollow": "Confirmer",
-    "unfollowSuccess": "Tu ne suis plus ce tripper",
+    "unfollowSuccess": "Tu ne suis plus ce voyageur",
     "unfollowError": "Erreur lors du désabonnement",
     "updateError": "Erreur lors de la mise à jour"
   },
   "list": {
-    "emptyTitle": "Aucun tripper suivi",
-    "emptyDescription": "Découvre les trippers de la communauté et suis ceux qui correspondent à tes besoins pour être prévenu·e dès qu'ils publient un nouveau trajet.",
-    "emptyCta": "Découvrir des Trippers",
-    "count": "{count, plural, one {1 tripper suivi} other {# trippers suivis}}",
+    "emptyTitle": "Aucun voyageur suivi",
+    "emptyDescription": "Découvre les voyageurs de la communauté et suis ceux qui correspondent à tes besoins pour être prévenu·e dès qu'ils publient un nouveau trajet.",
+    "emptyCta": "Découvrir des Voyageurs",
+    "count": "{count, plural, one {1 voyageur suivi} other {# voyageurs suivis}}",
     "discoverMore": "Découvrir plus",
     "errorMessage": "Erreur lors du chargement"
   }

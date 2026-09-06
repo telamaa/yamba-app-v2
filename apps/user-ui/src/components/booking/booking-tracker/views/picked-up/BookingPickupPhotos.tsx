@@ -8,9 +8,10 @@
 
 "use client";
 
-import { Check, ImageIcon, Package } from "lucide-react";
+import { Check } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import type { Booking } from "@/components/booking/booking-tracker/booking-tracker.types";
+import PhotoThumbs from "@/components/shared/photos/PhotoThumbs";
 
 type Props = {
   booking: Booking;
@@ -74,29 +75,7 @@ export default function BookingPickupPhotos({ booking, compact = false }: Props)
         </div>
       </div>
 
-      <div className="mt-3 flex gap-2">
-        {pickup.photos.map((photo) => (
-          <div
-            key={photo.id}
-            className={`relative flex flex-shrink-0 items-center justify-center rounded-lg text-white ${
-              compact ? "h-14 w-14" : "h-16 w-16"
-            }`}
-            style={{ background: "linear-gradient(135deg, #BA7517, #EF9F27)" }}
-            aria-label={photo.label}
-          >
-            {photo.context === "PICKUP_PACKAGED" ? (
-              <Package size={compact ? 18 : 20} aria-hidden="true" />
-            ) : (
-              <ImageIcon size={compact ? 18 : 20} aria-hidden="true" />
-            )}
-            {photo.label && (
-              <div className="absolute inset-x-1 bottom-1 rounded-sm bg-black/55 px-1 py-px text-center text-[8.5px] font-medium">
-                {photo.label}
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
+      <PhotoThumbs photos={pickup.photos} tone="amber" size="lg" className="mt-3" />
     </section>
   );
 }

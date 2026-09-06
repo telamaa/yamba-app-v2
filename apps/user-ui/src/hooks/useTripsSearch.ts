@@ -2,6 +2,7 @@
 
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { searchTrips, type SearchTripsParams } from "@/services/trip.api";
+import { track } from "@/lib/analytics";
 
 const PAGE_SIZE = 10;
 
@@ -21,12 +22,16 @@ const PAGE_SIZE = 10;
 export function useTripsSearch(params: SearchTripsParams) {
   return useInfiniteQuery({
     queryKey: ["trips-search", params],
-    queryFn: ({ pageParam }) =>
-      searchTrips({
+    queryFn: async ({ pageParam }) => {
+      const page = await searchTrips({
         ...params,
         cursor: pageParam,
         limit: params.limit ?? PAGE_SIZE,
-      }),
+      });
+      // D66 3A — le funnel commence ici (première page seulement)
+      if (!pageParam) void track("search_performed", { origin: (params as { origin?: string }).origin ?? null, destination: (params as { destination?: string }).destination ?? null, weightKg: (params as { weightKg?: number }).weightKg ?? null, resultsCount: page.trips?.length ?? 0, hasMore: Boolean(page.nextCursor) });
+      return page;
+    },
     initialPageParam: null as string | null,
     getNextPageParam: (lastPage) => lastPage.nextCursor,
     staleTime: 1000 * 60 * 2, // 2 min — la search peut tolérer un peu de stale

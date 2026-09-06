@@ -28,19 +28,24 @@
       "@/*": [
         "src/*"
       ],
-      "@packages/pricing": ["../../packages/libs/pricing/src/index.ts"]
+      "@packages/pricing": ["../../packages/libs/pricing/src/index.ts"],
+      "@packages/api-contracts/locale": ["../../packages/libs/api-contracts/src/locale.ts"]
     },
     "outDir": "dist",
     "rootDir": "../../",
-    "tsBuildInfoFile": "dist/tsconfig.tsbuildinfo"
+    "tsBuildInfoFile": "dist/tsconfig.tsbuildinfo",
+    "ignoreDeprecations": "6.0"
   },
   "include": [
     "../../packages/libs/pricing/src/index.ts",
+    "../../packages/libs/api-contracts/src/locale.ts",
     "../../apps/user-ui/.next/types/**/*.ts",
     "../../packages/**/*.tsx",
     "../../dist/apps/user-ui/.next/types/**/*.ts",
     "src/**/*.ts",
     "src/**/*.tsx",
+    "instrumentation.ts",
+    "instrumentation-client.ts",
     "src/**/*.js",
     "src/**/*.jsx",
     ".next/types/**/*.ts",

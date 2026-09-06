@@ -1,11 +1,9 @@
 "use client";
 
 import { useLocale, useTranslations } from "next-intl";
-import { useRouter } from "@/i18n/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { toast } from "sonner";
 import { useBookingDraft } from "@/hooks/useBookingDraft";
-import { createDeal } from "@/services/booking.api";
+import { useBookingCheckout } from "./useBookingCheckout";
 import { canContinueStep, computeTotal, validateStep } from "./booking.config";
 import type { Step, TripContext, ValidationErrors } from "./booking.types";
 import BookingBottomSheet from "./BookingBottomSheet";
@@ -25,6 +23,7 @@ const StepPayment = dynamic(() => import("./steps/StepPayment"), {
   ),
 });
 import StepRecipient from "./steps/StepRecipient";
+import { usePricingParams } from "@/hooks/usePricingParams";
 
 const EMPTY_ERRORS: ValidationErrors = {};
 
@@ -39,9 +38,9 @@ export default function BookingMobile({ trip, onCloseAction }: Props) {
   const isFr = locale === "fr";
 
   const { draft, setDraft, step, setStep, clear } = useBookingDraft();
-  const router = useRouter();
   const [showErrors, setShowErrors] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const checkout = useBookingCheckout({ draft, trip, step, clear });
+  const isSubmitting = checkout.isSubmitting;
 
   const errors = useMemo<ValidationErrors>(() => {
     if (!showErrors) return EMPTY_ERRORS;
@@ -52,7 +51,8 @@ export default function BookingMobile({ trip, onCloseAction }: Props) {
     setShowErrors(false);
   }, [step]);
 
-  const price = useMemo(() => computeTotal(draft, trip), [draft, trip]);
+  const pricingParams = usePricingParams(); // D62 7A — valeurs du serveur, défauts du moteur en attendant
+  const price = useMemo(() => computeTotal(draft, trip, pricingParams), [draft, trip, pricingParams]);
 
   const nextStep = () => {
     if (!canContinueStep(step, draft, trip, isFr)) {
@@ -65,25 +65,7 @@ export default function BookingMobile({ trip, onCloseAction }: Props) {
 
   const prevStep = () => setStep((s) => (s > 1 ? ((s - 1) as Step) : s));
 
-  const handleSubmit = async () => {
-    if (isSubmitting) return;
-    setIsSubmitting(true);
-    try {
-      const result = await createDeal(draft, trip);
-      toast.success(
-        isFr ? "Paiement confirmé !" : "Payment confirmed!",
-        { duration: 3000 }
-      );
-      clear();
-      // Phase 4: redirection vers le tracker post-confirmation paiement
-      // En mock, dealId = bookingId. Plus tard, l'API renverra les 2.
-      router.push(`/bookings/${result.dealId}`);
-    } catch {
-      toast.error(isFr ? "Erreur lors du paiement" : "Payment failed");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+  const handleSubmit = checkout.submit;
 
   const subtitle = `${trip.originCity} → ${trip.destinationCity}`;
 
@@ -129,9 +111,12 @@ export default function BookingMobile({ trip, onCloseAction }: Props) {
         )}
         {step === 4 && (
           <StepPayment
-            draft={draft}
-            setDraftAction={setDraft}
             price={price}
+            intent={checkout.intent}
+            intentLoading={checkout.intentLoading}
+            intentError={checkout.intentError}
+            onRetryAction={checkout.refreshIntent}
+            registerConfirmAction={checkout.registerConfirm}
           />
         )}
       </div>

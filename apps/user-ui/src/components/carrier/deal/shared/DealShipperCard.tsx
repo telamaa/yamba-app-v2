@@ -27,7 +27,12 @@ export default function DealShipperCard({
   const locale = useLocale();
 
   const initials = `${shipper.firstName[0] ?? ""}${shipper.lastInitial}`.toUpperCase();
-  const memberSinceLabel = formatMemberSince(shipper.memberSince, locale);
+  // Stats de confiance absentes de l'API réelle (BookingCounterpart) :
+  // chaque élément se masque individuellement (B5 les ramènera).
+  const memberSinceLabel = shipper.memberSince
+    ? formatMemberSince(shipper.memberSince, locale)
+    : null;
+  const hasStats = shipper.rating != null || shipper.shipmentCount != null;
 
   return (
     <section>
@@ -56,22 +61,28 @@ export default function DealShipperCard({
                 </span>
               )}
             </div>
-            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-slate-500 dark:text-slate-400 md:text-[12px]">
-              <span className="flex items-center gap-1">
-                <Star size={11} fill="#BA7517" stroke="#BA7517" />
-                {shipper.rating.toFixed(1)}
-              </span>
-              <span>·</span>
-              <span>
-                {t("shipperCard.shipmentCount", { count: shipper.shipmentCount })}
-              </span>
-              {showMemberSince && memberSinceLabel && (
-                <>
-                  <span className="hidden md:inline">·</span>
-                  <span className="hidden md:inline">{memberSinceLabel}</span>
-                </>
-              )}
-            </div>
+            {(hasStats || (showMemberSince && memberSinceLabel)) && (
+              <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-slate-500 dark:text-slate-400 md:text-[12px]">
+                {shipper.rating != null && (
+                  <span className="flex items-center gap-1">
+                    <Star size={11} fill="#BA7517" stroke="#BA7517" />
+                    {shipper.rating.toFixed(1)}
+                  </span>
+                )}
+                {shipper.rating != null && shipper.shipmentCount != null && <span>·</span>}
+                {shipper.shipmentCount != null && (
+                  <span>
+                    {t("shipperCard.shipmentCount", { count: shipper.shipmentCount })}
+                  </span>
+                )}
+                {showMemberSince && memberSinceLabel && (
+                  <>
+                    {hasStats && <span className="hidden md:inline">·</span>}
+                    <span className="hidden md:inline">{memberSinceLabel}</span>
+                  </>
+                )}
+              </div>
+            )}
           </div>
 
           {onViewProfileAction && (

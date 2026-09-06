@@ -10,6 +10,7 @@ import {
 } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useUiPreferences } from "@/components/providers/UiPreferencesProvider";
+import { otpCodeMessage, type OtpErrorCode } from "@/lib/auth/auth-error-codes";
 import { useForm } from "react-hook-form";
 import { useMutation } from "@tanstack/react-query";
 import { AlertTriangle, Clock, Loader2, ShieldCheck } from "lucide-react";
@@ -23,6 +24,8 @@ import {
 } from "@/services/auth.api";
 import type { HeroVisual } from "@/lib/auth/hero-visuals";
 import { maskEmail } from "@/lib/auth/email-mask";
+import { setFlashToast } from "@/lib/flash-toast";
+import { REGISTER_REDIRECT_KEY, sanitizeRedirect, withRedirect } from "@/lib/auth/safe-redirect";
 import { useToast } from "@/components/ui/Toast";
 import AuthHeroVisual from "@/components/auth/visual/AuthHeroVisual";
 
@@ -38,9 +41,11 @@ type VerifyFormData = {
 
 type OtpErrorDetails = {
   type?: string;
+  code?: OtpErrorCode;
   attemptsLeft?: number;
   locked?: boolean;
   lockUntilSeconds?: number;
+  otpInvalidated?: boolean;
 };
 
 type ErrorContext = {
@@ -84,31 +89,34 @@ function buildCopy(lang: string) {
       : "We've sent a 6-digit code to:",
     timerLabel: fr ? "Code valable" : "Code valid for",
     timerExpired: fr ? "Code expiré" : "Code expired",
-    otpLabel: fr ? "Saisissez votre code" : "Enter your code",
+    otpLabel: fr ? "Saisis ton code" : "Enter your code",
     otpHelp: fr
-      ? "Astuce : vous pouvez coller le code directement."
+      ? "Astuce : tu peux coller le code directement."
       : "Tip: you can paste the full code at once.",
     cta: fr ? "Valider mon code" : "Verify my code",
     ctaLoading: fr ? "Vérification…" : "Verifying…",
     resendText: fr
-      ? "Pas reçu le code ? Vérifiez vos spams ou"
+      ? "Pas reçu le code ? Vérifie tes spams ou"
       : "Didn't get the code? Check your spam or",
     resendCta: fr ? "Renvoyer le code" : "Resend code",
     resendCooldown: fr ? "Renvoyer dans" : "Resend in",
     resentToastTitle: fr ? "Code renvoyé" : "Code resent",
     resentToastMessage: fr
-      ? "Un nouveau code a été envoyé. Vérifiez votre boîte mail."
+      ? "Un nouveau code a été envoyé. Vérifie ta boîte mail."
       : "A new code has been sent. Check your inbox.",
     wrongEmailQuestion: fr ? "Trompé d'adresse e-mail ?" : "Wrong email?",
     startOver: fr ? "Recommencer" : "Start over",
     startOverConfirm: fr
-      ? "Êtes-vous sûr ? Vous devrez recommencer toute l'inscription depuis le début."
+      ? "Sûr·e ? Tu devras recommencer toute l'inscription depuis le début."
       : "Are you sure? You will need to restart the entire registration from scratch.",
     missingToken: fr
-      ? "Session expirée. Merci de recommencer l'inscription."
+      ? "Session expirée. Recommence l'inscription."
       : "Session expired. Please register again.",
-    incomplete: fr ? "Veuillez saisir le code complet." : "Please enter the full code.",
+    incomplete: fr ? "Saisis le code complet." : "Please enter the full code.",
     invalidOtp: fr ? "Code invalide ou expiré." : "Invalid or expired code.",
+    verifiedFlash: fr
+      ? "Ton compte est activé. Connecte-toi pour commencer."
+      : "Your account is activated. Sign in to get started.",
     genericError: fr
       ? "Validation impossible pour le moment."
       : "Unable to verify right now.",
@@ -116,16 +124,16 @@ function buildCopy(lang: string) {
       ? "La configuration de l'application est incomplète."
       : "Application configuration is incomplete.",
     attemptsLeftSingular: fr
-      ? "tentative restante avant verrouillage temporaire"
-      : "attempt left before temporary lock",
+      ? "essai restant avant invalidation du code"
+      : "attempt left before the code is invalidated",
     attemptsLeftPlural: fr
-      ? "tentatives restantes avant verrouillage temporaire"
-      : "attempts left before temporary lock",
+      ? "essais restants avant invalidation du code"
+      : "attempts left before the code is invalidated",
     incorrectCode: fr ? "Code incorrect." : "Incorrect code.",
-    locked: fr ? "Compte verrouillé temporairement." : "Account temporarily locked.",
-    lockedRetryIn: fr ? "Réessayez dans" : "Try again in",
+    locked: fr ? "Saisie bloquée temporairement." : "Account temporarily locked.",
+    lockedRetryIn: fr ? "Réessaie dans" : "Try again in",
     lockedTip: fr
-      ? "Pour votre sécurité, votre compte est verrouillé suite à plusieurs tentatives incorrectes."
+      ? "Pour ta sécurité, la saisie est bloquée après plusieurs tentatives incorrectes."
       : "For your security, your account has been locked due to multiple incorrect attempts.",
   };
 }
@@ -288,9 +296,23 @@ export default function RegisterVerifyForm({ heroVisual }: Props) {
   const verifyOtpMutation = useMutation({
     mutationFn: verifyRegistrationOtp,
     onSuccess: () => {
+      // Le serveur crée le compte SANS ouvrir de session : on emmène
+      // l'utilisateur au login en lui disant pourquoi (toast persistant +
+      // bandeau « compte activé »), email pré-rempli — jamais un renvoi
+      // muet vers le formulaire de connexion.
+      const verifiedEmail =
+        emailFromQuery || sessionStorage.getItem("register_verification_email") || "";
+      const redirectTo = sanitizeRedirect(sessionStorage.getItem(REGISTER_REDIRECT_KEY));
       sessionStorage.removeItem("register_verification_token");
       sessionStorage.removeItem("register_verification_email");
-      router.push("/login");
+      sessionStorage.removeItem(REGISTER_REDIRECT_KEY);
+      setFlashToast({ type: "success", message: copy.verifiedFlash, persistent: true });
+      router.push(
+        withRedirect(
+          "/login?verified=1" + (verifiedEmail ? "&email=" + encodeURIComponent(verifiedEmail) : ""),
+          redirectTo
+        )
+      );
       router.refresh();
     },
     onError: (error) => {
@@ -309,10 +331,12 @@ export default function RegisterVerifyForm({ heroVisual }: Props) {
           startLockTimer(details.lockUntilSeconds);
         }
 
-        if (data?.message) {
-          setError("otp", { type: "server", message: data.message });
-          return;
-        }
+        // Jamais le message anglais brut de l'API : phrase construite du code
+        setError("otp", {
+          type: "server",
+          message: otpCodeMessage(fr, { ...details, type: "otp" }),
+        });
+        return;
       }
 
       if (data?.errors?.otp) {

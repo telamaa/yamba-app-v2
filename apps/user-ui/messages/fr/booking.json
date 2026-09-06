@@ -43,7 +43,7 @@
     },
     "photos": {
       "label": "Photos du colis",
-      "requiredBadge": "Obligatoire avec l''assurance",
+      "requiredBadge": "Obligatoire avec la protection étendue",
       "hint": "Idéalement : une photo du contenu déballé + une du colis emballé. JPEG ou PNG, max 10 Mo par photo.",
       "add": "Ajouter",
       "tagContent": "Contenu",
@@ -147,30 +147,40 @@
   },
   "step4": {
     "title": "Paiement",
-    "subtitle": "Tu n''es débité qu''à acceptation par le voyageur (sous 24h max)",
-    "methodTitle": "Moyen de paiement",
-    "card": {
-      "title": "Carte bancaire",
-      "description": "Visa, Mastercard, Amex · Cartes internationales acceptées"
-    },
-    "applePay": {
-      "title": "Apple Pay",
-      "description": "Touch ID ou Face ID · pas de saisie de carte"
-    },
-    "googlePay": {
-      "title": "Google Pay",
-      "description": "Paiement en un clic depuis ton compte Google"
+    "subtitle": "Le montant est autorisé maintenant et débité uniquement quand le voyageur accepte (sous 24 h).",
+    "loadingMessage": "Préparation du paiement…",
+    "retry": "Réessayer",
+    "testMode": "Mode test : aucun prestataire de paiement n''est configuré. L''autorisation de {amount} est simulée — clique sur « Payer » pour envoyer ta demande.",
+    "stripeMissing": "Le paiement en ligne n''est pas disponible pour le moment. Réessaie dans quelques minutes.",
+    "elementLoadError": "Le module de paiement n''a pas pu se charger. Vérifie ta connexion puis réessaie.",
+    "confirmFailed": "Le paiement n''a pas pu être autorisé. Vérifie ta carte et réessaie.",
+    "requestSent": "Demande envoyée ! Le voyageur a 24 h pour accepter.",
+    "errors": {
+      "UPLOAD_FAILED": "Le téléversement d''une photo a échoué. Vérifie ta connexion et réessaye — ta carte n''a pas été débitée.",
+      "UPLOAD_TOO_LARGE": "Une photo dépasse {maxMb} Mo. Réduis-la ou retire-la — ta carte n''a pas été débitée.",
+      "UPLOAD_INVALID_TYPE": "Format de photo non pris en charge (JPG, PNG, HEIC ou WebP) — ta carte n''a pas été débitée.",
+      "QUOTE_DIVERGENCE": "Le prix a changé depuis ton devis. Le nouveau total est affiché — vérifie-le avant de payer.",
+      "CAPACITY_EXCEEDED": "Il ne reste plus assez de place sur ce trajet pour ton colis.",
+      "FAMILY_REFUSED": "Le voyageur n''accepte pas ce type de colis sur ce trajet.",
+      "TRIP_NOT_BOOKABLE": "Ce trajet n''accepte plus de demandes.",
+      "OWN_TRIP": "Tu ne peux pas réserver ton propre trajet.",
+      "NEW_ACCOUNT_CAP": "Ton compte est récent : pour l'instant, tes envois sont plafonnés (valeur déclarée, poids et nombre par mois). Le plafond se lève avec tes premiers envois terminés.",
+      "PAYMENT_NOT_AUTHORIZED": "Le paiement n''a pas encore été autorisé. Réessaie.",
+      "PAYMENT_MISMATCH": "L''autorisation ne correspond plus à ta demande. Une nouvelle autorisation est en cours.",
+      "PAYMENT_ALREADY_USED": "Ce paiement est déjà rattaché à une demande.",
+      "UNAUTHENTICATED": "Connecte-toi pour envoyer ta demande.",
+      "QUOTE_UNAVAILABLE": "Le devis n''est pas disponible pour ce colis : vérifie le poids et la taille.",
+      "GENERIC": "Une erreur est survenue. Rien n''a été débité — réessaie."
     },
     "afterPayment": {
       "title": "Après ton paiement",
       "step1": "Le voyageur reçoit ta demande et a **24h pour accepter**. Tu n''es débité qu''à acceptation.",
-      "step2": "Tu reçois ton **code à 6 chiffres**, à transmettre au destinataire.",
-      "step3": "Rendez-vous avec le voyageur pour la **remise du colis**, qu''il vérifiera et photographiera.",
+      "step2": "Rendez-vous avec le voyageur pour la **remise du colis**, qu''il vérifiera et photographiera.",
+      "step3": "Une fois le colis déposé, tu reçois ton **code à 6 chiffres**, à transmettre au destinataire.",
       "step4": "Le destinataire communique le code au voyageur à l''arrivée, qui le saisit pour valider la livraison.",
       "step5": "**3 jours après** la livraison validée, le voyageur reçoit son paiement."
     },
-    "trustStripe": "Paiement sécurisé par Stripe. Yamba ne stocke jamais tes données bancaires.",
-    "loadingMessage": "Préparation du paiement…"
+    "trustStripe": "Paiement sécurisé par Stripe. Yamba ne stocke jamais tes données bancaires."
   },
   "summary": {
     "tripSelectedTitle": "Trajet sélectionné",
@@ -202,7 +212,7 @@
     "deals": "{count, plural, =1 {# deal} other {# deals}}",
     "transportDetail": "Transport · {kg} kg × {rate}/kg × {size}",
     "minimumApplied": "Minimum par colis appliqué : {min}",
-    "newTripper": "Nouveau Tripper",
+    "newTripper": "Nouveau Voyageur",
     "quoteHint": {
       "MISSING_WEIGHT": "Indique le poids du colis pour voir le prix.",
       "MISSING_SIZE": "Choisis une taille (S, M ou L).",
@@ -231,9 +241,7 @@
   },
   "authGate": {
     "title": "Connecte-toi pour réserver",
-    "subtitle": "Une réservation engage un Voyageur : Yamba a besoin de savoir qui envoie. Ton colis et ce trajet t'attendent après connexion.",
-    "login": "Se connecter",
-    "register": "Créer un compte"
+    "subtitle": "Une réservation engage un Voyageur : Yamba a besoin de savoir qui envoie. Ton colis et ce trajet t'attendent après connexion."
   },
   "previousStep": "Étape précédente"
 }

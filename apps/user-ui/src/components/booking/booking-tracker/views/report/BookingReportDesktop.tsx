@@ -7,12 +7,10 @@
 
 "use client";
 
-import { ArrowLeft, ImageIcon, Package } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
-import {
-  PAYOUT_DAY,
-} from "../../booking-tracker.types";
 import type { BookingReportViewProps } from "./BookingReportClient";
+import PhotoThumbs from "@/components/shared/photos/PhotoThumbs";
 import {
   ReportCtaBar,
   ReportEmpathyBanner,
@@ -31,12 +29,8 @@ export default function BookingReportDesktop(props: BookingReportViewProps) {
   const deliveredDateStr = deliveredDate
     ? formatShortDate(deliveredDate, locale)
     : "";
-  const windowEndStr = deliveredDate
-    ? formatShortDate(
-      new Date(deliveredDate.getTime() + PAYOUT_DAY * 24 * 3600 * 1000),
-      locale
-    )
-    : "";
+  // La fin de fenêtre est SERVIE (payoutDueAt) — jamais recalculée ici.
+  const windowEndStr = booking.payoutDueAt ? formatShortDate(new Date(booking.payoutDueAt), locale) : "";
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
@@ -53,7 +47,7 @@ export default function BookingReportDesktop(props: BookingReportViewProps) {
           {t("report.title")}
         </h1>
         <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-          {t("report.subtitle", {
+          {t(deliveredDate ? "report.subtitle" : "report.subtitleShort", {
             originCity: booking.trip.originCity,
             destinationCity: booking.trip.destinationCity,
             date: deliveredDateStr,
@@ -136,43 +130,27 @@ export default function BookingReportDesktop(props: BookingReportViewProps) {
                 <p className="text-[11.5px] text-slate-500 dark:text-slate-400">
                   {t("report.sidebar.proofDeclared")}
                 </p>
-                <div className="mt-2 flex gap-1.5">
-                  {booking.parcel.photos.map((photo) => (
-                    <PhotoMini
-                      key={photo.id}
-                      isPackaged={photo.context === "DECLARED_PACKAGED"}
-                      gradient="linear-gradient(135deg, #534AB7, #7F77DD)"
-                      label={photo.label}
-                    />
-                  ))}
-                </div>
+                <PhotoThumbs photos={booking.parcel.photos} tone="violet" size="sm" className="mt-2" />
                 {booking.pickup && booking.pickup.photos.length > 0 && (
                   <>
                     <p className="mt-3.5 text-[11.5px] text-slate-500 dark:text-slate-400">
                       {t("report.sidebar.proofPickup", { carrierFirstName })}
                     </p>
-                    <div className="mt-2 flex gap-1.5">
-                      {booking.pickup.photos.map((photo) => (
-                        <PhotoMini
-                          key={photo.id}
-                          isPackaged={photo.context === "PICKUP_PACKAGED"}
-                          gradient="linear-gradient(135deg, #BA7517, #EF9F27)"
-                          label={photo.label}
-                        />
-                      ))}
-                    </div>
+                    <PhotoThumbs photos={booking.pickup.photos} tone="amber" size="sm" className="mt-2" />
                   </>
                 )}
               </section>
 
-              {/* FENÊTRE */}
-              {windowEndStr && (
+              {/* FENÊTRE — servie ; en transit (5A) : « non livré » seulement */}
+              {(windowEndStr || props.lockedCategory) && (
                 <section className="rounded-2xl bg-slate-100 p-4 dark:bg-slate-900">
                   <h3 className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                     {t("report.sidebar.windowLabel")}
                   </h3>
                   <p className="mt-1.5 text-[12.5px] leading-snug text-slate-600 dark:text-slate-400">
-                    {t("report.sidebar.windowText", { date: windowEndStr })}
+                    {props.lockedCategory
+                      ? t("report.sidebar.inTransitText", { carrierFirstName })
+                      : t("report.sidebar.windowText", { date: windowEndStr })}
                   </p>
                 </section>
               )}
@@ -209,30 +187,6 @@ function SideRow({
   );
 }
 
-function PhotoMini({
-                     isPackaged,
-                     gradient,
-                     label,
-                   }: {
-  isPackaged: boolean;
-  gradient: string;
-  label?: string;
-}) {
-  return (
-    <div
-      className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg text-white"
-      style={{ background: gradient }}
-      aria-label={label}
-      title={label}
-    >
-      {isPackaged ? (
-        <Package size={14} aria-hidden="true" />
-      ) : (
-        <ImageIcon size={14} aria-hidden="true" />
-      )}
-    </div>
-  );
-}
 
 function formatShortDate(date: Date, locale: string): string {
   const day = date.getDate();

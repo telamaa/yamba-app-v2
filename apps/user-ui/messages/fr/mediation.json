@@ -1,0 +1,44 @@
+{
+  "decision": {
+    "title": "Décision rendue",
+    "reasonLabel": "Motif de la décision",
+    "refundLine": "{amount} te sont remboursés, sur ta carte sous 5 à 10 jours.",
+    "payoutLine": "{amount} partent vers ton compte, sur ton compte bancaire sous 2 à 7 jours.",
+    "noPayoutLine": "Aucun versement ne te revient sur ce deal.",
+    "final": "Cette décision est définitive dans l'application.",
+    "recourse": "Désaccord ? Demander une médiation conventionnelle par email.",
+    "recourseSubject": "Yamba — dossier {ticket} — demande de médiation conventionnelle",
+    "SHIPPER": {
+      "REJECTED": "Ton signalement n'a pas été retenu : le Voyageur est payé en entier.",
+      "PARTIAL_REFUND": "Ton signalement est retenu en partie : remboursement partiel.",
+      "FULL_REFUND": "Ton signalement est retenu : remboursement total.",
+      "COMPENSATE_CARRIER": "La retenue d'annulation est versée au Voyageur.",
+      "RESTITUTE_SHIPPER": "La retenue d'annulation te revient."
+    },
+    "CARRIER": {
+      "REJECTED": "Le signalement n'a pas été retenu : tu es payé en entier.",
+      "PARTIAL_REFUND": "Le signalement est retenu en partie : une part du prix est remboursée à l'Expéditeur.",
+      "FULL_REFUND": "Le signalement est retenu : l'Expéditeur est remboursé en totalité.",
+      "COMPENSATE_CARRIER": "La retenue d'annulation te revient.",
+      "RESTITUTE_SHIPPER": "La retenue d'annulation est restituée à l'Expéditeur."
+    }
+  },
+  "statement": {
+    "title": "Donne ta version",
+    "intro": "Explique ce qui s'est passé, avec tes photos (prise en charge, remise). Une seule fois, jusqu'au {deadline}. Nous décidons après avoir lu les deux versions.",
+    "placeholder": "Ex : j'ai récupéré le colis fermé devant l'Expéditeur, checklist complète, et je l'ai remis en main propre au destinataire qui a validé le code…",
+    "minHint": "Au moins {min} caractères.",
+    "photosLabel": "Photos (jusqu'à {max})",
+    "uploadError": "Échec",
+    "removePhoto": "Retirer la photo",
+    "cta": "Envoyer ma version",
+    "sending": "Envoi…",
+    "once": "Ta version ne pourra plus être modifiée une fois envoyée.",
+    "sentTitle": "Version envoyée",
+    "sentText": "Envoyée le {date}. Nous décidons sous 5 jours ouvrés : tu seras prévenu ici et par email.",
+    "closedText": "Le délai pour donner ta version est passé. La décision est en cours : tu seras prévenu ici et par email.",
+    "toastSent": "Ta version est enregistrée.",
+    "toastConflict": "Ce dossier n'accepte plus de version (déjà envoyée ou décidé).",
+    "toastError": "Envoi impossible. Réessaye."
+  }
+}

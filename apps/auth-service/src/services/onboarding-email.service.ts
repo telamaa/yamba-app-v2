@@ -8,15 +8,16 @@
  * 📁 Place in: apps/auth-service/src/services/onboarding-email.service.ts
  */
 
-import { sendEmail } from "../utils/sendMail";
+import { sendAuthEmail } from "../emails/send-auth-email";
+import { getAuthEmails } from "../emails/auth-emails";
 import prisma from "@packages/libs/prisma";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
 // ─── Reminder schedule config ────────────────────────────────────
 export const REMINDER_SCHEDULE = [
-  { step: 1, delayHours: 24, subject: "Plus qu'une étape pour devenir Tripper !" },
-  { step: 2, delayHours: 72, subject: "Ton profil Tripper t'attend…" },
+  { step: 1, delayHours: 24, subject: "Plus qu'une étape pour devenir Voyageur !" }, // A144
+  { step: 2, delayHours: 72, subject: "Ton profil Voyageur t'attend…" },
   { step: 3, delayHours: 168, subject: "Dernière chance de finaliser ton profil" }, // 7 days
 ] as const;
 
@@ -51,16 +52,15 @@ export async function sendOnboardingCompleteEmail(userId: string) {
       carrierPage.stripeChargesEnabled
     );
 
-    await sendEmail(
+    await sendAuthEmail(
       user.email,
-      "🎉 Ton profil Tripper est actif !",
-      "carrier-onboarding-complete",
-      {
-        name: carrierPage.name || "Tripper",
+      user.preferredLocale,
+      getAuthEmails(user.preferredLocale).carrierOnboardingComplete({
+        name: carrierPage.name || user.firstName,
         city,
         stripeReady,
         appUrl: APP_URL,
-      }
+      })
     );
 
     console.log(`[onboarding-email] Completion email sent to ${user.email}`);
@@ -88,16 +88,15 @@ export async function sendOnboardingReminderEmail(
     const schedule = REMINDER_SCHEDULE[reminderStep - 1];
     if (!schedule) return;
 
-    await sendEmail(
+    await sendAuthEmail(
       user.email,
-      schedule.subject,
-      "carrier-onboarding-reminder",
-      {
-        name: user.carrierPage.name || "Tripper",
+      user.preferredLocale,
+      getAuthEmails(user.preferredLocale).carrierOnboardingReminder({
+        name: user.carrierPage.name || user.firstName,
         step: schedule.step,
         currentStep: user.carrierPage.onboardingStep,
         appUrl: APP_URL,
-      }
+      })
     );
 
     // Update reminder tracking fields

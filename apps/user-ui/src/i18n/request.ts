@@ -11,7 +11,6 @@ export default getRequestConfig(async ({ requestLocale }) => {
     home,
     auth,
     dashboard,
-    trips,
     carrier,
     search,
     tripDetail,
@@ -30,12 +29,18 @@ export default getRequestConfig(async ({ requestLocale }) => {
     myTrips, // ✨ NEW dashboard Mes trajets
     dashboardHome, // ✨ NEW dashboard home inbox
     notifications, // ✨ NEW dashboard notifications (PR5)
+    favorites, // D46 — Mes favoris
+    finances, // A83 — Finances (portefeuille + paiements)
+    mediation, // C-PR2 (D55) — décision de médiation, version du Voyageur
+    messaging, // F-PR2 (D61) — conversation, rendez-vous, numéro
+    maintenance, // C-PR8c (D64) — annonce / lecture seule
+    consent, // D66 — mesure d'audience
+    tracking, // D69 — page destinataire
   ] = await Promise.all([
     import(`../../messages/${locale}/common.json`),
     import(`../../messages/${locale}/home.json`),
     import(`../../messages/${locale}/auth.json`),
     import(`../../messages/${locale}/dashboard.json`),
-    import(`../../messages/${locale}/trips.json`),
     import(`../../messages/${locale}/carrier.json`),
     import(`../../messages/${locale}/search.json`),
     import(`../../messages/${locale}/trip-detail.json`),
@@ -54,6 +59,13 @@ export default getRequestConfig(async ({ requestLocale }) => {
     import(`../../messages/${locale}/myTrips.json`), // ✨ NEW dashboard Mes trajets
     import(`../../messages/${locale}/dashboardHome.json`), // ✨ NEW dashboard home inbox
     import(`../../messages/${locale}/notifications.json`), // ✨ NEW dashboard notifications (PR5)
+    import(`../../messages/${locale}/favorites.json`), // D46
+    import(`../../messages/${locale}/finances.json`), // A83
+    import(`../../messages/${locale}/mediation.json`), // C-PR2
+    import(`../../messages/${locale}/messaging.json`), // F-PR2 (D61)
+    import(`../../messages/${locale}/maintenance.json`), // C-PR8c (D64)
+    import(`../../messages/${locale}/consent.json`), // D66
+    import(`../../messages/${locale}/tracking.json`), // D69
   ]);
   return {
     locale,
@@ -62,7 +74,6 @@ export default getRequestConfig(async ({ requestLocale }) => {
       home: home.default,
       auth: auth.default,
       dashboard: dashboard.default,
-      trips: trips.default,
       carrier: carrier.default,
       search: search.default,
       tripDetail: tripDetail.default,
@@ -81,6 +92,13 @@ export default getRequestConfig(async ({ requestLocale }) => {
       myTrips: myTrips.default, // ✨ NEW dashboard Mes trajets
       dashboardHome: dashboardHome.default, // ✨ NEW dashboard home inbox
       notifications: notifications.default, // ✨ NEW dashboard notifications (PR5)
+      favorites: favorites.default, // D46
+      finances: finances.default, // A83
+      mediation: mediation.default, // C-PR2
+      messaging: messaging.default, // F-PR2 (D61)
+      maintenance: maintenance.default, // C-PR8c (D64)
+      consent: consent.default, // D66
+      tracking: tracking.default, // D69
     },
   };
 });

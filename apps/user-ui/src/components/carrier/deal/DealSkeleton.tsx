@@ -35,7 +35,7 @@ export default function DealSkeleton() {
         </div>
 
         {/* Grid */}
-        <div className="mt-4 grid grid-cols-1 gap-6 lg:mt-0 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="mt-4 grid grid-cols-1 gap-6 md:mt-0 md:grid-cols-[minmax(0,1fr)_300px] lg:grid-cols-[minmax(0,1fr)_340px]">
           {/* Main column */}
           <div className="space-y-6">
             <Card height="h-[88px]" />      {/* Shipper */}
@@ -47,7 +47,7 @@ export default function DealSkeleton() {
           </div>
 
           {/* Sidebar (hidden mobile) */}
-          <aside className="hidden space-y-4 lg:block">
+          <aside className="hidden space-y-4 md:block">
             <Card height="h-[260px]" />     {/* Earnings card */}
             <Card height="h-[120px]" />     {/* Coverage */}
             <Card height="h-[180px]" />     {/* Actions */}

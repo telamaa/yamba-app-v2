@@ -23,6 +23,27 @@ const nextConfig = {
   // Use this to set Nx-specific options
   // See: https://nx.dev/recipes/next/next-config-setup
   nx: {},
+  // Racine Turbopack = le monorepo : sans elle, Next choisit le premier package-lock.json trouvé en remontant
+  // (ex. ~/package-lock.json) et avertit « multiple lockfiles » à chaque démarrage.
+  turbopack: { root: require("path").join(__dirname, "../..") },
+  // Recette sur le réseau local (autres ordinateurs, téléphones) : Next 16
+  // répond 403 aux assets /_next/* demandés depuis une origine autre que
+  // localhost — la page reste figée sur son squelette SSR. Réseaux privés
+  // uniquement, sans effet en production (option de dev).
+  allowedDevOrigins: ["192.168.*.*", "10.*.*.*", "172.16.*.*"],
+
+  // D48 — API en MÊME ORIGINE : quand API_PROXY_TARGET est posé (ex.
+  // http://localhost:8080), Next sert /api/* en proxy vers le gateway. Le
+  // navigateur appelle alors `NEXT_PUBLIC_API_BASE_URL=/api` (relatif) : les
+  // cookies sont first-party quel que soit l'hôte (localhost, IP LAN, prod),
+  // plus de CORS ni de piège SameSite (recette 03/09 : login 200 puis /me 401
+  // avec le front sur localhost et l'API sur l'IP LAN). Sans la variable :
+  // comportement historique (URL absolue vers le gateway).
+  async rewrites() {
+    const target = (process.env.API_PROXY_TARGET || "").replace(/\/$/, "");
+    if (!target) return [];
+    return [{ source: "/api/:path*", destination: `${target}/api/:path*` }];
+  },
 };
 
 const plugins = [

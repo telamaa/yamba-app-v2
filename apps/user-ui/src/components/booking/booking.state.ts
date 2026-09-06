@@ -52,10 +52,9 @@ export const initialDraft: Draft = {
   charterAccepted: false,
   termsAccepted: false,
 
-  paymentMethod: "CARD",
 };
 
-export const DRAFT_VERSION = 4; // v3 : moteur PER_KG (product / family / sizeClass) — les brouillons v2 sont abandonnés
+export const DRAFT_VERSION = 5; // v5 : plus de paymentMethod (un seul Payment Element — B2/A30) // v3 : moteur PER_KG (product / family / sizeClass) — les brouillons v2 sont abandonnés
 
 // ============================================================
 // MOCK TRIP

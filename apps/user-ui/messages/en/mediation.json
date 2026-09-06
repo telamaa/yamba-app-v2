@@ -1,0 +1,44 @@
+{
+  "decision": {
+    "title": "Decision made",
+    "reasonLabel": "Reason for the decision",
+    "refundLine": "{amount} is refunded to you, on your card within 5 to 10 days.",
+    "payoutLine": "{amount} is on its way to your account, in your bank within 2 to 7 days.",
+    "noPayoutLine": "No payout is owed to you on this deal.",
+    "final": "This decision is final in the app.",
+    "recourse": "Disagree? Request conventional mediation by email.",
+    "recourseSubject": "Yamba — case {ticket} — conventional mediation request",
+    "SHIPPER": {
+      "REJECTED": "Your report was not upheld: the traveler is paid in full.",
+      "PARTIAL_REFUND": "Your report is partly upheld: partial refund.",
+      "FULL_REFUND": "Your report is upheld: full refund.",
+      "COMPENSATE_CARRIER": "The cancellation retention goes to the traveler.",
+      "RESTITUTE_SHIPPER": "The cancellation retention comes back to you."
+    },
+    "CARRIER": {
+      "REJECTED": "The report was not upheld: you are paid in full.",
+      "PARTIAL_REFUND": "The report is partly upheld: part of the price is refunded to the shipper.",
+      "FULL_REFUND": "The report is upheld: the shipper is refunded in full.",
+      "COMPENSATE_CARRIER": "The cancellation retention comes to you.",
+      "RESTITUTE_SHIPPER": "The cancellation retention goes back to the shipper."
+    }
+  },
+  "statement": {
+    "title": "Give your side",
+    "intro": "Explain what happened, with your photos (pickup, hand-over). Once only, until {deadline}. We decide after reading both sides.",
+    "placeholder": "E.g. I picked up the parcel closed in front of the shipper, full checklist, and handed it to the recipient who validated the code…",
+    "minHint": "At least {min} characters.",
+    "photosLabel": "Photos (up to {max})",
+    "uploadError": "Failed",
+    "removePhoto": "Remove photo",
+    "cta": "Send my side",
+    "sending": "Sending…",
+    "once": "Your statement can't be edited once sent.",
+    "sentTitle": "Statement sent",
+    "sentText": "Sent on {date}. We decide within 5 business days: you'll be notified here and by email.",
+    "closedText": "The time to give your side has passed. The decision is in progress: you'll be notified here and by email.",
+    "toastSent": "Your statement is recorded.",
+    "toastConflict": "This case no longer accepts a statement (already sent or decided).",
+    "toastError": "Could not send. Try again."
+  }
+}

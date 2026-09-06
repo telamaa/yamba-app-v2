@@ -70,6 +70,17 @@ export type ShipmentListItem = {
 
   /** EXPIRED / DECLINED / CANCELLED */
   refunded?: boolean;
+
+  /** `cancel` ∈ allowedActions serveur — le front reflète, ne décide jamais. */
+  canCancel?: boolean;
+  /** ANN-01 servie par le serveur (non nulle quand canCancel) — jamais recalculée ici. */
+  cancellationPreview?: {
+    refundCents: number;
+    retentionCents: number;
+    retentionPct: number;
+    fullRefundUntil: string; // ISO — avant cet instant : 100 %
+    currencyCode: string;
+  };
 };
 
 /* ─────────────────────────── Présentation ─────────────────────────── */

@@ -1,20 +1,17 @@
 {
   "memberSince": "Member since {date}",
-
   "badges": {
     "verified": "Verified",
-    "superTripper": "Super Tripper"
+    "superTripper": "Super Traveler"
   },
-
   "stats": {
     "trips": "Trips",
     "parcelsCarried": "Parcels delivered",
     "globalRating": "Global rating",
     "notRatedYet": "Not rated yet"
   },
-
   "tripperBlock": {
-    "title": "As a Tripper",
+    "title": "As a Traveler",
     "frequentRoutes": "Frequent routes",
     "routeCount": "{count, plural, one {1 trip} other {# trips}}",
     "availableTrips": "{count, plural, =0 {No available trips} one {# available trip} other {# available trips}}",
@@ -23,9 +20,8 @@
     "noAvailableTripsCta": "Follow to get notified",
     "reviewsHeader": "{count, plural, =0 {No reviews} one {# review · {average}} other {# reviews · {average}}}",
     "viewAllReviews": "View all",
-    "noReviews": "{firstName} has not received any reviews as a Tripper yet. Be the first to travel with them."
+    "noReviews": "{firstName} has not received any reviews as a Traveler yet. Be the first to travel with them."
   },
-
   "shipperBlock": {
     "title": "As a sender",
     "parcelsSent": "Parcels sent",
@@ -34,7 +30,6 @@
     "noReviews": "{firstName} has not received any reviews as a sender yet.",
     "compactNoActivity": "No activity yet"
   },
-
   "sidebar": {
     "editProfile": "Edit my profile",
     "follow": "Follow",
@@ -49,15 +44,59 @@
     "followersCount": "{count, plural, one {# person follows {firstName}} other {# people follow {firstName}}}",
     "reportProfile": "Report this profile"
   },
-
   "error": {
     "title": "Something went wrong",
     "message": "Unable to load this profile right now. Please try again in a moment."
   },
-
   "notFound": {
     "title": "Profile not found",
     "message": "This profile does not exist or has been removed.",
     "goHome": "Back to home"
+  },
+  "reputation": {
+    "carrier": {
+      "NEW": {
+        "label": "New Traveler",
+        "criteria": "Fewer than 3 completed Deals."
+      },
+      "CONFIRMED": {
+        "label": "Confirmed Traveler",
+        "criteria": "At least 3 completed Deals."
+      },
+      "TOP": {
+        "label": "Top Traveler",
+        "criteria": "At least 10 completed Deals, an average ≥ 4.8 and no late cancellation."
+      },
+      "nextConfirmed": "Next level “Confirmed Traveler”: 3 completed Deals.",
+      "nextTop": "Next level “Top Traveler”: 10 completed Deals, average ≥ 4.8, 0 late cancellation."
+    },
+    "shipper": {
+      "NEW": {
+        "label": "New Shipper",
+        "criteria": "Fewer than 3 completed shipments."
+      },
+      "CONFIRMED": {
+        "label": "Reliable Shipper",
+        "criteria": "At least 3 completed shipments."
+      },
+      "TOP": {
+        "label": "Top Shipper",
+        "criteria": "At least 5 completed shipments, an average ≥ 4.8 and no late cancellation."
+      },
+      "nextConfirmed": "Next level “Reliable Shipper”: 3 completed shipments.",
+      "nextTop": "Next level “Top Shipper”: 5 completed shipments, average ≥ 4.8, 0 late cancellation."
+    },
+    "facts": "{deals, plural, =0 {No completed Deal} one {# completed Deal} other {# completed Deals}} · {count, plural, =0 {no reviews yet} one {★ {avg} from # review} other {★ {avg} from # reviews}} · {late, plural, =0 {0 late cancellation} one {# late cancellation} other {# late cancellations}}"
+  },
+  "reviews": {
+    "criteria": {
+      "PUNCTUALITY": "Punctuality",
+      "COMMUNICATION": "Communication",
+      "PARCEL_CARE": "Parcel care",
+      "DECLARATION_CLARITY": "Clear declaration",
+      "RESPONSIVENESS": "Responsiveness"
+    },
+    "report": "Report this review",
+    "reportSubject": "Report a review (#{id})"
   }
 }

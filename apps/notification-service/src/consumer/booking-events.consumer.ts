@@ -25,6 +25,8 @@ import {
   CONSUMER_GROUPS,
   type ConsumedEventMessage,
 } from "@packages/messaging";
+import { dispatchBookingEmails } from "../emails/booking-emails";
+import { sinkToAnalytics } from "../lib/analytics-sink";
 
 type BookingDomainEvent = z.infer<typeof BookingDomainEventSchema>;
 type BookingEventKey = BookingDomainEvent["eventType"];
@@ -52,8 +54,11 @@ export const IN_APP_MATRIX: Record<BookingEventKey, RecipientRule> = {
   "booking.completed": "BOTH",
   "booking.payout_sent": "CARRIER",
   "booking.disputed": "BOTH",
+  "booking.verification_reminder": "SHIPPER", // B4/A70 : J+3, dernier jour pour vérifier ou signaler
   "booking.rating_reminder": "TARGET_ROLE",
   "booking.rating_revealed": "BOTH",
+  "booking.dispute_carrier_responded": "NONE", // C-PR2 (D55) : file admin seulement
+  "booking.dispute_resolved": "BOTH", // C-PR2 (D55, 5A)
 };
 
 export function resolveRecipients(event: BookingDomainEvent): string[] {
@@ -154,6 +159,14 @@ export async function handleBookingEventMessage(
       update: {},
     });
   }
+
+  // 3bis. CANAL EMAIL (D41/A35/A36) — best-effort : claims
+  // EmailDelivery par destinataire, jamais de throw sur un échec
+  // d'ENVOI (une erreur transitoire de claim, elle, remonte — la
+  // re-livraison retrouvera les claims posés).
+  await dispatchBookingEmails(eventId, event, logger);
+  // D66 4A — mesure d'audience côté serveur, pour les parties qui ont consenti (best effort)
+  await sinkToAnalytics({ eventId, eventType: event.eventType, occurredAt: event.occurredAt, payload: event.payload as never }, logger);
 
   // 4. PROCESSED — la row garde la trace du passage.
   await prisma.consumedEvent.update({

@@ -3,9 +3,13 @@ import { notFound } from "next/navigation";
 import { setRequestLocale } from "next-intl/server";
 import Header from "@/components/layout/Header";
 import { UiPreferencesProvider } from "@/components/providers/UiPreferencesProvider";
+import SessionExpiredGate from "@/components/providers/SessionExpiredGate";
 import { ToastProvider } from "@/components/ui/Toast";
 import { routing } from "@/i18n/routing";
 import Providers from "@/app/[locale]/providers";
+import MaintenanceBanner from "@/components/layout/MaintenanceBanner";
+import ConsentBanner from "@/components/layout/ConsentBanner";
+import AnalyticsProvider from "@/components/layout/AnalyticsProvider";
 
 // Generate static params for all supported locales at build time
 export function generateStaticParams() {
@@ -61,9 +65,16 @@ export default async function LocaleLayout({
         {/* ThemeProvider : dans app/layout.tsx (root) — voir la note là-bas */}
         <UiPreferencesProvider>
           <ToastProvider>
+            {/* A89 — « Ta session a expiré » : ici, sous UiPreferencesProvider + ToastProvider (LoginForm en dépend) */}
+            <SessionExpiredGate />
             <Header />
             <div className="min-h-screen bg-slate-50 pt-[78px] dark:bg-slate-950">
+              {/* C-PR8c (D64) — annonce / lecture seule, lu sur le gateway toutes les 60 s */}
+              <MaintenanceBanner />
               {children}
+              {/* D66 — mesure d'audience : bannière opt-in, pages vues et identité seulement après consentement */}
+              <ConsentBanner />
+              <AnalyticsProvider />
             </div>
           </ToastProvider>
         </UiPreferencesProvider>

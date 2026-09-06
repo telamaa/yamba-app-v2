@@ -3,17 +3,19 @@
  * ============================
  * Section COMMUNICATION côté Expéditrice :
  *  - SenderCarrierContact : Thomas ("en vol actuellement") + Message
- *  - SenderRecipientContact : Marie (Appeler / WhatsApp)
+ *  - SenderRecipientContact : Marie (Appeler / WhatsApp / suivi) — numéro réel (D69, fin du mock A137)
  */
 
 "use client";
 
 import { MessageSquare, Phone } from "lucide-react";
+import BookingTrackingLinkCard from "../../shared/BookingTrackingLinkCard"; // D69
 import { useTranslations } from "next-intl";
 import type {
   Booking,
   BookingTrackingEventId,
 } from "@/components/booking/booking-tracker/booking-tracker.types";
+import { useOpenDealThread } from "@/hooks/useMessaging";
 
 function hasEvent(booking: Booking, id: BookingTrackingEventId): boolean {
   return (booking.trackingEvents ?? []).some((e) => e.id === id);
@@ -31,10 +33,8 @@ export function SenderCarrierContact({ booking }: { booking: Booking }) {
     ? t("senderTracking.communication.carrierInFlight")
     : t("senderTracking.communication.carrierTraveling");
 
-  const handleMessage = () => {
-    // eslint-disable-next-line no-console
-    console.info("[sender-tracking] open message thread with", carrier.id);
-  };
+  const thread = useOpenDealThread();
+  const handleMessage = () => thread.open(booking.id);
 
   return (
     <section className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950 sm:rounded-2xl sm:p-5">
@@ -58,7 +58,8 @@ export function SenderCarrierContact({ booking }: { booking: Booking }) {
       <button
         type="button"
         onClick={handleMessage}
-        className="mt-3 inline-flex min-h-[42px] w-full items-center justify-center gap-1.5 rounded-xl border border-slate-300 bg-white text-[12.5px] font-semibold text-slate-800 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:hover:bg-slate-800"
+        disabled={thread.isPending}
+        className="mt-3 inline-flex min-h-[42px] w-full items-center justify-center gap-1.5 rounded-xl border border-slate-300 bg-white text-[12.5px] font-semibold text-slate-800 transition-colors hover:bg-slate-50 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:hover:bg-slate-800"
       >
         <MessageSquare size={13} aria-hidden="true" />
         {t("senderTracking.communication.message")}
@@ -74,10 +75,8 @@ export function SenderRecipientContact({ booking }: { booking: Booking }) {
     (recipient.firstName[0] ?? "") + (recipient.lastName[0] ?? "")
   ).toUpperCase();
 
-  // Le téléphone de Marie n'est pas dans le type Booking côté Sender
-  // (Aminata l'a fourni à la réservation) — mock statique cohérent.
-  const phone = "+242 06 421 88 12";
-  const phoneDigits = phone.replace(/[^\d+]/g, "");
+  // D69 — le numéro que l'Expéditeur a saisi à la réservation (servi par la vue Shipper).
+  const phoneDigits = (recipient.phoneE164 ?? "").replace(/[^\d+]/g, "");
   const telHref = "tel:" + phoneDigits;
 
   const handleWhatsApp = () => {
@@ -107,15 +106,20 @@ export function SenderRecipientContact({ booking }: { booking: Booking }) {
           </div>
         </div>
       </div>
-      <div className="mt-3 flex gap-2">
-        <a href={telHref} className={actionClass}>
-          <Phone size={13} aria-hidden="true" />
-          {t("senderTracking.communication.call")}
-        </a>
-        <button type="button" onClick={handleWhatsApp} className={actionClass}>
-          <MessageSquare size={13} aria-hidden="true" />
-          {t("senderTracking.communication.whatsapp")}
-        </button>
+      {phoneDigits && (
+        <div className="mt-3 flex gap-2">
+          <a href={telHref} className={actionClass}>
+            <Phone size={13} aria-hidden="true" />
+            {t("senderTracking.communication.call")}
+          </a>
+          <button type="button" onClick={handleWhatsApp} className={actionClass}>
+            <MessageSquare size={13} aria-hidden="true" />
+            {t("senderTracking.communication.whatsapp")}
+          </button>
+        </div>
+      )}
+      <div className="mt-3">
+        <BookingTrackingLinkCard booking={booking} compact />
       </div>
     </section>
   );

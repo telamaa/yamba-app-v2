@@ -346,7 +346,7 @@ export const AddDocumentsBodySchema = z
       .min(1)
       .meta({
         description:
-          "Maximum côté serveur : siteConfig.maxDocsPerTrip (défaut 5) · taille max par doc : siteConfig.maxDocSizeMb (défaut 5 Mo)",
+          "Maximum côté serveur : paramètre documents.maxDocsPerTrip (défaut 5) · taille max par doc : documents.maxDocSizeMb (défaut 5 Mo) — D62",
       }),
   })
   .meta({ id: "AddDocumentsBody" });

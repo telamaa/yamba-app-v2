@@ -4,6 +4,7 @@ import {
   createStripeConnectLink,
   checkStripeStatus,
   completeCarrierOnboarding,
+  createStripeDashboardLink,
 } from "../controller/carrier.controller";
 import isAuthenticated from "@packages/middleware/isAuthenticated";
 
@@ -18,5 +19,8 @@ router.get("/carrier/onboarding/stripe/status", isAuthenticated, checkStripeStat
 
 // Finaliser (skip Stripe)
 router.post("/carrier/onboarding/complete", isAuthenticated, completeCarrierOnboarding);
+
+// Finances (A84) : tableau de bord Stripe Express (virements, RIB) — lien à usage unique
+router.post("/carrier/stripe/dashboard-link", isAuthenticated, createStripeDashboardLink);
 
 export default router;

@@ -37,6 +37,7 @@ type TripPreviewDto = {
 };
 
 type ReviewPreviewDto = {
+  criteria: Record<string, "UP" | "DOWN"> | null;
   id: string;
   rating: number;
   comment: string | null;
@@ -132,6 +133,7 @@ function toReviewPreview(r: {
   id: string;
   rating: number;
   comment: string | null;
+  criteria?: unknown;
   createdAt: Date;
   authorUser: {
     firstName: string;
@@ -143,6 +145,8 @@ function toReviewPreview(r: {
     id: r.id,
     rating: r.rating,
     comment: r.comment,
+    // B5 — pouces des critères (public, comme la note)
+    criteria: r.criteria && typeof r.criteria === "object" ? (r.criteria as Record<string, "UP" | "DOWN">) : null,
     createdAt: r.createdAt,
     author: {
       firstName: r.authorUser.firstName,
@@ -192,7 +196,8 @@ export const getUserPublic: RequestHandler = async (
       },
     });
 
-    if (!user || user.isDeleted) {
+    // D67 1A — profil masqué : 404 pour tout le monde sauf le propriétaire (qui le voit marqué « masqué »)
+    if (!user || user.isDeleted || (user.profilePublic === false && currentUserId !== user.id)) {
       res.status(404).json({ success: false, message: "User not found." });
       return;
     }
@@ -257,7 +262,8 @@ export const getUserPublic: RequestHandler = async (
         : Promise.resolve(0),
 
       prisma.review.findMany({
-        where: { subjectUserId: user.id, kind: ReviewKind.AS_CARRIER },
+        // B5/D53 — seuls les avis RÉVÉLÉS sont publics (double-aveugle)
+        where: { subjectUserId: user.id, kind: ReviewKind.AS_CARRIER, revealedAt: { not: null } },
         orderBy: { createdAt: "desc" },
         take: PREVIEW_REVIEWS_LIMIT,
         include: {
@@ -272,11 +278,11 @@ export const getUserPublic: RequestHandler = async (
       }),
 
       prisma.review.count({
-        where: { subjectUserId: user.id, kind: ReviewKind.AS_CARRIER },
+        where: { subjectUserId: user.id, kind: ReviewKind.AS_CARRIER, revealedAt: { not: null } },
       }),
 
       prisma.review.findMany({
-        where: { subjectUserId: user.id, kind: ReviewKind.AS_SHIPPER },
+        where: { subjectUserId: user.id, kind: ReviewKind.AS_SHIPPER, revealedAt: { not: null } },
         orderBy: { createdAt: "desc" },
         take: PREVIEW_REVIEWS_LIMIT,
         include: {
@@ -291,7 +297,7 @@ export const getUserPublic: RequestHandler = async (
       }),
 
       prisma.review.count({
-        where: { subjectUserId: user.id, kind: ReviewKind.AS_SHIPPER },
+        where: { subjectUserId: user.id, kind: ReviewKind.AS_SHIPPER, revealedAt: { not: null } },
       }),
 
       prisma.userFollow.count({ where: { followedId: user.id } }),
@@ -322,10 +328,12 @@ export const getUserPublic: RequestHandler = async (
       avatarUrl: user.avatar?.url ?? null,
       memberSince: user.createdAt,
 
+      isMe: currentUserId === user.id,
+      hidden: user.profilePublic === false, // D67 — seul le propriétaire arrive ici avec hidden=true
       location: {
-        city: primaryAddress?.city ?? null,
-        country: primaryAddress?.country ?? null,
-        countryCode: primaryAddress?.countryCode ?? null,
+        city: user.showCity === false ? null : primaryAddress?.city ?? null,
+        country: user.showCity === false ? null : primaryAddress?.country ?? null,
+        countryCode: user.showCity === false ? null : primaryAddress?.countryCode ?? null,
       },
 
       stats: {
@@ -342,6 +350,27 @@ export const getUserPublic: RequestHandler = async (
       shipperRating: {
         average: user.shipperRatingsAvg,
         count: user.shipperRatingsCount,
+      },
+
+      // B5 / D29① — réputation visible : niveau + faits (calculés par le deal-service, dénormalisés)
+      reputation: {
+        carrier:
+          isCarrier && carrierPage
+            ? {
+                level: carrierPage.reputationLevel ?? "NEW",
+                ratingsAvg: carrierPage.ratingsAvg,
+                ratingsCount: carrierPage.ratingsCount,
+                completedDealsCount: carrierPage.completedDealsCount,
+                lateCancellationsCount: carrierPage.lateCancellationsCount,
+              }
+            : null,
+        shipper: {
+          level: user.shipperReputationLevel ?? "NEW",
+          ratingsAvg: user.shipperRatingsAvg,
+          ratingsCount: user.shipperRatingsCount,
+          completedDealsCount: user.shipperCompletedDealsCount,
+          lateCancellationsCount: user.shipperLateCancellationsCount,
+        },
       },
 
       tripper:
@@ -406,10 +435,10 @@ export const listUserPublicReviews: RequestHandler = async (req, res, next) => {
 
     const user = await prisma.user.findUnique({
       where: { publicSlug: slug },
-      select: { id: true, isDeleted: true },
+      select: { id: true, isDeleted: true, profilePublic: true },
     });
 
-    if (!user || user.isDeleted) {
+    if (!user || user.isDeleted || (user.profilePublic === false && (req as { user?: { id?: string } }).user?.id !== user.id)) { // D67 1A
       res.status(404).json({ success: false, message: "User not found." });
       return;
     }
@@ -465,10 +494,10 @@ export const listUserPublicTrips: RequestHandler = async (req, res, next) => {
 
     const user = await prisma.user.findUnique({
       where: { publicSlug: slug },
-      select: { id: true, isDeleted: true, carrierStatus: true },
+      select: { id: true, isDeleted: true, carrierStatus: true, profilePublic: true },
     });
 
-    if (!user || user.isDeleted) {
+    if (!user || user.isDeleted || (user.profilePublic === false && (req as { user?: { id?: string } }).user?.id !== user.id)) { // D67 1A
       res.status(404).json({ success: false, message: "User not found." });
       return;
     }
@@ -542,7 +571,7 @@ export const followUser = async (
 
     const followed = await prisma.user.findUnique({
       where: { publicSlug: slug },
-      select: { id: true, isDeleted: true },
+      select: { id: true, isDeleted: true, profilePublic: true },
     });
     console.log(`[${ts()}] [followUser] 👤 followed user:`, followed);
 

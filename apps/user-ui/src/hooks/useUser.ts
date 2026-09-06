@@ -34,6 +34,8 @@ export type User = {
   gender?: string;
   birthDate?: string | null;
   roles: string[];
+  /** D44 — langue des emails, alignée sur la bascule FR/EN du header. */
+  preferredLocale?: string;
   carrierStatus?: string;
   carrierPage?: CarrierPage | null;
   avatar?: { url: string } | null;

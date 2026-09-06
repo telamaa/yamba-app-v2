@@ -5,6 +5,9 @@ import { useMemo, useState } from "react";
 import { useUiPreferences } from "@/components/providers/UiPreferencesProvider";
 import { useForm } from "react-hook-form";
 import { useRouter } from "@/i18n/navigation";
+import { useSearchParams } from "next/navigation";
+import { REGISTER_REDIRECT_KEY, sanitizeRedirect, withRedirect } from "@/lib/auth/safe-redirect";
+import GoogleSignInButton from "@/components/auth/shared/GoogleSignInButton";
 import { Eye, EyeOff, Loader2, ShieldCheck } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import {
@@ -22,6 +25,13 @@ import {
   isPasswordValid,
   type PasswordContext,
 } from "@/lib/auth/password-strength";
+import {
+  firstFailingCheck,
+  passwordCheckMessage,
+  passwordCodeMessage,
+  readAuthErrorDetails,
+  registerCodeMessage,
+} from "@/lib/auth/auth-error-codes";
 import PasswordStrengthIndicator from "../shared/PasswordStrengthIndicator";
 import { useToast } from "@/components/ui/Toast";
 import AuthHeroVisual from "@/components/auth/visual/AuthHeroVisual";
@@ -39,17 +49,6 @@ type Props = {
   heroVisual: HeroVisual;
 };
 
-function GoogleIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 48 48" aria-hidden="true">
-      <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.2 6.2 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.1-.1-2.3-.4-3.5z" />
-      <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.2 6.2 29.3 4 24 4c-7.7 0-14.4 4.3-17.7 10.7z" />
-      <path fill="#4CAF50" d="M24 44c5.2 0 10-2 13.6-5.2l-6.3-5.2C29.3 35.4 26.8 36 24 36c-5.3 0-9.7-3.3-11.3-8l-6.6 5.1C9.4 39.7 16.2 44 24 44z" />
-      <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.3 4.3-4.2 5.6l6.3 5.2C40.9 35.6 44 30.3 44 24c0-1.1-.1-2.3-.4-3.5z" />
-    </svg>
-  );
-}
-
 function FacebookIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 48 48" aria-hidden="true">
@@ -63,11 +62,10 @@ function buildCopy(lang: string) {
   const fr = lang === "fr";
   return {
     trust: fr ? "Inscription sécurisée" : "Secure signup",
-    title: fr ? "Devenez Yamber" : "Become a Yamber",
+    title: fr ? "Deviens Voyageur" : "Become a Traveler",
     subtitle: fr
-      ? "Envoyez ou transportez des colis, en toute simplicité."
+      ? "Envoie ou transporte des colis, en toute simplicité."
       : "Send or transport parcels, simply.",
-    google: fr ? "Continuer avec Google" : "Continue with Google",
     facebook: fr ? "Continuer avec Facebook" : "Continue with Facebook",
     orMail: fr ? "ou par e-mail" : "or with email",
     firstName: fr ? "Prénom" : "First name",
@@ -75,29 +73,26 @@ function buildCopy(lang: string) {
     lastName: fr ? "Nom" : "Last name",
     lastNamePh: fr ? "Diallo" : "Diallo",
     email: fr ? "E-mail" : "Email",
-    emailPh: fr ? "vous@email.com" : "you@email.com",
+    emailPh: fr ? "prenom@email.com" : "you@email.com",
     password: fr ? "Mot de passe" : "Password",
     passwordConfirm: fr ? "Confirmer le mot de passe" : "Confirm password",
     cta: fr ? "Créer mon compte" : "Create my account",
     ctaLoading: fr ? "Création…" : "Creating…",
     haveAccount: fr ? "Déjà membre ?" : "Already a member?",
-    login: fr ? "Connectez-vous" : "Sign in",
+    login: fr ? "Connecte-toi" : "Sign in",
     showPasswordAria: fr ? "Afficher le mot de passe" : "Show password",
     hidePasswordAria: fr ? "Masquer le mot de passe" : "Hide password",
     requiredFirstName: fr ? "Le prénom est requis." : "First name is required.",
     requiredLastName: fr ? "Le nom est requis." : "Last name is required.",
     requiredEmail: fr ? "L'e-mail est requis." : "Email is required.",
-    invalidEmail: fr ? "Veuillez saisir un e-mail valide." : "Please enter a valid email.",
+    invalidEmail: fr ? "Saisis un e-mail valide." : "Please enter a valid email.",
     requiredPassword: fr ? "Le mot de passe est requis." : "Password is required.",
-    weakPassword: fr
-      ? "Le mot de passe ne respecte pas tous les critères."
-      : "Password does not meet all criteria.",
     requiredPasswordConfirm: fr
-      ? "Veuillez confirmer le mot de passe."
+      ? "Confirme le mot de passe."
       : "Please confirm the password.",
     passwordMismatch: fr ? "Les mots de passe ne correspondent pas." : "Passwords do not match.",
     requiredTerms: fr
-      ? "Vous devez accepter les conditions pour continuer."
+      ? "Tu dois accepter les conditions pour continuer."
       : "You must accept the terms to continue.",
     cguTextStart: fr ? "J'accepte les" : "I accept the",
     cguLink1: fr ? "Conditions générales d'utilisation" : "Terms of Service",
@@ -110,7 +105,7 @@ function buildCopy(lang: string) {
       : "Application configuration is incomplete.",
     pasteBlockedTitle: fr ? "Collage désactivé" : "Paste disabled",
     pasteBlocked: fr
-      ? "Pour votre sécurité, veuillez ressaisir le mot de passe."
+      ? "Pour ta sécurité, ressaisis le mot de passe."
       : "For your security, please retype the password.",
     pwdPopover: {
       title: fr ? "Sécurité du mot de passe" : "Password security",
@@ -126,7 +121,7 @@ function buildCopy(lang: string) {
         uppercase: fr ? "Une majuscule" : "One uppercase letter",
         number: fr ? "Un chiffre" : "One number",
         special: fr ? "Un caractère spécial" : "One special character",
-        personalInfo: fr ? "Pas votre nom ou e-mail" : "Not your name or email",
+        personalInfo: fr ? "Pas ton nom ni ton e-mail" : "Not your name or email",
         simpleDate: fr ? "Pas une date évidente" : "Not an obvious date",
         predictable: fr ? "Pas de suite simple (1234, abcd)" : "No simple sequence (1234, abcd)",
       },
@@ -143,6 +138,12 @@ export default function RegisterForm({ heroVisual }: Props) {
   const [passwordFocused, setPasswordFocused] = useState(false);
 
   const copy = useMemo(() => buildCopy(lang), [lang]);
+  // Page visée avant l'inscription (ex. réservation) : conservée jusqu'à la
+  // connexion qui suit l'OTP — en sessionStorage, l'URL de vérification
+  // reste propre.
+  const searchParams = useSearchParams();
+  const redirectTo = sanitizeRedirect(searchParams.get("redirect"));
+  const loginHref = withRedirect("/login", redirectTo);
 
   const {
     register,
@@ -199,6 +200,8 @@ export default function RegisterForm({ heroVisual }: Props) {
       // 🔒 SÉCURITÉ : token + email écrits en sessionStorage AVANT la redirection
       sessionStorage.setItem("register_verification_token", String(data.verificationToken));
       sessionStorage.setItem("register_verification_email", normalizedEmail);
+      if (redirectTo) sessionStorage.setItem(REGISTER_REDIRECT_KEY, redirectTo);
+      else sessionStorage.removeItem(REGISTER_REDIRECT_KEY);
 
       // 🔒 SÉCURITÉ : URL propre, pas d'email exposé via logs serveur, historique
       // navigateur, referrer headers ou analytics. L'email est lu côté verify
@@ -208,6 +211,24 @@ export default function RegisterForm({ heroVisual }: Props) {
     },
     onError: (error) => {
       const data = getApiErrorData(error);
+
+      // Codes de règle du serveur → message localisé sur LE champ concerné
+      const details = readAuthErrorDetails(data);
+      if (details?.type === "password") {
+        setError("password", {
+          type: "server",
+          message: passwordCodeMessage(lang === "fr", details.code),
+        });
+        return;
+      }
+      if (details?.type === "register") {
+        setError("email", {
+          type: "server",
+          message: registerCodeMessage(lang === "fr", details.code),
+        });
+        return;
+      }
+
       let hasFieldErrors = false;
       const fieldNames: Array<keyof RegisterFormData> = [
         "firstName",
@@ -247,7 +268,11 @@ export default function RegisterForm({ heroVisual }: Props) {
       email: values.email,
     });
     if (!isPasswordValid(checks)) {
-      setError("password", { type: "validate", message: copy.weakPassword });
+      // Nommer LE critère fautif (recette 03/09) — plus jamais « ne respecte pas tous les critères »
+      setError("password", {
+        type: "validate",
+        message: passwordCheckMessage(lang === "fr", firstFailingCheck(checks)),
+      });
       return;
     }
 
@@ -272,7 +297,7 @@ export default function RegisterForm({ heroVisual }: Props) {
   };
 
   const inputBase =
-    "mt-1.5 w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none " +
+    "mt-1.5 w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 text-base sm:text-sm text-slate-900 outline-none " +
     "transition-colors placeholder:text-slate-400 " +
     "focus:border-[#FF9900] focus:ring-4 focus:ring-[#FF9900]/20 " +
     "dark:border-slate-800 dark:bg-slate-950 dark:text-white dark:placeholder:text-slate-600 " +
@@ -314,14 +339,8 @@ export default function RegisterForm({ heroVisual }: Props) {
 
           {/* OAuth */}
           <div className="mt-6 space-y-2">
-            <button
-              type="button"
-              onClick={() => console.log("google oauth")}
-              className={oauthBtn}
-            >
-              <GoogleIcon />
-              {copy.google}
-            </button>
+            {/* D47 — bouton officiel Google Identity Services (inerte sans client ID) */}
+            <GoogleSignInButton redirectTo={redirectTo} text="signup_with" />
             <button
               type="button"
               onClick={() => console.log("facebook oauth")}
@@ -474,7 +493,7 @@ export default function RegisterForm({ heroVisual }: Props) {
                   onClick={() => setPasswordVisible((v) => !v)}
                   aria-label={passwordVisible ? copy.hidePasswordAria : copy.showPasswordAria}
                   aria-pressed={passwordVisible}
-                  className="absolute inset-y-0 right-1.5 my-auto inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+                  className="absolute bottom-0 right-1.5 top-1.5 my-auto inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
                 >
                   {passwordVisible ? <EyeOff size={15} /> : <Eye size={15} />}
                 </button>
@@ -537,7 +556,7 @@ export default function RegisterForm({ heroVisual }: Props) {
                   aria-label={
                     confirmVisible ? copy.hidePasswordAria : copy.showPasswordAria
                   }
-                  className="absolute inset-y-0 right-1.5 my-auto inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100 dark:text-slate-400"
+                  className="absolute bottom-0 right-1.5 top-1.5 my-auto inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100 dark:text-slate-400"
                 >
                   {confirmVisible ? <EyeOff size={15} /> : <Eye size={15} />}
                 </button>
@@ -617,7 +636,7 @@ export default function RegisterForm({ heroVisual }: Props) {
           <p className="mt-5 text-center text-sm text-slate-500 dark:text-slate-400">
             {copy.haveAccount}{" "}
             <Link
-              href="/login"
+              href={loginHref}
               className="font-bold text-[#FF9900] hover:underline hover:underline-offset-[3px] dark:text-[#FFB347]"
             >
               {copy.login}

@@ -22,6 +22,9 @@
  * naissance — chaque requête porte un id traçable de bout en bout,
  * qui suit les événements outbox → Kafka (relay PR4).
  */
+import { initSentry } from "@packages/error-handler";
+// C-PR3 (D56 7A) — Sentry : inerte sans SENTRY_DSN ; 5xx tagués du service et de l'identifiant de corrélation.
+initSentry("deal-service");
 import express from "express";
 import cors from "cors";
 import cookieParser = require("cookie-parser");
@@ -31,7 +34,19 @@ import { pinoHttp } from "pino-http";
 import { errorMiddleware } from "@packages/error-handler/error-middleware";
 import { KafkaEventPublisher } from "@packages/messaging";
 import { buildOpenApiDocument } from "./openapi/build-openapi";
-import dealRouter from "./routes/deal.routes";
+import dealRouter, { dealLifecycleService, dealRatingService, dealSettlementService, opsAlertsService } from "./routes/deal.routes";
+import redis from "@packages/libs/redis";
+import prisma from "@packages/libs/prisma";
+import { healthHandler, mongoCheck, redisCheck } from "@packages/libs/health";
+import { startOpsAlertsCron } from "./cron/ops-alerts.cron";
+import { startRecipientRedactionCron } from "./cron/recipient-redaction.cron";
+import { startOutboxRetentionCron } from "./cron/outbox-retention.cron";
+import { makeRecipientRedactionService } from "./services/recipient-redaction.service";
+import { makeStripeWebhookHandler } from "./controllers/stripe-webhook.controller";
+import { startBookingExpiryCron } from "./cron/expire-bookings.cron";
+import { startBookingPayoutCron } from "./cron/payout-bookings.cron";
+import { startOpsDigestCron } from "./cron/ops-digest.cron";
+import { startRatingCron } from "./cron/rating.cron";
 import { OutboxRelay } from "./relay/outbox-relay";
 
 const logger = pino({
@@ -62,6 +77,15 @@ app.use(
     credentials: true,
   })
 );
+// ── Webhook Stripe (D40) — AVANT express.json : la signature porte sur
+// les octets BRUTS du corps (un JSON re-sérialisé la casse — même raison
+// pour laquelle on n'y passe jamais par le gateway).
+app.post(
+  "/webhooks/stripe",
+  express.raw({ type: "application/json" }),
+  makeStripeWebhookHandler(dealLifecycleService, logger.child({ module: "stripe-webhook" }), dealSettlementService)
+);
+
 app.use(express.json({ limit: "10mb" }));
 app.use(cookieParser());
 
@@ -71,9 +95,8 @@ app.get("/", (req, res) => {
 
 // Health check — utilisé par le gateway et les smoke tests CI.
 // Volontairement AVANT les routes authentifiées et sans dépendance DB.
-app.get("/health", (req, res) => {
-  res.json({ status: "ok", service: "deal-service" });
-});
+// D64 3A — santé uniforme : Mongo + Redis, 2 s chacun, toujours 200 (le corps dit « ok » ou « degraded »).
+app.get("/health", healthHandler("deal-service", { mongo: mongoCheck(prisma), redis: redisCheck(redis) }));
 
 // OpenAPI 3.1 GÉNÉRÉ depuis les schémas Zod (D3) — construit une fois
 // au boot : le document ne peut pas diverger des contrats importés.
@@ -137,6 +160,59 @@ if (relayEnabled) {
   logger.info("Outbox relay disabled (OUTBOX_RELAY_ENABLED=false)");
 }
 
+// ── Cron expiration 24 h (DEA-01, B2-PR2) ───────────────────────────
+// Matérialise les PENDING périmés (la machine les traite déjà comme
+// EXPIRED via son guard — le cron libère l'argent et les kg).
+const expiryCronEnabled = process.env.BOOKING_EXPIRY_CRON_ENABLED !== "false";
+const expiryCron = expiryCronEnabled
+  ? startBookingExpiryCron(dealLifecycleService, logger.child({ module: "expire-bookings-cron" }))
+  : null;
+if (!expiryCronEnabled) {
+  logger.info("Booking expiry cron disabled (BOOKING_EXPIRY_CRON_ENABLED=false)");
+}
+
+// ── Cron versement J+4 + rejeu + rappel J+3 (B4, A66/A70) ───────────
+const payoutCronEnabled = process.env.BOOKING_PAYOUT_CRON_ENABLED !== "false";
+const payoutCron = payoutCronEnabled
+  ? startBookingPayoutCron(dealSettlementService, logger.child({ module: "payout-bookings-cron" }))
+  : null;
+if (!payoutCronEnabled) {
+  logger.info("Booking payout cron disabled (BOOKING_PAYOUT_CRON_ENABLED=false)");
+}
+
+// ── Récapitulatif quotidien support (A88) ─────────────────────────────
+const opsDigestEnabled = process.env.OPS_DIGEST_CRON_ENABLED !== "false";
+const opsDigestCron = opsDigestEnabled
+  ? startOpsDigestCron(dealSettlementService, logger.child({ module: "ops-digest-cron" }))
+  : null;
+if (!opsDigestEnabled) {
+  logger.info("Ops digest cron disabled (OPS_DIGEST_CRON_ENABLED=false)");
+}
+
+// ── Alertes de seuil horaires (C-PR6b, D59 3A) — dédoublonnées par Redis, un email par règle et par jour ──
+const opsAlertsEnabled = process.env.OPS_ALERTS_CRON_ENABLED !== "false";
+const opsAlertsCron = opsAlertsEnabled ? startOpsAlertsCron(opsAlertsService, redis, logger.child({ module: "ops-alerts-cron" })) : null;
+if (!opsAlertsEnabled) {
+  logger.info("Ops alerts cron disabled (OPS_ALERTS_CRON_ENABLED=false)");
+}
+
+// ── C-PR8b (D63 5A) — le tiers destinataire s'efface N jours après la fin du deal ──
+const recipientRedactionEnabled = process.env.RECIPIENT_REDACTION_CRON_ENABLED !== "false";
+const recipientRedactionCron = recipientRedactionEnabled ? startRecipientRedactionCron(makeRecipientRedactionService(), logger.child({ module: "recipient-redaction-cron" })) : null;
+if (!recipientRedactionEnabled) logger.info("Recipient redaction cron disabled (RECIPIENT_REDACTION_CRON_ENABLED=false)");
+
+// ── C-PR8c (D64 6A) — purge des événements `booking` publiés depuis retention.outboxPublishedDays ──
+const outboxRetentionEnabled = process.env.OUTBOX_RETENTION_CRON_ENABLED !== "false";
+const outboxRetentionCron = outboxRetentionEnabled ? startOutboxRetentionCron("booking", "deal-service", logger.child({ module: "outbox-retention-cron" })) : null;
+if (!outboxRetentionEnabled) logger.info("Outbox retention cron disabled (OUTBOX_RETENTION_CRON_ENABLED=false)");
+
+// ── Cron notation : relances J+5/J+7, révélation à 14 j (B5, D53) ─────
+const ratingCronEnabled = process.env.RATING_CRON_ENABLED !== "false";
+const ratingCron = ratingCronEnabled ? startRatingCron(dealRatingService, logger.child({ module: "rating-cron" })) : null;
+if (!ratingCronEnabled) {
+  logger.info("Rating cron disabled (RATING_CRON_ENABLED=false)");
+}
+
 // Arrêt propre : batch en vol terminé, bail libéré, producer déconnecté,
 // serveur HTTP fermé. La ceinture setTimeout garantit la sortie même si
 // une déconnexion traîne (5 s max). Le garde évite qu'un SIGINT répété
@@ -148,6 +224,27 @@ function shutdown(signal: string): void {
   shuttingDown = true;
   logger.info({ signal }, "Shutting down deal-service");
   void (async () => {
+    if (expiryCron) {
+      expiryCron.stop();
+    }
+    if (payoutCron) {
+      payoutCron.stop();
+    }
+    if (opsDigestCron) {
+      opsDigestCron.stop();
+    }
+    if (opsAlertsCron) {
+      opsAlertsCron.stop();
+    }
+    if (ratingCron) {
+      ratingCron.stop();
+    }
+    if (recipientRedactionCron) {
+      recipientRedactionCron.stop();
+    }
+    if (outboxRetentionCron) {
+      outboxRetentionCron.stop();
+    }
     if (relay) {
       await relay.stop().catch((err) => logger.error({ err }, "Relay stop failed"));
     }

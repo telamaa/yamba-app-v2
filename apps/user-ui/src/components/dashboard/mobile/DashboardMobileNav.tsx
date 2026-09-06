@@ -3,6 +3,7 @@
 import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
+import { useTripsBadge } from "@/hooks/useTripsBadge";
 import {
   MOBILE_TAB_SECTIONS,
   MOBILE_TABS,
@@ -42,6 +43,8 @@ export default function DashboardMobileNav() {
   const pathname = usePathname();
   const t = useTranslations("dashboard.sections"); // ← FIXED: namespace ajouté
   const activeTab = getActiveMobileTab(pathname ?? "");
+  // A44 : ce qui attend le Voyageur (demandes, brouillons) — visible sans ouvrir l'onglet
+  const activityBadge = useTripsBadge();
 
   return (
     <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 flex justify-around border-t border-slate-100 bg-white pb-[env(safe-area-inset-bottom)] pt-2 dark:border-slate-900 dark:bg-slate-950">
@@ -61,10 +64,20 @@ export default function DashboardMobileNav() {
             ].join(" ")}
             style={{ color: isActive ? MANGO_DARK : undefined }}
           >
-            <Icon
-              size={22}
-              className={isActive ? "" : "text-slate-400 dark:text-slate-500"}
-            />
+            <span className="relative">
+              <Icon
+                size={22}
+                className={isActive ? "" : "text-slate-400 dark:text-slate-500"}
+              />
+              {tab.key === "activity" && activityBadge > 0 && (
+                <span
+                  aria-label={String(activityBadge)}
+                  className="absolute -right-2.5 -top-1.5 grid min-h-[16px] min-w-[16px] place-items-center rounded-full bg-[#FF9900] px-1 text-[10px] font-bold leading-none text-slate-950"
+                >
+                  {activityBadge > 9 ? "9+" : activityBadge}
+                </span>
+              )}
+            </span>
             <span
               className={isActive ? "" : "text-slate-400 dark:text-slate-500"}
             >

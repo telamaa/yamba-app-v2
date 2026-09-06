@@ -12,10 +12,11 @@
 
 "use client";
 
-import { Home, ImageIcon, MapPin, Package } from "lucide-react";
+import { Home, MapPin, Package } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import type { ReactNode } from "react";
 import type { Booking } from "@/components/booking/booking-tracker/booking-tracker.types";
+import PhotoThumbs from "@/components/shared/photos/PhotoThumbs";
 
 type Props = {
   booking: Booking;
@@ -55,24 +56,7 @@ export default function BookingAcceptedRecap({ booking, compact = false }: Props
         sub={booking.parcel.description}
         extra={
           booking.parcel.photos.length > 0 ? (
-            <div className="mt-2 flex gap-1.5">
-              {booking.parcel.photos.slice(0, 3).map((photo, i) => (
-                <div
-                  key={photo.id}
-                  className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-md text-white shadow-sm sm:h-12 sm:w-12"
-                  style={{
-                    background: "linear-gradient(135deg, #534AB7, #7F77DD)",
-                  }}
-                  aria-label={photo.label || `Photo ${i + 1}`}
-                >
-                  {photo.context === "DECLARED_PACKAGED" ? (
-                    <Package size={16} />
-                  ) : (
-                    <ImageIcon size={16} />
-                  )}
-                </div>
-              ))}
-            </div>
+            <PhotoThumbs photos={booking.parcel.photos} tone="violet" size="md" max={3} className="mt-2" />
           ) : null
         }
       />

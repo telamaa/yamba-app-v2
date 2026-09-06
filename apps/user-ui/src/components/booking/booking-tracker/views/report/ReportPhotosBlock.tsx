@@ -8,7 +8,7 @@
 
 "use client";
 
-import { Camera, X } from "lucide-react";
+import { AlertCircle, Camera, Loader2, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useEffect, useRef } from "react";
 import {
@@ -100,7 +100,22 @@ export default function ReportPhotosBlock({
                     className="absolute inset-0 h-full w-full object-cover"
                   />
                 )}
-                {photo.label && (
+                {photo.uploading && (
+                  <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/45 text-white" aria-live="polite">
+                    <Loader2 size={20} className="animate-spin" aria-hidden="true" />
+                    <span className="sr-only">{t("report.photos.uploading")}</span>
+                  </div>
+                )}
+                {photo.error && (
+                  <div
+                    className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-1 bg-red-900/80 px-1.5 text-center text-white"
+                    title={photo.error}
+                  >
+                    <AlertCircle size={16} aria-hidden="true" />
+                    <span className="text-[10px] font-semibold leading-tight">{t("report.photos.uploadError")}</span>
+                  </div>
+                )}
+                {photo.label && !photo.uploading && !photo.error && (
                   <div className="absolute inset-x-1.5 bottom-1.5 z-10 rounded bg-black/65 px-1.5 py-0.5 text-center text-[10px] font-medium text-white">
                     {photo.label}
                   </div>

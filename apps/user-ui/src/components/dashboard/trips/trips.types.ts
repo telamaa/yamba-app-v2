@@ -58,6 +58,14 @@ export type CarrierDealItem = {
   deliveredAt?: string;
   payoutAt?: string;
   hasRated?: boolean;
+  /** B4-PR3 (A75/A77) — état réel du versement, servi. */
+  payoutStatus?: "PENDING" | "SENT" | "FAILED" | "FROZEN" | "REVERSED";
+  payoutSentAt?: string;
+  payoutBlocker?: "ACCOUNT_NOT_READY" | "RETRYING";
+  disputeTicket?: string;
+  /** D50/A82 — compensation d'annulation tardive (CANCELLED). */
+  payoutAmountCents?: number;
+  retentionDisposition?: "CARRIER" | "SHIPPER" | "HELD_FOR_MEDIATION";
 };
 
 export type CarrierTripItem = {

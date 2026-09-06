@@ -1,4 +1,5 @@
 import { AppError } from "./index";
+import { captureServerError } from "./sentry";
 import { Request, Response, NextFunction } from "express";
 
 /**
@@ -44,10 +45,17 @@ export const errorMiddleware = (
 
       // Cas 2 : details a un type connu et "safe" → on l'expose toujours (même en prod)
       // Liste des types safe : "otp" (exponential backoff), à étendre selon les besoins
-      const safeTypes = ["otp"];
+      // "booking" : codes métier 409 du deal-service (B2) · "password" / "register" :
+      // codes de règle (auth-service, recette 03/09) traduits par le front
+      const safeTypes = ["otp", "booking", "password", "register", "locale", "favorite", "oauth", "trip"];
       const detailsType = detailsObj.type as string | undefined;
 
-      if (detailsType && safeTypes.includes(detailsType)) {
+      // A146 — un `code` est PUBLIC par contrat : le client le lit et le traduit.
+      // Avant, un code posé sans `type` disparaissait en production et cassait la
+      // fonctionnalité qui en dépendait (SUDO_REQUIRED, refus de la messagerie…).
+      const hasPublicCode = typeof detailsObj.code === "string" && detailsObj.code.length > 0;
+
+      if (hasPublicCode || (detailsType && safeTypes.includes(detailsType))) {
         payload.details = err.details;
       } else if (!isProd) {
         // Cas 3 : details non typé ou type inconnu → exposé seulement hors prod (debug)
@@ -57,6 +65,7 @@ export const errorMiddleware = (
 
     // Log les erreurs serveur (5xx) en plus de la réponse
     if (err.statusCode >= 500) {
+      captureServerError(err, req); // C-PR3 (D56 7A) — Sentry, tagué correlationId
       console.error("[error-handler] Server error:", {
         message: err.message,
         statusCode: err.statusCode,
@@ -69,6 +78,7 @@ export const errorMiddleware = (
   }
 
   console.log("Unhandled error: ", err);
+  captureServerError(err, req); // C-PR3 (D56 7A) — erreur non opérationnelle : toujours remontée
 
   return res.status(500).json({
     status: "error",

@@ -37,6 +37,32 @@ export async function getMyShipments(): Promise<ShipmentListItem[]> {
   return toShipmentListItems(res.data.bookings);
 }
 
+/** Réponse des transitions (DealTransitionResponse, contrat B2-PR2). */
+type CancelShipmentResponse = {
+  bookingId: string;
+  status: ShipmentListItem["status"];
+  /** Montant rendu (cents) — total en PENDING, barème ANN-01 en ACCEPTED. */
+  refundAmountCents: number | null;
+  currencyCode: string;
+};
+
+/**
+ * Annulation Expéditeur (POST /deals/:id/cancel — B2-PR2).
+ * Le MONTANT du remboursement est décidé par le serveur au moment T
+ * (la préviz affichée avant confirmation n'était qu'informative).
+ * 409 : la machine a refusé (le deal a changé) — l'appelant recharge.
+ */
+export async function cancelShipment(
+  bookingId: string
+): Promise<CancelShipmentResponse> {
+  const res = await apiClient.post<CancelShipmentResponse>(
+    `/deals/${bookingId}/cancel`,
+    {},
+    { requireAuth: true }
+  );
+  return res.data;
+}
+
 export async function getMyShipmentsPreview(): Promise<ShipmentListItem[]> {
   await sleep(MOCK_DELAY_MS);
   return [...mockShipments];

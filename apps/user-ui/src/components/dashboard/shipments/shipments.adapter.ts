@@ -47,6 +47,8 @@ export type ShipperBookingViewDto = {
     firstName: string;
     lastInitial: string;
   };
+  /** B5 — état de notation de l'Expéditeur (servi) ; absent = rien à noter. */
+  rating?: { windowEndsAt: string | null; ratedByMe: boolean; counterpartHasRated: boolean; revealedAt: string | null; canRate: boolean } | null;
   requestedAt: string;
   expiresAt: string;
   acceptedAt?: string | null;
@@ -56,6 +58,16 @@ export type ShipperBookingViewDto = {
   completedAt?: string | null;
   disputeTicket?: string | null;
   trackingEvents: TrackingEventDto[];
+  /** Machine d'état serveur — pilote les CTA (« le front reflète »). */
+  allowedActions: string[];
+  /** ANN-01 servie (B2) — non nulle exactement quand `cancel` est permis. */
+  cancellationPreview?: {
+    refundCents: number;
+    retentionCents: number;
+    retentionPct: number;
+    fullRefundUntil: string;
+    currencyCode: string;
+  } | null;
 };
 
 /** null backend → undefined front (les optionnels du DTO liste). */
@@ -92,6 +104,10 @@ export function toShipmentListItem(
     hasTrackingEvents: view.trackingEvents.length > 0,
     lastTrackingStep: lastTracking?.step,
     disputeTicket: orUndef(view.disputeTicket),
+    // B5 — « à noter » tant que le serveur le permet ; sinon la ligne est au repos.
+    hasRated: view.rating ? !view.rating.canRate : true,
+    canCancel: view.allowedActions.includes("cancel"),
+    cancellationPreview: orUndef(view.cancellationPreview),
   };
 }
 

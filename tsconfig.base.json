@@ -23,15 +23,32 @@
       "@packages/api-contracts": [
         "packages/libs/api-contracts/src/index.ts"
       ],
+      "@packages/delivery-code": [
+        "packages/libs/delivery-code/src/index.ts"
+      ],
+      "@packages/email": [
+        "packages/libs/email/src/index.ts"
+      ],
       "@packages/messaging": [
         "packages/libs/messaging/src/index.ts"
+      ],
+      "@packages/payments": [
+        "packages/libs/payments/src/index.ts"
       ],
       "@packages/pricing": [
         "packages/libs/pricing/src/index.ts"
       ],
+      "@packages/totp": ["packages/libs/totp/src/index.ts"],
+      "@packages/admin-audit": ["packages/libs/admin-audit/src/index.ts"],
       "@packages/*": [
         "packages/*"
       ]
-    }
+    },
+    "noUncheckedSideEffectImports": false,
+    "types": [
+      "*"
+    ],
+    "esModuleInterop": true,
+    "ignoreDeprecations": "6.0"
   }
 }

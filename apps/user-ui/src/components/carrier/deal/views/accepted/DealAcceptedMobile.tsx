@@ -67,7 +67,7 @@ export default function DealAcceptedMobile({ deal, onCloseAction }: Props) {
 
       <div className="flex-1 space-y-4 px-4 pb-8 pt-4">
         <header>
-          <h2 className="text-[19px] font-black tracking-tight text-slate-900 dark:text-white">
+          <h2 className="text-[17px] font-semibold tracking-tight text-slate-900 dark:text-white">
             {t("h1")}
           </h2>
           <p className="mt-0.5 text-[13px] text-slate-500 dark:text-slate-400">

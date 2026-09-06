@@ -7,12 +7,14 @@
 
 "use client";
 
-import { AlertTriangle, ArrowLeft, ImageIcon, Package, PlaneLanding } from "lucide-react";
+import { AlertTriangle, ArrowLeft, PlaneLanding } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import type { DealDeliverViewProps } from "./DealDeliverClient";
 import DeliverHelpCard from "./DeliverHelpCard";
 import { DeliverInfoBox, DeliverRecipientRow } from "./DeliverInfoBox";
 import DeliverOtpInput from "./DeliverOtpInput";
+import DeliverPhotosBlock from "./DeliverPhotosBlock";
+import PhotoThumbs from "@/components/shared/photos/PhotoThumbs";
 
 export default function DealDeliverDesktop(props: DealDeliverViewProps) {
   const t = useTranslations("carrierDealDeliver");
@@ -35,7 +37,7 @@ export default function DealDeliverDesktop(props: DealDeliverViewProps) {
           <ArrowLeft size={14} />
           {t("back")}
         </button>
-        <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white sm:text-3xl">
+        <h1 className="text-[22px] font-semibold tracking-tight text-slate-900 dark:text-white sm:text-2xl">
           {t("title", { recipientFirstName })}
         </h1>
         <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
@@ -57,11 +59,11 @@ export default function DealDeliverDesktop(props: DealDeliverViewProps) {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-[minmax(0,1fr)_300px] lg:grid-cols-[minmax(0,1fr)_320px]">
           {/* Main */}
           <div className="space-y-4">
             <header>
-              <h2 className="text-xl font-black tracking-tight text-slate-900 dark:text-white sm:text-2xl">
+              <h2 className="text-[17px] font-semibold tracking-tight text-slate-900 dark:text-white sm:text-lg">
                 {t("h1")}
               </h2>
               <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
@@ -76,6 +78,8 @@ export default function DealDeliverDesktop(props: DealDeliverViewProps) {
 
             {deal.recipient && <DeliverRecipientRow recipient={deal.recipient} />}
 
+            {/* A76 — photo optionnelle de la remise, AVANT le code (le colis est encore en main). */}
+            <DeliverPhotosBlock photos={props.photos} onAddAction={props.onAddPhotoAction} onRemoveAction={props.onRemovePhotoAction} />
             <DeliverOtpInput
               recipientFirstName={recipientFirstName}
               attemptsUsed={props.attemptsUsed}
@@ -83,11 +87,12 @@ export default function DealDeliverDesktop(props: DealDeliverViewProps) {
               errorMessage={props.errorMessage}
               isLocked={props.isLocked}
               lockCountdown={props.lockCountdown}
-              isSubmitting={props.isSubmitting}
+              isSubmitting={props.isSubmitting || !props.photosReady}
               onSubmitAction={props.onSubmitAction}
             />
 
             <DeliverHelpCard
+              bookingId={deal.id}
               shipper={deal.shipper}
               recipientFirstName={recipientFirstName}
             />
@@ -103,7 +108,7 @@ export default function DealDeliverDesktop(props: DealDeliverViewProps) {
           </div>
 
           {/* Sidebar */}
-          <aside className="hidden lg:block">
+          <aside className="hidden md:block">
             <div className="sticky top-[88px] space-y-4">
               {/* LE COLIS À REMETTRE */}
               <section className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950">
@@ -121,25 +126,7 @@ export default function DealDeliverDesktop(props: DealDeliverViewProps) {
                 </p>
                 {deal.pickup && deal.pickup.photos.length > 0 && (
                   <>
-                    <div className="mt-3 flex gap-2">
-                      {deal.pickup.photos.map((photo) => (
-                        <div
-                          key={photo.id}
-                          className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg text-white"
-                          style={{
-                            background:
-                              "linear-gradient(135deg, #BA7517, #EF9F27)",
-                          }}
-                          aria-label={photo.label}
-                        >
-                          {photo.context === "PICKUP_PACKAGED" ? (
-                            <Package size={15} aria-hidden="true" />
-                          ) : (
-                            <ImageIcon size={15} aria-hidden="true" />
-                          )}
-                        </div>
-                      ))}
-                    </div>
+                    <PhotoThumbs photos={deal.pickup.photos} tone="amber" size="md" className="mt-3" />
                     <p className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">
                       {t("sidebar.parcelPhotosNote", {
                         location: deal.pickup.locationName,

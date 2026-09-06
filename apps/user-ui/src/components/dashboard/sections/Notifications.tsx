@@ -2,19 +2,23 @@
 
 import { useEffect, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import { Bell } from "lucide-react";
+import { Bell, CheckCheck, ChevronRight } from "lucide-react";
+import { Link } from "@/i18n/navigation";
+import useUser from "@/hooks/useUser";
 import { DashboardCopy } from "@/app/[locale]/dashboard/dashboard.copy";
 import SectionHeader from "@/components/dashboard/SectionHeader";
 import { EmptyState } from "@/components/dashboard/DashboardUI";
 import {
+  useMarkAllNotificationsRead,
   useMarkNotificationRead,
   useNotifications,
 } from "@/hooks/useNotifications";
 import {
   formatWhen,
+  buildNotificationCopy,
   getCorridorLabel,
+  readerRole,
   getNotificationPresentation,
-  getWeightKg,
   isKnownNotificationType,
   type NotificationTone,
 } from "@/components/dashboard/notifications/notifications.types";
@@ -24,8 +28,10 @@ import {
  * Moule visuel du preview (NotificationsPreview) : icône teintée,
  * non-lues surlignées, titre i18n (namespace "notifications"),
  * sous-titre neutre dérivé du payload (corridor · poids), temps
- * relatif. Clic sur une non-lue = marquage lu (idempotent côté
- * serveur), cache partagé avec la cloche du Header.
+ * relatif. Chaque ligne est un LIEN (A44) : vers /carrier/deals/[id]
+ * si le lecteur est le Voyageur du payload, vers /bookings/[id] sinon ;
+ * le clic marque lu (idempotent côté serveur) ET navigue. Cache partagé
+ * avec la cloche du Header.
  */
 
 const TONE: Record<NotificationTone, string> = {
@@ -41,6 +47,9 @@ export default function Notifications({ copy }: { copy: DashboardCopy }) {
   const locale = useLocale();
   const { data, isLoading } = useNotifications();
   const markRead = useMarkNotificationRead();
+  const markAll = useMarkAllNotificationsRead();
+  const { user } = useUser();
+  const userId: string | undefined = (user as { id?: string } | undefined)?.id;
   const [nowMs, setNowMs] = useState(() => Date.now());
 
   /* Tick 60 s pour les temps relatifs (pattern shipments). */
@@ -62,6 +71,19 @@ export default function Notifications({ copy }: { copy: DashboardCopy }) {
             : copy.notifications.sub
         }
       />
+      {unreadCount > 0 && (
+        <div className="-mt-3 mb-4 flex justify-end">
+          <button
+            type="button"
+            onClick={() => markAll.mutate()}
+            disabled={markAll.isPending}
+            className="inline-flex items-center gap-1.5 rounded-full border border-slate-300 bg-white px-3 py-1.5 text-[12px] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
+          >
+            <CheckCheck size={13} aria-hidden="true" />
+            {t("markAllRead")}
+          </button>
+        </div>
+      )}
 
       {isLoading && (
         <div className="space-y-3">
@@ -88,32 +110,29 @@ export default function Notifications({ copy }: { copy: DashboardCopy }) {
             const p = getNotificationPresentation(item.type);
             const Icon = p.icon;
             const unread = item.readAt === null;
-            const title = isKnownNotificationType(item.type)
-              ? t(`items.${p.i18nKey}`)
-              : t("items.fallback");
-            const weight = getWeightKg(item.payload);
-            const sub = [
-              getCorridorLabel(item.payload),
-              weight !== undefined ? `${weight} kg` : undefined,
-            ]
-              .filter(Boolean)
-              .join(" · ");
-            return (
-              <li key={item.id}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (unread && !markRead.isPending) {
-                      markRead.mutate(item.id);
-                    }
-                  }}
-                  className={
-                    "flex w-full items-start gap-3 rounded-2xl border p-4 text-left transition " +
-                    (unread
-                      ? "border-amber-200 bg-amber-50/50 dark:border-amber-900/40 dark:bg-amber-900/10"
-                      : "border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950")
-                  }
-                >
+            // A91 — copie contextuelle par événement et par rôle (prénom, corridor, détail).
+            const copy = isKnownNotificationType(item.type)
+              ? buildNotificationCopy(item, readerRole(item.payload, userId), t, locale)
+              : { title: t("items.fallback"), line: getCorridorLabel(item.payload) ?? "" };
+            const title = copy.title;
+            const sub = copy.line;
+            // A44 — destination : le deal (Voyageur) ou le suivi (Expéditeur)
+            const carrierId = item.payload.carrierId;
+            const href = item.bookingId
+              ? userId && carrierId === userId
+                ? `/carrier/deals/${item.bookingId}`
+                : `/bookings/${item.bookingId}`
+              : null;
+            const onOpen = () => {
+              if (unread && !markRead.isPending) markRead.mutate(item.id);
+            };
+            const rowClass =
+              "flex w-full items-start gap-3 rounded-2xl border p-4 text-left transition " +
+              (unread
+                ? "border-amber-200 bg-amber-50/50 hover:bg-amber-50 dark:border-amber-900/40 dark:bg-amber-900/10 dark:hover:bg-amber-900/20"
+                : "border-slate-200 bg-white hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:hover:bg-slate-900");
+            const body = (
+              <>
                   <span
                     className={
                       "mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full " +
@@ -140,7 +159,26 @@ export default function Notifications({ copy }: { copy: DashboardCopy }) {
                       {formatWhen(item.createdAt, nowMs, locale)}
                     </span>
                   </span>
-                </button>
+                  {href && (
+                    <ChevronRight
+                      size={16}
+                      className="mt-2 shrink-0 text-slate-300 dark:text-slate-600"
+                      aria-hidden
+                    />
+                  )}
+              </>
+            );
+            return (
+              <li key={item.id}>
+                {href ? (
+                  <Link href={href} onClick={onOpen} className={rowClass}>
+                    {body}
+                  </Link>
+                ) : (
+                  <button type="button" onClick={onOpen} className={rowClass}>
+                    {body}
+                  </button>
+                )}
               </li>
             );
           })}

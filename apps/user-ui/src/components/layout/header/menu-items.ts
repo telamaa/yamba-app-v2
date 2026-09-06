@@ -9,6 +9,7 @@ import {
   HelpCircle,
   Info,
   Compass,
+  Heart,
   type LucideIcon,
 } from "lucide-react";
 
@@ -31,6 +32,7 @@ export const AUTHENTICATED_MENU_ITEMS: MenuItem[] = [
   { type: "link", labelKey: "myAccount", href: "/dashboard/home", icon: User },
   { type: "link", labelKey: "myShipments", href: "/dashboard/shipments", icon: Inbox },
   { type: "link", labelKey: "myTrips", href: "/dashboard/trips", icon: Zap },
+  { type: "link", labelKey: "myFavorites", href: "/dashboard/favorites", icon: Heart }, // D46
   {
     type: "link",
     labelKey: "notifications",

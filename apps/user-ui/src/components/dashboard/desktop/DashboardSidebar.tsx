@@ -1,11 +1,9 @@
 "use client";
 
-import { useMemo } from "react";
 import { Link, usePathname } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
 import useUser from "@/hooks/useUser";
-import { useMyTrips } from "@/hooks/useTrip";
-import type { TripListItem } from "@/components/trips/list/my-trips.config";
+import { useTripsBadge } from "@/hooks/useTripsBadge";
 import {
   HOME_ITEM,
   NAV_GROUPS,
@@ -29,27 +27,10 @@ export default function DashboardSidebar() {
   const { user } = useUser();
   const isCarrier = Boolean((user as any)?.roles?.includes("CARRIER"));
 
-  /* ── Badge "Mes trajets" dérivé des données réelles ──
-     Demandes reçues + brouillons/pauses à finaliser.
-     TODO : "shipments" viendra avec le backend bookings ;
-     "messages"/"notifications" avec leurs chantiers respectifs. */
-  const { data: rawTripsData } = useMyTrips();
-  const tripsBadge = useMemo(() => {
-    const trips: TripListItem[] = !rawTripsData
-      ? []
-      : Array.isArray(rawTripsData)
-        ? rawTripsData
-        : Array.isArray(rawTripsData.trips)
-          ? rawTripsData.trips
-          : [];
-    return trips.reduce(
-      (count, trip) =>
-        count +
-        (trip.pendingDemandsCount ?? 0) +
-        (trip.status === "DRAFT" || trip.status === "PAUSED" ? 1 : 0),
-      0
-    );
-  }, [rawTripsData]);
+  /* ── Badge "Mes trajets" (A44) : demandes en attente + brouillons/pauses —
+     hook partagé avec la barre mobile. "shipments"/"messages" viendront
+     avec leurs chantiers. */
+  const tripsBadge = useTripsBadge();
 
   const dynamicBadges: Partial<Record<SectionKey, number>> = {
     trips: tripsBadge,

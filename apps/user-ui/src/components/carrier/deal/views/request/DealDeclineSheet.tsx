@@ -19,14 +19,14 @@ type Props = {
   shipperFirstName: string;
   isSubmitting?: boolean;
   onCloseAction: () => void;
-  onConfirmAction: (payload: { reason?: DeclineReason; details?: string }) => void;
+  onConfirmAction: (payload: { reason?: DeclineReason }) => void;
 };
 
 const REASONS: DeclineReason[] = [
-  "CATEGORY_NOT_TRANSPORTED",
-  "WEIGHT_TOO_HEAVY",
-  "LOCATION_INCOMPATIBLE",
-  "TIMING_TOO_TIGHT",
+  "CATEGORY_NOT_CARRIED",
+  "TOO_HEAVY",
+  "PLACES_INCOMPATIBLE",
+  "TIMING",
   "OTHER",
 ];
 
@@ -39,7 +39,6 @@ export default function DealDeclineSheet({
                                          }: Props) {
   const t = useTranslations("carrierDealRequest");
   const [reason, setReason] = useState<DeclineReason | undefined>(undefined);
-  const [details, setDetails] = useState("");
 
   useEffect(() => {
     if (!isOpen) return;
@@ -54,7 +53,6 @@ export default function DealDeclineSheet({
     // Reset différé pour éviter de voir le contenu changer pendant la fermeture
     const timeout = setTimeout(() => {
       setReason(undefined);
-      setDetails("");
     }, 200);
     return () => clearTimeout(timeout);
   }, [isOpen]);
@@ -114,20 +112,7 @@ export default function DealDeclineSheet({
             ))}
           </div>
 
-          <div className="mt-4">
-            <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              {t("decline.detailsLabel")}
-            </label>
-            <textarea
-              value={details}
-              onChange={(e) => setDetails(e.target.value)}
-              rows={3}
-              placeholder={t("decline.detailsPlaceholder", { shipperFirstName })}
-              className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-[13px] text-slate-900 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-white"
-            />
-          </div>
-
-          <div className="mt-3 flex items-center gap-1.5 text-[11px] text-amber-700 dark:text-amber-400">
+          <div className="mt-4 flex items-center gap-1.5 text-[11px] text-amber-700 dark:text-amber-400">
             <AlertTriangle size={12} />
             <span>{t("decline.finalWarning")}</span>
           </div>
@@ -142,11 +127,12 @@ export default function DealDeclineSheet({
           >
             {t("decline.cancel")}
           </button>
+          {/* Charte §3.4 : refus = slate (jamais de rouge) */}
           <button
             type="button"
-            onClick={() => onConfirmAction({ reason, details: details.trim() || undefined })}
+            onClick={() => onConfirmAction({ reason })}
             disabled={isSubmitting}
-            className="flex-1 rounded-full bg-red-600 px-4 py-3 text-[13px] font-bold text-white hover:bg-red-700 disabled:opacity-50"
+            className="flex-1 rounded-full bg-slate-900 px-4 py-3 text-[13px] font-bold text-white hover:bg-slate-800 disabled:opacity-50 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200"
           >
             {isSubmitting ? t("decline.submitting") : t("decline.confirmDecline")}
           </button>

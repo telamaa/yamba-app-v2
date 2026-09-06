@@ -15,6 +15,7 @@ import { MessageCircle } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import ContactActions from "@/components/carrier/deal/shared/ContactActions";
 import type { DealRequest } from "@/components/carrier/deal/deal.types";
+import { useOpenDealThread } from "@/hooks/useMessaging";
 
 type Props = {
   deal: DealRequest;
@@ -29,17 +30,11 @@ export default function DealContactShipperCard({ deal, compact = false }: Props)
   const pickupLocation = deal.pickupLocation.name;
   const shipperFirstName = deal.shipper.firstName;
 
-  const handleMessage = () => {
-    // TODO Phase backend: ouvrir le canal de messagerie
-    // eslint-disable-next-line no-console
-    console.info("[deal] open message thread with", deal.shipper.id);
-  };
-
-  const handleCall = () => {
-    // TODO Phase backend: déclencher l'appel via tel: link ou WebRTC
-    // eslint-disable-next-line no-console
-    console.info("[deal] open call channel with", deal.shipper.id);
-  };
+  // Les deux boutons ouvrent le fil du deal (A137). « Appeler » y met le numéro en avant :
+  // c'est le serveur qui décide de l'heure d'ouverture (2 h avant le rendez-vous, D61 3A).
+  const thread = useOpenDealThread();
+  const handleMessage = () => thread.open(deal.id);
+  const handleCall = () => thread.open(deal.id, "phone");
 
   return (
     <section
@@ -89,6 +84,7 @@ export default function DealContactShipperCard({ deal, compact = false }: Props)
         onCallAction={handleCall}
         variant="amber"
         layout={compact ? "grid" : "row"}
+        disabled={thread.isPending}
       />
     </section>
   );

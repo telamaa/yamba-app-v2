@@ -35,20 +35,10 @@ export const HERO_VISUALS: HeroVisual[] = [
     altFr: "Illustration : un expéditeur et un transporteur connectés",
     altEn: "Illustration: a shipper and a carrier connected",
   },
-  {
-    id: "photo-route",
-    type: "photo",
-    src: "/auth/visuals/photo-route.jpg",
-    altFr: "Photo : une route au coucher de soleil",
-    altEn: "Photo: a road at sunset",
-  },
-  {
-    id: "photo-package",
-    type: "photo",
-    src: "/auth/visuals/photo-package.jpg",
-    altFr: "Photo : un colis prêt à être expédié",
-    altEn: "Photo: a package ready to be shipped",
-  },
+  // Les deux photos JPG (photo-route, photo-package) ont été retirées le
+  // 03/09/2026 : les fichiers n'existaient pas dans /public/auth/visuals/ →
+  // 2 chargements sur 5 affichaient le texte alternatif (recette). À
+  // réintroduire UNIQUEMENT avec les fichiers dans la même PR.
 ];
 
 /**

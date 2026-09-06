@@ -1,0 +1,35 @@
+{
+  "title": "Your parcel is on its way, {recipientFirstName}",
+  "subtitle": "{shipperFirstName} is sending you a parcel with {carrierFirstName} {carrierInitial}., a Yamba traveler, from {originCity} to {destinationCity}.",
+  "departure": "Departure",
+  "arrival": "Expected arrival",
+  "current": "Where the parcel is",
+  "milestones": {
+    "ACCEPTED": "Parcel taken care of",
+    "PICKED_UP": "Parcel picked up by {carrierFirstName}",
+    "IN_TRANSIT": "On the way",
+    "ARRIVED": "Arrived in {destinationCity}",
+    "DELIVERED": "Parcel handed over",
+    "CLOSED": "Shipment cancelled"
+  },
+  "hints": {
+    "ACCEPTED": "{carrierFirstName} collects the parcel from {shipperFirstName} before departure.",
+    "PICKED_UP": "The parcel travels with {carrierFirstName}.",
+    "IN_TRANSIT": "{carrierFirstName} is on the way to {destinationCity}.",
+    "ARRIVED": "{carrierFirstName} has arrived and will contact you to arrange the handover: have the code {shipperFirstName} gave you ready.",
+    "DELIVERED": "The parcel has been handed to you. Enjoy!",
+    "CLOSED": "This shipment didn't happen. Please get in touch with {shipperFirstName}."
+  },
+  "privacy": "{shipperFirstName} shared your first name and phone number with Yamba for this delivery only, and with nobody else. They are erased after the handover.",
+  "privacyLink": "Privacy policy",
+  "notFound": {
+    "title": "This tracking link is no longer valid",
+    "text": "The parcel was handed over a while ago, or the link was withdrawn. Please get in touch with the person who sent it to you."
+  },
+  "acquisition": {
+    "title": "You too, send or carry with Yamba",
+    "text": "Parcels that travel with trusted people, cheaper and faster than a classic carrier.",
+    "send": "Send a parcel",
+    "carry": "Become a traveler"
+  }
+}

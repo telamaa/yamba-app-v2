@@ -2,6 +2,10 @@ import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import prisma from "../index";
 import bcrypt from "bcryptjs";
+import {
+  encryptDeliveryCode,
+  hashDeliveryCode,
+} from "../../delivery-code/src/index";
 
 /**
  * Mot de passe DEV commun aux 12 users du seed (PR5) : Yamba-Dev-2026!
@@ -10,6 +14,10 @@ import bcrypt from "bcryptjs";
  * Hash calcule UNE fois par run (bcryptjs, meme lib que loginUser).
  */
 const SEED_PASSWORD_HASH = bcrypt.hashSync("Yamba-Dev-2026!", 10);
+
+/** Code de livraison DEV commun aux bookings seedés passés par le pickup (D43). */
+export const SEED_DELIVERY_CODE = "742891";
+const SEED_CHECKLIST = ["CONTENT_MATCHES", "WEIGHT_OK", "NO_FORBIDDEN", "PACKAGING_OK", "ITEMS_IDENTIFIED"];
 
 /**
  * seed-deals.ts — jeu de données Deal lifecycle (PR3, A14)
@@ -36,8 +44,11 @@ const SEED_PASSWORD_HASH = bcrypt.hashSync("Yamba-Dev-2026!", 10);
  * bookings ACTIFS (PENDING/ACCEPTED/PICKED_UP/DELIVERED/DISPUTED) —
  * CALCULÉ par le script, jamais posé à la main.
  *
- * B1 : deliveryCodeHash reste null (aucun endpoint ne le lit) — B3
- * seedera de vrais hashes bcrypt avec les codes documentés.
+ * B3 (D43) : tout booking passé par le pickup (PICKED_UP, DELIVERED,
+ * DISPUTED, COMPLETED) porte un VRAI code — SEED_DELIVERY_CODE ci-dessous,
+ * haché (bcrypt) ET chiffré (AES, clé d'env ou clé de dev) — et une
+ * checklist 5/5 figée. Le Voyageur du seed peut donc livrer avec ce code
+ * et l'Expéditrice le voit dans son suivi.
  *
  * Sortie : table console + seed-output.json (à côté du script,
  * gitignoré) — successeur des magic IDs du mock front (PR5).
@@ -90,6 +101,8 @@ type SeedTrip = {
   destinationCountryCode: string;
   destinationTimezone: string;
   departureAt: Date;
+  /** Durée de vol en heures — sert à poser arrivalAt (sans quoi la carte de recherche n'affiche aucune heure d'arrivée). */
+  flightHours: number;
   transportMode: "PLANE";
   capacityKg: number;
   // A28 — moteur PER_KG (optionnel : seuls les trips nouvelle formule)
@@ -101,17 +114,17 @@ type SeedTrip = {
 
 const TRIPS: SeedTrip[] = [
   // Colonne vertébrale — 2 trips (états "avant départ" vs "en cours/finis")
-  { key: "bzv-upcoming", carrierKey: "thomas", originCity: "Paris", originCountryCode: "FR", originTimezone: "Europe/Paris", destinationCity: "Brazzaville", destinationCountryCode: "CG", destinationTimezone: "Africa/Brazzaville", departureAt: days(10), transportMode: "PLANE", capacityKg: 23 },
-  { key: "bzv-inflight", carrierKey: "thomas", originCity: "Paris", originCountryCode: "FR", originTimezone: "Europe/Paris", destinationCity: "Brazzaville", destinationCountryCode: "CG", destinationTimezone: "Africa/Brazzaville", departureAt: days(-6), transportMode: "PLANE", capacityKg: 23 },
-  { key: "yul", carrierKey: "marc", originCity: "Paris", originCountryCode: "FR", originTimezone: "Europe/Paris", destinationCity: "Montréal", destinationCountryCode: "CA", destinationTimezone: "America/Toronto", departureAt: days(3), transportMode: "PLANE", capacityKg: 20 },
-  { key: "gru", carrierKey: "ines", originCity: "Lisbonne", originCountryCode: "PT", originTimezone: "Europe/Lisbon", destinationCity: "São Paulo", destinationCountryCode: "BR", destinationTimezone: "America/Sao_Paulo", departureAt: days(5), transportMode: "PLANE", capacityKg: 18 },
-  { key: "los", carrierKey: "adebayo", originCity: "Londres", originCountryCode: "GB", originTimezone: "Europe/London", destinationCity: "Lagos", destinationCountryCode: "NG", destinationTimezone: "Africa/Lagos", departureAt: days(-2), transportMode: "PLANE", capacityKg: 23 },
-  { key: "sgn", carrierKey: "linh", originCity: "Paris", originCountryCode: "FR", originTimezone: "Europe/Paris", destinationCity: "Hô Chi Minh-Ville", destinationCountryCode: "VN", destinationTimezone: "Asia/Ho_Chi_Minh", departureAt: days(-1), transportMode: "PLANE", capacityKg: 15 },
-  { key: "fih", carrierKey: "josephine", originCity: "Bruxelles", originCountryCode: "BE", originTimezone: "Europe/Brussels", destinationCity: "Kinshasa", destinationCountryCode: "CD", destinationTimezone: "Africa/Kinshasa", departureAt: days(7), transportMode: "PLANE", capacityKg: 23 },
+  { key: "bzv-upcoming", carrierKey: "thomas", originCity: "Paris", originCountryCode: "FR", originTimezone: "Europe/Paris", destinationCity: "Brazzaville", destinationCountryCode: "CG", destinationTimezone: "Africa/Brazzaville", departureAt: days(10), flightHours: 7, transportMode: "PLANE", capacityKg: 23 },
+  { key: "bzv-inflight", carrierKey: "thomas", originCity: "Paris", originCountryCode: "FR", originTimezone: "Europe/Paris", destinationCity: "Brazzaville", destinationCountryCode: "CG", destinationTimezone: "Africa/Brazzaville", departureAt: days(-6), flightHours: 7, transportMode: "PLANE", capacityKg: 23 },
+  { key: "yul", carrierKey: "marc", originCity: "Paris", originCountryCode: "FR", originTimezone: "Europe/Paris", destinationCity: "Montréal", destinationCountryCode: "CA", destinationTimezone: "America/Toronto", departureAt: days(3), flightHours: 8, transportMode: "PLANE", capacityKg: 20 },
+  { key: "gru", carrierKey: "ines", originCity: "Lisbonne", originCountryCode: "PT", originTimezone: "Europe/Lisbon", destinationCity: "São Paulo", destinationCountryCode: "BR", destinationTimezone: "America/Sao_Paulo", departureAt: days(5), flightHours: 11, transportMode: "PLANE", capacityKg: 18 },
+  { key: "los", carrierKey: "adebayo", originCity: "Londres", originCountryCode: "GB", originTimezone: "Europe/London", destinationCity: "Lagos", destinationCountryCode: "NG", destinationTimezone: "Africa/Lagos", departureAt: days(-2), flightHours: 6, transportMode: "PLANE", capacityKg: 23 },
+  { key: "sgn", carrierKey: "linh", originCity: "Paris", originCountryCode: "FR", originTimezone: "Europe/Paris", destinationCity: "Hô Chi Minh-Ville", destinationCountryCode: "VN", destinationTimezone: "Asia/Ho_Chi_Minh", departureAt: days(-1), flightHours: 12, transportMode: "PLANE", capacityKg: 15 },
+  { key: "fih", carrierKey: "josephine", originCity: "Bruxelles", originCountryCode: "BE", originTimezone: "Europe/Brussels", destinationCity: "Kinshasa", destinationCountryCode: "CD", destinationTimezone: "Africa/Kinshasa", departureAt: days(7), flightHours: 8, transportMode: "PLANE", capacityKg: 23 },
   // ⭐ A28 — LE trip PER_KG de demonstration (QA de la PR-B) :
   // 11,50 €/kg · 23 kg · electronique +20 % · alimentaire REFUSE ·
   // bagage soute 23 kg a 230 € forfaitaire.
-  { key: "bzv-perkg", carrierKey: "thomas", originCity: "Paris", originCountryCode: "FR", originTimezone: "Europe/Paris", destinationCity: "Brazzaville", destinationCountryCode: "CG", destinationTimezone: "Africa/Brazzaville", departureAt: days(15), transportMode: "PLANE", capacityKg: 23, pricePerKgCents: 1150, checkedBag23PriceCents: 23000, familyConditions: [{ familyKey: "ELECTRONICS_DEVICES", mode: "SURCHARGE", surchargePct: 20 }, { familyKey: "FOOD_DRY_SEALED", mode: "REFUSE" }] },
+  { key: "bzv-perkg", carrierKey: "thomas", originCity: "Paris", originCountryCode: "FR", originTimezone: "Europe/Paris", destinationCity: "Brazzaville", destinationCountryCode: "CG", destinationTimezone: "Africa/Brazzaville", departureAt: days(15), flightHours: 7, transportMode: "PLANE", capacityKg: 23, pricePerKgCents: 1150, checkedBag23PriceCents: 23000, familyConditions: [{ familyKey: "ELECTRONICS_DEVICES", mode: "SURCHARGE", surchargePct: 20 }, { familyKey: "FOOD_DRY_SEALED", mode: "REFUSE" }] },
 ];
 
 /* ══ Pricing helpers (centimes entiers — A2, commission 15 %) ═ */
@@ -212,9 +225,16 @@ const BOOKINGS: SeedBooking[] = [
   { key: "bzv-disputed", tripKey: "bzv-inflight", shipperKey: "chinwe", status: "DISPUTED", weightKg: 3, category: "SMALL_TOYS", description: "Jouets anniversaire", declaredValueCents: 8000, pricing: perCategory(2800), recipient: RCP_BZV,
     milestones: { requestedAt: days(-9), expiresAt: days(-8), acceptedAt: days(-8), pickedUpAt: days(-6), deliveredAt: days(-2), payoutDueAt: days(2), disputeTicket: "YAM-2041", disputedAt: days(-1) },
     pickup: { confirmedAt: days(-6), photoUrls: ["https://r2.seed.yamba.dev/bzv-disputed-1.jpg"], notes: null } },
+  { key: "bzv-completed-blocked", tripKey: "bzv-inflight", shipperKey: "aminata", status: "COMPLETED", weightKg: 2, category: "BOOKS", description: "Manuels scolaires (versement bloqué : compte Stripe incomplet — recette V12/V13)", declaredValueCents: 4000, pricing: perCategory(2600), recipient: RCP_BZV,
+    milestones: { requestedAt: days(-13), expiresAt: days(-12), acceptedAt: days(-12), pickedUpAt: days(-7), deliveredAt: days(-7), payoutDueAt: days(-3), completedAt: days(-3) },
+    pickup: { confirmedAt: days(-7), photoUrls: ["https://r2.seed.yamba.dev/bzv-completed-blocked-1.jpg"], notes: null } },
   { key: "bzv-completed", tripKey: "bzv-inflight", shipperKey: "mai", status: "COMPLETED", weightKg: 4, category: "CLOTHES", description: "Pagnes et tissus", declaredValueCents: 20000, pricing: perCategory(3500), recipient: RCP_BZV,
     milestones: { requestedAt: days(-12), expiresAt: days(-11), acceptedAt: days(-11), pickedUpAt: days(-6), deliveredAt: days(-6), payoutDueAt: days(-2), completedAt: days(-2) },
     pickup: { confirmedAt: days(-6), photoUrls: ["https://r2.seed.yamba.dev/bzv-completed-1.jpg"], notes: null } },
+  // C-PR5 (D58) — transfert renversé par Stripe après versement : file admin « Transferts renversés » (recette FIN)
+  { key: "bzv-reversed", tripKey: "bzv-inflight", shipperKey: "pauline", status: "COMPLETED", weightKg: 3, category: "OTHER_ACCESSORIES", description: "Crèmes et parfums (transfert renversé — recette FIN04/FIN05)", declaredValueCents: 9000, pricing: perCategory(3000), recipient: RCP_BZV,
+    milestones: { requestedAt: days(-14), expiresAt: days(-13), acceptedAt: days(-13), pickedUpAt: days(-8), deliveredAt: days(-8), payoutDueAt: days(-4), completedAt: days(-4) },
+    pickup: { confirmedAt: days(-8), photoUrls: [], notes: null } },
 
   /* ── Paris → Montréal (PER_KG) ────────────────────────────── */
   { key: "yul-accepted", tripKey: "yul", shipperKey: "marieclaire", status: "ACCEPTED", weightKg: 7, category: "CLOTHES", description: "Manteaux d'hiver", declaredValueCents: 30000, pricing: perKg(600, 7, "M"), recipient: RCP_YUL,
@@ -255,6 +275,9 @@ const BOOKINGS: SeedBooking[] = [
     milestones: { requestedAt: days(-2), expiresAt: days(-1), closedAt: hours(-30), closedBy: "CARRIER", declineReason: "category_mismatch" } },
   { key: "fih-cancelled", tripKey: "fih", shipperKey: "marieclaire", status: "CANCELLED", weightKg: 3, category: "DOCUMENTS", description: "Actes de naissance", declaredValueCents: 2000, pricing: perCategory(2500), recipient: RCP_FIH,
     milestones: { requestedAt: days(-4), expiresAt: days(-3), closedAt: days(-3), closedBy: "SHIPPER" } },
+  // C-PR2 (A81/D55 3A) — annulée APRÈS le départ sans prise en charge : retenue 50 % « à arbitrer » (file admin, MED8).
+  { key: "bzv-held", tripKey: "bzv-inflight", shipperKey: "aminata", status: "CANCELLED", weightKg: 2, category: "OTHER_ACCESSORIES", description: "Produits de beauté", declaredValueCents: 6000, pricing: perCategory(2600), recipient: RCP_BZV,
+    milestones: { requestedAt: days(-9), expiresAt: days(-8), acceptedAt: days(-8), closedAt: days(-4), closedBy: "SHIPPER", cancelReason: "Le Voyageur ne s'est pas présenté au rendez-vous" } },
 ];
 
 /* ══ Exécution ════════════════════════════════════════════════ */
@@ -267,7 +290,9 @@ async function main() {
   for (const u of USERS) {
     const user = await prisma.user.upsert({
       where: { emailNormalized: u.email.toLowerCase() },
-      update: { firstName: u.firstName, lastName: u.lastName, roles: u.roles, passwordHash: SEED_PASSWORD_HASH },
+      // D71 — un compte de moins de 30 jours est « neuf » (plafonds CNF-06) : les membres du seed ont 90 jours,
+      // sauf pour la grille TrustScore qui utilise un compte fraîchement inscrit.
+      update: { firstName: u.firstName, lastName: u.lastName, roles: u.roles, passwordHash: SEED_PASSWORD_HASH, createdAt: days(-90) },
       create: {
         firstName: u.firstName,
         lastName: u.lastName,
@@ -278,23 +303,74 @@ async function main() {
         phoneE164: u.phoneE164 ?? null,
         roles: u.roles,
         carrierStatus: u.carrier ? "ACTIVE" : "NONE",
+        createdAt: days(-90),
       },
     });
     userIds.set(u.key, user.id);
   }
   console.log(`✓ ${USERS.length} users (upsert par emailNormalized)`);
 
+  // 1bis. CarrierPage Stripe-complet pour chaque Voyageur — le gate D31
+  // (accept) exige onboardingStep ≠ PROFILE + stripeOnboardingComplete +
+  // stripeChargesEnabled quand le provider est STRIPE. Compte factice :
+  // aucune API Stripe n'est appelée avec cet acct_ en dev.
+  let carrierPages = 0;
+  for (const u of USERS.filter((x) => x.carrier)) {
+    const userId = userIds.get(u.key)!;
+    await prisma.carrierPage.upsert({
+      where: { userId },
+      update: {
+        onboardingStep: "COMPLETE",
+        stripeOnboardingComplete: true,
+        stripeChargesEnabled: true,
+        stripePayoutsEnabled: true,
+      },
+      create: {
+        userId,
+        name: `${u.firstName} ${u.lastName.charAt(0)}.`,
+        onboardingStep: "COMPLETE",
+        stripeAccountId: `acct_fake_seed_${u.key}`,
+        stripeOnboardingComplete: true,
+        stripeChargesEnabled: true,
+        stripePayoutsEnabled: true,
+      },
+    });
+    carrierPages += 1;
+  }
+  console.log(`✓ ${carrierPages} carrier pages (onboarding COMPLETE, Stripe factice — gate D31 passant)`);
+
   const seedIds = [...userIds.values()];
 
   // 2. Wipe du périmètre seed (idempotence trips/bookings)
+  // B4 (D51) : les dossiers de litige suivent leurs bookings.
+  const delD = await prisma.dispute.deleteMany({
+    where: { OR: [{ shipperId: { in: seedIds } }, { carrierId: { in: seedIds } }] },
+  });
   const delB = await prisma.booking.deleteMany({
     where: { OR: [{ shipperId: { in: seedIds } }, { carrierId: { in: seedIds } }] },
   });
+  // C-PR4 — billets seedés (les documents suivent la cascade du Trip, mais on nettoie explicitement par fileId)
+  await prisma.tripDocument.deleteMany({ where: { fileId: { startsWith: "seed-ticket-" } } });
+  // Chantier F (D61) — fils de conversation des deals seedes (Message/Meetup suivent la cascade).
+  const seedConversations = await prisma.conversation.findMany({ where: { shipperId: { in: seedIds } }, select: { id: true } });
+  // F-PR3 — les signalements des messages de ces fils partent avec eux (Report.targetType MESSAGE).
+  if (seedConversations.length) {
+    const seedMessages = await prisma.message.findMany({ where: { conversationId: { in: seedConversations.map((c) => c.id) } }, select: { id: true } });
+    if (seedMessages.length) await prisma.report.deleteMany({ where: { targetType: "MESSAGE", targetId: { in: seedMessages.map((m) => m.id) } } });
+  }
+  if (seedConversations.length) {
+    const ids = seedConversations.map((c) => c.id);
+    await prisma.phoneReveal.deleteMany({ where: { conversationId: { in: ids } } });
+    await prisma.meetup.deleteMany({ where: { conversationId: { in: ids } } });
+    await prisma.message.deleteMany({ where: { conversationId: { in: ids } } });
+    await prisma.conversation.deleteMany({ where: { id: { in: ids } } });
+  }
   const delT = await prisma.trip.deleteMany({ where: { userId: { in: seedIds } } });
-  console.log(`✓ wipe : ${delB.count} bookings, ${delT.count} trips (périmètre seed)`);
+  console.log(`✓ wipe : ${delB.count} bookings, ${delD.count} disputes, ${delT.count} trips (périmètre seed)`);
 
   // 3. Trips — reservedKg = Σ poids des bookings ACTIFS (CAP-02, calculé)
   const tripIds = new Map<string, string>();
+  let ticketSeeded = false;
   for (const t of TRIPS) {
     const reservedKg = BOOKINGS
       .filter((b) => b.tripKey === t.key && ACTIVE.includes(b.status))
@@ -314,10 +390,13 @@ async function main() {
         destinationTimezone: t.destinationTimezone,
         destinationLabel: `${t.destinationCity} (${t.destinationCountryCode})`,
         departureAt: t.departureAt,
+        // Sans arrivalAt, la carte de recherche n'a aucune heure d'arrivée à afficher.
+        arrivalAt: new Date(t.departureAt.getTime() + t.flightHours * 3_600_000),
         capacityKg: t.capacityKg,
         reservedKg,
-        // A28 — pass-through PER_KG (undefined = champ absent, trips legacy intacts)
-        pricePerKgCents: t.pricePerKgCents,
+        // A28 — pass-through PER_KG. Défaut 9,50 €/kg : un trajet publié sans prix
+        // s'affichait « à partir de 0,00 € » en recherche (il n'est pas réservable).
+        pricePerKgCents: t.pricePerKgCents ?? 950,
         checkedBag23PriceCents: t.checkedBag23PriceCents,
         cabinBag12PriceCents: t.cabinBag12PriceCents,
         familyConditions: (t.familyConditions ?? []) as never,
@@ -326,6 +405,25 @@ async function main() {
     });
     tripIds.set(t.key, trip.id);
     console.log(`  · trip ${t.key} → ${trip.id} (reservedKg=${reservedKg}/${t.capacityKg})`);
+    // C-PR4 (D57 1A) — un billet PENDING sur le premier trajet à venir : alimente la file « Billets » de l'admin en recette.
+    if (!ticketSeeded && t.departureAt.getTime() > Date.now()) {
+      ticketSeeded = true;
+      await prisma.tripDocument.create({
+        data: {
+          tripId: trip.id,
+          uploadedByUserId: userIds.get(t.carrierKey)!,
+          type: "TICKET_PROOF",
+          status: "PENDING",
+          fileId: `seed-ticket-${t.key}`,
+          url: "https://ik.imagekit.io/demo/img/image10.jpeg",
+          originalName: `billet-${t.key}.jpeg`,
+          mimeType: "image/jpeg",
+          title: "Billet (seed)",
+        },
+      });
+      await prisma.trip.update({ where: { id: trip.id }, data: { ticketVerificationStatus: "PENDING" } });
+      console.log(`    · billet PENDING seedé sur ${t.key} (file admin « Billets »)`);
+    }
   }
 
   // 4. Bookings
@@ -333,6 +431,8 @@ async function main() {
     key: string; id: string; status: string; corridor: string;
     shipper: string; carrier: string;
   }[] = [];
+
+  const seedCodeHash = await hashDeliveryCode(SEED_DELIVERY_CODE);
 
   for (const b of BOOKINGS) {
     const t = TRIPS.find((x) => x.key === b.tripKey)!;
@@ -361,11 +461,137 @@ async function main() {
           photoUrls: [`https://r2.seed.yamba.dev/${b.key}-declared.jpg`],
         },
         recipient: b.recipient,
-        pickup: b.pickup ?? undefined,
+        pickup: b.pickup ? { ...b.pickup, checklist: SEED_CHECKLIST } : undefined,
         trackingEvents: b.trackingEvents ?? [],
+        // D43 — un vrai code (haché + chiffré) dès qu'il y a eu pickup.
+        ...(b.pickup
+          ? { deliveryCodeHash: seedCodeHash, deliveryCodeEncrypted: encryptDeliveryCode(SEED_DELIVERY_CODE) }
+          : {}),
+        // B2 : un intent FAKE par booking — le FakePaymentProvider ADOPTE
+        // les ids `pi_fake_seed_…` inconnus (AUTHORIZED à la lecture), donc
+        // accept/decline/cancel sont jouables en dev sans clés Stripe.
+        paymentProvider: "FAKE",
+        paymentIntentId: `pi_fake_seed_${b.key}`,
         ...b.milestones,
       } as never,
     });
+    // B4 — versement (D49/D50) et dossier de litige (D51) cohérents avec le statut.
+    const m = b.milestones as { completedAt?: Date; disputeTicket?: string; disputedAt?: Date };
+    if (b.status === "COMPLETED" && b.key.endsWith("-blocked")) {
+      // A75/V12 : versement FAILED faute de compte Stripe prêt — bandeau + CTA sans Stripe réel.
+      await prisma.booking.update({
+        where: { id: booking.id },
+        data: {
+          completedBy: "SYSTEM",
+          payoutStatus: "FAILED",
+          payoutFailureReason: "CARRIER_ACCOUNT_NOT_READY",
+          payoutAmountCents: (booking as unknown as { pricing: { transportCents: number } }).pricing.transportCents,
+          payoutAttempts: 4,
+          // C-PR5 (A111) — relance échue : le cron (ou « Relancer » dans l'admin) peut rejouer tout de suite
+          payoutLastAttemptAt: days(-1),
+          payoutNextRetryAt: days(-1),
+        },
+      });
+    } else if (b.status === "COMPLETED" && b.key.endsWith("-reversed")) {
+      // C-PR5 (D58) — versé puis renversé par Stripe (webhook transfer.reversed) : attend une décision admin.
+      await prisma.booking.update({
+        where: { id: booking.id },
+        data: {
+          completedBy: "SYSTEM",
+          payoutStatus: "REVERSED",
+          payoutFailureReason: "PROVIDER_REVERSED",
+          payoutAmountCents: (booking as unknown as { pricing: { transportCents: number } }).pricing.transportCents,
+          payoutSentAt: m.completedAt ?? NOW,
+          payoutAttempts: 1,
+          transferId: `tr_fake_seed_${b.key}`,
+          payoutReversalResolution: null,
+          payoutReversalResolvedAt: null,
+        },
+      });
+    } else if (b.status === "COMPLETED") {
+      await prisma.booking.update({
+        where: { id: booking.id },
+        data: {
+          completedBy: "SYSTEM",
+          // B5 : fenêtre de notation ouverte (14 j après completedAt) — recette de la notation
+          ratingWindowEndsAt: new Date((m.completedAt ?? NOW).getTime() + 14 * 86_400_000),
+          ratingRemindersSent: 0,
+          payoutStatus: "SENT",
+          payoutAmountCents: (booking as unknown as { pricing: { transportCents: number } }).pricing.transportCents,
+          payoutSentAt: m.completedAt ?? NOW,
+          payoutAttempts: 1,
+          transferId: `tr_fake_seed_${b.key}`,
+        },
+      });
+    }
+    if (b.status === "CANCELLED" && b.key.endsWith("-held")) {
+      // A81 — paiement capturé à l'acceptation, remboursé à 50 %, retenue conservée « à arbitrer ».
+      const pricing = (booking as unknown as { pricing: { totalShipperCents: number } }).pricing;
+      const retentionCents = Math.round(pricing.totalShipperCents / 2);
+      const closedAt = (b.milestones as { closedAt?: Date }).closedAt ?? NOW;
+      await prisma.booking.update({
+        where: { id: booking.id },
+        data: {
+          capturedAt: (b.milestones as { acceptedAt?: Date }).acceptedAt ?? NOW,
+          chargeId: `ch_fake_seed_${b.key}`,
+          refundedAt: closedAt,
+          refundAmountCents: pricing.totalShipperCents - retentionCents,
+          retentionCents,
+          retentionDisposition: "HELD_FOR_MEDIATION",
+        },
+      });
+    }
+    // Chantier F (D61) — un fil vivant sur le deal accepte : recette FCH01+ sans rien creer a la main.
+    if (b.key === "bzv-accepted") {
+      const shipperId = userIds.get(b.shipperKey)!;
+      const carrierId = userIds.get(t.carrierKey)!;
+      const conversation = await prisma.conversation.create({
+        data: { bookingId: booking.id, shipperId, carrierId, lastMessageAt: days(-1), shipperLastReadAt: days(-1) },
+      });
+      await prisma.message.create({
+        data: { conversationId: conversation.id, kind: "TEXT", authorId: shipperId, authorRole: "SHIPPER", body: "Bonjour ! Le colis est pret, emballe et ferme. On se retrouve ou ?", photoUrls: [], createdAt: days(-2) },
+      });
+      const carrierMessage = await prisma.message.create({
+        data: { conversationId: conversation.id, kind: "TEXT", authorId: carrierId, authorRole: "CARRIER", body: "Bonjour, parfait. Je propose le terminal 2E, cote enregistrement. Sinon on peut regler ca directement entre nous, hors appli ?", photoUrls: [], createdAt: days(-1) },
+      });
+      // F-PR3 (D61 7A) — un message signale par l'Expediteur, a traiter dans l'admin (file « Signalements »).
+      await prisma.report.create({
+        data: { reporterUserId: shipperId, targetType: "MESSAGE", targetId: carrierMessage.id, reason: "OFF_PLATFORM", details: "Il propose de regler hors de Yamba.", status: "OPEN", createdAt: days(-1) },
+      });
+      await prisma.conversation.update({ where: { id: conversation.id }, data: { lastMessageAuthorRole: "CARRIER", shipperRemindedAt: null, carrierRemindedAt: null } });
+      await prisma.meetup.create({
+        data: {
+          conversationId: conversation.id,
+          bookingId: booking.id,
+          kind: "PICKUP",
+          status: "PROPOSED",
+          proposedByRole: "CARRIER",
+          proposedById: carrierId,
+          placeLabel: "Paris CDG, terminal 2E, comptoirs d'enregistrement",
+          placeDetails: "Devant les bornes libre-service, cote depart.",
+          startAt: new Date(t.departureAt.getTime() - 3 * 3_600_000),
+          endAt: new Date(t.departureAt.getTime() - 2 * 3_600_000),
+          createdAt: days(-1),
+        },
+      });
+      console.log(`    · conversation seedee sur ${b.key} (2 messages, 1 rendez-vous propose, 1 message signale)`);
+    }
+    if (b.status === "DISPUTED") {
+      await prisma.booking.update({ where: { id: booking.id }, data: { payoutStatus: "FROZEN" } });
+      await prisma.dispute.create({
+        data: {
+          bookingId: booking.id,
+          ticketNumber: m.disputeTicket ?? `YAM-${1000 + output.length}`,
+          shipperId: userIds.get(b.shipperKey)!,
+          carrierId: userIds.get(t.carrierKey)!,
+          category: "CONTENT_MISSING",
+          description: "Le colis est bien arrivé mais il manque une partie du contenu déclaré : deux des trois jouets prévus ne sont pas dans le carton.",
+          desiredOutcome: "PARTIAL_REFUND",
+          photoUrls: [],
+          pledgeAcceptedAt: m.disputedAt ?? NOW,
+        },
+      });
+    }
     output.push({
       key: b.key,
       id: booking.id,

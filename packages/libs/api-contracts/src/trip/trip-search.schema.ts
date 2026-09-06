@@ -72,7 +72,7 @@ export const YambaTripResultSchema = z
     toCountry: z.string().optional(),
     travelDate: z.string().meta({ example: "12 juin 2026", description: "Formaté serveur selon locale" }),
     departureTime: z.string().meta({ example: "08:00" }),
-    arrivalTime: z.string().meta({ example: "14:30" }),
+    arrivalTime: z.string().optional().meta({ example: "14:30", description: "Absent quand le trajet n'a pas d'heure d'arrivée : le front n'affiche alors rien" }),
     nextDay: z.boolean().optional().meta({ description: "Arrivée le lendemain (absent si false)" }),
     durationMinutes: z.number().int().optional(),
     stopovers: z.number().int().optional(),
@@ -109,6 +109,8 @@ export const YambaTripResultSchema = z
     travelerFirstName: z.string().optional(),
     travelerLastName: z.string().optional().meta({ description: "Initiale uniquement (privacy)" }),
     travelerAvatarUrl: z.string().optional(),
+    isFavorite: z.boolean().optional().meta({ description: "D46 — true si l'utilisateur connecté a mis ce trajet en favori (absent/false pour un visiteur)" }),
+    viewsCount: z.number().int().optional().meta({ description: "D5 / C-PR6 — vues de la page publique, dédoublonnées par visiteur et par jour (Redis) ; absent si Redis indisponible" }),
   })
   .meta({ id: "YambaTripResult", description: "Carte résultat de recherche (DTO UI)" });
 export type YambaTripResult = z.infer<typeof YambaTripResultSchema>;

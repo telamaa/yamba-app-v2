@@ -193,7 +193,7 @@ export default function PricingSection() {
                 </p>
               </div>
               <div className="rounded-lg bg-teal-50 p-2.5 dark:bg-teal-950/30">
-                <p className="text-[10px] font-bold text-slate-900 dark:text-white">✈️ Yamber</p>
+                <p className="text-[10px] font-bold text-slate-900 dark:text-white">✈️ Voyageur</p>
                 <p className="mt-0.5 text-[10px] leading-tight text-slate-600 dark:text-slate-400">
                   {t("timeline.yamberBenefit")}
                 </p>

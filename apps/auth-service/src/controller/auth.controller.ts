@@ -2,6 +2,7 @@ import type { Request, Response, NextFunction } from "express";
 import bcrypt from "bcryptjs";
 import prisma from "@packages/libs/prisma";
 import { AuthError, ValidationError } from "@packages/error-handler";
+import { isSupportedLocale, resolveLocale } from "@packages/api-contracts";
 
 import {
   checkForgotPasswordOtpRestrictions,
@@ -23,6 +24,8 @@ import {
   sendPasswordChangedEmail,
   storePasswordResetToken,
   storePendingRegistration,
+  refreshPendingRegistration,
+  localeFromHeaders,
   storeRefreshSession,
   storeVerificationToken,
   trackForgotPasswordOtpRequests,
@@ -39,6 +42,16 @@ import {
   remainingLifetimeMs,
 } from "../utils/session-policy";
 import { recordRegistrationConsents } from "../utils/consent/consent.helper";
+import { describeUserAgent, shortUserAgent } from "../utils/session-device";
+import type { SessionMeta } from "../utils/auth.helper";
+
+/** D65 2A — ce qu'une session retient de l'appareil (jamais une empreinte). */
+function sessionMetaOf(req: Request): SessionMeta {
+  const ua = (req.headers["user-agent"] as string | undefined) ?? null;
+  return { ip: req.ip ?? null, userAgent: shortUserAgent(ua), device: describeUserAgent(ua) };
+}
+import { googleSignIn as googleSignInService } from "../services/google-auth.service";
+import { buildGoogleTokenVerifier } from "../services/google-token.verifier";
 import { clearAuthCookies, setCookie } from "../utils/cookies/setCookie";
 import jwt from "jsonwebtoken";
 import { AuthenticatedRequest } from "@packages/middleware/isAuthenticated";
@@ -82,7 +95,13 @@ export const registerUser = async (req: Request, res: Response, next: NextFuncti
       where: { emailNormalized: emailKey },
     });
     if (existingUser) {
-      return next(new ValidationError("User already exists with this email!"));
+      return next(
+        new ValidationError("User already exists with this email!", {
+          type: "register",
+          code: "EMAIL_ALREADY_USED",
+          field: "email",
+        })
+      );
     }
 
     await checkOtpRestrictions(emailKey);
@@ -93,6 +112,9 @@ export const registerUser = async (req: Request, res: Response, next: NextFuncti
     const consentIp = getClientIp(req);
     const consentUserAgent = req.headers["user-agent"];
     const consentLocale = getClientLocale(req);
+    // D44 — la langue de l'interface au moment de l'inscription devient la
+    // langue de l'utilisateur (emails), modifiable ensuite via PATCH /auth/me/locale.
+    const preferredLocale = resolveLocale(consentLocale);
 
     await storePendingRegistration(emailKey, {
       firstName: data.firstName,
@@ -105,9 +127,10 @@ export const registerUser = async (req: Request, res: Response, next: NextFuncti
       consentIp,
       consentUserAgent: typeof consentUserAgent === "string" ? consentUserAgent : undefined,
       consentLocale,
+      preferredLocale,
     });
 
-    await sendOtp(data.firstName, emailKey, "register-activation-mail");
+    await sendOtp(data.firstName, emailKey, preferredLocale);
 
     const verificationToken = createVerificationToken();
     await storeVerificationToken(verificationToken, emailKey);
@@ -147,13 +170,21 @@ export const resendRegistrationOtp = async (
       where: { emailNormalized: emailKey },
     });
     if (existingUser) {
-      return next(new ValidationError("User already exists with this email!"));
+      return next(
+        new ValidationError("User already exists with this email!", {
+          type: "register",
+          code: "EMAIL_ALREADY_USED",
+          field: "email",
+        })
+      );
     }
 
     await checkOtpRestrictions(emailKey);
     await trackOtpRequests(emailKey);
 
-    await sendOtp(pending.firstName, emailKey, "register-activation-mail");
+    await sendOtp(pending.firstName, emailKey, pending.preferredLocale ?? localeFromHeaders(req.headers));
+    // Le renvoi PROLONGE la fenêtre d'inscription (sinon : code valide, session morte)
+    await refreshPendingRegistration(emailKey);
 
     return res.status(200).json({
       message: "OTP sent again.",
@@ -231,7 +262,9 @@ export const verifyRegistrationOtp = async (
     const token = String(verificationToken);
     const emailKey = await getEmailKeyFromToken(token);
 
-    await verifyOtp(emailKey, String(otp));
+    // L'alerte sécurité (10e échec) part dans la langue de la requête ;
+    // l'inscription elle-même n'est lue qu'après un code correct.
+    await verifyOtp(emailKey, String(otp), localeFromHeaders(req.headers));
 
     const pending = await getPendingRegistration(emailKey);
     if (!pending) {
@@ -239,12 +272,19 @@ export const verifyRegistrationOtp = async (
         new ValidationError("Registration session expired. Please register again.")
       );
     }
+    const registrationLocale = pending.preferredLocale ?? localeFromHeaders(req.headers);
 
     const existingUser = await prisma.user.findUnique({
       where: { emailNormalized: emailKey },
     });
     if (existingUser) {
-      return next(new ValidationError("User already exists with this email!"));
+      return next(
+        new ValidationError("User already exists with this email!", {
+          type: "register",
+          code: "EMAIL_ALREADY_USED",
+          field: "email",
+        })
+      );
     }
 
     // ✨ NEW — Génération du slug public AVANT la transaction.
@@ -264,6 +304,7 @@ export const verifyRegistrationOtp = async (
           emailNormalized: pending.emailNormalized,
           passwordHash: pending.passwordHash,
           publicSlug, // ✨ NEW — Slug public unique pour /u/[slug]
+          preferredLocale: resolveLocale(registrationLocale), // D44
         },
       });
 
@@ -276,7 +317,7 @@ export const verifyRegistrationOtp = async (
       });
     });
 
-    sendAccountCreatedEmail(pending.firstName, pending.emailNormalized, {
+    sendAccountCreatedEmail(pending.firstName, pending.emailNormalized, registrationLocale, {
       loginUrl: process.env.USER_APP_URL
         ? `${process.env.USER_APP_URL}/login`
         : undefined,
@@ -301,6 +342,44 @@ export const verifyRegistrationOtp = async (
 // LOGIN, REFRESH, etc. — INCHANGÉS
 // ───────────────────────────────────────────────────────
 
+/**
+ * Ouvre une session (D27) : cookies access + refresh, record Redis.
+ * Partagé par le login mot de passe et la connexion Google (D47).
+ */
+async function issueSession(
+  res: Response,
+  user: { id: string; roles: string[] },
+  shouldRemember: boolean,
+  meta: SessionMeta = {}
+): Promise<void> {
+  clearAuthCookies(res);
+
+  const accessToken = jwt.sign(
+    { id: user.id, roles: user.roles },
+    process.env.ACCESS_TOKEN_SECRET as string,
+    { expiresIn: "15m" }
+  );
+
+  // D27 — nouvelle session : createdAt = now, TTL = min(inactivité, vie absolue)
+  const sessionCreatedAt = Date.now();
+  const jti = createRefreshJti();
+  await storeRefreshSession(user.id, jti, shouldRemember, sessionCreatedAt, meta);
+
+  // Le JWT refresh est borné à la vie absolue de la session (SES-02) —
+  // plus jamais un "30d" plein pot re-signé à chaque rotation.
+  const refreshLifetimeSeconds = Math.ceil(
+    remainingLifetimeMs(sessionCreatedAt, shouldRemember, loadSessionPolicy(), sessionCreatedAt) / 1000
+  );
+  const refreshToken = jwt.sign(
+    { id: user.id, jti, rememberMe: shouldRemember, sca: sessionCreatedAt },
+    process.env.REFRESH_TOKEN_SECRET as string,
+    { expiresIn: refreshLifetimeSeconds }
+  );
+
+  setCookie(res, "access_token", accessToken);
+  setCookie(res, "refresh_token", refreshToken, { rememberMe: shouldRemember });
+}
+
 export const loginUser = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { email, password, rememberMe } = req.body as {
@@ -322,35 +401,11 @@ export const loginUser = async (req: Request, res: Response, next: NextFunction)
 
     const isMatch = await bcrypt.compare(String(password), user.passwordHash ?? "");
     if (!isMatch) return next(new AuthError("Invalid email or password"));
+    // C-PR3 (D56 2A) — un compte suspendu ne se connecte pas ; le motif est dans l'email reçu.
+    if ((user as { accountStatus?: string }).accountStatus === "SUSPENDED") return next(new AuthError("Account suspended"));
 
     const shouldRemember = Boolean(rememberMe);
-
-    clearAuthCookies(res);
-
-    const accessToken = jwt.sign(
-      { id: user.id, roles: user.roles },
-      process.env.ACCESS_TOKEN_SECRET as string,
-      { expiresIn: "15m" }
-    );
-
-    // D27 — nouvelle session : createdAt = now, TTL = min(inactivité, vie absolue)
-    const sessionCreatedAt = Date.now();
-    const jti = createRefreshJti();
-    await storeRefreshSession(user.id, jti, shouldRemember, sessionCreatedAt);
-
-    // Le JWT refresh est borné à la vie absolue de la session (SES-02) —
-    // plus jamais un "30d" plein pot re-signé à chaque rotation.
-    const refreshLifetimeSeconds = Math.ceil(
-      remainingLifetimeMs(sessionCreatedAt, shouldRemember, loadSessionPolicy(), sessionCreatedAt) / 1000
-    );
-    const refreshToken = jwt.sign(
-      { id: user.id, jti, rememberMe: shouldRemember, sca: sessionCreatedAt },
-      process.env.REFRESH_TOKEN_SECRET as string,
-      { expiresIn: refreshLifetimeSeconds }
-    );
-
-    setCookie(res, "access_token", accessToken);
-    setCookie(res, "refresh_token", refreshToken, { rememberMe: shouldRemember });
+    await issueSession(res, user, shouldRemember, sessionMetaOf(req)); // D65 2A
 
     return res.status(200).json({
       message: "Login successful!",
@@ -451,7 +506,9 @@ export const refreshAuthTokens = async (
       user.id,
       newJti,
       shouldRemember,
-      sessionCreatedAt
+      sessionCreatedAt,
+      // D65 2A — la rotation garde l'appareil de la connexion, rafraîchit l'IP
+      session === "legacy" ? sessionMetaOf(req) : { ip: req.ip ?? session.ip ?? null, userAgent: session.userAgent ?? null, device: session.device ?? null }
     );
     if (ttlSet <= 0) {
       // La vie absolue s'est éteinte entre le check et l'écriture (course
@@ -498,7 +555,7 @@ export const requestPasswordResetOtp = async (
     if (user) {
       await checkForgotPasswordOtpRestrictions(emailKey);
       await trackForgotPasswordOtpRequests(emailKey);
-      await sendForgotPasswordOtp(user.firstName, emailKey, "forgot-password-mail");
+      await sendForgotPasswordOtp(user.firstName, emailKey, localeFromHeaders(req.headers));
     }
 
     return res.status(200).json({
@@ -530,7 +587,7 @@ export const resendPasswordResetOtp = async (
     if (user) {
       await checkForgotPasswordOtpRestrictions(emailKey);
       await trackForgotPasswordOtpRequests(emailKey);
-      await sendForgotPasswordOtp(user.firstName, emailKey, "forgot-password-mail");
+      await sendForgotPasswordOtp(user.firstName, emailKey, localeFromHeaders(req.headers));
     }
 
     return res.status(200).json({
@@ -553,7 +610,7 @@ export const verifyPasswordResetOtp = async (
     }
 
     const emailKey = normalizeEmail(String(email));
-    await verifyForgotPasswordOtpCode(emailKey, String(otp));
+    await verifyForgotPasswordOtpCode(emailKey, String(otp), localeFromHeaders(req.headers));
 
     const passwordResetToken = createPasswordResetToken();
     await storePasswordResetToken(passwordResetToken, emailKey);
@@ -685,13 +742,126 @@ export const resetPassword = async (req: Request, res: Response, next: NextFunct
       data: { passwordHash },
     });
 
-    await sendPasswordChangedEmail(user.firstName, emailKey, {
-      changedAt: new Date().toLocaleString("fr-FR"),
+    const resetLocale = localeFromHeaders(req.headers);
+    await sendPasswordChangedEmail(user.firstName, emailKey, resetLocale, {
+      changedAt: new Date().toLocaleString(resetLocale === "en" ? "en-US" : "fr-FR"),
       ip: req.ip,
       userAgent: req.headers["user-agent"] as string,
     });
 
     return res.status(200).json({ message: "Password reset successfully!" });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+// ───────────────────────────────────────────────────────
+// D44 — langue préférée (emails + interface)
+// ───────────────────────────────────────────────────────
+
+/**
+ * PATCH /auth/me/locale — body { locale: "fr" | "en" | … }
+ * Appelé par le header quand un utilisateur CONNECTÉ bascule la langue :
+ * la préférence est enregistrée immédiatement, sans écran de profil.
+ */
+export const updateMyLocale = async (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    if (!req.user) return next(new AuthError("Unauthorized"));
+
+    const { locale } = (req.body ?? {}) as { locale?: unknown };
+    if (!isSupportedLocale(locale)) {
+      return next(
+        new ValidationError("Unsupported locale.", {
+          type: "locale",
+          code: "LOCALE_UNSUPPORTED",
+          field: "locale",
+        })
+      );
+    }
+
+    await prisma.user.update({
+      where: { id: req.user.id },
+      data: { preferredLocale: locale },
+    });
+
+    return res.status(200).json({ success: true, preferredLocale: locale });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+// ───────────────────────────────────────────────────────
+// D47 — Connexion / inscription par Google
+// ───────────────────────────────────────────────────────
+
+const googleVerifier = buildGoogleTokenVerifier();
+
+/**
+ * POST /auth/google — body { credential, rememberMe?, consent?: { termsVersion, privacyVersion } }
+ * 200 { status: "LOGGED_IN", user, created, linked } (cookies posés)
+ * 200 { status: "CONSENT_REQUIRED", profile } (rien créé : le front demande les CGU puis rejoue)
+ * 401 GOOGLE_TOKEN_INVALID · 403 GOOGLE_EMAIL_UNVERIFIED · 503 GOOGLE_NOT_CONFIGURED
+ */
+export const googleSignIn = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { credential, rememberMe, consent } = (req.body ?? {}) as {
+      credential?: string;
+      rememberMe?: boolean;
+      consent?: { termsVersion?: string; privacyVersion?: string };
+    };
+    if (!credential || typeof credential !== "string") {
+      return next(new ValidationError("credential (Google id_token) is required."));
+    }
+
+    const result = await googleSignInService(
+      {
+        verify: googleVerifier,
+        prisma,
+        generatePublicSlug: generateUniquePublicSlug,
+        recordConsents: recordRegistrationConsents,
+        normalizeEmail,
+      },
+      {
+        idToken: credential,
+        consent:
+          consent?.termsVersion && consent?.privacyVersion
+            ? { termsVersion: String(consent.termsVersion), privacyVersion: String(consent.privacyVersion) }
+            : undefined,
+        locale: localeFromHeaders(req.headers),
+        ip: getClientIp(req),
+        userAgent: typeof req.headers["user-agent"] === "string" ? req.headers["user-agent"] : undefined,
+      }
+    );
+
+    if (result.status === "CONSENT_REQUIRED") {
+      return res.status(200).json(result);
+    }
+
+    await issueSession(res, result.user, Boolean(rememberMe), sessionMetaOf(req)); // D65 2A
+
+    if (result.created) {
+      sendAccountCreatedEmail(result.user.firstName, result.user.email, result.user.preferredLocale, {
+        loginUrl: process.env.USER_APP_URL ? `${process.env.USER_APP_URL}/login` : undefined,
+        supportEmail: "support@yamba.com",
+      }).catch((err) => console.error("Welcome email failed:", err));
+    }
+
+    return res.status(200).json({
+      status: "LOGGED_IN",
+      created: result.created,
+      linked: result.linked,
+      user: {
+        id: result.user.id,
+        email: result.user.email,
+        firstName: result.user.firstName,
+        lastName: result.user.lastName,
+        roles: result.user.roles,
+      },
+    });
   } catch (error) {
     return next(error);
   }

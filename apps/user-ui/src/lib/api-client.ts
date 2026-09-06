@@ -1,7 +1,10 @@
 "use client";
 
 import axios, { AxiosError } from "axios";
+import { getCurrentLocale } from "@/lib/current-locale";
 
+// D48 — absolu (http://…:8080/api) OU relatif (/api, proxy Next → gateway,
+// cookies first-party). Les deux formes sont acceptées telles quelles.
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ||
   "http://localhost:6001/api";
@@ -9,6 +12,15 @@ const API_BASE_URL =
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
   withCredentials: true,
+});
+
+// D44 — chaque requête porte la langue de l'interface : les services en
+// font la langue des emails sans compte (OTP, mot de passe oublié) et la
+// langue initiale de `User.preferredLocale` à l'inscription.
+apiClient.interceptors.request.use((config) => {
+  const locale = getCurrentLocale();
+  if (locale) config.headers.set("x-locale", locale);
+  return config;
 });
 
 let isRefreshing = false;
@@ -120,8 +132,13 @@ apiClient.interceptors.response.use(
       // Refresh échoué : enclenchement du circuit breaker
       refreshFailedAt = Date.now();
       flushRefreshQueue(refreshError);
-      // Pas de redirection ici — on laisse le composant gérer
-      // (useUser retournera user: undefined, le header affichera "Connexion")
+      // Pas de redirection ici — mais UN signal global (A89) : la fenêtre
+      // « ta session a expiré » s'ouvre par-dessus la page (SessionExpiredGate),
+      // à la place d'un toast « Erreur » par écran. useUser retourne user:
+      // undefined, le header affiche « Connexion ».
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("yamba:session-expired"));
+      }
       return Promise.reject(refreshError);
     } finally {
       isRefreshing = false;

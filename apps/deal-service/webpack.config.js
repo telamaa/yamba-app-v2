@@ -14,10 +14,16 @@ module.exports = {
         __dirname,
         "../../packages/libs/api-contracts/src"
       ),
+      "@packages/payments": resolve(__dirname, "../../packages/libs/payments/src"),
+      "@packages/email": resolve(__dirname, "../../packages/libs/email/src"),
+      "@packages/delivery-code": resolve(__dirname, "../../packages/libs/delivery-code/src"),
+      "@packages/pricing": resolve(__dirname, "../../packages/libs/pricing/src"),
       "@packages/messaging": resolve(
         __dirname,
         "../../packages/libs/messaging/src"
       ),
+      "@packages/totp": resolve(__dirname, "../../packages/libs/totp/src"),
+      "@packages/admin-audit": resolve(__dirname, "../../packages/libs/admin-audit/src"),
       "@packages": resolve(__dirname, "../../packages"),
     },
     extensions: [".ts", ".js"],

@@ -5,7 +5,6 @@
   "close": "Close",
   "share": "Share",
   "stateLabel": "State: request received, awaiting your response",
-
   "expiry": {
     "label": "This request expires in",
     "labelShort": "Expires in",
@@ -16,27 +15,20 @@
     "timeFormatShort": "{hours}h {minutes}min",
     "timeFormatMinutesOnly": "{minutes}min"
   },
-
   "earnings": {
     "hero": "YOU EARN",
     "currency": "€",
     "heroNote": "Paid out D+{days} after delivery confirmation · to your Stripe account",
     "heroNoteShort": "Paid out D+{days} after delivery",
-    "breakdownTitle": "WHAT YOU GET",
-    "totalPaid": "Total paid",
-    "yambaCommission": "Yamba commission",
-    "stripeFees": "Stripe fees",
     "net": "Net for you",
     "payoutNote": "Paid out {days} days after delivery confirmed via secret code",
     "detailTitle": "EARNINGS BREAKDOWN"
   },
-
   "tripCard": {
     "title": "YOUR TRIP",
     "directFlight": "Direct, {hours}h flight",
     "departure": "{weekday}, {month} {day} · {hour}:00"
   },
-
   "shipperCard": {
     "title": "FROM",
     "verifiedBadge": "Verified",
@@ -44,7 +36,6 @@
     "shipmentCount": "{count, plural, =1 {# shipment} other {# shipments}}",
     "memberSince": "Member since {month} {year}"
   },
-
   "parcelDetails": {
     "title": "PARCEL DETAILS",
     "categoryLabel": "Category",
@@ -55,7 +46,6 @@
     "descriptionLabel": "Description",
     "kg": "kg"
   },
-
   "photos": {
     "title": "PHOTOS DECLARED BY {shipperFirstName}",
     "subtitle": "click to enlarge",
@@ -68,23 +58,20 @@
       "next": "Next"
     }
   },
-
   "locations": {
     "title": "PICKUP AND DELIVERY",
     "titleShort": "PICKUP & DELIVERY",
     "pickupLabel": "PARCEL PICKUP",
     "deliveryLabel": "DELIVERY",
-    "deliveryNotePending": "Phone shared after acceptance"
+    "deliveryNotePending": "Recipient phone shared at pickup"
   },
-
   "coverage": {
     "title": "PARCEL COVERAGE",
-    "extended": "500 € insurance included",
-    "basic": "Basic insurance",
-    "shipperNoteExtended": "{shipperFirstName} purchased insurance — you''re protected in case of value-related dispute.",
-    "shipperNoteExtendedShort": "{shipperFirstName} bought 500 € insurance · you''re protected in case of dispute"
+    "extended": "Extended 500 € protection included",
+    "basic": "Yamba Guarantee included",
+    "shipperNoteExtended": "{shipperFirstName} chose the extended protection — you''re covered in case of a value-related dispute.",
+    "shipperNoteExtendedShort": "{shipperFirstName} chose the 500 € extended protection · you''re covered in case of dispute"
   },
-
   "acceptTip": {
     "title": "Before accepting, read these points carefully",
     "titleShort": "Before accepting",
@@ -97,10 +84,9 @@
     "takePhotosShort": "**Take your photos** before leaving.",
     "codeShort": "**6-digit code** to validate delivery."
   },
-
   "charter": {
     "blockTitle": "YOUR COMMITMENT",
-    "title": "Tripper Charter",
+    "title": "Traveler Charter",
     "subtitle": "Legal commitment — read carefully",
     "subtitleShort": "Legal commitment",
     "intro": "By accepting this Deal, I commit to:",
@@ -112,7 +98,7 @@
     "reportIncident": "**Report any incident** to Yamba without delay",
     "disclaimer": "I acknowledge that my sole responsibility would be engaged in case of transport of illicit goods, even without prior verification.",
     "viewFullLink": "View full Charter and Transport Contract",
-    "acceptTitle": "I accept the Tripper Charter",
+    "acceptTitle": "I accept the Traveler Charter",
     "acceptDescPrefix": "I have read and accept the ",
     "acceptContractLabel": "Transport Contract",
     "acceptDescJoin": " and the ",
@@ -120,33 +106,27 @@
     "acceptDescSuffix": ".",
     "acceptError": "You must accept the Charter to confirm this Deal"
   },
-
   "actions": {
     "decline": "Decline",
     "accept": "Accept",
     "acceptConfirm": "Accept and confirm",
-    "footerNote": "If you decline, {shipperFirstName} can look for another Tripper with no penalty.",
-    "footerNoteShort": "Declining doesn''t harm your reputation. {shipperFirstName} will find another Tripper.",
+    "footerNote": "If you decline, {shipperFirstName} can look for another Traveler with no penalty.",
+    "footerNoteShort": "Declining doesn''t harm your reputation. {shipperFirstName} will find another Traveler.",
     "charterAcceptedIndicator": "✓ Charter accepted",
     "charterPendingIndicator": "Tick the Charter to confirm"
   },
-
   "decline": {
     "dialogTitle": "Decline this request?",
-    "dialogIntro": "{shipperFirstName} will be notified and can contact another Tripper. Your acceptance rate stays intact.",
+    "dialogIntro": "{shipperFirstName} will be notified and can contact another Traveler. Your acceptance rate stays intact.",
     "reasonLabel": "Reason (optional)",
     "reasonPlaceholder": "Choose a reason",
     "reasonOption": {
-      "CATEGORY_NOT_TRANSPORTED": "Category not transported",
-      "WEIGHT_TOO_HEAVY": "Weight or volume too heavy",
-      "LOCATION_INCOMPATIBLE": "Pickup or delivery location incompatible",
-      "TIMING_TOO_TIGHT": "Timing too tight",
+      "CATEGORY_NOT_CARRIED": "Category not carried",
+      "TOO_HEAVY": "Weight or volume too heavy",
+      "PLACES_INCOMPATIBLE": "Pickup or delivery place incompatible",
+      "TIMING": "Timing too tight",
       "OTHER": "Other reason"
     },
-    "detailsLabel": "Additional details (optional)",
-    "detailsPlaceholder": "Anything to add for {shipperFirstName}?",
-    "detailsToggleExpand": "Add details",
-    "detailsToggleCollapse": "Hide details",
     "finalWarning": "This action is final",
     "cancel": "Cancel",
     "confirmDecline": "Decline Deal",
@@ -154,17 +134,34 @@
     "toastSuccess": "Request declined. {shipperFirstName} has been notified.",
     "toastError": "Error declining the request. Try again."
   },
-
   "accept": {
     "submitting": "Confirming…",
     "toastSuccess": "Deal accepted! Delivery code generated.",
     "toastError": "Error accepting the Deal. Try again."
   },
-
   "loading": "Loading request…",
   "error": {
     "notFound": "This request doesn''t exist or has already been processed.",
     "expired": "This request has expired. You can still view it but no longer respond.",
     "generic": "An error occurred. Try again in a moment."
+  },
+  "loadError": "This request does not exist or is no longer accessible.",
+  "closed": {
+    "PENDING": "Request pending",
+    "ACCEPTED": "Deal accepted",
+    "PICKED_UP": "Parcel in transit",
+    "DELIVERED": "Delivery confirmed",
+    "COMPLETED": "Deal completed — payment released",
+    "DISPUTED": "A dispute is open on this deal",
+    "DECLINED": "You declined this request",
+    "EXPIRED": "This request has expired",
+    "CANCELLED": "This request was cancelled",
+    "hint": "There is nothing left to do here.",
+    "retentionHeld": "Cancelled after departure: the shipper's retention is held by Yamba while we understand what happened. We will contact you."
+  },
+  "errors": {
+    "onboardingRequired": "Finish your Traveler profile and Stripe setup to be able to accept a deal.",
+    "dealChanged": "This deal changed in the meantime. The page has just been refreshed.",
+    "paymentConflict": "The payment on this request is no longer valid. The page has just been refreshed."
   }
 }

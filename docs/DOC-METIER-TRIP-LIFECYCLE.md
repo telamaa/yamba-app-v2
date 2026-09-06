@@ -1,5 +1,8 @@
 # 📗 Documentation métier — Cycle de vie d'un Trajet (Trip)
 
+
+> **Avertissement — relu le 06/09/2026, trois règles ont bougé.** **RG-01** : la publication n'exige plus le profil Voyageur complet ni Stripe — ce contrôle a migré vers l'**acceptation** d'un deal (D31). **RG-03** : les statuts s'affichent « En ligne » et « Masqué », plus « Actif » et « En pause » (D28). **RG-09** : l'annulation d'un trajet portant des deals est désormais **refusée** au lieu de cascader (D72) ; **RG-20** (filet de complétion à 7 jours) n'est pas implémenté, le cron d'arrivée + 24 h fait le travail.
+
 > **Public visé** : produit, support, développeurs — toute personne devant comprendre *pourquoi* le système se comporte comme il le fait.
 > **Document jumeau** : `DOC-DEV-TRIP-LIFECYCLE.md` (implémentation technique et guide de test).
 

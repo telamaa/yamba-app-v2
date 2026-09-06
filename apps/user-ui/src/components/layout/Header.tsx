@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
-import { Link } from "@/i18n/navigation";
+import { Link, usePathname } from "@/i18n/navigation";
+import { loginHrefFor } from "@/lib/auth/login-redirect";
 import CommandPalette, { type CommandAction } from "./CommandPalette";
 import HeaderLogo from "./header/HeaderLogo";
 import HeaderLocaleSwitcher from "./header/HeaderLocaleSwitcher";
@@ -16,6 +17,7 @@ import HeaderMobileBottomSheet from "./header/HeaderMobileBottomSheet";
 import HeaderSkeleton from "./HeaderSkeleton";
 import useHeaderUserState from "./header/useHeaderUserState";
 import { useNotifications } from "@/hooks/useNotifications";
+import { useConversations } from "@/hooks/useMessaging";
 import {
   HEADER_COMPACT_SCROLL_THRESHOLD,
   HEADER_Z_INDEX,
@@ -24,6 +26,9 @@ import {
 export default function Header() {
   const t = useTranslations("common.header");
   const userState = useHeaderUserState();
+  const pathname = usePathname();
+  // A58 — « Connexion » ramène sur la page courante (hors pages auth et accueil).
+  const loginHref = loginHrefFor(pathname);
   const [isCompact, setIsCompact] = useState(false);
   const [bottomSheetOpen, setBottomSheetOpen] = useState(false);
 
@@ -42,8 +47,10 @@ export default function Header() {
     enabled: userState.isAuthenticated,
   });
   const notificationCount = notificationsData?.unreadCount ?? 0;
-  // Mock assumé jusqu'au chantier F (message-service :6005).
-  const messageCount = 3;
+  // Chantier F (D61) — la bulle dit la vérité : conversations avec messages non lus,
+  // même cache que la messagerie du tableau de bord.
+  const { data: conversationsData } = useConversations({ enabled: userState.isAuthenticated });
+  const messageCount = conversationsData?.totalUnread ?? 0;
 
   const commandActions: CommandAction[] = useMemo(() => {
     const base: CommandAction[] = [
@@ -61,12 +68,12 @@ export default function Header() {
     if (!userState.isAuthenticated) {
       base.unshift({
         label: t("login"),
-        href: "/login",
+        href: loginHref,
         keywords: ["login", "connexion", "signin"],
       });
     }
     return base;
-  }, [t, userState.isAuthenticated]);
+  }, [t, userState.isAuthenticated, loginHref]);
 
   return (
     <>
@@ -116,7 +123,7 @@ export default function Header() {
                 </>
               ) : (
                 <Link
-                  href="/login"
+                  href={loginHref}
                   className="text-sm font-medium text-slate-700 transition-colors hover:underline hover:underline-offset-4 dark:text-slate-200 dark:hover:text-white"
                 >
                   {t("login")}

@@ -11,6 +11,7 @@
  */
 
 export * from "./common";
+export * from "./locale";
 export * from "./trip/trip.enums";
 export * from "./trip/trip.schema";
 export * from "./trip/trip-search.schema";
@@ -18,5 +19,29 @@ export * from "./trip/trip-public.schema";
 export * from "./booking/booking.enums";
 export * from "./booking/booking.schema";
 export * from "./booking/booking-events.schema";
+export * from "./booking/booking-request.schema";
+export * from "./booking/booking-lifecycle.schema";
+export * from "./booking/booking-transport.schema";
+export * from "./booking/booking-settlement.schema";
+export * from "./booking/booking-wallet.schema";
+export * from "./booking/booking-rating.schema";
 export * from "./notification/notification.schema";
 export * from "./trip/trip-pricing.schema";
+export * from "./trip/trip-favorite.schema";
+export * from "./admin/admin-dispute.schema";
+export * from "./admin/admin-users.schema";
+export * from "./admin/admin-trips.schema";
+export * from "./admin/admin-finances.schema";
+export * from "./admin/admin-pilotage.schema";
+export * from "./messaging/messaging.schema";
+export * from "./messaging/messaging-events.schema";
+export * from "./admin/admin-alerts.schema";
+export * from "./admin/platform-settings.schema"; // C-PR8a (D62)
+export * from "./admin/admin-privacy.schema"; // C-PR8b (D63)
+export * from "./admin/admin-status.schema"; // C-PR8c (D64)
+export * from "./admin/member-sessions.schema"; // D65
+export * from "./admin/member-profile.schema"; // D67
+export * from "./admin/reports.schema"; // D68
+export * from "./admin/trust.schema"; // D71
+export * from "./booking/tracking-link.schema"; // D69
+export * from "./auth/member-auth.schema"; // A145 — surface membre d'auth-service (OpenAPI)

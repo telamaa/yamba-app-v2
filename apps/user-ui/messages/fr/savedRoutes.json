@@ -62,7 +62,7 @@
   },
   "cta": {
     "noResultsTitle": "Aucun trajet ne correspond ?",
-    "noResultsDescription": "Crée une alerte et reçois un email dès qu'un tripper publie ce trajet.",
+    "noResultsDescription": "Crée une alerte et reçois un email dès qu'un voyageur publie ce trajet.",
     "noResultsCta": "Créer une alerte pour ce trajet",
     "bannerTitle": "Reste informé·e des futurs trajets",
     "bannerDescription": "Crée une alerte pour être prévenu·e dès qu'un nouveau trajet correspondant est publié.",

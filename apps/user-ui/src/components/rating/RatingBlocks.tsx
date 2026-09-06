@@ -13,7 +13,7 @@
 "use client";
 
 import { Eye, Send, Star } from "lucide-react";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import type { ReactNode } from "react";
 import type { RatingContext } from "./rating.types";
 
@@ -27,20 +27,18 @@ export function RatingBanner({
   variant?: "inset" | "flush" | "slim";
 }) {
   const t = useTranslations("rating");
-  const locale = useLocale();
 
-  const amount = formatEur(context.amountEur, locale);
   const firstName = context.person.firstName;
   const isCarrier = context.ratedRole === "CARRIER";
 
   const title =
     variant === "flush"
       ? isCarrier
-        ? t("banner.titleShortCARRIER", { amount })
-        : t("banner.titleShortSHIPPER", { amount })
+        ? t("banner.titleShortCARRIER")
+        : t("banner.titleShortSHIPPER")
       : isCarrier
-        ? t("banner.titleCARRIER", { amount, firstName })
-        : t("banner.titleSHIPPER", { amount, firstName });
+        ? t("banner.titleCARRIER", { firstName })
+        : t("banner.titleSHIPPER", { firstName });
 
   const sub =
     variant === "flush"
@@ -150,18 +148,6 @@ export function RatingPersonCard({
         <span className="inline-flex items-center rounded-full bg-slate-200 px-2 py-0.5 font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
           {isCarrier ? t("person.roleCARRIER") : t("person.roleSHIPPER")}
         </span>
-        <span className="inline-flex items-center gap-1">
-          <Star
-            size={11}
-            fill="currentColor"
-            className="text-amber-500"
-            aria-hidden="true"
-          />
-          {person.rating.toFixed(1)} ·{" "}
-          {isCarrier
-            ? t("person.dealsCARRIER", { count: person.dealCount })
-            : t("person.dealsSHIPPER", { count: person.dealCount })}
-        </span>
       </div>
     </section>
   );
@@ -180,10 +166,7 @@ export function RatingVisibilityNote({
 
   const text = compact
     ? t("visibility.textShort", { ratedFirstName: context.person.firstName })
-    : t("visibility.text", {
-      ratedFirstName: context.person.firstName,
-      raterName: context.raterName,
-    });
+    : t("visibility.text", { ratedFirstName: context.person.firstName });
 
   return (
     <div
@@ -213,7 +196,6 @@ export function RatingVisibilityNote({
 
 export function RatingPersonDealCard({ context }: { context: RatingContext }) {
   const t = useTranslations("rating");
-  const locale = useLocale();
   const { person, ratedRole } = context;
 
   const initials = (person.firstName[0] + person.lastInitial).toUpperCase();
@@ -239,18 +221,6 @@ export function RatingPersonDealCard({ context }: { context: RatingContext }) {
           <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
             {isCarrier ? t("person.roleCARRIER") : t("person.roleSHIPPER")}
           </span>
-          <span className="inline-flex items-center gap-1">
-            <Star
-              size={11}
-              fill="currentColor"
-              className="text-amber-500"
-              aria-hidden="true"
-            />
-            {person.rating.toFixed(1)} ·{" "}
-            {isCarrier
-              ? t("person.dealsCARRIER", { count: person.dealCount })
-              : t("person.dealsSHIPPER", { count: person.dealCount })}
-          </span>
         </div>
       </div>
 
@@ -262,16 +232,6 @@ export function RatingPersonDealCard({ context }: { context: RatingContext }) {
           </span>
           <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400">
             {t("sidebar.completedBadge")}
-          </span>
-        </div>
-        <div className="mt-1.5 flex items-center justify-between text-[12.5px]">
-          <span className="text-slate-600 dark:text-slate-400">
-            {isCarrier
-              ? t("sidebar.amountPaidLabel")
-              : t("sidebar.amountReceivedLabel")}
-          </span>
-          <span className="font-bold text-slate-900 dark:text-white">
-            {formatEur(context.amountEur, locale)}
           </span>
         </div>
       </div>
@@ -358,10 +318,3 @@ function parseBold(text: string): ReactNode[] {
   );
 }
 
-function formatEur(amount: number, locale: string): string {
-  return new Intl.NumberFormat(locale === "fr" ? "fr-FR" : "en-US", {
-    style: "currency",
-    currency: "EUR",
-    minimumFractionDigits: amount % 1 === 0 ? 0 : 2,
-  }).format(amount);
-}

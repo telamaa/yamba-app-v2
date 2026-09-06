@@ -4,6 +4,7 @@
 import { Plus } from "lucide-react";
 import { useTranslations } from "next-intl";
 import useShareTrip from "@/hooks/useShareTrip";
+import AuthGateModal from "@/components/auth/shared/AuthGateModal";
 import { HEADER_COLORS } from "./header.constants";
 
 type Props = {
@@ -14,8 +15,8 @@ type Props = {
 /**
  * CTA "Partager un trajet".
  *
- * Logique de redirection gérée par `useShareTrip` :
- * - Non connecté → /login?redirect=/trips/create
+ * Logique gérée par `useShareTrip` (A60) :
+ * - Non connecté → modale « Connecte-toi pour partager un trajet » (retour /trips/create)
  * - Connecté     → /trips/create
  *
  * Aucun gate Stripe ici — l'onboarding Yamber est déclenché à l'acceptation
@@ -23,7 +24,18 @@ type Props = {
  */
 export default function HeaderShareTripCTA({ variant = "desktop" }: Props) {
   const t = useTranslations("common.header");
-  const { handleShareTrip } = useShareTrip();
+  const tGate = useTranslations("common.authGate.shareTrip");
+  const { handleShareTrip, gateOpen, closeGate, shareRedirect } = useShareTrip();
+
+  const gate = (
+    <AuthGateModal
+      open={gateOpen}
+      onCloseAction={closeGate}
+      title={tGate("title")}
+      subtitle={tGate("subtitle")}
+      redirect={shareRedirect}
+    />
+  );
 
   const baseClass =
     "inline-flex items-center justify-center font-semibold transition-colors focus:outline-none focus-visible:ring-4";
@@ -31,6 +43,8 @@ export default function HeaderShareTripCTA({ variant = "desktop" }: Props) {
 
   if (variant === "compact") {
     return (
+      <>
+      {gate}
       <button
         type="button"
         onClick={handleShareTrip}
@@ -41,11 +55,14 @@ export default function HeaderShareTripCTA({ variant = "desktop" }: Props) {
       >
         <Plus size={18} strokeWidth={2.5} />
       </button>
+      </>
     );
   }
 
   if (variant === "mobile") {
     return (
+      <>
+      {gate}
       <button
         type="button"
         onClick={handleShareTrip}
@@ -58,10 +75,13 @@ export default function HeaderShareTripCTA({ variant = "desktop" }: Props) {
       >
         {t("shareTripShort")}
       </button>
+      </>
     );
   }
 
   return (
+    <>
+    {gate}
     <button
       type="button"
       onClick={handleShareTrip}
@@ -70,5 +90,6 @@ export default function HeaderShareTripCTA({ variant = "desktop" }: Props) {
     >
       {t("shareTrip")}
     </button>
+    </>
   );
 }

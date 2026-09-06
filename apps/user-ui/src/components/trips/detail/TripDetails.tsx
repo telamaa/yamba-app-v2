@@ -16,6 +16,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import apiClient from "@/lib/api-client";
 import { setFlashToast } from "@/lib/flash-toast";
 import TripDocumentsManager from "@/components/trips/create/TripDocumentsManager";
+import TripDealsSection from "@/components/dashboard/trips/TripDealsSection";
 import {
   STATUS_CONFIG, TRANSPORT_LABEL_KEYS, MANGO, TEAL, formatTripDate, isTripPastDeparture,
   type TripStatus, type TransportMode,
@@ -436,9 +437,22 @@ export default function TripDetails({ tripId }: { tripId: string }) {
         <StatusBadge status={status} />
       </div>
 
+      {/* C-PR4 (D57 3A) — masqué par Yamba : distinct de la pause, réversible, réservations en cours préservées */}
+      {trip.hiddenByAdminAt && (
+        <div className="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-[13px] text-red-800 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-200">
+          <p className="font-semibold">{t("detail.hiddenByAdmin.title")}</p>
+          <p className="mt-0.5">{t("detail.hiddenByAdmin.body")}</p>
+        </div>
+      )}
+
       <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
         {/* LEFT */}
         <div className="flex flex-col gap-5">
+          {/* Demandes et colis du trajet (A44) — en tête : c'est ce qu'on vient chercher */}
+          {(status === "PUBLISHED" || status === "COMPLETED") && (
+            <TripDealsSection tripId={tripId} />
+          )}
+
           <Section icon={MapPin} title={t("detail.route")}>
             <div className="flex items-center gap-4">
               <div className="flex flex-col items-center gap-1"><div className="h-3 w-3 rounded-full border-2" style={{ borderColor: MANGO }} /><div className="h-8 w-px bg-slate-200 dark:bg-slate-700" /><div className="h-3 w-3 rounded-full" style={{ background: TEAL }} /></div>

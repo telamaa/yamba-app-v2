@@ -7,7 +7,9 @@
  *
  * - Événements optionnels : card amber + bouton de confirmation
  * - Undo 5s : l'événement n'est "envoyé" (API) qu'après la fenêtre d'annulation
- *   (pattern Gmail) — le toast porte le bouton Annuler
+ *   (pattern Gmail) — le toast porte le bouton Annuler ; à la fin de la
+ *   fenêtre, `onEventCommittedAction` déclenche l'appel réel (A39 : le
+ *   serveur n'a pas d'undo, c'est le client qui porte l'attente)
  * - DELIVER : card devient emerald, CTA primaire vers la saisie du code
  */
 
@@ -43,6 +45,8 @@ type Props = {
   deal: DealRequest;
   confirmedEvents: DealTrackingEventId[];
   onEventConfirmedAction: (id: DealTrackingEventId) => void;
+  /** Fenêtre d'undo écoulée : l'appel API part MAINTENANT (A39). */
+  onEventCommittedAction: (id: DealTrackingEventId) => void;
   onDeliverAction: () => void;
   compact?: boolean;
 };
@@ -51,6 +55,7 @@ export default function TrackingSpotlight({
                                             deal,
                                             confirmedEvents,
                                             onEventConfirmedAction,
+                                            onEventCommittedAction,
                                             onDeliverAction,
                                             compact = false,
                                           }: Props) {
@@ -80,8 +85,8 @@ export default function TrackingSpotlight({
 
     const timer = setTimeout(() => {
       pendingTimers.current.delete(id);
-      // C'est ici que l'appel API réel partira (confirmTrackingEvent) —
-      // géré par le parent via le state ; en mock, rien de plus à faire.
+      // Fenêtre écoulée : l'appel réel part (POST /deals/:id/events).
+      onEventCommittedAction(id);
     }, UNDO_WINDOW_MS);
     pendingTimers.current.set(id, timer);
 

@@ -1,7 +1,13 @@
 const { NxAppWebpackPlugin } = require('@nx/webpack/app-plugin');
-const { join } = require('path');
+const { join, resolve } = require('path');
 
 module.exports = {
+  // C-PR8c — le gateway lit la base (maintenance) et les règles pures partagées : même alias générique que les services.
+  resolve: {
+    alias: {
+      "@packages": resolve(__dirname, "../../packages"),
+    },
+  },
   output: {
     path: join(__dirname, 'dist'),
     clean: true,

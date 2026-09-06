@@ -132,7 +132,17 @@ export class OutboxRelay {
 
   private async drainBatch(): Promise<void> {
     const rows = await prisma.outboxEvent.findMany({
-      where: { publishedAt: null, attempts: { lt: MAX_RELAY_ATTEMPTS } },
+      // Pitfall Prisma+Mongo (CLAUDE.md, 3e occurrence — A49) : `null` ne
+      // matche PAS un champ ABSENT ; les writers posent désormais `null`
+      // explicitement, mais les documents antérieurs n'ont pas le champ.
+      where: {
+        // Chantier F (D61) : chaque relais draine SON domaine. Sans ce filtre, celui-ci
+        // validerait un evenement de conversation contre le schema booking, echouerait, et
+        // finirait par le PARQUER (et reciproquement).
+        aggregateType: "booking",
+        OR: [{ publishedAt: null }, { publishedAt: { isSet: false } }],
+        attempts: { lt: MAX_RELAY_ATTEMPTS },
+      },
       orderBy: { occurredAt: "asc" },
       take: this.batchSize,
     });

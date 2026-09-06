@@ -206,7 +206,12 @@ describe("publication nominale", () => {
     await relay.tick();
 
     expect(findManyMock).toHaveBeenCalledWith({
-      where: { publishedAt: null, attempts: { lt: MAX_RELAY_ATTEMPTS } },
+      where: {
+        // Chantier F (D61) : ce relais ne draine que SON domaine
+        aggregateType: "booking",
+        OR: [{ publishedAt: null }, { publishedAt: { isSet: false } }],
+        attempts: { lt: MAX_RELAY_ATTEMPTS },
+      },
       orderBy: { occurredAt: "asc" },
       take: 50,
     });

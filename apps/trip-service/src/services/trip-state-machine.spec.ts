@@ -245,8 +245,12 @@ describe("canPerform — guards booking", () => {
     expect(check).toEqual({ allowed: true, to: "PAUSED" });
   });
 
-  it("cancel autorisé avec réservations actives (side-effects au chantier Booking)", () => {
-    const check = canPerform(makeTrip({ status: "PUBLISHED" }), "cancel", withBookings);
+  it("D72 — cancel REFUSÉ avec réservations actives : le Voyageur annule ses deals d'abord (ANN-02)", () => {
+    const refused = canPerform(makeTrip({ status: "PUBLISHED" }), "cancel", withBookings);
+    expect(refused.allowed).toBe(false);
+    expect(refused.reason).toMatch(/active deals/i);
+    expect(canPerform(makeTrip({ status: "PAUSED" }), "cancel", withBookings).allowed).toBe(false);
+    const check = canPerform(makeTrip({ status: "PUBLISHED" }), "cancel", ctx());
     expect(check).toEqual({ allowed: true, to: "CANCELLED" });
   });
 });
@@ -331,9 +335,9 @@ describe("getAllowedActions", () => {
       ["view", "viewPublic", "duplicate", "edit", "pause", "unpublish", "cancel"]);
   });
 
-  it("PUBLISHED avec réservations : edit et unpublish disparaissent", () => {
+  it("PUBLISHED avec réservations : edit, unpublish et cancel disparaissent (D72)", () => {
     expectActions(makeTrip({ status: "PUBLISHED" }), ctx({ hasActiveBookings: true }),
-      ["view", "viewPublic", "duplicate", "pause", "cancel"]);
+      ["view", "viewPublic", "duplicate", "pause"]);
   });
 
   it("PAUSED (départ futur, sans réservation) : view, viewPublic, duplicate, edit, resume, unpublish, cancel", () => {

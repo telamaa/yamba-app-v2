@@ -1,11 +1,12 @@
 import { defineRouting } from "next-intl/routing";
+import { DEFAULT_LOCALE, SUPPORTED_LOCALES } from "@packages/api-contracts/locale";
 
 export const routing = defineRouting({
-  // Toutes les locales supportées
-  locales: ["fr", "en"],
+  // Toutes les locales supportées — LA liste vit dans @packages/api-contracts (D44)
+  locales: SUPPORTED_LOCALES,
 
   // Locale par défaut (si le navigateur n'a pas de préférence claire)
-  defaultLocale: "fr",
+  defaultLocale: DEFAULT_LOCALE,
 
   // "as-needed" = pas de préfixe sur la locale par défaut (ex: /dashboard → FR)
   // "always" = préfixe toujours présent (/fr/dashboard, /en/dashboard) ← recommandé

@@ -28,7 +28,7 @@ type Props = {
   isSubmitting?: boolean;
   variant: "modal" | "sheet";
   onCloseAction: () => void;
-  onConfirmAction: (payload: { reason?: PickupRefuseReason; details?: string }) => void;
+  onConfirmAction: (payload: { reason?: PickupRefuseReason }) => void;
 };
 
 export default function PickupRefuseDialog({
@@ -41,7 +41,6 @@ export default function PickupRefuseDialog({
                                            }: Props) {
   const t = useTranslations("carrierDealPickup");
   const [reason, setReason] = useState<PickupRefuseReason | undefined>(undefined);
-  const [details, setDetails] = useState("");
 
   // Body scroll lock + Esc (modal uniquement)
   useEffect(() => {
@@ -63,7 +62,6 @@ export default function PickupRefuseDialog({
     const timeout = setTimeout(
       () => {
         setReason(undefined);
-        setDetails("");
       },
       variant === "sheet" ? 200 : 0
     );
@@ -95,19 +93,6 @@ export default function PickupRefuseDialog({
         ))}
       </div>
 
-      <div className="mt-4">
-        <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-          {t("refuse.detailsLabel")}
-        </label>
-        <textarea
-          value={details}
-          onChange={(e) => setDetails(e.target.value)}
-          rows={3}
-          placeholder={t("refuse.detailsPlaceholder")}
-          className="mt-1.5 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] text-slate-900 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-white"
-        />
-      </div>
-
       <div className="mt-3 flex items-center gap-1.5 text-[11px] text-amber-700 dark:text-amber-400">
         <AlertTriangle size={12} aria-hidden="true" />
         <span>{t("refuse.finalWarning")}</span>
@@ -127,7 +112,7 @@ export default function PickupRefuseDialog({
       </button>
       <button
         type="button"
-        onClick={() => onConfirmAction({ reason, details: details.trim() || undefined })}
+        onClick={() => onConfirmAction({ reason })}
         disabled={isSubmitting}
         className="flex-1 rounded-full bg-red-600 px-4 py-2.5 text-[13px] font-bold text-white hover:bg-red-700 disabled:opacity-50"
       >

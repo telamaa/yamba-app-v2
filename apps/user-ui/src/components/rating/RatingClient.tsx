@@ -14,7 +14,8 @@ import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { useRouter } from "@/i18n/navigation";
-import { getRatingContext, submitRating } from "./rating.api";
+import { RatingApiError, getRatingContext, submitRating } from "./rating.api";
+import { RatingDone, RatingUnavailable } from "./RatingDone";
 import {
   CARRIER_CRITERIA,
   SHIPPER_CRITERIA,
@@ -42,13 +43,18 @@ export default function RatingClient({ dealId, backPath }: Props) {
   const [votes, setVotes] = useState<Partial<Record<CriterionId, CriterionVote>>>({});
   const [comment, setComment] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
+  const [submitted, setSubmitted] = useState<{ revealed: boolean } | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    getRatingContext(dealId).then((c) => {
-      if (!cancelled) setContext(c);
-    });
+    getRatingContext(dealId)
+      .then((c) => {
+        if (!cancelled) setContext(c);
+      })
+      .catch(() => {
+        if (!cancelled) setLoadFailed(true);
+      });
     return () => {
       cancelled = true;
     };
@@ -75,29 +81,43 @@ export default function RatingClient({ dealId, backPath }: Props) {
     if (!context || stars < 1 || isSubmitting) return;
     setIsSubmitting(true);
     try {
-      await submitRating(context.dealId, {
-        overallStars: stars,
+      const res = await submitRating(context.dealId, {
+        rating: stars,
         criteria: votes,
         comment: comment.trim() || undefined,
       });
-      setSubmitted(true);
-    } catch {
-      toast.error(t("cta.toastError"));
+      setSubmitted({ revealed: res.revealed });
+    } catch (e) {
+      const code = e instanceof RatingApiError ? e.code : "GENERIC";
+      if (code === "TRANSITION_NOT_ALLOWED") {
+        // Déjà noté ailleurs, fenêtre close : on RELIT le contexte servi.
+        toast.error(t("cta.toastConflict"));
+        getRatingContext(context.dealId).then(setContext).catch(() => undefined);
+      } else {
+        toast.error(t("cta.toastError"));
+      }
     } finally {
       setIsSubmitting(false);
     }
   }, [context, stars, votes, comment, isSubmitting, t]);
 
+  // Chargement impossible (404/403 : jamais « ce Deal n'existe pas », A63/RG-403) → écran neutre + retour.
+  if (loadFailed) return <RatingUnavailable onBackAction={handleBack} />;
   if (isMobile === null || !context) return null;
 
   if (submitted) {
     return (
       <RatingSuccess
         ratedFirstName={context.person.firstName}
-        onBackHomeAction={() => router.push("/")}
+        revealed={submitted.revealed}
+        windowEndsAt={context.windowEndsAt}
+        onBackAction={handleBack}
       />
     );
   }
+
+  // Déjà notée, fenêtre close ou révélée : l'écran « fait » remplace le formulaire (jamais de 409 à l'écran).
+  if (!context.canRate) return <RatingDone context={context} onBackAction={handleBack} />;
 
   const criteria = buildCriteria(context, t);
 

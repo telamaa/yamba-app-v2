@@ -5,6 +5,7 @@ import {
   BookingActorSchema,
   BookingViewerRoleSchema,
   TrackingStepSchema,
+  DisputeCategorySchema,
 } from "./booking.enums";
 
 /**
@@ -41,8 +42,11 @@ export const BOOKING_EVENT_TYPES = [
   "booking.completed",
   "booking.payout_sent",
   "booking.disputed",
+  "booking.verification_reminder",
   "booking.rating_reminder",
   "booking.rating_revealed",
+  "booking.dispute_carrier_responded",
+  "booking.dispute_resolved",
 ] as const;
 
 export const BookingEventTypeSchema = z
@@ -249,7 +253,10 @@ export const BookingPayoutSentEventSchema = z
     eventType: z.literal("booking.payout_sent"),
     payload: BookingEventBasePayloadSchema.extend({
       transferId: z.string().nullish().meta({ description: "Stripe transfer id (B4)" }),
-      amountCents: z.number().int().meta({ description: "= transportCents (carrier net)" }),
+      amountCents: z.number().int().meta({ description: "Carrier net (DELIVERY) or ANN-01 compensation (LATE_CANCELLATION)" }),
+      reason: z.enum(["DELIVERY", "LATE_CANCELLATION"]).nullish().meta({
+        description: "Why the carrier is paid (A82). Absent on pre-D50 events = DELIVERY.",
+      }),
     }),
   })
   .meta({ id: "BookingPayoutSentEvent", description: "Stripe transfer executed → notify carrier" });
@@ -261,12 +268,25 @@ export const BookingDisputedEventSchema = z
     payload: BookingEventBasePayloadSchema.extend({
       ticketNumber: z.string().meta({ example: "YAM-2041" }),
       disputedAt: z.iso.datetime(),
+      disputeCategory: DisputeCategorySchema.nullish().meta({
+        description: "Why the shipper disputed — the carrier learns the category, never the file (A68). Absent on pre-B4 events.",
+      }),
     }),
   })
   .meta({
     id: "BookingDisputedEvent",
     description: "Dispute filed → payout frozen, shipper acknowledgment (≤48 business hours) + carrier statement request",
   });
+
+export const BookingVerificationReminderEventSchema = z
+  .object({
+    ...envelope,
+    eventType: z.literal("booking.verification_reminder"),
+    payload: BookingEventBasePayloadSchema.extend({
+      payoutDueAt: z.iso.datetime().meta({ description: "End of the verification window (D+4) — the reminder fires at D+3" }),
+    }),
+  })
+  .meta({ id: "BookingVerificationReminderEvent", description: "D+3 reminder to the shipper: last day to confirm or dispute (B4/A70)" });
 
 export const BookingRatingReminderEventSchema = z
   .object({
@@ -289,6 +309,34 @@ export const BookingRatingRevealedEventSchema = z
   })
   .meta({ id: "BookingRatingRevealedEvent", description: "Double-blind reviews revealed → in-app notification to both" });
 
+export const BookingDisputeCarrierRespondedEventSchema = z
+  .object({
+    ...envelope,
+    eventType: z.literal("booking.dispute_carrier_responded"),
+    payload: BookingEventBasePayloadSchema.extend({
+      ticketNumber: z.string(),
+      respondedAt: z.iso.datetime(),
+    }),
+  })
+  .meta({ id: "BookingDisputeCarrierRespondedEvent", description: "The carrier gave their side in the app (C-PR2, D55) — no notification, the admin queue shows it" });
+
+export const BookingDisputeResolvedEventSchema = z
+  .object({
+    ...envelope,
+    eventType: z.literal("booking.dispute_resolved"),
+    payload: BookingEventBasePayloadSchema.extend({
+      kind: z.enum(["DISPUTE", "RETENTION"]),
+      ticketNumber: z.string().nullable(),
+      outcome: z.enum(["REJECTED", "PARTIAL_REFUND", "FULL_REFUND", "COMPENSATE_CARRIER", "RESTITUTE_SHIPPER"]),
+      refundCents: z.number().int(),
+      carrierPayoutCents: z.number().int(),
+      reason: z.string(),
+      finalStatus: z.enum(["COMPLETED", "CANCELLED"]),
+      resolvedAt: z.iso.datetime(),
+    }),
+  })
+  .meta({ id: "BookingDisputeResolvedEvent", description: "Admin decision (C-PR2, D55) → both parties notified with the outcome, their amount and the reason" });
+
 /* ══ Union discriminée (consommateurs) ════════════════════════ */
 
 export const BookingDomainEventSchema = z
@@ -308,8 +356,11 @@ export const BookingDomainEventSchema = z
     BookingCompletedEventSchema,
     BookingPayoutSentEventSchema,
     BookingDisputedEventSchema,
+    BookingVerificationReminderEventSchema,
     BookingRatingReminderEventSchema,
     BookingRatingRevealedEventSchema,
+    BookingDisputeCarrierRespondedEventSchema,
+    BookingDisputeResolvedEventSchema,
   ])
   .meta({
     id: "BookingDomainEvent",

@@ -7,11 +7,10 @@
 
 "use client";
 
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { useState } from "react";
-import { toast } from "sonner";
-import { acceptDeal, declineDeal } from "@/components/carrier/deal/deal.api";
 import type { DealRequest, DeclineReason } from "@/components/carrier/deal/deal.types";
+import { useDealRequestActions } from "./useDealRequestActions";
 import DealLocationsBlock from "@/components/carrier/deal/shared/DealLocationsBlock";
 import DealParcelDetails from "@/components/carrier/deal/shared/DealParcelDetails";
 import DealParcelPhotos from "@/components/carrier/deal/shared/DealParcelPhotos";
@@ -29,7 +28,7 @@ import DealRequestHeader from "./DealRequestHeader";
 type Props = {
   deal: DealRequest;
   onCloseAction: () => void;
-  onAcceptedAction: (deal: DealRequest) => void;
+  onAcceptedAction: () => void;
 };
 
 export default function DealRequestMobile({
@@ -38,12 +37,22 @@ export default function DealRequestMobile({
                                             onAcceptedAction,
                                           }: Props) {
   const t = useTranslations("carrierDealRequest");
+  const locale = useLocale();
 
   const [charterAccepted, setCharterAccepted] = useState(false);
   const [charterError, setCharterError] = useState(false);
-  const [isSubmittingAccept, setIsSubmittingAccept] = useState(false);
-  const [isSubmittingDecline, setIsSubmittingDecline] = useState(false);
   const [declineSheetOpen, setDeclineSheetOpen] = useState(false);
+
+  const {
+    submitAccept,
+    submitDecline,
+    isSubmitting,
+    isSubmittingDecline,
+  } = useDealRequestActions({ deal, onAcceptedAction, onCloseAction });
+
+  // Miroir des allowedActions serveur (cf. DealRequestDesktop).
+  const canRespond =
+    !deal.allowedActions || deal.allowedActions.includes("accept");
 
   const handleAccept = async () => {
     if (!charterAccepted) {
@@ -53,41 +62,13 @@ export default function DealRequestMobile({
         ?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
-    setIsSubmittingAccept(true);
-    try {
-      const result = await acceptDeal(deal.id, { charterAccepted: true });
-      toast.success(t("accept.toastSuccess"), { duration: 4500 });
-      // eslint-disable-next-line no-console
-      console.info("[deal] accepted, deliveryCode:", result.deliveryCode);
-      onAcceptedAction(deal);
-    } catch {
-      toast.error(t("accept.toastError"));
-    } finally {
-      setIsSubmittingAccept(false);
-    }
+    await submitAccept();
   };
 
-  const handleDeclineConfirm = async (payload: {
-    reason?: DeclineReason;
-    details?: string;
-  }) => {
-    setIsSubmittingDecline(true);
-    try {
-      await declineDeal(deal.id, payload);
-      toast.success(
-        t("decline.toastSuccess", { shipperFirstName: deal.shipper.firstName }),
-        { duration: 4500 }
-      );
-      setDeclineSheetOpen(false);
-      onCloseAction();
-    } catch {
-      toast.error(t("decline.toastError"));
-    } finally {
-      setIsSubmittingDecline(false);
-    }
+  const handleDeclineConfirm = async (payload: { reason?: DeclineReason }) => {
+    const ok = await submitDecline(payload);
+    if (ok) setDeclineSheetOpen(false);
   };
-
-  const isSubmitting = isSubmittingAccept || isSubmittingDecline;
 
   return (
     <>
@@ -107,9 +88,11 @@ export default function DealRequestMobile({
 
           <DealShipperCard
             shipper={deal.shipper}
-            onViewProfileAction={() =>
-              console.info("[deal] view shipper profile")
-            }
+            onViewProfileAction={
+                  deal.shipper.publicSlug
+                    ? () => window.open(`/${locale}/u/${deal.shipper.publicSlug}`, "_blank", "noopener")
+                    : undefined
+                }
           />
 
           <DealParcelDetails
@@ -152,14 +135,16 @@ export default function DealRequestMobile({
           </div>
         </div>
 
-        <DealActionsFooter
-          shipperFirstName={deal.shipper.firstName}
-          charterAccepted={charterAccepted}
-          onDeclineAction={() => setDeclineSheetOpen(true)}
-          onAcceptAction={handleAccept}
-          isSubmitting={isSubmitting}
-          variant="mobile"
-        />
+        {canRespond && (
+          <DealActionsFooter
+            shipperFirstName={deal.shipper.firstName}
+            charterAccepted={charterAccepted}
+            onDeclineAction={() => setDeclineSheetOpen(true)}
+            onAcceptAction={handleAccept}
+            isSubmitting={isSubmitting}
+            variant="mobile"
+          />
+        )}
       </div>
 
       <DealDeclineSheet

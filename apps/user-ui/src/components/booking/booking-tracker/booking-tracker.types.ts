@@ -9,22 +9,26 @@
  */
 
 export type BookingStatus =
-  | "AWAITING_CARRIER" // Booking créé, en attente qu'un Voyageur accepte
+  | "AWAITING_CARRIER" // PENDING serveur — en attente de réponse du Voyageur
   | "ACCEPTED" // Un Voyageur a accepté (Phase 3 actuelle)
   | "PICKED_UP" // Voyageur a confirmé pickup, code livraison révélé
-  | "IN_TRANSIT" // Colis en transport
+  | "IN_TRANSIT" // Colis en transport (dérivé : PICKED_UP + trackingEvents)
   | "DELIVERED" // Code validé par le Voyageur à l'arrivée
-  | "VERIFIED" // Période de vérification 3j écoulée, payout libéré
+  | "VERIFIED" // COMPLETED serveur — vérification écoulée, payout libéré
   | "DISPUTED" // Sender a signalé un problème
+  | "DECLINED" // Le Voyageur a refusé (remboursement intégral)
+  | "EXPIRED" // 24 h sans réponse (remboursement intégral)
   | "CANCELLED";
 
 export type BookingCarrier = {
   id: string;
   firstName: string;
   lastInitial: string;
-  rating: number;
-  dealCount: number;
-  isVerified: boolean;
+  // Stats de réputation : naissent en B5 — absentes du contrat, jamais
+  // inventées (A37). Les vues dégradent proprement.
+  rating?: number;
+  dealCount?: number;
+  isVerified?: boolean;
   avatarUrl?: string;
 };
 
@@ -69,17 +73,19 @@ export type BookingRecipient = {
   firstName: string;
   lastName: string;
   city: string;
-  // Pas de téléphone côté Sender : c'est elle qui le saisit, donc le connaît déjà
+  /** D69 — le numéro que l'Expéditeur a saisi lui-même (servi par la vue Shipper) ; fin du mock A137. */
+  phoneE164: string | null;
 };
 
 export type BookingInsurance = "BASIC" | "EXTENDED_500";
 
 export type BookingPayment = {
   totalPaidEur: number;
-  cardBrand: string; // "Visa", "Mastercard", ...
-  cardLast4: string; // "4242"
-  statementDescriptor: string; // "YAMBA*COLIS"
-  paymentMethod: "CARD"; // pourra évoluer
+  // Métadonnées carte : viendront de Stripe (backlog A37) — le
+  // paiement affiche le total seul d'ici là.
+  cardBrand?: string; // "Visa", "Mastercard", ...
+  cardLast4?: string; // "4242"
+  statementDescriptor?: string; // "YAMBA*COLIS"
 };
 
 export type BookingDeliveryCode = {
@@ -95,6 +101,33 @@ export type Booking = {
   status: BookingStatus;
   createdAt: string;
   acceptedAt?: string;
+  /** Deadline d'acceptation 24 h (statut AWAITING_CARRIER). */
+  expiresAt?: string;
+  /** Posé sur DECLINED / EXPIRED / CANCELLED. */
+  closedAt?: string;
+  /** Fin de la fenêtre de vérification (J+4) — statut DELIVERED. */
+  payoutDueAt?: string;
+  /** Ticket YAM-XXXX si un litige est ouvert. */
+  disputeTicket?: string;
+  /** Ouverture du litige (ISO) — statut DISPUTED. */
+  disputedAt?: string;
+  /** Le dossier déposé (B4/A68) — servi à l'Expéditeur seul, en DISPUTED. */
+  dispute?: BookingDisputeFile;
+  /** Versement au Voyageur (B4/A68) : l'Expéditeur n'affiche JAMAIS un échec (2A). */
+  payoutStatus?: "PENDING" | "SENT" | "FAILED" | "FROZEN";
+  /** Qui a clos la transaction (COMPLETED) : confirmation anticipée ou J+4. */
+  completedBy?: "SHIPPER" | "SYSTEM";
+  completedAt?: string;
+  /** PICKED_UP : quand « signaler un colis non livré » devient possible (servi, A72). */
+  disputeOpensAt?: string;
+  /** B5 — état de notation de MON rôle (servi) : bouton, note envoyée, révélé. */
+  rating?: { windowEndsAt: string | null; ratedByMe: boolean; counterpartHasRated: boolean; revealedAt: string | null; canRate: boolean } | null;
+  /** Machine d'état serveur — les CTA reflètent, ne décident jamais. */
+  allowedActions?: string[];
+  /** C-PR2 (D55 3A) — arbitrage d'une retenue d'annulation. */
+  retentionDecision?: { outcome: "COMPENSATE_CARRIER" | "RESTITUTE_SHIPPER"; reason: string; decidedAt: string };
+  /** Retenue d'annulation (centimes) — servie avec l'arbitrage. */
+  retentionCents?: number;
 
   carrier: BookingCarrier;
   trip: BookingTrip;
@@ -135,7 +168,8 @@ export type BookingPickupInfo = {
 export type BookingDeliveryInfo = {
   deliveredAt: string; // ISO — moment de la validation du code par le Voyageur
   validatedBy: "CODE";
-  confirmedEarlyAt?: string; // ISO — si le Sender a confirmé avant J+4
+  /** Photos optionnelles prises par le Voyageur à la remise (B4-PR3, A76). */
+  photos: BookingPhoto[];
 };
 
 /** Durée de la période de vérification avant versement automatique */
@@ -165,15 +199,35 @@ export type DisputePhotoDraft = {
   id: string;
   label?: string;
   previewUrl?: string;
-  file?: File; // envoyé vers R2 en PR backend
+  file?: File;
+  /** URL ImageKit une fois l'upload direct terminé (D42, dossier deals/dispute/ — A73). */
+  url?: string;
+  uploading?: boolean;
+  /** Message d'erreur d'upload (format, taille, réseau) — la photo n'est pas envoyable. */
+  error?: string;
 };
 
 export type SubmitDisputePayload = {
   category: DisputeCategory;
   description: string; // min 50 caractères
-  photos: DisputePhotoDraft[];
+  /** Photos DÉJÀ en ligne — seules les URL voyagent. */
+  photoUrls: string[];
   desiredOutcome?: DisputeDesiredOutcome;
-  pledgeAccepted: boolean;
+  pledgeAccepted: true;
+};
+
+/** Le dossier tel que déposé (lecture, vue DISPUTED — A74). */
+export type BookingDisputeFile = {
+  ticketNumber: string;
+  category: DisputeCategory;
+  description: string;
+  desiredOutcome?: DisputeDesiredOutcome;
+  photoUrls: string[];
+  createdAt: string;
+  /** C-PR2 (D55) — le Voyageur a donné sa version (contenu jamais servi à l'Expéditeur). */
+  carrierRespondedAt?: string | null;
+  /** C-PR2 (D55 5A) — la décision : issue, montants, motif. */
+  resolution?: { outcome: "REJECTED" | "PARTIAL_REFUND" | "FULL_REFUND"; refundCents: number; carrierPayoutCents: number; reason: string; resolvedAt: string } | null;
 };
 
 export const DISPUTE_MIN_DESCRIPTION_LENGTH = 50;

@@ -165,6 +165,10 @@ export type PublicTrip = {
   tripper: PublicTripper;
 
   publishedAt: string | null;
+  /** D46 — favori de l'utilisateur connecté (false / absent pour un visiteur) */
+  isFavorite?: boolean;
+  /** D5 / C-PR6 — vues dédoublonnées, cette vue comprise (absent si indisponible) */
+  viewsCount?: number;
 };
 
 export type PublicTripResponse = {

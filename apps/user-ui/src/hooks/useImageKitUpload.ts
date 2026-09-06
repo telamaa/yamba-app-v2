@@ -56,26 +56,50 @@ async function fetchAuthParams(): Promise<AuthParams> {
   };
 }
 
-export function useImageKitUpload(folder = "/trips") {
+export type UploadOptions = {
+  /** Défaut : 5 Mo (justificatifs). Photos de colis : 10 Mo (spec §3.4). */
+  maxSizeBytes?: number;
+  /** Défaut : JPG/PNG/HEIC + PDF. */
+  allowedMimeTypes?: readonly string[];
+};
+
+/** Types image acceptés pour les photos de colis (déclaration, pickup, litige). */
+export const PHOTO_MIME_TYPES: readonly string[] = [
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "image/heic",
+  "image/heif",
+  "image/webp",
+];
+export const PHOTO_MAX_SIZE_BYTES = 10 * 1024 * 1024;
+
+export type UploadResult =
+  | { ok: true; file: UploadedFile }
+  | { ok: false; error: UploadError };
+
+export function useImageKitUpload(folder = "/trips", options: UploadOptions = {}) {
+  const maxSizeBytes = options.maxSizeBytes ?? MAX_SIZE_BYTES;
+  const allowedMimeTypes = options.allowedMimeTypes ?? ALLOWED_MIME_TYPES;
   const [progress, setProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<UploadError | null>(null);
 
   const validateFile = useCallback((file: File): UploadError | null => {
-    if (!ALLOWED_MIME_TYPES.includes(file.type.toLowerCase())) {
+    if (!allowedMimeTypes.includes(file.type.toLowerCase())) {
       return {
         code: "INVALID_TYPE",
         message: "Format non supporté. Utilisez PDF, JPG, PNG ou HEIC.",
       };
     }
-    if (file.size > MAX_SIZE_BYTES) {
+    if (file.size > maxSizeBytes) {
       return {
         code: "TOO_LARGE",
-        message: "Le fichier dépasse 5 Mo.",
+        message: `Le fichier dépasse ${Math.round(maxSizeBytes / (1024 * 1024))} Mo.`,
       };
     }
     return null;
-  }, []);
+  }, [allowedMimeTypes, maxSizeBytes]);
 
   const upload = useCallback(
     async (file: File): Promise<UploadedFile | null> => {
@@ -172,6 +196,7 @@ export function useImageKitUpload(folder = "/trips") {
           thumbnailUrl: uploadResult.thumbnailUrl,
         };
       } catch (err: any) {
+        console.error("[ImageKit] upload error:", err);
         const uploadError: UploadError = {
           code: err.message?.includes("auth") ? "AUTH_FAILED" : "UPLOAD_FAILED",
           message: err.message ?? "Erreur lors du téléchargement.",
@@ -185,6 +210,29 @@ export function useImageKitUpload(folder = "/trips") {
     [folder, validateFile]
   );
 
+  /**
+   * Variante à résultat DÉTAILLÉ : l'appelant reçoit le code d'erreur
+   * (INVALID_TYPE / TOO_LARGE / AUTH_FAILED / UPLOAD_FAILED) et peut le
+   * traduire — `upload()` ne rend que null (l'état `error` arrive trop tard
+   * pour la closure de l'appelant).
+   */
+  const uploadDetailed = useCallback(
+    async (file: File): Promise<UploadResult> => {
+      const validationError = validateFile(file);
+      if (validationError) {
+        setError(validationError);
+        return { ok: false, error: validationError };
+      }
+      const uploaded = await upload(file);
+      if (uploaded) return { ok: true, file: uploaded };
+      return {
+        ok: false,
+        error: { code: "UPLOAD_FAILED", message: "Erreur lors du téléchargement." },
+      };
+    },
+    [upload, validateFile]
+  );
+
   const reset = useCallback(() => {
     setProgress(0);
     setError(null);
@@ -193,6 +241,7 @@ export function useImageKitUpload(folder = "/trips") {
 
   return {
     upload,
+    uploadDetailed,
     progress,
     isUploading,
     error,

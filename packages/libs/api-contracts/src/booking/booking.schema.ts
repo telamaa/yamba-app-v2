@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { ObjectIdSchema } from "../common";
-import { ParcelCategorySchema } from "../trip/trip.enums";
+import { LocationKindSchema, ParcelCategorySchema } from "../trip/trip.enums";
 import {
   BookingStatusSchema,
   BookingActorSchema,
@@ -8,7 +8,10 @@ import {
   BookingTransitionActionSchema,
   PricingModelSchema,
   TrackingStepSchema,
+  PayoutStatusSchema,
+  DisputeCategorySchema,
 } from "./booking.enums";
+import { CarrierDisputeViewSchema, RetentionDecisionViewSchema, ShipperDisputeViewSchema } from "./booking-settlement.schema";
 
 /**
  * @packages/api-contracts — booking schemas (surface deal, PR3)
@@ -57,18 +60,29 @@ export const BookingRecipientSnapshotSchema = z
     firstName: z.string(),
     lastName: z.string(),
     phoneE164: z.string().meta({ example: "+242061234567" }),
-    email: z.string(),
+    email: z.string().nullable().meta({ description: "Optional at request time" }),
   })
   .meta({
     id: "BookingRecipientSnapshot",
     description: "Recipient contact — visible to both roles (the carrier needs it to deliver)",
   });
 
+export const BookingPlaceSnapshotSchema = z
+  .object({
+    kind: LocationKindSchema,
+    details: z.string().nullish(),
+  })
+  .meta({ id: "BookingPlaceSnapshot", description: "Meeting point chosen at booking (frozen)" });
+
 export const BookingPickupInfoSchema = z
   .object({
     confirmedAt: z.iso.datetime(),
-    photoUrls: z.array(z.string()).meta({ description: "Carrier pickup photos (R2, timestamped)" }),
+    photoUrls: z.array(z.string()).meta({ description: "Carrier pickup photos (ImageKit URLs — D42, 1..5, server-timestamped)" }),
     notes: z.string().nullish(),
+    checklist: z
+      .array(z.string())
+      .default([])
+      .meta({ description: "The 5 inspection items ticked at pickup (CNF-04 attestation, frozen — B3). Empty on pre-B3 records." }),
   })
   .meta({ id: "BookingPickupInfo" });
 
@@ -96,6 +110,14 @@ export const ShipperPricingSchema = z
     premiumCents: z.number().int().meta({ description: "Protection premium, separate flow (D22)" }),
     totalShipperCents: z.number().int().meta({ description: "Total charged to the shipper" }),
     currencyCode: z.string().meta({ example: "EUR" }),
+    // D34 (B2) — frozen quote details; absent on pre-B2 snapshots
+    product: z.string().nullish().meta({ description: "PARCEL | CHECKED_BAG_23KG | CABIN_BAG_12KG" }),
+    billableWeightKg: z.number().nullish().meta({ description: "max(weight, 0.5) — D32" }),
+    sizeCoef: z.number().nullish(),
+    familySurchargePct: z.number().nullish(),
+    rawTransportCents: z.number().int().nullish().meta({ description: "Before the 8 € floor" }),
+    minimumApplied: z.boolean().nullish(),
+    serviceCents: z.number().int().nullish().meta({ description: "commission + premium (COM-03)" }),
   })
   .meta({
     id: "ShipperPricing",
@@ -126,6 +148,7 @@ export const BookingCounterpartSchema = z
     firstName: z.string().nullish(),
     lastInitial: z.string().meta({ description: "Last-name initial, '' if absent (privacy)" }),
     avatarUrl: z.string().nullable(),
+    publicSlug: z.string().nullable().meta({ description: "Public profile slug (/u/[slug]) — null for accounts without one (A45)" }),
   })
   .meta({
     id: "BookingCounterpart",
@@ -145,11 +168,60 @@ const milestoneFields = {
   closedAt: z.iso.datetime().nullish().meta({ description: "Set on DECLINED / EXPIRED / CANCELLED" }),
   closedBy: BookingActorSchema.nullish(),
   declineReason: z.string().nullish(),
+  pickupRefusalReason: z.string().nullish().meta({ description: "Set when the carrier refused the parcel at pickup (PickupRefusalReason — B3/A40)" }),
   disputeTicket: z.string().nullish().meta({ example: "YAM-2041" }),
   disputedAt: z.iso.datetime().nullish(),
+  payoutStatus: PayoutStatusSchema.nullish().meta({
+    description: "Carrier payout state (B4/A68) — both roles read it; the transfer id is served to nobody",
+  }),
+  payoutSentAt: z.iso.datetime().nullish(),
+  deliveryPhotoUrls: z.array(z.string()).meta({
+    description: "Optional handover photos taken by the carrier at delivery (B4-PR3/A76) — served to both parties",
+  }),
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
 };
+
+/** B5/D53 — l'état de notation vu par CE rôle (le front reflète : bouton, « note envoyée », révélé). */
+export const BookingRatingStateSchema = z
+  .object({
+    windowEndsAt: z.iso.datetime().nullable().meta({ description: "completedAt + 14 days" }),
+    ratedByMe: z.boolean(),
+    counterpartHasRated: z.boolean(),
+    revealedAt: z.iso.datetime().nullable(),
+    canRate: z.boolean().meta({ description: "COMPLETED, window open, not rated by me — the state machine verdict (canRate)" }),
+  })
+  .meta({ id: "BookingRatingState" });
+export type BookingRatingState = z.infer<typeof BookingRatingStateSchema>;
+
+/* ══ Prévisualisation d'annulation (ANN-01 — servie, jamais
+      recalculée par le front : « le front reflète, ne décide
+      jamais »). Présente quand `cancel` ∈ allowedActions. ═══════ */
+
+export const CancellationPreviewSchema = z
+  .object({
+    refundCents: z.number().int().meta({
+      description:
+        "Amount returned to the shipper if they cancel NOW (full total while PENDING; ANN-01 scale once ACCEPTED)",
+    }),
+    retentionCents: z.number().int().meta({
+      description: "totalShipperCents - refundCents (0 while full refund applies)",
+    }),
+    retentionPct: z.number().meta({
+      description: "Retention percentage applied after the full-refund deadline (server parameter §13)",
+    }),
+    fullRefundUntil: z.iso.datetime().meta({
+      description: "departureAt - 48h — cancelling before this instant refunds 100% (ANN-01/D39)",
+    }),
+    currencyCode: z.string(),
+  })
+  .meta({
+    id: "CancellationPreview",
+    description:
+      "Server-computed ANN-01 preview shown before the shipper confirms a cancellation. " +
+      "Informative snapshot at read time — the refund is recomputed at the actual cancel.",
+  });
+export type CancellationPreview = z.infer<typeof CancellationPreviewSchema>;
 
 /* ══ Vues par rôle (listes blanches — A13) ════════════════════ */
 
@@ -164,13 +236,16 @@ export const ShipperBookingViewSchema = z
     pricing: ShipperPricingSchema,
     parcel: BookingParcelSnapshotSchema,
     recipient: BookingRecipientSnapshotSchema,
+    pickupPlace: BookingPlaceSnapshotSchema.nullish(),
+    deliveryPlace: BookingPlaceSnapshotSchema.nullish(),
     carrier: BookingCounterpartSchema,
 
     ...milestoneFields,
 
     deliveryCode: z.string().nullable().meta({
       description:
-        "6-digit delivery code — null until encrypted-at-rest storage lands (B2, deliveryCodeEncrypted). Never present in any carrier payload.",
+        "6-digit delivery code, revealed to the shipper ONLY while the parcel is in transit (PICKED_UP) and only on " +
+        "GET /deals/:id (never in lists — D43, AES-256-GCM at rest). null otherwise. Never present in any carrier payload.",
     }),
     codeRegenerationsLeft: z.number().int().meta({
       description: "MAX_CODE_REGENERATIONS (5) minus regenerations used — server is the only judge",
@@ -181,6 +256,28 @@ export const ShipperBookingViewSchema = z
 
     allowedActions: z.array(BookingTransitionActionSchema).meta({
       description: "getAllowedActions(booking, 'SHIPPER') — drives the frontend CTAs",
+    }),
+
+    cancellationPreview: CancellationPreviewSchema.nullable().meta({
+      description: "Non-null exactly when 'cancel' is in allowedActions (PENDING or ACCEPTED)",
+    }),
+
+    capturedAt: z.iso.datetime().nullish().meta({ description: "When the shipper's card was actually charged (at acceptance, D39)" }),
+    refundedAt: z.iso.datetime().nullish(),
+    refundAmountCents: z.number().int().nullish().meta({ description: "Amount returned (ANN-01 scale, plus a mediation refund or restitution); null when nothing was refunded" }),
+    retentionDecision: RetentionDecisionViewSchema.nullish().meta({ description: "C-PR2 (D55 3A): how a held retention was arbitrated" }),
+    retentionCents: z.number().int().nullish().meta({ description: "Late cancellation: amount retained (ANN-01), null otherwise" }),
+
+    dispute: ShipperDisputeViewSchema.nullish().meta({
+      description: "The dispute file — shipper only (A68); served while DISPUTED and after the decision (resolution), absent otherwise",
+    }),
+
+    rating: BookingRatingStateSchema.nullable().meta({ description: "null unless COMPLETED (B5)" }),
+
+    disputeOpensAt: z.iso.datetime().nullable().meta({
+      description:
+        "PICKED_UP only: when the 'not delivered' dispute becomes possible (trip departure + 48h — B4/D51). " +
+        "Served, never computed by the front (A72). null otherwise.",
     }),
   })
   .meta({
@@ -200,6 +297,8 @@ export const CarrierBookingViewSchema = z
     pricing: CarrierPricingSchema,
     parcel: BookingParcelSnapshotSchema,
     recipient: BookingRecipientSnapshotSchema,
+    pickupPlace: BookingPlaceSnapshotSchema.nullish(),
+    deliveryPlace: BookingPlaceSnapshotSchema.nullish(),
     shipper: BookingCounterpartSchema,
 
     ...milestoneFields,
@@ -213,6 +312,29 @@ export const CarrierBookingViewSchema = z
 
     pickup: BookingPickupInfoSchema.nullish(),
     trackingEvents: z.array(BookingTrackingEventSchema),
+
+    disputeCategory: DisputeCategorySchema.nullish().meta({
+      description: "Why the shipper disputed (status DISPUTED) — the carrier sees the category, never the file (A68)",
+    }),
+    dispute: CarrierDisputeViewSchema.nullish().meta({
+      description: "C-PR2 (D55): the carrier's view of the dispute — statement state, deadline, decision. Served while DISPUTED and after the decision.",
+    }),
+    retentionDecision: RetentionDecisionViewSchema.nullish().meta({ description: "C-PR2 (D55 3A): how a held retention was arbitrated" }),
+
+    payoutAmountCents: z.number().int().nullish().meta({
+      description: "Amount paid out to the carrier: the net at COMPLETED, the ANN-01 compensation at late CANCELLED (D50/A82)",
+    }),
+    retentionDisposition: z.enum(["CARRIER", "SHIPPER", "HELD_FOR_MEDIATION"]).nullish().meta({
+      description: "Late cancellation only: the retention went to the carrier (compensation), back to the shipper (mediation, C-PR2) or is held for mediation (cancelled after departure, A81)",
+    }),
+
+    rating: BookingRatingStateSchema.nullable().meta({ description: "null unless COMPLETED (B5)" }),
+
+    payoutBlocker: z.enum(["ACCOUNT_NOT_READY", "RETRYING"]).nullable().meta({
+      description:
+        "Coarse cause when payoutStatus = FAILED (A75): ACCOUNT_NOT_READY → finish the Stripe onboarding (CTA) · " +
+        "RETRYING → provider-side error, retried automatically, nothing to do. Never the raw provider message. null otherwise.",
+    }),
 
     allowedActions: z.array(BookingTransitionActionSchema).meta({
       description: "getAllowedActions(booking, 'CARRIER') — drives the frontend CTAs",
@@ -261,6 +383,15 @@ export const MyBookingsResponseSchema = z
     count: z.number().int(),
   })
   .meta({ id: "MyBookingsResponse" });
+
+/** GET /me/deals — 200 (vue Carrier, TOUS ses trajets — A44 : une lecture pour « Mes trajets », l'accueil et le badge). */
+export const MyDealsResponseSchema = z
+  .object({
+    success: z.literal(true),
+    deals: z.array(CarrierBookingViewSchema),
+    count: z.number().int(),
+  })
+  .meta({ id: "MyDealsResponse" });
 
 /** GET /deals?tripId= — 200 (vue Carrier, deals d'un de ses trips). */
 export const TripDealsResponseSchema = z

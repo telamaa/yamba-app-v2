@@ -14,9 +14,11 @@ export type DealStatus =
   | "ACCEPTED"         // Le voyageur a accepté
   | "PICKED_UP"        // Colis pris en charge, voyage en cours
   | "DELIVERED"        // Code validé à l'arrivée, livraison faite
+  | "COMPLETED"        // Fenêtre J+4 close, paiement libéré
+  | "DISPUTED"         // Litige ouvert pendant la vérification
   | "DECLINED"         // Le voyageur a refusé
   | "EXPIRED"          // Délai dépassé sans réponse
-  | "CANCELLED";       // Annulé par le shipper
+  | "CANCELLED";       // Annulé par le shipper (ou SYSTEM — D40)
 
 // fix baseline : source de vérité unique — l'union locale dupliquait
 // l'enum avec un vocabulaire fantôme (COSMETICS, ELECTRONICS_SMALL,
@@ -45,10 +47,15 @@ export type DealShipper = {
   firstName: string;
   lastInitial: string;
   avatarUrl?: string;
-  rating: number;
-  shipmentCount: number;
-  memberSince: string;  // ISO date
-  isVerified: boolean;
+  /** Slug du profil public (/u/[slug]) — absent = pas de lien « Voir profil » (A45). */
+  publicSlug?: string;
+  // Stats de confiance : absentes de BookingCounterpart (l'API réelle) —
+  // l'UI les masque quand elles manquent. Reviendront avec le profil
+  // public enrichi (B5 notation).
+  rating?: number;
+  shipmentCount?: number;
+  memberSince?: string; // ISO date
+  isVerified?: boolean;
 };
 
 export type DealLocation = {
@@ -68,21 +75,25 @@ export type DealTripContext = {
   originCity: string;
   destinationCity: string;
   departureDate: string;     // ISO
-  durationHours?: number;
-  isDirect: boolean;
+  durationHours?: number;    // absent du snapshot réel (mock seulement)
+  isDirect?: boolean;
 };
 
+// A13 : la vue Carrier n'expose NI la commission NI le total payé par
+// l'Expéditeur (CarrierPricing = gains seulement). L'ancien détail
+// totalPaidByShipper/yambaCommission/stripeFees venait du mock et
+// violait cette frontière — supprimé au branchement réel.
 export type DealEarningsBreakdown = {
-  totalPaidByShipper: number;  // Ex 103.75
-  yambaCommission: number;     // Ex 12.75 (frais Yamba)
-  stripeFees: number;          // Ex 1.70
-  netForCarrier: number;       // Ex 89.30
+  netForCarrier: number;       // Ex 89.30 (transportCents / 100)
   payoutDelayDays: number;     // Ex 4 (J+4 après livraison)
 };
 
 export type DealRequest = {
   id: string;
   status: DealStatus;
+  /** Actions permises par la machine d'état serveur — le front reflète,
+   *  ne décide jamais. Absent sur les vieux mocks (fallback par statut). */
+  allowedActions?: readonly string[];
   createdAt: string;          // ISO — quand la demande a été émise
   expiresAt: string;          // ISO — deadline pour accepter
   shipper: DealShipper;
@@ -100,24 +111,95 @@ export type DealRequest = {
   earnings: DealEarningsBreakdown;
   // ✨ Suivi du voyage (présents dès PICKED_UP)
   pickup?: DealPickupInfo;
+  /** Compteur SERVEUR de la saisie du code (vue Carrier — A38) : essais restants et verrou. */
+  deliveryAttemptsLeft?: number;
+  deliveryLockedUntil?: string;
   recipient?: DealRecipient;
   trackingEvents?: DealTrackingEvent[];
+
+  // ✨ B4-PR3 — après la remise (A75–A78) : le front reflète, ne décide jamais.
+  deliveredAt?: string;
+  /** Fin de la fenêtre de vérification de l'Expéditeur (J+4) — servie. */
+  payoutDueAt?: string;
+  /** Photos optionnelles prises à la remise (A76). */
+  deliveryPhotos: DealPhoto[];
+  completedAt?: string;
+  completedBy?: "SHIPPER" | "SYSTEM";
+  payoutStatus?: DealPayoutStatus;
+  payoutSentAt?: string;
+  /** Cause GROSSIÈRE d'un versement bloqué (A75) — jamais le message Stripe. */
+  payoutBlocker?: DealPayoutBlocker;
+  disputeTicket?: string;
+  disputedAt?: string;
+  /** Catégorie du signalement (A68) — jamais le dossier. */
+  disputeCategory?: DealDisputeCategory;
+  /** D50/A82 — montant réellement versé : le net à COMPLETED, la compensation ANN-01 à CANCELLED tardif. */
+  payoutAmountCents?: number;
+  /** B5 — état de notation de MON rôle (servi). */
+  rating?: { windowEndsAt: string | null; ratedByMe: boolean; counterpartHasRated: boolean; revealedAt: string | null; canRate: boolean } | null;
+  /** Annulation tardive : la retenue est versée (CARRIER), restituée (SHIPPER, C-PR2) ou conservée « à arbitrer » (HELD_FOR_MEDIATION, A81). */
+  retentionDisposition?: "CARRIER" | "SHIPPER" | "HELD_FOR_MEDIATION";
+  /** C-PR2 (D55) — ce que le Voyageur voit du litige : sa version, l'échéance, la décision. */
+  dispute?: DealDisputeView;
+  /** C-PR2 (D55 3A) — arbitrage d'une retenue. */
+  retentionDecision?: { outcome: "COMPENSATE_CARRIER" | "RESTITUTE_SHIPPER"; reason: string; decidedAt: string };
 };
+
+export type DealDisputeResolution = {
+  outcome: "REJECTED" | "PARTIAL_REFUND" | "FULL_REFUND";
+  refundCents: number;
+  carrierPayoutCents: number;
+  reason: string;
+  resolvedAt: string;
+};
+export type DealDisputeView = {
+  ticketNumber: string;
+  category: DealDisputeCategory;
+  disputedAt: string;
+  canRespond: boolean;
+  responseDeadlineAt: string;
+  respondedAt: string | null;
+  resolution: DealDisputeResolution | null;
+};
+
+export type DealPayoutStatus = "PENDING" | "SENT" | "FAILED" | "FROZEN" | "REVERSED";
+export type DealPayoutBlocker = "ACCOUNT_NOT_READY" | "RETRYING";
+export type DealDisputeCategory =
+  | "NOT_DELIVERED"
+  | "CONTENT_MISSING"
+  | "DAMAGED"
+  | "SIGNIFICANT_DELAY"
+  | "RECIPIENT_ISSUE"
+  | "OTHER";
+
+/** Photo de remise en cours de saisie (A76) — même cycle que le litige : upload à la sélection. */
+export type DeliveryPhotoDraft = {
+  id: string;
+  previewUrl?: string;
+  file?: File;
+  url?: string;
+  uploading?: boolean;
+  error?: string;
+};
+export const DELIVERY_PHOTOS_MAX = 2;
 
 // ────────────────────────────────────────────────────────────
 // Décline UX
 // ────────────────────────────────────────────────────────────
 
+// Aligné sur le contrat (DeclineReasonSchema, spec É2) — l'ancienne
+// union locale (CATEGORY_NOT_TRANSPORTED…) était un vocabulaire mock.
 export type DeclineReason =
-  | "CATEGORY_NOT_TRANSPORTED"
-  | "WEIGHT_TOO_HEAVY"
-  | "LOCATION_INCOMPATIBLE"
-  | "TIMING_TOO_TIGHT"
+  | "CATEGORY_NOT_CARRIED"
+  | "TOO_HEAVY"
+  | "PLACES_INCOMPATIBLE"
+  | "TIMING"
   | "OTHER";
 
+// Le contrat ne porte que la raison (le textarea « détails » du mock
+// n'existait pas côté serveur — retiré de l'UI plutôt qu'ignoré).
 export type DeclinePayload = {
   reason?: DeclineReason;
-  details?: string;
 };
 
 export type AcceptPayload = {
@@ -157,9 +239,17 @@ export type PickupPhotoDraft = {
   file?: File; // le fichier réel, envoyé vers R2 dans la PR backend
 };
 
+/** Ce que le formulaire tient (photos = fichiers locaux, pas encore téléversés). */
 export type ConfirmPickupPayload = {
   checklist: PickupChecklistItemId[];
   photos: PickupPhotoDraft[];
+  notes?: string;
+};
+
+/** Ce que l'API reçoit (D42/A43) : les URLs ImageKit, téléversées AVANT l'appel. */
+export type ConfirmPickupApiPayload = {
+  checklist: PickupChecklistItemId[];
+  photoUrls: string[];
   notes?: string;
 };
 
@@ -170,9 +260,10 @@ export type PickupRefuseReason =
   | "BAD_PACKAGING"
   | "OTHER";
 
+// Le contrat (RefusePickupRequest) ne porte que la raison — le textarea
+// « détails » du mock a disparu (A43, miroir A32).
 export type RefusePickupPayload = {
   reason?: PickupRefuseReason;
-  details?: string;
 };
 
 // ============================================================

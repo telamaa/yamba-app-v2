@@ -21,22 +21,38 @@ import {
   searchTrips,
   searchTripsFacets,
 } from "../controllers/trip-search.controller";
+import { getPricingParams } from "../controllers/pricing-params.controller";
 import isAuthenticated from "@packages/middleware/isAuthenticated";
+import requireActiveAccount from "@packages/middleware/requireActiveAccount";
+import isOptionallyAuthenticated from "@packages/middleware/isOptionallyAuthenticated";
+import {
+  addTripFavorite,
+  listMyFavoriteTrips,
+  removeTripFavorite,
+} from "../controllers/trip-favorite.controller";
 
 const router = Router();
 
 // ─── ⭐ PUBLIC SEARCH (PAS d'authent) ────────
 // IMPORTANT : ces routes DOIVENT être déclarées AVANT /:id, sinon Express
 // match "search" comme un id et appelle getTrip avec un faux id.
-router.get("/search", searchTrips);
+// D46 : authent OPTIONNELLE — un utilisateur connecté voit ses favoris (isFavorite),
+// un visiteur reçoit la même réponse avec isFavorite = false.
+router.get("/search", isOptionallyAuthenticated, searchTrips);
 router.get("/search/facets", searchTripsFacets);
+
+// ─── ⭐ FAVORIS (D46) — AVANT /:id ────────────
+router.get("/favorites", isAuthenticated, listMyFavoriteTrips);
+router.get("/pricing/params", getPricingParams); // C-PR8a (D62 7A) — public, déclaré AVANT /:id (A128)
 
 // ─── ⭐ PUBLIC TRIP DETAIL (PAS d'authent) — PR 1.a ───
 // Idem : doit être déclaré avant /:id pour ne pas être matché comme route privée.
-router.get("/:id/public", getPublicTrip);
+router.get("/:id/public", isOptionallyAuthenticated, getPublicTrip);
+router.post("/:id/favorite", isAuthenticated, addTripFavorite);      // D46 — idempotent
+router.delete("/:id/favorite", isAuthenticated, removeTripFavorite); // D46 — idempotent
 
 // ─── Trip CRUD ───────────────────────────────
-router.post("/", isAuthenticated, createTrip);                             // Créer un trip
+router.post("/", isAuthenticated, requireActiveAccount, createTrip); // C-PR3 (D56) : compte restreint = pas de publication                             // Créer un trip
 router.get("/my", isAuthenticated, getMyTrips);                            // Mes trips (avec filtre ?status=)
 router.get("/:id", isAuthenticated, getTrip);                              // Détail d'un trip (owner only)
 router.put("/:id", isAuthenticated, updateTrip);                           // Modifier un trip
@@ -47,7 +63,7 @@ router.put("/:id", isAuthenticated, updateTrip);                           // Mo
 router.delete("/:id", isAuthenticated, deleteTrip);
 
 // ─── Lifecycle ───────────────────────────────
-router.post("/:id/publish", isAuthenticated, publishTrip);                 // Publier un brouillon
+router.post("/:id/publish", isAuthenticated, requireActiveAccount, publishTrip);                 // Publier un brouillon
 router.post("/:id/pause", isAuthenticated, pauseTrip);                     // Mettre en pause
 router.post("/:id/resume", isAuthenticated, resumeTrip);                   // Reprendre après pause
 router.post("/:id/restore", isAuthenticated, restoreTrip);                 // Restaurer un trip annulé

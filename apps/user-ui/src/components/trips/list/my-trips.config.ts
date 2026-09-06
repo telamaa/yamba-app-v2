@@ -31,7 +31,6 @@ export type TripListItem = {
   cancelledAt: string | null;
   createdAt: string;
   updatedAt: string;
-  pendingDemandsCount?: number;
 };
 
 /* ── Colors ───────────────────────────────── */

@@ -1,8 +1,10 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { ChevronRight, AlertCircle, HelpCircle } from "lucide-react";
+import { ChevronRight, AlertCircle, HelpCircle, Eye } from "lucide-react";
+import { isPopular } from "@/lib/trip-signals";
 import { Link } from "@/i18n/navigation";
+import FavoriteButton from "@/components/favorites/FavoriteButton";
 import { useBottomSheet } from "@/hooks/useBottomSheet";
 import TripPricingBottomSheet from "./TripPricingBottomSheet";
 import { ParcelCategory, SearchFamily, YambaTripResult } from "./search-results.types";
@@ -60,12 +62,16 @@ export default function YambaTripResultCardMobile({
               {item.travelDate}
             </span>
           </div>
-          {showRemainingAlert && (
-            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 text-[11px] text-red-700 dark:bg-red-950/40 dark:text-red-400">
-              <AlertCircle size={9} strokeWidth={2.5} />
-              {t("card.remainingSlots", { count: item.remainingSlots! })}
-            </span>
-          )}
+          <div className="flex shrink-0 items-center gap-2">
+            {showRemainingAlert && (
+              <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 text-[11px] text-red-700 dark:bg-red-950/40 dark:text-red-400">
+                <AlertCircle size={9} strokeWidth={2.5} />
+                {t("card.remainingSlots", { count: item.remainingSlots! })}
+              </span>
+            )}
+            {/* D46 — cœur (44 px de cible tactile via h-9 + marge) */}
+            <FavoriteButton tripId={item.id} isFavorite={item.isFavorite} />
+          </div>
         </div>
 
         {/* ── Body : horaires + prix ── */}
@@ -108,7 +114,7 @@ export default function YambaTripResultCardMobile({
             {/* To */}
             <div className="min-w-0 text-right">
               <div className="text-[18px] font-semibold leading-tight tabular-nums text-slate-900 dark:text-white">
-                {item.arrivalTime}
+                {item.arrivalTime ?? ""}
                 {item.nextDay && (
                   <sup className="ml-1 inline-block rounded bg-[#FFEDD5] px-1 py-px align-super text-[9px] font-medium text-[#9A3412] dark:bg-[#FF9900]/20 dark:text-[#FFB84D]">
                     +1
@@ -194,6 +200,7 @@ export default function YambaTripResultCardMobile({
                         ({item.reviewCount})
                       </span>
                     )}
+
                   </>
                 ) : (
                   t("card.newTripper")
@@ -203,6 +210,13 @@ export default function YambaTripResultCardMobile({
           </div>
 
           <div className="flex shrink-0 items-center gap-1">
+            {/* D5 / C-PR6 — signal de popularité : pastille « n vues », « Populaire » à partir de 20 vues */}
+            {typeof item.viewsCount === "number" && item.viewsCount > 0 && (
+              <span className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-semibold ${isPopular(item.viewsCount) ? "bg-[#FFF6E8] text-[#B45309] dark:bg-[#FF9900]/15 dark:text-[#FFB84D]" : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300"}`}>
+                <Eye size={10} strokeWidth={2.5} />
+                {isPopular(item.viewsCount) ? t("badges.popular") : item.viewsCount}
+              </span>
+            )}
             <CategoryPreview categories={item.allowedCategories} />
             <ChevronRight
               size={14}

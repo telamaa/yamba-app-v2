@@ -8,9 +8,9 @@
 
 "use client";
 
-import { AlertTriangle } from "lucide-react";
+import DisputeInTransitLink from "../../shared/DisputeInTransitLink";
+
 import { useTranslations } from "next-intl";
-import { useRouter } from "@/i18n/navigation";
 import type { Booking } from "@/components/booking/booking-tracker/booking-tracker.types";
 import BookingAcceptedHeader from "../accepted/BookingAcceptedHeader";
 import {
@@ -38,7 +38,6 @@ export default function BookingInTransitDesktop({
                                                   onCodeRegeneratedAction,
                                                 }: Props) {
   const t = useTranslations("bookingTracker");
-  const router = useRouter();
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
@@ -73,14 +72,8 @@ export default function BookingInTransitDesktop({
               </div>
             </div>
 
-            <button
-              type="button"
-              onClick={() => router.push("/bookings/" + booking.id + "/report")}
-              className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-slate-500 transition-colors hover:text-red-700 dark:text-slate-400 dark:hover:text-red-400"
-            >
-              <AlertTriangle size={13} aria-hidden="true" />
-              {t("senderTracking.report")}
-            </button>
+            {/* B4-PR2 (A72) : « non livré » — actif 48 h après le départ, sinon désactivé avec la date servie. */}
+            <DisputeInTransitLink booking={booking} />
           </div>
 
           {/* Sidebar */}

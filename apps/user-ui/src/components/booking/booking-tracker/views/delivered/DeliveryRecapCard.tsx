@@ -9,9 +9,10 @@
 
 "use client";
 
-import { Camera, Check, ImageIcon, Package, User } from "lucide-react";
+import { Camera, Check, Package, User } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import type { Booking } from "@/components/booking/booking-tracker/booking-tracker.types";
+import PhotoThumbs from "@/components/shared/photos/PhotoThumbs";
 
 type Props = {
   booking: Booking;
@@ -108,24 +109,7 @@ export default function DeliveryRecapCard({ booking, compact = false }: Props) {
                       location: booking.pickup.locationName,
                     })}
                 </div>
-                <div className="flex gap-1.5">
-                  {booking.pickup.photos.map((photo) => (
-                    <div
-                      key={photo.id}
-                      className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg text-white"
-                      style={{
-                        background: "linear-gradient(135deg, #BA7517, #EF9F27)",
-                      }}
-                      aria-label={photo.label}
-                    >
-                      {photo.context === "PICKUP_PACKAGED" ? (
-                        <Package size={15} aria-hidden="true" />
-                      ) : (
-                        <ImageIcon size={15} aria-hidden="true" />
-                      )}
-                    </div>
-                  ))}
-                </div>
+                <PhotoThumbs photos={booking.pickup.photos} tone="amber" size="md" />
               </div>
             )}
             {/* Groupe livraison : badge code validé */}
@@ -137,13 +121,19 @@ export default function DeliveryRecapCard({ booking, compact = false }: Props) {
                     city: recipient.city,
                   })}
               </div>
-              <div
-                className="flex h-11 w-11 items-center justify-center rounded-lg text-white"
-                style={{ background: "linear-gradient(135deg, #BA7517, #EF9F27)" }}
-                aria-label={t("delivered.recap.codeValidatedBadge")}
-                title={t("delivered.recap.codeValidatedBadge")}
-              >
-                <Check size={18} strokeWidth={3} aria-hidden="true" />
+              <div className="flex items-center gap-2">
+                <div
+                  className="flex h-11 w-11 items-center justify-center rounded-lg text-white"
+                  style={{ background: "linear-gradient(135deg, #BA7517, #EF9F27)" }}
+                  aria-label={t("delivered.recap.codeValidatedBadge")}
+                  title={t("delivered.recap.codeValidatedBadge")}
+                >
+                  <Check size={18} strokeWidth={3} aria-hidden="true" />
+                </div>
+                {/* A76 — photos optionnelles prises par le Voyageur à la remise */}
+                {booking.delivery && booking.delivery.photos.length > 0 && (
+                  <PhotoThumbs photos={booking.delivery.photos} tone="amber" size="md" />
+                )}
               </div>
             </div>
           </div>

@@ -1,7 +1,10 @@
 import type { Response, NextFunction, RequestHandler } from "express";
 import prisma from "@packages/libs/prisma";
-import { ValidationError } from "@packages/error-handler";
+import { recordTripView, tripViews, viewerKey } from "@packages/libs/redis/trip-stats";
+import redis from "@packages/libs/redis";
+import { AppError, ValidationError } from "@packages/error-handler";
 import { AuthenticatedRequest } from "@packages/middleware/isAuthenticated";
+import { favoriteTripIds } from "../services/trip-favorite.service";
 import imagekit from "../lib/imagekit";
 import {
   computeMinPriceCents,
@@ -20,7 +23,7 @@ import {
   getCarrierStatDeltas,
   type TripStatus,
 } from "../services/trip-state-machine";
-import { hasActiveBookings } from "../services/booking-queries";
+import { countActiveBookings, hasActiveBookings } from "../services/booking-queries";
 // ⭐ A28 — gate de publication bi-moteur (D13/D14)
 import {
   resolvePricingEngine,
@@ -29,7 +32,8 @@ import {
   pickPerKgFields,
 } from "../services/pricing-gate";
 import { chunkUpdateData } from "../lib/mongo-update-chunks";
-import { computeComparablePriceCents } from "../lib/comparable-price";
+import { computeComparablePriceCents, comparableParamsFromSettings, DEFAULT_COMPARABLE_PARAMS, type ComparableParams } from "../lib/comparable-price";
+import { platformSettings } from "@packages/libs/settings/default";
 
 // ─────────────────────────────────────────────
 // Helper interne : recalcule les champs dénormalisés
@@ -40,7 +44,7 @@ function computeDenormalizedFields(input: {
   pricePerKgCents?: number | null;
   departureAt?: Date | null;
   originTimezone?: string | null;
-}): { minPriceCents: number | null; comparablePriceCents: number | null; departureHourLocal: number | null } {
+}, comparable: ComparableParams = DEFAULT_COMPARABLE_PARAMS): { minPriceCents: number | null; comparablePriceCents: number | null; departureHourLocal: number | null } {
   const minPriceCents = computeMinPriceCents(
     (input.categoryConditions ?? []) as any
   );
@@ -48,7 +52,7 @@ function computeDenormalizedFields(input: {
   const comparablePriceCents = computeComparablePriceCents({
     pricePerKgCents: input.pricePerKgCents,
     minPriceCents,
-  });
+  }, comparable);
   const departureHourLocal =
     input.departureAt && input.originTimezone
       ? computeHourLocal(input.departureAt, input.originTimezone)
@@ -134,27 +138,16 @@ export const createTrip = async (
     const userId = req.user.id;
     const shouldPublish = data.publish === true;
 
-    // ── DB-dependent publish gate ──
+    // ⭐ D31 — le gate profil/Stripe a MIGRÉ vers l'ACCEPTATION d'un deal
+    // (deal-service, B2-PR2) : publier n'exige plus le KYC — on le demande
+    // au moment où l'argent est réel. Le carrierPage ne sert plus ici qu'au
+    // snapshot de note.
     const carrierPage = await prisma.carrierPage.findUnique({
       where: { userId },
-      select: {
-        id: true,
-        onboardingStep: true,
-        stripeOnboardingComplete: true,
-        stripeChargesEnabled: true,
-        ratingsAvg: true,
-        ratingsCount: true,
-      },
+      select: { id: true, ratingsAvg: true, ratingsCount: true },
     });
 
     if (shouldPublish) {
-      if (!carrierPage || carrierPage.onboardingStep === "PROFILE") {
-        return next(new ValidationError("Carrier profile must be completed to publish a trip."));
-      }
-      if (!carrierPage.stripeOnboardingComplete || !carrierPage.stripeChargesEnabled) {
-        return next(new ValidationError("Stripe must be configured to publish a trip."));
-      }
-
       // ⭐ A28 — UN moteur de pricing COMPLET est exigé pour publier, sur ce
       // chemin aussi (POST /trips + publish: true) — même vérité que
       // publishTrip et updateTrip.
@@ -178,7 +171,7 @@ export const createTrip = async (
       pricePerKgCents: data.pricePerKgCents,
       departureAt: data.departureAt ?? null,
       originTimezone: data.originTimezone ?? null,
-    });
+    }, comparableParamsFromSettings(await platformSettings().get())); // D62
 
     const carrierRatingSnapshot =
       shouldPublish && carrierPage && carrierPage.ratingsCount > 0
@@ -337,7 +330,7 @@ export const updateTrip = async (
         pricePerKgCents: updateData.pricePerKgCents ?? trip.pricePerKgCents,
         departureAt: updateData.departureAt ?? trip.departureAt,
         originTimezone: updateData.originTimezone ?? trip.originTimezone,
-      });
+      }, comparableParamsFromSettings(await platformSettings().get())); // D62
       if (willRecomputePrice) {
         updateData.minPriceCents = recomputed.minPriceCents;
         updateData.comparablePriceCents = recomputed.comparablePriceCents;
@@ -352,24 +345,12 @@ export const updateTrip = async (
         return next(new ValidationError(publishCheck.reason));
       }
 
+      // ⭐ D31 — plus de gate profil/Stripe à la publication (déplacé vers
+      // l'acceptation, deal-service B2-PR2) ; seul le snapshot de note reste.
       const carrierPage = await prisma.carrierPage.findUnique({
         where: { userId },
-        select: {
-          id: true,
-          onboardingStep: true,
-          stripeOnboardingComplete: true,
-          stripeChargesEnabled: true,
-          ratingsAvg: true,
-          ratingsCount: true,
-        },
+        select: { ratingsAvg: true, ratingsCount: true },
       });
-
-      if (!carrierPage || carrierPage.onboardingStep === "PROFILE") {
-        return next(new ValidationError("Carrier profile must be completed to publish a trip."));
-      }
-      if (!carrierPage.stripeOnboardingComplete || !carrierPage.stripeChargesEnabled) {
-        return next(new ValidationError("Stripe must be configured to publish a trip."));
-      }
 
       // Locations gate: at least 1 pickup + 1 delivery
       const effectivePickup = updateData.pickupLocations ?? trip.pickupLocations ?? [];
@@ -404,7 +385,8 @@ export const updateTrip = async (
       updateData.status = "PUBLISHED";
       updateData.publishedAt = new Date();
       updateData.currentStep = 3;
-      updateData.carrierRatingSnapshot = carrierPage.ratingsCount > 0 ? carrierPage.ratingsAvg : null;
+      updateData.carrierRatingSnapshot =
+        carrierPage && carrierPage.ratingsCount > 0 ? carrierPage.ratingsAvg : null;
 
       // ⭐ Lot 2 — Deltas sur la transition DRAFT → PUBLISHED
       await applyCarrierStatDeltas(userId, trip.status, "PUBLISHED");
@@ -493,15 +475,15 @@ export const addTripDocuments = async (
       });
     }
 
-    const siteConfig = await prisma.siteConfig.findFirst();
-    const maxDocs = siteConfig?.maxDocsPerTrip ?? 5;
+    const settings = await platformSettings().get(); // D62 — ex-SiteConfig
+    const maxDocs = settings["documents.maxDocsPerTrip"];
     const currentCount = trip.documents.length;
 
     if (currentCount + newDocuments.length > maxDocs) {
       return next(new ValidationError(`Maximum ${maxDocs} documents per trip. Currently ${currentCount}.`));
     }
 
-    const maxSizeMb = siteConfig?.maxDocSizeMb ?? 5;
+    const maxSizeMb = settings["documents.maxDocSizeMb"];
     for (const doc of newDocuments) {
       if (!doc.type || !doc.fileId || !doc.url) {
         return next(new ValidationError("Each document must have type, fileId, and url."));
@@ -528,7 +510,8 @@ export const addTripDocuments = async (
     });
 
     const hasTicket = newDocuments.some((d) => d.type === "TICKET_PROOF");
-    if (hasTicket && trip.ticketVerificationStatus === "NOT_SUBMITTED") {
+    // C-PR4 (D57 1A) — un billet rejeté peut être redéposé : le trajet repasse en attente de vérification.
+    if (hasTicket && (trip.ticketVerificationStatus === "NOT_SUBMITTED" || trip.ticketVerificationStatus === "REJECTED")) {
       await prisma.trip.update({
         where: { id },
         data: { ticketVerificationStatus: "PENDING" },
@@ -623,10 +606,21 @@ async function performCancel(
 
   const ctx = await buildLifecycleCtx(trip.id);
   const check = canPerform(trip, "cancel", ctx);
-  if (!check.allowed) return next(new ValidationError(check.reason));
-
-  // NOTE chantier Booking : si hasActiveBookings, déclencher ici les
-  // side-effects (remboursements Stripe, notifications expéditeurs).
+  if (!check.allowed) {
+    // D72 — le refus dû à un deal vivant est un conflit métier typé : le front
+    // affiche « annule d'abord tes deals » avec leur nombre, pas une erreur de saisie.
+    if (ctx.hasActiveBookings) {
+      const activeDeals = await countActiveBookings(trip.id);
+      return next(
+        new AppError(check.reason ?? "This trip still has active deals.", 409, true, {
+          type: "trip",
+          code: "TRIP_HAS_ACTIVE_DEALS",
+          activeDeals,
+        })
+      );
+    }
+    return next(new ValidationError(check.reason));
+  }
 
   await prisma.trip.update({
     where: { id },
@@ -900,24 +894,13 @@ export const publishTrip = async (
     const check = canPerform(trip, "publish", ctx);
     if (!check.allowed) return next(new ValidationError(check.reason));
 
+    // ⭐ D31 — plus de gate profil/Stripe à la publication (déplacé vers
+    // l'acceptation, deal-service B2-PR2) ; seul le snapshot de note reste.
     const carrierPage = await prisma.carrierPage.findUnique({
       where: { userId },
-      select: {
-        id: true,
-        onboardingStep: true,
-        stripeOnboardingComplete: true,
-        stripeChargesEnabled: true,
-        ratingsAvg: true,
-        ratingsCount: true,
-      },
+      select: { ratingsAvg: true, ratingsCount: true },
     });
 
-    if (!carrierPage || carrierPage.onboardingStep === "PROFILE") {
-      return next(new ValidationError("Carrier profile must be completed to publish a trip."));
-    }
-    if (!carrierPage.stripeOnboardingComplete || !carrierPage.stripeChargesEnabled) {
-      return next(new ValidationError("Stripe must be configured to publish a trip."));
-    }
     if (!trip.transportMode) {
       return next(new ValidationError("Transport mode is required to publish."));
     }
@@ -957,7 +940,7 @@ export const publishTrip = async (
     }
 
     const carrierRatingSnapshot =
-      carrierPage.ratingsCount > 0 ? carrierPage.ratingsAvg : null;
+      carrierPage && carrierPage.ratingsCount > 0 ? carrierPage.ratingsAvg : null;
 
     const publishedTrip = await prisma.trip.update({
       where: { id },
@@ -1092,6 +1075,17 @@ export const resumeTrip = async (
 /**
  * GET /trips/:id/public
  */
+/** Compte la vue (une par visiteur et par jour) puis renvoie le total ; undefined si Redis est absent. */
+async function countPublicView(req: Parameters<RequestHandler>[0], trip: { id: string; originCity: string | null; destinationCity: string | null }): Promise<number | undefined> {
+  try {
+    const userId = (req as { user?: { id?: string } }).user?.id ?? null;
+    await recordTripView(redis, { tripId: trip.id, originCity: trip.originCity, destinationCity: trip.destinationCity, viewer: viewerKey(userId, req.ip ?? null, req.headers["user-agent"] ?? null), now: new Date() });
+    return (await tripViews(redis, [trip.id])).get(trip.id) ?? 0;
+  } catch {
+    return undefined;
+  }
+}
+
 export const getPublicTrip: RequestHandler = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -1136,7 +1130,7 @@ export const getPublicTrip: RequestHandler = async (req, res, next) => {
     }
     // ⭐ Lot 2 — soft-deleted = introuvable (belt & suspenders : un trip
     // supprimé est forcément DRAFT, donc déjà exclu par le check suivant)
-    if (trip.isDeleted || trip.status !== "PUBLISHED") {
+    if (trip.isDeleted || trip.status !== "PUBLISHED" || (trip as { hiddenByAdminAt?: Date | null }).hiddenByAdminAt /* C-PR4 (D57) : masqué par Yamba */) {
       res.status(404).json({ success: false, message: "Trip not found." });
       return;
     }
@@ -1226,6 +1220,8 @@ export const getPublicTrip: RequestHandler = async (req, res, next) => {
       familyConditions: trip.familyConditions,
 
       ticketVerified: trip.ticketVerificationStatus === "VERIFIED",
+      // D5 / C-PR6 (D59) — vues dédoublonnées par visiteur et par jour ; absent si Redis indisponible (jamais un 500 pour un compteur)
+      viewsCount: await countPublicView(req, trip),
 
       tripper: {
         id: trip.user.id,
@@ -1250,6 +1246,8 @@ export const getPublicTrip: RequestHandler = async (req, res, next) => {
       },
 
       publishedAt: trip.publishedAt,
+      // D46 — isOptionallyAuthenticated : connecté → son favori, visiteur → false
+      isFavorite: (await favoriteTripIds((req as { user?: { id?: string } }).user?.id, [trip.id])).has(trip.id),
     };
 
     res.status(200).json({ success: true, trip: publicDto });

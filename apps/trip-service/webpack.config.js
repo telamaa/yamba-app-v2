@@ -13,6 +13,8 @@ module.exports = {
         __dirname,
         "../../packages/libs/api-contracts/src"
       ),
+      "@packages/email": resolve(__dirname, "../../packages/libs/email/src"),
+      "@packages/admin-audit": resolve(__dirname, "../../packages/libs/admin-audit/src"),
       "@packages": resolve(__dirname, "../../packages"),
     },
     extensions: [".ts", ".js"],

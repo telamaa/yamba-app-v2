@@ -24,13 +24,45 @@ model User {
   birthDate       DateTime?
   roles           Role[]    @default([SHIPPER])
 
+  // D44 — langue des emails et de l'interface (code court : "fr", "en", …).
+  // Initialisée à l'inscription depuis l'en-tête x-locale, mise à jour quand
+  // l'utilisateur bascule la langue dans le header. Liste : SUPPORTED_LOCALES.
+  preferredLocale String    @default("fr")
+
   // Slug public unique pour la page profil /u/[slug]
   publicSlug String? @unique
 
   // Stats shipper (notes reçues en tant qu'expéditeur)
-  shipperRatingsAvg   Float @default(0)
+  shipperRatingsAvg   Float @default(0) // B5 : avis révélés seulement
   shipperRatingsCount Int   @default(0)
+  // B5 / D29① — miroir Expéditeur (« Expéditeur fiable »)
+  shipperReputationLevel        String? // "NEW" | "CONFIRMED" | "TOP"
+  shipperCompletedDealsCount    Int     @default(0)
+  shipperLateCancellationsCount Int     @default(0) // annulations tardives ANN-01 (retenue > 0)
+  shipperDisputesLostCount      Int     @default(0) // C-PR2 (D55, 4A) : litiges rejetés — INTERNE (D29②), jamais public
   parcelsSentCount    Int   @default(0)
+
+  // ── C-PR3 (D56) : profils admin et état du compte ──
+  adminRole        AdminRole? // profil PRINCIPAL (miroir du premier de adminRoles) — lu par la connexion admin et l'affichage
+  // C-PR3bis (D60 1A) — profils CUMULÉS : union des permissions ; writers posent TOUJOURS la liste (jamais absente)
+  adminRoles       AdminRole[] @default([])
+  invitedByAdminId String?    @db.ObjectId
+  adminInvitedAt   DateTime?
+  accountStatus    AccountStatus @default(ACTIVE) // ACTIVE | RESTRICTED (ni publier ni réserver) | SUSPENDED (connexion refusée)
+  suspensionReason         String?
+  suspensionUntil          DateTime?
+  suspendedAt              DateTime?
+  suspendedByAdminId       String?   @db.ObjectId
+  suspensionProposedLevel  String?   // proposition SUPPORT en attente d'exécution (3A : deux clics)
+  suspensionProposedReason String?
+  suspensionProposedByAdminId String? @db.ObjectId
+  suspensionProposedAt     DateTime?
+
+  // ── Chantier C (D54, 8A) : 2FA TOTP obligatoire pour les sessions admin ──
+  totpSecretEncrypted  String?   // AES-256-GCM (@packages/totp, clé TOTP_ENCRYPTION_KEY) — posé au setup, jamais servi
+  totpEnabledAt        DateTime? // null = 2FA non activée (un ADMIN sans 2FA ne peut PAS ouvrir de session admin)
+  totpLastUsedStep     Int?      // anti-rejeu : un pas de 30 s ne sert qu'une fois
+  totpBackupCodeHashes String[]  // SHA-256 des codes de secours restants (liste créée [] — pitfall Mongo)
 
   // Carrier onboarding
   carrierStatus CarrierStatus @default(NONE)
@@ -52,6 +84,12 @@ model User {
   // Alertes de route
   savedRoutes SavedRoute[]
 
+  // Favoris de trajets (D46)
+  tripFavorites TripFavorite[]
+
+  // Identités externes (D47) — Google aujourd'hui
+  identities AuthIdentity[]
+
   consentLogs ConsentLog[]
 
   // Lifecycle
@@ -60,9 +98,23 @@ model User {
   isDeleted Boolean   @default(false)
   deletedAt DateTime?
 
+  /// C-PR8b (D63 8A) — préférence membre : relance email des messages non lus (A138)
+  messagingReminderEmails Boolean @default(true)
+  /// D67 1A — visibilités du profil public : la page (404 aux autres si false) et la ville
+  profilePublic Boolean @default(true)
+  showCity      Boolean @default(true)
+  /// D66 2A — mesure d'audience : null = pas encore choisi, true = consenti (ConsentLog COOKIES), false = refusé
+  analyticsOptIn Boolean?
+  /// D35 4A — liste de suppression : rebond dur ou plainte ; levée par le support après correction de l'adresse
+  emailSuppressedAt     DateTime?
+  emailSuppressedReason String?
+
   @@index([carrierStatus])
   @@index([roles])
   @@index([phoneE164])
+  @@index([accountStatus])
+  @@index([adminRole])
+  @@index([adminRoles])
 }
 
 // ─────────────────────────────────────────────
@@ -111,7 +163,7 @@ model CarrierPage {
   socialLinks Json[]  @default([])
 
   // Localisation publique
-  primaryAddressId String?  @unique @db.ObjectId
+  primaryAddressId String?  @db.ObjectId // A42 : plus de @unique — sur Mongo deux pages sans adresse collisionnent sur null (P2002) ; l'adresse est créée par le service pour UNE page (unicité par construction)
   primaryAddress   Address? @relation("CarrierPrimaryAddress", fields: [primaryAddressId], references: [id])
 
   // Onboarding tracking
@@ -131,8 +183,13 @@ model CarrierPage {
   totalTripsPublished Int   @default(0)
   totalParcelsCarried Int   @default(0)
   totalTripsCancelled Int   @default(0)
-  ratingsAvg          Float @default(0)
+  ratingsAvg          Float @default(0) // B5 : moyenne des avis RÉVÉLÉS seulement
   ratingsCount        Int   @default(0)
+  // B5 / D29① — réputation visible, calculée serveur (reputation.service), critères affichés
+  reputationLevel        String? // "NEW" | "CONFIRMED" | "TOP"
+  completedDealsCount    Int     @default(0)
+  lateCancellationsCount Int     @default(0) // annulations Voyageur après acceptation (ANN-02)
+  disputesLostCount      Int @default(0) // C-PR2 (D55, 4A) : litiges perdus (remboursement décidé) — INTERNE, jamais public
 
   // Relations
   trips Trip[]
@@ -149,6 +206,7 @@ model CarrierPage {
   @@index([isVerified])
   @@index([isSuperCarrier])
   @@index([ratingsAvg])
+  @@index([primaryAddressId]) // A42 — index simple (jointure), non unique
 }
 
 // ─────────────────────────────────────────────
@@ -166,14 +224,19 @@ model Review {
 
   kind ReviewKind
 
-  bookingId String? @db.ObjectId
+  bookingId String? @db.ObjectId // B5 : toujours posé (une note par rôle et par deal, garde service)
 
   rating  Float
   comment String?
+  /// B5 — critères optionnels en pouces : { PUNCTUALITY: "UP", PARCEL_CARE: "DOWN", … }
+  criteria Json?
+  /// B5 — double-aveugle (D53) : null tant que l'autre n'a pas noté (ou 14 j) ; seuls les avis révélés sont publics
+  revealedAt DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@index([bookingId])
   @@index([subjectUserId])
   @@index([authorUserId])
   @@index([subjectUserId, kind])
@@ -217,6 +280,45 @@ model UserFollow {
 //   - expiresAt = createdAt + 6 mois (sinon)
 //   - Cron quotidien : warn à J-7, désactive à J
 // ─────────────────────────────────────────────
+
+/// D47 — Identité externe (OAuth / OpenID). Un utilisateur peut avoir un mot
+/// de passe ET une ou plusieurs identités. Modèle séparé (pas de `googleSub`
+/// nullable unique sur User : sur Mongo, les null se percutent — pitfall P2002).
+model AuthIdentity {
+  id          String       @id @default(auto()) @map("_id") @db.ObjectId
+  userId      String       @db.ObjectId
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider    AuthProvider
+  /// Identifiant STABLE chez le fournisseur (`sub` du jeton OpenID) — jamais l'email.
+  providerSub String
+  email       String?
+  createdAt   DateTime     @default(now())
+  lastUsedAt  DateTime     @default(now())
+
+  @@unique([provider, providerSub])
+  @@index([userId])
+}
+
+enum AuthProvider {
+  GOOGLE
+}
+
+/// D46 — Favori de trajet : signet PRIVÉ d'un utilisateur sur un trajet publié.
+/// Jamais notifié au Voyageur, jamais compté publiquement. Conservé quand le
+/// trajet passe (COMPLETED/ARCHIVED) : la page « Mes favoris » le montre comme passé.
+model TripFavorite {
+  id     String @id @default(auto()) @map("_id") @db.ObjectId
+  userId String @db.ObjectId
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tripId String @db.ObjectId
+  trip   Trip   @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, tripId])
+  @@index([userId, createdAt])
+  @@index([tripId])
+}
 
 model SavedRoute {
   id     String @id @default(auto()) @map("_id") @db.ObjectId
@@ -321,7 +423,7 @@ model Address {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  carrierPage CarrierPage? @relation("CarrierPrimaryAddress")
+  carrierPage CarrierPage[] @relation("CarrierPrimaryAddress") // A42 : liste déclarative (Prisma exige @unique pour un 1-1) — une adresse n'est jamais partagée par construction
 
   @@index([userId])
   @@index([userId, isArchived])
@@ -474,6 +576,13 @@ model Trip {
 
   publishedAt DateTime?
   cancelledAt DateTime?
+  // C-PR4 (D57, 3A) — « masqué par Yamba » : réversible, distinct de PAUSED, invisible en recherche / page publique.
+  hiddenByAdminAt   DateTime?
+  hiddenReason      String?
+  hiddenByAdminId   String?   @db.ObjectId
+  hideProposedReason    String?
+  hideProposedByAdminId String?  @db.ObjectId
+  hideProposedAt        DateTime?
   archivedAt  DateTime?
 
   // ⭐ Lifecycle hardening (Lot 1/2) — soft delete des brouillons
@@ -490,7 +599,11 @@ model Trip {
   @@index([transportMode])
   @@index([departureAt])
   @@index([publishedAt])
+  @@index([hiddenByAdminAt])
   @@index([userId, status])
+  // Favoris (D46) — signet privé d'un utilisateur sur ce trajet
+  favorites TripFavorite[]
+
   @@index([userId, isDeleted]) // ⭐ Lot 1/2 — requête chaude getMyTrips
   @@index([originPlaceId])
   @@index([destinationPlaceId])
@@ -528,7 +641,9 @@ model TripDocument {
 
   verifiedAt      DateTime?
   rejectedAt      DateTime?
-  rejectionReason String?
+  rejectionReason String? // C-PR4 : ILLEGIBLE | DATES_MISMATCH | NAME_MISMATCH | SUSPICIOUS
+  reviewedByAdminId String? @db.ObjectId
+  expiredAt       DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -579,6 +694,22 @@ type BookingPricingSnapshot {
 
   totalShipperCents Int
   currencyCode      String @default("EUR")
+  // D34 (B2) — devis figé tel quel depuis @packages/pricing ; optionnels
+  // car les snapshots antérieurs (seed PER_CATEGORY) ne les portent pas.
+  product            String? // "PARCEL" | "CHECKED_BAG_23KG" | "CABIN_BAG_12KG"
+  billableWeightKg   Float? // max(poids, 0,5) — D32
+  sizeCoef           Float? // 1 / 1,1 / 1,25
+  familySurchargePct Float? // supplément Voyageur de la famille (CAT-03)
+  rawTransportCents  Int? // avant plancher 8 €
+  minimumApplied     Boolean? // plancher D32 appliqué
+  serviceCents       Int? // commission + prime (COM-03, 2e ligne)
+}
+
+// B2 — lieu de remise / de retrait choisi par l'Expéditeur parmi les
+// points du trajet (figé : le trajet peut changer, le rendez-vous non).
+type BookingPlaceSnapshot {
+  kind    LocationKind
+  details String?
 }
 
 // Auto-suffisance : le trip peut changer, le booking garde sa vérité.
@@ -607,13 +738,14 @@ type BookingRecipientSnapshot {
   firstName String
   lastName  String
   phoneE164 String
-  email     String
+  email     String? // optionnel à la demande (spec É1 : « pour notifications si renseigné »)
 }
 
 type BookingPickupInfo {
   confirmedAt DateTime
-  photoUrls   String[]
+  photoUrls   String[] // ImageKit (D42), 1..5, horodatées serveur
   notes       String?
+  checklist   String[] @default([]) // B3 — les 5 points d'inspection cochés (CNF-04, attestation figée)
 }
 
 // Événements optionnels DANS l'état PICKED_UP — hors machine d'états
@@ -636,6 +768,8 @@ model Booking {
   pricing   BookingPricingSnapshot
   parcel    BookingParcelSnapshot
   recipient BookingRecipientSnapshot
+  pickupPlace   BookingPlaceSnapshot?
+  deliveryPlace BookingPlaceSnapshot?
 
   // ─── Jalons (horodatage SERVEUR) + échéances pré-calculées ───
   requestedAt   DateTime      @default(now())
@@ -644,13 +778,19 @@ model Booking {
   pickedUpAt    DateTime?
   deliveredAt   DateTime?
   payoutDueAt   DateTime? // deliveredAt + J+4 (cron B4)
+  /// C-PR8b (D63 5A) — tiers destinataire effacé (nom, téléphone, email) après la fin du deal
+  recipientRedactedAt DateTime?
+  deliveryPhotoUrls String[] // B4-PR3 (A76) : photos OPTIONNELLES à la remise (≤ 2, ImageKit deals/delivery/) — l'assurance du Voyageur
   completedAt   DateTime?
   closedAt      DateTime? // DECLINED / EXPIRED / CANCELLED
   closedBy      BookingActor?
-  declineReason String?
+  declineReason String? // refus PENDING (5 raisons — DeclineReason du contrat)
+  cancelReason  String? // annulation Expéditeur (texte libre court, B2)
+  pickupRefusalReason String? // refus au pickup (5 raisons — PickupRefusalReason, B3/A40)
 
   // ─── Code de livraison (spec §9 — le serveur est seul juge) ───
-  deliveryCodeHash    String? // bcrypt — JAMAIS dans un payload carrier
+  deliveryCodeHash    String? // bcrypt — JAMAIS dans un payload carrier (validation seule)
+  deliveryCodeEncrypted String? // AES-256-GCM (D43) — ré-affichage Expéditeur SEUL, en PICKED_UP, jamais en liste/event/email
   codeRegenerations   Int       @default(0) // ≤ MAX_CODE_REGENERATIONS (5)
   deliveryAttempts    Int       @default(0) // ≤ MAX_DELIVERY_ATTEMPTS (3)
   deliveryLockedUntil DateTime? // lock DELIVERY_LOCK_MINUTES (15)
@@ -659,15 +799,60 @@ model Booking {
   trackingEvents BookingTrackingEvent[]
 
   // ─── Paiement — colonnes prêtes, remplies en B2/B4 ───
-  paymentIntentId   String?
+  paymentIntentId   String? // référence PaymentProvider (D11) — autorisation manuelle, capture à l'acceptation
+  paymentProvider   String? // "STRIPE" | "FAKE" (dev/tests uniquement)
   capturedAt        DateTime?
+  chargeId          String? // charge Stripe de la capture (A69) — `source_transaction` du transfert B4
   refundedAt        DateTime?
   refundAmountCents Int?
+  refundId          String? // C-PR5 (D58) — dernier remboursement fournisseur (rapprochement exact)
   transferId        String?
 
-  // ─── Litige ───
-  disputeTicket String? // YAM-XXXX
+  // ─── Versement Voyageur (B4, D49) ───
+  payoutStatus        PayoutStatus? // PENDING dès COMPLETED · SENT/FAILED après transfert · FROZEN sur DISPUTED (INV-5)
+  payoutAmountCents   Int? // = pricing.transportCents (D50), figé à COMPLETED
+  payoutSentAt        DateTime?
+  payoutAttempts      Int     @default(0) // rejeux du cron (A65/A66), borné
+  payoutFailureReason String? // CARRIER_ACCOUNT_NOT_READY | PROVIDER_ERROR:<message>
+  // C-PR5 (D58, A111) — rejeux espacés : posé à chaque échec, lu par le cron (absent OU null OU <= now)
+  payoutNextRetryAt    DateTime?
+  payoutLastAttemptAt  DateTime?
+  // C-PR5 (D58) — clé d'idempotence fournisseur explicite après un renversement re-versé (défaut : payout:<id>)
+  payoutIdempotencyKey String?
+  // C-PR5 (D58 3A) — clôture d'un transfert renversé : "RESENT" | "WRITTEN_OFF"
+  payoutReversalResolution        String?
+  payoutReversalReason            String?
+  payoutReversalResolvedAt        DateTime?
+  payoutReversalResolvedByAdminId String?   @db.ObjectId
+  // C-PR5b (D58 3A-c) — remboursement manuel (geste commercial) : proposé par FINANCE / SUPPORT, appliqué par SUPER_ADMIN seul
+  manualRefundProposedCents     Int?
+  manualRefundProposedReason    String?
+  manualRefundProposedByAdminId String?   @db.ObjectId
+  manualRefundProposedAt        DateTime?
+  manualRefundCents             Int? // dernier remboursement manuel appliqué (cumul dans refundAmountCents)
+  manualRefundReason            String?
+  manualRefundByAdminId         String?   @db.ObjectId
+  manualRefundAt                DateTime?
+  completedBy         String? // "SHIPPER" (confirmation anticipée) | "SYSTEM" (J+4)
+  // ─── Retenue ANN-01 (D50, A79–A81) ───
+  retentionCents        Int? // total − remboursement (annulation tardive de l'Expéditeur)
+  // C-PR2 (D55, 3A) : arbitrage d'une retenue HELD_FOR_MEDIATION → CARRIER (compensation) ou SHIPPER (restitution).
+  retentionDecisionReason   String?
+  retentionDecidedAt        DateTime?
+  retentionDecidedByAdminId String?   @db.ObjectId
+  retentionDisposition  String? // "CARRIER" (compensation versée, payoutAmountCents) | "SHIPPER" (restituée, C-PR2) | "HELD_FOR_MEDIATION" (annulation après le départ, chantier C)
+  verificationReminderSentAt DateTime? // rappel J+3 émis (A70) — jamais deux fois
+
+  // ─── Litige (B4, D51 — le dossier est dans Dispute) ───
+  disputeTicket String? // YAM-XXXX (copie du Dispute.ticketNumber pour les listes)
   disputedAt    DateTime?
+
+  // ─── Notation mutuelle (B5, D53) ───
+  ratingWindowEndsAt   DateTime? // completedAt + 14 j : fin de la fenêtre de notation ET révélation forcée
+  shipperRatedAt       DateTime? // l'Expéditeur a noté le Voyageur
+  carrierRatedAt       DateTime? // le Voyageur a noté l'Expéditeur
+  ratingsRevealedAt    DateTime? // double-aveugle levé (les deux ont noté, ou 14 j)
+  ratingRemindersSent  Int       @default(0) // J+5 puis J+7, puis silence
 
   // ─── Lifecycle / RGPD ───
   isDeleted Boolean   @default(false)
@@ -680,6 +865,8 @@ model Booking {
   @@index([carrierId, status]) // deals Mes trajets
   @@index([status, expiresAt]) // cron expiration 24h (B2)
   @@index([status, payoutDueAt]) // cron versement J+4 (B4)
+  @@index([status, payoutStatus]) // rejeu des versements FAILED (B4, A66)
+  @@index([status, ratingWindowEndsAt]) // cron notation : relances J+5/J+7, révélation à 14 j (B5)
 }
 
 // ─────────────────────────────────────────────
@@ -687,6 +874,44 @@ model Booking {
 // ─────────────────────────────────────────────
 // Écrit dans la MÊME transaction Mongo que tout changement d'état.
 // Le relay (PR4) publie vers Redpanda/Kafka puis pose publishedAt.
+
+/// Dossier de litige (B4, D51 / A10) — UN par deal, lu par la médiation (chantier C).
+/// Le Booking porte le statut DISPUTED et le gel (payoutStatus FROZEN) ; ce modèle porte le dossier.
+model Dispute {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  bookingId    String @unique @db.ObjectId
+  ticketNumber String @unique // YAM-XXXX — CSPRNG, retiré en cas de collision (D51)
+  shipperId    String @db.ObjectId
+  carrierId    String @db.ObjectId
+
+  category       DisputeCategory
+  description    String // ≥ 50 caractères (DISPUTE_MIN_DESCRIPTION_LENGTH)
+  desiredOutcome DisputeDesiredOutcome?
+  photoUrls      String[] // ≤ 5, ImageKit (D42) — preuves rouges de la spec
+  pledgeAcceptedAt DateTime // engagement sur l'honneur horodaté (anti-abus)
+
+  status DisputeStatus @default(OPEN)
+
+  // ── C-PR2 (D55, 1A) : la version du Voyageur, une seule fois, dans l'app ──
+  carrierStatement         String?
+  carrierStatementPhotoUrls String[] // ≤ 5, ImageKit deals/dispute/ (liste créée [] — pitfall Mongo)
+  carrierRespondedAt       DateTime?
+
+  // ── C-PR2 (D55, 2A/7A) : la décision, gravée sur le dossier ──
+  resolutionOutcome            String?   // REJECTED | PARTIAL_REFUND | FULL_REFUND
+  resolutionRefundCents        Int?      // remboursé à l'Expéditeur
+  resolutionCarrierPayoutCents Int?      // versé au Voyageur (net − remboursement, plancher 0)
+  resolutionReason             String?   // ≥ 50 caractères, lu par les deux parties
+  resolvedByAdminId            String?   @db.ObjectId
+  resolvedAt                   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([carrierId])
+  @@index([status, createdAt])
+}
 
 model OutboxEvent {
   id            String    @id @default(auto()) @map("_id") @db.ObjectId
@@ -717,6 +942,113 @@ model OutboxEvent {
 // tick, expiration = reprenable par une autre instance. Permet le
 // scaling horizontal du deal-service sans double publication.
 
+/// Chantier F (D61) — coordination Expéditeur ↔ Voyageur : UNE conversation par deal.
+model Conversation {
+  id        String @id @default(auto()) @map("_id") @db.ObjectId
+  bookingId String @unique @db.ObjectId
+  shipperId String @db.ObjectId
+  carrierId String @db.ObjectId
+
+  lastMessageAt     DateTime?
+  shipperLastReadAt DateTime?
+  carrierLastReadAt DateTime?
+
+  // F-PR3 (D61 6A) — relance email des messages non lus : auteur du dernier message
+  // (une relance ne part qu'à l'AUTRE partie) et dernière relance envoyée par rôle
+  // (au plus une par heure et par conversation). Les writers posent null explicitement.
+  lastMessageAuthorRole String?
+  shipperRemindedAt     DateTime?
+  carrierRemindedAt     DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  messages Message[]
+  meetups  Meetup[]
+
+  @@index([shipperId, lastMessageAt])
+  @@index([carrierId, lastMessageAt])
+}
+
+/// Un message du fil : texte d'une partie, message SYSTÈME (état du deal), ou trace d'un rendez-vous.
+model Message {
+  id             String       @id @default(auto()) @map("_id") @db.ObjectId
+  conversationId String       @db.ObjectId
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  kind       MessageKind @default(TEXT)
+  authorId   String?     @db.ObjectId // null pour SYSTEM
+  authorRole String // SHIPPER | CARRIER | SYSTEM
+  body       String
+  photoUrls  String[]    @default([])
+
+  /// Message SYSTEM / MEETUP : clé i18n + données, jamais du texte figé (D44)
+  systemKey  String?
+  systemData Json?
+
+  /// D61 5A — coordonnées détectées : on avertit sans bloquer, l'admin le voit dans le dossier
+  flaggedContact Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
+  @@index([conversationId, createdAt])
+}
+
+/// D61 1A — le rendez-vous est un OBJET, pas une conversation : proposé, accepté, contre-proposé.
+model Meetup {
+  id             String       @id @default(auto()) @map("_id") @db.ObjectId
+  conversationId String       @db.ObjectId
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  bookingId      String       @db.ObjectId
+
+  kind           MeetupKind
+  status         MeetupStatus @default(PROPOSED)
+  proposedByRole String // SHIPPER | CARRIER
+  proposedById   String       @db.ObjectId
+
+  placeLabel   String
+  placeDetails String?
+  startAt      DateTime
+  endAt        DateTime
+
+  acceptedAt  DateTime?
+  cancelledAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([conversationId, kind, status])
+  @@index([bookingId])
+}
+
+/// D61 4A — le numéro se révèle tard, entre les deux parties, et la révélation est tracée.
+model PhoneReveal {
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  conversationId String   @db.ObjectId
+  bookingId      String   @db.ObjectId
+  revealedToId   String   @db.ObjectId
+  revealedUserId String   @db.ObjectId
+  revealedAt     DateTime @default(now())
+
+  @@unique([conversationId, revealedToId])
+}
+
+enum MessageKind {
+  TEXT
+  SYSTEM
+  MEETUP
+}
+
+enum MeetupKind {
+  PICKUP
+  DELIVERY
+}
+
+enum MeetupStatus {
+  PROPOSED
+  ACCEPTED
+  CANCELLED
+}
+
 model RelayLease {
   id        String   @id @map("_id") // clé fixe : "outbox-relay" (un doc par relay)
   owner     String // identité d'instance : hostname#pid#uuid
@@ -728,6 +1060,16 @@ model RelayLease {
 // ─────────────────────────────────────────────
 // REPORT (signalements — scope B1, registre)
 // ─────────────────────────────────────────────
+
+/// D69 — lien de suivi public d'une réservation, partagé par l'Expéditeur au destinataire (tiers sans compte).
+/// Un seul par réservation ; 404 dès que le tiers est effacé (recipientRedactedAt) ou le lien révoqué.
+model TrackingLink {
+  id        String    @id @default(auto()) @map("_id") @db.ObjectId
+  bookingId String    @unique @db.ObjectId
+  token     String    @unique
+  createdAt DateTime  @default(now())
+  revokedAt DateTime?
+}
 
 model Report {
   id             String @id @default(auto()) @map("_id") @db.ObjectId
@@ -747,6 +1089,25 @@ model Report {
   @@index([targetType, targetId])
   @@index([status, createdAt])
   @@index([reporterUserId])
+}
+
+/// Chantier C (D7, D54 8A) — journal d'audit : une ligne par geste admin,
+/// écrite dans la MÊME transaction que le geste (@packages/admin-audit).
+model AdminAction {
+  id          String  @id @default(auto()) @map("_id") @db.ObjectId
+  adminUserId String  @db.ObjectId
+  action      String // ADMIN_LOGIN | ADMIN_TOTP_ENABLED | DISPUTE_VIEWED | … (ADMIN_ACTIONS)
+  targetType  String // USER | BOOKING | DISPUTE | SESSION
+  targetId    String?
+  before      Json?
+  after       Json?
+  ip          String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([targetType, targetId])
+  @@index([adminUserId, createdAt])
 }
 
 // ─────────────────────────────────────────────
@@ -770,6 +1131,23 @@ enum Role {
   SHIPPER
   CARRIER
   ADMIN
+}
+
+/// C-PR3 (D56) — profils du back-office : SUPER_ADMIN a tout ; les autres sont bornés par route.
+enum AdminRole {
+  SUPER_ADMIN
+  MEDIATOR
+  SUPPORT
+  FINANCE
+  OPS // C-PR8a (D62 3A) — exploitation technique
+  PRIVACY // C-PR8b (D63 6A) — données personnelles : registre des demandes, effacement, export nominatif
+}
+
+/// C-PR3 (D56, 2A) — deux niveaux de sanction, toujours motivés, réversibles.
+enum AccountStatus {
+  ACTIVE
+  RESTRICTED
+  SUSPENDED
 }
 
 enum CarrierStatus {
@@ -866,6 +1244,7 @@ enum TripDocumentStatus {
   PENDING
   VERIFIED
   REJECTED
+  EXPIRED // C-PR4 (D57, 8A) : en attente sur un trajet déjà parti
 }
 
 enum ReviewKind {
@@ -888,6 +1267,39 @@ enum BookingStatus {
   DISPUTED
 }
 
+/// Versement au Voyageur (B4, D49) — INV-2 : aucun transfert avant COMPLETED ; INV-5 : FROZEN tant que le litige n'est pas résolu.
+enum PayoutStatus {
+  PENDING
+  SENT
+  FAILED
+  FROZEN
+  REVERSED // transfert renversé côté Stripe (webhook transfer.reversed, A87) — jamais renvoyé automatiquement
+}
+
+/// Litige (B4, D51) — catégories de la spec §3.6.
+enum DisputeCategory {
+  NOT_DELIVERED
+  CONTENT_MISSING
+  DAMAGED
+  SIGNIFICANT_DELAY
+  RECIPIENT_ISSUE
+  OTHER
+}
+
+enum DisputeDesiredOutcome {
+  FULL_REFUND
+  PARTIAL_REFUND
+  CONTACT_CARRIER
+  YAMBA_DECIDES
+}
+
+/// C-PR2 (D55) : OPEN → CARRIER_RESPONDED (version du Voyageur) → RESOLVED (décision admin).
+enum DisputeStatus {
+  OPEN
+  CARRIER_RESPONDED
+  RESOLVED
+}
+
 enum BookingActor {
   SHIPPER
   CARRIER
@@ -904,6 +1316,7 @@ enum ReportTargetType {
   TRIP
   USER
   BOOKING
+  MESSAGE
 }
 
 enum ReportStatus {
@@ -912,17 +1325,62 @@ enum ReportStatus {
   DISMISSED
 }
 
-model SiteConfig {
-  id String @id @default(auto()) @map("_id") @db.ObjectId
+/// C-PR8a (D62 4A) — UN document (`key` = "current") : les paramètres de classe A,
+/// `values` = { clé du catalogue → nombre }, `version` = verrou optimiste. Absent ou
+/// illisible → les services repartent sur les défauts du catalogue (repli sûr).
+/// Remplace `SiteConfig` (dormant, commission 0,10 contraire à D16 — A11).
+/// C-PR8b (D63 7A) — le registre des demandes RGPD : la preuve du délai légal.
+model DataRequest {
+  id      String @id @default(auto()) @map("_id") @db.ObjectId
+  userId  String @db.ObjectId
+  type    DataRequestType
+  channel DataRequestChannel
+  status  DataRequestStatus
+  /// Motifs de refus (deal vivant, versement en attente…), vides si faite
+  refusalReasons String[] @default([])
+  /// Canal admin : qui, pourquoi (motif ≥ 20)
+  requestedByAdminId String? @db.ObjectId
+  reason             String?
+  ip        String?
+  userAgent String?
+  requestedAt DateTime @default(now())
+  completedAt DateTime?
 
-  logo   String?
-  banner String?
+  @@index([userId, requestedAt])
+  @@index([type, requestedAt])
+}
+enum DataRequestType {
+  EXPORT
+  ERASURE
+}
+enum DataRequestChannel {
+  MEMBER
+  ADMIN
+}
+enum DataRequestStatus {
+  DONE
+  REFUSED
+}
 
-  commissionRate Float @default(0.10)
+/// C-PR8b (D63 4A) — ce qui survit à un compte effacé : l'identifiant Stripe Connect (obligations comptables,
+/// litiges de paiement) et la trace de l'effacement. Jamais de nom, d'email ni de téléphone ici.
+model ErasedAccount {
+  id     String @id @default(auto()) @map("_id") @db.ObjectId
+  userId String @unique @db.ObjectId
+  channel DataRequestChannel
+  requestedByAdminId String? @db.ObjectId
+  reason             String?
+  stripeAccountId    String?
+  erasedAt DateTime @default(now())
+}
 
-  maxDocSizeMb   Int @default(5)
-  maxDocsPerTrip Int @default(5)
+model PlatformSettings {
+  id      String @id @default(auto()) @map("_id") @db.ObjectId
+  key     String @unique
+  values  Json
+  version Int    @default(0)
 
+  updatedByAdminId String? @db.ObjectId
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -981,6 +1439,44 @@ model ConsumedEvent {
   claimedAt     DateTime            @default(now())
 
   @@unique([consumerGroup, eventId])
+}
+
+/// Statut d'un envoi d'email transactionnel (D41/A36).
+enum EmailDeliveryStatus {
+  PENDING
+  SENT
+  FAILED
+  DELIVERED // D35 3A — webhook du fournisseur
+  BOUNCED
+  COMPLAINED
+}
+
+/// Marqueur d'envoi email PAR DESTINATAIRE (A36 — at-most-once).
+/// Le retraitement d'un ConsumedEvent PENDING/FAILED re-exécute tout
+/// le handler : sans ce claim, un crash renverrait les emails.
+/// Claim-first : create PENDING AVANT l'envoi ; P2002 = déjà claimé
+/// (SENT, PENDING ou FAILED) → jamais de renvoi. Échec d'envoi →
+/// FAILED + lastError (rejeu MANUEL possible, jamais automatique).
+model EmailDelivery {
+  id        String              @id @default(auto()) @map("_id") @db.ObjectId
+  /// _id de l'OutboxEvent source (header `event-id`).
+  eventId   String              @db.ObjectId
+  userId    String              @db.ObjectId
+  /// Gabarit envoyé (ex. "booking/booking-accepted-shipper") — trace.
+  template  String
+  status    EmailDeliveryStatus @default(PENDING)
+  lastError String?
+  sentAt    DateTime?
+  /// D35 — fournisseur et identifiant du message (rapprochement des webhooks) ; jamais unique (nullable sur Mongo)
+  provider          String?
+  providerMessageId String?
+  deliveredAt DateTime?
+  bouncedAt   DateTime?
+  bounceType  String?
+  claimedAt DateTime            @default(now())
+
+  @@unique([eventId, userId])
+  @@index([providerMessageId])
 }
 
 // ─── D14 / CAT-02 — les 8 familles de risque (PR pricing socle, A28) ───

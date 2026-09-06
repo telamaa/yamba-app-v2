@@ -35,7 +35,7 @@
     "rate": "Noter {firstName}"
   },
   "trip": {
-    "statusPublished": "Publié",
+    "statusPublished": "En ligne",
     "statusDeparted": "En vol",
     "statusArrived": "Arrivé",
     "statusCompleted": "Terminé",
@@ -74,7 +74,16 @@
     "badgeReady": "Prêt à livrer",
     "badgeDelivered": "Livré",
     "badgeCompleted": "Terminé",
-    "badgeDisputed": "Litige"
+    "badgeDisputed": "Litige",
+    "completedSentSub": "{earnings} partis vers ton compte le {date} · 2 à 7 jours pour arriver",
+    "completedPendingSub": "Terminé · {earnings} en cours d'envoi vers ton compte",
+    "completedBlockedSub": "Terminé · {earnings} en attente : finalise ton compte Stripe",
+    "disputedSub": "Signalement {ticket} · versement en attente · on te contacte",
+    "cancelledCompensationSentSub": "Annulée tardivement · {amount} de compensation partis vers ton compte",
+    "cancelledCompensationPendingSub": "Annulée tardivement · {amount} de compensation en cours d'envoi",
+    "cancelledCompensationBlockedSub": "Annulée tardivement · {amount} de compensation en attente : finalise ton compte Stripe",
+    "cancelledHeldSub": "Annulée après le départ · retenue conservée, on te contacte",
+    "rateHint": "pense à noter {firstName}"
   },
   "historyRow": {
     "title": "{origin} → {destination} · {date}",
@@ -100,11 +109,10 @@
     "CABIN_BAG_12KG": "Bagage cabine 12 kg"
   },
   "loadError": "Impossible de charger tes trajets. Réessaie dans un instant.",
-
   "status": {
     "DRAFT": "Brouillon",
-    "PUBLISHED": "Actif",
-    "PAUSED": "En pause",
+    "PUBLISHED": "En ligne",
+    "PAUSED": "Masqué",
     "COMPLETED": "Terminé",
     "CANCELLED": "Annulé",
     "ARCHIVED": "Archivé"
@@ -119,8 +127,8 @@
     "viewPublic": "Voir en tant qu'expéditeur",
     "edit": "Modifier",
     "activate": "Activer",
-    "resume": "Reprendre",
-    "pause": "Mettre en pause",
+    "resume": "Remettre en ligne",
+    "pause": "Masquer",
     "revertToDraft": "Repasser en brouillon",
     "duplicate": "Dupliquer",
     "archive": "Archiver",
@@ -145,19 +153,26 @@
     "demands": "{count, plural, =1 {1 demande} other {# demandes}}",
     "setupRequired": "Config. requise",
     "errorTitle": "Impossible de charger vos trajets.",
-    "retry": "Réessayer"
+    "retry": "Réessayer",
+    "subtitle": "{actions, plural, =0 {Rien à traiter} =1 {1 action à traiter} other {# actions à traiter}} · {upcoming, plural, =0 {aucun trajet à venir} =1 {1 trajet à venir} other {# trajets à venir}}",
+    "deals": {
+      "title": "Demandes et colis",
+      "empty": "Aucune demande pour ce trajet pour l''instant.",
+      "toggle": "{count, plural, =1 {1 colis} other {# colis}}"
+    }
   },
   "gates": {
-    "onboardingToast": "Complétez votre profil transporteur pour activer ce trajet",
+    "onboardingToast": "Complète ton profil Voyageur pour activer ce trajet",
     "onboardingCta": "Configurer",
     "stripeToast": "Configurez Stripe pour activer ce trajet et recevoir des paiements",
     "stripeCta": "Configurer Stripe"
   },
   "toasts": {
+    "cancelBlocked": "Ce trajet porte encore {count, plural, =1 {un deal en cours} other {# deals en cours}} : annule-les d'abord depuis « Mes deals ». Chaque Expéditeur sera remboursé intégralement.",
     "activated": "Trajet activé",
     "activationFailed": "Erreur lors de l''activation",
-    "resumed": "Trajet republié",
-    "paused": "Trajet mis en pause",
+    "resumed": "Trajet remis en ligne",
+    "paused": "Trajet masqué",
     "reverted": "Trajet repassé en brouillon",
     "restored": "Trajet restauré en brouillon",
     "archived": "Trajet archivé",
@@ -181,7 +196,7 @@
   },
   "banner": {
     "title": "Vous avez {count, plural, =1 {1 brouillon en attente} other {# brouillons en attente}} de publication",
-    "subtitle": "Configurez votre espace transporteur pour activer vos trajets et recevoir des demandes.",
+    "subtitle": "Configure ton espace Voyageur pour activer tes trajets et recevoir des demandes.",
     "cta": "Configurer maintenant"
   },
   "detail": {
@@ -218,6 +233,10 @@
     "createdAt": "Créé le",
     "publishedAt": "Publié le",
     "cancelledAt": "Annulé le",
+    "hiddenByAdmin": {
+      "title": "Trajet masqué par Yamba",
+      "body": "Ce trajet n'apparaît plus dans la recherche ni sur sa page publique. Tes réservations en cours continuent normalement. Un email t'a été envoyé : réponds au support pour en discuter."
+    },
     "tripTypes": {
       "ONE_WAY": "Aller simple",
       "ROUND_TRIP": "Aller-retour"
@@ -250,5 +269,10 @@
       "cityWide": "Ville entière",
       "radius": "Rayon {km} km"
     }
+  },
+  "payoutBanner": {
+    "title": "{amount} en attente : finalise ton compte Stripe",
+    "text": "Ton compte de paiement n'est pas encore prêt à recevoir des virements. Termine ton onboarding : les versements en attente partent automatiquement ensuite.",
+    "cta": "Finaliser mon compte"
   }
 }
