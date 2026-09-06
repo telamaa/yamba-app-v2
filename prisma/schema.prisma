@@ -1108,6 +1108,7 @@ model AdminAction {
   @@index([createdAt])
   @@index([targetType, targetId])
   @@index([adminUserId, createdAt])
+  @@index([action, createdAt]) // A149 — filtre « Action » du journal
 }
 
 // ─────────────────────────────────────────────

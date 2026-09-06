@@ -1993,3 +1993,32 @@ Découvert en le rejouant : `seed-deals.ts` échouait sur `prisma.booking.create
 
 ### Preuves
 trip **209** (spec du mapper mise à jour : plus de tiret) · tsc user-ui + trip · build · miroir i18n · OpenAPI ×5 · seed rejoué de bout en bout (22 réservations) · recherche vérifiée en direct : heures d'arrivée servies, prix au kilo présents.
+
+---
+
+# A149 → A151 — `feat/admin-audit-filters-alerts` : le journal se fouille, les alertes ont leur page
+
+## 1. Le journal d'audit devient consultable (A149)
+`GET /admin/audit` ne prenait qu'un curseur : le seul moyen de retrouver une action était de dérouler. Il accepte maintenant six filtres, tous portés par ce que Mongo indexe.
+
+| Filtre | Paramètre | Remarque |
+|---|---|---|
+| Période | `from`, `to` | Une date seule (`2026-09-12`) inclut la journée entière ; un instant ISO est pris tel quel |
+| Auteur | `adminUserId` | Index `[adminUserId, createdAt]` |
+| Action | `action` | Nouvel index `[action, createdAt]` |
+| Type de cible | `targetType` | Index `[targetType, targetId]` |
+| Identifiant de cible | `targetId` | |
+| IP | `ip` | Égalité |
+
+Règle pure `apps/auth-service/src/lib/admin-audit.query.ts` : **une valeur mal formée est ignorée, jamais une erreur** — un journal ne répond pas 400 parce qu'un identifiant a été mal collé. La réponse renvoie `appliedFilters`, la liste des filtres réellement retenus, pour que l'écran n'affiche pas un filtre sans effet. Cinq tests.
+
+Côté écran (`AuditTable.tsx`) : les six filtres serveur, plus une recherche « contient » **sur les lignes chargées**, détail compris — le détail est du JSON, il ne s'indexe pas, et l'écran l'écrit sous les filtres plutôt que de faire croire à une recherche globale. Le détail est rendu lisible (`clé : valeur · clé : valeur`) au lieu du JSON brut, et chaque valeur du tableau est cliquable pour filtrer dessus.
+
+## 2. Les alertes de seuil quittent l'accueil (A150)
+Les neuf règles s'affichaient toutes sur l'accueil : à trois alertes ouvertes, il fallait dérouler avant d'atteindre les compteurs. L'accueil garde **une ligne** — nombre d'alertes, dont critiques, titre de la plus grave, lien. La page `/alerts` (permission `kpi.read`, entrée « Alertes » dans la navigation) affiche le détail groupé par gravité, avec le nombre d'éléments concernés, le lien d'action, et **les seuils qui ont servi au calcul** renvoyant vers la page Paramètres.
+
+## 3. L'avertissement de clé React sur la page Paramètres (A151)
+`PlatformSettingsEditor` rendait `<><tr key={…}>…</tr>{ligne d'historique}</>` : la clé était posée sur un enfant du fragment, jamais sur l'élément de la liste. React réclamait une clé à chaque rendu. Corrigé en `<Fragment key={def.key}>`.
+
+### Preuves
+auth **180** (+5 : filtres du journal) · tsc auth + admin-ui · `next build` admin-ui · OpenAPI ×5 (les six paramètres documentés) · index Prisma ajouté.

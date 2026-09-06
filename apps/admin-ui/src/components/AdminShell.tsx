@@ -35,6 +35,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
 
   const nav = [
     { href: "/home", label: "Accueil" },
+    ...(can(me.adminRoles, "kpi.read") ? [{ href: "/alerts", label: "Alertes" }] : []), // A150
     ...(can(me.adminRoles, "disputes.read") ? [{ href: "/disputes", label: "À arbitrer" }] : []),
     ...(can(me.adminRoles, "tickets.review") ? [{ href: "/tickets", label: "Billets" }] : []),
     ...(can(me.adminRoles, "trips.read") ? [{ href: "/trips", label: "Trajets" }] : []),

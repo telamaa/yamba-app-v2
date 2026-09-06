@@ -4142,7 +4142,8 @@
         "tags": [
           "admin"
         ],
-        "summary": "Admin journal, newest first",
+        "summary": "Admin journal, newest first — filterable (A149)",
+        "description": "Filters on what Mongo indexes: period, author, action, target, IP. A malformed value is IGNORED, never an error; the response echoes the filters actually applied in `appliedFilters`. Free-text search on the detail stays in the browser, on the loaded rows.",
         "operationId": "listAdminAudit",
         "parameters": [
           {
@@ -4153,6 +4154,69 @@
               "$ref": "#/components/schemas/ObjectId"
             },
             "description": "Id of the last item of the previous page"
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Début de période (date ou instant ISO)"
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Fin de période — une date seule inclut la journée entière"
+          },
+          {
+            "name": "adminUserId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/ObjectId"
+            },
+            "description": "Auteur de l'action"
+          },
+          {
+            "name": "action",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Action exacte (ADMIN_ACTIONS)"
+          },
+          {
+            "name": "targetType",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "USER, BOOKING, TRIP, SETTINGS…"
+          },
+          {
+            "name": "targetId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/ObjectId"
+            },
+            "description": "Identifiant de la cible"
+          },
+          {
+            "name": "ip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Adresse IP exacte"
           }
         ],
         "responses": {
@@ -28779,6 +28843,13 @@
                 "type": "null"
               }
             ]
+          },
+          "appliedFilters": {
+            "description": "A149 — filtres réellement appliqués (une valeur mal formée est ignorée)",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "required": [
