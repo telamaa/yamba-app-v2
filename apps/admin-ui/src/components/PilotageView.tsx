@@ -68,6 +68,20 @@ export default function PilotageView() {
   }, [days]);
   const currencies = useMemo(() => [...new Set((series?.points ?? []).flatMap((p) => p.finance.map((f) => f.currencyCode)))].sort(), [series]);
   useEffect(() => { if (!currency && currencies.length) setCurrency(currencies[0]); }, [currencies, currency]);
+  /* D74 — taux sur TOUTE la période, recalculés depuis les cohortes : jamais une moyenne de pourcentages. */
+  const rates = useMemo(() => {
+    const pts = series?.points ?? [];
+    const sum = (f: (p: PilotageSeriesPoint) => number) => pts.reduce((a, p) => a + f(p), 0);
+    const accepted = sum((p) => p.requestsAccepted);
+    const decided = accepted + sum((p) => p.requestsDeclined) + sum((p) => p.requestsExpired);
+    const delivered = sum((p) => p.delivered);
+    const disputed = sum((p) => p.deliveredDisputed);
+    return {
+      decided, accepted, delivered, disputed,
+      acceptancePct: decided > 0 ? Math.round((accepted / decided) * 100) : null,
+      disputePct: delivered > 0 ? Math.round((disputed / delivered) * 100) : null,
+    };
+  }, [series]);
 
   if (err) return <p className="mt-4 text-[13px] text-red-700">{err}</p>;
   const metrics = tab === "activity" ? ACTIVITY : FINANCE;
@@ -115,6 +129,43 @@ export default function PilotageView() {
             <LineChart key={m.key} title={m.label} hint={m.hint} points={points.map((p) => ({ x: p.period, label: periodLabel(p, granularity), short: periodLabel(p, granularity, true), y: valueOf(p, m, cur) }))} unit={m.money ? cur : undefined} height={220} onExpand={() => setExpanded(m.key)} />
           ))}
         </div>
+      )}
+
+      {series && (
+        <section className="mt-6">
+          <h2 className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Taux</h2>
+          <p className="mt-1 text-[12px] text-slate-500">
+            Chaque taux est calculé sur la <strong>cohorte</strong> : le sort d'une demande compte dans la période où elle a été faite, pas dans celle de la réponse.
+            Une demande encore en attente, ou annulée par l'Expéditeur avant réponse, n'est décidée par personne et n'entre dans aucun taux. « — » signifie « pas de dénominateur », jamais zéro.
+          </p>
+          <div className="mt-2 grid grid-cols-2 gap-3">
+            <Tile label={`Taux d'acceptation · ${rates.accepted} / ${rates.decided} demande(s) décidée(s)`} v={rates.acceptancePct != null ? `${rates.acceptancePct} %` : "—"} />
+            <Tile label={`Taux de litige · ${rates.disputed} / ${rates.delivered} livraison(s)`} v={rates.disputePct != null ? `${rates.disputePct} %` : "—"} />
+          </div>
+          <div className="mt-2 overflow-x-auto rounded-xl border border-slate-200 bg-white">
+            <table className="w-full text-[12.5px]">
+              <thead className="bg-slate-50 text-left text-[10.5px] uppercase tracking-wider text-slate-500">
+                <tr><th className="px-3 py-2">Période</th><th className="px-3 py-2 text-right">Décidées</th><th className="px-3 py-2 text-right">Acceptées</th><th className="px-3 py-2 text-right">Refusées</th><th className="px-3 py-2 text-right">Expirées</th><th className="px-3 py-2 text-right">Taux d'acceptation</th><th className="px-3 py-2 text-right">Livraisons</th><th className="px-3 py-2 text-right">Litiges</th><th className="px-3 py-2 text-right">Taux de litige</th></tr>
+              </thead>
+              <tbody>
+                {points.length === 0 && <tr><td colSpan={9} className="px-3 py-6 text-center text-slate-500">Aucune période.</td></tr>}
+                {points.map((p) => (
+                  <tr key={p.period} className="border-t border-slate-100">
+                    <td className="px-3 py-1.5 font-semibold">{periodLabel(p, granularity)}</td>
+                    <td className="px-3 py-1.5 text-right tabular-nums">{p.requestsAccepted + p.requestsDeclined + p.requestsExpired}</td>
+                    <td className="px-3 py-1.5 text-right tabular-nums">{p.requestsAccepted}</td>
+                    <td className="px-3 py-1.5 text-right tabular-nums">{p.requestsDeclined}</td>
+                    <td className="px-3 py-1.5 text-right tabular-nums">{p.requestsExpired}</td>
+                    <td className="px-3 py-1.5 text-right font-semibold tabular-nums">{p.acceptanceRatePct != null ? `${p.acceptanceRatePct} %` : "—"}</td>
+                    <td className="px-3 py-1.5 text-right tabular-nums">{p.delivered}</td>
+                    <td className="px-3 py-1.5 text-right tabular-nums">{p.deliveredDisputed}</td>
+                    <td className={`px-3 py-1.5 text-right font-semibold tabular-nums ${p.disputeRatePct != null && p.disputeRatePct >= 5 ? "text-amber-900" : ""}`}>{p.disputeRatePct != null ? `${p.disputeRatePct} %` : "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
       )}
 
       <section className="mt-6">

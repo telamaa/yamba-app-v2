@@ -182,6 +182,23 @@ export type FinanceReportMonthRow = {
   month: string; currencyCode: string;
   capturedCents: number; capturedCount: number; refundedCents: number; refundCount: number;
   paidOutCents: number; payoutCount: number; revenueCents: number; completedCount: number; retentionCents: number; cancelledCount: number;
+  /** C-PR6d (D74) — revenu moyen par deal terminé ; null quand aucun deal n'est terminé (jamais 0 pour « on ne sait pas »). */
+  avgRevenuePerCompletedCents: number | null;
+};
+
+/* ── C-PR6d (D74) — sinistralité par catégorie de litige ─────── */
+
+/** Un litige TRANCHÉ ; la devise vient du deal, un litige n'en porte pas. */
+export type ClaimRow = {
+  resolvedAt?: Date | null;
+  category: string;
+  resolutionOutcome?: string | null;
+  resolutionRefundCents?: number | null;
+  currencyCode: string;
+};
+export type FinanceClaimsRow = {
+  month: string; category: string; currencyCode: string;
+  resolved: number; upheld: number; rejected: number; refundedCents: number;
 };
 export type FinanceSnapshotRow = { currencyCode: string; pendingPayoutCents: number; frozenPayoutCents: number; reversedOpenCents: number; heldRetentionCents: number; proposedRefundCents: number };
 
@@ -206,7 +223,7 @@ export function buildFinanceReport(rows: FinanceReportRow[], from: Date, to: Dat
     const k = `${month}|${currencyCode}`;
     let m = byKey.get(k);
     if (!m) {
-      m = { month, currencyCode, capturedCents: 0, capturedCount: 0, refundedCents: 0, refundCount: 0, paidOutCents: 0, payoutCount: 0, revenueCents: 0, completedCount: 0, retentionCents: 0, cancelledCount: 0 };
+      m = { month, currencyCode, capturedCents: 0, capturedCount: 0, refundedCents: 0, refundCount: 0, paidOutCents: 0, payoutCount: 0, revenueCents: 0, completedCount: 0, retentionCents: 0, cancelledCount: 0, avgRevenuePerCompletedCents: null };
       byKey.set(k, m);
     }
     return m;
@@ -239,7 +256,34 @@ export function buildFinanceReport(rows: FinanceReportRow[], from: Date, to: Dat
       m.retentionCents += r.retentionCents ?? 0;
     }
   }
-  return [...byKey.values()].sort((a, b) => b.month.localeCompare(a.month) || a.currencyCode.localeCompare(b.currencyCode));
+  return [...byKey.values()]
+    .map((m) => ({ ...m, avgRevenuePerCompletedCents: m.completedCount > 0 ? Math.round(m.revenueCents / m.completedCount) : null }))
+    .sort((a, b) => b.month.localeCompare(a.month) || a.currencyCode.localeCompare(b.currencyCode));
+}
+
+/**
+ * Registre de sinistralité (D74) : les litiges TRANCHÉS, par mois de décision, catégorie et devise.
+ * Le mois est celui de la décision, pas celui de l'ouverture : c'est la date à laquelle l'argent bouge.
+ * « Retenu » = tranché en faveur de l'Expéditeur, remboursement partiel ou intégral. Un litige encore
+ * ouvert n'apparaît pas : il n'est pas un sinistre tant qu'il n'est pas décidé.
+ */
+export function buildClaimsReport(rows: ClaimRow[], from: Date, to: Date): FinanceClaimsRow[] {
+  const byKey = new Map<string, FinanceClaimsRow>();
+  for (const r of rows) {
+    if (!inRange(r.resolvedAt, from, to)) continue;
+    const month = monthKey(r.resolvedAt!);
+    const k = `${month}|${r.category}|${r.currencyCode}`;
+    let c = byKey.get(k);
+    if (!c) { c = { month, category: r.category, currencyCode: r.currencyCode, resolved: 0, upheld: 0, rejected: 0, refundedCents: 0 }; byKey.set(k, c); }
+    c.resolved += 1;
+    if (r.resolutionOutcome === "PARTIAL_REFUND" || r.resolutionOutcome === "FULL_REFUND") {
+      c.upheld += 1;
+      c.refundedCents += r.resolutionRefundCents ?? 0;
+    } else if (r.resolutionOutcome === "REJECTED") {
+      c.rejected += 1;
+    }
+  }
+  return [...byKey.values()].sort((a, b) => b.month.localeCompare(a.month) || a.category.localeCompare(b.category) || a.currencyCode.localeCompare(b.currencyCode));
 }
 
 /** Ce qui est dû, gelé, revenu ou proposé AUJOURD'HUI, par devise (passifs — jamais un revenu). */

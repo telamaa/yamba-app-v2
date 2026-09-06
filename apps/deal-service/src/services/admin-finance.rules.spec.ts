@@ -93,7 +93,7 @@ describe("admin-finance.rules (C-PR5a, D58)", () => {
 });
 
 describe("C-PR5b (D58 5A) — rapport mensuel, export CSV, bornes du remboursement manuel", () => {
-  const { buildFinanceReport, buildFinanceSnapshot, buildFinanceCsv, csvCell, csvRowInRange, manualRefundBounds, monthStartUtc, monthKey } = jest.requireActual("./admin-finance.rules") as typeof import("./admin-finance.rules");
+  const { buildClaimsReport, buildFinanceReport, buildFinanceSnapshot, buildFinanceCsv, csvCell, csvRowInRange, manualRefundBounds, monthStartUtc, monthKey } = jest.requireActual("./admin-finance.rules") as typeof import("./admin-finance.rules");
   const P = { totalShipperCents: 2957, transportCents: 2000, commissionCents: 957, premiumCents: 0, currencyCode: "EUR" };
   const d = (s: string) => new Date(s);
   const FROM = d("2026-08-01T00:00:00Z"); const TO = d("2026-10-01T00:00:00Z");
@@ -114,6 +114,40 @@ describe("C-PR5b (D58 5A) — rapport mensuel, export CSV, bornes du rembourseme
     expect(r[2]).toMatchObject({ capturedCents: 2957, capturedCount: 1, revenueCents: 0, completedCount: 0 });
     expect(r[0]).toMatchObject({ capturedCents: 2957, capturedCount: 1, refundedCents: 1479, refundCount: 1, paidOutCents: 2000, payoutCount: 1, revenueCents: 957, completedCount: 1, retentionCents: 1478, cancelledCount: 1 });
     expect(r[1]).toMatchObject({ currencyCode: "USD", capturedCents: 2957, revenueCents: 957 });
+  });
+  it("C-PR6d (D74) : revenu moyen par deal terminé — la division, et null quand aucun deal n'est terminé", () => {
+    const r = buildFinanceReport(
+      [
+        { id: "a", status: "COMPLETED", pricing: P, completedAt: d("2026-09-02T10:00:00Z") },
+        { id: "b", status: "COMPLETED", pricing: { ...P, commissionCents: 1000, premiumCents: 600 }, completedAt: d("2026-09-03T10:00:00Z") },
+        // Un mois qui n'a qu'une capture : aucun deal terminé, donc aucun revenu moyen (jamais 0).
+        { id: "c", status: "ACCEPTED", pricing: P, capturedAt: d("2026-08-10T10:00:00Z") },
+      ],
+      FROM, TO
+    );
+    const sept = r.find((m) => m.month === "2026-09")!;
+    expect(sept).toMatchObject({ revenueCents: 957 + 1600, completedCount: 2 });
+    expect(sept.avgRevenuePerCompletedCents).toBe(Math.round((957 + 1600) / 2));
+    expect(r.find((m) => m.month === "2026-08")!.avgRevenuePerCompletedCents).toBeNull();
+  });
+  it("C-PR6d (D74) : buildClaimsReport — sinistralité par mois de DÉCISION et par catégorie ; un litige ouvert n'est pas un sinistre", () => {
+    const rows = [
+      { resolvedAt: d("2026-09-10T10:00:00Z"), category: "DAMAGED", resolutionOutcome: "PARTIAL_REFUND", resolutionRefundCents: 1200, currencyCode: "EUR" },
+      { resolvedAt: d("2026-09-12T10:00:00Z"), category: "DAMAGED", resolutionOutcome: "FULL_REFUND", resolutionRefundCents: 2957, currencyCode: "EUR" },
+      { resolvedAt: d("2026-09-14T10:00:00Z"), category: "DAMAGED", resolutionOutcome: "REJECTED", resolutionRefundCents: 0, currencyCode: "EUR" },
+      { resolvedAt: d("2026-09-15T10:00:00Z"), category: "NOT_DELIVERED", resolutionOutcome: "FULL_REFUND", resolutionRefundCents: 2957, currencyCode: "EUR" },
+      { resolvedAt: d("2026-08-20T10:00:00Z"), category: "DAMAGED", resolutionOutcome: "FULL_REFUND", resolutionRefundCents: 500, currencyCode: "USD" },
+      // Encore ouvert : aucune date de décision, donc hors registre.
+      { resolvedAt: null, category: "DAMAGED", resolutionOutcome: null, resolutionRefundCents: null, currencyCode: "EUR" },
+      // Décidé avant la période demandée.
+      { resolvedAt: d("2026-06-01T10:00:00Z"), category: "OTHER", resolutionOutcome: "REJECTED", resolutionRefundCents: 0, currencyCode: "EUR" },
+    ];
+    const c = buildClaimsReport(rows, FROM, TO);
+    expect(c.map((x) => `${x.month}|${x.category}|${x.currencyCode}`)).toEqual(["2026-09|DAMAGED|EUR", "2026-09|NOT_DELIVERED|EUR", "2026-08|DAMAGED|USD"]);
+    expect(c[0]).toMatchObject({ resolved: 3, upheld: 2, rejected: 1, refundedCents: 1200 + 2957 });
+    expect(c[1]).toMatchObject({ resolved: 1, upheld: 1, rejected: 0, refundedCents: 2957 });
+    expect(c[2]).toMatchObject({ currencyCode: "USD", resolved: 1, refundedCents: 500 });
+    expect(buildClaimsReport([], FROM, TO)).toEqual([]);
   });
   it("buildFinanceSnapshot : passifs du jour par devise (dû, gelé, renversé ouvert, retenues, proposés)", () => {
     const s = buildFinanceSnapshot([

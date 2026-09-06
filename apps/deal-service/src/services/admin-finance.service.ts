@@ -30,6 +30,7 @@ import type { DealSettlementService } from "./deal-settlement.service";
 import { assertNotParty } from "./deal-mediation.service";
 import {
   buildFinanceCsv,
+  buildClaimsReport,
   buildFinanceReport,
   buildFinanceSnapshot,
   buildMoneyTimeline,
@@ -40,6 +41,7 @@ import {
   payoutFailureDetail,
   payoutFailureKind,
   reconcile,
+  type ClaimRow,
   type FinanceCsvRow,
 } from "./admin-finance.rules";
 
@@ -397,7 +399,7 @@ export function makeAdminFinanceService(provider: PaymentProvider, settlement: D
       const from = monthStartUtc(now, months - 1);
       const to = monthStartUtc(now, -1);
       const gte = { gte: from };
-      const [rows, live] = await Promise.all([
+      const [rows, live, disputes] = await Promise.all([
         prisma.booking.findMany({
           where: { isDeleted: false, OR: [{ capturedAt: gte }, { refundedAt: gte }, { payoutSentAt: gte }, { completedAt: gte }, { closedAt: gte }] } as never,
           select: MONEY_SELECT,
@@ -409,13 +411,35 @@ export function makeAdminFinanceService(provider: PaymentProvider, settlement: D
           } as never,
           select: MONEY_SELECT,
         }),
+        // D74 — sinistralité : les litiges TRANCHÉS de la période. `resolvedAt: { gte }` ne ramène que les
+        // dossiers décidés (un champ absent ne satisfait pas un `gte`), et `status` le confirme explicitement.
+        prisma.dispute.findMany({
+          where: { status: "RESOLVED", resolvedAt: { gte: from } } as never,
+          select: { bookingId: true, category: true, resolvedAt: true, resolutionOutcome: true, resolutionRefundCents: true },
+        }),
       ]);
+      // La devise vient du deal : un litige n'en porte pas. Un litige dont le deal a disparu est ignoré.
+      const currencies = new Map<string, string>();
+      if (disputes.length > 0) {
+        const bookings = await prisma.booking.findMany({ where: { id: { in: disputes.map((d) => d.bookingId) } } as never, select: { id: true, pricing: true } });
+        for (const b of bookings) currencies.set(b.id, b.pricing.currencyCode);
+      }
+      const claimRows: ClaimRow[] = disputes
+        .filter((d) => currencies.has(d.bookingId))
+        .map((d) => ({
+          resolvedAt: d.resolvedAt,
+          category: String(d.category),
+          resolutionOutcome: d.resolutionOutcome ?? null,
+          resolutionRefundCents: d.resolutionRefundCents ?? null,
+          currencyCode: currencies.get(d.bookingId)!,
+        }));
       return {
         from: from.toISOString(),
         to: to.toISOString(),
         generatedAt: now.toISOString(),
         months: buildFinanceReport(rows as unknown as MoneyRecord[], from, to),
         snapshot: buildFinanceSnapshot(live as unknown as MoneyRecord[]),
+        claims: buildClaimsReport(claimRows, from, to),
       };
     },
 

@@ -6,6 +6,7 @@
  */
 const prismaMock = {
   booking: { findUnique: jest.fn(), findMany: jest.fn(), updateMany: jest.fn() },
+  dispute: { findMany: jest.fn() },
   user: { findMany: jest.fn() },
   carrierPage: { findMany: jest.fn() },
   adminAction: { findMany: jest.fn(), create: jest.fn() },
@@ -46,6 +47,7 @@ beforeEach(() => {
   prismaMock.user.findMany.mockResolvedValue([{ id: SHIPPER_ID, firstName: "Aminata", lastName: "Diallo" }, { id: CARRIER_ID, firstName: "Thomas", lastName: "Nkounkou" }]);
   prismaMock.carrierPage.findMany.mockResolvedValue([{ userId: CARRIER_ID, stripeAccountId: "acct_1ABCDEFGHIJKLMNO", stripePayoutsEnabled: true }]);
   prismaMock.adminAction.findMany.mockResolvedValue([]);
+  prismaMock.dispute.findMany.mockResolvedValue([]);
   prismaMock.$transaction.mockImplementation(async (fn: (tx: typeof prismaMock) => Promise<void>) => fn(prismaMock));
 });
 
@@ -159,6 +161,21 @@ describe("C-PR5b — rapport, export journalisé, remboursement manuel", () => {
     expect(r.months[0]).toMatchObject({ revenueCents: 957, paidOutCents: 2000 });
     expect(r.snapshot).toEqual([{ currencyCode: "EUR", pendingPayoutCents: 2000, frozenPayoutCents: 0, reversedOpenCents: 0, heldRetentionCents: 0, proposedRefundCents: 0 }]);
     expect(prismaMock.booking.findMany.mock.calls[0][0].where.OR[0]).toEqual({ capturedAt: { gte: new Date("2026-07-01T00:00:00.000Z") } });
+    expect(r.claims).toEqual([]);
+  });
+  it("C-PR6d (D74) : getReport ramène la sinistralité — litiges TRANCHÉS seulement, devise reprise du deal", async () => {
+    prismaMock.booking.findMany.mockResolvedValueOnce([]);
+    prismaMock.booking.findMany.mockResolvedValueOnce([]);
+    prismaMock.dispute.findMany.mockResolvedValueOnce([
+      { bookingId: ID, category: "DAMAGED", resolvedAt: new Date("2026-09-10T10:00:00Z"), resolutionOutcome: "PARTIAL_REFUND", resolutionRefundCents: 1200 },
+      { bookingId: ID, category: "DAMAGED", resolvedAt: new Date("2026-09-12T10:00:00Z"), resolutionOutcome: "REJECTED", resolutionRefundCents: null },
+      // Deal disparu : sans devise, la ligne est ignorée plutôt qu'inventée.
+      { bookingId: "64b0000000000000000000ff", category: "OTHER", resolvedAt: new Date("2026-09-13T10:00:00Z"), resolutionOutcome: "FULL_REFUND", resolutionRefundCents: 2957 },
+    ]);
+    prismaMock.booking.findMany.mockResolvedValueOnce([{ id: ID, pricing: { currencyCode: "EUR" } }]);
+    const r = await makeService().getReport(3);
+    expect(prismaMock.dispute.findMany.mock.calls[0][0].where).toEqual({ status: "RESOLVED", resolvedAt: { gte: new Date("2026-07-01T00:00:00.000Z") } });
+    expect(r.claims).toEqual([{ month: "2026-09", category: "DAMAGED", currencyCode: "EUR", resolved: 2, upheld: 1, rejected: 1, refundedCents: 1200 }]);
   });
   it("exportCsv : période bornée, lignes filtrées par fait d'argent, journal FINANCE_EXPORTED avec le nombre de lignes", async () => {
     prismaMock.booking.findMany.mockResolvedValue([

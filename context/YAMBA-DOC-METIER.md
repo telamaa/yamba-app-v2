@@ -1821,3 +1821,56 @@ Un Voyageur dont le vol est annulé doit pouvoir retirer son trajet. Jusqu'ici, 
 | ANN23 | Trajet portant un deal accepté, annuler le deal depuis « Mes deals », puis le trajet | Expéditeur remboursé intégralement, annulation comptée au Voyageur, puis trajet annulé |
 | ANN24 | Trajet portant un colis déjà récupéré | L'annulation du trajet reste refusée ; le trajet se termine seul après l'arrivée |
 | ERR1 | En production, déclencher un geste sensible sans fenêtre ouverte (changer son mot de passe) | La porte de confirmation s'ouvre, au lieu d'une erreur muette |
+
+---
+
+# D74 — savoir si le modèle fonctionne, pas seulement ce qu'il faut traiter
+
+## Le besoin
+
+Le back-office savait dire ce qu'il fallait traiter aujourd'hui : les litiges à trancher, les versements en échec, les signalements ouverts. Il ne savait pas dire si l'entreprise marchait.
+
+Cinq questions, posées avant l'ouverture commerciale, restaient sans réponse chiffrée. Les Voyageurs acceptent-ils les demandes qu'on leur envoie ? Sur cent colis livrés, combien finissent en litige ? Combien la plateforme gagne-t-elle réellement par colis ? Quels types de sinistres coûtent, et combien ? Et surtout : ces chiffres seront exigés par un assureur, qui ne se contentera pas d'une réponse approximative.
+
+Les données existaient toutes. Le revenu du mois et le nombre de deals terminés étaient même affichés côte à côte, sans que personne ne fasse la division.
+
+## Ce qui change
+
+Deux endroits du back-office.
+
+**Pilotage, nouvelle section « Taux ».** Deux tuiles pour la période entière, puis un tableau par semaine ou par mois : demandes décidées, acceptées, refusées, expirées, taux d'acceptation, livraisons, litiges, taux de litige.
+
+**Finances, deux ajouts.** Une colonne « Revenu moyen / deal » dans le rapport mensuel, et une section « Sinistralité » : les litiges tranchés, par mois de décision, catégorie et devise, avec le nombre retenu en faveur de l'Expéditeur et la somme remboursée.
+
+### Règles de gestion
+
+- **RG-PIL-10 — Un taux se calcule sur la cohorte.** Le sort d'une demande est compté dans la période où elle a été **faite**, jamais dans celle de la réponse. Une demande de fin août acceptée début septembre compte dans août.
+- **RG-PIL-11 — Une demande non décidée par le Voyageur n'entre dans aucun taux.** Une demande encore en attente, ou annulée par l'Expéditeur avant réponse, est exclue des trois compteurs : elle ne dit rien du comportement du Voyageur.
+- **RG-PIL-12 — Un dénominateur vide affiche « — », jamais « 0 % ».** Un mois sans livraison n'a pas un taux de litige de zéro : il n'a pas de taux.
+- **RG-PIL-13 — Le taux de litige porte sur les colis livrés.** Un litige ouvert pour un colis jamais remis n'est pas à son numérateur ; il figure dans la sinistralité, catégorie « colis non livré ».
+- **RG-FIN-20 — Le revenu moyen par deal est le revenu reconnu du mois divisé par le nombre de deals terminés du mois**, et vaut « — » si aucun deal n'a été terminé.
+- **RG-SIN-01 — Un litige n'est un sinistre qu'une fois tranché.** Le registre est daté du mois de la **décision**, pas de l'ouverture : c'est la date à laquelle l'argent bouge. Un litige ouvert n'y figure pas.
+- **RG-SIN-02 — « En faveur de l'Expéditeur » regroupe le remboursement partiel et le remboursement intégral.** Le montant retenu est celui effectivement remboursé par la décision.
+- **RG-SIN-03 — La devise vient du deal**, un litige n'en portant pas. Un litige dont le deal a disparu est ignoré plutôt que rattaché à une devise supposée.
+
+### Ce qui reste hors du back-office
+
+La part d'Expéditeurs qui reviennent, les cohortes et les entonnoirs restent mesurés par l'outil d'audience, conformément à l'arbitrage déjà rendu. Le délai entre une recherche et une demande acceptée n'est pas mesurable côté serveur : les recherches ne sont qu'un compteur journalier, sans horodatage ni visiteur.
+
+### Recette (PIL, suite)
+
+| # | Scénario | Attendu |
+|---|---|---|
+| PIL20 | Pilotage, section « Taux », sur une période sans aucune demande | Les deux tuiles affichent « — », le tableau affiche « — » dans les colonnes de taux |
+| PIL21 | Créer 3 demandes : une acceptée, une refusée, une laissée en attente | Décidées 2, acceptées 1, refusées 1, expirées 0, taux d'acceptation 50 % |
+| PIL22 | Annuler une demande en attente côté Expéditeur, recharger | Le compteur « Décidées » ne bouge pas, le taux non plus |
+| PIL23 | Laisser expirer une demande (24 h, ou forcer le cron) | Expirées passe à 1, le taux d'acceptation se recalcule |
+| PIL24 | Demande faite en fin de semaine, acceptée la semaine suivante | Comptée comme acceptée dans la semaine de la **demande** ; la courbe « Acceptations » la montre la semaine suivante |
+| PIL25 | Livrer 4 colis, ouvrir un litige sur l'un d'eux | Livraisons 4, litiges 1, taux de litige 25 %, la valeur s'affiche en ambre au-delà de 5 % |
+| PIL26 | Ouvrir un litige depuis un colis récupéré mais jamais livré | Le taux de litige ne change pas ; le litige apparaît dans la sinistralité une fois tranché |
+| FIN30 | Rapport financier, mois avec 2 deals terminés | « Revenu moyen / deal » = revenu du mois divisé par 2 |
+| FIN31 | Rapport financier, mois sans deal terminé mais avec une capture | « Revenu moyen / deal » affiche « — » |
+| SIN1 | Trancher un litige « Colis endommagé » en remboursement partiel | Ligne « Colis endommagé » : tranchés 1, en faveur de l'Expéditeur 1, remboursé = le montant décidé |
+| SIN2 | Trancher un second litige de la même catégorie en rejet | La même ligne passe à tranchés 2, rejetés 1, le montant remboursé ne bouge pas |
+| SIN3 | Ouvrir un litige sans le trancher | Aucune ligne n'apparaît dans la sinistralité |
+| SIN4 | Trancher deux litiges de catégories différentes | Deux lignes distinctes, triées par mois puis par catégorie |

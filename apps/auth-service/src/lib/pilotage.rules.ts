@@ -81,20 +81,34 @@ export type SeriesInput = {
 
 type FinanceAcc = { capturedCents: number; refundedCents: number; paidOutCents: number; revenueCents: number; retentionCents: number };
 
+/** Un taux en pourcentage entier, ou `null` quand le dénominateur est vide — jamais 0 % pour « on ne sait pas » (D74). */
+export function ratePct(numerator: number, denominator: number): number | null {
+  return denominator > 0 ? Math.round((numerator / denominator) * 100) : null;
+}
+
 /** Chaque fait compte dans la période de SA date. Périodes vides incluses. */
 export function buildSeries(input: SeriesInput, from: Date, to: Date, g: PilotageGranularity): PilotageSeriesPoint[] {
   const points = new Map<string, PilotageSeriesPoint & { _volume: Map<string, number>; _fin: Map<string, FinanceAcc> }>();
   for (const start of periodsBetween(from, to, g)) {
-    points.set(periodKey(start, g), { period: periodKey(start, g), periodStart: start.toISOString(), signups: 0, tripsPublished: 0, requests: 0, accepted: 0, delivered: 0, completed: 0, cancelled: 0, disputes: 0, volume: [], finance: [], _volume: new Map(), _fin: new Map() });
+    points.set(periodKey(start, g), { period: periodKey(start, g), periodStart: start.toISOString(), signups: 0, tripsPublished: 0, requests: 0, accepted: 0, delivered: 0, completed: 0, cancelled: 0, disputes: 0, requestsAccepted: 0, requestsDeclined: 0, requestsExpired: 0, acceptanceRatePct: null, deliveredDisputed: 0, disputeRatePct: null, volume: [], finance: [], _volume: new Map(), _fin: new Map() });
   }
   const fin = (p: { _fin: Map<string, FinanceAcc> }, cur: string) => { let f = p._fin.get(cur); if (!f) { f = { capturedCents: 0, refundedCents: 0, paidOutCents: 0, revenueCents: 0, retentionCents: 0 }; p._fin.set(cur, f); } return f; };
   const at = (d: Date | null | undefined) => (d && d.getTime() >= from.getTime() && d.getTime() < to.getTime() ? points.get(periodKey(d, g)) : undefined);
   for (const d of input.userCreatedAts) { const p = at(d); if (p) p.signups += 1; }
   for (const d of input.tripPublishedAts) { const p = at(d); if (p) p.tripsPublished += 1; }
   for (const b of input.bookings) {
-    let p = at(b.requestedAt); if (p) p.requests += 1;
+    // Cohorte de la DEMANDE (D74) : le sort est compté dans la période de la demande, pas de la réponse.
+    // Une demande encore PENDING, ou annulée par l'Expéditeur avant réponse, n'est décidée par personne.
+    let p = at(b.requestedAt);
+    if (p) {
+      p.requests += 1;
+      if (b.acceptedAt) p.requestsAccepted += 1;
+      else if (b.status === "DECLINED") p.requestsDeclined += 1;
+      else if (b.status === "EXPIRED") p.requestsExpired += 1;
+    }
     p = at(b.acceptedAt); if (p) p.accepted += 1;
-    p = at(b.deliveredAt); if (p) p.delivered += 1;
+    // Cohorte de la LIVRAISON (D74) : parmi les livraisons de la période, celles qui ont fini en litige.
+    p = at(b.deliveredAt); if (p) { p.delivered += 1; if (b.disputedAt) p.deliveredDisputed += 1; }
     p = at(b.disputedAt); if (p) p.disputes += 1;
     const cur = b.pricing.currencyCode;
     if (b.status === "COMPLETED") { p = at(b.completedAt); if (p) { p.completed += 1; fin(p, cur).revenueCents += (b.pricing.commissionCents ?? 0) + (b.pricing.premiumCents ?? 0); } }
@@ -106,6 +120,8 @@ export function buildSeries(input: SeriesInput, from: Date, to: Date, g: Pilotag
   }
   return [...points.values()].map(({ _volume, _fin, ...pt }) => ({
     ...pt,
+    acceptanceRatePct: ratePct(pt.requestsAccepted, pt.requestsAccepted + pt.requestsDeclined + pt.requestsExpired),
+    disputeRatePct: ratePct(pt.deliveredDisputed, pt.delivered),
     volume: [..._volume.entries()].sort().map(([currencyCode, capturedCents]) => ({ currencyCode, capturedCents })),
     finance: [..._fin.entries()].sort().map(([currencyCode, f]) => ({ currencyCode, ...f })),
   }));

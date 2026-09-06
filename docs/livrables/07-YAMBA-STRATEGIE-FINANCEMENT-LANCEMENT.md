@@ -307,33 +307,39 @@ Le back-office affiche aujourd'hui **dix-huit tuiles d'accueil, neuf règles d'a
 courbes de pilotage, neuf colonnes par corridor et un rapport financier mensuel**. Le
 diagnostic sur les indicateurs qui comptent est le suivant.
 
-| Indicateur | État réel |
+L'audit a d'abord conclu qu'aucun des sept indicateurs n'était disponible sous une forme
+utile, et qu'un seul était partiellement affiché. **Quatre ont depuis été construits**, les
+numérateurs et les dénominateurs étant déjà calculés côté serveur. Voici l'état après ce
+travail.
+
+| Indicateur | État |
 |---|---|
-| Taux de demandes acceptées | **Affiché par corridor.** Au global, il n'existe que comme condition d'alerte et n'apparaît que s'il passe sous 30 %. La ventilation entre refus et expiration n'est agrégée nulle part |
-| Part des Expéditeurs qui reviennent | **Absent.** Aucune cohorte, aucun taux de réachat. Les données existent, la mesure est déléguée à l'outil de mesure d'audience |
-| Délai entre publication et première demande | **Absent.** Les deux dates existent en base, aucun calcul de délai n'est fait |
-| Commission encaissée par colis | **Non calculé.** Le revenu du mois et le nombre de dossiers terminés sont affichés côte à côte, la division n'est faite nulle part |
-| Litiges rapportés aux livraisons | **Non calculé.** Les deux courbes existent, le ratio n'est jamais fait |
+| Taux de demandes acceptées | **Construit.** Section « Taux » du pilotage, avec la ventilation entre refus et expiration, par semaine ou par mois, et sur la période entière |
+| Litiges rapportés aux livraisons | **Construit.** Même section, avec mise en évidence au-delà de 5 % |
+| Commission encaissée par colis | **Construit.** Colonne « Revenu moyen par deal » du rapport financier mensuel |
+| Colis perdus ou endommagés et montant indemnisé | **Construit.** Section « Sinistralité » du rapport financier : litiges tranchés par mois de décision, catégorie et devise, avec la somme remboursée. C'est la pièce destinée au courtier |
+| Part des Expéditeurs qui reviennent | **Délégué à l'outil de mesure d'audience**, conformément à un arbitrage déjà rendu. Les événements nécessaires sont émis |
+| Délai entre publication et première demande | **Délégué de même** |
+| Délai recherche vers demande acceptée | **Hors de portée du serveur.** Les recherches ne sont qu'un compteur journalier, sans horodatage ni visiteur. Mesurable uniquement dans l'outil d'audience |
 | Part des trajets recevant au moins une demande | **Absent.** L'agrégation se fait par corridor, jamais par trajet |
-| Délai recherche vers demande acceptée | **Donnée manquante.** Les recherches ne sont qu'un compteur journalier sans horodatage ni visiteur. Mesurable uniquement dans l'outil d'audience |
-| Colis perdus ou endommagés et montant indemnisé | **Non agrégé.** La catégorie de litige et le montant remboursé existent par dossier, aucune somme par catégorie n'est produite |
 
-**Conclusion.** Le back-office est un excellent outil d'exploitation : il dit ce qu'il faut
-traiter aujourd'hui. Ce n'est pas un outil de pilotage de marché : il ne dit pas si le modèle
-fonctionne. Aucun des sept indicateurs n'est disponible sous la forme utile, et un seul est
-partiellement affiché.
+**Deux principes ont été posés en construisant ces taux**, et ils comptent plus que les
+chiffres eux-mêmes.
 
-Deux conséquences pratiques.
+Un taux se calcule sur la **cohorte** : le sort d'une demande compte dans la période où elle a
+été faite, jamais dans celle de la réponse. L'ancien calcul de l'alerte divisait les
+acceptations d'une fenêtre par les demandes de la même fenêtre, ce qui mélange deux
+populations et peut dépasser cent pour cent.
 
-**La clé de mesure d'audience doit être posée avant la première livraison.** Les événements de
-parcours sont déjà émis, côté navigateur comme côté serveur, et couvrent le taux
-d'acceptation, le réachat, le délai jusqu'à la première demande et le délai depuis la
-recherche. Sans la clé, rien n'est enregistré, et un historique ne se reconstitue pas.
+Un dénominateur vide affiche **« — », jamais « 0 % »**. À dix colis par mois, afficher un taux
+de litige nul pour un mois sans livraison ferait passer une absence de données pour un bon
+résultat.
 
-**Quatre ratios manquants sont peu coûteux à ajouter** au pilotage, puisque les numérateurs et
-les dénominateurs sont déjà calculés : le taux d'acceptation global, la commission moyenne par
-dossier, le taux de litige, et le montant indemnisé par catégorie de litige. Ce dernier est
-celui que réclamera l'assureur.
+**Ce qui reste à faire, et qui ne demande aucune ligne de code : poser la clé de mesure
+d'audience avant la première livraison.** Les événements de parcours sont déjà émis, côté
+navigateur comme côté serveur. Sans la clé, rien n'est enregistré, et cet historique ne se
+reconstitue pas, contrairement aux quatre ratios ci-dessus qui se recalculent depuis la base
+et sont donc rétroactifs.
 
 Les deux dernières lignes ont une double fonction. Elles pilotent l'activité, et elles
 constituent le dossier de sinistralité qui sera demandé par tout assureur lors de la

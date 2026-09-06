@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ApiError, apiFetch } from "@/lib/api";
-import { dateTime, money } from "@/lib/format";
+import { CATEGORY_LABEL, dateTime, money } from "@/lib/format";
 import { can } from "@/lib/permissions";
 import type { AdminMe, FinanceReport } from "@/lib/types";
 
@@ -59,10 +59,10 @@ export default function FinanceReportView() {
             <div className="mt-2 overflow-x-auto rounded-xl border border-slate-200 bg-white">
               <table className="w-full text-[12.5px]">
                 <thead className="bg-slate-50 text-left text-[11px] uppercase tracking-wider text-slate-500">
-                  <tr><th className="px-3 py-2">Mois</th><th className="px-3 py-2">Devise</th><th className="px-3 py-2 text-right">Encaissé</th><th className="px-3 py-2 text-right">Remboursé</th><th className="px-3 py-2 text-right">Versé</th><th className="px-3 py-2 text-right">Revenu (commission + prime)</th><th className="px-3 py-2 text-right">Retenues nées</th><th className="px-3 py-2 text-right">Deals terminés / annulés</th></tr>
+                  <tr><th className="px-3 py-2">Mois</th><th className="px-3 py-2">Devise</th><th className="px-3 py-2 text-right">Encaissé</th><th className="px-3 py-2 text-right">Remboursé</th><th className="px-3 py-2 text-right">Versé</th><th className="px-3 py-2 text-right">Revenu (commission + prime)</th><th className="px-3 py-2 text-right">Revenu moyen / deal</th><th className="px-3 py-2 text-right">Retenues nées</th><th className="px-3 py-2 text-right">Deals terminés / annulés</th></tr>
                 </thead>
                 <tbody>
-                  {report.months.length === 0 && <tr><td colSpan={8} className="px-3 py-6 text-center text-slate-500">Aucun mouvement sur la période.</td></tr>}
+                  {report.months.length === 0 && <tr><td colSpan={9} className="px-3 py-6 text-center text-slate-500">Aucun mouvement sur la période.</td></tr>}
                   {report.months.map((m) => (
                     <tr key={`${m.month}|${m.currencyCode}`} className="border-t border-slate-100">
                       <td className="px-3 py-2 font-semibold">{m.month}</td><td className="px-3 py-2">{m.currencyCode}</td>
@@ -70,6 +70,7 @@ export default function FinanceReportView() {
                       <td className="px-3 py-2 text-right tabular-nums">{money(m.refundedCents, m.currencyCode)} <span className="text-[10.5px] text-slate-400">×{m.refundCount}</span></td>
                       <td className="px-3 py-2 text-right tabular-nums">{money(m.paidOutCents, m.currencyCode)} <span className="text-[10.5px] text-slate-400">×{m.payoutCount}</span></td>
                       <td className="px-3 py-2 text-right font-semibold tabular-nums">{money(m.revenueCents, m.currencyCode)}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{m.avgRevenuePerCompletedCents != null ? money(m.avgRevenuePerCompletedCents, m.currencyCode) : "—"}</td>
                       <td className="px-3 py-2 text-right tabular-nums">{money(m.retentionCents, m.currencyCode)}</td>
                       <td className="px-3 py-2 text-right tabular-nums">{m.completedCount} / {m.cancelledCount}</td>
                     </tr>
@@ -78,6 +79,31 @@ export default function FinanceReportView() {
               </table>
             </div>
             <p className="mt-1 text-[11px] text-slate-400">Du {dateTime(report.from)} au {dateTime(report.to)} · calculé le {dateTime(report.generatedAt)}. Un deal capturé en mars et terminé en avril compte dans les deux mois, chaque fait à sa date.</p>
+          </section>
+          <section className="mt-5">
+            <h2 className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Sinistralité (litiges tranchés)</h2>
+            <p className="mt-1 text-[12px] text-slate-500">Par mois de <strong>décision</strong> et par catégorie : c'est la pièce que demandera un assureur. Un litige encore ouvert n'y figure pas, il n'est pas encore un sinistre.</p>
+            <div className="mt-2 overflow-x-auto rounded-xl border border-slate-200 bg-white">
+              <table className="w-full text-[12.5px]">
+                <thead className="bg-slate-50 text-left text-[11px] uppercase tracking-wider text-slate-500">
+                  <tr><th className="px-3 py-2">Mois</th><th className="px-3 py-2">Catégorie</th><th className="px-3 py-2">Devise</th><th className="px-3 py-2 text-right">Tranchés</th><th className="px-3 py-2 text-right">En faveur de l'Expéditeur</th><th className="px-3 py-2 text-right">Rejetés</th><th className="px-3 py-2 text-right">Remboursé</th></tr>
+                </thead>
+                <tbody>
+                  {report.claims.length === 0 && <tr><td colSpan={7} className="px-3 py-6 text-center text-slate-500">Aucun litige tranché sur la période.</td></tr>}
+                  {report.claims.map((c) => (
+                    <tr key={`${c.month}|${c.category}|${c.currencyCode}`} className="border-t border-slate-100">
+                      <td className="px-3 py-2 font-semibold">{c.month}</td>
+                      <td className="px-3 py-2">{CATEGORY_LABEL[c.category] ?? c.category}</td>
+                      <td className="px-3 py-2">{c.currencyCode}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{c.resolved}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{c.upheld}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{c.rejected}</td>
+                      <td className="px-3 py-2 text-right font-semibold tabular-nums">{money(c.refundedCents, c.currencyCode)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </section>
           {can(me?.adminRoles, "finances.export") && (
             <section className="mt-5 rounded-xl border border-slate-200 bg-white p-4">
