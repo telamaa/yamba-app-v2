@@ -9,6 +9,7 @@ Quatre documents de transmission, chacun en Markdown (source) et en PDF (génér
 | 3 | Documentation d'utilisation de l'API de bout en bout | intégrateurs, mobile, développeurs | `03-YAMBA-DOCUMENTATION-API.md` | `.pdf` |
 | 4 | Documentation technique de bout en bout | développeurs (junior compris) | `04-YAMBA-DOCUMENTATION-TECHNIQUE.md` | `.pdf` |
 | 5 | Guide de configuration complet | qui installe ou déploie | `05-YAMBA-CONFIGURATION.md` | `.pdf` |
+| 6 | Préparer le chantier mobile | avant d'ouvrir le chantier mobile | `06-YAMBA-PREPARATION-MOBILE.md` | `.pdf` |
 
 ## Régénérer
 
