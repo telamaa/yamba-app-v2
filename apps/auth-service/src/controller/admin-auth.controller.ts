@@ -50,6 +50,7 @@ import {
   storeAdminSession,
   totpFailuresExceeded,
 } from "../utils/admin-session";
+import { appliedAuditFilters, buildAuditWhere } from "../lib/admin-audit.query"; // A149
 import {
   ADMIN_PREAUTH_COOKIE,
   ADMIN_REFRESH_COOKIE,
@@ -322,7 +323,11 @@ const AUDIT_PAGE = 50;
 export const listAdminAudit = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const cursor = typeof req.query.cursor === "string" && /^[a-f0-9]{24}$/.test(req.query.cursor) ? req.query.cursor : undefined;
+    // A149 — filtres du journal : période, auteur, action, cible, IP (règle pure, valeur mal formée ignorée).
+    const q = req.query as Record<string, string | undefined>;
+    const where = buildAuditWhere({ from: q.from, to: q.to, adminUserId: q.adminUserId, action: q.action, targetType: q.targetType, targetId: q.targetId, ip: q.ip });
     const rows = await prisma.adminAction.findMany({
+      where,
       orderBy: { createdAt: "desc" },
       take: AUDIT_PAGE + 1,
       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
@@ -344,6 +349,7 @@ export const listAdminAudit = async (req: AuthenticatedRequest, res: Response, n
         ip: r.ip,
       })),
       nextCursor: rows.length > AUDIT_PAGE ? page[page.length - 1].id : null,
+      appliedFilters: appliedAuditFilters({ from: q.from, to: q.to, adminUserId: q.adminUserId, action: q.action, targetType: q.targetType, targetId: q.targetId, ip: q.ip }),
     });
   } catch (e) {
     return next(e);

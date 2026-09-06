@@ -1993,3 +1993,80 @@ Découvert en le rejouant : `seed-deals.ts` échouait sur `prisma.booking.create
 
 ### Preuves
 trip **209** (spec du mapper mise à jour : plus de tiret) · tsc user-ui + trip · build · miroir i18n · OpenAPI ×5 · seed rejoué de bout en bout (22 réservations) · recherche vérifiée en direct : heures d'arrivée servies, prix au kilo présents.
+
+---
+
+# A149 → A151 — `feat/admin-audit-filters-alerts` : le journal se fouille, les alertes ont leur page
+
+## 1. Le journal d'audit devient consultable (A149)
+`GET /admin/audit` ne prenait qu'un curseur : le seul moyen de retrouver une action était de dérouler. Il accepte maintenant six filtres, tous portés par ce que Mongo indexe.
+
+| Filtre | Paramètre | Remarque |
+|---|---|---|
+| Période | `from`, `to` | Une date seule (`2026-09-12`) inclut la journée entière ; un instant ISO est pris tel quel |
+| Auteur | `adminUserId` | Index `[adminUserId, createdAt]` |
+| Action | `action` | Nouvel index `[action, createdAt]` |
+| Type de cible | `targetType` | Index `[targetType, targetId]` |
+| Identifiant de cible | `targetId` | |
+| IP | `ip` | Égalité |
+
+Règle pure `apps/auth-service/src/lib/admin-audit.query.ts` : **une valeur mal formée est ignorée, jamais une erreur** — un journal ne répond pas 400 parce qu'un identifiant a été mal collé. La réponse renvoie `appliedFilters`, la liste des filtres réellement retenus, pour que l'écran n'affiche pas un filtre sans effet. Cinq tests.
+
+Côté écran (`AuditTable.tsx`) : les six filtres serveur, plus une recherche « contient » **sur les lignes chargées**, détail compris — le détail est du JSON, il ne s'indexe pas, et l'écran l'écrit sous les filtres plutôt que de faire croire à une recherche globale. Le détail est rendu lisible (`clé : valeur · clé : valeur`) au lieu du JSON brut, et chaque valeur du tableau est cliquable pour filtrer dessus.
+
+## 2. Les alertes de seuil quittent l'accueil (A150)
+Les neuf règles s'affichaient toutes sur l'accueil : à trois alertes ouvertes, il fallait dérouler avant d'atteindre les compteurs. L'accueil garde **une ligne** — nombre d'alertes, dont critiques, titre de la plus grave, lien. La page `/alerts` (permission `kpi.read`, entrée « Alertes » dans la navigation) affiche le détail groupé par gravité, avec le nombre d'éléments concernés, le lien d'action, et **les seuils qui ont servi au calcul** renvoyant vers la page Paramètres.
+
+## 3. L'avertissement de clé React sur la page Paramètres (A151)
+`PlatformSettingsEditor` rendait `<><tr key={…}>…</tr>{ligne d'historique}</>` : la clé était posée sur un enfant du fragment, jamais sur l'élément de la liste. React réclamait une clé à chaque rendu. Corrigé en `<Fragment key={def.key}>`.
+
+### Preuves
+auth **180** (+5 : filtres du journal) · tsc auth + admin-ui · `next build` admin-ui · OpenAPI ×5 (les six paramètres documentés) · index Prisma ajouté.
+
+---
+
+# `fix/booking-location-undefined` — l'écran de réservation plantait sur un trajet sans lieu
+
+**Symptôme.** `Cannot read properties of undefined (reading 'kind')` dans `LocationDisplay`, à l'ouverture de l'étape 1 de la réservation : écran blanc, réservation impossible.
+
+**Cause.** `StepParcel` traite deux cas seulement — plusieurs lieux (une liste de choix) ou **un** lieu (`trip.pickupOptions[0]`). Un trajet **sans aucun lieu** tombe dans le second et passe `undefined`. La garde de publication exige au moins un lieu de remise et un de livraison, mais le seed écrit en base et la contourne : les trajets de recette n'en avaient aucun. Même famille que le tiret d'heure d'arrivée et le prix à zéro corrigés la veille — trois symptômes, une seule cause : un jeu d'essai incomplet, et des écrans qui supposaient des données complètes.
+
+**Correctif, en deux temps.**
+1. **L'écran ne suppose plus.** `LocationDisplay` rend `null` sur une entrée absente ; `StepParcel` distingue désormais trois cas et affiche, quand la liste est vide, « le Voyageur n'a pas précisé de lieu : vous conviendrez du point de rendez-vous dans la conversation ». C'est exact : `pickupPlace` est facultatif dans la demande de réservation, le rendez-vous se convient dans le fil (D61). Nouveau composant `LocationMissing`, clé `step1.locationMissing` FR/EN.
+2. **Le seed pose des lieux réalistes** : un terminal de départ et un hall d'arrivée sur chaque trajet, ce qui correspond au cas courant d'un vol.
+
+### Preuves
+tsc user-ui · miroir i18n 29 namespaces · seed rejoué · trajet public vérifié en direct : les deux lieux sont servis.
+
+---
+
+# A152 — `feat/error-pages` : les deux fronts ont des pages d'erreur
+
+Constat de recette : un plantage affichait au membre `BookingFormUi.tsx (615:41)` et la trace de Next. Ni le site ni le back-office n'avaient de frontière d'erreur, de page « introuvable » ni de filet global.
+
+## Ce qui est livré
+
+| Fichier | Rôle |
+|---|---|
+| `apps/user-ui/src/app/[locale]/error.tsx` | Frontière de toutes les pages du site |
+| `apps/user-ui/src/app/[locale]/not-found.tsx` | Page introuvable du site |
+| `apps/user-ui/src/app/global-error.tsx` | Filet quand le layout racine casse |
+| `apps/admin-ui/src/app/error.tsx`, `not-found.tsx`, `global-error.tsx` | Les mêmes pour le back-office |
+| `messages/{fr,en}/errors.json` | Namespace `errors` (30 namespaces) |
+
+## Les trois décisions de conception
+1. **Jamais la trace au membre.** On affiche une **référence d'incident** de huit caractères, copiable, qui est l'identifiant de l'événement Sentry : le support la retrouve en une recherche. Un lien d'email au support la reprend en objet.
+2. **Répondre à la question réelle.** Un plantage dans le tunnel de réservation ne pose qu'une question : « ai-je été débité ? ». La réponse arrive avant tout le reste, en vert, et elle est exacte — l'autorisation de paiement n'a lieu qu'à la création de la demande. La détection se fait sur le chemin (`/book`, `/bookings`).
+3. **La bonne action.** « Réessayer » appelle `reset()` et relance le rendu. Mais si l'erreur est un `ChunkLoadError`, c'est qu'une version a été publiée pendant la navigation : réessayer ne peut pas marcher, seul un rechargement récupère le nouveau code. Le message et le bouton changent alors.
+
+La page introuvable ne propose pas un lien d'accueil mais les deux gestes du produit — chercher un trajet, en publier un — et nomme les causes fréquentes : trajet supprimé, profil masqué (D67). Le membre comprend que le lien n'est pas cassé de son fait.
+
+Côté back-office, le public change : un opérateur veut savoir quoi faire et quoi transmettre. La référence **et** le message technique court sont affichés. La page introuvable rappelle qu'un écran absent du menu peut simplement manquer à son profil.
+
+`global-error` ne se déclenche que si le layout racine lui-même casse : ni traductions, ni thème, ni police. Il porte donc ses propres `<html><body>`, un texte court écrit en dur dans les deux langues, et un seul bouton.
+
+### Preuves
+tsc user-ui + admin-ui · `next build` des deux · miroir i18n 30 namespaces.
+
+### Limite
+Une référence d'incident n'a de valeur que si Sentry est configuré. Sans `NEXT_PUBLIC_SENTRY_DSN`, seul le `digest` de Next s'affiche, moins parlant. Voir le guide de configuration.

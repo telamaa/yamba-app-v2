@@ -21,6 +21,7 @@
     "pickupBlockTitle": "Tu remets le colis à {carrierFirstName}",
     "deliveryBlockTitle": "Le destinataire récupère le colis",
     "locationSingleHint": "Lieu convenu avec le voyageur",
+      "locationMissing": "Le Voyageur n'a pas précisé de lieu pour ce trajet : vous conviendrez ensemble du point de rendez-vous dans la conversation, une fois la demande acceptée.",
     "goldenRules": {
       "title": "Les règles d''or pour un envoi qui se passe bien",
       "pack": "**Emballe soigneusement.** Sac ou boîte solide, papier bulle pour le fragile, scotche correctement.",

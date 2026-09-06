@@ -1,0 +1,27 @@
+{
+  "boundary": {
+    "title": "This page could not be displayed",
+    "message": "A technical incident occurred on our side. Nothing you did is lost: neither your account, nor your shipments, nor your trips.",
+    "booking": "No payment was made. Your card was not charged and no request was sent to the traveler.",
+    "outdated": "A new version of Yamba has just been released. Reload the page to get it.",
+    "retry": "Try again",
+    "reload": "Reload the page",
+    "home": "Back to home",
+    "referenceLabel": "Incident reference",
+    "referenceHelp": "Give it to support if the problem repeats.",
+    "copied": "Reference copied",
+    "support": "Contact support"
+  },
+  "notFound": {
+    "title": "This page does not exist",
+    "message": "The link may be wrong, or the page was removed. A deleted trip or a hidden profile gives the same result.",
+    "search": "Find a trip",
+    "publish": "Publish a trip",
+    "home": "Back to home"
+  },
+  "fatal": {
+    "title": "Yamba is temporarily unavailable",
+    "message": "An unexpected error prevents display. Please reload the page in a moment.",
+    "reload": "Reload"
+  }
+}

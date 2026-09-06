@@ -62,23 +62,27 @@ export default function HomeKpis() {
     <>
       {alerts && (
         <section className="mt-5">
-          <h2 className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Alertes de seuil</h2>
+          {/* A150 — l'accueil ne déroule plus les neuf règles : un résumé, la plus grave, un lien. */}
           {alerts.alerts.length === 0 ? (
             <p className="mt-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-[12.5px] text-emerald-800">Aucune alerte : versements, litiges, relais, emails et liquidité dans les seuils.</p>
           ) : (
-            <ul className="mt-2 space-y-2">
-              {alerts.alerts.map((a) => (
-                <li key={a.rule}>
-                  <Link href={a.href} className={`block rounded-xl border px-3 py-2 hover:opacity-90 ${a.severity === "critical" ? "border-red-200 bg-red-50 text-red-900" : "border-amber-200 bg-amber-50 text-amber-900"}`}>
-                    <span className="mr-2 rounded-full bg-white/70 px-2 py-0.5 text-[10px] font-semibold uppercase">{a.severity === "critical" ? "critique" : "attention"}</span>
-                    <b className="text-[13px]">{a.title}</b>
-                    <span className="ml-2 text-[12px]">{a.detail}</span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
+            (() => {
+              const critical = alerts.alerts.filter((a) => a.severity === "critical");
+              const top = critical[0] ?? alerts.alerts[0];
+              return (
+                <Link href="/alerts" className={`block rounded-xl border px-3 py-2.5 hover:opacity-90 ${critical.length > 0 ? "border-red-200 bg-red-50 text-red-900" : "border-amber-200 bg-amber-50 text-amber-900"}`}>
+                  <div className="flex flex-wrap items-baseline gap-2">
+                    <b className="text-[13px]">
+                      {alerts.alerts.length} alerte{alerts.alerts.length > 1 ? "s" : ""} de seuil
+                      {critical.length > 0 ? ` · ${critical.length} critique${critical.length > 1 ? "s" : ""}` : ""}
+                    </b>
+                    <span className="text-[12px]">la plus grave : {top.title}</span>
+                    <span className="ml-auto text-[11.5px] underline underline-offset-2">Voir les alertes →</span>
+                  </div>
+                </Link>
+              );
+            })()
           )}
-          <p className="mt-1 text-[11px] text-slate-400">Évaluées le {new Date(alerts.evaluatedAt).toLocaleString("fr-FR")} · le support reçoit un email à la première apparition d'une règle dans la journée.</p>
         </section>
       )}
       {settings?.lastChange && (
