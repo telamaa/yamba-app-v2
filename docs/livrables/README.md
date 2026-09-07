@@ -1,6 +1,6 @@
 # Livrables de documentation (septembre 2026)
 
-Quatre documents de transmission, chacun en Markdown (source) et en PDF (généré), livrés par une PR chacun avant le chantier mobile.
+Documents de transmission, chacun en Markdown (source) et en PDF (généré). Les six premiers ont été livrés avant le chantier mobile ; les quatre suivants préparent l'ouverture commerciale (stratégie, assurance, juridique, aides publiques).
 
 | # | Document | Public | Source | PDF |
 |---|---|---|---|---|
@@ -10,6 +10,10 @@ Quatre documents de transmission, chacun en Markdown (source) et en PDF (génér
 | 4 | Documentation technique de bout en bout | développeurs (junior compris) | `04-YAMBA-DOCUMENTATION-TECHNIQUE.md` | `.pdf` |
 | 5 | Guide de configuration complet | qui installe ou déploie | `05-YAMBA-CONFIGURATION.md` | `.pdf` |
 | 6 | Préparer le chantier mobile | avant d'ouvrir le chantier mobile | `06-YAMBA-PREPARATION-MOBILE.md` | `.pdf` |
+| 7 | Stratégie de financement et de lancement | fondateur, futurs partenaires | `07-YAMBA-STRATEGIE-FINANCEMENT-LANCEMENT.md` | `.pdf` |
+| 8 | Dossier de présentation aux assureurs et courtiers | courtiers, assureurs affinitaires | `08-YAMBA-DOSSIER-ASSURANCE.md` | `.pdf` |
+| 9 | Dossier de présentation aux juristes | avocats, délégué à la protection des données | `09-YAMBA-DOSSIER-JURIDIQUE.md` | `.pdf` |
+| 10 | Dossier de demande d'aides publiques | guichets d'aide, réseaux d'accompagnement | `10-YAMBA-DOSSIER-AIDES-PUBLIQUES.md` | `.pdf` |
 
 ## Régénérer
 

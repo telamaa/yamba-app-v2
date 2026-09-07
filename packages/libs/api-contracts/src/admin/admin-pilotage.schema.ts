@@ -22,6 +22,17 @@ export const PilotageSeriesPointSchema = z
     completed: z.number().int(),
     cancelled: z.number().int(),
     disputes: z.number().int(),
+    // C-PR6d (D74) — cohorte de la DEMANDE : le sort d'une demande est compté dans la période où elle a été faite,
+    // jamais dans celle de la réponse. Une demande encore PENDING, ou annulée par l'Expéditeur avant réponse,
+    // n'entre dans aucun des trois compteurs : elle n'a pas été décidée par le Voyageur.
+    requestsAccepted: z.number().int().describe("Demandes de la période finalement acceptées"),
+    requestsDeclined: z.number().int().describe("Demandes de la période refusées par le Voyageur"),
+    requestsExpired: z.number().int().describe("Demandes de la période expirées faute de réponse en 24 h"),
+    acceptanceRatePct: z.number().nullable().describe("acceptées / (acceptées + refusées + expirées) — null si aucune demande décidée"),
+    // C-PR6d (D74) — cohorte de la LIVRAISON. Un litige ouvert depuis PICKED_UP sans livraison n'est pas
+    // au numérateur : il est compté dans la sinistralité du rapport financier, par catégorie.
+    deliveredDisputed: z.number().int().describe("Livraisons de la période ayant donné lieu à un litige"),
+    disputeRatePct: z.number().nullable().describe("litiges / livraisons de la période — null si aucune livraison"),
     volume: z.array(z.object({ currencyCode: z.string(), capturedCents: z.number().int() })).describe("Encaissé (capture) par devise"),
     // C-PR6c (D60 4A) — finances par période et par devise, mêmes règles que le rapport (A114)
     finance: z.array(

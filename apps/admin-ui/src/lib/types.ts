@@ -230,9 +230,10 @@ export type AdminDealMoneyFile = {
   manualRefund: { maxRefundableCents: number; proposal: { amountCents: number; reason: string; byAdmin: string; at: string } | null; last: { amountCents: number; reason: string; byAdmin: string; at: string } | null };
   allowedActions: { retryPayout: boolean; resolveReversal: boolean; reconcile: boolean; proposeRefund: boolean; applyRefund: boolean };
 };
-export type FinanceReportMonth = { month: string; currencyCode: string; capturedCents: number; capturedCount: number; refundedCents: number; refundCount: number; paidOutCents: number; payoutCount: number; revenueCents: number; completedCount: number; retentionCents: number; cancelledCount: number };
+export type FinanceReportMonth = { month: string; currencyCode: string; capturedCents: number; capturedCount: number; refundedCents: number; refundCount: number; paidOutCents: number; payoutCount: number; revenueCents: number; completedCount: number; retentionCents: number; cancelledCount: number; avgRevenuePerCompletedCents: number | null };
+export type FinanceClaimsMonth = { month: string; category: DisputeCategory; currencyCode: string; resolved: number; upheld: number; rejected: number; refundedCents: number };
 export type FinanceSnapshot = { currencyCode: string; pendingPayoutCents: number; frozenPayoutCents: number; reversedOpenCents: number; heldRetentionCents: number; proposedRefundCents: number };
-export type FinanceReport = { from: string; to: string; generatedAt: string; months: FinanceReportMonth[]; snapshot: FinanceSnapshot[] };
+export type FinanceReport = { from: string; to: string; generatedAt: string; months: FinanceReportMonth[]; snapshot: FinanceSnapshot[]; claims: FinanceClaimsMonth[] };
 export type PaymentReconciliation = {
   provider: string; checkedAt: string;
   live: { intentStatus: string; amountCents: number; amountReceivedCents: number; chargeId: string | null; refunds: Array<{ id: string; amountCents: number; status: string; createdAt: string | null }>; transfer: { id: string; amountCents: number; reversedCents: number; createdAt: string | null } | null } | null;
@@ -241,7 +242,7 @@ export type PaymentReconciliation = {
 
 /* ── C-PR6a (D59) — pilotage ── */
 export type PilotageFinancePoint = { currencyCode: string; capturedCents: number; refundedCents: number; paidOutCents: number; revenueCents: number; retentionCents: number };
-export type PilotageSeriesPoint = { period: string; periodStart: string; signups: number; tripsPublished: number; requests: number; accepted: number; delivered: number; completed: number; cancelled: number; disputes: number; volume: Array<{ currencyCode: string; capturedCents: number }>; finance: PilotageFinancePoint[] };
+export type PilotageSeriesPoint = { period: string; periodStart: string; signups: number; tripsPublished: number; requests: number; accepted: number; delivered: number; completed: number; cancelled: number; disputes: number; requestsAccepted: number; requestsDeclined: number; requestsExpired: number; acceptanceRatePct: number | null; deliveredDisputed: number; disputeRatePct: number | null; volume: Array<{ currencyCode: string; capturedCents: number }>; finance: PilotageFinancePoint[] };
 export type PilotageMetric = "signups" | "tripsPublished" | "requests" | "accepted" | "delivered" | "completed" | "cancelled" | "disputes" | "captured" | "refunded" | "paidOut" | "revenue" | "retention";
 export type PilotageDrilldownItem = { kind: "USER" | "TRIP" | "DEAL"; id: string; label: string; at: string; status: string | null; amountCents: number | null; currencyCode: string | null };
 export type PilotageDrilldownResponse = { metric: PilotageMetric; granularity: "week" | "month"; period: string; periodStart: string; periodEnd: string; items: PilotageDrilldownItem[]; total: number; truncated: boolean };

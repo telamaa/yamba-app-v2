@@ -18808,6 +18808,19 @@
             "type": "integer",
             "minimum": -9007199254740991,
             "maximum": 9007199254740991
+          },
+          "avgRevenuePerCompletedCents": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Revenu moyen par deal terminé : revenueCents / completedCount — null si aucun deal terminé"
           }
         },
         "required": [
@@ -18822,7 +18835,8 @@
           "revenueCents",
           "completedCount",
           "retentionCents",
-          "cancelledCount"
+          "cancelledCount",
+          "avgRevenuePerCompletedCents"
         ],
         "additionalProperties": false
       },
@@ -18873,6 +18887,58 @@
         ],
         "additionalProperties": false
       },
+      "FinanceClaimsMonth": {
+        "type": "object",
+        "properties": {
+          "month": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}$",
+            "description": "YYYY-MM (UTC) du mois de la DÉCISION"
+          },
+          "category": {
+            "type": "string",
+            "description": "DisputeCategory du litige"
+          },
+          "currencyCode": {
+            "type": "string"
+          },
+          "resolved": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Litiges tranchés ce mois dans cette catégorie"
+          },
+          "upheld": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Tranchés en faveur de l'Expéditeur (remboursement partiel ou intégral)"
+          },
+          "rejected": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Rejetés"
+          },
+          "refundedCents": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Somme remboursée à l'Expéditeur par ces décisions"
+          }
+        },
+        "required": [
+          "month",
+          "category",
+          "currencyCode",
+          "resolved",
+          "upheld",
+          "rejected",
+          "refundedCents"
+        ],
+        "additionalProperties": false,
+        "description": "Registre de sinistralité par mois et par catégorie — la pièce attendue par un assureur (D74)"
+      },
       "FinanceReport": {
         "type": "object",
         "properties": {
@@ -18902,6 +18968,12 @@
             "items": {
               "$ref": "#/components/schemas/FinanceSnapshot"
             }
+          },
+          "claims": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FinanceClaimsMonth"
+            }
           }
         },
         "required": [
@@ -18909,7 +18981,8 @@
           "to",
           "generatedAt",
           "months",
-          "snapshot"
+          "snapshot",
+          "claims"
         ],
         "additionalProperties": false,
         "description": "Aucun grand livre (D58 1A) : agrégats des champs posés par les transitions. Les frais Stripe ne sont pas en base — rapprocher avec l'export Stripe."
@@ -19034,6 +19107,52 @@
             "minimum": -9007199254740991,
             "maximum": 9007199254740991
           },
+          "requestsAccepted": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Demandes de la période finalement acceptées"
+          },
+          "requestsDeclined": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Demandes de la période refusées par le Voyageur"
+          },
+          "requestsExpired": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Demandes de la période expirées faute de réponse en 24 h"
+          },
+          "acceptanceRatePct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "acceptées / (acceptées + refusées + expirées) — null si aucune demande décidée"
+          },
+          "deliveredDisputed": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Livraisons de la période ayant donné lieu à un litige"
+          },
+          "disputeRatePct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "litiges / livraisons de la période — null si aucune livraison"
+          },
           "volume": {
             "type": "array",
             "items": {
@@ -19115,6 +19234,12 @@
           "completed",
           "cancelled",
           "disputes",
+          "requestsAccepted",
+          "requestsDeclined",
+          "requestsExpired",
+          "acceptanceRatePct",
+          "deliveredDisputed",
+          "disputeRatePct",
           "volume",
           "finance"
         ],

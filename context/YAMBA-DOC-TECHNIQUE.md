@@ -2094,3 +2094,119 @@ Le tableau transverse des tâches planifiées est également corrigé : le cron 
 
 ## Ce que les cahiers signalent sans le corriger
 Deux tâches — le récapitulatif quotidien et le rappel d'inscription — n'ont ni bail ni verrou : deux instances enverraient deux fois. Sans objet aujourd'hui, à traiter avant un déploiement multi-instances. Une carte de battements mal formée désarme la surveillance en silence. Enfin, plusieurs écrans portent encore des données de maquette (un nom, un IBAN partiel, un montant) et une seconde source de textes de réservation emploie un vocabulaire dépassé : chaque point est un scénario de contrôle, pas une correction de ce lot.
+
+---
+
+# C-PR6d (D74) — les quatre ratios qui manquaient au pilotage
+
+## Le constat qui a déclenché le lot
+
+Un audit du back-office, mené avant l'ouverture commerciale, a donné un résultat inconfortable : dix-huit tuiles d'accueil, neuf règles d'alerte, treize courbes de pilotage, neuf colonnes par corridor, un rapport financier mensuel — et **aucun des indicateurs qui disent si le modèle fonctionne**.
+
+| Indicateur cherché | Ce qu'on a trouvé |
+|---|---|
+| Taux de demandes acceptées | Affiché par corridor. Au global, il n'existait que comme condition de l'alerte `ACCEPTANCE_RATE_LOW_7D`, donc invisible tant qu'il ne se dégradait pas sous 30 % |
+| Ventilation refus / expiration | Aucune agrégation : `buildSeries` ne comptait `cancelled` que pour `status === "CANCELLED"` |
+| Commission moyenne par colis | Le revenu du mois et le nombre de deals terminés sont affichés **sur la même ligne** du rapport, la division n'était faite nulle part |
+| Litiges rapportés aux livraisons | Les deux courbes existaient, le ratio jamais |
+| Sinistralité par catégorie | Catégorie et montant remboursé existaient **par dossier**, aucun regroupement |
+
+Autrement dit : les numérateurs et les dénominateurs étaient déjà calculés. Il ne manquait que la division, et la discipline qui va avec.
+
+## Ce qui est livré
+
+**Côté auth-service, `apps/auth-service/src/lib/pilotage.rules.ts`.** Six champs de plus par point de série :
+
+```ts
+requestsAccepted   // demandes de la période finalement acceptées
+requestsDeclined   // refusées par le Voyageur
+requestsExpired    // expirées faute de réponse en 24 h
+acceptanceRatePct  // acceptées / (acceptées + refusées + expirées), null si aucune décidée
+deliveredDisputed  // livraisons de la période ayant fini en litige
+disputeRatePct     // litiges / livraisons, null si aucune livraison
+```
+
+**Côté deal-service, `apps/deal-service/src/services/admin-finance.rules.ts`.** Un champ de plus par ligne mensuelle (`avgRevenuePerCompletedCents`) et une fonction nouvelle, `buildClaimsReport`, qui produit le registre de sinistralité par mois de décision, catégorie et devise.
+
+**Côté back-office.** Une section « Taux » dans le pilotage, deux tuiles et un tableau par période ; une colonne « Revenu moyen / deal » et une section « Sinistralité » dans le rapport financier.
+
+Aucune requête nouvelle n'a été ajoutée au pilotage : le `select` du contrôleur portait déjà `status`, `acceptedAt`, `deliveredAt` et `disputedAt`. Le rapport financier gagne une lecture des litiges tranchés, plus une lecture des deals concernés pour en reprendre la devise.
+
+## Les trois décisions de conception
+
+### 1. Le taux se calcule sur la cohorte, jamais sur la période de la réponse
+
+C'est le cœur du lot, et c'est ce qui rendait l'ancien calcul faux.
+
+L'alerte existante divisait les acceptations d'une fenêtre par les demandes de la même fenêtre. Ces deux nombres ne portent pas sur la même population : une demande faite le 30 août et acceptée le 2 septembre est au dénominateur d'août et au numérateur de septembre. Sur une fin de campagne, ce calcul peut dépasser 100 %.
+
+La version retenue compte le **sort** d'une demande dans la période où elle a été *faite* :
+
+```ts
+let p = at(b.requestedAt);
+if (p) {
+  p.requests += 1;
+  if (b.acceptedAt) p.requestsAccepted += 1;
+  else if (b.status === "DECLINED") p.requestsDeclined += 1;
+  else if (b.status === "EXPIRED") p.requestsExpired += 1;
+}
+```
+
+La courbe « Acceptations », elle, ne bouge pas : elle continue de compter à la date de l'acceptation. Les deux lectures coexistent parce qu'elles répondent à deux questions différentes, et le test le vérifie explicitement.
+
+Le `else if` en cascade porte une règle métier : une demande encore `PENDING`, ou annulée par l'Expéditeur avant réponse, **n'entre dans aucun des trois compteurs**. Elle n'a pas été décidée par le Voyageur, donc elle ne dit rien de son taux d'acceptation. C'est une exclusion volontaire, pas un oubli.
+
+### 2. Un dénominateur vide donne `null`, jamais zéro
+
+```ts
+export function ratePct(numerator: number, denominator: number): number | null {
+  return denominator > 0 ? Math.round((numerator / denominator) * 100) : null;
+}
+```
+
+À dix colis par mois, afficher « 0 % de litiges » pour un mois sans aucune livraison ferait passer une absence de données pour un résultat, et personne ne s'en apercevrait. L'interface rend `null` par « — », et le texte de la page le dit : « — signifie pas de dénominateur, jamais zéro ».
+
+C'est la même règle que celle déjà appliquée à `acceptanceRatePct` par corridor et à `avgPricePerKgCents`. Le lot l'étend, il ne l'invente pas.
+
+### 3. La sinistralité se calcule côté serveur, pas dans la mesure d'audience
+
+La tentation était de laisser la mesure d'audience produire ce registre, comme elle produit déjà les entonnoirs et la rétention (D66 5A).
+
+Deux raisons l'interdisent, et elles ne se contournent pas.
+
+La mesure d'audience **ne voit que les membres ayant consenti** : elle n'est jamais exhaustive, et une sinistralité partielle n'a aucune valeur devant un assureur. Et elle **ne porte pas les montants** : la liste blanche de propriétés qui protège les données personnelles exclut tout ce qui n'est pas un identifiant technique ou un montant déjà autorisé.
+
+Le registre est donc bâti sur `Dispute`, groupé par **mois de décision** — la date à laquelle l'argent bouge, pas celle de l'ouverture :
+
+```ts
+if (r.resolutionOutcome === "PARTIAL_REFUND" || r.resolutionOutcome === "FULL_REFUND") {
+  c.upheld += 1;
+  c.refundedCents += r.resolutionRefundCents ?? 0;
+} else if (r.resolutionOutcome === "REJECTED") {
+  c.rejected += 1;
+}
+```
+
+Un litige encore ouvert n'y figure pas : il n'est pas un sinistre tant qu'il n'est pas tranché.
+
+## Deux pièges rencontrés
+
+**La devise n'est pas sur le litige.** Un `Dispute` ne porte aucun montant en devise : il faut la reprendre du deal. Le service lit donc les réservations concernées après coup, et **ignore les litiges dont le deal a disparu** plutôt que d'inventer une devise par défaut. Le test couvre ce cas.
+
+**Le faux Prisma des tests n'avait pas de modèle `dispute`.** Ajouter une lecture dans `getReport` a cassé un test qui passait depuis des mois, avec une erreur peu lisible. C'est le rappel habituel : un objet mimant Prisma ne signale jamais qu'il lui manque une table, il rend `undefined` et la pile d'appel se déroule ailleurs.
+
+Sur le filtre lui-même, une précaution : `resolvedAt: { gte: from }` ne ramène que les dossiers réellement décidés, un champ absent ne satisfaisant pas un `gte`. Le `status: "RESOLVED"` est ajouté pour que l'intention soit lisible sans connaître ce détail de Mongo — `Dispute.resolvedAt` fait partie des champs qui ont déjà coûté cher sur ce point.
+
+## Ce qui n'a délibérément pas été fait
+
+**La rétention et les cohortes d'Expéditeurs restent à la mesure d'audience.** Un arbitrage a été rendu (D66 5A) ; le réimplémenter côté serveur créerait une seconde vérité pour la même question.
+
+**Le délai entre une recherche et une demande acceptée n'est pas mesuré.** Les recherches ne sont qu'un compteur journalier, sans horodatage ni identifiant de visiteur. L'obtenir supposerait de journaliser chaque recherche, donc de créer un traitement de données personnelles pour un indicateur que la mesure d'audience donne déjà.
+
+**Les ratios ne sont pas des courbes agrandissables.** Le drill-down n'a pas de sens sur un ratio, et une courbe dessinerait un zéro là où il n'y a pas de dénominateur. Un tableau rend « — » correctement, et il affiche au passage la ventilation refus / expiration.
+
+## Une limite assumée
+
+Le taux de litige a pour dénominateur les **livraisons**. Un litige ouvert depuis `PICKED_UP` sans livraison — le cas « colis jamais remis », soit le plus grave — n'est pas à son numérateur. Il apparaît dans la sinistralité, catégorie `NOT_DELIVERED`.
+
+Élargir le dénominateur aux prises en charge supposerait d'ajouter `pickedUpAt` aux séries, ce qui est un vrai gain par ailleurs, la prise en charge étant aujourd'hui invisible du pilotage. À faire le jour où le volume le justifie.

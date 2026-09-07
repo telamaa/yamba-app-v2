@@ -182,6 +182,8 @@ export const FinanceReportMonthSchema = z
     completedCount: z.number().int(),
     retentionCents: z.number().int().describe("Retenues nées ce mois (annulations tardives), quel que soit leur sort"),
     cancelledCount: z.number().int(),
+    // C-PR6d (D74) — la division que personne ne faisait : le modèle tient-il à petite échelle ?
+    avgRevenuePerCompletedCents: z.number().int().nullable().describe("Revenu moyen par deal terminé : revenueCents / completedCount — null si aucun deal terminé"),
   })
   .meta({ id: "FinanceReportMonth" });
 export type FinanceReportMonth = z.infer<typeof FinanceReportMonthSchema>;
@@ -198,8 +200,22 @@ export const FinanceSnapshotSchema = z
   .meta({ id: "FinanceSnapshot" });
 export type FinanceSnapshot = z.infer<typeof FinanceSnapshotSchema>;
 
+/* ── C-PR6d (D74) — sinistralité : ce que le courtier demandera ── */
+export const FinanceClaimsMonthSchema = z
+  .object({
+    month: z.string().regex(/^\d{4}-\d{2}$/).describe("YYYY-MM (UTC) du mois de la DÉCISION"),
+    category: z.string().describe("DisputeCategory du litige"),
+    currencyCode: z.string(),
+    resolved: z.number().int().describe("Litiges tranchés ce mois dans cette catégorie"),
+    upheld: z.number().int().describe("Tranchés en faveur de l'Expéditeur (remboursement partiel ou intégral)"),
+    rejected: z.number().int().describe("Rejetés"),
+    refundedCents: z.number().int().describe("Somme remboursée à l'Expéditeur par ces décisions"),
+  })
+  .meta({ id: "FinanceClaimsMonth", description: "Registre de sinistralité par mois et par catégorie — la pièce attendue par un assureur (D74)" });
+export type FinanceClaimsMonth = z.infer<typeof FinanceClaimsMonthSchema>;
+
 export const FinanceReportSchema = z
-  .object({ from: z.string().datetime(), to: z.string().datetime(), generatedAt: z.string().datetime(), months: z.array(FinanceReportMonthSchema), snapshot: z.array(FinanceSnapshotSchema) })
+  .object({ from: z.string().datetime(), to: z.string().datetime(), generatedAt: z.string().datetime(), months: z.array(FinanceReportMonthSchema), snapshot: z.array(FinanceSnapshotSchema), claims: z.array(FinanceClaimsMonthSchema) })
   .meta({ id: "FinanceReport", description: "Aucun grand livre (D58 1A) : agrégats des champs posés par les transitions. Les frais Stripe ne sont pas en base — rapprocher avec l'export Stripe." });
 export type FinanceReport = z.infer<typeof FinanceReportSchema>;
 
