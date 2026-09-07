@@ -406,7 +406,7 @@ Ordre de demarrage : auth -> trip -> gateway.
   (GET /admin/status, sondage 30 s, editeur de maintenance). Gateway aligne (alias @packages,
   tsconfig). Chantier C : SOLDE (C-PR1 → C-PR8c). Candidat registre : moniteur externe de
   disponibilite avant le lancement. MERGE 05/09 : **#182** (17 checks comptes).
-- Plateforme de tests : 838 (trip 209, deal 494, notification 99, message 36) + auth 138.
+- Plateforme de tests : 860 (trip 209, deal 516, notification 99, message 36) + auth 183 (07/09, post-#227).
 - 04/09 : C-PR6b feat/c6b-admin-alerts (D59 3A / 4A, A129–A131) — neuf regles de seuil
   (evaluateAlerts pur, instantane de dix compteurs), GET /admin/alerts sans etat (accueil
   admin), cron horaire avec dedoublonnage Redis SET NX (un email par regle et par jour, Redis
@@ -450,12 +450,17 @@ Ordre de demarrage : auth -> trip -> gateway.
 - Chantier C admin-ui : SOLDE le 05/09 (C-PR1 #148 → C-PR8c #182 : mediation,
   billets, signalements, users, finances, pilotage, alertes, recherches / exports,
   parametres D62, RGPD D63, maintenance / etat des services / conservation D64).
+  Complete le 07/09 par C-PR6d (D74, #227) : les quatre indicateurs de sante du modele
+  (acceptation par cohorte, litige, revenu moyen par deal, sinistralite par categorie).
   Reste hors chantier : ~~TrustScore interne + plafonds progressifs (D29-2)~~ FAIT (D71),
-  moniteur externe de disponibilite (candidat D64).
+  ~~moniteur externe de disponibilite~~ FAIT (D70).
 - D35 email, D65 sessions, D66 PostHog, D67 profil editable (chantier E), D68 signalement +
   wording D28, D69 page destinataire + glossaire A144, D70 moniteur externe, A145 OpenAPI auth,
-  D71 TrustScore interne : FAITS le 05/09. Reste Jalon 2 : sauvegardes Atlas (a ta main), puis deps
-  + recette globale, puis le chantier mobile (D36).
+  D71 TrustScore interne : FAITS le 05/09 ; D72 + A146-A148 (#212), D73 approche mobile (#224) et
+  D74 indicateurs (#227) FAITS les 06 et 07/09. Reste Jalon 2 : sauvegardes Atlas (a ta main), puis
+  la recette globale a passer avec les quatre cahiers (docs/recette/), puis le chantier mobile (D36,
+  precise par D73). Les cles a ta main avant la recette : ImageKit (absentes du .env — tout
+  televersement echoue), PostHog, identifiant Google, Sentry, webhooks Stripe.
 - Solde sessions auth : FAIT (D65) — reste le cleanup des sessions legacy (30 j post-prod).
 - API : conversion OpenAPI auth-service (contrats Zod), page /docs Scalar
   auth, page /docs index gateway, audit anglais OAS trip-service.
@@ -589,19 +594,19 @@ Ordre de demarrage : auth -> trip -> gateway.
   d'onboarding est enfin demarre, avec filtre isDeleted / emailSuppressedAt et age max 30 j.
   A surveiller en production : volume du premier tour du cron de rappel. MERGE 06/09 : **#212**
   (17 checks comptes).
-- Divergences documents / code (06/09, fix/divergences-documentation) : les 29 ecarts releves par
+- Divergences documents / code (06/09, fix/divergences-documentation, MERGE **#214**) : les 29 ecarts releves par
   les livrables sont corriges dans les documents (le code fait foi) — 16 transitions dans CLAUDE.md,
   ANN-03 recrite (D72), REP-03 informatif, RGP-02 par la page de suivi, six profils admin, seuils
   d'alerte reglables — plus un avertissement en tete des quatre specifications historiques et les
   ecrans admin perimes. La file d'arbitrage lit enfin ses filtres d'URL.
-- Preparation mobile : docs/livrables/06-YAMBA-PREPARATION-MOBILE.md (outils + commandes, gratuit vs
+- Preparation mobile (MERGE 06/09 : **#225**) : docs/livrables/06-YAMBA-PREPARATION-MOBILE.md (outils + commandes, gratuit vs
   payant pour tester sur telephone, blocage depot App Store en local, individuel vs organisation,
   compte d'un tiers, calendrier des depenses).
-- Cahiers de recette (06/09, docs/recette/, .md + .pdf) : 01-WEB (344 scenarios), 02-ADMIN (125),
+- Cahiers de recette (06/09, docs/recette/, .md + .pdf, MERGE **#223**) : 01-WEB (344 scenarios), 02-ADMIN (125),
   03-API (146), 04-CRONS (90) + README (ordre conseille : API, web, admin, crons). Ecrits depuis les
   livrables et le code. Trois defauts corriges au passage, dont redpanda-bootstrap.sh qui ne creait
   pas le sujet messaging-events.
-- Guide de configuration : docs/livrables/05-YAMBA-CONFIGURATION.md (toutes les variables, les dix
+- Guide de configuration (MERGE 06/09 : **#218**, precedence des .env par projet **#222**) : docs/livrables/05-YAMBA-CONFIGURATION.md (toutes les variables, les dix
   services externes, secrets, diagnostic, etat reel de l'installation). A TA MAIN : cles ImageKit
   (absentes du .env — tout televersement echoue), PostHog, identifiant Google, Sentry, webhooks Stripe.
 - Livrables de documentation FAITS le 06/09 (une PR par document, .md + .pdf dans docs/livrables/,
@@ -609,6 +614,35 @@ Ordre de demarrage : auth -> trip -> gateway.
   bout en bout (16 134 + reference generee des 173 endpoints), lot 4 technique de transmission
   (41 578). Outillage : scripts/build-doc-pdf.py (python-markdown + Chrome headless),
   scripts/build-api-reference.py. MERGES 06/09 : **#208 a #211**.
+- Recette 06/09 (fix/recette-affichage, **#215**) : croix de fermeture absente sur la porte de
+  connexion mobile, tiret « — » servi comme heure d'arrivee par le mapper de recherche, pointilles
+  adoucis ; le seed publiait des trajets sans heure d'arrivee ni prix et echouait sur une categorie
+  de colis inexistante. Puis **#217** (journal d'audit filtrable, page des alertes, cle React des
+  parametres), **#219** (l'etape 1 de reservation plantait sur un trajet sans lieu de remise),
+  **#220** (pages d'erreur et pages introuvables sur les deux fronts).
+- D73 GRAVEE le 06/09 (feat/d73-mobile-approche, **#224**) : Android et iOS distingues dans le
+  chantier mobile — construire pour les deux des le socle, publier sequentiellement (Android
+  d'abord), « Se connecter avec Apple » comme prerequis SERVEUR, commission d'achat integre ecartee
+  (le transport est un service reel, hors achat in-app), manifeste de confidentialite Apple. Le
+  guide de configuration gagne son chapitre « Preparer le poste » (outils manquants, blocage du
+  depot App Store en local).
+- Dossiers d'ouverture commerciale FAITS le 06/09 (docs/livrables/, .md + .pdf) : 07 strategie de
+  financement et de lancement, 08 dossier assureurs, 09 dossier juristes, 10 dossier aides
+  publiques. Ecrits pour le flux « Telama seul » ci-dessous (Station F, Bourse French Tech, prets
+  d'honneur, embedded insurance). MERGE 07/09 : **#227**.
+- D74 FAIT le 07/09 (C-PR6d, meme PR **#227**, complete D59 et D66) — les quatre indicateurs qui
+  manquaient, reveles par l'audit des dossiers commerciaux : taux d'acceptation par COHORTE
+  (`accepted / (accepted + declined + expired)`, le sort d'une demande compte dans la periode ou
+  elle a ete FAITE) avec sa ventilation refus / expiration, taux de litige sur les livraisons,
+  revenu moyen par deal termine, registre de sinistralite par categorie (mois de DECISION,
+  categorie, devise, litiges tranches / retenus / somme remboursee — la piece qu'un assureur
+  exigera, D22). Regle transverse : un denominateur vide donne `null`, rendu « — », jamais « 0 % ».
+  Retention, cohortes d'Expediteurs et entonnoirs restent a la mesure d'audience (D66 5A) : pas de
+  seconde verite. Limite assumee : le numerateur du taux de litige ne compte que les colis livres.
+  17 checks comptes ; plateforme a 860 tests (+ auth 183).
+- Releases vers `main` : **#216** (jalon 2 + documentation de transmission), **#221** (correctifs de
+  recette, guide de configuration, pages d'erreur), **#226** (cahiers de recette, approche mobile,
+  preparation du poste).
 - Backlog parametre serveur : classe C du catalogue D62 (tolerance de poids,
   plafonds comptes neufs, plafond express, seuil de trois signalements…).
 - Photos hors TripDocument chez ImageKit sans fileId (colis, pickup, livraison, litige,
