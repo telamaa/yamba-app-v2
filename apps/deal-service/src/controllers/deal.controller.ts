@@ -101,7 +101,7 @@ export const getDeal = async (
     })) as BookingRecord | null;
 
     if (!booking || booking.isDeleted) {
-      return next(new NotFoundError("Deal not found."));
+      return next(new NotFoundError("Deal not found.", { code: "DEAL_NOT_FOUND" }));
     }
 
     const userId: string = req.user.id;
@@ -112,7 +112,7 @@ export const getDeal = async (
       viewerRole = "CARRIER";
     } else {
       // 403 et non 404 : le deal existe, le lecteur n'y est pas partie.
-      return next(new ForbiddenError("You are not a party to this deal."));
+      return next(new ForbiddenError("You are not a party to this deal.", { code: "NOT_A_PARTY" }));
     }
 
     const counterpartId =
@@ -233,10 +233,10 @@ export const getTripDeals = async (
     });
 
     if (!trip || trip.isDeleted) {
-      return next(new NotFoundError("Trip not found."));
+      return next(new NotFoundError("Trip not found.", { code: "TRIP_NOT_FOUND" }));
     }
     if (trip.userId !== req.user.id) {
-      return next(new ForbiddenError("You do not own this trip."));
+      return next(new ForbiddenError("You do not own this trip.", { code: "NOT_TRIP_OWNER" }));
     }
 
     const bookings = (await prisma.booking.findMany({

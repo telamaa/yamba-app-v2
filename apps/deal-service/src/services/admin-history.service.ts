@@ -70,7 +70,7 @@ export function makeAdminHistoryService(clock: () => Date = () => new Date()) {
   return {
     async getDealHistory(admin: AdminActor, bookingId: string): Promise<DealHistoryResponse> {
       const booking = await prisma.booking.findUnique({ where: { id: bookingId }, select: { id: true, shipperId: true, carrierId: true, isDeleted: true } });
-      if (!booking || booking.isDeleted) throw new NotFoundError("Deal not found.");
+      if (!booking || booking.isDeleted) throw new NotFoundError("Deal not found.", { code: "DEAL_NOT_FOUND" });
       const [outbox, adminActions, notifications] = await Promise.all([
         prisma.outboxEvent.findMany({ where: { aggregateType: "booking", aggregateId: bookingId }, orderBy: { occurredAt: "asc" }, take: 500, select: { id: true, eventType: true, payload: true, occurredAt: true, publishedAt: true, attempts: true, lastError: true } }),
         prisma.adminAction.findMany({ where: { targetId: bookingId }, orderBy: { createdAt: "asc" }, take: 200, select: { action: true, adminUserId: true, createdAt: true, after: true } }),

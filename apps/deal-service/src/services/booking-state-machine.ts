@@ -160,9 +160,29 @@ export type BookingLifecycleContext = {
   now?: Date;
 };
 
+/**
+ * Le motif STRUCTURÉ d'un refus de transition (ANO-API-04, recette API 08/09/2026).
+ * La phrase `reason` reste pour l'humain qui lit un journal ; ces champs-ci sont pour le
+ * programme : le front doit pouvoir dire « cette action n'est plus possible **depuis ce
+ * statut** » sans analyser une phrase anglaise, et recharger le deal en connaissant l'état vu
+ * par le serveur. Ils accompagnent toujours le code `TRANSITION_NOT_ALLOWED`.
+ */
+export type BookingRefusal = {
+  /** Le motif machine : pourquoi l'action est refusée. */
+  refusal: "DELETED" | "UNKNOWN_ACTION" | "WRONG_ROLE" | "WRONG_STATUS" | "GUARD";
+  /** L'action demandée, telle que reçue. */
+  action: BookingTransitionAction;
+  /** Le rôle qui l'a demandée. */
+  actor: BookingActor;
+  /** Le statut du deal AU MOMENT du refus — la donnée qui manquait. */
+  from: BookingStatus | null;
+  /** Les statuts depuis lesquels ce rôle PEUT encore faire cette action (vide = jamais). */
+  allowedFrom: readonly BookingStatus[];
+};
+
 export type BookingTransitionCheck =
   | { allowed: true; to: BookingStatus; effects: readonly BookingEffect[] }
-  | { allowed: false; reason: string };
+  | { allowed: false; reason: string; details: BookingRefusal };
 
 export type BookingOperationCheck =
   | { allowed: true }
@@ -429,6 +449,17 @@ const TRANSITIONS: readonly TransitionDef[] = [
  * exécute les effets retournés (+ écriture OutboxEvent, même
  * transaction Mongo).
  */
+/** Fabrique le motif structuré d'un refus — un seul endroit, pour qu'aucun chemin ne l'oublie. */
+function refus(
+  refusal: BookingRefusal["refusal"],
+  action: BookingTransitionAction,
+  actor: BookingActor,
+  from: BookingStatus | null,
+  allowedFrom: readonly BookingStatus[]
+): BookingRefusal {
+  return { refusal, action, actor, from, allowedFrom: [...new Set(allowedFrom)] };
+}
+
 export function canPerform(
   booking: BookingLike,
   action: BookingTransitionAction,
@@ -437,7 +468,7 @@ export function canPerform(
 ): BookingTransitionCheck {
   // Un booking soft-deleted est mort pour toutes les actions.
   if (booking.isDeleted) {
-    return { allowed: false, reason: "Booking not found." };
+    return { allowed: false, reason: "Booking not found.", details: refus("DELETED", action, actor, null, []) };
   }
 
   const fullCtx: Required<BookingLifecycleContext> = {
@@ -446,7 +477,7 @@ export function canPerform(
 
   const candidates = TRANSITIONS.filter((t) => t.action === action);
   if (candidates.length === 0) {
-    return { allowed: false, reason: `Unknown action "${action}".` };
+    return { allowed: false, reason: `Unknown action "${action}".`, details: refus("UNKNOWN_ACTION", action, actor, booking.status, []) };
   }
 
   const byActor = candidates.filter((t) => t.actor === actor);
@@ -454,6 +485,7 @@ export function canPerform(
     return {
       allowed: false,
       reason: `Action "${action}" is not allowed for role ${actor}.`,
+      details: refus("WRONG_ROLE", action, actor, booking.status, []),
     };
   }
 
@@ -462,12 +494,13 @@ export function canPerform(
     return {
       allowed: false,
       reason: `Action "${action}" is not allowed from status ${booking.status}.`,
+      details: refus("WRONG_STATUS", action, actor, booking.status, byActor.map((t) => t.from)),
     };
   }
 
   const guardError = def.guard?.(booking, fullCtx) ?? null;
   if (guardError) {
-    return { allowed: false, reason: guardError };
+    return { allowed: false, reason: guardError, details: refus("GUARD", action, actor, booking.status, [def.from]) };
   }
 
   return { allowed: true, to: def.to, effects: def.effects };

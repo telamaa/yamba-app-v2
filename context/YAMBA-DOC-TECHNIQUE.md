@@ -3011,3 +3011,88 @@ ANO-API-16 et ANO-API-17.
   rendre en 200 perdrait l'événement pour toujours puisque Stripe ne renverrait pas.
 
 notification-service 99 → **107**, deal-service 542 → **552**. Plateforme **929**.
+
+---
+
+# Recette API, chapitre 9 — consignation, et fermeture d'ANO-API-04
+
+Le chapitre 9 n'est pas un chapitre de test : c'est celui où l'on démontre que la campagne est
+**consignée** et que ses critères de sortie sont tenus. Trois travaux réels en sont sortis.
+
+## 1. Cinq fiches jamais jouées, dont une bloquante
+
+Le tableau §9.1 montrait cinq lignes vides — `API-DEAL-03` (**bloquante**), `04`, `13`, `14`, `19`.
+Elles ont été jouées :
+
+| Fiche | Résultat |
+|---|---|
+| API-DEAL-03 | 409 `QUOTE_DIVERGENCE`, `paymentIntentId: null` — **aucune autorisation posée** chez le fournisseur |
+| API-DEAL-04 | 201 `PENDING`, `expiresAt` +24 h, 21 → 18 kg, présent des deux côtés ; charte refusée → 400 |
+| API-DEAL-13 | 200 `CANCELLED`, `refundAmountCents` intégral, aucune pénalité au Voyageur |
+| API-DEAL-14 | 409 (saut d'étape, **le message nomme l'étape attendue**) · 409 (rejeu) · 200 avec la séquence · 409 (deal non `PICKED_UP`) |
+| API-DEAL-19 | 201 · 409 au rejeu · 403 pour l'Expéditrice · 400 sous 50 caractères |
+
+Deux fiches réputées « hors de portée d'une campagne API » ont également été jouées en levant
+l'obstacle : `API-SEC-05` et `API-MSG-12` exigeaient une **session administrateur avec TOTP**. Un
+profil SUPPORT a été posé sur un compte d'essai, la connexion en deux temps jouée, et le code TOTP
+**calculé avec la bibliothèque du dépôt** (`packages/libs/totp`) :
+
+```sh
+npx tsx -e 'import { totpCode } from ".../packages/libs/totp/src/index"; console.log(totpCode(process.argv[1]))' "<secret>"
+```
+
+Le profil a été retiré après les fiches. Zéro bloquante reste en ⏭.
+
+## 2. ANO-API-04 fermée — un 409 qui dit enfin depuis quel état
+
+`409 TRANSITION_NOT_ALLOWED` ne portait qu'une phrase : « Action "accept" is not allowed from status
+ACCEPTED. » La donnée utile — le statut réellement vu par le serveur — n'existait que dans du texte
+anglais.
+
+`BookingTransitionCheck` porte désormais un motif **structuré** :
+
+```ts
+export type BookingRefusal = {
+  refusal: "DELETED" | "UNKNOWN_ACTION" | "WRONG_ROLE" | "WRONG_STATUS" | "GUARD";
+  action: BookingTransitionAction;
+  actor: BookingActor;
+  from: BookingStatus | null;        // le statut au moment du refus
+  allowedFrom: readonly BookingStatus[]; // d'où ce rôle peut encore le faire
+};
+```
+
+Les cinq chemins de refus de `canPerform` le remplissent par une fabrique unique (`refus(...)`),
+pour qu'aucun n'oublie. Les quatre services qui lèvent le 409 le font remonter dans `details` :
+
+```json
+{"type":"booking","code":"TRANSITION_NOT_ALLOWED","refusal":"WRONG_STATUS",
+ "action":"accept","actor":"CARRIER","from":"ACCEPTED","allowedFrom":["PENDING"]}
+```
+
+Le front peut donc dire « ce deal a déjà été accepté » et recharger, sans analyser une phrase.
+
+**Et, dans le même mouvement, les 41 refus métier de deal-service portent un code** :
+`DEAL_NOT_FOUND`, `TRIP_NOT_FOUND`, `NOT_A_PARTY`, `NOT_TRIP_OWNER`, `CARRIER_ONLY`,
+`SHIPPER_ONLY`, `ADMIN_IS_PARTY`, `TRACKING_LINK_NOT_FOUND`, `ARBITRATION_FILE_NOT_FOUND`,
+`REFUND_NOT_ALLOWED`, `REFUND_ABOVE_MAX`, `PAYOUT_NOT_RETRYABLE`, `REVERSAL_NOT_OPEN`… Le
+garde-fou `refusal-codes.spec.ts` (celui écrit pour message-service à ANO-API-20) a été porté au
+service, avec un test dédié aux 403/404 — le cœur d'ANO-API-04.
+
+Le refus de permission admin (`requireAdminPermission`) nommait déjà la permission manquante, mais
+au **premier niveau** du corps, là où le reste de la plateforme lit `details.code`. Les deux formes
+coexistent désormais (additif : l'admin-ui qui lit les champs de tête n'est pas cassé).
+
+## 3. Le tableau de suivi comptait faux
+
+Une rebase avait laissé **seize lignes en double** dans le §9.1 (les blocs `API-MSG-*` et
+`API-NOTIF-*`, une version remplie et une version vide, dans un ordre mêlé) : 162 lignes annoncées
+pour 146 fiches. Dédoublonné en gardant la version remplie, et remis dans l'ordre des chapitres.
+
+Ce n'est pas un défaut de code, mais il méritait la même rigueur : un tableau de suivi qui compte
+faux est exactement ce qui permet à une fiche de disparaître sans que personne s'en aperçoive.
+
+## Tests
+
+`refusal-codes.spec.ts` (3 cas) et `transition-refusal.spec.ts` (5 cas) ; le cas S8 de
+`booking-state-machine.spec.ts` a été étendu au motif structuré.
+deal-service 552 → **560**. Plateforme **937**.

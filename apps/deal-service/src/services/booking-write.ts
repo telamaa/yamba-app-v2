@@ -127,7 +127,7 @@ export function toBookingForWrite(raw: Record<string, unknown>): BookingForWrite
 
 export async function loadBookingForWrite(id: string): Promise<BookingForWrite> {
   const booking = await prisma.booking.findUnique({ where: { id }, select: BOOKING_WRITE_SELECT });
-  if (!booking || booking.isDeleted) throw new NotFoundError("Deal not found.");
+  if (!booking || booking.isDeleted) throw new NotFoundError("Deal not found.", { code: "DEAL_NOT_FOUND" });
   return toBookingForWrite(booking as unknown as Record<string, unknown>);
 }
 

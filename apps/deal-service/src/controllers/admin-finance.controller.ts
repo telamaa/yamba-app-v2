@@ -66,7 +66,7 @@ export function makeAdminFinanceController(service: AdminFinanceService) {
     async getReport(req: AuthenticatedRequest, res: Response, next: NextFunction) {
       try {
         const months = typeof req.query.months === "string" ? Number(req.query.months) : 12;
-        if (!Number.isFinite(months) || months < 1 || months > 24) throw new ValidationError("months must be between 1 and 24.");
+        if (!Number.isFinite(months) || months < 1 || months > 24) throw new ValidationError("months must be between 1 and 24.", { code: "MONTHS_OUT_OF_RANGE" });
         res.status(200).json(await service.getReport(months));
       } catch (e) {
         next(e);

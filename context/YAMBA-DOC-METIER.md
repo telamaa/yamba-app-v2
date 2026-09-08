@@ -2097,3 +2097,44 @@ Rien n'était en défaut. Ce chapitre ne corrige pas, il **atteste** — et comp
 | HK7 | Un message d'un type dont nous ne faisons rien | Accepté et ignoré, jamais une erreur |
 
 Joués le 8 septembre 2026 — voir `context/YAMBA-RECETTE-API-RESULTATS.md`, chapitre 8. Aucun écart.
+
+# Recette API — un refus qui dit ce qu'il faut faire ensuite (lot consignation)
+
+## Le besoin
+
+Une plateforme refuse en permanence : « ce trajet est complet », « ce deal a déjà été accepté »,
+« ce n'est pas votre rôle ». Un refus n'est utile que si l'application peut **le comprendre** et
+dire à la personne quoi faire ensuite. Or la moitié des anomalies de cette campagne ne sont pas des
+fautes de logique : ce sont des refus **mal formulés**. Le serveur savait ce qu'il faisait ; il ne
+savait pas le dire.
+
+Le cas emblématique : quand un Voyageur acceptait un deal déjà accepté (deux clics, deux onglets),
+la réponse disait, en anglais, « cette action n'est pas permise depuis le statut ACCEPTED ».
+L'application ne pouvait ni traduire cette phrase, ni savoir que le deal était **déjà accepté**,
+donc ni proposer la bonne suite (« rechargez, c'est déjà fait »).
+
+## Les règles
+
+- **RG-API-04** — Tout refus dit **trois choses** : un code stable que le programme reconnaît, une
+  phrase lisible pour le journal, et — quand c'est un refus d'état — **l'état réellement vu par le
+  serveur** ainsi que les états depuis lesquels l'action reste possible. La personne doit pouvoir
+  être renseignée sans que le développeur analyse un texte anglais.
+- **RG-API-05** — Un refus de droit dit **quelle habilitation manque**, jamais seulement « interdit ».
+  C'est vrai pour un membre (« seul le Voyageur peut accepter ») comme pour un administrateur
+  (« votre profil n'a pas la permission `audit.read` »).
+- **RG-REC-01** — Une campagne de recette n'est close que si **chaque fiche a un verdict écrit**.
+  Une fiche sans verdict est une couverture manquante, pas un succès ; une fiche bloquante non
+  jouée interdit la mise en production, même si rien n'a été trouvé ailleurs.
+
+## Tests d'acceptation
+
+| Réf | Scénario | Attendu |
+|---|---|---|
+| REF1 | Accepter un deal déjà accepté | Refus indiquant que le deal est **ACCEPTED** et que l'acceptation n'était possible qu'en **PENDING** |
+| REF2 | Remettre un colis déjà livré | Même forme : état vu, états possibles |
+| REF3 | Un tiers consulte un deal qui n'est pas le sien | Refus « vous n'êtes pas partie à ce deal », code exploitable |
+| REF4 | Un identifiant de deal inexistant | Refus « deal introuvable », code exploitable — et rien qui révèle l'existence d'un autre deal |
+| REF5 | Un administrateur SUPPORT ouvre une page réservée | Refus **nommant la permission manquante** ; ses propres pages restent accessibles |
+| REF6 | Un administrateur lit un fil de discussion | Lecture possible, **journalisée** (qui, quand, quel fil), et le code de livraison n'y figure jamais |
+
+Joués le 8 septembre 2026 — voir `context/YAMBA-RECETTE-API-RESULTATS.md`, chapitre 9.

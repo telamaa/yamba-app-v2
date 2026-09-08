@@ -30,10 +30,10 @@ export function makeTrackingLinkService(deps: { db?: TrackingDb; token?: () => s
     /** POST /deals/:id/tracking-link — Expéditeur seul (403 Voyageur), 409 TRACKING_NOT_AVAILABLE hors statuts. */
     async issue(userId: string, bookingId: string): Promise<TrackingLinkResponse> {
       const booking = await db.booking.findUnique({ where: { id: bookingId }, select: { id: true, shipperId: true, carrierId: true, status: true, isDeleted: true, recipient: true } });
-      if (!booking || booking.isDeleted) throw new NotFoundError("Deal not found.");
+      if (!booking || booking.isDeleted) throw new NotFoundError("Deal not found.", { code: "DEAL_NOT_FOUND" });
       if (booking.shipperId !== userId) {
-        if (booking.carrierId === userId) throw new ForbiddenError("Only the shipper shares the tracking link.");
-        throw new ForbiddenError("You are not a party to this deal.");
+        if (booking.carrierId === userId) throw new ForbiddenError("Only the shipper shares the tracking link.", { code: "SHIPPER_ONLY" });
+        throw new ForbiddenError("You are not a party to this deal.", { code: "NOT_A_PARTY" });
       }
       if (!canIssueTrackingLink(booking.status as string)) throw new AppError("Tracking is not available for this deal.", 409, true, { type: "booking", code: "TRACKING_NOT_AVAILABLE" });
       let link = await db.trackingLink.findUnique({ where: { bookingId: booking.id }, select: { token: true, revokedAt: true } });
@@ -45,13 +45,13 @@ export function makeTrackingLinkService(deps: { db?: TrackingDb; token?: () => s
     /** GET /track/:token — sans session. Contenu minimal, 404 uniforme. */
     async publicView(token: string): Promise<PublicTrackingResponse> {
       const link = await db.trackingLink.findUnique({ where: { token }, select: { bookingId: true, revokedAt: true } });
-      if (!link) throw new NotFoundError("Tracking link not found.");
+      if (!link) throw new NotFoundError("Tracking link not found.", { code: "TRACKING_LINK_NOT_FOUND" });
       const booking = await db.booking.findUnique({
         where: { id: link.bookingId as string },
         select: { id: true, status: true, isDeleted: true, recipientRedactedAt: true, recipient: true, shipperId: true, carrierId: true, tripId: true, acceptedAt: true, pickedUpAt: true, deliveredAt: true, closedAt: true, trackingEvents: true },
       });
       if (!booking || !isTrackingVisible({ isDeleted: !!booking.isDeleted, recipientRedactedAt: (booking.recipientRedactedAt as Date | null) ?? null, revokedAt: (link.revokedAt as Date | null) ?? null })) {
-        throw new NotFoundError("Tracking link not found.");
+        throw new NotFoundError("Tracking link not found.", { code: "TRACKING_LINK_NOT_FOUND" });
       }
       const [users, trip] = await Promise.all([
         db.user.findMany({ where: { id: { in: [booking.shipperId as string, booking.carrierId as string] } }, select: { id: true, firstName: true, lastName: true } }),

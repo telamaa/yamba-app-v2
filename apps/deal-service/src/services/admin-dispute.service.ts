@@ -329,15 +329,15 @@ export function makeAdminDisputeService(settings: SettingsReader = platformSetti
 
     async getFile(admin: { id: string; ip?: string | null; userAgent?: string | null }, bookingId: string): Promise<AdminDisputeFile> {
       const booking = (await prisma.booking.findFirst({ where: { id: bookingId, isDeleted: false } })) as unknown as AdminBookingRecord | null;
-      if (!booking || !arbitrationKindOf(booking)) throw new NotFoundError("No arbitration file for this deal.");
+      if (!booking || !arbitrationKindOf(booking)) throw new NotFoundError("No arbitration file for this deal.", { code: "ARBITRATION_FILE_NOT_FOUND" });
       const [dispute, shipper, carrier] = await Promise.all([
         prisma.dispute.findUnique({ where: { bookingId } }),
         prisma.user.findUnique({ where: { id: booking.shipperId }, select: partySelect }),
         prisma.user.findUnique({ where: { id: booking.carrierId }, select: partySelect }),
       ]);
-      if (!shipper || !carrier) throw new NotFoundError("No arbitration file for this deal.");
+      if (!shipper || !carrier) throw new NotFoundError("No arbitration file for this deal.", { code: "ARBITRATION_FILE_NOT_FOUND" });
       const file = toDisputeFile(booking, dispute as unknown as AdminDisputeRecord | null, shipper as AdminPartyRecord, carrier as AdminPartyRecord, new Date(), (await settings.get())["dispute.responseDelayHours"]);
-      if (!file) throw new NotFoundError("No arbitration file for this deal.");
+      if (!file) throw new NotFoundError("No arbitration file for this deal.", { code: "ARBITRATION_FILE_NOT_FOUND" });
       // Journal : l'admin a ouvert un dossier (identités, photos, montants).
       await recordAdminAction(prisma, {
         adminUserId: admin.id,
