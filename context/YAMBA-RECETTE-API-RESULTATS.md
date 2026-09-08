@@ -1301,15 +1301,19 @@ règle tenue par un test ne se redéfait pas au prochain ajout.
 
 ---
 
-## Chapitre 8 — Webhooks (7 fiches sur 8, la huitième remplacée)
+## Chapitre 8 — Webhooks (8 fiches sur 8)
 
 Deux flux entrants, deux mécanismes de signature, deux chemins d'accès. Ce sont les **seuls
 points d'entrée que la plateforme expose au monde extérieur** sans session : leur seule défense est
 la signature.
 
+Les trois fiches Stripe ont d'abord été jouées avec des événements **signés à la main**, la CLI
+n'étant pas installée sur le poste ; elles ont été **rejouées le soir même avec la vraie CLI**
+(§ « Rejeu avec la CLI Stripe » plus bas), ce qui lève la première réserve du verdict.
+
 | Fiche | Ce qui est éprouvé | Résultat | Pourquoi | Recommandation |
 |---|---|---|---|---|
-| API-HOOK-01 | Écoute Stripe locale | **⏭** | la CLI Stripe n'est pas installée sur le poste | remplacée par des événements auto-signés — à rejouer avec la CLI avant la production |
+| API-HOOK-01 | Écoute Stripe locale | **OK** (rejouée le soir même) | CLI installée et lancée avec la clé de test ; secret de signature affiché, chaque événement transmis journalisé avec le code rendu | — |
 | API-HOOK-02 | Les quatre réponses Stripe | **OK** | 200 (type non traité) · 400 (en-tête absent) · 400 (signature invalide) · 501 (sans secret) | — |
 | API-HOOK-03 | Les événements traités | **OK** | annulation par autorisation morte, accusé de capacité, drapeaux du Voyageur suivis dans les deux sens | — |
 | API-HOOK-04 | Rejeu Stripe | **OK** | 200/200 et **un seul** `booking.cancelled` | — |
@@ -1352,6 +1356,55 @@ explique pourquoi cette route ne passe jamais par la passerelle : elle analyse p
 JSON, ce qui déplacerait ne serait-ce qu'une espace et casserait la signature. Vérifié au passage :
 `POST /api/webhooks/stripe` répond **404** — la route n'est pas exposée par la passerelle.
 
+### Rejeu avec la CLI Stripe — la réserve n° 1 est levée
+
+La CLI a été installée (`brew install stripe/stripe-cli/stripe`, 1.50.10) et lancée **sans
+connexion interactive**, en lui passant directement la clé de test du dépôt :
+
+```sh
+stripe listen --api-key "$STRIPE_SECRET_KEY" --forward-to localhost:6003/webhooks/stripe
+# Ready! … Your webhook signing secret is whsec_…
+```
+
+Ce secret a été posé dans le `.env`, deal-service redémarré — **fournisseur Stripe réel cette
+fois**, plus le FAKE de la campagne.
+
+**API-HOOK-01 — OK.** La CLI annonce le secret et journalise chaque événement avec le code rendu
+par le service.
+
+**API-HOOK-02 — OK, quatre réponses confirmées sur de vraies signatures.**
+
+| Cas | Résultat |
+|---|---|
+| `stripe trigger charge.succeeded` (et les `payment_intent.*` de sa séquence) | **200** — types non traités, ignorés volontairement |
+| en-tête `stripe-signature` absent | **400** `Missing stripe-signature header.` |
+| signature invalide | **400** `Invalid webhook signature.` |
+| sans `STRIPE_WEBHOOK_SECRET` | **501** (mesuré plus tôt dans la campagne) |
+
+**API-HOOK-03 — OK, et cette fois de bout en bout sur une autorisation RÉELLE.** C'est la vraie
+valeur ajoutée du rejeu : au lieu d'un événement fabriqué, on a suivi le chemin complet.
+
+1. Devis puis intention de paiement par l'API → `pi_3UDUp1…` créé chez Stripe ;
+2. `stripe payment_intents confirm … --payment-method pm_card_visa` → **`requires_capture`**,
+   `amount_capturable: 1450`, `capture_method: manual` — exactement le modèle de Yamba ;
+3. `POST /api/deals` → **201**, deal `PENDING` sur cette autorisation réelle ;
+4. `stripe payment_intents cancel …` → **Stripe** émet `payment_intent.canceled`, la CLI le
+   transmet signé, le service répond **200** ;
+5. le deal passe **`CANCELLED`**, `closedBy: SYSTEM`, `cancelReason: PAYMENT_AUTHORIZATION_LOST`.
+
+`account.updated` d'un compte connecté inconnu (`stripe trigger account.updated`, événement
+*connect*) → **200** et un avertissement au journal, sans plantage : le comportement voulu quand
+l'événement ne concerne aucun Voyageur de la base.
+
+**API-HOOK-04 — OK.** `stripe events resend` deux fois sur le même `evt_…` : **200 aux trois
+livraisons**, statut du deal inchangé, et toujours **un seul** `booking.cancelled` dans la boîte
+d'envoi.
+
+**Un détail relevé au passage :** la vue Expéditeur ne sert pas `cancelReason` (elle rend `null`),
+alors que la base porte bien `PAYMENT_AUTHORIZATION_LOST`. Ce n'est pas une fuite — c'est
+l'inverse : une information utile que le membre ne voit pas (« votre autorisation bancaire a
+expiré »). À arbitrer côté produit, pas un défaut de sécurité.
+
 ### Axe non demandé — les deux webhooks n'avaient aucun test de contrôleur
 
 Les règles pures étaient couvertes ; la **glu** ne l'était pas. Or c'est exactement la couche où la
@@ -1376,16 +1429,16 @@ notification-service 99 → **107**, deal-service 542 → **552**.
 
 ## 9.1 Ce que la campagne a couvert
 
-**146 fiches, 146 jouées ou justifiées.** Une seule reste en ⏭ : `API-HOOK-01` (mise en place de
-l'écoute Stripe locale), parce que la CLI Stripe n'est pas installée sur le poste — et son objet a
-été atteint autrement, par des événements signés à la main.
+**146 fiches, 146 jouées.** Plus aucune en ⏭ : `API-HOOK-01` (mise en place de l'écoute Stripe
+locale) a d'abord été contournée par des événements signés à la main, puis **rejouée le soir même
+avec la vraie CLI**, ainsi que les trois fiches Stripe qui en dépendaient.
 
 | Gravité | Jouées | OK du premier coup | KO → corrigé | Partiel | ⏭ |
 |---|---|---|---|---|---|
 | **Bloquante** | 54 | 43 | **11** | 0 | **0** |
-| Majeure | 67 | 55 | 10 | 1 | 1 |
+| Majeure | 67 | 56 | 10 | 1 | 0 |
 | Mineure | 25 | 21 | 2 | 2 | 0 |
-| **Total** | **146** | **119** | **23** | **3** | **1** |
+| **Total** | **146** | **120** | **23** | **3** | **0** |
 
 **Vingt-deux anomalies, vingt-deux closes.** Aucune n'a été « acceptée avec contournement » :
 toutes ont été corrigées, testées et contre-éprouvées pendant la campagne.
@@ -1438,7 +1491,7 @@ après correction : export complet, aucune donnée d'un tiers.
 
 Les dix majeures trouvées ont toutes été **corrigées**, aucune acceptée avec contournement. Reste
 une fiche majeure en écart : `API-TRIP-18`, la relance d'un lien de vérification n'est pas
-idempotente (inscrite au journal de dette ci-dessous), et `API-HOOK-01` en ⏭ justifié.
+idempotente (inscrite au journal de dette ci-dessous).
 
 ### 4. Les mineures inscrites au journal de dette — **TENU** (ci-dessous)
 
@@ -1463,9 +1516,11 @@ Le cahier l'exige, et c'est la partie la plus honnête d'un rapport de recette.
 - **Rien sur la cohérence des événements** au-delà de leur effet observable par l'API. La boîte
   d'envoi, le relais, le dédoublonnage et les événements parqués relèvent du cahier n° 4.
 - **Rien sur les écrans.** Une API conforme derrière un écran fautif reste un défaut.
-- **Rien sur Stripe en conditions réelles** : toute la campagne a tourné sur le fournisseur
-  **FAKE**. Les webhooks ont été signés à la main ; ils doivent être rejoués avec la CLI Stripe et
-  un compte de test avant la mise en production (`API-HOOK-01`).
+- **Peu sur Stripe en conditions réelles** : la campagne a tourné sur le fournisseur **FAKE**, à
+  l'exception du rejeu final des fiches webhook, joué sur le vrai Stripe en mode test (autorisation
+  confirmée par carte d'essai, puis annulée chez le fournisseur). Restent non éprouvés : la capture,
+  le versement au Voyageur, le remboursement et le renversement de transfert **en conditions
+  réelles**.
 - **Rien sur l'administration** au-delà des deux fiches jouées ici : le back-office a son propre
   cahier.
 
@@ -1475,11 +1530,13 @@ Le cahier l'exige, et c'est la partie la plus honnête d'un rapport de recette.
 bloquante ouverte, zéro bloquante non jouée, majeures toutes corrigées, mineures inscrites au
 journal de dette.
 
-**Deux réserves explicites**, qui ne conditionnent pas l'acceptation mais doivent être levées avant
-la mise en production :
+**Une réserve explicite** reste, qui ne conditionne pas l'acceptation mais doit être levée avant la
+mise en production : passer trip-service et auth-service au garde-fou `refusal-codes.spec.ts`
+(dette D-4).
 
-1. rejouer les fiches Stripe avec la CLI et un compte de test (`API-HOOK-01`) ;
-2. passer trip-service et auth-service au garde-fou `refusal-codes.spec.ts` (dette D-4).
+~~Rejouer les fiches Stripe avec la CLI et un compte de test~~ — **fait le 08/09 au soir** : CLI
+installée, événements réels signés par Stripe, et surtout une **autorisation réelle annulée chez le
+fournisseur** qui annule bien le deal côté Yamba. Voir « Rejeu avec la CLI Stripe » au chapitre 8.
 
 ## 9.7 Ce que la campagne a appris, au-delà des anomalies
 
