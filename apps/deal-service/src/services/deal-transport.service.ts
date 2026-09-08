@@ -37,17 +37,7 @@ import type {
   RegenerateCodeResponse,
   TrackingStepResponse,
 } from "@packages/api-contracts";
-import {
-  DELIVERY_LOCK_MINUTES,
-  MAX_CODE_REGENERATIONS,
-  MAX_DELIVERY_ATTEMPTS,
-  PAYOUT_DELAY_DAYS,
-  canConfirmTrackingStep,
-  canPerform,
-  canRegenerateCode,
-  type BookingStatus,
-  type BookingTransitionAction,
-} from "./booking-state-machine";
+import { DELIVERY_LOCK_MINUTES, MAX_CODE_REGENERATIONS, MAX_DELIVERY_ATTEMPTS, PAYOUT_DELAY_DAYS, canConfirmTrackingStep, canPerform, canRegenerateCode, isDeliveryLocked, type BookingStatus, type BookingTransitionAction } from "./booking-state-machine";
 import { BookingLifecycleError, baseEventPayload } from "./booking-lifecycle";
 import { applyBookingTransition, loadBookingForWrite, type BookingForWrite } from "./booking-write";
 import { issueDeliveryCode, verifyDeliveryCode } from "@packages/delivery-code";
@@ -277,6 +267,18 @@ export function makeDealTransportService(provider: PaymentProvider, clock: () =>
       const now = clock();
       const booking = await loadBookingForWrite(dealId);
       assertCarrier(booking, user, "deliver");
+      // ANO-API-15 (recette API 08/09/2026) — un verrou ACTIF est un refus typé, pas un
+      // conflit d'état. La garde de la machine refuse bien la transition, mais son motif
+      // remontait en TRANSITION_NOT_ALLOWED sans horizon : le Voyageur, devant le
+      // destinataire, lisait « action impossible » sans savoir quand réessayer, et un client
+      // qui traduit DELIVERY_LOCKED perdait le fil entre le 3e essai et les suivants.
+      if (isDeliveryLocked(machineView(booking), now)) {
+        throw new BookingLifecycleError(
+          "DELIVERY_LOCKED",
+          "Delivery confirmation is temporarily locked.",
+          { lockedUntil: booking.deliveryLockedUntil!.toISOString(), attemptsLeft: 0 }
+        );
+      }
       // Le guard machine : lock 15 min puis plafond — avant même de comparer.
       const { to } = assertTransition(booking, "deliver", "CARRIER", now);
 

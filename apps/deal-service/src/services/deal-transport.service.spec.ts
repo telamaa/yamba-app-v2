@@ -399,12 +399,20 @@ describe("E — deliver (A38)", () => {
     });
   });
 
-  it("verrou actif : refus par le guard machine AVANT toute comparaison (même avec le bon code)", async () => {
+  // ANO-API-15 — le refus reste AVANT toute comparaison, mais il est désormais TYPÉ :
+  // un verrou actif rend DELIVERY_LOCKED avec son horizon, et non TRANSITION_NOT_ALLOWED.
+  // Le Voyageur est devant le destinataire : il doit lire « réessaie à telle heure », pas
+  // « action impossible », et un client qui traduit DELIVERY_LOCKED ne doit pas perdre le
+  // fil entre le troisième essai et les suivants.
+  it("verrou actif : refus TYPÉ avant toute comparaison, avec l'horizon (même avec le bon code)", async () => {
+    const lockedUntil = minutesFromNow(5);
     prismaMock.booking.findUnique.mockResolvedValue(
-      makeBookingRecord({ status: "PICKED_UP", deliveryCodeHash: hash, deliveryLockedUntil: minutesFromNow(5) })
+      makeBookingRecord({ status: "PICKED_UP", deliveryCodeHash: hash, deliveryLockedUntil: lockedUntil })
     );
-    const err = await expectCode(makeService().deliver(CARRIER, BOOKING_ID, { code: "742891" }), "TRANSITION_NOT_ALLOWED");
+    const err = await expectCode(makeService().deliver(CARRIER, BOOKING_ID, { code: "742891" }), "DELIVERY_LOCKED");
     expect(err.message).toContain("locked");
+    expect((err.details as { lockedUntil?: string }).lockedUntil).toBe(lockedUntil.toISOString());
+    expect((err.details as { attemptsLeft?: number }).attemptsLeft).toBe(0);
     expect(prismaMock.booking.updateMany).not.toHaveBeenCalled();
   });
 

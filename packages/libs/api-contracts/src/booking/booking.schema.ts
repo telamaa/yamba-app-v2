@@ -64,7 +64,27 @@ export const BookingRecipientSnapshotSchema = z
   })
   .meta({
     id: "BookingRecipientSnapshot",
-    description: "Recipient contact — visible to both roles (the carrier needs it to deliver)",
+    description: "Recipient contact as the shipper entered it — SHIPPER view only",
+  });
+
+/**
+ * ANO-API-15 — ce que le VOYAGEUR voit du destinataire. Le destinataire est un tiers : ses
+ * coordonnées ont été confiées par l'Expéditeur pour la seule remise du colis. Le Voyageur
+ * reçoit donc le nom dès l'acceptation, le téléphone à partir de la prise en charge, et
+ * **jamais** l'email — qui ne sert à aucun moment à remettre un colis.
+ */
+export const CarrierRecipientViewSchema = z
+  .object({
+    firstName: z.string().nullable(),
+    lastName: z.string().nullable(),
+    phoneE164: z
+      .string()
+      .nullable()
+      .meta({ description: "Opens at PICKED_UP — null before the parcel is in transit" }),
+  })
+  .meta({
+    id: "CarrierRecipientView",
+    description: "Recipient as shown to the carrier: what delivering requires, when it requires it",
   });
 
 export const BookingPlaceSnapshotSchema = z
@@ -296,7 +316,7 @@ export const CarrierBookingViewSchema = z
     trip: BookingTripSnapshotSchema,
     pricing: CarrierPricingSchema,
     parcel: BookingParcelSnapshotSchema,
-    recipient: BookingRecipientSnapshotSchema,
+    recipient: CarrierRecipientViewSchema,
     pickupPlace: BookingPlaceSnapshotSchema.nullish(),
     deliveryPlace: BookingPlaceSnapshotSchema.nullish(),
     shipper: BookingCounterpartSchema,

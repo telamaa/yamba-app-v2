@@ -11223,7 +11223,50 @@
           "email"
         ],
         "additionalProperties": false,
-        "description": "Recipient contact — visible to both roles (the carrier needs it to deliver)"
+        "description": "Recipient contact as the shipper entered it — SHIPPER view only"
+      },
+      "CarrierRecipientView": {
+        "type": "object",
+        "properties": {
+          "firstName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "lastName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "phoneE164": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Opens at PICKED_UP — null before the parcel is in transit"
+          }
+        },
+        "required": [
+          "firstName",
+          "lastName",
+          "phoneE164"
+        ],
+        "additionalProperties": false,
+        "description": "Recipient as shown to the carrier: what delivering requires, when it requires it"
       },
       "BookingPlaceSnapshot": {
         "type": "object",
@@ -12127,7 +12170,7 @@
             "$ref": "#/components/schemas/BookingParcelSnapshot"
           },
           "recipient": {
-            "$ref": "#/components/schemas/BookingRecipientSnapshot"
+            "$ref": "#/components/schemas/CarrierRecipientView"
           },
           "pickupPlace": {
             "anyOf": [

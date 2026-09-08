@@ -2632,3 +2632,65 @@ et un vote invalide restent refusés ; le double aveugle est intact (`myRating` 
 Le test `booking-rating-criteria.spec.ts` (5 cas) couvre les deux rôles, le cas d'un seul critère,
 les refus — et **documente le piège lui-même** en comparant `z.record` et `z.partialRecord`, pour
 que la prochaine migration de Zod ne le réintroduise pas en silence. deal-service 523 → **528**.
+
+# Recette API — deux arbitrages tranchés : le destinataire est minimisé, le verrou dit son horizon (ANO-API-15)
+
+Ces deux points étaient laissés à l'arbitrage à l'issue du chapitre 5.3 : dans les deux cas, le code
+contredisait le cahier **et s'en expliquait**. Les deux explications étaient partiellement justes ;
+voici où passe la ligne.
+
+## Le destinataire côté Voyageur : ce qui sert à livrer, quand cela sert
+
+La vue Voyageur portait le destinataire **complet** — prénom, nom, téléphone **et email** — dès le
+statut `ACCEPTED`, donc avant même d'avoir le colis en main. Le commentaire du mapper l'assumait :
+« il en a besoin pour livrer ».
+
+C'est vrai du **nom** : on ne remet pas un colis à un inconnu. Ce n'est pas vrai de l'**email**, qui
+ne sert à aucun moment de la remise. Et le **téléphone** ne sert qu'une fois le colis en transit.
+
+Le destinataire est un **tiers** : il n'est pas membre, il n'a rien accepté, et ses coordonnées ont
+été confiées par l'Expéditeur pour un usage unique. La minimisation n'est donc pas une précaution de
+principe — c'est la limite de l'usage pour lequel la donnée a été donnée.
+
+| Étape | Ce que le Voyageur voit |
+|---|---|
+| Avant `PICKED_UP` | prénom et nom |
+| À partir de `PICKED_UP` | prénom, nom **et téléphone** |
+| Jamais | l'**email** |
+
+La règle vit dans `apps/deal-service/src/lib/recipient-minimisation.ts`, pure et testée (9 cas dont
+« l'email n'est jamais servi, à aucun statut »). La vue **Expéditeur est inchangée** : il voit ce
+qu'il a saisi.
+
+## Le verrou de livraison : un refus typé, avec son horizon
+
+Après trois codes faux, le quatrième essai — et tous les suivants — répondaient
+`TRANSITION_NOT_ALLOWED`, sans horizon. La garde de la machine refusait bien la transition, mais son
+motif remontait comme un simple conflit d'état : le Voyageur, **debout devant le destinataire**,
+lisait « action impossible » sans savoir quand réessayer, et un client qui traduit `DELIVERY_LOCKED`
+perdait le fil entre le troisième essai et les suivants.
+
+Le service vérifie désormais le verrou explicitement, **avant** la machine, et lève
+`DELIVERY_LOCKED` avec `lockedUntil` et `attemptsLeft: 0`. La machine reste la source de vérité —
+elle refuserait de toute façon — mais le service traduit ce refus dans le code que le contrat
+annonce déjà (`booking-lifecycle.schema.ts` documente `DELIVERY_LOCKED` avec `details.lockedUntil`).
+
+**Contre-épreuve** :
+
+```
+111111 → 409 DELIVERY_CODE_INVALID  attemptsLeft 2
+222222 → 409 DELIVERY_CODE_INVALID  attemptsLeft 1
+333333 → 409 DELIVERY_LOCKED        lockedUntil 2026-09-08T16:40:59.255Z
+444444 → 409 DELIVERY_LOCKED        lockedUntil (identique)
+bon code → 409 DELIVERY_LOCKED      lockedUntil (identique)
+```
+
+## Deux tests existants mis à jour, pas contournés
+
+Ils documentaient l'ancien contrat : « le destinataire est visible côté Carrier » et « refus par le
+guard machine ». Ils ont été **réécrits pour dire la nouvelle règle** — le premier vérifie
+maintenant que le téléphone n'ouvre qu'à la prise en charge et que l'email ne sort jamais, le second
+que le refus est typé et porte son horizon. Un test qui échoue après un changement voulu se met à
+jour en expliquant pourquoi ; il ne se supprime pas.
+
+deal-service 528 → **538**.

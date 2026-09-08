@@ -18,6 +18,7 @@ import {
   type CancellationParams,
 } from "./booking-lifecycle";
 import { DISPUTE_RESPONSE_DELAY_HOURS, type DisputeResolutionView, type PlatformSettingsValues, type RetentionDecisionView } from "@packages/api-contracts";
+import { recipientForCarrier, type RecipientSnapshot } from "../lib/recipient-minimisation";
 
 /** D62 — ce que les vues lisent dans les paramètres (défauts = les anciennes constantes). */
 export type ViewParams = { cancellation: CancellationParams; disputeResponseDelayHours: number };
@@ -474,8 +475,11 @@ export function toCarrierBookingView(
       currencyCode: booking.pricing.currencyCode,
     },
     parcel: toParcelSnapshot(booking.parcel),
-    // Le destinataire est visible côté Carrier : il en a besoin pour livrer.
-    recipient: booking.recipient,
+    // Le destinataire est visible côté Carrier : il en a besoin pour livrer — mais SEULEMENT
+    // ce qui sert à livrer, et seulement quand cela sert (ANO-API-15) : nom dès l'acceptation,
+    // téléphone à partir de la prise en charge, jamais l'email. C'est un tiers qui n'a rien
+    // signé et dont les coordonnées ont été confiées pour un seul usage.
+    recipient: recipientForCarrier(booking.recipient as RecipientSnapshot, booking.status),
     pickupPlace: toPlace(booking.pickupPlace),
     deliveryPlace: toPlace(booking.deliveryPlace),
     shipper: toCounterpart(shipper),
