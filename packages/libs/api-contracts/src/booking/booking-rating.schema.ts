@@ -30,7 +30,15 @@ export const RatingVoteSchema = z.enum(["UP", "DOWN"]).meta({ id: "RatingVote" }
 export const SubmitRatingRequestSchema = z
   .object({
     rating: z.number().int().min(1).max(5).meta({ description: "1 (disappointing) … 5 (excellent) — the only required field" }),
-    criteria: z.record(RatingCriterionSchema, RatingVoteSchema).optional().meta({ description: "Optional thumbs, only the criteria of the rated role are kept" }),
+    /**
+     * ANO-API-14 (recette API 08/09/2026) — `z.partialRecord` et NON `z.record` : depuis
+     * Zod 4, un `record` dont la clé est un enum est EXHAUSTIF, c'est-à-dire que toutes les
+     * valeurs de l'énumération deviennent obligatoires. Un client qui envoyait les trois
+     * critères de son rôle recevait donc 400 en réclamant ceux de l'autre rôle, et la
+     * notation par critères était impossible — alors que la description dit l'inverse et
+     * que le service ne garde que les critères du rôle noté.
+     */
+    criteria: z.partialRecord(RatingCriterionSchema, RatingVoteSchema).optional().meta({ description: "Optional thumbs, only the criteria of the rated role are kept" }),
     comment: z.string().trim().max(RATING_COMMENT_MAX_LENGTH).optional().meta({ description: "Public, attributed, immutable — 280 chars max" }),
   })
   .meta({ id: "SubmitRatingRequest" });
@@ -39,7 +47,9 @@ export type SubmitRatingRequest = z.infer<typeof SubmitRatingRequestSchema>;
 export const MyRatingSchema = z
   .object({
     rating: z.number().int(),
-    criteria: z.record(RatingCriterionSchema, RatingVoteSchema).nullable(),
+    // Même raison qu'au-dessus : une note ne porte QUE les critères de son rôle, la réponse
+    // ne peut donc pas les exiger tous (ANO-API-14).
+    criteria: z.partialRecord(RatingCriterionSchema, RatingVoteSchema).nullable(),
     comment: z.string().nullable(),
     submittedAt: z.iso.datetime(),
   })

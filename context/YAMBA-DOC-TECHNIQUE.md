@@ -2592,3 +2592,43 @@ chiffres, **aucun montant**, aucun email, aucun nom de famille, aucun téléphon
 recherche sur tous les chemins scalaires. Un jeton inventé répond 404.
 
 deal-service 520 → **523**.
+
+# Recette API — la notation par critères était impossible (ANO-API-14) : le piège d'exhaustivité de Zod 4
+
+Fiche API-DEAL-20. Un Expéditeur qui note un Voyageur envoie les trois critères de ce rôle —
+`PUNCTUALITY`, `COMMUNICATION`, `PARCEL_CARE`. Le serveur répondait **400**, en réclamant
+`DECLARATION_CLARITY` et `RESPONSIVENESS` : **les critères de l'autre rôle**.
+
+```ts
+criteria: z.record(RatingCriterionSchema, RatingVoteSchema).optional()   // avant
+```
+
+Depuis **Zod 4**, un `record` dont la clé est une énumération est **exhaustif** : toutes les valeurs
+de l'énumération deviennent obligatoires. En Zod 3, le même code produisait un enregistrement
+partiel. Preuve isolée, hors de tout contexte applicatif :
+
+```js
+z.record(z.enum(["A","B"]), z.string()).safeParse({ A: "x" }).success        // false
+z.partialRecord(z.enum(["A","B"]), z.string()).safeParse({ A: "x" }).success // true
+```
+
+La notation par critères — le cœur de la réputation (D53) — était donc **inutilisable**, sauf à
+envoyer les cinq critères des deux rôles, ce qu'aucun client ne fait. Seul le contournement
+« ne pas envoyer de critères du tout » fonctionnait, le champ étant facultatif.
+
+**Pourquoi personne ne l'a vu.** Le typecheck passe : le type inféré est correct, c'est la
+*validation à l'exécution* qui change. Les tests unitaires du service passent aussi, parce qu'ils ne
+transmettent pas de critères. Et la description du schéma affirmait exactement l'inverse du
+comportement réel : « only the criteria of the rated role are kept ».
+
+**Correction** : `z.partialRecord` sur les deux occurrences — la requête et la réponse, car une note
+ne porte jamais que les critères de son rôle. Vérifié qu'aucun autre `z.record(<enum>, …)` n'existe
+dans le dépôt : les autres enregistrements ont des clés `string`, non concernées par le piège.
+
+**Contre-épreuve** : les trois critères du rôle passent désormais la validation ; un critère inconnu
+et un vote invalide restent refusés ; le double aveugle est intact (`myRating` visible,
+`counterpartRating: null` tant que l'autre n'a pas noté).
+
+Le test `booking-rating-criteria.spec.ts` (5 cas) couvre les deux rôles, le cas d'un seul critère,
+les refus — et **documente le piège lui-même** en comparant `z.record` et `z.partialRecord`, pour
+que la prochaine migration de Zod ne le réintroduise pas en silence. deal-service 523 → **528**.
