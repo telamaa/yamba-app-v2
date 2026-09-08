@@ -22,7 +22,6 @@ import {
 } from "./session-policy";
 
 /** ---------- Constants ---------- */
-const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // OTP lifecycle
 const OTP_TTL_SECONDS = 600;                 // 10 min (était 5 min, aligné avec OTP 6 chiffres)
@@ -157,7 +156,6 @@ export const validateRegistrationData = (
   const lastName = data.lastName?.trim();
   const emailRaw = data.email?.trim();
   const password = data.password;
-  const termsAccepted = data.termsAccepted;
   const termsVersion = data.termsVersion?.trim();
   const privacyVersion = data.privacyVersion?.trim();
 
