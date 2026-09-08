@@ -4166,17 +4166,17 @@ volontairement**.
 | API-GW-20 | Pagination recherche | majeure | pages disjointes | pages disjointes, `nextCursor` null en fin | OK | — |
 | API-GW-21 | Pagination du fil | mineure | vers le passé | ordre ancien→récent, page antérieure vide | OK | — |
 | API-GW-22 | Listes bornées | mineure | ≤ 50 | `?limit=1000` ignoré | OK | — |
-| API-AUTH-01 | Démarrer une inscription | majeure | 200, rien en base | | | |
-| API-AUTH-02 | Consentement obligatoire | majeure | 400 | | | |
-| API-AUTH-03 | Email déjà pris | majeure | 409 | | | |
-| API-AUTH-04 | Mot de passe faible | mineure | 400 `type:"password"` | | | |
-| API-AUTH-05 | Code faux, compteur | majeure | 401 `OTP_INCORRECT` | | | |
-| API-AUTH-06 | Bon code, sans session | majeure | 201, 0 cookie | | | |
-| API-AUTH-07 | Jetons en cookies seulement | **bloquante** | 200, corps sans jeton | | | |
-| API-AUTH-08 | 401 indistinguable | **bloquante** | 401 identiques | | | |
-| API-AUTH-09 | `/auth/me` sans secret | **bloquante** | 200, `fuites: []` | | | |
-| API-AUTH-10 | Rotation révoque l'ancien | majeure | 200 puis 401 | | | |
-| API-AUTH-11 | Mes appareils | majeure | liste + révocation | | | |
+| API-AUTH-01 | Démarrer une inscription | majeure | 200, rien en base | 200, token 64 car., rien en base, code lu dans Mailpit | OK | — |
+| API-AUTH-02 | Consentement obligatoire | majeure | 400 | 400 (refus) et 400 (versions manquantes) | OK | — |
+| API-AUTH-03 | Email déjà pris | majeure | 409 | **400** au lieu de 409, `EMAIL_ALREADY_USED` présent | **KO** | ANO-API-05 |
+| API-AUTH-04 | Mot de passe faible | mineure | 400 `type:"password"` | 400, `details.type:"password"`, `PASSWORD_TOO_SHORT` | OK | — |
+| API-AUTH-05 | Code faux, compteur | majeure | 401 `OTP_INCORRECT` | compteur 4→3→2→1→0 exact, mais **400** au lieu de 401/429 | **KO** | ANO-API-05 |
+| API-AUTH-06 | Bon code, sans session | majeure | 201, 0 cookie | 201, `success:true`, **0 cookie** posé | OK | — |
+| API-AUTH-07 | Jetons en cookies seulement | **bloquante** | 200, corps sans jeton | 200, corps sans jeton ni hash, cookies HttpOnly 900 s / 30 j | OK | — |
+| API-AUTH-08 | 401 indistinguable | **bloquante** | 401 identiques | 401 ×2, corps identiques | OK | — |
+| API-AUTH-09 | `/auth/me` sans secret | **bloquante** | 200, `fuites: []` | 200 mais **4 champs TOTP exposés** au client | **KO** (08/09) → **corrigé** | ANO-API-06 · close |
+| API-AUTH-10 | Rotation révoque l'ancien | majeure | 200 puis 401 | 200, nouveau pot 200, ancien pot **401** | OK | — |
+| API-AUTH-11 | Mes appareils | majeure | liste + révocation | liste + `current` OK, révocation 200 — mais accès encore valide | **KO** | ANO-API-07 |
 | API-AUTH-12 | Mot de passe révoque les sessions | majeure | 200 puis 401 | | | |
 | API-AUTH-13 | Déconnexion | majeure | 200 puis 401 | | | |
 | API-AUTH-14 | Mot de passe oublié muet | **bloquante** | 200 identiques | | | |

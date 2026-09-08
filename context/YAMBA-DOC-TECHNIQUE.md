@@ -2310,3 +2310,55 @@ et **200 à son propriétaire** (D67 1A intacte).
 `apps/trip-service/src/dto/trip-search.dto.spec.ts` (9 cas), `…/lib/public-visibility.rules.spec.ts`
 (3 cas), `apps/auth-service/src/utils/public-visibility.spec.ts` (4 cas). Référence de plateforme :
 trip-service 209 → **221**, auth-service 183 → **187**, total 860 → **872**.
+
+# Recette API — `/auth/me` cesse de suivre le modèle Prisma (ANO-API-06)
+
+Fiche API-AUTH-09, **bloquante**. `GET /auth/me` construisait sa réponse par soustraction :
+
+```ts
+const { passwordHash, ...safeUser } = fullUser;   // avant
+```
+
+C'est le `spread + delete` que les règles non négociables du projet interdisent. La réponse suivait
+donc le modèle `User` : **tout champ ajouté au modèle partait vers le client**. C'est exactement ce
+qui s'est produit avec D54, écrit bien après ce contrôleur — `totpSecretEncrypted` (le secret du
+second facteur, chiffré), `totpBackupCodeHashes` (les hachages des codes de secours),
+`totpLastUsedStep` — auxquels s'ajoutaient les champs de modération interne
+`suspensionProposedReason`, `suspensionProposedLevel`, `suspensionProposedByAdminId`.
+
+Sur un compte sans 2FA, ces champs valent `null` : la lecture seule pouvait faire conclure au faux
+positif. Des valeurs factices posées en base ont levé le doute — le membre recevait bien
+`"totpSecretEncrypted":"FAKE-AES-GCM:…"`, les deux hachages, et le motif de modération rédigé
+contre lui par un administrateur.
+
+## La correction : une liste blanche qui se défend toute seule
+
+`apps/auth-service/src/utils/me-projection.ts` porte deux constantes :
+
+- **`ME_USER_SELECT`** — ce que le membre reçoit, passé tel quel en `select` Prisma ;
+- **`ME_EXCLUDED_FIELDS`** — ce qui est tenu dehors, **avec sa raison en clair** (`totpSecretEncrypted:
+  "secret du second facteur (D54), même chiffré"`), pour qu'un lecteur n'ait pas à fouiller l'historique.
+
+Trois arbitrages méritent d'être écrits. `totpEnabledAt` **reste** : dire « la 2FA est active » ne
+livre rien d'exploitable et le front en a besoin. `suspendedAt` / `suspensionReason` /
+`suspensionUntil` **restent** : une sanction prononcée est notifiée au membre. Mais tout
+`suspensionProposed*` **part** : une proposition est un état interne d'avant décision (D56), et
+`suspendedByAdminId` ne regarde pas le sanctionné.
+
+## Le test qui refuse le silence
+
+Vérifier l'absence de `totpSecretEncrypted` aurait raté le prochain champ sensible. Le test
+(`me-projection.spec.ts`) **lit `prisma/schema.prisma`**, extrait les champs du modèle `User` et
+exige que chacun soit classé — renvoyé ou explicitement exclu :
+
+```ts
+const nonClasses = champsDuModele().filter((c) => !connus.has(c));
+expect(nonClasses).toEqual([]);   // un champ ajouté au modèle doit être classé ici
+```
+
+Le jour où quelqu'un ajoute un champ à `User`, la suite d'auth-service échoue et l'oblige à décider.
+C'est la même technique que le test A145 qui lit les `*.router.ts` pour refuser une route non
+documentée : faire lire le code source par le test plutôt qu'espérer la vigilance.
+
+Vérifié aussi : aucun des champs retirés n'était utilisé par `user-ui` ni `admin-ui`, et plus aucun
+`spread + delete` sur un `User` ne subsiste dans le dépôt. auth-service : 187 → **192** tests.

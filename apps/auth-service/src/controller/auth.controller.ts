@@ -58,6 +58,7 @@ import { AuthenticatedRequest } from "@packages/middleware/isAuthenticated";
 
 // ✨ NEW — Helper pour la génération du slug public à l'inscription
 import { generateUniquePublicSlug } from "../utils/slug.helper";
+import { ME_USER_SELECT } from "../utils/me-projection";
 
 // ───────────────────────────────────────────────────────
 // Helpers
@@ -636,9 +637,12 @@ export const getMe = async (
   try {
     if (!req.user) return next(new AuthError("Unauthorized"));
 
+    // ANO-API-06 — liste BLANCHE explicite (me-projection.ts) : la réponse ne suit plus
+    // le modèle Prisma, un champ nouveau n'est renvoyé que si quelqu'un l'a décidé.
     const fullUser = await prisma.user.findUnique({
       where: { id: req.user.id },
-      include: {
+      select: {
+        ...ME_USER_SELECT,
         carrierPage: {
           select: {
             id: true,
@@ -670,12 +674,10 @@ export const getMe = async (
 
     if (!fullUser) return next(new AuthError("Unauthorized"));
 
-    const { passwordHash, ...safeUser } = fullUser;
-
     return res.status(200).json({
       success: true,
-      user: safeUser,
-      roles: req.roles ?? safeUser.roles ?? [],
+      user: fullUser,
+      roles: req.roles ?? fullUser.roles ?? [],
     });
   } catch (error) {
     return next(error);
