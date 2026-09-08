@@ -84,7 +84,12 @@ const isoDate = z
 // ─── Schema : GET /trips/search ──────────────────────
 
 export const searchTripsQuerySchema = z.object({
-  mode: z.enum(TRANSPORT_MODES).optional().default("all"),
+  // ANO-API-11 bis / ANO-API-10 (recette API 08/09/2026) — un mode inconnu est IGNORÉ,
+  // comme le sont déjà les catégories et les tranches horaires inconnues (`csvOf`). Un
+  // z.enum strict faisait répondre 400 à un lien partagé ou à une ancienne version de
+  // l'application portant un mode retiré du catalogue : une recherche dégrade, elle ne
+  // casse pas.
+  mode: z.enum(TRANSPORT_MODES).optional().default("all").catch("all"),
   from: z.string().trim().min(1).max(100).optional(),
   to: z.string().trim().min(1).max(100).optional(),
   dateFrom: isoDate,
@@ -134,7 +139,12 @@ export type SearchTripsQuery = z.infer<typeof searchTripsQuerySchema>;
  * rester non-filtrés dans le baseWhere des facets.
  */
 export const searchFacetsQuerySchema = z.object({
-  mode: z.enum(TRANSPORT_MODES).optional().default("all"),
+  // ANO-API-11 bis / ANO-API-10 (recette API 08/09/2026) — un mode inconnu est IGNORÉ,
+  // comme le sont déjà les catégories et les tranches horaires inconnues (`csvOf`). Un
+  // z.enum strict faisait répondre 400 à un lien partagé ou à une ancienne version de
+  // l'application portant un mode retiré du catalogue : une recherche dégrade, elle ne
+  // casse pas.
+  mode: z.enum(TRANSPORT_MODES).optional().default("all").catch("all"),
   from: z.string().trim().min(1).max(100).optional(),
   to: z.string().trim().min(1).max(100).optional(),
   dateFrom: isoDate,
