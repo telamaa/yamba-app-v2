@@ -29,22 +29,25 @@ export type RecipientSnapshot = {
   email?: string | null;
 } | null;
 
-/** Ce qui est servi au Voyageur : jamais l'email, le téléphone à partir de la prise en charge. */
+/**
+ * Ce qui est servi au Voyageur : jamais l'email, le téléphone à partir de la prise en charge.
+ * La forme est TOUJOURS la même — un destinataire manquant donne des champs `null`, jamais un
+ * objet absent : un client n'a pas à gérer deux formes pour le même champ.
+ */
 export type CarrierRecipientView = {
   firstName: string | null;
   lastName: string | null;
   phoneE164: string | null;
-} | null;
+};
 
 /** Les statuts à partir desquels le colis est entre les mains du Voyageur. */
 const APRES_PRISE_EN_CHARGE = new Set(["PICKED_UP", "DELIVERED", "COMPLETED", "DISPUTED"]);
 
 export function recipientForCarrier(recipient: RecipientSnapshot, status: string): CarrierRecipientView {
-  if (!recipient) return null;
   const enTransit = APRES_PRISE_EN_CHARGE.has(status);
   return {
-    firstName: recipient.firstName ?? null,
-    lastName: recipient.lastName ?? null,
-    phoneE164: enTransit ? recipient.phoneE164 ?? null : null,
+    firstName: recipient?.firstName ?? null,
+    lastName: recipient?.lastName ?? null,
+    phoneE164: enTransit ? recipient?.phoneE164 ?? null : null,
   };
 }

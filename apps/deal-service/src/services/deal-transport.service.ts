@@ -272,7 +272,7 @@ export function makeDealTransportService(provider: PaymentProvider, clock: () =>
       // remontait en TRANSITION_NOT_ALLOWED sans horizon : le Voyageur, devant le
       // destinataire, lisait « action impossible » sans savoir quand réessayer, et un client
       // qui traduit DELIVERY_LOCKED perdait le fil entre le 3e essai et les suivants.
-      if (isDeliveryLocked(booking, now)) {
+      if (isDeliveryLocked(machineView(booking), now)) {
         throw new BookingLifecycleError(
           "DELIVERY_LOCKED",
           "Delivery confirmation is temporarily locked.",

@@ -36,8 +36,13 @@ describe("recipientForCarrier — ce que le Voyageur voit, et quand", () => {
     }
   });
 
-  it("un deal sans destinataire reste null", () => {
-    expect(recipientForCarrier(null, "PICKED_UP")).toBeNull();
+  it("un destinataire manquant donne des champs null, pas un objet absent", () => {
+    // La forme du DTO ne change jamais : un client n'a pas à gérer deux cas pour un champ.
+    expect(recipientForCarrier(null, "PICKED_UP")).toEqual({
+      firstName: null,
+      lastName: null,
+      phoneE164: null,
+    });
   });
 
   it("les champs absents ne deviennent pas `undefined` dans la réponse", () => {
