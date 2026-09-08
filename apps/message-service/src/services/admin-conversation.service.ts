@@ -21,7 +21,7 @@ export function makeAdminConversationService() {
   return {
     async viewByDeal(actor: AdminActor, bookingId: string): Promise<AdminConversationResponse> {
       const conversation = await prisma.conversation.findUnique({ where: { bookingId } });
-      if (!conversation) throw new NotFoundError("This deal has no conversation.");
+      if (!conversation) throw new NotFoundError("This deal has no conversation.", { code: "CONVERSATION_NOT_FOUND" });
       const [booking, shipper, carrier, messages, meetups, reveals] = await Promise.all([
         prisma.booking.findUnique({ where: { id: bookingId }, select: { status: true, trip: { select: { originCity: true, destinationCity: true, departureAt: true } } } }),
         prisma.user.findUnique({ where: { id: conversation.shipperId }, select: { id: true, firstName: true, lastName: true } }),
@@ -30,7 +30,7 @@ export function makeAdminConversationService() {
         prisma.meetup.findMany({ where: { conversationId: conversation.id }, orderBy: { createdAt: "asc" } }),
         prisma.phoneReveal.findMany({ where: { conversationId: conversation.id }, orderBy: { revealedAt: "asc" } }),
       ]);
-      if (!booking) throw new NotFoundError("Deal not found.");
+      if (!booking) throw new NotFoundError("Deal not found.", { code: "DEAL_NOT_FOUND" });
       const reports = messages.length
         ? await prisma.report.findMany({ where: { targetType: "MESSAGE", targetId: { in: messages.map((m) => m.id) } }, orderBy: { createdAt: "asc" } })
         : [];
@@ -127,11 +127,11 @@ export function makeAdminConversationService() {
     /** Traiter un signalement : décision + journal dans la MÊME transaction ; un signalement déjà traité ne se retraite pas (409). */
     async reviewReport(actor: AdminActor, reportId: string, input: ReviewMessageReportRequest): Promise<{ id: string; status: MessageReportStatus }> {
       const report = await prisma.report.findFirst({ where: { id: reportId, targetType: "MESSAGE" }, select: { id: true, status: true } });
-      if (!report) throw new NotFoundError("Report not found.");
-      if (report.status !== "OPEN") throw new ConflictError("This report has already been reviewed.");
+      if (!report) throw new NotFoundError("Report not found.", { code: "REPORT_NOT_FOUND" });
+      if (report.status !== "OPEN") throw new ConflictError("This report has already been reviewed.", { code: "REPORT_ALREADY_REVIEWED" });
       await prisma.$transaction(async (tx) => {
         const updated = await tx.report.updateMany({ where: { id: report.id, status: "OPEN" }, data: { status: input.decision } });
-        if (updated.count !== 1) throw new ConflictError("This report has already been reviewed.");
+        if (updated.count !== 1) throw new ConflictError("This report has already been reviewed.", { code: "REPORT_ALREADY_REVIEWED" });
         await recordAdminAction(tx, {
           adminUserId: actor.id,
           action: "MESSAGE_REPORT_REVIEWED",

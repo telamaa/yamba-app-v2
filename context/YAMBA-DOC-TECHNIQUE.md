@@ -2823,3 +2823,133 @@ Ce qui a sauvé la troisième, c'est le **témoin positif** : exiger que le code
 il est légitime. Un test de sécurité qui ne trouve rien doit être suspecté avant d'être cru.
 
 auth-service 209 → **215**.
+
+---
+
+# Recette API, chapitre 7 — idempotence et concurrence (ANO-API-19, 20, 21)
+
+Trois anomalies, deux causes. Toutes les gardes métier tenaient : aucune double capture, aucun
+double décrément de capacité, aucun compteur faussé. Ce qui manquait, c'était **la réponse rendue
+au perdant**.
+
+## ANO-API-19 et ANO-API-21 (bloquante, majeure) — un conflit d'écriture n'est pas une réponse
+
+### Ce qu'on observait
+
+Deux Expéditeurs réservent en même temps les derniers kilos d'un trajet. Un reçoit **201**, l'autre
+**500 « Something went wrong, please try again! »**. La capacité, elle, restait juste (17 → 5 kg,
+une seule réservation comptée). Deux fiches plus loin, même symptôme sur un double clic de
+régénération du code de livraison.
+
+Dans le journal, la même ligne :
+
+```
+Transaction failed due to a write conflict or a deadlock. Please retry your transaction
+code: 'P2034'
+```
+
+### Pourquoi
+
+MongoDB, comme tout moteur transactionnel, refuse la transaction perdante quand deux écritures se
+disputent le même document. Ce n'est pas une décision métier : c'est un accident d'infrastructure,
+et la base **dit elle-même quoi en faire** — réessayer. Personne ne rattrapait ce code : l'erreur
+traversait la pile jusqu'au middleware d'erreur, qui n'y voyait qu'une exception inconnue, donc un
+500. Elle partait aussi dans Sentry comme une vraie panne serveur.
+
+### La correction
+
+`apps/deal-service/src/lib/write-conflict-retry.ts` :
+
+```ts
+const WRITE_CONFLICT = "P2034";
+
+export async function withWriteConflictRetry<T>(
+  operation: () => Promise<T>,
+  { tentatives = 3, delaiBaseMs = 25 }: { tentatives?: number; delaiBaseMs?: number } = {}
+): Promise<T> { /* … */ }
+```
+
+Trois points de conception :
+
+1. **Seul P2034 est rattrapé.** Toute autre erreur remonte intacte — y compris
+   `BookingLifecycleError`, qui est le refus métier légitime. Rejouer ce qu'on ne comprend pas est
+   le meilleur moyen de doubler un effet de bord.
+2. **Le délai est court et légèrement aléatoire** (25 ms × essai + jitter) : deux perdants
+   simultanés ne doivent pas se retrouver au coude à coude au réessai.
+3. **Le rejeu est sûr** parce que la transaction avortée n'a rien validé, et parce qu'aucune de ces
+   transactions ne fait d'appel externe en son sein — le fournisseur de paiement est toujours
+   sollicité **avant** la transaction (règle posée en C-PR5b : « l'argent d'abord, puis une seule
+   transaction conditionnelle »).
+
+**La leçon d'ANO-API-21 :** la première correction avait été posée là où le défaut avait été *vu*
+(la création de deal). La même cause a resurgi deux fiches plus loin, sur un autre chemin. La
+protection a donc été remontée au **writer central** — `applyBookingTransition` dans
+`booking-write.ts`, par où passent accepter, refuser, remettre, annuler, régénérer — puis appliquée
+aux transactions restantes du service (`deal-mediation`, `admin-finance` ×2). Cinq transactions,
+une seule règle.
+
+Après correction : `A:201` / `B:409 CAPACITY_EXCEEDED`, capacité 5 → 1 kg ; et pour la
+régénération, `200` + `409 TRANSITION_NOT_ALLOWED`, compteur 4 → 3.
+
+## ANO-API-20 (majeure) — un refus qui ne se laisse pas lire par un programme
+
+### Ce qu'on observait
+
+Deux acceptations simultanées du même rendez-vous : un **200**, un **400** — le bon comportement.
+Mais le corps du 400 :
+
+```json
+{ "message": "This meeting was just changed. Reload the conversation.", "details": null }
+```
+
+Aucun code. Et ailleurs dans le même service :
+
+```
+"This conversation is read-only (DISPUTE_OPEN)."
+"Invalid meeting slot (TOO_SOON)."
+```
+
+La raison lisible par la machine était **dans la phrase**. Le front ne peut ni la traduire, ni
+brancher dessus, ni distinguer ce refus d'une erreur de saisie.
+
+### Pourquoi
+
+Deux conventions coexistaient dans le même fichier : certains refus portaient déjà un
+`details.code` (`DELIVERY_CODE_IN_MESSAGE`, fenêtre de révélation du téléphone), d'autres non. Et
+surtout, **deux des quatre classes d'erreur ne pouvaient pas en porter** :
+
+```ts
+export class NotFoundError extends AppError {
+  constructor(message = "Resources not found") { super(message, 404, true); }   // pas de details
+}
+export class ForbiddenError extends AppError {
+  constructor(message = "Forbidden access") { super(message, 403, true); }      // pas de details
+}
+```
+
+Un 403 ou un 404 métier n'avait donc **aucun moyen** de dire pourquoi.
+
+### La correction
+
+1. `packages/error-handler/index.ts` — `NotFoundError` et `ForbiddenError` acceptent `details`,
+   comme `ValidationError`, `AuthError` et `ConflictError` le faisaient déjà. Additif : aucun
+   appelant existant n'est cassé (le paramètre est optionnel).
+2. `apps/message-service` — les seize refus portent un code : `CONVERSATION_READ_ONLY` (+ `reason`),
+   `MEETUP_CHANGED`, `MEETUP_NOT_ACCEPTABLE` (+ `reason`), `INVALID_MEETUP_SLOT` (+ `reason`),
+   `EMPTY_MESSAGE`, `NOT_A_PARTY`, `CONVERSATION_NOT_OPEN`, `MEETUP_NOT_FOUND`,
+   `CONVERSATION_NOT_FOUND`, `DEAL_NOT_FOUND`, `MESSAGE_NOT_FOUND`, `MISSING_IDENTIFIER`,
+   `ALREADY_REPORTED`, `REPORT_ALREADY_REVIEWED`. La raison machine a quitté la phrase.
+3. **Le garde-fou** — `apps/message-service/src/services/refusal-codes.spec.ts` lit les sources du
+   service, extrait chaque `new ValidationError(…)` / `ForbiddenError` / `NotFoundError` /
+   `ConflictError` / `AuthError`, et échoue si l'un d'eux part sans `code:` — ou si une raison est
+   encore cachée entre parenthèses dans le message. Même famille que les tests qui lisent
+   `prisma/schema.prisma` (ANO-API-09, ANO-API-13) : faire lire le code par le test plutôt
+   qu'espérer la relecture.
+
+Le middleware d'erreur expose déjà `details` en production dès que `details.code` est une chaîne
+(A146) : le code atteint donc réellement le client.
+
+## Tests
+
+`write-conflict-retry.spec.ts` (4 cas) et `refusal-codes.spec.ts` (3 cas).
+deal-service 538 → **542**, message-service 36 → **39**. Plateforme : 904 → **911**.

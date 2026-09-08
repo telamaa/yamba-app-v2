@@ -23,6 +23,7 @@ import { NotFoundError } from "@packages/error-handler";
 import { BookingDomainEventSchema } from "@packages/api-contracts";
 import type { BookingStatus } from "./booking-state-machine";
 import { BookingLifecycleError, kgReservedBySnapshot, type BookingSnapshotsForLifecycle } from "./booking-lifecycle";
+import { withWriteConflictRetry } from "../lib/write-conflict-retry";
 
 /* ══ Chargement ═══════════════════════════════════════════════ */
 
@@ -171,7 +172,8 @@ export async function applyBookingTransition(args: {
   const envelope = makeEnvelope(booking.id, now);
   const parsed = events.map((e) => BookingDomainEventSchema.parse({ ...envelope, ...e }));
 
-  await prisma.$transaction(async (tx) => {
+  await withWriteConflictRetry(() =>
+    prisma.$transaction(async (tx) => {
     const updated = await tx.booking.updateMany({
       where: { id: booking.id, status: from as never, ...(where ?? {}) } as never,
       data: data as never,
@@ -208,5 +210,6 @@ export async function applyBookingTransition(args: {
         },
       });
     }
-  });
+    })
+  );
 }

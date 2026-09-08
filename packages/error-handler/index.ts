@@ -27,8 +27,10 @@ export class AppError extends Error {
 
 // Not found error
 export class NotFoundError extends AppError {
-  constructor(message = "Resources not found") {
-    super(message, 404, true);
+  // `details` (ANO-API-20) : un 404 metier porte lui aussi un code — CONVERSATION_NOT_FOUND,
+  // DEAL_NOT_FOUND… Sans lui, le client devait deviner la cause dans la phrase anglaise.
+  constructor(message = "Resources not found", details?: unknown) {
+    super(message, 404, true, details);
   }
 }
 
@@ -51,8 +53,9 @@ export class AuthError extends AppError {
 
 // Forbidden Error (For Insufficient Permissions)
 export class ForbiddenError extends AppError {
-  constructor(message = "Forbidden access") {
-    super(message, 403, true);
+  // `details` (ANO-API-20) : meme raison que le 404 — NOT_A_PARTY, CONVERSATION_NOT_OPEN…
+  constructor(message = "Forbidden access", details?: unknown) {
+    super(message, 403, true, details);
   }
 }
 

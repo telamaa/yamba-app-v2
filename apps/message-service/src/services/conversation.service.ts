@@ -133,17 +133,17 @@ export function makeConversationService(clock: () => Date = () => new Date(), se
     let conversation = null as null | { id: string; bookingId: string; shipperLastReadAt: Date | null; carrierLastReadAt: Date | null };
     if (by.conversationId) {
       conversation = await prisma.conversation.findUnique({ where: { id: by.conversationId }, select: { id: true, bookingId: true, shipperLastReadAt: true, carrierLastReadAt: true } });
-      if (!conversation) throw new NotFoundError("Conversation not found.");
+      if (!conversation) throw new NotFoundError("Conversation not found.", { code: "CONVERSATION_NOT_FOUND" });
       bookingId = conversation.bookingId;
     }
-    if (!bookingId) throw new ValidationError("A deal id or a conversation id is required.");
+    if (!bookingId) throw new ValidationError("A deal id or a conversation id is required.", { code: "MISSING_IDENTIFIER" });
 
     const booking = (await prisma.booking.findFirst({ where: { id: bookingId, isDeleted: false }, select: BOOKING_SELECT })) as BookingRow | null;
-    if (!booking) throw new NotFoundError("Deal not found.");
+    if (!booking) throw new NotFoundError("Deal not found.", { code: "DEAL_NOT_FOUND" });
     const role = roleOf(userId, booking);
     // 403 et non 404 : le deal existe, l'appelant n'est pas partie (semantique D-existant).
-    if (!role) throw new ForbiddenError("You are not a party to this deal.");
-    if (!conversationExists(booking)) throw new ForbiddenError("This deal has no conversation yet.");
+    if (!role) throw new ForbiddenError("You are not a party to this deal.", { code: "NOT_A_PARTY" });
+    if (!conversationExists(booking)) throw new ForbiddenError("This deal has no conversation yet.", { code: "CONVERSATION_NOT_OPEN" });
 
     if (!conversation) {
       conversation =
@@ -319,11 +319,11 @@ export function makeConversationService(clock: () => Date = () => new Date(), se
     async reportMessage(userId: string, conversationId: string, messageId: string, input: ReportMessageRequest): Promise<ReportMessageResponse> {
       const { conversation, role } = await loadContext(userId, { conversationId });
       const message = await prisma.message.findFirst({ where: { id: messageId, conversationId: conversation.id }, select: { id: true, kind: true, authorRole: true } });
-      if (!message) throw new NotFoundError("Message not found.");
+      if (!message) throw new NotFoundError("Message not found.", { code: "MESSAGE_NOT_FOUND" });
       const existing = await prisma.report.findFirst({ where: { targetType: "MESSAGE", targetId: message.id, reporterUserId: userId }, select: { id: true } });
       const verdict = canReportMessage(role, message, !!existing);
       if (!verdict.allowed) {
-        if (verdict.reason === "ALREADY_REPORTED") throw new ConflictError("You already reported this message.");
+        if (verdict.reason === "ALREADY_REPORTED") throw new ConflictError("You already reported this message.", { code: "ALREADY_REPORTED" });
         throw new ValidationError(verdict.reason === "OWN_MESSAGE" ? "You cannot report your own message." : "Only text messages can be reported.", { code: verdict.reason });
       }
       const report = await prisma.report.create({
@@ -345,9 +345,9 @@ export function makeConversationService(clock: () => Date = () => new Date(), se
     async postMessage(userId: string, conversationId: string, input: PostMessageRequest): Promise<MessageDto> {
       const now = clock();
       const { booking, conversation, role, access } = await loadContext(userId, { conversationId });
-      if (!access.canWrite) throw new ValidationError(`This conversation is read-only (${access.reason}).`);
+      if (!access.canWrite) throw new ValidationError("This conversation is read-only.", { code: "CONVERSATION_READ_ONLY", reason: access.reason });
       const body = normalizeBody(input.body);
-      if (!body) throw new ValidationError("The message is empty.");
+      if (!body) throw new ValidationError("The message is empty.", { code: "EMPTY_MESSAGE" });
 
       // D43 / D61 4A — le code de livraison ne voyage JAMAIS : on compare les groupes de six chiffres au hash.
       if (booking.deliveryCodeHash) {
@@ -377,10 +377,10 @@ export function makeConversationService(clock: () => Date = () => new Date(), se
     async proposeMeetup(userId: string, conversationId: string, input: ProposeMeetupRequest): Promise<MeetupDto> {
       const now = clock();
       const { booking, conversation, role, access } = await loadContext(userId, { conversationId });
-      if (!access.canWrite) throw new ValidationError(`This conversation is read-only (${access.reason}).`);
+      if (!access.canWrite) throw new ValidationError("This conversation is read-only.", { code: "CONVERSATION_READ_ONLY", reason: access.reason });
       const slot = { startAt: new Date(input.startAt), endAt: new Date(input.endAt) };
       const check = validateMeetupSlot(slot, now);
-      if (!check.ok) throw new ValidationError(`Invalid meeting slot (${check.reason}).`);
+      if (!check.ok) throw new ValidationError("Invalid meeting slot.", { code: "INVALID_MEETUP_SLOT", reason: check.reason });
 
       // Une seule proposition ouverte par type : la nouvelle remplace la precedente.
       await prisma.meetup.updateMany({ where: { conversationId: conversation.id, kind: input.kind as never, status: "PROPOSED" }, data: { status: "CANCELLED", cancelledAt: now } });
@@ -415,14 +415,14 @@ export function makeConversationService(clock: () => Date = () => new Date(), se
     async acceptMeetup(userId: string, conversationId: string, meetupId: string): Promise<MeetupDto> {
       const now = clock();
       const { booking, conversation, role, access } = await loadContext(userId, { conversationId });
-      if (!access.canWrite) throw new ValidationError(`This conversation is read-only (${access.reason}).`);
+      if (!access.canWrite) throw new ValidationError("This conversation is read-only.", { code: "CONVERSATION_READ_ONLY", reason: access.reason });
       const meetup = await prisma.meetup.findFirst({ where: { id: meetupId, conversationId: conversation.id } });
-      if (!meetup) throw new NotFoundError("Meeting not found.");
+      if (!meetup) throw new NotFoundError("Meeting not found.", { code: "MEETUP_NOT_FOUND" });
       const check = canAcceptMeetup(meetup as unknown as MeetupRow, role);
-      if (!check.ok) throw new ValidationError(`This meeting cannot be accepted (${check.reason}).`);
+      if (!check.ok) throw new ValidationError("This meeting cannot be accepted.", { code: "MEETUP_NOT_ACCEPTABLE", reason: check.reason });
 
       const updated = await prisma.meetup.updateMany({ where: { id: meetupId, status: "PROPOSED" }, data: { status: "ACCEPTED", acceptedAt: now } });
-      if (updated.count === 0) throw new ValidationError("This meeting was just changed. Reload the conversation.");
+      if (updated.count === 0) throw new ValidationError("This meeting was just changed. Reload the conversation.", { code: "MEETUP_CHANGED" });
       const fresh = (await prisma.meetup.findUniqueOrThrow({ where: { id: meetupId } })) as unknown as MeetupRow;
       await writeMessage(
         conversation.id,

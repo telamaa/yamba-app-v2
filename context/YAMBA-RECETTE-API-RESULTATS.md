@@ -226,13 +226,18 @@ L'historique est conservé : un KO reste écrit KO, sa correction s'ajoute en de
 | ANO-API-07 | API-AUTH-11 / 12 / 13 | majeure | 08/09/2026 | **close** | `jti` dans le jeton d'accès — registre **D75 candidate** |
 | ANO-API-08 | API-AUTH-14 | **bloquante** | 08/09/2026 | **close** | envoi détaché de la réponse (forgot ET resend) |
 | ANO-API-09 | API-AUTH-22 / 24 / 25 | **bloquante** | 08/09/2026 | **close** | champ corrigé + test lisant le schéma ; API-AUTH-24 enfin jouée (OK) |
+| ANO-API-19 | API-IDEM-07 | **bloquante** | 08/09/2026 | **close** | conflit d'écriture Mongo (P2034) rejoué, jamais rendu en 500 |
+| ANO-API-20 | API-IDEM-08 | majeure | 08/09/2026 | **close** | tout refus de message-service porte un `details.code` + garde-fou lisant les sources |
+| ANO-API-21 | API-IDEM-09 | majeure | 08/09/2026 | **close** | protection P2034 remontée au writer central `applyBookingTransition` |
 
-**Huit anomalies sur neuf sont closes.** Seule `ANO-API-04` (mineure, `details.reason` absent du
-409 de transition) reste ouverte : elle appartient au domaine **deal**, et sera groupée avec le
-chapitre 5.3 comme le demande le cahier. État du critère de sortie n° 1 du §9.3 (« zéro anomalie bloquante ouverte ») : tenu pour le
-chapitre 4 ; **trois bloquantes ouvertes** au
-chapitre 5.1 — `ANO-API-08`, `ANO-API-09`, et la bloquante `API-AUTH-24` reste **sans verdict** tant
-que l'export ne fonctionne pas.
+**Vingt anomalies sur vingt et une sont closes**, à la fin du chapitre 7. Les huit bloquantes
+(`ANO-API-01`, `02`, `06`, `08`, `09`, `13`, `16`, `18`, `19`) sont **toutes fermées et
+contre-éprouvées** : le critère de sortie n° 1 du §9.3 (« zéro anomalie bloquante ouverte ») est
+tenu à ce stade de la campagne — il reste les chapitres 8 (webhooks) et 9 à jouer.
+
+Seule `ANO-API-04` (mineure : le 409 `TRANSITION_NOT_ALLOWED` ne dit pas *depuis quel statut*
+dans `details`) reste ouverte. Elle est de la même famille que `ANO-API-20`, désormais close pour
+message-service : la prochaine occasion de la fermer est un passage équivalent sur deal-service.
 
 **Référence de tests après corrections** : trip-service 209 → **221**, auth-service 183 → **192**
 (plateforme 860 → **877**), `CLAUDE.md` mis à jour.
@@ -1156,3 +1161,138 @@ la seconde utilisait `head -n -1`, qui n'existe pas sur macOS (tous les corps é
 Un test de sécurité qui ne trouve rien doit être **suspecté avant d'être cru**. Ce qui a sauvé
 celui-ci, c'est le **témoin positif** : exiger que le code soit **présent** là où il est légitime.
 Sans cette ligne, l'erreur passait pour un succès.
+
+---
+
+## Chapitre 7 — Idempotence et concurrence (10 fiches sur 10)
+
+Ce chapitre pose une seule question, sous dix formes : **que se passe-t-il quand le même geste
+arrive deux fois ?** Deux clics, deux onglets, un réseau qui bégaie, deux Expéditeurs qui visent
+les mêmes kilos. Un rejeu n'est pas un cas limite : c'est le comportement normal d'un client mobile.
+
+| Fiche | Ce qui est éprouvé | Résultat | Pourquoi | Recommandation |
+|---|---|---|---|---|
+| API-IDEM-01 | Une intention de paiement ne sert qu'une fois | **OK** | 409 `PAYMENT_ALREADY_USED`, un seul deal | — |
+| API-IDEM-02 | Rejouer une acceptation | **OK** | 200 puis 409 ; `acceptedAt` identique, une seule capture, un seul `booking.accepted` | — |
+| API-IDEM-03 | Rejouer une remise | **OK** | 200 puis 409 ; `deliveredAt` et `payoutDueAt` figés ; le rejeu ne consomme aucune tentative de code | — |
+| API-IDEM-04 | Les gestes déclarés idempotents | **OK** | favori, abonnement, tout-lu, lecture de fil : même code deux fois, aucun doublon ; le lien de suivi rend **le même jeton** | — |
+| API-IDEM-05 | Rejouer un événement consommé | **OK** | même webhook signé deux fois : 200/200, `suppressed` vrai puis faux ; un type inconnu répond 200 `ignored` | — |
+| API-IDEM-06 | Deux acceptations simultanées | **OK** | un 200, deux 409 `PAYMENT_STATE_CONFLICT`, une seule capture | — |
+| API-IDEM-07 | Deux réservations sur les derniers kilos | **KO** | la capacité reste juste, mais le perdant recevait **500** | **ANO-API-19** |
+| API-IDEM-08 | Deux acceptations de rendez-vous | **KO** | 200 + 400 corrects, mais le refus partait sans `details.code` | **ANO-API-20** |
+| API-IDEM-09 | Deux régénérations de code | **KO** | le compteur ne descend que d'un, mais le perdant recevait **500** | **ANO-API-21** |
+| API-IDEM-10 | Deux rafraîchissements de session | **OK** | 200 + 401, une seule session vivante ensuite | — |
+
+**Ce que le chapitre démontre, et qui est rassurant :** les gardes métier tiennent toutes. Aucun
+double débit, aucun double décrément de capacité, aucun compteur faussé, aucune date de jalon
+déplacée par un rejeu. Le mécanisme est partout le même — une **écriture conditionnelle** (statut
+attendu, compteur attendu) plutôt qu'une lecture suivie d'une écriture — et il fait exactement ce
+qu'on attend de lui.
+
+**Ce que le chapitre révèle, et qui l'était moins :** quand deux transactions Mongo se disputent le
+même document, la base rejette la perdante avec le code `P2034`
+(« *write conflict … please retry* »). Personne ne rattrapait ce cas : il traversait la pile et
+sortait en **500 « Something went wrong »**. Deux fiches sur dix sont tombées dessus, sur deux
+chemins différents — donc ce n'était pas un accident local, mais un **trou de famille**.
+
+### Anomalies du chapitre 7
+
+```
+ANO-API-19
+Fiche          : API-IDEM-07 · Gravité : BLOQUANTE · ÉTAT : CLOSE
+Appel exact    : deux POST /api/deals simultanés (deux Expéditeurs, 4 kg chacun) sur un
+                 trajet où il ne reste que 5 kg
+Attendu        : un 201, un 409 CAPACITY_EXCEEDED
+Obtenu         : un 201 — et un 500 {"status":"error","error":"Something went wrong,
+                 please try again!"}. La capacité, elle, restait JUSTE (17 → 5 kg, une
+                 seule réservation comptée) : la garde métier a tenu.
+Cause          : MongoDB rejette la transaction perdante avec « Transaction failed due to a
+                 write conflict or a deadlock. Please retry your transaction » (Prisma
+                 P2034), levée dans le $transaction de createBooking. Ce n'est pas une
+                 décision métier : c'est un accident d'infrastructure, et la base dit
+                 elle-même quoi en faire — réessayer.
+Impact         : sur une place de marché, la course aux derniers kilos est la situation
+                 NORMALE, pas le cas limite. L'Expéditeur perdant voyait une panne au lieu
+                 d'un refus compréhensible, ne savait pas s'il devait recommencer, et le
+                 500 partait dans Sentry comme une vraie erreur serveur.
+Correction     : apps/deal-service/src/lib/write-conflict-retry.ts — withWriteConflictRetry
+                 rejoue l'opération UNIQUEMENT sur P2034 (3 tentatives, délai court et
+                 légèrement aléatoire pour ne pas remettre les perdants au coude à coude).
+                 Toute autre erreur remonte intacte : réessayer ce qu'on ne comprend pas est
+                 le meilleur moyen de doubler un effet de bord. Après ANO-API-21, la
+                 protection a été posée sur les CINQ transactions de deal-service, dont
+                 applyBookingTransition — le writer central de toutes les transitions.
+Contre-épreuve : mêmes deux appels simultanés → A:201, B:409 CAPACITY_EXCEEDED, capacité
+                 5 → 1 kg. Tests : write-conflict-retry.spec.ts (4 cas).
+```
+
+```
+ANO-API-20
+Fiche          : API-IDEM-08 · Gravité : MAJEURE · ÉTAT : CLOSE
+Appel exact    : deux POST /api/messages/conversations/{id}/meetups/{id}/accept simultanés
+Attendu        : 200 + 400, un seul acceptedAt — et un refus exploitable par le client
+Obtenu         : 200 + 400 avec un seul acceptedAt (la garde optimiste fait son travail),
+                 mais le 400 portait {"message":"This meeting was just changed. Reload the
+                 conversation.","details":null}. Aucun code.
+Cause          : message-service mélangeait deux conventions. Certains refus portaient déjà
+                 un details.code (DELIVERY_CODE_IN_MESSAGE, fenêtre du téléphone), d'autres
+                 collaient la raison machine DANS la phrase anglaise :
+                 « This conversation is read-only (DISPUTE_OPEN). ». Lisible par un humain
+                 anglophone, inexploitable par un programme. Et deux des quatre classes
+                 d'erreur — ForbiddenError et NotFoundError — n'acceptaient même pas de
+                 `details` : un 403 ou un 404 métier ne POUVAIT pas porter de code.
+Impact         : le front ne peut ni traduire le refus, ni le distinguer d'une saisie
+                 invalide, ni décider s'il faut recharger le fil. C'est exactement la règle
+                 non négociable « un refus métier porte un details.code, et ce code atteint
+                 le client » — non tenue sur tout un service.
+Correction     : packages/error-handler/index.ts — ForbiddenError et NotFoundError acceptent
+                 désormais `details` (additif, aucun appelant existant cassé).
+                 apps/message-service : les 16 refus portent un code
+                 (CONVERSATION_READ_ONLY + reason, MEETUP_CHANGED, MEETUP_NOT_ACCEPTABLE
+                 + reason, INVALID_MEETUP_SLOT + reason, EMPTY_MESSAGE, NOT_A_PARTY,
+                 CONVERSATION_NOT_OPEN, MEETUP_NOT_FOUND, REPORT_ALREADY_REVIEWED…), et la
+                 raison machine a quitté la phrase.
+                 Garde-fou : refusal-codes.spec.ts LIT les sources du service et refuse tout
+                 jet d'erreur métier sans code, ainsi que toute raison cachée entre
+                 parenthèses dans le message — même famille que les tests qui lisent
+                 prisma/schema.prisma (ANO-API-09, ANO-API-13).
+Contre-épreuve : rendez-vous déjà accepté → 400 {"code":"MEETUP_NOT_ACCEPTABLE",
+                 "reason":"NOT_PROPOSED"} · écriture pendant un litige → 400
+                 {"code":"CONVERSATION_READ_ONLY","reason":"DISPUTE_OPEN"} · non-partie au
+                 deal → 403 {"code":"NOT_A_PARTY"}.
+```
+
+```
+ANO-API-21
+Fiche          : API-IDEM-09 · Gravité : MAJEURE · ÉTAT : CLOSE
+Appel exact    : deux POST /api/deals/{id}/code/regenerate simultanés
+Attendu        : un succès, un refus métier, compteur décrémenté d'une seule unité
+Obtenu         : un 200 (compteur 5 → 4, donc juste) et un 500. Journal : P2034 dans
+                 regenerateCode — la MÊME cause qu'ANO-API-19, sur un autre chemin.
+Cause          : la protection posée pour ANO-API-19 avait été appliquée à l'endroit où le
+                 défaut avait été observé (la création de deal), pas à la famille. Or toutes
+                 les transitions passent par applyBookingTransition : accepter, refuser,
+                 remettre, annuler, régénérer un code… Chacune pouvait rendre un 500 le jour
+                 où deux appels se croisent.
+Impact         : un membre qui double-clique sur « régénérer le code » voit une panne. Plus
+                 largement : n'importe quelle transition concurrente pouvait le faire.
+Correction     : withWriteConflictRetry appliqué au WRITER CENTRAL (booking-write.ts,
+                 applyBookingTransition) et aux transactions restantes de deal-service
+                 (deal-mediation, admin-finance ×2). Aucune ne fait d'appel externe en son
+                 sein — le fournisseur de paiement est toujours sollicité AVANT la
+                 transaction — donc un rejeu est sans effet de bord.
+Contre-épreuve : deux régénérations simultanées → 200 + 409 TRANSITION_NOT_ALLOWED,
+                 compteur 4 → 3 (une seule unité).
+```
+
+### La leçon transverse du chapitre
+
+Corriger là où le défaut a été **vu** n'est pas corriger le défaut. ANO-API-19 avait été refermée
+sur la création de deal ; la même cause a resurgi deux fiches plus loin sur la régénération de code.
+Le bon geste était de remonter au **writer commun** — `applyBookingTransition` — et d'y poser la
+protection une fois pour toutes. Le même raisonnement avait déjà servi pour ANO-API-09 → ANO-API-13
+(un test qui lit le schéma pour UN fichier, puis pour TOUT le service).
+
+C'est aussi ce qui justifie les deux garde-fous de ce chapitre : `write-conflict-retry.spec.ts` et
+`refusal-codes.spec.ts` ne testent pas un comportement, ils testent une **règle du code** — et une
+règle tenue par un test ne se redéfait pas au prochain ajout.
