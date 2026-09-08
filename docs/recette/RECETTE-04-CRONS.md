@@ -84,7 +84,7 @@ docker compose up -d
 docker ps --format '{{.Names}}\t{{.Status}}'
 ```
 
-Attendu : deux conteneurs, `yamba-redpanda` (courtier, ports 9092 et 9644) et `yamba-mailpit` (boîte aux lettres de recette, ports 1025 et 8025), tous deux `Up` et le premier `healthy`.
+Attendu : deux conteneurs, `yamba-redpanda` (courtier, ports 9092 et 9644) et `yamba-mailpit` (boîte aux lettres de recette, ports 1025 et 8026), tous deux `Up` et le premier `healthy`.
 
 Mongo n'est **pas** dans `docker-compose.yml` : la base est distante (Atlas, replica set obligatoire pour les transactions). Redis non plus. Les deux se lisent dans `.env` (`DATABASE_URL`, `REDIS_DATABASE_URI`).
 
@@ -118,18 +118,18 @@ SMTP_HOST=localhost
 SMTP_PORT=1025
 ```
 
-Les emails se lisent ensuite sur `http://localhost:8025` (Mailpit). Aucun email ne part vers l'extérieur. Un email qui n'apparaît pas dans Mailpit n'a pas été envoyé — c'est la preuve d'absence utilisée dans tout ce cahier.
+Les emails se lisent ensuite sur `http://localhost:8026` (Mailpit). Aucun email ne part vers l'extérieur. Un email qui n'apparaît pas dans Mailpit n'a pas été envoyé — c'est la preuve d'absence utilisée dans tout ce cahier.
 
 Vider la boîte avant chaque scénario d'email, pour que le verdict soit sans ambiguïté :
 
 ```sh
-curl -s -X DELETE http://localhost:8025/api/v1/messages && echo "boîte vidée"
+curl -s -X DELETE http://localhost:8026/api/v1/messages && echo "boîte vidée"
 ```
 
 Compter les messages reçus :
 
 ```sh
-curl -s http://localhost:8025/api/v1/messages | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['total'], 'message(s)'); [print('-', m['Subject'], '->', [t['Address'] for t in m['To']]) for m in d['messages'][:20]]"
+curl -s http://localhost:8026/api/v1/messages | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['total'], 'message(s)'); [print('-', m['Subject'], '->', [t['Address'] for t in m['To']]) for m in d['messages'][:20]]"
 ```
 
 ### 2.4 Le jeu d'essai
@@ -3332,7 +3332,7 @@ npx tsx --env-file=.env packages/libs/prisma/scripts/seed-deals.ts
 npx tsx --env-file=.env scripts/recette-alertes-verrou.ts --reset
 
 # Vider la boîte de recette
-curl -s -X DELETE http://localhost:8025/api/v1/messages
+curl -s -X DELETE http://localhost:8026/api/v1/messages
 ```
 
 Et, dans `.env`, retirer toutes les variables `*_CRON_ENABLED=false`, `OUTBOX_RELAY_ENABLED=false`, `MESSAGING_RELAY_ENABLED=false`, `NOTIFICATION_CONSUMER_ENABLED=false` et la carte `CRON_HEARTBEAT_PING_URLS` de test posées pendant la campagne. Une variable de coupure oubliée est exactement la panne silencieuse que ce cahier cherche à éviter.
