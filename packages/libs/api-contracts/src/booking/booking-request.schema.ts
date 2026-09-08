@@ -55,6 +55,20 @@ export type BookingQuoteInput = z.infer<typeof BookingQuoteInputSchema>;
 export const CreatePaymentIntentRequestSchema = BookingQuoteInputSchema.extend({
   tripId: ObjectIdSchema,
   expectedTotalCents: z.number().int().positive().meta({ description: "Total the shipper saw (D17 check)" }),
+  /**
+   * ANO-API-12 (recette API 08/09/2026) — la valeur déclarée est FACULTATIVE ici, mais si le
+   * client l'envoie elle est confrontée aux plafonds CNF-06 **avant** d'autoriser l'argent.
+   * Sans elle, le plafond `DECLARED_VALUE` n'était vérifié qu'à la création du deal : la carte
+   * de l'Expéditeur était déjà pré-autorisée quand le refus tombait — précisément ce que le
+   * code cherchait à éviter. L'assistant connaît cette valeur avant de payer : il l'envoie.
+   */
+  declaredValueCents: z
+    .number()
+    .int()
+    .nonnegative()
+    .max(50_000_00)
+    .optional()
+    .meta({ description: "Declared value, checked against progressive caps before authorising (D71)" }),
 }).meta({ id: "CreatePaymentIntentRequest" });
 export type CreatePaymentIntentRequest = z.infer<typeof CreatePaymentIntentRequestSchema>;
 

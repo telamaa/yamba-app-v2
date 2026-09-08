@@ -9551,6 +9551,12 @@
             "exclusiveMinimum": 0,
             "maximum": 9007199254740991,
             "description": "Total the shipper saw (D17 check)"
+          },
+          "declaredValueCents": {
+            "description": "Declared value, checked against progressive caps before authorising (D71)",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 5000000
           }
         },
         "required": [

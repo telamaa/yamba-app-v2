@@ -2508,3 +2508,38 @@ elle ne casse pas.
 `apps/trip-service/src/lib/search-sort.spec.ts` (10 cas) : modes inconnus ramenés à `all`, modes
 valides conservés, défaut inchangé, et non-régression des filtres déjà tolérants. trip-service
 221 → **231**.
+
+# Recette API — le plafond de valeur déclarée arrive avant l'argent (ANO-API-12)
+
+Fiche API-DEAL-02, **bloquante** — c'est le catalogue des refus que tout client doit savoir
+traduire. Sept des huit codes répondaient exactement. Le huitième, `NEW_ACCOUNT_CAP`, ne se
+déclenchait **jamais** à l'autorisation de paiement.
+
+Un compte créé trente secondes plus tôt obtenait une intention de paiement pour un colis déclaré à
+**5 000 €**. Le plafond existe pourtant et fonctionne : à la création du deal, le service répond
+bien `409 NEW_ACCOUNT_CAP` avec `cap: "DECLARED_VALUE"`, `limit: 30000`, `value: 500000`.
+
+Le défaut était l'**ordre**. Dans `deal-request.service.ts` :
+
+```ts
+await trust.assertWithinCaps(user.id, { declaredValueCents: 0, … }); // avant
+```
+
+La valeur déclarée était passée **à zéro en dur**, si bien que le plafond `DECLARED_VALUE` ne
+pouvait rien détecter à ce stade — alors que le commentaire de cette même ligne annonce
+« avant d'autoriser l'argent ». Le refus tombait donc à l'étape suivante, **une fois la carte de
+l'Expéditeur déjà pré-autorisée** : en production, une empreinte reste plusieurs jours sur le compte
+d'un client pour un deal qui ne se fera pas.
+
+**Correction.** `CreatePaymentIntentRequest` accepte désormais `declaredValueCents`, **facultatif** —
+un client qui ne l'envoie pas garde exactement le comportement d'avant — et le service le confronte
+aux plafonds avant d'autoriser. L'assistant de réservation connaît cette valeur avant de payer : il
+n'y a aucune raison de la lui cacher jusqu'après le débit.
+
+**Contre-épreuve** : compte neuf + 5 000 € déclarés → **409 `NEW_ACCOUNT_CAP`** dès l'autorisation ·
+sans valeur déclarée → 201 (inchangé) · valeur raisonnable (200 €) → 201 · **compte ancien** +
+5 000 € → 201, le plafond ne visant que les comptes récents ou à risque.
+
+Tests : `payment-intent-caps.spec.ts` (4 cas, dont la non-régression du champ absent).
+deal-service 516 → **520**. Les cinq `openapi.json` sont régénérés : le contrat public porte
+désormais ce champ.
