@@ -48,7 +48,7 @@ export function makeTrackingLinkService(deps: { db?: TrackingDb; token?: () => s
       if (!link) throw new NotFoundError("Tracking link not found.");
       const booking = await db.booking.findUnique({
         where: { id: link.bookingId as string },
-        select: { id: true, status: true, isDeleted: true, recipientRedactedAt: true, recipient: true, shipperId: true, carrierId: true, tripId: true, acceptedAt: true, pickedUpAt: true, deliveredAt: true, closedAt: true, cancelledAt: true, trackingEvents: true },
+        select: { id: true, status: true, isDeleted: true, recipientRedactedAt: true, recipient: true, shipperId: true, carrierId: true, tripId: true, acceptedAt: true, pickedUpAt: true, deliveredAt: true, closedAt: true, trackingEvents: true },
       });
       if (!booking || !isTrackingVisible({ isDeleted: !!booking.isDeleted, recipientRedactedAt: (booking.recipientRedactedAt as Date | null) ?? null, revokedAt: (link.revokedAt as Date | null) ?? null })) {
         throw new NotFoundError("Tracking link not found.");
@@ -66,7 +66,11 @@ export function makeTrackingLinkService(deps: { db?: TrackingDb; token?: () => s
         pickedUpAt: (booking.pickedUpAt as Date | null) ?? null,
         deliveredAt: (booking.deliveredAt as Date | null) ?? null,
         closedAt: (booking.closedAt as Date | null) ?? null,
-        cancelledAt: (booking.cancelledAt as Date | null) ?? null,
+        // ANO-API-13 — `Booking` n'a PAS de `cancelledAt` (le seul champ d'annulation est
+        // `cancelReason`) : le demander faisait échouer la requête, donc la page du
+        // destinataire répondait 500. La date d'annulation, quand elle existe, est celle de
+        // clôture — c'est déjà le repli suivant dans la règle de tri.
+        cancelledAt: null,
         trackingEvents: ((booking.trackingEvents as { step: string; confirmedAt: Date }[] | null) ?? []),
       });
       const recipient = (booking.recipient as { firstName?: string } | null) ?? {};
