@@ -796,3 +796,89 @@ surprise du refus au premier deal.
 **Ce qu'il ne faut PAS raccourcir** : les étapes Stripe elles-mêmes (identité, IBAN) ne sont pas
 négociables — elles sont imposées par la réglementation et par Stripe. Le seul levier est de les
 préremplir (fait) et de les demander au bon moment (à faire).
+
+## Chapitre 5.2 — trip-service (17 fiches jouées sur 18)
+
+**13 OK · 2 PARTIEL · 1 KO · 1 ⏭.** Les deux fiches bloquantes du chapitre passent.
+
+| Fiche | Intitulé | Gravité | Verdict | Pourquoi | Recommandation |
+|---|---|---|---|---|---|
+| API-TRIP-01 | Recherche publique et personnalisée | majeure | **OK** | 200 avec et sans session, enveloppe `{trips, nextCursor, totalCount}` **sans `success`** (documenté), `isFavorite` reflète bien les favoris du membre. | `rating` et `reviewCount` sont **absents** du JSON (le jeu d'essai n'a pas d'avis) : à confirmer au cahier Web, la carte les annonce. |
+| API-TRIP-02 | **Filtres durs** | **bloquante** | **OK** | Aucun trajet non publié, aucun départ passé, et une borne `dateFrom=2000-01-01` ne contourne rien. **Contre-épreuve** : un trajet masqué par Yamba disparaît de la recherche (2 → 1) et revient après restauration. | — |
+| API-TRIP-03 | Filtres invalides ignorés | mineure | **KO** | `categories=inventee` et `departureBuckets=matin,morning` sont bien **tolérés** (200), mais `mode=teleportation` renvoie **400**. | Voir `ANO-API-10`. |
+| API-TRIP-04 | Devis et paramètres publics | majeure | **OK** | `/trips/pricing/params` lisible **sans session** (commission 12 %, plancher 8 €, kilo de référence 2 kg, prime Garantie 6 €) ; avec `weightKg`, chaque carte porte `transportForWeight` et `totalForWeight`. | — |
+| API-TRIP-05 | Facettes | majeure | **OK** | 200 avec `familyCounts`, `modeCount`, `instantBookingCount`, `superTripperCount`, `profileVerifiedCount`, `verifiedTicketCount`, `totalCount`. | — |
+| API-TRIP-06 | Vue publique d'un trajet | majeure | **OK** | 200, DTO public complet (lieux, dates, prix, conditions par famille, `isFavorite`). | — |
+| API-TRIP-07 | Favori idempotent et gardé | majeure | **OK** | Ajout 200 puis rejeu **sans doublon** (liste = 1), retrait **idempotent** (200 deux fois). Les deux exceptions annoncées tiennent : **404** sur un trajet inexistant, **403 `OWN_TRIP`** sur son propre trajet. | — |
+| API-TRIP-08 | Brouillon puis publication | majeure | **OK** | 201 `DRAFT` puis 200. **Le point de la fiche est prouvé** : `departureHourLocal` envoyé à `"03:00"` est **recalculé à 21**, et `minPriceCents` envoyé à 1 est ignoré. | — |
+| API-TRIP-09 | Portes de publication | majeure | **OK** | 400 avec le motif de la machine : « A complete pricing engine is required to publish… (D13) ». | — |
+| API-TRIP-10 | `allowedActions` | majeure | **OK** | Les actions varient réellement : un trajet portant des deals vivants n'expose **ni `edit` ni `cancel`**, les autres oui. | — |
+| API-TRIP-11 | Cycle de vie complet | majeure | **⏭** | Non joué isolément ; ses transitions sont couvertes par 08 (publication), 12 (annulation refusée) et 15 (annulation, suppression). | À jouer pour compléter. |
+| API-TRIP-12 | **Annulation refusée, deal vivant** | **bloquante** | **OK** | **409** `{"type":"trip","code":"TRIP_HAS_ACTIVE_DEALS","activeDeals":4}` — la règle **D72** tient exactement. | — |
+| API-TRIP-13 | Modification, capacité immuable | majeure | **PARTIEL** | La modification partielle fonctionne (seul le champ envoyé est écrit). Mais la capacité **est modifiable après publication** (50 accepté), alors que la fiche l'annonce immuable. | **Le code a raison, le cahier est trop strict.** La vraie garde est plus fine et plus juste : **toute** modification est refusée dès qu'une réservation active existe — « Cannot edit a trip with active bookings » (vérifié : réduire la capacité à 1 kg sur un trajet à 18 kg réservés est **refusé en 400**). Le cas dangereux est donc impossible ; corriger l'attendu de la fiche. |
+| API-TRIP-14 | **Trajet d'autrui** | **bloquante** | **OK** | 400 « Unauthorized. » sur lecture, modification et annulation — l'écart de sémantique annoncé par le cahier. **Ce qui compte est tenu** : aucune des trois ne réussit, le corps ne divulgue rien, et le prix reste à 1150. | — |
+| API-TRIP-15 | Suppression / annulation | mineure | **OK** | « Draft deleted. » et « Trip cancelled. », puis **404** sur les deux vues publiques. | — |
+| API-TRIP-16 | Déclarer un billet | majeure | **OK** | 201 « 1 document(s) added. », `ticketVerificationStatus` passe à **PENDING** ; après retrait du document il revient à **NOT_SUBMITTED**. | — |
+| API-TRIP-17 | Signature de téléversement | majeure | **OK** | **401** sans session, 200 avec (token de 36 caractères + `expire`). | — |
+| API-TRIP-18 | Suppression idempotente | mineure | **PARTIEL** | Le retrait d'un document répond 200, mais **le rejeu répond 400 « Document not found. »** au lieu d'être idempotent. | Aligner sur le favori et sur la session, qui sont idempotents : un second retrait doit répondre 200. À rejouer aussi sur `/uploads/:fileId`, que cette fiche vise en propre. |
+
+### Anomalies du chapitre 5.2
+
+```
+ANO-API-10
+Fiche          : API-TRIP-03
+Gravité        : mineure
+Appel exact    : curl -s "$BASE/trips/search?limit=3&mode=teleportation"
+Attendu        : 200 — les valeurs de filtre inconnues sont ignorées silencieusement
+Obtenu         : 400 « Invalid query parameters: mode: Invalid option: expected one of
+                 "all"|"plane"|"train"|"car" »
+Reproductible  : oui — et l'incohérence est nette : categories=inventee et
+                 departureBuckets=matin,morning passent en 200, seul `mode` rejette.
+Impact         : rupture de compatibilité. Un lien partagé, un favori de navigateur ou une
+                 ancienne version de l'application mobile portant un mode retiré du
+                 catalogue affiche une erreur au lieu d'une recherche. Les autres filtres,
+                 eux, dégradent proprement.
+Piste          : apps/trip-service/src/dto/trip-search.dto.ts — `mode` est un z.enum strict
+                 là où les listes passent par `csvOf`, qui filtre les valeurs inconnues.
+                 Un `.catch("all")` suffit à aligner le comportement.
+ÉTAT           : ouverte
+```
+
+```
+ANO-API-11
+Fiche          : API-TRIP-01 / 04 (révélée en jouant le tri par prix)
+Gravité        : majeure — masque des trajets aux Expéditeurs
+Appel exact    : curl -s "$BASE/trips/search?sort=lowestPrice&limit=10" | jq '.totalCount'
+                 curl -s "$BASE/trips/search?sort=earliest&limit=10"   | jq '.totalCount'
+Attendu        : le tri change l'ORDRE, pas le nombre de résultats
+Obtenu         : sort=earliest → 3 trajets · sort=lowestPrice → **1 trajet**, totalCount
+                 passant de 3 à 1. Mesure en base : **7 trajets cherchables, 5 sans
+                 `comparablePriceCents`** — donc exclus du tri.
+Cause          : le tri par prix s'appuie sur `comparablePriceCents` (D33) et EXCLUT les
+                 trajets qui ne l'ont pas (`where.comparablePriceCents = { not: null }`,
+                 trip-search.controller.ts:259). Le code de création le calcule
+                 correctement — le trajet créé pendant la recette l'avait (2400 = 1200 × 2 kg).
+                 Ce sont les trajets ANTÉRIEURS à D33 qui ne l'ont pas.
+Reproductible  : oui
+Impact         : un Expéditeur qui trie par prix — le tri le plus utilisé d'une place de
+                 marché — ne voit qu'une fraction de l'offre, et `totalCount` le lui cache.
+                 Les Voyageurs concernés sont invisibles sans le savoir.
+Correction     : le script `packages/libs/prisma/scripts/backfill-comparable-price.ts`
+                 EXISTE (il était prévu par D33). Joué sur la base de recette :
+                 « 37 trips lus, 8 mis à jour ». Après quoi sort=lowestPrice renvoie bien
+                 3 trajets, ordonnés 9,50 → 11,50 → 12,00 €.
+À TRANCHER     : ce script a-t-il été joué sur la base de PRODUCTION ? Si non, la même
+                 amputation du tri par prix y est active aujourd'hui.
+Reste à faire  : (a) le seed ne pose PAS `comparablePriceCents` — toute recette du tri par
+                 prix est donc faussée tant qu'on ne rejoue pas le backfill après un seed ;
+                 (b) sur le fond, exclure silencieusement est discutable : un trajet sans
+                 prix comparable devrait être rangé en fin de liste, pas retiré, et
+                 `totalCount` ne devrait jamais varier selon le tri.
+ÉTAT           : corrigée en donnée sur la recette ; décision produit et vérification en
+                 production restant à faire
+```
+
+### Écarts du cahier (chapitre 5.2)
+
+10. **API-TRIP-13** annonce la capacité « immuable après publication » : elle ne l'est pas, et la garde réelle (aucune modification dès qu'une réservation existe) est meilleure.
+11. **API-TRIP-01** liste `rating` et `reviewCount` parmi les champs d'une carte : ils n'apparaissent pas sur un jeu d'essai sans avis.

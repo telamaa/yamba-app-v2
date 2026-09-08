@@ -4200,24 +4200,24 @@ volontairement**.
 | API-AUTH-32 | Gardes du signalement | majeure | 400/400/404/409 | 400 `OWN_TARGET` · 400 `REASON_NOT_ALLOWED` · 404 · 409 | OK | — |
 | API-AUTH-33 | Onboarding Voyageur | majeure | 200 ×4 | 200 ×4, `url` Stripe, statut `pending` + 3 drapeaux | OK | rôle visible après reconnexion |
 | API-AUTH-34 | Tableau de bord sans compte | mineure | 409 `STRIPE_ACCOUNT_MISSING` | 403 sans fenêtre, puis 409 `STRIPE_ACCOUNT_MISSING` | OK | — |
-| API-TRIP-01 | Recherche publique | majeure | 200 ×2 | | | |
-| API-TRIP-02 | Filtres durs | **bloquante** | aucun trajet interdit | | | |
-| API-TRIP-03 | Filtres invalides ignorés | mineure | 200 | | | |
-| API-TRIP-04 | Paramètres de prix publics | majeure | 200 | | | |
-| API-TRIP-05 | Facettes | mineure | 200, 9 compteurs | | | |
-| API-TRIP-06 | Trajet public | majeure | 200 / 404 / 400 | | | |
-| API-TRIP-07 | Favori idempotent et gardé | majeure | 200 · 403 · 404 · 409 | | | |
-| API-TRIP-08 | Brouillon puis publication | majeure | 201 puis 200 | | | |
-| API-TRIP-09 | Portes de publication | majeure | 400 | | | |
-| API-TRIP-10 | `allowedActions` fait foi | majeure | 400 hors liste | | | |
-| API-TRIP-11 | Cycle de vie complet | majeure | 200 / 400 cohérents | | | |
-| API-TRIP-12 | **Annulation refusée, deal vivant** | **bloquante** | 409 `TRIP_HAS_ACTIVE_DEALS` | | | |
-| API-TRIP-13 | Modification, capacité immuable | majeure | 200 / 400 | | | |
-| API-TRIP-14 | Trajet d'autrui | **bloquante** | refus ×3, prix inchangé | | | |
-| API-TRIP-15 | Suppression et annulation | mineure | 200 puis 404 | | | |
-| API-TRIP-16 | Documents et déduplication | majeure | 201 puis 200 | | | |
-| API-TRIP-17 | Signature de téléversement | majeure | 401 / 200 | | | |
-| API-TRIP-18 | Suppression idempotente | mineure | 200 ×2 | | | |
+| API-TRIP-01 | Recherche publique | majeure | 200 ×2 | 200 avec et sans session, enveloppe sans `success`, `isFavorite` réel | OK | `rating`/`reviewCount` absents |
+| API-TRIP-02 | Filtres durs | **bloquante** | aucun trajet interdit | aucun non-publié, aucun départ passé, masqué exclu (2→1) | OK | — |
+| API-TRIP-03 | Filtres invalides ignorés | mineure | 200 | `mode` inconnu → **400** ; categories et buckets tolérés | **KO** | ANO-API-10 |
+| API-TRIP-04 | Paramètres de prix publics | majeure | 200 | params publics 200 sans session ; devis pondéré servi | OK | — |
+| API-TRIP-05 | Facettes | mineure | 200, 9 compteurs | 200, 7 facettes dont familyCounts et modeCount | OK | — |
+| API-TRIP-06 | Trajet public | majeure | 200 / 404 / 400 | 200, DTO public complet | OK | — |
+| API-TRIP-07 | Favori idempotent et gardé | majeure | 200 · 403 · 404 · 409 | idempotent des deux côtés, 404 inexistant, 403 `OWN_TRIP` | OK | — |
+| API-TRIP-08 | Brouillon puis publication | majeure | 201 puis 200 | 201 DRAFT puis 200 ; `departureHourLocal` recalculé (21), `minPriceCents` client ignoré | OK | — |
+| API-TRIP-09 | Portes de publication | majeure | 400 | 400 avec le motif de la machine (moteur de prix incomplet) | OK | — |
+| API-TRIP-10 | `allowedActions` fait foi | majeure | 400 hors liste | actions cohérentes ; un trajet à deals vivants n'expose ni `edit` ni `cancel` | OK | — |
+| API-TRIP-11 | Cycle de vie complet | majeure | 200 / 400 cohérents | non joué (couvert partiellement par 08, 12 et 15) | ⏭ | à jouer |
+| API-TRIP-12 | **Annulation refusée, deal vivant** | **bloquante** | 409 `TRIP_HAS_ACTIVE_DEALS` | 409 `TRIP_HAS_ACTIVE_DEALS`, `activeDeals: 4` | OK | — |
+| API-TRIP-13 | Modification, capacité immuable | majeure | 200 / 400 | modification partielle OK ; capacité modifiable après publication | PARTIEL | écart de cahier |
+| API-TRIP-14 | Trajet d'autrui | **bloquante** | refus ×3, prix inchangé | 400 « Unauthorized. » ×3, aucune fuite, prix inchangé | OK | écart connu |
+| API-TRIP-15 | Suppression et annulation | mineure | 200 puis 404 | 200 « Draft deleted. » / « Trip cancelled. », 404 ensuite | OK | — |
+| API-TRIP-16 | Documents et déduplication | majeure | 201 puis 200 | 201, statut `PENDING`, retour à `NOT_SUBMITTED` après retrait | OK | — |
+| API-TRIP-17 | Signature de téléversement | majeure | 401 / 200 | 401 sans session, 200 avec (token + expire) | OK | — |
+| API-TRIP-18 | Suppression idempotente | mineure | 200 ×2 | suppression 200 ; rejeu **400 « Document not found. »** | PARTIEL | non idempotent |
 | API-DEAL-01 | Intention de paiement | majeure | 201, rien persisté | | | |
 | API-DEAL-02 | Les neuf refus typés | **bloquante** | 409 + code | | | |
 | API-DEAL-03 | Divergence de devis | **bloquante** | 409 `QUOTE_DIVERGENCE` | | | |
