@@ -1919,3 +1919,39 @@ plateforme s'interdit, au lieu d'un refus explicite.
 
 Tous joués le 8 septembre 2026 sur l'environnement de recette (base `development`, paiement FAKE,
 Mailpit) — voir `context/YAMBA-RECETTE-API-RESULTATS.md`.
+
+# Recette API — ce que « mes informations » ne doit jamais contenir (ANO-API-06)
+
+## Le besoin
+
+Un membre qui demande ses propres informations reçoit son profil. Il ne doit pas recevoir, au
+passage, ce qui protège son compte ni ce que la modération écrit à son sujet avant de décider.
+
+Deux fuites cohabitaient. La première : le secret du second facteur (chiffré) et les codes de
+secours d'un compte **administrateur** partaient dans la réponse — un vol de session livrait donc de
+quoi s'attaquer, hors ligne, à la protection même des accès administrateur. La seconde : un membre
+visé par une **proposition** de suspension lisait le motif rédigé par l'administrateur et son
+identifiant, avant même qu'une décision soit prise.
+
+## Les règles
+
+- **RG-ME-01** — La réponse « mes informations » est une **liste blanche** : un champ nouveau du
+  modèle n'y entre que sur décision explicite, jamais par défaut.
+- **RG-ME-02** — N'en font jamais partie : les secrets d'authentification (mot de passe, secret du
+  second facteur même chiffré, codes de secours), les compteurs techniques anti-rejeu, et les
+  éléments de modération **avant décision** (niveau proposé, motif proposé, administrateur
+  auteur de la proposition).
+- **RG-ME-03** — En font partie, à dessein : une sanction **prononcée** (date, motif, échéance),
+  parce qu'un membre sanctionné doit pouvoir lire sa sanction, et l'information « le second facteur
+  est actif », qui ne livre rien d'exploitable.
+
+## Tests d'acceptation
+
+| Réf | Scénario | Attendu |
+|---|---|---|
+| ME1 | Lire ses informations avec un compte dont la 2FA est active | Aucun champ de secret ni de code de secours dans la réponse |
+| ME2 | Lire ses informations alors qu'une suspension est **proposée** contre soi | Ni le motif proposé, ni le niveau proposé, ni l'administrateur auteur |
+| ME3 | Lire ses informations alors qu'une suspension est **prononcée** | La sanction est lisible : date, motif, échéance |
+| ME4 | Ajouter un champ au modèle des membres sans le classer | La suite de tests d'auth-service échoue |
+
+Joués le 8 septembre 2026 — voir `context/YAMBA-RECETTE-API-RESULTATS.md`, fiche `ANO-API-06`.

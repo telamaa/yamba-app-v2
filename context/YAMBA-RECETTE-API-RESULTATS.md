@@ -201,11 +201,145 @@ L'historique est conservé : un KO reste écrit KO, sa correction s'ajoute en de
 | ANO-API-02 | API-GW-18 | bloquante (critère cahier) | 08/09/2026 | **close** | visibilité dans le `where`, deux services + tests |
 | ANO-API-03 | API-GW-14 | mineure | 08/09/2026 | ouverte | à grouper avec le domaine auth (chapitre 5.1) |
 | ANO-API-04 | API-GW-19 | mineure | 08/09/2026 | ouverte | à grouper avec le domaine deal (chapitre 5.3) |
+| ANO-API-05 | API-AUTH-03 / 05 | majeure | 08/09/2026 | ouverte | statuts HTTP contre OpenAPI — à grouper (chapitre 5.1) |
+| ANO-API-06 | API-AUTH-09 | **bloquante** | 08/09/2026 | **close** | liste blanche + test lisant le schéma Prisma |
+| ANO-API-07 | API-AUTH-11 | majeure | 08/09/2026 | ouverte | révocation non immédiate — à grouper (chapitre 5.1) |
 
 Les deux mineures restent ouvertes **volontairement** : le cahier demande des PR groupées par
 domaine, et les chapitres 5.1 (auth) et 5.3 (deal) sont susceptibles d'en révéler d'autres au même
 endroit. Aucune anomalie bloquante n'est ouverte à ce stade — critère de sortie n° 1 du §9.3 tenu
 pour le chapitre 4.
 
-**Référence de tests après correction** : trip-service 209 → **221**, auth-service 183 → **187**
-(plateforme 860 → **872**), `CLAUDE.md` mis à jour.
+**Référence de tests après corrections** : trip-service 209 → **221**, auth-service 183 → **192**
+(plateforme 860 → **877**), `CLAUDE.md` mis à jour.
+
+## Chapitre 5.1 — auth-service (en cours)
+
+**11 fiches jouées sur ~35.** 7 OK, 4 KO — dont **une bloquante**.
+
+| Fiche | Intitulé | Gravité | Verdict | Pourquoi | Recommandation |
+|---|---|---|---|---|---|
+| API-AUTH-01 | Démarrer une inscription | majeure | **OK** | 200, `verificationToken` de 64 caractères. **Rien en base** : `POST /auth/login` sur ce compte répond 401. Le code à six chiffres est arrivé dans Mailpit, en français, expéditeur `no-reply@yamba.test`, objet « Ton code d'activation Yamba » (tutoiement conforme aux décisions du 03/09). | — |
+| API-AUTH-02 | Consentement obligatoire | majeure | **OK** | `termsAccepted:false` → 400 ; sans `termsVersion` → 400 avec un motif distinct. | — |
+| API-AUTH-03 | Email déjà pris | majeure | **KO** | `details.code:"EMAIL_ALREADY_USED"` et `details.type:"register"` sont bien là, mais le statut est **400**, pas 409. | Voir `ANO-API-05` — l'OpenAPI documente 409. |
+| API-AUTH-04 | Mot de passe faible | mineure | **OK** | 400, `details.type:"password"`, `details.code:"PASSWORD_TOO_SHORT"`, `details.field:"password"`. | — |
+| API-AUTH-05 | Code faux, compteur | majeure | **KO** | La mécanique est **exacte** : `attemptsLeft` 4→3→2→1, puis `OTP_INVALIDATED` avec `locked:true` et `lockUntilSeconds:60` (premier palier), puis `OTP_LOCKED` — et le **bon** code est refusé pendant le verrou, ce qui est le comportement voulu. Mais les statuts sont **400** partout, au lieu de 401 (code faux) et 429 (verrou). | Voir `ANO-API-05`. |
+| API-AUTH-06 | Bon code, sans session | majeure | **OK** | 201, `{"success":true}`, et **`grep -c access_token` = 0** : aucune session n'est ouverte à la vérification. | — |
+| API-AUTH-07 | Jetons en cookies seulement | **bloquante** | **OK** | 200. Le corps ne porte que `message` et `user` (id, email, firstName, lastName, roles) — **aucun** `accessToken`, `refreshToken` ni `passwordHash`. Deux `Set-Cookie` **HttpOnly** + `SameSite=Lax` : `access_token` Max-Age **900 s**, `refresh_token` Max-Age **2 592 000 s** (30 j avec `rememberMe`). Les anciens cookies sont expirés avant d'être réécrits. | — |
+| API-AUTH-08 | 401 indistinguable | **bloquante** | **OK** | Mot de passe faux et compte inconnu : **401 tous les deux**, corps rigoureusement identiques (`Invalid email or password`). | — |
+| API-AUTH-09 | `/auth/me` sans secret | **bloquante** | **KO le 08/09** → corrigé le 08/09 | `passwordHash` est bien retiré, mais quatre champs TOTP sortent : `totpSecretEncrypted`, `totpBackupCodeHashes`, `totpEnabledAt`, `totpLastUsedStep` — plus les champs de modération `suspensionProposed*`. | Voir `ANO-API-06`. |
+| API-AUTH-10 | Rotation de session | majeure | **OK** | `POST /auth/refresh` → 200 `{success:true}` sans jeton dans le corps ; le pot mis à jour ouvre `/auth/me` (200) ; **l'ancien pot répond 401** (« Session expired or invalid »). Un jeton de rafraîchissement ne sert bien qu'une fois. | — |
+| API-AUTH-11 | Mes appareils | majeure | **KO** | La liste est juste (deux sessions, une seule `current:true`, `device` / `ip` / dates) et la révocation répond 200 `{ok:true}` — mais la session révoquée **continue d'ouvrir `/auth/me` (200)**. Seul `/auth/refresh` est coupé (401). | Voir `ANO-API-07`. Écart de cahier au passage : la réponse s'appelle `items[]`, pas `sessions[]`. |
+
+### Anomalies du chapitre 5.1
+
+```
+ANO-API-05
+Fiches         : API-AUTH-03, API-AUTH-05
+Gravité        : majeure
+Constat        : auth-service répond 400 pour des refus que son PROPRE contrat OpenAPI
+                 documente autrement.
+                 · POST /auth/register, email déjà pris   → 400 obtenu, 409 documenté
+                 · POST /auth/register/verify, code faux  → 400 obtenu, 401 documenté
+                 · POST /auth/register/verify, verrouillé → 400 obtenu, 429 documenté
+                 (statuts lus dans apps/auth-service/openapi.json, généré depuis les
+                 contrats Zod — A145)
+Reproductible  : oui, systématique
+Impact         : le front web actuel décide sur `details.code` et n'est pas gêné. Un client
+                 GÉNÉRÉ depuis l'OpenAPI — le client mobile de D36 est le cas prévu — code
+                 des branches 409 et 429 qui ne seront jamais atteintes, et traite ces refus
+                 comme de simples erreurs de saisie. Un 429 manquant prive aussi les clients
+                 et les proxys de la sémantique « ralentis », la seule qu'un intermédiaire
+                 comprend sans lire le corps.
+Piste          : les contrôleurs d'inscription lèvent tous une ValidationError (400).
+                 Il existe déjà des erreurs typées côté @packages/error-handler ; le code de
+                 refus (`EMAIL_ALREADY_USED`, `OTP_INCORRECT`, `OTP_LOCKED`) est présent et
+                 juste — seul le statut porté par l'erreur est à corriger.
+ÉTAT           : ouverte
+```
+
+```
+ANO-API-06
+Fiche          : API-AUTH-09
+Gravité        : BLOQUANTE
+Appel exact    : curl -s -b shipper.txt "$BASE/auth/me" | jq '.user | keys'
+Attendu        : le document User SANS passwordHash ni aucun secret (fuites: [])
+Obtenu         : 200, `passwordHash` bien retiré — mais le corps porte
+                 `totpSecretEncrypted`, `totpBackupCodeHashes`, `totpEnabledAt`,
+                 `totpLastUsedStep`, ainsi que `suspensionProposedReason`,
+                 `suspensionProposedLevel`, `suspensionProposedByAdminId`,
+                 `invitedByAdminId`, `emailSuppressedReason`, `emailNormalized`.
+PREUVE         : sur un compte du jeu d'essai sans 2FA ces champs valent null / [] — ce qui
+                 pouvait faire croire à un faux positif. Des valeurs factices ont donc été
+                 posées en base, puis retirées : /auth/me a bien renvoyé au membre
+                 `"totpSecretEncrypted":"FAKE-AES-GCM:…"`, les deux hachages de codes de
+                 secours, et `"suspensionProposedReason":"Motif interne rédigé par un
+                 administrateur…"`. Base restaurée après la mesure.
+Reproductible  : oui
+Impact         : 1. Le secret du second facteur (chiffré) et les hachages des codes de
+                 secours d'un compte ADMINISTRATEUR sont lisibles par toute session de ce
+                 compte : un vol de cookie ou un XSS donne de quoi attaquer le 2FA hors
+                 ligne, alors que D54 en fait la garde des accès admin. La clé de
+                 déchiffrement a un repli de développement hors production — deux moitiés
+                 qu'il vaut mieux ne pas laisser voyager ensemble.
+                 2. Un membre lit le MOTIF de modération rédigé contre lui et l'identité de
+                 l'administrateur, avant même toute décision de suspension.
+Piste          : apps/auth-service/src/controller/auth.controller.ts:672
+                 `const { passwordHash, ...safeUser } = fullUser;`
+                 C'est le `spread + delete` que les règles non négociables du projet
+                 interdisent explicitement : tout champ ajouté au modèle User part vers le
+                 client sans que personne ait à y penser — c'est ainsi que les champs TOTP
+                 de D54, écrits bien après, sont sortis. Correctif : une liste blanche
+                 explicite (`select` Prisma ou DTO), et un test qui échoue si un champ
+                 inconnu apparaît dans la réponse.
+
+CORRECTION       : 08/09/2026 — apps/auth-service/src/utils/me-projection.ts
+                   `ME_USER_SELECT` (liste blanche passée en `select` Prisma) et
+                   `ME_EXCLUDED_FIELDS`, où chaque exclusion porte SA RAISON en clair.
+                   Le `spread + delete` disparaît du contrôleur. Sont conservés à dessein :
+                   `totpEnabledAt` (dire « la 2FA est active » ne livre rien),
+                   `suspendedAt` / `suspensionReason` / `suspensionUntil` (une sanction
+                   PRONONCÉE est notifiée au membre, contrairement à une proposition).
+                   Aucun des champs retirés n'était utilisé par user-ui ni admin-ui
+                   (vérifié par recherche avant correction).
+TEST             : apps/auth-service/src/utils/me-projection.spec.ts (5 cas). Le premier
+                   LIT prisma/schema.prisma et échoue tant qu'un champ du modèle `User`
+                   n'est pas classé — renvoyé ou explicitement exclu. Un test qui se
+                   contenterait de vérifier l'absence de `totpSecretEncrypted` raterait le
+                   prochain champ sensible ; celui-ci ne peut pas le rater.
+CONTRE-ÉPREUVE   : mêmes valeurs factices reposées en base, /auth/me renvoie désormais
+                   `fuites: []` et aucun des champs sensibles n'apparaît, tandis que
+                   `totpEnabledAt`, `avatar`, `carrierPage`, `roles`, `adminRoles`,
+                   `accountStatus`, `preferredLocale` restent servis. Base restaurée.
+ÉTAT             : CLOSE
+```
+
+```
+ANO-API-07
+Fiche          : API-AUTH-11
+Gravité        : majeure
+Appel exact    : DELETE "$BASE/auth/me/sessions/<jti>" -b shipper.txt      → 200 {ok:true}
+                 GET    "$BASE/auth/me"  -b autre-appareil.txt             → 200  (attendu 401)
+                 POST   "$BASE/auth/refresh" -b autre-appareil.txt         → 401  (correct)
+Attendu        : « la révocation est immédiate et côté serveur »
+Obtenu         : la révocation coupe le RAFRAÎCHISSEMENT mais pas l'accès en cours : le
+                 jeton d'accès reste accepté jusqu'à son expiration naturelle (15 min).
+Reproductible  : oui
+Impact         : « Couper cet appareil » ne coupe rien pendant un quart d'heure. C'est
+                 exactement la fonction qu'un membre utilise quand il PENSE avoir été
+                 compromis : pendant 15 minutes, l'attaquant garde la lecture de son profil,
+                 de ses deals et de ses messages. Même limite pour le changement de mot de
+                 passe (API-AUTH-12, à jouer).
+Piste          : packages/middleware/isAuthenticated.ts vérifie la signature du jeton puis
+                 lit l'utilisateur en base — ce qui rend d'ailleurs la SUSPENSION de compte
+                 immédiate, elle — mais ne consulte aucune liste de révocation. Le `jti` est
+                 déjà dans le jeton (la liste des sessions l'affiche) et Redis est déjà là :
+                 un test d'existence par requête authentifiée, avec un TTL calé sur la durée
+                 de vie du jeton d'accès, suffit. À défaut, raccourcir le jeton d'accès.
+ÉTAT           : ouverte
+```
+
+### Écarts du cahier (chapitre 5.1)
+
+4. **API-AUTH-11** annonce une réponse `{ "sessions": [...] }` ; l'API renvoie `{ "items": [...] }`.
+5. **API-AUTH-01** cite un corps `"OTP sent to your email…"` ; le service dit « OTP sent to email. Please verify your account. » (sans portée : on ne juge jamais sur le message).
