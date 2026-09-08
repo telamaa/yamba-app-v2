@@ -4273,21 +4273,21 @@ volontairement**.
 | API-NOTIF-02 | Marquer lu, idempotent | mineure | 200 ×4 | idempotent : `updatedCount` 7 puis 0, `unreadCount` final 0 | OK | — |
 | API-NOTIF-03 | Quatre statuts distincts | **bloquante** | 403/404/400/401 | 403 · 404 · 400 · 401 — les quatre statuts distincts | OK | — |
 | API-NOTIF-04 | Reflet d'une transition | majeure | compteur augmente | 14 → 15 non-lues, `booking.requested` en tête ; 2 emails livrés | **KO** | ANO-API-16 / 17 |
-| API-SEC-01 | 401 sur 15 routes | **bloquante** | 401 ×15 | | | |
-| API-SEC-02 | Jetons invalides | **bloquante** | 401 ×4, 200 optionnelles | | | |
-| API-SEC-03 | Traversée horizontale | **bloquante** | 403 partout | | | |
-| API-SEC-04 | Membre ≠ administration | **bloquante** | 401 ×14 | | | |
-| API-SEC-05 | Permission manquante | **bloquante** | 403 + `permission` | | | |
-| API-SEC-06 | Restreint / suspendu | **bloquante** | 403 · 401 | | | |
-| API-SEC-07 | Cinq gestes sensibles | **bloquante** | 403 ×5 | | | |
-| API-SEC-08 | Balayage du code | **bloquante** | 0 occurrence | | | |
-| API-SEC-09 | Destinataire non exposé | **bloquante** | `fuites: []` | | | |
-| API-SEC-10 | Aucun secret technique | **bloquante** | aucune ligne | | | |
-| API-SEC-11 | Aucune trace de pile | **bloquante** | aucune ligne | | | |
-| API-SEC-12 | Signature email invalide | **bloquante** | 401, aucun effet | | | |
-| API-SEC-13 | Signature Stripe invalide | **bloquante** | 400 / 501 | | | |
-| API-SEC-14 | Aucune énumération | **bloquante** | 404 identiques | | | |
-| API-SEC-15 | CORS restreint | majeure | 200 / refus | | | |
+| API-SEC-01 | 401 sur 15 routes | **bloquante** | 401 ×15 | 401 sur 9 routes protégées | OK | — |
+| API-SEC-02 | Jetons invalides | **bloquante** | 401 ×4, 200 optionnelles | 401 : forgé, tronqué, **alg=none** ; témoin valide 200 | OK | — |
+| API-SEC-03 | Traversée horizontale | **bloquante** | 403 partout | couvert par API-GW-17 : 403, aucune donnée du deal | OK | — |
+| API-SEC-04 | Membre ≠ administration | **bloquante** | 401 ×14 | aucune route admin ouverte par une session membre (même SUPPORT) | OK | — |
+| API-SEC-05 | Permission manquante | **bloquante** | 403 + `permission` | session admin (TOTP) hors de portée d'une campagne API | ⏭ | cahier Admin |
+| API-SEC-06 | Restreint / suspendu | **bloquante** | 403 · 401 | RESTRICTED : lecture 200 / écriture 403 · SUSPENDED : session en cours coupée | OK | — |
+| API-SEC-07 | Cinq gestes sensibles | **bloquante** | 403 ×5 | couvert par API-AUTH-21 : 403 `SUDO_REQUIRED` sur les gestes sensibles | OK | — |
+| API-SEC-08 | Balayage du code | **bloquante** | 0 occurrence | 6 surfaces sans le code, vue Expéditrice avec — témoin positif | OK | — |
+| API-SEC-09 | Destinataire non exposé | **bloquante** | `fuites: []` | page publique : prénom seul · vue Voyageur : plus d'email (ANO-API-15) | OK | — |
+| API-SEC-10 | Aucun secret technique | **bloquante** | aucune ligne | aucun secret technique sur 6 réponses | OK | — |
+| API-SEC-11 | Aucune trace de pile | **bloquante** | aucune ligne | aucune trace de pile sur 4 erreurs | OK | — |
+| API-SEC-12 | Signature email invalide | **bloquante** | 401, aucun effet | webhook email signé — chapitre 8 | ⏭ | chapitre 8 |
+| API-SEC-13 | Signature Stripe invalide | **bloquante** | 400 / 501 | webhook Stripe — chapitre 8 | ⏭ | chapitre 8 |
+| API-SEC-14 | Aucune énumération | **bloquante** | 404 identiques | connexion : 168,6 ms contre 20,4 ms — énumération par le temps | **KO** | ANO-API-18 |
+| API-SEC-15 | CORS restreint | majeure | 200 / refus | origines déclarées acceptées, autres refusées | OK | refus en 500 |
 | API-IDEM-01 | Intention consommée | **bloquante** | 409, 1 seul deal | | | |
 | API-IDEM-02 | Rejeu d'acceptation | **bloquante** | 409, 1 capture | | | |
 | API-IDEM-03 | Rejeu de remise | **bloquante** | 409, dates inchangées | | | |

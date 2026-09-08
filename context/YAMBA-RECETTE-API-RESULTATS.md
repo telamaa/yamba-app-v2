@@ -220,6 +220,7 @@ L'historique est conservé : un KO reste écrit KO, sa correction s'ajoute en de
 | ANO-API-15 | API-DEAL-06 / 15 | majeure | 08/09/2026 | **close** | destinataire minimisé ; verrou typé avec son horizon |
 | ANO-API-16 | API-NOTIF-01 / 04 | **bloquante** | 08/09/2026 | **close** | types `conversation.*` au contrat + lecture robuste |
 | ANO-API-17 | API-NOTIF-04 | majeure | 08/09/2026 | **close** | gabarits d'email embarqués, chemin indépendant du cwd |
+| ANO-API-18 | API-SEC-14 | **bloquante** | 08/09/2026 | **close** | connexion à temps constant (membre ET admin) |
 | ANO-API-05 | API-AUTH-03 / 05 | majeure | 08/09/2026 | **close** | 409 / 401 / 429, classes d'erreur enrichies |
 | ANO-API-06 | API-AUTH-09 | **bloquante** | 08/09/2026 | **close** | liste blanche + test lisant le schéma Prisma |
 | ANO-API-07 | API-AUTH-11 / 12 / 13 | majeure | 08/09/2026 | **close** | `jti` dans le jeton d'accès — registre **D75 candidate** |
@@ -1092,3 +1093,66 @@ Portée         : ce défaut ne se voyait ni au typecheck, ni aux tests unitaire
                  aller regarder la boîte aux lettres — c'est précisément ce que la bascule
                  Mailpit du début de campagne a rendu possible.
 ```
+
+## Chapitre 6 — Sécurité (12 fiches jouées sur 15)
+
+**11 OK · 1 KO · 3 ⏭** (deux webhooks renvoyés au chapitre 8, une fiche admin au cahier Admin).
+
+Le chapitre confirme l'essentiel : jetons, cloisonnement des rôles, sanctions, secrets, traces.
+La seule anomalie est une **fuite par le temps sur la connexion**, la plus exposée des surfaces.
+
+| Fiche | Intitulé | Verdict | Pourquoi |
+|---|---|---|---|
+| API-SEC-01 | 401 partout sans jeton | **OK** | Neuf routes protégées, neuf 401. |
+| API-SEC-02 | Jeton expiré, invalide, tronqué | **OK** | Forgé → 401, tronqué → 401, **`alg=none` → 401** (l'attaque classique ne passe pas), témoin valide → 200. |
+| API-SEC-04 | Une session membre n'ouvre rien d'admin | **OK** | Six routes d'administration, **aucune** ouverte — alors même que ce compte porte le profil SUPPORT. Les cookies admin sont bien une session à part. |
+| API-SEC-06 | Compte restreint, compte suspendu | **OK** | `RESTRICTED` : lecture 200, écriture **403** avec un message clair. `SUSPENDED` : **la session déjà ouverte tombe immédiatement** (401 `ACCOUNT_SUSPENDED`) et la reconnexion est refusée — la sanction agit par lecture à chaque requête, pas par une révocation différée. |
+| API-SEC-08 | **Balayage du code de livraison** | **OK** | Six surfaces (2 à 32 Ko de corps) **sans** le code — deal Voyageur, listes, notifications, fil, portefeuille, page publique — et la vue Expéditrice **avec**. C'est ce **témoin positif** qui rend le test valable. |
+| API-SEC-09 | Le destinataire n'est pas exposé | **OK** | Page publique : `recipientFirstName` seul. Vue Voyageur : nom et téléphone, **plus d'email** — l'effet de `ANO-API-15`. |
+| API-SEC-10 | Aucun secret technique | **OK** | Six réponses balayées (`passwordHash`, `totpSecret*`, `deliveryCodeHash`, `deliveryCodeEncrypted`, `stripeAccountId`, clés) : aucune occurrence. |
+| API-SEC-11 | Aucune trace de pile | **OK** | Quatre erreurs provoquées : ni `at Object`, ni chemin `node_modules`, ni mention de Prisma. |
+| API-SEC-14 | **Aucune énumération possible** | **KO → corrigé** | Corps identiques, mais **168,6 ms contre 20,4 ms** à la connexion. Voir `ANO-API-18`. |
+| API-SEC-15 | CORS | **OK** | Les trois origines déclarées reçoivent l'en-tête ; les autres sont refusées. **Réserve mineure** : le refus prend la forme d'un **500**, alors qu'il n'a rien d'une erreur serveur — sans conséquence de sécurité (le navigateur bloque de toute façon), mais trompeur dans les journaux et pour qui déboguera un nouveau front. |
+
+### Anomalie du chapitre 6
+
+```
+ANO-API-18
+Fiche          : API-SEC-14 · Gravité : BLOQUANTE · ÉTAT : CLOSE
+Appel exact    : for i in $(seq 1 20); do curl -s -o /dev/null -w '%{time_total}\n' \
+                   -X POST "$BASE/auth/login" -H 'Content-Type: application/json' \
+                   -d '{"email":"<adresse>","password":"MauvaisMotDePasse-1!"}'; done | sort -n
+Attendu        : rien ne distingue un compte existant d'un compte inconnu
+Obtenu         : corps et statut identiques (401 « Invalid email or password ») — mais
+                 · compte existant   médiane 168,6 ms (min 146,7 / max 370,9)
+                 · compte inexistant médiane  20,4 ms (min  14,1 / max  31,1)
+                 Distributions DISJOINTES : le minimum du cas « existe » dépasse de loin le
+                 maximum du cas « n'existe pas ». Un seul appel suffit à trancher.
+Cause          : le cas d'école. `if (!user) return next(...)` est placé AVANT
+                 `bcrypt.compare` : un compte inexistant ne paie jamais le coût du hachage,
+                 un compte existant le paie toujours.
+Impact         : énumération de comptes sur la surface la PLUS exposée de la plateforme.
+                 C'est le point de départ du bourrage d'identifiants — et cela annule le soin
+                 pris (à juste titre) à rendre les corps rigoureusement identiques.
+                 La même faille existait sur la connexion ADMIN, où l'enjeu est plus grand
+                 encore : elle laissait deviner QUI est administrateur.
+Correction     : apps/auth-service/src/utils/password-timing.ts — le mot de passe est comparé
+                 dans TOUS les cas, contre un hachage leurre de même coût (bcrypt, 10 tours)
+                 calculé au chargement du module, jamais écrit en dur. Appliqué à la
+                 connexion membre ET à la connexion admin.
+Contre-épreuve : compte existant 179,0 ms (157,8 / 448,7) · compte inexistant 180,6 ms
+                 (157,4 / 507,8) — distributions superposées, l'écart a disparu. Connexion
+                 valide toujours 200. Tests : password-timing.spec.ts (6 cas, dont un qui
+                 refuse un rapport de durée supérieur à 3 entre les deux chemins).
+```
+
+### Ce que ce chapitre m'a appris sur mes propres tests
+
+Le balayage du code de livraison (API-SEC-08) a été écrit **trois fois**. Les deux premières
+versions affichaient « code absent partout » — un résultat rassurant et **entièrement faux** : la
+première envoyait les cookies dans un seul argument mal formé (toutes les réponses étaient des 401),
+la seconde utilisait `head -n -1`, qui n'existe pas sur macOS (tous les corps étaient vides).
+
+Un test de sécurité qui ne trouve rien doit être **suspecté avant d'être cru**. Ce qui a sauvé
+celui-ci, c'est le **témoin positif** : exiger que le code soit **présent** là où il est légitime.
+Sans cette ligne, l'erreur passait pour un succès.
