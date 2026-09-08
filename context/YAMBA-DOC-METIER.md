@@ -2054,3 +2054,46 @@ comportement ordinaire d'une place de marché. Trois promesses n'étaient pas te
 
 Joués le 8 septembre 2026 — voir `context/YAMBA-RECETTE-API-RESULTATS.md`, fiches `ANO-API-19`,
 `ANO-API-20` et `ANO-API-21`.
+
+# Recette API — ce que le monde extérieur nous apprend (lot webhooks)
+
+## Le besoin
+
+Deux acteurs extérieurs nous parlent sans jamais ouvrir de session : **Stripe**, qui sait avant nous
+qu'un paiement est mort ou qu'un compte de Voyageur est bloqué, et **le fournisseur d'emails**, qui
+sait avant nous qu'une adresse n'existe plus. Ce sont les deux seules portes de la plateforme
+ouvertes sur l'extérieur ; leur unique défense est la signature du message.
+
+Rien n'était en défaut. Ce chapitre ne corrige pas, il **atteste** — et complète les tests.
+
+## Les règles
+
+- **RG-HOOK-01** — Un message extérieur n'est traité que si sa **signature** est valide et
+  **récente**. Sans secret configuré, la plateforme **refuse** (503 côté email, 501 côté Stripe) :
+  elle n'accepte jamais un message qu'elle ne peut pas vérifier.
+- **RG-HOOK-02** — Un type de message dont nous ne faisons rien reçoit tout de même une réponse
+  positive : un refus ferait retenter l'émetteur indéfiniment pour rien.
+- **RG-HOOK-03** — Un échec de notre côté (base indisponible) répond en **erreur serveur**, pour que
+  l'émetteur réessaie. Répondre « reçu » perdrait l'information définitivement.
+- **RG-HOOK-04** — Le même message reçu deux fois ne produit **qu'un seul effet** : une seule
+  annulation, une seule mise sur liste de suppression.
+- **RG-HOOK-05** — Sur l'argent, **c'est Stripe qui fait foi** : l'état de Yamba converge vers le
+  sien. Un compte de Voyageur qui redevient conforme voit ses versements bloqués **repartir seuls**,
+  sans qu'il refasse son inscription.
+- **RG-EMAIL-05** — Une adresse qui rebondit durement, ou dont le titulaire signale un abus, est
+  **mise en retrait** : plus aucun email ne part vers elle, sur aucun flux, jusqu'à ce qu'un
+  administrateur lève le retrait. Un rebond passager (boîte pleine) ne déclenche rien.
+
+## Tests d'acceptation
+
+| Réf | Scénario | Attendu |
+|---|---|---|
+| HK1 | Message Stripe sans signature, ou mal signé | Refusé ; aucun effet |
+| HK2 | Stripe annonce une autorisation morte sur une demande en attente | La demande est annulée par le système, l'Expéditeur n'est pas débité |
+| HK3 | Le même message Stripe arrive deux fois | Une seule annulation, un seul événement |
+| HK4 | Le compte du Voyageur redevient conforme | Ses drapeaux suivent, ses versements en attente repartent |
+| HK5 | Le fournisseur d'emails signale un rebond dur | L'adresse est mise en retrait ; **la transition suivante n'envoie plus rien** à ce membre, l'autre partie reçoit normalement le sien |
+| HK6 | Le même rebond est rejoué | Aucun second effet |
+| HK7 | Un message d'un type dont nous ne faisons rien | Accepté et ignoré, jamais une erreur |
+
+Joués le 8 septembre 2026 — voir `context/YAMBA-RECETTE-API-RESULTATS.md`, chapitre 8. Aucun écart.

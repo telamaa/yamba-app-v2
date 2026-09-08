@@ -2953,3 +2953,61 @@ Le middleware d'erreur expose déjà `details` en production dès que `details.c
 
 `write-conflict-retry.spec.ts` (4 cas) et `refusal-codes.spec.ts` (3 cas).
 deal-service 538 → **542**, message-service 36 → **39**. Plateforme : 904 → **911**.
+
+---
+
+# Recette API, chapitre 8 — webhooks : aucune anomalie, deux specs de contrôleur ajoutés
+
+Sept fiches sur huit jouées, **aucun écart**. Les deux webhooks — Stripe (`:6003/webhooks/stripe`,
+hors passerelle) et email Resend (`/api/webhooks/email/resend`, via la passerelle) — se comportent
+exactement comme le cahier l'annonce.
+
+## Ce qui a été prouvé
+
+| Chemin | Preuve |
+|---|---|
+| Stripe, secret absent | **501** — l'endpoint existe mais refuse plutôt que d'accepter sans signature |
+| Stripe, en-tête absent / signature invalide | **400** ×2 |
+| Stripe, `payment_intent.canceled` | deal `PENDING` → `CANCELLED`, `closedBy: SYSTEM`, `cancelReason: PAYMENT_AUTHORIZATION_LOST` |
+| Stripe, rejeu du même événement | 200/200, **un seul** `booking.cancelled` en boîte d'envoi |
+| Stripe, `account.updated` sur un compte réel | `chargesEnabled` / `payoutsEnabled` suivent Stripe dans les **deux** sens |
+| Stripe via la passerelle | **404** — la route n'y est pas exposée, comme voulu |
+| Email, secret absent | **503** |
+| Email, signature absente / fausse / périmée | **401** avec `reason` |
+| Email, `email.delivered` | trace `EmailDelivery` **SENT → DELIVERED** |
+| Email, rebond dur | `HARD_BOUNCE` posé — **et plus aucune trace email écrite** pour cette adresse à la transition suivante |
+| Email, rejeu et type inconnu | 200 sans second effet ; `{ ok: true, ignored: "email.opened" }` |
+
+## Signer un événement Stripe à la main (la CLI n'était pas disponible)
+
+Plutôt que de laisser deux fiches bloquantes en ⏭, les événements ont été signés comme Stripe les
+signe : `HMAC-SHA256(secret, "<timestamp>.<corps brut>")` en hexadécimal, dans
+`stripe-signature: t=<timestamp>,v1=<hex>`.
+
+**Le piège, payé une fois :** `$(cat fichier)` retire le saut de ligne final, alors que
+`curl --data-binary @fichier` l'envoie. La signature portait donc sur des octets différents de ceux
+transmis — et le service répondait 400, **correctement**. La signature se calcule sur les octets
+exacts, lus en binaire :
+
+```js
+createHmac("sha256", secret).update(Buffer.concat([Buffer.from(ts + "."), fs.readFileSync(f)]))
+```
+
+C'est la même exigence qui interdit de faire passer ce webhook par la passerelle : elle analyse
+puis re-sérialise le JSON, ce qui déplacerait une espace et invaliderait la signature. La route est
+donc montée **avant** `express.json`, sur un lecteur de corps brut.
+
+## Les deux specs de contrôleur ajoutés
+
+Les règles pures étaient testées (`verifySvixSignature` sur vecteurs, `interpretEmailEvent` type par
+type, `constructStripeWebhookEvent`), mais **la glu ne l'était pas** — la couche où vivaient
+ANO-API-16 et ANO-API-17.
+
+- `apps/notification-service/src/controllers/email-webhook.controller.spec.ts` (8 cas). Un cas
+  n'était couvert nulle part : **l'horodatage hors tolérance** (rejeu tardif d'un événement
+  correctement signé) — refusé en 401 `STALE`.
+- `apps/deal-service/src/controllers/stripe-webhook.controller.spec.ts` (10 cas). Le tableau des
+  quatre réponses est verrouillé, y compris le **500 sur échec transitoire** : c'est le filet, et le
+  rendre en 200 perdrait l'événement pour toujours puisque Stripe ne renverrait pas.
+
+notification-service 99 → **107**, deal-service 542 → **552**. Plateforme **929**.

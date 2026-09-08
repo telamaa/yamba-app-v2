@@ -4284,8 +4284,8 @@ volontairement**.
 | API-SEC-09 | Destinataire non exposé | **bloquante** | `fuites: []` | page publique : prénom seul · vue Voyageur : plus d'email (ANO-API-15) | OK | — |
 | API-SEC-10 | Aucun secret technique | **bloquante** | aucune ligne | aucun secret technique sur 6 réponses | OK | — |
 | API-SEC-11 | Aucune trace de pile | **bloquante** | aucune ligne | aucune trace de pile sur 4 erreurs | OK | — |
-| API-SEC-12 | Signature email invalide | **bloquante** | 401, aucun effet | webhook email signé — chapitre 8 | ⏭ | chapitre 8 |
-| API-SEC-13 | Signature Stripe invalide | **bloquante** | 400 / 501 | webhook Stripe — chapitre 8 | ⏭ | chapitre 8 |
+| API-SEC-12 | Signature email invalide | **bloquante** | 401, aucun effet | 401 `MISSING_HEADERS` / `BAD_SIGNATURE` / `STALE`, aucune écriture | OK | — |
+| API-SEC-13 | Signature Stripe invalide | **bloquante** | 400 / 501 | 400 en-tête absent · 400 signature invalide · 501 sans secret ; route non exposée par la passerelle (404) | OK | — |
 | API-SEC-14 | Aucune énumération | **bloquante** | 404 identiques | connexion : 168,6 ms contre 20,4 ms — énumération par le temps | **KO** | ANO-API-18 |
 | API-SEC-15 | CORS restreint | majeure | 200 / refus | origines déclarées acceptées, autres refusées | OK | refus en 500 |
 | API-IDEM-01 | Intention consommée | **bloquante** | 409, 1 seul deal | 409 `PAYMENT_ALREADY_USED`, un seul deal créé | OK | — |
@@ -4298,14 +4298,14 @@ volontairement**.
 | API-IDEM-08 | Deux acceptations RDV | majeure | 200 + 400 | 200 + 400, un seul `acceptedAt` — mais le refus partait **sans `details.code`**, la raison collée dans la phrase anglaise | **KO** | ANO-API-20 |
 | API-IDEM-09 | Deux régénérations | majeure | −1 seulement | compteur juste (−1), mais le perdant recevait **500** (même conflit d'écriture) — corrigé : 200 + 409 | **KO** | ANO-API-21 |
 | API-IDEM-10 | Deux rafraîchissements | majeure | ≤ 1 session vivante | 200 + 401 ; une seule session utilisable ensuite (jeton de rafraîchissement à usage unique) | OK | — |
-| API-HOOK-01 | Écoute Stripe locale | majeure | secret affiché | | | |
-| API-HOOK-02 | Quatre réponses Stripe | **bloquante** | 200/400/501/500 | | | |
-| API-HOOK-03 | Cinq événements traités | majeure | effets attendus | | | |
-| API-HOOK-04 | Rejeu Stripe | **bloquante** | 1 seul effet | | | |
-| API-HOOK-05 | Trois réponses email | majeure | 503/401/200 | | | |
-| API-HOOK-06 | Événement email signé | majeure | 200 `DELIVERED` | | | |
-| API-HOOK-07 | Rebond dur → suppression | **bloquante** | 200 `suppressed:true` | | | |
-| API-HOOK-08 | Événement inconnu / rejeu | majeure | 200 sans effet | | | |
+| API-HOOK-01 | Écoute Stripe locale | majeure | secret affiché | CLI Stripe absente du poste — remplacée par des événements **auto-signés** (HMAC-SHA256 sur `t.corps`), ce qui couvre 02/03/04 | ⏭ | à rejouer avec la CLI |
+| API-HOOK-02 | Quatre réponses Stripe | **bloquante** | 200/400/501/500 | 200 (type non traité), 400 (en-tête absent), 400 (signature invalide), 501 (sans secret) ; le 500 transitoire est couvert par le test unitaire | OK | — |
+| API-HOOK-03 | Cinq événements traités | majeure | effets attendus | `payment_intent.canceled` → CANCELLED par SYSTEM (`PAYMENT_AUTHORIZATION_LOST`) · `amount_capturable_updated` sans effet · `account.updated` : drapeaux suivis dans les DEUX sens sur un compte réel · objets inconnus → 200 + avertissement | OK | — |
+| API-HOOK-04 | Rejeu Stripe | **bloquante** | 1 seul effet | 200 aux deux envois, **un seul** `booking.cancelled` en boîte d'envoi, statut inchangé | OK | — |
+| API-HOOK-05 | Trois réponses email | majeure | 503/401/200 | 503 sans secret (instance dédiée), 401 signature absente/fausse, 200 signature valide | OK | — |
+| API-HOOK-06 | Événement email signé | majeure | 200 `DELIVERED` | 200 `{ok,status:DELIVERED,suppressed:false}` ; la trace réelle passe **SENT → DELIVERED** | OK | — |
+| API-HOOK-07 | Rebond dur → suppression | **bloquante** | 200 `suppressed:true` | 200 `suppressed:true`, `HARD_BOUNCE` posé — et **conséquence prouvée** : la transition suivante n'écrit **aucune** trace email pour l'adresse supprimée, celle de l'autre partie part normalement | OK | — |
+| API-HOOK-08 | Événement inconnu / rejeu | majeure | 200 sans effet | `email.opened` → 200 `ignored` ; rebond rejoué → 200 `suppressed:false` (un seul effet) | OK | — |
 
 ### 9.2 Fiche d'anomalie
 
