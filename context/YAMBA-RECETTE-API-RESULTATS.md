@@ -583,3 +583,216 @@ rapide qu'une révocation de session.
 - **La fenêtre sensible est consommée par le changement de mot de passe** (constaté : il faut la
   rouvrir pour enchaîner un export). C'est défendable, mais ce n'est écrit nulle part — à graver
   dans D65 ou à documenter dans le cahier, sinon chaque testeur le redécouvrira.
+
+## Challenge expert — l'argent du membre : compte Stripe du Voyageur et finances du tableau de bord
+
+Sujet soulevé hors recette, et point aveugle réel : la campagne API vérifie que l'argent est
+**correctement calculé** ; personne ne vérifiait qu'il est **correctement montré**. Inventaire
+factuel (chemins et lignes vérifiés), puis propositions classées.
+
+### A — Le parcours Stripe du Voyageur : quatre défauts qui s'enchaînent
+
+**A1. « Configurer plus tard » clôt l'onboarding sans Stripe.** `completeCarrierOnboarding`
+(`apps/auth-service/src/controller/carrier.controller.ts:396-441`) pose `onboardingStep = COMPLETE`
+et `carrierStatus = ACTIVE` **sans lire un seul drapeau Stripe**, et le front propose explicitement
+le bouton (`CarrierOnboardingWizard.tsx:318`, libellé « Configurer plus tard »). Constaté en recette
+sur API-AUTH-33 : l'étape 4 répond **200 « Carrier onboarding complete! »** avec
+`stripeOnboardingComplete: false`, `chargesEnabled: false`, `payoutsEnabled: false`.
+
+Le Voyageur est donc « actif », publie ses trajets, reçoit des demandes — et découvre le blocage
+au moment d'accepter son premier deal, face à un Expéditeur qui attend. C'est le pire moment
+possible : la garde D31 (`deal-lifecycle.service.ts:151`) refuse alors avec
+`CARRIER_ONBOARDING_REQUIRED`.
+
+**Proposition** : garder le bouton (interrompre un tunnel est légitime) mais **cesser de mentir sur
+l'état**. `carrierStatus` reste `ONBOARDING` tant que Stripe n'est pas opérationnel, et l'écran
+« Mes trajets » porte un bandeau permanent « il vous reste une étape avant de pouvoir accepter une
+demande ». Le bandeau existe déjà (`MyTripsList.tsx:611-617`) mais sa condition
+(`onboardingStep !== STRIPE/COMPLETE` **et** `draftCount > 0`) ne se déclenche jamais dans ce cas.
+
+**A2. Un compte qui redevient incomplet ne redescend jamais.** Le webhook `account.updated`
+(`apps/deal-service/src/controllers/stripe-webhook.controller.ts:89-104`) écrit **exactement trois
+booléens** et ne touche ni `onboardingStep` ni `carrierStatus`. Si Stripe désactive un compte
+(pièce expirée, vérification échouée), le Voyageur reste `COMPLETE` / `ACTIVE`, **sans aucune
+notification** — l'écriture est silencieuse. Il l'apprendra par un refus d'acceptation.
+
+**Proposition** : sur passage à `false`, repasser `carrierStatus` à `ONBOARDING` et **prévenir par
+email** — le canal existe déjà (`payout.failed` déclenche `notifyCarrierPayoutFailed`, ligne 108).
+
+**A3. Stripe dit POURQUOI, et personne ne l'écoute.** `account.requirements` (`currently_due`,
+`past_due`, `eventually_due`, `disabled_reason`) : **zéro occurrence dans tout le dépôt**. Seuls
+`charges_enabled`, `payouts_enabled` et `details_submitted` sont lus
+(`packages/libs/payments/src/index.ts:427-432`). La plateforme sait donc dire « ça ne marche pas »
+mais **jamais** « il manque votre pièce d'identité ».
+
+**Proposition** : stocker `requirements.currently_due` et `disabled_reason` sur `CarrierPage`, et
+les traduire en une phrase actionnable. C'est le seul de ces quatre points qui demande une décision
+de modèle (deux champs de plus), les autres sont du câblage.
+
+**A4. La garde D31 ignore `stripePayoutsEnabled`.** `deal-lifecycle.service.ts:151` vérifie
+`stripeOnboardingComplete` et `stripeChargesEnabled` — **pas** `payoutsEnabled`. Conséquence : un
+deal peut être accepté, **l'argent de l'Expéditeur capturé** (ligne 180), pour un Voyageur qui ne
+peut pas être payé. L'argent est encaissé, la prestation faite, et le versement échouera.
+
+**Proposition** : ajouter `stripePayoutsEnabled` à la garde. Une ligne, et elle empêche d'encaisser
+ce qu'on ne pourra pas reverser.
+
+### B — Le bouton « tableau de bord Stripe » ne fonctionne pour personne
+
+`FinancesSection.tsx:84` calcule `stripeAccountReady = Boolean(user?.carrierPage?.stripeAccountId)`.
+Or `GET /auth/me` **ne projette pas `stripeAccountId`** (ni `stripePayoutsEnabled`) dans
+`carrierPage`. Vérifié en conditions réelles sur un Voyageur pleinement onboardé :
+
+```json
+{"champs":["bio","id","name","onboardingStep","phoneE164","primaryAddress",
+           "stripeChargesEnabled","stripeOnboardingComplete"],
+ "stripeAccountId":null,"stripeOnboardingComplete":true,"stripeChargesEnabled":true}
+```
+
+Le bouton affiche donc **toujours** le toast « compte Stripe manquant », y compris pour un Voyageur
+irréprochable. `useUser.ts:10` type pourtant le champ comme présent : le front et le serveur ne sont
+pas d'accord, et rien ne l'a signalé. **Le défaut est antérieur à la campagne** (vérifié sur le
+commit D65 `339ecc1` : le `select` ne l'a jamais porté).
+
+**Proposition** : ajouter `stripeAccountId` à la projection — ou mieux, exposer un booléen
+`stripeAccountReady` plutôt que l'identifiant d'un compte externe, que le front n'a aucune raison de
+connaître. À traiter au cahier Web, c'est une anomalie front/API.
+
+### C — Ce que le Voyageur voit de son argent, et ce qui lui manque
+
+**Ce qui existe et fonctionne** : `GET /me/wallet` (`wallet.service.ts:91-107`) renvoie
+`upcomingCents`, `pendingCents`, `blockedCents`, `sentCents`, `sentThisMonthCents` et un historique
+par deal. Vérifié en recette : `{upcoming: 5500, pending: 2800, blocked: 0, sent: 6100}` avec le
+corridor, la contrepartie et la date pour chaque ligne. Le socle est bon.
+
+**C1. La commission n'est pas cachée par négligence, c'est un choix — mais il mérite d'être
+réexaminé.** Le DTO Voyageur (`booking-view.mapper.ts:466-475`) est une liste blanche explicite,
+commentée « GAINS uniquement — ni commission ni total Shipper » (A13). Le Voyageur voit
+`transportCents`, jamais `totalShipperCents` ni `commissionCents`.
+
+Il faut être précis sur le modèle : d'après le catalogue de paramètres, la commission est
+**calculée sur le transport et payée par l'Expéditeur**, en plus. Le Voyageur touche donc
+l'intégralité de `transportCents` — « ce qui reste après commission » **est** son gain affiché.
+Cacher la commission n'est donc pas un vol dissimulé, et l'afficher ne changerait pas son revenu.
+
+Mais l'argument de transparence tient quand même : un Voyageur qui ignore le prix payé par
+l'Expéditeur ne peut pas juger si la plateforme est chère, ni vérifier qu'on ne rogne pas sa part.
+**Proposition** : afficher au Voyageur, sur le deal terminé, une ligne « l'Expéditeur a payé X, dont
+Y de frais Yamba — votre gain : Z, intégralement ». C'est plus honnête que le silence, et cela
+protège Yamba de la suspicion inverse. À arbitrer, car cela touche une décision existante (A13).
+
+**C2. Le vrai manque n'est pas la commission, c'est l'écart et la date.** Trois questions qu'un
+Voyageur se pose et auxquelles rien ne répond aujourd'hui :
+
+- *« Pourquoi mon versement est-il inférieur à mon gain annoncé ? »* — `retentionCents` (retenue
+  d'annulation tardive) peut réduire le montant, et `retentionDisposition` est exposé au Voyageur
+  sans explication chiffrée.
+- *« Quand serai-je payé ? »* — `payoutDueAt` est servi, mais en cas d'échec **`payoutNextRetryAt`
+  n'est jamais exposé au membre** : ses seuls lecteurs sont l'admin et les crons. Le Voyageur voit
+  « bloqué », sans horizon.
+- *« Pourquoi est-ce bloqué ? »* — `payoutFailureReason` est lu (`wallet.controller.ts:35`) puis
+  **réduit à deux états grossiers** (`BLOCKED` / `PENDING`, `wallet.service.ts:77-79`). Le motif
+  n'est jamais traduit pour le membre.
+
+**C3. `blockedCents` est calculé et jamais affiché.** Le contrat le documente comme « drives the
+banner » (`booking-wallet.schema.ts:51`), mais `WalletTab` n'affiche que upcoming / sent / pending
+(`FinancesSection.tsx:119-128`). Le bandeau réellement utilisé s'appuie sur `useMyDeals`, pas sur ce
+total. Travail serveur payé, jamais consommé.
+
+**C4. Aucun relevé, aucun justificatif — et c'est un sujet réglementaire.** Il n'existe **aucun
+export côté membre** : `/admin/finances/export` et `/admin/finances/report` sont réservés à
+l'administration. Or un Voyageur perçoit des revenus qu'il doit déclarer, et une plateforme de mise
+en relation européenne relève de **DAC7** : obligation de déclarer les revenus des prestataires
+**et de leur en remettre une copie**. Le dossier juridique (livrable 09) mérite d'être confronté à
+ce point avant l'ouverture commerciale.
+
+**Proposition** : un relevé annuel téléchargeable (le calcul existe déjà côté admin, il faut
+l'exposer au membre pour ses propres données), plus un reçu par versement.
+
+**C5. Trou d'historique.** `toPayoutItem` (`wallet.service.ts:85`) renvoie `null` pour les deals
+COMPLETED antérieurs à B4 qui n'ont pas de `payoutStatus` : ils **disparaissent** du portefeuille.
+Un Voyageur de la première heure ne voit pas ses premiers gains. À traiter par une migration, sinon
+la somme affichée ne réconcilie pas avec la réalité.
+
+### D — Côté Expéditeur
+
+Le DTO est complet (`booking-view.mapper.ts:372-393` : transport, commission, prime, total, plus
+`refundAmountCents` et `retentionCents`). Il manque en revanche, comme pour le Voyageur, **tout
+justificatif téléchargeable** : ni reçu de paiement, ni justificatif de remboursement. Pour un
+service payé d'avance et parfois remboursé partiellement, c'est la première réclamation attendue au
+support.
+
+### E — Code mort à retirer au passage
+
+- `apps/user-ui/src/components/dashboard/sections/WalletSection.tsx` — ancienne section, **plus
+  aucun import**.
+- `apps/user-ui/src/components/carrier/OnboardingBanner.tsx` — **jamais importé** (le bandeau utilisé
+  est celui de `MyTripsList`).
+- `apps/user-ui/src/app/[locale]/dashboard/finances/preview/page.tsx` — page **mock** accessible par
+  URL, hors navigation.
+
+### Priorisation proposée
+
+| # | Sujet | Effort | Pourquoi maintenant |
+|---|---|---|---|
+| 1 | **A4** — `payoutsEnabled` dans la garde D31 | une ligne | On encaisse aujourd'hui de l'argent qu'on ne pourra pas reverser |
+| 2 | **B** — le bouton Stripe mort | une ligne de projection | Un Voyageur onboardé ne peut pas ouvrir son tableau de bord |
+| 3 | **A1 + A2** — l'état affiché dit la vérité, et le webhook rétrograde | petit | Le Voyageur découvre le blocage face à un client |
+| 4 | **C2** — date de prochain essai, motif de blocage, explication de la retenue | moyen | Ce sont les trois questions du support |
+| 5 | **A3** — lire `requirements` de Stripe | moyen (2 champs) | Transforme « ça ne marche pas » en « il manque ceci » |
+| 6 | **C4** — relevé membre | moyen | Sujet **réglementaire** (DAC7) avant ouverture commerciale |
+| 7 | **C1** — transparence de la commission au Voyageur | décision | Touche A13 : à arbitrer, pas à coder d'emblée |
+| 8 | **C3, C5, E** — `blockedCents`, trou d'historique, code mort | petit | Dette visible, à solder en passant |
+
+### F — L'onboarding est-il trop long ? Ce qu'on peut retirer sans rien perdre
+
+**Ce qui est déjà bien fait, et qu'il ne faut pas casser** : le compte Stripe est créé
+**prérempli** (`carrier.controller.ts:238-291`) — prénom, nom, email, téléphone, date de naissance
+et adresse postale sont envoyés à `accounts.create`. Le Voyageur ne ressaisit donc pas ces champs
+chez Stripe. C'est le gros du travail d'allègement, et il est fait.
+
+Restent trois sources de frottement, par ordre de gain.
+
+**F1. Le front exige quatre champs, le serveur en exige deux.** L'écran annonce « Tous les champs
+sont obligatoires » et refuse de continuer sans **nom, bio, adresse et téléphone**
+(`CarrierOnboardingWizard.tsx:228-238`). Or `validateCarrierOnboardingData`
+(`auth.helper.ts:201-213`) n'exige que **`phone_number` et `country`**.
+
+La **bio** est le champ le plus coûteux du formulaire — un texte libre, à rédiger, devant lequel on
+abandonne — et c'est le seul qui ne sert **ni à Stripe, ni à encaisser, ni à accepter un deal**.
+Elle n'alimente que la page publique.
+
+**Proposition** : la rendre facultative dans le tunnel et la demander **au moment où elle sert** :
+à la publication du premier trajet, quand le Voyageur cherche justement à convaincre. Gain
+immédiat : le tunnel passe de quatre saisies à trois, dont deux triviales.
+
+**F2. Expliquer pourquoi l'adresse est demandée.** Elle est nécessaire (elle préremplit Stripe et
+lui évite une saisie), mais rien ne le dit : l'écran demande une adresse postale à quelqu'un qui
+veut juste transporter un colis, ce qui ressemble à de la collecte gratuite. Une phrase — « pour ne
+pas avoir à la ressaisir à l'étape suivante » — coûte zéro et supprime une hésitation.
+
+**F3. Le vrai levier n'est pas le nombre de champs, c'est le MOMENT.** Aujourd'hui, un membre qui
+veut devenir Voyageur doit fournir une pièce d'identité et un IBAN **avant d'avoir publié un seul
+trajet**, donc avant de savoir s'il recevra la moindre demande. C'est l'effort maximal au moment de
+motivation le plus faible.
+
+Or la garde D31 ne se déclenche **qu'à l'acceptation d'un deal**
+(`deal-lifecycle.service.ts:151`) — le verrou a d'ailleurs déjà migré depuis la publication de
+trajet. Techniquement, rien n'oblige à faire Stripe si tôt.
+
+Trois moments possibles :
+
+| Moment | Effet |
+|---|---|
+| **Aujourd'hui** — avant tout | Effort maximal, motivation minimale : c'est là qu'on perd les Voyageurs |
+| **À la première demande reçue** | Motivation maximale… mais la demande **expire** pendant que la vérification Stripe traîne : on perd le deal ET l'Expéditeur |
+| **À la publication du premier trajet** *(recommandé)* | Le Voyageur est engagé, il a du temps devant lui avant les demandes, et le KYC a le temps d'aboutir |
+
+**Proposition** : découpler. Profil minimal → publication → « avant de recevoir des demandes,
+finalisez votre compte de paiement ». Cela suppose que l'état affiché soit honnête (voir **A1**) :
+c'est la même correction, vue par l'autre bout. Sans elle, décaler Stripe ne ferait qu'aggraver la
+surprise du refus au premier deal.
+
+**Ce qu'il ne faut PAS raccourcir** : les étapes Stripe elles-mêmes (identité, IBAN) ne sont pas
+négociables — elles sont imposées par la réglementation et par Stripe. Le seul levier est de les
+préremplir (fait) et de les demander au bon moment (à faire).
