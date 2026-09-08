@@ -3249,3 +3249,105 @@ Même leçon que le typecheck servi depuis le cache pendant la campagne : **un a
 ## Tests
 
 trip-service 231 → **235**, auth-service 215 → **219**. Plateforme **941**.
+
+---
+
+# Dette D-5 soldée, et ANO-API-23 (bloquante) trouvée en la soldant
+
+## D-5 — une seule forme de corps d'erreur
+
+Trois formes coexistaient : `{status:"error", message, details}` (le middleware d'erreur),
+`{message, code}` (les middlewares qui répondaient eux-mêmes) et `{success:false, message}` (les
+404 des pages publiques). Aucun client ne pouvait écrire UNE fonction pour les lire — et
+court-circuiter le middleware d'erreur, c'est aussi perdre la décision centrale sur ce qui est
+exposé en production, et la remontée Sentry.
+
+**La clé de la migration** : le middleware d'erreur recopie désormais `code` au **premier niveau**
+quand `details.code` existe.
+
+```ts
+if (hasPublicCode) payload.code = detailsObj.code as string;
+```
+
+Sans cette ligne, faire passer les middlewares par `next()` supprimait le `code` de tête que des
+écrans lisent déjà. Avec elle, les deux formes disent la même chose et la migration ne casse rien.
+
+Douze refus convertis : les sept de `isAuthenticated`, les quatre de `isAdminAuthenticated` (qui
+n'avaient **aucun** code), `requireActiveAccount`, `requireAdminPermission`, les cinq 404
+`{success:false}` des pages publiques, le 409 Stripe du Voyageur, un 400 de session admin.
+
+**Deux exceptions écrites et justifiées** : les réponses du webhook Stripe (le destinataire est
+Stripe, son contrat est le statut) et le 409 `ERASURE_BLOCKED` (réponse **documentée** avec son
+schéma OpenAPI, pas un corps d'erreur ad hoc).
+
+**Garde-fou** : `middleware-responses.spec.ts` interdit `res.status(4xx|5xx).json(...)` dans
+`packages/middleware`.
+
+## ANO-API-23 — les deux pages publiques répondaient 404
+
+En vérifiant une réponse au passage, `GET /users/{slug}/public` a rendu 404 sur un compte
+manifestement public. Mesuré ensuite sur toute la base :
+
+- **profil public : 404 pour 22 comptes sur 26** ;
+- **page d'un trajet : 404 pour 24 trajets publiés sur 37**.
+
+### La cause
+
+```ts
+// ❌ ce que le code faisait, avec ce commentaire :
+// « `{ not: true }` … pour matcher aussi les documents où le champ est ABSENT »
+{ isDeleted: { not: true }, OR: [{ profilePublic: { not: false } }] }
+```
+
+Sur Prisma + Mongo, **aucun filtre ne matche un champ absent**, `not` compris. Or `profilePublic`
+et `isDeleted` n'existent pas sur les documents créés avant leur ajout au schéma. Prisma **relit**
+pourtant la valeur par défaut : le compte s'affiche `profilePublic: true` et reste introuvable.
+
+### La limite du remède habituel
+
+`isSet: false` est le réflexe du projet — **il ne s'applique pas ici**. Prisma ne l'offre que sur
+les champs **optionnels** ; sur un champ requis à défaut, il lève `Unknown argument \`isSet\``.
+C'est pourquoi `notHiddenFilter()` peut l'utiliser sur `hiddenByAdminAt` (`DateTime?`) mais pas
+`isDeleted`.
+
+Pour un champ REQUIS, « absent » n'est donc pas exprimable dans une requête : c'est un défaut de
+**données**.
+
+```ts
+// ✅ l'écriture correcte, une fois les données saines
+{ isDeleted: false, OR: [{ profilePublic: true }] }
+```
+
+### Le correctif, en deux temps
+
+1. **Données** — `packages/libs/prisma/scripts/repair-absent-scalars.ts` pose le défaut du schéma
+   là où le champ manque (90 champs sur `User`, 24 sur `Trip`). Idempotent, avec `--dry-run`, et
+   il refuse deux champs volontairement : `emailVerified` (absent du modèle) et `adminRoles` (qui a
+   son propre script, capable de recopier le rôle principal).
+2. **Code** — les deux filtres reviennent à l'égalité simple, avec un commentaire qui dit ce qui a
+   été **vérifié**, pas ce qu'on suppose.
+
+Les documents créés ensuite sont sains d'office : Prisma écrit les défauts à la création. Le script
+est à passer **après tout ajout d'un champ requis à défaut**.
+
+### Ce que l'épisode apprend
+
+**Un test peut protéger le défaut.** Les deux specs existants exigeaient littéralement l'erreur :
+
+```ts
+it("n'utilise jamais `isDeleted: false`, qui raterait les documents sans le champ", () => {
+  expect(JSON.stringify(publicTripWhere(ID))).not.toContain('"isDeleted":false');
+});
+```
+
+Ils passaient, la fonctionnalité était morte. Un test qui vérifie la **forme** d'une requête ne
+vérifie pas qu'elle **trouve** quelque chose : il fige la croyance de son auteur.
+
+**Et la première version de mon correctif a répété l'erreur** : elle posait `OR … isSet: false`, les
+tests de forme passaient au vert, et le service répondait **500** au premier appel réel. Ce qui a
+servi de garde-fou n'est pas un test, c'est d'avoir rejoué la requête contre la base avant de
+conclure.
+
+## Tests
+
+auth-service 219 → **225**, trip-service **235**. Plateforme **941**.

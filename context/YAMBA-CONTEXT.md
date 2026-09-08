@@ -443,6 +443,19 @@ Ordre de demarrage : auth -> trip -> gateway.
   ROLE_NOT_ALLOWED. **Plus aucune reserve au verdict de campagne.** Plateforme 941 tests.
   PIEGE NX paye une 2e fois : `npm run dev` sert la cible `build:development`, que
   `nx build --skip-nx-cache` ne rechauffe PAS → utiliser `NX_SKIP_NX_CACHE=true npm run dev`.
+- 08/09 (soir) : **dette D-5 soldee** — douze refus passent par le middleware d'erreur commun
+  (une seule forme de corps), qui recopie desormais `code` au premier niveau pour ne casser
+  aucun client ; garde-fou `middleware-responses.spec.ts`. Deux exceptions ecrites : webhook
+  Stripe et la reponse documentee ERASURE_BLOCKED.
+- 08/09 (soir) : **ANO-API-23, BLOQUANTE, trouvee en soldant D-5** — les DEUX pages publiques
+  (profil d'un membre, page d'un trajet) repondaient 404 : `profilePublic` / `isDeleted` sont
+  ABSENTS des documents crees avant leur ajout au schema, et aucun filtre Prisma+Mongo ne
+  matche un champ absent (`not` compris). Mesure : 404 pour 22 comptes sur 26 et 24 trajets
+  publies sur 37. Deux tests PROTEGEAIENT le defaut (ils exigeaient l'ecriture fautive).
+  Correction en deux temps : `repair-absent-scalars.ts` (donnees, idempotent, --dry-run) puis
+  filtres remis en EGALITE SIMPLE. Limite decouverte : `isSet` n'existe que sur les champs
+  OPTIONNELS — sur un champ requis a defaut, « absent » n'est pas exprimable en requete, c'est
+  un defaut de donnees. Plateforme 941 tests.
 - 04/09 : C-PR6b feat/c6b-admin-alerts (D59 3A / 4A, A129–A131) — neuf regles de seuil
   (evaluateAlerts pur, instantane de dix compteurs), GET /admin/alerts sans etat (accueil
   admin), cron horaire avec dedoublonnage Redis SET NX (un email par regle et par jour, Redis

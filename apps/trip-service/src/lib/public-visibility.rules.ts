@@ -12,15 +12,27 @@
  * exactement comme un trajet inexistant, et personne ne paie de jointure pour rien.
  *
  * Piège maison Prisma + Mongo : `hiddenByAdminAt: null` ne matche PAS un document où
- * le champ est ABSENT — d'où le OR de `notHiddenFilter()`. Même raison pour
- * `isDeleted: { not: true }` plutôt que `isDeleted: false`.
+ * le champ est ABSENT — d'où le OR de `notHiddenFilter()`.
+ *
+ * ⚠ ANO-API-23 (08/09/2026) — CE QU'IL FAUT SAVOIR, vérifié contre la base :
+ *
+ * 1. La version précédente ajoutait « même raison pour `isDeleted: { not: true }` plutôt que
+ *    `isDeleted: false` ». **C'était faux** : `not` ne matche pas davantage un champ absent.
+ *    `GET /trips/{id}/public` répondait **404 pour 24 trajets publiés sur 37**.
+ * 2. `isSet: false` n'est **pas disponible** sur `isDeleted` : Prisma ne l'offre que sur les
+ *    champs OPTIONNELS, et `isDeleted` est requis avec un défaut. C'est précisément pourquoi
+ *    `notHiddenFilter()` peut l'utiliser sur `hiddenByAdminAt`, qui est `DateTime?`.
+ *
+ * Pour un champ REQUIS, « absent » n'est donc pas exprimable dans la requête : c'est un défaut de
+ * DONNÉES. L'égalité simple est la bonne écriture, et le remède est
+ * `packages/libs/prisma/scripts/repair-absent-scalars.ts`.
  */
 import { notHiddenFilter } from "./admin-trips.rules";
 
 export type PublicTripWhere = {
   id: string;
   status: "PUBLISHED";
-  isDeleted: { not: true };
+  isDeleted: false;
   AND: Array<ReturnType<typeof notHiddenFilter>>;
 };
 
@@ -30,5 +42,5 @@ export type PublicTripWhere = {
  * qui n'accepte pas de critère non unique).
  */
 export function publicTripWhere(id: string): PublicTripWhere {
-  return { id, status: "PUBLISHED", isDeleted: { not: true }, AND: [notHiddenFilter()] };
+  return { id, status: "PUBLISHED", isDeleted: false, AND: [notHiddenFilter()] };
 }

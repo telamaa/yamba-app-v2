@@ -6,11 +6,18 @@ import { Request, Response, NextFunction } from "express";
  * Middleware global de gestion d'erreurs Express pour Yamba.
  *
  * Format de réponse :
- *   { status: "error", message: "...", errors?: {...}, details?: {...} }
+ *   { status: "error", message: "...", code?: "...", errors?: {...}, details?: {...} }
  *
  * `details` est exposé même en production quand il contient un contexte
  * structuré "safe" (ex: OTP exponential backoff avec attemptsLeft, locked).
  * Les détails de debug sensibles (stacktraces, etc.) restent masqués en prod.
+ *
+ * Dette D-5 (recette API 08/09/2026) — `code` est aussi recopié au PREMIER NIVEAU quand
+ * `details.code` existe. Raison : plusieurs middlewares écrivaient leur réponse eux-mêmes,
+ * avec le code en tête, et des clients le lisent là. En le recopiant ici, ces middlewares
+ * peuvent enfin passer par ce middleware — une seule forme de corps d'erreur pour toute la
+ * plateforme — sans qu'aucun client existant cesse de fonctionner. Les deux formes disent la
+ * même chose ; `details.code` reste la forme de référence.
  */
 export const errorMiddleware = (
   err: Error,
@@ -27,6 +34,7 @@ export const errorMiddleware = (
     const payload: {
       status: string;
       message: string;
+      code?: string;
       errors?: Record<string, string>;
       details?: unknown;
     } = {
@@ -57,6 +65,8 @@ export const errorMiddleware = (
 
       if (hasPublicCode || (detailsType && safeTypes.includes(detailsType))) {
         payload.details = err.details;
+        // D-5 — le même code, aussi en tête : voir l'en-tête de fichier.
+        if (hasPublicCode) payload.code = detailsObj.code as string;
       } else if (!isProd) {
         // Cas 3 : details non typé ou type inconnu → exposé seulement hors prod (debug)
         payload.details = err.details;

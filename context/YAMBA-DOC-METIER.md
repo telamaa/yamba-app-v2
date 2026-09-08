@@ -2179,3 +2179,41 @@ reconnecter.
 | SEM6 | Se suivre soi-même | **400**, code dédié |
 
 Joués le 8 septembre 2026 — voir `context/YAMBA-RECETTE-API-RESULTATS.md`, « Solde de la dette D-4 ».
+
+# Recette API — la vitrine était fermée (ANO-API-23)
+
+## Le besoin
+
+Deux pages seulement se partagent à l'extérieur de Yamba : le **profil public d'un membre** et la
+**page d'un trajet**. C'est ce qu'un Voyageur envoie pour se faire connaître, ce qu'un Expéditeur
+ouvre avant de réserver. Elles répondaient « introuvable » :
+
+- pour **22 comptes sur 26** ;
+- pour **24 trajets publiés sur 37**.
+
+Rien ne le signalait : dans le tableau de bord, le profil s'affichait bien « public », et le trajet
+bien « publié ». Seul un visiteur extérieur voyait la porte close — et personne ne teste sa propre
+plateforme en visiteur.
+
+## Les règles
+
+- **RG-PUB-01** — Un profil déclaré public et un trajet publié sont consultables par **tout le
+  monde**, sans compte. Si l'un des deux ne l'est pas, c'est un défaut bloquant : c'est la vitrine.
+- **RG-PUB-02** — Ce qu'un membre voit de son propre profil (« public », « publié ») doit
+  correspondre à ce qu'un visiteur obtient. Un écart entre les deux est un défaut, même si chaque
+  écran pris séparément semble juste.
+- **RG-DON-01** — Un compte ou un trajet créé **avant** l'ajout d'une option ne doit pas disparaître
+  des listes et des pages publiques pour autant : la valeur par défaut de l'option s'applique à
+  lui comme aux autres.
+
+## Tests d'acceptation
+
+| Réf | Scénario | Attendu |
+|---|---|---|
+| PUB1 | Ouvrir le profil public d'un membre ancien, sans être connecté | **200**, le profil s'affiche |
+| PUB2 | Ouvrir la page d'un trajet publié par un membre ancien | **200**, le trajet s'affiche |
+| PUB3 | Ouvrir le profil d'un membre qui l'a rendu privé | **404**, identique à un profil inexistant |
+| PUB4 | Ouvrir un trajet masqué par la modération | **404**, identique à un trajet inexistant |
+| PUB5 | Le propriétaire ouvre son propre profil masqué | **200**, marqué « masqué » |
+
+Joués le 8 septembre 2026 — voir `context/YAMBA-RECETTE-API-RESULTATS.md`, `ANO-API-23`.

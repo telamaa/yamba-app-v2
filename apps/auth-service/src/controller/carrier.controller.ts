@@ -1,7 +1,7 @@
 import type { Response, NextFunction } from "express";
 import prisma from "@packages/libs/prisma";
 import { requireSudo } from "../utils/sudo";
-import { ValidationError } from "@packages/error-handler";
+import { ConflictError, ValidationError } from "@packages/error-handler";
 import { AuthenticatedRequest } from "@packages/middleware/isAuthenticated";
 import { Role } from "@prisma/client";
 import Stripe from "stripe";
@@ -461,11 +461,13 @@ export const createStripeDashboardLink = async (
       select: { stripeAccountId: true },
     });
     if (!carrierPage?.stripeAccountId) {
-      return res.status(409).json({
-        success: false,
-        message: "No Stripe account yet — finish the carrier onboarding first.",
-        details: { type: "carrier", code: "STRIPE_ACCOUNT_MISSING" },
-      });
+      // D-5 : passe par le middleware d'erreur commun ; `details` et le code de tête sont conservés.
+      return next(
+        new ConflictError("No Stripe account yet — finish the carrier onboarding first.", {
+          type: "carrier",
+          code: "STRIPE_ACCOUNT_MISSING",
+        })
+      );
     }
     const link = await stripe.accounts.createLoginLink(carrierPage.stripeAccountId);
     return res.status(200).json({ success: true, url: link.url });

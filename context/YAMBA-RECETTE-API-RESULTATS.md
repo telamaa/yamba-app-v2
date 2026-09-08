@@ -230,10 +230,11 @@ L'historique est conservé : un KO reste écrit KO, sa correction s'ajoute en de
 | ANO-API-20 | API-IDEM-08 | majeure | 08/09/2026 | **close** | tout refus de message-service porte un `details.code` + garde-fou lisant les sources |
 | ANO-API-21 | API-IDEM-09 | majeure | 08/09/2026 | **close** | protection P2034 remontée au writer central `applyBookingTransition` |
 | ANO-API-04 | API-GW-19 | mineure | 08/09/2026 | **close** | le 409 de transition dit enfin **depuis quel statut** ; tout refus de deal-service porte un code |
+| ANO-API-23 | hors cahier (solde D-5) | **bloquante** | 08/09/2026 | **close** | les deux pages publiques répondaient 404 (22 comptes sur 26, 24 trajets sur 37) : champ requis ABSENT, données réparées + filtres remis en égalité |
 
 *Chapitre 8 — aucune anomalie.*
 
-**Vingt-deux anomalies, vingt-deux closes** à la fin de la campagne. Les onze bloquantes sont
+**Vingt-trois anomalies, vingt-trois closes** — la vingt-troisième trouvée après la campagne, en soldant la dette D-5. Les onze bloquantes sont
 toutes fermées **et contre-éprouvées** : le critère de sortie n° 1 du §9.3 (« zéro anomalie
 bloquante ouverte ») est tenu. Aucune anomalie n'a été « acceptée avec contournement ».
 
@@ -1503,7 +1504,7 @@ idempotente (inscrite au journal de dette ci-dessous).
 | D-2 | trip-service rend parfois **400** là où 403 ou 404 seraient exacts | API-TRIP-13 | écart de sémantique connu, sans fuite d'information | aligner sur la règle 403/404 du reste de la plateforme |
 | D-3 | relancer un lien de vérification n'est pas idempotent | API-TRIP-18 | pas d'effet de bord dangereux, seulement un second email | même traitement que les autres gestes idempotents |
 | ~~D-4~~ | ~~les refus de **trip-service** et **auth-service** ne portent pas tous un `details.code`~~ | observé au chapitre 9 | — | **SOLDÉE le 08/09 au soir** : 250 refus codés, garde-fou posé sur les deux services, et deux défauts de sémantique tombés avec (voir ci-dessous) |
-| D-5 | les middlewares (`isAuthenticated`, `requireAdminPermission`) écrivent leur réponse **eux-mêmes**, hors du middleware d'erreur | API-SEC-05 | ils portent désormais tous `details.code` **et** leur `code` de tête | les faire passer par le middleware d'erreur commun, pour n'avoir qu'une seule forme de corps d'erreur |
+| ~~D-5~~ | ~~les middlewares écrivent leur réponse **eux-mêmes**, hors du middleware d'erreur~~ | API-SEC-05 | — | **SOLDÉE le 08/09 au soir** : douze refus passés par `next()`, le middleware d'erreur recopie `code` en tête pour ne casser aucun client, garde-fou `middleware-responses.spec.ts`. Deux exceptions écrites et justifiées (webhook Stripe, réponse documentée `ERASURE_BLOCKED`) |
 
 ## 9.5 Ce que cette campagne NE prouve pas
 
@@ -1669,3 +1670,119 @@ un artefact en cache.
 C'est la même leçon que le typecheck servi depuis le cache pendant la campagne : **un artefact Nx
 « reconstruit » n'est pas forcément neuf.** Pour redémarrer sur du code frais :
 `NX_SKIP_NX_CACHE=true npm run dev`.
+
+---
+
+# Solde de la dette D-5 — une seule forme de corps d'erreur
+
+Le journal de dette disait : « les middlewares écrivent leur réponse **eux-mêmes**, hors du
+middleware d'erreur ». Conséquence : **trois** formes de corps coexistaient sur la plateforme, et
+aucun client ne pouvait écrire UNE fonction pour les lire.
+
+| Forme | Qui la produisait |
+|---|---|
+| `{ status: "error", message, details }` | le middleware d'erreur commun |
+| `{ message, code }` | `isAuthenticated`, `requireAdminPermission`, `requireActiveAccount` |
+| `{ success: false, message }` | les 404 des pages publiques (profil, trajet) |
+
+Court-circuiter le middleware d'erreur coûte plus qu'une incohérence de forme : **aucune décision
+centrale** sur ce qui est exposé en production, et **aucune remontée Sentry**.
+
+## Ce qui a été fait
+
+**Le middleware d'erreur recopie `code` au premier niveau** quand `details.code` existe. C'est ce
+qui rend la migration possible sans casser personne : les clients qui lisaient le code en tête
+continuent de le trouver, ceux qui suivent la règle générale lisent `details.code`. Sans cette
+recopie, solder D-5 revenait à casser des écrans.
+
+Puis douze refus sont passés par `next()` : les sept de `isAuthenticated`, les quatre de
+`isAdminAuthenticated` (qui n'avaient **aucun** code), `requireActiveAccount`,
+`requireAdminPermission`, les cinq 404 `{success: false}` des pages publiques, le 409 Stripe du
+Voyageur et un 400 de session admin.
+
+**Ce qui reste volontairement en dehors**, et pourquoi : les réponses du webhook Stripe
+(`{received: true}` / `{error}`) — leur destinataire est Stripe, pas un client Yamba, et leur
+contrat est le **statut**, pas le corps ; et le 409 `ERASURE_BLOCKED`, qui n'est pas un corps
+d'erreur ad hoc mais une **réponse documentée** avec son propre schéma OpenAPI. Les transformer
+changerait un contrat publié pour un gain de forme. C'est écrit ici pour que le choix soit
+relisible, pas oublié.
+
+**Garde-fou** : `middleware-responses.spec.ts` interdit tout `res.status(4xx|5xx).json(...)` dans
+`packages/middleware` et exige un code sur chaque refus.
+
+---
+
+# ANO-API-23 (bloquante) — les deux pages publiques répondaient 404, et un test protégeait le défaut
+
+Trouvée **en soldant D-5**, en vérifiant une réponse qui semblait anodine.
+
+```
+ANO-API-23
+Fiche          : hors cahier — trouvée au solde de la dette D-5 · Gravité : BLOQUANTE · ÉTAT : CLOSE
+Appel exact    : curl -s -o /dev/null -w '%{http_code}' "$BASE/users/madi-d-cmqhd/public"
+                 curl -s -o /dev/null -w '%{http_code}' "$BASE/trips/69e23ec5c5c73a77d8fed8e0/public"
+Attendu        : 200 — le compte est public, le trajet est PUBLISHED
+Obtenu         : 404 sur les deux. Mesuré sur toute la base :
+                 · profil public   → 404 pour 22 comptes sur 26
+                 · page du trajet  → 404 pour 24 trajets publiés sur 37
+Cause          : `publicProfileWhere` filtrait sur `isDeleted: { not: true }` et
+                 `profilePublic: { not: false }`, `publicTripWhere` sur `isDeleted: { not: true }`.
+                 Or ces champs sont ABSENTS des documents créés avant leur ajout au schéma — et
+                 sur Prisma + Mongo **aucun filtre ne matche un champ absent**, `not` compris.
+                 Prisma RELIT pourtant la valeur par défaut : le compte s'affiche `profilePublic:
+                 true` à la lecture et reste introuvable à la requête.
+Impact         : la vitrine de la plateforme. Le profil public d'un Voyageur et la page d'un
+                 trajet — les deux seules pages qu'on partage à l'extérieur — invisibles pour la
+                 grande majorité des comptes et des trajets hérités.
+Correction     : (1) données — `repair-absent-scalars.ts` pose le défaut du schéma là où le champ
+                 manque (90 champs sur les comptes, 24 sur les trajets), idempotent, avec un
+                 `--dry-run` ; (2) code — les filtres reviennent à l'ÉGALITÉ SIMPLE, qui est la
+                 bonne écriture une fois les données saines.
+Contre-épreuve : profil 200, les deux trajets hérités 200, et un trajet inexistant toujours
+                 404 `TRIP_NOT_FOUND`. Vérifié CONTRE LA BASE, pas seulement sur la forme.
+```
+
+## Deux choses que cette anomalie apprend
+
+**Un commentaire n'est pas une vérification.** Le fichier fautif affirmait, noir sur blanc :
+« `isDeleted: { not: true }` et `profilePublic: { not: false }` plutôt qu'une égalité, **pour
+matcher aussi les documents où le champ est ABSENT** ». La phrase est confiante, elle cite le bon
+piège maison — et elle est fausse. Elle a été écrite en corrigeant `ANO-API-02`, jamais éprouvée
+contre la base, et elle a survécu à la campagne entière.
+
+**Un test peut protéger le défaut au lieu de le trouver.** Les deux specs existants exigeaient
+littéralement l'erreur :
+
+```ts
+it("n'utilise jamais `isDeleted: false`, qui raterait les documents sans le champ", () => {
+  expect(JSON.stringify(publicTripWhere(ID))).not.toContain('"isDeleted":false');
+});
+```
+
+Le test passait, la fonctionnalité était morte. Un test qui vérifie la **forme** d'une requête ne
+vérifie pas qu'elle **trouve** quelque chose : il fige la croyance de son auteur. C'est le pendant
+exact de la leçon d'`ANO-API-09` (« un mock ne dit jamais ce qu'on lui invente »), un cran plus
+haut.
+
+## Et pourquoi la campagne ne l'avait pas vue
+
+Le jeu d'essai **écrit** ces champs. Toutes les fiches jouées sur des données de seed passaient.
+C'est mot pour mot le piège déjà inscrit dans `CLAUDE.md` — « une fixture qui pose le champ ne
+prouve rien sur le vrai writer » — payé ici pour la sixième fois, et pour la première fois sur
+`User` et `Trip`.
+
+## Le remède complet, et sa limite
+
+`isSet: false` est le réflexe du projet pour « champ absent ». **Il ne s'applique pas ici** : Prisma
+ne l'offre que sur les champs **optionnels**. Sur un champ requis à défaut, l'écrire lève
+`Unknown argument \`isSet\`` — vérifié contre la base (et vérifié aussi qu'il fonctionne bien sur
+`hiddenByAdminAt`, qui est `DateTime?`).
+
+Donc, pour un champ REQUIS, « absent » n'est pas exprimable dans une requête : c'est un défaut de
+**données**, et le remède est le script de réparation, à passer après tout ajout d'un champ requis
+à défaut. Les documents créés ensuite sont sains d'office : Prisma écrit le défaut à la création.
+
+**Cette limite a failli me coûter une deuxième erreur du même genre** : la première version du
+correctif posait un `OR … isSet: false` sur les deux champs, les tests unitaires de forme passaient
+au vert, et le service répondait **500** au premier appel réel. Le garde-fou qui a servi n'est pas
+un test : c'est d'avoir rejoué la requête contre la base avant de conclure.
