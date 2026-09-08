@@ -193,7 +193,7 @@ function buildOrderBy(
     // ⚠️ MongoDB ne supporte pas `nulls: 'last'`.
     // D33 — tri sur le prix COMPARABLE (colis de référence 2 kg) : PER_KG et
     // legacy ensemble. Les trips sans valeur sont exclus côté `where`.
-    return [{ comparablePriceCents: "asc" }, { id: "asc" }];
+    return [{ comparablePriceCents: "asc" }, { minPriceCents: "asc" }, { id: "asc" }];
   }
   if (sort === "bestRated") {
     // En desc, MongoDB met les nulls en dernier naturellement → parfait.
@@ -254,11 +254,17 @@ export const searchTrips = async (
     if (params.instantBooking) where.instantBooking = true;
     if (params.verifiedTicket) where.ticketVerificationStatus = "VERIFIED";
 
-    // ⭐ Quand on tri par prix, on exclut les trips sans prix défini
-    // (sinon Mongo les remonte en premier en mode asc).
-    if (params.sort === "lowestPrice") {
-      where.comparablePriceCents = { not: null };
-    }
+    // ANO-API-11 (recette API 08/09/2026) — on n'exclut PLUS les trajets sans prix
+    // comparable. L'exclusion faisait disparaître les deux tiers de l'offre du tri le plus
+    // utilisé (mesuré : 1 résultat sur 3), et `totalCount` le cachait : un tri doit changer
+    // l'ORDRE, jamais le NOMBRE. L'invariant est désormais posé à la publication
+    // (trip.controller.ts) et rattrapé pour l'existant par
+    // packages/libs/prisma/scripts/backfill-comparable-price.ts, si bien qu'un trajet
+    // visible porte toujours sa valeur.
+    //
+    // Le tri secondaire sur `minPriceCents` puis `id` garde un ordre déterministe si une
+    // valeur manquait malgré tout : ces trajets remontent en tête plutôt que de disparaître
+    // — un défaut d'affichage vaut mieux qu'une offre invisible.
 
     // ⭐ D33 V2 — tri par prix POUR LE POIDS SAISI : la clé dépend du poids
     // (crossover legacy/PER_KG), donc pas d'index possible → tri en mémoire

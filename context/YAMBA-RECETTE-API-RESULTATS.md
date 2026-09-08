@@ -212,6 +212,8 @@ L'historique est conservé : un KO reste écrit KO, sa correction s'ajoute en de
 | ANO-API-02 | API-GW-18 | bloquante (critère cahier) | 08/09/2026 | **close** | visibilité dans le `where`, deux services + tests |
 | ANO-API-03 | API-GW-14 | mineure | 08/09/2026 | **close** | règle pure `collectRegistrationErrors` + tests |
 | ANO-API-04 | API-GW-19 | mineure | 08/09/2026 | ouverte | à grouper avec le domaine deal (chapitre 5.3) |
+| ANO-API-10 | API-TRIP-03 | mineure | 08/09/2026 | **close** | `.catch("all")` sur le filtre `mode` |
+| ANO-API-11 | API-TRIP-01 / 04 | majeure | 08/09/2026 | **close** | invariant à la publication + exclusion retirée + seed |
 | ANO-API-05 | API-AUTH-03 / 05 | majeure | 08/09/2026 | **close** | 409 / 401 / 429, classes d'erreur enrichies |
 | ANO-API-06 | API-AUTH-09 | **bloquante** | 08/09/2026 | **close** | liste blanche + test lisant le schéma Prisma |
 | ANO-API-07 | API-AUTH-11 / 12 / 13 | majeure | 08/09/2026 | **close** | `jti` dans le jeton d'accès — registre **D75 candidate** |
@@ -841,7 +843,12 @@ Impact         : rupture de compatibilité. Un lien partagé, un favori de navig
 Piste          : apps/trip-service/src/dto/trip-search.dto.ts — `mode` est un z.enum strict
                  là où les listes passent par `csvOf`, qui filtre les valeurs inconnues.
                  Un `.catch("all")` suffit à aligner le comportement.
-ÉTAT           : ouverte
+
+CORRECTION       : 08/09/2026 — `.catch("all")` posé sur les DEUX schémas (recherche et
+                   facettes), avec un test qui couvre les modes inconnus et la
+                   non-régression des filtres déjà tolérants.
+CONTRE-ÉPREUVE   : mode=teleportation → 200 (2 résultats) · mode=plane → 200.
+ÉTAT             : CLOSE
 ```
 
 ```
@@ -874,8 +881,25 @@ Reste à faire  : (a) le seed ne pose PAS `comparablePriceCents` — toute recet
                  (b) sur le fond, exclure silencieusement est discutable : un trajet sans
                  prix comparable devrait être rangé en fin de liste, pas retiré, et
                  `totalCount` ne devrait jamais varier selon le tri.
-ÉTAT           : corrigée en donnée sur la recette ; décision produit et vérification en
-                 production restant à faire
+
+CORRECTION       : 08/09/2026 — la cause est traitée, pas le symptôme, sur trois plans :
+                   (1) INVARIANT à la publication (trip.controller.ts) : les champs
+                       dénormalisés sont recalculés au moment où le trajet devient visible.
+                       Un trajet d'avant D33 se REPARE donc tout seul en étant publié —
+                       vérifié : champ effacé à la main, null avant publication, 1800 après.
+                   (2) L'EXCLUSION EST RETIREE du tri (trip-search.controller.ts) : un tri
+                       change l'ORDRE, jamais le NOMBRE. Tri secondaire sur `minPriceCents`
+                       puis `id` pour rester déterministe si une valeur manquait malgré tout
+                       — ces trajets remontent en tête plutôt que de disparaître, car un
+                       défaut d'affichage vaut mieux qu'une offre invisible.
+                   (3) Le SEED pose désormais le champ : sans cela, toute recette du tri par
+                       prix reste faussée, et c'est précisément ce qui avait masqué le défaut.
+CONTRE-ÉPREUVE   : base volontairement privée du champ sur les 28 trajets publiés —
+                   sort=earliest 2, sort=lowestPrice 2, sort=bestRated 2. Le tri ne perd
+                   plus rien. Avant correction, lowestPrice aurait renvoyé 0.
+                   Backfill rejoué ensuite (40 lus, 28 mis à jour).
+PRODUCTION       : sans objet — rien n'est en production à ce jour.
+ÉTAT             : CLOSE
 ```
 
 ### Écarts du cahier (chapitre 5.2)

@@ -943,6 +943,21 @@ export const publishTrip = async (
     const carrierRatingSnapshot =
       carrierPage && carrierPage.ratingsCount > 0 ? carrierPage.ratingsAvg : null;
 
+    // ANO-API-11 (recette API 08/09/2026) — INVARIANT : un trajet publié porte toujours son
+    // prix comparable (D33). Le tri par prix s'appuie dessus ; un trajet qui en manquait
+    // sortait purement et simplement des résultats, et `totalCount` le cachait. Les champs
+    // dénormalisés sont donc recalculés ICI, au moment où le trajet devient visible — même
+    // s'il a été créé avant D33, ou par un chemin qui les aurait oubliés.
+    const denormalized = computeDenormalizedFields(
+      {
+        pricePerKgCents: trip.pricePerKgCents,
+        categoryConditions: trip.categoryConditions as Array<{ priceAmountCents: number }>,
+        departureAt: trip.departureAt,
+        originTimezone: trip.originTimezone,
+      },
+      comparableParamsFromSettings(await platformSettings().get())
+    );
+
     const publishedTrip = await prisma.trip.update({
       where: { id },
       data: {
@@ -950,6 +965,9 @@ export const publishTrip = async (
         publishedAt: new Date(),
         currentStep: 3,
         carrierRatingSnapshot,
+        minPriceCents: denormalized.minPriceCents,
+        comparablePriceCents: denormalized.comparablePriceCents,
+        departureHourLocal: denormalized.departureHourLocal,
       },
     });
 

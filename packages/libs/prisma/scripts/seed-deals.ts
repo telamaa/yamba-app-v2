@@ -402,6 +402,11 @@ async function main() {
         // A28 — pass-through PER_KG. Défaut 9,50 €/kg : un trajet publié sans prix
         // s'affichait « à partir de 0,00 € » en recherche (il n'est pas réservable).
         pricePerKgCents: t.pricePerKgCents ?? 950,
+        // ANO-API-11 (recette API 08/09/2026) — le prix comparable (D33, colis de référence
+        // de 2 kg) doit être posé ICI : le tri par prix s'appuie dessus, et un jeu d'essai
+        // qui l'oublie rend ce tri intestable (mesuré : 1 résultat sur 3, et personne ne
+        // voyait que les deux autres manquaient).
+        comparablePriceCents: Math.max(Math.round((t.pricePerKgCents ?? 950) * 2), 800),
         checkedBag23PriceCents: t.checkedBag23PriceCents,
         cabinBag12PriceCents: t.cabinBag12PriceCents,
         familyConditions: (t.familyConditions ?? []) as never,

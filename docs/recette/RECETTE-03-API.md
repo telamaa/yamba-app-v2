@@ -4202,7 +4202,7 @@ volontairement**.
 | API-AUTH-34 | Tableau de bord sans compte | mineure | 409 `STRIPE_ACCOUNT_MISSING` | 403 sans fenêtre, puis 409 `STRIPE_ACCOUNT_MISSING` | OK | — |
 | API-TRIP-01 | Recherche publique | majeure | 200 ×2 | 200 avec et sans session, enveloppe sans `success`, `isFavorite` réel | OK | `rating`/`reviewCount` absents |
 | API-TRIP-02 | Filtres durs | **bloquante** | aucun trajet interdit | aucun non-publié, aucun départ passé, masqué exclu (2→1) | OK | — |
-| API-TRIP-03 | Filtres invalides ignorés | mineure | 200 | `mode` inconnu → **400** ; categories et buckets tolérés | **KO** | ANO-API-10 |
+| API-TRIP-03 | Filtres invalides ignorés | mineure | 200 | `mode` inconnu → **400** ; categories et buckets tolérés | **KO** (08/09) → **corrigé** | ANO-API-10 · close |
 | API-TRIP-04 | Paramètres de prix publics | majeure | 200 | params publics 200 sans session ; devis pondéré servi | OK | — |
 | API-TRIP-05 | Facettes | mineure | 200, 9 compteurs | 200, 7 facettes dont familyCounts et modeCount | OK | — |
 | API-TRIP-06 | Trajet public | majeure | 200 / 404 / 400 | 200, DTO public complet | OK | — |

@@ -2446,3 +2446,65 @@ auth-service 192 → **209** (+17). deal-service inchangé à 516, ce qui vérif
 de `@packages/error-handler` ne casse aucun appelant. Les six bundles passent
 `scripts/smoke-services.sh` — `isAuthenticated` étant partagé, un défaut de résolution de
 `@packages/libs/redis` aurait mis six services à terre.
+
+# Recette API — le tri par prix ne perd plus de trajets (ANO-API-11), et un filtre inconnu ne casse plus une recherche (ANO-API-10)
+
+## ANO-API-11 — un tri qui amputait l'offre
+
+Mesure faite en recette : `sort=earliest` renvoyait **3** trajets, `sort=lowestPrice` **1**, et
+`totalCount` tombait de 3 à 1. Le tri par prix s'appuie sur `comparablePriceCents` (D33) et
+**excluait** les trajets qui ne l'avaient pas :
+
+```ts
+if (params.sort === "lowestPrice") {
+  where.comparablePriceCents = { not: null };   // avant
+}
+```
+
+En base : **7 trajets cherchables, 5 sans la valeur**. Le code de création la calcule pourtant
+correctement — le trajet créé pendant la campagne l'avait (2400 = 1200 × 2 kg de référence). Ce sont
+les trajets **antérieurs à D33** qui manquaient, et le script `backfill-comparable-price.ts`, prévu
+pour cela, n'avait jamais été joué sur cette base.
+
+Un correctif de données aurait suffi ce jour-là. Il n'aurait pas empêché le prochain trajet mal
+formé de redevenir invisible. La cause est donc traitée sur **trois** plans.
+
+**1. Un invariant à la publication.** Les champs dénormalisés sont recalculés au moment où le
+trajet devient visible :
+
+```ts
+const denormalized = computeDenormalizedFields({ … }, comparableParamsFromSettings(await platformSettings().get()));
+// … puis écrits dans le même update que status: "PUBLISHED"
+```
+
+Un trajet créé avant D33, ou par un chemin qui aurait oublié le calcul, **se répare tout seul** en
+étant publié. Vérifié : champ effacé à la main → `null` avant publication → `1800` après.
+
+**2. L'exclusion est retirée du tri.** Un tri change l'**ordre**, jamais le **nombre**. Le tri
+secondaire passe à `comparablePriceCents` puis `minPriceCents` puis `id` : si une valeur manquait
+malgré tout, le trajet remonte en tête au lieu de disparaître — un défaut d'affichage vaut mieux
+qu'une offre invisible, et `totalCount` cesse de mentir.
+
+**3. Le seed pose le champ.** C'est ce qui manquait pour que le défaut soit visible en recette :
+un jeu d'essai qui n'a pas la donnée rend le tri par prix intestable, et personne ne voyait que
+les deux tiers des trajets manquaient.
+
+**Contre-épreuve** : base volontairement privée du champ sur les 28 trajets publiés →
+`earliest` 2, `lowestPrice` 2, `bestRated` 2. Avant correction, `lowestPrice` aurait renvoyé 0.
+
+## ANO-API-10 — un filtre strict au milieu de filtres tolérants
+
+`categories=inventee` et `departureBuckets=matin,morning` étaient ignorés silencieusement ;
+`mode=teleportation` répondait **400**. Un lien partagé, un favori de navigateur ou une ancienne
+version de l'application portant un mode retiré du catalogue affichait donc une erreur au lieu
+d'une recherche.
+
+`mode` était un `z.enum` strict là où les listes passent par `csvOf`, qui filtre. Un `.catch("all")`
+sur les **deux** schémas (recherche et facettes) aligne le comportement : une recherche dégrade,
+elle ne casse pas.
+
+## Tests
+
+`apps/trip-service/src/lib/search-sort.spec.ts` (10 cas) : modes inconnus ramenés à `all`, modes
+valides conservés, défaut inchangé, et non-régression des filtres déjà tolérants. trip-service
+221 → **231**.
