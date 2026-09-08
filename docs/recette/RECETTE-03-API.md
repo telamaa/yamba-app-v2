@@ -4257,6 +4257,22 @@ volontairement**.
 | API-NOTIF-02 | Marquer lu, idempotent | mineure | 200 ×4 | | | |
 | API-NOTIF-03 | Quatre statuts distincts | **bloquante** | 403/404/400/401 | | | |
 | API-NOTIF-04 | Reflet d'une transition | majeure | compteur augmente | | | |
+| API-MSG-01 | Fil créé au premier accès | majeure | 200, même id | | | |
+| API-MSG-02 | Pas de fil avant acceptation | **bloquante** | 403 ×3 | | | |
+| API-MSG-03 | Code refusé, contact marqué | **bloquante** | 400 / 201 `flagged` | | | |
+| API-MSG-04 | Fenêtre d'écriture | majeure | clés stables + 400 | | | |
+| API-MSG-05 | Marquer lu | mineure | 200 idempotent | | | |
+| API-MSG-06 | Rendez-vous et créneaux | majeure | 201 / 400 ×5 | | | |
+| API-MSG-07 | Contre-proposition | majeure | remplace | | | |
+| API-MSG-08 | Accepter celle de l'autre | majeure | 400 / 200 / 400 | | | |
+| API-MSG-09 | Numéro pas avant l'heure | **bloquante** | 400 `TOO_EARLY` | | | |
+| API-MSG-10 | Signaler un message | majeure | 400/400/201/409 | | | |
+| API-MSG-11 | Réponses rapides | mineure | 200, clés stables | | | |
+| API-MSG-12 | Lecture admin journalisée | majeure | 200 + ligne de journal | | | |
+| API-NOTIF-01 | Lire ses notifications | mineure | 200, ≤ 50 | 200, 8 notifications, `unreadCount` juste, types cohérents | OK | — |
+| API-NOTIF-02 | Marquer lu, idempotent | mineure | 200 ×4 | idempotent : `updatedCount` 7 puis 0, `unreadCount` final 0 | OK | — |
+| API-NOTIF-03 | Quatre statuts distincts | **bloquante** | 403/404/400/401 | 403 · 404 · 400 · 401 — les quatre statuts distincts | OK | — |
+| API-NOTIF-04 | Reflet d'une transition | majeure | compteur augmente | 14 → 15 non-lues, `booking.requested` en tête ; 2 emails livrés | **KO** | ANO-API-16 / 17 |
 | API-SEC-01 | 401 sur 15 routes | **bloquante** | 401 ×15 | | | |
 | API-SEC-02 | Jetons invalides | **bloquante** | 401 ×4, 200 optionnelles | | | |
 | API-SEC-03 | Traversée horizontale | **bloquante** | 403 partout | | | |
