@@ -3,6 +3,7 @@ import prisma from "@packages/libs/prisma";
 import { ValidationError } from "@packages/error-handler";
 import { AuthenticatedRequest } from "@packages/middleware/isAuthenticated";
 import { ReviewKind } from "@prisma/client";
+import { publicProfileWhere } from "../utils/public-visibility";
 
 // Helper pour les logs avec timestamp précis
 function ts(): string {
@@ -178,8 +179,11 @@ export const getUserPublic: RequestHandler = async (
 
     console.log(`[${ts()}] [getUserPublic] 👀 slug=${slug} currentUserId=${currentUserId}`);
 
-    const user = await prisma.user.findUnique({
-      where: { publicSlug: slug },
+    // ANO-API-02 — la visibilité descend dans la requête : un profil privé est
+    // introuvable au même prix qu'un slug inexistant (aucune jointure chargée pour
+    // rien). `findFirst` car `findUnique` n'accepte pas de critère non unique.
+    const user = await prisma.user.findFirst({
+      where: publicProfileWhere(slug, currentUserId),
       include: {
         avatar: { select: { url: true } },
         carrierPage: {
@@ -196,7 +200,8 @@ export const getUserPublic: RequestHandler = async (
       },
     });
 
-    // D67 1A — profil masqué : 404 pour tout le monde sauf le propriétaire (qui le voit marqué « masqué »)
+    // D67 1A — profil masqué : 404 pour tout le monde sauf le propriétaire (qui le voit
+    // marqué « masqué »). Ceinture et bretelles : le filtre ci-dessus est la garde.
     if (!user || user.isDeleted || (user.profilePublic === false && currentUserId !== user.id)) {
       res.status(404).json({ success: false, message: "User not found." });
       return;
