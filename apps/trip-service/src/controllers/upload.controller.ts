@@ -1,6 +1,6 @@
 import type { Response, NextFunction } from "express";
 import imagekit from "../lib/imagekit";
-import { ValidationError } from "@packages/error-handler";
+import { AuthError, ValidationError } from "@packages/error-handler";
 import { AuthenticatedRequest } from "@packages/middleware/isAuthenticated";
 
 // GET /uploads/imagekit-auth
@@ -10,7 +10,7 @@ export const getImageKitAuthParams = async (
   next: NextFunction
 ) => {
   try {
-    if (!req.user) return next(new ValidationError("Unauthorized", { code: "UNAUTHENTICATED" }));
+    if (!req.user) return next(new AuthError("Unauthorized", { code: "UNAUTHENTICATED" }));
 
     // Let ImageKit SDK use its default expire (30 min from now).
     // Do NOT pass a relative duration — it expects an absolute Unix timestamp.
@@ -34,7 +34,7 @@ export const deleteImageKitFile = async (
   next: NextFunction
 ) => {
   try {
-    if (!req.user) return next(new ValidationError("Unauthorized", { code: "UNAUTHENTICATED" }));
+    if (!req.user) return next(new AuthError("Unauthorized", { code: "UNAUTHENTICATED" }));
 
     const { fileId } = req.params;
     if (!fileId) return next(new ValidationError("fileId is required", { code: "FILE_ID_REQUIRED" }));

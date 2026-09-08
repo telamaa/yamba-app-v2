@@ -1502,7 +1502,7 @@ idempotente (inscrite au journal de dette ci-dessous).
 |---|---|---|---|---|
 | D-1 | `x-locale` ne pilote pas le formatage des réponses rapides : c'est `preferredLocale` du membre qui gagne | API-GW-10, API-MSG-11 | comportement cohérent et défendable — c'est le **cahier** qui décrit autre chose | trancher : soit l'en-tête prime, soit le cahier est corrigé |
 | D-2 | trip-service rend parfois **400** là où 403 ou 404 seraient exacts | API-TRIP-13 | écart de sémantique connu, sans fuite d'information | aligner sur la règle 403/404 du reste de la plateforme |
-| D-3 | relancer un lien de vérification n'est pas idempotent | API-TRIP-18 | pas d'effet de bord dangereux, seulement un second email | même traitement que les autres gestes idempotents |
+| ~~D-3~~ | ~~supprimer un document de trajet n'est pas idempotent : le rejeu répond 400~~ (l'intitulé du journal parlait à tort d'un « lien de vérification » — c'est la suppression d'un document) | API-TRIP-18 | — | **SOLDÉE le 09/09** : 200 « déjà supprimé » au rejeu, base supprimée avant le fichier, garde-fou `idempotent-delete.spec.ts` |
 | ~~D-4~~ | ~~les refus de **trip-service** et **auth-service** ne portent pas tous un `details.code`~~ | observé au chapitre 9 | — | **SOLDÉE le 08/09 au soir** : 250 refus codés, garde-fou posé sur les deux services, et deux défauts de sémantique tombés avec (voir ci-dessous) |
 | ~~D-5~~ | ~~les middlewares écrivent leur réponse **eux-mêmes**, hors du middleware d'erreur~~ | API-SEC-05 | — | **SOLDÉE le 08/09 au soir** : douze refus passés par `next()`, le middleware d'erreur recopie `code` en tête pour ne casser aucun client, garde-fou `middleware-responses.spec.ts`. Deux exceptions écrites et justifiées (webhook Stripe, réponse documentée `ERASURE_BLOCKED`) |
 
@@ -1786,3 +1786,82 @@ Donc, pour un champ REQUIS, « absent » n'est pas exprimable dans une requête 
 correctif posait un `OR … isSet: false` sur les deux champs, les tests unitaires de forme passaient
 au vert, et le service répondait **500** au premier appel réel. Le garde-fou qui a servi n'est pas
 un test : c'est d'avoir rejoué la requête contre la base avant de conclure.
+
+---
+
+# Solde de la dette D-3 — une suppression rejouée n'est pas une erreur
+
+## Ce que le journal disait, et ce qu'il fallait lire
+
+L'entrée D-3 était **mal écrite** : elle parlait d'un « lien de vérification » alors que la fiche
+`API-TRIP-18` porte sur la **suppression d'un document de trajet**. L'intitulé est corrigé dans le
+tableau ci-dessus. Une dette mal nommée est une dette qu'on ne retrouve pas.
+
+## Le défaut
+
+```
+DELETE /api/trips/{id}/documents/{documentId}   →  200  « Document removed. »
+DELETE /api/trips/{id}/documents/{documentId}   →  400  « Document not found. »   ← le rejeu
+```
+
+Deux défauts dans un seul refus :
+
+1. **Le geste n'était pas idempotent.** Un second clic, un rejeu réseau, un retour arrière du
+   navigateur : le Voyageur voyait une erreur pour un geste qui avait parfaitement fonctionné.
+2. **Le statut était faux.** 400 annonce une faute du client ; il n'y en avait aucune.
+
+Et la route **voisine** — `DELETE /uploads/imagekit/:fileId` — appliquait déjà la bonne convention
+(« File was already deleted. » en 200). Deux suppressions côte à côte, deux comportements.
+
+## La correction
+
+```ts
+// Un document absent, ou appartenant à un AUTRE trajet, est traité comme déjà supprimé.
+if (!doc || doc.tripId !== id) {
+  return res.status(200).json({ success: true, message: "Document was already removed." });
+}
+```
+
+Confondre « n'a jamais existé » et « déjà supprimé » n'est pas un pis-aller : c'est ce qui **ferme
+la porte à l'énumération d'identifiants**. L'appelant ne peut rien déduire, et rien n'est touché.
+
+**L'ordre des effets a été inversé au passage.** L'ancien code supprimait le fichier chez ImageKit
+**puis** la ligne en base : si la seconde écriture échouait, il restait une ligne pointant vers un
+fichier disparu. Désormais la base — source de vérité — part d'abord ; au pire il reste un fichier
+orphelin chez le fournisseur, sans conséquence. L'échec du fournisseur reste absorbé : il ne fait
+pas échouer la suppression.
+
+## Trois statuts faux corrigés dans la même passe
+
+La dette D-4 avait donné un `details.code` à tous les refus, mais **sans toucher aux statuts** :
+plusieurs `ValidationError` portaient un code d'authentification tout en répondant **400**.
+
+| Cas | Avant | Après |
+|---|---|---|
+| garde défensive `!req.user` (16 sites) | 400 `UNAUTHENTICATED` | **401** `UNAUTHENTICATED` |
+| alerte de trajet appartenant à un autre membre (3 sites) | 400 `UNAUTHENTICATED` | **403** `NOT_OWNER` |
+
+Le second cas était le plus trompeur : « UNAUTHENTICATED » sur un membre parfaitement authentifié,
+à qui il manquait seulement la propriété de la ressource.
+
+## Garde-fou
+
+`apps/trip-service/src/lib/idempotent-delete.spec.ts` (5 cas) : il lit les sources et vérifie que
+la suppression d'un document ne rend aucun refus sur l'absence, que les deux cas d'absence
+partagent **la même sortie** (pas d'énumération), que la base est supprimée **avant** le fichier,
+que l'échec du fournisseur est absorbé, et que la route voisine garde sa convention.
+
+## Contre-épreuves
+
+| Appel | Résultat |
+|---|---|
+| supprimer un document, trois fois de suite | **200** · **200** « déjà supprimé » · **200** |
+| supprimer le document d'un autre trajet | **200** « déjà supprimé », rien touché |
+| supprimer sur le trajet d'autrui | **403** `NOT_TRIP_OWNER` (inchangé) |
+| supprimer une alerte de trajet inexistante | **200** (elle était déjà idempotente) |
+| appeler une route d'upload sans session | **401** `TOKEN_MISSING` |
+
+trip-service 235 → **240**. Plateforme **946**.
+
+**Le journal de dette ne contient plus qu'une ligne : D-1**, l'arbitrage produit entre l'en-tête
+`x-locale` et le `preferredLocale` du membre — qui n'est pas un défaut, mais un choix à trancher.

@@ -3351,3 +3351,68 @@ conclure.
 ## Tests
 
 auth-service 219 → **225**, trip-service **235**. Plateforme **941**.
+
+---
+
+# Dette D-3 soldée — une suppression rejouée n'est pas une erreur
+
+## Le défaut
+
+`DELETE /api/trips/{id}/documents/{documentId}` répondait **200** au premier appel et **400
+« Document not found. »** au second. Deux défauts dans un seul refus : le geste n'était pas
+idempotent (un double clic ressemblait à une erreur), et le statut annonçait une faute du client
+là où il n'y en avait aucune.
+
+La route **voisine**, `DELETE /uploads/imagekit/:fileId`, appliquait pourtant déjà la bonne
+convention : « File was already deleted. » en 200. Deux suppressions côte à côte, deux
+comportements — c'est ce genre d'écart qu'une campagne de recette rend visible.
+
+## La correction
+
+```ts
+// Un document absent, ou appartenant à un AUTRE trajet, est traité comme déjà supprimé.
+if (!doc || doc.tripId !== id) {
+  return res.status(200).json({ success: true, message: "Document was already removed." });
+}
+```
+
+Confondre « n'a jamais existé » et « déjà supprimé » n'est pas un pis-aller : c'est ce qui ferme la
+porte à l'**énumération d'identifiants**. L'appelant ne peut rien déduire de la réponse, et rien
+n'est touché.
+
+**L'ordre des effets a été inversé** : la base — source de vérité — est écrite **avant** l'appel au
+fournisseur de fichiers.
+
+```ts
+await prisma.tripDocument.delete({ where: { id: documentId } });   // d'abord
+if (doc.fileId) { try { await imagekit.deleteFile(doc.fileId); } catch { /* best effort */ } }
+```
+
+Avant, un échec de l'écriture en base laissait une ligne pointant vers un fichier disparu.
+Maintenant, au pire, un fichier orphelin chez le fournisseur — sans conséquence.
+
+**La règle générale** : quand deux systèmes doivent être mis d'accord et qu'on ne peut pas les
+écrire ensemble, on écrit **d'abord celui qui fait foi**, et on rend l'autre rattrapable.
+
+## Trois statuts faux corrigés dans la même passe
+
+La dette D-4 avait donné un code à tous les refus **sans toucher aux statuts**. Il restait des
+`ValidationError` portant un code d'authentification :
+
+| Cas | Avant | Après |
+|---|---|---|
+| garde défensive `!req.user` (16 sites) | 400 `UNAUTHENTICATED` | **401** `UNAUTHENTICATED` |
+| alerte de trajet d'un autre membre (3 sites) | 400 `UNAUTHENTICATED` | **403** `NOT_OWNER` |
+
+Le second était le plus trompeur : « non authentifié » sur un membre parfaitement authentifié, à
+qui il manquait seulement la propriété de la ressource.
+
+## Garde-fou
+
+`apps/trip-service/src/lib/idempotent-delete.spec.ts` (5 cas) — il lit les sources et vérifie :
+aucun refus sur l'absence, **une seule sortie** pour les deux cas d'absence (pas d'énumération), la
+base supprimée **avant** le fichier, l'échec du fournisseur absorbé, et la route voisine inchangée.
+
+## Tests
+
+trip-service 235 → **240**. Plateforme **946**.

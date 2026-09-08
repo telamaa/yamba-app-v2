@@ -1,6 +1,6 @@
 import type { Response, NextFunction } from "express";
 import prisma from "@packages/libs/prisma";
-import { ValidationError } from "@packages/error-handler";
+import { AuthError, ForbiddenError, ValidationError } from "@packages/error-handler";
 import { AuthenticatedRequest } from "@packages/middleware/isAuthenticated";
 import {
   computeExpiresAt,
@@ -27,7 +27,7 @@ export const createSavedRoute = async (
   next: NextFunction
 ) => {
   try {
-    if (!req.user) return next(new ValidationError("Unauthorized", { code: "UNAUTHENTICATED" }));
+    if (!req.user) return next(new AuthError("Unauthorized", { code: "UNAUTHENTICATED" }));
 
     const userId = req.user.id;
     const {
@@ -181,7 +181,7 @@ export const listSavedRoutes = async (
   next: NextFunction
 ) => {
   try {
-    if (!req.user) return next(new ValidationError("Unauthorized", { code: "UNAUTHENTICATED" }));
+    if (!req.user) return next(new AuthError("Unauthorized", { code: "UNAUTHENTICATED" }));
 
     const userId = req.user.id;
     const includeInactive = req.query.includeInactive === "true";
@@ -214,14 +214,14 @@ export const updateSavedRoute = async (
   next: NextFunction
 ) => {
   try {
-    if (!req.user) return next(new ValidationError("Unauthorized", { code: "UNAUTHENTICATED" }));
+    if (!req.user) return next(new AuthError("Unauthorized", { code: "UNAUTHENTICATED" }));
 
     const { id } = req.params;
     const userId = req.user.id;
 
     const savedRoute = await prisma.savedRoute.findUnique({ where: { id } });
     if (!savedRoute) return next(new ValidationError("Route alert not found.", { code: "ROUTE_ALERT_NOT_FOUND" }));
-    if (savedRoute.userId !== userId) return next(new ValidationError("Unauthorized.", { code: "UNAUTHENTICATED" }));
+    if (savedRoute.userId !== userId) return next(new ForbiddenError("This route alert is not yours.", { code: "NOT_OWNER" }));
 
     const { earliestDate, latestDate, emailEnabled, includeNearby } = req.body as {
       earliestDate?: string | null;
@@ -278,7 +278,7 @@ export const deleteSavedRoute = async (
   next: NextFunction
 ) => {
   try {
-    if (!req.user) return next(new ValidationError("Unauthorized", { code: "UNAUTHENTICATED" }));
+    if (!req.user) return next(new AuthError("Unauthorized", { code: "UNAUTHENTICATED" }));
 
     const { id } = req.params;
     const userId = req.user.id;
@@ -287,7 +287,7 @@ export const deleteSavedRoute = async (
     if (!savedRoute) {
       return res.status(200).json({ success: true, message: "Route alert removed." });
     }
-    if (savedRoute.userId !== userId) return next(new ValidationError("Unauthorized.", { code: "UNAUTHENTICATED" }));
+    if (savedRoute.userId !== userId) return next(new ForbiddenError("This route alert is not yours.", { code: "NOT_OWNER" }));
 
     await prisma.savedRoute.delete({ where: { id } });
 
@@ -307,14 +307,14 @@ export const extendSavedRoute = async (
   next: NextFunction
 ) => {
   try {
-    if (!req.user) return next(new ValidationError("Unauthorized", { code: "UNAUTHENTICATED" }));
+    if (!req.user) return next(new AuthError("Unauthorized", { code: "UNAUTHENTICATED" }));
 
     const { id } = req.params;
     const userId = req.user.id;
 
     const savedRoute = await prisma.savedRoute.findUnique({ where: { id } });
     if (!savedRoute) return next(new ValidationError("Route alert not found.", { code: "ROUTE_ALERT_NOT_FOUND" }));
-    if (savedRoute.userId !== userId) return next(new ValidationError("Unauthorized.", { code: "UNAUTHENTICATED" }));
+    if (savedRoute.userId !== userId) return next(new ForbiddenError("This route alert is not yours.", { code: "NOT_OWNER" }));
 
     const newExpiresAt = computeExtendedExpiresAt();
 

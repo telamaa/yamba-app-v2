@@ -1,6 +1,6 @@
 import type { Response, NextFunction, RequestHandler } from "express";
 import prisma from "@packages/libs/prisma";
-import { NotFoundError, ValidationError } from "@packages/error-handler";
+import { AuthError, NotFoundError, ValidationError } from "@packages/error-handler";
 import { AuthenticatedRequest } from "@packages/middleware/isAuthenticated";
 import { ReviewKind } from "@prisma/client";
 import { publicProfileWhere } from "../utils/public-visibility";
@@ -565,7 +565,7 @@ export const followUser = async (
 
     if (!req.user) {
       console.log(`[${ts()}] [followUser] ❌ No req.user`);
-      return next(new ValidationError("Unauthorized", { code: "UNAUTHENTICATED" }));
+      return next(new AuthError("Unauthorized", { code: "UNAUTHENTICATED" }));
     }
 
     const { slug } = req.params;
@@ -646,7 +646,7 @@ export const unfollowUser = async (
 
     if (!req.user) {
       console.log(`[${ts()}] [unfollowUser] ❌ No req.user`);
-      return next(new ValidationError("Unauthorized", { code: "UNAUTHENTICATED" }));
+      return next(new AuthError("Unauthorized", { code: "UNAUTHENTICATED" }));
     }
 
     const { slug } = req.params;
@@ -703,7 +703,7 @@ export const updateFollowPreferences = async (
   try {
     console.log(`\n[${ts()}] [updateFollowPreferences] 🎬 START - slug=${req.params.slug} userId=${req.user?.id}`);
 
-    if (!req.user) return next(new ValidationError("Unauthorized", { code: "UNAUTHENTICATED" }));
+    if (!req.user) return next(new AuthError("Unauthorized", { code: "UNAUTHENTICATED" }));
 
     const { slug } = req.params;
     const followerId = req.user.id;
@@ -794,7 +794,7 @@ export const listMyFollowing: RequestHandler = async (
 ) => {
   try {
     if (!req.user) {
-      next(new ValidationError("Unauthorized", { code: "UNAUTHENTICATED" }));
+      next(new AuthError("Unauthorized", { code: "UNAUTHENTICATED" }));
       return;
     }
 

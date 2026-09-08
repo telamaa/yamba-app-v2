@@ -2217,3 +2217,40 @@ plateforme en visiteur.
 | PUB5 | Le propriétaire ouvre son propre profil masqué | **200**, marqué « masqué » |
 
 Joués le 8 septembre 2026 — voir `context/YAMBA-RECETTE-API-RESULTATS.md`, `ANO-API-23`.
+
+# Recette API — supprimer deux fois, c'est supprimer une fois (dette D-3)
+
+## Le besoin
+
+Un Voyageur retire le billet qu'il avait joint à son trajet. Il clique deux fois — parce que la
+page a mis une seconde, parce qu'il est revenu en arrière, parce que le réseau a bégayé. Le second
+clic répondait **« Document introuvable »**, en annonçant une erreur de saisie. Le geste avait
+pourtant parfaitement fonctionné.
+
+La même plateforme faisait déjà bien les choses juste à côté : supprimer un fichier deux fois
+répondait « ce fichier était déjà supprimé », sans erreur. Deux gestes voisins, deux réponses
+opposées.
+
+## Les règles
+
+- **RG-SUP-01** — Supprimer est un geste **rejouable** : la deuxième fois répond comme la première,
+  en indiquant simplement que c'était déjà fait. Une suppression ne se solde jamais par une erreur
+  pour la seule raison qu'il n'y avait plus rien à supprimer.
+- **RG-SUP-02** — La plateforme ne dit **jamais** si un identifiant a existé. « Déjà supprimé » et
+  « n'a jamais existé » reçoivent la même réponse : sans quoi, en essayant des identifiants au
+  hasard, on apprendrait lesquels sont réels.
+- **RG-SUP-03** — Quand une suppression touche deux endroits (la fiche et le fichier joint), c'est
+  **la fiche qui part d'abord**. Si le reste échoue, il subsiste au pire un fichier inutile chez le
+  prestataire — jamais une fiche qui renvoie vers un document disparu.
+
+## Tests d'acceptation
+
+| Réf | Scénario | Attendu |
+|---|---|---|
+| SUP1 | Retirer un document, puis recliquer deux fois | Trois fois **la même réponse positive**, la seconde et la troisième précisant « déjà retiré » |
+| SUP2 | Retirer un document qui appartient à un autre trajet | Même réponse positive, **rien n'est touché** |
+| SUP3 | Retirer un document sur le trajet de quelqu'un d'autre | Refus « ce trajet n'est pas le vôtre » |
+| SUP4 | Supprimer une alerte de trajet déjà supprimée | Réponse positive |
+| SUP5 | Le prestataire de fichiers est indisponible | Le document est retiré quand même |
+
+Joués le 9 septembre 2026 — voir `context/YAMBA-RECETTE-API-RESULTATS.md`, « Solde de la dette D-3 ».
