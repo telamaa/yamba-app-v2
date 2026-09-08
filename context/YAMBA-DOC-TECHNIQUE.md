@@ -2543,3 +2543,52 @@ sans valeur déclarée → 201 (inchangé) · valeur raisonnable (200 €) → 2
 Tests : `payment-intent-caps.spec.ts` (4 cas, dont la non-régression du champ absent).
 deal-service 516 → **520**. Les cinq `openapi.json` sont régénérés : le contrat public porte
 désormais ce champ.
+
+# Recette API — la page du destinataire était entièrement cassée (ANO-API-13), et le garde-fou devient systémique
+
+Fiche API-DEAL-22, **bloquante**. `GET /api/track/{token}` — la page que l'Expéditeur partage au
+destinataire pour suivre son colis — répondait **500** :
+
+```
+Unknown field `cancelledAt` for select statement on model `Booking`
+tracking-link.service.ts:51
+```
+
+`Booking` n'a pas de champ `cancelledAt` : le seul champ d'annulation est `cancelReason`. La
+fonctionnalité était donc **totalement inopérante**, et rien ne l'avait signalé.
+
+## Le vrai sujet : c'est le deuxième cas identique de la campagne
+
+`ANO-API-09` avait cassé l'export RGPD exactement de la même façon, dans auth-service : un `select`
+demandant un champ inexistant, un test qui passait parce qu'il injecte un faux Prisma — lequel ne
+valide aucun nom de champ. Un garde-fou avait alors été écrit **pour ce service**. Le défaut est
+réapparu ailleurs.
+
+La leçon est donc de portée : quand la même erreur survient deux fois dans deux services, le
+correctif n'est pas un test de plus au même endroit, c'est un test qui couvre **le service entier**.
+
+`apps/deal-service/src/services/prisma-select-fields.spec.ts` lit **tous** les fichiers source du
+service, extrait chaque `select: { … }` posé sur un modèle Prisma, et confronte les champs demandés
+à `prisma/schema.prisma`. Aucune base ouverte, aucun mock.
+
+Deux pièges rencontrés en l'écrivant, qui valent d'être notés parce qu'un test injuste est pire
+qu'un test absent :
+
+1. **Les sous-sélections appartiennent à un autre modèle.** `select: { avatar: { select: { url:
+   true } } }` sur `Booking` ne demande pas `Booking.url`. Le test aplatit donc les blocs imbriqués
+   avant d'analyser les clés de premier niveau.
+2. **Un appel sans `select` empruntait celui de l'appel suivant.** Chercher `select:` après
+   l'accesseur sans borne remontait 53 faux positifs. L'extraction est désormais **bornée à l'objet
+   d'arguments de l'appel courant**, accolades équilibrées.
+
+Vérifié en réintroduisant le bug : le test échoue bien sur
+`services/tracking-link.service.ts → Booking.cancelledAt`.
+
+## Ce que la fiche a par ailleurs confirmé
+
+Une fois la page réparée, elle est **exemplaire** : elle ne porte que `milestone`, `steps`,
+`corridor`, les dates, `recipientFirstName`, `shipperFirstName` et le Voyageur. Aucun code à six
+chiffres, **aucun montant**, aucun email, aucun nom de famille, aucun téléphone — vérifié par
+recherche sur tous les chemins scalaires. Un jeton inventé répond 404.
+
+deal-service 520 → **523**.
