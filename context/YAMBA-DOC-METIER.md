@@ -1578,7 +1578,7 @@ Jusqu'ici Yamba envoyait ses emails par un serveur SMTP nu (Gmail en recette) et
 ### Recette (EML)
 | # | Scénario | Attendu |
 |---|---|---|
-| EML1 | `docker compose up -d`, `EMAIL_PROVIDER=smtp`, `SMTP_HOST=localhost`, `SMTP_PORT=1025` ; s'inscrire | Le code OTP apparaît dans http://localhost:8025 |
+| EML1 | `docker compose up -d`, `EMAIL_PROVIDER=smtp`, `SMTP_HOST=localhost`, `SMTP_PORT=1025` ; s'inscrire | Le code OTP apparaît dans http://localhost:8026 |
 | EML2 | Sans variable email, en développement, accepter un deal | Le service log « [email:fake] → … » ; `EmailDelivery` en SENT avec `provider: FAKE` |
 | EML3 | `NODE_ENV=production` sans `RESEND_API_KEY` ni `SMTP_HOST` | Le service refuse de démarrer (« FAKE provider is refused in production ») |
 | EML4 | `EMAIL_PROVIDER=resend` avec une clé de test ; accepter un deal | L'email arrive à l'adresse du compte Resend ; `EmailDelivery` porte `provider: RESEND` et `providerMessageId` |

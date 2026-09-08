@@ -91,7 +91,7 @@ Scalar sur `/docs` pour les quatre premiers.
 | `node` (≥ 20) et `npx` | Démarrer les services, rejouer le jeu d'essai. | `node -v` |
 | MongoDB (Atlas ou local) | La base unique des cinq services. | `DATABASE_URL` dans `.env` |
 | Redis | OTP, sessions, fenêtres sudo, compteurs. | `REDIS_DATABASE_URI` dans `.env` |
-| Mailpit (facultatif) | Lire les codes OTP envoyés par email en local. | `http://localhost:8025` |
+| Mailpit (facultatif) | Lire les codes OTP envoyés par email en local. | `http://localhost:8026` |
 | Redpanda (facultatif) | Le broker d'événements. Les services démarrent sans lui. | `bash scripts/redpanda-bootstrap.sh` |
 | `stripe` CLI (facultatif) | Rejouer le webhook Stripe. Sans elle, les fiches concernées sont ⏭. | `stripe --version` |
 
@@ -3494,7 +3494,7 @@ occurrence est une anomalie bloquante**, y compris dans un email et dans un év�
 Compléter par le balayage des emails, si Mailpit est en place :
 
 ```bash
-curl -s "http://localhost:8025/api/v1/messages" | grep -c 742891   # attendu : 0
+curl -s "http://localhost:8026/api/v1/messages" | grep -c 742891   # attendu : 0
 ```
 
 ---

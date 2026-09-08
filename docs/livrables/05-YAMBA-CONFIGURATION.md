@@ -313,7 +313,7 @@ RESEND_WEBHOOK_SECRET=whsec_xxx
 EMAIL_FROM="Yamba <bonjour@votre-domaine>"
 ```
 
-En développement, préférez Mailpit : `EMAIL_PROVIDER=smtp`, `SMTP_HOST=localhost`, `SMTP_PORT=1025`, et vous lisez les emails sur `http://localhost:8025`.
+En développement, préférez Mailpit : `EMAIL_PROVIDER=smtp`, `SMTP_HOST=localhost`, `SMTP_PORT=1025`, et vous lisez les emails sur `http://localhost:8026`.
 
 ### Sentry
 

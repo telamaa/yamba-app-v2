@@ -91,7 +91,7 @@ Au testeur fonctionnel, qui n'a pas besoin de lire une ligne de code. Les réfé
 
 Le testeur doit avoir accès à :
 
-- **Mailpit — http://localhost:8025** : toute vérification d'email passe par là. C'est la boîte aux lettres commune de tous les comptes de test.
+- **Mailpit — http://localhost:8026** : toute vérification d'email passe par là. C'est la boîte aux lettres commune de tous les comptes de test.
 - **Le back-office — http://localhost:3001** : uniquement pour les gestes d'administration qu'un scénario web exige (masquer un trajet, trancher un litige, activer la maintenance). Le détail de ces écrans est dans **RECETTE-02-ADMIN**.
 - **La base de données** (Compass, Studio, ou `npx prisma studio`) : pour les vérifications complémentaires « ligne en base ». Optionnel : leur absence ne fait jamais échouer un scénario, elle réduit la précision de la consignation.
 
@@ -134,7 +134,7 @@ npx nx dev admin-ui      # dans un second terminal, le back-office sur :3001
 | `curl -i http://localhost:8080/api/status` | `200`, `status: "ok"`, cinq services `reachable: true` |
 | `curl -i http://localhost:3000/api/health` | `200`, `app: "user-ui"` |
 | http://localhost:3000 s'ouvre | L'accueil s'affiche, pas un squelette figé |
-| http://localhost:8025 s'ouvre | Boîte Mailpit accessible, vide ou non |
+| http://localhost:8026 s'ouvre | Boîte Mailpit accessible, vide ou non |
 
 Si `npm run dev` échoue sur un service avec `ENOENT … src/assets`, c'est un dossier `assets` manquant : le signaler comme **anomalie bloquante d'environnement**, pas comme anomalie fonctionnelle.
 
@@ -508,7 +508,7 @@ Une session complète représente environ **deux journées de test**. Découpage
 
 **Ce que couvre ce chapitre.** La création d'un compte par adresse email avec code à six chiffres, les règles de mot de passe, l'acceptation des conditions, le barème de blocage sur code erroné, et le parcours Google.
 
-**Préconditions communes.** Fenêtre privée. Mailpit ouvert sur `http://localhost:8025`.
+**Préconditions communes.** Fenêtre privée. Mailpit ouvert sur `http://localhost:8026`.
 
 **Adresse de travail** — utilise `recette+neuf@seed.yamba.dev` pour le compte neuf. Si un scénario demande une seconde adresse libre, ajoute un suffixe (`recette+neuf2@…`).
 
