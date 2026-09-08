@@ -4288,16 +4288,16 @@ volontairement**.
 | API-SEC-13 | Signature Stripe invalide | **bloquante** | 400 / 501 | webhook Stripe — chapitre 8 | ⏭ | chapitre 8 |
 | API-SEC-14 | Aucune énumération | **bloquante** | 404 identiques | connexion : 168,6 ms contre 20,4 ms — énumération par le temps | **KO** | ANO-API-18 |
 | API-SEC-15 | CORS restreint | majeure | 200 / refus | origines déclarées acceptées, autres refusées | OK | refus en 500 |
-| API-IDEM-01 | Intention consommée | **bloquante** | 409, 1 seul deal | | | |
-| API-IDEM-02 | Rejeu d'acceptation | **bloquante** | 409, 1 capture | | | |
-| API-IDEM-03 | Rejeu de remise | **bloquante** | 409, dates inchangées | | | |
-| API-IDEM-04 | Gestes idempotents | majeure | mêmes codes | | | |
-| API-IDEM-05 | Rejeu d'événement | majeure | 1 seul effet | | | |
-| API-IDEM-06 | Deux acceptations | **bloquante** | 1×200, 2×409 | | | |
-| API-IDEM-07 | Deux réservations | **bloquante** | 201 + 409, kg ≥ 0 | | | |
-| API-IDEM-08 | Deux acceptations RDV | majeure | 200 + 400 | | | |
-| API-IDEM-09 | Deux régénérations | majeure | −1 seulement | | | |
-| API-IDEM-10 | Deux rafraîchissements | majeure | ≤ 1 session vivante | | | |
+| API-IDEM-01 | Intention consommée | **bloquante** | 409, 1 seul deal | 409 `PAYMENT_ALREADY_USED`, un seul deal créé | OK | — |
+| API-IDEM-02 | Rejeu d'acceptation | **bloquante** | 409, 1 capture | 200 puis 409 `TRANSITION_NOT_ALLOWED` ; `acceptedAt` identique, un seul `booking.accepted` | OK | — |
+| API-IDEM-03 | Rejeu de remise | **bloquante** | 409, dates inchangées | 200 puis 409 ; `deliveredAt` et `payoutDueAt` inchangés, aucune tentative de code consommée par le rejeu | OK | — |
+| API-IDEM-04 | Gestes idempotents | majeure | mêmes codes | favori, abonnement, tout-lu, lecture de fil : même code deux fois, aucun doublon ; lien de suivi = **même jeton** | OK | — |
+| API-IDEM-05 | Rejeu d'événement | majeure | 1 seul effet | même webhook signé deux fois : 200/200, `suppressed` vrai puis faux ; type inconnu → 200 `ignored` | OK | — |
+| API-IDEM-06 | Deux acceptations | **bloquante** | 1×200, 2×409 | un 200, deux 409 `PAYMENT_STATE_CONFLICT` ; une seule capture | OK | — |
+| API-IDEM-07 | Deux réservations | **bloquante** | 201 + 409, kg ≥ 0 | capacité juste (17 → 5 kg), mais le perdant recevait **500** (conflit d'écriture Mongo) — corrigé : 201 + 409 `CAPACITY_EXCEEDED` | **KO** | ANO-API-19 |
+| API-IDEM-08 | Deux acceptations RDV | majeure | 200 + 400 | 200 + 400, un seul `acceptedAt` — mais le refus partait **sans `details.code`**, la raison collée dans la phrase anglaise | **KO** | ANO-API-20 |
+| API-IDEM-09 | Deux régénérations | majeure | −1 seulement | compteur juste (−1), mais le perdant recevait **500** (même conflit d'écriture) — corrigé : 200 + 409 | **KO** | ANO-API-21 |
+| API-IDEM-10 | Deux rafraîchissements | majeure | ≤ 1 session vivante | 200 + 401 ; une seule session utilisable ensuite (jeton de rafraîchissement à usage unique) | OK | — |
 | API-HOOK-01 | Écoute Stripe locale | majeure | secret affiché | | | |
 | API-HOOK-02 | Quatre réponses Stripe | **bloquante** | 200/400/501/500 | | | |
 | API-HOOK-03 | Cinq événements traités | majeure | effets attendus | | | |

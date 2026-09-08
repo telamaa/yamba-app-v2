@@ -2003,3 +2003,54 @@ Cinq promesses du service des comptes n'étaient pas tenues.
 | API2b | Se tromper de code cinq fois | **401** ×4 puis **429**, compteur et verrou inchangés |
 
 Tous joués le 8 septembre 2026 — voir `context/YAMBA-RECETTE-API-RESULTATS.md`.
+
+# Recette API — deux clics ne valent qu'un geste (lot idempotence et concurrence)
+
+## Le besoin
+
+Un client mobile rejoue. Le réseau bégaie, l'utilisateur double-clique, deux onglets sont ouverts,
+deux Expéditeurs visent les mêmes kilos au même instant. Ce n'est pas un cas limite : c'est le
+comportement ordinaire d'une place de marché. Trois promesses n'étaient pas tenues jusqu'au bout.
+
+1. **« Vous ne serez jamais débité deux fois, ni compté deux fois. »** Tenue — les gardes métier
+   font toutes leur travail. Mais quand deux réservations se croisaient sur les derniers kilos, le
+   perdant recevait **une panne** au lieu d'un refus : « Something went wrong ». Il ne savait ni
+   pourquoi, ni s'il devait recommencer. Même chose sur un double clic de régénération du code.
+2. **« Nous vous dirons toujours pourquoi c'est refusé. »** Sur toute la messagerie, les refus
+   partaient **sans code exploitable** : la raison lisible par la machine était collée dans une
+   phrase anglaise, que l'application ne peut ni traduire ni interpréter.
+3. **« Un rejeu ne coûte rien. »** Tenue partout : dates de jalon figées, aucune tentative de code
+   consommée, un seul lien de suivi, aucun doublon de favori ou d'abonnement.
+
+## Les règles
+
+- **RG-CNC-01** — Un conflit d'écriture de la base de données n'est **jamais** une réponse rendue
+  au membre. Il est rejoué ; au second essai, la plateforme rend soit le succès, soit le refus
+  métier qui correspond réellement à l'état des choses (« il ne reste plus assez de kilos »,
+  « ce deal a changé »). Une panne technique ne se transforme pas en information métier fausse,
+  et un refus métier ne se déguise pas en panne.
+- **RG-CNC-02** — Le rejeu ne s'applique qu'au conflit d'écriture identifié comme tel. Toute autre
+  erreur remonte telle quelle : rejouer un geste qu'on ne comprend pas risque de le produire deux
+  fois.
+- **RG-API-03** — **Tout** refus métier porte un code exploitable par le client, quel que soit le
+  statut HTTP (400, 403, 404, 409). La raison n'est jamais cachée dans la phrase du message :
+  la phrase est pour l'humain, le code est pour le programme, et c'est le programme qui choisit ce
+  que l'humain lira dans sa langue.
+- **RG-CNC-03** — Deux gestes simultanés sur le même objet ne comptent qu'une fois : une seule
+  capture de paiement, un seul décrément de capacité, un seul décompte de régénération, une seule
+  acceptation de rendez-vous, une seule session vivante après deux rafraîchissements.
+
+## Tests d'acceptation
+
+| Réf | Scénario | Attendu |
+|---|---|---|
+| CNC1 | Deux Expéditeurs réservent en même temps les 5 derniers kilos, 4 kg chacun | Un 201, un refus **« capacité dépassée »** — jamais une panne ; capacité finale 1 kg |
+| CNC2 | Double clic sur « régénérer le code de livraison » | Un succès, un refus « ce deal a changé » ; le compteur ne baisse **que d'une unité** |
+| CNC3 | Deux acceptations simultanées du même rendez-vous | Un succès, un refus portant le code `MEETUP_NOT_ACCEPTABLE` et sa raison ; une seule date d'acceptation |
+| CNC4 | Écrire dans une conversation gelée par un litige | Refus portant `CONVERSATION_READ_ONLY` et la raison `DISPUTE_OPEN` |
+| CNC5 | Rejouer une acceptation, puis une remise | 409 à chaque fois ; dates de jalon inchangées, une seule capture, aucune tentative de code consommée |
+| CNC6 | Rejouer le même événement email signé | Effet appliqué une seule fois ; 200 dans les deux cas |
+| CNC7 | Deux rafraîchissements simultanés de la même session | Une seule session utilisable ensuite |
+
+Joués le 8 septembre 2026 — voir `context/YAMBA-RECETTE-API-RESULTATS.md`, fiches `ANO-API-19`,
+`ANO-API-20` et `ANO-API-21`.

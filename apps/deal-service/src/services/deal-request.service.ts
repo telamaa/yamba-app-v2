@@ -30,6 +30,7 @@ import { QuoteError, type PricingParams, type ShipperQuote } from "@packages/pri
 import { pricingParamsFromSettings } from "@packages/api-contracts";
 import { platformSettings } from "@packages/libs/settings/default";
 import type { SettingsReader } from "@packages/libs/settings";
+import { withWriteConflictRetry } from "../lib/write-conflict-retry";
 import { makeTrustService, type TrustService } from "./trust.service"; // D71
 import {
   BookingDomainEventSchema,
@@ -202,7 +203,11 @@ export function makeDealRequestService(provider: PaymentProvider, clock: () => D
       const snapshots = buildBookingSnapshots({ trip, input, quote, now });
 
       try {
-        const booking = await prisma.$transaction(async (tx) => {
+        // ANO-API-19 — deux Expéditeurs sur les derniers kilos, c'est la vie normale d'une
+        // place de marché : MongoDB rejette la transaction perdante (P2034) et l'erreur
+        // remontait en 500. On rejoue, et le second essai rend une réponse métier — la place
+        // existe encore, ou CAPACITY_EXCEEDED.
+        const booking = await withWriteConflictRetry(() => prisma.$transaction(async (tx) => {
           const reused = await tx.booking.findFirst({
             where: { paymentIntentId: input.paymentIntentId },
             select: { id: true },
@@ -287,7 +292,7 @@ export function makeDealRequestService(provider: PaymentProvider, clock: () => D
             });
           }
           return created;
-        });
+        }));
 
         return {
           bookingId: booking.id,

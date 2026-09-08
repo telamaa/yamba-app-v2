@@ -30,6 +30,7 @@ import { BookingLifecycleError, baseEventPayload, computeLateCancellationCompens
 import { applyBookingTransition, loadBookingForWrite, makeEnvelope, type BookingForWrite } from "./booking-write";
 import { recomputeBookingParties } from "./reputation.service";
 import type { PayoutExecutor } from "./deal-lifecycle.service";
+import { withWriteConflictRetry } from "../lib/write-conflict-retry";
 
 export type RequestingUser = { id: string };
 export type AdminActor = { id: string; ip?: string | null; userAgent?: string | null };
@@ -135,7 +136,7 @@ export function makeDealMediationService(
       if (dispute.carrierRespondedAt || dispute.status !== "OPEN") {
         throw new BookingLifecycleError("TRANSITION_NOT_ALLOWED", "Your statement was already recorded.");
       }
-      await prisma.$transaction(async (tx) => {
+      await withWriteConflictRetry(() => prisma.$transaction(async (tx) => {
         const updated = await tx.dispute.updateMany({
           where: { id: dispute.id, status: "OPEN" },
           data: { carrierStatement: input.statement, carrierStatementPhotoUrls: input.photoUrls, carrierRespondedAt: now, status: "CARRIER_RESPONDED" },
@@ -148,7 +149,7 @@ export function makeDealMediationService(
           { ...baseEventPayload(booking, "CARRIER"), ticketNumber: dispute.ticketNumber, respondedAt: now.toISOString() },
           now
         );
-      });
+      }));
       return { bookingId: booking.id, ticketNumber: dispute.ticketNumber, respondedAt: now.toISOString() };
     },
 

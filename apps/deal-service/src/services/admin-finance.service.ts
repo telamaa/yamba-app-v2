@@ -44,6 +44,7 @@ import {
   type ClaimRow,
   type FinanceCsvRow,
 } from "./admin-finance.rules";
+import { withWriteConflictRetry } from "../lib/write-conflict-retry";
 
 const iso = (d: Date | null | undefined) => (d ? d.toISOString() : null);
 
@@ -381,11 +382,11 @@ export function makeAdminFinanceService(provider: PaymentProvider, settlement: D
               payoutReversalResolvedAt: now,
               payoutReversalResolvedByAdminId: admin.id,
             };
-      await prisma.$transaction(async (tx) => {
+      await withWriteConflictRetry(() => prisma.$transaction(async (tx) => {
         const written = await tx.booking.updateMany({ where: { id, payoutStatus: "REVERSED", ...UNRESOLVED_REVERSAL } as never, data: data as never });
         if (written.count === 0) throw new ValidationError("This payout is not an open reversal.");
         await recordAdminAction(tx, audit(admin, "PAYOUT_REVERSAL_RESOLVED", id, { outcome: input.outcome, reason: input.reason }));
-      });
+      }));
       if (input.outcome === "WRITTEN_OFF") return { outcome: "WRITTEN_OFF", payoutStatus: "REVERSED", reason: null };
       const fresh = await loadBookingForWrite(id);
       const outcome = await settlement.executePayout(fresh, now);
@@ -468,13 +469,13 @@ export function makeAdminFinanceService(provider: PaymentProvider, settlement: D
       if (!bounds.allowed) throw new ValidationError(bounds.reason ?? "This deal cannot be refunded.");
       if (input.amountCents > bounds.maxRefundableCents) throw new ValidationError(`At most ${bounds.maxRefundableCents} cents can still be refunded on this deal.`);
       const now = clock();
-      await prisma.$transaction(async (tx) => {
+      await withWriteConflictRetry(() => prisma.$transaction(async (tx) => {
         await tx.booking.update({
           where: { id },
           data: { manualRefundProposedCents: input.amountCents, manualRefundProposedReason: input.reason, manualRefundProposedByAdminId: admin.id, manualRefundProposedAt: now },
         });
         await recordAdminAction(tx, audit(admin, "REFUND_MANUAL_PROPOSED", id, { amountCents: input.amountCents, reason: input.reason }));
-      });
+      }));
       return { ok: true, proposedAt: now.toISOString() };
     },
 
