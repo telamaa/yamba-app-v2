@@ -2765,3 +2765,61 @@ vérifie `/health`, pas l'envoi d'un email.
 
 Il fallait **provoquer une transition réelle et aller regarder la boîte aux lettres** — c'est
 exactement ce que la bascule Mailpit, décidée au tout début de la campagne, a rendu possible.
+
+# Recette API — la connexion trahissait l'existence d'un compte (ANO-API-18)
+
+Fiche API-SEC-14, **bloquante**. Les corps sont rigoureusement identiques — 401
+« Invalid email or password » dans les deux cas. Mais sur vingt mesures :
+
+| | Médiane | Min | Max |
+|---|---|---|---|
+| Compte existant | **168,6 ms** | 146,7 | 370,9 |
+| Compte inexistant | **20,4 ms** | 14,1 | 31,1 |
+
+Distributions **disjointes** : le minimum du cas « existe » dépasse de cinq fois le maximum du cas
+« n'existe pas ». Un seul appel suffit à savoir si une adresse a un compte Yamba.
+
+La cause est le cas d'école :
+
+```ts
+if (!user) return next(new AuthError("Invalid email or password"));   // avant
+const isMatch = await bcrypt.compare(String(password), user.passwordHash ?? "");
+```
+
+Un compte inexistant **sort avant le hachage** ; un compte existant le paie toujours. Tout le soin
+pris à rendre les corps identiques est annulé par un chronomètre.
+
+La même faille existait sur la **connexion administrateur**, où l'enjeu est plus grand encore :
+elle laissait deviner *qui* est administrateur.
+
+## La correction : payer le même prix dans les deux cas
+
+`apps/auth-service/src/utils/password-timing.ts` compare le mot de passe **dans tous les cas**,
+contre un hachage leurre de même coût (bcrypt, 10 tours) calculé au chargement du module — jamais
+écrit en dur, jamais dérivé d'un secret réel :
+
+```ts
+const hash = passwordHash && passwordHash.length > 0 ? passwordHash : DUMMY_HASH;
+const ok = await bcrypt.compare(password, hash);
+return Boolean(passwordHash) && ok;
+```
+
+**Contre-épreuve** : 179,0 ms contre 180,6 ms, distributions superposées. La connexion valide répond
+toujours 200.
+
+Le test (`password-timing.spec.ts`, 6 cas) mesure le rapport des durées entre les deux chemins et
+**refuse un facteur supérieur à 3** — assez large pour ignorer le bruit d'une machine de
+construction, assez strict pour rattraper un retour en arrière qui réintroduirait un ordre de
+grandeur d'écart.
+
+## Une leçon de méthode, notée parce qu'elle a failli coûter cher
+
+Le balayage du code de livraison (API-SEC-08) a dû être écrit **trois fois**. Les deux premières
+versions affichaient « code absent partout » — rassurant, et entièrement faux : l'une passait les
+cookies dans un argument mal formé (tout répondait 401), l'autre utilisait `head -n -1`, qui
+n'existe pas sur macOS (tous les corps étaient vides).
+
+Ce qui a sauvé la troisième, c'est le **témoin positif** : exiger que le code soit **présent** là où
+il est légitime. Un test de sécurité qui ne trouve rien doit être suspecté avant d'être cru.
+
+auth-service 209 → **215**.

@@ -59,6 +59,7 @@ import { AuthenticatedRequest } from "@packages/middleware/isAuthenticated";
 // ✨ NEW — Helper pour la génération du slug public à l'inscription
 import { generateUniquePublicSlug } from "../utils/slug.helper";
 import { ME_USER_SELECT } from "../utils/me-projection";
+import { comparePasswordConstantTime } from "../utils/password-timing";
 
 // ───────────────────────────────────────────────────────
 // Helpers
@@ -400,10 +401,11 @@ export const loginUser = async (req: Request, res: Response, next: NextFunction)
       where: { emailNormalized: emailKey },
     });
 
-    if (!user) return next(new AuthError("Invalid email or password"));
-
-    const isMatch = await bcrypt.compare(String(password), user.passwordHash ?? "");
-    if (!isMatch) return next(new AuthError("Invalid email or password"));
+    // ANO-API-18 — le refus coûte le même temps que le compte existe ou non : sans cela, une
+    // adresse connue payait le hachage (≈ 168 ms) et une inconnue non (≈ 20 ms), ce qui
+    // suffisait à énumérer les comptes en un appel malgré un corps identique.
+    const isMatch = await comparePasswordConstantTime(String(password), user?.passwordHash);
+    if (!user || !isMatch) return next(new AuthError("Invalid email or password"));
     // C-PR3 (D56 2A) — un compte suspendu ne se connecte pas ; le motif est dans l'email reçu.
     if ((user as { accountStatus?: string }).accountStatus === "SUSPENDED") return next(new AuthError("Account suspended"));
 

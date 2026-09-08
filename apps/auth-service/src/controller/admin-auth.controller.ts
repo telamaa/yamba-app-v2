@@ -18,7 +18,6 @@
  * transaction que l'écriture qui l'accompagne.
  */
 import type { NextFunction, Request, Response } from "express";
-import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import prisma from "@packages/libs/prisma";
 import { adminRolesOf } from "../utils/admin-roles";
@@ -58,6 +57,7 @@ import {
   setAdminPreauthCookie,
   setAdminSessionCookies,
 } from "../utils/cookies/adminCookies";
+import { comparePasswordConstantTime } from "../utils/password-timing";
 
 const TOTP_ISSUER = process.env.ADMIN_TOTP_ISSUER || "Yamba Admin";
 const ADMIN_UI_URL = (process.env.ADMIN_UI_URL || "http://localhost:3001").replace(/\/$/, "");
@@ -130,9 +130,13 @@ export const adminLogin = async (req: Request, res: Response, next: NextFunction
     if (!email || !password) return next(new ValidationError("Email and password are required!"));
     const user = await prisma.user.findUnique({ where: { emailNormalized: normalizeEmail(String(email)) } });
     // Même message pour « inconnu », « pas admin » et « mauvais mot de passe » : ne rien révéler.
-    if (!user || user.isDeleted || !user.roles.includes("ADMIN") || !user.adminRole) return next(new AuthError("Invalid email or password"));
+    // ANO-API-18 — même raison qu'à la connexion membre, et l'enjeu est ici plus grand : une
+    // porte d'administration ne doit pas laisser deviner QUI est administrateur. Le hachage
+    // est comparé dans tous les cas, y compris pour un compte absent ou sans profil admin.
+    const eligible = Boolean(user && !user.isDeleted && user.roles.includes("ADMIN") && user.adminRole);
+    const ok = await comparePasswordConstantTime(String(password), eligible ? user?.passwordHash : null);
+    if (!eligible || !user) return next(new AuthError("Invalid email or password"));
     if (!user.passwordHash) return next(new AuthError("Set your password with the invitation link first."));
-    const ok = await bcrypt.compare(String(password), user.passwordHash ?? "");
     if (!ok) return next(new AuthError("Invalid email or password"));
 
     const policy = loadAdminSessionPolicy();
