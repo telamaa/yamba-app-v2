@@ -1500,7 +1500,7 @@ idempotente (inscrite au journal de dette ci-dessous).
 
 | # | Constat | Fiche | Pourquoi ce n'est pas bloquant | Ce qu'il faudrait faire |
 |---|---|---|---|---|
-| D-1 | `x-locale` ne pilote pas le formatage des réponses rapides : c'est `preferredLocale` du membre qui gagne | API-GW-10, API-MSG-11 | comportement cohérent et défendable — c'est le **cahier** qui décrit autre chose | trancher : soit l'en-tête prime, soit le cahier est corrigé |
+| ~~D-1~~ | ~~`x-locale` ne pilote pas le formatage : c'est `preferredLocale` qui gagne~~ | API-GW-10, API-MSG-11 | — | **SOLDÉE le 09/09** : l'arbitrage était **déjà rendu au registre (D44)** — le cahier avait tort. La vraie dette était ailleurs : trois endpoints écrivaient la règle de trois façons. Une seule fonction (`resolveViewerLocale`), appliquée partout, + garde-fou |
 | D-2 | trip-service rend parfois **400** là où 403 ou 404 seraient exacts | API-TRIP-13 | écart de sémantique connu, sans fuite d'information | aligner sur la règle 403/404 du reste de la plateforme |
 | ~~D-3~~ | ~~supprimer un document de trajet n'est pas idempotent : le rejeu répond 400~~ (l'intitulé du journal parlait à tort d'un « lien de vérification » — c'est la suppression d'un document) | API-TRIP-18 | — | **SOLDÉE le 09/09** : 200 « déjà supprimé » au rejeu, base supprimée avant le fichier, garde-fou `idempotent-delete.spec.ts` |
 | ~~D-4~~ | ~~les refus de **trip-service** et **auth-service** ne portent pas tous un `details.code`~~ | observé au chapitre 9 | — | **SOLDÉE le 08/09 au soir** : 250 refus codés, garde-fou posé sur les deux services, et deux défauts de sémantique tombés avec (voir ci-dessous) |
@@ -1865,3 +1865,75 @@ trip-service 235 → **240**. Plateforme **946**.
 
 **Le journal de dette ne contient plus qu'une ligne : D-1**, l'arbitrage produit entre l'en-tête
 `x-locale` et le `preferredLocale` du membre — qui n'est pas un défaut, mais un choix à trancher.
+
+---
+
+# Solde de la dette D-1 — une seule règle pour la langue d'une réponse
+
+## L'arbitrage n'était pas à rendre : il était déjà au registre
+
+Le journal présentait D-1 comme un choix à trancher — « soit l'en-tête prime, soit le cahier est
+corrigé ». En allant lire, la décision **D44** dit exactement ceci :
+
+> ③ Flux **avec compte** : `preferredLocale`, initialisée à l'inscription depuis `x-locale` et
+> **mise à jour immédiatement quand un utilisateur connecté bascule la langue** […]
+> Une locale **par utilisateur (pas par appareil)**.
+
+Et la seconde moitié est bien implémentée : `HeaderLocaleSwitcher` appelle `PATCH /auth/me/locale`
+à chaque bascule. Le code et le registre étaient d'accord ; **c'est l'attendu du cahier de recette
+qui était faux**, et la règle de précédence du projet le dit — code + tests > registre > synthèses.
+
+Le cahier est corrigé (fiche API-GW-10 et les deux lignes de suivi).
+
+## La vraie dette était ailleurs, et le code la portait
+
+En vérifiant, trois endpoints résolvaient la langue de **trois façons différentes** :
+
+| Endpoint | Règle appliquée | Ce qui manquait |
+|---|---|---|
+| `GET /messages/quick-replies` | compte → appareil | rien (la règle juste) |
+| `GET /trips/favorites` | `?locale` → appareil | **le compte n'était jamais consulté** |
+| `GET /trips/search` | `?locale` seul, défaut `fr` | ni compte, ni appareil |
+
+Aucune n'était fausse isolément. Ensemble, elles n'étaient pas la même règle — et la recherche
+répondait **toujours en français** à qui ne passait pas `?locale=`. Le front s'en sortait parce
+qu'il passe le paramètre ; **tout autre client de l'API recevait du français**, quel que soit le
+lecteur.
+
+## La règle, écrite une fois
+
+`resolveViewerLocale` (dans `@packages/api-contracts`, là où vit déjà la liste des langues) :
+
+1. **`?locale=` explicite** — l'appelant a demandé cette langue pour cet appel. C'est ce qui rend
+   un lien partageable et une réponse d'API reproductible : une préférence stockée ne doit pas
+   changer le résultat d'une URL qu'on s'est envoyée.
+2. **`preferredLocale`** — D44, la langue du compte, pas de l'appareil.
+3. **`x-locale`** — l'appareil, pour un visiteur sans compte.
+4. **`Accept-Language`**, puis le défaut.
+
+Un détail qui compte : une valeur **non supportée** ne consomme pas son tour. `?locale=de` sur un
+membre anglophone rend de l'anglais, pas le français par défaut — sinon un paramètre erroné
+écraserait silencieusement la préférence du lecteur.
+
+## Garde-fous
+
+- `viewer-locale.spec.ts` (6 cas) — la règle elle-même, y compris le piège de la valeur inconnue ;
+- `one-locale-rule.spec.ts` (4 cas) — **aucun contrôleur ne lit `x-locale` sans passer par la
+  règle commune**. C'est ce test qui empêche l'apparition d'une quatrième variante.
+
+## Contre-épreuves sur le service
+
+| Appel | Résultat |
+|---|---|
+| réponses rapides, compte FR, appareil **EN** | « Je suis en route. » — le compte gagne |
+| après `PATCH /auth/me/locale` en `en`, appareil **FR** | « I'm on my way. » — la bascule est immédiate |
+| recherche, visiteur anonyme, appareil EN / FR | `September 11, 2026` / `11 septembre 2026` |
+| recherche, **membre EN**, appareil FR, sans paramètre | `September 11, 2026` — avant : toujours du français |
+| recherche, membre EN, `?locale=fr` | `11 septembre 2026` — la surcharge explicite gagne |
+
+trip-service 240 → **250**. Plateforme **956**.
+
+---
+
+**Le journal de dette est vide.** Les cinq lignes ouvertes à la fin de la campagne (D-1 à D-5) sont
+soldées, et les vingt-trois anomalies closes.

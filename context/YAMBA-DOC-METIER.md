@@ -2254,3 +2254,41 @@ opposées.
 | SUP5 | Le prestataire de fichiers est indisponible | Le document est retiré quand même |
 
 Joués le 9 septembre 2026 — voir `context/YAMBA-RECETTE-API-RESULTATS.md`, « Solde de la dette D-3 ».
+
+# Recette API — dans quelle langue Yamba nous parle (dette D-1)
+
+## Le besoin
+
+Un membre a choisi l'anglais. Il ouvre l'application depuis un téléphone réglé en français. Dans
+quelle langue Yamba lui répond ?
+
+La décision était prise depuis le 3 septembre — **la langue est celle du compte, pas de l'appareil**
+(registre, D44) : on choisit sa langue une fois, elle vaut partout, y compris dans les emails. Mais
+elle n'était appliquée qu'à un endroit sur trois. Les favoris suivaient l'appareil, et la
+**recherche répondait toujours en français** à qui ne demandait pas explicitement autre chose — ce
+que l'application fait, mais qu'un autre programme branché sur l'API ne faisait pas.
+
+## Les règles
+
+- **RG-LANG-01** — La langue d'une réponse est celle du **compte** du lecteur. On choisit sa langue
+  une fois ; elle vaut sur tous les écrans et dans tous les emails, quel que soit l'appareil.
+- **RG-LANG-02** — Un visiteur **sans compte** est servi dans la langue de son appareil.
+- **RG-LANG-03** — Un lien qui porte explicitement une langue (`?locale=`) l'emporte : une adresse
+  qu'on s'envoie doit afficher la même chose chez les deux personnes.
+- **RG-LANG-04** — Changer de langue dans l'application enregistre le choix **immédiatement** : il
+  n'y a pas d'écran de préférences à aller chercher.
+- **RG-LANG-05** — Une langue demandée que Yamba ne parle pas est **ignorée**, pas remplacée par le
+  français : on retombe sur la langue du lecteur, jamais sur le défaut.
+
+## Tests d'acceptation
+
+| Réf | Scénario | Attendu |
+|---|---|---|
+| LANG1 | Membre en anglais, téléphone en français | Réponses **en anglais** |
+| LANG2 | Le membre bascule en anglais dans l'application | La réponse suivante est déjà en anglais |
+| LANG3 | Visiteur sans compte, navigateur en anglais | Résultats de recherche **en anglais** |
+| LANG4 | Membre anglais, recherche **sans** préciser de langue | Dates en anglais (avant : toujours en français) |
+| LANG5 | Lien de recherche portant `locale=fr`, ouvert par un membre anglais | La page s'affiche **en français** |
+| LANG6 | Une langue inconnue est demandée | La langue du lecteur s'applique |
+
+Joués le 9 septembre 2026 — voir `context/YAMBA-RECETTE-API-RESULTATS.md`, « Solde de la dette D-1 ».

@@ -766,6 +766,14 @@ curl -s "$BASE/messages/quick-replies" -b shipper.txt -H 'x-locale: fr' | jq '.i
 **Attendu :** les dates formatées par le serveur diffèrent (`dim. 12 oct.` contre `Sun, Oct 12`) ;
 les réponses rapides portent **la même clé** dans les deux langues et **un texte différent**.
 
+**Précision (dette D-1, 09/09/2026)** — pour un membre CONNECTÉ, c'est la langue de son **compte**
+(`preferredLocale`) qui l'emporte sur l'en-tête : décision **D44**, « une locale par utilisateur,
+pas par appareil ». L'en-tête sert au visiteur sans compte, et le front tient la préférence à jour
+(`PATCH /auth/me/locale` à chaque bascule). L'ordre complet, désormais unique pour toute la
+plateforme (`resolveViewerLocale`) : **`?locale=` explicite > langue du compte > `x-locale` >
+`Accept-Language` > défaut**. Rejouer la commande avec `x-locale: en` sur un compte français rend
+donc du français : c'est le comportement voulu, pas un écart.
+
 ---
 
 **API-GW-11 — Une langue non supportée est refusée proprement**
@@ -4153,7 +4161,7 @@ volontairement**.
 | API-GW-07 | Lectures et exceptions en maintenance | majeure | 200 ×4 | 200/200/200, (d) 401 sans session admin — jamais 503 | OK | — |
 | API-GW-08 | Plafonds 100 / 1 000 | majeure | 100 · 1000 · 100 | 100 · 1000 · 100, puis 17×429 | OK | — |
 | API-GW-09 | Identifiant de corrélation | majeure | posé et renvoyé | UUID v4 généré, valeur fournie conservée | OK | — |
-| API-GW-10 | `x-locale` pilote le formatage | mineure | dates et textes différents | dates OK ; réponses rapides suivent `preferredLocale` | PARTIEL | écart de cahier |
+| API-GW-10 | `x-locale` pilote le formatage | mineure | dates et textes différents | dates OK ; les réponses rapides suivaient `preferredLocale`, ce qui est la règle **D44** (« une locale par utilisateur, pas par appareil ») — c'est l'attendu du cahier qui était faux. Règle unifiée depuis : `?locale` > compte > appareil | OK | attendu du cahier corrigé |
 | API-GW-11 | Langue non supportée | mineure | 400 `LOCALE_UNSUPPORTED` | 400 `LOCALE_UNSUPPORTED` | OK | — |
 | API-GW-12 | Locales exotiques tolérées | mineure | 200 ×5 | 200 ×5 | OK | — |
 | API-GW-13 | **`details.code` arrive au client** | **bloquante** | 409/403/400 avec code | 409/403/400, `details` dans les trois | OK | cible (c) à corriger |
@@ -4251,7 +4259,7 @@ volontairement**.
 | API-MSG-08 | Accepter celle de l'autre | majeure | 400 / 200 / 400 | sa propre proposition refusée (OWN_PROPOSAL), l'autre l'accepte → `ACCEPTED` | OK | code dans le message |
 | API-MSG-09 | Numéro pas avant l'heure | **bloquante** | 400 `TOO_EARLY` | 400 `TOO_EARLY` avec l'heure exacte d'ouverture (17 h − 2 h) | OK | — |
 | API-MSG-10 | Signaler un message | majeure | 400/400/201/409 | 409 doublon · 400 son propre message · motif en liste fermée | OK | — |
-| API-MSG-11 | Réponses rapides | mineure | 200, clés stables | couvert par API-GW-10 : clé stable, texte selon la langue du LECTEUR | OK | — |
+| API-MSG-11 | Réponses rapides | mineure | 200, clés stables | clés stables, texte traduit ; la langue est celle du COMPTE (D44), pas de l'en-tête — conforme au registre | OK | — |
 | API-MSG-12 | Lecture admin journalisée | majeure | 200 + ligne de journal | session admin ouverte pour la campagne (SUPPORT + TOTP) : 200, 3 messages / 1 rendez-vous, **aucune trace du code de livraison** ; journal `CONVERSATION_VIEWED` avec l'admin, la conversation, l'IP et l'agent — la connexion admin elle-même est journalisée | OK | — |
 | API-NOTIF-01 | Lire ses notifications | mineure | 200, ≤ 50 | 200, 8 notifications, `unreadCount` juste, types cohérents | OK | — |
 | API-NOTIF-02 | Marquer lu, idempotent | mineure | 200 ×4 | idempotent : `updatedCount` 7 puis 0, `unreadCount` final 0 | OK | — |
