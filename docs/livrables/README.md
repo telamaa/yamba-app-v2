@@ -14,6 +14,7 @@ Documents de transmission, chacun en Markdown (source) et en PDF (généré). Le
 | 8 | Dossier de présentation aux assureurs et courtiers | courtiers, assureurs affinitaires | `08-YAMBA-DOSSIER-ASSURANCE.md` | `.pdf` |
 | 9 | Dossier de présentation aux juristes | avocats, délégué à la protection des données | `09-YAMBA-DOSSIER-JURIDIQUE.md` | `.pdf` |
 | 10 | Dossier de demande d'aides publiques | guichets d'aide, réseaux d'accompagnement | `10-YAMBA-DOSSIER-AIDES-PUBLIQUES.md` | `.pdf` |
+| 11 | Dossier identité, vérification et parcours d'inscription du Voyageur | produit, développeurs, assureurs (08), juristes et DPO (09) | `11-YAMBA-DOSSIER-IDENTITE-VERIFICATION.md` | `.pdf` |
 
 ## Régénérer
 
