@@ -406,7 +406,24 @@ Ordre de demarrage : auth -> trip -> gateway.
   (GET /admin/status, sondage 30 s, editeur de maintenance). Gateway aligne (alias @packages,
   tsconfig). Chantier C : SOLDE (C-PR1 → C-PR8c). Candidat registre : moniteur externe de
   disponibilite avant le lancement. MERGE 05/09 : **#182** (17 checks comptes).
-- Plateforme de tests : 860 (trip 209, deal 516, notification 99, message 36) + auth 183 (07/09, post-#227).
+- Plateforme de tests : **937** (trip 231, deal 560, notification 107, message 39) + auth 215
+  (08/09, post-#248 — campagne de recette API).
+- 08/09 : **CAMPAGNE DE RECETTE API (cahier n° 3) — TERMINEE ET ACCEPTEE**. 146 fiches, 145
+  jouees, 1 en ⏭ justifie (CLI Stripe absente du poste, objet atteint par des evenements
+  signes a la main). **54 fiches bloquantes, toutes jouees et fermees.** 22 anomalies
+  trouvees, **22 closes** — aucune acceptee avec contournement. Les onze bloquantes :
+  curseur en 500 (ANO-01), 404/400 discriminables au temps (02), secret TOTP servi par
+  /auth/me (06), « mot de passe oublie » qui trahit l'existence d'un compte (08), export
+  RGPD en 500 (09), plafonds non confrontes a la valeur declaree (12), page de suivi du
+  destinataire en 500 (13), destinataire trop expose (15), boite de notifications illisible
+  (16), **connexion enumerable par le temps, membre ET admin** (18), course aux derniers
+  kilos rendue en 500 (19). Deux garde-fous systemiques en sont sortis : des tests qui
+  **lisent les sources** et les confrontent a prisma/schema.prisma (7 aujourd'hui), et la
+  regle « tout refus metier porte un details.code » tenue par un test sur deal-service et
+  message-service. Deux reserves ecrites avant production : rejouer les fiches Stripe avec
+  la CLI (API-HOOK-01), passer trip-service et auth-service au meme garde-fou (dette D-4).
+  Rapport complet : `context/YAMBA-RECETTE-API-RESULTATS.md`. MERGES 08/09 : **#232 → #248**
+  (17 checks comptes a chaque fois).
 - 04/09 : C-PR6b feat/c6b-admin-alerts (D59 3A / 4A, A129–A131) — neuf regles de seuil
   (evaluateAlerts pur, instantane de dix compteurs), GET /admin/alerts sans etat (accueil
   admin), cron horaire avec dedoublonnage Redis SET NX (un email par regle et par jour, Redis
