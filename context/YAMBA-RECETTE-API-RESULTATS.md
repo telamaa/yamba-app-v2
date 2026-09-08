@@ -150,6 +150,17 @@ Impact         : le front ne peut pas afficher les erreurs sous chaque champ à 
 Piste          : apps/auth-service/src/utils/auth.helper.ts:163-181 (validation séquentielle
                  legacy). Le contrat Zod existe déjà mais ne garde pas encore ces contrôleurs
                  (dette connue, member-auth.schema.ts).
+CORRECTION       : 08/09/2026 — la règle sort du contrôleur : apps/auth-service/src/utils/
+                   registration-rules.ts (`collectRegistrationErrors`), pure, sans Redis ni
+                   Prisma, testable telle quelle comme password-rules et otp-policy à côté.
+                   TOUS les champs sont examinés ; l'erreur porte `details.errors`
+                   { champ → code } (REQUIRED, INVALID_FORMAT, TERMS_NOT_ACCEPTED). Le mot de
+                   passe garde ses règles propres : quand il est le SEUL fautif, son erreur
+                   typée (`details.type: "password"` + code) est relayée telle quelle.
+CONTRE-ÉPREUVE   : email invalide + mot de passe court → 400
+                   {"errors":{"email":"INVALID_FORMAT","password":"PASSWORD_TOO_SHORT"}}
+                   mot de passe seul fautif → 400 {"type":"password","code":"PASSWORD_TOO_SHORT"}
+ÉTAT             : CLOSE
 ```
 
 ```
@@ -199,23 +210,29 @@ L'historique est conservé : un KO reste écrit KO, sa correction s'ajoute en de
 |---|---|---|---|---|---|
 | ANO-API-01 | API-GW-15 / 20 | bloquante (critère cahier) | 08/09/2026 | **close** | validation du curseur + test — même campagne |
 | ANO-API-02 | API-GW-18 | bloquante (critère cahier) | 08/09/2026 | **close** | visibilité dans le `where`, deux services + tests |
-| ANO-API-03 | API-GW-14 | mineure | 08/09/2026 | ouverte | à grouper avec le domaine auth (chapitre 5.1) |
+| ANO-API-03 | API-GW-14 | mineure | 08/09/2026 | **close** | règle pure `collectRegistrationErrors` + tests |
 | ANO-API-04 | API-GW-19 | mineure | 08/09/2026 | ouverte | à grouper avec le domaine deal (chapitre 5.3) |
-| ANO-API-05 | API-AUTH-03 / 05 | majeure | 08/09/2026 | ouverte | statuts HTTP contre OpenAPI — à grouper (chapitre 5.1) |
+| ANO-API-05 | API-AUTH-03 / 05 | majeure | 08/09/2026 | **close** | 409 / 401 / 429, classes d'erreur enrichies |
 | ANO-API-06 | API-AUTH-09 | **bloquante** | 08/09/2026 | **close** | liste blanche + test lisant le schéma Prisma |
-| ANO-API-07 | API-AUTH-11 | majeure | 08/09/2026 | ouverte | révocation non immédiate — à grouper (chapitre 5.1) |
+| ANO-API-07 | API-AUTH-11 / 12 / 13 | majeure | 08/09/2026 | **close** | `jti` dans le jeton d'accès — registre **D75 candidate** |
+| ANO-API-08 | API-AUTH-14 | **bloquante** | 08/09/2026 | **close** | envoi détaché de la réponse (forgot ET resend) |
+| ANO-API-09 | API-AUTH-22 / 24 / 25 | **bloquante** | 08/09/2026 | **close** | champ corrigé + test lisant le schéma ; API-AUTH-24 enfin jouée (OK) |
 
-Les deux mineures restent ouvertes **volontairement** : le cahier demande des PR groupées par
-domaine, et les chapitres 5.1 (auth) et 5.3 (deal) sont susceptibles d'en révéler d'autres au même
-endroit. Aucune anomalie bloquante n'est ouverte à ce stade — critère de sortie n° 1 du §9.3 tenu
-pour le chapitre 4.
+**Huit anomalies sur neuf sont closes.** Seule `ANO-API-04` (mineure, `details.reason` absent du
+409 de transition) reste ouverte : elle appartient au domaine **deal**, et sera groupée avec le
+chapitre 5.3 comme le demande le cahier. État du critère de sortie n° 1 du §9.3 (« zéro anomalie bloquante ouverte ») : tenu pour le
+chapitre 4 ; **trois bloquantes ouvertes** au
+chapitre 5.1 — `ANO-API-08`, `ANO-API-09`, et la bloquante `API-AUTH-24` reste **sans verdict** tant
+que l'export ne fonctionne pas.
 
 **Référence de tests après corrections** : trip-service 209 → **221**, auth-service 183 → **192**
 (plateforme 860 → **877**), `CLAUDE.md` mis à jour.
 
-## Chapitre 5.1 — auth-service (en cours)
+## Chapitre 5.1 — auth-service (terminé)
 
-**11 fiches jouées sur ~35.** 7 OK, 4 KO — dont **une bloquante**.
+**34 fiches : 32 jouées, 2 ⏭.** 24 OK, 8 KO — dont **trois bloquantes** (une close, deux ouvertes).
+Les deux ⏭ (API-AUTH-24 et 25) ne sont pas un choix : elles portent sur le contenu de l'export,
+et l'export lui-même échoue (`ANO-API-09`).
 
 | Fiche | Intitulé | Gravité | Verdict | Pourquoi | Recommandation |
 |---|---|---|---|---|---|
@@ -230,6 +247,29 @@ pour le chapitre 4.
 | API-AUTH-09 | `/auth/me` sans secret | **bloquante** | **KO le 08/09** → corrigé le 08/09 | `passwordHash` est bien retiré, mais quatre champs TOTP sortent : `totpSecretEncrypted`, `totpBackupCodeHashes`, `totpEnabledAt`, `totpLastUsedStep` — plus les champs de modération `suspensionProposed*`. | Voir `ANO-API-06`. |
 | API-AUTH-10 | Rotation de session | majeure | **OK** | `POST /auth/refresh` → 200 `{success:true}` sans jeton dans le corps ; le pot mis à jour ouvre `/auth/me` (200) ; **l'ancien pot répond 401** (« Session expired or invalid »). Un jeton de rafraîchissement ne sert bien qu'une fois. | — |
 | API-AUTH-11 | Mes appareils | majeure | **KO** | La liste est juste (deux sessions, une seule `current:true`, `device` / `ip` / dates) et la révocation répond 200 `{ok:true}` — mais la session révoquée **continue d'ouvrir `/auth/me` (200)**. Seul `/auth/refresh` est coupé (401). | Voir `ANO-API-07`. Écart de cahier au passage : la réponse s'appelle `items[]`, pas `sessions[]`. |
+| API-AUTH-12 | Mot de passe révoque les sessions | majeure | **KO** | La chaîne complète marche : `sudo/request` → code lu dans Mailpit → `sudo/verify` (200, `active:true`) → changement accepté ; l'ancien mot de passe répond 401, le nouveau 200. Mais **les autres sessions gardent l'accès** : `/auth/me` répond encore 200 sur l'autre appareil, seul `/auth/refresh` est coupé. | Voir `ANO-API-07` — c'est la troisième surface touchée. Écart de cahier : `sudo/verify` attend le champ **`code`**, pas `otp`. |
+| API-AUTH-13 | Déconnexion | majeure | **KO** | 200 puis 401, et le pot ne porte plus de cookie — mais avec **une copie du pot prise avant** le logout, `/auth/me` répond toujours **200**. Seul le rafraîchissement est révoqué : la déconnexion est côté client, pas côté serveur. | Voir `ANO-API-07`. |
+| API-AUTH-14 | Mot de passe oublié muet | **bloquante** | **KO** | Corps et statut rigoureusement identiques pour un compte existant et un compte inconnu ✅ — mais le **temps** trahit : **95,7 ms contre 18,8 ms** (15 mesures, min 87,0 > max 23,6). | Voir `ANO-API-08`. |
+| API-AUTH-15 | Profil éditable, slug stable | mineure | **OK** | 200 sur les champs du membre, `publicSlug` **identique avant et après**. | La fiche envoie `displayName` et `bio` sur une **Expéditrice** : ces champs appartiennent à la page Voyageur, d'où un 400 `NO_CARRIER_PAGE` champ par champ — refus correct. Rejoué sur un Voyageur : 200. Cible à corriger dans le cahier. |
+| API-AUTH-16 | Date de naissance invalide | mineure | **OK** | 400 avec `errors: {"birthDate":"IN_THE_FUTURE"}` puis `"TOO_YOUNG"`. **Les erreurs sont ici champ par champ** — ce qui confirme que `ANO-API-03` est propre à `/auth/register` et à sa validation historique, pas au service entier. | — |
+| API-AUTH-17 | Avatar signé, URL gardée | majeure | **OK** | `/uploads/imagekit-auth` : 200 avec `token` (36), `signature` (40), `expire`, plus `publicKey` et `urlEndpoint` — l'environnement ImageKit est bien configuré. **La garde tient** : une URL étrangère est refusée en 400 (« must belong to Yamba's media endpoint »). | Étapes 2 et 3 (téléversement réel) **⏭** : elles écrivent un fichier chez un prestataire tiers, ce qui n'a pas sa place dans une campagne API. À couvrir au cahier Web. |
+| API-AUTH-18 | Profil public / masqué | **bloquante** | **OK** | **Jamais 401** : sans session, avec un tiers, avec un jeton forgé, sur `/reviews` et `/trips` → 200 partout quand le profil est public. Masqué : un tiers reçoit **404**, le propriétaire **200 avec `hidden:true`**. La seule asymétrie autorisée est bien la seule présente — et elle valide au passage le correctif `ANO-API-02` en conditions réelles. | — |
+| API-AUTH-19 | Abonnements | mineure | **OK** | Abonnement 200, **rejeu sans doublon** (la liste ne porte qu'une entrée), désabonnement 200 et liste vide ensuite, refus 400 sur soi-même. | — |
+| API-AUTH-20 | Préférences et consentement | mineure | **OK** | 200 sur `analyticsOptIn` et `messagingReminderEmails`. Effet de bord vérifié **en base** : une ligne `ConsentLog` `COOKIES` version `cookies-2026-09` est écrite — le consentement est tracé, pas seulement stocké. | — |
+| API-AUTH-21 | Geste sensible sans fenêtre | **bloquante** | **OK** | `/auth/me/sudo` → `{active:false, expiresAt:null}` ; export, effacement et lien Stripe → **403 `SUDO_REQUIRED`** avec `windowMinutes:15`. | — |
+| API-AUTH-22 | Ouvrir la fenêtre puis exporter | **bloquante** | **KO** | La fenêtre s'ouvre parfaitement (code lu dans Mailpit, `verify` 200, `active:true` avec `expiresAt` à +15 min) — puis **l'export répond 500**. | Voir `ANO-API-09`. |
+| API-AUTH-23 | La fenêtre est liée à UNE session | **bloquante** | **OK** | La session d'origine a `active:true` ; l'autre appareil du **même membre** voit `active:false` et reçoit 403 `SUDO_REQUIRED` sur l'export. Un appareil compromis n'hérite de rien. | — |
+| API-AUTH-24 | Export sans données d'autrui | **bloquante** | **⏭** | Non jouable : l'export échoue (`ANO-API-09`). **À rejouer en priorité après correction** — c'est une bloquante qui n'a pas encore de verdict. | — |
+| API-AUTH-25 | Export trop fréquent | mineure | **⏭** | Idem. | — |
+| API-AUTH-26 | Bloqueurs d'effacement | majeure | **OK** | 200, `blockers: [ACTIVE_DEAL, PENDING_REQUEST, RETENTION_HELD, ADMIN_ACCOUNT]` et `counts` détaillés ; la liste fermée est respectée. | — |
+| API-AUTH-27 | Effacement bloqué | majeure | **OK** | 409, `code:"ERASURE_BLOCKED"` **à la racine** comme documenté, avec `blockers` et `counts`. | — |
+| API-AUTH-28 | Effacement effectif | **bloquante** | **OK** | 200 `{success:true, erased:true}` puis **401 `ACCOUNT_DELETED`** : la session tombe immédiatement. En base : `email` et `emailNormalized` → `erased+<id>@anonymised.invalid`, `publicSlug` → `deleted-<id>`, `firstName`/`lastName` → « Membre »/« supprimé », `isDeleted:true`, `deletedAt` posé, ligne `DataRequest` `ERASURE`/`DONE`. **Aucun champ unique à `null`** (`phoneE164` l'est, mais il n'est qu'indexé — vérifié au schéma). | — |
+| API-AUTH-29 | Alertes de route | mineure | **OK** | 201 avec `isActive:true` et `expiresAt` **à six mois** jour pour jour ; lecture 200 ; suppression 200. | — |
+| API-AUTH-30 | Gardes des alertes | majeure | **OK** | Origine = destination → 400. Plafond : **20 créations acceptées, la 21e refusée** en 400 avec un message explicite. Nettoyage vérifié (0 restante). | — |
+| API-AUTH-31 | Signaler un trajet | majeure | **OK** | 201 avec `reportId` et `createdAt`. | — |
+| API-AUTH-32 | Gardes du signalement | majeure | **OK** | Les quatre gardes tiennent : 400 `OWN_TARGET`, 400 `REASON_NOT_ALLOWED` (motif d'une autre cible), **404** pour un slug inexistant, **409** sur le doublon du même auteur. | — |
+| API-AUTH-33 | Onboarding Voyageur | majeure | **OK** | (1) 200, `onboardingStep` passe à `STRIPE` ; (2) 200 avec une `url` Stripe ; (3) 200 `status:"pending"` et les trois drapeaux à `false` ; (4) 200. | Deux précisions pour le cahier : le rôle `CARRIER` n'apparaît dans `roles` **qu'après renouvellement de la session** (les rôles vivent dans le jeton) ; et l'étape (4) réussit malgré un Stripe incomplet — ce n'est pas un défaut, la garde D31 est **en aval** (`deal-lifecycle.service.ts:151` refuse l'acceptation d'un deal sans `stripeOnboardingComplete` ni `stripeChargesEnabled`). |
+| API-AUTH-34 | Tableau de bord sans compte Connect | mineure | **OK** | 403 `SUDO_REQUIRED` sans fenêtre, puis **409 `STRIPE_ACCOUNT_MISSING`** une fois la fenêtre ouverte : l'ordre des gardes est le bon. | — |
 
 ### Anomalies du chapitre 5.1
 
@@ -255,7 +295,16 @@ Piste          : les contrôleurs d'inscription lèvent tous une ValidationError
                  Il existe déjà des erreurs typées côté @packages/error-handler ; le code de
                  refus (`EMAIL_ALREADY_USED`, `OTP_INCORRECT`, `OTP_LOCKED`) est présent et
                  juste — seul le statut porté par l'erreur est à corriger.
-ÉTAT           : ouverte
+CORRECTION       : 08/09/2026 — les trois classes de @packages/error-handler acceptent
+                   désormais un `details` (AuthError, RateLimitError, ConflictError) : sans
+                   lui, il fallait passer par ValidationError, donc répondre 400, pour ne pas
+                   perdre le code métier. Puis EMAIL_ALREADY_USED → ConflictError (409, trois
+                   sites) ; OTP_INCORRECT → AuthError (401) ; OTP_INVALIDATED et OTP_LOCKED →
+                   RateLimitError (429), les deux portant un verrou.
+CONTRE-ÉPREUVE   : email déjà pris → 409 `EMAIL_ALREADY_USED` ; essais OTP → 401, 401, 401,
+                   401 (compteur 4→1), puis 429 OTP_INVALIDATED, puis 429 OTP_LOCKED.
+                   Codes, compteurs et verrous inchangés.
+ÉTAT             : CLOSE
 ```
 
 ```
@@ -336,10 +385,201 @@ Piste          : packages/middleware/isAuthenticated.ts vérifie la signature du
                  déjà dans le jeton (la liste des sessions l'affiche) et Redis est déjà là :
                  un test d'existence par requête authentifiée, avec un TTL calé sur la durée
                  de vie du jeton d'accès, suffit. À défaut, raccourcir le jeton d'accès.
-ÉTAT           : ouverte
+ÉTENDUE        : trois surfaces mesurées, toutes avec le même symptôme (accès conservé,
+                 rafraîchissement coupé) —
+                 · API-AUTH-11 « couper cet appareil »
+                 · API-AUTH-13 « se déconnecter » (avec une copie du pot prise avant)
+                 · API-AUTH-12 « changer de mot de passe », qui doit couper les autres sessions
+                 La gravité tient à ce troisième cas : on change son mot de passe précisément
+                 quand on se croit compromis, et l'intrus garde la lecture un quart d'heure.
+CORRECTION       : 08/09/2026 — décision d'architecture proposée au registre en **D75
+                   (candidate)**, comme l'exige la règle du projet. Le jeton d'accès porte
+                   désormais le `jti` de sa session (émission ET rotation), et
+                   `isAuthenticated` vérifie que `refresh_jti:<userId>:<jti>` existe encore —
+                   la clé que auth-service posait déjà. La décision est isolée dans
+                   packages/middleware/session-revocation.ts : pas de `jti` (jeton émis avant
+                   le déploiement) → accepté jusqu'à expiration ; Redis muet → laissé passer
+                   (une panne de cache ne déconnecte pas la plateforme, et le compte suspendu
+                   ou effacé reste refusé par la lecture Mongo).
+CONTRE-ÉPREUVE   : les trois surfaces, la session courante restant vivante à chaque fois —
+                   · couper un appareil      → l'autre session  : 401 SESSION_REVOKED
+                   · se déconnecter          → le pot d'AVANT   : 401 SESSION_REVOKED
+                   · changer de mot de passe → l'autre appareil : 401 SESSION_REVOKED
+ÉTAT             : CLOSE
+```
+
+```
+ANO-API-08
+Fiche          : API-AUTH-14
+Gravité        : BLOQUANTE (« toute différence est bloquante », §5.1.3)
+Appel exact    : for i in $(seq 1 15); do curl -s -o /dev/null -w '%{time_total}\n' \
+                   -X POST "$BASE/auth/password/forgot" -H 'Content-Type: application/json' \
+                   -d '{"email":"<adresse>"}'; done | sort -n
+Attendu        : aucune différence observable entre un compte existant et un compte inconnu
+Obtenu         : statut 200 et corps identiques ✅ (« If an account exists, an OTP has been
+                 sent to the email. ») — mais, sur 15 mesures :
+                 · compte existant   médiane 95,7 ms (min 87,0 / max 113,6)
+                 · compte inexistant médiane 18,8 ms (min 12,1 /  max 23,6)
+                 Distributions DISJOINTES : un seul appel suffit à trancher.
+Reproductible  : oui (15/15)
+Impact         : énumération de comptes. Savoir qu'une adresse a un compte Yamba est une
+                 donnée personnelle en soi, et c'est le point de départ classique du bourrage
+                 d'identifiants. Le soin pris à rendre le corps identique est annulé par la
+                 mesure du temps — c'est le même motif qu'ANO-API-02, sur une autre surface.
+Piste          : l'envoi de l'email est fait DANS la requête (SMTP synchrone) : le compte
+                 existant paie l'aller-retour au serveur d'envoi, l'inconnu ne paie rien.
+                 Correctif : répondre d'abord, envoyer ensuite (l'envoi ne conditionne pas la
+                 réponse, qui est volontairement muette) — ou aligner les deux chemins.
+                 Le même raisonnement vaut pour `/auth/register/resend` et pour tout point
+                 d'entrée public qui envoie un email selon l'existence d'un compte.
+CORRECTION       : 08/09/2026 — compteurs anti-abus ET envoi partent en arrière-plan dans
+                   `envoyerSansRienReveler` : la réponse ne dépend plus de rien de ce qui
+                   suit, ni par son corps, ni par son statut, ni par son temps. Appliqué à
+                   /auth/password/forgot ET /auth/password/resend, qui portait la même fuite.
+                   Effet voulu : un compte existant en cooldown recevait une erreur là où un
+                   compte inconnu recevait 200 — cette seconde fuite, non temporelle, se
+                   referme aussi (le cooldown est désormais journalisé).
+CONTRE-ÉPREUVE   : 15 mesures — existant 21,6 ms (13,9 / 41,3), inexistant 19,3 ms
+                   (12,9 / 24,8) : plages largement superposées. Corps identiques, et les
+                   emails arrivent toujours dans Mailpit.
+ÉTAT             : CLOSE
+```
+
+```
+ANO-API-09
+Fiche          : API-AUTH-22 (bloque aussi API-AUTH-24 et 25)
+Gravité        : BLOQUANTE
+Appel exact    : curl -s -X POST "$BASE/auth/me/data-export" -b shipper.txt   (fenêtre sudo ouverte)
+Attendu        : 200, l'export des données du membre, en-tête Content-Disposition,
+                 et une ligne DataRequest de type EXPORT
+Obtenu         : **500** {"status":"error","error":"Something went wrong, please try again!"}
+                 Journal auth-service : PrismaClientValidationError sur db.booking.findMany()
+                 dans buildDataExport — « Unknown field `ticketNumber` for select statement
+                 on model `Booking` ».
+Reproductible  : oui, systématique — la fonction ne peut PAS marcher
+Cause          : apps/auth-service/src/services/privacy.service.ts:155 sélectionne
+                 `ticketNumber` sur `Booking`. Vérifié au schéma : **`Booking` n'a pas ce
+                 champ** (il porte `disputeTicket`, « copie du Dispute.ticketNumber ») ;
+                 `ticketNumber` appartient au modèle `Dispute`. La ligne 180 lit ensuite
+                 `b.ticketNumber`.
+Impact         : le droit d'accès du RGPD (D63) est **entièrement inopérant** : aucun membre
+                 ne peut obtenir ses données. C'est une obligation légale, et le geste est
+                 mis en avant dans l'interface. S'y ajoute un 500 de forme n° 2, que le §4.6
+                 qualifie de bloquant à lui seul.
+Pourquoi les tests ne l'ont pas vu : privacy.service.spec.ts existe et passe — il injecte un
+                 faux Prisma, qui ne valide aucun nom de champ. C'est le piège déjà consigné
+                 au chapitre 100 de l'apprentissage (« ces objets ne signalent jamais ce qui
+                 leur manque »), rencontré ici dans l'autre sens : le mock accepte un champ
+                 qui n'existe pas.
+Piste          : corriger le select (`disputeTicket`) et la projection, puis se donner un
+                 garde-fou qui ne dépende pas du mock — par exemple un test qui confronte les
+                 champs demandés au modèle de prisma/schema.prisma, comme le fait déjà
+                 me-projection.spec.ts depuis ANO-API-06.
+CORRECTION       : 08/09/2026 — `ticketNumber` → `disputeTicket` dans le select et dans la
+                   projection (privacy.service.ts:155 et 180).
+TEST             : apps/auth-service/src/services/privacy-export-fields.spec.ts — il ne mocke
+                   rien : il LIT le source de l'export, en extrait chaque `db.<modèle>… select`
+                   et confronte les champs à prisma/schema.prisma. Vérifié qu'il échoue bien
+                   quand on réintroduit le bug (« Booking.ticketNumber »).
+CONTRE-ÉPREUVE   : export → 200, 14 269 octets, en-tête `content-disposition: attachment;
+                   filename="yamba-mes-donnees-2026-09-08.json"`, 20 rubriques.
+                   **API-AUTH-24, la fiche bloquante restée sans verdict, est enfin jouable et
+                   PASSE** : code de livraison absent, VOYAGEUR (l'autre partie) totalement
+                   absent — ni nom, ni email, ni téléphone —, signalements visant le membre et
+                   dossiers de médiation absents. Les destinataires présents sont ceux que le
+                   membre a saisis lui-même.
+ÉTAT             : CLOSE
 ```
 
 ### Écarts du cahier (chapitre 5.1)
 
 4. **API-AUTH-11** annonce une réponse `{ "sessions": [...] }` ; l'API renvoie `{ "items": [...] }`.
+6. **API-AUTH-12** : `sudo/verify` attend le champ **`code`**, le cahier écrit `otp`.
+7. **API-AUTH-15** applique `displayName` et `bio` à une **Expéditrice** : ces champs sont ceux de la page Voyageur (refus correct `NO_CARRIER_PAGE`).
+8. **API-AUTH-33** : le rôle `CARRIER` n'apparaît qu'après **renouvellement de la session**.
+9. **API-AUTH-11** annonce `sessions[]`, l'API renvoie `items[]`.
 5. **API-AUTH-01** cite un corps `"OTP sent to your email…"` ; le service dit « OTP sent to email. Please verify your account. » (sans portée : on ne juge jamais sur le message).
+
+## Challenge expert — auth-service (au-delà des anomalies de recette)
+
+La recette juge des fiches ; ce qui suit est un regard d'ingénierie sur le service tel qu'il est
+apparu pendant la campagne. **Rien n'est corrigé ici** : ce sont des propositions, classées par
+rapport valeur / risque, à arbitrer.
+
+### 1. `isAuthenticated` charge tout le document membre, à chaque requête, sur les six services
+
+```ts
+const user = await prisma.user.findUnique({ where: { id: decoded.id } });   // 60 champs
+```
+
+Le middleware n'utilise que `isDeleted`, `accountStatus` et `roles`. Il rapatrie pourtant les
+**soixante** champs du modèle depuis Atlas (distant), à **chaque requête authentifiée de chaque
+service** — `passwordHash` et `totpSecretEncrypted` compris, qui transitent donc en mémoire dans
+trip-service, deal-service, message-service et notification-service sans qu'aucun n'en ait l'usage.
+C'est la même racine que `ANO-API-06` : charger tout par défaut.
+
+**Proposition** — un `select` explicite. Attention, ce n'est pas une correction de trois lignes :
+`req.user` est exposé aux contrôleurs, qui lisent aussi `email` (11 usages), `preferredLocale` (7),
+`firstName` (6), `emailNormalized` (4), `lastName` (2), `analyticsOptIn` (1) et — le point dur —
+**`passwordHash` (3 usages)**. La bonne cible est un `select` d'une dizaine de champs, les trois
+appelants de `passwordHash` relisant l'utilisateur eux-mêmes. Gain : moins de trafic sur le chemin
+le plus chaud de la plateforme, et plus aucun secret hors d'auth-service. **PR dédiée**, avec la
+liste des usages en preuve.
+
+### 2. Aucune protection anti-force brute par compte sur `/auth/login`
+
+L'OTP a des paliers de verrou soignés (1 min → 30 min → 24 h) et une alerte de sécurité par email.
+La **connexion par mot de passe**, elle, n'a rien : seul le limiteur de la passerelle protège, à
+100 requêtes / 15 min **par IP**. Un attaquant qui vise un compte précis depuis quelques adresses
+dispose donc de plusieurs centaines d'essais par heure, et le titulaire n'est jamais prévenu.
+
+**Proposition** — réutiliser la mécanique OTP, qui existe déjà : compteur par
+`emailNormalized`, paliers, et email d'alerte au titulaire au deuxième palier. Le refus doit rester
+**indistinguable** (`ANO-API-08` vient de rappeler que la fuite passe aussi par le temps) : même
+corps, même statut, verrou silencieux.
+
+### 3. La journalisation d'auth-service est en retard sur le reste de la plateforme
+
+deal-service et message-service émettent du **pino** structuré (`{"level":30,"name":"deal-service"}`).
+auth-service n'utilise pino nulle part : `user-public.controller.ts` compte **25 `console.log`** de
+débogage, avec emojis et données personnelles :
+
+```
+[getUserPublic] 👀 slug=seed-aminata currentUserId=6a5c1d3b8faeca66b436c0eb
+[followUser] 🎬 START - slug=… userId=…
+```
+
+Ces lignes partent en clair dans les journaux de production, sans niveau, sans corrélation, et
+portent des identifiants de membres. **Proposition** : adopter pino comme les autres services, et
+supprimer les traces de débogage (ou les passer en `debug`, désactivé par défaut).
+
+### 4. Deux fichiers de 900 lignes portent l'essentiel du service
+
+`auth.controller.ts` (900 lignes) et `user-public.controller.ts` (895) mélangent HTTP, règles
+métier et accès aux données. La campagne l'a montré à ses dépens : la fuite d'`ANO-API-06` était
+une ligne perdue au milieu de 900, et aucun contrôleur du service n'a de test — **il n'existe pas
+un seul `*.spec.ts` de contrôleur dans auth-service**. Toute la logique HTTP n'est vérifiée que par
+la recette manuelle.
+
+**Proposition** — poursuivre le mouvement amorcé dans cette PR : sortir les règles en modules purs
+(`registration-rules`, `me-projection`, `session-revocation` viennent de l'être) et les tester
+unitairement. C'est ce découpage qui a permis d'écrire quatre tests là où il n'y en avait aucun.
+
+### 5. Les rôles vivent dans le jeton, donc ils ont jusqu'à 15 minutes de retard
+
+Constaté en jouant API-AUTH-33 : après l'octroi du rôle `CARRIER`, `roles` reste `["SHIPPER"]`
+jusqu'à la reconnexion. Symétriquement, un rôle **retiré** (ou un profil admin révoqué) reste actif
+jusqu'à l'expiration du jeton. Or, depuis `ANO-API-07`, le middleware lit déjà l'utilisateur en base
+à chaque requête — `user.roles` est là, à jour, gratuitement.
+
+**Proposition** — faire autorité sur les rôles lus en base plutôt que sur ceux du jeton (le jeton
+les garde en repli). Coût nul, cohérence immédiate, et une révocation de privilège devient aussi
+rapide qu'une révocation de session.
+
+### 6. Deux détails à faible coût
+
+- **`emailRegex` maison** pour valider les adresses, là où le projet a Zod partout ailleurs.
+  Uniformiser éviterait les écarts entre ce que le contrat annonce et ce que le service accepte.
+- **La fenêtre sensible est consommée par le changement de mot de passe** (constaté : il faut la
+  rouvrir pour enchaîner un export). C'est défendable, mais ce n'est écrit nulle part — à graver
+  dans D65 ou à documenter dans le cahier, sinon chaque testeur le redécouvrira.

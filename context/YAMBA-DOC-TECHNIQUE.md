@@ -2362,3 +2362,87 @@ documentée : faire lire le code source par le test plutôt qu'espérer la vigil
 
 Vérifié aussi : aucun des champs retirés n'était utilisé par `user-ui` ni `admin-ui`, et plus aucun
 `spread + delete` sur un `User` ne subsiste dans le dépôt. auth-service : 187 → **192** tests.
+
+# Recette API — le lot « domaine auth » : cinq anomalies du chapitre 5.1 (ANO-API-03, 05, 07, 08, 09)
+
+Le cahier demande des PR **groupées par domaine**. Le chapitre 5.1 ayant été joué en entier
+(34 fiches), voici les cinq anomalies d'auth-service corrigées ensemble.
+
+## ANO-API-09 (bloquante) — l'export RGPD ne fonctionnait pas du tout
+
+`POST /auth/me/data-export` répondait 500 : `privacy.service.ts` demandait `ticketNumber` sur
+`Booking`, un champ qui n'existe que sur `Dispute` (`Booking` porte `disputeTicket`). Le **droit
+d'accès** du RGPD (D63) était donc entièrement inopérant — une obligation légale, un geste mis en
+avant dans l'interface.
+
+Le service a pourtant ses tests, et ils passaient : ils injectent un faux Prisma, qui ne valide
+aucun nom de champ. C'est le piège déjà consigné au chapitre 100 de l'apprentissage, rencontré ici
+dans l'autre sens — **le mock accepte un champ qui n'existe pas**.
+
+Le correctif tient en deux mots. Le garde-fou, lui, est le vrai livrable :
+`privacy-export-fields.spec.ts` ne mocke rien, il **lit le source** de l'export, en extrait chaque
+`db.<modèle>… select: { … }` et confronte les champs au modèle de `prisma/schema.prisma`. Vérifié
+en réintroduisant le bug : le test échoue sur `Booking.ticketNumber`.
+
+Conséquence directe : **API-AUTH-24**, fiche bloquante restée sans verdict faute d'export, a enfin
+pu être jouée — et elle passe (le code de livraison est absent, le Voyageur totalement absent).
+
+## ANO-API-08 (bloquante) — « mot de passe oublié » se trahissait par le chronomètre
+
+Corps et statut identiques pour un compte existant et un compte inconnu, mais **95,7 ms contre
+18,8 ms** sur 15 mesures, distributions disjointes : un seul appel suffisait à savoir si une adresse
+a un compte Yamba. L'envoi SMTP se faisait dans la requête.
+
+Le travail (compteurs anti-abus **et** envoi) part désormais en arrière-plan : la réponse ne dépend
+plus de rien de ce qui suit. Cela referme au passage une seconde fuite, non temporelle — un compte
+existant en cooldown recevait une erreur là où un compte inconnu recevait 200. Le même traitement
+est appliqué à `/auth/password/resend`, qui portait la même faille. Après correction : 21,6 ms
+contre 19,3 ms, plages superposées.
+
+## ANO-API-07 (majeure) — une révocation qui ne révoquait que la moitié
+
+« Couper cet appareil », « se déconnecter » et « changer de mot de passe » supprimaient la clé de
+session Redis — donc le rafraîchissement répondait 401 — mais le **jeton d'accès restait accepté
+15 minutes**. `isAuthenticated` ne consultait aucune liste de révocation, et pour cause : le jeton
+d'accès ne portait que `{ id, roles }`, sans le moindre `jti`. Rien ne permettait de savoir de
+quelle session il venait.
+
+Décision d'architecture, donc **proposée au registre en D75 (candidate)** avant le code, comme
+l'exige la règle du projet. Le jeton d'accès porte le `jti` de sa session (émission et rotation) et
+le middleware vérifie `refresh_jti:<userId>:<jti>` — la clé que auth-service posait déjà. La
+décision est isolée dans `packages/middleware/session-revocation.ts`, sans Redis, donc testable :
+
+```ts
+export function isSessionRevoked(jti: string | undefined | null, exists: number | null): boolean {
+  if (!jti) return false;        // jeton d'avant le déploiement : il expire de lui-même
+  if (exists === null) return false; // Redis muet : fail-open, une panne de cache ne déconnecte pas
+  return exists === 0;
+}
+```
+
+## ANO-API-05 (majeure) — 400 là où le contrat promet 409, 401 et 429
+
+L'OpenAPI d'auth-service documente `409` pour un email déjà pris et `401` / `429` pour les refus
+d'OTP. Le service répondait 400 partout. Le front web s'en sortait — il lit `details.code` — mais un
+client **généré depuis le contrat**, c'est-à-dire le client mobile de D36, aurait codé des branches
+jamais atteintes.
+
+La cause était en amont : `AuthError`, `RateLimitError` et `ConflictError` **n'acceptaient pas de
+`details`**. Utiliser le bon statut aurait fait perdre le code métier, d'où le repli historique sur
+`ValidationError`. Les trois classes acceptent désormais un `details` (paramètre optionnel, aucun
+appelant existant ne change), puis les sites de refus ont été reclassés.
+
+## ANO-API-03 (mineure) — l'inscription s'arrêtait au premier champ fautif
+
+La règle sort du contrôleur : `registration-rules.ts` (`collectRegistrationErrors`) est pure, sans
+Redis ni Prisma — c'est ce qui la rend testable, la première tentative important `auth.helper` ayant
+fait tourner Jest sans fin (connexions ouvertes). Tous les champs sont examinés et l'erreur porte
+`details.errors` { champ → code }. Le mot de passe garde ses règles propres : seul fautif, son
+erreur typée est relayée telle quelle, aucun client ne casse.
+
+## Tests
+
+auth-service 192 → **209** (+17). deal-service inchangé à 516, ce qui vérifie que l'enrichissement
+de `@packages/error-handler` ne casse aucun appelant. Les six bundles passent
+`scripts/smoke-services.sh` — `isAuthenticated` étant partagé, un défaut de résolution de
+`@packages/libs/redis` aurait mis six services à terre.

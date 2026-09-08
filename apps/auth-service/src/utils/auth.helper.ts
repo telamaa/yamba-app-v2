@@ -1,5 +1,5 @@
 // auth.helper.ts
-import { ValidationError } from "@packages/error-handler";
+import { AuthError, RateLimitError, ValidationError } from "@packages/error-handler";
 import crypto from "node:crypto";
 import redis from "@packages/libs/redis";
 import { sendAuthEmail } from "../emails/send-auth-email";
@@ -7,6 +7,7 @@ import { getAuthEmails } from "../emails/auth-emails";
 import { resolveLocale } from "@packages/api-contracts";
 import { getOtpFailurePolicy, formatLockDuration } from "./otp-policy";
 import { validatePasswordStrength } from "./password-rules";
+import { collectRegistrationErrors } from "./registration-rules";
 
 // Ré-exports : les contrôleurs continuent d'importer depuis auth.helper.
 export { validatePasswordStrength };
@@ -21,7 +22,6 @@ import {
 } from "./session-policy";
 
 /** ---------- Constants ---------- */
-const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // OTP lifecycle
 const OTP_TTL_SECONDS = 600;                 // 10 min (était 5 min, aligné avec OTP 6 chiffres)
@@ -156,44 +156,45 @@ export const validateRegistrationData = (
   const lastName = data.lastName?.trim();
   const emailRaw = data.email?.trim();
   const password = data.password;
-  const termsAccepted = data.termsAccepted;
   const termsVersion = data.termsVersion?.trim();
   const privacyVersion = data.privacyVersion?.trim();
 
-  if (!firstName || !lastName || !emailRaw || !password) {
-    throw new ValidationError("Missing required fields!");
+  // ANO-API-03 (recette API 08/09/2026, fiche API-GW-14) — la validation s'arrêtait au
+  // PREMIER champ fautif et ne renvoyait qu'un message anglais : le front ne pouvait pas
+  // afficher l'erreur sous chaque champ, alors que deal-service et message-service le font
+  // déjà. Les champs sont donc TOUS examinés, et l'erreur porte un objet `errors`
+  // { champ → code }, comme le PATCH de profil.
+  const errors: Record<string, string> = collectRegistrationErrors(data);
+  const emailNormalized = emailRaw ? normalizeEmail(emailRaw) : "";
+
+  // Le mot de passe garde son erreur typée (`details.type: "password"` + code de règle) :
+  // on la capture pour l'agréger sans rien perdre.
+  let passwordError: ValidationError | null = null;
+  if (password) {
+    try {
+      validatePasswordStrength(password, { firstName, lastName, email: emailNormalized });
+    } catch (e) {
+      passwordError = e as ValidationError;
+      const d = passwordError.details as { code?: string } | undefined;
+      errors.password = d?.code ?? "PASSWORD_WEAK";
+    }
   }
 
-  if (termsAccepted !== true) {
-    throw new ValidationError(
-      "You must accept the Terms of Service and Privacy Policy to register."
-    );
+  if (Object.keys(errors).length > 0) {
+    // Un seul champ fautif, et c'est le mot de passe : on relaie SON erreur telle quelle,
+    // pour que `details.type` et `details.code` restent au format que les clients lisent.
+    if (passwordError && Object.keys(errors).length === 1) throw passwordError;
+    throw new ValidationError("Some fields are invalid.", { errors });
   }
-
-  if (!termsVersion || !privacyVersion) {
-    throw new ValidationError("Legal document versions are required.");
-  }
-
-  const emailNormalized = normalizeEmail(emailRaw);
-
-  if (!emailRegex.test(emailNormalized)) {
-    throw new ValidationError("Invalid email format!");
-  }
-
-  validatePasswordStrength(password, {
-    firstName,
-    lastName,
-    email: emailNormalized,
-  });
 
   return {
-    firstName,
-    lastName,
-    email: emailRaw,
+    firstName: firstName as string,
+    lastName: lastName as string,
+    email: emailRaw as string,
     emailNormalized,
-    password,
-    termsVersion,
-    privacyVersion,
+    password: password as string,
+    termsVersion: termsVersion as string,
+    privacyVersion: privacyVersion as string,
   };
 };
 
@@ -225,7 +226,7 @@ const checkOtpRestrictionsScoped = async (scope: OtpScope, emailKey: string) => 
   // Lock actif (suite à des échecs répétés)
   const lockTtl = await redis.ttl(keys.otpLock(scope, emailKey));
   if (lockTtl > 0) {
-    throw new ValidationError(
+    throw new RateLimitError(
       `Account temporarily locked. Try again in ${formatLockDuration(lockTtl)}.`,
       {
         type: "otp",
@@ -306,7 +307,7 @@ const verifyOtpScoped = async (
   // 1. Vérifier si lock actif
   const existingLockTtl = await redis.ttl(keys.otpLock(scope, emailKey));
   if (existingLockTtl > 0) {
-    throw new ValidationError(
+    throw new RateLimitError(
       `Account temporarily locked. Try again in ${formatLockDuration(existingLockTtl)}.`,
       {
         type: "otp",
@@ -362,7 +363,7 @@ const verifyOtpScoped = async (
       await maybeSendSecurityAlert(scope, emailKey, locale, currentAttempt, policy.lockSeconds);
     }
 
-    throw new ValidationError(
+    throw new RateLimitError(
       `Incorrect code. This code is no longer valid — request a new one in ${formatLockDuration(policy.lockSeconds)}.`,
       {
         type: "otp",
@@ -376,7 +377,7 @@ const verifyOtpScoped = async (
   }
 
   // 6. Pas de palier atteint : informer du nombre d'essais restants
-  throw new ValidationError(
+  throw new AuthError(
     `Incorrect code. ${policy.attemptsLeft} attempt(s) left before this code is invalidated.`,
     {
       type: "otp",
