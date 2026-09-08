@@ -424,6 +424,15 @@ Ordre de demarrage : auth -> trip -> gateway.
   la CLI (API-HOOK-01), passer trip-service et auth-service au meme garde-fou (dette D-4).
   Rapport complet : `context/YAMBA-RECETTE-API-RESULTATS.md`. MERGES 08/09 : **#232 → #248**
   (17 checks comptes a chaque fois).
+- 08/09 (soir) : **reserve n° 1 levee** — les fiches Stripe rejouees avec la VRAIE CLI
+  (`brew install stripe/stripe-cli/stripe`, puis `stripe listen --api-key "$STRIPE_SECRET_KEY"`
+  : pas de `stripe login` interactif necessaire). Chemin complet sur le vrai fournisseur en
+  mode test : intention creee par l'API, confirmee en `requires_capture` avec `pm_card_visa`,
+  deal cree dessus, puis `stripe payment_intents cancel` → Stripe emet l'evenement, le service
+  le verifie et le deal passe CANCELLED / SYSTEM / PAYMENT_AUTHORIZATION_LOST. Rejeu
+  (`stripe events resend` ×2) : 200 aux trois livraisons, UN SEUL booking.cancelled.
+  **146 fiches sur 146 jouees, plus aucune en ⏭.** Reste la seule dette D-4 (garde-fou des
+  codes de refus a etendre a trip-service et auth-service).
 - 04/09 : C-PR6b feat/c6b-admin-alerts (D59 3A / 4A, A129–A131) — neuf regles de seuil
   (evaluateAlerts pur, instantane de dix compteurs), GET /admin/alerts sans etat (accueil
   admin), cron horaire avec dedoublonnage Redis SET NX (un email par regle et par jour, Redis

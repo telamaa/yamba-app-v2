@@ -3096,3 +3096,67 @@ faux est exactement ce qui permet à une fiche de disparaître sans que personne
 `refusal-codes.spec.ts` (3 cas) et `transition-refusal.spec.ts` (5 cas) ; le cas S8 de
 `booking-state-machine.spec.ts` a été étendu au motif structuré.
 deal-service 552 → **560**. Plateforme **937**.
+
+---
+
+# Recette API — rejeu des fiches Stripe avec la CLI (réserve n° 1 levée)
+
+Le chapitre 8 avait joué les fiches Stripe en **signant les événements à la main**, faute de CLI sur
+le poste, et le verdict de campagne portait la réserve « rejouer avec la CLI avant la production ».
+C'est fait.
+
+## Lancer la CLI sans connexion interactive
+
+`stripe login` ouvre un navigateur. On peut s'en passer : la CLI accepte une clé d'API directement,
+et le dépôt en a une **de test** dans son `.env`.
+
+```sh
+brew install stripe/stripe-cli/stripe
+stripe listen --api-key "$STRIPE_SECRET_KEY" --forward-to localhost:6003/webhooks/stripe
+# Ready! … Your webhook signing secret is whsec_…
+```
+
+Ce `whsec_…` va dans `STRIPE_WEBHOOK_SECRET`, puis on redémarre les services — **avec le vrai
+fournisseur Stripe cette fois**, plus le FAKE de la campagne (`nx serve` recharge le `.env` racine).
+
+## Ce que le rejeu a prouvé de plus que les événements fabriqués
+
+Un événement fabriqué prouve la **vérification de signature** et l'aiguillage. Il ne prouve pas que
+l'objet référencé existe vraiment chez Stripe ni que la chaîne complète tient. Le rejeu, lui, a
+suivi le chemin réel :
+
+1. devis puis intention par l'API → `pi_…` créé chez Stripe ;
+2. `stripe payment_intents confirm <pi> --payment-method pm_card_visa --return-url …`
+   → **`requires_capture`**, `amount_capturable: 1450`, `capture_method: manual` — le modèle exact
+   de Yamba (autorisation posée, capture différée) ;
+3. `POST /api/deals` → 201, deal `PENDING` **sur cette autorisation réelle** ;
+4. `stripe payment_intents cancel <pi>` → **c'est Stripe qui émet** `payment_intent.canceled` ; la
+   CLI le transmet signé ; le service répond 200 ;
+5. le deal passe `CANCELLED`, `closedBy: SYSTEM`, `cancelReason: PAYMENT_AUTHORIZATION_LOST`.
+
+Le principe « entre la base et Stripe, c'est Stripe qui a l'argent » est donc vérifié sur le vrai
+fournisseur, pas seulement sur un corps JSON écrit par le testeur.
+
+**Deux pièges à connaître pour rejouer :**
+
+- `stripe payment_intents confirm` échoue avec « you must provide a `return_url` » sur une intention
+  qui accepte les moyens de paiement du Dashboard : passer `--return-url` (n'importe quelle URL) ou
+  créer l'intention avec `automatic_payment_methods[allow_redirects] = never`.
+- `stripe events resend <evt> --webhook-endpoint we_…` échoue en `resource-missing` quand on n'a pas
+  d'endpoint enregistré : **omettre l'option** pour que le rejeu parte vers l'écoute de la CLI.
+
+## Résultats
+
+| Fiche | Résultat |
+|---|---|
+| API-HOOK-01 | OK — secret affiché, chaque événement journalisé avec le code rendu |
+| API-HOOK-02 | OK — 200 (types non traités), 400 (en-tête absent), 400 (signature invalide), 501 (sans secret) |
+| API-HOOK-03 | OK — autorisation réelle annulée chez le fournisseur → deal `CANCELLED` par SYSTEM ; `account.updated` d'un compte connecté inconnu → 200 + avertissement |
+| API-HOOK-04 | OK — `stripe events resend` ×2 : 200 aux trois livraisons, **un seul** `booking.cancelled` |
+
+**Plus aucune fiche de la campagne n'est en ⏭ : 146 sur 146 jouées.**
+
+**Un détail relevé au passage** (à arbitrer côté produit, pas un défaut) : la vue Expéditeur ne sert
+pas `cancelReason` alors que la base porte `PAYMENT_AUTHORIZATION_LOST`. Ce n'est pas une fuite,
+c'est l'inverse — une information utile que le membre ne voit pas (« votre autorisation bancaire a
+expiré »).
