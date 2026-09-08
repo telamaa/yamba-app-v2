@@ -9,12 +9,28 @@
 import { z } from "zod";
 import { ObjectIdSchema } from "../common";
 import { BookingEventTypeSchema } from "../booking/booking-events.schema";
+import { MessagingEventTypeSchema } from "../messaging/messaging-events.schema";
 
 /** Notifications qui ne viennent PAS d'un événement de deal (A87 : compte Stripe). */
 export const SYSTEM_NOTIFICATION_TYPES = ["carrier.payout_failed"] as const;
+/**
+ * ANO-API-16 (recette API 08/09/2026, fiche API-NOTIF-01, bloquante) — l'union ne couvrait
+ * que les clés `booking.*` et une clé système. Or message-service produit aussi
+ * `conversation.message_posted` et `conversation.meetup_proposed` (D61) : dès qu'un membre
+ * recevait un message, la validation échouait et **toute sa boîte répondait 500**.
+ *
+ * L'union reste FERMÉE — le mapper est un garde, pas un tuyau, et un type inventé doit être
+ * refusé — mais elle est désormais COMPLÈTE : elle réutilise la liste que message-service
+ * publie déjà, plutôt que d'en recopier deux clés qui divergeraient au prochain événement.
+ * La robustesse, elle, est traitée là où elle doit l'être : côté lecture, une notification
+ * illisible est ignorée et journalisée, jamais fatale à la liste entière.
+ */
 export const NotificationTypeSchema = z
-  .union([BookingEventTypeSchema, z.enum(SYSTEM_NOTIFICATION_TYPES)])
-  .meta({ id: "NotificationType", description: "Booking event key, or a system notification (A87)" });
+  .union([BookingEventTypeSchema, z.enum(SYSTEM_NOTIFICATION_TYPES), MessagingEventTypeSchema])
+  .meta({
+    id: "NotificationType",
+    description: "Booking event key, messaging event key (D61), or a system notification (A87)",
+  });
 
 export const NotificationViewSchema = z
   .object({

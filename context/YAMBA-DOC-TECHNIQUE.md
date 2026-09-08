@@ -2694,3 +2694,74 @@ que le refus est typé et porte son horizon. Un test qui échoue après un chang
 jour en expliquant pourquoi ; il ne se supprime pas.
 
 deal-service 528 → **538**.
+
+# Recette API — la boîte de notifications tombait, et aucun email ne partait (ANO-API-16, ANO-API-17)
+
+Le chapitre 5.5 ne compte que quatre fiches. La dernière en a révélé deux défauts qu'aucun test, ni
+le typecheck, ni le smoke ne pouvaient voir.
+
+## ANO-API-16 (bloquante) — une notification de messagerie rendait la boîte entière illisible
+
+`GET /me/notifications` répondait **500** pour le Voyageur. En cause, une `ZodError` : le type de
+notification était une union **fermée** de clés `booking.*` et d'une clé système, alors que
+message-service produit aussi `conversation.message_posted` et `conversation.meetup_proposed`
+(D61). Vérifié en base : huit notifications de ce genre existaient. **Une seule suffisait** à faire
+tomber toute la liste.
+
+Le premier réflexe — ouvrir complètement le type — a été écarté par un test existant :
+
+```ts
+it("type hors contrat = rejet strict (le mapper est un garde, pas un tuyau)", () => {
+  expect(() => toNotificationView({ ...record, type: "booking.hacked" })).toThrow();
+});
+```
+
+Ce test a raison : un type **inventé** doit être refusé. Le défaut n'était donc pas que l'énumération
+soit fermée, c'était **qu'elle était incomplète**, et surtout qu'un élément illisible emportait la
+réponse entière. La correction traite les deux séparément :
+
+1. **L'union reste fermée, mais complète** : elle réutilise `MESSAGING_EVENT_TYPES`, la liste que
+   message-service publie déjà — plutôt que d'y recopier deux clés qui divergeraient au prochain
+   événement.
+2. **La lecture devient robuste** : une notification que le mapper refuse est **ignorée et
+   journalisée** (identifiant + type), au lieu de faire échouer la liste. Le membre garde ses autres
+   notifications ; l'exploitation voit dans les journaux ce qu'il faut ajouter au contrat.
+
+C'est la nuance qui compte : le garde reste un garde, mais il ne casse plus la vitrine.
+
+## ANO-API-17 (majeure) — aucun email transactionnel ne partait
+
+Le journal du service répétait, à chaque événement :
+
+```
+ENOENT: …/apps/notification-service/apps/notification-service/src/emails/templates/booking/booking-requested-carrier.ejs
+Booking email send failed — marked FAILED
+```
+
+Le segment est **doublé**. Le dossier des gabarits était résolu depuis le répertoire de travail :
+
+```ts
+const TEMPLATES_DIR = path.join(process.cwd(), "apps/notification-service/src/emails/templates");
+```
+
+Ce chemin n'est juste que si le service est lancé **depuis la racine du dépôt**. Lancé depuis son
+propre dossier — ce que fait `scripts/smoke-services.sh`, et ce que fera n'importe quel conteneur —
+il se double, et **plus aucun email ne part**. Silencieusement : l'événement est marqué `FAILED`,
+rien ne remonte à l'appelant ni au membre.
+
+Les gabarits sont désormais **copiés dans le bundle** (webpack `assets`) et résolus depuis
+`__dirname`, avec un repli sur les sources pour les tests unitaires qui s'exécutent hors bundle.
+
+**Contre-épreuve** : après la création d'un deal, deux emails sont réellement arrivés dans Mailpit —
+« Nouvelle demande de transport Paris → Brazzaville » au Voyageur, « Reçu : paiement autorisé » à
+l'Expéditrice.
+
+## Ce que cet épisode dit de la méthode
+
+Aucun de ces deux défauts n'était détectable autrement. Le typecheck passe : les chemins sont des
+chaînes, les types sont inférés correctement. Les tests unitaires passent : ils ne lisent pas le
+disque et n'exercent pas la validation de sortie sur des données réelles. Le smoke passe : il
+vérifie `/health`, pas l'envoi d'un email.
+
+Il fallait **provoquer une transition réelle et aller regarder la boîte aux lettres** — c'est
+exactement ce que la bascule Mailpit, décidée au tout début de la campagne, a rendu possible.

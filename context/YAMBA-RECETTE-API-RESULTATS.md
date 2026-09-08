@@ -217,6 +217,9 @@ L'historique est conservé : un KO reste écrit KO, sa correction s'ajoute en de
 | ANO-API-12 | API-DEAL-02 | majeure | 08/09/2026 | **close** | valeur déclarée confrontée aux plafonds avant l'autorisation |
 | ANO-API-13 | API-DEAL-22 | **bloquante** | 08/09/2026 | **close** | champ corrigé + garde-fou `select` **systémique** sur deal-service |
 | ANO-API-14 | API-DEAL-20 | majeure | 08/09/2026 | **close** | `z.partialRecord` — piège d'exhaustivité de Zod 4 |
+| ANO-API-15 | API-DEAL-06 / 15 | majeure | 08/09/2026 | **close** | destinataire minimisé ; verrou typé avec son horizon |
+| ANO-API-16 | API-NOTIF-01 / 04 | **bloquante** | 08/09/2026 | **close** | types `conversation.*` au contrat + lecture robuste |
+| ANO-API-17 | API-NOTIF-04 | majeure | 08/09/2026 | **close** | gabarits d'email embarqués, chemin indépendant du cwd |
 | ANO-API-05 | API-AUTH-03 / 05 | majeure | 08/09/2026 | **close** | 409 / 401 / 429, classes d'erreur enrichies |
 | ANO-API-06 | API-AUTH-09 | **bloquante** | 08/09/2026 | **close** | liste blanche + test lisant le schéma Prisma |
 | ANO-API-07 | API-AUTH-11 / 12 / 13 | majeure | 08/09/2026 | **close** | `jti` dans le jeton d'accès — registre **D75 candidate** |
@@ -1028,3 +1031,64 @@ Trois refus de ce service portent leur code **dans le message** plutôt que dans
 sur le message anglais : un client doit pouvoir traduire sans analyser une phrase. Deux lignes par
 site suffiraient à les exposer dans `details`. Rien d'urgent, mais c'est le même thème que les
 verrous qui ne donnent pas leur horizon.
+## Chapitre 5.5 — notification-service (4 fiches)
+
+**3 OK · 1 KO** — mais ce KO a révélé **deux anomalies**, dont une bloquante, et l'une d'elles
+rendait muet tout l'envoi d'emails transactionnels.
+
+| API-NOTIF-01 | Lire ses notifications | mineure | **OK** | 200, `unreadCount` juste, types cohérents avec les clés d'événement. |
+| API-NOTIF-02 | Marquer lu | mineure | **OK** | Idempotent des deux côtés : `updatedCount` **7** puis **0** au rejeu, `unreadCount` final **0**. |
+| API-NOTIF-03 | **La notification d'autrui** | **bloquante** | **OK** | **403** (pas destinataire) · **404** (inexistante) · **400** (identifiant malformé) · **401** (sans session). Les quatre statuts sont **distincts et corrects** — le tableau complet de la sémantique, mieux tenu qu'ailleurs dans la plateforme. La notification de l'autre membre reste non lue. |
+| API-NOTIF-04 | Une transition réelle produit une notification | majeure | **KO → corrigé** | Le compteur du Voyageur passe bien de 14 à 15 et `booking.requested` arrive en tête : la chaîne **transition → outbox (même transaction) → Redpanda → consommateur → notification** fonctionne. Mais la fiche a buté sur deux défauts, voir ci-dessous. |
+
+### Anomalies du chapitre 5.5
+
+```
+ANO-API-16
+Fiche          : API-NOTIF-01 / 04 · Gravité : BLOQUANTE · ÉTAT : CLOSE
+Constat        : GET /me/notifications répondait 500 pour le Voyageur — et pour tout membre
+                 ayant reçu un message. La boîte entière devenait inaccessible.
+Cause          : le type de notification était une union FERMÉE de clés `booking.*` et d'une
+                 clé système. Or message-service produit aussi `conversation.message_posted`
+                 et `conversation.meetup_proposed` (D61) : la validation de la réponse
+                 échouait sur ces lignes, et une seule suffisait à faire tomber la liste.
+                 Vérifié en base : 5 notifications `conversation.message_posted` et 3
+                 `conversation.meetup_proposed` existaient bel et bien.
+Correction     : l'union reste FERMÉE — le mapper est un garde, pas un tuyau, et un type
+                 inventé (`booking.hacked`) doit continuer d'être refusé, ce qu'un test
+                 existant exigeait à juste titre — mais elle est COMPLÈTE : elle réutilise la
+                 liste que message-service publie déjà, plutôt que d'en recopier des clés qui
+                 divergeraient au prochain événement.
+                 Et la robustesse est traitée là où elle doit l'être : à la lecture, une
+                 notification illisible est ignorée et JOURNALISÉE (type + identifiant), au
+                 lieu d'emporter la boîte entière. Un membre garde ses autres notifications,
+                 l'exploitation voit ce qu'il faut ajouter au contrat.
+Contre-épreuve : la boîte du Voyageur répond 200 avec ses 14 notifications, dont les
+                 `conversation.*` qui la faisaient tomber. Les 99 tests du service passent,
+                 y compris celui du rejet strict.
+```
+
+```
+ANO-API-17
+Fiche          : API-NOTIF-04 · Gravité : majeure · ÉTAT : CLOSE
+Constat        : AUCUN email transactionnel de deal ne partait. Chaque envoi échouait en
+                 ENOENT et l'événement était marqué « Booking email send failed — marked
+                 FAILED » — sans que rien ne remonte au membre ni à l'appelant.
+Cause          : le dossier des gabarits EJS était résolu depuis `process.cwd()` :
+                 `path.join(process.cwd(), "apps/notification-service/src/emails/templates")`.
+                 Le chemin n'est donc juste QUE si le service est lancé depuis la racine du
+                 dépôt. Lancé depuis son propre dossier — ce que fait `scripts/smoke-services.sh`,
+                 et ce que fera n'importe quel conteneur — il se doublait :
+                 `…/apps/notification-service/apps/notification-service/src/emails/templates/…`
+Correction     : les gabarits sont copiés dans le bundle (webpack `assets`) et résolus depuis
+                 `__dirname`, avec un repli sur les sources pour les tests unitaires. Le
+                 chemin ne dépend plus du répertoire de lancement.
+Contre-épreuve : après création d'un deal, DEUX emails sont réellement arrivés dans Mailpit —
+                 « Nouvelle demande de transport Paris → Brazzaville » au **Voyageur** et
+                 « Reçu : paiement autorisé pour ton envoi » à l'**Expéditrice**. Avant la
+                 correction, les deux étaient marqués FAILED.
+Portée         : ce défaut ne se voyait ni au typecheck, ni aux tests unitaires, ni au smoke
+                 (qui ne vérifie que /health). Il fallait provoquer une transition réelle et
+                 aller regarder la boîte aux lettres — c'est précisément ce que la bascule
+                 Mailpit du début de campagne a rendu possible.
+```

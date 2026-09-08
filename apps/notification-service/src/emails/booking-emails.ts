@@ -28,6 +28,7 @@ import { Prisma } from "@prisma/client";
 import prisma from "@packages/libs/prisma";
 import { BookingDomainEventSchema } from "@packages/api-contracts";
 import { isEmailConfigured, sendTemplatedEmail, sendTransactionalEmail, type EmailContent } from "@packages/email";
+import { existsSync } from "node:fs";
 import { SETTLEMENT_EMAILS } from "./settlement-emails";
 import { resolveLocale, type SupportedLocale } from "@packages/api-contracts";
 
@@ -37,10 +38,20 @@ type BookingEventKey = BookingDomainEvent["eventType"];
 const APP_URL = process.env.USER_APP_URL ?? "http://localhost:3000";
 const SUPPORT_EMAIL = process.env.SUPPORT_EMAIL ?? "support@yamba.app";
 // D44 — la locale est celle du DESTINATAIRE (User.preferredLocale), jamais de l'acteur.
-const TEMPLATES_DIR = path.join(
-  process.cwd(),
-  "apps/notification-service/src/emails/templates"
-);
+/**
+ * ANO-API-17 (recette API 08/09/2026) — le dossier des gabarits était résolu depuis
+ * `process.cwd()`, donc il ne fonctionnait QUE si le service était lancé depuis la racine du
+ * dépôt. Lancé depuis son propre dossier — ce que fait `scripts/smoke-services.sh`, et ce
+ * que fera n'importe quel conteneur — le chemin se doublait
+ * (`apps/notification-service/apps/notification-service/…`) : chaque envoi échouait en
+ * ENOENT et l'email était marqué FAILED. Silencieusement, du point de vue du membre.
+ *
+ * Les gabarits sont désormais copiés dans le bundle (webpack `assets`) et résolus depuis
+ * `__dirname`. Le repli sur les sources sert aux tests unitaires, qui s'exécutent hors bundle.
+ */
+const BUNDLED_TEMPLATES = path.join(__dirname, "emails/templates");
+const SOURCE_TEMPLATES = path.join(__dirname, "templates");
+const TEMPLATES_DIR = existsSync(BUNDLED_TEMPLATES) ? BUNDLED_TEMPLATES : SOURCE_TEMPLATES;
 
 /* ══ A35 — la matrice email, en data ══════════════════════════ */
 

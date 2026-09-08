@@ -14164,6 +14164,529 @@
         "additionalProperties": false,
         "description": "Badges + statistics, never an opaque score (D29①)"
       },
+      "MessagingEventType": {
+        "type": "string",
+        "enum": [
+          "conversation.message_posted",
+          "conversation.meetup_proposed",
+          "conversation.meetup_accepted",
+          "conversation.phone_revealed"
+        ]
+      },
+      "MessagePostedEvent": {
+        "type": "object",
+        "properties": {
+          "aggregateType": {
+            "type": "string",
+            "const": "conversation"
+          },
+          "aggregateId": {
+            "$ref": "#/components/schemas/ObjectId"
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          },
+          "correlationId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "schemaVersion": {
+            "type": "number",
+            "const": 1
+          },
+          "eventType": {
+            "type": "string",
+            "const": "conversation.message_posted"
+          },
+          "payload": {
+            "type": "object",
+            "properties": {
+              "conversationId": {
+                "$ref": "#/components/schemas/ObjectId"
+              },
+              "bookingId": {
+                "$ref": "#/components/schemas/ObjectId"
+              },
+              "shipperId": {
+                "$ref": "#/components/schemas/ObjectId"
+              },
+              "carrierId": {
+                "$ref": "#/components/schemas/ObjectId"
+              },
+              "actorRole": {
+                "type": "string",
+                "enum": [
+                  "SHIPPER",
+                  "CARRIER",
+                  "SYSTEM"
+                ]
+              },
+              "actorId": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/ObjectId"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "recipientId": {
+                "$ref": "#/components/schemas/ObjectId"
+              },
+              "corridor": {
+                "type": "object",
+                "properties": {
+                  "originCity": {
+                    "type": "string"
+                  },
+                  "destinationCity": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "originCity",
+                  "destinationCity"
+                ],
+                "additionalProperties": false
+              },
+              "messageId": {
+                "$ref": "#/components/schemas/ObjectId"
+              },
+              "preview": {
+                "type": "string",
+                "maxLength": 140,
+                "description": "Extrait, jamais la totalité — l'email n'est pas le fil"
+              }
+            },
+            "required": [
+              "conversationId",
+              "bookingId",
+              "shipperId",
+              "carrierId",
+              "actorRole",
+              "actorId",
+              "recipientId",
+              "corridor",
+              "messageId",
+              "preview"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "aggregateType",
+          "aggregateId",
+          "occurredAt",
+          "correlationId",
+          "schemaVersion",
+          "eventType",
+          "payload"
+        ],
+        "additionalProperties": false
+      },
+      "MeetupProposedEvent": {
+        "type": "object",
+        "properties": {
+          "aggregateType": {
+            "type": "string",
+            "const": "conversation"
+          },
+          "aggregateId": {
+            "$ref": "#/components/schemas/ObjectId"
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          },
+          "correlationId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "schemaVersion": {
+            "type": "number",
+            "const": 1
+          },
+          "eventType": {
+            "type": "string",
+            "const": "conversation.meetup_proposed"
+          },
+          "payload": {
+            "type": "object",
+            "properties": {
+              "conversationId": {
+                "$ref": "#/components/schemas/ObjectId"
+              },
+              "bookingId": {
+                "$ref": "#/components/schemas/ObjectId"
+              },
+              "shipperId": {
+                "$ref": "#/components/schemas/ObjectId"
+              },
+              "carrierId": {
+                "$ref": "#/components/schemas/ObjectId"
+              },
+              "actorRole": {
+                "type": "string",
+                "enum": [
+                  "SHIPPER",
+                  "CARRIER",
+                  "SYSTEM"
+                ]
+              },
+              "actorId": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/ObjectId"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "recipientId": {
+                "$ref": "#/components/schemas/ObjectId"
+              },
+              "corridor": {
+                "type": "object",
+                "properties": {
+                  "originCity": {
+                    "type": "string"
+                  },
+                  "destinationCity": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "originCity",
+                  "destinationCity"
+                ],
+                "additionalProperties": false
+              },
+              "meetupId": {
+                "$ref": "#/components/schemas/ObjectId"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "PICKUP",
+                  "DELIVERY"
+                ]
+              },
+              "placeLabel": {
+                "type": "string"
+              },
+              "startAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              }
+            },
+            "required": [
+              "conversationId",
+              "bookingId",
+              "shipperId",
+              "carrierId",
+              "actorRole",
+              "actorId",
+              "recipientId",
+              "corridor",
+              "meetupId",
+              "kind",
+              "placeLabel",
+              "startAt"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "aggregateType",
+          "aggregateId",
+          "occurredAt",
+          "correlationId",
+          "schemaVersion",
+          "eventType",
+          "payload"
+        ],
+        "additionalProperties": false
+      },
+      "MeetupAcceptedEvent": {
+        "type": "object",
+        "properties": {
+          "aggregateType": {
+            "type": "string",
+            "const": "conversation"
+          },
+          "aggregateId": {
+            "$ref": "#/components/schemas/ObjectId"
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          },
+          "correlationId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "schemaVersion": {
+            "type": "number",
+            "const": 1
+          },
+          "eventType": {
+            "type": "string",
+            "const": "conversation.meetup_accepted"
+          },
+          "payload": {
+            "type": "object",
+            "properties": {
+              "conversationId": {
+                "$ref": "#/components/schemas/ObjectId"
+              },
+              "bookingId": {
+                "$ref": "#/components/schemas/ObjectId"
+              },
+              "shipperId": {
+                "$ref": "#/components/schemas/ObjectId"
+              },
+              "carrierId": {
+                "$ref": "#/components/schemas/ObjectId"
+              },
+              "actorRole": {
+                "type": "string",
+                "enum": [
+                  "SHIPPER",
+                  "CARRIER",
+                  "SYSTEM"
+                ]
+              },
+              "actorId": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/ObjectId"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "recipientId": {
+                "$ref": "#/components/schemas/ObjectId"
+              },
+              "corridor": {
+                "type": "object",
+                "properties": {
+                  "originCity": {
+                    "type": "string"
+                  },
+                  "destinationCity": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "originCity",
+                  "destinationCity"
+                ],
+                "additionalProperties": false
+              },
+              "meetupId": {
+                "$ref": "#/components/schemas/ObjectId"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "PICKUP",
+                  "DELIVERY"
+                ]
+              },
+              "placeLabel": {
+                "type": "string"
+              },
+              "startAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              }
+            },
+            "required": [
+              "conversationId",
+              "bookingId",
+              "shipperId",
+              "carrierId",
+              "actorRole",
+              "actorId",
+              "recipientId",
+              "corridor",
+              "meetupId",
+              "kind",
+              "placeLabel",
+              "startAt"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "aggregateType",
+          "aggregateId",
+          "occurredAt",
+          "correlationId",
+          "schemaVersion",
+          "eventType",
+          "payload"
+        ],
+        "additionalProperties": false
+      },
+      "PhoneRevealedEvent": {
+        "type": "object",
+        "properties": {
+          "aggregateType": {
+            "type": "string",
+            "const": "conversation"
+          },
+          "aggregateId": {
+            "$ref": "#/components/schemas/ObjectId"
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          },
+          "correlationId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "schemaVersion": {
+            "type": "number",
+            "const": 1
+          },
+          "eventType": {
+            "type": "string",
+            "const": "conversation.phone_revealed"
+          },
+          "payload": {
+            "type": "object",
+            "properties": {
+              "conversationId": {
+                "$ref": "#/components/schemas/ObjectId"
+              },
+              "bookingId": {
+                "$ref": "#/components/schemas/ObjectId"
+              },
+              "shipperId": {
+                "$ref": "#/components/schemas/ObjectId"
+              },
+              "carrierId": {
+                "$ref": "#/components/schemas/ObjectId"
+              },
+              "actorRole": {
+                "type": "string",
+                "enum": [
+                  "SHIPPER",
+                  "CARRIER",
+                  "SYSTEM"
+                ]
+              },
+              "actorId": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/ObjectId"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "recipientId": {
+                "$ref": "#/components/schemas/ObjectId"
+              },
+              "corridor": {
+                "type": "object",
+                "properties": {
+                  "originCity": {
+                    "type": "string"
+                  },
+                  "destinationCity": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "originCity",
+                  "destinationCity"
+                ],
+                "additionalProperties": false
+              },
+              "revealedUserId": {
+                "$ref": "#/components/schemas/ObjectId"
+              }
+            },
+            "required": [
+              "conversationId",
+              "bookingId",
+              "shipperId",
+              "carrierId",
+              "actorRole",
+              "actorId",
+              "recipientId",
+              "corridor",
+              "revealedUserId"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "aggregateType",
+          "aggregateId",
+          "occurredAt",
+          "correlationId",
+          "schemaVersion",
+          "eventType",
+          "payload"
+        ],
+        "additionalProperties": false
+      },
+      "MessagingDomainEvent": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/MessagePostedEvent"
+          },
+          {
+            "$ref": "#/components/schemas/MeetupProposedEvent"
+          },
+          {
+            "$ref": "#/components/schemas/MeetupAcceptedEvent"
+          },
+          {
+            "$ref": "#/components/schemas/PhoneRevealedEvent"
+          }
+        ]
+      },
       "NotificationType": {
         "anyOf": [
           {
@@ -14174,9 +14697,12 @@
             "enum": [
               "carrier.payout_failed"
             ]
+          },
+          {
+            "$ref": "#/components/schemas/MessagingEventType"
           }
         ],
-        "description": "Booking event key, or a system notification (A87)"
+        "description": "Booking event key, messaging event key (D61), or a system notification (A87)"
       },
       "NotificationView": {
         "type": "object",
@@ -20969,529 +21495,6 @@
           "decision"
         ],
         "additionalProperties": false
-      },
-      "MessagingEventType": {
-        "type": "string",
-        "enum": [
-          "conversation.message_posted",
-          "conversation.meetup_proposed",
-          "conversation.meetup_accepted",
-          "conversation.phone_revealed"
-        ]
-      },
-      "MessagePostedEvent": {
-        "type": "object",
-        "properties": {
-          "aggregateType": {
-            "type": "string",
-            "const": "conversation"
-          },
-          "aggregateId": {
-            "$ref": "#/components/schemas/ObjectId"
-          },
-          "occurredAt": {
-            "type": "string",
-            "format": "date-time",
-            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
-          },
-          "correlationId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "schemaVersion": {
-            "type": "number",
-            "const": 1
-          },
-          "eventType": {
-            "type": "string",
-            "const": "conversation.message_posted"
-          },
-          "payload": {
-            "type": "object",
-            "properties": {
-              "conversationId": {
-                "$ref": "#/components/schemas/ObjectId"
-              },
-              "bookingId": {
-                "$ref": "#/components/schemas/ObjectId"
-              },
-              "shipperId": {
-                "$ref": "#/components/schemas/ObjectId"
-              },
-              "carrierId": {
-                "$ref": "#/components/schemas/ObjectId"
-              },
-              "actorRole": {
-                "type": "string",
-                "enum": [
-                  "SHIPPER",
-                  "CARRIER",
-                  "SYSTEM"
-                ]
-              },
-              "actorId": {
-                "anyOf": [
-                  {
-                    "$ref": "#/components/schemas/ObjectId"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              },
-              "recipientId": {
-                "$ref": "#/components/schemas/ObjectId"
-              },
-              "corridor": {
-                "type": "object",
-                "properties": {
-                  "originCity": {
-                    "type": "string"
-                  },
-                  "destinationCity": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "originCity",
-                  "destinationCity"
-                ],
-                "additionalProperties": false
-              },
-              "messageId": {
-                "$ref": "#/components/schemas/ObjectId"
-              },
-              "preview": {
-                "type": "string",
-                "maxLength": 140,
-                "description": "Extrait, jamais la totalité — l'email n'est pas le fil"
-              }
-            },
-            "required": [
-              "conversationId",
-              "bookingId",
-              "shipperId",
-              "carrierId",
-              "actorRole",
-              "actorId",
-              "recipientId",
-              "corridor",
-              "messageId",
-              "preview"
-            ],
-            "additionalProperties": false
-          }
-        },
-        "required": [
-          "aggregateType",
-          "aggregateId",
-          "occurredAt",
-          "correlationId",
-          "schemaVersion",
-          "eventType",
-          "payload"
-        ],
-        "additionalProperties": false
-      },
-      "MeetupProposedEvent": {
-        "type": "object",
-        "properties": {
-          "aggregateType": {
-            "type": "string",
-            "const": "conversation"
-          },
-          "aggregateId": {
-            "$ref": "#/components/schemas/ObjectId"
-          },
-          "occurredAt": {
-            "type": "string",
-            "format": "date-time",
-            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
-          },
-          "correlationId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "schemaVersion": {
-            "type": "number",
-            "const": 1
-          },
-          "eventType": {
-            "type": "string",
-            "const": "conversation.meetup_proposed"
-          },
-          "payload": {
-            "type": "object",
-            "properties": {
-              "conversationId": {
-                "$ref": "#/components/schemas/ObjectId"
-              },
-              "bookingId": {
-                "$ref": "#/components/schemas/ObjectId"
-              },
-              "shipperId": {
-                "$ref": "#/components/schemas/ObjectId"
-              },
-              "carrierId": {
-                "$ref": "#/components/schemas/ObjectId"
-              },
-              "actorRole": {
-                "type": "string",
-                "enum": [
-                  "SHIPPER",
-                  "CARRIER",
-                  "SYSTEM"
-                ]
-              },
-              "actorId": {
-                "anyOf": [
-                  {
-                    "$ref": "#/components/schemas/ObjectId"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              },
-              "recipientId": {
-                "$ref": "#/components/schemas/ObjectId"
-              },
-              "corridor": {
-                "type": "object",
-                "properties": {
-                  "originCity": {
-                    "type": "string"
-                  },
-                  "destinationCity": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "originCity",
-                  "destinationCity"
-                ],
-                "additionalProperties": false
-              },
-              "meetupId": {
-                "$ref": "#/components/schemas/ObjectId"
-              },
-              "kind": {
-                "type": "string",
-                "enum": [
-                  "PICKUP",
-                  "DELIVERY"
-                ]
-              },
-              "placeLabel": {
-                "type": "string"
-              },
-              "startAt": {
-                "type": "string",
-                "format": "date-time",
-                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
-              }
-            },
-            "required": [
-              "conversationId",
-              "bookingId",
-              "shipperId",
-              "carrierId",
-              "actorRole",
-              "actorId",
-              "recipientId",
-              "corridor",
-              "meetupId",
-              "kind",
-              "placeLabel",
-              "startAt"
-            ],
-            "additionalProperties": false
-          }
-        },
-        "required": [
-          "aggregateType",
-          "aggregateId",
-          "occurredAt",
-          "correlationId",
-          "schemaVersion",
-          "eventType",
-          "payload"
-        ],
-        "additionalProperties": false
-      },
-      "MeetupAcceptedEvent": {
-        "type": "object",
-        "properties": {
-          "aggregateType": {
-            "type": "string",
-            "const": "conversation"
-          },
-          "aggregateId": {
-            "$ref": "#/components/schemas/ObjectId"
-          },
-          "occurredAt": {
-            "type": "string",
-            "format": "date-time",
-            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
-          },
-          "correlationId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "schemaVersion": {
-            "type": "number",
-            "const": 1
-          },
-          "eventType": {
-            "type": "string",
-            "const": "conversation.meetup_accepted"
-          },
-          "payload": {
-            "type": "object",
-            "properties": {
-              "conversationId": {
-                "$ref": "#/components/schemas/ObjectId"
-              },
-              "bookingId": {
-                "$ref": "#/components/schemas/ObjectId"
-              },
-              "shipperId": {
-                "$ref": "#/components/schemas/ObjectId"
-              },
-              "carrierId": {
-                "$ref": "#/components/schemas/ObjectId"
-              },
-              "actorRole": {
-                "type": "string",
-                "enum": [
-                  "SHIPPER",
-                  "CARRIER",
-                  "SYSTEM"
-                ]
-              },
-              "actorId": {
-                "anyOf": [
-                  {
-                    "$ref": "#/components/schemas/ObjectId"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              },
-              "recipientId": {
-                "$ref": "#/components/schemas/ObjectId"
-              },
-              "corridor": {
-                "type": "object",
-                "properties": {
-                  "originCity": {
-                    "type": "string"
-                  },
-                  "destinationCity": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "originCity",
-                  "destinationCity"
-                ],
-                "additionalProperties": false
-              },
-              "meetupId": {
-                "$ref": "#/components/schemas/ObjectId"
-              },
-              "kind": {
-                "type": "string",
-                "enum": [
-                  "PICKUP",
-                  "DELIVERY"
-                ]
-              },
-              "placeLabel": {
-                "type": "string"
-              },
-              "startAt": {
-                "type": "string",
-                "format": "date-time",
-                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
-              }
-            },
-            "required": [
-              "conversationId",
-              "bookingId",
-              "shipperId",
-              "carrierId",
-              "actorRole",
-              "actorId",
-              "recipientId",
-              "corridor",
-              "meetupId",
-              "kind",
-              "placeLabel",
-              "startAt"
-            ],
-            "additionalProperties": false
-          }
-        },
-        "required": [
-          "aggregateType",
-          "aggregateId",
-          "occurredAt",
-          "correlationId",
-          "schemaVersion",
-          "eventType",
-          "payload"
-        ],
-        "additionalProperties": false
-      },
-      "PhoneRevealedEvent": {
-        "type": "object",
-        "properties": {
-          "aggregateType": {
-            "type": "string",
-            "const": "conversation"
-          },
-          "aggregateId": {
-            "$ref": "#/components/schemas/ObjectId"
-          },
-          "occurredAt": {
-            "type": "string",
-            "format": "date-time",
-            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
-          },
-          "correlationId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "schemaVersion": {
-            "type": "number",
-            "const": 1
-          },
-          "eventType": {
-            "type": "string",
-            "const": "conversation.phone_revealed"
-          },
-          "payload": {
-            "type": "object",
-            "properties": {
-              "conversationId": {
-                "$ref": "#/components/schemas/ObjectId"
-              },
-              "bookingId": {
-                "$ref": "#/components/schemas/ObjectId"
-              },
-              "shipperId": {
-                "$ref": "#/components/schemas/ObjectId"
-              },
-              "carrierId": {
-                "$ref": "#/components/schemas/ObjectId"
-              },
-              "actorRole": {
-                "type": "string",
-                "enum": [
-                  "SHIPPER",
-                  "CARRIER",
-                  "SYSTEM"
-                ]
-              },
-              "actorId": {
-                "anyOf": [
-                  {
-                    "$ref": "#/components/schemas/ObjectId"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              },
-              "recipientId": {
-                "$ref": "#/components/schemas/ObjectId"
-              },
-              "corridor": {
-                "type": "object",
-                "properties": {
-                  "originCity": {
-                    "type": "string"
-                  },
-                  "destinationCity": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "originCity",
-                  "destinationCity"
-                ],
-                "additionalProperties": false
-              },
-              "revealedUserId": {
-                "$ref": "#/components/schemas/ObjectId"
-              }
-            },
-            "required": [
-              "conversationId",
-              "bookingId",
-              "shipperId",
-              "carrierId",
-              "actorRole",
-              "actorId",
-              "recipientId",
-              "corridor",
-              "revealedUserId"
-            ],
-            "additionalProperties": false
-          }
-        },
-        "required": [
-          "aggregateType",
-          "aggregateId",
-          "occurredAt",
-          "correlationId",
-          "schemaVersion",
-          "eventType",
-          "payload"
-        ],
-        "additionalProperties": false
-      },
-      "MessagingDomainEvent": {
-        "oneOf": [
-          {
-            "$ref": "#/components/schemas/MessagePostedEvent"
-          },
-          {
-            "$ref": "#/components/schemas/MeetupProposedEvent"
-          },
-          {
-            "$ref": "#/components/schemas/MeetupAcceptedEvent"
-          },
-          {
-            "$ref": "#/components/schemas/PhoneRevealedEvent"
-          }
-        ]
       },
       "OpsAlertRule": {
         "type": "string",

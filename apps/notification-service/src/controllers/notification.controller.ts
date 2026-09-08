@@ -18,6 +18,9 @@ import {
 import type { AuthenticatedRequest } from "@packages/middleware/isAuthenticated";
 import { ObjectIdSchema } from "@packages/api-contracts";
 import { toNotificationView } from "../services/notification-view.mapper";
+import pino from "pino";
+
+const controllerLogger = pino({ name: "notification-service" }).child({ module: "notifications" });
 
 const PAGE_SIZE = 50;
 
@@ -55,14 +58,26 @@ export async function getMyNotifications(
       ? await prisma.user.findMany({ where: { id: { in: [...counterpartIds] } }, select: { id: true, firstName: true } })
       : [];
     const firstNames = new Map(users.map((u) => [u.id, u.firstName]));
-    res.json({
-      notifications: rows.map((row) => {
-        const p = row.payload as { shipperId?: unknown; carrierId?: unknown };
-        const other = p.carrierId === userId ? p.shipperId : p.shipperId === userId ? p.carrierId : null;
-        return toNotificationView(row, typeof other === "string" ? (firstNames.get(other) ?? null) : null);
-      }),
-      unreadCount,
+    // ANO-API-16 — le mapper reste un GARDE (il refuse un type hors contrat), mais son refus
+    // ne doit pas emporter la boîte entière : jusqu'ici, une seule notification illisible
+    // faisait répondre 500 à toute la liste, et un membre ne voyait plus rien. Une ligne
+    // qu'on ne sait pas rendre est donc ignorée et JOURNALISÉE — le membre garde ses autres
+    // notifications, et l'exploitation voit ce qu'il faut ajouter au contrat.
+    const notifications = rows.flatMap((row) => {
+      const p = row.payload as { shipperId?: unknown; carrierId?: unknown };
+      const other = p.carrierId === userId ? p.shipperId : p.shipperId === userId ? p.carrierId : null;
+      try {
+        return [toNotificationView(row, typeof other === "string" ? (firstNames.get(other) ?? null) : null)];
+      } catch (e) {
+        controllerLogger.warn(
+          { notificationId: row.id, type: row.type, err: e },
+          "Notification illisible ignorée — type absent du contrat ?"
+        );
+        return [];
+      }
     });
+
+    res.json({ notifications, unreadCount });
   } catch (err) {
     next(err);
   }

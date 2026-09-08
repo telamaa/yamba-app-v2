@@ -30,7 +30,12 @@ module.exports = {
       compiler: "tsc",
       main: "./src/main.ts",
       tsConfig: "./tsconfig.app.json",
-      assets: ["./src/assets"],
+      // ANO-API-17 — les gabarits EJS sont EMBARQUÉS dans le bundle : leur chemin ne doit
+      // pas dépendre du répertoire depuis lequel on lance le service (voir booking-emails.ts).
+      assets: [
+        "./src/assets",
+        { input: "./src/emails/templates", output: "emails/templates", glob: "**/*.ejs" },
+      ],
       optimization: false,
       outputHashing: "none",
       generatePackageJson: true,
