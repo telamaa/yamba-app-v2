@@ -4218,29 +4218,29 @@ volontairement**.
 | API-TRIP-16 | Documents et déduplication | majeure | 201 puis 200 | 201, statut `PENDING`, retour à `NOT_SUBMITTED` après retrait | OK | — |
 | API-TRIP-17 | Signature de téléversement | majeure | 401 / 200 | 401 sans session, 200 avec (token + expire) | OK | — |
 | API-TRIP-18 | Suppression idempotente | mineure | 200 ×2 | suppression 200 ; rejeu **400 « Document not found. »** | PARTIEL | non idempotent |
-| API-DEAL-01 | Intention de paiement | majeure | 201, rien persisté | | | |
-| API-DEAL-02 | Les neuf refus typés | **bloquante** | 409 + code | | | |
+| API-DEAL-01 | Intention de paiement | majeure | 201, rien persisté | 409 `QUOTE_DIVERGENCE` puis 201 `provider: FAKE` | OK | — |
+| API-DEAL-02 | Les neuf refus typés | **bloquante** | 409 + code | 6 codes vérifiés, tous 409 `type:booking` | **KO** | ANO-API-12 |
 | API-DEAL-03 | Divergence de devis | **bloquante** | 409 `QUOTE_DIVERGENCE` | | | |
 | API-DEAL-04 | Créer un deal | majeure | 201, kilos réservés | | | |
-| API-DEAL-05 | Instantanés immuables | **bloquante** | devis inchangé | | | |
-| API-DEAL-06 | Deux vues, listes blanches | **bloquante** | `fuites: []` | | | |
-| API-DEAL-07 | Acceptation, capture | majeure | 200 `ACCEPTED` | | | |
-| API-DEAL-08 | Refus d'acceptation | majeure | 409 / 403 | | | |
-| API-DEAL-09 | Refus du Voyageur | majeure | 200, remboursement total | | | |
-| API-DEAL-10 | Aperçu = montant appliqué | **bloquante** | égalité | | | |
-| API-DEAL-11 | Inspection complète exigée | **bloquante** | 400 / 400 / 200 | | | |
-| API-DEAL-12 | **Code absent de la réponse** | **bloquante** | corps sans code | | | |
+| API-DEAL-05 | Instantanés immuables | **bloquante** | devis inchangé | prix du trajet ×9 → devis inchangé au centime | OK | — |
+| API-DEAL-06 | Deux vues, listes blanches | **bloquante** | `fuites: []` | code invisible au Voyageur, gains seuls ; `recipient` complet exposé | PARTIEL | à arbitrer |
+| API-DEAL-07 | Acceptation, capture | majeure | 200 `ACCEPTED` | charte 400, acceptation 200, capture posée, conversation ouverte | OK | — |
+| API-DEAL-08 | Refus d'acceptation | majeure | 409 / 403 | 409 · 409 · 403 « Only the carrier can accept » | OK | `reason` absent (ANO-API-04) |
+| API-DEAL-09 | Refus du Voyageur | majeure | 200, remboursement total | motif en liste fermée ; `DECLINED` + remboursement intégral | OK | — |
+| API-DEAL-10 | Aperçu = montant appliqué | **bloquante** | égalité | aperçu 2834/0 = annulation 2834/0 | OK | — |
+| API-DEAL-11 | Inspection complète exigée | **bloquante** | 400 / 400 / 200 | 400 partielle · 400 sans photo · 200 `PICKED_UP` | OK | — |
+| API-DEAL-12 | **Code absent de la réponse** | **bloquante** | corps sans code | 0 séquence de six chiffres, 4 champs exactement | OK | — |
 | API-DEAL-13 | Refus à la récupération | majeure | 200, remboursement | | | |
 | API-DEAL-14 | Séquence des jalons | majeure | 409 / 409 / 200 / 409 | | | |
-| API-DEAL-15 | Remise, verrou du code | **bloquante** | 3 essais puis verrou | | | |
-| API-DEAL-16 | Régénération, limite 5 | majeure | 5×200 puis 409 | | | |
-| API-DEAL-17 | Confirmation, versement | majeure | 200 `SENT` | | | |
-| API-DEAL-18 | Litige, versement gelé | majeure | 200 `FROZEN` | | | |
+| API-DEAL-15 | Remise, verrou du code | **bloquante** | 3 essais puis verrou | 2→1→0 puis `DELIVERY_LOCKED` ; bon code refusé pendant le verrou | PARTIEL | pas d'horizon |
+| API-DEAL-16 | Régénération, limite 5 | majeure | 5×200 puis 409 | 5 régénérations, la 6e `CODE_REGENERATION_LIMIT` | OK | — |
+| API-DEAL-17 | Confirmation, versement | majeure | 200 `SENT` | `COMPLETED`, `payoutStatus: SENT`, portefeuille +5500 | OK | — |
+| API-DEAL-18 | Litige, versement gelé | majeure | 200 `FROZEN` | 400 ×2 puis `DISPUTED` + `payoutStatus: FROZEN` | OK | — |
 | API-DEAL-19 | Déclaration du Voyageur | majeure | 201 puis 409 | | | |
-| API-DEAL-20 | Notation double aveugle | majeure | 201, autre note cachée | | | |
-| API-DEAL-21 | Lien de suivi unique | majeure | même jeton | | | |
-| API-DEAL-22 | Page destinataire minimale | **bloquante** | `fuites: []` | | | |
-| API-DEAL-23 | Listes bornées au propriétaire | **bloquante** | aucun croisement | | | |
+| API-DEAL-20 | Notation double aveugle | majeure | 201, autre note cachée | critères refusés en 400 ; double aveugle correct | **KO** | ANO-API-14 |
+| API-DEAL-21 | Lien de suivi unique | majeure | même jeton | un seul jeton par deal, refus 403 au Voyageur | OK | — |
+| API-DEAL-22 | Page destinataire minimale | **bloquante** | `fuites: []` | 500 → corrigé ; page minimale, jeton inventé 404 | **KO** | ANO-API-13 |
+| API-DEAL-23 | Listes bornées au propriétaire | **bloquante** | aucun croisement | 401 sans session, 200 avec, sur les trois listes | OK | — |
 | API-MSG-01 | Fil créé au premier accès | majeure | 200, même id | | | |
 | API-MSG-02 | Pas de fil avant acceptation | **bloquante** | 403 ×3 | | | |
 | API-MSG-03 | Code refusé, contact marqué | **bloquante** | 400 / 201 `flagged` | | | |

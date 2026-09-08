@@ -214,6 +214,9 @@ L'historique est conservé : un KO reste écrit KO, sa correction s'ajoute en de
 | ANO-API-04 | API-GW-19 | mineure | 08/09/2026 | ouverte | à grouper avec le domaine deal (chapitre 5.3) |
 | ANO-API-10 | API-TRIP-03 | mineure | 08/09/2026 | **close** | `.catch("all")` sur le filtre `mode` |
 | ANO-API-11 | API-TRIP-01 / 04 | majeure | 08/09/2026 | **close** | invariant à la publication + exclusion retirée + seed |
+| ANO-API-12 | API-DEAL-02 | majeure | 08/09/2026 | **close** | valeur déclarée confrontée aux plafonds avant l'autorisation |
+| ANO-API-13 | API-DEAL-22 | **bloquante** | 08/09/2026 | **close** | champ corrigé + garde-fou `select` **systémique** sur deal-service |
+| ANO-API-14 | API-DEAL-20 | majeure | 08/09/2026 | **close** | `z.partialRecord` — piège d'exhaustivité de Zod 4 |
 | ANO-API-05 | API-AUTH-03 / 05 | majeure | 08/09/2026 | **close** | 409 / 401 / 429, classes d'erreur enrichies |
 | ANO-API-06 | API-AUTH-09 | **bloquante** | 08/09/2026 | **close** | liste blanche + test lisant le schéma Prisma |
 | ANO-API-07 | API-AUTH-11 / 12 / 13 | majeure | 08/09/2026 | **close** | `jti` dans le jeton d'accès — registre **D75 candidate** |
@@ -906,3 +909,94 @@ PRODUCTION       : sans objet — rien n'est en production à ce jour.
 
 10. **API-TRIP-13** annonce la capacité « immuable après publication » : elle ne l'est pas, et la garde réelle (aucune modification dès qu'une réservation existe) est meilleure.
 11. **API-TRIP-01** liste `rating` et `reviewCount` parmi les champs d'une carte : ils n'apparaissent pas sur un jeu d'essai sans avis.
+
+## Chapitre 5.3 — deal-service, le cœur transactionnel (18 fiches jouées sur 23)
+
+**13 OK · 2 PARTIEL · 3 KO.** Les cinq fiches bloquantes jouées passent, sauf celles portant les
+trois anomalies ci-dessous — toutes corrigées dans la campagne.
+
+| Fiche | Intitulé | Gravité | Verdict | Pourquoi |
+|---|---|---|---|---|
+| API-DEAL-01 | Autoriser un devis | majeure | **OK** | 409 `QUOTE_DIVERGENCE` avec les deux montants, puis 201 `provider: FAKE`, `clientSecret: null`. |
+| API-DEAL-02 | **Catalogue des refus typés** | **bloquante** | **KO** | Six codes vérifiés — `QUOTE_DIVERGENCE`, `CAPACITY_EXCEEDED`, `FAMILY_REFUSED`, `OWN_TRIP`, `TRIP_NOT_BOOKABLE` répondent tous 409 `type:"booking"`. Le septième, `NEW_ACCOUNT_CAP`, ne se déclenchait jamais → `ANO-API-12`. |
+| API-DEAL-05 | **Instantané de prix immuable** | **bloquante** | **OK** | Prix du trajet multiplié par 9 : le devis du deal **ne bouge pas d'un centime**. La règle non négociable tient. |
+| API-DEAL-06 | **Vues à liste blanche** | **bloquante** | **PARTIEL** | Le point critique passe : le code de livraison est **invisible** au Voyageur (`fuites: []`), qui ne voit que ses gains (`transportCents`), jamais les totaux Expéditeur. Mais la vue Voyageur porte `recipient` **complet** (nom, téléphone, **email**) dès `ACCEPTED`. |
+| API-DEAL-07 | Acceptation et capture | majeure | **OK** | Charte refusée → 400 ; acceptation → 200, `capturedAt` posée, et **la conversation du deal s'ouvre** (`canWrite: true`). |
+| API-DEAL-08 | Refus de l'acceptation | majeure | **OK** | Rejeu → 409, deal terminal → 409, Expéditeur qui accepte → **403** « Only the carrier can accept this deal ». |
+| API-DEAL-09 | Le Voyageur refuse | majeure | **OK** | Le motif est une **liste fermée** (refus champ par champ avec les valeurs admises) ; `DECLINED` + **remboursement intégral** (2834 = le total). |
+| API-DEAL-10 | Retenue annoncée = retenue appliquée | majeure | **OK** | Aperçu `{refundCents: 2834, retentionCents: 0, fullRefundUntil}` → annulation `refundAmountCents: 2834`. L'annonce et l'effet coïncident. |
+| API-DEAL-11 | **Cinq points d'inspection** | **bloquante** | **OK** | Inspection partielle → 400 ; sans photo → 400 ; complète → 200 `PICKED_UP`. |
+| API-DEAL-12 | **Le code n'est pas dans la réponse** | **bloquante** | **OK** | **Zéro** séquence de six chiffres, et exactement quatre champs : `bookingId`, `status`, `refundAmountCents`, `currencyCode`. |
+| API-DEAL-15 | **Le verrou du code** | **bloquante** | **PARTIEL** | Compteur 2 → 1 → 0 avec `DELIVERY_CODE_INVALID`, puis `DELIVERY_LOCKED`, et le **bon code est refusé pendant le verrou**. Deux réserves : `lockUntilSeconds` est `null` (le Voyageur ignore combien de temps attendre) et le code passe ensuite à `TRANSITION_NOT_ALLOWED`, donc un client qui traduit `DELIVERY_LOCKED` perd le fil. |
+| API-DEAL-16 | Régénérer le code | majeure | **OK** | **Cinq** régénérations acceptées, codes tous différents (CSPRNG), la sixième refusée en 409 `CODE_REGENERATION_LIMIT`. |
+| API-DEAL-17 | La confirmation lance le versement | majeure | **OK** | `COMPLETED`, `payoutStatus: "SENT"`, `payoutAmountCents: 5500` — et le portefeuille du Voyageur passe de 6 100 à **11 600**. La chaîne argent complète fonctionne. |
+| API-DEAL-18 | Le litige gèle le versement | majeure | **OK** | Description < 50 caractères → 400 ; engagement d'honnêteté obligatoire → 400 ; litige complet → `DISPUTED` et **`payoutStatus: "FROZEN"`**. |
+| API-DEAL-20 | Notation en double aveugle | majeure | **KO** | Le double aveugle lui-même est **correct** (`myRating` visible, `counterpartRating: null`, `revealedAt: null`). Mais noter **avec des critères** était impossible → `ANO-API-14`. |
+| API-DEAL-21 | Un seul lien par deal | mineure | **OK** | Le rejeu rend **le même jeton** ; le Voyageur reçoit 403 « Only the shipper shares the tracking link ». |
+| API-DEAL-22 | **Page destinataire publique** | **bloquante** | **KO** | Répondait **500** → `ANO-API-13`. Une fois corrigée, elle est exemplaire : prénoms seuls, aucun code, **aucun montant**, aucun email, aucun nom de famille, aucun téléphone ; jeton inventé → 404. |
+| API-DEAL-23 | Listes bornées au propriétaire | majeure | **OK** | `me/deals`, `me/notifications`, `me/wallet` : 401 sans session, 200 avec. |
+
+### Anomalies du chapitre 5.3
+
+```
+ANO-API-12
+Fiche          : API-DEAL-02 · Gravité : majeure · ÉTAT : CLOSE (PR #239)
+Constat        : un compte créé 30 secondes plus tôt obtenait une intention de paiement pour
+                 un colis déclaré à 5 000 €. Le plafond CNF-06 existe et fonctionne — mais à
+                 la CRÉATION du deal, une fois la carte déjà pré-autorisée.
+Cause          : deal-request.service.ts passait `declaredValueCents: 0` EN DUR à
+                 assertWithinCaps, sur la ligne dont le commentaire dit « avant d'autoriser
+                 l'argent ».
+Correction     : `CreatePaymentIntentRequest` accepte la valeur déclarée (FACULTATIVE), qui
+                 est confrontée aux plafonds avant l'autorisation.
+Contre-épreuve : compte neuf + 5000 € → 409 dès l'autorisation · sans valeur → 201 inchangé ·
+                 200 € → 201 · compte ancien + 5000 € → 201.
+```
+
+```
+ANO-API-13
+Fiche          : API-DEAL-22 · Gravité : BLOQUANTE · ÉTAT : CLOSE (PR #240)
+Constat        : GET /api/track/{token} — la page que l'Expéditeur partage au destinataire —
+                 répondait 500. « Unknown field `cancelledAt` for select on model `Booking` ».
+                 La fonctionnalité était ENTIÈREMENT inopérante.
+Cause          : `Booking` n'a pas de `cancelledAt` (seul `cancelReason` existe). C'est le
+                 DEUXIÈME cas identique de la campagne après ANO-API-09 (export RGPD), et
+                 pour la même raison : les specs injectent un faux Prisma, qui ne valide
+                 aucun nom de champ.
+Correction     : champ retiré du select — et surtout, le garde-fou devient SYSTÉMIQUE :
+                 prisma-select-fields.spec.ts lit tous les fichiers de deal-service, extrait
+                 chaque `select` et le confronte à prisma/schema.prisma.
+Contre-épreuve : page à 200 ; contenu vérifié minimal ; jeton inventé → 404 ; test vérifié en
+                 réintroduisant le bug.
+```
+
+```
+ANO-API-14
+Fiche          : API-DEAL-20 · Gravité : majeure · ÉTAT : CLOSE
+Constat        : noter AVEC des critères était impossible. Un Expéditeur notant un Voyageur
+                 avec ses trois critères (PUNCTUALITY, COMMUNICATION, PARCEL_CARE) recevait
+                 400 en réclamant DECLARATION_CLARITY et RESPONSIVENESS — les critères de
+                 l'AUTRE rôle. Seul le contournement « ne pas envoyer de critères » marchait.
+Cause          : `z.record(RatingCriterionSchema, RatingVoteSchema)`. Depuis **Zod 4**, un
+                 `record` dont la clé est un enum est EXHAUSTIF : toutes les valeurs de
+                 l'énumération deviennent obligatoires. Preuve isolée :
+                 `z.record(z.enum(['A','B']), z.string()).safeParse({A:'x'})` → échec ;
+                 `z.partialRecord(...)` → succès. Le piège est silencieux : le typecheck
+                 passe, et les tests qui n'envoient pas de critères passent aussi.
+Correction     : `z.partialRecord` sur les deux occurrences (requête et réponse). Vérifié
+                 qu'aucun autre `z.record(<enum>, …)` n'existe dans le dépôt — les autres
+                 records ont des clés `string`, non concernées.
+Contre-épreuve : trois critères du rôle → la validation passe (409 « déjà noté », plus 400) ;
+                 critère inconnu → toujours 400 ; double aveugle intact.
+```
+
+### À arbitrer (le code contredit le cahier et s'en explique)
+
+1. **API-DEAL-06** — la vue Voyageur porte `recipient` complet dès `ACCEPTED`. Le code l'assume :
+   « Le destinataire est visible côté Carrier : il en a besoin pour livrer. » C'est vrai du **nom**.
+   Ça ne l'est pas de l'**email**, qui ne sert à rien pour livrer, et le **téléphone** gagnerait à
+   n'apparaître qu'à `PICKED_UP`. Le destinataire est un **tiers** qui n'a rien signé : c'est un
+   sujet de minimisation, à trancher avec le dossier 11.
+2. **API-DEAL-15** — le verrou du code de livraison ne dit pas **quand réessayer**
+   (`lockUntilSeconds: null`), et le code métier change entre le troisième essai et les suivants.
+   Même thème que côté auth : un refus doit donner un horizon.

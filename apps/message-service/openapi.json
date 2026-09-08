@@ -11486,14 +11486,7 @@
             },
             "additionalProperties": {
               "$ref": "#/components/schemas/RatingVote"
-            },
-            "required": [
-              "PUNCTUALITY",
-              "COMMUNICATION",
-              "PARCEL_CARE",
-              "DECLARATION_CLARITY",
-              "RESPONSIVENESS"
-            ]
+            }
           },
           "comment": {
             "description": "Public, attributed, immutable — 280 chars max",
@@ -11523,14 +11516,7 @@
                 },
                 "additionalProperties": {
                   "$ref": "#/components/schemas/RatingVote"
-                },
-                "required": [
-                  "PUNCTUALITY",
-                  "COMMUNICATION",
-                  "PARCEL_CARE",
-                  "DECLARATION_CLARITY",
-                  "RESPONSIVENESS"
-                ]
+                }
               },
               {
                 "type": "null"
