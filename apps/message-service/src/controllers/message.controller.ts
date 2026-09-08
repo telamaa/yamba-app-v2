@@ -7,7 +7,7 @@
 import type { NextFunction, Response } from "express";
 import { ValidationError } from "@packages/error-handler";
 import type { AuthenticatedRequest } from "@packages/middleware/isAuthenticated";
-import { ObjectIdSchema, PostMessageRequestSchema, ProposeMeetupRequestSchema, ReportMessageRequestSchema } from "@packages/api-contracts";
+import { ObjectIdSchema, PostMessageRequestSchema, ProposeMeetupRequestSchema, ReportMessageRequestSchema, resolveViewerLocale } from "@packages/api-contracts";
 import { quickRepliesFor } from "../lib/quick-replies";
 import type { ConversationService } from "../services/conversation.service";
 
@@ -26,7 +26,13 @@ export function makeMessageController(service: ConversationService) {
   return {
     async quickReplies(req: AuthenticatedRequest, res: Response, next: NextFunction) {
       try {
-        const locale = (req.user as { preferredLocale?: string | null } | undefined)?.preferredLocale ?? (req.headers["x-locale"] as string | undefined) ?? null;
+        // Dette D-1 : une seule règle pour toute la plateforme (D44 — la langue du COMPTE avant
+        // celle de l'appareil). Avant, chaque endpoint écrivait la sienne.
+        const locale = resolveViewerLocale({
+          preferred: (req.user as { preferredLocale?: string | null } | undefined)?.preferredLocale,
+          header: req.headers["x-locale"] as string | undefined,
+          acceptLanguage: req.headers["accept-language"],
+        });
         res.status(200).json({ items: quickRepliesFor(locale) });
       } catch (e) {
         next(e);

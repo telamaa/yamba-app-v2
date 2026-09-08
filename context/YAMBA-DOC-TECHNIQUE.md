@@ -3416,3 +3416,67 @@ base supprimée **avant** le fichier, l'échec du fournisseur absorbé, et la ro
 ## Tests
 
 trip-service 235 → **240**. Plateforme **946**.
+
+---
+
+# Dette D-1 soldée — une seule règle pour la langue d'une réponse
+
+## L'arbitrage était déjà rendu
+
+Le journal présentait D-1 comme un choix à trancher. La décision **D44** le tranchait déjà : « flux
+avec compte : `preferredLocale` […] une locale par **utilisateur**, pas par appareil », le front
+tenant la valeur à jour (`PATCH /auth/me/locale` à chaque bascule, implémenté). Le code et le
+registre étaient d'accord ; **l'attendu du cahier de recette était faux**, et la règle de précédence
+du projet le dit : code + tests > registre > synthèses. Le cahier est corrigé.
+
+## La vraie dette : la règle existait en trois exemplaires
+
+| Endpoint | Règle appliquée | Manque |
+|---|---|---|
+| `GET /messages/quick-replies` | compte → appareil | — |
+| `GET /trips/favorites` | `?locale` → appareil | le compte jamais consulté |
+| `GET /trips/search` | `?locale` seul, défaut `fr` | ni compte, ni appareil |
+
+Aucune fausse isolément ; ensemble, pas la même règle. Et la recherche répondait **toujours en
+français** à qui ne passait pas `?locale=` : le front passe le paramètre, donc rien ne se voyait —
+mais tout autre client de l'API recevait du français, quel que soit le lecteur.
+
+## La règle, écrite une fois
+
+```ts
+export function resolveViewerLocale(sources: LocaleSources): SupportedLocale
+// 1. ?locale= explicite   → surcharge délibérée, pour cet appel (liens partageables, clients API)
+// 2. preferredLocale      → D44, la langue du COMPTE
+// 3. x-locale             → l'appareil, pour un visiteur sans compte
+// 4. Accept-Language, puis le défaut
+```
+
+Elle vit dans `@packages/api-contracts/locale`, là où vit déjà la liste des langues — le fichier
+que le front importe par un alias dédié, sans embarquer les schémas.
+
+**Un détail qui compte** : une valeur non supportée **ne consomme pas son tour**. `?locale=de` sur
+un membre anglophone rend de l'anglais, pas le français par défaut — sinon un paramètre erroné
+écraserait silencieusement la préférence du lecteur. C'est la différence entre boucler sur les
+sources et enchaîner des `??`.
+
+## Le cas de la recherche
+
+Son schéma portait `locale: z.enum(LOCALES).optional().default("fr")` : le défaut **avalait
+l'absence** avant qu'on puisse la voir. La locale est donc résolue **avant** l'analyse :
+
+```ts
+const parsed = searchTripsQuerySchema.safeParse({ ...req.query, locale: localeDeLaRequete(req) });
+```
+
+Le contrat du DTO ne bouge pas ; c'est l'entrée qui est complétée. `searchTrips` est
+`isOptionallyAuthenticated` : `req.user` peut être absent, et c'est le cas nominal.
+
+## Garde-fous
+
+- `viewer-locale.spec.ts` (6 cas) — la règle, y compris le piège de la valeur inconnue ;
+- `one-locale-rule.spec.ts` (4 cas) — **aucun contrôleur ne lit `x-locale` sans passer par la règle
+  commune**. C'est lui qui empêche l'apparition d'une quatrième variante.
+
+## Tests
+
+trip-service 240 → **250**. Plateforme **956**. Contrats OpenAPI inchangés.

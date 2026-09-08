@@ -463,8 +463,17 @@ Ordre de demarrage : auth -> trip -> gateway.
   fichier orphelin, jamais une ligne qui pointe vers un fichier disparu. Corriges dans la
   meme passe, des statuts que D-4 avait laisses : 16 gardes `!req.user` en 400 → **401**, et
   3 refus de propriete en 400 `UNAUTHENTICATED` → **403 NOT_OWNER**. Garde-fou
-  `idempotent-delete.spec.ts`. Plateforme **946 tests**. **Journal de dette : il ne reste que
-  D-1**, l'arbitrage produit `x-locale` contre `preferredLocale` — un choix, pas un defaut.
+  `idempotent-delete.spec.ts`. Plateforme **946 tests**.
+- 09/09 : **dette D-1 soldee — le JOURNAL DE DETTE EST VIDE**. L'arbitrage n'etait pas a
+  rendre : D44 le tranchait deja (« une locale par utilisateur, pas par appareil ») et le
+  front tient `preferredLocale` a jour — c'est l'ATTENDU DU CAHIER qui etait faux (corrige).
+  La vraie dette : la regle existait en TROIS exemplaires — les favoris ignoraient le compte,
+  la recherche repondait toujours en francais sans `?locale=` (invisible depuis le front, qui
+  passe le parametre ; visible pour tout autre client de l'API). Une seule fonction
+  `resolveViewerLocale` (@packages/api-contracts) : `?locale` > compte > appareil >
+  Accept-Language > defaut, une valeur non supportee ne consommant PAS son tour. Garde-fou
+  `one-locale-rule.spec.ts` : aucun controleur ne lit `x-locale` sans passer par la regle.
+  Plateforme **956 tests**. Bilan campagne : 23 anomalies closes, 5 dettes soldees.
 - 04/09 : C-PR6b feat/c6b-admin-alerts (D59 3A / 4A, A129–A131) — neuf regles de seuil
   (evaluateAlerts pur, instantane de dix compteurs), GET /admin/alerts sans etat (accueil
   admin), cron horaire avec dedoublonnage Redis SET NX (un email par regle et par jour, Redis

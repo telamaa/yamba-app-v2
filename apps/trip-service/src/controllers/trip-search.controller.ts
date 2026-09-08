@@ -1,4 +1,5 @@
 import type { Request, Response, NextFunction } from "express";
+import { resolveViewerLocale, type SupportedLocale } from "@packages/api-contracts";
 import { notHiddenFilter } from "../lib/admin-trips.rules";
 import { recordSearch, tripViews } from "@packages/libs/redis/trip-stats";
 import redis from "@packages/libs/redis";
@@ -25,6 +26,21 @@ import {
   PARCEL_FAMILIES,
   type ParcelFamily,
 } from "../dto/trip-search.dto";
+
+/**
+ * La langue d'une réponse de recherche (dette D-1, règle commune D44) : la surcharge explicite
+ * `?locale=`, puis la langue du COMPTE, puis celle de l'appareil. La recherche est
+ * `isOptionallyAuthenticated` : `req.user` peut être absent, et c'est le cas nominal.
+ */
+function localeDeLaRequete(req: Request): SupportedLocale {
+  return resolveViewerLocale({
+    query: typeof req.query.locale === "string" ? req.query.locale : null,
+    preferred: (req as { user?: { preferredLocale?: string | null } }).user?.preferredLocale,
+    header: req.headers["x-locale"] as string | undefined,
+    acceptLanguage: req.headers["accept-language"],
+  });
+}
+
 
 // ─────────────────────────────────────────────────────
 // HARD FILTERS — appliqués TOUJOURS, non-négociables
@@ -213,7 +229,11 @@ export const searchTrips = async (
   next: NextFunction
 ) => {
   try {
-    const parsed = searchTripsQuerySchema.safeParse(req.query);
+    // Dette D-1 — sans `?locale=`, la recherche répondait TOUJOURS en français (le défaut du
+    // schéma), même pour un membre anglophone : ni la langue du compte ni celle de l'appareil
+    // n'étaient consultées. Le front s'en sortait parce qu'il passe le paramètre ; un autre
+    // client de l'API, non. On résout AVANT l'analyse, avec la règle commune.
+    const parsed = searchTripsQuerySchema.safeParse({ ...req.query, locale: localeDeLaRequete(req) });
     if (!parsed.success) {
       return next(
         new ValidationError(
@@ -353,7 +373,7 @@ export const searchTripsFacets = async (
   next: NextFunction
 ) => {
   try {
-    const parsed = searchFacetsQuerySchema.safeParse(req.query);
+    const parsed = searchFacetsQuerySchema.safeParse({ ...req.query, locale: localeDeLaRequete(req) });
     if (!parsed.success) {
       return next(
         new ValidationError(
