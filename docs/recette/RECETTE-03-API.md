@@ -4241,18 +4241,18 @@ volontairement**.
 | API-DEAL-21 | Lien de suivi unique | majeure | même jeton | un seul jeton par deal, refus 403 au Voyageur | OK | — |
 | API-DEAL-22 | Page destinataire minimale | **bloquante** | `fuites: []` | 500 → corrigé ; page minimale, jeton inventé 404 | **KO** | ANO-API-13 |
 | API-DEAL-23 | Listes bornées au propriétaire | **bloquante** | aucun croisement | 401 sans session, 200 avec, sur les trois listes | OK | — |
-| API-MSG-01 | Fil créé au premier accès | majeure | 200, même id | | | |
-| API-MSG-02 | Pas de fil avant acceptation | **bloquante** | 403 ×3 | | | |
-| API-MSG-03 | Code refusé, contact marqué | **bloquante** | 400 / 201 `flagged` | | | |
-| API-MSG-04 | Fenêtre d'écriture | majeure | clés stables + 400 | | | |
-| API-MSG-05 | Marquer lu | mineure | 200 idempotent | | | |
-| API-MSG-06 | Rendez-vous et créneaux | majeure | 201 / 400 ×5 | | | |
-| API-MSG-07 | Contre-proposition | majeure | remplace | | | |
-| API-MSG-08 | Accepter celle de l'autre | majeure | 400 / 200 / 400 | | | |
-| API-MSG-09 | Numéro pas avant l'heure | **bloquante** | 400 `TOO_EARLY` | | | |
-| API-MSG-10 | Signaler un message | majeure | 400/400/201/409 | | | |
-| API-MSG-11 | Réponses rapides | mineure | 200, clés stables | | | |
-| API-MSG-12 | Lecture admin journalisée | majeure | 200 + ligne de journal | | | |
+| API-MSG-01 | Fil créé au premier accès | majeure | 200, même id | 200, fil créé, `canWrite: true` | OK | — |
+| API-MSG-02 | Pas de fil avant acceptation | **bloquante** | 403 ×3 | 403 pour un tiers, 401 sans session | OK | — |
+| API-MSG-03 | Code refusé, contact marqué | **bloquante** | 400 / 201 `flagged` | 201 · **400 `DELIVERY_CODE_IN_MESSAGE`** · 201 `flaggedContact:true` · 400 | OK | — |
+| API-MSG-04 | Fenêtre d'écriture | majeure | clés stables + 400 | `DISPUTE_OPEN` lecture seule ; `writeClosesAt` sur les deals finis ; écriture 400 | OK | code dans le message |
+| API-MSG-05 | Marquer lu | mineure | 200 idempotent | non-lus 5 → 0 après `read` | OK | — |
+| API-MSG-06 | Rendez-vous et créneaux | majeure | 201 / 400 ×5 | 201 `PROPOSED`, objet à part entière | OK | — |
+| API-MSG-07 | Contre-proposition | majeure | remplace | la contre-proposition annule la précédente, historique conservé | OK | — |
+| API-MSG-08 | Accepter celle de l'autre | majeure | 400 / 200 / 400 | sa propre proposition refusée (OWN_PROPOSAL), l'autre l'accepte → `ACCEPTED` | OK | code dans le message |
+| API-MSG-09 | Numéro pas avant l'heure | **bloquante** | 400 `TOO_EARLY` | 400 `TOO_EARLY` avec l'heure exacte d'ouverture (17 h − 2 h) | OK | — |
+| API-MSG-10 | Signaler un message | majeure | 400/400/201/409 | 409 doublon · 400 son propre message · motif en liste fermée | OK | — |
+| API-MSG-11 | Réponses rapides | mineure | 200, clés stables | couvert par API-GW-10 : clé stable, texte selon la langue du LECTEUR | OK | — |
+| API-MSG-12 | Lecture admin journalisée | majeure | 200 + ligne de journal | session admin (TOTP) hors de portée d'une campagne API | ⏭ | cahier Admin |
 | API-NOTIF-01 | Lire ses notifications | mineure | 200, ≤ 50 | | | |
 | API-NOTIF-02 | Marquer lu, idempotent | mineure | 200 ×4 | | | |
 | API-NOTIF-03 | Quatre statuts distincts | **bloquante** | 403/404/400/401 | | | |

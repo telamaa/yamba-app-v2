@@ -1000,3 +1000,31 @@ Contre-épreuve : trois critères du rôle → la validation passe (409 « déj�
 2. **API-DEAL-15** — le verrou du code de livraison ne dit pas **quand réessayer**
    (`lockUntilSeconds: null`), et le code métier change entre le troisième essai et les suivants.
    Même thème que côté auth : un refus doit donner un horizon.
+
+## Chapitre 5.4 — message-service (11 fiches sur 12)
+
+**11 OK · 1 ⏭.** Aucune anomalie. C'est le chapitre le plus propre de la campagne.
+
+| Fiche | Intitulé | Gravité | Verdict | Pourquoi |
+|---|---|---|---|---|
+| API-MSG-01 | Fil créé au premier accès | majeure | **OK** | 200, identifiant créé, `access: {canRead:true, canWrite:true}`. |
+| API-MSG-02 | Aucun fil pour un tiers | **bloquante** | **OK** | Tiers → **403** « You are not a party to this deal » ; sans session → **401**. |
+| API-MSG-03 | **Les deux gardes du message** | **bloquante** | **OK** | Message ordinaire → 201 `flaggedContact:false` · **le code de livraison → 400 `DELIVERY_CODE_IN_MESSAGE`** · un numéro de téléphone → **201 avec `flaggedContact:true`** · texte vide → 400. La distinction voulue par D61 est exacte : le code se **refuse**, les coordonnées se **marquent**. |
+| API-MSG-04 | Fenêtre d'écriture et motif | majeure | **OK** | Litige → `canWrite:false`, `reason:"DISPUTE_OPEN"` ; deals terminés → `writeClosesAt` à 14 jours. **Le serveur tient la règle** : écrire dans un fil en litige → 400 « This conversation is read-only (DISPUTE_OPEN) ». |
+| API-MSG-05 | Marquer lu | mineure | **OK** | Compteur de non-lus 5 → 0 après `POST /read`, `readAt` retourné. |
+| API-MSG-06 | Le rendez-vous est un objet | majeure | **OK** | 201, `status:"PROPOSED"`, `kind:"PICKUP"` — un objet à part entière, pas un fil de messages. |
+| API-MSG-07 | Contre-proposition | majeure | **OK** | La nouvelle proposition passe la précédente en `CANCELLED` et l'**historique reste visible** — la traçabilité prime sur la propreté de la liste. |
+| API-MSG-08 | On n'accepte que la proposition de l'autre | majeure | **OK** | Sa propre proposition → 400 `OWN_PROPOSAL` ; acceptée par l'autre partie → `ACCEPTED`. |
+| API-MSG-09 | **Le numéro ne s'ouvre pas avant l'heure** | majeure | **OK** | Rendez-vous le 20/09 à 17 h, demande le 08/09 → **400 `TOO_EARLY`** avec l'heure exacte d'ouverture (15 h UTC = 17 h − 2 h). La règle D61 tient au caractère près. |
+| API-MSG-10 | Signaler un message | majeure | **OK** | Message de l'autre → signalement créé, rejeu → **409** « already reported » ; **son propre message → 400** ; motif hors liste → 400. |
+| API-MSG-11 | Réponses rapides | mineure | **OK** | Couvert par API-GW-10 : clé stable, texte selon la langue **du lecteur** (`preferredLocale`). |
+| API-MSG-12 | Lecture admin journalisée | majeure | **⏭** | Suppose une session administrateur avec 2FA TOTP, hors de portée d'une campagne API. À jouer au cahier Admin. |
+
+### Une remarque transverse, mineure
+
+Trois refus de ce service portent leur code **dans le message** plutôt que dans `details.code` :
+`OWN_PROPOSAL`, `DISPUTE_OPEN`, et le motif du verrou d'écriture — par exemple
+« This conversation is read-only (DISPUTE_OPEN). ». Le cahier demande de juger sur le **code**, pas
+sur le message anglais : un client doit pouvoir traduire sans analyser une phrase. Deux lignes par
+site suffiraient à les exposer dans `details`. Rien d'urgent, mais c'est le même thème que les
+verrous qui ne donnent pas leur horizon.
