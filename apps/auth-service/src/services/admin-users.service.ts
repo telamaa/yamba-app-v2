@@ -184,7 +184,7 @@ export function makeAdminUsersService() {
           },
         },
       });
-      if (!u) throw new NotFoundError("User not found.");
+      if (!u) throw new NotFoundError("User not found.", { code: "USER_NOT_FOUND" });
 
       const [trips, bookings, actions, adminNames, activeSessionsCount] = await Promise.all([
         prisma.trip.findMany({

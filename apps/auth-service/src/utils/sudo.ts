@@ -44,10 +44,10 @@ export async function closeSudoWindow(store: SudoStore, userId: string, jti: str
 export async function requireSudo(req: Request & { user?: { id: string } }, store: SudoStore = redisClient as unknown as SudoStore): Promise<string> {
   const userId = req.user?.id;
   const jti = currentMemberJti(req);
-  if (!userId || !jti) throw new ForbiddenError("Sudo required: confirm with the code sent by email.");
+  if (!userId || !jti) throw new ForbiddenError("Sudo required: confirm with the code sent by email.", { code: "SUDO_REQUIRED" });
   const status = await sudoStatus(store, userId, jti);
   if (!status.active) {
-    const err = new ForbiddenError("Sudo required: confirm with the code sent by email.");
+    const err = new ForbiddenError("Sudo required: confirm with the code sent by email.", { code: "SUDO_REQUIRED" });
     (err as ForbiddenError & { details?: unknown }).details = { code: "SUDO_REQUIRED", windowMinutes: SUDO_WINDOW_MINUTES };
     throw err;
   }

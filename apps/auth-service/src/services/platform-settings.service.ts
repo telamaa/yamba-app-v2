@@ -100,14 +100,14 @@ export function makePlatformSettingsService(deps: {
       const scope = settingDefinition(key)!.scope;
       return !adminRolesAllow(actor.roles, scope === "BUSINESS" ? "settings.business.write" : "settings.operations.write");
     });
-    if (denied.length) throw new ForbiddenError(`Your admin profile cannot change: ${denied.join(", ")}.`);
+    if (denied.length) throw new ForbiddenError(`Your admin profile cannot change: ${denied.join(", ")}.`, { code: "ADMIN_ROLE_CHANGE_DENIED" });
   }
 
   async function commit(actor: SettingsActor, expectedVersion: number, changes: SettingsChange[], reason: string, action: "SETTING_CHANGED" | "SETTINGS_RESET"): Promise<SettingsWriteResponse> {
     const now = clock();
     const nextVersion = await deps.db.$transaction(async (tx) => {
       const cur = await current(tx);
-      if (cur.version !== expectedVersion) throw new ConflictError("The settings changed meanwhile: reload and try again.");
+      if (cur.version !== expectedVersion) throw new ConflictError("The settings changed meanwhile: reload and try again.", { code: "STALE_VERSION" });
       const nextValues: PlatformSettingsValues = { ...cur.values };
       for (const c of changes) nextValues[c.key] = c.after;
       const issues = settingsCoherenceIssues(nextValues);
@@ -115,7 +115,7 @@ export function makePlatformSettingsService(deps: {
       const version = cur.version + 1;
       if (cur.stored) {
         const r = await tx.platformSettings.updateMany({ where: { key: PLATFORM_SETTINGS_KEY, version: cur.version }, data: { values: nextValues, version, updatedByAdminId: actor.id } });
-        if (r.count !== 1) throw new ConflictError("The settings changed meanwhile: reload and try again.");
+        if (r.count !== 1) throw new ConflictError("The settings changed meanwhile: reload and try again.", { code: "STALE_VERSION" });
       } else {
         await tx.platformSettings.create({ data: { key: PLATFORM_SETTINGS_KEY, values: nextValues, version, updatedByAdminId: actor.id } });
       }
@@ -183,27 +183,27 @@ export function makePlatformSettingsService(deps: {
 
     /** PATCH : seules les clés modifiées ; 400 hors bornes / inconnue / motif court ; 403 hors portée ; 409 version. */
     async update(actor: SettingsActor, body: UpdateSettingsRequest): Promise<SettingsWriteResponse> {
-      if (body.reason.trim().length < SETTINGS_REASON_MIN_LENGTH) throw new ValidationError(`A reason of at least ${SETTINGS_REASON_MIN_LENGTH} characters is required.`);
+      if (body.reason.trim().length < SETTINGS_REASON_MIN_LENGTH) throw new ValidationError(`A reason of at least ${SETTINGS_REASON_MIN_LENGTH} characters is required.`, { code: "REASON_TOO_SHORT" });
       const { errors, keys } = validateValues(body.changes);
       if (Object.keys(errors).length) throw new ValidationError("Some values are out of bounds.", { errors });
-      if (keys.length === 0) throw new ValidationError("Nothing to change.");
+      if (keys.length === 0) throw new ValidationError("Nothing to change.", { code: "NOTHING_TO_CHANGE" });
       assertScopes(actor, keys);
       const cur = await current(deps.db);
       const changes: SettingsChange[] = keys.map((key) => ({ key, before: cur.values[key], after: body.changes[key] })).filter((c) => c.before !== c.after);
-      if (changes.length === 0) throw new ValidationError("Nothing to change: every value equals the current one.");
+      if (changes.length === 0) throw new ValidationError("Nothing to change: every value equals the current one.", { code: "NOTHING_TO_CHANGE" });
       return commit(actor, body.expectedVersion, changes, body.reason.trim(), "SETTING_CHANGED");
     },
 
     /** POST /reset : clés données (ou toutes) remises au défaut du catalogue ; 400 si rien ne s'écarte du défaut. */
     async reset(actor: SettingsActor, body: ResetSettingsRequest): Promise<SettingsWriteResponse> {
-      if (body.reason.trim().length < SETTINGS_REASON_MIN_LENGTH) throw new ValidationError(`A reason of at least ${SETTINGS_REASON_MIN_LENGTH} characters is required.`);
+      if (body.reason.trim().length < SETTINGS_REASON_MIN_LENGTH) throw new ValidationError(`A reason of at least ${SETTINGS_REASON_MIN_LENGTH} characters is required.`, { code: "REASON_TOO_SHORT" });
       const wanted = body.keys && body.keys.length ? body.keys : [...SETTINGS_CATALOG.map((d) => d.key)];
       const unknown = wanted.filter((k) => !isSettingKey(k));
       if (unknown.length) throw new ValidationError("Unknown setting.", { errors: Object.fromEntries(unknown.map((k) => [k, "Unknown setting."])) });
       const keys = wanted as SettingKey[];
       const cur = await current(deps.db);
       const changes: SettingsChange[] = keys.map((key) => ({ key, before: cur.values[key], after: SETTINGS_DEFAULTS[key] })).filter((c) => c.before !== c.after);
-      if (changes.length === 0) throw new ValidationError("Nothing to reset: every value already equals its default.");
+      if (changes.length === 0) throw new ValidationError("Nothing to reset: every value already equals its default.", { code: "NOTHING_TO_RESET" });
       assertScopes(actor, changes.map((c) => c.key));
       return commit(actor, body.expectedVersion, changes, body.reason.trim(), "SETTINGS_RESET");
     },

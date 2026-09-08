@@ -33,7 +33,7 @@ export const getPilotageSeries = async (req: AuthenticatedRequest, res: Response
   try {
     const granularity = (req.query.granularity === "month" ? "month" : "week") as PilotageGranularity;
     const months = typeof req.query.months === "string" ? Number(req.query.months) : granularity === "week" ? 3 : 12;
-    if (!Number.isFinite(months) || months < 1 || months > 24) throw new ValidationError("months must be between 1 and 24.");
+    if (!Number.isFinite(months) || months < 1 || months > 24) throw new ValidationError("months must be between 1 and 24.", { code: "MONTHS_OUT_OF_RANGE" });
     const now = new Date();
     const to = nextPeriod(periodStart(now, granularity), granularity);
     const from = periodStart(new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - (months - 1), 1)), granularity);
@@ -67,7 +67,7 @@ export const getPilotageSeries = async (req: AuthenticatedRequest, res: Response
 export const getPilotageCorridors = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const days = typeof req.query.days === "string" ? Number(req.query.days) : 30;
-    if (!Number.isFinite(days) || days < 1 || days > 365) throw new ValidationError("days must be between 1 and 365.");
+    if (!Number.isFinite(days) || days < 1 || days > 365) throw new ValidationError("days must be between 1 and 365.", { code: "DAYS_OUT_OF_RANGE" });
     const now = new Date();
     const from = new Date(now.getTime() - days * 86_400_000);
     const { value, cached: hit } = await cached(`corridors:${days}`, async () => {
@@ -104,11 +104,11 @@ const DEAL_DATE_FIELD: Record<string, string> = { requests: "requestedAt", accep
 export const getPilotageDrilldown = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const metric = PilotageMetricSchema.safeParse(req.query.metric);
-    if (!metric.success) throw new ValidationError("Invalid metric.");
+    if (!metric.success) throw new ValidationError("Invalid metric.", { code: "INVALID_METRIC" });
     const granularity = (req.query.granularity === "month" ? "month" : "week") as PilotageGranularity;
     const period = typeof req.query.period === "string" ? req.query.period : "";
     const bounds = periodBounds(period, granularity);
-    if (!bounds) throw new ValidationError("Invalid period key.");
+    if (!bounds) throw new ValidationError("Invalid period key.", { code: "INVALID_PERIOD" });
     const range = { gte: bounds.start, lt: bounds.end };
     let items: PilotageDrilldownItem[] = [];
     let total = 0;

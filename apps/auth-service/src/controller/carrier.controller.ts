@@ -60,7 +60,7 @@ export const saveCarrierProfile = async (
 ) => {
   try {
     if (!req.user) {
-      return next(new ValidationError("Unauthorized"));
+      return next(new ValidationError("Unauthorized", { code: "UNAUTHENTICATED" }));
     }
 
     const { name, bio, address, phoneE164 } = req.body as {
@@ -71,11 +71,11 @@ export const saveCarrierProfile = async (
     };
 
     if (!name || !name.trim()) {
-      return next(new ValidationError("Name is required!"));
+      return next(new ValidationError("Name is required!", { code: "MISSING_FIELDS" }));
     }
 
     if (bio && bio.length > 500) {
-      return next(new ValidationError("Bio must be 500 characters or less."));
+      return next(new ValidationError("Bio must be 500 characters or less.", { code: "BIO_TOO_LONG" }));
     }
 
     const userId = req.user.id;
@@ -183,7 +183,7 @@ export const createStripeConnectLink = async (
 ) => {
   try {
     if (!req.user) {
-      return next(new ValidationError("Unauthorized"));
+      return next(new ValidationError("Unauthorized", { code: "UNAUTHENTICATED" }));
     }
 
     const userId = req.user.id;
@@ -204,7 +204,7 @@ export const createStripeConnectLink = async (
     });
 
     if (!carrierPage) {
-      return next(new ValidationError("Please complete your profile first."));
+      return next(new ValidationError("Please complete your profile first.", { code: "PROFILE_INCOMPLETE" }));
     }
 
     let stripeAccountId = carrierPage.stripeAccountId;
@@ -218,7 +218,8 @@ export const createStripeConnectLink = async (
       if (!isValidCountryCode) {
         return next(
           new ValidationError(
-            "Country is required to set up Stripe. Please update your address in your carrier profile."
+            "Country is required to set up Stripe. Please update your address in your carrier profile.",
+            { code: "COUNTRY_REQUIRED" }
           )
         );
       }
@@ -329,7 +330,7 @@ export const checkStripeStatus = async (
 ) => {
   try {
     if (!req.user) {
-      return next(new ValidationError("Unauthorized"));
+      return next(new ValidationError("Unauthorized", { code: "UNAUTHENTICATED" }));
     }
 
     const userId = req.user.id;
@@ -400,7 +401,7 @@ export const completeCarrierOnboarding = async (
 ) => {
   try {
     if (!req.user) {
-      return next(new ValidationError("Unauthorized"));
+      return next(new ValidationError("Unauthorized", { code: "UNAUTHENTICATED" }));
     }
 
     const userId = req.user.id;
@@ -410,7 +411,7 @@ export const completeCarrierOnboarding = async (
     });
 
     if (!carrierPage) {
-      return next(new ValidationError("Please complete your profile first."));
+      return next(new ValidationError("Please complete your profile first.", { code: "PROFILE_INCOMPLETE" }));
     }
 
     // Déjà complété — répondre sans renvoyer d'email
@@ -452,7 +453,7 @@ export const createStripeDashboardLink = async (
 ) => {
   try {
     if (!req.user) {
-      return next(new ValidationError("Unauthorized"));
+      return next(new ValidationError("Unauthorized", { code: "UNAUTHENTICATED" }));
     }
     await requireSudo(req); // D65 1A — l'IBAN vit chez Stripe : geste sensible (SES-03)
     const carrierPage = await prisma.carrierPage.findUnique({

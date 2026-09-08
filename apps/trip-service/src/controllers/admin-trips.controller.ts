@@ -31,7 +31,7 @@ function zodErrors(issues: Array<{ path: PropertyKey[]; message: string }>) {
 }
 function parseId(raw: unknown, what = "id"): string {
   const p = ObjectIdSchema.safeParse(raw);
-  if (!p.success) throw new ValidationError(`Invalid ${what}.`);
+  if (!p.success) throw new ValidationError(`Invalid ${what}.`, { code: "INVALID_ID" });
   return p.data;
 }
 function meta(req: AuthenticatedRequest) {
@@ -63,7 +63,7 @@ export const listTrips = async (req: AuthenticatedRequest, res: Response, next: 
   try {
     // C-PR7a (D60 2A) — filtres serveur validés, tri, curseur (l'id en second : stable)
     const parsed = AdminTripsQuerySchema.safeParse(req.query);
-    if (!parsed.success) throw new ValidationError("Invalid query.");
+    if (!parsed.success) throw new ValidationError("Invalid query.", { code: "INVALID_QUERY" });
     const q = parsed.data;
     const where = buildTripsWhere(q);
     const [rows, total] = await Promise.all([
@@ -111,7 +111,7 @@ export const listTrips = async (req: AuthenticatedRequest, res: Response, next: 
 export const exportTrips = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const parsed = AdminTripsQuerySchema.safeParse(req.query);
-    if (!parsed.success) throw new ValidationError("Invalid query.");
+    if (!parsed.success) throw new ValidationError("Invalid query.", { code: "INVALID_QUERY" });
     const q = parsed.data;
     const rows = await prisma.trip.findMany({
       where: buildTripsWhere(q) as never,
@@ -139,7 +139,7 @@ export const getTripFile = async (req: AuthenticatedRequest, res: Response, next
       where: { id },
       include: { user: { select: { id: true, firstName: true, lastName: true, email: true, accountStatus: true, carrierStatus: true } }, documents: { orderBy: { createdAt: "desc" } } },
     });
-    if (!t || t.isDeleted) throw new NotFoundError("Trip not found.");
+    if (!t || t.isDeleted) throw new NotFoundError("Trip not found.", { code: "TRIP_NOT_FOUND" });
     const [bookings, actions] = await Promise.all([
       prisma.booking.findMany({ where: { tripId: id, isDeleted: false }, orderBy: { requestedAt: "desc" }, select: { id: true, status: true, shipperId: true, pricing: true, disputeTicket: true, requestedAt: true } }),
       prisma.adminAction.findMany({ where: { targetType: "TRIP", targetId: id }, orderBy: { createdAt: "desc" }, take: 50 }),
@@ -199,8 +199,8 @@ export const getTripFile = async (req: AuthenticatedRequest, res: Response, next
 async function loadTripForAdmin(req: AuthenticatedRequest) {
   const id = parseId(req.params.id, "trip id");
   const t = await prisma.trip.findUnique({ where: { id }, select: { id: true, userId: true, originCity: true, destinationCity: true, hiddenByAdminAt: true, isDeleted: true } });
-  if (!t || t.isDeleted) throw new NotFoundError("Trip not found.");
-  if (t.userId === req.user.id) throw new ForbiddenError("You cannot act on your own trip.");
+  if (!t || t.isDeleted) throw new NotFoundError("Trip not found.", { code: "TRIP_NOT_FOUND" });
+  if (t.userId === req.user.id) throw new ForbiddenError("You cannot act on your own trip.", { code: "ADMIN_IS_OWNER" });
   return t;
 }
 
@@ -225,7 +225,7 @@ export const hideTrip = async (req: AuthenticatedRequest, res: Response, next: N
     const t = await loadTripForAdmin(req);
     const parsed = HideTripRequestSchema.safeParse(req.body);
     if (!parsed.success) throw new ValidationError("Invalid request", { errors: zodErrors(parsed.error.issues) });
-    if (t.hiddenByAdminAt) throw new ValidationError("This trip is already hidden.");
+    if (t.hiddenByAdminAt) throw new ValidationError("This trip is already hidden.", { code: "TRIP_ALREADY_HIDDEN" });
     const now = new Date();
     await prisma.$transaction(async (tx) => {
       await tx.trip.update({
@@ -244,7 +244,7 @@ export const hideTrip = async (req: AuthenticatedRequest, res: Response, next: N
 export const unhideTrip = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const t = await loadTripForAdmin(req);
-    if (!t.hiddenByAdminAt) throw new ValidationError("This trip is not hidden.");
+    if (!t.hiddenByAdminAt) throw new ValidationError("This trip is not hidden.", { code: "TRIP_NOT_HIDDEN" });
     const parsed = HideTripRequestSchema.safeParse(req.body);
     if (!parsed.success) throw new ValidationError("Invalid request", { errors: zodErrors(parsed.error.issues) });
     await prisma.$transaction(async (tx) => {
@@ -264,7 +264,7 @@ export const listTickets = async (req: AuthenticatedRequest, res: Response, next
     const now = new Date();
     // C-PR7a (D60 2A) — filtres : villes, période de dépôt, « plus vieux que N jours »
     const parsedQ = TicketQueueQuerySchema.safeParse(req.query);
-    if (!parsedQ.success) throw new ValidationError("Invalid query.");
+    if (!parsedQ.success) throw new ValidationError("Invalid query.", { code: "INVALID_QUERY" });
     const pending = await prisma.tripDocument.findMany({
       where: buildTicketsWhere(parsedQ.data, now) as never,
       orderBy: { createdAt: "asc" },
@@ -299,7 +299,7 @@ export const exportTickets = async (req: AuthenticatedRequest, res: Response, ne
   try {
     const now = new Date();
     const parsedQ = TicketQueueQuerySchema.safeParse(req.query);
-    if (!parsedQ.success) throw new ValidationError("Invalid query.");
+    if (!parsedQ.success) throw new ValidationError("Invalid query.", { code: "INVALID_QUERY" });
     const rows = await prisma.tripDocument.findMany({
       where: buildTicketsWhere(parsedQ.data, now) as never,
       orderBy: { createdAt: "asc" },
@@ -320,7 +320,7 @@ export const viewTicket = async (req: AuthenticatedRequest, res: Response, next:
   try {
     const documentId = parseId(req.params.documentId, "document id");
     const d = await prisma.tripDocument.findUnique({ where: { id: documentId }, select: { id: true, url: true, mimeType: true, originalName: true, status: true, tripId: true } });
-    if (!d) throw new NotFoundError("Document not found.");
+    if (!d) throw new NotFoundError("Document not found.", { code: "DOCUMENT_NOT_FOUND" });
     // 7A — un billet est une donnée personnelle : chaque ouverture est journalisée.
     await recordAdminAction(prisma, { adminUserId: req.user.id, action: "DOCUMENT_VIEWED", targetType: "TRIP", targetId: d.tripId, after: { documentId: d.id }, ...meta(req) });
     res.status(200).json({ id: d.id, url: d.url, mimeType: d.mimeType, originalName: d.originalName, status: String(d.status) });
@@ -335,9 +335,9 @@ export const reviewTicket = async (req: AuthenticatedRequest, res: Response, nex
     const parsed = ReviewTicketRequestSchema.safeParse(req.body);
     if (!parsed.success) throw new ValidationError("Invalid request", { errors: zodErrors(parsed.error.issues) });
     const d = await prisma.tripDocument.findUnique({ where: { id: documentId }, include: { trip: { select: { id: true, userId: true, originCity: true, destinationCity: true } } } });
-    if (!d || d.type !== "TICKET_PROOF") throw new NotFoundError("Ticket not found.");
-    if (d.status !== "PENDING") throw new ValidationError("This ticket was already reviewed.");
-    if (d.trip.userId === req.user.id) throw new ForbiddenError("You cannot review your own ticket.");
+    if (!d || d.type !== "TICKET_PROOF") throw new NotFoundError("Ticket not found.", { code: "TICKET_NOT_FOUND" });
+    if (d.status !== "PENDING") throw new ValidationError("This ticket was already reviewed.", { code: "TICKET_ALREADY_REVIEWED" });
+    if (d.trip.userId === req.user.id) throw new ForbiddenError("You cannot review your own ticket.", { code: "ADMIN_IS_OWNER" });
     const outcome = ticketReviewOutcome(parsed.data.decision, parsed.data.reason ?? null);
     const now = new Date();
     await prisma.$transaction(async (tx) => {
@@ -347,7 +347,7 @@ export const reviewTicket = async (req: AuthenticatedRequest, res: Response, nex
           ? { status: "VERIFIED", verifiedAt: now, reviewedByAdminId: req.user.id, rejectionReason: null }
           : { status: "REJECTED", rejectedAt: now, reviewedByAdminId: req.user.id, rejectionReason: outcome.rejectionReason },
       });
-      if (updated.count === 0) throw new ValidationError("This ticket was already reviewed.");
+      if (updated.count === 0) throw new ValidationError("This ticket was already reviewed.", { code: "TICKET_ALREADY_REVIEWED" });
       await tx.trip.update({ where: { id: d.trip.id }, data: { ticketVerificationStatus: outcome.tripTicketStatus } });
       await recordAdminAction(tx, {
         adminUserId: req.user.id,

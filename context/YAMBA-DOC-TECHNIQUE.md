@@ -3160,3 +3160,92 @@ fournisseur, pas seulement sur un corps JSON écrit par le testeur.
 pas `cancelReason` alors que la base porte `PAYMENT_AUTHORIZATION_LOST`. Ce n'est pas une fuite,
 c'est l'inverse — une information utile que le membre ne voit pas (« votre autorisation bancaire a
 expiré »).
+
+---
+
+# Dette D-4 soldée — la règle des codes de refus sur les quatre services
+
+Le verdict de la recette API inscrivait au journal de dette : « un refus métier porte un
+`details.code` » était tenue sur deal-service et message-service, pas sur trip-service ni
+auth-service. **250 refus** y ont reçu leur code, et deux garde-fous les y maintiennent.
+
+## Deux défauts de sémantique tombés avec la dette
+
+Le vrai gain n'était pas dans l'énoncé. Neuf routes de trip-service faisaient ceci :
+
+```ts
+const { trip, error } = await findOwnedTrip(id, userId);
+if (!trip) return next(new ValidationError(error));   // ← 400, toujours
+```
+
+`findOwnedTrip` renvoie « Trip not found. » **ou** « Unauthorized. » — deux situations que la règle
+non négociable distingue par le statut (404 et 403), écrasées ici en un seul 400 sans code. C'était
+la dette **D-2** sur ces neuf sites. Le helper renvoie maintenant un code, et l'appelant lève la
+bonne classe :
+
+```ts
+function ownershipError(code: "TRIP_NOT_FOUND" | "NOT_TRIP_OWNER", message: string) {
+  return code === "TRIP_NOT_FOUND"
+    ? new NotFoundError(message, { code })
+    : new ForbiddenError(message, { code });
+}
+```
+
+**Vérifié avant de changer les statuts** : aucun écran du front ne branche sur le 400 de ces routes
+(les `status === 40x` du front portent sur la notation, le suivi de deal, la messagerie, les profils
+publics). Changer un statut public sans cette vérification serait un pari, pas une correction.
+
+Dans la même passe, les `new ValidationError("Unauthorized")` défensifs des contrôleurs (14
+occurrences) deviennent des `AuthError` 401 `UNAUTHENTICATED` : un défaut d'authentification n'a
+jamais été une erreur de saisie.
+
+## Les middlewares partagés
+
+`isAuthenticated` écrit ses réponses lui-même. Trois de ses sept refus portaient un `code`, les
+quatre autres rien — dont « jeton absent », le 401 le plus fréquent de la plateforme. Un helper
+unique les rend tous uniformes :
+
+```ts
+function refus(res: Response, message: string, code: string) {
+  return res.status(401).json({ message, code, details: { code } });
+}
+```
+
+Les deux formes coexistent : `code` en tête (le front le lit déjà) et `details.code` (la règle
+générale). Sept codes distincts — `TOKEN_MISSING`, `TOKEN_INVALID`, `TOKEN_EXPIRED`,
+`USER_NOT_FOUND`, `ACCOUNT_DELETED`, `ACCOUNT_SUSPENDED`, `SESSION_REVOKED` — parce qu'un client
+doit réagir différemment à chacun : se connecter, rafraîchir, ou contacter le support.
+`authorizeRoles` reçoit `ROLE_NOT_ALLOWED`.
+
+## Le garde-fou, et son faux positif
+
+`refusal-codes.spec.ts` (trip-service et auth-service) lit les sources et refuse tout jet d'erreur
+métier sans code. Sa première version cherchait littéralement `code:` — et criait au loup sur trois
+sites corrects : un code peut s'écrire de **trois** façons légitimes.
+
+```ts
+const porteUnCode = (args: string) => /(^|[\s,{])code\s*[,:}]|,\s*details\s*$/.test(args.trim());
+```
+
+`{ code: "X" }`, le raccourci `{ code }`, et un objet `details` construit ailleurs. **Un garde-fou
+trop littéral fabrique du faux positif, et le faux positif est ce qui fait désactiver les
+garde-fous.**
+
+Le test d'auth-service vérifie en plus que trois codes de 401 **différents** existent bien
+(`INVALID_CREDENTIALS`, `SESSION_EXPIRED`, `ACCOUNT_SUSPENDED`) : sans cela, coder tous les refus
+avec le même `UNAUTHORIZED` passerait le test sans rien apporter au client.
+
+## Un piège Nx, payé une deuxième fois
+
+La contre-épreuve montrait les **anciens** corps d'erreur alors que le bundle contenait le nouveau
+code. `npm run dev` lance `nx serve`, qui construit la cible **`build:development`** — or
+`nx build <service> --skip-nx-cache` ne réchauffe que `build`. Le serveur repartait sur un artefact
+en cache.
+
+Même leçon que le typecheck servi depuis le cache pendant la campagne : **un artefact Nx
+« reconstruit » n'est pas forcément neuf.** Pour redémarrer sur du code frais :
+`NX_SKIP_NX_CACHE=true npm run dev`.
+
+## Tests
+
+trip-service 231 → **235**, auth-service 215 → **219**. Plateforme **941**.

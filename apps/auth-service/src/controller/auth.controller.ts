@@ -155,7 +155,7 @@ export const resendRegistrationOtp = async (
     const { verificationToken } = req.body as { verificationToken?: string };
 
     if (!verificationToken) {
-      return next(new ValidationError("verificationToken is required!"));
+      return next(new ValidationError("verificationToken is required!", { code: "MISSING_FIELDS" }));
     }
 
     const token = String(verificationToken);
@@ -164,7 +164,7 @@ export const resendRegistrationOtp = async (
     const pending = await getPendingRegistration(emailKey);
     if (!pending) {
       return next(
-        new ValidationError("Registration session expired. Please register again.")
+        new ValidationError("Registration session expired. Please register again.", { code: "REGISTRATION_EXPIRED" })
       );
     }
 
@@ -220,7 +220,7 @@ export const cancelRegistration = async (
     const { verificationToken } = req.body as { verificationToken?: string };
 
     if (!verificationToken) {
-      return next(new ValidationError("verificationToken is required!"));
+      return next(new ValidationError("verificationToken is required!", { code: "MISSING_FIELDS" }));
     }
 
     const token = String(verificationToken);
@@ -258,7 +258,7 @@ export const verifyRegistrationOtp = async (
     const { verificationToken, otp } = req.body;
 
     if (!verificationToken || !otp) {
-      return next(new ValidationError("verificationToken and OTP are required!"));
+      return next(new ValidationError("verificationToken and OTP are required!", { code: "MISSING_FIELDS" }));
     }
 
     const token = String(verificationToken);
@@ -271,7 +271,7 @@ export const verifyRegistrationOtp = async (
     const pending = await getPendingRegistration(emailKey);
     if (!pending) {
       return next(
-        new ValidationError("Registration session expired. Please register again.")
+        new ValidationError("Registration session expired. Please register again.", { code: "REGISTRATION_EXPIRED" })
       );
     }
     const registrationLocale = pending.preferredLocale ?? localeFromHeaders(req.headers);
@@ -393,7 +393,7 @@ export const loginUser = async (req: Request, res: Response, next: NextFunction)
     };
 
     if (!email || !password) {
-      return next(new ValidationError("Email and password are required!"));
+      return next(new ValidationError("Email and password are required!", { code: "MISSING_FIELDS" }));
     }
 
     const emailKey = normalizeEmail(String(email));
@@ -405,9 +405,9 @@ export const loginUser = async (req: Request, res: Response, next: NextFunction)
     // adresse connue payait le hachage (≈ 168 ms) et une inconnue non (≈ 20 ms), ce qui
     // suffisait à énumérer les comptes en un appel malgré un corps identique.
     const isMatch = await comparePasswordConstantTime(String(password), user?.passwordHash);
-    if (!user || !isMatch) return next(new AuthError("Invalid email or password"));
+    if (!user || !isMatch) return next(new AuthError("Invalid email or password", { code: "INVALID_CREDENTIALS" }));
     // C-PR3 (D56 2A) — un compte suspendu ne se connecte pas ; le motif est dans l'email reçu.
-    if ((user as { accountStatus?: string }).accountStatus === "SUSPENDED") return next(new AuthError("Account suspended"));
+    if ((user as { accountStatus?: string }).accountStatus === "SUSPENDED") return next(new AuthError("Account suspended", { code: "ACCOUNT_SUSPENDED" }));
 
     const shouldRemember = Boolean(rememberMe);
     await issueSession(res, user, shouldRemember, sessionMetaOf(req)); // D65 2A
@@ -448,25 +448,25 @@ export const refreshAuthTokens = async (
         : undefined;
 
     const token = cookieToken || headerToken;
-    if (!token) return next(new AuthError("Unauthorized! No refresh token."));
+    if (!token) return next(new AuthError("Unauthorized! No refresh token.", { code: "REFRESH_TOKEN_MISSING" }));
 
     let decoded: RefreshPayload;
     try {
       decoded = jwt.verify(token, process.env.REFRESH_TOKEN_SECRET as string) as RefreshPayload;
     } catch {
       clearAuthCookies(res);
-      return next(new AuthError("Unauthorized! Invalid refresh token."));
+      return next(new AuthError("Unauthorized! Invalid refresh token.", { code: "REFRESH_TOKEN_INVALID" }));
     }
 
     if (!decoded?.id || !decoded?.jti) {
       clearAuthCookies(res);
-      return next(new AuthError("Unauthorized! Invalid refresh token payload."));
+      return next(new AuthError("Unauthorized! Invalid refresh token payload.", { code: "REFRESH_TOKEN_INVALID" }));
     }
 
     const user = await prisma.user.findUnique({ where: { id: decoded.id } });
     if (!user) {
       clearAuthCookies(res);
-      return next(new AuthError("Unauthorized! User not found."));
+      return next(new AuthError("Unauthorized! User not found.", { code: "USER_NOT_FOUND" }));
     }
 
     // D27 — lecture du record de session.
@@ -475,7 +475,7 @@ export const refreshAuthTokens = async (
     const session = await getRefreshSession(user.id, decoded.jti);
     if (session === null) {
       clearAuthCookies(res);
-      return next(new AuthError("Unauthorized! Session expired or invalid. Please log in again."));
+      return next(new AuthError("Unauthorized! Session expired or invalid. Please log in again.", { code: "SESSION_EXPIRED" }));
     }
 
     const shouldRemember =
@@ -494,7 +494,7 @@ export const refreshAuthTokens = async (
     if (isAbsoluteExpired(sessionCreatedAt, shouldRemember, policy, Date.now())) {
       await revokeRefreshJti(user.id, decoded.jti);
       clearAuthCookies(res);
-      return next(new AuthError("Unauthorized! Session expired. Please log in again."));
+      return next(new AuthError("Unauthorized! Session expired. Please log in again.", { code: "SESSION_EXPIRED" }));
     }
 
     await revokeRefreshJti(user.id, decoded.jti);
@@ -513,7 +513,7 @@ export const refreshAuthTokens = async (
       // La vie absolue s'est éteinte entre le check et l'écriture (course
       // improbable) : rien n'a été écrit, on refuse proprement.
       clearAuthCookies(res);
-      return next(new AuthError("Unauthorized! Session expired. Please log in again."));
+      return next(new AuthError("Unauthorized! Session expired. Please log in again.", { code: "SESSION_EXPIRED" }));
     }
 
     // ANO-API-07 — le nouveau jeton d'accès porte le nouveau `jti` (signé après lui).
@@ -572,7 +572,7 @@ export const requestPasswordResetOtp = async (
 ) => {
   try {
     const { email } = req.body as { email?: string };
-    if (!email) return next(new ValidationError("Email is required!"));
+    if (!email) return next(new ValidationError("Email is required!", { code: "MISSING_FIELDS" }));
 
     const emailKey = normalizeEmail(String(email));
     const user = await prisma.user.findUnique({ where: { emailNormalized: emailKey } });
@@ -605,7 +605,7 @@ export const resendPasswordResetOtp = async (
 ) => {
   try {
     const { email } = req.body as { email?: string };
-    if (!email) return next(new ValidationError("Email is required!"));
+    if (!email) return next(new ValidationError("Email is required!", { code: "MISSING_FIELDS" }));
 
     const emailKey = normalizeEmail(String(email));
     const user = await prisma.user.findUnique({
@@ -639,7 +639,7 @@ export const verifyPasswordResetOtp = async (
   try {
     const { email, otp } = req.body as { email?: string; otp?: string };
     if (!email || !otp) {
-      return next(new ValidationError("Email and OTP are required!"));
+      return next(new ValidationError("Email and OTP are required!", { code: "MISSING_FIELDS" }));
     }
 
     const emailKey = normalizeEmail(String(email));
@@ -667,7 +667,7 @@ export const getMe = async (
   next: NextFunction
 ) => {
   try {
-    if (!req.user) return next(new AuthError("Unauthorized"));
+    if (!req.user) return next(new AuthError("Unauthorized", { code: "UNAUTHENTICATED" }));
 
     // ANO-API-06 — liste BLANCHE explicite (me-projection.ts) : la réponse ne suit plus
     // le modèle Prisma, un champ nouveau n'est renvoyé que si quelqu'un l'a décidé.
@@ -704,7 +704,7 @@ export const getMe = async (
       },
     });
 
-    if (!fullUser) return next(new AuthError("Unauthorized"));
+    if (!fullUser) return next(new AuthError("Unauthorized", { code: "UNAUTHENTICATED" }));
 
     return res.status(200).json({
       success: true,
@@ -750,13 +750,13 @@ export const resetPassword = async (req: Request, res: Response, next: NextFunct
     };
 
     if (!passwordResetToken || !newPassword) {
-      return next(new ValidationError("passwordResetToken and newPassword are required!"));
+      return next(new ValidationError("passwordResetToken and newPassword are required!", { code: "MISSING_FIELDS" }));
     }
 
     const emailKey = await consumePasswordResetToken(String(passwordResetToken));
 
     const user = await prisma.user.findUnique({ where: { emailNormalized: emailKey } });
-    if (!user) return next(new ValidationError("User not found!"));
+    if (!user) return next(new ValidationError("User not found!", { code: "USER_NOT_FOUND" }));
 
     validatePasswordStrength(String(newPassword), {
       firstName: user.firstName ?? "",
@@ -766,7 +766,7 @@ export const resetPassword = async (req: Request, res: Response, next: NextFunct
 
     const isSamePassword = await bcrypt.compare(String(newPassword), user.passwordHash ?? "");
     if (isSamePassword) {
-      return next(new ValidationError("New password cannot be the same as the old password!"));
+      return next(new ValidationError("New password cannot be the same as the old password!", { code: "PASSWORD_UNCHANGED" }));
     }
 
     const passwordHash = await bcrypt.hash(String(newPassword), 10);
@@ -804,7 +804,7 @@ export const updateMyLocale = async (
   next: NextFunction
 ) => {
   try {
-    if (!req.user) return next(new AuthError("Unauthorized"));
+    if (!req.user) return next(new AuthError("Unauthorized", { code: "UNAUTHENTICATED" }));
 
     const { locale } = (req.body ?? {}) as { locale?: unknown };
     if (!isSupportedLocale(locale)) {
@@ -848,7 +848,7 @@ export const googleSignIn = async (req: Request, res: Response, next: NextFuncti
       consent?: { termsVersion?: string; privacyVersion?: string };
     };
     if (!credential || typeof credential !== "string") {
-      return next(new ValidationError("credential (Google id_token) is required."));
+      return next(new ValidationError("credential (Google id_token) is required.", { code: "MISSING_FIELDS" }));
     }
 
     const result = await googleSignInService(

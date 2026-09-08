@@ -431,8 +431,18 @@ Ordre de demarrage : auth -> trip -> gateway.
   deal cree dessus, puis `stripe payment_intents cancel` → Stripe emet l'evenement, le service
   le verifie et le deal passe CANCELLED / SYSTEM / PAYMENT_AUTHORIZATION_LOST. Rejeu
   (`stripe events resend` ×2) : 200 aux trois livraisons, UN SEUL booking.cancelled.
-  **146 fiches sur 146 jouees, plus aucune en ⏭.** Reste la seule dette D-4 (garde-fou des
-  codes de refus a etendre a trip-service et auth-service).
+  **146 fiches sur 146 jouees, plus aucune en ⏭.**
+- 08/09 (soir) : **dette D-4 soldee** — la regle « tout refus metier porte un details.code »
+  est desormais tenue sur les QUATRE services : 250 refus codes (trip 81, auth 169) et deux
+  garde-fous `refusal-codes.spec.ts` de plus. Deux defauts de SEMANTIQUE sont tombes avec
+  (dette D-2 sur ces sites) : `findOwnedTrip` ecrasait « trajet introuvable » et « trajet
+  d'autrui » en un seul 400 sans code, sur neuf routes → 404 TRIP_NOT_FOUND / 403
+  NOT_TRIP_OWNER (verifie avant : aucun ecran du front ne branche sur ce 400). Les sept refus
+  de `isAuthenticated` ont sept codes distincts (TOKEN_MISSING, TOKEN_INVALID, TOKEN_EXPIRED,
+  USER_NOT_FOUND, ACCOUNT_DELETED, ACCOUNT_SUSPENDED, SESSION_REVOKED), `authorizeRoles` a
+  ROLE_NOT_ALLOWED. **Plus aucune reserve au verdict de campagne.** Plateforme 941 tests.
+  PIEGE NX paye une 2e fois : `npm run dev` sert la cible `build:development`, que
+  `nx build --skip-nx-cache` ne rechauffe PAS → utiliser `NX_SKIP_NX_CACHE=true npm run dev`.
 - 04/09 : C-PR6b feat/c6b-admin-alerts (D59 3A / 4A, A129–A131) — neuf regles de seuil
   (evaluateAlerts pur, instantane de dix compteurs), GET /admin/alerts sans etat (accueil
   admin), cron horaire avec dedoublonnage Redis SET NX (un email par regle et par jour, Redis

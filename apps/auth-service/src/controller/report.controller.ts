@@ -25,7 +25,7 @@ export function makeReportController(service: ReportService = makeReportService(
     async adminList(req: AuthenticatedRequest, res: Response, next: NextFunction) {
       try {
         const status = ReportStatusSchema.safeParse(req.query.status ?? "OPEN");
-        if (!status.success) return next(new ValidationError("Invalid status."));
+        if (!status.success) return next(new ValidationError("Invalid status.", { code: "INVALID_STATUS" }));
         res.status(200).json(await service.listReports(status.data));
       } catch (e) {
         next(e);
