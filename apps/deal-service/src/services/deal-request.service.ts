@@ -133,7 +133,14 @@ export function makeDealRequestService(provider: PaymentProvider, clock: () => D
       const now = clock();
       const trip = await loadTrip(input.tripId);
       checkTripBookable(trip, user.id, now);
-      await trust.assertWithinCaps(user.id, { declaredValueCents: 0, weightKg: input.product === "PARCEL" ? input.weightKg ?? null : null }); // D71 — plafonds CNF-06 (poids, envois du mois) avant d'autoriser l'argent
+      // D71 — plafonds CNF-06 AVANT d'autoriser l'argent. ANO-API-12 : la valeur déclarée
+      // était passée à 0 en dur, donc le plafond DECLARED_VALUE ne pouvait pas se déclencher
+      // ici ; il ne tombait qu'à la création du deal, une fois la carte déjà pré-autorisée.
+      // Elle est désormais prise en compte dès que le client l'envoie.
+      await trust.assertWithinCaps(user.id, {
+        declaredValueCents: input.declaredValueCents ?? 0,
+        weightKg: input.product === "PARCEL" ? input.weightKg ?? null : null,
+      });
       const quote = quoteOr400(trip, input, pricingParamsFromSettings(await settings.get())); // D62
       assertQuoteMatches(quote, input.expectedTotalCents);
       checkCapacity(trip, kgToReserve(quote)); // refus précoce, avant de poser une empreinte
