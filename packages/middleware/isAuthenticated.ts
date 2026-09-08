@@ -2,6 +2,7 @@ import { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
 import prisma from "@packages/libs/prisma";
 import redis from "@packages/libs/redis";
+import { AuthError } from "@packages/error-handler";
 import { isSessionRevoked, sessionKey } from "./session-revocation";
 
 export type AuthenticatedRequest = Request & {
@@ -55,17 +56,20 @@ const extractToken = (req: Request): string | null => {
 };
 
 /**
- * Dette D-4 de la recette API (08/09/2026) — ce middleware écrit sa réponse lui-même, sans passer
- * par le middleware d'erreur : trois de ses refus portaient un `code` au premier niveau, les
- * quatre autres **rien du tout** — dont « jeton absent », le 401 le plus fréquent de la plateforme.
+ * Dettes D-4 puis D-5 de la recette API (08/09/2026).
  *
- * Les deux formes coexistent maintenant : `code` en tête (le front le lit déjà) et `details.code`
- * (la règle générale). Sept refus, sept codes distincts : un client doit pouvoir distinguer
- * « pas de jeton » (se connecter) de « session révoquée » (on vous a déconnecté) de « compte
- * suspendu » (contacter le support).
+ * D-4 : trois des sept refus de ce middleware portaient un `code`, les quatre autres **rien du
+ * tout** — dont « jeton absent », le 401 le plus fréquent de la plateforme. Les sept en ont un,
+ * et sept codes DISTINCTS : un client doit pouvoir distinguer « pas de jeton » (se connecter) de
+ * « session révoquée » (on vous a déconnecté) de « compte suspendu » (contacter le support).
+ *
+ * D-5 : le refus passe désormais par `next()`, donc par le middleware d'erreur commun — une seule
+ * forme de corps d'erreur sur toute la plateforme, un seul endroit qui décide ce qui est exposé en
+ * production, et Sentry qui voit tout. Le `code` reste servi en tête ET dans `details` (le
+ * middleware d'erreur recopie l'un depuis l'autre).
  */
-function refus(res: Response, message: string, code: string) {
-  return res.status(401).json({ message, code, details: { code } });
+function refus(next: NextFunction, message: string, code: string) {
+  return next(new AuthError(message, { code }));
 }
 
 const isAuthenticated = async (
@@ -77,7 +81,7 @@ const isAuthenticated = async (
     const token = extractToken(req);
 
     if (!token) {
-      return refus(res, "Unauthorized! Token missing.", "TOKEN_MISSING");
+      return refus(next, "Unauthorized! Token missing.", "TOKEN_MISSING");
     }
 
     // Verify token
@@ -87,7 +91,7 @@ const isAuthenticated = async (
     ) as JwtPayload;
 
     if (!decoded?.id) {
-      return refus(res, "Unauthorized! Invalid token.", "TOKEN_INVALID");
+      return refus(next, "Unauthorized! Invalid token.", "TOKEN_INVALID");
     }
 
     const user = await prisma.user.findUnique({
@@ -95,20 +99,20 @@ const isAuthenticated = async (
     });
 
     if (!user) {
-      return refus(res, "Account not found.", "USER_NOT_FOUND");
+      return refus(next, "Account not found.", "USER_NOT_FOUND");
     }
     // C-PR8b (D63 4A) — compte effacé : plus aucune session, plus aucun email.
     if ((user as { isDeleted?: boolean }).isDeleted) {
-      return refus(res, "Account deleted.", "ACCOUNT_DELETED");
+      return refus(next, "Account deleted.", "ACCOUNT_DELETED");
     }
     // C-PR3 (D56 2A) — SUSPENDED : connexion refusée partout (les sessions sont révoquées à la suspension).
     if ((user as { accountStatus?: string }).accountStatus === "SUSPENDED") {
-      return refus(res, "Account suspended.", "ACCOUNT_SUSPENDED");
+      return refus(next, "Account suspended.", "ACCOUNT_SUSPENDED");
     }
     // ANO-API-07 — la session a-t-elle été révoquée (déconnexion, coupure d'appareil,
     // changement de mot de passe) ? L'accès tombe alors immédiatement.
     if (await sessionRevoquee(decoded.id, decoded.jti)) {
-      return refus(res, "Session revoked.", "SESSION_REVOKED");
+      return refus(next, "Session revoked.", "SESSION_REVOKED");
     }
 
     req.user = user;
@@ -116,7 +120,7 @@ const isAuthenticated = async (
 
     return next();
   } catch (error) {
-    return refus(res, "Unauthorized! Token expired or invalid.", "TOKEN_EXPIRED");
+    return refus(next, "Unauthorized! Token expired or invalid.", "TOKEN_EXPIRED");
   }
 };
 

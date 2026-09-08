@@ -402,7 +402,7 @@ export const listAdminSessions = async (req: AuthenticatedRequest, res: Response
 export const revokeAdminSessionById = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const jti = String(req.params.jti ?? "");
-    if (!/^[a-f0-9]{32}$/.test(jti)) return res.status(400).json({ message: "Invalid session id." });
+    if (!/^[a-f0-9]{32}$/.test(jti)) return next(new ValidationError("Invalid session id.", { code: "INVALID_ID" }));
     await revokeAdminSession(req.user.id, jti);
     await recordAdminAction(prisma, { adminUserId: req.user.id, action: "ADMIN_SESSION_REVOKED", targetType: "SESSION", targetId: jti, ...clientMeta(req) });
     if (jti === currentJti(req)) clearAdminCookies(res);

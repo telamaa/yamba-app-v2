@@ -1,6 +1,6 @@
 import type { Response, NextFunction, RequestHandler } from "express";
 import prisma from "@packages/libs/prisma";
-import { ValidationError } from "@packages/error-handler";
+import { NotFoundError, ValidationError } from "@packages/error-handler";
 import { AuthenticatedRequest } from "@packages/middleware/isAuthenticated";
 import { ReviewKind } from "@prisma/client";
 import { publicProfileWhere } from "../utils/public-visibility";
@@ -203,8 +203,8 @@ export const getUserPublic: RequestHandler = async (
     // D67 1A — profil masqué : 404 pour tout le monde sauf le propriétaire (qui le voit
     // marqué « masqué »). Ceinture et bretelles : le filtre ci-dessus est la garde.
     if (!user || user.isDeleted || (user.profilePublic === false && currentUserId !== user.id)) {
-      res.status(404).json({ success: false, message: "User not found." });
-      return;
+      // D-5 : un seul corps d'erreur — et les deux branches restent indiscernables en temps.
+      return next(new NotFoundError("User not found.", { code: "USER_NOT_FOUND" }));
     }
 
     const isOwnProfile = currentUserId === user.id;
@@ -444,8 +444,8 @@ export const listUserPublicReviews: RequestHandler = async (req, res, next) => {
     });
 
     if (!user || user.isDeleted || (user.profilePublic === false && (req as { user?: { id?: string } }).user?.id !== user.id)) { // D67 1A
-      res.status(404).json({ success: false, message: "User not found." });
-      return;
+      // D-5 : un seul corps d'erreur — et les deux branches restent indiscernables en temps.
+      return next(new NotFoundError("User not found.", { code: "USER_NOT_FOUND" }));
     }
 
     const items = await prisma.review.findMany({
@@ -503,8 +503,8 @@ export const listUserPublicTrips: RequestHandler = async (req, res, next) => {
     });
 
     if (!user || user.isDeleted || (user.profilePublic === false && (req as { user?: { id?: string } }).user?.id !== user.id)) { // D67 1A
-      res.status(404).json({ success: false, message: "User not found." });
-      return;
+      // D-5 : un seul corps d'erreur — et les deux branches restent indiscernables en temps.
+      return next(new NotFoundError("User not found.", { code: "USER_NOT_FOUND" }));
     }
 
     if (user.carrierStatus !== "ACTIVE") {

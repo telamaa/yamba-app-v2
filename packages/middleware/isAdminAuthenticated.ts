@@ -1,5 +1,10 @@
 /**
  * isAdminAuthenticated — garde des routes /admin/* (D54, 8A)
+ *
+ * Dettes D-4 / D-5 (recette API 08/09/2026) : ses quatre refus n'avaient AUCUN code et
+ * écrivaient leur réponse eux-mêmes. Ils passent maintenant par `next()`, donc par le middleware
+ * d'erreur commun, avec un code chacun — l'admin-ui peut distinguer « pas de jeton admin » d'une
+ * « session sans 2FA » et d'un « compte qui n'est plus administrateur ».
  * ==========================================================
  * Lit UNIQUEMENT le cookie `admin_access_token` (ou un Bearer), jamais
  * `access_token` : une session utilisateur, même d'un compte ADMIN, n'ouvre
@@ -9,6 +14,7 @@
 import { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
 import prisma from "@packages/libs/prisma";
+import { AuthError, ForbiddenError } from "@packages/error-handler";
 import type { AuthenticatedRequest } from "./isAuthenticated";
 
 declare module "express-serve-static-core" {
@@ -29,14 +35,14 @@ const extractToken = (req: Request): string | null => {
 const isAdminAuthenticated = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const token = extractToken(req);
-    if (!token) return res.status(401).json({ message: "Unauthorized! Admin token missing." });
+    if (!token) return next(new AuthError("Unauthorized! Admin token missing.", { code: "ADMIN_TOKEN_MISSING" }));
     const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET!) as AdminJwtPayload;
     if (!decoded?.id || decoded.adm !== true || !decoded.amr?.includes("totp")) {
-      return res.status(401).json({ message: "Unauthorized! Admin session required." });
+      return next(new AuthError("Unauthorized! Admin session required.", { code: "ADMIN_SESSION_REQUIRED" }));
     }
     const user = await prisma.user.findUnique({ where: { id: decoded.id } });
     if (!user || user.isDeleted || !user.roles.includes("ADMIN") || !user.totpEnabledAt) {
-      return res.status(403).json({ message: "Access denied." });
+      return next(new ForbiddenError("Access denied.", { code: "NOT_AN_ADMIN" }));
     }
     req.user = user;
     req.roles = user.roles;
@@ -46,7 +52,7 @@ const isAdminAuthenticated = async (req: AuthenticatedRequest, res: Response, ne
     req.adminRole = u.adminRole ?? req.adminRoles[0] ?? null;
     return next();
   } catch {
-    return res.status(401).json({ message: "Unauthorized! Admin token expired or invalid." });
+    return next(new AuthError("Unauthorized! Admin token expired or invalid.", { code: "ADMIN_TOKEN_EXPIRED" }));
   }
 };
 

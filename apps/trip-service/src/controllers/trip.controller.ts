@@ -1159,14 +1159,16 @@ export const getPublicTrip: RequestHandler = async (req, res, next) => {
     });
 
     if (!trip) {
-      res.status(404).json({ success: false, message: "Trip not found." });
-      return;
+      // D-5 : un seul corps d'erreur pour toute la plateforme — le 404 passe par le middleware.
+      // Les deux branches restent indiscernables en temps (ANO-API-02) : même chemin, même coût.
+      return next(new NotFoundError("Trip not found.", { code: "TRIP_NOT_FOUND" }));
     }
     // Ceinture et bretelles : le filtre ci-dessus est la garde (il rend les deux cas
     // indiscernables en temps) ; ce test reste au cas où la requête évoluerait.
     if (trip.isDeleted || trip.status !== "PUBLISHED" || (trip as { hiddenByAdminAt?: Date | null }).hiddenByAdminAt /* C-PR4 (D57) : masqué par Yamba */) {
-      res.status(404).json({ success: false, message: "Trip not found." });
-      return;
+      // D-5 : un seul corps d'erreur pour toute la plateforme — le 404 passe par le middleware.
+      // Les deux branches restent indiscernables en temps (ANO-API-02) : même chemin, même coût.
+      return next(new NotFoundError("Trip not found.", { code: "TRIP_NOT_FOUND" }));
     }
 
     const carrierPage = trip.user.carrierPage;

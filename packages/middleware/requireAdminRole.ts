@@ -8,6 +8,7 @@
  */
 import type { NextFunction, Response } from "express";
 import { adminRolesAllow, type AdminPermission, type AdminRole } from "@packages/api-contracts";
+import { ForbiddenError } from "@packages/error-handler";
 import type { AuthenticatedRequest } from "./isAuthenticated";
 
 export const requireAdminPermission =
@@ -16,16 +17,15 @@ export const requireAdminPermission =
     // C-PR3bis (D60 1A) — union des profils cumulés
     const roles = (req.adminRoles && req.adminRoles.length ? req.adminRoles : [req.adminRole ?? (req.user as { adminRole?: string | null } | undefined)?.adminRole].filter(Boolean)) as AdminRole[];
     if (!adminRolesAllow(roles, permission)) {
-      // Recette API 08/09/2026, fiche API-SEC-05 : le refus nommait déjà la permission manquante,
-      // mais au PREMIER niveau du corps — alors que tout le reste de la plateforme la cherche dans
-      // `details.code`. Les deux formes coexistent désormais : `details` pour la règle générale,
-      // les champs de tête pour l'admin-ui qui les lit déjà (changement purement additif).
-      return res.status(403).json({
-        message: "Your admin profile does not allow this action.",
-        code: "ADMIN_PERMISSION_DENIED",
-        permission,
-        details: { code: "ADMIN_PERMISSION_DENIED", permission },
-      });
+      // Recette API 08/09/2026 — fiche API-SEC-05 (le refus nomme la permission manquante) puis
+      // dette D-5 : il passe maintenant par le middleware d'erreur commun. Le `code` et la
+      // `permission` restent servis en tête, recopiés depuis `details` par ce middleware.
+      return next(
+        new ForbiddenError("Your admin profile does not allow this action.", {
+          code: "ADMIN_PERMISSION_DENIED",
+          permission,
+        })
+      );
     }
     return next();
   };
