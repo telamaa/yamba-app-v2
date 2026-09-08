@@ -32,6 +32,7 @@ import {
   pickPerKgFields,
 } from "../services/pricing-gate";
 import { chunkUpdateData } from "../lib/mongo-update-chunks";
+import { publicTripWhere } from "../lib/public-visibility.rules";
 import { computeComparablePriceCents, comparableParamsFromSettings, DEFAULT_COMPARABLE_PARAMS, type ComparableParams } from "../lib/comparable-price";
 import { platformSettings } from "@packages/libs/settings/default";
 
@@ -1095,8 +1096,11 @@ export const getPublicTrip: RequestHandler = async (req, res, next) => {
       return;
     }
 
-    const trip = await prisma.trip.findUnique({
-      where: { id },
+    // ANO-API-02 — la visibilité est DANS la requête : un trajet masqué, dépublié ou
+    // supprimé est introuvable au même prix qu'un trajet inexistant (aucune jointure
+    // chargée pour rien). `findFirst` car `findUnique` n'accepte pas de critère non unique.
+    const trip = await prisma.trip.findFirst({
+      where: publicTripWhere(id),
       include: {
         user: {
           select: {
@@ -1128,8 +1132,8 @@ export const getPublicTrip: RequestHandler = async (req, res, next) => {
       res.status(404).json({ success: false, message: "Trip not found." });
       return;
     }
-    // ⭐ Lot 2 — soft-deleted = introuvable (belt & suspenders : un trip
-    // supprimé est forcément DRAFT, donc déjà exclu par le check suivant)
+    // Ceinture et bretelles : le filtre ci-dessus est la garde (il rend les deux cas
+    // indiscernables en temps) ; ce test reste au cas où la requête évoluerait.
     if (trip.isDeleted || trip.status !== "PUBLISHED" || (trip as { hiddenByAdminAt?: Date | null }).hiddenByAdminAt /* C-PR4 (D57) : masqué par Yamba */) {
       res.status(404).json({ success: false, message: "Trip not found." });
       return;

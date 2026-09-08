@@ -1874,3 +1874,48 @@ La part d'Expéditeurs qui reviennent, les cohortes et les entonnoirs restent me
 | SIN2 | Trancher un second litige de la même catégorie en rejet | La même ligne passe à tranchés 2, rejetés 1, le montant remboursé ne bouge pas |
 | SIN3 | Ouvrir un litige sans le trancher | Aucune ligne n'apparaît dans la sinistralité |
 | SIN4 | Trancher deux litiges de catégories différentes | Deux lignes distinctes, triées par mois puis par catégorie |
+
+# Recette API — non-divulgation et robustesse de la recherche (ANO-API-01, ANO-API-02)
+
+## Le besoin
+
+Deux promesses faites aux membres étaient tenues **en apparence** seulement.
+
+La première : « ce que Yamba a masqué n'existe plus pour les autres ». Un trajet retiré par la
+modération et un profil rendu privé répondaient bien « introuvable » — mais mettaient presque trois
+fois plus de temps à le dire qu'une adresse réellement inexistante. Un curieux muni d'un chronomètre
+pouvait donc dresser la liste de ce qui lui était caché : quels trajets la modération a retirés,
+quels membres ont rendu leur profil privé. La promesse de discrétion n'était pas tenue.
+
+La seconde : « une erreur de l'appelant reçoit une réponse claire ». Une recherche dont le curseur
+de pagination était mal formé provoquait une erreur technique 500, la seule forme de réponse que la
+plateforme s'interdit, au lieu d'un refus explicite.
+
+## Les règles
+
+- **RG-PUB-01** — Une ressource publique **invisible** (trajet masqué par Yamba, trajet dépublié ou
+  supprimé, profil privé) est indiscernable d'une ressource **inexistante** : même statut HTTP, même
+  corps, **et même temps de réponse**. Aucun travail supplémentaire n'est effectué pour une
+  ressource que l'appelant n'a pas le droit de voir.
+- **RG-PUB-02** — Un membre voit toujours **son propre** profil, même rendu privé (rappel de D67 1A,
+  inchangé) : c'est la seule exception à RG-PUB-01, et elle porte sur l'identité de l'appelant,
+  jamais sur la ressource visée.
+- **RG-SRCH-09** — Le curseur de pagination de la recherche est un identifiant technique : mal
+  formé, il est refusé par un **400** explicite, jamais par une erreur technique. Le curseur
+  **vide** signifie « première page » et reste accepté.
+
+## Tests d'acceptation
+
+| Réf | Scénario | Attendu |
+|---|---|---|
+| PUB1 | Consulter un trajet masqué par Yamba, puis un identifiant inexistant | Deux 404 au corps identique, et des temps de réponse indiscernables (médianes à moins de 2 ms l'une de l'autre sur 25 mesures) |
+| PUB2 | Consulter un profil privé, puis un slug inexistant | Idem |
+| PUB3 | Consulter son propre profil, rendu privé, en étant connecté | 200 — le propriétaire se voit toujours |
+| PUB4 | Consulter ce même profil privé avec un autre compte connecté | 404 |
+| PUB5 | Consulter un trajet publié normal | 200 (non-régression) |
+| SRCH9a | Rechercher avec `cursor=null`, `cursor=abc` | 400, message « Identifiant MongoDB invalide (24 hex attendus) » |
+| SRCH9b | Rechercher avec `cursor=` (vide) | 200, première page |
+| SRCH9c | Rechercher avec un curseur bien formé | 200 |
+
+Tous joués le 8 septembre 2026 sur l'environnement de recette (base `development`, paiement FAKE,
+Mailpit) — voir `context/YAMBA-RECETTE-API-RESULTATS.md`.

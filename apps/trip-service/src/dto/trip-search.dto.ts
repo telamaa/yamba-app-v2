@@ -106,8 +106,18 @@ export const searchTripsQuerySchema = z.object({
   weightKg: z.coerce.number().min(0.5).max(30).optional(),
   departureBuckets: csvOf(DEPARTURE_BUCKETS),
 
-  // Pagination cursor-based
-  cursor: z.string().optional(),
+  // Pagination cursor-based — le curseur est l'id du dernier trip de la page.
+  // ANO-API-01 (recette API 08/09/2026) : sans contrainte de format, un curseur
+  // non hexadécimal (« null » renvoyé tel quel par un client, cas le plus courant)
+  // atteignait Prisma et remontait en 500 P2023 « Malformed ObjectID ». Le format
+  // est donc validé ici, comme `limit` juste en dessous : le refus est un 400.
+  // Une chaîne VIDE vaut « pas de curseur » : un client qui envoie toujours le
+  // paramètre (`?cursor=`) demande la première page, il ne se trompe pas.
+  cursor: z
+    .string()
+    .regex(/^[0-9a-fA-F]{24}$/, "Identifiant MongoDB invalide (24 hex attendus)")
+    .optional()
+    .or(z.literal("").transform(() => undefined)),
   limit: z.coerce.number().int().min(1).max(50).optional().default(10),
 
   // Formatage côté serveur (dates locale-aware)

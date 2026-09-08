@@ -2210,3 +2210,103 @@ Sur le filtre lui-même, une précaution : `resolvedAt: { gte: from }` ne ramèn
 Le taux de litige a pour dénominateur les **livraisons**. Un litige ouvert depuis `PICKED_UP` sans livraison — le cas « colis jamais remis », soit le plus grave — n'est pas à son numérateur. Il apparaît dans la sinistralité, catégorie `NOT_DELIVERED`.
 
 Élargir le dénominateur aux prises en charge supposerait d'ajouter `pickedUpAt` aux séries, ce qui est un vrai gain par ailleurs, la prise en charge étant aujourd'hui invisible du pilotage. À faire le jour où le volume le justifie.
+
+# Recette API — correction des deux anomalies bloquantes du chapitre 4 (ANO-API-01, ANO-API-02)
+
+La campagne de recette du cahier n° 3 (API) a démarré le 8 septembre 2026. Le chapitre 4, celui qui
+se joue en premier parce que tous les autres héritent de ses défauts, a produit 22 verdicts : 17 OK,
+2 PARTIEL, 3 KO. Deux des KO tombent sous un critère que le cahier qualifie de **bloquant**. Ils sont
+corrigés ici, dans la campagne même, avant de dérouler le chapitre 5.
+
+## ANO-API-01 — un paramètre de pagination est une entrée utilisateur
+
+`GET /api/trips/search?cursor=null` répondait **500** avec la forme « Something went wrong, please
+try again! », c'est-à-dire une exception non gérée. Au journal du trip-service : une
+`PrismaClientKnownRequestError` **P2023**, « Malformed ObjectID: invalid character 'n' … "null" »,
+levée dans `searchTrips`.
+
+La cause tenait en une ligne de `apps/trip-service/src/dto/trip-search.dto.ts` :
+
+```ts
+cursor: z.string().optional(),                                   // avant
+limit:  z.coerce.number().int().min(1).max(50).optional().default(10),
+```
+
+`limit` était borné, `cursor` ne l'était pas : n'importe quelle chaîne traversait le schéma et
+atteignait Prisma. Le cas n'est pas théorique — c'est le comportement d'un client qui renvoie
+littéralement son `nextCursor` alors qu'il vaut `null` (sérialisé en la chaîne `"null"`), l'erreur
+d'intégration la plus banale sur une pagination par curseur.
+
+Le curseur est désormais validé au format ObjectId, **et la chaîne vide vaut « pas de curseur »** :
+
+```ts
+cursor: z
+  .string()
+  .regex(/^[0-9a-fA-F]{24}$/, "Identifiant MongoDB invalide (24 hex attendus)")
+  .optional()
+  .or(z.literal("").transform(() => undefined)),
+```
+
+Cette dernière clause n'était pas dans la première rédaction du correctif, et elle a immédiatement
+provoqué une régression détectée par la contre-épreuve : un client qui envoie toujours le paramètre
+(`?cursor=`) demandait la première page et recevait un 400. Le cas est couvert par un test.
+
+## ANO-API-02 — la visibilité vérifiée après coup se lit dans le chronomètre
+
+Fiche API-GW-18. Un trajet **masqué par Yamba** et un trajet **inexistant** rendaient bien le même
+404 avec le même corps — la règle de non-divulgation semblait tenue. Mais sur 25 mesures :
+
+| Cible | Médiane | Min | Max |
+|---|---|---|---|
+| Trajet masqué (existe) | 32,8 ms | 30,2 | 64,7 |
+| Trajet inexistant | 12,2 ms | 11,2 | 20,4 |
+| Profil privé (existe) | 26,5 ms | 22,8 | 30,7 |
+| Profil inexistant | 11,3 ms | 10,2 | 15,2 |
+
+Les distributions sont **disjointes** : le minimum du cas « existe » dépasse le maximum du cas
+« n'existe pas ». Un tiers peut donc énumérer ce que la modération a caché sans jamais lire une
+donnée — exactement ce que la sémantique 403/404 cherche à empêcher.
+
+La cause n'est pas le 404, c'est **l'ordre des opérations**. Dans `trip.controller.ts`, la requête
+chargeait le trajet et trois jointures (`user`, `avatar`, `carrierPage`), puis seulement ensuite
+testait `isDeleted`, `status` et `hiddenByAdminAt`. Le cas inexistant ne payait aucune jointure, le
+cas masqué les payait toutes. Le profil public d'auth-service suivait le même schéma.
+
+La visibilité descend donc dans la requête, dans deux règles pures :
+
+```ts
+// apps/trip-service/src/lib/public-visibility.rules.ts
+export function publicTripWhere(id: string) {
+  return { id, status: "PUBLISHED", isDeleted: { not: true }, AND: [notHiddenFilter()] };
+}
+
+// apps/auth-service/src/utils/public-visibility.ts
+export function publicProfileWhere(slug: string, currentUserId: string | null) {
+  const or = [{ profilePublic: { not: false } }];
+  if (currentUserId) or.push({ id: currentUserId });        // D67 1A : le propriétaire se voit
+  return { publicSlug: slug, isDeleted: { not: true }, OR: or };
+}
+```
+
+Trois points méritent d'être notés.
+
+1. **`findUnique` devient `findFirst`.** Prisma refuse un critère non unique dans `findUnique` : dès
+   qu'on ajoute `status` ou `isDeleted` à côté de l'`id`, il faut `findFirst`.
+2. **Le piège maison Prisma + Mongo est respecté.** `notHiddenFilter()` (déjà présent dans
+   `admin-trips.rules.ts`) fait `OR: [{ hiddenByAdminAt: null }, { hiddenByAdminAt: { isSet: false } }]`,
+   parce qu'un `field: null` ne matche pas un document où le champ est **absent**. Même raison pour
+   `isDeleted: { not: true }` plutôt que `isDeleted: false`, et `profilePublic: { not: false }`
+   plutôt que `profilePublic: true`.
+3. **Le test applicatif est conservé** derrière la requête : il ne s'exécutera plus, mais il protège
+   le jour où quelqu'un modifiera le `where`.
+
+Après correction, les médianes sont indiscernables : 13,6 ms contre 13,5 ms pour le trajet, 12,5 ms
+contre 12,3 ms pour le profil, distributions superposées, corps toujours identiques. Les
+non-régressions sont vérifiées : un trajet publié répond 200, un profil masqué répond 404 à un tiers
+et **200 à son propriétaire** (D67 1A intacte).
+
+## Tests
+
+`apps/trip-service/src/dto/trip-search.dto.spec.ts` (9 cas), `…/lib/public-visibility.rules.spec.ts`
+(3 cas), `apps/auth-service/src/utils/public-visibility.spec.ts` (4 cas). Référence de plateforme :
+trip-service 209 → **221**, auth-service 183 → **187**, total 860 → **872**.

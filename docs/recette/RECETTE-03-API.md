@@ -4130,42 +4130,42 @@ volontairement**.
 
 | Champ | Valeur |
 |---|---|
-| Date | |
-| Testeur | |
-| Branche / version | |
-| Base de données | |
-| Fournisseur de paiement | `STRIPE` / `FAKE` |
-| Broker d'événements | actif / absent |
-| Fournisseur d'email | `resend` / `smtp` (Mailpit) / `fake` |
-| Jeu d'essai rejoué à | |
-| `smoke-services.sh` | 6/6 ✅ / … |
+| Date | 8 septembre 2026 |
+| Testeur | Gomab (assisté) |
+| Branche / version | `dev` — 99bc1fc |
+| Base de données | Atlas, base `development` |
+| Fournisseur de paiement | **`FAKE`** (bundle, `STRIPE_SECRET_KEY` vidée) |
+| Broker d'événements | **actif** (Redpanda) |
+| Fournisseur d'email | **`smtp` (Mailpit)** — interface sur :8026 |
+| Jeu d'essai rejoué à | 8 septembre 2026 |
+| `smoke-services.sh` | **6/6 ✅** |
 
 **Fiches**
 
 | Fiche | Intitulé | Gravité | Attendu | Obtenu | Verdict | Anomalie |
 |---|---|---|---|---|---|---|
-| API-GW-01 | Sonde publique `ok` | majeure | 200 `ok`, 5 services | | | |
-| API-GW-02 | Sonde `down` service coupé | majeure | 503 `down` | | | |
-| API-GW-03 | Santé de la passerelle | mineure | 200 `ok` | | | |
-| API-GW-04 | `/health` des 5 services | mineure | 200 ×5 | | | |
-| API-GW-05 | État public de maintenance | mineure | 200 `enabled:false` | | | |
-| API-GW-06 | Écriture refusée en maintenance | majeure | 503 `MAINTENANCE` | | | |
-| API-GW-07 | Lectures et exceptions en maintenance | majeure | 200 ×4 | | | |
-| API-GW-08 | Plafonds 100 / 1 000 | majeure | 100 · 1000 · 100 | | | |
-| API-GW-09 | Identifiant de corrélation | majeure | posé et renvoyé | | | |
-| API-GW-10 | `x-locale` pilote le formatage | mineure | dates et textes différents | | | |
-| API-GW-11 | Langue non supportée | mineure | 400 `LOCALE_UNSUPPORTED` | | | |
-| API-GW-12 | Locales exotiques tolérées | mineure | 200 ×5 | | | |
-| API-GW-13 | **`details.code` arrive au client** | **bloquante** | 409/403/400 avec code | | | |
-| API-GW-14 | Erreurs par champ | mineure | 400 + `errors` | | | |
-| API-GW-15 | Aucune erreur non gérée | **bloquante** | 0 occurrence | | | |
-| API-GW-16 | 401 sans session | **bloquante** | 401 ×4 | | | |
-| API-GW-17 | 403 non partie prenante | **bloquante** | 403, corps vide de données | | | |
-| API-GW-18 | 404 sans divulgation | **bloquante** | 404 / 400 | | | |
-| API-GW-19 | 409 conflit typé | majeure | 409 `TRANSITION_NOT_ALLOWED` | | | |
-| API-GW-20 | Pagination recherche | majeure | pages disjointes | | | |
-| API-GW-21 | Pagination du fil | mineure | vers le passé | | | |
-| API-GW-22 | Listes bornées | mineure | ≤ 50 | | | |
+| API-GW-01 | Sonde publique `ok` | majeure | 200 `ok`, 5 services | 200, 5 services, cache 10 s | OK | — |
+| API-GW-02 | Sonde `down` service coupé | majeure | 503 `down` | 503 `down`, 1 muet / 4 vivants | OK | — |
+| API-GW-03 | Santé de la passerelle | mineure | 200 `ok` | 200 `ok`, `maintenance.ok:true` | OK | — |
+| API-GW-04 | `/health` des 5 services | mineure | 200 ×5 | 200 ×5, mongo+redis | OK | — |
+| API-GW-05 | État public de maintenance | mineure | 200 `enabled:false` | 200 `enabled:false`, `no-store` | OK | — |
+| API-GW-06 | Écriture refusée en maintenance | majeure | 503 `MAINTENANCE` | 503 `MAINTENANCE`, `Retry-After: 300` | OK | — |
+| API-GW-07 | Lectures et exceptions en maintenance | majeure | 200 ×4 | 200/200/200, (d) 401 sans session admin — jamais 503 | OK | — |
+| API-GW-08 | Plafonds 100 / 1 000 | majeure | 100 · 1000 · 100 | 100 · 1000 · 100, puis 17×429 | OK | — |
+| API-GW-09 | Identifiant de corrélation | majeure | posé et renvoyé | UUID v4 généré, valeur fournie conservée | OK | — |
+| API-GW-10 | `x-locale` pilote le formatage | mineure | dates et textes différents | dates OK ; réponses rapides suivent `preferredLocale` | PARTIEL | écart de cahier |
+| API-GW-11 | Langue non supportée | mineure | 400 `LOCALE_UNSUPPORTED` | 400 `LOCALE_UNSUPPORTED` | OK | — |
+| API-GW-12 | Locales exotiques tolérées | mineure | 200 ×5 | 200 ×5 | OK | — |
+| API-GW-13 | **`details.code` arrive au client** | **bloquante** | 409/403/400 avec code | 409/403/400, `details` dans les trois | OK | cible (c) à corriger |
+| API-GW-14 | Erreurs par champ | mineure | 400 + `errors` | 400 sans objet `errors` | **KO** (08/09) | ANO-API-03 · ouverte |
+| API-GW-15 | Aucune erreur non gérée | **bloquante** | 0 occurrence | 1 occurrence (cursor invalide) | **KO** (08/09) → **corrigé** | ANO-API-01 · close, PR à venir |
+| API-GW-16 | 401 sans session | **bloquante** | 401 ×4 | 401 ×4, corps plat | OK | — |
+| API-GW-17 | 403 non partie prenante | **bloquante** | 403, corps vide de données | 403, 0 donnée du deal | OK | — |
+| API-GW-18 | 404 sans divulgation | **bloquante** | 404 / 400 | corps identiques ✅, temps discriminants ❌ | **KO** (08/09) → **corrigé** | ANO-API-02 · close, PR à venir |
+| API-GW-19 | 409 conflit typé | majeure | 409 `TRANSITION_NOT_ALLOWED` | 409 typé, `details.reason` absent | PARTIEL (08/09) | ANO-API-04 · ouverte |
+| API-GW-20 | Pagination recherche | majeure | pages disjointes | pages disjointes, `nextCursor` null en fin | OK | — |
+| API-GW-21 | Pagination du fil | mineure | vers le passé | ordre ancien→récent, page antérieure vide | OK | — |
+| API-GW-22 | Listes bornées | mineure | ≤ 50 | `?limit=1000` ignoré | OK | — |
 | API-AUTH-01 | Démarrer une inscription | majeure | 200, rien en base | | | |
 | API-AUTH-02 | Consentement obligatoire | majeure | 400 | | | |
 | API-AUTH-03 | Email déjà pris | majeure | 409 | | | |
