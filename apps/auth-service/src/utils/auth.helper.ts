@@ -206,11 +206,11 @@ export const validateCarrierOnboardingData = (
   const shopName = data.shopName?.trim();
 
   if (!phone_number || !country) {
-    throw new ValidationError("Missing required fields!");
+    throw new ValidationError("Missing required fields!", { code: "MISSING_FIELDS" });
   }
 
   if (country.length < 2) {
-    throw new ValidationError("Invalid country!");
+    throw new ValidationError("Invalid country!", { code: "INVALID_COUNTRY" });
   }
 
   return {
@@ -240,13 +240,14 @@ const checkOtpRestrictionsScoped = async (scope: OtpScope, emailKey: string) => 
   // Lock anti-spam (trop de demandes de resend)
   if (await redis.get(keys.otpSpamLock(scope, emailKey))) {
     throw new ValidationError(
-      "Too many OTP requests! Please wait 1 hour before requesting again."
+      "Too many OTP requests! Please wait 1 hour before requesting again.",
+      { code: "OTP_TOO_MANY" }
     );
   }
 
   // Cooldown entre 2 envois
   if (await redis.get(keys.otpCooldown(scope, emailKey))) {
-    throw new ValidationError("Please wait 1 minute before requesting a new OTP!");
+    throw new ValidationError("Please wait 1 minute before requesting a new OTP!", { code: "OTP_COOLDOWN" });
   }
 };
 
@@ -262,7 +263,8 @@ const trackOtpRequestsScoped = async (scope: OtpScope, emailKey: string) => {
       OTP_SPAM_LOCK_SECONDS
     );
     throw new ValidationError(
-      "Too many OTP requests. Please wait 1 hour before requesting again."
+      "Too many OTP requests. Please wait 1 hour before requesting again.",
+      { code: "OTP_TOO_MANY" }
     );
   }
 
@@ -517,7 +519,8 @@ export const getEmailKeyFromToken = async (token: string) => {
   const emailKey = await redis.get(keys.verifyToken(token));
   if (!emailKey) {
     throw new ValidationError(
-      "Verification session expired or invalid. Please register again."
+      "Verification session expired or invalid. Please register again.",
+      { code: "VERIFICATION_EXPIRED" }
     );
   }
   return emailKey;
@@ -543,7 +546,8 @@ export const consumePasswordResetToken = async (token: string) => {
   const emailKey = await redis.get(keys.passwordResetToken(token));
   if (!emailKey) {
     throw new ValidationError(
-      "Password reset session expired or invalid. Please retry."
+      "Password reset session expired or invalid. Please retry.",
+      { code: "RESET_SESSION_EXPIRED" }
     );
   }
   await redis.del(keys.passwordResetToken(token));

@@ -74,7 +74,7 @@ export const inviteAdmin = async (req: AuthenticatedRequest, res: Response, next
     const existing = await prisma.user.findUnique({ where: { emailNormalized: emailKey } });
 
     if (existing) {
-      if (existing.adminRole) throw new ValidationError("This account already has an admin profile.");
+      if (existing.adminRole) throw new ValidationError("This account already has an admin profile.", { code: "ADMIN_ALREADY_GRANTED" });
       await prisma.$transaction(async (tx) => {
         await tx.user.update({
           where: { id: existing.id },
@@ -122,16 +122,16 @@ export const inviteAdmin = async (req: AuthenticatedRequest, res: Response, next
 export const updateAdminRole = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const id = ObjectIdSchema.safeParse(req.params.id);
-    if (!id.success) throw new ValidationError("Invalid id.");
+    if (!id.success) throw new ValidationError("Invalid id.", { code: "INVALID_ID" });
     const parsed = UpdateAdminRoleRequestSchema.safeParse(req.body);
     if (!parsed.success) throw new ValidationError("Invalid request", { errors: zodErrors(parsed.error.issues) });
     const target = await prisma.user.findUnique({ where: { id: id.data } });
     const before = target ? adminRolesOf(target) : [];
-    if (!target || before.length === 0) throw new NotFoundError("Admin account not found.");
-    if (target.id === req.user.id) throw new ForbiddenError("You cannot change your own profile.");
+    if (!target || before.length === 0) throw new NotFoundError("Admin account not found.", { code: "ADMIN_NOT_FOUND" });
+    if (target.id === req.user.id) throw new ForbiddenError("You cannot change your own profile.", { code: "ADMIN_IS_SELF" });
     const next = adminRolesData(parsed.data.adminRoles).adminRoles;
     if (before.includes("SUPER_ADMIN") && !next.includes("SUPER_ADMIN") && (await superAdminCount()) <= 1) {
-      throw new ForbiddenError("The last super administrator cannot be downgraded.");
+      throw new ForbiddenError("The last super administrator cannot be downgraded.", { code: "LAST_SUPER_ADMIN" });
     }
     const rolesData = adminRolesData(next);
     await prisma.$transaction(async (tx) => {
@@ -147,12 +147,12 @@ export const updateAdminRole = async (req: AuthenticatedRequest, res: Response, 
 export const revokeAdmin = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const id = ObjectIdSchema.safeParse(req.params.id);
-    if (!id.success) throw new ValidationError("Invalid id.");
+    if (!id.success) throw new ValidationError("Invalid id.", { code: "INVALID_ID" });
     const target = await prisma.user.findUnique({ where: { id: id.data } });
     const before = target ? adminRolesOf(target) : [];
-    if (!target || before.length === 0) throw new NotFoundError("Admin account not found.");
-    if (target.id === req.user.id) throw new ForbiddenError("You cannot revoke your own access.");
-    if (before.includes("SUPER_ADMIN") && (await superAdminCount()) <= 1) throw new ForbiddenError("The last super administrator cannot be revoked.");
+    if (!target || before.length === 0) throw new NotFoundError("Admin account not found.", { code: "ADMIN_NOT_FOUND" });
+    if (target.id === req.user.id) throw new ForbiddenError("You cannot revoke your own access.", { code: "ADMIN_IS_SELF" });
+    if (before.includes("SUPER_ADMIN") && (await superAdminCount()) <= 1) throw new ForbiddenError("The last super administrator cannot be revoked.", { code: "LAST_SUPER_ADMIN" });
     await prisma.$transaction(async (tx) => {
       await tx.user.update({
         where: { id: target.id },
@@ -179,9 +179,9 @@ export const acceptAdminInvite = async (req: Request, res: Response, next: NextF
     const parsed = AcceptAdminInviteRequestSchema.safeParse(req.body);
     if (!parsed.success) throw new ValidationError("Invalid request", { errors: zodErrors(parsed.error.issues) });
     const userId = await redis.get(inviteKey(parsed.data.token));
-    if (!userId) throw new ValidationError("This invitation link is invalid or expired.");
+    if (!userId) throw new ValidationError("This invitation link is invalid or expired.", { code: "INVITATION_INVALID" });
     const user = await prisma.user.findUnique({ where: { id: userId } });
-    if (!user || adminRolesOf(user).length === 0) throw new ValidationError("This invitation link is invalid or expired.");
+    if (!user || adminRolesOf(user).length === 0) throw new ValidationError("This invitation link is invalid or expired.", { code: "INVITATION_INVALID" });
     validatePasswordStrength(parsed.data.password, { email: user.email, firstName: user.firstName, lastName: user.lastName });
     const passwordHash = await bcrypt.hash(parsed.data.password, 10);
     await prisma.$transaction(async (tx) => {

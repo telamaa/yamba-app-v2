@@ -35,7 +35,7 @@ function zodErrors(issues: Array<{ path: PropertyKey[]; message: string }>) {
 }
 function parseId(raw: unknown): string {
   const p = ObjectIdSchema.safeParse(raw);
-  if (!p.success) throw new ValidationError("Invalid user id.");
+  if (!p.success) throw new ValidationError("Invalid user id.", { code: "INVALID_ID" });
   return p.data;
 }
 function meta(req: AuthenticatedRequest) {
@@ -48,12 +48,12 @@ function fmtDate(d: Date | null, locale: string): string | null {
 export function makeAdminUsersController(service: AdminUsersService) {
   async function loadTarget(req: AuthenticatedRequest) {
     const userId = parseId(req.params.id);
-    if (userId === req.user.id) throw new ForbiddenError("You cannot act on your own account.");
+    if (userId === req.user.id) throw new ForbiddenError("You cannot act on your own account.", { code: "ADMIN_IS_SELF" });
     const user = await prisma.user.findUnique({ where: { id: userId } });
-    if (!user) throw new NotFoundError("User not found.");
+    if (!user) throw new NotFoundError("User not found.", { code: "USER_NOT_FOUND" });
     // Un admin ne se sanctionne pas entre pairs sans le super admin.
     // C-PR3bis — un admin (n'importe quel profil) n'est sanctionné que par un SUPER_ADMIN (profils cumulés)
-    if (adminRolesOf(user).length > 0 && !isSuperAdmin(req.adminRoles ?? [req.adminRole ?? ""])) throw new ForbiddenError("Only a super administrator can act on an admin account.");
+    if (adminRolesOf(user).length > 0 && !isSuperAdmin(req.adminRoles ?? [req.adminRole ?? ""])) throw new ForbiddenError("Only a super administrator can act on an admin account.", { code: "SUPER_ADMIN_ONLY" });
     return user;
   }
 
@@ -82,9 +82,9 @@ export function makeAdminUsersController(service: AdminUsersService) {
     async exportCsv(req: AuthenticatedRequest, res: Response, next: NextFunction) {
       try {
         const parsed = AdminUsersQuerySchema.safeParse(req.query);
-        if (!parsed.success) throw new ValidationError("Invalid query.");
+        if (!parsed.success) throw new ValidationError("Invalid query.", { code: "INVALID_QUERY" });
         const reason = typeof req.query.reason === "string" ? req.query.reason.trim() : "";
-        if (reason.length < EXPORT_REASON_MIN_LENGTH) throw new ValidationError(`A reason of at least ${EXPORT_REASON_MIN_LENGTH} characters is required for a personal-data export.`);
+        if (reason.length < EXPORT_REASON_MIN_LENGTH) throw new ValidationError(`A reason of at least ${EXPORT_REASON_MIN_LENGTH} characters is required for a personal-data export.`, { code: "REASON_TOO_SHORT" });
         const rows = await service.exportRows(parsed.data);
         const now = new Date();
         const { cursor: _c, limit: _l, ...filters } = parsed.data;
@@ -101,7 +101,7 @@ export function makeAdminUsersController(service: AdminUsersService) {
       try {
         // C-PR7a — filtres, tri, curseur (la recherche simple reste le cas « q seul »)
         const parsed = AdminUsersQuerySchema.safeParse(req.query);
-        if (!parsed.success) throw new ValidationError("Invalid query.");
+        if (!parsed.success) throw new ValidationError("Invalid query.", { code: "INVALID_QUERY" });
         res.status(200).json(await service.searchAdvanced(parsed.data));
       } catch (e) {
         next(e);
@@ -145,7 +145,7 @@ export function makeAdminUsersController(service: AdminUsersService) {
         if (!parsed.success) throw new ValidationError("Invalid request", { errors: zodErrors(parsed.error.issues) });
         const { level, reason } = parsed.data;
         const until = parsed.data.until ? new Date(parsed.data.until) : null;
-        if (until && until.getTime() <= Date.now()) throw new ValidationError("The end date must be in the future.");
+        if (until && until.getTime() <= Date.now()) throw new ValidationError("The end date must be in the future.", { code: "DATE_IN_PAST" });
         const now = new Date();
         await prisma.$transaction(async (tx) => {
           await tx.user.update({
@@ -190,7 +190,7 @@ export function makeAdminUsersController(service: AdminUsersService) {
       try {
         const user = await loadTarget(req);
         const suppressedAt = user.emailSuppressedAt;
-        if (!suppressedAt) throw new ValidationError("This address is not suppressed.");
+        if (!suppressedAt) throw new ValidationError("This address is not suppressed.", { code: "EMAIL_NOT_SUPPRESSED" });
         await prisma.$transaction(async (tx) => {
           await tx.user.update({ where: { id: user.id }, data: { emailSuppressedAt: null, emailSuppressedReason: null } });
           await recordAdminAction(tx, { adminUserId: req.user.id, action: "EMAIL_SUPPRESSION_LIFTED", targetType: "USER", targetId: user.id, before: { emailSuppressedAt: suppressedAt.toISOString(), reason: user.emailSuppressedReason }, after: { emailSuppressedAt: null }, ...meta(req) });
@@ -205,7 +205,7 @@ export function makeAdminUsersController(service: AdminUsersService) {
         const user = await loadTarget(req);
         const parsed = LiftSuspensionRequestSchema.safeParse(req.body);
         if (!parsed.success) throw new ValidationError("Invalid request", { errors: zodErrors(parsed.error.issues) });
-        if (user.accountStatus === "ACTIVE") throw new ValidationError("This account is not restricted.");
+        if (user.accountStatus === "ACTIVE") throw new ValidationError("This account is not restricted.", { code: "ACCOUNT_NOT_RESTRICTED" });
         await prisma.$transaction(async (tx) => {
           await tx.user.update({
             where: { id: user.id },

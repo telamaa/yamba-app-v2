@@ -59,7 +59,7 @@ function blocked(res: Response, e: ErasureBlockedError) {
 
 export const requestSudoCode = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
-    if (!req.user) return next(new AuthError("Unauthorized"));
+    if (!req.user) return next(new AuthError("Unauthorized", { code: "UNAUTHENTICATED" }));
     const emailKey = req.user.emailNormalized ?? req.user.email.toLowerCase();
     await checkSudoOtpRestrictions(emailKey);
     await trackSudoOtpRequests(emailKey);
@@ -75,7 +75,7 @@ const assertSudo = (req: AuthenticatedRequest) => requireSudo(req);
 
 export const exportMyData = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
-    if (!req.user) return next(new AuthError("Unauthorized"));
+    if (!req.user) return next(new AuthError("Unauthorized", { code: "UNAUTHENTICATED" }));
     const last = await privacyService.lastExportAt(req.user.id);
     if (last && Date.now() - last.getTime() < DATA_EXPORT_MIN_INTERVAL_HOURS * 3_600_000) {
       throw new ValidationError(`One export per ${DATA_EXPORT_MIN_INTERVAL_HOURS} hours.`, { code: "EXPORT_RATE_LIMITED", nextAt: new Date(last.getTime() + DATA_EXPORT_MIN_INTERVAL_HOURS * 3_600_000).toISOString() });
@@ -93,7 +93,7 @@ export const exportMyData = async (req: AuthenticatedRequest, res: Response, nex
 
 export const getMyErasureBlockers = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
-    if (!req.user) return next(new AuthError("Unauthorized"));
+    if (!req.user) return next(new AuthError("Unauthorized", { code: "UNAUTHENTICATED" }));
     return res.status(200).json(await privacyService.erasureBlockers(req.user.id));
   } catch (e) {
     return next(e);
@@ -102,7 +102,7 @@ export const getMyErasureBlockers = async (req: AuthenticatedRequest, res: Respo
 
 export const eraseMyAccount = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
-    if (!req.user) return next(new AuthError("Unauthorized"));
+    if (!req.user) return next(new AuthError("Unauthorized", { code: "UNAUTHENTICATED" }));
     const parsed = EraseMyAccountRequestSchema.safeParse(req.body);
     if (!parsed.success) throw new ValidationError("Invalid request", { errors: zodErrors(parsed.error.issues) });
     await assertSudo(req);
@@ -122,13 +122,13 @@ export const eraseMyAccount = async (req: AuthenticatedRequest, res: Response, n
 
 export const updateMyPreferences = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
-    if (!req.user) return next(new AuthError("Unauthorized"));
+    if (!req.user) return next(new AuthError("Unauthorized", { code: "UNAUTHENTICATED" }));
     const parsed = UpdateMyPreferencesRequestSchema.safeParse(req.body);
     if (!parsed.success) throw new ValidationError("Invalid request", { errors: zodErrors(parsed.error.issues) });
     const data: Record<string, unknown> = {};
     if (typeof parsed.data.messagingReminderEmails === "boolean") data.messagingReminderEmails = parsed.data.messagingReminderEmails;
     if (typeof parsed.data.analyticsOptIn === "boolean") data.analyticsOptIn = parsed.data.analyticsOptIn;
-    if (Object.keys(data).length === 0) throw new ValidationError("Nothing to update.");
+    if (Object.keys(data).length === 0) throw new ValidationError("Nothing to update.", { code: "NOTHING_TO_UPDATE" });
     const user = await prisma.user.update({ where: { id: req.user.id }, data, select: { messagingReminderEmails: true, preferredLocale: true, analyticsOptIn: true } });
     // D66 2A — le choix cookies est tracé (accepté : ligne COOKIES ; refusé : révocation de la dernière)
     if (typeof parsed.data.analyticsOptIn === "boolean" && parsed.data.analyticsOptIn !== req.user.analyticsOptIn) {
@@ -145,12 +145,12 @@ export const updateMyPreferences = async (req: AuthenticatedRequest, res: Respon
 export const adminEraseUser = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const id = ObjectIdSchema.safeParse(req.params.id);
-    if (!id.success) throw new ValidationError("Invalid user id.");
+    if (!id.success) throw new ValidationError("Invalid user id.", { code: "INVALID_ID" });
     const parsed = AdminEraseUserRequestSchema.safeParse(req.body);
     if (!parsed.success) throw new ValidationError("Invalid request", { errors: zodErrors(parsed.error.issues) });
-    if (id.data === req.user.id) throw new ForbiddenError("You cannot erase your own account from the back-office.");
+    if (id.data === req.user.id) throw new ForbiddenError("You cannot erase your own account from the back-office.", { code: "ADMIN_IS_SELF" });
     const target = await prisma.user.findUnique({ where: { id: id.data }, select: { id: true, isDeleted: true } });
-    if (!target || target.isDeleted) throw new NotFoundError("User not found.");
+    if (!target || target.isDeleted) throw new NotFoundError("User not found.", { code: "USER_NOT_FOUND" });
     try {
       await privacyService.eraseAccount({ userId: id.data, channel: "ADMIN", requestedByAdminId: req.user.id, reason: parsed.data.reason, ...meta(req) });
     } catch (e) {

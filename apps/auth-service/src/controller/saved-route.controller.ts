@@ -27,7 +27,7 @@ export const createSavedRoute = async (
   next: NextFunction
 ) => {
   try {
-    if (!req.user) return next(new ValidationError("Unauthorized"));
+    if (!req.user) return next(new ValidationError("Unauthorized", { code: "UNAUTHENTICATED" }));
 
     const userId = req.user.id;
     const {
@@ -92,7 +92,7 @@ export const createSavedRoute = async (
       earliestDate,
       latestDate,
     });
-    if (error) return next(new ValidationError(error));
+    if (error) return next(new ValidationError(error, { code: "ROUTE_ALERT_INVALID" }));
 
     const normalizedOriginCountryCode = normalizeIso(originCountryCode)!;
     const normalizedDestinationCountryCode = normalizeIso(destinationCountryCode)!;
@@ -104,7 +104,8 @@ export const createSavedRoute = async (
     if (activeCount >= MAX_SAVED_ROUTES_PER_USER) {
       return next(
         new ValidationError(
-          `You can have a maximum of ${MAX_SAVED_ROUTES_PER_USER} active route alerts. Please remove one before creating a new one.`
+          `You can have a maximum of ${MAX_SAVED_ROUTES_PER_USER} active route alerts. Please remove one before creating a new one.`,
+          { code: "ROUTE_ALERT_LIMIT" }
         )
       );
     }
@@ -121,7 +122,7 @@ export const createSavedRoute = async (
       },
     });
     if (duplicate) {
-      return next(new ValidationError("You already have an active alert for this route."));
+      return next(new ValidationError("You already have an active alert for this route.", { code: "ROUTE_ALERT_DUPLICATE" }));
     }
 
     const latestDateParsed = latestDate ? new Date(latestDate) : null;
@@ -180,7 +181,7 @@ export const listSavedRoutes = async (
   next: NextFunction
 ) => {
   try {
-    if (!req.user) return next(new ValidationError("Unauthorized"));
+    if (!req.user) return next(new ValidationError("Unauthorized", { code: "UNAUTHENTICATED" }));
 
     const userId = req.user.id;
     const includeInactive = req.query.includeInactive === "true";
@@ -213,14 +214,14 @@ export const updateSavedRoute = async (
   next: NextFunction
 ) => {
   try {
-    if (!req.user) return next(new ValidationError("Unauthorized"));
+    if (!req.user) return next(new ValidationError("Unauthorized", { code: "UNAUTHENTICATED" }));
 
     const { id } = req.params;
     const userId = req.user.id;
 
     const savedRoute = await prisma.savedRoute.findUnique({ where: { id } });
-    if (!savedRoute) return next(new ValidationError("Route alert not found."));
-    if (savedRoute.userId !== userId) return next(new ValidationError("Unauthorized."));
+    if (!savedRoute) return next(new ValidationError("Route alert not found.", { code: "ROUTE_ALERT_NOT_FOUND" }));
+    if (savedRoute.userId !== userId) return next(new ValidationError("Unauthorized.", { code: "UNAUTHENTICATED" }));
 
     const { earliestDate, latestDate, emailEnabled, includeNearby } = req.body as {
       earliestDate?: string | null;
@@ -234,7 +235,7 @@ export const updateSavedRoute = async (
         const earliest = new Date(earliestDate);
         const latest = new Date(latestDate);
         if (earliest > latest) {
-          return next(new ValidationError("Earliest date must be before latest date."));
+          return next(new ValidationError("Earliest date must be before latest date.", { code: "DATE_RANGE_INVALID" }));
         }
       }
     }
@@ -277,7 +278,7 @@ export const deleteSavedRoute = async (
   next: NextFunction
 ) => {
   try {
-    if (!req.user) return next(new ValidationError("Unauthorized"));
+    if (!req.user) return next(new ValidationError("Unauthorized", { code: "UNAUTHENTICATED" }));
 
     const { id } = req.params;
     const userId = req.user.id;
@@ -286,7 +287,7 @@ export const deleteSavedRoute = async (
     if (!savedRoute) {
       return res.status(200).json({ success: true, message: "Route alert removed." });
     }
-    if (savedRoute.userId !== userId) return next(new ValidationError("Unauthorized."));
+    if (savedRoute.userId !== userId) return next(new ValidationError("Unauthorized.", { code: "UNAUTHENTICATED" }));
 
     await prisma.savedRoute.delete({ where: { id } });
 
@@ -306,14 +307,14 @@ export const extendSavedRoute = async (
   next: NextFunction
 ) => {
   try {
-    if (!req.user) return next(new ValidationError("Unauthorized"));
+    if (!req.user) return next(new ValidationError("Unauthorized", { code: "UNAUTHENTICATED" }));
 
     const { id } = req.params;
     const userId = req.user.id;
 
     const savedRoute = await prisma.savedRoute.findUnique({ where: { id } });
-    if (!savedRoute) return next(new ValidationError("Route alert not found."));
-    if (savedRoute.userId !== userId) return next(new ValidationError("Unauthorized."));
+    if (!savedRoute) return next(new ValidationError("Route alert not found.", { code: "ROUTE_ALERT_NOT_FOUND" }));
+    if (savedRoute.userId !== userId) return next(new ValidationError("Unauthorized.", { code: "UNAUTHENTICATED" }));
 
     const newExpiresAt = computeExtendedExpiresAt();
 

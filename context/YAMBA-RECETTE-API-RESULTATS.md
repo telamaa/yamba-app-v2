@@ -1502,8 +1502,8 @@ idempotente (inscrite au journal de dette ci-dessous).
 | D-1 | `x-locale` ne pilote pas le formatage des réponses rapides : c'est `preferredLocale` du membre qui gagne | API-GW-10, API-MSG-11 | comportement cohérent et défendable — c'est le **cahier** qui décrit autre chose | trancher : soit l'en-tête prime, soit le cahier est corrigé |
 | D-2 | trip-service rend parfois **400** là où 403 ou 404 seraient exacts | API-TRIP-13 | écart de sémantique connu, sans fuite d'information | aligner sur la règle 403/404 du reste de la plateforme |
 | D-3 | relancer un lien de vérification n'est pas idempotent | API-TRIP-18 | pas d'effet de bord dangereux, seulement un second email | même traitement que les autres gestes idempotents |
-| D-4 | les refus de **trip-service** et **auth-service** ne portent pas tous un `details.code` | observé au chapitre 9 | la règle est tenue sur deal-service et message-service ; les deux autres services restent à passer | appliquer le garde-fou `refusal-codes.spec.ts` aux deux services restants |
-| D-5 | le refus de permission admin écrit sa réponse **lui-même**, hors du middleware d'erreur | API-SEC-05 | il porte désormais `details.code` en plus de ses champs de tête | le faire passer par le middleware d'erreur commun |
+| ~~D-4~~ | ~~les refus de **trip-service** et **auth-service** ne portent pas tous un `details.code`~~ | observé au chapitre 9 | — | **SOLDÉE le 08/09 au soir** : 250 refus codés, garde-fou posé sur les deux services, et deux défauts de sémantique tombés avec (voir ci-dessous) |
+| D-5 | les middlewares (`isAuthenticated`, `requireAdminPermission`) écrivent leur réponse **eux-mêmes**, hors du middleware d'erreur | API-SEC-05 | ils portent désormais tous `details.code` **et** leur `code` de tête | les faire passer par le middleware d'erreur commun, pour n'avoir qu'une seule forme de corps d'erreur |
 
 ## 9.5 Ce que cette campagne NE prouve pas
 
@@ -1530,9 +1530,11 @@ Le cahier l'exige, et c'est la partie la plus honnête d'un rapport de recette.
 bloquante ouverte, zéro bloquante non jouée, majeures toutes corrigées, mineures inscrites au
 journal de dette.
 
-**Une réserve explicite** reste, qui ne conditionne pas l'acceptation mais doit être levée avant la
-mise en production : passer trip-service et auth-service au garde-fou `refusal-codes.spec.ts`
-(dette D-4).
+**Plus aucune réserve.** Les deux qui restaient au verdict ont été levées le soir même :
+
+1. ~~rejouer les fiches Stripe avec la CLI~~ — fait (voir « Rejeu avec la CLI Stripe », chapitre 8) ;
+2. ~~passer trip-service et auth-service au garde-fou `refusal-codes.spec.ts`~~ — fait
+   (voir « Solde de la dette D-4 » ci-dessous).
 
 ~~Rejouer les fiches Stripe avec la CLI et un compte de test~~ — **fait le 08/09 au soir** : CLI
 installée, événements réels signés par Stripe, et surtout une **autorisation réelle annulée chez le
@@ -1561,3 +1563,109 @@ confrontent au schéma — sept au total aujourd'hui.
 
 **Enfin : la moitié des anomalies de cette campagne ne sont pas des fautes de logique, mais des
 refus mal formulés.** Le serveur savait ce qu'il faisait ; il ne savait pas le *dire*.
+
+---
+
+# Solde de la dette D-4 — « tout refus métier porte un `details.code` », partout
+
+Le verdict de campagne inscrivait au journal de dette : la règle était tenue sur deal-service
+(ANO-API-04) et message-service (ANO-API-20), pas sur **trip-service** ni **auth-service**. Elle
+l'est maintenant sur les quatre, et sur les middlewares partagés.
+
+## Ce qu'il y avait à faire
+
+| Service | Refus métier sans code | Erreurs de forme (exclues) |
+|---|---|---|
+| trip-service | **81** | 8 |
+| auth-service | **169** | 26 |
+
+Les erreurs de forme (schéma Zod) restent hors périmètre : elles portent déjà la liste des champs
+fautifs, **qui est leur contrat** — le client y lit quel champ corriger.
+
+## Deux défauts de sémantique sont tombés avec la dette
+
+C'est le vrai gain, et il n'était pas dans l'énoncé. En codant les refus de trip-service, la même
+fonction est apparue neuf fois :
+
+```ts
+const { trip, error } = await findOwnedTrip(id, userId);
+if (!trip) return next(new ValidationError(error));   // ← 400, toujours
+```
+
+`findOwnedTrip` renvoie « Trip not found. » **ou** « Unauthorized. » — deux situations que la règle
+non négociable de la plateforme distingue par le statut (**404** et **403**), et que ce code
+écrasait en un seul **400**, sans code. Un 400 dit « votre saisie est mauvaise » : ni l'une ni
+l'autre ne l'était.
+
+C'était la dette **D-2** du même journal (« trip-service rend parfois 400 là où 403 ou 404 seraient
+exacts »), sur ces neuf sites. Corrigée en même temps :
+
+```ts
+const { trip, error, code } = await findOwnedTrip(id, userId);
+if (!trip) return next(ownershipError(code, error));  // 404 TRIP_NOT_FOUND | 403 NOT_TRIP_OWNER
+```
+
+Vérification faite avant de changer les statuts : **aucun écran du front ne branche sur le 400** de
+ces routes (les seuls `status === 40x` du front portent sur la notation, le suivi de deal, la
+messagerie et les profils publics).
+
+## Les middlewares partagés — la dette D-5, à moitié soldée
+
+`isAuthenticated` écrit ses réponses lui-même, sans passer par le middleware d'erreur. Trois de ses
+sept refus portaient un `code`, **les quatre autres rien du tout** — dont « jeton absent », le 401
+le plus fréquent de la plateforme. Les sept ont désormais un code distinct :
+
+| Refus | Code | Ce que le client doit en faire |
+|---|---|---|
+| jeton absent | `TOKEN_MISSING` | se connecter |
+| jeton illisible | `TOKEN_INVALID` | se connecter |
+| jeton expiré ou invalide | `TOKEN_EXPIRED` | rafraîchir, puis se connecter |
+| compte introuvable | `USER_NOT_FOUND` | se connecter |
+| compte effacé | `ACCOUNT_DELETED` | ne pas réessayer |
+| compte suspendu | `ACCOUNT_SUSPENDED` | contacter le support |
+| session révoquée | `SESSION_REVOKED` | se reconnecter (on l'a déconnecté ailleurs) |
+
+`authorizeRoles` a reçu `ROLE_NOT_ALLOWED`. Ce qu'il reste de D-5 — faire passer ces middlewares par
+le middleware d'erreur commun, pour n'avoir qu'**une seule** forme de corps d'erreur — est un
+chantier de forme, sans effet fonctionnel : il reste au journal.
+
+## Les garde-fous
+
+`apps/trip-service/src/lib/refusal-codes.spec.ts` et
+`apps/auth-service/src/utils/refusal-codes.spec.ts` — mêmes que ceux de deal-service et
+message-service : ils lisent les sources et refusent tout jet d'erreur métier sans code.
+
+Un détail a demandé une deuxième passe : un code peut s'écrire de **trois** façons légitimes —
+`{ code: "X" }`, le raccourci `{ code }` quand la variable porte déjà le nom, et un objet `details`
+construit ailleurs et passé tel quel. La première version du test ne reconnaissait que la première
+et criait au loup sur trois sites corrects. Un garde-fou trop littéral fabrique du faux positif,
+et le faux positif est ce qui fait désactiver les garde-fous.
+
+Le test d'auth-service vérifie en plus que trois codes de 401 **différents** existent bien
+(`INVALID_CREDENTIALS`, `SESSION_EXPIRED`, `ACCOUNT_SUSPENDED`) : c'est tout l'intérêt de la règle,
+un client doit réagir différemment à chacun.
+
+## Contre-épreuves
+
+| Appel | Avant | Après |
+|---|---|---|
+| modifier un trajet inexistant | 400 « Trip not found. » | **404** `{"code":"TRIP_NOT_FOUND"}` |
+| modifier le trajet d'un autre | 400 « Unauthorized. » | **403** `{"code":"NOT_TRIP_OWNER"}` |
+| mettre en favori un trajet inexistant | 400 | **404** `{"code":"TRIP_NOT_FOUND"}` |
+| appel sans jeton | 401 sans code | 401 `{"code":"TOKEN_MISSING"}` |
+| jeton forgé | 401 sans code | 401 `{"code":"TOKEN_EXPIRED"}` |
+| mauvais mot de passe | 401 sans code | 401 `{"code":"INVALID_CREDENTIALS"}` |
+| se suivre soi-même | 400 sans code | 400 `{"code":"CANNOT_FOLLOW_SELF"}` |
+
+trip-service 231 → **235**, auth-service 215 → **219**. Plateforme **941**.
+
+## Un piège Nx, payé une deuxième fois
+
+La contre-épreuve a d'abord montré les **anciens** corps d'erreur alors que le bundle contenait bien
+le nouveau code. Cause : `npm run dev` lance `nx serve`, qui construit la cible `build:development`
+— et `nx build <service> --skip-nx-cache` ne réchauffe que `build`. Le serveur repartait donc sur
+un artefact en cache.
+
+C'est la même leçon que le typecheck servi depuis le cache pendant la campagne : **un artefact Nx
+« reconstruit » n'est pas forcément neuf.** Pour redémarrer sur du code frais :
+`NX_SKIP_NX_CACHE=true npm run dev`.

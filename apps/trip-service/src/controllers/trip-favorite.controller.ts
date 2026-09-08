@@ -11,13 +11,13 @@ import { addFavorite, listFavoriteTrips, removeFavorite } from "../services/trip
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 
 function requireUserId(req: AuthenticatedRequest): string {
-  if (!req.user?.id) throw new AuthError("Unauthorized");
+  if (!req.user?.id) throw new AuthError("Unauthorized", { code: "UNAUTHENTICATED" });
   return String(req.user.id);
 }
 
 function requireTripId(req: AuthenticatedRequest): string {
   const { id } = req.params as { id?: string };
-  if (!id || !OBJECT_ID.test(id)) throw new ValidationError("Invalid trip id.");
+  if (!id || !OBJECT_ID.test(id)) throw new ValidationError("Invalid trip id.", { code: "INVALID_ID" });
   return id;
 }
 

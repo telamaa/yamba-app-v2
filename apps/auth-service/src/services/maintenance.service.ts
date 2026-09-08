@@ -52,11 +52,11 @@ export function makeMaintenanceService(deps: { db: MaintenanceDb; notify?: (n: {
       const after: MaintenanceValues = { enabled: body.enabled, messageFr: body.messageFr ?? "", messageEn: body.messageEn ?? "", scheduledAt: body.scheduledAt ?? null };
       const before = await deps.db.$transaction(async (tx) => {
         const cur = await current(tx);
-        if (cur.version !== body.expectedVersion) throw new ConflictError("The maintenance state changed meanwhile: reload and try again.");
+        if (cur.version !== body.expectedVersion) throw new ConflictError("The maintenance state changed meanwhile: reload and try again.", { code: "STALE_VERSION" });
         const version = cur.version + 1;
         if (cur.row) {
           const r = await tx.platformSettings.updateMany({ where: { key: MAINTENANCE_KEY, version: cur.version }, data: { values: after, version, updatedByAdminId: actor.id } });
-          if (r.count !== 1) throw new ConflictError("The maintenance state changed meanwhile: reload and try again.");
+          if (r.count !== 1) throw new ConflictError("The maintenance state changed meanwhile: reload and try again.", { code: "STALE_VERSION" });
         } else {
           await tx.platformSettings.create({ data: { key: MAINTENANCE_KEY, values: after, version, updatedByAdminId: actor.id } });
         }

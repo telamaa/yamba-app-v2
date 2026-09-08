@@ -2,7 +2,7 @@ import type { Response, NextFunction, RequestHandler } from "express";
 import prisma from "@packages/libs/prisma";
 import { recordTripView, tripViews, viewerKey } from "@packages/libs/redis/trip-stats";
 import redis from "@packages/libs/redis";
-import { AppError, ValidationError } from "@packages/error-handler";
+import { AppError, AuthError, ForbiddenError, NotFoundError, ValidationError } from "@packages/error-handler";
 import { AuthenticatedRequest } from "@packages/middleware/isAuthenticated";
 import { favoriteTripIds } from "../services/trip-favorite.service";
 import imagekit from "../lib/imagekit";
@@ -75,12 +75,24 @@ function computeDenormalizedFields(input: {
 async function findOwnedTrip(id: string, userId: string) {
   const trip = await prisma.trip.findUnique({ where: { id } });
   if (!trip || trip.isDeleted) {
-    return { trip: null, error: "Trip not found." } as const;
+    return { trip: null, error: "Trip not found.", code: "TRIP_NOT_FOUND" } as const;
   }
   if (trip.userId !== userId) {
-    return { trip: null, error: "Unauthorized." } as const;
+    return { trip: null, error: "You do not own this trip.", code: "NOT_TRIP_OWNER" } as const;
   }
-  return { trip, error: null } as const;
+  return { trip, error: null, code: null } as const;
+}
+
+/**
+ * Dette D-4 / D-2 de la recette API (08/09/2026) — ces deux refus partaient en **400** avec une
+ * phrase anglaise et sans code : le client ne pouvait ni distinguer « ce trajet n'existe pas » de
+ * « ce trajet n'est pas le vôtre », ni traduire le message. Ils prennent leur statut exact
+ * (404 / 403, règle non négociable de la sémantique) et leur code.
+ */
+function ownershipError(code: "TRIP_NOT_FOUND" | "NOT_TRIP_OWNER", message: string) {
+  return code === "TRIP_NOT_FOUND"
+    ? new NotFoundError(message, { code })
+    : new ForbiddenError(message, { code });
 }
 
 /**
@@ -128,7 +140,7 @@ export const createTrip = async (
   next: NextFunction
 ) => {
   try {
-    if (!req.user) return next(new ValidationError("Unauthorized"));
+    if (!req.user) return next(new AuthError("Unauthorized", { code: "UNAUTHENTICATED" }));
 
     // ── Zod validation (shape + intra-payload rules) ──
     const parsed = createTripSchema.safeParse(req.body);
@@ -159,11 +171,11 @@ export const createTrip = async (
           categoryConditions: data.categoryConditions as unknown[] | undefined,
         }) === null
       ) {
-        return next(new ValidationError(PRICING_GATE_MESSAGE));
+        return next(new ValidationError(PRICING_GATE_MESSAGE, { code: "PRICING_INCOMPLETE" }));
       }
       const bagIssue = checkBagCapacity(data);
       if (bagIssue) {
-        return next(new ValidationError(bagIssue));
+        return next(new ValidationError(bagIssue, { code: "BAGGAGE_INVALID" }));
       }
     }
 
@@ -290,7 +302,7 @@ export const updateTrip = async (
   next: NextFunction
 ) => {
   try {
-    if (!req.user) return next(new ValidationError("Unauthorized"));
+    if (!req.user) return next(new AuthError("Unauthorized", { code: "UNAUTHENTICATED" }));
 
     const { id } = req.params;
     const userId = req.user.id;
@@ -302,8 +314,8 @@ export const updateTrip = async (
     }
     const { publish, ...data } = parsed.data;
 
-    const { trip, error } = await findOwnedTrip(id, userId);
-    if (!trip) return next(new ValidationError(error));
+    const { trip, error, code } = await findOwnedTrip(id, userId);
+    if (!trip) return next(ownershipError(code, error));
 
     // ⭐ Lot 2 — La machine remplace le check ad hoc "CANCELLED".
     // Bloque désormais aussi COMPLETED / ARCHIVED, et (à terme) les
@@ -311,7 +323,7 @@ export const updateTrip = async (
     const ctx = await buildLifecycleCtx(trip.id);
     const editCheck = canPerform(trip, "edit", ctx);
     if (!editCheck.allowed) {
-      return next(new ValidationError(editCheck.reason));
+      return next(new ValidationError(editCheck.reason, { code: "TRIP_NOT_EDITABLE" }));
     }
 
     // Build update payload: only include fields that were actually sent
@@ -343,7 +355,7 @@ export const updateTrip = async (
       // ⭐ Lot 2 — Guard machine (statut + date de départ non passée)
       const publishCheck = canPerform(trip, "publish", ctx);
       if (!publishCheck.allowed) {
-        return next(new ValidationError(publishCheck.reason));
+        return next(new ValidationError(publishCheck.reason, { code: "TRIP_NOT_PUBLISHABLE" }));
       }
 
       // ⭐ D31 — plus de gate profil/Stripe à la publication (déplacé vers
@@ -357,10 +369,10 @@ export const updateTrip = async (
       const effectivePickup = updateData.pickupLocations ?? trip.pickupLocations ?? [];
       const effectiveDelivery = updateData.deliveryLocations ?? trip.deliveryLocations ?? [];
       if (effectivePickup.length === 0) {
-        return next(new ValidationError("At least one pickup location is required to publish."));
+        return next(new ValidationError("At least one pickup location is required to publish.", { code: "PUBLISH_PICKUP_REQUIRED" }));
       }
       if (effectiveDelivery.length === 0) {
-        return next(new ValidationError("At least one delivery location is required to publish."));
+        return next(new ValidationError("At least one delivery location is required to publish.", { code: "PUBLISH_DELIVERY_REQUIRED" }));
       }
 
       // ⭐ A28 — gate bi-moteur sur les valeurs EFFECTIVES (payload ?? trip).
@@ -372,7 +384,7 @@ export const updateTrip = async (
             trip.categoryConditions) as unknown[],
         }) === null
       ) {
-        return next(new ValidationError(PRICING_GATE_MESSAGE));
+        return next(new ValidationError(PRICING_GATE_MESSAGE, { code: "PRICING_INCOMPLETE" }));
       }
       const bagIssue = checkBagCapacity({
         capacityKg: updateData.capacityKg ?? trip.capacityKg,
@@ -380,7 +392,7 @@ export const updateTrip = async (
         cabinBag12PriceCents: updateData.cabinBag12PriceCents ?? trip.cabinBag12PriceCents,
       });
       if (bagIssue) {
-        return next(new ValidationError(bagIssue));
+        return next(new ValidationError(bagIssue, { code: "BAGGAGE_INVALID" }));
       }
 
       updateData.status = "PUBLISHED";
@@ -430,7 +442,7 @@ export const addTripDocuments = async (
   next: NextFunction
 ) => {
   try {
-    if (!req.user) return next(new ValidationError("Unauthorized"));
+    if (!req.user) return next(new AuthError("Unauthorized", { code: "UNAUTHENTICATED" }));
 
     const { id } = req.params;
     const userId = req.user.id;
@@ -441,8 +453,8 @@ export const addTripDocuments = async (
     });
 
     // ⭐ Lot 2 — soft-deleted = introuvable
-    if (!trip || trip.isDeleted) return next(new ValidationError("Trip not found."));
-    if (trip.userId !== userId) return next(new ValidationError("Unauthorized."));
+    if (!trip || trip.isDeleted) return next(new NotFoundError("Trip not found.", { code: "TRIP_NOT_FOUND" }));
+    if (trip.userId !== userId) return next(new ForbiddenError("You do not own this trip.", { code: "NOT_TRIP_OWNER" }));
 
     const { documents } = req.body as {
       documents: Array<{
@@ -458,7 +470,7 @@ export const addTripDocuments = async (
     };
 
     if (!documents || !Array.isArray(documents) || documents.length === 0) {
-      return next(new ValidationError("At least one document is required."));
+      return next(new ValidationError("At least one document is required.", { code: "DOCUMENT_REQUIRED" }));
     }
 
     const existingFileIds = new Set(trip.documents.map((d) => d.fileId));
@@ -481,16 +493,16 @@ export const addTripDocuments = async (
     const currentCount = trip.documents.length;
 
     if (currentCount + newDocuments.length > maxDocs) {
-      return next(new ValidationError(`Maximum ${maxDocs} documents per trip. Currently ${currentCount}.`));
+      return next(new ValidationError(`Maximum ${maxDocs} documents per trip. Currently ${currentCount}.`, { code: "DOCUMENT_LIMIT_REACHED" }));
     }
 
     const maxSizeMb = settings["documents.maxDocSizeMb"];
     for (const doc of newDocuments) {
       if (!doc.type || !doc.fileId || !doc.url) {
-        return next(new ValidationError("Each document must have type, fileId, and url."));
+        return next(new ValidationError("Each document must have type, fileId, and url.", { code: "DOCUMENT_INCOMPLETE" }));
       }
       if (doc.sizeBytes && doc.sizeBytes > maxSizeMb * 1024 * 1024) {
-        return next(new ValidationError(`Document "${doc.originalName}" exceeds ${maxSizeMb}MB limit.`));
+        return next(new ValidationError(`Document "${doc.originalName}" exceeds ${maxSizeMb}MB limit.`, { code: "DOCUMENT_TOO_LARGE" }));
       }
     }
 
@@ -544,7 +556,7 @@ export const removeTripDocument = async (
   next: NextFunction
 ) => {
   try {
-    if (!req.user) return next(new ValidationError("Unauthorized"));
+    if (!req.user) return next(new AuthError("Unauthorized", { code: "UNAUTHENTICATED" }));
 
     const { id, documentId } = req.params;
     const userId = req.user.id;
@@ -554,12 +566,12 @@ export const removeTripDocument = async (
       include: { documents: { select: { id: true, type: true } } },
     });
     // ⭐ Lot 2 — soft-deleted = introuvable
-    if (!trip || trip.isDeleted) return next(new ValidationError("Trip not found."));
-    if (trip.userId !== userId) return next(new ValidationError("Unauthorized."));
+    if (!trip || trip.isDeleted) return next(new NotFoundError("Trip not found.", { code: "TRIP_NOT_FOUND" }));
+    if (trip.userId !== userId) return next(new ForbiddenError("You do not own this trip.", { code: "NOT_TRIP_OWNER" }));
 
     const doc = await prisma.tripDocument.findUnique({ where: { id: documentId } });
     if (!doc || doc.tripId !== id) {
-      return next(new ValidationError("Document not found."));
+      return next(new ValidationError("Document not found.", { code: "DOCUMENT_NOT_FOUND" }));
     }
 
     if (doc.fileId) {
@@ -597,13 +609,13 @@ async function performCancel(
   res: Response,
   next: NextFunction
 ) {
-  if (!req.user) return next(new ValidationError("Unauthorized"));
+  if (!req.user) return next(new AuthError("Unauthorized", { code: "UNAUTHENTICATED" }));
 
   const { id } = req.params;
   const userId = req.user.id;
 
-  const { trip, error } = await findOwnedTrip(id, userId);
-  if (!trip) return next(new ValidationError(error));
+  const { trip, error, code } = await findOwnedTrip(id, userId);
+  if (!trip) return next(ownershipError(code, error));
 
   const ctx = await buildLifecycleCtx(trip.id);
   const check = canPerform(trip, "cancel", ctx);
@@ -620,7 +632,7 @@ async function performCancel(
         })
       );
     }
-    return next(new ValidationError(check.reason));
+    return next(new ValidationError(check.reason, { code: "TRIP_TRANSITION_NOT_ALLOWED" }));
   }
 
   await prisma.trip.update({
@@ -639,17 +651,17 @@ async function performSoftDelete(
   res: Response,
   next: NextFunction
 ) {
-  if (!req.user) return next(new ValidationError("Unauthorized"));
+  if (!req.user) return next(new AuthError("Unauthorized", { code: "UNAUTHENTICATED" }));
 
   const { id } = req.params;
   const userId = req.user.id;
 
-  const { trip, error } = await findOwnedTrip(id, userId);
-  if (!trip) return next(new ValidationError(error));
+  const { trip, error, code } = await findOwnedTrip(id, userId);
+  if (!trip) return next(ownershipError(code, error));
 
   const ctx = await buildLifecycleCtx(trip.id);
   const check = canPerform(trip, "delete", ctx);
-  if (!check.allowed) return next(new ValidationError(check.reason));
+  if (!check.allowed) return next(new ValidationError(check.reason, { code: "TRIP_TRANSITION_NOT_ALLOWED" }));
 
   // ⭐ Soft delete — le statut reste DRAFT, le trip sort de toutes
   // les listes via le filtre isDeleted. Plus de hard delete : les
@@ -714,17 +726,17 @@ export const archiveTrip = async (
   next: NextFunction
 ) => {
   try {
-    if (!req.user) return next(new ValidationError("Unauthorized"));
+    if (!req.user) return next(new AuthError("Unauthorized", { code: "UNAUTHENTICATED" }));
 
     const { id } = req.params;
     const userId = req.user.id;
 
-    const { trip, error } = await findOwnedTrip(id, userId);
-    if (!trip) return next(new ValidationError(error));
+    const { trip, error, code } = await findOwnedTrip(id, userId);
+    if (!trip) return next(ownershipError(code, error));
 
     const ctx = await buildLifecycleCtx(trip.id);
     const check = canPerform(trip, "archive", ctx);
-    if (!check.allowed) return next(new ValidationError(check.reason));
+    if (!check.allowed) return next(new ValidationError(check.reason, { code: "TRIP_TRANSITION_NOT_ALLOWED" }));
 
     await prisma.trip.update({
       where: { id },
@@ -749,18 +761,18 @@ export const restoreTrip = async (
   next: NextFunction
 ) => {
   try {
-    if (!req.user) return next(new ValidationError("Unauthorized"));
+    if (!req.user) return next(new AuthError("Unauthorized", { code: "UNAUTHENTICATED" }));
 
     const { id } = req.params;
     const userId = req.user.id;
 
-    const { trip, error } = await findOwnedTrip(id, userId);
-    if (!trip) return next(new ValidationError(error));
+    const { trip, error, code } = await findOwnedTrip(id, userId);
+    if (!trip) return next(ownershipError(code, error));
 
     // ⭐ Lot 2 — Machine : CANCELLED → DRAFT, date non passée
     const ctx = await buildLifecycleCtx(trip.id);
     const check = canPerform(trip, "restore", ctx);
-    if (!check.allowed) return next(new ValidationError(check.reason));
+    if (!check.allowed) return next(new ValidationError(check.reason, { code: "TRIP_TRANSITION_NOT_ALLOWED" }));
 
     await prisma.trip.update({
       where: { id },
@@ -786,7 +798,7 @@ export const getTrip = async (
   next: NextFunction
 ) => {
   try {
-    if (!req.user) return next(new ValidationError("Unauthorized"));
+    if (!req.user) return next(new AuthError("Unauthorized", { code: "UNAUTHENTICATED" }));
 
     const { id } = req.params;
     const userId = req.user.id;
@@ -815,8 +827,8 @@ export const getTrip = async (
       },
     });
 
-    if (!trip || trip.isDeleted) return next(new ValidationError("Trip not found."));
-    if (trip.userId !== userId) return next(new ValidationError("Unauthorized."));
+    if (!trip || trip.isDeleted) return next(new NotFoundError("Trip not found.", { code: "TRIP_NOT_FOUND" }));
+    if (trip.userId !== userId) return next(new ForbiddenError("You do not own this trip.", { code: "NOT_TRIP_OWNER" }));
 
     // ⭐ Lot 2 — Le front affichera exactement ce que l'API autorise
     const ctx = await buildLifecycleCtx(trip.id);
@@ -838,7 +850,7 @@ export const getMyTrips = async (
   next: NextFunction
 ) => {
   try {
-    if (!req.user) return next(new ValidationError("Unauthorized"));
+    if (!req.user) return next(new AuthError("Unauthorized", { code: "UNAUTHENTICATED" }));
 
     const userId = req.user.id;
     const { status } = req.query;
@@ -882,18 +894,18 @@ export const publishTrip = async (
   next: NextFunction
 ) => {
   try {
-    if (!req.user) return next(new ValidationError("Unauthorized"));
+    if (!req.user) return next(new AuthError("Unauthorized", { code: "UNAUTHENTICATED" }));
 
     const { id } = req.params;
     const userId = req.user.id;
 
-    const { trip, error } = await findOwnedTrip(id, userId);
-    if (!trip) return next(new ValidationError(error));
+    const { trip, error, code } = await findOwnedTrip(id, userId);
+    if (!trip) return next(ownershipError(code, error));
 
     // ⭐ Lot 2 — Machine : DRAFT uniquement + date de départ future
     const ctx = await buildLifecycleCtx(trip.id);
     const check = canPerform(trip, "publish", ctx);
-    if (!check.allowed) return next(new ValidationError(check.reason));
+    if (!check.allowed) return next(new ValidationError(check.reason, { code: "TRIP_TRANSITION_NOT_ALLOWED" }));
 
     // ⭐ D31 — plus de gate profil/Stripe à la publication (déplacé vers
     // l'acceptation, deal-service B2-PR2) ; seul le snapshot de note reste.
@@ -903,13 +915,13 @@ export const publishTrip = async (
     });
 
     if (!trip.transportMode) {
-      return next(new ValidationError("Transport mode is required to publish."));
+      return next(new ValidationError("Transport mode is required to publish.", { code: "PUBLISH_MODE_REQUIRED" }));
     }
     if (!trip.originCity || !trip.destinationCity) {
-      return next(new ValidationError("Origin and destination are required to publish."));
+      return next(new ValidationError("Origin and destination are required to publish.", { code: "PUBLISH_ROUTE_REQUIRED" }));
     }
     if (!trip.departureAt) {
-      return next(new ValidationError("Departure date is required to publish."));
+      return next(new ValidationError("Departure date is required to publish.", { code: "PUBLISH_DEPARTURE_REQUIRED" }));
     }
     // ⭐ A28 — UN moteur de pricing COMPLET est exige pour publier.
     const pricingEngine = resolvePricingEngine({
@@ -918,26 +930,26 @@ export const publishTrip = async (
       categoryConditions: trip.categoryConditions as unknown[],
     });
     if (pricingEngine === null) {
-      return next(new ValidationError(PRICING_GATE_MESSAGE));
+      return next(new ValidationError(PRICING_GATE_MESSAGE, { code: "PRICING_INCOMPLETE" }));
     }
     const bagIssue = checkBagCapacity(trip);
     if (bagIssue) {
-      return next(new ValidationError(bagIssue));
+      return next(new ValidationError(bagIssue, { code: "BAGGAGE_INVALID" }));
     }
     // Les categories n'existent que pour le moteur legacy (la famille D14 les remplace)
     if (
       pricingEngine === "PER_CATEGORY" &&
       (!trip.acceptedCategories || trip.acceptedCategories.length === 0)
     ) {
-      return next(new ValidationError("At least one parcel category must be accepted."));
+      return next(new ValidationError("At least one parcel category must be accepted.", { code: "PUBLISH_CATEGORY_REQUIRED" }));
     }
 
     // ⭐ Locations gate
     if (!trip.pickupLocations || trip.pickupLocations.length === 0) {
-      return next(new ValidationError("At least one pickup location is required to publish."));
+      return next(new ValidationError("At least one pickup location is required to publish.", { code: "PUBLISH_PICKUP_REQUIRED" }));
     }
     if (!trip.deliveryLocations || trip.deliveryLocations.length === 0) {
-      return next(new ValidationError("At least one delivery location is required to publish."));
+      return next(new ValidationError("At least one delivery location is required to publish.", { code: "PUBLISH_DELIVERY_REQUIRED" }));
     }
 
     const carrierRatingSnapshot =
@@ -992,19 +1004,19 @@ export const unpublishTrip = async (
   next: NextFunction
 ) => {
   try {
-    if (!req.user) return next(new ValidationError("Unauthorized"));
+    if (!req.user) return next(new AuthError("Unauthorized", { code: "UNAUTHENTICATED" }));
 
     const { id } = req.params;
     const userId = req.user.id;
 
-    const { trip, error } = await findOwnedTrip(id, userId);
-    if (!trip) return next(new ValidationError(error));
+    const { trip, error, code } = await findOwnedTrip(id, userId);
+    if (!trip) return next(ownershipError(code, error));
 
     // ⭐ Lot 2 — Machine : PUBLISHED/PAUSED → DRAFT, interdit avec
     // réservations actives (guard prêt pour le chantier Booking).
     const ctx = await buildLifecycleCtx(trip.id);
     const check = canPerform(trip, "unpublish", ctx);
-    if (!check.allowed) return next(new ValidationError(check.reason));
+    if (!check.allowed) return next(new ValidationError(check.reason, { code: "TRIP_TRANSITION_NOT_ALLOWED" }));
 
     await prisma.trip.update({
       where: { id },
@@ -1030,17 +1042,17 @@ export const pauseTrip = async (
   next: NextFunction
 ) => {
   try {
-    if (!req.user) return next(new ValidationError("Unauthorized"));
+    if (!req.user) return next(new AuthError("Unauthorized", { code: "UNAUTHENTICATED" }));
 
     const { id } = req.params;
     const userId = req.user.id;
 
-    const { trip, error } = await findOwnedTrip(id, userId);
-    if (!trip) return next(new ValidationError(error));
+    const { trip, error, code } = await findOwnedTrip(id, userId);
+    if (!trip) return next(ownershipError(code, error));
 
     const ctx = await buildLifecycleCtx(trip.id);
     const check = canPerform(trip, "pause", ctx);
-    if (!check.allowed) return next(new ValidationError(check.reason));
+    if (!check.allowed) return next(new ValidationError(check.reason, { code: "TRIP_TRANSITION_NOT_ALLOWED" }));
 
     await prisma.trip.update({
       where: { id },
@@ -1065,18 +1077,18 @@ export const resumeTrip = async (
   next: NextFunction
 ) => {
   try {
-    if (!req.user) return next(new ValidationError("Unauthorized"));
+    if (!req.user) return next(new AuthError("Unauthorized", { code: "UNAUTHENTICATED" }));
 
     const { id } = req.params;
     const userId = req.user.id;
 
-    const { trip, error } = await findOwnedTrip(id, userId);
-    if (!trip) return next(new ValidationError(error));
+    const { trip, error, code } = await findOwnedTrip(id, userId);
+    if (!trip) return next(ownershipError(code, error));
 
     // ⭐ Lot 2 — Machine : PAUSED → PUBLISHED, date non passée
     const ctx = await buildLifecycleCtx(trip.id);
     const check = canPerform(trip, "resume", ctx);
-    if (!check.allowed) return next(new ValidationError(check.reason));
+    if (!check.allowed) return next(new ValidationError(check.reason, { code: "TRIP_TRANSITION_NOT_ALLOWED" }));
 
     await prisma.trip.update({
       where: { id },
@@ -1110,7 +1122,7 @@ export const getPublicTrip: RequestHandler = async (req, res, next) => {
     const { id } = req.params;
 
     if (!id || !/^[a-f0-9]{24}$/i.test(id)) {
-      next(new ValidationError("Invalid trip id."));
+      next(new ValidationError("Invalid trip id.", { code: "INVALID_ID" }));
       return;
     }
 

@@ -24,7 +24,7 @@ async function buildProfile(userId: string): Promise<MyProfileResponse> {
 
 export const getMyProfile = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
-    if (!req.user) return next(new AuthError("Unauthorized"));
+    if (!req.user) return next(new AuthError("Unauthorized", { code: "UNAUTHENTICATED" }));
     return res.status(200).json(await buildProfile(req.user.id));
   } catch (e) {
     return next(e);
@@ -33,13 +33,13 @@ export const getMyProfile = async (req: AuthenticatedRequest, res: Response, nex
 
 export const updateMyProfile = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
-    if (!req.user) return next(new AuthError("Unauthorized"));
+    if (!req.user) return next(new AuthError("Unauthorized", { code: "UNAUTHENTICATED" }));
     const parsed = UpdateMyProfileRequestSchema.safeParse(req.body);
     if (!parsed.success) throw new ValidationError("Invalid request", { errors: zodErrors(parsed.error.issues) });
     const page = await prisma.carrierPage.findUnique({ where: { userId: req.user.id }, select: { id: true } });
     const { errors, user, carrier } = normalizeProfileUpdate(parsed.data, { hasCarrierPage: !!page });
     if (Object.keys(errors).length) throw new ValidationError("Some fields are invalid.", { errors });
-    if (Object.keys(user).length === 0 && Object.keys(carrier).length === 0) throw new ValidationError("Nothing to update.");
+    if (Object.keys(user).length === 0 && Object.keys(carrier).length === 0) throw new ValidationError("Nothing to update.", { code: "NOTHING_TO_UPDATE" });
     await prisma.$transaction(async (tx) => {
       if (Object.keys(user).length) await tx.user.update({ where: { id: req.user.id }, data: user });
       if (page && Object.keys(carrier).length) await tx.carrierPage.update({ where: { id: page.id }, data: carrier });
@@ -52,7 +52,7 @@ export const updateMyProfile = async (req: AuthenticatedRequest, res: Response, 
 
 export const setMyAvatar = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
-    if (!req.user) return next(new AuthError("Unauthorized"));
+    if (!req.user) return next(new AuthError("Unauthorized", { code: "UNAUTHENTICATED" }));
     const parsed = SetMyAvatarRequestSchema.safeParse(req.body);
     if (!parsed.success) throw new ValidationError("Invalid request", { errors: zodErrors(parsed.error.issues) });
     if (!isImageKitUrl(parsed.data.url, process.env.IMAGEKIT_URL_ENDPOINT)) throw new ValidationError("The avatar URL must belong to Yamba's media endpoint.", { errors: { url: "NOT_OUR_ENDPOINT" } });
@@ -68,7 +68,7 @@ export const setMyAvatar = async (req: AuthenticatedRequest, res: Response, next
 
 export const deleteMyAvatar = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
-    if (!req.user) return next(new AuthError("Unauthorized"));
+    if (!req.user) return next(new AuthError("Unauthorized", { code: "UNAUTHENTICATED" }));
     const previous = await prisma.image.findUnique({ where: { userId: req.user.id }, select: { id: true, fileId: true } });
     if (previous) {
       await prisma.image.delete({ where: { id: previous.id } });

@@ -58,8 +58,9 @@ export type GoogleAuthErrorCode = "GOOGLE_NOT_CONFIGURED" | "GOOGLE_TOKEN_INVALI
 
 function oauthError(status: 401 | 403 | 503, code: GoogleAuthErrorCode, message: string) {
   const details = { type: "oauth", provider: "GOOGLE", code };
-  if (status === 401) return Object.assign(new AuthError(message), { details });
-  if (status === 403) return Object.assign(new ForbiddenError(message), { details });
+  // Dette D-4 : `details` passe par le constructeur depuis qu'un 403 sait le porter.
+  if (status === 401) return new AuthError(message, details);
+  if (status === 403) return new ForbiddenError(message, details);
   return new AppError(message, 503, true, details);
 }
 

@@ -171,7 +171,7 @@ export const getUserPublic: RequestHandler = async (
     const { slug } = req.params;
 
     if (!slug || typeof slug !== "string" || slug.trim().length === 0) {
-      next(new ValidationError("Invalid slug."));
+      next(new ValidationError("Invalid slug.", { code: "INVALID_SLUG" }));
       return;
     }
 
@@ -424,7 +424,7 @@ export const listUserPublicReviews: RequestHandler = async (req, res, next) => {
     const { slug } = req.params;
 
     if (!slug || typeof slug !== "string") {
-      next(new ValidationError("Invalid slug."));
+      next(new ValidationError("Invalid slug.", { code: "INVALID_SLUG" }));
       return;
     }
 
@@ -487,7 +487,7 @@ export const listUserPublicTrips: RequestHandler = async (req, res, next) => {
     const { slug } = req.params;
 
     if (!slug || typeof slug !== "string") {
-      next(new ValidationError("Invalid slug."));
+      next(new ValidationError("Invalid slug.", { code: "INVALID_SLUG" }));
       return;
     }
 
@@ -565,7 +565,7 @@ export const followUser = async (
 
     if (!req.user) {
       console.log(`[${ts()}] [followUser] ❌ No req.user`);
-      return next(new ValidationError("Unauthorized"));
+      return next(new ValidationError("Unauthorized", { code: "UNAUTHENTICATED" }));
     }
 
     const { slug } = req.params;
@@ -582,12 +582,12 @@ export const followUser = async (
 
     if (!followed || followed.isDeleted) {
       console.log(`[${ts()}] [followUser] ❌ Followed user not found or deleted`);
-      return next(new ValidationError("User not found."));
+      return next(new ValidationError("User not found.", { code: "USER_NOT_FOUND" }));
     }
 
     if (followed.id === followerId) {
       console.log(`[${ts()}] [followUser] ❌ Cannot follow yourself`);
-      return next(new ValidationError("You cannot follow yourself."));
+      return next(new ValidationError("You cannot follow yourself.", { code: "CANNOT_FOLLOW_SELF" }));
     }
 
     // Count BEFORE upsert
@@ -646,7 +646,7 @@ export const unfollowUser = async (
 
     if (!req.user) {
       console.log(`[${ts()}] [unfollowUser] ❌ No req.user`);
-      return next(new ValidationError("Unauthorized"));
+      return next(new ValidationError("Unauthorized", { code: "UNAUTHENTICATED" }));
     }
 
     const { slug } = req.params;
@@ -659,7 +659,7 @@ export const unfollowUser = async (
 
     if (!followed) {
       console.log(`[${ts()}] [unfollowUser] ❌ Followed user not found`);
-      return next(new ValidationError("User not found."));
+      return next(new ValidationError("User not found.", { code: "USER_NOT_FOUND" }));
     }
 
     // Count BEFORE delete
@@ -703,7 +703,7 @@ export const updateFollowPreferences = async (
   try {
     console.log(`\n[${ts()}] [updateFollowPreferences] 🎬 START - slug=${req.params.slug} userId=${req.user?.id}`);
 
-    if (!req.user) return next(new ValidationError("Unauthorized"));
+    if (!req.user) return next(new ValidationError("Unauthorized", { code: "UNAUTHENTICATED" }));
 
     const { slug } = req.params;
     const followerId = req.user.id;
@@ -711,7 +711,7 @@ export const updateFollowPreferences = async (
     const { notifyNextTrip } = req.body as { notifyNextTrip?: boolean };
 
     if (typeof notifyNextTrip !== "boolean") {
-      return next(new ValidationError("notifyNextTrip (boolean) is required."));
+      return next(new ValidationError("notifyNextTrip (boolean) is required.", { code: "MISSING_FIELDS" }));
     }
 
     const followed = await prisma.user.findUnique({
@@ -720,7 +720,7 @@ export const updateFollowPreferences = async (
     });
 
     if (!followed) {
-      return next(new ValidationError("User not found."));
+      return next(new ValidationError("User not found.", { code: "USER_NOT_FOUND" }));
     }
 
     const existing = await prisma.userFollow.findUnique({
@@ -733,7 +733,7 @@ export const updateFollowPreferences = async (
     });
 
     if (!existing) {
-      return next(new ValidationError("You must follow this user first."));
+      return next(new ValidationError("You must follow this user first.", { code: "NOT_FOLLOWING" }));
     }
 
     const updated = await prisma.userFollow.update({
@@ -794,7 +794,7 @@ export const listMyFollowing: RequestHandler = async (
 ) => {
   try {
     if (!req.user) {
-      next(new ValidationError("Unauthorized"));
+      next(new ValidationError("Unauthorized", { code: "UNAUTHENTICATED" }));
       return;
     }
 

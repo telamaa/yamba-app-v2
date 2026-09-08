@@ -36,11 +36,11 @@ export function makeReportService(deps: { db?: ReportDb; sendEmail?: typeof send
   async function resolveTarget(targetType: ReportTargetType, targetRef: string): Promise<{ id: string; ownerId: string }> {
     if (targetType === "TRIP") {
       const trip = await db.trip.findFirst({ where: { id: targetRef, isDeleted: false }, select: { id: true, userId: true } });
-      if (!trip) throw new NotFoundError("Trip not found.");
+      if (!trip) throw new NotFoundError("Trip not found.", { code: "TRIP_NOT_FOUND" });
       return { id: trip.id as string, ownerId: trip.userId as string };
     }
     const user = await db.user.findFirst({ where: { publicSlug: targetRef, isDeleted: false, profilePublic: true }, select: { id: true } });
-    if (!user) throw new NotFoundError("Member not found.");
+    if (!user) throw new NotFoundError("Member not found.", { code: "USER_NOT_FOUND" });
     return { id: user.id as string, ownerId: user.id as string };
   }
 
@@ -51,7 +51,7 @@ export function makeReportService(deps: { db?: ReportDb; sendEmail?: typeof send
       const existing = await db.report.findFirst({ where: { reporterUserId: reporterId, targetType: input.targetType, targetId: target.id, status: "OPEN" }, select: { id: true } });
       const verdict = canReport({ reporterId, targetType: input.targetType, targetOwnerId: target.ownerId, reason: input.reason, alreadyOpen: !!existing });
       if (!verdict.allowed) {
-        if (verdict.reason === "ALREADY_REPORTED") throw new ConflictError("You already reported this.");
+        if (verdict.reason === "ALREADY_REPORTED") throw new ConflictError("You already reported this.", { code: "ALREADY_REPORTED" });
         throw new ValidationError(verdict.reason === "OWN_TARGET" ? "You cannot report your own trip or profile." : "This reason is not allowed for this target.", { code: verdict.reason });
       }
       const report = await db.report.create({
@@ -126,11 +126,11 @@ export function makeReportService(deps: { db?: ReportDb; sendEmail?: typeof send
     /** PATCH /admin/reports/:id — décision + journal dans la même transaction ; 409 si déjà traité. */
     async reviewReport(actor: AdminActor, reportId: string, input: ReviewReportRequest): Promise<{ id: string; status: ReportStatus }> {
       const report = await db.report.findFirst({ where: { id: reportId, targetType: { in: ["TRIP", "USER"] } }, select: { id: true, status: true, targetType: true, targetId: true } });
-      if (!report) throw new NotFoundError("Report not found.");
-      if (report.status !== "OPEN") throw new ConflictError("This report has already been reviewed.");
+      if (!report) throw new NotFoundError("Report not found.", { code: "REPORT_NOT_FOUND" });
+      if (report.status !== "OPEN") throw new ConflictError("This report has already been reviewed.", { code: "REPORT_ALREADY_REVIEWED" });
       await db.$transaction(async (tx) => {
         const updated = await tx.report.updateMany({ where: { id: report.id, status: "OPEN" }, data: { status: input.decision } });
-        if (updated.count !== 1) throw new ConflictError("This report has already been reviewed.");
+        if (updated.count !== 1) throw new ConflictError("This report has already been reviewed.", { code: "REPORT_ALREADY_REVIEWED" });
         await recordAdminAction(tx as never, {
           adminUserId: actor.id,
           action: "REPORT_REVIEWED",

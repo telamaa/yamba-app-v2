@@ -91,16 +91,16 @@ function clientMeta(req: Request) {
 /** Lit et vérifie le cookie de pré-authentification ; charge l'utilisateur ADMIN. */
 async function requirePreauth(req: Request) {
   const token = req.cookies?.[ADMIN_PREAUTH_COOKIE];
-  if (!token) throw new AuthError("Admin pre-authentication required.");
+  if (!token) throw new AuthError("Admin pre-authentication required.", { code: "ADMIN_PREAUTH_REQUIRED" });
   let decoded: PreauthPayload;
   try {
     decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET as string) as PreauthPayload;
   } catch {
-    throw new AuthError("Admin pre-authentication expired.");
+    throw new AuthError("Admin pre-authentication expired.", { code: "ADMIN_PREAUTH_EXPIRED" });
   }
-  if (decoded?.stage !== "admin-preauth" || !decoded.id) throw new AuthError("Admin pre-authentication invalid.");
+  if (decoded?.stage !== "admin-preauth" || !decoded.id) throw new AuthError("Admin pre-authentication invalid.", { code: "ADMIN_PREAUTH_INVALID" });
   const user = await prisma.user.findUnique({ where: { id: decoded.id } });
-  if (!user || user.isDeleted || !user.roles.includes("ADMIN") || !user.adminRole) throw new ForbiddenError("Not an admin account.");
+  if (!user || user.isDeleted || !user.roles.includes("ADMIN") || !user.adminRole) throw new ForbiddenError("Not an admin account.", { code: "NOT_AN_ADMIN" });
   return user;
 }
 
@@ -109,7 +109,7 @@ async function issueAdminSession(res: Response, user: { id: string; roles: strin
   const createdAt = Date.now();
   const jti = createRefreshJti();
   const ttl = await storeAdminSession(user.id, jti, createdAt, createdAt);
-  if (ttl <= 0) throw new AuthError("Admin session could not be opened.");
+  if (ttl <= 0) throw new AuthError("Admin session could not be opened.", { code: "ADMIN_SESSION_FAILED" });
   const accessToken = jwt.sign(
     { id: user.id, roles: user.roles, adm: true, amr: ["pwd", "totp"], adminRole: (user as { adminRole?: string | null }).adminRole ?? null, adminRoles: adminRolesOf(user as { adminRole?: string | null; adminRoles?: string[] | null }) },
     process.env.ACCESS_TOKEN_SECRET as string,
@@ -127,7 +127,7 @@ async function issueAdminSession(res: Response, user: { id: string; roles: strin
 export const adminLogin = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { email, password } = req.body as { email?: string; password?: string };
-    if (!email || !password) return next(new ValidationError("Email and password are required!"));
+    if (!email || !password) return next(new ValidationError("Email and password are required!", { code: "MISSING_FIELDS" }));
     const user = await prisma.user.findUnique({ where: { emailNormalized: normalizeEmail(String(email)) } });
     // Même message pour « inconnu », « pas admin » et « mauvais mot de passe » : ne rien révéler.
     // ANO-API-18 — même raison qu'à la connexion membre, et l'enjeu est ici plus grand : une
@@ -135,9 +135,9 @@ export const adminLogin = async (req: Request, res: Response, next: NextFunction
     // est comparé dans tous les cas, y compris pour un compte absent ou sans profil admin.
     const eligible = Boolean(user && !user.isDeleted && user.roles.includes("ADMIN") && user.adminRole);
     const ok = await comparePasswordConstantTime(String(password), eligible ? user?.passwordHash : null);
-    if (!eligible || !user) return next(new AuthError("Invalid email or password"));
-    if (!user.passwordHash) return next(new AuthError("Set your password with the invitation link first."));
-    if (!ok) return next(new AuthError("Invalid email or password"));
+    if (!eligible || !user) return next(new AuthError("Invalid email or password", { code: "INVALID_CREDENTIALS" }));
+    if (!user.passwordHash) return next(new AuthError("Set your password with the invitation link first.", { code: "PASSWORD_NOT_SET" }));
+    if (!ok) return next(new AuthError("Invalid email or password", { code: "INVALID_CREDENTIALS" }));
 
     const policy = loadAdminSessionPolicy();
     const preauth = jwt.sign({ id: user.id, stage: "admin-preauth" } satisfies PreauthPayload, process.env.ACCESS_TOKEN_SECRET as string, {
@@ -154,7 +154,7 @@ export const adminLogin = async (req: Request, res: Response, next: NextFunction
 export const adminTotpSetup = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const user = await requirePreauth(req);
-    if (user.totpEnabledAt) return next(new ForbiddenError("Two-factor authentication is already enabled."));
+    if (user.totpEnabledAt) return next(new ForbiddenError("Two-factor authentication is already enabled.", { code: "TOTP_ALREADY_ENABLED" }));
     const secret = generateTotpSecret();
     await prisma.user.update({ where: { id: user.id }, data: { totpSecretEncrypted: encryptTotpSecret(secret) } });
     return res.status(200).json({ secret, otpauthUrl: otpauthUrl({ issuer: TOTP_ISSUER, account: user.email, secret }) });
@@ -166,13 +166,13 @@ export const adminTotpSetup = async (req: Request, res: Response, next: NextFunc
 export const adminTotpEnable = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const user = await requirePreauth(req);
-    if (user.totpEnabledAt) return next(new ForbiddenError("Two-factor authentication is already enabled."));
-    if (!user.totpSecretEncrypted) return next(new ValidationError("Run the setup first."));
+    if (user.totpEnabledAt) return next(new ForbiddenError("Two-factor authentication is already enabled.", { code: "TOTP_ALREADY_ENABLED" }));
+    if (!user.totpSecretEncrypted) return next(new ValidationError("Run the setup first.", { code: "TOTP_SETUP_REQUIRED" }));
     const secret = decryptTotpSecret(user.totpSecretEncrypted);
-    if (!secret) return next(new AuthError("Stored secret unreadable — run the setup again."));
+    if (!secret) return next(new AuthError("Stored secret unreadable — run the setup again.", { code: "TOTP_SECRET_UNREADABLE" }));
     const { code } = req.body as { code?: string };
     const verdict = verifyTotp(secret, String(code ?? ""));
-    if (!verdict.ok) return next(new AuthError("Invalid code."));
+    if (!verdict.ok) return next(new AuthError("Invalid code.", { code: "OTP_INCORRECT" }));
 
     const backupCodes = generateBackupCodes();
     await prisma.$transaction(async (tx) => {
@@ -194,8 +194,8 @@ export const adminTotpEnable = async (req: Request, res: Response, next: NextFun
 export const adminTotpVerify = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const user = await requirePreauth(req);
-    if (!user.totpEnabledAt || !user.totpSecretEncrypted) return next(new ForbiddenError("Two-factor authentication is not enabled."));
-    if (await totpFailuresExceeded(user.id)) return next(new AuthError("Too many attempts. Try again in 15 minutes."));
+    if (!user.totpEnabledAt || !user.totpSecretEncrypted) return next(new ForbiddenError("Two-factor authentication is not enabled.", { code: "TOTP_NOT_ENABLED" }));
+    if (await totpFailuresExceeded(user.id)) return next(new AuthError("Too many attempts. Try again in 15 minutes.", { code: "TOO_MANY_ATTEMPTS" }));
     const { code } = req.body as { code?: string };
     const raw = String(code ?? "").trim();
 
@@ -203,11 +203,11 @@ export const adminTotpVerify = async (req: Request, res: Response, next: NextFun
     let remainingBackupCodes = user.totpBackupCodeHashes.length;
     if (/^\d{6}$/.test(raw.replace(/\s+/g, ""))) {
       const secret = decryptTotpSecret(user.totpSecretEncrypted);
-      if (!secret) return next(new AuthError("Stored secret unreadable."));
+      if (!secret) return next(new AuthError("Stored secret unreadable.", { code: "TOTP_SECRET_UNREADABLE" }));
       const verdict = verifyTotp(secret, raw, { lastUsedStep: user.totpLastUsedStep });
       if (!verdict.ok) {
         await registerTotpFailure(user.id);
-        return next(new AuthError("Invalid code."));
+        return next(new AuthError("Invalid code.", { code: "OTP_INCORRECT" }));
       }
       await prisma.$transaction(async (tx) => {
         await tx.user.update({ where: { id: user.id }, data: { totpLastUsedStep: verdict.step } });
@@ -217,7 +217,7 @@ export const adminTotpVerify = async (req: Request, res: Response, next: NextFun
       const remaining = consumeBackupCode(raw, user.totpBackupCodeHashes);
       if (!remaining) {
         await registerTotpFailure(user.id);
-        return next(new AuthError("Invalid code."));
+        return next(new AuthError("Invalid code.", { code: "OTP_INCORRECT" }));
       }
       usedBackup = true;
       remainingBackupCodes = remaining.length;
@@ -228,7 +228,7 @@ export const adminTotpVerify = async (req: Request, res: Response, next: NextFun
       });
     } else {
       await registerTotpFailure(user.id);
-      return next(new AuthError("Invalid code."));
+      return next(new AuthError("Invalid code.", { code: "OTP_INCORRECT" }));
     }
 
     await clearTotpFailures(user.id);
@@ -243,27 +243,27 @@ export const adminTotpVerify = async (req: Request, res: Response, next: NextFun
 export const adminRefresh = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const token = req.cookies?.[ADMIN_REFRESH_COOKIE];
-    if (!token) return next(new AuthError("Admin refresh token missing."));
+    if (!token) return next(new AuthError("Admin refresh token missing.", { code: "ADMIN_REFRESH_MISSING" }));
     let decoded: AdminRefreshPayload;
     try {
       decoded = jwt.verify(token, process.env.REFRESH_TOKEN_SECRET as string) as AdminRefreshPayload;
     } catch {
       clearAdminCookies(res);
-      return next(new AuthError("Admin refresh token invalid or expired."));
+      return next(new AuthError("Admin refresh token invalid or expired.", { code: "ADMIN_REFRESH_INVALID" }));
     }
     if (!decoded?.adm || !decoded.id || !decoded.jti) {
       clearAdminCookies(res);
-      return next(new AuthError("Admin refresh token invalid."));
+      return next(new AuthError("Admin refresh token invalid.", { code: "ADMIN_REFRESH_INVALID" }));
     }
     const session = await getAdminSession(decoded.id, decoded.jti);
     if (!session) {
       clearAdminCookies(res);
-      return next(new AuthError("Admin session expired."));
+      return next(new AuthError("Admin session expired.", { code: "ADMIN_SESSION_EXPIRED" }));
     }
     const user = await prisma.user.findUnique({ where: { id: decoded.id } });
     if (!user || user.isDeleted || !user.roles.includes("ADMIN") || !user.totpEnabledAt) {
       clearAdminCookies(res);
-      return next(new ForbiddenError("Not an admin account."));
+      return next(new ForbiddenError("Not an admin account.", { code: "NOT_AN_ADMIN" }));
     }
     // Rotation : nouveau jti, MÊME createdAt (c'est lui qui borne la vie absolue).
     const now = Date.now();
@@ -272,7 +272,7 @@ export const adminRefresh = async (req: Request, res: Response, next: NextFuncti
     await revokeAdminSession(user.id, decoded.jti);
     if (ttl <= 0) {
       clearAdminCookies(res);
-      return next(new AuthError("Admin session expired."));
+      return next(new AuthError("Admin session expired.", { code: "ADMIN_SESSION_EXPIRED" }));
     }
     const accessToken = jwt.sign({ id: user.id, roles: user.roles, adm: true, amr: ["pwd", "totp"] }, process.env.ACCESS_TOKEN_SECRET as string, { expiresIn: "15m" });
     const lifetimeSeconds = Math.ceil(adminRemainingLifetimeMs(session.createdAt, loadAdminSessionPolicy(), now) / 1000);

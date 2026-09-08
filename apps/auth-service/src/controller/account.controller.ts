@@ -55,11 +55,11 @@ export async function revokeOtherSessions(userId: string, keepJti: string | null
 /* ── Sudo (D65 1A) ─────────────────────────────────────────────────────── */
 export const verifySudo = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
-    if (!req.user) return next(new AuthError("Unauthorized"));
+    if (!req.user) return next(new AuthError("Unauthorized", { code: "UNAUTHENTICATED" }));
     const parsed = SudoVerifyRequestSchema.safeParse(req.body);
     if (!parsed.success) throw new ValidationError("Invalid request", { errors: zodErrors(parsed.error.issues) });
     const jti = currentMemberJti(req);
-    if (!jti) throw new AuthError("No session.");
+    if (!jti) throw new AuthError("No session.", { code: "NO_SESSION" });
     const emailKey = req.user.emailNormalized ?? req.user.email.toLowerCase();
     await verifySudoOtp(emailKey, parsed.data.code, req.user.preferredLocale);
     const expiresAt = await openSudoWindow(store, req.user.id, jti);
@@ -71,7 +71,7 @@ export const verifySudo = async (req: AuthenticatedRequest, res: Response, next:
 
 export const getSudoStatus = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
-    if (!req.user) return next(new AuthError("Unauthorized"));
+    if (!req.user) return next(new AuthError("Unauthorized", { code: "UNAUTHENTICATED" }));
     return res.status(200).json(await sudoStatus(store, req.user.id, currentMemberJti(req)));
   } catch (e) {
     return next(e);
@@ -81,7 +81,7 @@ export const getSudoStatus = async (req: AuthenticatedRequest, res: Response, ne
 /* ── Sessions (D65 2A) ─────────────────────────────────────────────────── */
 export const listMySessions = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
-    if (!req.user) return next(new AuthError("Unauthorized"));
+    if (!req.user) return next(new AuthError("Unauthorized", { code: "UNAUTHENTICATED" }));
     const mine = currentMemberJti(req);
     const items: MemberSessionsResponse["items"] = [];
     let cursor = "0";
@@ -108,9 +108,9 @@ export const listMySessions = async (req: AuthenticatedRequest, res: Response, n
 
 export const revokeMySession = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
-    if (!req.user) return next(new AuthError("Unauthorized"));
+    if (!req.user) return next(new AuthError("Unauthorized", { code: "UNAUTHENTICATED" }));
     const jti = String(req.params.jti ?? "");
-    if (!/^[a-f0-9]{32}$/.test(jti)) throw new ValidationError("Invalid session id.");
+    if (!/^[a-f0-9]{32}$/.test(jti)) throw new ValidationError("Invalid session id.", { code: "INVALID_ID" });
     await revokeRefreshJti(req.user.id, jti);
     await closeSudoWindow(store, req.user.id, jti);
     const isCurrent = jti === currentMemberJti(req);
@@ -123,7 +123,7 @@ export const revokeMySession = async (req: AuthenticatedRequest, res: Response, 
 
 export const revokeMyOtherSessions = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
-    if (!req.user) return next(new AuthError("Unauthorized"));
+    if (!req.user) return next(new AuthError("Unauthorized", { code: "UNAUTHENTICATED" }));
     const revoked = await revokeOtherSessions(req.user.id, currentMemberJti(req));
     return res.status(200).json({ ok: true, revoked });
   } catch (e) {
@@ -134,7 +134,7 @@ export const revokeMyOtherSessions = async (req: AuthenticatedRequest, res: Resp
 /* ── Mot de passe (D65 3A) ─────────────────────────────────────────────── */
 export const changeMyPassword = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
-    if (!req.user) return next(new AuthError("Unauthorized"));
+    if (!req.user) return next(new AuthError("Unauthorized", { code: "UNAUTHENTICATED" }));
     const jti = await requireSudo(req, store);
     const parsed = ChangePasswordRequestSchema.safeParse(req.body);
     if (!parsed.success) throw new ValidationError("Invalid request", { errors: zodErrors(parsed.error.issues) });
@@ -156,14 +156,14 @@ export const changeMyPassword = async (req: AuthenticatedRequest, res: Response,
 /* ── Email (D65 4A) ────────────────────────────────────────────────────── */
 export const requestEmailChange = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
-    if (!req.user) return next(new AuthError("Unauthorized"));
+    if (!req.user) return next(new AuthError("Unauthorized", { code: "UNAUTHENTICATED" }));
     await requireSudo(req, store);
     const parsed = RequestEmailChangeSchema.safeParse(req.body);
     if (!parsed.success) throw new ValidationError("Invalid request", { errors: zodErrors(parsed.error.issues) });
     const newEmailKey = normalizeEmail(parsed.data.newEmail);
     if (newEmailKey === (req.user.emailNormalized ?? req.user.email.toLowerCase())) throw new ValidationError("This is already your address.", { type: "email", code: "EMAIL_SAME" });
     const taken = await prisma.user.findUnique({ where: { emailNormalized: newEmailKey }, select: { id: true } });
-    if (taken) throw new ConflictError("This address is already used by another account.");
+    if (taken) throw new ConflictError("This address is already used by another account.", { code: "EMAIL_ALREADY_USED" });
     await checkEmailChangeOtpRestrictions(newEmailKey);
     await trackEmailChangeOtpRequests(newEmailKey);
     await redis.set(emailChangeKey(req.user.id), newEmailKey, "EX", EMAIL_CHANGE_TTL_MINUTES * 60);
@@ -176,14 +176,14 @@ export const requestEmailChange = async (req: AuthenticatedRequest, res: Respons
 
 export const confirmEmailChange = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
-    if (!req.user) return next(new AuthError("Unauthorized"));
+    if (!req.user) return next(new AuthError("Unauthorized", { code: "UNAUTHENTICATED" }));
     const parsed = ConfirmEmailChangeSchema.safeParse(req.body);
     if (!parsed.success) throw new ValidationError("Invalid request", { errors: zodErrors(parsed.error.issues) });
     const newEmailKey = await redis.get(emailChangeKey(req.user.id));
     if (!newEmailKey) throw new ValidationError("No pending email change (or it expired): request a new code.", { type: "email", code: "EMAIL_CHANGE_EXPIRED" });
     await verifyEmailChangeOtp(newEmailKey, parsed.data.code, req.user.preferredLocale);
     const taken = await prisma.user.findUnique({ where: { emailNormalized: newEmailKey }, select: { id: true } });
-    if (taken) throw new ConflictError("This address is already used by another account.");
+    if (taken) throw new ConflictError("This address is already used by another account.", { code: "EMAIL_ALREADY_USED" });
     const oldEmail = req.user.email;
     await prisma.user.update({ where: { id: req.user.id }, data: { email: newEmailKey, emailNormalized: newEmailKey, emailSuppressedAt: null, emailSuppressedReason: null } });
     await redis.del(emailChangeKey(req.user.id));

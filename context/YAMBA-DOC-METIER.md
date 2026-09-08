@@ -2138,3 +2138,44 @@ donc ni proposer la bonne suite (« rechargez, c'est déjà fait »).
 | REF6 | Un administrateur lit un fil de discussion | Lecture possible, **journalisée** (qui, quand, quel fil), et le code de livraison n'y figure jamais |
 
 Joués le 8 septembre 2026 — voir `context/YAMBA-RECETTE-API-RESULTATS.md`, chapitre 9.
+
+# Recette API — pourquoi un refus doit se distinguer d'un autre (dette D-4)
+
+## Le besoin
+
+Trois refus qui se ressemblent n'appellent pas la même conduite :
+
+- « ce trajet n'existe pas » → il a été supprimé, inutile de réessayer ;
+- « ce trajet n'est pas le vôtre » → il existe, mais vous n'y avez pas droit ;
+- « votre saisie est incorrecte » → corrigez et renvoyez.
+
+La plateforme rendait les trois de la même façon : un **400**, avec une phrase anglaise et aucun
+code. L'application ne pouvait ni les distinguer, ni les traduire, ni décider quoi proposer. Même
+chose du côté des sessions : « pas de jeton », « session expirée », « compte suspendu » et
+« session révoquée » arrivaient tous en 401, et quatre d'entre eux sans rien pour les différencier
+— alors qu'ils appellent respectivement : se connecter, rafraîchir, contacter le support, se
+reconnecter.
+
+## Les règles
+
+- **RG-API-06** — Le **statut** d'un refus dit sa nature : 404 « cela n'existe pas », 403 « cela ne
+  vous appartient pas », 401 « vous n'êtes pas identifié », 400 « votre saisie est à corriger ».
+  Un statut n'est jamais choisi par commodité.
+- **RG-API-07** — Deux refus qui appellent une conduite différente portent des **codes différents**.
+  Un code unique posé partout satisfait la lettre de la règle et en manque l'objet.
+- **RG-SES-06** — Un membre déconnecté doit savoir **pourquoi** : sa session a été coupée depuis un
+  autre appareil, son compte est suspendu, ou son jeton a simplement expiré. Ces trois situations ne
+  se racontent pas de la même façon.
+
+## Tests d'acceptation
+
+| Réf | Scénario | Attendu |
+|---|---|---|
+| SEM1 | Modifier un trajet qui n'existe pas | **404**, code « trajet introuvable » |
+| SEM2 | Modifier le trajet d'un autre membre | **403**, code « vous n'êtes pas le propriétaire » |
+| SEM3 | Appeler une route protégée sans être connecté | **401**, code « jeton absent » |
+| SEM4 | Utiliser une session coupée depuis un autre appareil | **401**, code « session révoquée » — pas le même que SEM3 |
+| SEM5 | Se connecter avec un mauvais mot de passe | **401**, code « identifiants invalides » |
+| SEM6 | Se suivre soi-même | **400**, code dédié |
+
+Joués le 8 septembre 2026 — voir `context/YAMBA-RECETTE-API-RESULTATS.md`, « Solde de la dette D-4 ».

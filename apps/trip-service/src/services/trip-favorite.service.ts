@@ -19,9 +19,9 @@ type FavoriteErrorDetails = { type: "favorite"; code: TripFavoriteErrorCode; tri
 
 function favoriteError(status: 403 | 409, code: TripFavoriteErrorCode, tripId: string, message: string) {
   const details: FavoriteErrorDetails = { type: "favorite", code, tripId };
-  return status === 403
-    ? Object.assign(new ForbiddenError(message), { details })
-    : new AppError(message, 409, true, details);
+  // D-4 (recette API 08/09/2026) : `details` passe par le constructeur depuis qu'un 403 sait le
+  // porter — plus besoin de le greffer après coup avec Object.assign.
+  return status === 403 ? new ForbiddenError(message, details) : new AppError(message, 409, true, details);
 }
 
 async function loadTripForFavorite(tripId: string) {
@@ -29,7 +29,7 @@ async function loadTripForFavorite(tripId: string) {
     where: { id: tripId },
     select: { id: true, userId: true, status: true, isDeleted: true },
   });
-  if (!trip || trip.isDeleted) throw new NotFoundError("Trip not found.");
+  if (!trip || trip.isDeleted) throw new NotFoundError("Trip not found.", { code: "TRIP_NOT_FOUND" });
   return trip;
 }
 

@@ -12,7 +12,7 @@ export const authorizeRoles =
       const hasAccess = allowedRoles.some((role) => roles.includes(role));
 
       if (!hasAccess) {
-        return next(new AuthError("Access denied."));
+        return next(new AuthError("Access denied.", { code: "ROLE_NOT_ALLOWED" }));
       }
 
       return next();
