@@ -796,3 +796,128 @@ surprise du refus au premier deal.
 **Ce qu'il ne faut PAS raccourcir** : les étapes Stripe elles-mêmes (identité, IBAN) ne sont pas
 négociables — elles sont imposées par la réglementation et par Stripe. Le seul levier est de les
 préremplir (fait) et de les demander au bon moment (à faire).
+
+## Note d'expert — vérification d'identité (KYC) et « voyage vérifié »
+
+Question posée hors recette. Réponse en partant de **ce qui existe déjà** : sur ce sujet, Yamba a
+plus d'acquis qu'il n'y paraît, et le travail restant est plus étroit qu'une « mise en place du
+KYC ».
+
+### 1. L'état des lieux : trois briques déjà là, deux non exploitées
+
+| Brique | État |
+|---|---|
+| **KYC du Voyageur** | **DÉJÀ FAIT, et déjà payé.** Stripe Connect impose une vérification d'identité réglementaire (pièce, parfois selfie) à quiconque reçoit des fonds. Aucun Voyageur ne peut être payé sans l'avoir passée. |
+| **Règle métier CNF-05** | **DÉJÀ ÉCRITE** : « Voyageur : KYC Stripe Connect (existant). Expéditeur : Stripe Identity avant la première réservation, seuil paramétrable. » La décision de principe est donc prise. |
+| **Paramètre `IDENTITY_REQUIRED_FROM`** | **DÉJÀ PRÉVU**, en classe C — présent au catalogue, aucun consommateur dans le code. |
+| **Billet vérifié** | **DÉJÀ EN PLACE** (D57) : `TripDocument`, `ticketVerificationStatus` (NOT_SUBMITTED / PENDING / VERIFIED / REJECTED), file d'attente admin, badge `verifiedTicket` filtrable dans la recherche. **Mais la vérification est humaine.** |
+| **Types de justificatifs** | Le modèle prévoit déjà `TICKET_PROOF`, `ITINERARY_PROOF`, **`VEHICLE_PROOF`** et **`IDENTITY_PROOF`** — les deux derniers ne sont utilisés nulle part. |
+
+**Première conclusion, contre-intuitive** : le badge « Voyageur vérifié » ne demande **aucun nouvel
+outil**. L'information existe (Stripe a vérifié la pièce d'identité), elle n'est simplement pas
+remontée comme un badge de confiance. C'est de l'affichage, pas du KYC. À faire en premier, coût
+quasi nul.
+
+### 2. Faut-il un KYC de l'Expéditeur ? Oui — mais pas pour la raison habituelle
+
+Sur la plupart des places de marché, le KYC sert à sécuriser **l'argent**. Ici, l'argent est déjà
+couvert : l'Expéditeur paie par carte (3-D Secure = authentification forte du porteur), et le
+Voyageur est vérifié par Stripe.
+
+Le vrai motif est ailleurs, et il est **spécifique à Yamba** : **le Voyageur porte physiquement le
+colis à travers une frontière**. En cas de contenu illicite, c'est **lui** qui est arrêté, lui qui
+doit prouver sa bonne foi. Un Expéditeur anonyme, c'est un Voyageur sans recours — et pour Yamba,
+une exposition pénale et réputationnelle sans commune mesure avec un impayé.
+
+Autrement dit : **le KYC Expéditeur n'est pas une mesure anti-fraude, c'est une mesure de
+traçabilité pénale**, et c'est ce qui la rend non négociable au-delà d'un certain volume. C'est
+aussi l'argument à présenter aux assureurs (D22) et aux juristes (livrable 09).
+
+### 3. Les options, et ce qui est réellement gratuit
+
+**Les prix ci-dessous sont des ordres de grandeur à revérifier avant décision** — les grilles
+changent, et plusieurs acteurs pratiquent le tarif dégressif ou l'offre de lancement.
+
+| Approche | Coût indicatif | Ce que ça prouve |
+|---|---|---|
+| **Carte bancaire + 3DS** *(déjà en place)* | **0 €** — déjà payé dans la commission | Un porteur de carte authentifié par sa banque. Pas une identité légale, mais un lien bancaire nominatif et une piste d'audit. |
+| **Téléphone vérifié par OTP** *(déjà en place)* | ~0,03–0,08 € par SMS, ou **0 €** en gardant l'email | Un numéro joignable. Faible, mais utile en cumul. |
+| **Stripe Identity** | ~1,50 $ par vérification document + selfie (moins pour le document seul) | Identité légale vérifiée. **Même fournisseur que le paiement** : pas de contrat de plus, réutilise l'intégration existante. |
+| **Concurrents** (Veriff, Onfido, Sumsub, IDnow, Ubble…) | de ~0,50 à ~2,50 € selon volume et profondeur | Idem, parfois moins cher à volume. Un contrat et une intégration de plus. |
+| **Acteurs à offre gratuite** (certains éditeurs annoncent un palier gratuit) | 0 € annoncé | À traiter avec prudence : un KYC « gratuit » se paie ailleurs (données, limites, disponibilité, conformité). Pour une pièce qu'un assureur regardera, la traçabilité du fournisseur compte. |
+
+**Réponse directe à « peut-on l'avoir gratuit ? »** : pour le **Voyageur**, oui — c'est déjà gratuit
+et déjà fait, via Stripe Connect. Pour l'**Expéditeur**, non : une vérification d'identité sérieuse
+a un coût unitaire. Mais ce coût est **maîtrisable par le seuil** — c'est précisément le rôle de
+`IDENTITY_REQUIRED_FROM`.
+
+### 4. Comment traiter le point : un seuil, pas un mur
+
+Exiger une pièce d'identité à l'inscription tuerait la conversion. La règle CNF-05 prévoit déjà un
+**seuil paramétrable** ; voici comment je le réglerais :
+
+1. **Inscription** : rien de plus qu'aujourd'hui (email + mot de passe).
+2. **Première réservation** : carte 3DS + téléphone vérifié. Gratuit, déjà en place.
+3. **Déclenchement du KYC** sur un **faisceau**, pas sur un seul critère —
+   valeur déclarée élevée, catégorie sensible, corridor à risque, compte récent
+   (le `TrustScore` de **D71** calcule déjà exactement ce genre de signaux et n'est aujourd'hui
+   utilisé que côté admin : il ferait un excellent déclencheur), ou signalement reçu.
+4. **Toujours vérifié** : un Expéditeur qui a eu un litige tranché contre lui, ou un colis refusé
+   en douane.
+
+Ainsi la dépense suit le risque, et l'immense majorité des envois n'en supporte pas le coût.
+
+### 5. « Voyage vérifié » : c'est là que le gain est le plus grand, et il est automatisable
+
+Aujourd'hui un humain regarde une capture de billet (D57). Cela ne passe pas à l'échelle, et un
+justificatif retouché passe inaperçu. Or **une carte d'embarquement est un objet vérifiable par
+machine**.
+
+**Avion — le levier principal.** Les cartes d'embarquement portent un code-barres (PDF417 ou Aztec)
+au format **BCBP**, normalisé par l'IATA : il contient le **nom du passager**, le **numéro de vol**,
+la **date**, l'**origine/destination** et le PNR. Le décoder est **gratuit** (bibliothèques
+ouvertes), local, instantané. On peut donc vérifier automatiquement :
+
+- que le nom du passager **correspond au titulaire du compte** (déjà vérifié par Stripe) ;
+- que le vol, la date et le corridor **correspondent au trajet publié**.
+
+C'est une vérification bien **plus forte** que l'œil d'un modérateur sur une capture d'écran, et
+elle coûte zéro. En complément, une API de statut de vol (plusieurs éditeurs, dont des paliers
+gratuits) confirme que le vol existe réellement et prévient des annulations — utile aussi pour
+avertir l'Expéditeur.
+
+**Train.** Les billets ferroviaires européens suivent la spécification **UIC 918.3**, dont les
+codes-barres sont **signés numériquement** par l'émetteur : la signature est vérifiable, donc un
+billet contrefait est détectable. C'est plus hétérogène que l'aérien (formats selon opérateurs),
+mais le principe tient.
+
+**Voiture.** Il n'y a **rien à vérifier** : pas de billet, pas d'émetteur tiers. Trois options
+honnêtes, par ordre de préférence :
+
+1. **Ne pas décerner de badge « voyage vérifié »** pour la voiture, et l'assumer dans l'interface —
+   mieux vaut pas de badge qu'un badge qui ne prouve rien.
+2. Vérifier le **véhicule et le conducteur** (`VEHICLE_PROOF` existe déjà au modèle : carte grise +
+   permis), ce qui prouve l'identité et le moyen, pas le déplacement.
+3. Compenser par l'**historique** : un Voyageur voiture avec dix livraisons terminées et bien notées
+   est un meilleur signal qu'un billet.
+
+**Un point RGPD à ne pas manquer** : une carte d'embarquement est une donnée personnelle (nom, PNR,
+itinéraire). La règle doit être de **décoder puis jeter** : conserver le résultat de la comparaison
+(nom concordant oui/non, vol et date concordants) et les seules métadonnées utiles, **jamais
+l'image du billet** au-delà du délai de contestation. Le même raisonnement que pour le code de
+livraison : on garde la preuve, pas le secret.
+
+### 6. Ce que je ferais, dans cet ordre
+
+| # | Action | Coût | Gain |
+|---|---|---|---|
+| 1 | **Afficher « Voyageur vérifié »** à partir du KYC Stripe déjà passé | quasi nul | Confiance immédiate, information déjà payée |
+| 2 | **Décoder le code-barres des cartes d'embarquement** (BCBP) et comparer nom + vol + date | faible, gratuit | Remplace une revue humaine par une preuve, et supprime une file d'attente admin |
+| 3 | **Brancher `IDENTITY_REQUIRED_FROM`** sur un faisceau de risque, en réutilisant le TrustScore D71 | moyen | Le coût du KYC suit le risque |
+| 4 | **Stripe Identity pour l'Expéditeur** au-dessus du seuil | ~1,50 $/vérification | Traçabilité pénale — l'argument des assureurs et des juristes |
+| 5 | Train (UIC 918.3), puis décision explicite sur la voiture | moyen | Couvre les autres modes sans badge trompeur |
+
+**Ce que je ne ferais pas** : un KYC universel à l'inscription (il tue la conversion sans réduire le
+risque réel), et un badge « vérifié » qui ne reposerait que sur un document regardé à l'œil — c'est
+une promesse que la plateforme ne peut pas tenir, et elle se retournera contre elle au premier
+incident.
