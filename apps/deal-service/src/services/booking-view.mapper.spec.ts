@@ -377,9 +377,23 @@ describe("sérialisation et privacy", () => {
     expect(view.carrier.lastInitial).toBe("");
   });
 
-  it("le destinataire est visible côté Carrier (nécessaire à la livraison)", () => {
-    const view = toCarrierBookingView(makeBooking(), SHIPPER);
-    expect(view.recipient.phoneE164).toBe("+242061234567");
+  // ANO-API-15 — le destinataire reste visible côté Carrier, mais MINIMISÉ : le nom dès
+  // l'acceptation, le téléphone seulement à partir de la prise en charge, jamais l'email.
+  // C'est un tiers dont les coordonnées ont été confiées pour la seule remise du colis.
+  it("le destinataire est visible côté Carrier, mais son téléphone n'ouvre qu'à la prise en charge", () => {
+    const avant = toCarrierBookingView(makeBooking({ status: "ACCEPTED" }), SHIPPER);
+    expect(avant.recipient.lastName).toBe("Mabiala");
+    expect(avant.recipient.phoneE164).toBeNull();
+
+    const pendant = toCarrierBookingView(makeBooking({ status: "PICKED_UP" }), SHIPPER);
+    expect(pendant.recipient.phoneE164).toBe("+242061234567");
+  });
+
+  it("l'email du destinataire n'est JAMAIS servi au Carrier", () => {
+    for (const status of ["ACCEPTED", "PICKED_UP", "DELIVERED", "COMPLETED"]) {
+      const view = toCarrierBookingView(makeBooking({ status }), SHIPPER);
+      expect(view.recipient).not.toHaveProperty("email");
+    }
   });
 });
 
