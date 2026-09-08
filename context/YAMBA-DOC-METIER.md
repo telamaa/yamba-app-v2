@@ -1955,3 +1955,51 @@ identifiant, avant même qu'une décision soit prise.
 | ME4 | Ajouter un champ au modèle des membres sans le classer | La suite de tests d'auth-service échoue |
 
 Joués le 8 septembre 2026 — voir `context/YAMBA-RECETTE-API-RESULTATS.md`, fiche `ANO-API-06`.
+
+# Recette API — ce qu'un refus doit dire, et ce qu'il ne doit pas laisser deviner (lot auth)
+
+## Le besoin
+
+Cinq promesses du service des comptes n'étaient pas tenues.
+
+1. **« Vous pouvez récupérer vos données. »** L'export ne fonctionnait pas du tout : le membre
+   recevait une erreur technique. C'est une obligation légale, pas une commodité.
+2. **« Nous ne dirons jamais si cette adresse a un compte. »** La réponse était bien muette, mais
+   elle mettait cinq fois plus de temps quand le compte existait : le silence était mesurable.
+3. **« Déconnectez cet appareil. »** L'appareil restait connecté un quart d'heure.
+4. **« Corrigez les champs en rouge. »** L'inscription n'en signalait qu'un à la fois.
+5. **« Cette adresse est déjà utilisée. »** Le message était juste, mais le code technique de la
+   réponse annonçait une simple erreur de saisie, pas un conflit.
+
+## Les règles
+
+- **RG-EXP-01** — Un membre peut obtenir l'export de ses données à tout moment (fenêtre sensible
+  ouverte). L'export contient ce qu'il a saisi et ce qui le concerne ; **jamais** le code de
+  livraison, jamais l'identité de l'autre partie, jamais les signalements le visant, jamais les
+  dossiers de médiation.
+- **RG-SEC-04** — Un point d'entrée public qui envoie un email selon l'existence d'un compte répond
+  **de la même façon et dans le même temps** dans les deux cas. L'envoi et ses contrôles anti-abus
+  ne conditionnent jamais la réponse.
+- **RG-SES-05** — Couper un appareil, se déconnecter ou changer son mot de passe **coupe l'accès
+  immédiatement**, pas à l'expiration du jeton. La session courante, elle, reste vivante.
+- **RG-INS-03** — Le formulaire d'inscription signale **tous** ses champs fautifs en une fois, avec
+  un code par champ que le client traduit.
+- **RG-API-02** — Le statut HTTP d'un refus est celui que le contrat public annonce : conflit
+  (409), authentification (401), trop d'essais (429). Le code métier accompagne le statut, il ne le
+  remplace pas.
+
+## Tests d'acceptation
+
+| Réf | Scénario | Attendu |
+|---|---|---|
+| EXP1 | Demander l'export, fenêtre sensible ouverte | 200, fichier téléchargeable, 20 rubriques |
+| EXP2 | Chercher dans l'export le code de livraison, l'email ou le téléphone du Voyageur | Aucune occurrence |
+| SEC4 | Demander un code « mot de passe oublié » pour un compte existant, puis inconnu | Même corps, même statut, temps indiscernables |
+| SES5a | Couper un autre appareil, puis l'utiliser | 401 `SESSION_REVOKED`, session courante intacte |
+| SES5b | Se déconnecter, puis rejouer avec les cookies d'avant | 401 `SESSION_REVOKED` |
+| SES5c | Changer son mot de passe, puis utiliser l'autre appareil | 401 `SESSION_REVOKED` |
+| INS3 | S'inscrire avec un email invalide **et** un mot de passe trop court | 400, les deux champs signalés |
+| API2a | S'inscrire avec une adresse déjà prise | **409** `EMAIL_ALREADY_USED` |
+| API2b | Se tromper de code cinq fois | **401** ×4 puis **429**, compteur et verrou inchangés |
+
+Tous joués le 8 septembre 2026 — voir `context/YAMBA-RECETTE-API-RESULTATS.md`.

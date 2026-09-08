@@ -4177,29 +4177,29 @@ volontairement**.
 | API-AUTH-09 | `/auth/me` sans secret | **bloquante** | 200, `fuites: []` | 200 mais **4 champs TOTP exposés** au client | **KO** (08/09) → **corrigé** | ANO-API-06 · close |
 | API-AUTH-10 | Rotation révoque l'ancien | majeure | 200 puis 401 | 200, nouveau pot 200, ancien pot **401** | OK | — |
 | API-AUTH-11 | Mes appareils | majeure | liste + révocation | liste + `current` OK, révocation 200 — mais accès encore valide | **KO** | ANO-API-07 |
-| API-AUTH-12 | Mot de passe révoque les sessions | majeure | 200 puis 401 | | | |
-| API-AUTH-13 | Déconnexion | majeure | 200 puis 401 | | | |
-| API-AUTH-14 | Mot de passe oublié muet | **bloquante** | 200 identiques | | | |
-| API-AUTH-15 | Profil éditable, slug stable | mineure | 200, slug inchangé | | | |
-| API-AUTH-16 | Date de naissance invalide | mineure | 400 + code de règle | | | |
-| API-AUTH-17 | Avatar signé, URL gardée | majeure | 200 / 400 | | | |
-| API-AUTH-18 | Profil public / masqué | **bloquante** | 404 tiers, `hidden` propriétaire | | | |
-| API-AUTH-19 | Abonnement | mineure | 200/201, pas de doublon | | | |
-| API-AUTH-20 | Préférences et consentement | mineure | 200 + `ConsentLog` | | | |
-| API-AUTH-21 | Geste sensible sans fenêtre | **bloquante** | 403 `SUDO_REQUIRED` | | | |
-| API-AUTH-22 | Ouvrir puis rejouer | **bloquante** | 200 | | | |
-| API-AUTH-23 | Fenêtre liée à une session | **bloquante** | 403 sur l'autre | | | |
-| API-AUTH-24 | Export sans données d'autrui | **bloquante** | aucune fuite | | | |
-| API-AUTH-25 | Export trop fréquent | mineure | 400 `EXPORT_RATE_LIMITED` | | | |
-| API-AUTH-26 | Bloqueurs d'effacement | majeure | 200 + liste fermée | | | |
-| API-AUTH-27 | Effacement bloqué | majeure | 409 `ERASURE_BLOCKED` | | | |
-| API-AUTH-28 | Effacement effectif | **bloquante** | 200 puis 401 | | | |
-| API-AUTH-29 | Alertes de route, cycle | mineure | 201/200 | | | |
-| API-AUTH-30 | Gardes des alertes | majeure | 400 · 409 à 20 | | | |
-| API-AUTH-31 | Signaler un trajet | majeure | 201 | | | |
-| API-AUTH-32 | Gardes du signalement | majeure | 400/400/404/409 | | | |
-| API-AUTH-33 | Onboarding Voyageur | majeure | 200 ×4 | | | |
-| API-AUTH-34 | Tableau de bord sans compte | mineure | 409 `STRIPE_ACCOUNT_MISSING` | | | |
+| API-AUTH-12 | Mot de passe révoque les sessions | majeure | 200 puis 401 | 200 (sudo exigé et fonctionnel), mais autres sessions encore actives | **KO** | ANO-API-07 |
+| API-AUTH-13 | Déconnexion | majeure | 200 puis 401 | 200 puis 401 côté client — mais le pot d'avant ouvre encore /auth/me | **KO** | ANO-API-07 |
+| API-AUTH-14 | Mot de passe oublié muet | **bloquante** | 200 identiques | 200 ×2, corps identiques — mais 95,7 ms contre 18,8 ms | **KO** | ANO-API-08 |
+| API-AUTH-15 | Profil éditable, slug stable | mineure | 200, slug inchangé | 200, `publicSlug` inchangé | OK | cible du cahier à revoir |
+| API-AUTH-16 | Date de naissance invalide | mineure | 400 + code de règle | 400 `IN_THE_FUTURE` / `TOO_YOUNG`, champ par champ | OK | — |
+| API-AUTH-17 | Avatar signé, URL gardée | majeure | 200 / 400 | signature 200 complète ; URL étrangère refusée 400 | OK | étapes 2-3 ⏭ (service tiers) |
+| API-AUTH-18 | Profil public / masqué | **bloquante** | 404 tiers, `hidden` propriétaire | jamais 401 ; masqué : tiers 404, propriétaire 200 `hidden:true` | OK | — |
+| API-AUTH-19 | Abonnement | mineure | 200/201, pas de doublon | 200, rejeu sans doublon, unfollow 200, soi-même 400 | OK | — |
+| API-AUTH-20 | Préférences et consentement | mineure | 200 + `ConsentLog` | 200 ×2 + ligne `ConsentLog` COOKIES écrite | OK | — |
+| API-AUTH-21 | Geste sensible sans fenêtre | **bloquante** | 403 `SUDO_REQUIRED` | `{active:false}` et 403 `SUDO_REQUIRED` ×3 | OK | — |
+| API-AUTH-22 | Ouvrir puis rejouer | **bloquante** | 200 | fenêtre ouverte 200, mais l'export répond **500** | **KO** | ANO-API-09 |
+| API-AUTH-23 | Fenêtre liée à une session | **bloquante** | 403 sur l'autre | autre session `active:false` + 403 — fenêtre bien liée au `jti` | OK | — |
+| API-AUTH-24 | Export sans données d'autrui | **bloquante** | aucune fuite | non jouable : l'export échoue | ⏭ | bloquée par ANO-API-09 |
+| API-AUTH-25 | Export trop fréquent | mineure | 400 `EXPORT_RATE_LIMITED` | non jouable : l'export échoue | ⏭ | bloquée par ANO-API-09 |
+| API-AUTH-26 | Bloqueurs d'effacement | majeure | 200 + liste fermée | 200, 4 bloqueurs + `counts`, liste fermée respectée | OK | — |
+| API-AUTH-27 | Effacement bloqué | majeure | 409 `ERASURE_BLOCKED` | 409, `code` à la racine, `blockers` + `counts` | OK | — |
+| API-AUTH-28 | Effacement effectif | **bloquante** | 200 puis 401 | 200 `erased:true`, puis 401 `ACCOUNT_DELETED` ; anonymisation exacte | OK | — |
+| API-AUTH-29 | Alertes de route, cycle | mineure | 201/200 | 201 `expiresAt` à 6 mois, liste 200, suppression 200 | OK | — |
+| API-AUTH-30 | Gardes des alertes | majeure | 400 · 409 à 20 | 400 même ville ; 20 acceptées, la 21e refusée | OK | — |
+| API-AUTH-31 | Signaler un trajet | majeure | 201 | 201 `reportId` + `createdAt` | OK | — |
+| API-AUTH-32 | Gardes du signalement | majeure | 400/400/404/409 | 400 `OWN_TARGET` · 400 `REASON_NOT_ALLOWED` · 404 · 409 | OK | — |
+| API-AUTH-33 | Onboarding Voyageur | majeure | 200 ×4 | 200 ×4, `url` Stripe, statut `pending` + 3 drapeaux | OK | rôle visible après reconnexion |
+| API-AUTH-34 | Tableau de bord sans compte | mineure | 409 `STRIPE_ACCOUNT_MISSING` | 403 sans fenêtre, puis 409 `STRIPE_ACCOUNT_MISSING` | OK | — |
 | API-TRIP-01 | Recherche publique | majeure | 200 ×2 | | | |
 | API-TRIP-02 | Filtres durs | **bloquante** | aucun trajet interdit | | | |
 | API-TRIP-03 | Filtres invalides ignorés | mineure | 200 | | | |

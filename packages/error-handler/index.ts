@@ -41,8 +41,10 @@ export class ValidationError extends AppError {
 
 // Authentication error
 export class AuthError extends AppError {
-  constructor(message = "Unauthorized"){
-    super(message, 401, true);
+  // `details` (ANO-API-05) : un refus d'authentification porte lui aussi un code métier
+  // — OTP_INCORRECT et son compteur, par exemple. Sans lui, il fallait répondre 400.
+  constructor(message = "Unauthorized", details?: unknown){
+    super(message, 401, true, details);
   }
 }
 
@@ -63,15 +65,15 @@ export class DatabaseError extends AppError {
 
 // rate Limit Error (If user exceeds API limits)
 export class RateLimitError extends AppError {
-  constructor(message = "Too many requests, please try again later") {
-    super(message, 429, true);
+  constructor(message = "Too many requests, please try again later", details?: unknown) {
+    super(message, 429, true, details);
   }
 }
 
 // “email déjà pris”, “booking déjà confirmé”, etc
 export class ConflictError extends AppError {
-  constructor(message = "Conflict") {
-    super(message, 409);
+  constructor(message = "Conflict", details?: unknown) {
+    super(message, 409, true, details);
   }
 }
 export { initSentry, isSentryEnabled, captureServerError } from "./sentry";

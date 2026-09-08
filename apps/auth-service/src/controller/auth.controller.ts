@@ -1,7 +1,7 @@
 import type { Request, Response, NextFunction } from "express";
 import bcrypt from "bcryptjs";
 import prisma from "@packages/libs/prisma";
-import { AuthError, ValidationError } from "@packages/error-handler";
+import { AuthError, ConflictError, ValidationError } from "@packages/error-handler";
 import { isSupportedLocale, resolveLocale } from "@packages/api-contracts";
 
 import {
@@ -97,7 +97,7 @@ export const registerUser = async (req: Request, res: Response, next: NextFuncti
     });
     if (existingUser) {
       return next(
-        new ValidationError("User already exists with this email!", {
+        new ConflictError("User already exists with this email!", {
           type: "register",
           code: "EMAIL_ALREADY_USED",
           field: "email",
@@ -172,7 +172,7 @@ export const resendRegistrationOtp = async (
     });
     if (existingUser) {
       return next(
-        new ValidationError("User already exists with this email!", {
+        new ConflictError("User already exists with this email!", {
           type: "register",
           code: "EMAIL_ALREADY_USED",
           field: "email",
@@ -280,7 +280,7 @@ export const verifyRegistrationOtp = async (
     });
     if (existingUser) {
       return next(
-        new ValidationError("User already exists with this email!", {
+        new ConflictError("User already exists with this email!", {
           type: "register",
           code: "EMAIL_ALREADY_USED",
           field: "email",
@@ -355,16 +355,18 @@ async function issueSession(
 ): Promise<void> {
   clearAuthCookies(res);
 
-  const accessToken = jwt.sign(
-    { id: user.id, roles: user.roles },
-    process.env.ACCESS_TOKEN_SECRET as string,
-    { expiresIn: "15m" }
-  );
-
   // D27 — nouvelle session : createdAt = now, TTL = min(inactivité, vie absolue)
   const sessionCreatedAt = Date.now();
   const jti = createRefreshJti();
   await storeRefreshSession(user.id, jti, shouldRemember, sessionCreatedAt, meta);
+
+  // ANO-API-07 — le jeton d'accès porte le `jti` de SA session : isAuthenticated vérifie
+  // que la session existe encore, donc une révocation coupe l'accès immédiatement.
+  const accessToken = jwt.sign(
+    { id: user.id, roles: user.roles, jti },
+    process.env.ACCESS_TOKEN_SECRET as string,
+    { expiresIn: "15m" }
+  );
 
   // Le JWT refresh est borné à la vie absolue de la session (SES-02) —
   // plus jamais un "30d" plein pot re-signé à chaque rotation.
@@ -495,12 +497,6 @@ export const refreshAuthTokens = async (
 
     await revokeRefreshJti(user.id, decoded.jti);
 
-    const newAccessToken = jwt.sign(
-      { id: user.id, roles: user.roles },
-      process.env.ACCESS_TOKEN_SECRET as string,
-      { expiresIn: "15m" }
-    );
-
     // Rotation : nouveau jti, MÊME createdAt (c'est lui qui borne SES-02).
     const newJti = createRefreshJti();
     const ttlSet = await storeRefreshSession(
@@ -517,6 +513,13 @@ export const refreshAuthTokens = async (
       clearAuthCookies(res);
       return next(new AuthError("Unauthorized! Session expired. Please log in again."));
     }
+
+    // ANO-API-07 — le nouveau jeton d'accès porte le nouveau `jti` (signé après lui).
+    const newAccessToken = jwt.sign(
+      { id: user.id, roles: user.roles, jti: newJti },
+      process.env.ACCESS_TOKEN_SECRET as string,
+      { expiresIn: "15m" }
+    );
 
     // JWT refresh borné à la vie absolue restante (plus jamais 30d plein pot).
     const refreshLifetimeSeconds = Math.ceil(
@@ -541,6 +544,25 @@ export const refreshAuthTokens = async (
 // FORGOT PASSWORD
 // ───────────────────────────────────────────────────────
 
+/**
+ * ANO-API-08 (recette API 08/09/2026, fiche API-AUTH-14, bloquante) — « mot de passe oublié »
+ * répond volontairement la même chose que le compte existe ou non. Le corps était bien
+ * identique… mais le compte EXISTANT payait l'aller-retour SMTP dans la requête : 95,7 ms de
+ * médiane contre 18,8 ms, distributions disjointes. Un seul appel suffisait à savoir si une
+ * adresse a un compte Yamba.
+ *
+ * La réponse ne doit donc dépendre de RIEN de ce qui suit : le travail (compteurs anti-abus et
+ * envoi) part en arrière-plan et son issue — succès, verrou anti-abus, panne du fournisseur —
+ * ne change ni le corps, ni le statut, ni le temps. C'est aussi ce qui referme une seconde
+ * fuite plus discrète : un compte existant en cooldown recevait une erreur, un compte inconnu
+ * un 200.
+ */
+function envoyerSansRienReveler(travail: () => Promise<unknown>, contexte: string): void {
+  void travail().catch((e) => {
+    console.error(`[${contexte}] envoi silencieux échoué :`, e instanceof Error ? e.message : e);
+  });
+}
+
 export const requestPasswordResetOtp = async (
   req: Request,
   res: Response,
@@ -553,10 +575,14 @@ export const requestPasswordResetOtp = async (
     const emailKey = normalizeEmail(String(email));
     const user = await prisma.user.findUnique({ where: { emailNormalized: emailKey } });
 
+    // Le travail part en arrière-plan : la réponse ne l'attend pas (ANO-API-08).
     if (user) {
-      await checkForgotPasswordOtpRestrictions(emailKey);
-      await trackForgotPasswordOtpRequests(emailKey);
-      await sendForgotPasswordOtp(user.firstName, emailKey, localeFromHeaders(req.headers));
+      const locale = localeFromHeaders(req.headers);
+      envoyerSansRienReveler(async () => {
+        await checkForgotPasswordOtpRestrictions(emailKey);
+        await trackForgotPasswordOtpRequests(emailKey);
+        await sendForgotPasswordOtp(user.firstName, emailKey, locale);
+      }, "password/forgot");
     }
 
     return res.status(200).json({
@@ -584,11 +610,15 @@ export const resendPasswordResetOtp = async (
       where: { emailNormalized: emailKey },
     });
 
-    // Anti-énumération : même réponse que le compte existe ou non
+    // Anti-énumération : même réponse, et même TEMPS de réponse, que le compte
+    // existe ou non (ANO-API-08 — la même fuite valait ici).
     if (user) {
-      await checkForgotPasswordOtpRestrictions(emailKey);
-      await trackForgotPasswordOtpRequests(emailKey);
-      await sendForgotPasswordOtp(user.firstName, emailKey, localeFromHeaders(req.headers));
+      const locale = localeFromHeaders(req.headers);
+      envoyerSansRienReveler(async () => {
+        await checkForgotPasswordOtpRestrictions(emailKey);
+        await trackForgotPasswordOtpRequests(emailKey);
+        await sendForgotPasswordOtp(user.firstName, emailKey, locale);
+      }, "password/resend");
     }
 
     return res.status(200).json({
