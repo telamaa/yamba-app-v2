@@ -28,7 +28,7 @@ import prisma from "../index";
  * - `adminRoles` a son propre script, `backfill-admin-roles.ts`, qui sait recopier le rôle
  *   principal dans la liste — poser `[]` à l'aveugle effacerait cette information.
  */
-const DEFAUTS: Record<string, Record<string, unknown>> = {
+const DEFAUTS: Record<string, Record<string, string | boolean>> = {
   User: {
     isDeleted: false, //               @default(false)
     profilePublic: true, //            @default(true)
