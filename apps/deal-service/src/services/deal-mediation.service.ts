@@ -56,6 +56,7 @@ export function computeResolutionMoney(
   if (outcome === "FULL_REFUND") return { refundCents: total, carrierPayoutCents: 0, yambaKeepsCents: 0 };
   if (refundCents === undefined || !Number.isInteger(refundCents) || refundCents < 1 || refundCents > total - 1) {
     throw new ValidationError("A partial refund must be between 1 cent and the total minus 1 cent.", {
+      code: "PARTIAL_REFUND_OUT_OF_BOUNDS",
       errors: { refundCents: `1 ≤ refundCents ≤ ${total - 1}` },
     });
   }
@@ -81,7 +82,7 @@ export function disputeLoser(outcome: DisputeResolutionOutcome): "SHIPPER" | "CA
 /** C-PR3 (D56) — conflit d'intérêts : un admin ne tranche jamais un deal dont il est partie. */
 export function assertNotParty(admin: { id: string }, booking: { shipperId: string; carrierId: string }): void {
   if (admin.id === booking.shipperId || admin.id === booking.carrierId) {
-    throw new ForbiddenError("You are a party to this deal: another admin must decide.");
+    throw new ForbiddenError("You are a party to this deal: another admin must decide.", { code: "ADMIN_IS_PARTY" });
   }
 }
 
@@ -107,7 +108,7 @@ export function makeDealMediationService(
       where: { bookingId },
       select: { id: true, bookingId: true, ticketNumber: true, status: true, carrierRespondedAt: true, resolvedAt: true },
     });
-    if (!d) throw new NotFoundError("Deal not found.");
+    if (!d) throw new NotFoundError("Deal not found.", { code: "DEAL_NOT_FOUND" });
     return d;
   }
 
@@ -130,7 +131,7 @@ export function makeDealMediationService(
     async respond(user: RequestingUser, dealId: string, input: CarrierDisputeStatementRequest): Promise<CarrierDisputeStatementResponse> {
       const now = clock();
       const booking = await loadBookingForWrite(dealId);
-      if (booking.carrierId !== user.id) throw new ForbiddenError("Only the carrier can answer this dispute.");
+      if (booking.carrierId !== user.id) throw new ForbiddenError("Only the carrier can answer this dispute.", { code: "CARRIER_ONLY" });
       if (booking.status !== "DISPUTED") throw new BookingLifecycleError("TRANSITION_NOT_ALLOWED", "This deal is not under dispute.");
       const dispute = await loadDispute(booking.id);
       if (dispute.carrierRespondedAt || dispute.status !== "OPEN") {
@@ -165,7 +166,7 @@ export function makeDealMediationService(
         "ADMIN",
         { now }
       );
-      if (!check.allowed) throw new BookingLifecycleError("TRANSITION_NOT_ALLOWED", check.reason);
+      if (!check.allowed) throw new BookingLifecycleError("TRANSITION_NOT_ALLOWED", check.reason, check.details);
       const dispute = await loadDispute(booking.id);
       if (dispute.resolvedAt) throw new BookingLifecycleError("TRANSITION_NOT_ALLOWED", "This dispute was already decided.");
       if (!booking.disputedAt) throw new BookingLifecycleError("TRANSITION_NOT_ALLOWED", "This dispute has no opening date.");

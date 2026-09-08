@@ -211,7 +211,7 @@ L'historique est conservé : un KO reste écrit KO, sa correction s'ajoute en de
 | ANO-API-01 | API-GW-15 / 20 | bloquante (critère cahier) | 08/09/2026 | **close** | validation du curseur + test — même campagne |
 | ANO-API-02 | API-GW-18 | bloquante (critère cahier) | 08/09/2026 | **close** | visibilité dans le `where`, deux services + tests |
 | ANO-API-03 | API-GW-14 | mineure | 08/09/2026 | **close** | règle pure `collectRegistrationErrors` + tests |
-| ANO-API-04 | API-GW-19 | mineure | 08/09/2026 | ouverte | à grouper avec le domaine deal (chapitre 5.3) |
+| ANO-API-04 | API-GW-19 | mineure | 08/09/2026 | **close** | fermée au chapitre 9 — voir la ligne en fin de tableau |
 | ANO-API-10 | API-TRIP-03 | mineure | 08/09/2026 | **close** | `.catch("all")` sur le filtre `mode` |
 | ANO-API-11 | API-TRIP-01 / 04 | majeure | 08/09/2026 | **close** | invariant à la publication + exclusion retirée + seed |
 | ANO-API-12 | API-DEAL-02 | majeure | 08/09/2026 | **close** | valeur déclarée confrontée aux plafonds avant l'autorisation |
@@ -229,17 +229,17 @@ L'historique est conservé : un KO reste écrit KO, sa correction s'ajoute en de
 | ANO-API-19 | API-IDEM-07 | **bloquante** | 08/09/2026 | **close** | conflit d'écriture Mongo (P2034) rejoué, jamais rendu en 500 |
 | ANO-API-20 | API-IDEM-08 | majeure | 08/09/2026 | **close** | tout refus de message-service porte un `details.code` + garde-fou lisant les sources |
 | ANO-API-21 | API-IDEM-09 | majeure | 08/09/2026 | **close** | protection P2034 remontée au writer central `applyBookingTransition` |
+| ANO-API-04 | API-GW-19 | mineure | 08/09/2026 | **close** | le 409 de transition dit enfin **depuis quel statut** ; tout refus de deal-service porte un code |
 
 *Chapitre 8 — aucune anomalie.*
 
-**Vingt anomalies sur vingt et une sont closes**, à la fin du chapitre 7. Les huit bloquantes
-(`ANO-API-01`, `02`, `06`, `08`, `09`, `13`, `16`, `18`, `19`) sont **toutes fermées et
-contre-éprouvées** : le critère de sortie n° 1 du §9.3 (« zéro anomalie bloquante ouverte ») est
-tenu à ce stade de la campagne — il reste les chapitres 8 (webhooks) et 9 à jouer.
+**Vingt-deux anomalies, vingt-deux closes** à la fin de la campagne. Les onze bloquantes sont
+toutes fermées **et contre-éprouvées** : le critère de sortie n° 1 du §9.3 (« zéro anomalie
+bloquante ouverte ») est tenu. Aucune anomalie n'a été « acceptée avec contournement ».
 
-Seule `ANO-API-04` (mineure : le 409 `TRANSITION_NOT_ALLOWED` ne dit pas *depuis quel statut*
-dans `details`) reste ouverte. Elle est de la même famille que `ANO-API-20`, désormais close pour
-message-service : la prochaine occasion de la fermer est un passage équivalent sur deal-service.
+`ANO-API-04`, dernière ouverte à la fin du chapitre 7, a été fermée au **chapitre 9** : le 409
+`TRANSITION_NOT_ALLOWED` porte désormais le statut d'où l'action a été tentée et ceux d'où elle
+reste possible, et les quarante et un refus métier de deal-service portent leur code.
 
 **Référence de tests après corrections** : trip-service 209 → **221**, auth-service 183 → **192**
 (plateforme 860 → **877**), `CLAUDE.md` mis à jour.
@@ -1369,3 +1369,138 @@ Deux specs ont donc été ajoutés dans cette PR :
   celui-là est important : rendre 200 sur une base indisponible perdrait l'événement pour toujours.
 
 notification-service 99 → **107**, deal-service 542 → **552**.
+
+---
+
+# Chapitre 9 — Consignation et verdict de campagne
+
+## 9.1 Ce que la campagne a couvert
+
+**146 fiches, 146 jouées ou justifiées.** Une seule reste en ⏭ : `API-HOOK-01` (mise en place de
+l'écoute Stripe locale), parce que la CLI Stripe n'est pas installée sur le poste — et son objet a
+été atteint autrement, par des événements signés à la main.
+
+| Gravité | Jouées | OK du premier coup | KO → corrigé | Partiel | ⏭ |
+|---|---|---|---|---|---|
+| **Bloquante** | 54 | 43 | **11** | 0 | **0** |
+| Majeure | 67 | 55 | 10 | 1 | 1 |
+| Mineure | 25 | 21 | 2 | 2 | 0 |
+| **Total** | **146** | **119** | **23** | **3** | **1** |
+
+**Vingt-deux anomalies, vingt-deux closes.** Aucune n'a été « acceptée avec contournement » :
+toutes ont été corrigées, testées et contre-éprouvées pendant la campagne.
+
+## 9.2 Le tableau de suivi a lui-même été réparé
+
+Une rebase avait laissé **seize lignes en double** dans le §9.1 du cahier (les blocs `API-MSG-*` et
+`API-NOTIF-*` figuraient deux fois, une version remplie et une version vide, dans un ordre mêlé).
+Le tableau annonçait 162 lignes pour 146 fiches. Il a été dédoublonné — en gardant systématiquement
+la version **remplie** — et remis dans l'ordre des chapitres.
+
+C'est un défaut de consignation, pas de code, mais il méritait d'être noté : un tableau de suivi qui
+compte faux est exactement ce qui permet à une fiche de disparaître sans que personne s'en aperçoive.
+
+## 9.3 Les quatre critères de sortie, un par un
+
+### 1. Zéro anomalie bloquante ouverte — **TENU**
+
+Les onze bloquantes trouvées sont fermées et contre-éprouvées :
+
+| Anomalie | Ce qui était en jeu |
+|---|---|
+| `ANO-API-01` | un curseur invalide sortait en 500 non géré |
+| `ANO-API-02` | 404 et 400 étaient discriminables **au temps de réponse** |
+| `ANO-API-06` | `/auth/me` renvoyait le **secret TOTP** du membre |
+| `ANO-API-08` | « mot de passe oublié » trahissait l'existence du compte par sa durée |
+| `ANO-API-09` | l'export RGPD répondait 500 — obligation légale inopérante |
+| `ANO-API-13` | la page de suivi du destinataire répondait 500 |
+| `ANO-API-16` | une notification de messagerie rendait la boîte entière illisible |
+| `ANO-API-18` | la **connexion** permettait d'énumérer les comptes par le temps (membre ET admin) |
+| `ANO-API-19` | une course sur les derniers kilos rendait 500 au perdant |
+| `ANO-API-12` / `ANO-API-15` | valeur déclarée non confrontée aux plafonds ; destinataire trop exposé |
+
+### 2. Toutes les fiches bloquantes jouées et OK — **TENU**
+
+**Zéro bloquante en ⏭.** Deux d'entre elles ont failli y rester et ont été jouées en levant
+l'obstacle plutôt qu'en le contournant :
+
+- `API-SEC-05` (permission admin manquante) exigeait une **session administrateur avec TOTP**, ce
+  que le cahier jugeait « hors de portée d'une campagne API ». Un profil SUPPORT a été posé sur un
+  compte d'essai, la connexion en deux temps jouée, et le code TOTP **calculé** avec la bibliothèque
+  du dépôt. Résultat : 403 sur `exports.personal`, `audit.read`, `finances.read`, la permission
+  manquante étant nommée ; les routes du profil restent accessibles. Profil retiré après la fiche.
+- `API-SEC-12` / `API-SEC-13` (signatures) attendaient le chapitre 8 : fermées là-bas.
+
+`API-AUTH-24` (export sans données d'autrui), qui était bloquée par `ANO-API-09`, a été **rejouée**
+après correction : export complet, aucune donnée d'un tiers.
+
+### 3. Les majeures arbitrées une par une — **TENU**
+
+Les dix majeures trouvées ont toutes été **corrigées**, aucune acceptée avec contournement. Reste
+une fiche majeure en écart : `API-TRIP-18`, la relance d'un lien de vérification n'est pas
+idempotente (inscrite au journal de dette ci-dessous), et `API-HOOK-01` en ⏭ justifié.
+
+### 4. Les mineures inscrites au journal de dette — **TENU** (ci-dessous)
+
+## 9.4 Journal de dette au 8 septembre 2026
+
+| # | Constat | Fiche | Pourquoi ce n'est pas bloquant | Ce qu'il faudrait faire |
+|---|---|---|---|---|
+| D-1 | `x-locale` ne pilote pas le formatage des réponses rapides : c'est `preferredLocale` du membre qui gagne | API-GW-10, API-MSG-11 | comportement cohérent et défendable — c'est le **cahier** qui décrit autre chose | trancher : soit l'en-tête prime, soit le cahier est corrigé |
+| D-2 | trip-service rend parfois **400** là où 403 ou 404 seraient exacts | API-TRIP-13 | écart de sémantique connu, sans fuite d'information | aligner sur la règle 403/404 du reste de la plateforme |
+| D-3 | relancer un lien de vérification n'est pas idempotent | API-TRIP-18 | pas d'effet de bord dangereux, seulement un second email | même traitement que les autres gestes idempotents |
+| D-4 | les refus de **trip-service** et **auth-service** ne portent pas tous un `details.code` | observé au chapitre 9 | la règle est tenue sur deal-service et message-service ; les deux autres services restent à passer | appliquer le garde-fou `refusal-codes.spec.ts` aux deux services restants |
+| D-5 | le refus de permission admin écrit sa réponse **lui-même**, hors du middleware d'erreur | API-SEC-05 | il porte désormais `details.code` en plus de ses champs de tête | le faire passer par le middleware d'erreur commun |
+
+## 9.5 Ce que cette campagne NE prouve pas
+
+Le cahier l'exige, et c'est la partie la plus honnête d'un rapport de recette.
+
+- **Rien sur la charge ni la tenue en durée.** Le limiteur a été vérifié comme **garde métier**
+  (100 / 1 000 requêtes), pas comme protection contre un déni de service distribué.
+- **Rien sur les tâches planifiées** : expiration à 24 h, versement à 4 jours, révélation des avis à
+  14 jours, purges de rétention. Elles relèvent du cahier n° 4.
+- **Rien sur la cohérence des événements** au-delà de leur effet observable par l'API. La boîte
+  d'envoi, le relais, le dédoublonnage et les événements parqués relèvent du cahier n° 4.
+- **Rien sur les écrans.** Une API conforme derrière un écran fautif reste un défaut.
+- **Rien sur Stripe en conditions réelles** : toute la campagne a tourné sur le fournisseur
+  **FAKE**. Les webhooks ont été signés à la main ; ils doivent être rejoués avec la CLI Stripe et
+  un compte de test avant la mise en production (`API-HOOK-01`).
+- **Rien sur l'administration** au-delà des deux fiches jouées ici : le back-office a son propre
+  cahier.
+
+## 9.6 Verdict
+
+**La campagne est acceptée.** Les quatre critères de sortie du §9.3 du cahier sont tenus : zéro
+bloquante ouverte, zéro bloquante non jouée, majeures toutes corrigées, mineures inscrites au
+journal de dette.
+
+**Deux réserves explicites**, qui ne conditionnent pas l'acceptation mais doivent être levées avant
+la mise en production :
+
+1. rejouer les fiches Stripe avec la CLI et un compte de test (`API-HOOK-01`) ;
+2. passer trip-service et auth-service au garde-fou `refusal-codes.spec.ts` (dette D-4).
+
+## 9.7 Ce que la campagne a appris, au-delà des anomalies
+
+**Un test qui ne trouve rien doit être suspecté avant d'être cru.** Le balayage du code de livraison
+a été écrit trois fois ; les deux premières versions annonçaient « code absent partout » et ne
+testaient rien. Ce qui a sauvé la troisième : un **témoin positif** — exiger que le code soit
+*présent* là où il est légitime.
+
+**Corriger là où le défaut a été vu ne corrige pas le défaut.** `ANO-API-19` avait été refermée sur
+la création de deal ; la même cause est ressortie deux fiches plus loin (`ANO-API-21`). Le bon geste
+était de remonter au writer commun. Même histoire pour `ANO-API-09` → `ANO-API-13`, puis
+`ANO-API-20` → `ANO-API-04`.
+
+**Une règle qu'un outil rend impossible n'est pas une règle.** « Tout refus métier porte un
+`details.code` » était écrit noir sur blanc — et inapplicable pour les 403 et 404, dont les classes
+d'erreur n'acceptaient pas de `details`. Aucune relecture n'aurait attrapé cela.
+
+**Un mock ne dit jamais ce qu'on lui invente.** Deux 500 en production potentielle (`ANO-API-09`,
+`ANO-API-13`) venaient de champs Prisma inexistants, dans du code **couvert par des tests** qui
+injectaient un faux client. La réponse a été une famille de tests qui **lisent les sources** et les
+confrontent au schéma — sept au total aujourd'hui.
+
+**Enfin : la moitié des anomalies de cette campagne ne sont pas des fautes de logique, mais des
+refus mal formulés.** Le serveur savait ce qu'il faisait ; il ne savait pas le *dire*.

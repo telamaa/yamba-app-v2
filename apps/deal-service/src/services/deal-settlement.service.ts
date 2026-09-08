@@ -122,7 +122,7 @@ export function makeDealSettlementService(
   ): { to: BookingStatus } {
     const check = canPerform(machineView(booking), action, actor, { now });
     if (!check.allowed) {
-      throw new BookingLifecycleError("TRANSITION_NOT_ALLOWED", check.reason);
+      throw new BookingLifecycleError("TRANSITION_NOT_ALLOWED", check.reason, check.details);
     }
     return { to: check.to };
   }
@@ -130,7 +130,7 @@ export function makeDealSettlementService(
   function assertShipper(booking: BookingForWrite, user: RequestingUser, verb: string): void {
     if (booking.shipperId !== user.id) {
       // 403 et non 404 : le deal existe, l'appelant n'est pas l'Expéditeur.
-      throw new ForbiddenError(`Only the shipper can ${verb} this deal.`);
+      throw new ForbiddenError(`Only the shipper can ${verb} this deal.`, { code: "SHIPPER_ONLY" });
     }
   }
 
@@ -304,6 +304,7 @@ export function makeDealSettlementService(
         // D51 — en transit, seul le « jamais livré » a un sens (le contenu
         // ne peut pas être constaté avant la remise).
         throw new ValidationError("While the parcel is in transit, only a NOT_DELIVERED dispute can be filed.", {
+          code: "DISPUTE_CATEGORY_NOT_ALLOWED",
           errors: { category: "Must be NOT_DELIVERED while the parcel is in transit" },
         });
       }

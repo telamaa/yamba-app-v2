@@ -77,7 +77,7 @@ const TRIP_SELECT = {
 
 async function loadTrip(tripId: string): Promise<TripForBooking> {
   const trip = await prisma.trip.findUnique({ where: { id: tripId }, select: TRIP_SELECT });
-  if (!trip || trip.isDeleted) throw new NotFoundError("Trip not found");
+  if (!trip || trip.isDeleted) throw new NotFoundError("Trip not found", { code: "TRIP_NOT_FOUND" });
   return {
     ...trip,
     status: String(trip.status),
@@ -94,7 +94,7 @@ function quoteOr400(trip: TripForBooking, input: CreatePaymentIntentRequest | Cr
   try {
     return quoteForTrip(trip, input, params);
   } catch (e) {
-    if (e instanceof QuoteError) throw new ValidationError(e.message, { errors: { quote: e.code } });
+    if (e instanceof QuoteError) throw new ValidationError(e.message, { code: e.code, errors: { quote: e.code } });
     throw e;
   }
 }

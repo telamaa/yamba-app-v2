@@ -167,7 +167,7 @@ async function stripeReadiness(carrierIds: string[]): Promise<Map<string, { acco
 export function makeAdminFinanceService(provider: PaymentProvider, settlement: DealSettlementService, clock: () => Date = () => new Date()) {
   async function loadMoney(id: string): Promise<MoneyRecord> {
     const b = await prisma.booking.findUnique({ where: { id }, select: MONEY_SELECT });
-    if (!b || b.isDeleted) throw new NotFoundError("Deal not found.");
+    if (!b || b.isDeleted) throw new NotFoundError("Deal not found.", { code: "DEAL_NOT_FOUND" });
     return b as unknown as MoneyRecord;
   }
 
@@ -316,7 +316,7 @@ export function makeAdminFinanceService(provider: PaymentProvider, settlement: D
     async reconcileDeal(admin: AdminActor, id: string): Promise<PaymentReconciliation> {
       const b = await loadMoney(id);
       const now = clock();
-      if (!b.paymentIntentId) throw new ValidationError("This deal has no payment to reconcile.");
+      if (!b.paymentIntentId) throw new ValidationError("This deal has no payment to reconcile.", { code: "NO_PAYMENT_TO_RECONCILE" });
       let live: PaymentReconciliation["live"] = null;
       let divergences: PaymentReconciliation["divergences"];
       try {
@@ -344,14 +344,14 @@ export function makeAdminFinanceService(provider: PaymentProvider, settlement: D
     async retryPayout(admin: AdminActor, id: string): Promise<RetryPayoutResponse> {
       const booking = await loadBookingForWrite(id);
       assertNotParty(admin, booking);
-      if (booking.status !== "COMPLETED" && booking.status !== "CANCELLED") throw new ValidationError("Only a completed or late-cancelled deal has a payout.");
-      if (booking.payoutStatus !== "FAILED" && booking.payoutStatus !== "PENDING") throw new ValidationError(`Nothing to retry: payout is ${booking.payoutStatus ?? "not scheduled"}.`);
+      if (booking.status !== "COMPLETED" && booking.status !== "CANCELLED") throw new ValidationError("Only a completed or late-cancelled deal has a payout.", { code: "NO_PAYOUT_FOR_STATUS" });
+      if (booking.payoutStatus !== "FAILED" && booking.payoutStatus !== "PENDING") throw new ValidationError(`Nothing to retry: payout is ${booking.payoutStatus ?? "not scheduled"}.`, { code: "PAYOUT_NOT_RETRYABLE" });
       const now = clock();
       let outcome: { payoutStatus: "SENT" | "FAILED"; transferId: string | null; reason: string | null };
       try {
         outcome = await settlement.executePayout(booking, now);
       } catch (err) {
-        if (err instanceof BookingLifecycleError) throw new ValidationError(err.message);
+        if (err instanceof BookingLifecycleError) throw new ValidationError(err.message, { code: err.code });
         throw err;
       }
       await recordAdminAction(prisma, audit(admin, "PAYOUT_RETRIED", id, { outcome: outcome.payoutStatus, reason: outcome.reason, transferId: outcome.transferId }));
@@ -384,7 +384,7 @@ export function makeAdminFinanceService(provider: PaymentProvider, settlement: D
             };
       await withWriteConflictRetry(() => prisma.$transaction(async (tx) => {
         const written = await tx.booking.updateMany({ where: { id, payoutStatus: "REVERSED", ...UNRESOLVED_REVERSAL } as never, data: data as never });
-        if (written.count === 0) throw new ValidationError("This payout is not an open reversal.");
+        if (written.count === 0) throw new ValidationError("This payout is not an open reversal.", { code: "REVERSAL_NOT_OPEN" });
         await recordAdminAction(tx, audit(admin, "PAYOUT_REVERSAL_RESOLVED", id, { outcome: input.outcome, reason: input.reason }));
       }));
       if (input.outcome === "WRITTEN_OFF") return { outcome: "WRITTEN_OFF", payoutStatus: "REVERSED", reason: null };
@@ -446,8 +446,8 @@ export function makeAdminFinanceService(provider: PaymentProvider, settlement: D
 
     /* ── C-PR5b — export CSV par deal, journalisé (5A) ───────── */
     async exportCsv(admin: AdminActor, from: Date, to: Date): Promise<{ csv: string; rows: number; filename: string }> {
-      if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime()) || to.getTime() <= from.getTime()) throw new ValidationError("Invalid period.");
-      if (to.getTime() - from.getTime() > EXPORT_MAX_DAYS * 86_400_000) throw new ValidationError(`The period cannot exceed ${EXPORT_MAX_DAYS} days.`);
+      if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime()) || to.getTime() <= from.getTime()) throw new ValidationError("Invalid period.", { code: "INVALID_PERIOD" });
+      if (to.getTime() - from.getTime() > EXPORT_MAX_DAYS * 86_400_000) throw new ValidationError(`The period cannot exceed ${EXPORT_MAX_DAYS} days.`, { code: "PERIOD_TOO_LONG" });
       const gte = { gte: from };
       const rows = (await prisma.booking.findMany({
         where: { isDeleted: false, OR: [{ capturedAt: gte }, { refundedAt: gte }, { payoutSentAt: gte }, { completedAt: gte }, { closedAt: gte }] } as never,
@@ -466,8 +466,8 @@ export function makeAdminFinanceService(provider: PaymentProvider, settlement: D
       const b = await loadMoney(id);
       assertNotParty(admin, b);
       const bounds = manualRefundBounds(b);
-      if (!bounds.allowed) throw new ValidationError(bounds.reason ?? "This deal cannot be refunded.");
-      if (input.amountCents > bounds.maxRefundableCents) throw new ValidationError(`At most ${bounds.maxRefundableCents} cents can still be refunded on this deal.`);
+      if (!bounds.allowed) throw new ValidationError(bounds.reason ?? "This deal cannot be refunded.", { code: "REFUND_NOT_ALLOWED" });
+      if (input.amountCents > bounds.maxRefundableCents) throw new ValidationError(`At most ${bounds.maxRefundableCents} cents can still be refunded on this deal.`, { code: "REFUND_ABOVE_MAX" });
       const now = clock();
       await withWriteConflictRetry(() => prisma.$transaction(async (tx) => {
         await tx.booking.update({
@@ -490,15 +490,15 @@ export function makeAdminFinanceService(provider: PaymentProvider, settlement: D
       const raw = await loadMoney(id);
       assertNotParty(admin, raw);
       const bounds = manualRefundBounds(raw);
-      if (!bounds.allowed) throw new ValidationError(bounds.reason ?? "This deal cannot be refunded.");
-      if (input.amountCents > bounds.maxRefundableCents) throw new ValidationError(`At most ${bounds.maxRefundableCents} cents can still be refunded on this deal.`);
+      if (!bounds.allowed) throw new ValidationError(bounds.reason ?? "This deal cannot be refunded.", { code: "REFUND_NOT_ALLOWED" });
+      if (input.amountCents > bounds.maxRefundableCents) throw new ValidationError(`At most ${bounds.maxRefundableCents} cents can still be refunded on this deal.`, { code: "REFUND_ABOVE_MAX" });
       const booking: BookingForWrite = toBookingForWrite(raw as unknown as Record<string, unknown>);
       const now = clock();
       let refundId: string | null = null;
       try {
         refundId = (await provider.refund(raw.paymentIntentId!, input.amountCents)).refundId;
       } catch {
-        throw new ValidationError("The refund could not be issued by the payment provider.");
+        throw new ValidationError("The refund could not be issued by the payment provider.", { code: "REFUND_PROVIDER_FAILED" });
       }
       const previous = raw.refundAmountCents ?? 0;
       const total = previous + input.amountCents;

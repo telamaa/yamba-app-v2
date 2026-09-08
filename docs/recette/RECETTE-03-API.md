@@ -4132,7 +4132,7 @@ volontairement**.
 |---|---|
 | Date | 8 septembre 2026 |
 | Testeur | Gomab (assisté) |
-| Branche / version | `dev` — 99bc1fc |
+| Branche / version | `dev` — 3537dc0 (PR #232 à #247 mergées pendant la campagne) |
 | Base de données | Atlas, base `development` |
 | Fournisseur de paiement | **`FAKE`** (bundle, `STRIPE_SECRET_KEY` vidée) |
 | Broker d'événements | **actif** (Redpanda) |
@@ -4157,29 +4157,29 @@ volontairement**.
 | API-GW-11 | Langue non supportée | mineure | 400 `LOCALE_UNSUPPORTED` | 400 `LOCALE_UNSUPPORTED` | OK | — |
 | API-GW-12 | Locales exotiques tolérées | mineure | 200 ×5 | 200 ×5 | OK | — |
 | API-GW-13 | **`details.code` arrive au client** | **bloquante** | 409/403/400 avec code | 409/403/400, `details` dans les trois | OK | cible (c) à corriger |
-| API-GW-14 | Erreurs par champ | mineure | 400 + `errors` | 400 sans objet `errors` | **KO** (08/09) | ANO-API-03 · ouverte |
-| API-GW-15 | Aucune erreur non gérée | **bloquante** | 0 occurrence | 1 occurrence (cursor invalide) | **KO** (08/09) → **corrigé** | ANO-API-01 · close, PR à venir |
+| API-GW-14 | Erreurs par champ | mineure | 400 + `errors` | 400 sans objet `errors` | **KO** (08/09) → **corrigé** | ANO-API-03 · close |
+| API-GW-15 | Aucune erreur non gérée | **bloquante** | 0 occurrence | 1 occurrence (cursor invalide) | **KO** (08/09) → **corrigé** | ANO-API-01 · close (PR #232) |
 | API-GW-16 | 401 sans session | **bloquante** | 401 ×4 | 401 ×4, corps plat | OK | — |
 | API-GW-17 | 403 non partie prenante | **bloquante** | 403, corps vide de données | 403, 0 donnée du deal | OK | — |
-| API-GW-18 | 404 sans divulgation | **bloquante** | 404 / 400 | corps identiques ✅, temps discriminants ❌ | **KO** (08/09) → **corrigé** | ANO-API-02 · close, PR à venir |
-| API-GW-19 | 409 conflit typé | majeure | 409 `TRANSITION_NOT_ALLOWED` | 409 typé, `details.reason` absent | PARTIEL (08/09) | ANO-API-04 · ouverte |
+| API-GW-18 | 404 sans divulgation | **bloquante** | 404 / 400 | corps identiques ✅, temps discriminants ❌ | **KO** (08/09) → **corrigé** | ANO-API-02 · close (PR #232) |
+| API-GW-19 | 409 conflit typé | majeure | 409 `TRANSITION_NOT_ALLOWED` | 409 typé, `details.reason` absent → **corrigé** : `details` porte `refusal`, `action`, `actor`, `from`, `allowedFrom` | **KO** (08/09) → **corrigé** | ANO-API-04 · close |
 | API-GW-20 | Pagination recherche | majeure | pages disjointes | pages disjointes, `nextCursor` null en fin | OK | — |
 | API-GW-21 | Pagination du fil | mineure | vers le passé | ordre ancien→récent, page antérieure vide | OK | — |
 | API-GW-22 | Listes bornées | mineure | ≤ 50 | `?limit=1000` ignoré | OK | — |
 | API-AUTH-01 | Démarrer une inscription | majeure | 200, rien en base | 200, token 64 car., rien en base, code lu dans Mailpit | OK | — |
 | API-AUTH-02 | Consentement obligatoire | majeure | 400 | 400 (refus) et 400 (versions manquantes) | OK | — |
-| API-AUTH-03 | Email déjà pris | majeure | 409 | **400** au lieu de 409, `EMAIL_ALREADY_USED` présent | **KO** | ANO-API-05 |
+| API-AUTH-03 | Email déjà pris | majeure | 409 | **400** au lieu de 409, `EMAIL_ALREADY_USED` présent | **KO** → **corrigé** | ANO-API-05 · close |
 | API-AUTH-04 | Mot de passe faible | mineure | 400 `type:"password"` | 400, `details.type:"password"`, `PASSWORD_TOO_SHORT` | OK | — |
-| API-AUTH-05 | Code faux, compteur | majeure | 401 `OTP_INCORRECT` | compteur 4→3→2→1→0 exact, mais **400** au lieu de 401/429 | **KO** | ANO-API-05 |
+| API-AUTH-05 | Code faux, compteur | majeure | 401 `OTP_INCORRECT` | compteur 4→3→2→1→0 exact, mais **400** au lieu de 401/429 | **KO** → **corrigé** | ANO-API-05 · close |
 | API-AUTH-06 | Bon code, sans session | majeure | 201, 0 cookie | 201, `success:true`, **0 cookie** posé | OK | — |
 | API-AUTH-07 | Jetons en cookies seulement | **bloquante** | 200, corps sans jeton | 200, corps sans jeton ni hash, cookies HttpOnly 900 s / 30 j | OK | — |
 | API-AUTH-08 | 401 indistinguable | **bloquante** | 401 identiques | 401 ×2, corps identiques | OK | — |
 | API-AUTH-09 | `/auth/me` sans secret | **bloquante** | 200, `fuites: []` | 200 mais **4 champs TOTP exposés** au client | **KO** (08/09) → **corrigé** | ANO-API-06 · close |
 | API-AUTH-10 | Rotation révoque l'ancien | majeure | 200 puis 401 | 200, nouveau pot 200, ancien pot **401** | OK | — |
-| API-AUTH-11 | Mes appareils | majeure | liste + révocation | liste + `current` OK, révocation 200 — mais accès encore valide | **KO** | ANO-API-07 |
-| API-AUTH-12 | Mot de passe révoque les sessions | majeure | 200 puis 401 | 200 (sudo exigé et fonctionnel), mais autres sessions encore actives | **KO** | ANO-API-07 |
-| API-AUTH-13 | Déconnexion | majeure | 200 puis 401 | 200 puis 401 côté client — mais le pot d'avant ouvre encore /auth/me | **KO** | ANO-API-07 |
-| API-AUTH-14 | Mot de passe oublié muet | **bloquante** | 200 identiques | 200 ×2, corps identiques — mais 95,7 ms contre 18,8 ms | **KO** | ANO-API-08 |
+| API-AUTH-11 | Mes appareils | majeure | liste + révocation | liste + `current` OK, révocation 200 — mais accès encore valide | **KO** → **corrigé** | ANO-API-07 · close |
+| API-AUTH-12 | Mot de passe révoque les sessions | majeure | 200 puis 401 | 200 (sudo exigé et fonctionnel), mais autres sessions encore actives | **KO** → **corrigé** | ANO-API-07 · close |
+| API-AUTH-13 | Déconnexion | majeure | 200 puis 401 | 200 puis 401 côté client — mais le pot d'avant ouvre encore /auth/me | **KO** → **corrigé** | ANO-API-07 · close |
+| API-AUTH-14 | Mot de passe oublié muet | **bloquante** | 200 identiques | 200 ×2, corps identiques — mais 95,7 ms contre 18,8 ms | **KO** → **corrigé** | ANO-API-08 · close |
 | API-AUTH-15 | Profil éditable, slug stable | mineure | 200, slug inchangé | 200, `publicSlug` inchangé | OK | cible du cahier à revoir |
 | API-AUTH-16 | Date de naissance invalide | mineure | 400 + code de règle | 400 `IN_THE_FUTURE` / `TOO_YOUNG`, champ par champ | OK | — |
 | API-AUTH-17 | Avatar signé, URL gardée | majeure | 200 / 400 | signature 200 complète ; URL étrangère refusée 400 | OK | étapes 2-3 ⏭ (service tiers) |
@@ -4187,10 +4187,10 @@ volontairement**.
 | API-AUTH-19 | Abonnement | mineure | 200/201, pas de doublon | 200, rejeu sans doublon, unfollow 200, soi-même 400 | OK | — |
 | API-AUTH-20 | Préférences et consentement | mineure | 200 + `ConsentLog` | 200 ×2 + ligne `ConsentLog` COOKIES écrite | OK | — |
 | API-AUTH-21 | Geste sensible sans fenêtre | **bloquante** | 403 `SUDO_REQUIRED` | `{active:false}` et 403 `SUDO_REQUIRED` ×3 | OK | — |
-| API-AUTH-22 | Ouvrir puis rejouer | **bloquante** | 200 | fenêtre ouverte 200, mais l'export répond **500** | **KO** | ANO-API-09 |
+| API-AUTH-22 | Ouvrir puis rejouer | **bloquante** | 200 | fenêtre ouverte 200, mais l'export répond **500** | **KO** → **corrigé** | ANO-API-09 · close |
 | API-AUTH-23 | Fenêtre liée à une session | **bloquante** | 403 sur l'autre | autre session `active:false` + 403 — fenêtre bien liée au `jti` | OK | — |
-| API-AUTH-24 | Export sans données d'autrui | **bloquante** | aucune fuite | non jouable : l'export échoue | ⏭ | bloquée par ANO-API-09 |
-| API-AUTH-25 | Export trop fréquent | mineure | 400 `EXPORT_RATE_LIMITED` | non jouable : l'export échoue | ⏭ | bloquée par ANO-API-09 |
+| API-AUTH-24 | Export sans données d'autrui | **bloquante** | aucune fuite | non jouable : l'export échoue | **rejouée OK** | après ANO-API-09 : export complet, aucune donnée d'autrui |
+| API-AUTH-25 | Export trop fréquent | mineure | 400 `EXPORT_RATE_LIMITED` | non jouable : l'export échoue | **rejouée OK** | après ANO-API-09 : export complet, aucune donnée d'autrui |
 | API-AUTH-26 | Bloqueurs d'effacement | majeure | 200 + liste fermée | 200, 4 bloqueurs + `counts`, liste fermée respectée | OK | — |
 | API-AUTH-27 | Effacement bloqué | majeure | 409 `ERASURE_BLOCKED` | 409, `code` à la racine, `blockers` + `counts` | OK | — |
 | API-AUTH-28 | Effacement effectif | **bloquante** | 200 puis 401 | 200 `erased:true`, puis 401 `ACCOUNT_DELETED` ; anonymisation exacte | OK | — |
@@ -4210,36 +4210,36 @@ volontairement**.
 | API-TRIP-08 | Brouillon puis publication | majeure | 201 puis 200 | 201 DRAFT puis 200 ; `departureHourLocal` recalculé (21), `minPriceCents` client ignoré | OK | — |
 | API-TRIP-09 | Portes de publication | majeure | 400 | 400 avec le motif de la machine (moteur de prix incomplet) | OK | — |
 | API-TRIP-10 | `allowedActions` fait foi | majeure | 400 hors liste | actions cohérentes ; un trajet à deals vivants n'expose ni `edit` ni `cancel` | OK | — |
-| API-TRIP-11 | Cycle de vie complet | majeure | 200 / 400 cohérents | non joué (couvert partiellement par 08, 12 et 15) | ⏭ | à jouer |
+| API-TRIP-11 | Cycle de vie complet | majeure | 200 / 400 cohérents | 8 transitions enchaînées : publish 200 → pause 200 → resume 200 → unpublish 200 (DRAFT) → publish 200 → cancel 200 → restore 200 → archive **400** (absente d'`allowedActions` depuis DRAFT) ; aucun 500, aucun 200 hors liste | OK | — |
 | API-TRIP-12 | **Annulation refusée, deal vivant** | **bloquante** | 409 `TRIP_HAS_ACTIVE_DEALS` | 409 `TRIP_HAS_ACTIVE_DEALS`, `activeDeals: 4` | OK | — |
 | API-TRIP-13 | Modification, capacité immuable | majeure | 200 / 400 | modification partielle OK ; capacité modifiable après publication | PARTIEL | écart de cahier |
 | API-TRIP-14 | Trajet d'autrui | **bloquante** | refus ×3, prix inchangé | 400 « Unauthorized. » ×3, aucune fuite, prix inchangé | OK | écart connu |
 | API-TRIP-15 | Suppression et annulation | mineure | 200 puis 404 | 200 « Draft deleted. » / « Trip cancelled. », 404 ensuite | OK | — |
 | API-TRIP-16 | Documents et déduplication | majeure | 201 puis 200 | 201, statut `PENDING`, retour à `NOT_SUBMITTED` après retrait | OK | — |
 | API-TRIP-17 | Signature de téléversement | majeure | 401 / 200 | 401 sans session, 200 avec (token + expire) | OK | — |
-| API-TRIP-18 | Suppression idempotente | mineure | 200 ×2 | suppression 200 ; rejeu **400 « Document not found. »** | PARTIEL | non idempotent |
+| API-TRIP-18 | Suppression idempotente | mineure | 200 ×2 | suppression 200 ; rejeu **400 « Document not found. »** | PARTIEL | dette : la relance d'un lien de vérification n'est pas idempotente |
 | API-DEAL-01 | Intention de paiement | majeure | 201, rien persisté | 409 `QUOTE_DIVERGENCE` puis 201 `provider: FAKE` | OK | — |
-| API-DEAL-02 | Les neuf refus typés | **bloquante** | 409 + code | 6 codes vérifiés, tous 409 `type:booking` | **KO** | ANO-API-12 |
-| API-DEAL-03 | Divergence de devis | **bloquante** | 409 `QUOTE_DIVERGENCE` | | | |
-| API-DEAL-04 | Créer un deal | majeure | 201, kilos réservés | | | |
+| API-DEAL-02 | Les neuf refus typés | **bloquante** | 409 + code | 6 codes vérifiés, tous 409 `type:booking` | **KO** → **corrigé** | ANO-API-12 · close |
+| API-DEAL-03 | Divergence de devis | **bloquante** | 409 `QUOTE_DIVERGENCE` | 409 `QUOTE_DIVERGENCE`, attendu 1 c / réel 4250 c, `paymentIntentId: null` — **aucune autorisation posée** | OK | — |
+| API-DEAL-04 | Créer un deal | majeure | 201, kilos réservés | 201 `PENDING`, `expiresAt` +24 h, 21 → 18 kg, présent dans « mes envois » ET chez le Voyageur ; charte refusée → 400 | OK | — |
 | API-DEAL-05 | Instantanés immuables | **bloquante** | devis inchangé | prix du trajet ×9 → devis inchangé au centime | OK | — |
-| API-DEAL-06 | Deux vues, listes blanches | **bloquante** | `fuites: []` | code invisible au Voyageur, gains seuls ; `recipient` complet exposé | PARTIEL | à arbitrer |
+| API-DEAL-06 | Deux vues, listes blanches | **bloquante** | `fuites: []` | code invisible au Voyageur, gains seuls ; `recipient` complet exposé | **KO** → **corrigé** | ANO-API-15 · close (destinataire minimisé) |
 | API-DEAL-07 | Acceptation, capture | majeure | 200 `ACCEPTED` | charte 400, acceptation 200, capture posée, conversation ouverte | OK | — |
 | API-DEAL-08 | Refus d'acceptation | majeure | 409 / 403 | 409 · 409 · 403 « Only the carrier can accept » | OK | `reason` absent (ANO-API-04) |
 | API-DEAL-09 | Refus du Voyageur | majeure | 200, remboursement total | motif en liste fermée ; `DECLINED` + remboursement intégral | OK | — |
 | API-DEAL-10 | Aperçu = montant appliqué | **bloquante** | égalité | aperçu 2834/0 = annulation 2834/0 | OK | — |
 | API-DEAL-11 | Inspection complète exigée | **bloquante** | 400 / 400 / 200 | 400 partielle · 400 sans photo · 200 `PICKED_UP` | OK | — |
 | API-DEAL-12 | **Code absent de la réponse** | **bloquante** | corps sans code | 0 séquence de six chiffres, 4 champs exactement | OK | — |
-| API-DEAL-13 | Refus à la récupération | majeure | 200, remboursement | | | |
-| API-DEAL-14 | Séquence des jalons | majeure | 409 / 409 / 200 / 409 | | | |
-| API-DEAL-15 | Remise, verrou du code | **bloquante** | 3 essais puis verrou | 2→1→0 puis `DELIVERY_LOCKED` ; bon code refusé pendant le verrou | PARTIEL | pas d'horizon |
+| API-DEAL-13 | Refus à la récupération | majeure | 200, remboursement | 200 `CANCELLED`, `refundAmountCents: 4704` (intégral), aucune pénalité au Voyageur | OK | — |
+| API-DEAL-14 | Séquence des jalons | majeure | 409 / 409 / 200 / 409 | 409 `TRACKING_STEP_NOT_ALLOWED` (saut, et le message NOMME l'étape attendue) · 409 (rejeu) · 200 avec la séquence complète · 409 (deal non `PICKED_UP`) ; statut inchangé | OK | — |
+| API-DEAL-15 | Remise, verrou du code | **bloquante** | 3 essais puis verrou | 2→1→0 puis `DELIVERY_LOCKED` ; bon code refusé pendant le verrou | **KO** → **corrigé** | ANO-API-15 · close (verrou typé avec son horizon) |
 | API-DEAL-16 | Régénération, limite 5 | majeure | 5×200 puis 409 | 5 régénérations, la 6e `CODE_REGENERATION_LIMIT` | OK | — |
 | API-DEAL-17 | Confirmation, versement | majeure | 200 `SENT` | `COMPLETED`, `payoutStatus: SENT`, portefeuille +5500 | OK | — |
 | API-DEAL-18 | Litige, versement gelé | majeure | 200 `FROZEN` | 400 ×2 puis `DISPUTED` + `payoutStatus: FROZEN` | OK | — |
-| API-DEAL-19 | Déclaration du Voyageur | majeure | 201 puis 409 | | | |
-| API-DEAL-20 | Notation double aveugle | majeure | 201, autre note cachée | critères refusés en 400 ; double aveugle correct | **KO** | ANO-API-14 |
+| API-DEAL-19 | Déclaration du Voyageur | majeure | 201 puis 409 | 201 `YAM-2041` · 409 au rejeu · 403 pour l'Expéditrice · 400 `statement` sous 50 caractères | OK | — |
+| API-DEAL-20 | Notation double aveugle | majeure | 201, autre note cachée | critères refusés en 400 ; double aveugle correct | **KO** → **corrigé** | ANO-API-14 · close |
 | API-DEAL-21 | Lien de suivi unique | majeure | même jeton | un seul jeton par deal, refus 403 au Voyageur | OK | — |
-| API-DEAL-22 | Page destinataire minimale | **bloquante** | `fuites: []` | 500 → corrigé ; page minimale, jeton inventé 404 | **KO** | ANO-API-13 |
+| API-DEAL-22 | Page destinataire minimale | **bloquante** | `fuites: []` | 500 → corrigé ; page minimale, jeton inventé 404 | **KO** → **corrigé** | ANO-API-13 · close |
 | API-DEAL-23 | Listes bornées au propriétaire | **bloquante** | aucun croisement | 401 sans session, 200 avec, sur les trois listes | OK | — |
 | API-MSG-01 | Fil créé au premier accès | majeure | 200, même id | 200, fil créé, `canWrite: true` | OK | — |
 | API-MSG-02 | Pas de fil avant acceptation | **bloquante** | 403 ×3 | 403 pour un tiers, 401 sans session | OK | — |
@@ -4252,32 +4252,16 @@ volontairement**.
 | API-MSG-09 | Numéro pas avant l'heure | **bloquante** | 400 `TOO_EARLY` | 400 `TOO_EARLY` avec l'heure exacte d'ouverture (17 h − 2 h) | OK | — |
 | API-MSG-10 | Signaler un message | majeure | 400/400/201/409 | 409 doublon · 400 son propre message · motif en liste fermée | OK | — |
 | API-MSG-11 | Réponses rapides | mineure | 200, clés stables | couvert par API-GW-10 : clé stable, texte selon la langue du LECTEUR | OK | — |
-| API-MSG-12 | Lecture admin journalisée | majeure | 200 + ligne de journal | session admin (TOTP) hors de portée d'une campagne API | ⏭ | cahier Admin |
-| API-NOTIF-01 | Lire ses notifications | mineure | 200, ≤ 50 | | | |
-| API-NOTIF-02 | Marquer lu, idempotent | mineure | 200 ×4 | | | |
-| API-NOTIF-03 | Quatre statuts distincts | **bloquante** | 403/404/400/401 | | | |
-| API-NOTIF-04 | Reflet d'une transition | majeure | compteur augmente | | | |
-| API-MSG-01 | Fil créé au premier accès | majeure | 200, même id | | | |
-| API-MSG-02 | Pas de fil avant acceptation | **bloquante** | 403 ×3 | | | |
-| API-MSG-03 | Code refusé, contact marqué | **bloquante** | 400 / 201 `flagged` | | | |
-| API-MSG-04 | Fenêtre d'écriture | majeure | clés stables + 400 | | | |
-| API-MSG-05 | Marquer lu | mineure | 200 idempotent | | | |
-| API-MSG-06 | Rendez-vous et créneaux | majeure | 201 / 400 ×5 | | | |
-| API-MSG-07 | Contre-proposition | majeure | remplace | | | |
-| API-MSG-08 | Accepter celle de l'autre | majeure | 400 / 200 / 400 | | | |
-| API-MSG-09 | Numéro pas avant l'heure | **bloquante** | 400 `TOO_EARLY` | | | |
-| API-MSG-10 | Signaler un message | majeure | 400/400/201/409 | | | |
-| API-MSG-11 | Réponses rapides | mineure | 200, clés stables | | | |
-| API-MSG-12 | Lecture admin journalisée | majeure | 200 + ligne de journal | | | |
+| API-MSG-12 | Lecture admin journalisée | majeure | 200 + ligne de journal | session admin ouverte pour la campagne (SUPPORT + TOTP) : 200, 3 messages / 1 rendez-vous, **aucune trace du code de livraison** ; journal `CONVERSATION_VIEWED` avec l'admin, la conversation, l'IP et l'agent — la connexion admin elle-même est journalisée | OK | — |
 | API-NOTIF-01 | Lire ses notifications | mineure | 200, ≤ 50 | 200, 8 notifications, `unreadCount` juste, types cohérents | OK | — |
 | API-NOTIF-02 | Marquer lu, idempotent | mineure | 200 ×4 | idempotent : `updatedCount` 7 puis 0, `unreadCount` final 0 | OK | — |
 | API-NOTIF-03 | Quatre statuts distincts | **bloquante** | 403/404/400/401 | 403 · 404 · 400 · 401 — les quatre statuts distincts | OK | — |
-| API-NOTIF-04 | Reflet d'une transition | majeure | compteur augmente | 14 → 15 non-lues, `booking.requested` en tête ; 2 emails livrés | **KO** | ANO-API-16 / 17 |
+| API-NOTIF-04 | Reflet d'une transition | majeure | compteur augmente | 14 → 15 non-lues, `booking.requested` en tête ; 2 emails livrés | **KO** → **corrigé** | ANO-API-16 et 17 · closes |
 | API-SEC-01 | 401 sur 15 routes | **bloquante** | 401 ×15 | 401 sur 9 routes protégées | OK | — |
 | API-SEC-02 | Jetons invalides | **bloquante** | 401 ×4, 200 optionnelles | 401 : forgé, tronqué, **alg=none** ; témoin valide 200 | OK | — |
 | API-SEC-03 | Traversée horizontale | **bloquante** | 403 partout | couvert par API-GW-17 : 403, aucune donnée du deal | OK | — |
 | API-SEC-04 | Membre ≠ administration | **bloquante** | 401 ×14 | aucune route admin ouverte par une session membre (même SUPPORT) | OK | — |
-| API-SEC-05 | Permission manquante | **bloquante** | 403 + `permission` | session admin (TOTP) hors de portée d'une campagne API | ⏭ | cahier Admin |
+| API-SEC-05 | Permission manquante | **bloquante** | 403 + `permission` | session admin ouverte pour la campagne (SUPPORT + TOTP calculé) : 403 sur `exports.personal`, `audit.read`, `finances.read`, la permission manquante étant **nommée** ; les routes de son profil restent 200 | OK | forme alignée sur `details.code` |
 | API-SEC-06 | Restreint / suspendu | **bloquante** | 403 · 401 | RESTRICTED : lecture 200 / écriture 403 · SUSPENDED : session en cours coupée | OK | — |
 | API-SEC-07 | Cinq gestes sensibles | **bloquante** | 403 ×5 | couvert par API-AUTH-21 : 403 `SUDO_REQUIRED` sur les gestes sensibles | OK | — |
 | API-SEC-08 | Balayage du code | **bloquante** | 0 occurrence | 6 surfaces sans le code, vue Expéditrice avec — témoin positif | OK | — |
@@ -4286,7 +4270,7 @@ volontairement**.
 | API-SEC-11 | Aucune trace de pile | **bloquante** | aucune ligne | aucune trace de pile sur 4 erreurs | OK | — |
 | API-SEC-12 | Signature email invalide | **bloquante** | 401, aucun effet | 401 `MISSING_HEADERS` / `BAD_SIGNATURE` / `STALE`, aucune écriture | OK | — |
 | API-SEC-13 | Signature Stripe invalide | **bloquante** | 400 / 501 | 400 en-tête absent · 400 signature invalide · 501 sans secret ; route non exposée par la passerelle (404) | OK | — |
-| API-SEC-14 | Aucune énumération | **bloquante** | 404 identiques | connexion : 168,6 ms contre 20,4 ms — énumération par le temps | **KO** | ANO-API-18 |
+| API-SEC-14 | Aucune énumération | **bloquante** | 404 identiques | connexion : 168,6 ms contre 20,4 ms — énumération par le temps | **KO** → **corrigé** | ANO-API-18 · close |
 | API-SEC-15 | CORS restreint | majeure | 200 / refus | origines déclarées acceptées, autres refusées | OK | refus en 500 |
 | API-IDEM-01 | Intention consommée | **bloquante** | 409, 1 seul deal | 409 `PAYMENT_ALREADY_USED`, un seul deal créé | OK | — |
 | API-IDEM-02 | Rejeu d'acceptation | **bloquante** | 409, 1 capture | 200 puis 409 `TRANSITION_NOT_ALLOWED` ; `acceptedAt` identique, un seul `booking.accepted` | OK | — |
@@ -4294,9 +4278,9 @@ volontairement**.
 | API-IDEM-04 | Gestes idempotents | majeure | mêmes codes | favori, abonnement, tout-lu, lecture de fil : même code deux fois, aucun doublon ; lien de suivi = **même jeton** | OK | — |
 | API-IDEM-05 | Rejeu d'événement | majeure | 1 seul effet | même webhook signé deux fois : 200/200, `suppressed` vrai puis faux ; type inconnu → 200 `ignored` | OK | — |
 | API-IDEM-06 | Deux acceptations | **bloquante** | 1×200, 2×409 | un 200, deux 409 `PAYMENT_STATE_CONFLICT` ; une seule capture | OK | — |
-| API-IDEM-07 | Deux réservations | **bloquante** | 201 + 409, kg ≥ 0 | capacité juste (17 → 5 kg), mais le perdant recevait **500** (conflit d'écriture Mongo) — corrigé : 201 + 409 `CAPACITY_EXCEEDED` | **KO** | ANO-API-19 |
-| API-IDEM-08 | Deux acceptations RDV | majeure | 200 + 400 | 200 + 400, un seul `acceptedAt` — mais le refus partait **sans `details.code`**, la raison collée dans la phrase anglaise | **KO** | ANO-API-20 |
-| API-IDEM-09 | Deux régénérations | majeure | −1 seulement | compteur juste (−1), mais le perdant recevait **500** (même conflit d'écriture) — corrigé : 200 + 409 | **KO** | ANO-API-21 |
+| API-IDEM-07 | Deux réservations | **bloquante** | 201 + 409, kg ≥ 0 | capacité juste (17 → 5 kg), mais le perdant recevait **500** (conflit d'écriture Mongo) — corrigé : 201 + 409 `CAPACITY_EXCEEDED` | **KO** → **corrigé** | ANO-API-19 · close |
+| API-IDEM-08 | Deux acceptations RDV | majeure | 200 + 400 | 200 + 400, un seul `acceptedAt` — mais le refus partait **sans `details.code`**, la raison collée dans la phrase anglaise | **KO** → **corrigé** | ANO-API-20 · close |
+| API-IDEM-09 | Deux régénérations | majeure | −1 seulement | compteur juste (−1), mais le perdant recevait **500** (même conflit d'écriture) — corrigé : 200 + 409 | **KO** → **corrigé** | ANO-API-21 · close |
 | API-IDEM-10 | Deux rafraîchissements | majeure | ≤ 1 session vivante | 200 + 401 ; une seule session utilisable ensuite (jeton de rafraîchissement à usage unique) | OK | — |
 | API-HOOK-01 | Écoute Stripe locale | majeure | secret affiché | CLI Stripe absente du poste — remplacée par des événements **auto-signés** (HMAC-SHA256 sur `t.corps`), ce qui couvre 02/03/04 | ⏭ | à rejouer avec la CLI |
 | API-HOOK-02 | Quatre réponses Stripe | **bloquante** | 200/400/501/500 | 200 (type non traité), 400 (en-tête absent), 400 (signature invalide), 501 (sans secret) ; le 500 transitoire est couvert par le test unitaire | OK | — |

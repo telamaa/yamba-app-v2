@@ -65,7 +65,7 @@ export function makeDealTransportService(provider: PaymentProvider, clock: () =>
   ): { to: BookingStatus } {
     const check = canPerform(machineView(booking), action, actor, { now });
     if (!check.allowed) {
-      throw new BookingLifecycleError("TRANSITION_NOT_ALLOWED", check.reason);
+      throw new BookingLifecycleError("TRANSITION_NOT_ALLOWED", check.reason, check.details);
     }
     return { to: check.to };
   }
@@ -73,7 +73,7 @@ export function makeDealTransportService(provider: PaymentProvider, clock: () =>
   function assertCarrier(booking: BookingForWrite, user: RequestingUser, verb: string): void {
     if (booking.carrierId !== user.id) {
       // 403 et non 404 : le deal existe, l'appelant n'est pas le Voyageur.
-      throw new ForbiddenError(`Only the carrier can ${verb} this deal.`);
+      throw new ForbiddenError(`Only the carrier can ${verb} this deal.`, { code: "CARRIER_ONLY" });
     }
   }
 
@@ -225,7 +225,7 @@ export function makeDealTransportService(provider: PaymentProvider, clock: () =>
       const now = clock();
       const booking = await loadBookingForWrite(dealId);
       if (booking.shipperId !== user.id) {
-        throw new ForbiddenError("Only the shipper can regenerate the delivery code.");
+        throw new ForbiddenError("Only the shipper can regenerate the delivery code.", { code: "SHIPPER_ONLY" });
       }
       const check = canRegenerateCode(machineView(booking));
       if (!check.allowed) {

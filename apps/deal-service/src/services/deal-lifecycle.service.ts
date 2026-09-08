@@ -95,7 +95,7 @@ export function makeDealLifecycleService(
       { now }
     );
     if (!check.allowed) {
-      throw new BookingLifecycleError("TRANSITION_NOT_ALLOWED", check.reason);
+      throw new BookingLifecycleError("TRANSITION_NOT_ALLOWED", check.reason, check.details);
     }
     return { to: check.to, effects: check.effects };
   }
@@ -131,7 +131,7 @@ export function makeDealLifecycleService(
       const booking = await loadBooking(dealId);
       if (booking.carrierId !== user.id) {
         // 403 et non 404 : le deal existe, l'appelant n'est pas le Voyageur.
-        throw new ForbiddenError("Only the carrier can accept this deal.");
+        throw new ForbiddenError("Only the carrier can accept this deal.", { code: "CARRIER_ONLY" });
       }
       const { to } = assertTransition(booking, "accept", "CARRIER", now);
 
@@ -213,7 +213,7 @@ export function makeDealLifecycleService(
       const now = clock();
       const booking = await loadBooking(dealId);
       if (booking.carrierId !== user.id) {
-        throw new ForbiddenError("Only the carrier can decline this deal.");
+        throw new ForbiddenError("Only the carrier can decline this deal.", { code: "CARRIER_ONLY" });
       }
       const { to } = assertTransition(booking, "decline", "CARRIER", now);
 
@@ -255,7 +255,7 @@ export function makeDealLifecycleService(
       const now = clock();
       const booking = await loadBooking(dealId);
       if (booking.shipperId !== user.id) {
-        throw new ForbiddenError("Only the shipper can cancel this deal.");
+        throw new ForbiddenError("Only the shipper can cancel this deal.", { code: "SHIPPER_ONLY" });
       }
       const { to, effects } = assertTransition(booking, "cancel", "SHIPPER", now);
       const wasAccepted = effects.includes("REFUND_PER_CANCELLATION_POLICY");

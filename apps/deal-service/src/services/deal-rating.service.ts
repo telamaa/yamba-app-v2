@@ -75,7 +75,7 @@ const iso = (d: Date | null | undefined) => (d ? new Date(d).toISOString() : nul
 export function makeDealRatingService(clock: () => Date = () => new Date(), logger: RatingLogger = silent) {
   async function loadRatingBooking(dealId: string): Promise<RatingBooking> {
     const raw = await prisma.booking.findUnique({ where: { id: dealId }, select: RATING_SELECT });
-    if (!raw || (raw as { isDeleted?: boolean }).isDeleted) throw new NotFoundError("Deal not found.");
+    if (!raw || (raw as { isDeleted?: boolean }).isDeleted) throw new NotFoundError("Deal not found.", { code: "DEAL_NOT_FOUND" });
     return toBookingForWrite(raw as unknown as Record<string, unknown>) as RatingBooking;
   }
 
@@ -103,7 +103,7 @@ export function makeDealRatingService(clock: () => Date = () => new Date(), logg
       const now = clock();
       const booking = await loadRatingBooking(dealId);
       const viewerRole = roleOf(booking, user.id);
-      if (!viewerRole) throw new ForbiddenError("You are not a party to this deal.");
+      if (!viewerRole) throw new ForbiddenError("You are not a party to this deal.", { code: "NOT_A_PARTY" });
       const ratedRole: Role = viewerRole === "SHIPPER" ? "CARRIER" : "SHIPPER";
       const personId = ratedRole === "CARRIER" ? booking.carrierId : booking.shipperId;
       const [person, reviews] = await Promise.all([
@@ -148,7 +148,7 @@ export function makeDealRatingService(clock: () => Date = () => new Date(), logg
       const now = clock();
       const booking = await loadRatingBooking(dealId);
       const viewerRole = roleOf(booking, user.id);
-      if (!viewerRole) throw new ForbiddenError("You are not a party to this deal.");
+      if (!viewerRole) throw new ForbiddenError("You are not a party to this deal.", { code: "NOT_A_PARTY" });
       const check = canRate(machineView(booking), viewerRole, now);
       if (!check.allowed) throw new BookingLifecycleError("TRANSITION_NOT_ALLOWED", check.reason);
 

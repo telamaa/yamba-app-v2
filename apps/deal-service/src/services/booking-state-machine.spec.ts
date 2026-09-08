@@ -477,7 +477,9 @@ describe("S8 — booking soft-deleted", () => {
   const dead = makeBooking({ isDeleted: true });
   it("canPerform refuse tout avec 'Booking not found.'", () => {
     const check = canPerform(dead, "accept", "CARRIER", ctx);
-    expect(check).toEqual({ allowed: false, reason: "Booking not found." });
+    expect(check).toMatchObject({ allowed: false, reason: "Booking not found." });
+    // ANO-API-04 — le refus porte désormais son motif structuré, pas seulement une phrase.
+    expect(check).toMatchObject({ details: { refusal: "DELETED", action: "accept", actor: "CARRIER", from: null } });
   });
   it("canRegenerateCode refuse", () => {
     expect(canRegenerateCode({ ...dead, status: "PICKED_UP" }).allowed).toBe(false);
