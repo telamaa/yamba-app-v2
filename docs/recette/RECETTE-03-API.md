@@ -4217,7 +4217,7 @@ volontairement**.
 | API-TRIP-15 | Suppression et annulation | mineure | 200 puis 404 | 200 « Draft deleted. » / « Trip cancelled. », 404 ensuite | OK | — |
 | API-TRIP-16 | Documents et déduplication | majeure | 201 puis 200 | 201, statut `PENDING`, retour à `NOT_SUBMITTED` après retrait | OK | — |
 | API-TRIP-17 | Signature de téléversement | majeure | 401 / 200 | 401 sans session, 200 avec (token + expire) | OK | — |
-| API-TRIP-18 | Suppression idempotente | mineure | 200 ×2 | suppression 200 ; rejeu **400 « Document not found. »** | PARTIEL | dette : la relance d'un lien de vérification n'est pas idempotente |
+| API-TRIP-18 | Suppression idempotente | mineure | 200 ×2 | suppression 200 ; rejeu **400 « Document not found. »** → **corrigé** : 200 « Document was already removed. » aux rejeux, base supprimée avant le fichier | **KO** → **corrigé** | dette D-3 · soldée |
 | API-DEAL-01 | Intention de paiement | majeure | 201, rien persisté | 409 `QUOTE_DIVERGENCE` puis 201 `provider: FAKE` | OK | — |
 | API-DEAL-02 | Les neuf refus typés | **bloquante** | 409 + code | 6 codes vérifiés, tous 409 `type:booking` | **KO** → **corrigé** | ANO-API-12 · close |
 | API-DEAL-03 | Divergence de devis | **bloquante** | 409 `QUOTE_DIVERGENCE` | 409 `QUOTE_DIVERGENCE`, attendu 1 c / réel 4250 c, `paymentIntentId: null` — **aucune autorisation posée** | OK | — |

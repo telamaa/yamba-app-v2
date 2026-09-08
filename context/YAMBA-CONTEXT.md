@@ -456,6 +456,15 @@ Ordre de demarrage : auth -> trip -> gateway.
   filtres remis en EGALITE SIMPLE. Limite decouverte : `isSet` n'existe que sur les champs
   OPTIONNELS — sur un champ requis a defaut, « absent » n'est pas exprimable en requete, c'est
   un defaut de donnees. Plateforme 941 tests.
+- 09/09 : **dette D-3 soldee** — `DELETE /trips/{id}/documents/{documentId}` rendait 400
+  « Document not found. » au rejeu ; elle rend 200 « deja supprime », comme la route voisine
+  des fichiers. Un document d'un AUTRE trajet donne la meme reponse : pas d'enumeration
+  d'identifiants. L'ordre des effets est inverse (base d'abord, fichier ensuite) : au pire un
+  fichier orphelin, jamais une ligne qui pointe vers un fichier disparu. Corriges dans la
+  meme passe, des statuts que D-4 avait laisses : 16 gardes `!req.user` en 400 → **401**, et
+  3 refus de propriete en 400 `UNAUTHENTICATED` → **403 NOT_OWNER**. Garde-fou
+  `idempotent-delete.spec.ts`. Plateforme **946 tests**. **Journal de dette : il ne reste que
+  D-1**, l'arbitrage produit `x-locale` contre `preferredLocale` — un choix, pas un defaut.
 - 04/09 : C-PR6b feat/c6b-admin-alerts (D59 3A / 4A, A129–A131) — neuf regles de seuil
   (evaluateAlerts pur, instantane de dix compteurs), GET /admin/alerts sans etat (accueil
   admin), cron horaire avec dedoublonnage Redis SET NX (un email par regle et par jour, Redis

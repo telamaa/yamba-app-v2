@@ -570,9 +570,20 @@ export const removeTripDocument = async (
     if (trip.userId !== userId) return next(new ForbiddenError("You do not own this trip.", { code: "NOT_TRIP_OWNER" }));
 
     const doc = await prisma.tripDocument.findUnique({ where: { id: documentId } });
+    // Dette D-3 (recette API 08/09/2026, fiche API-TRIP-18) — une suppression est IDEMPOTENTE :
+    // rejouée, elle répond 200 « déjà supprimé » au lieu d'un 400. Le second clic d'un Voyageur,
+    // ou un rejeu réseau, ne doit pas ressembler à une erreur de saisie. C'est déjà la convention
+    // de la route voisine (`DELETE /uploads/imagekit/:fileId` → « File was already deleted. »).
+    // Un document appartenant à un AUTRE trajet est traité comme absent : l'appelant ne peut pas
+    // distinguer « n'a jamais existé » de « déjà supprimé », et rien n'est touché.
     if (!doc || doc.tripId !== id) {
-      return next(new ValidationError("Document not found.", { code: "DOCUMENT_NOT_FOUND" }));
+      return res.status(200).json({ success: true, message: "Document was already removed." });
     }
+
+    // La base d'abord : elle est la source de vérité. Si l'appel à ImageKit échoue, il reste un
+    // fichier orphelin chez le fournisseur (sans conséquence) plutôt qu'une ligne qui pointe vers
+    // un fichier disparu — l'inverse de l'ordre précédent.
+    await prisma.tripDocument.delete({ where: { id: documentId } });
 
     if (doc.fileId) {
       try {
@@ -581,8 +592,6 @@ export const removeTripDocument = async (
         console.warn(`[ImageKit] Failed to delete file ${doc.fileId}:`, err?.message);
       }
     }
-
-    await prisma.tripDocument.delete({ where: { id: documentId } });
 
     const remainingTickets = trip.documents.filter(
       (d) => d.id !== documentId && d.type === "TICKET_PROOF"

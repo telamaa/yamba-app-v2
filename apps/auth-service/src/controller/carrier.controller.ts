@@ -1,7 +1,7 @@
 import type { Response, NextFunction } from "express";
 import prisma from "@packages/libs/prisma";
 import { requireSudo } from "../utils/sudo";
-import { ConflictError, ValidationError } from "@packages/error-handler";
+import { AuthError, ConflictError, ValidationError } from "@packages/error-handler";
 import { AuthenticatedRequest } from "@packages/middleware/isAuthenticated";
 import { Role } from "@prisma/client";
 import Stripe from "stripe";
@@ -60,7 +60,7 @@ export const saveCarrierProfile = async (
 ) => {
   try {
     if (!req.user) {
-      return next(new ValidationError("Unauthorized", { code: "UNAUTHENTICATED" }));
+      return next(new AuthError("Unauthorized", { code: "UNAUTHENTICATED" }));
     }
 
     const { name, bio, address, phoneE164 } = req.body as {
@@ -183,7 +183,7 @@ export const createStripeConnectLink = async (
 ) => {
   try {
     if (!req.user) {
-      return next(new ValidationError("Unauthorized", { code: "UNAUTHENTICATED" }));
+      return next(new AuthError("Unauthorized", { code: "UNAUTHENTICATED" }));
     }
 
     const userId = req.user.id;
@@ -330,7 +330,7 @@ export const checkStripeStatus = async (
 ) => {
   try {
     if (!req.user) {
-      return next(new ValidationError("Unauthorized", { code: "UNAUTHENTICATED" }));
+      return next(new AuthError("Unauthorized", { code: "UNAUTHENTICATED" }));
     }
 
     const userId = req.user.id;
@@ -401,7 +401,7 @@ export const completeCarrierOnboarding = async (
 ) => {
   try {
     if (!req.user) {
-      return next(new ValidationError("Unauthorized", { code: "UNAUTHENTICATED" }));
+      return next(new AuthError("Unauthorized", { code: "UNAUTHENTICATED" }));
     }
 
     const userId = req.user.id;
@@ -453,7 +453,7 @@ export const createStripeDashboardLink = async (
 ) => {
   try {
     if (!req.user) {
-      return next(new ValidationError("Unauthorized", { code: "UNAUTHENTICATED" }));
+      return next(new AuthError("Unauthorized", { code: "UNAUTHENTICATED" }));
     }
     await requireSudo(req); // D65 1A — l'IBAN vit chez Stripe : geste sensible (SES-03)
     const carrierPage = await prisma.carrierPage.findUnique({
