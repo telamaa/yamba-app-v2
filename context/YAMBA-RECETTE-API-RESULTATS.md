@@ -230,6 +230,8 @@ L'historique est conservé : un KO reste écrit KO, sa correction s'ajoute en de
 | ANO-API-20 | API-IDEM-08 | majeure | 08/09/2026 | **close** | tout refus de message-service porte un `details.code` + garde-fou lisant les sources |
 | ANO-API-21 | API-IDEM-09 | majeure | 08/09/2026 | **close** | protection P2034 remontée au writer central `applyBookingTransition` |
 
+*Chapitre 8 — aucune anomalie.*
+
 **Vingt anomalies sur vingt et une sont closes**, à la fin du chapitre 7. Les huit bloquantes
 (`ANO-API-01`, `02`, `06`, `08`, `09`, `13`, `16`, `18`, `19`) sont **toutes fermées et
 contre-éprouvées** : le critère de sortie n° 1 du §9.3 (« zéro anomalie bloquante ouverte ») est
@@ -1296,3 +1298,74 @@ protection une fois pour toutes. Le même raisonnement avait déjà servi pour A
 C'est aussi ce qui justifie les deux garde-fous de ce chapitre : `write-conflict-retry.spec.ts` et
 `refusal-codes.spec.ts` ne testent pas un comportement, ils testent une **règle du code** — et une
 règle tenue par un test ne se redéfait pas au prochain ajout.
+
+---
+
+## Chapitre 8 — Webhooks (7 fiches sur 8, la huitième remplacée)
+
+Deux flux entrants, deux mécanismes de signature, deux chemins d'accès. Ce sont les **seuls
+points d'entrée que la plateforme expose au monde extérieur** sans session : leur seule défense est
+la signature.
+
+| Fiche | Ce qui est éprouvé | Résultat | Pourquoi | Recommandation |
+|---|---|---|---|---|
+| API-HOOK-01 | Écoute Stripe locale | **⏭** | la CLI Stripe n'est pas installée sur le poste | remplacée par des événements auto-signés — à rejouer avec la CLI avant la production |
+| API-HOOK-02 | Les quatre réponses Stripe | **OK** | 200 (type non traité) · 400 (en-tête absent) · 400 (signature invalide) · 501 (sans secret) | — |
+| API-HOOK-03 | Les événements traités | **OK** | annulation par autorisation morte, accusé de capacité, drapeaux du Voyageur suivis dans les deux sens | — |
+| API-HOOK-04 | Rejeu Stripe | **OK** | 200/200 et **un seul** `booking.cancelled` | — |
+| API-HOOK-05 | Les trois réponses email | **OK** | 503 sans secret, 401 signature absente/fausse, 200 valide | — |
+| API-HOOK-06 | Événement email signé | **OK** | la trace réelle passe SENT → DELIVERED | — |
+| API-HOOK-07 | Rebond dur → suppression | **OK** | suppression posée, **et plus aucun email ne part** vers cette adresse | — |
+| API-HOOK-08 | Type inconnu / rejeu | **OK** | 200 `ignored` ; rejeu sans second effet | — |
+
+**Aucune anomalie.** C'est le premier chapitre de la campagne qui se termine sans écart, et ce
+n'est pas un hasard : les deux webhooks reposent sur des **règles pures déjà testées**
+(`verifySvixSignature` sur vecteurs, `interpretEmailEvent` type par type, `constructStripeWebhookEvent`
+côté Stripe), et le contrôleur au-dessus se contente d'orchestrer.
+
+### La preuve qui compte le plus, et comment elle a été obtenue
+
+La fiche API-HOOK-07 ne se contente pas de vérifier que le rebond dur pose `HARD_BOUNCE` : elle
+demande la **conséquence** — plus aucun email ne doit partir vers l'adresse supprimée. Le protocole :
+
+1. créer un deal → deux traces email écrites (`booking-requested-carrier` au Voyageur,
+   `payment-authorized-shipper` à l'Expéditrice) ;
+2. envoyer un rebond dur signé sur l'adresse du Voyageur → `suppressed: true` ;
+3. créer un **second** deal identique.
+
+Résultat : pour le second deal, l'événement `booking.requested` produit **zéro** trace email, tandis
+que `booking.payment_authorized` en produit une pour l'Expéditrice. Le résolveur de destinataires
+fait donc exactement ce que la règle exige — et la preuve ne repose pas sur la lecture du code.
+
+### Comment les fiches Stripe ont été jouées sans la CLI Stripe
+
+La CLI n'était pas installée. Plutôt que de marquer trois fiches (dont deux **bloquantes**) en ⏭,
+les événements ont été **signés à la main**, exactement comme Stripe les signe : HMAC-SHA256 de
+`<timestamp>.<corps brut>` avec le secret d'endpoint, en hexadécimal, dans l'en-tête
+`stripe-signature: t=…,v1=…`.
+
+Un détail a coûté un premier échec, et mérite d'être noté : `$(cat fichier)` **retire le saut de
+ligne final**, alors que `curl --data-binary @fichier` l'envoie. La signature portait donc sur des
+octets différents de ceux transmis, et le service répondait 400 — **correctement**. La signature
+doit être calculée sur les **octets exacts du fichier**, lus en binaire. C'est la même exigence qui
+explique pourquoi cette route ne passe jamais par la passerelle : elle analyse puis re-sérialise le
+JSON, ce qui déplacerait ne serait-ce qu'une espace et casserait la signature. Vérifié au passage :
+`POST /api/webhooks/stripe` répond **404** — la route n'est pas exposée par la passerelle.
+
+### Axe non demandé — les deux webhooks n'avaient aucun test de contrôleur
+
+Les règles pures étaient couvertes ; la **glu** ne l'était pas. Or c'est exactement la couche où la
+campagne a trouvé `ANO-API-16` et `ANO-API-17`, et c'est ici que se décide une écriture lourde de
+conséquences : mettre une adresse sur liste de suppression coupe **tous** les emails d'un membre.
+
+Deux specs ont donc été ajoutés dans cette PR :
+
+- `email-webhook.controller.spec.ts` (8 cas) — 503 sans secret, 401 en-têtes absents, 401 mauvais
+  secret, **401 horodatage hors tolérance** (anti-rejeu, non couvert jusqu'ici), 200 livraison,
+  suppression **une seule fois**, rebond transitoire qui ne supprime pas, type ignoré ;
+- `stripe-webhook.controller.spec.ts` (10 cas) — le tableau des quatre réponses, l'essai du second
+  secret (Connect, A87), l'annulation, les drapeaux du Voyageur avec relance des versements, le
+  compte inconnu qui ne fait pas planter, `payout.failed`, et le **500 sur échec transitoire** —
+  celui-là est important : rendre 200 sur une base indisponible perdrait l'événement pour toujours.
+
+notification-service 99 → **107**, deal-service 542 → **552**.
