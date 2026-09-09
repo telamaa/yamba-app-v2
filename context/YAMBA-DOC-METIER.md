@@ -2581,3 +2581,45 @@ Voyageur peut faire. *(ANO-WEB-07, ouverte.)*
 | 27 | Fenêtre d'annulation à moins de 48 h | 15,96 € remboursés, retenue 15,96 € reversée, « Garder » sans effet | oui |
 | 28 | Annulation confirmée | toast, ligne « Annulée », Finances des deux côtés (15,96 € / 14,25 €), kilos rendus, quatre emails | oui |
 | 29 | Le Voyageur tente d'annuler son trajet | refus 409 avec le nombre de deals vivants | oui (conseil inapplicable : ANO-WEB-07) |
+
+---
+
+# Le compte neuf — ce que WEB-E2E-4 fait respecter
+
+*(PR `chore/e2e-parcours-4`, 09/09/2026 — cahier 01-WEB chapitre 6, CNF-06 / D71, D63, D65, SES-01.)*
+
+## Le besoin
+
+Un compte neuf est plafonné pendant trente jours, et ces plafonds doivent tomber **avant** tout
+argent — jamais après une autorisation bancaire. Le score qui les décide ne se montre à
+personne : ni à l'écran, ni dans l'export des données. Et la vie ordinaire du compte doit tenir
+ses promesses : une session qui expire, ses appareils, une suppression bloquée tant qu'un deal
+est en cours.
+
+## Les règles
+
+**RG-WEB-25 — Un plafond refuse avant tout paiement.** Valeur déclarée, poids et nombre
+d'envois du mois sont contrôlés à la demande d'intention de paiement ; rien n'est autorisé, aucune
+ligne Finances, aucun email. *(ANO-WEB-08.)*
+
+**RG-WEB-26 — Le score de confiance n'existe pour personne.** Aucune page du membre, aucune page
+publique, aucun export ne le mentionne. *(D71.)*
+
+**RG-WEB-27 — L'export des données passe par la porte, puis se télécharge.** Le refus
+`SUDO_REQUIRED` ouvre la porte, quel que soit le format de réponse demandé. *(ANO-WEB-09.)*
+
+**RG-WEB-28 — Une session expirée se rattrape sur place.** La fenêtre se pose par-dessus la
+page, la reconnexion ne la quitte pas, et le membre refait son geste.
+
+**RG-WEB-29 — La suppression est bloquée avant toute porte.** Un deal en cours ou une demande en
+attente affichent le bandeau et les motifs ; aucun code n'est demandé ni envoyé.
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| 30 | Inscription, code, connexion sans « Rester connecté » | compte activé, bienvenue, cookie de session sans expiration | oui |
+| 31 | 450 € / 12 kg / sixième demande du mois | refus à l'intention, message unique, rien nulle part | oui |
+| 32 | Profil, tableau de bord, page publique, export | aucun score, aucun niveau de risque, aucun point | oui |
+| 33 | Session expirée puis un geste | fenêtre par-dessus la page, reconnexion sur place, geste refait | oui |
+| 34 | Supprimer mon compte avec un deal en cours | bandeau, motifs, aucune porte, aucun email | oui |
