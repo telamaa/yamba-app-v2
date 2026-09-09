@@ -1,5 +1,6 @@
 import axios from "axios";
 import apiClient from "@/lib/api-client";
+import { oublierSession } from "@/lib/session-marker";
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
 
@@ -218,5 +219,8 @@ export const logoutUser = async () => {
     withCredentials: true,
     skipAuthRefresh: true,
   });
+  // ANO-WEB-01 — se déconnecter, c'est renoncer à sa session : le marqueur part avec elle,
+  // sans quoi le prochain 401 rouvrirait « ta session a expiré » sur un visiteur volontaire.
+  oublierSession();
   return response.data;
 };

@@ -38,6 +38,7 @@ npx nx test <project>              # jest tests for one project
 npx nx test <project> -- --testPathPatterns=<pattern>   # single test file (jest 30)
 
 bash scripts/smoke-services.sh     # EVERY bundle actually boots? (ports +900, no clash with `npm run dev`) — run after any toolchain change
+npx nx e2e e2e                     # recette navigateur (Playwright, apps/e2e) — needs `npm run dev` + Mailpit up; NOT in CI
 npx prisma generate                # after editing prisma/schema.prisma (schema at repo ROOT)
 npx prisma db push                 # sync schema to MongoDB (no migrations — Mongo provider)
 
@@ -47,6 +48,8 @@ npm run generate:openapi           # regenerate the FIVE openapi.json (trip, dea
 Test platform baseline: **989 tests** (trip-service 257, deal-service 575, notification-service 115, message-service 42) + auth-service 225 (also a CI check) — any deviation must be explained.
 
 Manual `tsc` (when Nx typecheck target is not what you want): `npx tsc --noEmit --project apps/<service>/tsconfig.app.json` — NEVER `--project apps/<service>` (resolves the solution-style tsconfig: 0 files checked).
+
+Browser QA harness: `apps/e2e` (Playwright). It drives the **system Chrome** (`channel: "chrome"` — Chromium builds are no longer published for macOS 13; `PLAYWRIGHT_CHANNEL=bundled` to switch back), reads the front's `NEXT_PUBLIC_API_BASE_URL` to pick the right base URL (cookies are host-bound: front on `localhost` + API on a LAN IP = login 200 and NO cookie), and runs `workers: 1` against the real dev stack. It is deliberately NOT a CI check.
 
 No linter is configured (Nx generators use `linter: none`). Root `.env` holds all secrets (`DATABASE_URL` Mongo, `REDIS_DATABASE_URI`, JWT secrets, SMTP, Stripe, Google Maps) — see `.env.example`. Never commit any `.env` (`.example` files are fine).
 

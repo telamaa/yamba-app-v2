@@ -2381,3 +2381,48 @@ que l'API refuse fabrique de fausses anomalies et fait perdre du temps. *(ANO-CR
 | 11 | Compte effacé et adresse supprimée, quatre flux d'emails | zéro email, notification interne conservée | oui |
 | 12 | Effacement du tiers à 29 / 30 / 31 jours | 29 intact, 30 et 31 effacés ; aucune réservation vivante touchée | oui |
 | 13 | Prix du trajet modifié après réservation, puis versement | le versement vaut l'instantané, pas le prix courant | oui |
+
+---
+
+# Recette navigateur — les règles que le harnais fait respecter
+
+*(cahiers 01-WEB et 02-ADMIN, campagne ouverte le 09/09/2026.)*
+
+## Le besoin
+
+Un membre ne voit ni les services, ni les événements, ni les tâches de nuit : il voit **des
+écrans**. Deux cahiers décrivent 438 scénarios navigateur. Les jouer à la main coûte plusieurs
+jours et ne protège que le jour où on les joue. Le harnais les exécute — et chaque défaut trouvé
+y laisse un scénario qui interdit sa réapparition.
+
+## Les règles
+
+**RG-WEB-01 — Une session qui n'a jamais existé ne peut pas expirer.** Un visiteur ne reçoit
+jamais le message « ta session a expiré » : il n'a rien perdu. L'annonce est réservée à un
+membre dont la session a réellement pris fin. *(ANO-WEB-01.)*
+
+**RG-WEB-02 — Rien ne se pose devant l'écran de connexion.** Sur `/login`, `/register`,
+`/password` et `/refresh`, aucune fenêtre modale ne recouvre le formulaire : ce sont les écrans
+où l'on vient précisément régler sa session. Une fenêtre au fond opaque y rend le produit
+inutilisable. *(ANO-WEB-01.)*
+
+**RG-WEB-03 — Un écran n'affiche jamais une clé de traduction.** Un libellé manquant est un
+défaut visible par l'utilisateur, pas un détail technique — et il n'est pas rattrapé par la
+comparaison des langues entre elles, puisque deux langues peuvent être incomplètes de la même
+façon. *(ANO-WEB-02.)*
+
+**RG-WEB-04 — Ce qu'un rôle ne voit pas est aussi important que ce qu'il voit.** Chaque scénario
+du harnais joue les rôles dans des navigateurs séparés : Expéditeur, Voyageur, visiteur. Une
+session partagée rendrait vertes, pour de mauvaises raisons, la moitié des vérifications des
+cahiers.
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| 1 | Un visiteur ouvre l'écran de connexion | aucune fenêtre parasite, formulaire cliquable, connexion possible | oui |
+| 2 | Un visiteur ouvre l'accueil, la recherche, l'inscription | aucune annonce d'expiration de session | oui |
+| 3 | Un membre connecté ouvre son tableau de bord | le marqueur de session existe ; il n'existe pas pour un visiteur | oui |
+| 4 | Un visiteur clique « Réserver » sans compte | la porte propose « Se connecter » et « Créer un compte », en clair | oui |
+| 5 | La même porte en anglais | « Sign in » et « Create an account » | oui |
+| 6 | Le bouton « Se connecter » de la porte | mène à la connexion **et** revient sur la réservation | oui |

@@ -1,0 +1,13 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "ignoreDeprecations": "6.0",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "lib": ["es2022", "dom"],
+    "types": ["node"],
+    "noEmit": true,
+    "outDir": "./out-tsc"
+  },
+  "include": ["playwright.config.ts", "src/**/*.ts"]
+}

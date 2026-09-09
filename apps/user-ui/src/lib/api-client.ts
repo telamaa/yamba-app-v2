@@ -2,6 +2,7 @@
 
 import axios, { AxiosError } from "axios";
 import { getCurrentLocale } from "@/lib/current-locale";
+import { aEuUneSession, marquerSessionActive, oublierSession } from "@/lib/session-marker";
 
 // D48 — absolu (http://…:8080/api) OU relatif (/api, proxy Next → gateway,
 // cookies first-party). Les deux formes sont acceptées telles quelles.
@@ -75,7 +76,16 @@ export const resetAuthRefreshCircuitBreaker = () => {
 };
 
 apiClient.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // ANO-WEB-01 — une requête authentifiée qui RÉUSSIT prouve qu'une session existe. C'est la
+    // seule information qui distingue plus tard « ta session a expiré » de « tu n'as jamais
+    // été connecté » : sans elle, un visiteur recevait la fenêtre d'expiration, posée sur
+    // l'écran de connexion, dont le fond bloquait le formulaire.
+    if (response.config?.requireAuth === true && typeof window !== "undefined") {
+      marquerSessionActive();
+    }
+    return response;
+  },
   async (error: AxiosError) => {
     const originalRequest = error.config;
 
@@ -136,7 +146,11 @@ apiClient.interceptors.response.use(
       // « ta session a expiré » s'ouvre par-dessus la page (SessionExpiredGate),
       // à la place d'un toast « Erreur » par écran. useUser retourne user:
       // undefined, le header affiche « Connexion ».
-      if (typeof window !== "undefined") {
+      // ANO-WEB-01 — on ne signale une EXPIRATION que s'il y avait une session. Un visiteur
+      // qui n'a jamais été connecté n'a rien perdu : le header affiche « Connexion », et
+      // aucune fenêtre ne vient se poser sur la page.
+      if (typeof window !== "undefined" && aEuUneSession()) {
+        oublierSession();
         window.dispatchEvent(new CustomEvent("yamba:session-expired"));
       }
       return Promise.reject(refreshError);
