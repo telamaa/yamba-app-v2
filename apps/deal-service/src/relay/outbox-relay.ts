@@ -5,6 +5,7 @@ import prisma from "@packages/libs/prisma";
 import { BookingDomainEventSchema } from "@packages/api-contracts";
 import { TOPICS, type EventPublisher } from "@packages/messaging";
 import { buildLeaseOwner, releaseLease, tryAcquireLease } from "./relay-lease";
+import { isBrokerUnavailable } from "../../../../packages/libs/messaging/src/broker-errors";
 
 /**
  * outbox-relay.ts — le PRODUCTEUR de D2 (A23/A24, PR4)
@@ -221,12 +222,10 @@ function isPoison(err: unknown): boolean {
   // internes épuisés (KafkaJSNumberOfRetriesExceeded). Un broker
   // injoignable n'est JAMAIS un poison — sans cette exclusion, une
   // panne > MAX_RELAY_ATTEMPTS ticks parquerait des événements sains.
-  if (
-    candidate.name === "KafkaJSNumberOfRetriesExceeded" ||
-    candidate.name === "KafkaJSConnectionError"
-  ) {
-    return false;
-  }
+  // ANO-CRON-06 — énumérer les noms est une course perdue : avec le courtier arrêté, kafkajs
+  // lève `KafkaJSNonRetriableError: Connection error`, un TROISIÈME nom que cette liste ne
+  // couvrait pas. La classification se fait désormais par CAUSE, dans `@packages/messaging`.
+  if (isBrokerUnavailable(err)) return false;
   return candidate.retriable === false;
 }
 

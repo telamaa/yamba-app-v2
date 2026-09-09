@@ -458,3 +458,143 @@ deux rappels, que j'avais laissé à « il y a quelques secondes » en jouant le
 Le champ à vieillir est `CarrierPage.lastReminderSentAt` — et non un champ `onboardingLastReminderSentAt`,
 qui n'existe pas. Vérifier les noms de champs **dans le schéma** avant d'accuser le code : la
 première tentative écrivait dans le vide.
+
+---
+
+## Chapitre 5 — Relais d'événements
+
+| Fiche | Ce qui est éprouvé | Verdict | Preuve |
+|---|---|---|---|
+| CRON-RELAIS-1 | L'événement de la transaction est publié | **Conforme** | les deux événements d'une expiration retrouvés dans `booking-events`, clé = `aggregateId` |
+| CRON-RELAIS-2 | L'ordre par agrégat | **Conforme** | même agrégat = **même partition**, dans l'ordre : `requested` → `payment_authorized` → `cancelled` (partition 5), `rating_reminder` ×2 → `rating_revealed` (partition 1) |
+| CRON-RELAIS-3 | Le bail d'exclusivité | **Conforme** | deux instances deal-service (6003 et 6903) : le bail a **un seul** propriétaire, et `Event published` n'apparaît que dans **un** journal (B : 2, A : 0) |
+| CRON-RELAIS-4 | Chaque relais ne draine que son domaine | **Conforme** | `messaging-events` ne contient que des agrégats `conversation` ; `booking-events` que des `booking` |
+| CRON-RELAIS-5 | L'empoisonné est parqué, jamais supprimé | **Conforme** | `seed-outbox --with-poison` : 6 sains publiés, 1 parqué à exactement 10 tentatives, toujours en base |
+| CRON-RELAIS-6 | Le sujet absent | **Comportement modifié** | voir « la décision qui découle d'ANO-CRON-06 » ci-dessous |
+| CRON-RELAIS-7 | Le courtier redémarre en cours de route | **Non conforme** | → `ANO-CRON-06`, majeure |
+| CRON-RELAIS-8 | Le relais coupé, l'application vit | **Conforme** | `Outbox relay disabled` au démarrage, API à 200, expiration effectuée, événements **en attente** avec `attempts: 0` — rien n'est perdu, rien ne part |
+| CRON-RELAIS-9 | Aucun secret dans un payload | **Conforme** | 36 messages, **52 clés distinctes** analysées : aucun code de livraison, aucun destinataire, aucune adresse email, aucun jeton. Seuls des identifiants, un corridor, des montants et des dates |
+
+### Anomalie du chapitre 5
+
+```
+ANO-CRON-06
+Fiche          : CRON-RELAIS-7 · Gravité : MAJEURE (échelle du cahier : « un événement sain
+                 parqué ») · ÉTAT : CLOSE
+Attendu        : garantie n° 6 du cahier — « Une panne de courtier n'incrémente JAMAIS
+                 `attempts` […] sans cette exclusion, une panne de dix minutes parquerait des
+                 dizaines d'événements parfaitement sains. »
+Obtenu         : courtier arrêté (`docker stop yamba-redpanda`), puis mesure directe.
+                 · relais des RÉSERVATIONS : `attempts` passe à 1 puis se stabilise, avec
+                   `KafkaJSNonRetriableError: Connection error`. L'exclusion ne couvrait que
+                   `KafkaJSNumberOfRetriesExceeded` et `KafkaJSConnectionError` — kafkajs lève
+                   ici un TROISIÈME nom. Dix pannes successives suffisent à parquer.
+                 · relais de la MESSAGERIE : aucune classification du tout. Mesuré, sur un
+                   événement parfaitement sain, courtier éteint :
+                       2 → 5 → 7 → 10 tentatives en 100 secondes → **PARQUÉ**
+                   et il l'est resté après le retour du courtier.
+Impact         : une panne de courtier d'une minute et demie suffisait à perdre définitivement
+                 les notifications et emails de toute la messagerie en attente. Avant la
+                 correction d'`ANO-CRON-02`, ces événements étaient irrécupérables.
+Cause          : la classification se faisait par NOM d'erreur. Énumérer les noms est une course
+                 perdue : kafkajs en ajoute, et il enveloppe volontiers une panne de connexion
+                 dans un nom générique.
+Correction     : `isBrokerUnavailable` dans `@packages/messaging` — pure, testée, partagée par
+                 les deux relais. Elle classe par **cause** : elle suit la chaîne
+                 `cause` / `originalError` (bornée à 5 niveaux, résistante aux cycles) et cherche
+                 la signature d'un courtier injoignable, par nom **ou** par message.
+                 `KafkaJSNonRetriableError` n'est **pas** exclu en bloc — il enveloppe aussi de
+                 vrais poisons (message trop gros) — seulement quand sa cause parle de connexion.
+                 Le relais de la messagerie trace désormais l'erreur **sans compter** et sort du
+                 lot : inutile d'insister quand le courtier est injoignable.
+Contre-épreuve : la MÊME panne de 100 secondes qui portait l'événement de 0 à 10 tentatives le
+                 laisse maintenant à **0**, l'erreur restant tracée dans `lastError` pour
+                 l'exploitant. Courtier relancé → publié. Tests : `broker-unavailable.spec.ts`
+                 (6 cas, dont la forme exactement relevée en recette et un vrai poison qui doit
+                 rester un poison).
+```
+
+### La décision qui découle d'ANO-CRON-06 — à porter au registre
+
+En rejouant CRON-RELAIS-6 (**sujet supprimé du courtier**), l'erreur remontée est
+`This server does not host this topic-partition`, que kafkajs finit par présenter sous le nom
+`KafkaJSNumberOfRetriesExceeded` — **le même nom qu'une panne**. Conséquence directe :
+
+| | Avant | Après |
+|---|---|---|
+| Relais réservations, sujet absent | rejeu sans fin (le nom était déjà exclu) | rejeu sans fin |
+| Relais messagerie, sujet absent | **parqué au bout de 10 tentatives** | rejeu sans fin |
+
+Les deux relais se comportent donc désormais **de la même façon**, ce qui n'était pas le cas
+avant. Et le cahier, qui décrit le parcage comme le résultat attendu de CRON-RELAIS-6, décrit en
+réalité l'ancien comportement du seul message-service.
+
+**Ce changement est-il souhaitable ?** Oui, et c'est un choix, pas un effet de bord :
+
+- un sujet absent est un défaut d'**infrastructure**, réparable en une commande — le parcage, lui,
+  fait sortir l'événement de la file **définitivement** ;
+- le signal existe déjà et il est meilleur : `OUTBOX_LAGGING_15MIN` s'est déclenchée dès que
+  l'événement a dépassé 15 minutes d'attente — *« Le plus ancien événement non publié attend
+  depuis 20 min (seuil 15). Redpanda ou le relais est arrêté ? »* ;
+- **contre-épreuve** : sujet recréé → l'événement est publié **tout seul**, `attempts: 0`, jamais
+  perdu.
+
+À porter au registre comme décision (« un défaut d'infrastructure se signale par le retard, il ne
+se solde pas par un parcage »), et à corriger dans le cahier, fiche CRON-RELAIS-6.
+
+### Un incident de recette qui vaut une observation
+
+Une première mesure de CRON-RELAIS-8 a montré les événements **publiés** alors que le relais était
+coupé. Cause : un deal-service **fantôme** d'un `npm run dev` antérieur tournait encore, sans
+détenir le port 6003, mais avec son relais actif — c'est lui qui publiait. Deux leçons :
+
+1. sur un poste de recette, vérifier **qui détient le bail** (`RelayLease.owner` porte le PID)
+   avant de conclure qu'un composant est coupé ;
+2. le bail a parfaitement joué son rôle — c'est même ainsi que CRON-RELAIS-3 s'est vérifié : deux
+   instances, **une seule** publie.
+
+---
+
+# Point d'étape de la campagne (chapitres 4 et 5)
+
+**53 fiches sur 90 jouées.** Chapitres 4 (les treize tâches planifiées) et 5 (les relais)
+terminés ; restent les chapitres 6 (consommateurs, 8 fiches), 7 (battements et moniteur externe,
+7 fiches) et 8 (sécurité et conformité, 9 fiches), plus la consignation du §9.
+
+## Anomalies
+
+| Anomalie | Fiche | Gravité | État | En une phrase |
+|---|---|---|---|---|
+| ANO-CRON-01 | CRON-TRAJETS-1 | mineure | **close** | le compteur public d'un Voyageur descendait à **-1**, et le nombre sortait tel quel sur l'API publique |
+| ANO-CRON-02 | CRON-ALERTES-1 | **majeure** | **close** | quatre événements de litige **parqués depuis le 4 septembre**, redevenus valides, sans aucun moyen de les libérer — deux litiges dont les parties n'ont jamais su la décision |
+| ANO-CRON-03 | CRON-ALERTES-4 | cosmétique | **close** | le titre d'une alerte annonçait « plus de 48 h » quel que soit le seuil réglé |
+| ANO-CRON-04 | CRON-RELANCE-5 | mineure | **close** | le battement annonçait « 1 relance(s) » pour zéro email envoyé |
+| ANO-CRON-05 | CRON-PURGEOUT-2 | **BLOQUANTE** | **close** | la purge nocturne supprimait **tout événement non publié**, à n'importe quel âge — parqués compris |
+| ANO-CRON-06 | CRON-RELAIS-7 | **majeure** | **close** | une panne de courtier de **100 secondes** parquait définitivement les événements sains de la messagerie |
+
+**Six anomalies, six closes**, toutes contre-éprouvées sur les services réels.
+
+## Ce que cette moitié de campagne apprend
+
+**1. Les deux anomalies les plus graves sont des pertes silencieuses.** `ANO-CRON-05` et
+`ANO-CRON-06` détruisent ou immobilisent des événements *sans que rien ne réponde en erreur* :
+l'API dit 200, la transaction est committée, et la notification ne part jamais. C'est la signature
+d'un défaut de tâche de fond, et c'est précisément pourquoi ce cahier existe.
+
+**2. Une requête large est sans danger tant qu'une règle pure tranche derrière.** Quatre endroits
+comparent une date nullable avec `lt` ; trois sont sûrs parce qu'ils repassent chaque candidat
+devant une règle pure. Le quatrième — le `deleteMany` de la boîte d'envoi — **décidait et écrivait
+d'un seul geste**. C'est la différence entre sur-sélectionner et se tromper.
+
+**3. Énumérer les noms d'erreur d'une bibliothèque est une course perdue.** Le commentaire du
+relais racontait déjà un piège payé une fois, et deux noms avaient été ajoutés. kafkajs en a sorti
+un troisième. La classification par **cause** est la seule qui vieillisse bien.
+
+**4. Un test peut asserter le défaut.** `ANO-CRON-04` était couverte par un test qui exigeait le
+comptage inexact, commentaire à l'appui. Le défaut n'était pas le comptage mais le fait que deux
+issues différentes portaient le même nom. Quand un test et un symptôme se contredisent, relire le
+test d'abord.
+
+**5. Une preuve d'absence se construit.** « Aucun secret ne circule » ne se lit pas : les 36
+messages du courtier ont été analysés champ par champ — **52 clés distinctes**, aucun code de
+livraison, aucun destinataire, aucune adresse.

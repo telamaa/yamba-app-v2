@@ -15,6 +15,7 @@ import type { Logger } from "pino";
 import prisma from "@packages/libs/prisma";
 import { MessagingDomainEventSchema } from "@packages/api-contracts";
 import { TOPICS, type EventPublisher } from "@packages/messaging";
+import { isBrokerUnavailable } from "../../../../packages/libs/messaging/src/broker-errors";
 
 export const MESSAGING_RELAY_LEASE_ID = "messaging-relay";
 export const MESSAGING_RELAY_POLL_MS = 2_000;
@@ -149,10 +150,22 @@ export class MessagingOutboxRelay {
         await prisma.outboxEvent.update({ where: { id: row.id }, data: { publishedAt: this.clock() } });
         this.logger.info({ eventId: row.id, eventType: row.eventType }, "Messaging event published");
       } catch (err) {
+        const message = err instanceof Error ? err.message.slice(0, 500) : String(err).slice(0, 500);
+        // ANO-CRON-06 — ce relais incrémentait `attempts` à CHAQUE erreur, y compris une simple
+        // panne de courtier : mesuré, 2 → 5 → 7 → 10 tentatives en 100 secondes, et un événement
+        // parfaitement sain se retrouvait parqué. Une indisponibilité du courtier est
+        // TRANSITOIRE : on trace, on ne compte pas, et le tick suivant réessaiera.
+        if (isBrokerUnavailable(err)) {
+          await prisma.outboxEvent
+            .update({ where: { id: row.id }, data: { lastError: message, lastErrorAt: this.clock() } })
+            .catch(() => undefined);
+          this.logger.warn({ eventId: row.id, eventType: row.eventType }, "Messaging event: broker unavailable, retrying next tick");
+          return; // inutile d'insister sur le reste du lot : le courtier est injoignable
+        }
         const attempts = row.attempts + 1;
         await prisma.outboxEvent.update({
           where: { id: row.id },
-          data: { attempts, lastError: err instanceof Error ? err.message.slice(0, 500) : String(err).slice(0, 500), lastErrorAt: this.clock() },
+          data: { attempts, lastError: message, lastErrorAt: this.clock() },
         });
         if (attempts >= MAX_RELAY_ATTEMPTS) {
           this.logger.error({ eventId: row.id, eventType: row.eventType, attempts }, "Messaging event PARKED after max attempts");

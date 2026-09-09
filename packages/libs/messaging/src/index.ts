@@ -18,3 +18,6 @@ export type {
   EventConsumer,
 } from "./event-consumer";
 export { KafkaEventConsumer, type KafkaEventConsumerOptions } from "./kafka-consumer";
+
+/* ══ Classer une erreur de publication (ANO-CRON-06) ═══════════ */
+export { isBrokerUnavailable } from "./broker-errors";
