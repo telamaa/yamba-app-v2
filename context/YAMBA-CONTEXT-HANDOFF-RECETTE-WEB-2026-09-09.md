@@ -4,11 +4,16 @@
 tourne sur le poste, ce qui reste à faire, et les pièges déjà payés qu'il ne faut pas repayer.*
 
 > **CONSIGNE DE REPRISE (donnée le 09/09/2026).** Dans cet ordre, sans rien intercaler :
-> **1.** corriger le harnais avec `storageState` (§ 4 bis) ; **2.** finir **WEB-E2E-1** en entier
-> (étapes 11 à 29), puis ouvrir la PR de la branche `chore/e2e-parcours`.
 >
-> Puis **finir TOUTE la recette** : le reste du cahier 01-WEB (32 chapitres, 326 fiches) et le
-> cahier 02-ADMIN (110 fiches).
+> **1.** corriger le harnais avec `storageState` (§ 4 bis) ;
+> **2.** monter la **fixture de session administrateur** (§ 5, point 2) — elle n'est pas un
+> sujet de fin de parcours : **huit scénarios du cahier 01-WEB en dépendent** ;
+> **3.** finir **WEB-E2E-1** en entier (étapes 11 à 29), puis ouvrir la PR de
+> `chore/e2e-parcours` ;
+> **4.** les cinq autres parcours du chapitre 6 ;
+> **5.** les 32 chapitres du cahier **01-WEB** (326 fiches) ;
+> **6.** le cahier **02-ADMIN** (110 fiches) — 19 fiches de sécurité d'accès, 91 fiches
+> d'écrans.
 >
 > **La question Elasticsearch vient APRÈS la recette** — consigne explicite du 09/09/2026. Rien
 > ne se touche du côté de la recherche tant que les deux cahiers ne sont pas clos. L'analyse est
@@ -127,19 +132,47 @@ Contournement immédiat, si l'on veut relancer sans attendre : redémarrer la pa
 
 ## 5. Ce qui reste à faire, dans l'ordre
 
-0. **Mémoriser les sessions du harnais** (§ 4 bis) — sans quoi les parcours longs échoueront par
+1. **Mémoriser les sessions du harnais** (§ 4 bis) — sans quoi les parcours longs échoueront par
    intermittence, pour une raison qui n'a rien à voir avec le produit.
-1. **Finir WEB-E2E-1** — étapes 11 à 29 : rendez-vous proposé et accepté, numéro révélé au plus
+
+2. **La fixture de session administrateur** — et c'est un **prérequis, pas une fin de parcours**.
+   Le cahier 01-WEB ne se joue pas en entier sans le back-office : la recherche de ce qui en
+   dépend donne **huit points d'appui**, dans huit chapitres différents.
+
+   | Où, dans le cahier 01-WEB | Ce que l'administrateur doit faire d'abord |
+   |---|---|
+   | 5.3 `WEB-CNX` | suspendre `marieclaire.shipper@seed.yamba.dev` |
+   | 5.7 `WEB-TRJ` | masquer le trajet `yul` avec un motif interne |
+   | 5.8 `WEB-DOC` | valider le billet de `bzv-upcoming` |
+   | 5.13 `WEB-TRU` | abaisser le paramètre `[TRU7]` depuis la page Paramètres |
+   | 5.15 `WEB-MSG` | relire la file des messages signalés |
+   | 5.21 `WEB-LIT` | ouvrir la file d'arbitrage |
+   | 6 · `WEB-E2E-2` | **trancher le litige en remboursement partiel de 15,00 €** — le parcours bloquant s'arrête là sans lui |
+   | 5.28 `WEB-MNT` | activer le mode maintenance |
+
+   Ce que la fixture doit monter (cahier 02-ADMIN § 2.5) : **quatre comptes**, créés comme des
+   membres ordinaires puis promus par `grant-admin.ts` — `SUPER_ADMIN`, `MEDIATOR`, `SUPPORT`,
+   `OPS` — puis la **connexion en deux temps** du back-office (mot de passe, puis code TOTP)
+   avec un code **calculé** par `packages/libs/totp`. La campagne API l'a déjà fait : le code
+   est réutilisable tel quel. Sessions séparées de celles du membre (cookies `admin_*`), donc
+   un `storageState` distinct.
+
+3. **Finir WEB-E2E-1** — étapes 11 à 29 : rendez-vous proposé et accepté, numéro révélé au plus
    tôt 2 h avant, lien de suivi (page destinataire sans code ni montant), prise en charge en cinq
    points + photos, **code à six chiffres** côté Expéditrice, jalons (un SEUL email, celui de
    l'atterrissage), remise contre le code, période de vérification, confirmation anticipée,
-   notation croisée et révélation.
-2. **Les cinq autres parcours du chapitre 6** : litige (E2E-2), annulation tardive (E2E-3), compte
-   neuf plafonné (E2E-4), refus au pickup (E2E-5), parcours du destinataire (E2E-6).
-3. **Les chapitres 5.x** du cahier 01-WEB, par famille (32 chapitres, 326 fiches).
-4. **Le cahier 02-ADMIN** (110 fiches) — il faudra une fixture de session administrateur :
-   `grant-admin.ts` puis connexion en deux temps avec un code TOTP **calculé** par
-   `packages/libs/totp` (la campagne API l'a déjà fait, le code est réutilisable).
+   notation croisée et révélation. Puis ouvrir la PR de `chore/e2e-parcours`.
+
+4. **Les cinq autres parcours du chapitre 6** : litige (E2E-2, **exige la fixture admin**),
+   annulation tardive (E2E-3), compte neuf plafonné (E2E-4), refus au pickup (E2E-5), parcours
+   du destinataire (E2E-6).
+
+5. **Les 32 chapitres 5.x du cahier 01-WEB** (326 fiches), par famille.
+
+6. **Le cahier 02-ADMIN** (110 fiches) : 19 fiches de **sécurité d'accès** (connexion à deux
+   facteurs, séparation et durée de vie des sessions, matrice des permissions profil par profil)
+   et 91 fiches d'**écrans** — accueil et compteurs, alertes de seuil, files de signalements,
+   arbitrage, finances, paramètres, journal d'audit, RGPD, maintenance, exports CSV.
 
 ## 6. Deux observations à traiter un jour
 
