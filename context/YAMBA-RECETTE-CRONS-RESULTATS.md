@@ -470,7 +470,7 @@ première tentative écrivait dans le vide.
 | CRON-RELAIS-3 | Le bail d'exclusivité | **Conforme** | deux instances deal-service (6003 et 6903) : le bail a **un seul** propriétaire, et `Event published` n'apparaît que dans **un** journal (B : 2, A : 0) |
 | CRON-RELAIS-4 | Chaque relais ne draine que son domaine | **Conforme** | `messaging-events` ne contient que des agrégats `conversation` ; `booking-events` que des `booking` |
 | CRON-RELAIS-5 | L'empoisonné est parqué, jamais supprimé | **Conforme** | `seed-outbox --with-poison` : 6 sains publiés, 1 parqué à exactement 10 tentatives, toujours en base |
-| CRON-RELAIS-6 | Le sujet absent | **Comportement modifié** | voir « la décision qui découle d'ANO-CRON-06 » ci-dessous |
+| CRON-RELAIS-6 | Le sujet absent | **Conforme après correction** | fiche du cahier corrigée le 09/09/2026 ; décision gravée en **D76** — voir ci-dessous |
 | CRON-RELAIS-7 | Le courtier redémarre en cours de route | **Non conforme** | → `ANO-CRON-06`, majeure |
 | CRON-RELAIS-8 | Le relais coupé, l'application vit | **Conforme** | `Outbox relay disabled` au démarrage, API à 200, expiration effectuée, événements **en attente** avec `attempts: 0` — rien n'est perdu, rien ne part |
 | CRON-RELAIS-9 | Aucun secret dans un payload | **Conforme** | 36 messages, **52 clés distinctes** analysées : aucun code de livraison, aucun destinataire, aucune adresse email, aucun jeton. Seuls des identifiants, un corridor, des montants et des dates |
@@ -539,8 +539,8 @@ réalité l'ancien comportement du seul message-service.
 - **contre-épreuve** : sujet recréé → l'événement est publié **tout seul**, `attempts: 0`, jamais
   perdu.
 
-À porter au registre comme décision (« un défaut d'infrastructure se signale par le retard, il ne
-se solde pas par un parcage »), et à corriger dans le cahier, fiche CRON-RELAIS-6.
+**Gravé en D76** (« un défaut d'infrastructure se signale par le retard ; il ne se solde ni par un
+parcage, ni par un silence ») et corrigé dans le cahier, fiche CRON-RELAIS-6.
 
 ### Un incident de recette qui vaut une observation
 
@@ -598,3 +598,205 @@ test d'abord.
 **5. Une preuve d'absence se construit.** « Aucun secret ne circule » ne se lit pas : les 36
 messages du courtier ont été analysés champ par champ — **52 clés distinctes**, aucun code de
 livraison, aucun destinataire, aucune adresse.
+
+---
+
+## Chapitre 7 — Battements et moniteur externe
+
+| Fiche | Ce qui est éprouvé | Verdict | Preuve |
+|---|---|---|---|
+| CRON-BATT-1 | Chaque tâche laisse sa trace | **Conforme** | 7 battements — les six tâches à horaire court ou horaire, plus l'`ops-digest` en échec. Les sept nocturnes n'ont **aucune** clé : c'est normal, elles n'ont pas eu d'échéance |
+| CRON-BATT-2 | Une tâche coupée ne bat plus | **Conforme** | vu au 4.2 : `BOOKING_EXPIRY_CRON_ENABLED=false` → le battement se fige et vieillit |
+| CRON-BATT-3 | Une tâche en échec bat avec son erreur | **Conforme** | `KO deal-service:ops-digest … connect ECONNREFUSED ::1:1025` |
+| CRON-BATT-4 | L'adresse de battement sortante est appelée | **Conforme** | moniteur local sur `:7799` → l'appel arrive (`/battement/rating`) ; un cron non déclaré dans la carte n'appelle rien |
+| CRON-BATT-5 | Une carte invalide désarme la surveillance | **Conforme** | JSON cassé, vide, `null`, liste, valeur non-texte → « aucune URL », **sans jamais lever** |
+| CRON-BATT-6 | Redis absent ne casse aucune tâche | **Conforme** | client Redis qui lève à chaque appel → la tâche rend son résultat ; et un échec métier remonte toujours **son** erreur, pas celle de Redis |
+| CRON-BATT-7 | La page « État des services » dit la vérité | **Conforme** | la même agrégation que la page admin rend : 7 battements dont 1 en échec, boîte d'envoi à 0/0, 21 emails sur 24 h dont 0 en échec — cohérent avec les mesures directes. `listCronRuns(...).catch(() => [])` : la page se dégrade proprement si Redis tombe |
+
+**Le point le plus utile du chapitre**, et il est contre-intuitif : un battement **absent** ne
+distingue pas « la tâche n'a jamais tourné » de « la tâche est morte ». Seul l'horaire tranche.
+C'est exactement pourquoi le battement externe (BATT-4) existe : c'est le seul dispositif qui
+alerte sur une **absence**, alors que tout le reste alerte sur une présence anormale.
+
+### Les trois fiches restantes des chapitres 4.8 et 4.9
+
+| Fiche | Verdict | Preuve |
+|---|---|---|
+| CRON-PURGEFIL-4 | **Conforme** | `messaging.retentionDays = 365`, lu dans les paramètres (comme `retention.outboxPublishedDays = 90` et `privacy.recipientRetentionDays = 30`) |
+| CRON-PURGEOUT-4 | **Conforme** | événements récents → `0 supprimé(s)` ; la durée vient des paramètres |
+| CRON-PURGEOUT-5 | **Conforme** | rejeu sur les deux agrégats → `0` et `0` |
+
+---
+
+## Chapitre 6 — Consommateurs
+
+| Fiche | Ce qui est éprouvé | Verdict | Preuve |
+|---|---|---|---|
+| CRON-CONSO-1 | L'événement devient notification et email | **Conforme** | expiration réelle : `booking.expired` → `ConsumedEvent` PROCESSED (`processedAt` posé, `lastError` nul), **une** notification pour l'Expéditeur seul, `EmailDelivery` SENT, email dans Mailpit ; `booking.refund_issued` → **zéro** notification (règle `NONE`) et son propre email. `readAt` est **explicitement `null`** : 0 document sur 20 sans le champ |
+| CRON-CONSO-2 | Rejouer ne produit pas de doublon | **Conforme** | rejeu du même `event-id` → `Duplicate delivery — skipped`, mailpit inchangé (3 → 3), `ConsumedEvent` inchangé. **Ceinture et bretelles** : ligne `ConsumedEvent` supprimée puis rejeu → retraitement, `Email already claimed — skipped (at-most-once)`, **ni** notification **ni** email en double — la réclamation `EmailDelivery` tient toute seule |
+| CRON-CONSO-3 | Le message malformé ne bloque pas la file | **Conforme** | deux messages hors contrat → deux lignes `ConsumedEvent` **FAILED** avec leur `ZodError`, aucune notification, aucun email, retard du groupe à **0**. *Voir `ANO-CRON-08` : la garantie ne tient que pour un message que le transport sait décoder* |
+| CRON-CONSO-4 | Le message sans en-tête `event-id` est ignoré | **Conforme** | `Message without event-id header — skipped` avec sujet, partition et offset ; `ConsumedEvent` 33 → 33 ; retard à 0 (offset validé) |
+| CRON-CONSO-5 | Panne du consommateur et rattrapage | **Conforme** | service arrêté, **6** événements publiés (2 expirations + 2 relances de notation) → `TOTAL-LAG 6`, Mailpit **vide** ; redémarrage → les six traités en rafale, retard à **0**, chaque email une fois, et l'ordre par agrégat respecté (`expired` puis `refund_issued`) |
+| CRON-CONSO-6 | La panne de base ne valide pas l'offset | **Conforme** | `DATABASE_URL` détournée vers un hôte injoignable : 17 × `[Runner] Error when calling eachMessage` sur le même offset, **aucun** `Event materialized`, retard figé à 1. Base rétablie → message **relivré**, traité, `PROCESSED`, **une** notification, **une** trace d'email |
+| CRON-CONSO-7 | Les deux groupes sont indépendants | **Conforme** | `rpk group list` → exactement `notification-service` et `messaging-notifications`, chacun sur son sujet, noms identiques à `consumer-groups.ts`. Indépendance **prouvée par accident** : pendant la panne d'`ANO-CRON-08`, le consommateur des réservations était mort et celui de la messagerie tournait toujours |
+| CRON-CONSO-8 | La mesure d'audience sur liste blanche | **Conforme** | projection exécutée sur une charge réelle : `bookingId`, `tripId`, `category`, `weightKg`, montants, `currencyCode`, `actor`, corridor, `role`, `source` — **et rien d'autre**. Garantie **structurelle** : la boucle ne recopie que des valeurs `string | number | boolean` de la liste blanche, donc un objet imbriqué (l'instantané destinataire) ne peut pas passer, même par oubli. `distinctId` = l'identifiant technique. Filtre de consentement `analyticsOptIn: true, isDeleted: false` dans `analytics-sink.ts`. Sans `POSTHOG_API_KEY`, `isAnalyticsEnabled()` rend faux : déversement inerte, consommateurs indemnes (toute la campagne l'a tourné ainsi) |
+
+### Anomalies du chapitre 6
+
+```
+ANO-CRON-08
+Fiche          : CRON-CONSO-3 · Gravité : BLOQUANTE · ÉTAT : OUVERTE (correction proposée)
+Attendu        : « Si la partition se bloquait ici, une seule ligne malformée arrêterait toutes
+                 les notifications de la plateforme. C'est le scénario à ne jamais laisser
+                 régresser. »
+Obtenu         : un `rpk topic produce` ordinaire — la commande **du cahier lui-même** — publie
+                 en **snappy** (compression par défaut de rpk). kafkajs ne sait pas décompresser
+                 snappy et lève `KafkaJSNotImplemented`, une erreur NON retriable :
+
+                     [Consumer] Crash: KafkaJSNotImplemented: Snappy compression not implemented
+                     [Consumer] Stopped
+
+                 Le consommateur des réservations s'arrête **définitivement**. Le processus, lui,
+                 reste vivant : `/health` répond **`{"status":"ok"}`**, le groupe passe `Empty`,
+                 et plus une seule notification ni un seul email ne sort. Au redémarrage du
+                 service, il retombe sur le même message et meurt à nouveau.
+Mesuré         : deux événements d'expiration parfaitement sains sont restés **neuf minutes** en
+                 attente sur une autre partition, jusqu'à ce que le message empoisonné soit sauté
+                 à la main (`rpk group seek --to-file`).
+Impact         : toutes les notifications et tous les emails de la plateforme s'arrêtent, sans
+                 aucun signal — ni journal après coup, ni `/health`, ni page « État des
+                 services ». Un producteur tiers, un outil d'exploitation ou une reconfiguration
+                 du courtier suffisent.
+Cause          : `startConsumer()` ne gère que l'échec **au démarrage** (il réessaie toutes les
+                 5 s). Un plantage **après** démarrage n'est traité nulle part : kafkajs relance
+                 tout seul les crashs *retriables* (vu en CRON-CONSO-6 : « Restarting the
+                 consumer in 8206ms »), mais s'arrête pour de bon sur un crash non retriable.
+                 `consumerRunning` reste à `true` et ne sert qu'à l'arrêt du processus.
+Correction     : (1) `KafkaEventConsumer` expose l'événement `CRASH` de kafkajs ; (2) chaque
+                 consommateur se relance avec un retrait exponentiel plafonné, en criant dans le
+                 journal ; (3) `/health` porte une vérification `consumers` : un consommateur
+                 activé et non courant rend le service **`degraded`**, donc visible sur la page
+                 d'état et sur la sonde publique. Un poison de transport fait alors une boucle
+                 **bruyante** au lieu d'une mort silencieuse — on ne saute jamais un message
+                 qu'on n'a pas su lire.
+Note de recette: en recette, produire **toujours** avec `rpk topic produce -z none`.
+```
+
+```
+ANO-CRON-09
+Fiche          : CRON-SEC-3 · Gravité : MAJEURE · ÉTAT : OUVERTE (correction proposée)
+Attendu        : « Le signalement est toujours là, avec son motif, son statut et sa date. Le
+                 corps du message a disparu avec le fil. L'administrateur voit un dossier sans
+                 contenu — c'est le compromis assumé entre conservation et modération. »
+Obtenu         : le `Report` survit bien en base (vérifié : un signalement `MESSAGE` `OPEN` dont
+                 la cible n'existe plus, motif et date intacts) — mais il **disparaît de la file
+                 de modération** :
+
+                     if (!message || !conversation) continue;  // admin-conversation.service.ts:107
+
+                 L'administrateur ne voit rien, ne peut pas le traiter, et le dossier reste
+                 `OPEN` pour toujours. Le compteur ne ment pas (`total: items.length`), ce qui
+                 rend la disparition encore plus silencieuse.
+Impact         : un signalement peut être escamoté par la seule conservation. Le back-office
+                 affiche une file « propre » alors que des dossiers ouverts sont hors de vue.
+Correction     : rendre le dossier purgé **visible et traitable** — c'est ce que le cahier décrit.
+                 `AdminMessageReportItem` gagne `purged: boolean` ; `author`, `conversationId`,
+                 `bookingId`, `corridor` deviennent nullables et `message.body` / `message.createdAt`
+                 aussi. La file rend le dossier avec « contenu purgé », et `reviewReport` — qui
+                 fonctionnait déjà par identifiant — devient atteignable.
+```
+
+```
+ANO-CRON-07
+Fiche          : hors fiche (constat de recette, chapitre 6) · Gravité : MINEURE · ÉTAT : OUVERTE
+Attendu        : le jeu d'essai respecte les règles métier qu'il sert à éprouver.
+Obtenu         : `seed-deals.ts` crée `gru-completed` avec `shipperKey: "ines"` sur le trajet
+                 `gru` dont `carrierKey` est… `ines`. Le membre est **son propre Expéditeur**,
+                 ce que l'API refuse explicitement (`OWN_TRIP`, `booking-request.ts:100`).
+Impact         : mesures faussées — la relance de notation envoie **deux** emails « Pense à noter
+                 Inês » à Inês elle-même, ce qui ressemble à un doublon et a coûté une
+                 investigation ; et toute recette sur la notation croisée part d'un cas
+                 impossible.
+Correction     : `shipperKey: "joao"` (cohérent avec la description en portugais), plus un
+                 garde-fou qui **lit la source du seed** et refuse qu'une réservation ait pour
+                 Expéditeur le Voyageur de son trajet — même famille de test que les gardes de
+                 la campagne API.
+```
+
+---
+
+## Chapitre 8 — Sécurité et conformité
+
+| Fiche | Ce qui est éprouvé | Verdict | Preuve |
+|---|---|---|---|
+| CRON-SEC-1 | Une purge ne supprime jamais un événement non publié | **Conforme** | trois lignes non publiées (10 j, 200 j, 2 ans, dont une parquée à 10 tentatives) ; les quatre purges passées → `0 supprimé(s)` partout, **3 lignes intactes** avec leurs `attempts`, `lastError` et charge utile |
+| CRON-SEC-2 | Une purge ne déborde jamais de son domaine | **Conforme** | seize collections comptées avant/après **chacune** des cinq tâches, horloge portée à 2030 pour qu'elles mordent vraiment : `outbox-retention` (deal) → `outboxBooking 31 → 0` **et rien d'autre** ; (message) → aucune variation ; `conversation-retention` → `conversation 2 → 1`, `message 4 → 2` ; `retention` → `notification 29 → 0`, `emailDelivery 35 → 0`, `consumedEvent 40 → 0` ; `recipient-redaction` → **aucun** compte modifié (elle écrase des champs, elle ne supprime rien). `Booking`, `Trip`, `User`, `Dispute`, `Review`, `Report` : **inchangés** dans les cinq cas |
+| CRON-SEC-3 | Le signalement survit à la purge du fil | **Partiellement conforme** | il survit **en base** (motif, statut, date), mais disparaît de la file de modération → `ANO-CRON-09`, majeure |
+| CRON-SEC-4 | L'effacement du tiers respecte le délai | **Conforme** | 29 / 30 / 31 jours → **29 intact**, **31 effacé**, **30 effacé** (comparaison stricte `< now − 30 j`, l'écart de quelques millisecondes tranche — cohérent avec le cahier). Aucune réservation vivante touchée (`PENDING`…`DISPUTED` : 0 effacement) |
+| CRON-SEC-5 | Aucun email vers un compte effacé ou supprimé | **Conforme** | deux comptes piégés (`isDeleted: true` et `emailSuppressedAt` posé), Mailpit vidé, quatre flux rendus éligibles : rappel d'inscription → `{"sent":0}` ; relance des non-lus → `{"scanned":1,"sent":0,"skipped":1}` ; rappel J+3 → l'événement est produit, **zéro email** ; relance de notation → les deux `booking.rating_reminder` sont produits et **matérialisés** (1 notification chacun) avec **zéro `EmailDelivery`**. La notification interne reste créée : c'est le bon découpage — la suppression porte sur l'**email**, pas sur le domaine |
+| CRON-SEC-6 | Le code de livraison ne quitte jamais la base | **Conforme** | audit des notifications, de l'outbox et des traces d'emails : **0 fautif** ; corps de tous les emails de Mailpit : **0 occurrence** de `742891` ; et sur les 26 réservations en base, les seuls champs de code sont `deliveryCodeHash` et `deliveryCodeEncrypted` — **aucun** code en clair |
+| CRON-SEC-7 | Les tâches ne contournent jamais les machines à états | **Conforme** | `complete-trips` sur un trajet portant un `PENDING` et un `DELIVERED` → `scanned=4 completed=0 skipped=4`, trajet toujours `PUBLISHED` ; `expire-bookings` sur deux demandes non périmées → `expirées : 0` ; `payout-bookings` sur une réservation `DISPUTED` avec échéance dépassée → `autoCompleteDue → 0`, aucune écriture. Les trois gardes viennent bien de `canPerform` / `applyBookingTransition`, jamais d'un `if` recopié |
+| CRON-SEC-8 | Aucune écriture d'état sans son événement | **Conforme** | expiration → `booking.expired` + `booking.refund_issued` ; complétion automatique → `booking.completed` ; versement → `booking.payout_sent` (relevé au chapitre 6, provider FAKE) ; rappel J+3 → `booking.verification_reminder` ; relance de notation → `booking.rating_reminder` **un par rôle** ; révélation avec au moins une note → `booking.rating_revealed` ; révélation **sans aucune note** → **aucun** événement, `ratingsRevealedAt` posé seul — l'exception que le cahier prévoit (fermer une fenêtre n'est pas un fait du domaine) |
+| CRON-SEC-9 | Montants en centimes entiers, jamais recalculés | **Conforme** | prix du trajet porté de 950 à **9999** c/kg, puis versement sur une autre réservation du même trajet → `payoutAmountCents = 4000 = pricing.transportCents`, l'instantané fait foi. Types bruts en base sur cinq champs monétaires : **111 `long`, 0 `double`** |
+
+### Ce que le chapitre 8 apprend
+
+Les deux garanties les plus fortes de la plateforme ne tiennent pas à une vérification, mais à une
+**forme** :
+
+- la mesure d'audience ne peut pas fuiter un objet imbriqué parce que la projection ne recopie que
+  des scalaires d'une liste blanche — un oubli de liste ne peut pas faire sortir un destinataire ;
+- un montant ne peut pas dériver parce qu'aucun code ne le recalcule : il est lu dans l'instantané.
+
+À l'inverse, les deux écarts du chapitre (`ANO-CRON-08`, `ANO-CRON-09`) sont des **silences** :
+un composant mort qui se déclare en forme, un dossier ouvert qui n'apparaît nulle part. La leçon
+est la même qu'au chapitre 4.9 : ce qui coûte cher n'est pas l'erreur, c'est l'erreur qui ne se
+voit pas.
+
+---
+
+# Verdict de la campagne — cahier n° 4 (tâches planifiées, relais, consommateurs)
+
+**90 fiches sur 90 jouées.** Aucune fiche non jouée, aucune fiche reportée.
+
+## Les neuf anomalies
+
+| # | Fiche | Gravité | Ce qui n'allait pas | État |
+|---|---|---|---|---|
+| ANO-CRON-01 | CRON-TRAJ-5 | mineure | un compteur de trajets pouvait descendre sous zéro (`{ decrement: 1 }` sans plancher) | **close** |
+| ANO-CRON-02 | CRON-ALERTES-2 | majeure | un événement parqué ne pouvait être remis en file par aucun outil | **close** |
+| ANO-CRON-03 | CRON-ALERTES-3 | mineure | le titre d'une alerte annonçait un seuil figé, pas celui des paramètres | **close** |
+| ANO-CRON-04 | CRON-RELANCE-2 | mineure | le battement annonçait « 1 relance » pour zéro email envoyé | **close** |
+| ANO-CRON-05 | CRON-PURGEOUT-1 | **bloquante** | la purge nocturne supprimait **tous** les événements non publiés, chaque nuit | **close** |
+| ANO-CRON-06 | CRON-RELAIS-7 | majeure | une panne de courtier de 100 s parquait définitivement des événements sains | **close** |
+| ANO-CRON-07 | chapitre 6 | mineure | le jeu d'essai créait une réservation interdite (le Voyageur son propre Expéditeur) | **close** |
+| ANO-CRON-08 | CRON-CONSO-3 | **bloquante** | un consommateur mort restait mort, en silence, `/health` répondant `ok` | **close** |
+| ANO-CRON-09 | CRON-SEC-3 | majeure | un signalement dont le message est purgé disparaissait de la file de modération | **close** |
+
+Deux bloquantes, quatre majeures, trois mineures — **toutes corrigées avec contre-épreuve**.
+
+## Ce que cette campagne aura appris
+
+**Les défauts des tâches de fond ne ressemblent pas aux défauts d'une API.** Une API qui se trompe
+répond mal : on le voit tout de suite. Une tâche de fond qui se trompe ne répond à personne. Sur
+les neuf anomalies, **sept étaient parfaitement invisibles** : la purge qui détruisait la file
+d'attente le faisait à 3 h 30 du matin, le consommateur mort laissait un `/health` vert, le
+signalement escamoté laissait une file « propre ». Aucune n'aurait été trouvée par un test
+unitaire, un tableau de bord ou un utilisateur. Il a fallu, à chaque fois, **provoquer la panne**.
+
+**Trois familles reviennent, et ce sont toujours les mêmes :**
+
+1. **Le filtre qui ne dit pas ce qu'on croit.** `{ publishedAt: { not: null } }` ne voit pas un
+   champ absent ; `{ lt: <date> }` attrape `null`, parce que `null` précède les dates en BSON ;
+   `isSet` n'existe que sur les champs optionnels. C'est la **sixième** fois que la plateforme
+   paie cette famille — et la première fois qu'elle la paie en destruction de données.
+2. **La classification par nom.** Énumérer les noms d'erreurs d'une bibliothèque tierce est une
+   course perdue : elle en ajoute, et elle enveloppe. On classe par **cause**, jamais par nom.
+3. **Le silence.** Un composant qui tombe doit se relever ou se voir. Les deux bloquantes de cette
+   campagne sont, au fond, la même : un mécanisme qui échoue sans que rien ne l'annonce.
+
+**Et une leçon de méthode.** L'outil de recette lui-même peut être le piège : `rpk topic produce`
+compresse en snappy par défaut, ce que kafkajs ne sait pas lire — c'est la commande écrite dans le
+cahier qui a tué le consommateur. Le défaut découvert était réel et grave, mais il faut retenir le
+réflexe : quand un outil de recette provoque un effondrement, vérifier d'abord ce que l'outil
+envoie vraiment. (En recette : `rpk topic produce -z none`, toujours.)

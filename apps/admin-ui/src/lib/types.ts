@@ -279,10 +279,12 @@ export type AdminConversation = {
 };
 export type AdminMessageReportItem = {
   id: string; status: MessageReportStatus; reason: MessageReportReason; details: string | null; createdAt: string;
-  reporter: { id: string; firstName: string; role: "SHIPPER" | "CARRIER" };
-  author: { id: string | null; firstName: string; role: "SHIPPER" | "CARRIER" | "SYSTEM" };
-  message: { id: string; body: string; createdAt: string };
-  conversationId: string; bookingId: string; corridor: { originCity: string; destinationCity: string };
+  reporter: { id: string; firstName: string; role: "SHIPPER" | "CARRIER" | null };
+  /** ANO-CRON-09 — le message visé a été purgé : le dossier reste, son contenu a disparu. */
+  purged: boolean;
+  author: { id: string | null; firstName: string; role: "SHIPPER" | "CARRIER" | "SYSTEM" } | null;
+  message: { id: string; body: string | null; createdAt: string | null };
+  conversationId: string | null; bookingId: string | null; corridor: { originCity: string; destinationCity: string } | null;
 };
 export type AdminMessageReportsResponse = { items: AdminMessageReportItem[]; total: number };
 

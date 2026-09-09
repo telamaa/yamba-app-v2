@@ -21,6 +21,7 @@ import { Kafka, type Consumer } from "kafkajs";
 import type {
   ConsumedEventHandler,
   ConsumedEventMessage,
+  ConsumerCrash,
   EventConsumer,
 } from "./event-consumer";
 
@@ -70,6 +71,18 @@ export class KafkaEventConsumer implements EventConsumer {
         };
         await handler(consumed);
       },
+    });
+  }
+
+  /**
+   * Relaie l'événement CRASH de kafkajs (ANO-CRON-08). `payload.restart`
+   * vaut `true` quand kafkajs se relance lui-même (erreur retriable) et
+   * `false` quand il s'arrête pour de bon — c'est ce second cas que le
+   * service doit rattraper.
+   */
+  onCrash(handler: (crash: ConsumerCrash) => void): void {
+    this.consumer.on(this.consumer.events.CRASH, (event) => {
+      handler({ error: event.payload?.error, willRestart: Boolean(event.payload?.restart) });
     });
   }
 

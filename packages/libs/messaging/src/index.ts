@@ -15,6 +15,7 @@ export { CONSUMER_GROUPS } from "./consumer-groups";
 export type {
   ConsumedEventHandler,
   ConsumedEventMessage,
+  ConsumerCrash,
   EventConsumer,
 } from "./event-consumer";
 export { KafkaEventConsumer, type KafkaEventConsumerOptions } from "./kafka-consumer";

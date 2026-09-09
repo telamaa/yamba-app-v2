@@ -55,26 +55,38 @@ export default function MessageReportsQueue() {
             <li key={item.id} className="rounded-xl border border-slate-200 bg-white p-4">
               <div className="flex flex-wrap items-baseline justify-between gap-2 text-[12.5px] text-slate-500">
                 <span>
-                  <span className="font-semibold text-red-700">{REPORT_REASON_LABEL[item.reason] ?? item.reason}</span> · signalé par {item.reporter.firstName} ({CHAT_ROLE_LABEL[item.reporter.role]}) le {dateTime(item.createdAt)}
+                  <span className="font-semibold text-red-700">{REPORT_REASON_LABEL[item.reason] ?? item.reason}</span> · signalé par {item.reporter.firstName}
+                  {item.reporter.role ? ` (${CHAT_ROLE_LABEL[item.reporter.role]})` : ""} le {dateTime(item.createdAt)}
                 </span>
                 <span>
-                  {item.corridor.originCity} → {item.corridor.destinationCity}
+                  {item.corridor ? `${item.corridor.originCity} → ${item.corridor.destinationCity}` : "corridor inconnu"}
                 </span>
               </div>
-              <blockquote className="mt-2 rounded-lg bg-slate-50 px-3 py-2 text-[13px] text-slate-800">
-                <span className="text-[11.5px] uppercase tracking-wide text-slate-500">
-                  {item.author.firstName} ({CHAT_ROLE_LABEL[item.author.role]}) · {dateTime(item.message.createdAt)}
-                </span>
-                <p className="mt-1 whitespace-pre-wrap">{item.message.body}</p>
-              </blockquote>
+              {/* ANO-CRON-09 — dossier dont le message a été purgé : il reste traitable, sans son contenu. */}
+              {item.purged ? (
+                <p className="mt-2 rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-2 text-[12.5px] text-slate-600">
+                  Contenu purgé par la conservation : le message et son fil n'existent plus. Le dossier reste ouvert et peut être clos ici.
+                </p>
+              ) : (
+                <blockquote className="mt-2 rounded-lg bg-slate-50 px-3 py-2 text-[13px] text-slate-800">
+                  <span className="text-[11.5px] uppercase tracking-wide text-slate-500">
+                    {item.author?.firstName} ({item.author ? CHAT_ROLE_LABEL[item.author.role] : "—"}) · {dateTime(item.message.createdAt ?? item.createdAt)}
+                  </span>
+                  <p className="mt-1 whitespace-pre-wrap">{item.message.body}</p>
+                </blockquote>
+              )}
               {item.details && <p className="mt-2 text-[12.5px] text-slate-600">Précisions : {item.details}</p>}
               <div className="mt-3 flex flex-wrap items-center gap-2">
-                <Link href={`/conversations/${item.bookingId}`} className="text-[12.5px] font-medium text-[#185FA5] hover:underline">
-                  Lire la conversation →
-                </Link>
-                <Link href={`/users/${item.author.id ?? ""}`} className="text-[12.5px] font-medium text-[#185FA5] hover:underline">
-                  Fiche de {item.author.firstName} →
-                </Link>
+                {item.bookingId && (
+                  <Link href={`/conversations/${item.bookingId}`} className="text-[12.5px] font-medium text-[#185FA5] hover:underline">
+                    Lire la conversation →
+                  </Link>
+                )}
+                {item.author && (
+                  <Link href={`/users/${item.author.id ?? ""}`} className="text-[12.5px] font-medium text-[#185FA5] hover:underline">
+                    Fiche de {item.author.firstName} →
+                  </Link>
+                )}
                 {item.status === "OPEN" && (
                   <>
                     <input

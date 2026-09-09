@@ -24031,10 +24031,17 @@
                 "type": "string"
               },
               "role": {
-                "type": "string",
-                "enum": [
-                  "SHIPPER",
-                  "CARRIER"
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "SHIPPER",
+                      "CARRIER"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
                 ]
               }
             },
@@ -24045,37 +24052,48 @@
             ],
             "additionalProperties": false
           },
+          "purged": {
+            "type": "boolean",
+            "description": "Le message visé a été purgé : le dossier reste, son contenu a disparu"
+          },
           "author": {
-            "type": "object",
-            "properties": {
-              "id": {
-                "anyOf": [
-                  {
-                    "$ref": "#/components/schemas/ObjectId"
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/components/schemas/ObjectId"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
                   },
-                  {
-                    "type": "null"
+                  "firstName": {
+                    "type": "string"
+                  },
+                  "role": {
+                    "type": "string",
+                    "enum": [
+                      "SHIPPER",
+                      "CARRIER",
+                      "SYSTEM"
+                    ]
                   }
-                ]
+                },
+                "required": [
+                  "id",
+                  "firstName",
+                  "role"
+                ],
+                "additionalProperties": false
               },
-              "firstName": {
-                "type": "string"
-              },
-              "role": {
-                "type": "string",
-                "enum": [
-                  "SHIPPER",
-                  "CARRIER",
-                  "SYSTEM"
-                ]
+              {
+                "type": "null"
               }
-            },
-            "required": [
-              "id",
-              "firstName",
-              "role"
-            ],
-            "additionalProperties": false
+            ]
           },
           "message": {
             "type": "object",
@@ -24084,12 +24102,26 @@
                 "$ref": "#/components/schemas/ObjectId"
               },
               "body": {
-                "type": "string"
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               },
               "createdAt": {
-                "type": "string",
-                "format": "date-time",
-                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               }
             },
             "required": [
@@ -24100,26 +24132,47 @@
             "additionalProperties": false
           },
           "conversationId": {
-            "$ref": "#/components/schemas/ObjectId"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ObjectId"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "bookingId": {
-            "$ref": "#/components/schemas/ObjectId"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ObjectId"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "corridor": {
-            "type": "object",
-            "properties": {
-              "originCity": {
-                "type": "string"
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "originCity": {
+                    "type": "string"
+                  },
+                  "destinationCity": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "originCity",
+                  "destinationCity"
+                ],
+                "additionalProperties": false
               },
-              "destinationCity": {
-                "type": "string"
+              {
+                "type": "null"
               }
-            },
-            "required": [
-              "originCity",
-              "destinationCity"
-            ],
-            "additionalProperties": false
+            ]
           }
         },
         "required": [
@@ -24129,6 +24182,7 @@
           "details",
           "createdAt",
           "reporter",
+          "purged",
           "author",
           "message",
           "conversationId",

@@ -2292,3 +2292,92 @@ que l'application fait, mais qu'un autre programme branché sur l'API ne faisait
 | LANG6 | Une langue inconnue est demandée | La langue du lecteur s'applique |
 
 Joués le 9 septembre 2026 — voir `context/YAMBA-RECETTE-API-RESULTATS.md`, « Solde de la dette D-1 ».
+
+---
+
+# Recette « tâches planifiées » — ce que le métier attend des mécaniques invisibles
+
+*(cahier n° 4, 09/09/2026 — 90 fiches, 9 anomalies closes, décisions **D76** et **D77**.)*
+
+## Le besoin
+
+Quinze tâches tournent la nuit, deux relais publient les événements, deux consommateurs les
+transforment en notifications et en emails. **Aucune de ces mécaniques n'a d'écran.** Personne ne
+se plaint quand elles s'arrêtent : les emails cessent simplement d'arriver, les remboursements
+attendent, les données ne se purgent plus. Le besoin métier est donc double — qu'elles fassent leur
+travail, et qu'on **sache** quand elles ne le font pas.
+
+## Les règles
+
+**RG-CRON-01 — Un événement en attente de publication n'est jamais supprimé.** Un événement qui
+n'est pas encore parti est une piste d'audit et une notification due. Aucune purge, quelle que soit
+son ancienneté, ne peut l'effacer. *(ANO-CRON-05 : la purge nocturne les supprimait tous, chaque
+nuit.)*
+
+**RG-CRON-02 — Une panne d'infrastructure fait du retard, jamais une perte.** Courtier arrêté,
+sujet absent, base injoignable : l'événement attend, il n'est ni parqué ni consommé de travers. Le
+signal est le **retard** (alerte au-delà de quinze minutes d'attente), jamais la disparition.
+*(ANO-CRON-06, D76.)*
+
+**RG-CRON-03 — Un composant qui tombe se relève, ou se voit.** Un consommateur arrêté rend le
+service **dégradé** sur la page « État des services » et sur la sonde publique. Un service qui
+répond « en forme » alors qu'il ne consomme plus rien est un défaut à part entière. *(ANO-CRON-08,
+D76.)*
+
+**RG-CRON-04 — Un message illisible n'est jamais sauté.** On rejoue, bruyamment et de plus en plus
+espacé. Sauter un message qu'on n'a pas su lire, c'est le perdre.
+
+**RG-CRON-05 — Un message hors contrat ne bloque pas les autres.** Il est marqué en échec
+définitif, la file continue d'avancer. Une seule ligne malformée ne doit jamais arrêter les
+notifications de toute la plateforme.
+
+**RG-CRON-06 — Rejouer un événement ne produit ni doublon d'email, ni doublon de notification.**
+La réclamation se fait par identifiant d'événement, et l'email par destinataire : un rejeu retrouve
+ce qui existe au lieu de le recréer.
+
+**RG-CRON-07 — Chaque purge reste dans son domaine.** Une tâche ne supprime que ses propres
+collections. Aucune ne touche aux réservations, aux trajets, aux comptes, aux litiges, aux avis ni
+aux signalements.
+
+**RG-CRON-08 — La conservation efface le propos, jamais le dossier de modération.** Quand la purge
+d'un fil emporte un message signalé, le signalement **reste visible et traitable** par
+l'administrateur, sans son contenu. Un dossier ouvert ne doit jamais sortir de la file autrement
+que par une décision humaine. *(ANO-CRON-09, D77.)*
+
+**RG-CRON-09 — Aucun email ne part vers un compte effacé ou une adresse supprimée.** La règle vaut
+pour **tous** les flux issus d'une tâche planifiée : rappel d'inscription, relance des messages non
+lus, rappel de vérification, relance de notation. La notification interne, elle, reste créée : la
+suppression porte sur l'email, pas sur le domaine.
+
+**RG-CRON-10 — Une tâche planifiée est un acteur comme un autre.** Elle passe par la machine à
+états (`SYSTEM`), elle ne recopie pas la règle dans un `if`. Un trajet portant un deal vivant n'est
+pas complété, une demande non périmée n'est pas expirée, une réservation en litige n'est pas versée.
+
+**RG-CRON-11 — Un montant versé est celui de l'instantané, jamais du trajet.** Modifier le prix
+d'un trajet n'a aucun effet sur les réservations déjà prises. Les montants sont des centimes
+entiers.
+
+**RG-CRON-12 — Le code de livraison ne quitte jamais la base.** Ni dans un événement, ni dans un
+email, ni dans une notification, ni dans la mesure d'audience. En base il n'existe que sous deux
+formes : une empreinte (validation) et un chiffré (réaffichage à l'Expéditeur).
+
+**RG-CRON-13 — Le jeu d'essai respecte les règles qu'il sert à éprouver.** Un seed qui écrit un cas
+que l'API refuse fabrique de fausses anomalies et fait perdre du temps. *(ANO-CRON-07.)*
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| 1 | Trois événements non publiés (10 j, 200 j, 2 ans), toutes les purges passées | les trois survivent, intacts | oui |
+| 2 | Courtier arrêté 100 s, un événement sain en file | `attempts` reste à 0 ; publié seul au retour | oui |
+| 3 | Sujet supprimé du courtier | rejeu sans fin, alerte de retard à 15 min, jamais parqué | oui |
+| 4 | Message que le transport ne sait pas décoder | le service passe **dégradé**, réessaie 5 s → 10 s → 20 s → 40 s, et se remet seul une fois le message retiré | oui |
+| 5 | Message hors contrat, puis message suivant | échec définitif tracé, retard du groupe à 0, le suivant est traité | oui |
+| 6 | Même événement rejoué | aucun email, aucune notification en double | oui |
+| 7 | Consommateur arrêté, 6 événements publiés, puis redémarré | retard 6 → 0, chacun traité une fois, dans l'ordre par réservation | oui |
+| 8 | Base injoignable pendant l'arrivée d'un message | l'offset n'avance pas ; base revenue, message relivré et traité **une** fois | oui |
+| 9 | Cinq tâches de suppression, seize collections comptées | chacune ne fait varier que ses propres collections | oui |
+| 10 | Signalement dont le message a été purgé | dossier visible dans la file, marqué « contenu purgé », toujours traitable | oui |
+| 11 | Compte effacé et adresse supprimée, quatre flux d'emails | zéro email, notification interne conservée | oui |
+| 12 | Effacement du tiers à 29 / 30 / 31 jours | 29 intact, 30 et 31 effacés ; aucune réservation vivante touchée | oui |
+| 13 | Prix du trajet modifié après réservation, puis versement | le versement vaut l'instantané, pas le prix courant | oui |

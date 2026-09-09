@@ -106,7 +106,7 @@ docker exec yamba-redpanda rpk topic list
 
 Attendu : les deux lignes `booking-events` et `messaging-events`, chacune avec 12 partitions.
 
-> **Point de recette à part entière.** Le script de démarrage ne crée que `booking-events`. Sur une machine neuve, si personne ne crée `messaging-events`, le relais de la messagerie échouera en boucle sur un sujet inconnu — et, au bout de dix tentatives, **parquera** des événements sains. C'est le scénario CRON-RELAIS-6.
+> **Point de recette à part entière.** Le script de démarrage ne crée que `booking-events`. Sur une machine neuve, si personne ne crée `messaging-events`, le relais de la messagerie échouera en boucle sur un sujet inconnu. C'est le scénario CRON-RELAIS-6. *(Mise à jour du 09/09/2026, D76 : depuis la correction d'`ANO-CRON-06`, cet échec n'est plus parqué — il est rejoué sans fin et signalé par l'alerte de retard.)*
 
 ### 2.3 La boîte aux lettres de recette
 
@@ -2396,12 +2396,19 @@ npx tsx --env-file=.env -e 'import p from "./packages/libs/prisma"; p.outboxEven
 
 ---
 
-#### CRON-RELAIS-6 — Le sujet absent parque des événements sains
+#### CRON-RELAIS-6 — Le sujet absent ne parque plus, il fait du retard
 
 | | |
 |---|---|
 | **Objectif** | Éprouver le scénario d'installation le plus probable : `messaging-events` n'a pas été créé |
 | **Gravité si écart** | **Majeure** |
+
+> **Fiche corrigée le 09/09/2026 (D76).** La version d'origine posait le parcage comme le
+> résultat *attendu*. La campagne a montré que c'était l'ancien comportement du seul
+> message-service, et que ce comportement était une perte : un sujet absent est un défaut
+> d'**infrastructure**, réparable en une commande, alors que le parcage sort l'événement de la
+> file définitivement. Depuis la correction d'`ANO-CRON-06`, les deux relais rejouent sans fin
+> et le signal passe par l'alerte `OUTBOX_LAGGING_15MIN`.
 
 **Étapes**
 
@@ -2410,12 +2417,13 @@ npx tsx --env-file=.env -e 'import p from "./packages/libs/prisma"; p.outboxEven
 3. Envoyer un message dans une conversation (cahier 01).
 4. Observer la ligne d'outbox correspondante pendant une minute.
 
-**Résultat attendu à documenter précisément.** L'auto-création de sujets étant désactivée au niveau du cluster **et** du producteur, la publication échoue. La question de recette est : **cet échec est-il traité comme transitoire (pas de parking) ou comme non rejouable (parking) ?**
+**Résultat attendu.** L'auto-création de sujets étant désactivée au niveau du cluster **et** du producteur, la publication échoue avec `This server does not host this topic-partition`, que kafkajs finit par présenter sous le nom `KafkaJSNumberOfRetriesExceeded` — le **même nom** qu'une panne de courtier. C'est précisément pourquoi la classification se fait désormais par **cause** et non par nom (`isBrokerUnavailable`).
 
-- Si l'erreur remontée par `kafkajs` est une erreur de connexion, `attempts` **ne bouge pas** et le tick part en attente croissante (1 s → 30 s). Comportement souhaitable.
-- Si elle est marquée `retriable: false` sans porter l'un des deux noms exclus, `attempts` **monte** et l'événement finit **parqué** au bout de dix tentatives, soit une vingtaine de secondes. Comportement à consigner comme anomalie majeure : un événement parfaitement sain, perdu pour une erreur d'installation.
+- `attempts` **reste à 0** sur les deux relais, l'erreur étant tracée dans `lastError` pour l'exploitant.
+- L'événement **n'est jamais parqué**, quelle que soit la durée de l'incident.
+- Le signal vient du **retard** : l'alerte `OUTBOX_LAGGING_15MIN` se déclenche dès que le plus ancien événement non publié dépasse quinze minutes d'attente.
 
-Consigner le comportement observé, avec la valeur de `lastError`. Puis recréer le sujet (§ 2.2) et vérifier que les événements en attente partent bien — **s'ils n'ont pas été parqués**.
+Recréer le sujet (§ 2.2) et vérifier que les événements en attente partent **tout seuls**, avec `attempts: 0`.
 
 **Verdict** : ☐ conforme ☐ non conforme
 
@@ -3171,96 +3179,96 @@ Trois tâches n'émettent **aucun** événement, et c'est normal : `recipient-re
 
 | ID | Intitulé | Verdict | Gravité | Anomalie | Testeur | Date |
 |---|---|---|---|---|---|---|
-| CRON-TRAJETS-1 | Le trajet terminé passe COMPLETED | | | | | |
-| CRON-TRAJETS-2 | Le trajet avec un deal en cours n'est pas terminé | | | | | |
-| CRON-TRAJETS-3 | Le litige ne bloque pas la complétion | | | | | |
-| CRON-TRAJETS-4 | Un trajet en échec ne bloque pas la fournée | | | | | |
-| CRON-EXPIRE-1 | La demande dépassée expire et libère tout | | | | | |
-| CRON-EXPIRE-2 | La demande non dépassée n'est pas touchée | | | | | |
-| CRON-EXPIRE-3 | Pas de double expiration ni double restitution | | | | | |
-| CRON-EXPIRE-4 | La garde de chevauchement | | | | | |
-| CRON-EXPIRE-5 | La coupure par variable d'environnement | | | | | |
-| CRON-PAYOUT-1 | Le versement à échéance part | | | | | |
-| CRON-PAYOUT-2 | La remise non échue n'est pas versée | | | | | |
-| CRON-PAYOUT-3 | Le rappel de vérification à J+3 | | | | | |
-| CRON-PAYOUT-4 | Jamais deux rappels | | | | | |
-| CRON-PAYOUT-5 | Le rejeu espacé d'un versement en échec | | | | | |
-| CRON-PAYOUT-6 | Jamais deux transferts | | | | | |
-| CRON-PAYOUT-7 | L'ordre des trois passes | | | | | |
-| CRON-ALERTES-1 | Une alerte nouvelle déclenche un email | | | | | |
-| CRON-ALERTES-2 | Rien sous le seuil, rien à envoyer | | | | | |
-| CRON-ALERTES-3 | Une alerte, un email par jour | | | | | |
-| CRON-ALERTES-4 | Le seuil est lu dans les paramètres | | | | | |
-| CRON-ALERTES-5 | Le verrou est posé même sans email | | | | | |
-| CRON-NOTATION-1 | La première relance part à J+5 | | | | | |
-| CRON-NOTATION-2 | La révélation à la fin de la fenêtre | | | | | |
-| CRON-NOTATION-3 | Ce que la tâche ne doit pas faire | | | | | |
-| CRON-NOTATION-4 | Jamais deux relances ni deux révélations | | | | | |
-| CRON-NOTATION-5 | Le compteur avance même sans cible | | | | | |
-| CRON-DIGEST-1 | Le récapitulatif part avec ses trois listes | | | | | |
-| CRON-DIGEST-2 | Rien à signaler, rien à envoyer | | | | | |
-| CRON-DIGEST-3 | Un seul email par passage | | | | | |
-| CRON-DIGEST-4 | L'erreur d'envoi remonte | | | | | |
-| CRON-RELANCE-1 | Le message non lu déclenche une relance | | | | | |
-| CRON-RELANCE-2 | Les six cas de non-relance | | | | | |
-| CRON-RELANCE-3 | Le verrou optimiste empêche le double envoi | | | | | |
-| CRON-RELANCE-4 | Les délais sont lus dans les paramètres | | | | | |
-| CRON-RELANCE-5 | Le destinataire qui a coupé les relances | | | | | |
-| CRON-PURGEFIL-1 | La conversation d'un vieux deal disparaît | | | | | |
-| CRON-PURGEFIL-2 | Les trois cas de non-purge | | | | | |
-| CRON-PURGEFIL-3 | Rejouer ne casse rien | | | | | |
-| CRON-PURGEFIL-4 | La durée est lue dans les paramètres | | | | | |
-| CRON-PURGEOUT-1 | Les événements publiés et anciens partent | | | | | |
-| CRON-PURGEOUT-2 | L'événement parqué survit | | | | | |
-| CRON-PURGEOUT-3 | Chaque service ne purge que son domaine | | | | | |
-| CRON-PURGEOUT-4 | Le récent ne part pas, durée paramétrable | | | | | |
-| CRON-PURGEOUT-5 | Rejouer ne supprime rien de plus | | | | | |
-| CRON-DESTINATAIRE-1 | Le tiers est effacé après le délai | | | | | |
-| CRON-DESTINATAIRE-2 | Les trois cas de non-effacement | | | | | |
-| CRON-DESTINATAIRE-3 | Jamais deux effacements | | | | | |
-| CRON-DESTINATAIRE-4 | Le délai est lu et borné | | | | | |
-| CRON-CONSERV-1 | Les trois collections sont purgées | | | | | |
-| CRON-CONSERV-2 | Chaque durée est indépendante | | | | | |
-| CRON-CONSERV-3 | La purge n'efface pas ce qui n'est pas à elle | | | | | |
-| CRON-CONSERV-4 | Le registre purgé rouvre le retraitement | | | | | |
-| CRON-ONBOARD-1 | Les trois rappels partent dans l'ordre | | | | | |
-| CRON-ONBOARD-2 | Les cas de non-envoi | | | | | |
-| CRON-ONBOARD-3 | Le compte abandonné n'est pas réveillé | | | | | |
-| CRON-ONBOARD-4 | Pas de double rappel | | | | | |
-| CRON-ONBOARD-5 | Le cron démarre bien | | | | | |
-| CRON-RELAIS-1 | L'événement transactionnel est publié | | | | | |
-| CRON-RELAIS-2 | L'ordre par agrégat est respecté | | | | | |
-| CRON-RELAIS-3 | Le bail d'exclusivité entre deux instances | | | | | |
-| CRON-RELAIS-4 | Chaque relais ne draine que son domaine | | | | | |
-| CRON-RELAIS-5 | L'événement empoisonné est parqué | | | | | |
-| CRON-RELAIS-6 | Le sujet absent parque des événements sains | | | | | |
-| CRON-RELAIS-7 | Le courtier redémarre en cours de route | | | | | |
-| CRON-RELAIS-8 | Le relais coupé, l'application vit | | | | | |
-| CRON-RELAIS-9 | Aucun secret dans un payload | | | | | |
-| CRON-CONSO-1 | L'événement devient notification et email | | | | | |
-| CRON-CONSO-2 | Rejouer ne produit pas de doublon | | | | | |
-| CRON-CONSO-3 | Le message malformé ne bloque pas la file | | | | | |
-| CRON-CONSO-4 | Le message sans en-tête est ignoré | | | | | |
-| CRON-CONSO-5 | Panne du consommateur et rattrapage | | | | | |
-| CRON-CONSO-6 | La panne de base ne valide pas l'offset | | | | | |
-| CRON-CONSO-7 | Les deux groupes sont indépendants | | | | | |
-| CRON-CONSO-8 | La mesure d'audience sur liste blanche | | | | | |
-| CRON-BATT-1 | Chaque tâche laisse sa trace | | | | | |
-| CRON-BATT-2 | Une tâche coupée ne bat plus | | | | | |
-| CRON-BATT-3 | Une tâche en échec bat avec son erreur | | | | | |
-| CRON-BATT-4 | L'adresse de battement sortante est appelée | | | | | |
-| CRON-BATT-5 | Une carte invalide désarme la surveillance | | | | | |
-| CRON-BATT-6 | Redis absent ne casse aucune tâche | | | | | |
-| CRON-BATT-7 | La page « État des services » dit la vérité | | | | | |
-| CRON-SEC-1 | Une purge ne supprime jamais un non publié | | | | | |
-| CRON-SEC-2 | Une purge ne déborde jamais de son domaine | | | | | |
-| CRON-SEC-3 | Le signalement survit à la purge du fil | | | | | |
-| CRON-SEC-4 | L'effacement du tiers respecte le délai | | | | | |
-| CRON-SEC-5 | Aucun email vers un compte effacé | | | | | |
-| CRON-SEC-6 | Le code de livraison ne sort jamais | | | | | |
-| CRON-SEC-7 | Les tâches passent par les machines à états | | | | | |
-| CRON-SEC-8 | Aucune écriture d'état sans son événement | | | | | |
-| CRON-SEC-9 | Montants entiers, jamais recalculés | | | | | |
+| CRON-TRAJETS-1 | Le trajet terminé passe COMPLETED | **Non conforme** | mineure | ANO-CRON-01 | Gomab (assisté) | 09/09/2026 |
+| CRON-TRAJETS-2 | Le trajet avec un deal en cours n'est pas terminé | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
+| CRON-TRAJETS-3 | Le litige ne bloque pas la complétion | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
+| CRON-TRAJETS-4 | Un trajet en échec ne bloque pas la fournée | **Conforme** |  | provocation du cahier inopérante | Gomab (assisté) | 09/09/2026 |
+| CRON-EXPIRE-1 | La demande dépassée expire et libère tout | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
+| CRON-EXPIRE-2 | La demande non dépassée n'est pas touchée | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
+| CRON-EXPIRE-3 | Pas de double expiration ni double restitution | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
+| CRON-EXPIRE-4 | La garde de chevauchement | **Conforme** |  | fournée éprouvée à 1 | Gomab (assisté) | 09/09/2026 |
+| CRON-EXPIRE-5 | La coupure par variable d'environnement | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
+| CRON-PAYOUT-1 | Le versement à échéance part | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
+| CRON-PAYOUT-2 | La remise non échue n'est pas versée | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
+| CRON-PAYOUT-3 | Le rappel de vérification à J+3 | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
+| CRON-PAYOUT-4 | Jamais deux rappels | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
+| CRON-PAYOUT-5 | Le rejeu espacé d'un versement en échec | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
+| CRON-PAYOUT-6 | Jamais deux transferts | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
+| CRON-PAYOUT-7 | L'ordre des trois passes | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
+| CRON-ALERTES-1 | Une alerte nouvelle déclenche un email | **Conforme** |  | a révélé ANO-CRON-02 | Gomab (assisté) | 09/09/2026 |
+| CRON-ALERTES-2 | Rien sous le seuil, rien à envoyer | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
+| CRON-ALERTES-3 | Une alerte, un email par jour | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
+| CRON-ALERTES-4 | Le seuil est lu dans les paramètres | **Non conforme** | cosmétique | ANO-CRON-03 | Gomab (assisté) | 09/09/2026 |
+| CRON-ALERTES-5 | Le verrou est posé même sans email | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
+| CRON-NOTATION-1 | La première relance part à J+5 | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
+| CRON-NOTATION-2 | La révélation à la fin de la fenêtre | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
+| CRON-NOTATION-3 | Ce que la tâche ne doit pas faire | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
+| CRON-NOTATION-4 | Jamais deux relances ni deux révélations | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
+| CRON-NOTATION-5 | Le compteur avance même sans cible | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
+| CRON-DIGEST-1 | Le récapitulatif part avec ses trois listes | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
+| CRON-DIGEST-2 | Rien à signaler, rien à envoyer | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
+| CRON-DIGEST-3 | Un seul email par passage | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
+| CRON-DIGEST-4 | L'erreur d'envoi remonte | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
+| CRON-RELANCE-1 | Le message non lu déclenche une relance | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
+| CRON-RELANCE-2 | Les six cas de non-relance | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
+| CRON-RELANCE-3 | Le verrou optimiste empêche le double envoi | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
+| CRON-RELANCE-4 | Les délais sont lus dans les paramètres | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
+| CRON-RELANCE-5 | Le destinataire qui a coupé les relances | **Non conforme** | mineure | ANO-CRON-04 | Gomab (assisté) | 09/09/2026 |
+| CRON-PURGEFIL-1 | La conversation d'un vieux deal disparaît | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
+| CRON-PURGEFIL-2 | Les trois cas de non-purge | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
+| CRON-PURGEFIL-3 | Rejouer ne casse rien | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
+| CRON-PURGEFIL-4 | La durée est lue dans les paramètres | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
+| CRON-PURGEOUT-1 | Les événements publiés et anciens partent | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
+| CRON-PURGEOUT-2 | L'événement parqué survit | **Non conforme** | BLOQUANTE | ANO-CRON-05 | Gomab (assisté) | 09/09/2026 |
+| CRON-PURGEOUT-3 | Chaque service ne purge que son domaine | **Conforme** |  | isolation des agrégats | Gomab (assisté) | 09/09/2026 |
+| CRON-PURGEOUT-4 | Le récent ne part pas, durée paramétrable | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
+| CRON-PURGEOUT-5 | Rejouer ne supprime rien de plus | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
+| CRON-DESTINATAIRE-1 | Le tiers est effacé après le délai | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
+| CRON-DESTINATAIRE-2 | Les trois cas de non-effacement | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
+| CRON-DESTINATAIRE-3 | Jamais deux effacements | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
+| CRON-DESTINATAIRE-4 | Le délai est lu et borné | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
+| CRON-CONSERV-1 | Les trois collections sont purgées | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
+| CRON-CONSERV-2 | Chaque durée est indépendante | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
+| CRON-CONSERV-3 | La purge n'efface pas ce qui n'est pas à elle | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
+| CRON-CONSERV-4 | Le registre purgé rouvre le retraitement | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
+| CRON-ONBOARD-1 | Les trois rappels partent dans l'ordre | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
+| CRON-ONBOARD-2 | Les cas de non-envoi | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
+| CRON-ONBOARD-3 | Le compte abandonné n'est pas réveillé | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
+| CRON-ONBOARD-4 | Pas de double rappel | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
+| CRON-ONBOARD-5 | Le cron démarre bien | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
+| CRON-RELAIS-1 | L'événement transactionnel est publié | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
+| CRON-RELAIS-2 | L'ordre par agrégat est respecté | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
+| CRON-RELAIS-3 | Le bail d'exclusivité entre deux instances | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
+| CRON-RELAIS-4 | Chaque relais ne draine que son domaine | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
+| CRON-RELAIS-5 | L'événement empoisonné est parqué | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
+| CRON-RELAIS-6 | Le sujet absent ne parque plus, il fait du retard | **Conforme** |  | fiche corrigée le 09/09/2026 (D76) après ANO-CRON-06 | Gomab (assisté) | 09/09/2026 |
+| CRON-RELAIS-7 | Le courtier redémarre en cours de route | **Non conforme** | majeure | ANO-CRON-06 | Gomab (assisté) | 09/09/2026 |
+| CRON-RELAIS-8 | Le relais coupé, l'application vit | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
+| CRON-RELAIS-9 | Aucun secret dans un payload | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
+| CRON-CONSO-1 | L'événement devient notification et email | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
+| CRON-CONSO-2 | Rejouer ne produit pas de doublon | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
+| CRON-CONSO-3 | Le message malformé ne bloque pas la file | **Conforme** |  | tient pour un message décodable — voir ANO-CRON-08 | Gomab (assisté) | 09/09/2026 |
+| CRON-CONSO-4 | Le message sans en-tête est ignoré | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
+| CRON-CONSO-5 | Panne du consommateur et rattrapage | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
+| CRON-CONSO-6 | La panne de base ne valide pas l'offset | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
+| CRON-CONSO-7 | Les deux groupes sont indépendants | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
+| CRON-CONSO-8 | La mesure d'audience sur liste blanche | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
+| CRON-BATT-1 | Chaque tâche laisse sa trace | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
+| CRON-BATT-2 | Une tâche coupée ne bat plus | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
+| CRON-BATT-3 | Une tâche en échec bat avec son erreur | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
+| CRON-BATT-4 | L'adresse de battement sortante est appelée | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
+| CRON-BATT-5 | Une carte invalide désarme la surveillance | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
+| CRON-BATT-6 | Redis absent ne casse aucune tâche | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
+| CRON-BATT-7 | La page « État des services » dit la vérité | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
+| CRON-SEC-1 | Une purge ne supprime jamais un non publié | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
+| CRON-SEC-2 | Une purge ne déborde jamais de son domaine | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
+| CRON-SEC-3 | Le signalement survit à la purge du fil | **Non conforme** | majeure | ANO-CRON-09 | Gomab (assisté) | 09/09/2026 |
+| CRON-SEC-4 | L'effacement du tiers respecte le délai | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
+| CRON-SEC-5 | Aucun email vers un compte effacé | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
+| CRON-SEC-6 | Le code de livraison ne sort jamais | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
+| CRON-SEC-7 | Les tâches passent par les machines à états | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
+| CRON-SEC-8 | Aucune écriture d'état sans son événement | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
+| CRON-SEC-9 | Montants entiers, jamais recalculés | **Conforme** |  |  | Gomab (assisté) | 09/09/2026 |
 
 **Total : 90 scénarios.**
 

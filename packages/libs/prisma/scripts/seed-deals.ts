@@ -246,7 +246,7 @@ const BOOKINGS: SeedBooking[] = [
   /* ── Lisbonne → São Paulo (PER_KG) ────────────────────────── */
   { key: "gru-pending", tripKey: "gru", shipperKey: "joao", status: "PENDING", weightKg: 5, category: "FASHION_ACCESSORIES", description: "Acessórios de moda", declaredValueCents: 18000, pricing: perKg(550, 5, "M"), recipient: RCP_GRU,
     milestones: { requestedAt: hours(-5), expiresAt: hours(19) } },
-  { key: "gru-completed", tripKey: "gru", shipperKey: "ines", status: "COMPLETED", weightKg: 6, category: "DOCUMENTS", description: "Documentos notariais", declaredValueCents: 3000, pricing: perKg(550, 6, "M"), recipient: RCP_GRU,
+  { key: "gru-completed", tripKey: "gru", shipperKey: "joao", status: "COMPLETED", weightKg: 6, category: "DOCUMENTS", description: "Documentos notariais", declaredValueCents: 3000, pricing: perKg(550, 6, "M"), recipient: RCP_GRU,
     milestones: { requestedAt: days(-15), expiresAt: days(-14), acceptedAt: days(-14), pickedUpAt: days(-10), deliveredAt: days(-9), payoutDueAt: days(-5), completedAt: days(-6) },
     pickup: { confirmedAt: days(-10), photoUrls: ["https://r2.seed.yamba.dev/gru-completed-1.jpg"], notes: null } },
 
