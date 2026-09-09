@@ -1,5 +1,5 @@
 /** rate-limit-tier.spec.ts — le plafond du limiteur du gateway (A147). */
-import { RATE_LIMIT_ANONYMOUS, RATE_LIMIT_AUTHENTICATED, extractSessionToken, rateLimitMax } from "@packages/middleware/rate-limit-tier";
+import { RATE_LIMIT_ANONYMOUS, RATE_LIMIT_AUTHENTICATED, extractSessionToken, rateLimitMax, resolveRateLimits } from "@packages/middleware/rate-limit-tier";
 
 const always = () => true;
 const never = () => false;
@@ -26,5 +26,26 @@ describe("rateLimitMax (A147)", () => {
   });
   it("les deux plafonds sont distincts et le connecté est le plus haut", () => {
     expect(RATE_LIMIT_AUTHENTICATED).toBeGreaterThan(RATE_LIMIT_ANONYMOUS);
+  });
+});
+
+describe("resolveRateLimits (recette 09/09/2026)", () => {
+  it("sans variable → les défauts", () => {
+    expect(resolveRateLimits({})).toEqual({ anonymous: RATE_LIMIT_ANONYMOUS, authenticated: RATE_LIMIT_AUTHENTICATED });
+  });
+  it("une valeur entière strictement positive surcharge, chacune indépendamment", () => {
+    expect(resolveRateLimits({ RATE_LIMIT_ANONYMOUS_MAX: "2000" })).toEqual({ anonymous: 2000, authenticated: RATE_LIMIT_AUTHENTICATED });
+    expect(resolveRateLimits({ RATE_LIMIT_AUTHENTICATED_MAX: " 5000 " })).toEqual({ anonymous: RATE_LIMIT_ANONYMOUS, authenticated: 5000 });
+  });
+  it("vide, zéro, négatif ou non numérique → ignoré (jamais un plafond nul)", () => {
+    for (const v of ["", "0", "-5", "abc", "1e3", "12.5"]) {
+      expect(resolveRateLimits({ RATE_LIMIT_ANONYMOUS_MAX: v })).toEqual({ anonymous: RATE_LIMIT_ANONYMOUS, authenticated: RATE_LIMIT_AUTHENTICATED });
+    }
+  });
+  it("les plafonds résolus sont ceux que rateLimitMax applique", () => {
+    const limits = resolveRateLimits({ RATE_LIMIT_ANONYMOUS_MAX: "7", RATE_LIMIT_AUTHENTICATED_MAX: "9" });
+    expect(rateLimitMax({}, always, limits)).toBe(7);
+    expect(rateLimitMax({ cookies: { access_token: "t" } }, always, limits)).toBe(9);
+    expect(rateLimitMax({ cookies: { access_token: "forgé" } }, never, limits)).toBe(7);
   });
 });

@@ -292,7 +292,10 @@ async function main() {
       where: { emailNormalized: u.email.toLowerCase() },
       // D71 — un compte de moins de 30 jours est « neuf » (plafonds CNF-06) : les membres du seed ont 90 jours,
       // sauf pour la grille TrustScore qui utilise un compte fraîchement inscrit.
-      update: { firstName: u.firstName, lastName: u.lastName, roles: u.roles, passwordHash: SEED_PASSWORD_HASH, createdAt: days(-90) },
+      // `publicSlug` aussi à la mise à jour : les comptes du seed antérieurs au profil public
+      // (`/u/[slug]`) restaient sans slug, et `/u/seed-thomas` répondait « Profil introuvable »
+      // (recette WEB-E2E-1, étape 29).
+      update: { firstName: u.firstName, lastName: u.lastName, roles: u.roles, passwordHash: SEED_PASSWORD_HASH, createdAt: days(-90), publicSlug: `seed-${u.key}` },
       create: {
         firstName: u.firstName,
         lastName: u.lastName,

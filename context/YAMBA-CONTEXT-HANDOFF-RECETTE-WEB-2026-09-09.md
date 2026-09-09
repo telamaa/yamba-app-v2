@@ -1,0 +1,287 @@
+# Handoff — recette navigateur (cahiers 01-WEB / 02-ADMIN) · 09/09/2026
+
+*Ce document sert à REPRENDRE le chantier après une pause. Il dit où en est la campagne, ce qui
+tourne sur le poste, ce qui reste à faire, et les pièges déjà payés qu'il ne faut pas repayer.*
+
+> **CONSIGNE DE REPRISE (donnée le 09/09/2026).** Dans cet ordre, sans rien intercaler :
+>
+> **1.** ~~corriger le harnais avec `storageState`~~ **FAIT** (§ 4 bis) ;
+> **2.** ~~monter la fixture de session administrateur~~ **FAIT** (`seed-admins.ts` + `navigateurAdmin`) ;
+> **3.** ~~finir WEB-E2E-1 en entier (étapes 11 à 29)~~ **FAIT, 29 étapes vertes** — **ouvrir la PR
+> de `chore/e2e-parcours`** (c'est le point exact de reprise si elle n'est pas encore ouverte) ;
+> **4.** les cinq autres parcours du chapitre 6 (E2E-2 exige la fixture admin — elle est là) ;
+> **5.** les 32 chapitres du cahier **01-WEB** (326 fiches) ;
+> **6.** le cahier **02-ADMIN** (110 fiches) — 19 fiches de sécurité d'accès, 91 fiches d'écrans.
+>
+> **La question Elasticsearch vient APRÈS la recette** — consigne explicite du 09/09/2026. Rien
+> ne se touche du côté de la recherche tant que les deux cahiers ne sont pas clos. L'analyse est
+> prête au § 8 (réponse proposée : **non**, avec une correction ciblée et Atlas Search comme voie
+> de sortie) ; elle attend son tour. Autre sujet produit ouvert le 09/09, **également après la
+> recette** : rendre la demande visible aux Voyageurs (§ 9).
+
+---
+
+## 1. Où en est la journée
+
+| Livraison | État |
+|---|---|
+| **Cahier n° 4 — tâches planifiées** (90 fiches) | **CLOS.** 9 anomalies, 9 closes. PR **#256** + docs **#257**, mergées. Décisions **D76** et **D77** gravées au registre. Rapport : `context/YAMBA-RECETTE-CRONS-RESULTATS.md` |
+| **Harnais de recette navigateur** (Playwright) | **MERGÉ** — PR **#258**. Avec `ANO-WEB-01` (bloquante) et `ANO-WEB-02` (majeure), toutes deux closes |
+| **Parcours transactionnels** | **PRÊT À OUVRIR EN PR**, branche `chore/e2e-parcours` : WEB-E2E-1 passe **en entier** (29 étapes, 1 min 24), sessions mémorisées, fixture admin, `ANO-WEB-03` (majeure) close, 15 scénarios verts en 3 min 06 |
+
+Rapport de la campagne navigateur : `context/YAMBA-RECETTE-WEB-RESULTATS.md`.
+
+## 2. Ce qui tourne sur le poste (à reconstituer après redémarrage)
+
+**Yamba n'a besoin que de DEUX conteneurs Docker.** Vérifié le 09/09 en lisant le `.env` :
+MongoDB est sur **Atlas** et Redis sur **Upstash** — tous deux distants. Les conteneurs locaux
+`mongodb_container*`, `redis_container*`, `postgres_container*`, `mysql_container*`,
+`elasticsearch_container*`, `rabbitmq_container*`, `*notification_container`, `odoo-*` et
+`leko-app-mailhog-1` (dix-sept en tout) **n'ont aucun rôle dans Yamba** : ils appartiennent à
+d'autres projets ou à une ancienne pile. Ils ont été arrêtés proprement avant le redémarrage.
+
+```sh
+# 1. L'infrastructure : DEUX conteneurs, pas dix-neuf
+docker start yamba-redpanda yamba-mailpit
+
+# 2. Les six services — `npm run dev` ne lance QUE les services (nx run-many serve), pas les fronts
+npm run dev                            # NX_SKIP_NX_CACHE=true npm run dev après un changement de code serveur
+npx nx dev user-ui                     # port 3000
+npx nx dev admin-ui                    # port 3001 — indispensable à navigateurAdmin()
+
+# 3. POUR LES PARCOURS SEULEMENT — deal-service avec le fournisseur de paiement FAKE
+#    (voir § 4 : le Payment Element de Stripe ne se monte pas sur l'origine du poste)
+kill -9 $(lsof -nP -iTCP:6003 -sTCP:LISTEN -t)
+cd apps/deal-service && STRIPE_SECRET_KEY= node --env-file=../../.env dist/main.js
+
+# 4. Le plafond anonyme du limiteur (§ 4 bis) : RATE_LIMIT_ANONYMOUS_MAX=2000 est dans le .env du
+#    poste ; `nx serve` lit le .env au LANCEMENT — après l'avoir ajouté, relancer la passerelle
+#    (ou la faire tourner en bundle comme deal-service) :
+kill -9 $(lsof -nP -iTCP:8080 -sTCP:LISTEN -t)
+cd apps/api-gateway && node --env-file=../../.env dist/main.js
+
+# 5. Les comptes du back-office (une fois, ou après un scénario qui les a abîmés)
+npx tsx --env-file=.env packages/libs/prisma/scripts/seed-admins.ts
+```
+
+Vérification rapide : `bash scripts/smoke-services.sh`, puis `curl -s localhost:8080/api/status | jq`.
+
+**Le harnais** : `npx nx e2e e2e` (tout), ou
+`npx playwright test --config=apps/e2e/playwright.config.ts src/parcours/web-e2e-1.spec.ts` (rejoue le seed dans son `beforeAll`).
+
+> **Hygiène du poste.** Ce qui charge la machine, ce sont les **huit processus Node** de
+> `npm run dev` (six services + deux fronts Next en mode développement, qui recompilent à chaque
+> route visitée), plus Docker, plus le navigateur. Le harnais, lui, referme ses contextes :
+> vérifié au moment du handoff, **aucun** navigateur de test ne restait. Pour rendre la main à la
+> machine entre deux sessions : arrêter `npm run dev`, et ne relancer que les services utiles
+> (`npx nx serve auth-service` + `trip-service` + `deal-service` + la passerelle suffisent pour
+> les parcours de réservation).
+>
+> Attention : le harnais pilote le **Chrome du poste**. Ne jamais faire `pkill -f Chrome` pendant
+> une session — cela ferme aussi le navigateur personnel.
+
+## 3. État exact de la branche `chore/e2e-parcours`
+
+Tout est **vert sur le poste** (15 scénarios, 3 min 06) et prêt pour la PR. Elle contient :
+
+- **la mémoire des sessions** — `src/fixtures/sessions.ts` (`storageState` dans
+  `apps/e2e/.sessions/`, ignoré), `src/fixtures/adresses.ts` (front / API / back-office déduits
+  de la config du front), `navigateurConnecte(clé, { parEcran })` qui sonde, réutilise ou repasse
+  par l'écran, et rend l'état à la fermeture ;
+- **le navigateur du back-office** — `packages/libs/prisma/scripts/seed-admins.ts` (sept comptes du
+  cahier 02-ADMIN promus et enrôlés, secrets TOTP dans `seed-admins-output.json`, ignoré),
+  `COMPTES_ADMIN`, `jeuEssai.admin(clé)` / `rejouerAdmins()`, `navigateurAdmin(clé)` (mot de
+  passe, puis code calculé par `packages/libs/totp`) ;
+- **les objets de page** des étapes 11 à 29 : `fil-messagerie.ts`, `transport-voyageur.ts`,
+  `suivi-expediteur.ts`, `suivi-destinataire.ts`, `notation.ts` ; plus `fixtures/photos.ts`
+  (ImageKit interposé, `E2E_IMAGEKIT=real`) et `fixtures/presse-papiers.ts` ;
+- **`src/parcours/web-e2e-1.spec.ts`** — les 29 étapes, seed rejoué en `beforeAll` ;
+- `harnais.spec.ts` : six scénarios (connexion par l'écran, mémoire des sessions, back-office) ;
+- **trois corrections hors harnais** : `ANO-WEB-03` (`Messages.tsx`), `publicSlug` à la mise à
+  jour dans `seed-deals.ts`, et le plafond du limiteur surchargeable
+  (`packages/middleware/rate-limit-tier.ts`, gateway, `.env.example`, 4 tests → auth-service 229) ;
+- les documents : rapport de recette, les trois docs cumulatifs, contexte, suivi, CLAUDE.md.
+
+**Ne PAS mettre dans la PR** : `apps/user-ui/AGENTS.md`, `apps/user-ui/CLAUDE.md`,
+`apps/admin-ui/AGENTS.md`, `apps/admin-ui/CLAUDE.md` et `apps/admin-ui/next-env.d.ts` — Next 16
+les génère au lancement de `nx dev`, ils ne sont pas à nous. Les laisser hors index.
+
+## 4. Les pièges déjà payés — ne pas les repayer
+
+1. **Les cookies sont liés à l'hôte.** Le poste sert le front sur `http://192.168.1.155:3000`
+   (recette mobile). Ouvrir `localhost:3000` donne une connexion **200 sans un seul cookie**. Le
+   harnais déduit l'adresse de `NEXT_PUBLIC_API_BASE_URL` — ne pas la forcer à la main.
+2. **`networkidle` ne dit rien de React.** Cliquer avant l'hydratation envoie le formulaire en
+   **GET**, mot de passe dans l'URL. Le helper de connexion attend un appel d'API fait par le
+   client, puis réessaie une fois.
+3. **Le Payment Element de Stripe ne se monte pas sur une origine non sécurisée.** Le bouton
+   « Payer » reste cliquable et ne fait **rien**. D'où le fournisseur **FAKE** pour les parcours
+   (§ 2). Le harnais le détecte et le dit, au lieu d'échouer trente secondes plus loin.
+4. **L'espace fine insécable avant le « € ».** `"32,20 €"` attendu et `"32,20 €"` obtenu
+   s'affichent à l'identique dans un rapport d'échec. `normaliserEspaces()` existe pour ça.
+5. **Les cases à cocher sont habillées** : cliquer le libellé, jamais `check()` sur l'`input`.
+6. **Chromium n'est plus publié pour macOS 13** : le harnais pilote le Chrome du poste.
+7. **Une assertion doit pouvoir échouer.** La première version du parcours cherchait un texte
+   déjà présent avant le clic : elle passait pour rien. La preuve retenue est l'URL du suivi de
+   la réservation créée.
+
+## 4 bis. Le limiteur de débit — réglé, et ce qu'il a appris
+
+Deux plafonds, pas un. **(1)** Les connexions par l'écran épuisaient le plafond anonyme sur
+`POST /auth/login` : réglé par la mémoire des sessions. **(2)** Une fois les connexions
+disparues, les seuls **visiteurs** des parcours (page du trajet, porte, `/track`, profil public,
+tous anonymes) épuisaient encore les **100 requêtes par quart d'heure et par adresse** après
+trois exécutions — symptôme : « Impossible de charger ce trajet », `RateLimit-Remaining: 0` sur
+la passerelle. Réglé par `RATE_LIMIT_ANONYMOUS_MAX` (défaut inchangé en production). **Point
+d'attention produit** noté au rapport : derrière un NAT partagé, 100 requêtes anonymes par quart
+d'heure se partagent entre plusieurs visiteurs.
+
+Pièges payés sur les étapes 11 à 29, pour ne pas les repayer :
+
+8. **`navigator.clipboard` n'existe pas sur `http://192.168…`** (contexte non sécurisé), et Chrome
+   refuse `grantPermissions` : le harnais interpose un presse-papiers en mémoire de page.
+9. **Deux effets React qui posent le même état dans le même rendu : le dernier gagne** —
+   c'était `ANO-WEB-03`. Quand un parcours ouvre « le mauvais écran », chercher l'effet concurrent.
+10. **Un toast de 5 s est encore là quand le suivant arrive** : `.last()` sur les toasts de jalon.
+11. **Le refus « trop tôt » du numéro est un 400 `TOO_EARLY`**, pas un 403 : lire le service,
+    pas la cartographie.
+12. **Les comptes du seed n'avaient pas de `publicSlug`** (antérieurs au profil public) : le seed
+    le pose désormais à chaque rejeu.
+13. **`npm run dev` ne lance pas les fronts.** Sans `nx dev admin-ui`, `navigateurAdmin` attend
+    un écran qui n'existe pas.
+
+## 5. Ce qui reste à faire, dans l'ordre
+
+1. **Ouvrir la PR de `chore/e2e-parcours`** (base `dev`), compter les 17 checks, merger, puis
+   noter le numéro dans le suivi.
+
+2. **Les cinq autres parcours du chapitre 6** : litige (E2E-2, avec `navigateurAdmin("mediateur")`
+   pour trancher en remboursement partiel de 15,00 €), annulation tardive (E2E-3), compte neuf
+   plafonné (E2E-4), refus au pickup (E2E-5), parcours du destinataire (E2E-6). Les objets de page
+   des étapes 11 à 29 couvrent déjà la plus grande part de leurs écrans.
+
+3. **Les 32 chapitres 5.x du cahier 01-WEB** (326 fiches), par famille. Huit d'entre eux
+   s'appuient sur le back-office (tableau du handoff précédent : suspendre, masquer, valider un
+   billet, abaisser un paramètre, relire les signalés, ouvrir l'arbitrage, maintenance) — la
+   fixture est prête.
+
+4. **Le cahier 02-ADMIN** (110 fiches) : 19 fiches de sécurité d'accès (le premier enrôlement
+   `ADM-SEC-2` se joue sur un compte remis à neuf par `grant-admin.ts --revoke` puis une nouvelle
+   attribution — le seed enrôle les sept), 91 fiches d'écrans.
+
+## 6. Observations à traiter un jour
+
+- Le message d'erreur quand le module de paiement ne se charge pas est **générique** : il devrait
+  nommer la cause. Chapitre 5.12.
+- **100 requêtes anonymes par quart d'heure et par adresse IP** (défaut du limiteur) : une
+  trentaine de pages de trajet. À regarder sur les premiers chiffres réels — derrière un NAT
+  partagé (bureau, CGNAT mobile), plusieurs visiteurs partagent une adresse.
+- **Deux formulaires de connexion coexistent dans le DOM** dès qu'une fenêtre de connexion est
+  montée, avec les **mêmes `id`** (`#email`, `#password`) : défaut de validité HTML et gêne
+  d'accessibilité (`label for=` ne désigne plus un champ unique). Chapitre 5.31.
+
+## 7. Documents de référence
+
+| Document | Ce qu'il contient |
+|---|---|
+| `context/YAMBA-RECETTE-WEB-RESULTATS.md` | La campagne navigateur : méthode, anomalies, verdicts par chapitre |
+| `context/YAMBA-RECETTE-CRONS-RESULTATS.md` | La campagne « tâches planifiées », close |
+| `docs/recette/RECETTE-01-WEB.md` | Le cahier (328 fiches) — § 2.3 les comptes, § 2.4 les trajets, § 2.5 les deals, § 6 les parcours |
+| `docs/recette/RECETTE-02-ADMIN.md` | Le cahier back-office (110 fiches) |
+| `context/YAMBA-REGISTRE-DECISIONS-ROADMAP-v1.3.md` | D76 et D77, gravées aujourd'hui |
+| `CLAUDE.md` | La commande du harnais et ses contraintes de poste |
+
+---
+
+## 8. Faut-il ajouter Elasticsearch ? — analyse du 09/09/2026
+
+**Recommandation : non.** Pas maintenant, et probablement jamais sous cette forme.
+
+### Ce que fait la recherche aujourd'hui
+
+`apps/trip-service/src/controllers/trip-search.controller.ts` (517 lignes) interroge MongoDB par
+Prisma : filtres composables (mode de transport, dates, tranches horaires, familles et
+catégories, prix, note), tris (départ le plus tôt, prix le plus bas, mieux notés), facettes, et
+un tri par prix pour un poids donné calculé sur une fenêtre de résultats.
+
+Le modèle `Trip` porte **vingt index**, dont `[status, departureAt, transportMode]`,
+`[originCity]`, `[destinationCity]`, `[originPlaceId]`, `[comparablePriceCents]`.
+
+### Le vrai défaut, et il est précis
+
+```ts
+{ originCity: { contains: params.from, mode: "insensitive" } }
+```
+
+`contains` insensible à la casse devient une **expression régulière non ancrée** : MongoDB ne
+peut PAS utiliser `@@index([originCity])`, et fait un balayage de collection. Quatre champs sont
+concernés (ville et pays, au départ et à l'arrivée). C'est le seul endroit de la recherche qui ne
+passe pas par un index — tout le reste est indexé correctement.
+
+Ce défaut est **réel**, et il grandira avec le nombre de trajets. Mais Elasticsearch n'est pas la
+réponse proportionnée.
+
+### Ce que coûterait Elasticsearch
+
+1. **Une sixième brique d'infrastructure**, en développement ET en production, à côté de Mongo
+   Atlas, Redis Upstash et Redpanda. Un cluster à dimensionner, surveiller, mettre à jour.
+2. **Une seconde vérité.** Le registre en fait une règle : un index de recherche est une
+   *projection*, donc il dérive. Il faut le peupler (l'outbox ne porte aujourd'hui que
+   `booking` et `conversation` — il faudrait un agrégat `trip`, son relais, son consommateur),
+   le réindexer, et détecter la dérive. C'est un chantier, pas une dépendance.
+3. **Un décalage assumé** entre l'écriture et la visibilité en recherche, à expliquer au
+   Voyageur qui vient de publier son trajet et ne le trouve pas.
+
+### Ce qui règle le problème réel, à moindre coût
+
+**(a) Chercher par identifiant de lieu.** Le front utilise déjà l'autocomplétion Google Places,
+et le schéma porte `@@index([originPlaceId])` / `@@index([destinationPlaceId])`. Une recherche
+par `placeId` est **exacte et indexée** — zéro balayage. Le texte libre ne resterait que le
+repli.
+
+**(b) Un champ normalisé et un préfixe.** Stocker `originCitySlug` (minuscules, accents retirés)
+et interroger en `startsWith` : une expression régulière **ancrée à gauche** utilise l'index. Cela
+couvre exactement l'usage réel — on tape « par », on veut « Paris ».
+
+**(c) Si le besoin grandit : Atlas Search, pas Elasticsearch.** MongoDB Atlas embarque Lucene.
+Recherche floue, repli d'accents, autocomplétion — **sans nouvelle infrastructure, sans
+synchronisation, sans seconde vérité**, l'index vivant dans la base qui détient déjà la donnée.
+C'est la voie de sortie naturelle, et elle ne se décide que le jour où (a) et (b) ne suffisent
+plus.
+
+### Le déclencheur qui changerait le verdict
+
+Elasticsearch se justifierait si l'on voulait de la recherche **plein texte sur du contenu
+rédigé** (descriptions, messages, avis) avec pertinence, synonymes et surlignage — ou de
+l'agrégation analytique lourde sur des millions de documents. Rien de tel n'est au programme : le
+pilotage est déjà servi par `/admin/pilotage` et la mesure d'audience (D66, D74).
+
+**À graver en D78 si l'arbitrage est retenu** : « la recherche reste dans la base qui détient la
+donnée ; pas de second moteur tant qu'un index Mongo bien posé suffit ».
+
+**Quand ?** *Après la recette*, et pas avant (consigne du 09/09/2026). Deux raisons de fond, en
+plus de la consigne : une campagne de recette qui se déroule pendant qu'on change le moteur de
+recherche ne prouve plus rien de stable ; et le harnais navigateur, une fois les deux cahiers
+joués, deviendra précisément le filet qui permettra de toucher à la recherche sans rien casser —
+le bon ordre est donc celui-là, pas l'inverse.
+
+---
+
+## 9. Rendre la demande visible aux Voyageurs — avis du 09/09/2026 (après la recette)
+
+Question posée : permettre aux Expéditeurs de publier une « intention d'envoi » (villes, kilos,
+période) pour inciter un Voyageur hésitant à publier un trajet, avec un cron d'appariement.
+
+**Avis : le besoin est réel, la forme publique est trop lourde.** La moitié « Expéditeur » existe
+déjà : `SavedRoute` (corridor, période, appariement à trois niveaux, email anti-spam) — il lui
+manque un champ `weightKg`. Ce qui manque, c'est la moitié « Voyageur », et elle ne demande pas
+un nouvel objet métier : **la demande agrégée et anonyme**, à trois endroits — une page publique
+« corridors demandés » (« Paris → Brazzaville : 12 Expéditeurs en attente en octobre, 35 kg »),
+l'assistant de publication du trajet (« 12 Expéditeurs ont une alerte sur ce corridor à ces
+dates »), et l'après-publication (« ton trajet a été envoyé à 12 Expéditeurs »). Un seuil
+d'anonymat (≥ 2 ou 3 alertes) pour qu'une paire ville + dates ne désigne personne. Calcul depuis
+les alertes actives, cache Redis 60 s comme le pilotage. L'annonce publique individuelle
+apporterait peu de plus et coûterait la modération du contenu et le contact hors plateforme
+(D61 n'ouvre la conversation qu'à ACCEPTED précisément pour cela). **Candidat au registre,
+après la recette.**
+

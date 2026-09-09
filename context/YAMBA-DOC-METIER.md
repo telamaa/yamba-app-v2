@@ -2426,3 +2426,65 @@ cahiers.
 | 4 | Un visiteur clique « Réserver » sans compte | la porte propose « Se connecter » et « Créer un compte », en clair | oui |
 | 5 | La même porte en anglais | « Sign in » et « Create an account » | oui |
 | 6 | Le bouton « Se connecter » de la porte | mène à la connexion **et** revient sur la réservation | oui |
+
+---
+
+# Le parcours nominal complet — ce que WEB-E2E-1 fait respecter
+
+*(PR `chore/e2e-parcours`, 09/09/2026 — cahier 01-WEB chapitre 6.)*
+
+## Le besoin
+
+Le parcours bloquant du cahier est la chaîne de valeur entière : un colis réservé, accepté, remis
+sur rendez-vous, transporté, livré contre un code, confirmé, puis noté des deux côtés. Chacune de
+ses vingt-neuf étapes énonce une promesse faite à un rôle — et souvent une chose qu'un autre rôle
+**ne doit pas** voir. Le harnais les tient toutes, en une minute et demie, à chaque exécution.
+
+## Les règles
+
+**RG-WEB-05 — Un bouton de deal ouvre le fil de CE deal.** Sur grand écran comme sur mobile,
+« Envoyer un message » et « Appeler » mènent à la conversation du deal d'où l'on vient, jamais
+au premier fil de la liste. *(ANO-WEB-03.)*
+
+**RG-WEB-06 — Le numéro de l'autre partie ne s'affiche qu'à partir de deux heures avant le
+rendez-vous de remise confirmé.** Avant, l'écran dit à partir de quand, et le serveur refuse avec
+un code (`TOO_EARLY`) — le bouton ne fait rien d'autre. *(D61.)*
+
+**RG-WEB-07 — La page du destinataire ne révèle rien.** Le lien `/track/<jeton>` montre le
+prénom du destinataire, le corridor, les dates et les jalons ; **jamais** le code, un numéro de
+téléphone ni un montant. *(D69.)*
+
+**RG-WEB-08 — Le code de livraison naît à la prise en charge et ne voyage jamais par email.**
+L'Expéditeur le lit dans son suivi ; l'email qui l'y invite en parle sans le contenir, ni en
+clair ni avec l'espace de lecture (« 742 891 »). *(D43, invariant B3/A41.)*
+
+**RG-WEB-09 — Un seul jalon écrit : l'atterrissage.** L'aéroport et le décollage restent dans les
+notifications ; seul « a atterri — préviens le destinataire » part par email.
+
+**RG-WEB-10 — Le versement est annoncé à J+4 au Voyageur dès la remise validée**, et
+l'Expéditeur dispose de trois jours pour confirmer ou signaler ; la confirmation anticipée est
+définitive et fait disparaître la carte de signalement.
+
+**RG-WEB-11 — Les avis restent secrets jusqu'à ce que les deux parties aient noté.** Le premier
+notant lit qu'il attend l'autre, et son avis n'est pas sur le profil public ; le second lit que
+« vos deux avis sont maintenant visibles » ; chacun reçoit la notification « Les notes sont
+révélées » ; l'avis public est signé du prénom et de l'initiale de son auteur. *(D53.)*
+
+**RG-WEB-12 — Le jeu d'essai promet des profils publics.** Tout compte du seed répond sur
+`/u/seed-<clé>` : le cahier s'y réfère (§ 2.3, chapitre 5.24).
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| 7 | Le Voyageur clique « Envoyer un message » depuis un deal, avec six conversations | le fil ouvert est celui du deal, vide | oui |
+| 8 | Le Voyageur propose un rendez-vous dans 3 jours ; l'Expéditrice accepte | « Un rendez-vous a été proposé. » → « Confirmé », « Le rendez-vous est confirmé. » | oui |
+| 9 | L'Expéditrice demande le numéro plus de 2 h avant | bandeau « à partir du … », refus 400 `TOO_EARLY`, aucun numéro | oui |
+| 10 | Le destinataire ouvre le lien de suivi, avant et après la prise en charge, après l'atterrissage, après la remise | jalons justes ; ni code, ni numéro, ni montant, à chaque fois | oui |
+| 11 | Le Voyageur confirme la prise en charge (5/5, 2 photos) | code visible côté Expéditrice ; email sans le code ; numéro du destinataire visible côté Voyageur | oui |
+| 12 | Trois jalons | un seul email, l'atterrissage | oui |
+| 13 | Remise avec le code lu par l'Expéditrice | « Livraison validée ! », versement à J+4 | oui |
+| 14 | Confirmation anticipée | « Transaction close », plus de signalement possible, deux emails de clôture avec le montant qui concerne chacun | oui |
+| 15 | Notation croisée | secret puis révélé, notification aux deux, avis public signé « Aminata D. » | oui |
+| 16 | Un second navigateur du même compte | aucune requête de connexion, session vivante | oui |
+| 17 | Un administrateur (médiateur) ouvre le back-office | mot de passe puis code TOTP calculé, cookies `admin_*` seuls | oui |

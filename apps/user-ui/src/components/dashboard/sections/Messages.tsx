@@ -29,12 +29,16 @@ export default function Messages({ copy }: { copy: DashboardCopy }) {
     if (wanted) setSelectedId(wanted);
   }, [searchParams]);
 
-  // Sur grand écran, on ouvre le premier fil pour ne pas laisser une colonne vide.
+  // Sur grand écran, on ouvre le premier fil pour ne pas laisser une colonne vide — sauf si
+  // l'URL a déjà choisi : quand la liste est déjà en cache (badge de l'en-tête), les deux effets
+  // posent `selectedId` dans le même rendu et le dernier gagnait, ouvrant le premier fil à la
+  // place de celui demandé (ANO-WEB-03, recette WEB-E2E-1 étape 11).
   useEffect(() => {
+    if (searchParams?.get("conversation")) return;
     if (!selectedId && data?.items.length && typeof window !== "undefined" && window.innerWidth >= 1024) {
       setSelectedId(data.items[0].id);
     }
-  }, [data, selectedId]);
+  }, [data, selectedId, searchParams]);
 
   return (
     <>

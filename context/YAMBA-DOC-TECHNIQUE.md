@@ -3745,3 +3745,103 @@ nomme `booking.authGate.login — BookingClient.tsx`.
 
 `apps/e2e` : **10 scénarios** verts sur le poste (harnais, WEB-CNX ×3, WEB-RSV ×3). Les suites
 Jest et les 17 vérifications de CI sont inchangées.
+
+---
+
+# Parcours transactionnels : sessions mémorisées, fixture administrateur, WEB-E2E-1 en entier
+
+*(PR `chore/e2e-parcours`, 09/09/2026.)*
+
+## Ce qui a été fait
+
+Le harnais jouait dix scénarios courts. Cette PR lui fait jouer le parcours **bloquant** du cahier
+01-WEB — WEB-E2E-1, vingt-neuf étapes, trois navigateurs, d'une réservation à la révélation des
+avis — et lui donne les deux fondations que la suite de la campagne exige : une **mémoire des
+sessions** et un **navigateur du back-office**.
+
+```
+apps/e2e/
+  src/fixtures/adresses.ts        front, API, back-office : trois adresses, une seule source (la config du front)
+  src/fixtures/sessions.ts        la mémoire des sessions (storageState sur disque, .sessions/ ignoré)
+  src/fixtures/photos.ts          un PNG en mémoire + ImageKit interposé (E2E_IMAGEKIT=real pour le vrai)
+  src/fixtures/presse-papiers.ts  un presse-papiers en mémoire de page (navigator.clipboard n'existe pas en http://192.168…)
+  src/fixtures/comptes.ts         + les sept comptes du back-office (COMPTES_ADMIN)
+  src/fixtures/jeu-essai.ts       + rejouerAdmins() et admin(clé) → { secret TOTP, codes de secours }
+  src/fixtures/yamba.ts           navigateurConnecte(clé, { parEcran }) · navigateurAdmin(clé) · connexionAdmin
+  src/pages/fil-messagerie.ts     fil, rendez-vous (proposer / accepter), numéro trop tôt
+  src/pages/transport-voyageur.ts prise en charge, jalons, remise contre le code
+  src/pages/suivi-expediteur.ts   lien de suivi, code, message du code, vérification, confirmation
+  src/pages/suivi-destinataire.ts la page /track/[token] : jalon courant, frise, « ne révèle rien »
+  src/pages/notation.ts           étoiles (radios nommés), pouces, commentaire, révélation
+  src/parcours/web-e2e-1.spec.ts  les 29 étapes
+packages/libs/prisma/scripts/seed-admins.ts   les sept comptes admin, promus et enrôlés
+```
+
+## La mémoire des sessions (`storageState`)
+
+Chaque navigateur ouvrait une vraie session par l'écran. À deux ou trois connexions par scénario
+et plusieurs exécutions par heure, `POST /auth/login` finissait en **429**. Désormais :
+
+1. la première connexion d'un compte passe par l'écran, puis `contexte.storageState()` est
+   écrit dans `apps/e2e/.sessions/<clé>.json` ;
+2. un contexte suivant repart de ce fichier — après l'avoir **sondé** avec les cookies du
+   contexte (`contexte.request.get(…/auth/me)`, et `POST /auth/refresh` si le jeton d'accès de
+   15 min a expiré : la rotation dépose les nouveaux cookies dans le contexte avant la première
+   page) ; s'il ne répond plus, on repasse par l'écran et la mémoire est remplacée ;
+3. à la fermeture, le contexte **rend** son état : le rafraîchissement révoque l'ancien `jti`
+   et `isAuthenticated` le vérifie dans Redis — les cookies les plus récents doivent gagner.
+
+`{ parEcran: true }` force l'écran ; `harnais.spec.ts` s'en sert pour garder un scénario qui
+éprouve la porte d'entrée, et un autre prouve qu'un second navigateur du même compte n'émet
+**aucune** requête de connexion.
+
+## Le navigateur du back-office
+
+`seed-admins.ts` fait ce que le cahier 02-ADMIN § 2.5 décrit à la main : sept membres ordinaires
+(`super`, `mediateur`, `support`, `exploitation`, `finance`, `privacy`, `cumul` = SUPPORT + FINANCE)
+avec l'écriture exacte de `grant-admin.ts`, puis l'enrôlement TOTP tel que `/auth/admin/totp/setup`
+le fait (`encryptTotpSecret`, huit codes de secours hachés) — le secret et les codes en clair dans
+`seed-admins-output.json` (ignoré par git). `navigateurAdmin("mediateur")` joue la connexion en
+deux temps par l'écran : mot de passe, puis un code **calculé** par `totpCode(secret)` de
+`packages/libs/totp` ; un pas de 30 s ne servant qu'une fois par compte (anti-rejeu), un code
+refusé fait attendre le pas suivant. Les cookies `admin_*` ont leur propre mémoire
+(`admin-<clé>.json`), sondée sur `/admin/me` et rafraîchie par `/auth/admin/refresh`.
+
+## Le limiteur de débit, en deux temps
+
+Les sessions mémorisées ont fait disparaître les 429 sur la connexion — et révélé le second
+plafond : **100 requêtes anonymes réussies par quart d'heure et par adresse**, épuisées par les
+seuls visiteurs des parcours (trajet, porte, `/track`, profil public) après trois exécutions.
+`resolveRateLimits(env)` dans `packages/middleware/rate-limit-tier.ts` lit
+`RATE_LIMIT_ANONYMOUS_MAX` / `RATE_LIMIT_AUTHENTICATED_MAX` (entier strictement positif, sinon
+le défaut) ; le gateway le résout une fois au démarrage et le passe à `rateLimitMax`. Quatre tests
+ajoutés à `rate-limit-tier.spec.ts` (auth-service **229**). La production ne pose pas ces
+variables.
+
+## ANO-WEB-03 (majeure) — le mauvais fil s'ouvrait sur grand écran
+
+`Messages.tsx` : un effet lit `?conversation=<id>`, un autre ouvre le premier fil « pour ne pas
+laisser une colonne vide » sur ≥ 1024 px. Quand la liste est déjà en cache (le badge de l'en-tête
+la charge), les deux posent `selectedId` dans le **même** rendu et le dernier gagne. Le Voyageur
+arrivait dans le fil d'un autre deal. Correction : l'ouverture automatique s'abstient dès que
+l'URL a choisi (`if (searchParams?.get("conversation")) return;`).
+
+## Deux corrections de jeu d'essai
+
+- `seed-deals.ts` pose `publicSlug: seed-<clé>` aussi à la **mise à jour** : les comptes du seed
+  sont antérieurs au profil public et `/u/seed-thomas` répondait « Profil introuvable ».
+- Le parcours rejoue le seed dans un `beforeAll` : chaque exécution réserve 2,5 kg sur le trajet
+  de démonstration.
+
+## Trois choses que le harnais interpose, et pourquoi
+
+| Interposé | Pourquoi | Ce qui reste traversé |
+|---|---|---|
+| Paiement → FAKE (D11/D38) | le Payment Element de Stripe ne se monte pas sur `http://192.168…` | tout le cycle du deal ; la carte est éprouvée par la campagne API |
+| ImageKit (`page.route`) | ne pas déposer trois images en production à chaque exécution | le jeton demandé à trip-service, la validation client, les URL enregistrées sur le deal |
+| `navigator.clipboard` (`addInitScript`) | absent hors contexte sécurisé ; Chrome refuse la permission | le code du produit appelle `writeText`, le test relit ce qui a été écrit |
+
+## Tests
+
+`apps/e2e` : **15 scénarios** verts sur le poste en 3 min 06 (harnais ×6, WEB-CNX ×3, WEB-RSV ×5, WEB-E2E-1).
+auth-service **229** (+4, `resolveRateLimits`). Plateforme 989 inchangée.

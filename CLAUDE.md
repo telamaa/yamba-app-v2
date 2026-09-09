@@ -22,7 +22,7 @@ Precedence on divergence: code + its tests > registre > business rules > synthes
 Always run tasks through Nx (see also `AGENTS.md`):
 
 ```sh
-npm run dev                        # serve everything (all backends + frontend)
+npm run dev                        # the SIX services only (nx run-many serve) — the two Next fronts start separately (below)
 npx nx dev user-ui                 # Next.js frontend only (port 3000)
 npx nx dev admin-ui                # back-office Next.js (port 3001, chantier C) — needs an ADMIN account: grant-admin.ts
 npx nx serve api-gateway           # gateway (port 8080)
@@ -38,14 +38,14 @@ npx nx test <project>              # jest tests for one project
 npx nx test <project> -- --testPathPatterns=<pattern>   # single test file (jest 30)
 
 bash scripts/smoke-services.sh     # EVERY bundle actually boots? (ports +900, no clash with `npm run dev`) — run after any toolchain change
-npx nx e2e e2e                     # recette navigateur (Playwright, apps/e2e) — needs `npm run dev` + Mailpit up; NOT in CI
+npx nx e2e e2e                     # recette navigateur (Playwright, apps/e2e) — needs the six services + both fronts + Mailpit up; NOT in CI. Parcours need deal-service on the FAKE provider and RATE_LIMIT_ANONYMOUS_MAX raised (root .env) — see the latest handoff
 npx prisma generate                # after editing prisma/schema.prisma (schema at repo ROOT)
 npx prisma db push                 # sync schema to MongoDB (no migrations — Mongo provider)
 
 npm run generate:openapi           # regenerate the FIVE openapi.json (trip, deal, notification, message, auth — A145) from the global Zod registry; CI diffs them
 ```
 
-Test platform baseline: **989 tests** (trip-service 257, deal-service 575, notification-service 115, message-service 42) + auth-service 225 (also a CI check) — any deviation must be explained.
+Test platform baseline: **989 tests** (trip-service 257, deal-service 575, notification-service 115, message-service 42) + auth-service 229 (also a CI check) — any deviation must be explained.
 
 Manual `tsc` (when Nx typecheck target is not what you want): `npx tsc --noEmit --project apps/<service>/tsconfig.app.json` — NEVER `--project apps/<service>` (resolves the solution-style tsconfig: 0 files checked).
 
@@ -140,7 +140,7 @@ JWT `access_token` + `refresh_token` set as cookies by auth-service. Sensitive m
 - A CSS grid whose columns are only declared from `lg:` has an implicit `auto` column below: its minimum is the children's min-content width, so a `nowrap` title or a chip row pushes the column wider than the phone screen and right-aligned content vanishes under an `overflow-hidden` ancestor. Declare `grid-cols-[minmax(0,1fr)]` on mobile too and `min-w-0` on the cells (#175).
 - LAN testing (other computers/phones on `http://192.168.x.x:3000`): EITHER switch `NEXT_PUBLIC_API_BASE_URL` in `apps/user-ui/.env.local` to the LAN IP (then EVERY device, the Mac included, must use the LAN URL — cookies are host-bound: front on `localhost` + API on the LAN IP = login 200 then `/me` 401), OR (D48, preferred) set `API_PROXY_TARGET=http://localhost:8080` + `NEXT_PUBLIC_API_BASE_URL=/api` so Next proxies `/api/*` to the gateway and cookies are first-party on any host. Restart user-ui after changing either. `allowedDevOrigins` in `next.config.js` is required or Next 16 answers 403 on `/_next/*` and pages stay on their SSR skeleton.
 - Nx merges the ROOT `.env` **and** a per-project `apps/<service>/.env`. A key placed only in a project folder works for that service and silently fails everywhere else — it bit ImageKit (upload worked from trip-service, deletion from auth-service did not; `node --env-file=../../.env` and `scripts/smoke-services.sh` were blind too). Every service variable goes in the ROOT `.env`; a project-level `.env` is a leftover to delete, never a place to add one.
-- Seeds live in `packages/libs/prisma/scripts/`, relative imports, run via `npx tsx --env-file=.env …` (sourcing `.env` in zsh mangles the Mongo password). `seed-deals.ts` is the QA reset: wipe + recreate trips/bookings of the seed users, real delivery code `742891` on every post-pickup booking.
+- Seeds live in `packages/libs/prisma/scripts/`, relative imports, run via `npx tsx --env-file=.env …` (sourcing `.env` in zsh mangles the Mongo password). `seed-deals.ts` is the QA reset: wipe + recreate trips/bookings of the seed users, real delivery code `742891` on every post-pickup booking. `seed-admins.ts` creates and TOTP-enrols the seven back-office accounts of cahier 02-ADMIN (secrets in the gitignored `seed-admins-output.json`; the e2e harness computes the codes). Sessions the harness memorises live in `apps/e2e/.sessions/` (gitignored).
 - `nx serve` loads root `.env` and OVERRIDES variables passed on the command line — to run a service with a controlled env (e.g. forcing the FAKE payment provider), run the built bundle: `STRIPE_SECRET_KEY= node --env-file=../../.env dist/main.js` from `apps/<service>` (Node lets the process env win).
 
 ## End of task

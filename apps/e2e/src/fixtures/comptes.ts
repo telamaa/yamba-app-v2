@@ -42,3 +42,35 @@ export const COMPTES = {
 } as const satisfies Record<string, Compte>;
 
 export type CleCompte = keyof typeof COMPTES;
+
+/* ══ Les comptes du back-office (RECETTE-02-ADMIN § 2.5) ══════════════════════════════════════
+ * Créés comme des membres ordinaires puis promus — c'est `seed-admins.ts` qui le fait, avec
+ * l'écriture exacte de `grant-admin.ts`, et qui enrôle leur double authentification : le
+ * secret TOTP de chacun est écrit dans `seed-admins-output.json` (jamais versionné) et le
+ * harnais CALCULE le code à six chiffres avec `packages/libs/totp`, comme la campagne API.
+ * Même mot de passe que les membres du seed. */
+
+export type ProfilAdmin = "SUPER_ADMIN" | "MEDIATOR" | "SUPPORT" | "FINANCE" | "OPS" | "PRIVACY";
+
+export interface CompteAdmin {
+  cle: string;
+  email: string;
+  prenom: string;
+  nom: string;
+  profils: readonly ProfilAdmin[];
+}
+
+const admin = (cle: string, email: string, prenom: string, nom: string, ...profils: ProfilAdmin[]): CompteAdmin => ({ cle, email, prenom, nom, profils });
+
+export const COMPTES_ADMIN = {
+  super: admin("super", "super@recette.yamba.dev", "Sacha", "Superviseur", "SUPER_ADMIN"),
+  mediateur: admin("mediateur", "mediateur@recette.yamba.dev", "Nadia", "Médiatrice", "MEDIATOR"),
+  support: admin("support", "support@recette.yamba.dev", "Sami", "Support", "SUPPORT"),
+  exploitation: admin("exploitation", "exploitation@recette.yamba.dev", "Olivier", "Exploitation", "OPS"),
+  finance: admin("finance", "finance@recette.yamba.dev", "Fatou", "Finance", "FINANCE"),
+  privacy: admin("privacy", "privacy@recette.yamba.dev", "Paul", "Privacy", "PRIVACY"),
+  /** Profils cumulés = UNION des permissions (D60 1A) — scénario ADM-PRM-7. */
+  cumul: admin("cumul", "cumul@recette.yamba.dev", "Camille", "Cumul", "SUPPORT", "FINANCE"),
+} as const satisfies Record<string, CompteAdmin>;
+
+export type CleCompteAdmin = keyof typeof COMPTES_ADMIN;
