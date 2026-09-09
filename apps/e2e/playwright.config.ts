@@ -22,52 +22,17 @@
  * machine récente ou en conteneur, `PLAYWRIGHT_CHANNEL=bundled` bascule sur le Chromium livré
  * avec Playwright.
  */
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { defineConfig, devices } from "@playwright/test";
+import { adresseDuFront } from "./src/fixtures/adresses";
 
 const canal = process.env.PLAYWRIGHT_CHANNEL ?? "chrome";
 
 /**
- * L'adresse du front — et c'est un piège que le projet a déjà payé (CLAUDE.md, § LAN).
- *
- * Les cookies de session sont **liés à l'hôte** : si le front est ouvert sur `localhost:3000`
- * alors que l'API est déclarée sur `http://192.168.1.155:8080/api`, la connexion répond 200 et
- * **aucun cookie n'est posé** — tout le reste du parcours échoue, sans que rien n'explique
- * pourquoi. Mesuré tel quel au montage du harnais.
- *
- * Le harnais lit donc la configuration du front et en déduit l'adresse à ouvrir :
- * base d'API absolue → on prend SON hôte ; base relative (`/api`, proxy Next, D48) → localhost.
- * `E2E_BASE_URL` reste prioritaire pour un poste monté autrement.
+ * L'adresse du front est DÉDUITE de la configuration du front lui-même (`src/fixtures/adresses.ts`) :
+ * les cookies de session sont liés à l'hôte, et un front ouvert sur le mauvais hôte donne une
+ * connexion 200 sans cookie. Ne pas la forcer à la main — `E2E_BASE_URL` existe pour un poste
+ * monté autrement.
  */
-function adresseDuFront(): string {
-  if (process.env.E2E_BASE_URL) return process.env.E2E_BASE_URL;
-  const racine = join(__dirname, "../..");
-  for (const fichier of ["apps/user-ui/.env.local", ".env"]) {
-    let contenu: string;
-    try {
-      contenu = readFileSync(join(racine, fichier), "utf-8");
-    } catch {
-      continue;
-    }
-    const ligne = contenu
-      .split("\n")
-      .map((l) => l.trim())
-      .filter((l) => l.startsWith("NEXT_PUBLIC_API_BASE_URL="))
-      .pop();
-    if (!ligne) continue;
-    const valeur = ligne.slice("NEXT_PUBLIC_API_BASE_URL=".length).replace(/^["']|["']$/g, "").trim();
-    if (!valeur) continue;
-    if (!/^https?:\/\//.test(valeur)) return "http://localhost:3000"; // proxy Next : cookies first-party
-    try {
-      return `http://${new URL(valeur).hostname}:3000`;
-    } catch {
-      /* valeur illisible : on retombe sur le défaut */
-    }
-  }
-  return "http://localhost:3000";
-}
-
 const BASE = adresseDuFront();
 
 export default defineConfig({

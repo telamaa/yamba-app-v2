@@ -4,3 +4,6 @@
 rapport/
 resultats/
 out-tsc/
+
+# Sessions mémorisées par le harnais (cookies des comptes du seed, poste de recette seulement).
+.sessions/
