@@ -3480,3 +3480,159 @@ Le contrat du DTO ne bouge pas ; c'est l'entrée qui est complétée. `searchTri
 ## Tests
 
 trip-service 240 → **250**. Plateforme **956**. Contrats OpenAPI inchangés.
+
+---
+
+# Recette « tâches planifiées » — cahier n° 4 : neuf anomalies, deux bloquantes
+
+*(PR `chore/recette-crons-campagne`, 09/09/2026 — 90 fiches jouées, 9 anomalies closes.
+Décisions gravées : **D76**, **D77**.)*
+
+## De quoi parle ce lot
+
+La plateforme porte **quinze tâches planifiées**, **deux relais d'événements** et **deux
+consommateurs**. Rien de tout cela n'a d'interface : aucune de ces mécaniques ne répond à un
+utilisateur, aucune ne se voit dans un écran. Elles complètent des trajets, expirent des demandes,
+versent de l'argent, envoient des relances, purgent des données et transforment des événements en
+notifications — la nuit, toutes seules. Cette campagne les a **provoquées une par une**, avec de
+vrais services, un vrai courtier et une vraie base.
+
+Neuf anomalies, dont deux bloquantes. Les six premières ont été traitées au fil des chapitres et
+sont détaillées dans `context/YAMBA-RECETTE-CRONS-RESULTATS.md` ; ce chapitre développe les trois
+dernières et le principe commun aux deux bloquantes.
+
+## ANO-CRON-05 (bloquante) — la purge qui vidait la file d'attente
+
+```ts
+// avant — apps/deal-service/src/cron/outbox-retention.cron.ts
+where: { aggregateType, publishedAt: { lt: cutoff } }
+```
+
+Trois pièges de Prisma + MongoDB se cumulaient dans cette ligne :
+
+1. `publishedAt` est **nullable**, donc absent des documents qui n'ont jamais été publiés ;
+2. en BSON, **`null` précède toutes les dates** : `{ lt: <date> }` matche donc `null` ;
+3. il n'y avait aucun garde-fou côté application, la requête faisant foi.
+
+Résultat : chaque nuit à 3 h 30, la purge « des événements publiés depuis plus de 90 jours »
+supprimait **tous les événements en attente de publication**, quel que soit leur âge — c'est-à-dire
+exactement ceux qu'un incident de courtier venait de laisser en file. Un `docker stop` de dix
+minutes suivi d'une nuit, et les notifications correspondantes n'existaient plus.
+
+```ts
+// après — l'appartenance à « publié » est explicite, l'âge vient ensuite
+where: {
+  aggregateType,
+  AND: [{ publishedAt: { not: null } }, { publishedAt: { lt: cutoffFor(now, days) } }],
+}
+```
+
+Corrigé dans les **deux** relais (deal-service et message-service), avec un test qui **lit la
+source** et refuse un `deleteMany` sur `OutboxEvent` dont le `where` ne contient pas la condition
+« publié ».
+
+## ANO-CRON-06 (majeure) — classer par cause, jamais par nom
+
+L'exclusion « une panne de courtier n'use pas les tentatives » était écrite avec une liste de
+**noms** d'erreurs kafkajs. Mesuré, courtier éteint, sur un événement parfaitement sain :
+
+```
+2 → 5 → 7 → 10 tentatives en 100 secondes → PARQUÉ
+```
+
+`packages/libs/messaging/src/broker-errors.ts` remplace la liste de noms par une reconnaissance
+**par cause** : la chaîne `cause` / `originalError` est parcourue (bornée à cinq niveaux,
+résistante aux cycles) et l'on cherche la signature d'un courtier injoignable, par nom **ou** par
+message. Le fichier n'importe **rien** — condition nécessaire pour survivre au `jest.mock` virtuel
+de `@packages/messaging` posé par les tests de relais, qui l'importent donc par chemin relatif.
+
+Conséquence assumée, gravée en **D76** : un **sujet absent** produit la même signature et n'est
+donc plus parqué non plus. C'est le bon arbitrage — un sujet absent se répare en une commande,
+le parcage est définitif — et le signal existe déjà, meilleur : l'alerte `OUTBOX_LAGGING_15MIN`.
+
+## ANO-CRON-08 (bloquante) — un consommateur mort restait mort, en silence
+
+Le déclencheur est presque comique : `rpk topic produce`, la commande écrite dans le cahier de
+recette lui-même, **compresse en snappy par défaut**. kafkajs ne sait pas décompresser snappy et
+lève `KafkaJSNotImplemented`, une erreur non retriable.
+
+```
+[Consumer] Crash: KafkaJSNotImplemented: Snappy compression not implemented
+[Consumer] Stopped
+```
+
+Le consommateur des réservations s'arrêtait **définitivement**. Le processus restait vivant,
+`/health` répondait `{"status":"ok"}`, le groupe passait `Empty`, et plus une notification ni un
+email ne sortait — indéfiniment, y compris après un redémarrage du service (il retombait sur le
+même message). Deux événements d'expiration parfaitement sains sont restés **neuf minutes** en
+attente sur une autre partition.
+
+La cause : `startConsumer()` ne traitait que l'échec **au démarrage**. kafkajs se relève seul sur
+un crash *retriable* (vérifié au passage en CRON-CONSO-6 : « Restarting the consumer in 8206ms »),
+mais s'arrête pour de bon sur un crash non retriable. `consumerRunning` restait à `true` et ne
+servait qu'à l'arrêt du processus.
+
+**Correction en trois pièces.**
+
+1. `KafkaEventConsumer.onCrash(handler)` relaie l'événement `CRASH` de kafkajs, avec son drapeau
+   `restart` (le client se relance-t-il lui-même ?). L'interface `EventConsumer` porte le type
+   `ConsumerCrash` ; la méthode est **optionnelle**, donc aucun autre implémenteur n'est cassé.
+2. `apps/notification-service/src/consumer/supervisor.ts` — un superviseur commun aux deux
+   consommateurs : démarrage réessayé, plantage définitif rattrapé, **retrait exponentiel plafonné
+   à cinq minutes**, et une **fenêtre de stabilité** de 60 secondes. Cette dernière est le point
+   subtil : un poison de transport laisse le *démarrage* réussir et tue la boucle juste après ;
+   sans fenêtre, chaque cycle repartirait du délai de base — une ligne d'erreur toutes les cinq
+   secondes, pour toujours. Le retrait ne se remet à zéro que si la boucle a **tenu**.
+3. `/health` porte une vérification `consumers` : un consommateur activé et non courant rend le
+   service **`degraded`**, donc visible sur la page « État des services » et sur `GET /api/status`.
+   Un **délai de grâce de 90 s** distingue « pas encore démarré » (rejoindre un groupe prend une
+   dizaine de secondes) de « tombé » — sans quoi la sonde clignoterait à chaque déploiement.
+
+**Contre-épreuve mesurée** : même message snappy, service corrigé →
+`nextRetryMs: 5000 → 10000 → 20000 → 40000`, `/health` en `degraded` avec
+`"consumer(s) not running: booking-events"`. Message empoisonné retiré du sujet → le service se
+**remet seul** en `ok`, groupe `Stable`, retard 0, sans redémarrage du processus.
+
+On ne saute jamais un message qu'on n'a pas su lire : sauter, c'est perdre. Le poison fait donc
+une boucle **bruyante et espacée**, jamais un arrêt muet.
+
+## ANO-CRON-09 (majeure) — le dossier de modération escamoté par la conservation
+
+```ts
+// avant — apps/message-service/src/services/admin-conversation.service.ts
+if (!message || !conversation) continue; // message purgé : le signalement reste, sans corps — hors file
+```
+
+Le commentaire décrivait exactement le problème sans le voir : le `Report` restait bien en base,
+mais **hors de la file**. Un signalement dont le message a été purgé par la conservation
+disparaissait donc de l'écran de modération et restait `OPEN` pour toujours — invisible,
+intraitable, et sans que le compteur (`total: items.length`) ne le trahisse.
+
+Le contrat `AdminMessageReportItem` gagne `purged: boolean` ; tout ce qui vient du message ou de
+son fil devient **nullable** — `author`, `conversationId`, `bookingId`, `corridor`, le corps et la
+date du message — **ainsi que le rôle du signalant** : sans la conversation, on ne peut pas dire
+s'il était Expéditeur ou Voyageur, et l'inventer serait pire que se taire. Le back-office rend le
+dossier avec « Contenu purgé par la conservation », et les boutons « Traité » / « Sans suite »
+restent actifs. Gravé en **D77**.
+
+## ANO-CRON-07 (mineure) — un jeu d'essai qui viole sa propre règle
+
+`seed-deals.ts` créait `gru-completed` avec `shipperKey: "ines"` sur le trajet `gru` dont le
+Voyageur est `ines` : le membre était son propre Expéditeur, ce que l'API refuse (`OWN_TRIP`).
+Coût réel : la relance de notation envoyait **deux** emails « Pense à noter Inês » à Inês, ce qui
+ressemblait trait pour trait à un doublon d'idempotence et a coûté une investigation en pleine
+campagne. `seed-integrity.spec.ts` lit la source du seed et refuse désormais ce cas.
+
+## Outillage de recette ajouté
+
+- `packages/libs/prisma/scripts/repair-negative-counters.ts` — remet à zéro les compteurs négatifs
+  (`CarrierPage`, `User`), idempotent, `--dry-run` ;
+- `packages/libs/prisma/scripts/requeue-parked-outbox.ts` — remet en file un événement parqué,
+  **après l'avoir re-validé contre le contrat courant** : seuls les événements sains repartent ;
+- `scripts/recette/` — une trentaine de scripts de provocation et de mesure (rendre une ligne
+  éligible, forcer une passe, lire l'état des relais, des battements, des compteurs).
+
+## Tests
+
+trip-service 257, deal-service 575, notification-service 115, message-service 42 →
+plateforme **989** (auth-service 225 inchangé). Contrats OpenAPI régénérés (`AdminMessageReportItem`).

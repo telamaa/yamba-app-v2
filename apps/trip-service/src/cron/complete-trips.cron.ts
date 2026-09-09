@@ -34,6 +34,7 @@ import { withHeartbeat } from "@packages/libs/redis/cron-heartbeat";
 import {
   canPerform,
   getCarrierStatDeltas,
+  clampedCarrierStats,
   type TripStatus,
 } from "../services/trip-state-machine";
 import { hasActiveBookings, hasBookingsInProgress } from "../services/booking-queries";
@@ -107,12 +108,14 @@ export async function runCompleteTripsOnce(now: Date = new Date()): Promise<{
       if (deltas) {
         const carrierPage = await prisma.carrierPage.findUnique({
           where: { userId: trip.userId },
-          select: { id: true },
+          select: { id: true, totalTripsPublished: true, totalTripsCancelled: true },
         });
-        if (carrierPage) {
+        // ANO-CRON-01 — valeur bornée à zéro plutôt que delta brut (voir clampedCarrierStats).
+        const valeurs = carrierPage && clampedCarrierStats(carrierPage, deltas);
+        if (carrierPage && valeurs) {
           await prisma.carrierPage.update({
             where: { id: carrierPage.id },
-            data: deltas,
+            data: valeurs,
           });
         }
       }

@@ -49,7 +49,16 @@ export function makeUnreadReminderService(deps: { send?: typeof sendTransactiona
     return result.count === 1;
   }
 
-  async function remind(conversation: ConversationRow, role: ReminderRole): Promise<void> {
+  /**
+   * Envoie la relance — ou explique pourquoi elle ne part pas.
+   *
+   * ANO-CRON-04 (recette n° 4, CRON-RELANCE-5) : le verrou est réclamé AVANT l'envoi (c'est
+   * voulu, la conversation ne doit pas être réexaminée en boucle), mais l'appelant comptait
+   * alors comme « relance envoyée » un email qui ne partait pas. Le résumé du battement
+   * annonçait « 1 relance(s) » pour zéro email. On rend donc le verdict, et l'appelant compte
+   * ce qui est vrai.
+   */
+  async function remind(conversation: ConversationRow, role: ReminderRole): Promise<"SENT" | "SKIPPED"> {
     const recipientId = role === "SHIPPER" ? conversation.shipperId : conversation.carrierId;
     const counterpartId = role === "SHIPPER" ? conversation.carrierId : conversation.shipperId;
     const [recipient, counterpart, booking] = await Promise.all([
@@ -58,7 +67,7 @@ export function makeUnreadReminderService(deps: { send?: typeof sendTransactiona
       prisma.booking.findUnique({ where: { id: conversation.bookingId }, select: { trip: { select: { originCity: true, destinationCity: true } } } }),
     ]);
     // D63 8A — préférence membre « ne plus me relancer par email » (A138) : le verrou est posé, rien ne part.
-    if (!recipient?.email || recipient.isDeleted || recipient.emailSuppressedAt || recipient.messagingReminderEmails === false || !booking) return; // D35 4A : adresse supprimée
+    if (!recipient?.email || recipient.isDeleted || recipient.emailSuppressedAt || recipient.messagingReminderEmails === false || !booking) return "SKIPPED"; // D35 4A : adresse supprimée
     const { locale, dictionary } = messagingEmailsFor(recipient.preferredLocale);
     const built = dictionary.unreadReminder({
       firstName: recipient.firstName,
@@ -67,11 +76,12 @@ export function makeUnreadReminderService(deps: { send?: typeof sendTransactiona
       conversationUrl: `${FRONTEND_URL}/${locale}/dashboard/messages?conversation=${conversation.id}`,
     });
     await send({ to: recipient.email, locale, subject: built.subject, content: built.content });
+    return "SENT";
   }
 
   return {
-    /** Un passage : renvoie le nombre de relances envoyées. Les erreurs d'envoi ne bloquent pas les autres fils. */
-    async runOnce(now: Date = clock()): Promise<{ scanned: number; sent: number; failed: number }> {
+    /** Un passage. `sent` = emails réellement partis ; `skipped` = verrou posé mais envoi volontairement omis (préférence, adresse supprimée, compte effacé). Les erreurs d'envoi ne bloquent pas les autres fils. */
+    async runOnce(now: Date = clock()): Promise<{ scanned: number; sent: number; skipped: number; failed: number }> {
       // D62 — délais lus dans les paramètres (défauts = les anciennes constantes).
       const v = await settings.get();
       const params = { delayMinutes: v["messaging.reminderDelayMinutes"], minIntervalMinutes: v["messaging.reminderMinIntervalMinutes"] };
@@ -81,6 +91,7 @@ export function makeUnreadReminderService(deps: { send?: typeof sendTransactiona
         take: BATCH,
       })) as ConversationRow[];
       let sent = 0;
+      let skipped = 0;
       let failed = 0;
       for (const conversation of rows) {
         for (const role of ["SHIPPER", "CARRIER"] as const) {
@@ -98,14 +109,15 @@ export function makeUnreadReminderService(deps: { send?: typeof sendTransactiona
           if (!verdict.due) continue;
           if (!(await claim(conversation, role, now))) continue;
           try {
-            await remind(conversation, role);
-            sent += 1;
+            // ANO-CRON-04 — on ne compte « envoyée » qu'une relance réellement partie.
+            if ((await remind(conversation, role)) === "SENT") sent += 1;
+            else skipped += 1;
           } catch {
             failed += 1;
           }
         }
       }
-      return { scanned: rows.length, sent, failed };
+      return { scanned: rows.length, sent, skipped, failed };
     },
   };
 }

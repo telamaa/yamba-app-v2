@@ -97,6 +97,9 @@ export function makeAdminConversationService() {
         userIds.add(c.shipperId);
         userIds.add(c.carrierId);
       }
+      // ANO-CRON-09 — le signalant d'un message purgé n'appartient à aucune conversation
+      // chargée ici : sans cette ligne, son prénom serait « — » dans la file.
+      for (const r of reports) userIds.add(r.reporterUserId);
       const users = await prisma.user.findMany({ where: { id: { in: [...userIds] } }, select: { id: true, firstName: true } });
       const nameOf = new Map(users.map((u) => [u.id, u.firstName]));
 
@@ -104,7 +107,27 @@ export function makeAdminConversationService() {
       for (const r of reports) {
         const message = byMessage.get(r.targetId);
         const conversation = message ? byConversation.get(message.conversationId) : undefined;
-        if (!message || !conversation) continue; // message purgé : le signalement reste, sans corps — hors file
+        // ANO-CRON-09 — le message peut avoir été purgé par la conservation. Le dossier reste
+        // OUVERT : le sortir de la file reviendrait à le perdre (personne ne peut plus le
+        // traiter, et rien ne le signale). On le rend donc SANS son contenu, ce qui est
+        // exactement le compromis assumé entre conservation et modération.
+        if (!message || !conversation) {
+          items.push({
+            id: r.id,
+            status: r.status as MessageReportStatus,
+            reason: r.reason as MessageReportReason,
+            details: r.details,
+            createdAt: r.createdAt.toISOString(),
+            reporter: { id: r.reporterUserId, firstName: nameOf.get(r.reporterUserId) ?? "—", role: null },
+            purged: true,
+            author: null,
+            message: { id: r.targetId, body: null, createdAt: null },
+            conversationId: null,
+            bookingId: null,
+            corridor: null,
+          });
+          continue;
+        }
         const booking = byBooking.get(conversation.bookingId);
         const roleOf = (userId: string | null): "SHIPPER" | "CARRIER" | "SYSTEM" => (!userId ? "SYSTEM" : userId === conversation.shipperId ? "SHIPPER" : "CARRIER");
         items.push({
@@ -114,6 +137,7 @@ export function makeAdminConversationService() {
           details: r.details,
           createdAt: r.createdAt.toISOString(),
           reporter: { id: r.reporterUserId, firstName: nameOf.get(r.reporterUserId) ?? "—", role: roleOf(r.reporterUserId) as "SHIPPER" | "CARRIER" },
+          purged: false,
           author: { id: message.authorId, firstName: message.authorId ? nameOf.get(message.authorId) ?? "—" : "Système", role: roleOf(message.authorId) },
           message: { id: message.id, body: message.body, createdAt: message.createdAt.toISOString() },
           conversationId: conversation.id,

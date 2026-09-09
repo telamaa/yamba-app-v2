@@ -34,10 +34,27 @@ export type ConsumedEventHandler = (
   message: ConsumedEventMessage
 ) => Promise<void>;
 
+/**
+ * Ce que le client rapporte quand la boucle de consommation MEURT après
+ * son démarrage (ANO-CRON-08). `willRestart` dit si le client se relève
+ * tout seul : kafkajs le fait pour une erreur retriable, jamais pour une
+ * erreur définitive (une compression qu'il ne sait pas décoder, par ex.).
+ */
+export interface ConsumerCrash {
+  error: unknown;
+  willRestart: boolean;
+}
+
 export interface EventConsumer {
   connect(): Promise<void>;
   subscribe(topic: string): Promise<void>;
   /** Démarre la boucle de consommation — ne résout qu'au démarrage. */
   run(handler: ConsumedEventHandler): Promise<void>;
   disconnect(): Promise<void>;
+  /**
+   * S'abonne aux plantages de la boucle. Sans cela, un consommateur mort
+   * reste mort en silence : le processus vit, `/health` répond `ok`, et
+   * plus rien n'est consommé (ANO-CRON-08, recette crons du 09/09/2026).
+   */
+  onCrash?(handler: (crash: ConsumerCrash) => void): void;
 }

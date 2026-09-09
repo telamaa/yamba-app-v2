@@ -192,12 +192,19 @@ export const AdminMessageReportItemSchema = z
     reason: MessageReportReasonSchema,
     details: z.string().nullable(),
     createdAt: z.string().datetime(),
-    reporter: z.object({ id: ObjectIdSchema, firstName: z.string(), role: z.enum(["SHIPPER", "CARRIER"]) }),
-    author: z.object({ id: ObjectIdSchema.nullable(), firstName: z.string(), role: z.enum(["SHIPPER", "CARRIER", "SYSTEM"]) }),
-    message: z.object({ id: ObjectIdSchema, body: z.string(), createdAt: z.string().datetime() }),
-    conversationId: ObjectIdSchema,
-    bookingId: ObjectIdSchema,
-    corridor: z.object({ originCity: z.string(), destinationCity: z.string() }),
+    // `role` est nul quand le fil a disparu : sans conversation, on ne PEUT pas dire si le
+    // signalant était l'Expéditeur ou le Voyageur — et inventer un rôle serait pire que se taire.
+    reporter: z.object({ id: ObjectIdSchema, firstName: z.string(), role: z.enum(["SHIPPER", "CARRIER"]).nullable() }),
+    // ANO-CRON-09 (recette crons 09/09/2026) — le message visé peut avoir été PURGÉ par la
+    // conservation. Le dossier de modération, lui, survit : il doit rester VISIBLE et
+    // traitable, sinon un signalement ouvert disparaît de la file pour toujours. Tout ce qui
+    // vient du message ou de son fil devient donc nullable, et `purged` le dit franchement.
+    purged: z.boolean().describe("Le message visé a été purgé : le dossier reste, son contenu a disparu"),
+    author: z.object({ id: ObjectIdSchema.nullable(), firstName: z.string(), role: z.enum(["SHIPPER", "CARRIER", "SYSTEM"]) }).nullable(),
+    message: z.object({ id: ObjectIdSchema, body: z.string().nullable(), createdAt: z.string().datetime().nullable() }),
+    conversationId: ObjectIdSchema.nullable(),
+    bookingId: ObjectIdSchema.nullable(),
+    corridor: z.object({ originCity: z.string(), destinationCity: z.string() }).nullable(),
   })
   .meta({ id: "AdminMessageReportItem" });
 export type AdminMessageReportItem = z.infer<typeof AdminMessageReportItemSchema>;

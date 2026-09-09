@@ -406,8 +406,8 @@ Ordre de demarrage : auth -> trip -> gateway.
   (GET /admin/status, sondage 30 s, editeur de maintenance). Gateway aligne (alias @packages,
   tsconfig). Chantier C : SOLDE (C-PR1 → C-PR8c). Candidat registre : moniteur externe de
   disponibilite avant le lancement. MERGE 05/09 : **#182** (17 checks comptes).
-- Plateforme de tests : **937** (trip 231, deal 560, notification 107, message 39) + auth 215
-  (08/09, post-#248 — campagne de recette API).
+- Plateforme de tests : **989** (trip 257, deal 575, notification 115, message 42) + auth 225
+  (09/09, post-campagne de recette « taches planifiees »).
 - 08/09 : **CAMPAGNE DE RECETTE API (cahier n° 3) — TERMINEE ET ACCEPTEE**. 146 fiches, 145
   jouees, 1 en ⏭ justifie (CLI Stripe absente du poste, objet atteint par des evenements
   signes a la main). **54 fiches bloquantes, toutes jouees et fermees.** 22 anomalies
@@ -474,6 +474,26 @@ Ordre de demarrage : auth -> trip -> gateway.
   Accept-Language > defaut, une valeur non supportee ne consommant PAS son tour. Garde-fou
   `one-locale-rule.spec.ts` : aucun controleur ne lit `x-locale` sans passer par la regle.
   Plateforme **956 tests**. Bilan campagne : 23 anomalies closes, 5 dettes soldees.
+- 09/09 : **CAMPAGNE DE RECETTE « TACHES PLANIFIEES » (cahier n° 4) — TERMINEE**. 90 fiches sur
+  90 jouees, aucune reportee. **9 anomalies, 9 closes** (2 bloquantes, 4 majeures, 3 mineures).
+  Les deux bloquantes : (a) **ANO-CRON-05** — la purge nocturne supprimait CHAQUE NUIT tous les
+  evenements d'outbox NON publies (`{ publishedAt: { lt: cutoff } }` : en BSON `null` precede
+  les dates), c'est-a-dire exactement ceux qu'une panne de courtier venait de laisser en file ;
+  (b) **ANO-CRON-08** — un consommateur qui plante APRES son demarrage restait mort en silence,
+  `/health` repondant `ok`, groupe `Empty`, plus une notification ni un email (declencheur :
+  `rpk topic produce` compresse en snappy par defaut, que kafkajs ne sait pas lire). Les
+  majeures : ANO-CRON-02 (aucun outil pour remettre un evenement parque en file), ANO-CRON-06
+  (une panne de courtier de 100 s parquait des evenements sains — classification par NOM
+  d'erreur), ANO-CRON-09 (un signalement dont le message est purge disparaissait de la file de
+  moderation et restait OPEN pour toujours). Deux decisions gravees : **D76** (« un defaut
+  d'infrastructure se signale par le retard ; il ne se solde ni par un parcage, ni par un
+  silence » — classement par CAUSE, superviseur de consommateur avec retrait exponentiel et
+  fenetre de stabilite, etat des consommateurs dans `/health`) et **D77** (« la conservation
+  efface le propos, jamais le dossier de moderation »). Sept des neuf anomalies etaient
+  INVISIBLES : ni test unitaire, ni tableau de bord, ni utilisateur ne les aurait trouvees — il
+  a fallu provoquer la panne. Precaution de recette a retenir : `rpk topic produce -z none`,
+  toujours. Rapport complet : `context/YAMBA-RECETTE-CRONS-RESULTATS.md`. Plateforme **989
+  tests**.
 - 04/09 : C-PR6b feat/c6b-admin-alerts (D59 3A / 4A, A129–A131) — neuf regles de seuil
   (evaluateAlerts pur, instantane de dix compteurs), GET /admin/alerts sans etat (accueil
   admin), cron horaire avec dedoublonnage Redis SET NX (un email par regle et par jour, Redis

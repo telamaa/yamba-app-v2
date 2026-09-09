@@ -35,6 +35,7 @@ import {
 } from "@packages/messaging";
 import { handleBookingEventMessage } from "./consumer/booking-events.consumer";
 import { handleMessagingEventMessage } from "./consumer/messaging-events.consumer";
+import { superviseConsumer, type SupervisedConsumer } from "./consumer/supervisor";
 import { buildOpenApiDocument } from "./openapi/build-openapi";
 import notificationRouter from "./routes/notification.routes";
 import { makeRetentionService, startRetentionCron } from "./cron/retention.cron";
@@ -78,7 +79,37 @@ app.get("/", (req, res) => {
 
 // Health check — utilisé par le gateway et les smoke tests CI.
 // Volontairement AVANT les routes authentifiées et sans dépendance DB.
-app.get("/health", healthHandler("notification-service", { mongo: mongoCheck(prisma), redis: redisCheck(redis) })); // D64 3A
+// ANO-CRON-08 — les deux consommateurs sont déclarés ici pour que `/health` puisse dire la
+// vérité à leur sujet : un consommateur activé mais à l'arrêt rend le service `degraded`.
+const consumerEnabled = process.env.NOTIFICATION_CONSUMER_ENABLED !== "false";
+let bookingSupervisor: SupervisedConsumer | null = null;
+let messagingSupervisor: SupervisedConsumer | null = null;
+
+/**
+ * Délai laissé aux consommateurs pour rejoindre leur groupe avant de compter comme tombés.
+ * Rejoindre prend une dizaine de secondes après un arrêt (le courtier attend l'expiration de
+ * la session du membre précédent) : sans ce délai de grâce, chaque démarrage passerait par une
+ * fenêtre `degraded` et ferait clignoter la sonde publique.
+ */
+const CONSUMER_STARTUP_GRACE_MS = 90_000;
+const bootedAt = Date.now();
+
+/** Vérification `consumers` : jette (donc `degraded`) dès qu'un consommateur attendu est mort. */
+const consumersCheck = async (): Promise<void> => {
+  if (!consumerEnabled) return;
+  const enPanne = (s: SupervisedConsumer | null): boolean => {
+    if (s?.running()) return false;
+    // Pas encore démarré ET dans le délai de grâce : on ne crie pas, on attend.
+    if (!s?.everRan() && Date.now() - bootedAt < CONSUMER_STARTUP_GRACE_MS) return false;
+    return true;
+  };
+  const morts: string[] = [];
+  if (enPanne(bookingSupervisor)) morts.push(TOPICS.BOOKING_EVENTS);
+  if (enPanne(messagingSupervisor)) morts.push(TOPICS.MESSAGING_EVENTS);
+  if (morts.length > 0) throw new Error(`consumer(s) not running: ${morts.join(", ")}`);
+};
+
+app.get("/health", healthHandler("notification-service", { mongo: mongoCheck(prisma), redis: redisCheck(redis), consumers: consumersCheck })); // D64 3A, ANO-CRON-08
 
 // OpenAPI 3.1 GÉNÉRÉ depuis les schémas Zod (D3) — pattern deal.
 const openApiDocument = buildOpenApiDocument();
@@ -120,9 +151,14 @@ server.on("error", (err) => {
   logger.error(err, "server error");
 });
 
-// ── Consumer booking-events (PR4bis, A25) ───────────────────────────
-const consumerEnabled = process.env.NOTIFICATION_CONSUMER_ENABLED !== "false";
+// ── Consumers booking-events (PR4bis, A25) et messaging-events (F-PR2, D61 6A) ──────
+// Groupes et sujets SÉPARÉS : un incident sur le chat ne bloque jamais les événements
+// d'argent, et chaque flux garde ses propres offsets.
+//
+// La supervision (ANO-CRON-08) est la même pour les deux : démarrage réessayé, plantage
+// définitif rattrapé avec retrait exponentiel, état exposé à `/health`.
 const consumerLogger = logger.child({ module: "booking-events-consumer" });
+const messagingLogger = logger.child({ module: "messaging-events-consumer" });
 
 const consumer = new KafkaEventConsumer({
   brokers: (process.env.KAFKA_BROKERS || "localhost:9092")
@@ -132,70 +168,34 @@ const consumer = new KafkaEventConsumer({
   groupId: CONSUMER_GROUPS.NOTIFICATION_SERVICE,
 });
 
-let consumerRunning = false;
-let retryTimer: NodeJS.Timeout | null = null;
-
-const CONSUMER_RETRY_MS = 5_000;
-
-async function startConsumer(): Promise<void> {
-  try {
-    await consumer.connect();
-    await consumer.subscribe(TOPICS.BOOKING_EVENTS);
-    await consumer.run((message) =>
-      handleBookingEventMessage(message, consumerLogger)
-    );
-    consumerRunning = true;
-    consumerLogger.info(
-      { topic: TOPICS.BOOKING_EVENTS, groupId: CONSUMER_GROUPS.NOTIFICATION_SERVICE },
-      "Consumer running"
-    );
-  } catch (err) {
-    consumerLogger.error(
-      { err, nextRetryMs: CONSUMER_RETRY_MS },
-      "Consumer start failed — retrying"
-    );
-    retryTimer = setTimeout(() => {
-      void startConsumer();
-    }, CONSUMER_RETRY_MS);
-    retryTimer.unref(); // le serveur HTTP porte la vie du process (§6.4)
-  }
-}
-
-if (consumerEnabled) {
-  void startConsumer();
-} else {
-  logger.info("Consumer disabled (NOTIFICATION_CONSUMER_ENABLED=false)");
-}
-
-// ── Consumer messaging-events (F-PR2, D61 6A) ───────────────────────
-// Groupe et topic SÉPARÉS : un incident sur le chat ne bloque jamais les
-// événements d'argent, et chaque flux garde ses propres offsets.
-const messagingLogger = logger.child({ module: "messaging-events-consumer" });
 const messagingConsumer = new KafkaEventConsumer({
   brokers: (process.env.KAFKA_BROKERS || "localhost:9092").split(",").map((broker) => broker.trim()),
   clientId: "notification-service-messaging",
   groupId: CONSUMER_GROUPS.MESSAGING_NOTIFICATIONS,
 });
-let messagingConsumerRunning = false;
-let messagingRetryTimer: NodeJS.Timeout | null = null;
 
-async function startMessagingConsumer(): Promise<void> {
-  try {
-    await messagingConsumer.connect();
-    await messagingConsumer.subscribe(TOPICS.MESSAGING_EVENTS);
-    await messagingConsumer.run((message) => handleMessagingEventMessage(message, messagingLogger));
-    messagingConsumerRunning = true;
-    messagingLogger.info({ topic: TOPICS.MESSAGING_EVENTS, groupId: CONSUMER_GROUPS.MESSAGING_NOTIFICATIONS }, "Messaging consumer running");
-  } catch (err) {
-    messagingLogger.error({ err, nextRetryMs: CONSUMER_RETRY_MS }, "Messaging consumer start failed — retrying");
-    messagingRetryTimer = setTimeout(() => {
-      void startMessagingConsumer();
-    }, CONSUMER_RETRY_MS);
-    messagingRetryTimer.unref();
-  }
+bookingSupervisor = superviseConsumer({
+  consumer,
+  topic: TOPICS.BOOKING_EVENTS,
+  groupId: CONSUMER_GROUPS.NOTIFICATION_SERVICE,
+  handler: (message) => handleBookingEventMessage(message, consumerLogger),
+  logger: consumerLogger,
+});
+
+messagingSupervisor = superviseConsumer({
+  consumer: messagingConsumer,
+  topic: TOPICS.MESSAGING_EVENTS,
+  groupId: CONSUMER_GROUPS.MESSAGING_NOTIFICATIONS,
+  handler: (message) => handleMessagingEventMessage(message, messagingLogger),
+  logger: messagingLogger,
+});
+
+if (consumerEnabled) {
+  void bookingSupervisor.start();
+  void messagingSupervisor.start();
+} else {
+  logger.info("Consumer disabled (NOTIFICATION_CONSUMER_ENABLED=false)");
 }
-
-if (consumerEnabled) void startMessagingConsumer();
 
 // ── Arrêt propre — gardé contre les SIGINT répétés (leçon PR4) ──────
 let shuttingDown = false;
@@ -208,9 +208,7 @@ async function shutdown(signal: string): Promise<void> {
   // Ceinture : sortie garantie même si une déconnexion traîne.
   const belt = setTimeout(() => process.exit(0), 5_000);
   belt.unref();
-  if (retryTimer) clearTimeout(retryTimer);
-  if (messagingRetryTimer) clearTimeout(messagingRetryTimer);
-  if (messagingConsumerRunning || consumerEnabled) {
+  if (consumerEnabled) {
     try {
       await messagingConsumer.disconnect();
       messagingLogger.info("Messaging consumer disconnected");
@@ -218,7 +216,7 @@ async function shutdown(signal: string): Promise<void> {
       messagingLogger.error({ err }, "Messaging consumer disconnect failed");
     }
   }
-  if (consumerRunning || consumerEnabled) {
+  if (consumerEnabled) {
     try {
       await consumer.disconnect();
       logger.info("Consumer disconnected");
