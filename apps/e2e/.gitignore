@@ -1,0 +1,6 @@
+# Sorties du harnais : rapport HTML, traces, captures et vidéos d'échec.
+# Elles se régénèrent à chaque exécution et pèsent lourd — jamais versionnées
+# (même règle que les captures de recette, cf. context/fiches-pr).
+rapport/
+resultats/
+out-tsc/
