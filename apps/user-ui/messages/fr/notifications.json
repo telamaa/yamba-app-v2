@@ -88,6 +88,16 @@
         "line": "{route} · {weight} · ta capacité est libérée"
       }
     },
+    "conversation_message_posted": {
+      "SHIPPER": {
+        "title": "Nouveau message",
+        "line": "{route} · « {preview} »"
+      },
+      "CARRIER": {
+        "title": "Nouveau message",
+        "line": "{route} · « {preview} »"
+      }
+    },
     "booking_refund_issued": {
       "SHIPPER": {
         "title": "Remboursement émis",
