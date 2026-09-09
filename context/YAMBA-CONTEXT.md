@@ -493,7 +493,7 @@ Ordre de demarrage : auth -> trip -> gateway.
   INVISIBLES : ni test unitaire, ni tableau de bord, ni utilisateur ne les aurait trouvees — il
   a fallu provoquer la panne. Precaution de recette a retenir : `rpk topic produce -z none`,
   toujours. Rapport complet : `context/YAMBA-RECETTE-CRONS-RESULTATS.md`. Plateforme **989
-  tests**.
+  tests**. MERGE 09/09 : **#256** (17 checks comptes).
 - 04/09 : C-PR6b feat/c6b-admin-alerts (D59 3A / 4A, A129–A131) — neuf regles de seuil
   (evaluateAlerts pur, instantane de dix compteurs), GET /admin/alerts sans etat (accueil
   admin), cron horaire avec dedoublonnage Redis SET NX (un email par regle et par jour, Redis
