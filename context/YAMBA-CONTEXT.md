@@ -494,6 +494,23 @@ Ordre de demarrage : auth -> trip -> gateway.
   a fallu provoquer la panne. Precaution de recette a retenir : `rpk topic produce -z none`,
   toujours. Rapport complet : `context/YAMBA-RECETTE-CRONS-RESULTATS.md`. Plateforme **989
   tests**. MERGE 09/09 : **#256** (17 checks comptes).
+- 09/09 : **HARNAIS DE RECETTE NAVIGATEUR (Playwright, `apps/e2e`)** — les cahiers 01-WEB (328
+  fiches) et 02-ADMIN (110) se jouent au navigateur ; a la main c'est plusieurs jours et cela ne
+  se rejoue pas. Le harnais tourne contre l'environnement REEL (six services + Mailpit), avec
+  trois navigateurs comme le cahier les decrit (Expediteur / Voyageur / visiteur), `workers: 1`,
+  et il n'est PAS branche a la CI (elle garde ses 17 verifications). Lancement : `npx nx e2e e2e`.
+  Deux pieges de poste desarmes dans la configuration : les cookies sont LIES A L'HOTE (front sur
+  localhost + API sur une IP de reseau local = connexion 200 et AUCUN cookie), et `networkidle`
+  ne dit rien de React (clic avant hydratation = formulaire envoye en GET). Chromium n'etant plus
+  publie pour macOS 13, le harnais pilote le Chrome du poste.
+  Deux anomalies des le montage : **ANO-WEB-01 (BLOQUANTE)** — un visiteur sans aucune session
+  recevait la fenetre « Ta session a expire » sur `/fr/login`, dont le fond opaque BLOQUAIT le
+  formulaire (correction : un marqueur de session, et le refus d'ouverture sur les ecrans de
+  session) ; **ANO-WEB-02 (majeure)** — la porte « Connecte-toi pour reserver » affichait ses
+  deux boutons sous les noms `booking.authGate.login` et `booking.authGate.register`, dans les
+  DEUX langues (le miroir FR/EN ne voit pas une absence symetrique). Cinquieme regle ajoutee a
+  `scripts/check-i18n-messages.mjs` : toute cle LITTERALE utilisee dans les sources existe
+  (213 faux positifs ramenes a 0). Rapport : `context/YAMBA-RECETTE-WEB-RESULTATS.md`.
 - 04/09 : C-PR6b feat/c6b-admin-alerts (D59 3A / 4A, A129–A131) — neuf regles de seuil
   (evaluateAlerts pur, instantane de dix compteurs), GET /admin/alerts sans etat (accueil
   admin), cron horaire avec dedoublonnage Redis SET NX (un email par regle et par jour, Redis

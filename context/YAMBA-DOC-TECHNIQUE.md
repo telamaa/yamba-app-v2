@@ -3636,3 +3636,112 @@ campagne. `seed-integrity.spec.ts` lit la source du seed et refuse désormais ce
 
 trip-service 257, deal-service 575, notification-service 115, message-service 42 →
 plateforme **989** (auth-service 225 inchangé). Contrats OpenAPI régénérés (`AdminMessageReportItem`).
+
+---
+
+# Harnais de recette navigateur (Playwright) — et les deux premières anomalies
+
+*(PR `chore/e2e-playwright`, 09/09/2026.)*
+
+## Pourquoi un harnais
+
+Les cahiers 01-WEB (328 fiches) et 02-ADMIN (110) se jouent **au navigateur**. À la main, c'est
+plusieurs jours — et surtout, cela ne se **rejoue** pas : un cahier joué une fois ne protège de
+rien le mois suivant. `apps/e2e` exécute ces scénarios.
+
+Trois choix structurants, tous justifiés par la campagne précédente :
+
+1. **Contre l'environnement réel** (six services, Mongo, Redis, Redpanda, Mailpit), jamais
+   contre des bouchons. Les défauts qui comptent sont ceux qu'aucun test unitaire ne voit.
+2. **Pas branché à la CI**, délibérément : il faudrait toute l'infrastructure. La CI garde ses
+   **17** vérifications ; le harnais se lance sur un poste où l'environnement tourne
+   (`npx nx e2e e2e`).
+3. **Trois navigateurs, comme le cahier les décrit** — A l'Expéditeur, B le Voyageur, C le
+   visiteur — chacun dans son `BrowserContext`. La moitié des vérifications portent sur ce qu'un
+   rôle **ne voit pas** : une session partagée les rendrait toutes vertes pour de mauvaises
+   raisons. Et `workers: 1`, parce que les parcours partagent une base et un jeu d'essai.
+
+```
+apps/e2e/
+  playwright.config.ts        adresse du front déduite, canal Chrome, rapport et traces
+  src/fixtures/comptes.ts     les 12 comptes du seed (§ 2.3 du cahier)
+  src/fixtures/jeu-essai.ts   remise à zéro (§ 3.6) + carte des repères → identifiants réels
+  src/fixtures/mailpit.ts     attendre un email — et prouver qu'un autre n'en reçoit AUCUN
+  src/fixtures/yamba.ts       les navigateurs A / B / C, la connexion par l'écran
+  src/harnais.spec.ts         le harnais s'éprouve lui-même avant d'éprouver le produit
+  src/chapitres/*.spec.ts     les scénarios, par chapitre du cahier
+```
+
+## Deux pièges de poste, désarmés dans la configuration
+
+**Les cookies sont liés à l'hôte.** Le poste est configuré pour la recette mobile
+(`NEXT_PUBLIC_API_BASE_URL=http://192.168.1.155:8080/api`). Ouvrir le front sur `localhost:3000`
+donne alors une connexion **200 sans un seul cookie posé** — et tout échoue ensuite sans que rien
+ne l'explique. Le harnais lit la configuration du front et en déduit l'adresse à ouvrir : base
+absolue → son hôte ; base relative (`/api`, proxy Next, D48) → `localhost`.
+
+**`networkidle` ne dit rien de React.** Sur une adresse de réseau local, Next 16 sert d'abord un
+squelette SSR ; cliquer avant l'hydratation envoie le formulaire de connexion en **GET**, mot de
+passe dans l'URL. Le signal fiable est un appel d'API fait par le **client** ; le helper l'attend,
+puis réessaie une fois si la requête de connexion n'est jamais partie.
+
+**Chromium n'est plus publié pour macOS 13** : le harnais pilote le **Chrome du poste**
+(`channel: "chrome"`), `PLAYWRIGHT_CHANNEL=bundled` revenant au Chromium livré avec Playwright.
+
+## ANO-WEB-01 (bloquante) — une session qui n'a jamais existé ne peut pas expirer
+
+Trouvée avant le premier scénario du cahier, en tentant simplement de se connecter. Un visiteur
+qui ouvre `/fr/login` recevait la fenêtre « Ta session a expiré », dont le fond opaque
+**interceptait les clics** :
+
+```
+<button aria-label="Plus tard" class="absolute inset-0 bg-slate-900/50 …">
+… subtree intercepts pointer events
+```
+
+Le formulaire de connexion était inutilisable tant que la fenêtre n'était pas fermée à la main.
+
+Deux défauts cumulés. `api-client` traitait **tout** 401 suivi d'un rafraîchissement raté comme
+une *expiration* — or un visiteur n'a rien à faire expirer. Et l'en-tête de `SessionExpiredGate`
+affirmait « sur les pages publiques, la fenêtre reste fermée » : le code ne le faisait pas.
+
+```ts
+// apps/user-ui/src/lib/session-marker.ts — le marqueur, sans aucune donnée personnelle
+export function marquerSessionActive(): void { try { window.localStorage.setItem("yamba:session", "1"); } catch {} }
+```
+
+Une requête authentifiée qui **réussit** pose le marqueur ; la déconnexion et l'expiration
+l'effacent ; l'événement d'expiration n'est émis que s'il existait. Et l'écran refuse de s'ouvrir
+sur `/login`, `/register`, `/password`, `/refresh`. Toute lecture du stockage est protégée : en
+navigation privée, l'absence de marqueur fait retomber sur le comportement prudent — pas de
+fenêtre plutôt qu'une fenêtre injustifiée.
+
+## ANO-WEB-02 (majeure) — deux clés de traduction affichées à l'écran
+
+La porte « Connecte-toi pour réserver » proposait deux boutons intitulés
+**`booking.authGate.login`** et **`booking.authGate.register`** : les clés elles-mêmes, faute de
+messages, **dans les deux langues**.
+
+Le contrôle i18n de la CI compare les locales **entre elles**. Ici les deux étaient également
+incomplètes : le miroir était parfait, et le défaut invisible. D'où une **cinquième règle** dans
+`scripts/check-i18n-messages.mjs` — *toute clé littérale utilisée dans les sources existe*.
+
+Elle ne juge que ce qui est certain, parce qu'un garde-fou qui crie sur du code juste finit
+désactivé (leçon de la campagne API) :
+
+- la **carte des espaces de noms** est lue dans `src/i18n/request.ts` — un fichier ne porte pas
+  forcément le nom de son espace (`trip-detail.json` → `tripDetail`) ;
+- une variable liée **deux fois** dans le même fichier est ignorée : on ne peut plus attribuer
+  ses appels à coup sûr ;
+- une liaison ne gouverne que ce qui la **suit** : un `t("…")` plus haut appartient à une autre
+  fonction, qui reçoit souvent `t` en paramètre ;
+- une clé finissant par un point est un **préfixe concaténé** (`t("cat." + x)`), pas une clé ;
+- et un **garde-fou du garde-fou** échoue si moins de 200 clés littérales ont été analysées.
+
+Passées de 213 faux positifs à **0**, tout en attrapant le cas réel : clé retirée → le contrôle
+nomme `booking.authGate.login — BookingClient.tsx`.
+
+## Tests
+
+`apps/e2e` : **10 scénarios** verts sur le poste (harnais, WEB-CNX ×3, WEB-RSV ×3). Les suites
+Jest et les 17 vérifications de CI sont inchangées.

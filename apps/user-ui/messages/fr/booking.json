@@ -21,7 +21,7 @@
     "pickupBlockTitle": "Tu remets le colis à {carrierFirstName}",
     "deliveryBlockTitle": "Le destinataire récupère le colis",
     "locationSingleHint": "Lieu convenu avec le voyageur",
-      "locationMissing": "Le Voyageur n'a pas précisé de lieu pour ce trajet : vous conviendrez ensemble du point de rendez-vous dans la conversation, une fois la demande acceptée.",
+    "locationMissing": "Le Voyageur n'a pas précisé de lieu pour ce trajet : vous conviendrez ensemble du point de rendez-vous dans la conversation, une fois la demande acceptée.",
     "goldenRules": {
       "title": "Les règles d''or pour un envoi qui se passe bien",
       "pack": "**Emballe soigneusement.** Sac ou boîte solide, papier bulle pour le fragile, scotche correctement.",
@@ -242,7 +242,9 @@
   },
   "authGate": {
     "title": "Connecte-toi pour réserver",
-    "subtitle": "Une réservation engage un Voyageur : Yamba a besoin de savoir qui envoie. Ton colis et ce trajet t'attendent après connexion."
+    "subtitle": "Une réservation engage un Voyageur : Yamba a besoin de savoir qui envoie. Ton colis et ce trajet t'attendent après connexion.",
+    "login": "Se connecter",
+    "register": "Créer un compte"
   },
   "previousStep": "Étape précédente"
 }
