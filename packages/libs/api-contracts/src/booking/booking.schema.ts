@@ -185,6 +185,9 @@ const milestoneFields = {
   deliveredAt: z.iso.datetime().nullish(),
   payoutDueAt: z.iso.datetime().nullish().meta({ description: "deliveredAt + D+4 (verification window end)" }),
   completedAt: z.iso.datetime().nullish(),
+  completedBy: BookingActorSchema.nullish().meta({
+    description: "SHIPPER = early confirmation, SYSTEM = D+4 auto-complete, ADMIN = mediation decision (D55) — the tracker wording depends on it (ANO-WEB-04)",
+  }),
   closedAt: z.iso.datetime().nullish().meta({ description: "Set on DECLINED / EXPIRED / CANCELLED" }),
   closedBy: BookingActorSchema.nullish(),
   declineReason: z.string().nullish(),

@@ -116,7 +116,7 @@ export type Booking = {
   /** Versement au Voyageur (B4/A68) : l'Expéditeur n'affiche JAMAIS un échec (2A). */
   payoutStatus?: "PENDING" | "SENT" | "FAILED" | "FROZEN";
   /** Qui a clos la transaction (COMPLETED) : confirmation anticipée ou J+4. */
-  completedBy?: "SHIPPER" | "SYSTEM";
+  completedBy?: "SHIPPER" | "SYSTEM" | "ADMIN";
   completedAt?: string;
   /** PICKED_UP : quand « signaler un colis non livré » devient possible (servi, A72). */
   disputeOpensAt?: string;

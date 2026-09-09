@@ -23,6 +23,8 @@ export function CompletedBanner({ booking, compact = false }: { booking: Booking
     ? format.dateTime(completedAt, { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" })
     : "";
   const byShipper = booking.completedBy === "SHIPPER";
+  // Clos par la médiation (D55) : la ligne dit la décision, jamais « sans signalement de ta part » (ANO-WEB-04).
+  const byMediation = booking.completedBy === "ADMIN";
   return (
     <div
       className={`flex items-center gap-3 border-teal-200 bg-teal-50 dark:border-teal-900/40 dark:bg-teal-950/30 ${
@@ -41,7 +43,7 @@ export function CompletedBanner({ booking, compact = false }: { booking: Booking
           {t("banner.title")}
         </div>
         <div className={`text-teal-800 dark:text-teal-300 ${compact ? "text-[11px]" : "mt-0.5 text-[12px] sm:text-[13px]"}`}>
-          {byShipper ? t("banner.byShipper", { date }) : t("banner.bySystem", { date })}
+          {byShipper ? t("banner.byShipper", { date }) : byMediation ? t("banner.byMediation", { date }) : t("banner.bySystem", { date })}
         </div>
       </div>
     </div>
