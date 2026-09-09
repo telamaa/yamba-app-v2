@@ -11,7 +11,7 @@ tourne sur le poste, ce qui reste à faire, et les pièges déjà payés qu'il n
 |---|---|
 | **Cahier n° 4 — tâches planifiées** (90 fiches) | **CLOS.** 9 anomalies, 9 closes. PR **#256** + docs **#257**, mergées. Décisions **D76** et **D77** gravées au registre. Rapport : `context/YAMBA-RECETTE-CRONS-RESULTATS.md` |
 | **Harnais de recette navigateur** (Playwright) | **MERGÉ** — PR **#258**. Avec `ANO-WEB-01` (bloquante) et `ANO-WEB-02` (majeure), toutes deux closes |
-| **Parcours transactionnels** | **EN COURS**, branche `chore/e2e-parcours` — non poussée à l'heure du handoff |
+| **Parcours transactionnels** | **EN COURS**, branche `chore/e2e-parcours` **poussée** (commit `9e87ae8`), PR non ouverte : le parcours WEB-E2E-1 doit d'abord passer en entier |
 
 Rapport de la campagne navigateur : `context/YAMBA-RECETTE-WEB-RESULTATS.md`.
 
