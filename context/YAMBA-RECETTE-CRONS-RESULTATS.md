@@ -322,3 +322,139 @@ Correction     : `remind()` rend `"SENT" | "SKIPPED"` ; `runOnce` rend
 Contre-épreuve : membre ayant coupé → `{"sent":0,"skipped":1,"failed":0}` et 0 email ;
                  membre normal → `{"sent":1,"skipped":0,"failed":0}` et 1 email.
 ```
+
+---
+
+## Chapitre 4.8 — Purge des conversations (`conversation-retention`)
+
+| Fiche | Ce qui est éprouvé | Verdict | Preuve |
+|---|---|---|---|
+| CRON-PURGEFIL-1 | La conversation d'un vieux deal disparaît | **Conforme** | `{examined:1, purged:1}` ; conversation, 2 messages, 1 rendez-vous supprimés — et le **signalement de modération conservé** |
+| CRON-PURGEFIL-2 | Les trois cas de non-purge | **Conforme** | deal `ACCEPTED` → `purged:0` · deal `DISPUTED` → `purged:0` · activité d'hier sur un deal clos il y a deux ans → même pas examiné (`examined:0`) |
+| CRON-PURGEFIL-3 | Rejouer ne casse rien | **Conforme** | `{examined:0, purged:0}` deux fois, sans erreur |
+
+Le troisième cas de PURGEFIL-2 est celui que le cahier désigne comme le plus fragile — l'ancre est
+la **plus tardive** des deux dates, pas la seule fin du deal. Il tient.
+
+---
+
+## Chapitre 4.9 — Purge des événements publiés (`outbox-retention`)
+
+| Fiche | Ce qui est éprouvé | Verdict | Preuve |
+|---|---|---|---|
+| CRON-PURGEOUT-1 | La purge des publiés anciens | **Conforme** | horloge avancée de 200 j → 173 événements `booking` supprimés |
+| CRON-PURGEOUT-2 | Un événement parqué n'est jamais purgé | **Non conforme** | **il a été supprimé** → `ANO-CRON-05`, bloquante |
+| — | Chaque service ne purge que son agrégat | **Conforme** | la purge `booking` a laissé les **11** événements `conversation` intacts ; la purge `conversation` les a ensuite pris |
+
+### Anomalie du chapitre 4.9
+
+```
+ANO-CRON-05
+Fiche          : CRON-PURGEOUT-2 · Gravité : BLOQUANTE · ÉTAT : CLOSE
+Appel exact    : créer un événement { publishedAt: null, attempts: 10 }, puis
+                 npx tsx --env-file=.env scripts/recette/purgeout.ts booking
+Attendu        : « Un événement jamais publié n'est jamais supprimé […] c'est la piste
+                 d'audit, c'est intentionnel, et c'est une exigence de conformité » (cahier
+                 §4.9). `CLAUDE.md` dit la même chose.
+Obtenu         : l'événement parqué est **supprimé**.
+Cause          : le cron décide dans la requête :
+                   deleteMany({ where: { aggregateType, publishedAt: { lt: cutoff } } })
+                 Or sur MongoDB, `null` précède les dates dans l'ordre des types BSON :
+                 **`null < n'importe quelle date` est VRAI**. Mesuré séparément, sur deux
+                 événements créés à l'instant :
+                   publishedAt = null   → attrapé par `lt: (il y a 90 j)`
+                   publishedAt ABSENT   → non attrapé
+                 Et le writer pose `publishedAt: null` explicitement (règle A49 du dépôt) :
+                 **tous** les événements non publiés sont donc concernés.
+Impact         : la purge nocturne supprimait tout événement non encore publié, **à
+                 n'importe quel âge**. Deux conséquences :
+                 · un événement que le relais n'a pas eu le temps de publier (courtier
+                   arrêté à 03:55) est détruit — la notification et l'email ne partiront
+                   jamais, et il n'en reste aucune trace ;
+                 · les événements PARQUÉS, que la conformité exige de conserver,
+                   disparaissent — c'est la piste d'audit qui s'efface toute seule.
+                 La règle pure `isOutboxEventPurgeable` disait pourtant la vérité
+                 (`!!e.publishedAt && olderThan(...)`) : elle n'était simplement pas utilisée.
+Correction     : filtre explicite dans les DEUX services (deal et message) —
+                   AND: [{ publishedAt: { not: null } }, { publishedAt: { lt: cutoff } }]
+                 vérifié CONTRE LA BASE avant d'être écrit : sur quatre événements témoins
+                 (publié ancien, publié récent, null, champ absent), l'ancien filtre en prenait
+                 deux, le nouveau n'en prend qu'un — le bon.
+Contre-épreuve : un parqué (jamais publié) et un publié il y a 500 j → la purge supprime
+                 **le publié seulement**, le parqué reste. Tests : `outbox-purge.spec.ts` (5 cas),
+                 dont un garde-fou qui lit la source du cron et interdit le retour du filtre nu.
+```
+
+### Pourquoi la famille est saine ailleurs — l'observation qui vaut la correction
+
+Le même piège pouvait exister partout où une **date nullable** est comparée avec `lt`. Quatre
+autres endroits comparent des dates dans des opérations destructrices ou décisives :
+
+| Endroit | Champ | Nullable ? | Verdict |
+|---|---|---|---|
+| `notification-service/retention.cron` | `createdAt`, `claimedAt` ×2 | **non** (`@default(now())`) | sans risque |
+| `conversation-retention` | `updatedAt` | **non** (`@updatedAt`) | sans risque |
+| `recipient-redaction` | `completedAt`, `closedAt` | **oui** | **sûr quand même** |
+| `complete-trips` | `arrivalAt`, `departureAt` | **oui** | **sûr quand même** |
+
+Les deux derniers sur-sélectionnent bel et bien — un `completedAt` à `null` passe le filtre — mais
+**ils ne décident pas dans la requête** : chaque candidat repasse ensuite devant une règle pure
+(`isRecipientRedactable`, `canPerform` avec `isPastArrival`) avant la moindre écriture.
+
+C'est exactement ce qui manquait au cron de l'outbox : un `deleteMany` **décide et écrit d'un seul
+geste**, sans rien derrière lui. La leçon générale, à retenir au-delà de cette anomalie :
+
+> Une requête large est sans danger **tant qu'une règle pure tranche derrière**. Elle devient
+> fatale le jour où la requête EST la décision.
+
+---
+
+## Chapitre 4.10 — Effacement du destinataire (`recipient-redaction`)
+
+Tâche de conformité : le destinataire d'un colis est un **tiers sans compte**, qui n'a rien signé.
+
+| Fiche | Ce qui est éprouvé | Verdict | Preuve |
+|---|---|---|---|
+| CRON-DESTINATAIRE-1 | Le tiers est effacé après la rétention | **Conforme** | `{"firstName":"—","lastName":"—","phoneE164":"+00000000000","email":null}` — le tiret est bien le cadratin U+2014, et l'email passe à `null`, pas à une chaîne vide |
+| CRON-DESTINATAIRE-2 | Les trois cas de non-effacement | **Conforme** | deal `PICKED_UP` → `examined:0` · terminé il y a 10 j (délai 30) → `examined:0` · déjà effacé → `examined:0` |
+| CRON-DESTINATAIRE-3 | Jamais deux effacements | **Conforme** | rejeu → `{examined:0, redacted:0}`, `recipientRedactedAt` **inchangé au milliseconde près** |
+| CRON-DESTINATAIRE-4 | Le délai est lu dans les paramètres | **Conforme** | à 30 j, une réservation de 15 j n'est pas candidate ; le délai ramené à 7 j, la **même** réservation est effacée |
+
+---
+
+## Chapitre 4.11 — Conservation générale (`retention`, notification-service)
+
+| Fiche | Ce qui est éprouvé | Verdict | Preuve |
+|---|---|---|---|
+| CRON-CONSERV-1 | Les trois collections sont purgées | **Conforme** | horloge +400 j → `{"notifications":135,"emailDeliveries":133,"consumedEvents":161}`, les trois à zéro |
+| CRON-CONSERV-2 | Chaque durée est indépendante | **Conforme** | trois lignes de **100 jours** : seul `ConsumedEvent` (seuil 90 j) tombe ; `Notification` et `EmailDelivery` (365 j) restent |
+| CRON-CONSERV-3 | La purge n'efface pas ce qui n'est pas à elle | **Conforme** | horloge +4000 j → boîte d'envoi, réservations, signalements et comptes **inchangés** au document près |
+| CRON-CONSERV-4 | Le registre purgé rouvre le retraitement | **Conforme** | événements republiés **sans** purge → ignorés (2 emails, registre à 2) ; registre purgé puis republiés → **retraités** (2 → 4 emails) |
+
+**La nuance de CONSERV-4, qui mérite d'être connue de l'exploitant.** Après purge du registre, les
+événements republiés produisent bien de **nouveaux emails** — mais **pas** de nouvelles
+notifications : leur matérialisation est un « insère ou met à jour » sur le couple (événement,
+destinataire), qui absorbe le rejeu. Autrement dit, les deux canaux n'ont pas la même protection :
+la notification est idempotente par construction, l'email l'est par le registre. Purger le registre
+plus court que la rétention de la boîte d'envoi exposerait donc à des emails en double. Avec les
+défauts (registre 90 j, boîte d'envoi 90 j), le cas ne peut pas se produire — c'est une contrainte
+à garder en tête si l'un des deux réglages bouge.
+
+---
+
+## Chapitre 4.12 — Rappels d'inscription Voyageur (`onboarding-reminder`)
+
+| Fiche | Ce qui est éprouvé | Verdict | Preuve |
+|---|---|---|---|
+| CRON-ONBOARD-1 | Les trois rappels partent dans l'ordre | **Conforme** | « Plus qu'une étape pour devenir Voyageur » → « Ton profil Voyageur t'attend » → « Dernière chance de finaliser ton profil », aux délais 24 h / 72 h / 168 h |
+| CRON-ONBOARD-2 | Les cas de non-envoi | **Conforme** | matrice complète sur la règle pure : 11 cas, 11 verdicts justes |
+| CRON-ONBOARD-3 | Jamais un quatrième rappel | **Conforme** | `reminderCount ≥ 3` → `sent: 0`, même sur une page très ancienne |
+| CRON-ONBOARD-4 | Le compte abandonné n'est pas réveillé | **Conforme** | page de plus de **30 jours** → aucun rappel. C'est la garde ajoutée avec A148 : brancher le cron sans elle aurait envoyé « dernière chance » à des comptes abandonnés depuis des mois |
+| CRON-ONBOARD-5 | L'intervalle minimum entre deux rappels | **Conforme** | un rappel il y a moins de **12 h** → aucun envoi, même si le délai du palier est atteint |
+
+**Un piège de recette utile à noter.** Les rappels 2 et 3 ne partaient pas alors que la page était
+suffisamment vieille : la cause n'était pas un défaut mais **l'intervalle minimum de 12 h** entre
+deux rappels, que j'avais laissé à « il y a quelques secondes » en jouant le rappel 1 juste avant.
+Le champ à vieillir est `CarrierPage.lastReminderSentAt` — et non un champ `onboardingLastReminderSentAt`,
+qui n'existe pas. Vérifier les noms de champs **dans le schéma** avant d'accuser le code : la
+première tentative écrivait dans le vide.
