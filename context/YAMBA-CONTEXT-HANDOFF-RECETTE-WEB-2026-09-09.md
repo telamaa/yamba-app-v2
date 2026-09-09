@@ -3,6 +3,15 @@
 *Ce document sert à REPRENDRE le chantier après une pause. Il dit où en est la campagne, ce qui
 tourne sur le poste, ce qui reste à faire, et les pièges déjà payés qu'il ne faut pas repayer.*
 
+> **CONSIGNE DE REPRISE (donnée le 09/09/2026).** Dans cet ordre, sans rien intercaler :
+> **1.** corriger le harnais avec `storageState` (§ 4 bis) ; **2.** finir **WEB-E2E-1** en entier
+> (étapes 11 à 29), puis ouvrir la PR de la branche `chore/e2e-parcours`.
+>
+> Question ouverte du même échange : **faut-il ajouter Elasticsearch au projet ?** L'analyse est
+> au § 8 — la réponse proposée est **non**, avec une correction ciblée de la recherche et
+> Atlas Search comme voie de sortie si le besoin grandit. À arbitrer, puis à graver (D78) si
+> l'arbitrage est retenu.
+
 ---
 
 ## 1. Où en est la journée
@@ -147,3 +156,71 @@ Contournement immédiat, si l'on veut relancer sans attendre : redémarrer la pa
 | `docs/recette/RECETTE-02-ADMIN.md` | Le cahier back-office (110 fiches) |
 | `context/YAMBA-REGISTRE-DECISIONS-ROADMAP-v1.3.md` | D76 et D77, gravées aujourd'hui |
 | `CLAUDE.md` | La commande du harnais et ses contraintes de poste |
+
+---
+
+## 8. Faut-il ajouter Elasticsearch ? — analyse du 09/09/2026
+
+**Recommandation : non.** Pas maintenant, et probablement jamais sous cette forme.
+
+### Ce que fait la recherche aujourd'hui
+
+`apps/trip-service/src/controllers/trip-search.controller.ts` (517 lignes) interroge MongoDB par
+Prisma : filtres composables (mode de transport, dates, tranches horaires, familles et
+catégories, prix, note), tris (départ le plus tôt, prix le plus bas, mieux notés), facettes, et
+un tri par prix pour un poids donné calculé sur une fenêtre de résultats.
+
+Le modèle `Trip` porte **vingt index**, dont `[status, departureAt, transportMode]`,
+`[originCity]`, `[destinationCity]`, `[originPlaceId]`, `[comparablePriceCents]`.
+
+### Le vrai défaut, et il est précis
+
+```ts
+{ originCity: { contains: params.from, mode: "insensitive" } }
+```
+
+`contains` insensible à la casse devient une **expression régulière non ancrée** : MongoDB ne
+peut PAS utiliser `@@index([originCity])`, et fait un balayage de collection. Quatre champs sont
+concernés (ville et pays, au départ et à l'arrivée). C'est le seul endroit de la recherche qui ne
+passe pas par un index — tout le reste est indexé correctement.
+
+Ce défaut est **réel**, et il grandira avec le nombre de trajets. Mais Elasticsearch n'est pas la
+réponse proportionnée.
+
+### Ce que coûterait Elasticsearch
+
+1. **Une sixième brique d'infrastructure**, en développement ET en production, à côté de Mongo
+   Atlas, Redis Upstash et Redpanda. Un cluster à dimensionner, surveiller, mettre à jour.
+2. **Une seconde vérité.** Le registre en fait une règle : un index de recherche est une
+   *projection*, donc il dérive. Il faut le peupler (l'outbox ne porte aujourd'hui que
+   `booking` et `conversation` — il faudrait un agrégat `trip`, son relais, son consommateur),
+   le réindexer, et détecter la dérive. C'est un chantier, pas une dépendance.
+3. **Un décalage assumé** entre l'écriture et la visibilité en recherche, à expliquer au
+   Voyageur qui vient de publier son trajet et ne le trouve pas.
+
+### Ce qui règle le problème réel, à moindre coût
+
+**(a) Chercher par identifiant de lieu.** Le front utilise déjà l'autocomplétion Google Places,
+et le schéma porte `@@index([originPlaceId])` / `@@index([destinationPlaceId])`. Une recherche
+par `placeId` est **exacte et indexée** — zéro balayage. Le texte libre ne resterait que le
+repli.
+
+**(b) Un champ normalisé et un préfixe.** Stocker `originCitySlug` (minuscules, accents retirés)
+et interroger en `startsWith` : une expression régulière **ancrée à gauche** utilise l'index. Cela
+couvre exactement l'usage réel — on tape « par », on veut « Paris ».
+
+**(c) Si le besoin grandit : Atlas Search, pas Elasticsearch.** MongoDB Atlas embarque Lucene.
+Recherche floue, repli d'accents, autocomplétion — **sans nouvelle infrastructure, sans
+synchronisation, sans seconde vérité**, l'index vivant dans la base qui détient déjà la donnée.
+C'est la voie de sortie naturelle, et elle ne se décide que le jour où (a) et (b) ne suffisent
+plus.
+
+### Le déclencheur qui changerait le verdict
+
+Elasticsearch se justifierait si l'on voulait de la recherche **plein texte sur du contenu
+rédigé** (descriptions, messages, avis) avec pertinence, synonymes et surlignage — ou de
+l'agrégation analytique lourde sur des millions de documents. Rien de tel n'est au programme : le
+pilotage est déjà servi par `/admin/pilotage` et la mesure d'audience (D66, D74).
+
+**À graver en D78 si l'arbitrage est retenu** : « la recherche reste dans la base qui détient la
+donnée ; pas de second moteur tant qu'un index Mongo bien posé suffit ».
