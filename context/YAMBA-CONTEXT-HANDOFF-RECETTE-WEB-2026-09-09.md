@@ -8,7 +8,7 @@ tourne sur le poste, ce qui reste à faire, et les pièges déjà payés qu'il n
 > **1.** ~~corriger le harnais avec `storageState`~~ **FAIT** (§ 4 bis) ;
 > **2.** ~~monter la fixture de session administrateur~~ **FAIT** (`seed-admins.ts` + `navigateurAdmin`) ;
 > **3.** ~~finir WEB-E2E-1 en entier, ouvrir la PR~~ **FAIT — PR #259 mergée** ;
-> **4.** les cinq autres parcours du chapitre 6 : ~~E2E-2~~ **FAIT, #260 mergée**, puis E2E-3, E2E-4, E2E-5, E2E-6 ;
+> **4.** les cinq autres parcours du chapitre 6 : ~~E2E-2~~ **FAIT, #260 mergée**, ~~E2E-3~~ **FAIT** (branche `chore/e2e-parcours-3`, PR à ouvrir), puis E2E-4, E2E-5, E2E-6 ;
 > **5.** les 32 chapitres du cahier **01-WEB** (326 fiches) ;
 > **6.** le cahier **02-ADMIN** (110 fiches) — 19 fiches de sécurité d'accès, 91 fiches d'écrans.
 >
@@ -26,7 +26,7 @@ tourne sur le poste, ce qui reste à faire, et les pièges déjà payés qu'il n
 |---|---|
 | **Cahier n° 4 — tâches planifiées** (90 fiches) | **CLOS.** 9 anomalies, 9 closes. PR **#256** + docs **#257**, mergées. Décisions **D76** et **D77** gravées au registre. Rapport : `context/YAMBA-RECETTE-CRONS-RESULTATS.md` |
 | **Harnais de recette navigateur** (Playwright) | **MERGÉ** — PR **#258**. Avec `ANO-WEB-01` (bloquante) et `ANO-WEB-02` (majeure), toutes deux closes |
-| **Parcours transactionnels** | **#259 MERGÉ** (WEB-E2E-1) · **#260 MERGÉ** (WEB-E2E-2, ANO-WEB-04, ANO-WEB-05) · #259 : WEB-E2E-1 passe **en entier** (29 étapes, 1 min 24), sessions mémorisées, fixture admin, `ANO-WEB-03` (majeure) close, 15 scénarios verts en 3 min 06 |
+| **Parcours transactionnels** | **#259 MERGÉ** (WEB-E2E-1) · **#260 MERGÉ** (WEB-E2E-2, ANO-WEB-04, ANO-WEB-05) · **WEB-E2E-3 vert** sur `chore/e2e-parcours-3`, PR à ouvrir (ANO-WEB-06 close, ANO-WEB-07 ouverte) · #259 : WEB-E2E-1 passe **en entier** (29 étapes, 1 min 24), sessions mémorisées, fixture admin, `ANO-WEB-03` (majeure) close, 15 scénarios verts en 3 min 06 |
 
 Rapport de la campagne navigateur : `context/YAMBA-RECETTE-WEB-RESULTATS.md`.
 
@@ -58,6 +58,11 @@ cd apps/deal-service && STRIPE_SECRET_KEY= node --env-file=../../.env dist/main.
 #    (ou la faire tourner en bundle comme deal-service) :
 kill -9 $(lsof -nP -iTCP:8080 -sTCP:LISTEN -t)
 cd apps/api-gateway && node --env-file=../../.env dist/main.js
+
+# 4 bis. Si nx serve a laissé tomber trip / notification / message (piège 17), les relancer en bundle :
+cd apps/trip-service && node --env-file=../../.env dist/main.js
+cd apps/notification-service && node --env-file=../../.env dist/main.js
+cd apps/message-service && node --env-file=../../.env dist/main.js
 
 # 5. Les comptes du back-office (une fois, ou après un scénario qui les a abîmés)
 npx tsx --env-file=.env packages/libs/prisma/scripts/seed-admins.ts
@@ -151,7 +156,15 @@ Pièges payés sur les étapes 11 à 29, pour ne pas les repayer :
     stricte fait qu'un champ oublié n'arrive jamais — `completedBy` (ANO-WEB-04).
 15. **deal-service tourne en bundle** : après un changement de son code, `npx nx build
     deal-service` puis relancer le bundle FAKE (§ 2), sinon l'ancien code répond.
-16. **La décision de médiation est unique** (409 au second envoi) : rejouer le seed avant. Sans `nx dev admin-ui`, `navigateurAdmin` attend
+16. **La décision de médiation est unique** (409 au second envoi) : rejouer le seed avant.
+17. **`nx serve` tombe sur un changement de bibliothèque partagée** (« Recursive task invocation
+    detected ») : trois services restent arrêtés alors que webpack a compilé. Les relancer en
+    bundle : `cd apps/<service> && node --env-file=../../.env dist/main.js` (le `.env` porte les
+    ports : `PORT` pour trip, `NOTIFICATION_SERVICE_PORT`, `MESSAGE_SERVICE_PORT`).
+18. **« Payer » cliqué avant le retour de l'intention de paiement ne fait rien** : `payer()`
+    attend le texte du mode test, puis la demande de réservation.
+19. **Une manœuvre se joue là où le produit la lit** : le barème d'annulation lit le départ figé
+    dans le deal — avancer le trajet APRÈS la réservation ne change rien. Sans `nx dev admin-ui`, `navigateurAdmin` attend
     un écran qui n'existe pas.
 
 ## 5. Ce qui reste à faire, dans l'ordre
@@ -163,8 +176,12 @@ Pièges payés sur les étapes 11 à 29, pour ne pas les repayer :
    copie à rendre (rapport, observations : l'écran « Transaction close » après médiation, la ligne
    Finances « retenue reversée »).
 
-3. **Les quatre autres parcours du chapitre 6** : annulation tardive (E2E-3), compte neuf
-   plafonné (E2E-4), refus au pickup (E2E-5), parcours du destinataire (E2E-6). Les objets de page
+3. ~~E2E-3 (annulation tardive)~~ **FAIT** — 15 étapes, 38 s, `ANO-WEB-06` close, `ANO-WEB-07`
+   OUVERTE (arbitrage : le refus D72 conseille un geste impossible). Branche
+   `chore/e2e-parcours-3` : **ouvrir la PR**, compter les 17 checks, merger.
+
+   **Les trois autres parcours du chapitre 6** : compte neuf plafonné (E2E-4), refus au pickup
+   (E2E-5), parcours du destinataire (E2E-6). Les objets de page
    existants (réservation, fil, transport, suivi, signalement, médiation) couvrent la plus grande
    part de leurs écrans.
 

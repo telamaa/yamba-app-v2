@@ -180,6 +180,41 @@ Correction     : le seed pose `capturedAt = acceptedAt` et un `chargeId` factice
 Contre-épreuve : WEB-E2E-2 étape 19 — « Remboursé 15,00 € le … », montant « + 15,00 € ».
 ```
 
+
+```
+ANO-WEB-06
+Fiche          : parcours WEB-E2E-3 étape 4 (chapitre 5.16 notifications) · Gravité : MINEURE · ÉTAT : CLOSE
+Attendu        : « notification in-app à chaque envoi » d'un message.
+Obtenu         : la cloche et la page des notifications affichaient « Notification » — le titre
+                 de repli — et le corridor, sans rien dire d'un message ; le lien menait au deal,
+                 pas au fil.
+Cause          : `conversation.message_posted` n'avait ni présentation ni copie
+                 (`notifications.types.ts`, `notifications.json`) : l'événement était « inconnu ».
+Correction     : présentation dédiée (icône message), copie « Nouveau message » / « {route} ·
+                 « {extrait} » » en FR et EN (l'extrait est celui que l'événement porte, jamais
+                 le message entier), et le lien d'une notification de conversation ouvre le fil.
+Contre-épreuve : WEB-E2E-3 étape 4 — « Nouveau message » chez chacun des deux après l'échange.
+```
+
+```
+ANO-WEB-07
+Fiche          : parcours WEB-E2E-3 étape 15 (chapitre 5.7, D72) · Gravité : MAJEURE · ÉTAT : OUVERTE (arbitrage)
+Attendu        : le refus d'annuler un trajet qui porte un deal vivant dit au Voyageur quoi faire.
+Obtenu         : « Ce trajet porte encore 2 deals en cours : annule-les d'abord depuis « Mes
+                 deals ». Chaque Expéditeur sera remboursé intégralement. » — or **« Mes deals »
+                 n'existe pas** (la chaîne n'apparaît que dans ce message), et **le Voyageur ne
+                 peut pas annuler un deal** : la machine d'états prévoit `ACCEPTED + cancel +
+                 CARRIER` (ANN-02) mais le service refuse tout appelant qui n'est pas
+                 l'Expéditeur (`deal-lifecycle.service.ts`, 403 `SHIPPER_ONLY`) et aucun écran
+                 ne propose le geste.
+Impact         : un Voyageur bloqué sur un trajet qu'il ne peut ni annuler ni vider ; le conseil
+                 affiché est inapplicable.
+Proposition    : (1) tout de suite, le message renvoie vers « Mes trajets » (où les deals sont
+                 listés) ; (2) l'annulation d'un deal par le Voyageur (ANN-02 : remboursement
+                 intégral, annulation à sa charge, réputation) — un lot à part, à graver au
+                 registre. Décision attendue.
+```
+
 ---
 
 ## Chapitre 5.12 — Réserver : l'assistant en quatre étapes
@@ -260,10 +295,54 @@ Contre-épreuve : WEB-E2E-2 étape 19 — « Remboursé 15,00 € le … », mon
   déjà ouvert dans la carte « Donne ta version » ; le libellé du cahier est celui de l'email.
 - Étape 12 : l'endpoint est `POST /deals/:id/dispute/statement` (le cahier n'en nomme aucun).
 
+## Chapitre 6 — WEB-E2E-3, l'annulation tardive · **CONFORME** (15 étapes, 38 s)
+
+| Étape du cahier | Ce qui est éprouvé | Verdict |
+|---|---|---|
+| 1 | Le trajet part dans moins de 48 h | **Manœuvre consignée** — `yul` part à J+3 dans le seed ; départ ramené à +24 h AVANT la réservation (le barème lit le départ figé dans le deal) |
+| 2 | 3 kg, taille S, 100 € | **Conforme** — transport 28,50 € + service 3,42 € = **31,92 €** ; Finances : « Autorisé, pas débité » |
+| 3 | Marc accepte | **Conforme** — net 28,50 €, paiement capturé (« Bloqué chez Yamba »), 3 kg réservés |
+| 4 | Deux messages, notification à chaque envoi | **Conforme après correction** → `ANO-WEB-06` (« Nouveau message ») |
+| 5 – 7 | « Annuler cet envoi ? » et son arithmétique | **Conforme** — « Tu seras remboursée de 15,96 € », retenue de 50 % (15,96 €) reversée au Voyageur ; remboursement = total ÷ 2, compensation = arrondi(retenue × net ÷ total) = 14,25 €, écart 0 |
+| 8 | « Garder l'envoi » | **Conforme** — la fenêtre se ferme, aucune requête ne part, le deal reste accepté |
+| 9 | « Confirmer l'annulation » | **Conforme** — réponse `CANCELLED`, toast « Envoi annulé. Remboursement de 15,96 € en cours. », ligne « Annulée » |
+| 10 | Finances › Paiements | **Conforme** — « Remboursé 15,96 € le … · retenue 15,96 € reversée au Voyageur » |
+| 11 | Finances › Portefeuille de Marc | **Conforme** — « Compensation · annulation tardive de Marie-Claire », « Parti le … · 2 à 7 jours », + 14,25 € |
+| 12 | Mes trajets, kilos rendus | **Conforme** — « Annulée tardivement · 14,25 € de compensation … » ; kilos vérifiés par l'API (13 → 10), l'écran ne les affiche pas (voir écarts) |
+| 13 | Mailpit | **Conforme** — Marie-Claire : « est annulée » puis « Remboursement émis … » avec la retenue qui « revient au Voyageur » ; Marc : « a été annulé » puis « 14,25 € de compensation en route vers ton compte » |
+| 14 | Le fil reste lisible et ouvert | **Conforme** — saisie présente, aucun bandeau (fermeture à J+14) |
+| 15 | Marc tente d'annuler le trajet | **Conforme sur le refus** (409, « Ce trajet porte encore 2 deals en cours … ») — mais le conseil affiché est inapplicable → `ANO-WEB-07` (ouverte) |
+
+### Trois écarts assumés, écrits dans le parcours
+
+- Étape 12 : « Mes trajets » n'affiche pas les kilos restants du trajet ; ils sont vérifiés par
+  l'API (`capacityKg − reservedKg`), avant et après. Chapitre 5.7 à reprendre pour l'écran.
+- Étape 15 : « sinon, l'annulation passe » n'est pas atteignable sur `yul` (un deal DELIVERED
+  d'Aminata y reste vivant et n'est pas annulable) ; seule la branche du refus est jouée.
+- Étape 4 : le libellé « Nouveau message » est celui posé par la correction ANO-WEB-06 (le
+  cahier ne nommait pas le titre).
+
 ---
 
 ## Observations (pas des anomalies, mais à savoir)
 
+- **Depuis ANO-WEB-05, le cron de rejeu des versements paie les deals terminés du seed restés
+  « en attente »** (ils portent désormais `capturedAt`) : c'est le comportement réel du produit,
+  mais un deal du seed qui devait montrer « À venir » dans le Portefeuille passe « Parti » à
+  l'heure suivante, et son email « … en route vers ton compte » arrive au Voyageur en plein
+  parcours (WEB-E2E-1 étape 25 vise désormais le montant de SON deal). À garder en tête pour le
+  chapitre 5.26 : rejouer le seed juste avant.
+- **« Payer » cliqué avant le retour de l'intention de paiement ne fait rien**, sans message :
+  le bouton est actif dès l'affichage de l'étape 4, l'intention arrive une seconde plus tard.
+  Le harnais attend le texte du mode test (qui porte le montant de l'intention) ; un humain
+  rapide obtiendrait un clic muet. Chapitre 5.12, avec l'observation sur le message générique.
+- **La ligne « Annulée le {date} » de « Mes envois » affiche la date de la demande**, pas celle
+  de l'annulation (`ShipmentRow` passe `requestedAt`). Mineure, chapitre 5.11.
+- **Poste : `nx serve` s'arrête sur un changement de bibliothèque partagée.** La recompilation
+  déclenchée par `api-contracts` a levé « Recursive task invocation detected » et trois
+  services (trip, notification, message) sont restés arrêtés alors que webpack avait compilé.
+  Ils tournent désormais en bundle (`node --env-file=../../.env dist/main.js`), comme la
+  passerelle et deal-service ; consigné au handoff.
 - **L'écran « Transaction close » ignore encore la médiation** (suite d'ANO-WEB-04, à
   arbitrer) : sous la ligne corrigée, « Tout est en ordre : le paiement de ton Voyageur est
   libéré », « Yamba verse à {prénom} le montant convenu pour ce transport » et, dans « Ton

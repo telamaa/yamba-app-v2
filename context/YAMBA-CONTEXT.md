@@ -544,6 +544,19 @@ Ordre de demarrage : auth -> trip -> gateway.
   l'ecran « Transaction close » ignore encore la mediation ; la ligne Finances parle de
   « retenue reversee ». 16 scenarios e2e verts. MERGE 09/09 : **#260** (17 checks comptes). Reste : E2E-3 a E2E-6, les 32
   chapitres 5.x, le cahier 02-ADMIN.
+- 09/09 : **WEB-E2E-3, L'ANNULATION TARDIVE (branche `chore/e2e-parcours-3`)** — troisieme parcours
+  BLOQUANT vert : 15 etapes, 38 s (reservation 31,92 €, acceptation et capture, deux messages
+  avec notification, fenetre « Annuler cet envoi ? » avec l'arithmetique ANN-01 refaite a partir
+  des montants LUS a l'ecran (15,96 € rembourses, 15,96 € retenus, 14,25 € de compensation,
+  ecart 0), « Garder » sans requete, Finances des deux cotes, kilos rendus (API), quatre emails,
+  fil encore ouvert, refus D72 a l'annulation du trajet). Manoeuvre consignee : `yul` ramene a
+  +24 h AVANT la reservation (le bareme lit le depart fige dans le deal). **ANO-WEB-06 (mineure)**
+  corrigee : un message recu s'affichait « Notification » (copie + lien vers le fil).
+  **ANO-WEB-07 (majeure, OUVERTE)** : le refus D72 renvoie vers « Mes deals » (n'existe pas) et
+  le Voyageur ne peut pas annuler un deal (403 SHIPPER_ONLY malgre ANN-02) — arbitrage demande.
+  Harnais : `payer()` attend l'intention de paiement (clic muet sinon). Poste : `nx serve` tombe
+  sur un changement de lib partagee (recursion Nx) → trip/notification/message en bundle.
+  17 scenarios e2e verts. PR a ouvrir. Reste : E2E-4 a E2E-6, les 32 chapitres 5.x, 02-ADMIN.
 - 04/09 : C-PR6b feat/c6b-admin-alerts (D59 3A / 4A, A129–A131) — neuf regles de seuil
   (evaluateAlerts pur, instantane de dix compteurs), GET /admin/alerts sans etat (accueil
   admin), cron horaire avec dedoublonnage Redis SET NX (un email par regle et par jour, Redis

@@ -2537,3 +2537,47 @@ vérité que sur un deal réel. *(ANO-WEB-05.)*
 | 22 | La médiatrice tranche 15,00 € de remboursement partiel | récapitulatif 15,00 / 40,00 / 6,60 €, « Décision enregistrée », le code de livraison absent du dossier | oui |
 | 23 | Chacun relit son deal et son email | son montant seul, le même motif, « Clos par la médiation », aucun « Noter » | oui |
 | 24 | Finances › Paiements de l'Expéditeur | « Remboursé 15,00 € le … », « + 15,00 € » | oui |
+
+---
+
+# L'annulation tardive — ce que WEB-E2E-3 fait respecter
+
+*(PR `chore/e2e-parcours-3`, 09/09/2026 — cahier 01-WEB chapitre 6, ANN-01 / D50.)*
+
+## Le besoin
+
+Annuler à moins de 48 h du départ coûte la moitié du prix : le Voyageur avait réservé sa
+capacité. L'Expéditrice doit lire ce montant AVANT de confirmer, pouvoir renoncer sans
+conséquence, et retrouver ensuite les mêmes chiffres partout — son remboursement, la
+compensation du Voyageur, les kilos rendus au trajet, les emails.
+
+## Les règles
+
+**RG-WEB-19 — La fenêtre d'annulation dit le montant remboursé et la retenue avant tout geste.**
+À moins de 48 h : « Tu seras remboursée de » la moitié, « Une retenue de 50 % … reversée au
+Voyageur ». « Garder l'envoi » ne déclenche rien.
+
+**RG-WEB-20 — L'arithmétique est la même à l'écran, dans la réponse du serveur, dans les
+Finances des deux côtés et dans les emails.** Remboursement = total ÷ 2 ; compensation du
+Voyageur = arrondi(retenue × transport ÷ total) ; écart toléré : un centime.
+
+**RG-WEB-21 — Les kilos annulés reviennent au trajet immédiatement.**
+
+**RG-WEB-22 — Un message reçu se présente comme tel.** La notification dit « Nouveau message »,
+montre l'extrait, et mène au fil. *(ANO-WEB-06.)*
+
+**RG-WEB-23 — Le fil d'un deal annulé reste lisible, et ouvert à l'écriture quatorze jours.**
+
+**RG-WEB-24 — Un refus doit conseiller un geste possible.** Le refus d'annuler un trajet qui
+porte un deal vivant (D72) doit renvoyer vers un écran qui existe et vers un geste que le
+Voyageur peut faire. *(ANO-WEB-07, ouverte.)*
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| 25 | Réservation de 3 kg (S, 100 €) sur un trajet à 9,50 €/kg | 31,92 € ; Finances « Autorisé, pas débité » puis « Bloqué chez Yamba » à l'acceptation | oui |
+| 26 | Deux messages échangés | chacun reçoit « Nouveau message » | oui |
+| 27 | Fenêtre d'annulation à moins de 48 h | 15,96 € remboursés, retenue 15,96 € reversée, « Garder » sans effet | oui |
+| 28 | Annulation confirmée | toast, ligne « Annulée », Finances des deux côtés (15,96 € / 14,25 €), kilos rendus, quatre emails | oui |
+| 29 | Le Voyageur tente d'annuler son trajet | refus 409 avec le nombre de deals vivants | oui (conseil inapplicable : ANO-WEB-07) |

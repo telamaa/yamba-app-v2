@@ -3915,3 +3915,64 @@ tout le back-office finances lit enfin des deals cohérents.
 
 `apps/e2e` : **16 scénarios** verts sur le poste (harnais ×6, WEB-CNX ×3, WEB-RSV ×5, WEB-E2E-1,
 WEB-E2E-2). deal-service 575 inchangé (mapper), auth-service 229. OpenAPI régénéré.
+
+---
+
+# WEB-E2E-3 : l'annulation tardive, l'arithmétique lue à l'écran, et une notification qui manquait
+
+*(PR `chore/e2e-parcours-3`, 09/09/2026.)*
+
+## Ce qui a été fait
+
+Le troisième parcours bloquant du cahier 01-WEB : un deal accepté puis annulé par l'Expéditrice
+à moins de 48 h du départ (ANN-01, D50). Quinze étapes, 38 s, et l'arithmétique du cahier refaite
+à partir des montants **lus** — le total du bouton « Payer », le net « TU GAGNES » du Voyageur —
+jamais de constantes : remboursement = total ÷ 2, compensation = arrondi(retenue × net ÷ total),
+confrontés à la réponse du serveur et aux lignes Finances des deux côtés, à un centime près.
+
+```
+apps/e2e/src/pages/mes-envois.ts     la liste, la fenêtre « Annuler cet envoi ? », « Garder » (zéro requête), « Confirmer »
+apps/e2e/src/pages/finances.ts       Paiements / Portefeuille : la ligne d'un deal, visée par son lien
+apps/e2e/src/pages/mes-trajets.ts    la ligne d'un deal sous son trajet, la tentative d'annulation du trajet (D72)
+apps/e2e/src/pages/fil-messagerie.ts + envoyer(texte), + ouvrirEncoreOuvert
+apps/e2e/src/pages/reservation.ts    payer() attend l'intention, puis la demande, et réessaie une fois
+apps/e2e/src/parcours/web-e2e-3.spec.ts
+```
+
+## La manœuvre en base, consignée
+
+Le seed fait partir `yul` à J+3 ; le cahier exige moins de 48 h et autorise la manœuvre. Elle
+passe par `jeuEssai.manoeuvre(raison, script)` — un `tsx -e` avec le `.env`, la raison écrite dans
+la sortie du test — et elle est jouée **avant** la réservation : le barème lit le départ figé dans
+le deal (`booking.trip.departureAt`), pas le trajet.
+
+## Trois lectures d'écran rendues sûres
+
+- **Une ligne se vise par son lien**, jamais par son texte : Marie-Claire a deux deals sur
+  Paris → Montréal (`a[href="/fr/bookings/<id>"]`, `a[href="/fr/carrier/deals/<id>"]`).
+- **« Bloqué chez Yamba » est à la fois une carte et un état de ligne** : on lit dans la ligne.
+- **Un message vit deux fois** (aperçu de la liste, bulle du fil) : `.last()`.
+
+Et « Payer » : cliqué avant le retour de l'intention de paiement, il ne fait rien. `payer()`
+attend le texte du mode test (il porte le montant de l'intention), clique, attend `POST /deals`,
+réessaie une fois — et lève si la demande n'est jamais partie.
+
+## ANO-WEB-06 — un message reçu s'appelait « Notification »
+
+`conversation.message_posted` n'avait ni présentation ni copie : la cloche affichait le titre de
+repli et un lien vers le deal. Présentation dédiée (`MessageSquare`, teal), copie « Nouveau
+message » / « {route} · « {extrait} » » (FR + EN — l'extrait est celui de l'événement, jamais le
+message entier), et `Notifications.tsx` envoie une notification de conversation vers le fil
+(`/dashboard/messages?conversation=…`).
+
+## ANO-WEB-07 — un conseil inapplicable (ouverte)
+
+Le refus D72 dit « annule-les d'abord depuis « Mes deals » » : cet écran n'existe pas, et le
+Voyageur **ne peut pas** annuler un deal — la machine d'états le prévoit (ANN-02), le service le
+refuse (`SHIPPER_ONLY`). Proposition au rapport : corriger le message tout de suite, et graver
+l'annulation par le Voyageur comme un lot à part. Décision attendue.
+
+## Tests
+
+`apps/e2e` : **17 scénarios** verts sur le poste (harnais ×6, WEB-CNX ×3, WEB-RSV ×5, WEB-E2E-1 à 3).
+user-ui : typecheck et i18n verts. Aucun service modifié.
