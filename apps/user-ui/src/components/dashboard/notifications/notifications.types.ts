@@ -17,6 +17,7 @@ import {
   Plane,
   Star,
   Wallet,
+  MessageSquare,
   type LucideIcon,
 } from "lucide-react";
 
@@ -72,6 +73,7 @@ export function buildNotificationCopy(
     net: fmtMoney(p.transportCents, p.currencyCode),
     ticket: typeof p.ticketNumber === "string" ? p.ticketNumber : "",
     date: fmtDate(p.payoutDueAt),
+    preview: typeof p.preview === "string" ? p.preview : "",
   };
   const key = item.type.replace(/\./g, "_");
   if (item.type === "booking.tracking_event" && typeof p.step === "string") {
@@ -109,6 +111,8 @@ const PRESENTATION: Record<string, Omit<NotificationPresentation, "i18nKey">> = 
   "carrier.payout_failed": { icon: Wallet, tone: "red" }, // A87 : virement bancaire refusé
   "booking.rating_reminder": { icon: Star, tone: "amber" },
   "booking.rating_revealed": { icon: PartyPopper, tone: "emerald" },
+  // ANO-WEB-06 (recette WEB-E2E-3) : un message reçu s'affichait « Notification », sans titre ni extrait.
+  "conversation.message_posted": { icon: MessageSquare, tone: "teal" },
 };
 
 /** Fallback : un event key inconnu (18e événement futur) s'affiche

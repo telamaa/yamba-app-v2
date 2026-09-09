@@ -118,11 +118,15 @@ export default function Notifications({ copy }: { copy: DashboardCopy }) {
             const sub = copy.line;
             // A44 — destination : le deal (Voyageur) ou le suivi (Expéditeur)
             const carrierId = item.payload.carrierId;
-            const href = item.bookingId
-              ? userId && carrierId === userId
-                ? `/carrier/deals/${item.bookingId}`
-                : `/bookings/${item.bookingId}`
-              : null;
+            const conversationId = item.payload.conversationId;
+            const href =
+              item.type.startsWith("conversation.") && typeof conversationId === "string"
+                ? `/dashboard/messages?conversation=${conversationId}` // ANO-WEB-06 : un message mène au fil
+                : item.bookingId
+                  ? userId && carrierId === userId
+                    ? `/carrier/deals/${item.bookingId}`
+                    : `/bookings/${item.bookingId}`
+                  : null;
             const onOpen = () => {
               if (unread && !markRead.isPending) markRead.mutate(item.id);
             };

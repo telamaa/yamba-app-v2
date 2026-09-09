@@ -141,6 +141,10 @@ export async function connexionAdmin(page: Page, compte: CompteAdmin, secret: st
   const tenter = async (): Promise<boolean> => {
     await page.goto(`${backOffice}/login`, { waitUntil: "domcontentloaded" });
     await expect(page.getByRole("heading", { name: "Yamba · Back-office" })).toBeVisible({ timeout: 60_000 });
+    // L'écran ne fait aucun appel d'API au chargement : on laisse le réseau se calmer avant de
+    // saisir, sinon React n'est pas encore branché sur les champs et le formulaire part VIDE
+    // (400 MISSING_FIELDS, mesuré sur une suite complète).
+    await page.waitForLoadState("networkidle").catch(() => undefined);
     await page.getByLabel("Email").fill(compte.email);
     await page.getByLabel("Mot de passe").fill(motDePasse);
     const reponse = page
@@ -149,9 +153,12 @@ export async function connexionAdmin(page: Page, compte: CompteAdmin, secret: st
     await page.getByRole("button", { name: "Continuer" }).click();
     const r = await reponse;
     if (r && !r.ok()) {
+      const corps = await r.text().catch(() => "");
+      // Un formulaire parti vide (MISSING_FIELDS) trahit une saisie avant hydratation : on
+      // recommence une fois sur une page chaude, comme pour le membre.
+      if (r.status() === 400 && corps.includes("MISSING_FIELDS")) return false;
       // Une porte qui refuse doit dire pourquoi dans le rapport : statut ET corps, pas un
       // délai d'attente trente secondes plus loin sur l'écran suivant.
-      const corps = await r.text().catch(() => "");
       throw new Error(`Connexion admin de ${compte.email} : POST /auth/admin/login → ${r.status()} ${corps.slice(0, 300)}`);
     }
     return r !== null;

@@ -199,7 +199,9 @@ test.describe("WEB-E2E-1 — le nominal complet", () => {
 
     /* ── Étape 25 — Mailpit : « Transaction terminée » / « en route vers ton compte » ── */
     await mailpit.attendreEmail({ pour: COMPTES.aminata.email, sujet: /Transaction terminée/ });
-    const versement = await mailpit.attendreEmail({ pour: COMPTES.thomas.email, sujet: /en route vers ton compte/ });
+    // Le cron de rejeu des versements peut écrire à Thomas pour un AUTRE deal du seed pendant le
+    // parcours : on vise l'email de CE deal par son montant.
+    const versement = await mailpit.attendreEmail({ pour: COMPTES.thomas.email, sujet: /28,75\s?€ en route vers ton compte/ });
     expect(versement.sujet).toContain("28,75");
 
     /* ── Étape 26 — l'Expéditrice note, et l'avis n'est pas encore public ── */

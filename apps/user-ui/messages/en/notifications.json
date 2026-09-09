@@ -88,6 +88,16 @@
         "line": "{route} · {weight} · your capacity is released"
       }
     },
+    "conversation_message_posted": {
+      "SHIPPER": {
+        "title": "New message",
+        "line": "{route} · “{preview}”"
+      },
+      "CARRIER": {
+        "title": "New message",
+        "line": "{route} · “{preview}”"
+      }
+    },
     "booking_refund_issued": {
       "SHIPPER": {
         "title": "Refund issued",
