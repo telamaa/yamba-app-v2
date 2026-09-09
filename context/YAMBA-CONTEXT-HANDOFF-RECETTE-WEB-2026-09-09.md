@@ -7,8 +7,7 @@ tourne sur le poste, ce qui reste à faire, et les pièges déjà payés qu'il n
 >
 > **1.** ~~corriger le harnais avec `storageState`~~ **FAIT** (§ 4 bis) ;
 > **2.** ~~monter la fixture de session administrateur~~ **FAIT** (`seed-admins.ts` + `navigateurAdmin`) ;
-> **3.** ~~finir WEB-E2E-1 en entier (étapes 11 à 29)~~ **FAIT, 29 étapes vertes** — **ouvrir la PR
-> de `chore/e2e-parcours`** (c'est le point exact de reprise si elle n'est pas encore ouverte) ;
+> **3.** ~~finir WEB-E2E-1 en entier, ouvrir la PR~~ **FAIT — PR #259 mergée** ;
 > **4.** les cinq autres parcours du chapitre 6 (E2E-2 exige la fixture admin — elle est là) ;
 > **5.** les 32 chapitres du cahier **01-WEB** (326 fiches) ;
 > **6.** le cahier **02-ADMIN** (110 fiches) — 19 fiches de sécurité d'accès, 91 fiches d'écrans.
@@ -27,7 +26,7 @@ tourne sur le poste, ce qui reste à faire, et les pièges déjà payés qu'il n
 |---|---|
 | **Cahier n° 4 — tâches planifiées** (90 fiches) | **CLOS.** 9 anomalies, 9 closes. PR **#256** + docs **#257**, mergées. Décisions **D76** et **D77** gravées au registre. Rapport : `context/YAMBA-RECETTE-CRONS-RESULTATS.md` |
 | **Harnais de recette navigateur** (Playwright) | **MERGÉ** — PR **#258**. Avec `ANO-WEB-01` (bloquante) et `ANO-WEB-02` (majeure), toutes deux closes |
-| **Parcours transactionnels** | **PRÊT À OUVRIR EN PR**, branche `chore/e2e-parcours` : WEB-E2E-1 passe **en entier** (29 étapes, 1 min 24), sessions mémorisées, fixture admin, `ANO-WEB-03` (majeure) close, 15 scénarios verts en 3 min 06 |
+| **Parcours transactionnels** | **MERGÉ** — PR **#259** (17 checks comptés) : WEB-E2E-1 passe **en entier** (29 étapes, 1 min 24), sessions mémorisées, fixture admin, `ANO-WEB-03` (majeure) close, 15 scénarios verts en 3 min 06 |
 
 Rapport de la campagne navigateur : `context/YAMBA-RECETTE-WEB-RESULTATS.md`.
 
@@ -152,8 +151,7 @@ Pièges payés sur les étapes 11 à 29, pour ne pas les repayer :
 
 ## 5. Ce qui reste à faire, dans l'ordre
 
-1. **Ouvrir la PR de `chore/e2e-parcours`** (base `dev`), compter les 17 checks, merger, puis
-   noter le numéro dans le suivi.
+1. ~~Ouvrir la PR de `chore/e2e-parcours`~~ **FAIT, #259.** Branche suivante : `chore/e2e-parcours-2`.
 
 2. **Les cinq autres parcours du chapitre 6** : litige (E2E-2, avec `navigateurAdmin("mediateur")`
    pour trancher en remboursement partiel de 15,00 €), annulation tardive (E2E-3), compte neuf

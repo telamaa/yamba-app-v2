@@ -528,7 +528,7 @@ Ordre de demarrage : auth -> trip -> gateway.
   100 requetes anonymes / 15 min / IP etaient epuisees par les seuls visiteurs des parcours —
   point d'attention produit (NAT partage) note au rapport. Interposes et ecrits noir sur blanc :
   paiement FAKE, ImageKit, presse-papiers. auth-service **229** tests (+4). 15 scenarios e2e verts.
-  PR a ouvrir. Reste : E2E-2 a E2E-6, les 32 chapitres 5.x, le cahier 02-ADMIN.
+  MERGE 09/09 : **#259** (17 checks comptes). Reste : E2E-2 a E2E-6, les 32 chapitres 5.x, le cahier 02-ADMIN.
 - 04/09 : C-PR6b feat/c6b-admin-alerts (D59 3A / 4A, A129–A131) — neuf regles de seuil
   (evaluateAlerts pur, instantane de dix compteurs), GET /admin/alerts sans etat (accueil
   admin), cron horaire avec dedoublonnage Redis SET NX (un email par regle et par jour, Redis
