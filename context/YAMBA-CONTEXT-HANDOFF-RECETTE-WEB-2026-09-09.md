@@ -17,9 +17,16 @@ Rapport de la campagne navigateur : `context/YAMBA-RECETTE-WEB-RESULTATS.md`.
 
 ## 2. Ce qui tourne sur le poste (à reconstituer après redémarrage)
 
+**Yamba n'a besoin que de DEUX conteneurs Docker.** Vérifié le 09/09 en lisant le `.env` :
+MongoDB est sur **Atlas** et Redis sur **Upstash** — tous deux distants. Les conteneurs locaux
+`mongodb_container*`, `redis_container*`, `postgres_container*`, `mysql_container*`,
+`elasticsearch_container*`, `rabbitmq_container*`, `*notification_container`, `odoo-*` et
+`leko-app-mailhog-1` (dix-sept en tout) **n'ont aucun rôle dans Yamba** : ils appartiennent à
+d'autres projets ou à une ancienne pile. Ils ont été arrêtés proprement avant le redémarrage.
+
 ```sh
-# 1. L'infrastructure (Docker) : Mongo n'est pas local (Atlas), mais Redis, Redpanda et Mailpit le sont
-docker start yamba-redpanda            # + Redis et Mailpit selon ton compose
+# 1. L'infrastructure : DEUX conteneurs, pas dix-neuf
+docker start yamba-redpanda yamba-mailpit
 
 # 2. Les six services + les deux fronts
 npm run dev                            # NX_SKIP_NX_CACHE=true npm run dev après un changement de code serveur
