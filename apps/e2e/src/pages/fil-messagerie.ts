@@ -63,6 +63,24 @@ export class FilMessagerie {
     await expect(this.page.getByRole("button", { name: "Envoyer", exact: true })).toHaveCount(0);
   }
 
+  /** Écrit un message et attend qu'il apparaisse dans le fil (la requête, puis la bulle). */
+  async envoyer(texte: string): Promise<void> {
+    await this.page.getByPlaceholder("Écrire un message…").fill(texte);
+    const reponse = this.page.waitForResponse((r) => /\/conversations\/[^/]+\/messages$/.test(r.url()) && r.request().method() === "POST", { timeout: 30_000 });
+    await this.page.getByRole("button", { name: "Envoyer", exact: true }).click();
+    const r = await reponse;
+    if (!r.ok()) throw new Error(`Message refusé : ${r.status()} ${await r.text()}`);
+    // L'aperçu de la liste reprend le texte : la bulle est la dernière occurrence.
+    await expect(this.page.getByText(texte, { exact: true }).last()).toBeVisible({ timeout: 15_000 });
+  }
+
+  /** Le fil reste ouvert à l'écriture (deal clos depuis moins de 14 jours) : la saisie est là, aucun bandeau. */
+  async ouvrirEncoreOuvert(conversationId: string): Promise<void> {
+    await this.ouvrir(conversationId);
+    await expect(this.page.getByText("Cette conversation est fermée à l'écriture. Vous pouvez toujours la relire.")).toHaveCount(0);
+    await expect(this.page.getByText("Cette conversation est en lecture seule.")).toHaveCount(0);
+  }
+
   async proposerRendezVous(rdv: RendezVous): Promise<void> {
     await this.page.getByRole("button", { name: "Proposer", exact: true }).click();
     await this.page.getByLabel("Lieu").fill(rdv.lieu);

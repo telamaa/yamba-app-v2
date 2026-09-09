@@ -111,7 +111,6 @@ export class AssistantReservation {
    * avec la vraie CLI) : ce n'est pas une zone d'ombre, c'est un partage de responsabilité.
    */
   async payer(): Promise<void> {
-    await this.page.getByRole("button", { name: /^Payer / }).click();
     // Un `iframe` Stripe visible signifie que le fournisseur STRIPE est actif : on le dit
     // franchement plutôt que de laisser le parcours échouer trente secondes plus loin sur un
     // symptôme incompréhensible.
@@ -122,6 +121,22 @@ export class AssistantReservation {
           "  cd apps/deal-service && STRIPE_SECRET_KEY= node --env-file=../../.env dist/main.js"
       );
     }
+    // L'intention de paiement est demandée au montage de l'étape 4 ; cliquer AVANT sa réponse ne
+    // fait rien (mesuré sur WEB-E2E-3 : le bouton est cliquable, la demande ne part jamais). Le
+    // texte du mode test porte le montant de l'intention : quand il est là, l'intention l'est.
+    await expect(this.page.getByText(/Mode test : aucun prestataire de paiement/)).toBeVisible({ timeout: 30_000 });
+    for (let essai = 0; essai < 2; essai++) {
+      const reponse = this.page
+        .waitForResponse((r) => /\/deals$/.test(r.url()) && r.request().method() === "POST", { timeout: 20_000 })
+        .catch(() => null);
+      await this.page.getByRole("button", { name: /^Payer / }).click();
+      const r = await reponse;
+      if (r) {
+        if (!r.ok()) throw new Error(`Réservation refusée : ${r.status()} ${await r.text()}`);
+        return;
+      }
+    }
+    throw new Error("« Payer » a été cliqué deux fois sans qu'aucune demande de réservation ne parte.");
   }
 
   /**
