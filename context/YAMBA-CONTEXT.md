@@ -542,7 +542,7 @@ Ordre de demarrage : auth -> trip -> gateway.
   jamais le paiement a l'acceptation (`capturedAt`/`chargeId`) → le portefeuille lisait
   « Libere » au lieu de « Rembourse 15,00 € » ; corrige a la source. Reste a arbitrer (copie) :
   l'ecran « Transaction close » ignore encore la mediation ; la ligne Finances parle de
-  « retenue reversee ». 16 scenarios e2e verts. PR a ouvrir. Reste : E2E-3 a E2E-6, les 32
+  « retenue reversee ». 16 scenarios e2e verts. MERGE 09/09 : **#260** (17 checks comptes). Reste : E2E-3 a E2E-6, les 32
   chapitres 5.x, le cahier 02-ADMIN.
 - 04/09 : C-PR6b feat/c6b-admin-alerts (D59 3A / 4A, A129–A131) — neuf regles de seuil
   (evaluateAlerts pur, instantane de dix compteurs), GET /admin/alerts sans etat (accueil

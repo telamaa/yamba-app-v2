@@ -8,7 +8,7 @@ tourne sur le poste, ce qui reste à faire, et les pièges déjà payés qu'il n
 > **1.** ~~corriger le harnais avec `storageState`~~ **FAIT** (§ 4 bis) ;
 > **2.** ~~monter la fixture de session administrateur~~ **FAIT** (`seed-admins.ts` + `navigateurAdmin`) ;
 > **3.** ~~finir WEB-E2E-1 en entier, ouvrir la PR~~ **FAIT — PR #259 mergée** ;
-> **4.** les cinq autres parcours du chapitre 6 : ~~E2E-2~~ **FAIT** (branche `chore/e2e-parcours-2`, PR à ouvrir), puis E2E-3, E2E-4, E2E-5, E2E-6 ;
+> **4.** les cinq autres parcours du chapitre 6 : ~~E2E-2~~ **FAIT, #260 mergée**, puis E2E-3, E2E-4, E2E-5, E2E-6 ;
 > **5.** les 32 chapitres du cahier **01-WEB** (326 fiches) ;
 > **6.** le cahier **02-ADMIN** (110 fiches) — 19 fiches de sécurité d'accès, 91 fiches d'écrans.
 >
@@ -26,7 +26,7 @@ tourne sur le poste, ce qui reste à faire, et les pièges déjà payés qu'il n
 |---|---|
 | **Cahier n° 4 — tâches planifiées** (90 fiches) | **CLOS.** 9 anomalies, 9 closes. PR **#256** + docs **#257**, mergées. Décisions **D76** et **D77** gravées au registre. Rapport : `context/YAMBA-RECETTE-CRONS-RESULTATS.md` |
 | **Harnais de recette navigateur** (Playwright) | **MERGÉ** — PR **#258**. Avec `ANO-WEB-01` (bloquante) et `ANO-WEB-02` (majeure), toutes deux closes |
-| **Parcours transactionnels** | **#259 MERGÉ** (WEB-E2E-1) · **WEB-E2E-2 vert** sur `chore/e2e-parcours-2`, PR à ouvrir (ANO-WEB-04, ANO-WEB-05 closes) · #259 : WEB-E2E-1 passe **en entier** (29 étapes, 1 min 24), sessions mémorisées, fixture admin, `ANO-WEB-03` (majeure) close, 15 scénarios verts en 3 min 06 |
+| **Parcours transactionnels** | **#259 MERGÉ** (WEB-E2E-1) · **#260 MERGÉ** (WEB-E2E-2, ANO-WEB-04, ANO-WEB-05) · #259 : WEB-E2E-1 passe **en entier** (29 étapes, 1 min 24), sessions mémorisées, fixture admin, `ANO-WEB-03` (majeure) close, 15 scénarios verts en 3 min 06 |
 
 Rapport de la campagne navigateur : `context/YAMBA-RECETTE-WEB-RESULTATS.md`.
 
@@ -158,8 +158,8 @@ Pièges payés sur les étapes 11 à 29, pour ne pas les repayer :
 
 1. ~~Ouvrir la PR de `chore/e2e-parcours`~~ **FAIT, #259.** Branche suivante : `chore/e2e-parcours-2`.
 
-2. ~~E2E-2 (litige)~~ **FAIT** — 19 étapes, 30 s, `ANO-WEB-04` et `ANO-WEB-05` closes, branche
-   `chore/e2e-parcours-2` : **ouvrir la PR**, compter les 17 checks, merger. Deux arbitrages de
+2. ~~E2E-2 (litige)~~ **FAIT, PR #260 mergée** — 19 étapes, 30 s, `ANO-WEB-04` et `ANO-WEB-05` closes.
+   Branche suivante : `chore/e2e-parcours-3`. Deux arbitrages de
    copie à rendre (rapport, observations : l'écran « Transaction close » après médiation, la ligne
    Finances « retenue reversée »).
 
