@@ -215,6 +215,42 @@ Proposition    : (1) tout de suite, le message renvoie vers « Mes trajets » (o
                  registre. Décision attendue.
 ```
 
+
+```
+ANO-WEB-08
+Fiche          : parcours WEB-E2E-4 étape 3 (chapitre 5.13, CNF-06 / D71) · Gravité : MAJEURE · ÉTAT : CLOSE
+Attendu        : un compte neuf qui déclare 450 € est refusé « AVANT tout paiement ».
+Obtenu         : l'assistant n'envoyait pas la valeur déclarée à la demande d'intention de
+                 paiement (`createPaymentIntent` postait les seuls champs du devis) : le plafond
+                 « valeur déclarée » n'était vérifié qu'à la création du deal, APRÈS le clic
+                 « Payer » — donc après l'autorisation bancaire avec Stripe. Les deux autres
+                 plafonds (poids, nombre par mois) tombaient bien à l'intention.
+Cause          : le contrat prévoit `declaredValueCents` sur l'intention depuis ANO-API-12
+                 (« l'assistant connaît cette valeur avant de payer : il l'envoie ») ; le front
+                 ne l'envoyait pas. Régression de l'anomalie de la campagne API.
+Correction     : `apps/user-ui/src/services/booking.api.ts` — l'intention part avec la valeur
+                 déclarée (même conversion que la création du deal, factorisée).
+Contre-épreuve : WEB-E2E-4 étape 3 — 450 € : refus dans la carte de l'étape 4 (409 à
+                 l'intention), aucune ligne Finances, aucun email ; étapes 5 et 8 inchangées.
+```
+
+```
+ANO-WEB-09
+Fiche          : parcours WEB-E2E-4 étape 10 (chapitre 5.30, RGPD D63 / sudo D65) · Gravité : MAJEURE · ÉTAT : CLOSE
+Attendu        : « Télécharger mes données » ouvre la porte par code, puis télécharge le JSON.
+Obtenu         : « Impossible pour le moment, réessaie. » — la porte ne s'ouvrait JAMAIS :
+                 l'export est inutilisable pour tout membre (le droit d'accès RGPD, en pratique).
+Cause          : l'export demande la réponse en `blob` ; le refus 403 `SUDO_REQUIRED` arrive lui
+                 aussi en blob, et `isSudoRequired` ne lisait pas le code dans un blob. Même
+                 sort pour le 429 « une fois par 24 h ».
+Correction     : `apps/user-ui/src/services/privacy.api.ts` — un corps d'erreur en blob est
+                 relu en JSON avant d'être relancé ; la porte s'ouvre, le code arrive par email,
+                 le fichier se télécharge.
+Contre-épreuve : WEB-E2E-4 étape 10 — porte, code « Ton code de confirmation Yamba », fichier
+                 `yamba-mes-donnees-….json` (format `yamba-data-export/1`, 5 réservations,
+                 aucune trace de score).
+```
+
 ---
 
 ## Chapitre 5.12 — Réserver : l'assistant en quatre étapes
@@ -322,6 +358,33 @@ Proposition    : (1) tout de suite, le message renvoie vers « Mes trajets » (o
 - Étape 4 : le libellé « Nouveau message » est celui posé par la correction ANO-WEB-06 (le
   cahier ne nommait pas le titre).
 
+## Chapitre 6 — WEB-E2E-4, le compte neuf plafonné · **CONFORME** (14 étapes, 1 min 06)
+
+| Étape du cahier | Ce qui est éprouvé | Verdict |
+|---|---|---|
+| 1 | Inscription, code reçu, activation, bienvenue | **Conforme** — « Ton code d'activation Yamba », « Compte activé », « Bienvenue sur Yamba » |
+| 2 | Connexion sans « Rester connecté » | **Conforme** — cookie de rafraîchissement de session (sans date d'expiration) |
+| 3 – 4 | 450 € déclarés | **Conforme après correction** → `ANO-WEB-08` ; refus à l'intention, « Aucun paiement pour l'instant », aucun email |
+| 5 | 12 kg | **Conforme** — refus à l'intention (plafond de poids) |
+| 6 – 7 | Cinq demandes dans le mois (bzv-perkg, fih, gru, yul, bzv-upcoming) | **Conforme** |
+| 8 | La sixième | **Conforme** — refusée, même message |
+| 9 | Profil, tableau de bord, page publique | **Conforme** — aucun « score », « niveau de risque », « points » |
+| 10 | Export de mes données par la porte | **Conforme après correction** → `ANO-WEB-09` ; JSON `yamba-data-export/1`, aucune trace du score |
+| 11 | Thomas accepte | **Conforme** — email « est acceptée », notification |
+| 12 | Session inactive plus d'une heure, puis un geste | **Conforme** (manœuvre SES-01 consignée) — fenêtre « Ta session a expiré » par-dessus la page, reconnexion sur place, page inchangée, session de retour ; le geste est refait à la main (voir écarts) |
+| 13 | Appareils connectés | **Conforme** — « Chrome · … · cet appareil », « Dernière activité … · ::1 » (l'écran s'intitule « Sessions actives », voir écarts) |
+| 14 | Supprimer mon compte | **Conforme** — bandeau ambre, les deux motifs (deal en cours, demande en attente), aucune porte, aucun email |
+
+### Trois écarts assumés, écrits dans le parcours
+
+- Étape 12 : « le geste reprend » — le produit ne rejoue pas l'action qui a échoué ; il
+  rafraîchit les données de la page. Le harnais vérifie l'URL inchangée, la session de retour, et
+  que le même geste refait passe. Copie du cahier à ajuster, ou évolution produit à décider.
+- Étape 12 : l'heure d'inactivité est simulée (SES-01 : le délai d'inactivité EST la durée de vie
+  de la clé Redis de la session ; la supprimer, c'est l'avoir laissée expirer), consignée.
+- Étape 13 : le cahier dit « Appareils connectés », l'écran s'intitule « Sessions actives »
+  (sous-titre « Les appareils connectés à ton compte »). Le cahier à aligner.
+
 ---
 
 ## Observations (pas des anomalies, mais à savoir)
@@ -332,6 +395,13 @@ Proposition    : (1) tout de suite, le message renvoie vers « Mes trajets » (o
   l'heure suivante, et son email « … en route vers ton compte » arrive au Voyageur en plein
   parcours (WEB-E2E-1 étape 25 vise désormais le montant de SON deal). À garder en tête pour le
   chapitre 5.26 : rejouer le seed juste avant.
+- **L'assistant de réservation garde son brouillon et son étape en `sessionStorage`** : après
+  un refus à l'étape 4, rouvrir `/trips/[id]/book` rouvre directement l'étape 4 avec l'ancien
+  colis. Pratique pour un membre qui revient ; à connaître pour la recette (le harnais oublie le
+  brouillon à l'ouverture). Chapitre 5.12.
+- **Après un refus de plafond, la carte de paiement montre encore un bouton « Payer »** à côté
+  de l'encadré de refus. Il ne mène nulle part de dangereux (le serveur refuse aussi le deal),
+  mais il contredit l'encadré. Mineure, chapitre 5.13.
 - **« Payer » cliqué avant le retour de l'intention de paiement ne fait rien**, sans message :
   le bouton est actif dès l'affichage de l'étape 4, l'intention arrive une seconde plus tard.
   Le harnais attend le texte du mode test (qui porte le montant de l'intention) ; un humain

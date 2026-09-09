@@ -8,7 +8,7 @@ tourne sur le poste, ce qui reste à faire, et les pièges déjà payés qu'il n
 > **1.** ~~corriger le harnais avec `storageState`~~ **FAIT** (§ 4 bis) ;
 > **2.** ~~monter la fixture de session administrateur~~ **FAIT** (`seed-admins.ts` + `navigateurAdmin`) ;
 > **3.** ~~finir WEB-E2E-1 en entier, ouvrir la PR~~ **FAIT — PR #259 mergée** ;
-> **4.** les cinq autres parcours du chapitre 6 : ~~E2E-2~~ **FAIT, #260 mergée**, ~~E2E-3~~ **FAIT, #261 mergée**, puis E2E-4 (branche `chore/e2e-parcours-4`), E2E-5, E2E-6 ;
+> **4.** les cinq autres parcours du chapitre 6 : ~~E2E-2~~ **FAIT, #260 mergée**, ~~E2E-3~~ **FAIT, #261 mergée**, ~~E2E-4~~ **FAIT** (branche `chore/e2e-parcours-4`, PR à ouvrir), puis E2E-5, E2E-6 ;
 > **5.** les 32 chapitres du cahier **01-WEB** (326 fiches) ;
 > **6.** le cahier **02-ADMIN** (110 fiches) — 19 fiches de sécurité d'accès, 91 fiches d'écrans.
 >
@@ -26,7 +26,7 @@ tourne sur le poste, ce qui reste à faire, et les pièges déjà payés qu'il n
 |---|---|
 | **Cahier n° 4 — tâches planifiées** (90 fiches) | **CLOS.** 9 anomalies, 9 closes. PR **#256** + docs **#257**, mergées. Décisions **D76** et **D77** gravées au registre. Rapport : `context/YAMBA-RECETTE-CRONS-RESULTATS.md` |
 | **Harnais de recette navigateur** (Playwright) | **MERGÉ** — PR **#258**. Avec `ANO-WEB-01` (bloquante) et `ANO-WEB-02` (majeure), toutes deux closes |
-| **Parcours transactionnels** | **#259 MERGÉ** (WEB-E2E-1) · **#260 MERGÉ** (WEB-E2E-2, ANO-WEB-04, ANO-WEB-05) · **#261 MERGÉ** (WEB-E2E-3, ANO-WEB-06 ; ANO-WEB-07 tranchée : message corrigé, annulation Voyageur en lot à part) · #259 : WEB-E2E-1 passe **en entier** (29 étapes, 1 min 24), sessions mémorisées, fixture admin, `ANO-WEB-03` (majeure) close, 15 scénarios verts en 3 min 06 |
+| **Parcours transactionnels** | **#259 MERGÉ** (WEB-E2E-1) · **#260 MERGÉ** (WEB-E2E-2, ANO-WEB-04, ANO-WEB-05) · **#261 MERGÉ** (WEB-E2E-3, ANO-WEB-06 ; ANO-WEB-07 tranchée) · **WEB-E2E-4 vert** sur `chore/e2e-parcours-4`, PR à ouvrir (ANO-WEB-08, ANO-WEB-09 closes) · #259 : WEB-E2E-1 passe **en entier** (29 étapes, 1 min 24), sessions mémorisées, fixture admin, `ANO-WEB-03` (majeure) close, 15 scénarios verts en 3 min 06 |
 
 Rapport de la campagne navigateur : `context/YAMBA-RECETTE-WEB-RESULTATS.md`.
 
@@ -163,6 +163,12 @@ Pièges payés sur les étapes 11 à 29, pour ne pas les repayer :
     ports : `PORT` pour trip, `NOTIFICATION_SERVICE_PORT`, `MESSAGE_SERVICE_PORT`).
 18. **« Payer » cliqué avant le retour de l'intention de paiement ne fait rien** : `payer()`
     attend le texte du mode test, puis la demande de réservation.
+20. **L'assistant de réservation garde brouillon et étape en `sessionStorage`** : après un refus,
+    il rouvre l'étape 4 — `ouvrir()` oublie le brouillon et recharge.
+21. **Une session expirée se simule en deux gestes** : supprimer la clé Redis `refresh_jti:<userId>:*`
+    (manœuvre) ET retirer le cookie `access_token` ; puis un clic qui appelle l'API.
+22. **Un compte neuf par exécution** (`compte-neuf.ts`) : la base en garde un de plus à chaque
+    passage — sans conséquence, mais à savoir pour les compteurs du back-office.
 19. **Une manœuvre se joue là où le produit la lit** : le barème d'annulation lit le départ figé
     dans le deal — avancer le trajet APRÈS la réservation ne change rien. Sans `nx dev admin-ui`, `navigateurAdmin` attend
     un écran qui n'existe pas.
@@ -180,8 +186,11 @@ Pièges payés sur les étapes 11 à 29, pour ne pas les repayer :
    tranchée le 09/09 : le message D72 renvoie vers « Mes trajets » (fait, branche
    `chore/e2e-parcours-4`) ; l'annulation d'un deal par le Voyageur = lot à part. **PR #261 mergée.**
 
-   **Les trois autres parcours du chapitre 6** : compte neuf plafonné (E2E-4), refus au pickup
-   (E2E-5), parcours du destinataire (E2E-6). Les objets de page
+   ~~E2E-4 (compte neuf)~~ **FAIT** — 14 étapes, 1 min 06, `ANO-WEB-08` et `ANO-WEB-09` closes,
+   message D72 corrigé. Branche `chore/e2e-parcours-4` : **ouvrir la PR**, compter, merger.
+
+   **Les deux derniers parcours du chapitre 6** : refus au pickup (E2E-5), parcours du
+   destinataire (E2E-6). Les objets de page
    existants (réservation, fil, transport, suivi, signalement, médiation) couvrent la plus grande
    part de leurs écrans.
 

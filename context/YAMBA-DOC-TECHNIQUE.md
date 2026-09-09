@@ -3976,3 +3976,52 @@ l'annulation par le Voyageur comme un lot à part. Décision attendue.
 
 `apps/e2e` : **17 scénarios** verts sur le poste (harnais ×6, WEB-CNX ×3, WEB-RSV ×5, WEB-E2E-1 à 3).
 user-ui : typecheck et i18n verts. Aucun service modifié.
+
+---
+
+# WEB-E2E-4 : le compte neuf, deux plafonds qui tombaient trop tard, un export qui ne s'ouvrait pas
+
+*(PR `chore/e2e-parcours-4`, 09/09/2026.)*
+
+## Ce qui a été fait
+
+Le quatrième parcours du cahier 01-WEB (gravité majeure) : un compte créé sur place, plafonné
+pendant trente jours (CNF-06, D71), et la vie ordinaire du compte — export des données, session
+qui expire, appareils, suppression bloquée. Quatorze étapes, 1 min 06.
+
+```
+apps/e2e/src/fixtures/compte-neuf.ts   une adresse unique par exécution, le mot de passe de recette
+apps/e2e/src/pages/inscription.ts      formulaire, case des conditions, code à six chiffres, « Compte activé »
+apps/e2e/src/pages/securite.ts         export par la porte (téléchargement réel), sessions actives, suppression bloquée, reconnexion dans la fenêtre
+apps/e2e/src/pages/reservation.ts      + tenterDeReserver() : le refus à l'intention, le refus au clic, ou le deal
+apps/e2e/src/parcours/web-e2e-4.spec.ts
+```
+
+## Deux anomalies produit, corrigées
+
+**ANO-WEB-08** — l'intention de paiement partait sans la valeur déclarée : le plafond « valeur
+déclarée » ne tombait qu'à la création du deal, après l'autorisation bancaire. Le contrat le
+prévoyait depuis ANO-API-12 ; `booking.api.ts` l'envoie désormais (conversion factorisée).
+
+**ANO-WEB-09** — l'export « Mes données » demande la réponse en `blob` : le 403 `SUDO_REQUIRED`
+arrivait en blob, le code n'était jamais lu, la porte ne s'ouvrait jamais. Le corps d'erreur en
+blob est relu en JSON avant d'être relancé. L'export RGPD était inutilisable pour tout membre.
+
+## Ce que le harnais a appris
+
+- **Un refus peut tomber à deux moments** : à l'intention (encadré dans la carte de paiement) ou
+  au clic « Payer » (toast). `tenterDeReserver()` écoute la réponse de l'intention, puis celle
+  du deal, et rend le refus tel qu'il est écrit, ou l'identifiant du deal.
+- **L'assistant garde son brouillon en `sessionStorage`** : `ouvrir()` l'oublie et recharge.
+- **Un téléchargement réel se capture** : `page.waitForEvent("download")` armé avant le clic qui
+  déclenche l'ancre `download` sur un blob ; le fichier est relu sur le disque.
+- **Une heure d'inactivité se simule fidèlement** : SES-01 fait du délai d'inactivité la durée de
+  vie de la clé Redis `refresh_jti:<userId>:<jti>` ; la supprimer (manœuvre consignée) et
+  retirer le cookie d'accès de quinze minutes, c'est exactement l'avoir laissée expirer.
+- **La fenêtre « Ta session a expiré » embarque un formulaire complet** : on la vise par son
+  `dialog`, jamais par `#email` seul.
+
+## Tests
+
+`apps/e2e` : **18 scénarios** verts sur le poste (harnais ×6, WEB-CNX ×3, WEB-RSV ×5, WEB-E2E-1 à 4).
+user-ui : typecheck et i18n verts. Aucun service modifié.
