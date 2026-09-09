@@ -7,10 +7,13 @@ tourne sur le poste, ce qui reste à faire, et les pièges déjà payés qu'il n
 > **1.** corriger le harnais avec `storageState` (§ 4 bis) ; **2.** finir **WEB-E2E-1** en entier
 > (étapes 11 à 29), puis ouvrir la PR de la branche `chore/e2e-parcours`.
 >
-> Question ouverte du même échange : **faut-il ajouter Elasticsearch au projet ?** L'analyse est
-> au § 8 — la réponse proposée est **non**, avec une correction ciblée de la recherche et
-> Atlas Search comme voie de sortie si le besoin grandit. À arbitrer, puis à graver (D78) si
-> l'arbitrage est retenu.
+> Puis **finir TOUTE la recette** : le reste du cahier 01-WEB (32 chapitres, 326 fiches) et le
+> cahier 02-ADMIN (110 fiches).
+>
+> **La question Elasticsearch vient APRÈS la recette** — consigne explicite du 09/09/2026. Rien
+> ne se touche du côté de la recherche tant que les deux cahiers ne sont pas clos. L'analyse est
+> prête au § 8 (réponse proposée : **non**, avec une correction ciblée et Atlas Search comme voie
+> de sortie) ; elle attend son tour.
 
 ---
 
@@ -224,3 +227,9 @@ pilotage est déjà servi par `/admin/pilotage` et la mesure d'audience (D66, D7
 
 **À graver en D78 si l'arbitrage est retenu** : « la recherche reste dans la base qui détient la
 donnée ; pas de second moteur tant qu'un index Mongo bien posé suffit ».
+
+**Quand ?** *Après la recette*, et pas avant (consigne du 09/09/2026). Deux raisons de fond, en
+plus de la consigne : une campagne de recette qui se déroule pendant qu'on change le moteur de
+recherche ne prouve plus rien de stable ; et le harnais navigateur, une fois les deux cahiers
+joués, deviendra précisément le filet qui permettra de toucher à la recherche sans rien casser —
+le bon ordre est donc celui-là, pas l'inverse.
