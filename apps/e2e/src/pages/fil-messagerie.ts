@@ -9,7 +9,8 @@
  * Le fil se rafraîchit seul toutes les 3 s : les attentes sur ce que l'AUTRE a fait laissent
  * ce délai passer, sans recharger la page.
  */
-import { expect, type Page } from "@playwright/test";
+import { expect, type BrowserContext, type Page } from "@playwright/test";
+import { adresseDeLApi } from "../fixtures/adresses";
 
 export interface RendezVous {
   lieu: string;
@@ -28,6 +29,18 @@ export function dateLocale(d: Date): string {
 export class FilMessagerie {
   constructor(private readonly page: Page) {}
 
+  /**
+   * L'identifiant du fil d'un deal, demandé à l'API avec les cookies du contexte — pour les
+   * écrans qui n'ont pas de bouton vers le fil (un deal en litige, par exemple).
+   */
+  static async identifiantDuFil(contexte: BrowserContext, dealId: string): Promise<string> {
+    const r = await contexte.request.get(`${adresseDeLApi()}/messages/conversations/by-deal/${dealId}`);
+    if (!r.ok()) throw new Error(`Fil du deal ${dealId} : ${r.status()} ${await r.text()}`);
+    const corps = (await r.json()) as { conversation?: { id?: string } };
+    if (!corps.conversation?.id) throw new Error(`Fil du deal ${dealId} : réponse sans conversation.id`);
+    return corps.conversation.id;
+  }
+
   /** Depuis l'écran « Mon Deal accepté » du Voyageur : le bouton ouvre le fil, et on note son identifiant. */
   async ouvrirDepuisDealVoyageur(dealId: string): Promise<string> {
     await this.page.goto(`/fr/carrier/deals/${dealId}`, { waitUntil: "networkidle" });
@@ -40,6 +53,14 @@ export class FilMessagerie {
   async ouvrir(conversationId: string, focusNumero = false): Promise<void> {
     await this.page.goto(`/fr/dashboard/messages?conversation=${conversationId}${focusNumero ? "&focus=phone" : ""}`, { waitUntil: "networkidle" });
     await expect(this.page.getByPlaceholder("Écrire un message…")).toBeVisible({ timeout: 60_000 });
+  }
+
+  /** Un fil fermé par un litige : la phrase est là, la saisie n'est pas rendue du tout. */
+  async ouvrirFermeParLeLitige(conversationId: string): Promise<void> {
+    await this.page.goto(`/fr/dashboard/messages?conversation=${conversationId}`, { waitUntil: "networkidle" });
+    await expect(this.page.getByText("Un litige est en cours : les échanges passent par la médiation.")).toBeVisible({ timeout: 60_000 });
+    await expect(this.page.getByPlaceholder("Écrire un message…")).toHaveCount(0);
+    await expect(this.page.getByRole("button", { name: "Envoyer", exact: true })).toHaveCount(0);
   }
 
   async proposerRendezVous(rdv: RendezVous): Promise<void> {

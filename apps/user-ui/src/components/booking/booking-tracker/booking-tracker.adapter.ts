@@ -203,7 +203,8 @@ export function toBooking(view: ShipperBookingViewDto): Booking {
     retentionDecision: view.retentionDecision ?? undefined,
     retentionCents: view.retentionCents ?? undefined,
     payoutStatus: view.payoutStatus ?? undefined,
-    completedBy: view.completedBy === "SHIPPER" || view.completedBy === "SYSTEM" ? view.completedBy : undefined,
+    // ADMIN aussi : un deal clos par la médiation ne doit pas se lire « sans signalement de ta part » (ANO-WEB-04).
+    completedBy: view.completedBy === "SHIPPER" || view.completedBy === "SYSTEM" || view.completedBy === "ADMIN" ? view.completedBy : undefined,
     completedAt: view.completedAt ?? undefined,
     disputeOpensAt: view.disputeOpensAt ?? undefined,
     rating: view.rating ?? null,

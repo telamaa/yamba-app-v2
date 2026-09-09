@@ -7,9 +7,8 @@ tourne sur le poste, ce qui reste à faire, et les pièges déjà payés qu'il n
 >
 > **1.** ~~corriger le harnais avec `storageState`~~ **FAIT** (§ 4 bis) ;
 > **2.** ~~monter la fixture de session administrateur~~ **FAIT** (`seed-admins.ts` + `navigateurAdmin`) ;
-> **3.** ~~finir WEB-E2E-1 en entier (étapes 11 à 29)~~ **FAIT, 29 étapes vertes** — **ouvrir la PR
-> de `chore/e2e-parcours`** (c'est le point exact de reprise si elle n'est pas encore ouverte) ;
-> **4.** les cinq autres parcours du chapitre 6 (E2E-2 exige la fixture admin — elle est là) ;
+> **3.** ~~finir WEB-E2E-1 en entier, ouvrir la PR~~ **FAIT — PR #259 mergée** ;
+> **4.** les cinq autres parcours du chapitre 6 : ~~E2E-2~~ **FAIT** (branche `chore/e2e-parcours-2`, PR à ouvrir), puis E2E-3, E2E-4, E2E-5, E2E-6 ;
 > **5.** les 32 chapitres du cahier **01-WEB** (326 fiches) ;
 > **6.** le cahier **02-ADMIN** (110 fiches) — 19 fiches de sécurité d'accès, 91 fiches d'écrans.
 >
@@ -27,7 +26,7 @@ tourne sur le poste, ce qui reste à faire, et les pièges déjà payés qu'il n
 |---|---|
 | **Cahier n° 4 — tâches planifiées** (90 fiches) | **CLOS.** 9 anomalies, 9 closes. PR **#256** + docs **#257**, mergées. Décisions **D76** et **D77** gravées au registre. Rapport : `context/YAMBA-RECETTE-CRONS-RESULTATS.md` |
 | **Harnais de recette navigateur** (Playwright) | **MERGÉ** — PR **#258**. Avec `ANO-WEB-01` (bloquante) et `ANO-WEB-02` (majeure), toutes deux closes |
-| **Parcours transactionnels** | **PRÊT À OUVRIR EN PR**, branche `chore/e2e-parcours` : WEB-E2E-1 passe **en entier** (29 étapes, 1 min 24), sessions mémorisées, fixture admin, `ANO-WEB-03` (majeure) close, 15 scénarios verts en 3 min 06 |
+| **Parcours transactionnels** | **#259 MERGÉ** (WEB-E2E-1) · **WEB-E2E-2 vert** sur `chore/e2e-parcours-2`, PR à ouvrir (ANO-WEB-04, ANO-WEB-05 closes) · #259 : WEB-E2E-1 passe **en entier** (29 étapes, 1 min 24), sessions mémorisées, fixture admin, `ANO-WEB-03` (majeure) close, 15 scénarios verts en 3 min 06 |
 
 Rapport de la campagne navigateur : `context/YAMBA-RECETTE-WEB-RESULTATS.md`.
 
@@ -147,25 +146,34 @@ Pièges payés sur les étapes 11 à 29, pour ne pas les repayer :
     pas la cartographie.
 12. **Les comptes du seed n'avaient pas de `publicSlug`** (antérieurs au profil public) : le seed
     le pose désormais à chaque rejeu.
-13. **`npm run dev` ne lance pas les fronts.** Sans `nx dev admin-ui`, `navigateurAdmin` attend
+13. **`npm run dev` ne lance pas les fronts.**
+14. **Un correctif front qui ne prend pas : remonter à la vue de l'API.** Un DTO à whitelist
+    stricte fait qu'un champ oublié n'arrive jamais — `completedBy` (ANO-WEB-04).
+15. **deal-service tourne en bundle** : après un changement de son code, `npx nx build
+    deal-service` puis relancer le bundle FAKE (§ 2), sinon l'ancien code répond.
+16. **La décision de médiation est unique** (409 au second envoi) : rejouer le seed avant. Sans `nx dev admin-ui`, `navigateurAdmin` attend
     un écran qui n'existe pas.
 
 ## 5. Ce qui reste à faire, dans l'ordre
 
-1. **Ouvrir la PR de `chore/e2e-parcours`** (base `dev`), compter les 17 checks, merger, puis
-   noter le numéro dans le suivi.
+1. ~~Ouvrir la PR de `chore/e2e-parcours`~~ **FAIT, #259.** Branche suivante : `chore/e2e-parcours-2`.
 
-2. **Les cinq autres parcours du chapitre 6** : litige (E2E-2, avec `navigateurAdmin("mediateur")`
-   pour trancher en remboursement partiel de 15,00 €), annulation tardive (E2E-3), compte neuf
+2. ~~E2E-2 (litige)~~ **FAIT** — 19 étapes, 30 s, `ANO-WEB-04` et `ANO-WEB-05` closes, branche
+   `chore/e2e-parcours-2` : **ouvrir la PR**, compter les 17 checks, merger. Deux arbitrages de
+   copie à rendre (rapport, observations : l'écran « Transaction close » après médiation, la ligne
+   Finances « retenue reversée »).
+
+3. **Les quatre autres parcours du chapitre 6** : annulation tardive (E2E-3), compte neuf
    plafonné (E2E-4), refus au pickup (E2E-5), parcours du destinataire (E2E-6). Les objets de page
-   des étapes 11 à 29 couvrent déjà la plus grande part de leurs écrans.
+   existants (réservation, fil, transport, suivi, signalement, médiation) couvrent la plus grande
+   part de leurs écrans.
 
-3. **Les 32 chapitres 5.x du cahier 01-WEB** (326 fiches), par famille. Huit d'entre eux
+4. **Les 32 chapitres 5.x du cahier 01-WEB** (326 fiches), par famille. Huit d'entre eux
    s'appuient sur le back-office (tableau du handoff précédent : suspendre, masquer, valider un
    billet, abaisser un paramètre, relire les signalés, ouvrir l'arbitrage, maintenance) — la
    fixture est prête.
 
-4. **Le cahier 02-ADMIN** (110 fiches) : 19 fiches de sécurité d'accès (le premier enrôlement
+5. **Le cahier 02-ADMIN** (110 fiches) : 19 fiches de sécurité d'accès (le premier enrôlement
    `ADM-SEC-2` se joue sur un compte remis à neuf par `grant-admin.ts --revoke` puis une nouvelle
    attribution — le seed enrôle les sept), 91 fiches d'écrans.
 

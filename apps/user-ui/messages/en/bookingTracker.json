@@ -495,7 +495,8 @@
     "banner": {
       "title": "Shipment completed",
       "byShipper": "You confirmed the delivery on {date}.",
-      "bySystem": "Verification period ended on {date}, with no report from you."
+      "bySystem": "Verification period ended on {date}, with no report from you.",
+      "byMediation": "Closed by mediation on {date}: the decision is below."
     },
     "h1": "Transaction closed",
     "h1Subtitle": "All good: your carrier's payment has been released and this deal is closed.",

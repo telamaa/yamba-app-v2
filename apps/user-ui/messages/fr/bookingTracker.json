@@ -495,7 +495,8 @@
     "banner": {
       "title": "Envoi terminé",
       "byShipper": "Tu as confirmé la livraison le {date}.",
-      "bySystem": "Période de vérification terminée le {date}, sans signalement de ta part."
+      "bySystem": "Période de vérification terminée le {date}, sans signalement de ta part.",
+      "byMediation": "Clos par la médiation le {date} : la décision est ci-dessous."
     },
     "h1": "Transaction close",
     "h1Subtitle": "Tout est en ordre : le paiement de ton Voyageur est libéré et ce deal est clos.",

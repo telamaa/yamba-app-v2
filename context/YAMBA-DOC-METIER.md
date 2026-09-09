@@ -2488,3 +2488,52 @@ révélées » ; l'avis public est signé du prénom et de l'initiale de son aut
 | 15 | Notation croisée | secret puis révélé, notification aux deux, avis public signé « Aminata D. » | oui |
 | 16 | Un second navigateur du même compte | aucune requête de connexion, session vivante | oui |
 | 17 | Un administrateur (médiateur) ouvre le back-office | mot de passe puis code TOTP calculé, cookies `admin_*` seuls | oui |
+
+---
+
+# Le parcours avec litige — ce que WEB-E2E-2 fait respecter
+
+*(PR `chore/e2e-parcours-2`, 09/09/2026 — cahier 01-WEB chapitre 6, cahier 02-ADMIN § 5.9.)*
+
+## Le besoin
+
+Un litige est le moment où la confiance se joue. Chaque partie doit pouvoir dire sa version ;
+aucune ne doit lire celle de l'autre avant la décision ; le back-office doit tout voir sauf le
+code de livraison ; et la décision doit revenir à chacun avec **son** montant. Le harnais joue
+cette chaîne en trente secondes.
+
+## Les règles
+
+**RG-WEB-13 — Le Voyageur ne lit que la catégorie du signalement.** Ni le récit, ni les photos,
+ni la solution souhaitée par l'Expéditeur — à l'écran comme dans l'email. *(A68.)*
+
+**RG-WEB-14 — L'Expéditeur apprend que le Voyageur a répondu, jamais ce qu'il a dit.** La
+version du Voyageur ne sert qu'à la médiation. *(D55 5A.)*
+
+**RG-WEB-15 — La version se donne une fois, en cinquante caractères au moins ; elle n'écrit à
+personne.** Après l'envoi, le formulaire ne revient pas, même au rechargement ; aucun email ne
+part ni vers l'un ni vers l'autre.
+
+**RG-WEB-16 — Un deal clos par la médiation le dit, et ne se note pas.** Le suivi de
+l'Expéditeur annonce « Clos par la médiation », jamais « sans signalement de ta part » ; aucun
+des deux ne peut noter l'autre. *(ANO-WEB-04, D54 4B.)*
+
+**RG-WEB-17 — La décision revient à chacun avec son montant seul.** L'Expéditeur lit le
+remboursement, le Voyageur son versement ; ni l'écran ni l'email de l'un ne porte le montant de
+l'autre ; le motif de la médiation est lu par les deux.
+
+**RG-WEB-18 — Le jeu d'essai capture ce qu'un vrai deal capture.** Tout deal accepté du seed
+porte `capturedAt` et un `chargeId` : le portefeuille et les files finances lisent la même
+vérité que sur un deal réel. *(ANO-WEB-05.)*
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| 18 | L'Expéditeur signale avec un récit de 12 caractères | compteur « n / minimum 50 caractères », envoi impossible | oui |
+| 19 | Le dossier complet est envoyé | numéro `YAM-XXXX`, fil fermé, accusé avec dossier, gel et 48 h ouvrées | oui |
+| 20 | Le Voyageur ouvre le deal et reçoit l'email | catégorie seule ; le récit et les photos n'apparaissent nulle part | oui |
+| 21 | Le Voyageur donne sa version (photo) | « Version envoyée », bouton disparu après rechargement, aucun email | oui |
+| 22 | La médiatrice tranche 15,00 € de remboursement partiel | récapitulatif 15,00 / 40,00 / 6,60 €, « Décision enregistrée », le code de livraison absent du dossier | oui |
+| 23 | Chacun relit son deal et son email | son montant seul, le même motif, « Clos par la médiation », aucun « Noter » | oui |
+| 24 | Finances › Paiements de l'Expéditeur | « Remboursé 15,00 € le … », « + 15,00 € » | oui |

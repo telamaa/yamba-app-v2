@@ -297,6 +297,8 @@ const toMilestones = (b: BookingRecord) => ({
   deliveredAt: toIso(b.deliveredAt),
   payoutDueAt: toIso(b.payoutDueAt),
   completedAt: toIso(b.completedAt),
+  // ANO-WEB-04 : sans lui, le suivi disait « sans signalement de ta part » à tout deal clos — même tranché en médiation.
+  completedBy: (b.completedBy as ShipperBookingView["completedBy"]) ?? null,
   closedAt: toIso(b.closedAt),
   closedBy: (b.closedBy as ShipperBookingView["closedBy"]) ?? null,
   declineReason: b.declineReason,

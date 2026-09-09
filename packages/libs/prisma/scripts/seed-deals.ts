@@ -485,6 +485,12 @@ async function main() {
         // accept/decline/cancel sont jouables en dev sans clés Stripe.
         paymentProvider: "FAKE",
         paymentIntentId: `pi_fake_seed_${b.key}`,
+        // D31 : l'acceptation CAPTURE le paiement (deal-lifecycle.service.ts pose capturedAt + chargeId).
+        // Sans eux, le portefeuille lisait « Libéré » au lieu de « Remboursé 15,00 € » après une
+        // décision de médiation partielle (WEB-E2E-2, étape 19) — le jeu d'essai est du code.
+        ...((b.milestones as { acceptedAt?: Date }).acceptedAt
+          ? { capturedAt: (b.milestones as { acceptedAt?: Date }).acceptedAt, chargeId: `ch_fake_seed_${b.key}` }
+          : {}),
         ...b.milestones,
       } as never,
     });
