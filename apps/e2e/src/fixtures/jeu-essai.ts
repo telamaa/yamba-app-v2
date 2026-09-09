@@ -16,11 +16,12 @@
  *    `workers: 1` et que le seed se demande, fichier de parcours par fichier de parcours.
  */
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const RACINE = join(__dirname, "../../../..");
 const SORTIE_SEED = join(RACINE, "packages/libs/prisma/scripts/seed-output.json");
+const SORTIE_ADMINS = join(RACINE, "packages/libs/prisma/scripts/seed-admins-output.json");
 
 export interface DealSeed {
   cle: string;
@@ -29,6 +30,23 @@ export interface DealSeed {
   corridor: string;
   expediteur: string;
   voyageur: string;
+}
+
+/** Un compte du back-office tel que `seed-admins.ts` l'a enrôlé (RECETTE-02-ADMIN § 2.5). */
+export interface AdminSeed {
+  cle: string;
+  id: string;
+  email: string;
+  profils: string[];
+  /** Le secret TOTP en base32 — le harnais CALCULE le code, comme la campagne API. */
+  secret: string;
+  /** Les huit codes de secours, montrés une fois à l'écran ; ici pour ADM-SEC-4 / ADM-SEC-5. */
+  codesDeSecours: string[];
+}
+
+interface SortieAdmins {
+  generatedAt: string;
+  admins: Record<string, { id: string; email: string; roles: string[]; secret: string; backupCodes: string[] }>;
 }
 
 interface SortieSeed {
@@ -40,6 +58,7 @@ interface SortieSeed {
 
 export class JeuEssai {
   private cache: SortieSeed | null = null;
+  private cacheAdmins: SortieAdmins | null = null;
 
   /**
    * Rejoue `seed-deals.ts` (§ 3.6). Long — une vingtaine de secondes — donc appelé une fois par
@@ -52,6 +71,31 @@ export class JeuEssai {
       timeout: 180_000,
     });
     this.cache = null;
+  }
+
+  /**
+   * Rejoue `seed-admins.ts` : les sept comptes du back-office, promus et enrôlés (2FA), avec un
+   * secret TOTP NEUF à chaque fois. Les sessions admin déjà ouvertes restent valides (le seed ne
+   * touche pas à Redis) ; seule une nouvelle connexion par l'écran lit le nouveau secret.
+   */
+  rejouerAdmins(): void {
+    execFileSync("npx", ["tsx", "--env-file=.env", "packages/libs/prisma/scripts/seed-admins.ts"], {
+      cwd: RACINE,
+      stdio: "pipe",
+      timeout: 120_000,
+    });
+    this.cacheAdmins = null;
+  }
+
+  /** Un compte admin du seed. S'il n'a jamais été créé sur ce poste, le seed est joué d'abord. */
+  admin(cle: string): AdminSeed {
+    if (!this.cacheAdmins) {
+      if (!existsSync(SORTIE_ADMINS)) this.rejouerAdmins();
+      this.cacheAdmins = JSON.parse(readFileSync(SORTIE_ADMINS, "utf-8")) as SortieAdmins;
+    }
+    const a = this.cacheAdmins.admins[cle];
+    if (!a) throw new Error(`Jeu d'essai : aucun compte admin « ${cle} » (${Object.keys(this.cacheAdmins.admins).join(", ")})`);
+    return { cle, id: a.id, email: a.email, profils: a.roles, secret: a.secret, codesDeSecours: a.backupCodes };
   }
 
   private lire(): SortieSeed {
