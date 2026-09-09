@@ -511,6 +511,24 @@ Ordre de demarrage : auth -> trip -> gateway.
   DEUX langues (le miroir FR/EN ne voit pas une absence symetrique). Cinquieme regle ajoutee a
   `scripts/check-i18n-messages.mjs` : toute cle LITTERALE utilisee dans les sources existe
   (213 faux positifs ramenes a 0). Rapport : `context/YAMBA-RECETTE-WEB-RESULTATS.md`.
+- 09/09 : **PARCOURS TRANSACTIONNELS DU HARNAIS (branche `chore/e2e-parcours`)** — WEB-E2E-1, le
+  parcours BLOQUANT du cahier 01-WEB, passe en ENTIER : 29 etapes, trois navigateurs, 1 min 24
+  (reservation 32,20 €, acceptation, rendez-vous propose/accepte, numero refuse avant 2 h
+  (400 `TOO_EARLY`), lien de suivi et page destinataire qui ne revele RIEN, prise en charge 5/5
+  + 2 photos, code lu par l'Expeditrice et JAMAIS dans l'email, trois jalons et UN seul email
+  (atterrissage), remise contre le code (J+4), verification, confirmation anticipee, notation
+  croisee secrete puis revelee, avis public signe). Deux fondations posees : les SESSIONS
+  MEMORISEES (`storageState` sur disque, sondees avant reutilisation, rendues a la fermeture —
+  le refresh fait une rotation du jti) et le NAVIGATEUR DU BACK-OFFICE (`seed-admins.ts` : sept
+  comptes du cahier 02-ADMIN promus et enroles, code TOTP CALCULE par `packages/libs/totp`).
+  **ANO-WEB-03 (majeure)** : sur grand ecran, un bouton de deal ouvrait le PREMIER fil de la
+  liste au lieu du sien (deux effets React, le dernier gagnait) — corrige. Deux corrections de
+  jeu d'essai (`publicSlug` a la mise a jour ; seed rejoue par le parcours). Le plafond du
+  limiteur est surchargeable par l'environnement (`RATE_LIMIT_ANONYMOUS_MAX`, defaut inchange) :
+  100 requetes anonymes / 15 min / IP etaient epuisees par les seuls visiteurs des parcours —
+  point d'attention produit (NAT partage) note au rapport. Interposes et ecrits noir sur blanc :
+  paiement FAKE, ImageKit, presse-papiers. auth-service **229** tests (+4). 15 scenarios e2e verts.
+  PR a ouvrir. Reste : E2E-2 a E2E-6, les 32 chapitres 5.x, le cahier 02-ADMIN.
 - 04/09 : C-PR6b feat/c6b-admin-alerts (D59 3A / 4A, A129–A131) — neuf regles de seuil
   (evaluateAlerts pur, instantane de dix compteurs), GET /admin/alerts sans etat (accueil
   admin), cron horaire avec dedoublonnage Redis SET NX (un email par regle et par jour, Redis
