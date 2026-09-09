@@ -556,7 +556,9 @@ Ordre de demarrage : auth -> trip -> gateway.
   le Voyageur ne peut pas annuler un deal (403 SHIPPER_ONLY malgre ANN-02) — arbitrage demande.
   Harnais : `payer()` attend l'intention de paiement (clic muet sinon). Poste : `nx serve` tombe
   sur un changement de lib partagee (recursion Nx) → trip/notification/message en bundle.
-  17 scenarios e2e verts. PR a ouvrir. Reste : E2E-4 a E2E-6, les 32 chapitres 5.x, 02-ADMIN.
+  17 scenarios e2e verts. MERGE 09/09 : **#261** (17 checks comptes). ANO-WEB-07, decision du
+  09/09 : le message D72 renvoie vers « Mes trajets » (corrige dans la PR suivante) ; l'annulation
+  d'un deal par le Voyageur reste un lot a part. Reste : E2E-4 a E2E-6, les 32 chapitres 5.x, 02-ADMIN.
 - 04/09 : C-PR6b feat/c6b-admin-alerts (D59 3A / 4A, A129–A131) — neuf regles de seuil
   (evaluateAlerts pur, instantane de dix compteurs), GET /admin/alerts sans etat (accueil
   admin), cron horaire avec dedoublonnage Redis SET NX (un email par regle et par jour, Redis

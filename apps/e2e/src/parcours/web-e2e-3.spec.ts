@@ -172,6 +172,7 @@ test.describe("WEB-E2E-3 — le parcours avec annulation tardive", () => {
     await trajets.ouvrir();
     const refus = await trajets.tenterDAnnulerLeTrajet("Paris → Montréal");
     expect(refus.statut).toBe(409);
-    expect(refus.toast).toMatch(/^Ce trajet porte encore \d+ deals? en cours : annule-les d'abord depuis « Mes deals »\. Chaque Expéditeur sera remboursé intégralement\.$/);
+    // ANO-WEB-07 (tranchée le 09/09) : le conseil renvoie vers « Mes trajets », qui existe.
+    expect(refus.toast).toMatch(/^Ce trajet porte encore \d+ deals? en cours : annule-les d'abord depuis « Mes trajets » \(chaque deal y est listé sous son trajet\)\. Chaque Expéditeur sera remboursé intégralement\.$/);
   });
 });

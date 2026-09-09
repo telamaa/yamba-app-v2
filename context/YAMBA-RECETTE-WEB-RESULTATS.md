@@ -198,7 +198,7 @@ Contre-épreuve : WEB-E2E-3 étape 4 — « Nouveau message » chez chacun des d
 
 ```
 ANO-WEB-07
-Fiche          : parcours WEB-E2E-3 étape 15 (chapitre 5.7, D72) · Gravité : MAJEURE · ÉTAT : OUVERTE (arbitrage)
+Fiche          : parcours WEB-E2E-3 étape 15 (chapitre 5.7, D72) · Gravité : MAJEURE · ÉTAT : TRANCHÉE le 09/09 — message corrigé (« Mes trajets »), annulation par le Voyageur = lot à part (registre)
 Attendu        : le refus d'annuler un trajet qui porte un deal vivant dit au Voyageur quoi faire.
 Obtenu         : « Ce trajet porte encore 2 deals en cours : annule-les d'abord depuis « Mes
                  deals ». Chaque Expéditeur sera remboursé intégralement. » — or **« Mes deals »
