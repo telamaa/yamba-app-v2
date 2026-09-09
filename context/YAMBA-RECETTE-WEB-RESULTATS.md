@@ -117,6 +117,37 @@ Contre-épreuve : clé retirée → le garde-fou nomme exactement
 
 ---
 
+## Chapitre 5.12 — Réserver : l'assistant en quatre étapes
+
+| Fiche | Ce qui est éprouvé | Verdict | Preuve |
+|---|---|---|---|
+| WEB-RSV — porte | La porte de la réservation, connecté ou non | **Conforme après correction** | → `ANO-WEB-02` ; les deux libellés sont lisibles en FR et en EN, et « Se connecter » ramène bien à la réservation |
+| WEB-RSV — nominal | Les quatre étapes, de la description au paiement | **Conforme** | 2,5 kg de vêtements taille S sur `bzv-perkg` : transport **28,75 €**, service **3,45 €**, total **32,20 €** — exactement les montants du cahier. Le deal est créé (`201 POST /deals`), le suivi s'ouvre sur « En attente du Voyageur » |
+| WEB-RSV — conditions du trajet | Le refus de famille et le supplément sont tenus par l'écran | **Conforme** | « Alimentaire sec & scellé ✕ » et « Électronique & appareils +20 % » sont affichés **avant** la saisie, comme le trajet les déclare (§ 2.4) |
+
+## Chapitre 6 — WEB-E2E-1, le nominal complet (premier tiers)
+
+| Étape du cahier | Ce qui est éprouvé | Verdict |
+|---|---|---|
+| 2 – 3 | Le visiteur voit le trajet, mais la porte se ferme sur « Réserver » | **Conforme** |
+| 4 – 8 | L'Expéditrice réserve : colis, destinataire, Charte, autorisation | **Conforme** — total 32,20 € |
+| 9 | Mailpit : chacun reçoit le sien | **Conforme** — l'Expéditrice lit **32,20 €**, le Voyageur **28,75 €**, et l'email du Voyageur **ne contient jamais** ce que l'Expéditrice a payé |
+| 10 | Le Voyageur accepte, Charte comprise | **Conforme** — « Coche la Charte pour confirmer » tant qu'elle n'est pas cochée, puis « Tu es engagé sur ce Deal » |
+
+Les étapes 11 à 29 (rendez-vous, révélation du numéro, prise en charge, code de livraison, jalons,
+remise, confirmation, notation croisée) s'ajoutent au même fichier, étape par étape.
+
+### Deux écarts assumés, écrits dans le parcours
+
+- Le cahier fait **publier un trajet** à l'étape 1 ; le harnais réserve sur `bzv-perkg`, que le
+  cahier lui-même désigne comme « le trajet de démonstration : c'est lui qu'on réserve dans tous
+  les scénarios de réservation » (§ 2.4). La publication d'un trajet est éprouvée par le
+  chapitre 5.7, à sa place.
+- Le paiement passe par le fournisseur **FAKE** (D11/D38), pour la raison technique décrite
+  ci-dessous. Le paiement par carte reste éprouvé par la campagne API, avec la vraie CLI Stripe.
+
+---
+
 ## Observations (pas des anomalies, mais à savoir)
 
 - **Deux formulaires de connexion coexistent dans le DOM** dès qu'une fenêtre de connexion est
@@ -124,6 +155,20 @@ Contre-épreuve : clé retirée → le garde-fou nomme exactement
   HTML (un `id` est unique dans un document) et une gêne pour l'accessibilité : un `label
   for="email"` ne désigne plus un champ unique. Le harnais contourne en visant le formulaire de
   la page. À reprendre dans le chapitre 5.31 (accessibilité).
+- **Le Payment Element de Stripe ne se monte pas sur l'origine du poste de recette.**
+  `http://192.168.1.155:3000` n'est pas une origine sécurisée ; Stripe.js n'y monte pas ses
+  `iframe`. Conséquence observée : le bouton « Payer 32,20 € » reste cliquable et **ne fait
+  rien** — `useBookingCheckout` constate qu'aucune fonction de confirmation n'a été enregistrée,
+  affiche un message générique et sort. Ce n'est pas un défaut du produit (l'origine est une
+  contrainte du poste), mais **le message mériterait de nommer la cause** : « le module de
+  paiement n'a pas pu se charger » plutôt qu'une erreur générique. À reprendre au chapitre 5.12.
+- **Le harnais épuise le limiteur de débit de la passerelle.** Chaque navigateur ouvre une vraie
+  session par l'écran de connexion ; au bout de quelques exécutions, `POST /api/auth/login`
+  répond **429**, et le parcours échoue sur un symptôme trompeur (« la page reste sur /login »).
+  Ce n'est pas un défaut du produit — le limiteur fait exactement son travail — mais c'est un
+  défaut du **harnais** : il doit mémoriser l'état de session par compte (`storageState`) et ne
+  se connecter réellement qu'une fois par compte et par exécution. À faire en premier à la
+  reprise.
 - **L'annonce « ta session a expiré » ne survient que si la session meurt pendant que la page est
   ouverte.** Au rechargement d'une page dont la session est déjà morte, l'événement part avant
   que l'écran n'ait posé son écoute : l'utilisateur voit simplement l'interface déconnectée.

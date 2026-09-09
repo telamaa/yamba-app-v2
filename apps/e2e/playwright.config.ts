@@ -90,7 +90,11 @@ export default defineConfig({
     locale: "fr-FR",
     timezoneId: "Europe/Paris",
     actionTimeout: 15_000,
-    navigationTimeout: 30_000,
+    // Next en mode développement COMPILE la route à la première visite : la page reste sur
+    // « Compiling … » pendant vingt à soixante secondes. Un délai de navigation calibré pour
+    // de la production ferait échouer le premier parcours qui touche un écran neuf, et ce
+    // serait un faux négatif — mesuré sur `/carrier/deals/[dealId]`.
+    navigationTimeout: 120_000,
     // Une recette qui échoue doit se relire : trace, capture et vidéo au premier échec.
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
