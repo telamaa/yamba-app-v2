@@ -1,0 +1,71 @@
+/**
+ * suivi-expediteur.ts — le suivi de l'envoi, vu par l'Expéditeur (cahier 01-WEB, 5.13, 5.17, 5.19)
+ * ==============================================================================================
+ * Une seule adresse, `/bookings/[id]`, dont le contenu suit le statut du deal : le lien de suivi
+ * à partager dès l'acceptation, le **code à six chiffres** dès la prise en charge, la période de
+ * vérification après la remise, puis « Transaction close » une fois confirmée.
+ *
+ * Les messages « Copier le message » ne sont écrits nulle part dans la page : ils partent au
+ * presse-papiers, que le harnais observe (`fixtures/presse-papiers.ts`).
+ */
+import { expect, type Page } from "@playwright/test";
+import { lirePressePapiers } from "../fixtures/presse-papiers";
+
+export class SuiviExpediteur {
+  constructor(private readonly page: Page) {}
+
+  async ouvrir(dealId: string): Promise<void> {
+    await this.page.goto(`/fr/bookings/${dealId}`, { waitUntil: "networkidle" });
+    await expect(this.page.getByRole("heading", { level: 1 })).toBeVisible({ timeout: 60_000 });
+  }
+
+  /** Étape 14 — la carte « Partage le suivi à {prénom} » : le lien apparaît en clair dans la carte. */
+  async creerLeLienDeSuivi(prenomDestinataire: string): Promise<{ url: string; message: string }> {
+    const carte = this.page.locator("section").filter({ hasText: `Partage le suivi à ${prenomDestinataire}` });
+    await expect(carte).toBeVisible({ timeout: 30_000 });
+    const reponse = this.page.waitForResponse((r) => r.url().includes("/tracking-link") && r.request().method() === "POST");
+    await carte.getByRole("button", { name: "Copier le message" }).click();
+    const r = await reponse;
+    if (!r.ok()) throw new Error(`Lien de suivi refusé : ${r.status()} ${await r.text()}`);
+    const url = (await carte.getByText(/\/track\//).innerText()).trim();
+    const message = await lirePressePapiers(this.page);
+    return { url, message };
+  }
+
+  /** Étape 17 — le code à six chiffres, lu sur la carte « Code à transmettre à … ». */
+  async lireLeCode(): Promise<string> {
+    await expect(this.page.getByText(/CODE À TRANSMETTRE À/)).toBeVisible({ timeout: 60_000 });
+    const bloc = this.page.getByLabel(/^\d( \d){5}$/);
+    await expect(bloc).toBeVisible();
+    return (await bloc.getAttribute("aria-label"))!.replace(/\s+/g, "");
+  }
+
+  /** Étape 18 — « Copier le message » de la carte de partage du CODE (pas celle du lien). */
+  async copierLeMessageDuCode(prenomDestinataire: string): Promise<string> {
+    const carte = this.page.locator("section").filter({ hasText: `Partage le code à ${prenomDestinataire}` });
+    await carte.getByRole("button", { name: "Copier le message" }).click();
+    await expect(carte.getByRole("button", { name: "Message copié !" })).toBeVisible({ timeout: 10_000 });
+    return lirePressePapiers(this.page);
+  }
+
+  /** Étape 22 — après la remise : la période de vérification et son compte à rebours. */
+  async attendrePeriodeDeVerification(): Promise<void> {
+    await expect(this.page.getByRole("heading", { name: "Période de vérification" })).toBeVisible({ timeout: 60_000 });
+    await expect(this.page.getByText(/VERSEMENT (AUTOMATIQUE )?DANS/)).toBeVisible();
+    await expect(this.page.getByRole("button", { name: "Signaler un problème" })).toBeVisible();
+  }
+
+  /** Étape 24 — la confirmation anticipée, en deux clics, puis « Transaction close ». */
+  async confirmerLaLivraison(): Promise<void> {
+    await this.page.getByRole("button", { name: "Confirmer la livraison" }).click();
+    await expect(this.page.getByText("Confirmer définitivement ?")).toBeVisible();
+    const reponse = this.page.waitForResponse((r) => /\/deals\/[^/]+\/confirm$/.test(r.url()) && r.request().method() === "POST", { timeout: 60_000 });
+    await this.page.getByRole("button", { name: "Oui, tout est OK" }).click();
+    const r = await reponse;
+    if (!r.ok()) throw new Error(`Confirmation refusée : ${r.status()} ${await r.text()}`);
+    await expect(this.page.getByText("Envoi terminé")).toBeVisible({ timeout: 60_000 });
+    await expect(this.page.getByRole("heading", { name: "Transaction close" })).toBeVisible();
+    await expect(this.page.getByRole("button", { name: "Signaler un problème" })).toHaveCount(0);
+    await expect(this.page.getByText("Quelque chose ne va pas avec ce colis ?")).toHaveCount(0);
+  }
+}
