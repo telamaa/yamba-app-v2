@@ -8,7 +8,7 @@ import { aggregateStatus, probeService, serviceEntries, toPublicBody, type Publi
 import cookieParser from "cookie-parser";
 import { randomUUID } from "crypto";
 import jwt from "jsonwebtoken";
-import { rateLimitMax } from "@packages/middleware/rate-limit-tier"; // A147
+import { rateLimitMax, resolveRateLimits } from "@packages/middleware/rate-limit-tier"; // A147
 
 const app = express();
 
@@ -86,9 +86,10 @@ const verifySessionToken = (token: string): boolean => {
   }
 };
 
+const rateLimits = resolveRateLimits(process.env); // défauts 100 / 1 000, surchargeables (poste de recette)
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: (req: any) => rateLimitMax(req, verifySessionToken),
+  max: (req: any) => rateLimitMax(req, verifySessionToken, rateLimits),
   message: { error: "Too many requests, please try again later!" },
   standardHeaders: true,
   skipFailedRequests: true,
