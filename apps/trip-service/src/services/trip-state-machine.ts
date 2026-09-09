@@ -378,6 +378,35 @@ export function getCarrierStatDeltas(
   return Object.keys(deltas).length > 0 ? deltas : null;
 }
 
+/**
+ * Les VALEURS à écrire, une fois les deltas appliqués au compteur courant — bornées à zéro.
+ *
+ * ANO-CRON-01 (recette n° 4, 09/09/2026) — `getCarrierStatDeltas` rend un `{ decrement: 1 }` que
+ * les deux appelants passaient tel quel à Prisma. Sans plancher : un trajet publié avant que le
+ * compteur existe, une incrémentation ratée, une correction manuelle en base, et la page publique
+ * du Voyageur affiche **« -1 trajet publié »**. Mesuré : deux pages Voyageur sur onze après un
+ * seul passage de `complete-trips`, et le nombre négatif sort tel quel sur `GET /users/{slug}/public`.
+ *
+ * Écrire une VALEUR plutôt qu'un delta a un second mérite, connu de ce dépôt : sur Mongo,
+ * `{ increment: 1 }` sur un champ ABSENT rend `null`, pas `1`.
+ */
+export function clampedCarrierStats(
+  actuel: { totalTripsPublished?: number | null; totalTripsCancelled?: number | null },
+  deltas: ReturnType<typeof getCarrierStatDeltas>
+): { totalTripsPublished?: number; totalTripsCancelled?: number } | null {
+  if (!deltas) return null;
+  const out: { totalTripsPublished?: number; totalTripsCancelled?: number } = {};
+  const publies = actuel.totalTripsPublished ?? 0;
+  if (deltas.totalTripsPublished) {
+    const d = "increment" in deltas.totalTripsPublished ? deltas.totalTripsPublished.increment : -deltas.totalTripsPublished.decrement;
+    out.totalTripsPublished = Math.max(0, publies + d);
+  }
+  if (deltas.totalTripsCancelled) {
+    out.totalTripsCancelled = Math.max(0, (actuel.totalTripsCancelled ?? 0) + deltas.totalTripsCancelled.increment);
+  }
+  return Object.keys(out).length > 0 ? out : null;
+}
+
 // ─────────────────────────────────────────────
 // Branchement booking (PR3 — A19/A20)
 // ─────────────────────────────────────────────

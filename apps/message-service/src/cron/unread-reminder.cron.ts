@@ -16,7 +16,7 @@ export const UNREAD_REMINDER_CRON_SCHEDULE = "*/5 * * * *";
 export function startUnreadReminderCron(service: UnreadReminderService, logger: Logger): ScheduledTask {
   const task = cron.schedule(UNREAD_REMINDER_CRON_SCHEDULE, async () => {
     try {
-      const result = await withHeartbeat(redis, { service: "message-service", name: "unread-reminder", schedule: UNREAD_REMINDER_CRON_SCHEDULE }, () => service.runOnce(), (r) => `${r.sent} relance(s), ${r.failed} échec(s)`);
+      const result = await withHeartbeat(redis, { service: "message-service", name: "unread-reminder", schedule: UNREAD_REMINDER_CRON_SCHEDULE }, () => service.runOnce(), (r) => `${r.sent} relance(s), ${r.skipped} ignorée(s), ${r.failed} échec(s)`);
       if (result.sent || result.failed) logger.info(result, "Unread message reminders sent");
     } catch (err) {
       logger.error({ err }, "Unread reminder cron failed");

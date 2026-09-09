@@ -29,17 +29,24 @@ describe("unread-reminder.service — qui ne reçoit pas l'email", () => {
     const r = await svc.runOnce(now);
     expect(send).not.toHaveBeenCalled();
     expect(prismaMock.conversation.updateMany).toHaveBeenCalledTimes(1); // le verrou évite une nouvelle tentative dans l'heure
-    expect(r.sent).toBe(1); // remind() a « réussi » sans envoyer : pas une erreur
+    // ANO-CRON-04 — l'intention d'origine reste : ce n'est PAS une erreur. Mais ce n'est pas non
+    // plus une relance envoyée : le battement annonçait « 1 relance(s) » pour zéro email. Les
+    // trois issues sont désormais distinctes, et `skipped` dit exactement ce qui s'est passé.
+    expect(r.sent).toBe(0);
+    expect(r.skipped).toBe(1);
+    expect(r.failed).toBe(0);
   });
-  it("compte effacé (isDeleted) : aucun email", async () => {
+  it("compte effacé (isDeleted) : aucun email, et compté comme ignoré", async () => {
     const { send, svc } = setup({ email: "erased+s1@anonymised.invalid", firstName: "Membre", preferredLocale: "fr", isDeleted: true, messagingReminderEmails: true });
-    await svc.runOnce(now);
+    const r = await svc.runOnce(now);
     expect(send).not.toHaveBeenCalled();
+    expect(r).toMatchObject({ sent: 0, skipped: 1, failed: 0 });
   });
-  it("destinataire normal : un email dans sa langue", async () => {
+  it("destinataire normal : un email dans sa langue, compté comme envoyé", async () => {
     const { send, svc } = setup({ email: "s@x.com", firstName: "Pauline", preferredLocale: "en", isDeleted: false, messagingReminderEmails: true });
-    await svc.runOnce(now);
+    const r = await svc.runOnce(now);
     expect(send).toHaveBeenCalledTimes(1);
     expect(send.mock.calls[0][0]).toMatchObject({ to: "s@x.com", locale: "en" });
+    expect(r).toMatchObject({ sent: 1, skipped: 0, failed: 0 });
   });
 });

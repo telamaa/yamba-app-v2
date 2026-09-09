@@ -21,6 +21,7 @@ import {
   canPerform,
   getAllowedActions,
   getCarrierStatDeltas,
+  clampedCarrierStats,
   type TripStatus,
 } from "../services/trip-state-machine";
 import { countActiveBookings, hasActiveBookings } from "../services/booking-queries";
@@ -120,13 +121,18 @@ async function applyCarrierStatDeltas(
 
   const carrierPage = await prisma.carrierPage.findUnique({
     where: { userId },
-    select: { id: true },
+    select: { id: true, totalTripsPublished: true, totalTripsCancelled: true },
   });
   if (!carrierPage) return;
 
+  // ANO-CRON-01 — on écrit une VALEUR bornée à zéro, pas un delta : un compteur public ne
+  // descend jamais sous zéro, et un `{ increment }` sur un champ absent rendrait `null`.
+  const valeurs = clampedCarrierStats(carrierPage, deltas);
+  if (!valeurs) return;
+
   await prisma.carrierPage.update({
     where: { id: carrierPage.id },
-    data: deltas,
+    data: valeurs,
   });
 }
 
