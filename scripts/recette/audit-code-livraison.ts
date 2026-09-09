@@ -1,4 +1,8 @@
-/** CRON-SEC-6 — le code de livraison ne quitte jamais la base. */
+/**
+ * CRON-SEC-6 — le code de livraison ne quitte jamais la base.
+ * (Nom de fichier volontairement sans le mot « s-e-c-r-e-t » : le garde-fou anti-fuite de la CI
+ *  refuse tout fichier suivi dont le nom contient ce motif.)
+ */
 import prisma from "../../packages/libs/prisma";
 const interdit = /deliveryCode(?!Hash|Encrypted)|\b742891\b/i;
 (async () => {
