@@ -137,6 +137,49 @@ Contre-épreuve : WEB-E2E-1 étape 11 — le fil ouvert porte le prénom de l'Ex
                  et n'a « Pas encore de message » ; la proposition de rendez-vous y atterrit.
 ```
 
+
+```
+ANO-WEB-04
+Fiche          : parcours WEB-E2E-2 étape 15 (chapitre 5.21) · Gravité : MAJEURE · ÉTAT : CLOSE
+Attendu        : après une décision de médiation, le suivi de l'Expéditeur dit que le deal a été
+                 clos par la médiation et montre la décision.
+Obtenu         : le bandeau « Envoi terminé » disait « Période de vérification terminée le …,
+                 **sans signalement de ta part** » — à un membre qui venait précisément d'ouvrir
+                 un signalement, tranché en remboursement partiel.
+Impact         : tout deal clos par la médiation ; et, en creux, tout deal confirmé par
+                 l'Expéditeur lui-même lisait aussi la phrase « du système ».
+Cause          : deux étages. La vue Expéditeur de l'API ne servait PAS `completedBy` (le
+                 mapper ne sérialisait que `completedAt`), donc le front ne savait jamais QUI
+                 avait clos ; et l'adaptateur front ne gardait de toute façon que SHIPPER /
+                 SYSTEM, sans cas pour ADMIN. Le bandeau retombait toujours sur « bySystem ».
+Correction     : `completedBy` ajouté à la whitelist des jalons du contrat
+                 (`packages/libs/api-contracts/src/booking/booking.schema.ts`, OpenAPI
+                 régénéré), servi par `booking-view.mapper.ts` ; l'adaptateur conserve ADMIN ;
+                 nouvelle ligne « Clos par la médiation le {date} : la décision est ci-dessous. »
+                 (`completed.banner.byMediation`, FR + EN).
+Contre-épreuve : WEB-E2E-2 étape 15 — la phrase « sans signalement de ta part » est absente, la
+                 ligne de médiation est là, la carte « Décision rendue » suit.
+Reste ouvert   : le reste de l'écran « Transaction close » ignore encore la médiation — voir
+                 les observations (arbitrage de copie à rendre).
+```
+
+```
+ANO-WEB-05
+Fiche          : parcours WEB-E2E-2 étape 19 (chapitre 5.26 Finances) · Gravité : MINEURE (jeu d'essai) · ÉTAT : CLOSE
+Attendu        : Finances › Paiements porte la ligne « Remboursé 15,00 € le … » après la décision.
+Obtenu         : « Libéré le 9 sept. · transaction close − 61,60 € » — le remboursement partiel
+                 invisible.
+Cause          : le service pose `capturedAt` + `chargeId` à l'ACCEPTATION (D31, capture
+                 manuelle) ; `seed-deals.ts` ne le faisait pour aucun de ses deals acceptés, et
+                 la règle du portefeuille (`wallet.service.ts`) exige `capturedAt` pour lire un
+                 remboursement. Le jeu d'essai est du code (ANO-CRON-07) : ici il ne disait pas
+                 la vérité sur l'argent, pour tous les deals au-delà de PENDING — les files
+                 finances du back-office lisaient le même mensonge.
+Correction     : le seed pose `capturedAt = acceptedAt` et un `chargeId` factice dès qu'un deal
+                 a été accepté. `seed-integrity.spec.ts` inchangé, vert.
+Contre-épreuve : WEB-E2E-2 étape 19 — « Remboursé 15,00 € le … », montant « + 15,00 € ».
+```
+
 ---
 
 ## Chapitre 5.12 — Réserver : l'assistant en quatre étapes
@@ -189,10 +232,48 @@ Contre-épreuve : WEB-E2E-1 étape 11 — le fil ouvert porte le prénom de l'Ex
   traversée, et les URL rendues sont enregistrées sur le deal — mais une recette qui déposerait
   trois vraies images dans la médiathèque de production à chaque exécution n'est pas une recette.
 
+## Chapitre 6 — WEB-E2E-2, le parcours avec litige · **CONFORME** (19 étapes, 30 s)
+
+| Étape du cahier | Ce qui est éprouvé | Verdict |
+|---|---|---|
+| 1 – 2 | Le suivi livré, « Signaler un problème », l'écran et ses quatre blocs | **Conforme** |
+| 3 | Motif « Contenu manquant ou différent de la déclaration » | **Conforme** — radios habillées, `aria-checked` |
+| 4 | « Ça ne va pas » : refusé | **Conforme** — compteur « n / minimum 50 caractères », bouton inactif (12 ou 13 selon la forme du Ç : le harnais ne parie pas) |
+| 5 | Récit ≥ 50, deux photos, « Remboursement intégral », engagement | **Conforme** — le bouton s'active seulement alors |
+| 6 | « Envoyer » puis « Oui, envoyer » | **Conforme** — « Signalement envoyé », numéro `YAM-XXXX`, identique à celui de la réponse serveur |
+| 7 | Le fil est fermé | **Conforme** — « Un litige est en cours : les échanges passent par la médiation. », aucune saisie rendue |
+| 8 | Mailpit | **Conforme** — accusé au signalant (dossier, « gelé », « 48 h ouvrées ») ; email calme au Voyageur avec la catégorie seule, sans le récit ni les photos |
+| 9 – 10 | Le Voyageur voit le dossier | **Conforme** — « Signalement en cours · dossier … », versement « mis en attente », motif « contenu manquant » seul, jamais le récit |
+| 11 | Sa version trop courte | **Conforme** — « Au moins 50 caractères. », bouton inactif (pas de bouton « Donner ma version » : le formulaire est déjà ouvert, voir écarts) |
+| 12 | Sa version, une photo | **Conforme** — « Ta version est enregistrée. », « Version envoyée », le bouton ne revient pas après rechargement ; **aucun** email de plus ni pour l'un ni pour l'autre |
+| 13 | L'Expéditeur apprend le fait | **Conforme** — « a donné sa version. La décision arrive sous 5 jours ouvrés. », jamais le contenu |
+| 14 | La médiatrice tranche | **Conforme** — file « À arbitrer », dossier avec les deux versions et sans le code de livraison, récapitulatif « 15,00 € / 40,00 € / 6,60 € », « Décision enregistrée » |
+| 15 | L'Expéditeur lit la décision | **Conforme après correction** → `ANO-WEB-04` ; « retenu en partie », « 15,00 € te sont remboursés », le motif |
+| 16 | Le Voyageur lit la décision | **Conforme** — « une part du prix est remboursée à l'Expéditeur », « 40,00 € partent vers ton compte », le même motif, **jamais 15,00 €** |
+| 17 | Aucun « Noter » | **Conforme** — des deux côtés |
+| 18 | Mailpit | **Conforme** — « Décision rendue sur ton envoi » avec 15,00 € et sans 40,00 € ; « … sur ton transport » avec 40,00 € et sans 15,00 € |
+| 19 | Finances › Paiements | **Conforme après correction du seed** → `ANO-WEB-05` ; « Remboursé 15,00 € le … », « + 15,00 € » |
+
+### Deux écarts assumés, écrits dans le parcours
+
+- Étape 11 : il n'y a pas de bouton « Donner ma version » dans le produit — le formulaire est
+  déjà ouvert dans la carte « Donne ta version » ; le libellé du cahier est celui de l'email.
+- Étape 12 : l'endpoint est `POST /deals/:id/dispute/statement` (le cahier n'en nomme aucun).
+
 ---
 
 ## Observations (pas des anomalies, mais à savoir)
 
+- **L'écran « Transaction close » ignore encore la médiation** (suite d'ANO-WEB-04, à
+  arbitrer) : sous la ligne corrigée, « Tout est en ordre : le paiement de ton Voyageur est
+  libéré », « Yamba verse à {prénom} le montant convenu pour ce transport » et, dans « Ton
+  paiement », « Tu as confirmé la livraison — les fonds sont en cours de versement » — trois
+  phrases fausses après un remboursement partiel. Proposition : quand `completedBy === "ADMIN"`,
+  un sous-titre « La médiation a tranché : voir la décision ci-dessous. », une carte paiement
+  « Remboursé {montant} · versé {montant} au Voyageur », et pas de carte « paiement libéré ».
+- **La ligne Finances d'un remboursement de médiation parle de « retenue … reversée au
+  Voyageur »** : un libellé conçu pour l'annulation tardive (`finances.state.PARTIALLY_REFUNDED`)
+  réutilisé tel quel. Exact sur les montants, trompeur sur le mot. Même arbitrage de copie.
 - **Deux formulaires de connexion coexistent dans le DOM** dès qu'une fenêtre de connexion est
   montée, avec les **mêmes identifiants** `#email` et `#password`. C'est un défaut de validité
   HTML (un `id` est unique dans un document) et une gêne pour l'accessibilité : un `label

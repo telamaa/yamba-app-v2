@@ -3845,3 +3845,73 @@ l'URL a choisi (`if (searchParams?.get("conversation")) return;`).
 
 `apps/e2e` : **15 scénarios** verts sur le poste en 3 min 06 (harnais ×6, WEB-CNX ×3, WEB-RSV ×5, WEB-E2E-1).
 auth-service **229** (+4, `resolveRateLimits`). Plateforme 989 inchangée.
+
+---
+
+# WEB-E2E-2 : le litige de bout en bout, et deux vérités rétablies (contrat, jeu d'essai)
+
+*(PR `chore/e2e-parcours-2`, 09/09/2026.)*
+
+## Ce qui a été fait
+
+Le second parcours bloquant du cahier 01-WEB : un signalement, la version du Voyageur, une
+décision de médiation prise dans le back-office, puis ce que chacun lit — et surtout ce que
+chacun **ne lit pas**. Dix-neuf étapes, quatre navigateurs (João, Thomas, la médiatrice, plus
+Mailpit), trente secondes.
+
+```
+apps/e2e/src/pages/signalement-expediteur.ts  l'assistant de signalement (4 blocs), le suivi en litige, la décision, Finances
+apps/e2e/src/pages/litige-voyageur.ts         le dossier vu du Voyageur, sa version, sa décision
+apps/e2e/src/pages/mediation-admin.ts         la file « À arbitrer », le dossier, « Trancher »
+apps/e2e/src/pages/fil-messagerie.ts          + identifiantDuFil(contexte, dealId) par l'API, + ouvrirFermeParLeLitige
+apps/e2e/src/parcours/web-e2e-2.spec.ts       les 19 étapes
+```
+
+Le parcours vérifie des **absences** autant que des présences : le récit et les photos de
+l'Expéditeur n'atteignent jamais le Voyageur (A68) — ni l'écran, ni l'email ; le contenu de la
+version du Voyageur n'atteint jamais l'Expéditeur (D55 5A) ; le code de livraison n'est jamais
+servi au back-office ; l'email de décision de chacun ne porte que **son** montant. Chaque
+absence est affirmée sur le texte entier de la page ou de l'email, pas sur un élément.
+
+## ANO-WEB-04 — la vue Expéditeur ne disait pas qui avait clos le deal
+
+Le bandeau « Envoi terminé » choisissait sa phrase sur `booking.completedBy`. Or la vue
+Expéditeur de l'API ne sérialisait que `completedAt` : `completedBy` n'arrivait jamais, et
+l'adaptateur front retombait sur la phrase « du système » — « Période de vérification terminée
+le …, sans signalement de ta part » — y compris après une décision de médiation.
+
+Correction en trois points, dans l'ordre de la vérité :
+
+1. **le contrat** — `completedBy: BookingActorSchema.nullish()` dans les jalons de
+   `booking.schema.ts` (whitelist explicite, jamais un spread) ; les cinq `openapi.json` sont
+   régénérés (le registre de schémas est global) ;
+2. **le mapper** — `toMilestones` sert `completedBy` ;
+3. **le front** — l'adaptateur conserve `ADMIN`, et `CompletedCards` rend
+   `completed.banner.byMediation` : « Clos par la médiation le {date} : la décision est
+   ci-dessous. » (FR + EN, contrôle i18n vert).
+
+Le reste de l'écran (« le paiement de ton Voyageur est libéré », « le montant convenu ») reste
+à arbitrer côté copie — noté au rapport, pas tranché ici.
+
+## ANO-WEB-05 — le jeu d'essai n'avait jamais capturé un paiement
+
+`deal-lifecycle.service.ts` pose `capturedAt` et `chargeId` à l'acceptation (D31). Le seed ne le
+faisait pas : ses deals acceptés, livrés, terminés vivaient sans capture. Conséquence : la règle
+du portefeuille (`wallet.service.ts`, `if (b.capturedAt && refund > 0 …)`) lisait « Libéré »
+là où un remboursement partiel venait d'être décidé. Le seed pose désormais
+`capturedAt = acceptedAt` et un `chargeId` factice dès qu'un deal a été accepté — une ligne, et
+tout le back-office finances lit enfin des deals cohérents.
+
+## Ce que le back-office a exigé du harnais
+
+- adresses **absolues** (`adresseDuBackOffice()`) : la `baseURL` du projet est le front membre ;
+- « À arbitrer » existe deux fois (menu latéral, lien retour) : on scope sur `aside` ;
+- les montants sont formatés avec une espace insécable étroite avant `€` : `normaliserEspaces`
+  avant toute comparaison ;
+- la décision est **unique** : un second `POST …/resolve` répond 409 — le seed est rejoué en
+  `beforeAll`.
+
+## Tests
+
+`apps/e2e` : **16 scénarios** verts sur le poste (harnais ×6, WEB-CNX ×3, WEB-RSV ×5, WEB-E2E-1,
+WEB-E2E-2). deal-service 575 inchangé (mapper), auth-service 229. OpenAPI régénéré.

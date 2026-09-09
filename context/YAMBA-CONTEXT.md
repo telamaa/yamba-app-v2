@@ -529,6 +529,21 @@ Ordre de demarrage : auth -> trip -> gateway.
   point d'attention produit (NAT partage) note au rapport. Interposes et ecrits noir sur blanc :
   paiement FAKE, ImageKit, presse-papiers. auth-service **229** tests (+4). 15 scenarios e2e verts.
   MERGE 09/09 : **#259** (17 checks comptes). Reste : E2E-2 a E2E-6, les 32 chapitres 5.x, le cahier 02-ADMIN.
+- 09/09 : **WEB-E2E-2, LE LITIGE (branche `chore/e2e-parcours-2`)** — le second parcours BLOQUANT
+  passe en entier : 19 etapes, 30 s, quatre navigateurs (Joao, Thomas, la mediatrice du
+  back-office). Signalement en quatre blocs (refus sous 50 caracteres, deux photos, engagement,
+  numero YAM-XXXX), fil ferme, accuse et email calme (categorie seule, JAMAIS le recit ni les
+  photos — A68), version du Voyageur (une fois, aucun email), decision de mediation dans
+  admin-ui (partiel 15,00 € : recapitulatif 15,00 / 40,00 / 6,60 €, code de livraison absent du
+  dossier), decision relue par chacun avec SON montant seul, aucun « Noter », ligne Finances.
+  **ANO-WEB-04 (majeure)** : la vue Expediteur ne servait pas `completedBy` → « sans signalement
+  de ta part » apres une mediation — contrat (whitelist, OpenAPI regenere) + mapper + front
+  (« Clos par la mediation le … »). **ANO-WEB-05 (mineure, jeu d'essai)** : le seed ne capturait
+  jamais le paiement a l'acceptation (`capturedAt`/`chargeId`) → le portefeuille lisait
+  « Libere » au lieu de « Rembourse 15,00 € » ; corrige a la source. Reste a arbitrer (copie) :
+  l'ecran « Transaction close » ignore encore la mediation ; la ligne Finances parle de
+  « retenue reversee ». 16 scenarios e2e verts. PR a ouvrir. Reste : E2E-3 a E2E-6, les 32
+  chapitres 5.x, le cahier 02-ADMIN.
 - 04/09 : C-PR6b feat/c6b-admin-alerts (D59 3A / 4A, A129–A131) — neuf regles de seuil
   (evaluateAlerts pur, instantane de dix compteurs), GET /admin/alerts sans etat (accueil
   admin), cron horaire avec dedoublonnage Redis SET NX (un email par regle et par jour, Redis
