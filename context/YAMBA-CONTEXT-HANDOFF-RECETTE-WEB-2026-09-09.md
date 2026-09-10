@@ -8,7 +8,7 @@ tourne sur le poste, ce qui reste à faire, et les pièges déjà payés qu'il n
 > **1.** ~~corriger le harnais avec `storageState`~~ **FAIT** (§ 4 bis) ;
 > **2.** ~~monter la fixture de session administrateur~~ **FAIT** (`seed-admins.ts` + `navigateurAdmin`) ;
 > **3.** ~~finir WEB-E2E-1 en entier, ouvrir la PR~~ **FAIT — PR #259 mergée** ;
-> **4.** les cinq autres parcours du chapitre 6 : ~~E2E-2~~ **FAIT, #260 mergée**, ~~E2E-3~~ **FAIT, #261 mergée**, ~~E2E-4~~ **FAIT, PR #262** (17 checks verts, à merger), ~~E2E-5~~ **FAIT** (branche `chore/e2e-parcours-5`, ANO-WEB-10 close, PR à ouvrir après le merge de #262), puis E2E-6 ;
+> **4.** les cinq autres parcours du chapitre 6 : ~~E2E-2~~ **FAIT, #260 mergée**, ~~E2E-3~~ **FAIT, #261 mergée**, ~~E2E-4~~ **FAIT, PR #262** (17 checks verts, à merger), ~~E2E-5~~ **FAIT, PR #263** (empilée sur #262, ANO-WEB-10 close), puis E2E-6 ;
 > **5.** les 32 chapitres du cahier **01-WEB** (326 fiches) ;
 > **6.** le cahier **02-ADMIN** (110 fiches) — 19 fiches de sécurité d'accès, 91 fiches d'écrans.
 >
@@ -26,7 +26,7 @@ tourne sur le poste, ce qui reste à faire, et les pièges déjà payés qu'il n
 |---|---|
 | **Cahier n° 4 — tâches planifiées** (90 fiches) | **CLOS.** 9 anomalies, 9 closes. PR **#256** + docs **#257**, mergées. Décisions **D76** et **D77** gravées au registre. Rapport : `context/YAMBA-RECETTE-CRONS-RESULTATS.md` |
 | **Harnais de recette navigateur** (Playwright) | **MERGÉ** — PR **#258**. Avec `ANO-WEB-01` (bloquante) et `ANO-WEB-02` (majeure), toutes deux closes |
-| **Parcours transactionnels** | **#259 MERGÉ** (WEB-E2E-1) · **#260 MERGÉ** (WEB-E2E-2, ANO-WEB-04, ANO-WEB-05) · **#261 MERGÉ** (WEB-E2E-3, ANO-WEB-06 ; ANO-WEB-07 tranchée) · **PR #262 ouverte, 17/17 verts** (WEB-E2E-4, ANO-WEB-08, ANO-WEB-09 closes) · **WEB-E2E-5 vert** sur `chore/e2e-parcours-5` (8 étapes, 1 min 06, ANO-WEB-10 close — la réputation comptait le refus au pickup comme une annulation tardive) · #259 : WEB-E2E-1 passe **en entier** (29 étapes, 1 min 24), sessions mémorisées, fixture admin, `ANO-WEB-03` (majeure) close, 15 scénarios verts en 3 min 06 |
+| **Parcours transactionnels** | **#259 MERGÉ** (WEB-E2E-1) · **#260 MERGÉ** (WEB-E2E-2, ANO-WEB-04, ANO-WEB-05) · **#261 MERGÉ** (WEB-E2E-3, ANO-WEB-06 ; ANO-WEB-07 tranchée) · **PR #262 ouverte, 17/17 verts** (WEB-E2E-4, ANO-WEB-08, ANO-WEB-09 closes) · **PR #263 ouverte** (WEB-E2E-5, 8 étapes, 1 min 06, ANO-WEB-10 close — la réputation comptait le refus au pickup comme une annulation tardive) · #259 : WEB-E2E-1 passe **en entier** (29 étapes, 1 min 24), sessions mémorisées, fixture admin, `ANO-WEB-03` (majeure) close, 15 scénarios verts en 3 min 06 |
 
 Rapport de la campagne navigateur : `context/YAMBA-RECETTE-WEB-RESULTATS.md`.
 
@@ -201,8 +201,9 @@ Pièges payés sur les étapes 11 à 29, pour ne pas les repayer :
    ~~E2E-5 (refus au pickup)~~ **FAIT** — 8 étapes, 1 min 06, `ANO-WEB-10` close (majeure : la
    réputation comptait tout refus au pickup comme une annulation tardive au prochain recalcul ;
    marque `Booking.pickupRefusedAt`, requête qui l'exclut, refus qui recalcule). Branche
-   `chore/e2e-parcours-5`, empilée sur `chore/e2e-parcours-4` : **ouvrir la PR après le merge de
-   #262** (sinon le diff porte les deux parcours), compter, merger.
+   `chore/e2e-parcours-5`, empilée sur `chore/e2e-parcours-4` : **PR #263 ouverte, base
+   `chore/e2e-parcours-4`** (GitHub la recible sur `dev` au merge de #262). Merger #262, puis
+   compter les 17 checks de #263 et la merger.
 
    **Le dernier parcours du chapitre 6** : le parcours du destinataire (E2E-6), qui se joue en
    parallèle de E2E-1 dans le navigateur C — `suivi-destinataire.ts` couvre déjà la page ; il

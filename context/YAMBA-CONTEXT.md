@@ -583,7 +583,7 @@ Ordre de demarrage : auth -> trip -> gateway.
   refus, requete des faits Voyageur qui l'exclut (absent compris, `isSet`), refus qui recalcule
   les deux parties. deal-service **576** tests (+1), plateforme 990. Ecarts cahier : sujet de
   l'email « n'a pas pu etre pris en charge », kilos lus a l'API. 19 scenarios e2e verts.
-  Reste : E2E-6, les 32 chapitres 5.x, 02-ADMIN.
+  PR **#263** (empilee sur #262). Reste : E2E-6, les 32 chapitres 5.x, 02-ADMIN.
 - 04/09 : C-PR6b feat/c6b-admin-alerts (D59 3A / 4A, A129–A131) — neuf regles de seuil
   (evaluateAlerts pur, instantane de dix compteurs), GET /admin/alerts sans etat (accueil
   admin), cron horaire avec dedoublonnage Redis SET NX (un email par regle et par jour, Redis
