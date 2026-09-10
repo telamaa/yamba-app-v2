@@ -155,7 +155,8 @@ test.describe("WEB-INS — inscription par code email, consentement, Google (cha
     expect(onglets, "aucune fenêtre").toEqual([]);
     expect(requetes.filter((u) => /facebook|oauth/i.test(u)), "aucun appel réseau vers Facebook").toEqual([]);
     expect(erreurs, "aucune erreur").toEqual([]);
-    await expect(page.locator('[role="alert"]').filter({ visible: true })).toHaveCount(0);
+    // Le `role="alert"` de l'indicateur « Open Next.js Dev Tools » vit hors de <main> : on ne vise que le produit.
+    await expect(page.locator("main").locator('[role="alert"]').filter({ visible: true })).toHaveCount(0);
   });
 
   test("WEB-INS-3 · les champs obligatoires sont nommés un par un", async ({ navigateurVisiteur }) => {
@@ -245,7 +246,9 @@ test.describe("WEB-INS — inscription par code email, consentement, Google (cha
       await expect(page.getByText("Vérification sécurisée")).toBeVisible({ timeout: 60_000 });
       await expect(page.getByRole("heading", { name: "Plus qu'une étape !" })).toBeVisible();
       await expect(page.getByText("Nous avons envoyé un code à 6 chiffres à :")).toBeVisible();
-      await expect(page.getByText(compte.email)).toBeVisible();
+      // Écart consigné (5.2) : l'écran MASQUE volontairement l'adresse (« n*********5@r***.dev »), le cahier
+      // attendait « l'adresse saisie ». On vérifie le premier caractère, le « @ » et le domaine.
+      await expect(page.getByText(new RegExp(`^${compte.email[0]}\\*+.*@.*\\.dev$`))).toBeVisible();
       await expect(page.getByText("Code valable")).toBeVisible();
       const compteARebours = page.getByText(/^(09|10):[0-5]\d$/).first();
       await expect(compteARebours).toBeVisible();

@@ -29,10 +29,9 @@ async function main() {
       lastName: true,
       preferredLocale: true,
       passwordHash: true,
-      isVerified: true,
       createdAt: true,
       consentLogs: { select: { type: true, version: true, acceptedAt: true, locale: true, ipAddress: true, userAgent: true }, orderBy: { acceptedAt: "asc" } },
-      authIdentities: { select: { provider: true, email: true, createdAt: true } },
+      identities: { select: { provider: true, email: true, createdAt: true } },
     },
   });
   if (!user) {
@@ -47,7 +46,6 @@ async function main() {
       lastName: user.lastName,
       preferredLocale: user.preferredLocale,
       hasPassword: Boolean(user.passwordHash),
-      isVerified: user.isVerified,
       createdAt: user.createdAt,
       consents: user.consentLogs.map((c) => ({
         type: c.type,
@@ -57,7 +55,7 @@ async function main() {
         hasIp: Boolean(c.ipAddress),
         hasUserAgent: Boolean(c.userAgent),
       })),
-      identities: user.authIdentities.map((i) => ({ provider: i.provider, email: i.email, createdAt: i.createdAt })),
+      identities: user.identities.map((i) => ({ provider: i.provider, email: i.email, createdAt: i.createdAt })),
     })
   );
 }

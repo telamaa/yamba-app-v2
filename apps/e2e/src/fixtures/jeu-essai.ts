@@ -163,7 +163,6 @@ export interface CompteInspecte {
   lastName?: string;
   preferredLocale?: string;
   hasPassword?: boolean;
-  isVerified?: boolean;
   createdAt?: string;
   consents?: Array<{ type: string; version: string; acceptedAt: string; locale: string | null; hasIp: boolean; hasUserAgent: boolean }>;
   identities?: Array<{ provider: string; email: string | null; createdAt: string }>;
