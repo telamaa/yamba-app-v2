@@ -35,7 +35,7 @@ const FOOTER_LEGAL_LINKS: FooterLink[] = [
   { labelKey: "legalNotice", href: "/legal/notice" },
 ];
 
-const SOCIAL_LINKS_ENABLED: boolean = true;
+const SOCIAL_LINKS_ENABLED: boolean = false;
 
 const FOOTER_SOCIAL_LINKS: SocialLink[] = [
   { name: "instagram", href: "https://instagram.com/yamba", enabled: SOCIAL_LINKS_ENABLED },
