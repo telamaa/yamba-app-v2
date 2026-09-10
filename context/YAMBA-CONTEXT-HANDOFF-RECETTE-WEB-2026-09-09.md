@@ -1,4 +1,4 @@
-# Handoff — recette navigateur (cahiers 01-WEB / 02-ADMIN) · 09/09/2026 (mis à jour le 10/09, chapitre 5.1)
+# Handoff — recette navigateur (cahiers 01-WEB / 02-ADMIN) · 09/09/2026 (mis à jour le 10/09 — arrêt en cours de chapitre 5.2)
 
 *Ce document sert à REPRENDRE le chantier après une pause. Il dit où en est la campagne, ce qui
 tourne sur le poste, ce qui reste à faire, et les pièges déjà payés qu'il ne faut pas repayer.*
@@ -12,6 +12,53 @@ tourne sur le poste, ce qui reste à faire, et les pièges déjà payés qu'il n
 > **5.** les 32 chapitres du cahier **01-WEB** (326 fiches) — **5.1 FAIT** (branche `chore/recette-web-5-1`, 12 fiches conformes, ANO-WEB-12 à 17 closes, **PR #265** sur `dev`, empilée sur #264) ; suite : 5.2 → 5.32 dans l'ordre du cahier ;
 > **6.** le cahier **02-ADMIN** (110 fiches) — 19 fiches de sécurité d'accès, 91 fiches d'écrans.
 >
+> **ARRÊT DU 10/09/2026 (fin de matinée) — REPRENDRE ICI.** Le chapitre 5.2 (`WEB-INS`,
+> inscription) est **en cours** sur la branche `chore/recette-web-5-2` (empilée sur
+> `chore/recette-web-5-1` = PR #265, elle-même empilée sur #264 → #263 → #262 : merger dans cet
+> ordre, à la main — `gh pr merge` est refusé par le classifieur du poste). Le spec
+> `apps/e2e/src/chapitres/web-ins.spec.ts` est écrit (16 fiches : 12 jouées, 13–16 `⏭` sans
+> `NEXT_PUBLIC_GOOGLE_CLIENT_ID`), commité en l'état ; **premier passage : 6 ✓, 3 ✘, 4 ⏭**, et les
+> trois ✘ sont déjà diagnostiqués :
+>
+> 1. **WEB-INS-2 (Facebook inerte)** — faux positif du HARNAIS : le `role="alert"` visible est
+>    l'indicateur « Open Next.js Dev Tools », pas le produit. Correctif : viser
+>    `page.locator("main").locator('[role="alert"]')`. Le bouton est bien inerte (aucune requête,
+>    aucun onglet, adresse inchangée).
+> 2. **WEB-INS-6 (écran du code)** — l'écran MASQUE l'adresse (« n*********5@r***.dev ») alors que
+>    le cahier attend « l'adresse saisie ». Décision produit à consigner comme **écart** (masquage
+>    volontaire, écran partageable) ; assouplir l'assertion : premier caractère + `@` + `.dev`.
+> 3. **WEB-INS-10 (adresse déjà utilisée)** — le message « Un compte existe déjà avec cet e-mail.
+>    **Connectez-vous ou utilisez** « Mot de passe oublié ». » vouvoie (décision du 03/09 : tutoiement
+>    partout). **Anomalie mineure à ouvrir (ANO-WEB-18)** et corriger dans
+>    `apps/user-ui/src/lib/auth/auth-error-codes.ts`, `registerCodeMessage` : « Connecte-toi ou
+>    utilise … ». L'assertion du spec le vérifie déjà (`not.toContainText(/Connectez-vous|utilisez/)`).
+>
+> Et deux écarts déjà constatés par les fiches vertes, à consigner au rapport : WEB-INS-1 —
+> « Créer un compte » n'est pas dans l'en-tête desktop (le spec passe par « Connexion » puis le
+> lien de l'écran de connexion ; même décision que 5.1) et le titre « Deviens Voyageur » sur un
+> écran d'inscription générique (note du cahier, écart mineur) ; WEB-INS-5 cas e — `01/01/2000!` n'a
+> aucune lettre : la première règle manquante est « minuscule », pas « date » (ordre `CHECK_ORDER`
+> de `auth-error-codes.ts`) ; le spec accepte les deux, à trancher (une date mérite peut-être la
+> phrase « date » d'abord).
+>
+> **Ce qui reste pour clore 5.2** (dans l'ordre) : (a) les trois correctifs ci-dessus ; (b) rejouer
+> `npx playwright test --config=apps/e2e/playwright.config.ts src/chapitres/web-ins.spec.ts` — les
+> fiches 6 à 9 forment UN scénario de ~3 min (le blocage d'une vraie minute est attendu, pas
+> simulé ; la preuve « le compteur ne repart pas après un renvoi » est le 6e échec qui annonce
+> « 4 essais restants » puis le 7e « 3 ») ; les preuves en base (ConsentLog TERMS + PRIVACY,
+> `preferredLocale: "fr"`, mot de passe présent) passent par le NOUVEAU script
+> `packages/libs/prisma/scripts/inspect-user.ts <email>` (`jeuEssai.inspecterCompte`) ; (c) le
+> rapport `YAMBA-RECETTE-WEB-RESULTATS.md` (section « Chapitre 5.2 » AVANT « Chapitre 5.12 », bloc
+> ANO-WEB-18, écarts, ⏭ 13–16 motivés) ; (d) les trois docs cumulatifs (DOC-TECHNIQUE lot 5.2,
+> DOC-METIER RG-WEB-46+, APPRENTISSAGE chapitre 126) ; (e) CONTEXT, SUIVI (harnais 32 → 45
+> scénarios), CLAUDE.md inchangé (aucun test unitaire ajouté) ; (f) PR sur `dev`, empilée sur
+> #265, **sans aucune attribution Claude** (commit, corps de PR — consigne redite le 10/09 ; les
+> quatre commits de #265 ont été réécrits pour l'appliquer).
+>
+> La pile tourne comme décrit au § 2 ; deal-service en bundle FAKE ; seed rejoué avant la suite
+> complète du matin (32 verts). Les comptes `neuf-<horodatage>@recette.yamba.dev` créés par le
+> chapitre 5.2 restent en base (sans conséquence, piège 22).
+
 > **La question Elasticsearch vient APRÈS la recette** — consigne explicite du 09/09/2026. Rien
 > ne se touche du côté de la recherche tant que les deux cahiers ne sont pas clos. L'analyse est
 > prête au § 8 (réponse proposée : **non**, avec une correction ciblée et Atlas Search comme voie

@@ -610,6 +610,13 @@ Ordre de demarrage : auth -> trip -> gateway.
   desktop du visiteur sans « Creer un compte » ni « Rechercher un trajet ». Piege de poste : la cle
   Google Maps n'accepte que `localhost` comme referent. Harnais : 32 scenarios verts. PR **#265**
   (empilee sur #264). Reste : 5.2 a 5.32, 02-ADMIN.
+- 10/09 (fin de matinee) : **CHAPITRE 5.2 (WEB-INS, inscription) EN COURS — ARRET** sur la branche
+  `chore/recette-web-5-2` (empilee sur #265). Spec ecrit (16 fiches, 13-16 ⏭ sans Google), premier
+  passage 6 ✓ / 3 ✘ / 4 ⏭, les trois ✘ diagnostiques (faux positif harnais sur l'alerte Next Dev
+  Tools ; adresse masquee sur l'ecran du code = ecart ; message « Connectez-vous » vouvoie =
+  ANO-WEB-18 a ouvrir). Nouveau script `inspect-user.ts` (preuves en base). Le handoff
+  `YAMBA-CONTEXT-HANDOFF-RECETTE-WEB-2026-09-09.md` dit exactement ou reprendre. Consigne redite :
+  AUCUNE attribution Claude dans les commits/PR (les 4 commits de #265 ont ete reecrits).
 - 04/09 : C-PR6b feat/c6b-admin-alerts (D59 3A / 4A, A129–A131) — neuf regles de seuil
   (evaluateAlerts pur, instantane de dix compteurs), GET /admin/alerts sans etat (accueil
   admin), cron horaire avec dedoublonnage Redis SET NX (un email par regle et par jour, Redis
