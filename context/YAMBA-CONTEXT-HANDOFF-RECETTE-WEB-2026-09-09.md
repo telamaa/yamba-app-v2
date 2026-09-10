@@ -1,4 +1,4 @@
-# Handoff — recette navigateur (cahiers 01-WEB / 02-ADMIN) · 09/09/2026 (mis à jour le 10/09)
+# Handoff — recette navigateur (cahiers 01-WEB / 02-ADMIN) · 09/09/2026 (mis à jour le 10/09, chapitre 5.1)
 
 *Ce document sert à REPRENDRE le chantier après une pause. Il dit où en est la campagne, ce qui
 tourne sur le poste, ce qui reste à faire, et les pièges déjà payés qu'il ne faut pas repayer.*
@@ -9,7 +9,7 @@ tourne sur le poste, ce qui reste à faire, et les pièges déjà payés qu'il n
 > **2.** ~~monter la fixture de session administrateur~~ **FAIT** (`seed-admins.ts` + `navigateurAdmin`) ;
 > **3.** ~~finir WEB-E2E-1 en entier, ouvrir la PR~~ **FAIT — PR #259 mergée** ;
 > **4.** les cinq autres parcours du chapitre 6 : ~~E2E-2~~ **FAIT, #260 mergée**, ~~E2E-3~~ **FAIT, #261 mergée**, ~~E2E-4~~ **FAIT, PR #262** (17 checks verts, à merger), ~~E2E-5~~ **FAIT, PR #263** (empilée sur #262, ANO-WEB-10 close), ~~E2E-6~~ **FAIT, PR #264** (ANO-WEB-11 close) — **le chapitre 6 est clos** ;
-> **5.** les 32 chapitres du cahier **01-WEB** (326 fiches) ;
+> **5.** les 32 chapitres du cahier **01-WEB** (326 fiches) — **5.1 FAIT** (branche `chore/recette-web-5-1`, 12 fiches conformes, ANO-WEB-12 à 17 closes, PR à ouvrir sur `dev`) ; suite : 5.2 → 5.32 dans l'ordre du cahier ;
 > **6.** le cahier **02-ADMIN** (110 fiches) — 19 fiches de sécurité d'accès, 91 fiches d'écrans.
 >
 > **La question Elasticsearch vient APRÈS la recette** — consigne explicite du 09/09/2026. Rien
@@ -26,6 +26,7 @@ tourne sur le poste, ce qui reste à faire, et les pièges déjà payés qu'il n
 |---|---|
 | **Cahier n° 4 — tâches planifiées** (90 fiches) | **CLOS.** 9 anomalies, 9 closes. PR **#256** + docs **#257**, mergées. Décisions **D76** et **D77** gravées au registre. Rapport : `context/YAMBA-RECETTE-CRONS-RESULTATS.md` |
 | **Harnais de recette navigateur** (Playwright) | **MERGÉ** — PR **#258**. Avec `ANO-WEB-01` (bloquante) et `ANO-WEB-02` (majeure), toutes deux closes |
+| **Chapitres 5.x du cahier 01-WEB** | **5.1 CONFORME** (12 fiches, 1 min 24) — branche `chore/recette-web-5-1`, six anomalies trouvées et closes : `ANO-WEB-12` (bloquante : « Rechercher » de l'accueil ne faisait rien), `ANO-WEB-13` (bloquante : une ville choisie dans la liste donnait zéro résultat), `ANO-WEB-14` (majeure : première liste de suggestions perdue), `ANO-WEB-15` à `17` (mineures : réseaux sociaux actifs, `lang` faux sur `/en`, `main` imbriqué). Une décision produit à trancher : l'en-tête desktop du visiteur (« Créer un compte », « Rechercher un trajet »). Suite : 5.2 |
 | **Parcours transactionnels** | **#259 MERGÉ** (WEB-E2E-1) · **#260 MERGÉ** (WEB-E2E-2, ANO-WEB-04, ANO-WEB-05) · **#261 MERGÉ** (WEB-E2E-3, ANO-WEB-06 ; ANO-WEB-07 tranchée) · **PR #262 ouverte, 17/17 verts** (WEB-E2E-4, ANO-WEB-08, ANO-WEB-09 closes) · **PR #263 ouverte** (WEB-E2E-5, 8 étapes, 1 min 06, ANO-WEB-10 close — la réputation comptait le refus au pickup comme une annulation tardive) · #259 : WEB-E2E-1 passe **en entier** (29 étapes, 1 min 24), sessions mémorisées, fixture admin, `ANO-WEB-03` (majeure) close, 15 scénarios verts en 3 min 06 |
 
 Rapport de la campagne navigateur : `context/YAMBA-RECETTE-WEB-RESULTATS.md`.
@@ -69,6 +70,12 @@ npx tsx --env-file=.env packages/libs/prisma/scripts/seed-admins.ts
 ```
 
 Vérification rapide : `bash scripts/smoke-services.sh`, puis `curl -s localhost:8080/api/status | jq`.
+
+**Poste redémarré le 10/09 (matin)** : Docker Desktop était arrêté (`open -a Docker`, puis les deux
+conteneurs) ; les cinq services par `nx run-many --target=serve --projects=api-gateway,auth-service,
+trip-service,notification-service,message-service`, deal-service en bundle FAKE, les deux fronts par
+`nx dev`. Le limiteur (`RATE_LIMIT_ANONYMOUS_MAX`) est lu du `.env` par `nx serve` : plus besoin de
+la passerelle en bundle. La clé Google Maps n'accepte que `localhost` comme référent (piège 27).
 
 **Le harnais** : `npx nx e2e e2e` (tout), ou
 `npx playwright test --config=apps/e2e/playwright.config.ts src/parcours/web-e2e-1.spec.ts` (rejoue le seed dans son `beforeAll`).
@@ -183,6 +190,18 @@ Pièges payés sur les étapes 11 à 29, pour ne pas les repayer :
     d'arrivée (`CANCELLED` + `closedBy`) voit toutes les transitions qui y mènent — y compris
     celles que la machine déclare « sans pénalité ». À chaque transition ajoutée, relire les
     requêtes qui filtrent sur son statut.
+27. **La clé Google Maps est restreinte par référent HTTP à `localhost`** : sur l'adresse LAN du
+    poste, Places répond 403 « Requests from referer http://192.168.1.155:3000/ are blocked » et
+    le champ de ville reste muet, sans message. Les fiches d'autocomplétion se jouent en visiteur
+    (aucun cookie) : le harnais ouvre le même front par `localhost` (`ORIGINE_GOOGLE`,
+    `E2E_GOOGLE_ORIGIN` pour un autre poste). Pour un téléphone, ajouter l'origine LAN à la clé.
+28. **`fill()` ne déclenche pas l'autocomplétion** (aucune requête) ; `pressSequentially` oui. Et
+    un `catch {}` vide cache le vrai défaut : instrumenter avant de conclure « Google ne répond
+    pas » — c'était `importLibrary is not a function` (ANO-WEB-14).
+29. **Un libellé visible peut exister deux fois dans le DOM** (en-tête et pied de page ont un arbre
+    mobile ET un arbre desktop) : `filter({ visible: true })` avant `first()`. Et quatre
+    `role="dialog" aria-modal` dorment dans chaque page (feuilles de la recherche mobile) : viser
+    une porte par son NOM.
 19. **Une manœuvre se joue là où le produit la lit** : le barème d'annulation lit le départ figé
     dans le deal — avancer le trajet APRÈS la réservation ne change rien. Sans `nx dev admin-ui`, `navigateurAdmin` attend
     un écran qui n'existe pas.
@@ -218,7 +237,9 @@ Pièges payés sur les étapes 11 à 29, pour ne pas les repayer :
    `dev`**. Merger dans l'ordre #262, #263, #264 (chaque diff se réduit seul). **Le chapitre 6 est
    clos.** Suite : les 32 chapitres 5.x du cahier 01-WEB, par famille (point 4 ci-dessous).
 
-4. **Les 32 chapitres 5.x du cahier 01-WEB** (326 fiches), par famille. Huit d'entre eux
+4. **Les 32 chapitres 5.x du cahier 01-WEB** (326 fiches), par famille. ~~5.1~~ **FAIT** (`chore/recette-web-5-1`,
+   `apps/e2e/src/chapitres/web-acc.spec.ts`, rapport « Chapitre 5.1 ») — suivant : **5.2 `WEB-INS`** (inscription,
+   16 fiches : `compte-neuf.ts` et `pages/inscription.ts` existent déjà). Huit d'entre eux
    s'appuient sur le back-office (tableau du handoff précédent : suspendre, masquer, valider un
    billet, abaisser un paramètre, relire les signalés, ouvrir l'arbitrage, maintenance) — la
    fixture est prête.

@@ -4147,3 +4147,96 @@ WEB-VOY-1.
 
 `apps/e2e` : **20 scénarios** verts sur le poste (harnais ×6, WEB-CNX ×3, WEB-RSV ×5, WEB-E2E-1 à 6).
 user-ui : typecheck vert. Aucun service modifié.
+
+---
+
+# Chapitre 5.1 du cahier 01-WEB : l'accueil du visiteur, et six anomalies derrière la première recherche
+
+*(PR `chore/recette-web-5-1`, 10/09/2026.)*
+
+## Ce qui a été fait
+
+Le premier des 32 chapitres « fiches » du cahier 01-WEB : `WEB-ACC` (découverte, accueil et
+navigation), douze fiches jouées dans l'ordre du cahier, en desktop, par le harnais
+(`apps/e2e/src/chapitres/web-acc.spec.ts`, 1 min 24). Dix passent sur le produit tel quel ; les
+deux qui touchent la recherche depuis l'accueil ont fait tomber trois anomalies (deux bloquantes,
+une majeure), et trois fiches d'apparence anodine (bascule de langue, textes légaux, réseaux
+sociaux) trois anomalies mineures. Toutes closes dans la PR.
+
+```
+apps/e2e/src/chapitres/web-acc.spec.ts         NOUVEAU — 12 fiches WEB-ACC-1 à 12 ; aides : clesBrutesAffichees()
+                                                 (balayage des nœuds de texte), ecouterLesErreurs(), lienVisible()
+                                                 (le libellé VISIBLE d'un bloc qui en porte deux), choisirUneVille()
+                                                 (frappe touche par touche + journal des réponses Google), ORIGINE_GOOGLE
+apps/user-ui/src/components/home/HeroSection.tsx          « Rechercher » → router.push("/search")             (ANO-WEB-12)
+apps/user-ui/src/components/search/TripSearchBar.tsx      exporte TRIP_SEARCH_STORAGE_KEY, initialSearchDraft, SEARCH_VERSION
+apps/user-ui/src/components/search/SearchResultsView.tsx  interroge le brouillon mémorisé (même clé)          (ANO-WEB-12)
+apps/trip-service/src/lib/place-text.ts (+ .spec.ts)      placeSearchTerm() : « Ville, Pays » → « Ville »       (ANO-WEB-13)
+apps/trip-service/src/controllers/trip-search.controller.ts  buildBaseWhere() passe from/to par placeSearchTerm()
+apps/user-ui/src/lib/googlePlaces.ts                      callback= de Google au lieu de onload ; prêt = importLibrary (ANO-WEB-14)
+apps/user-ui/src/components/search/CityAutocomplete.tsx   le catch journalise (console.warn)                    (ANO-WEB-14)
+apps/user-ui/src/components/layout/Footer.tsx             SOCIAL_LINKS_ENABLED = false                          (ANO-WEB-15)
+apps/user-ui/src/app/layout.tsx                           <html lang={await getLocale()}>                       (ANO-WEB-16)
+apps/user-ui/src/components/layout/HtmlLang.tsx           NOUVEAU — aligne document.documentElement.lang après une bascule
+apps/user-ui/src/app/[locale]/layout.tsx                  monte <HtmlLang locale={locale} />
+apps/user-ui/src/app/[locale]/(marketing)/legal/layout.tsx  <main> → <div> (plus de main imbriqué)              (ANO-WEB-17)
+context/YAMBA-RECETTE-WEB-RESULTATS.md                    ANO-WEB-12 à 17, chapitre 5.1, observations
+```
+
+## Les six anomalies, et pourquoi elles tenaient ensemble
+
+**ANO-WEB-12 (bloquante) — « Rechercher » ne cherchait pas.** `HeroSection` montait
+`<TripSearchBar>` sans `onSearchAction` ; le composant documente lui-même ce cas comme
+« comportement par défaut : log ». Le bouton faisait un `console.log` et rien d'autre. Deuxième
+moitié du même défaut : `SearchResultsView` interrogeait un brouillon `useState` VIDE, alors que la
+barre mémorise le sien en `sessionStorage` (`usePersistedFormState("trip-search")`). Correction en
+deux gestes cohérents : l'accueil navigue vers `/search`, et la page de résultats lit le MÊME
+brouillon (clé, brouillon initial et version désormais exportés par `TripSearchBar`). Une seule
+source pour ce que le visiteur a saisi ; en arrivant, les résultats correspondent.
+
+**ANO-WEB-13 (bloquante) — une ville choisie dans la liste ne trouvait rien.** L'autocomplétion
+pose « Ville, Pays » dans le champ (`CityAutocomplete.select`, « on rétablit toujours le pays »).
+La recherche comparait ce libellé ENTIER à `destinationCity` et `destinationCountry` par
+`contains` : « Brazzaville, République du Congo » n'est contenu dans aucun des deux. Toute ville
+étrangère donnait zéro résultat ; Paris passait par accident (Google omet le pays du domicile).
+La règle est désormais dans `lib/place-text.ts` : le terme cherché est le premier segment avant
+une virgule. Le pays n'est pas un critère — il est dans la langue de l'écran, la base le porte
+dans la langue du Voyageur qui a publié. Fonction pure, trois tests. Le contrôleur ne change que
+sur deux lignes.
+
+**ANO-WEB-14 (majeure) — la première liste de suggestions était perdue.** `googlePlaces.ts`
+chargeait l'API avec `loading=async` et se résolvait sur `script.onload` — qui arrive avant que
+`google.maps.importLibrary` n'existe. La toute première requête (celle qui déclenche le
+chargement) échouait sur « importLibrary is not a function » ; les suivantes trouvaient tout prêt.
+D'où un symptôme qui dépend du RYTHME de frappe : « Paris » à 60 ms par touche → rien ; à
+250 ms → la liste (chaque frappe relance, la deuxième arrive après le chargement). Le contrat de
+Google pour `loading=async` est le paramètre `callback=` : c'est lui qui dit « prêt ». Et le
+composant avalait l'erreur (`catch {}`) : il journalise maintenant.
+
+**ANO-WEB-15, 16, 17 (mineures)** — les icônes sociales ouvraient `instagram.com/yamba` (pas à
+nous) : `SOCIAL_LINKS_ENABLED = false`, l'état inactif était déjà écrit. `<html lang="fr">` sur
+`/en` : le layout racine lit `getLocale()` (rendu serveur), `HtmlLang` aligne l'attribut après une
+bascule côté client (le layout racine, partagé, ne se re-rend pas). Deux `<main>` imbriqués sur
+les pages légales : le cadre devient un `<div>`.
+
+## Ce que le harnais a appris
+
+- **Le libellé visible d'un bloc qui en porte deux.** L'en-tête et le pied de page ont chacun un
+  arbre mobile et un arbre desktop dans le DOM ; `first()` tombe souvent sur le mobile, caché.
+  `filter({ visible: true })` avant `first()`, systématiquement.
+- **Une porte se vise par son nom.** Quatre autres `role="dialog" aria-modal="true"` vivent en
+  permanence dans la page (feuilles de la recherche mobile, fermées) ; un sélecteur par rôle seul
+  en trouve cinq.
+- **`fill()` n'est pas taper.** L'autocomplétion n'interroge Google qu'au fil des frappes ;
+  `pressSequentially` — et l'échec journalise ce que Google a répondu (référent refusé, clé
+  absente), pour que le rapport dise la cause.
+- **La clé Google est restreinte par référent à `localhost`** : sur l'adresse LAN du poste,
+  Places répond 403. Les fiches d'autocomplétion se jouent en visiteur, sans cookie : le harnais
+  ouvre le même front par `localhost` (`ORIGINE_GOOGLE`, surchargeable).
+- **Les 401 de la sonde de session sont rouges dans la console de tout visiteur.** Filtrés et
+  consignés comme observation (le marqueur `yamba:session` permettrait de ne pas sonder).
+
+## Tests
+
+trip-service **257 → 260** (`lib/place-text.spec.ts`). `apps/e2e` : **32 scénarios** verts sur le
+poste (20 + WEB-ACC ×12). user-ui et trip-service : typecheck vert.

@@ -2708,3 +2708,53 @@ recherche ; « Devenir Voyageur » ouvre l'onboarding (la porte de connexion d'a
 | 43 | Bloc d'acquisition | recherche ; porte de connexion puis onboarding | oui |
 | 44 | Jeton altéré d'un caractère | « plus valide », sans rien de plus, 404 identique à un jeton inventé | oui |
 | 45 | Boîte du destinataire | aucun email ; tous les emails vont à des membres | oui |
+
+---
+
+# L'accueil du visiteur — ce que le chapitre 5.1 fait respecter
+
+*(PR `chore/recette-web-5-1`, 10/09/2026 — cahier 01-WEB chapitre 5.1, WEB-ACC-1 à 12.)*
+
+## Le besoin
+
+Un visiteur arrive sur l'accueil sans compte. Il doit comprendre le produit en une page, chercher
+un trajet en trois champs, changer de langue et de thème, lire les textes légaux, et n'être
+trompé par rien : ni par un bouton qui ne fait rien, ni par une icône qui mène ailleurs. C'est le
+premier geste de tout le monde, et aucun parcours du chapitre 6 ne le couvrait (ils entrent par
+l'adresse d'un trajet).
+
+## Les règles
+
+**RG-WEB-40 — « Rechercher » cherche.** Depuis l'accueil, deux villes et « Rechercher » ouvrent
+la page de résultats, qui interroge exactement ce qui a été saisi — sans second clic.
+*(ANO-WEB-12.)*
+
+**RG-WEB-41 — Une ville choisie dans la liste est cherchée par son nom.** Le libellé « Ville,
+Pays » est une aide à la lecture ; la recherche compare la ville. Le pays tapé à la main reste
+cherché tel quel. *(ANO-WEB-13.)*
+
+**RG-WEB-42 — La première liste de suggestions vient, quel que soit le rythme de frappe.**
+*(ANO-WEB-14.)*
+
+**RG-WEB-43 — Ce qui n'existe pas encore est annoncé comme tel.** Les réseaux sociaux portent
+« Bientôt disponible » et ne mènent nulle part tant que les comptes n'existent pas. *(ANO-WEB-15.)*
+
+**RG-WEB-44 — La langue affichée est la langue déclarée.** `<html lang>` suit la bascule, au
+rendu comme après un clic. *(ANO-WEB-16.)*
+
+**RG-WEB-45 — La porte d'identité se referme sans conséquence.** « Plus tard », Échap et le
+fond referment ; la page est intacte, rien n'est parti vers le serveur.
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| 46 | Accueil visiteur | en-tête, barre, pied de page, aucun squelette, console propre hors sonde | oui |
+| 47 | FR → EN → FR, rechargement | `/en` puis `/fr`, `lang` fidèle, aucune clé brute | oui |
+| 48 | Thème sombre | conservé au rechargement, contraste AA, retour au clair | oui |
+| 49 | CGU, confidentialité | un texte, un seul `main` | oui |
+| 50 | Icônes sociales | « Bientôt disponible », aucun onglet | oui |
+| 51 | « Partager un trajet » puis trois fermetures | porte par-dessus la page, refermée sans requête | oui |
+| 52 | Paris → Brazzaville depuis l'accueil | `/search`, titre, deux trajets du seed | oui |
+| 53 | Inversion puis « Rechercher » | Brazzaville → Paris, aucun trajet | oui |
+| 54 | Accueil connecté, déconnexion | menu utilisateur ; puis « Connexion », cookies absents | oui |

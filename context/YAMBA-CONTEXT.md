@@ -596,6 +596,20 @@ Ordre de demarrage : auth -> trip -> gateway.
   `/carrier/onboarding`. Ecarts cahier : l'aeroport n'est pas un jalon public ; « aucun SMS »
   est un fait de plateforme. 20 scenarios e2e verts. **Chapitre 6 clos** (6 parcours, 100
   etapes, ANO-WEB-08 a 11). PR **#264**. Reste : les 32 chapitres 5.x, 02-ADMIN.
+- 10/09 : **CHAPITRE 5.1 DU CAHIER 01-WEB — WEB-ACC, L'ACCUEIL DU VISITEUR (branche
+  `chore/recette-web-5-1`)** — premier des 32 chapitres « fiches », 12 fiches conformes en 1 min 24
+  (`apps/e2e/src/chapitres/web-acc.spec.ts`). Six anomalies trouvees et closes : ANO-WEB-12
+  (BLOQUANTE : « Rechercher » de l'accueil ne faisait qu'un console.log, et /search interrogeait un
+  brouillon vide), ANO-WEB-13 (BLOQUANTE : le libelle « Ville, Pays » de l'autocompletion compare
+  entier par `contains` → zero resultat pour toute ville etrangere ; `lib/place-text.ts`,
+  `placeSearchTerm`, trip-service 257 → 260), ANO-WEB-14 (MAJEURE : `loading=async` + `onload` →
+  la premiere requete de suggestions echouait sur « importLibrary is not a function », symptome
+  dependant du rythme de frappe ; `callback=` de Google), ANO-WEB-15 (icones sociales actives vers
+  des comptes qui ne sont pas les notres), ANO-WEB-16 (`<html lang="fr">` sur /en : `getLocale()`
+  + `HtmlLang`), ANO-WEB-17 (deux `<main>` imbriques sur les pages legales). A trancher : l'en-tete
+  desktop du visiteur sans « Creer un compte » ni « Rechercher un trajet ». Piege de poste : la cle
+  Google Maps n'accepte que `localhost` comme referent. Harnais : 32 scenarios verts. Reste : 5.2 a
+  5.32, 02-ADMIN.
 - 04/09 : C-PR6b feat/c6b-admin-alerts (D59 3A / 4A, A129–A131) — neuf regles de seuil
   (evaluateAlerts pur, instantane de dix compteurs), GET /admin/alerts sans etat (accueil
   admin), cron horaire avec dedoublonnage Redis SET NX (un email par regle et par jour, Redis

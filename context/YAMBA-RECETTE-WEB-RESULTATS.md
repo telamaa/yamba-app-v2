@@ -305,7 +305,164 @@ Contre-épreuve : WEB-E2E-6 étape 7 — « Envoyer un colis » → `/fr/search`
                  → `/fr/carrier/onboarding`, `/fr/become/shipper` 307 → `/fr/search`.
 ```
 
+```
+ANO-WEB-12
+Fiche          : WEB-ACC-9 (chapitre 5.1) · Gravité : BLOQUANTE · ÉTAT : CLOSE
+Attendu        : sur l'accueil, deux villes choisies, « Rechercher » ouvre `/search` avec le titre
+                 « Trajets pour Paris → Brazzaville » et les trajets du jeu d'essai.
+Obtenu         : rien. Le bouton « Rechercher » de l'accueil ne faisait qu'un `console.log`
+                 (« [TripSearchBar] Search: … ») : le visiteur restait sur l'accueil, sans message.
+                 Et même en ouvrant `/search` à la main, la page interrogeait un brouillon VIDE
+                 (« 0 résultats » sous une barre qui affichait pourtant Paris → Brazzaville) : il
+                 fallait cliquer « Rechercher » une seconde fois.
+Impact         : le premier geste du produit pour tout visiteur desktop. Aucun parcours du
+                 chapitre 6 ne le couvrait : ils entrent par l'adresse d'un trajet.
+Cause          : `HeroSection` montait `<TripSearchBar>` sans `onSearchAction` (le composant
+                 documente ce défaut comme « comportement par défaut : log ») ; et
+                 `SearchResultsView` initialisait son brouillon interrogé par `useState` vide, sans
+                 lire le brouillon que la barre mémorise en `sessionStorage` (`trip-search`).
+Correction     : `onSearchAction={() => router.push("/search")}` sur l'accueil ; la clé, le
+                 brouillon initial et la version du brouillon sont exportés par `TripSearchBar`
+                 (`TRIP_SEARCH_STORAGE_KEY`) et `SearchResultsView` interroge CE brouillon
+                 (`usePersistedFormState`, même clé) — en arrivant, les résultats correspondent à
+                 la saisie, sans second clic.
+Contre-épreuve : WEB-ACC-9 — `/fr/search`, « Trajets pour Paris → Brazzaville, République du
+                 Congo », 2 cartes. WEB-ACC-10 — inversion, « Rechercher », « Trajets pour
+                 Brazzaville, République du Congo → Paris », 0 carte (état vide, WEB-RCH-9).
+```
+
+```
+ANO-WEB-13
+Fiche          : WEB-ACC-9 (chapitre 5.1 ; touche 5.9 et 5.10) · Gravité : BLOQUANTE · ÉTAT : CLOSE
+Attendu        : une ville choisie dans la liste de l'autocomplétion trouve les trajets qui en
+                 partent ou y arrivent.
+Obtenu         : « 0 résultats » pour Paris → Brazzaville alors que l'API en rend deux pour
+                 `to=Brazzaville`. La liste pose le libellé normalisé « Ville, Pays »
+                 (« Brazzaville, République du Congo ») dans le champ, et c'est ce libellé entier
+                 que la recherche comparait à `destinationCity` ET `destinationCountry` par un
+                 `contains` : il n'est contenu dans aucun des deux. Toute ville ÉTRANGÈRE choisie
+                 dans la liste donnait zéro résultat — Paris passait parce que Google omet le pays
+                 du domicile (« Paris » tout court).
+Impact         : la recherche par autocomplétion, c'est-à-dire la recherche telle qu'on l'utilise.
+                 Les alertes de route (5.10) portent le même libellé.
+Cause          : `apps/trip-service/src/controllers/trip-search.controller.ts`, `buildBaseWhere` :
+                 `contains: params.to` sur le texte brut.
+Correction     : `apps/trip-service/src/lib/place-text.ts`, `placeSearchTerm(text)` : le terme
+                 cherché est le premier segment avant une virgule (la ville) ; le pays qui suit est
+                 une aide à la lecture, pas un critère — il dépend de la langue de l'écran
+                 (« République du Congo » / « Republic of the Congo ») alors que la base porte le
+                 pays dans la langue du Voyageur qui a publié. Un texte tapé à la main (« Congo »)
+                 reste cherché tel quel. Trois tests unitaires (trip-service 257 → 260).
+Contre-épreuve : `GET /api/trips/search?from=Paris&to=Brazzaville%2C%20République%20du%20Congo`
+                 → `totalCount` 0 avant, 2 après. WEB-ACC-9 vert.
+```
+
+```
+ANO-WEB-14
+Fiche          : WEB-ACC-9 (chapitre 5.1 ; touche 5.7, 5.9, 5.10, 5.12) · Gravité : MAJEURE · ÉTAT : CLOSE
+Attendu        : taper « Paris » dans un champ de ville fait apparaître des propositions.
+Obtenu         : sur une page fraîche, un visiteur qui tape « Paris » d'une traite (5 frappes à
+                 60 ms) ne voit RIEN — ni liste, ni sablier, ni message — tant qu'il ne frappe pas
+                 une lettre de plus. À 250 ms par frappe, la liste vient. Mesuré quatre fois.
+Impact         : la première recherche de chaque visite, pour quiconque tape vite : le champ
+                 paraît mort. Les mêmes champs servent à publier un trajet et à créer une alerte.
+Cause          : `apps/user-ui/src/lib/googlePlaces.ts` chargeait l'API Google avec
+                 `loading=async` et attendait l'événement `load` du `<script>` — qui arrive AVANT
+                 que `google.maps.importLibrary` n'existe. La toute première requête de
+                 suggestions (celle qui déclenche le chargement) échouait sur
+                 « importLibrary is not a function » ; les suivantes trouvaient la bibliothèque
+                 prête. Et `CityAutocomplete` avalait l'erreur (`catch {}`) : aucune trace nulle
+                 part, ni pour l'utilisateur ni pour le développeur.
+Correction     : le chargeur passe `callback=__yambaGoogleMapsReady` (le contrat de Google pour
+                 `loading=async`) et ne se résout que là ; « prêt » se lit sur
+                 `typeof google.maps.importLibrary === "function"`, pas sur `window.google.maps` ;
+                 un chargeur déjà posé est attendu par sondage (15 s) ; un échec de chargement
+                 laisse retenter. Le `catch` du composant journalise (`console.warn`).
+Contre-épreuve : les quatre rythmes de frappe donnent 5 propositions ; WEB-ACC-9 et 10 verts.
+```
+
+```
+ANO-WEB-15
+Fiche          : WEB-ACC-6 (chapitre 5.1) · Gravité : MINEURE · ÉTAT : CLOSE
+Attendu        : les icônes sociales du pied de page portent « Bientôt disponible » et ne mènent
+                 nulle part.
+Obtenu         : elles ouvraient un nouvel onglet vers `https://instagram.com/yamba`,
+                 `https://x.com/yamba`, `https://facebook.com/yamba` — des comptes qui ne sont pas
+                 ceux de Yamba.
+Cause          : `apps/user-ui/src/components/layout/Footer.tsx`, `SOCIAL_LINKS_ENABLED = true`.
+                 L'état « inactif » (info-bulle, curseur, aucun lien) était écrit, pas activé.
+Correction     : `SOCIAL_LINKS_ENABLED = false` — le jour où les comptes existent, une constante
+                 et trois adresses.
+Contre-épreuve : WEB-ACC-6 — `title="Bientôt disponible"` sur les trois, aucun `window.open`,
+                 aucun onglet, adresse inchangée.
+```
+
+```
+ANO-WEB-16
+Fiche          : WEB-ACC-2 (chapitre 5.1 ; touche 5.31 et 5.32) · Gravité : MINEURE · ÉTAT : CLOSE
+Attendu        : sur `/en`, la page est en anglais — jusqu'à l'attribut `lang` du document, que
+                 les lecteurs d'écran (voix), les correcteurs et la traduction automatique lisent.
+Obtenu         : `<html lang="fr">` sur `/en`, au rendu serveur comme après la bascule.
+Cause          : `app/layout.tsx` écrivait `lang="fr"` en dur, avec un commentaire promettant
+                 que « le layout de locale le mettra à jour » — rien ne le faisait. Et une bascule
+                 FR ⇄ EN est une navigation côté client : le layout racine, partagé, ne se
+                 re-rend pas.
+Correction     : le layout racine lit `getLocale()` (next-intl) pour le rendu serveur ;
+                 `components/layout/HtmlLang.tsx` (client, monté dans le layout de locale) aligne
+                 `document.documentElement.lang` après chaque bascule.
+Contre-épreuve : `curl /en` → `lang="en"`, `/fr` → `lang="fr"` ; WEB-ACC-2 lit `lang="en"` après
+                 le clic.
+```
+
+```
+ANO-WEB-17
+Fiche          : WEB-ACC-5 (chapitre 5.1 ; touche 5.31) · Gravité : MINEURE · ÉTAT : CLOSE
+Attendu        : une page = un repère « contenu principal » (`<main>`).
+Obtenu         : deux `<main>` imbriqués sur `/legal/terms` et `/legal/privacy` : celui du
+                 groupe `(marketing)` et celui du cadre `legal/layout.tsx`. Invalide en HTML, et
+                 un lecteur d'écran annonce deux « contenus principaux ».
+Correction     : le cadre légal devient un `<div>`.
+Contre-épreuve : WEB-ACC-5 compte UN `main` sur chacune des deux pages.
+```
+
 ---
+
+## Chapitre 5.1 — Découverte, accueil et navigation · **CONFORME** (12 fiches, 1 min 24)
+
+| Fiche | Ce qui est éprouvé | Verdict | Preuve |
+|---|---|---|---|
+| WEB-ACC-1 | L'accueil du visiteur : en-tête, barre de recherche, pied de page, aucun squelette, console | **Conforme** — logo, « Partager un trajet », « Connexion » ; deux villes et une date ; « Découvrir / Entreprise / Légal » et la phrase de marque ; aucun `animate-pulse` après 5 s. Console : deux lignes 401 (sonde de session, voir observations), rien d'autre. **Écart** : l'en-tête desktop ne porte ni « Rechercher un trajet » ni « Créer un compte » (ils n'existent que dans la feuille mobile) — décision à prendre, voir « à trancher » |
+| WEB-ACC-2 | Bascule FR → EN | **Conforme après correction** → `ANO-WEB-16` ; `/en`, `lang="en"`, en-tête, barre et pied de page en anglais, **aucune clé brute** dans les deux langues (balayage de tous les nœuds de texte). **Écart** : le sélecteur est un « FR \| EN » segmenté (libellés « Français » / « English »), sans info-bulle « Changer de langue » — la clé `header.toggleLanguage` existe et n'est pas utilisée |
+| WEB-ACC-3 | Retour au français, persistance | **Conforme** — `/fr` après rechargement ; la racine `/` revient sur `/fr` |
+| WEB-ACC-4 | Thème clair / sombre | **Conforme** — classe `dark` posée, conservée au rechargement, retirée au retour ; contraste titre / fond mesuré en sombre : **20,2:1** (AA ≥ 4,5). Le bouton de l'en-tête est une bascule (une icône) ; « Mode clair / Mode sombre » nommés vivent dans le menu mobile |
+| WEB-ACC-5 | Les textes légaux | **Conforme après correction** → `ANO-WEB-17` ; `/fr/legal/terms` et `/fr/legal/privacy`, un titre, plus de 500 caractères, un seul `main` |
+| WEB-ACC-6 | Réseaux sociaux inactifs | **Conforme après correction** → `ANO-WEB-15` |
+| WEB-ACC-7 | « Partager un trajet » ouvre la porte | **Conforme** — fenêtre par-dessus l'accueil (adresse inchangée), titre et sous-titre exacts, e-mail + mot de passe + Google, « Plus tard » et la croix |
+| WEB-ACC-8 | « Plus tard », Échap, clic sur le fond | **Conforme** — les trois gestes ferment ; adresse inchangée, aucune écriture vers l'API, aucune erreur |
+| WEB-ACC-9 | La recherche depuis l'accueil | **Conforme après correction** → `ANO-WEB-12`, `ANO-WEB-13`, `ANO-WEB-14` ; « Trajets pour Paris → Brazzaville, République du Congo », **2 cartes** (le cahier en annonce trois : `bzv-inflight` est parti, la recherche ne le montre pas — cahier à corriger) |
+| WEB-ACC-10 | Intervertir départ et destination | **Conforme** — les deux champs s'échangent ; **écart** : les résultats se recalculent au clic « Rechercher », pas d'office (le cahier les attendait recalculés) ; puis « Trajets pour Brazzaville → Paris », 0 carte |
+| WEB-ACC-11 | L'accueil connecté | **Conforme** — plus de « Connexion » ni « Créer un compte » ; cloche, « Messages », « Menu utilisateur » ; le menu porte Mon compte, Mes envois, Mes trajets, Mes favoris, Notifications, Messages, Centre d'aide, Déconnexion. **Écarts** : « Centre d'aide » (le cahier dit « Aide ») ; les intitulés de section et les préférences langue / apparence ne sont rendus que dans la feuille mobile — sur desktop, la langue et le thème sont dans l'en-tête à côté du menu |
+| WEB-ACC-12 | La déconnexion | **Conforme** — `POST /auth/logout` 200, « Connexion » de retour, cookies `access_token` / `refresh_token` absents, le rechargement ne réouvre rien |
+
+### À trancher (produit)
+
+- **L'en-tête desktop d'un visiteur** ne propose que « Partager un trajet » et « Connexion ».
+  Pas de « Créer un compte » (il faut passer par l'écran de connexion), pas de « Rechercher un
+  trajet » (la barre de l'accueil est le seul chemin ; depuis une autre page, le logo). Le cahier
+  attend les deux. Recommandation : un « Créer un compte » plein (mangue) à droite de
+  « Connexion », comme la feuille mobile le fait déjà ; « Rechercher un trajet » en lien texte à
+  gauche. Une décision de produit, pas une régression : rien n'a été changé.
+
+### Pièges de poste payés ici
+
+- **La clé Google Maps est restreinte par référent HTTP à `localhost`.** Sur l'adresse LAN du
+  poste (`http://192.168.1.155:3000`), Places répond 403 « Requests from referer … are blocked »
+  et le champ reste muet — sans message (voir ANO-WEB-14 pour le `catch` muet). Les deux fiches
+  d'autocomplétion se jouent en visiteur : le harnais ouvre le même front par `localhost`
+  (`E2E_GOOGLE_ORIGIN` pour un poste monté autrement). Pour tester depuis un téléphone, ajouter
+  l'origine LAN aux référents autorisés de la clé.
+- **`fill()` ne déclenche aucune requête d'autocomplétion** ; la liste ne vient qu'au fil des
+  frappes (`pressSequentially`).
 
 ## Chapitre 5.12 — Réserver : l'assistant en quatre étapes
 
@@ -572,3 +729,16 @@ majeures corrigées en chemin (ANO-WEB-08 à 11).
   que l'écran n'ait posé son écoute : l'utilisateur voit simplement l'interface déconnectée.
   Comportement acceptable, mais non documenté — et il explique pourquoi le scénario « je reviens
   le lendemain » ne montre jamais la fenêtre.
+- **Deux lignes rouges 401 dans la console de tout visiteur** (`/auth/me` puis
+  `/auth/refresh`) à chaque page : c'est le front qui demande « qui suis-je ? ». Depuis
+  ANO-WEB-01, un marqueur `yamba:session` distingue le membre du visiteur ; il permettrait de ne
+  pas sonder quand il est absent — une requête de moins par page, et une console propre.
+  Chapitre 5.3.
+- **Quatre `role="dialog" aria-modal="true"` vivent en permanence dans le DOM** (les feuilles de
+  la recherche mobile : « Modifier la recherche », « Départ », « Destination », « Quand
+  partez-vous ? »), montées fermées et masquées par CSS (`translateX(100%)`, `md:hidden`).
+  Masquées visuellement, pas pour l'arbre d'accessibilité sur mobile (`aria-hidden` absent) : un
+  lecteur d'écran peut y entrer. Chapitre 5.31.
+- **Le cahier annonce « au moins les trois trajets Paris → Brazzaville » en WEB-ACC-9** ;
+  `bzv-inflight` est parti (J−6) et la recherche ne montre que l'avenir : deux cartes. À corriger
+  dans le cahier (§ 2.4 le dit déjà).
