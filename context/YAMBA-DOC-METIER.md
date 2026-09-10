@@ -2758,3 +2758,69 @@ fond referment ; la page est intacte, rien n'est parti vers le serveur.
 | 52 | Paris → Brazzaville depuis l'accueil | `/search`, titre, deux trajets du seed | oui |
 | 53 | Inversion puis « Rechercher » | Brazzaville → Paris, aucun trajet | oui |
 | 54 | Accueil connecté, déconnexion | menu utilisateur ; puis « Connexion », cookies absents | oui |
+
+---
+
+# L'inscription — ce que le chapitre 5.2 fait respecter
+
+*(PR `chore/recette-web-5-2`, 10/09/2026 — cahier 01-WEB chapitre 5.2, WEB-INS-1 à 16.)*
+
+## Le besoin
+
+Une personne crée son compte avec une adresse email et un code à six chiffres. Elle doit savoir
+ce qu'on attend d'elle (champ par champ, règle par règle), ne pas pouvoir s'inscrire sans avoir
+accepté les conditions, être protégée contre quelqu'un qui devinerait son code, et pouvoir se
+tromper d'adresse sans conséquence. Le produit garde la trace de son consentement et de sa
+langue. Le parcours Google existe mais reste fermé tant que la clé n'est pas posée.
+
+## Les règles
+
+**RG-WEB-46 — Pas de compte sans consentement.** La case d'acceptation est obligatoire ; sans
+elle, rien ne part vers le serveur et un message le dit. Avec elle, deux lignes `ConsentLog`
+(`TERMS`, `PRIVACY`) portent la version des textes, l'horodatage serveur, l'adresse IP et le
+navigateur.
+
+**RG-WEB-47 — La langue de l'écran devient la langue du compte.** Un compte créé sur `/fr` porte
+`preferredLocale: "fr"` ; c'est elle qui choisit la langue des emails (D44).
+
+**RG-WEB-48 — Le code vaut dix minutes, à l'écran comme dans l'email.** Le compte à rebours
+démarre à 10:00 et l'email annonce la même validité ; un renvoi repart de 10:00 avec un NOUVEAU
+code.
+
+**RG-WEB-49 — Cinq codes faux bloquent la saisie une minute, côté serveur.** Les quatre premiers
+échecs annoncent les essais restants ; le cinquième bloque, l'écran désactive la saisie, et le
+blocage survit à un rechargement (le compteur vit sur le serveur, `OTP_LOCKED`). **Un renvoi de
+code ne rouvre pas le compteur** : le sixième échec est le sixième.
+
+**RG-WEB-50 — Une règle violée, une phrase.** Le mot de passe est jugé règle par règle dans
+l'ordre du produit (longueur, minuscule, majuscule, chiffre, spécial, date, suite, données
+personnelles) ; le message nomme la PREMIÈRE règle manquante, en une phrase, jamais « tous les
+critères ». Un indicateur de force accompagne la saisie.
+
+**RG-WEB-51 — Une adresse déjà connue est refusée sans rien envoyer.** Ni code, ni inscription
+en attente, ni email à l'adresse existante ; le message sous le champ tutoie (ANO-WEB-18).
+
+**RG-WEB-52 — Se tromper d'adresse ne coûte rien.** « Recommencer » demande confirmation, annule
+l'inscription en attente et rend un formulaire vide.
+
+**RG-WEB-53 — L'adresse en attente est affichée masquée.** L'écran du code montre
+`n*********5@r***.dev` ; un écran photographié ou partagé ne livre pas l'adresse. *(Écart de
+cahier consigné, décision recommandée : garder le masquage.)*
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| 55 | Écran d'inscription | mention de confiance, titre, cinq champs et indices, case unique à deux liens, Google et Facebook, « Connecte-toi » | oui |
+| 56 | Facebook | inerte : aucune fenêtre, requête ou erreur | oui |
+| 57 | Formulaire vide | quatre messages nommés, rien ne part | oui |
+| 58 | `pas-un-email` | « Saisis un e-mail valide. » au blur | oui |
+| 59 | Six mots de passe fautifs | une phrase chacun, une règle chacun ; indicateur de force | oui (cas e : « minuscule », écart consigné) |
+| 60 | Sans la case, puis avec | refus expliqué ; puis écran du code, 10:00 décroissant, email avec code et « 10 minutes » | oui (adresse masquée, écart consigné) |
+| 61 | Cinq codes faux, rechargement | 4 → 1 restants, blocage d'une minute, saisie désactivée, `OTP_LOCKED` après rechargement | oui |
+| 62 | Renvoi après la minute | « Code renvoyé », bouton temporisé, nouvel email, 10:00 ; 6e et 7e échecs : 4 puis 3 restants | oui |
+| 63 | Collage du bon code | six cases remplies, `/login?verified=1`, « Compte activé », email Bienvenue ; en base TERMS + PRIVACY, `fr`, mot de passe | oui |
+| 64 | Adresse d'Aminata | refus sous le champ, aucun email | oui |
+| 65 | « Recommencer » | confirmation exacte, `cancel`, formulaire vide | oui |
+| 66 | Google sans clé | « Connexion Google bientôt disponible », désactivé, sur les deux écrans | oui |
+| 67 | Parcours Google | ⏭ sans clé ; à la main quand elle sera posée | ⏭ |

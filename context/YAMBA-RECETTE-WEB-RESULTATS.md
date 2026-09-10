@@ -425,6 +425,22 @@ Correction     : le cadre légal devient un `<div>`.
 Contre-épreuve : WEB-ACC-5 compte UN `main` sur chacune des deux pages.
 ```
 
+```
+ANO-WEB-18
+Fiche          : WEB-INS-10 (chapitre 5.2) · Gravité : MINEURE · ÉTAT : CLOSE
+Attendu        : le tutoiement partout (décision du 03/09/2026), jusque dans un message d'erreur.
+Obtenu         : sous le champ e-mail : « Un compte existe déjà avec cet e-mail. Connectez-vous ou
+                 utilisez « Mot de passe oublié ». »
+Cause          : `registerCodeMessage` (`apps/user-ui/src/lib/auth/auth-error-codes.ts`) est
+                 antérieur à la décision ; les phrases voisines (règles de mot de passe) sont
+                 impersonnelles et n'ont donc jamais eu à changer — celle-ci, la seule à
+                 s'adresser à la personne, avait échappé au passage au tutoiement.
+Correction     : « Un compte existe déjà avec cet e-mail. Connecte-toi ou utilise « Mot de passe
+                 oublié ». » (la version anglaise est inchangée).
+Contre-épreuve : WEB-INS-10 exige « Un compte existe déjà avec cet e-mail » sous le champ et
+                 refuse `Connectez-vous|utilisez`.
+```
+
 ---
 
 ## Chapitre 5.1 — Découverte, accueil et navigation · **CONFORME** (12 fiches, 1 min 24)
@@ -463,6 +479,66 @@ Contre-épreuve : WEB-ACC-5 compte UN `main` sur chacune des deux pages.
   l'origine LAN aux référents autorisés de la clé.
 - **`fill()` ne déclenche aucune requête d'autocomplétion** ; la liste ne vient qu'au fil des
   frappes (`pressSequentially`).
+
+## Chapitre 5.2 — Inscription par code email, consentement, Google · **CONFORME** (16 fiches : 12 jouées, 4 ⏭ · 5 min 27)
+
+Le compte neuf est créé à chaque exécution sous une adresse unique (`neuf-<horodatage>@recette.yamba.dev`,
+`compteNeuf()`) — jamais `recette+neuf@…` en dur : un compte créé la veille ferait tomber la fiche 6
+du lendemain sur « adresse déjà utilisée ». Les fiches 6 à 9 forment UNE histoire (le même compte :
+créé, bloqué, code renvoyé, activé) et se jouent dans un seul scénario ; le blocage d'une minute est
+**attendu**, pas simulé.
+
+| Fiche | Ce qui est éprouvé | Verdict | Preuve |
+|---|---|---|---|
+| WEB-INS-1 | L'écran d'inscription | **Conforme** — `/fr/register`, « Inscription sécurisée », « Deviens Voyageur », le sous-titre, cinq champs et leurs indices (Aminata, Diallo, prenom@email.com), une case unique dont les deux textes en gras sont des liens vers `/legal/terms` et `/legal/privacy`, « Créer mon compte », « ou par e-mail », Google, « Continuer avec Facebook », « Déjà membre ? Connecte-toi ». **Écarts** : pas de « Créer un compte » dans l'en-tête desktop (même décision que 5.1 : le harnais passe par « Connexion » puis le lien de l'écran de connexion) ; le titre « Deviens Voyageur » sur un écran générique (note du cahier : écart de libellé mineur, à trancher) |
+| WEB-INS-2 | Le bouton Facebook est inerte | **Conforme** — aucune fenêtre, aucune requête vers Facebook ou un OAuth, aucune erreur de page, adresse inchangée, aucune alerte dans le produit. Le premier passage l'avait déclaré ✘ à tort : le `role="alert"` visible est l'indicateur « Open Next.js Dev Tools », hors `<main>` (voir pièges) |
+| WEB-INS-3 | Les champs obligatoires sont nommés un par un | **Conforme** — les quatre messages exacts sous leur champ, rien ne part au serveur, aucun message global |
+| WEB-INS-4 | L'adresse email est contrôlée | **Conforme** — « Saisis un e-mail valide. » dès que le champ perd le focus |
+| WEB-INS-5 | Le mot de passe : une règle violée, une phrase | **Conforme** — six cas, une seule phrase à chaque fois, nommant une seule règle (8 caractères, majuscule, caractère spécial, prénom, minuscule, suite simple), jamais « tous les critères » ; rien ne part au serveur ; l'indicateur de force accompagne la saisie. **Écart** : cas e `01/01/2000!` — la phrase dit « minuscule », pas « date » : la valeur n'a aucune lettre et la minuscule vient avant la date dans l'ordre du produit (`CHECK_ORDER`) ; à trancher |
+| WEB-INS-6 | Création du compte neuf jusqu'au code | **Conforme** — sans la case : « Tu dois accepter les conditions pour continuer. », rien ne part ; avec : `POST /auth/register` 2xx, `/fr/register/verify`, « Vérification sécurisée », « Plus qu'une étape ! », « Nous avons envoyé un code à 6 chiffres à : », « Code valable » de 10:00 qui décroît (mesuré à 2 s d'écart), six cases, l'astuce du collage, « Valider mon code » ; Mailpit : « Ton code d'activation Yamba », un code à six chiffres, « 10 minutes ». **Écart** : l'adresse est affichée **masquée** (`n*********5@r***.dev`), le cahier attendait l'adresse saisie — voir « à trancher » |
+| WEB-INS-7 | Le barème de blocage sur code erroné | **Conforme** — quatre codes faux : « Code incorrect. » puis « 4 / 3 / 2 essais restants avant invalidation du code » et « 1 essai restant … » ; le cinquième : « Saisie bloquée temporairement. », « Réessaie dans », l'explication, les six cases et le bouton désactivés. Après rechargement, une sixième saisie répond `OTP_LOCKED` avec `lockUntilSeconds` = 58 : le compteur vit sur le serveur |
+| WEB-INS-8 | « Renvoyer le code » et son délai | **Conforme** — après la vraie minute, `POST /auth/register/resend` 2xx, « Code renvoyé », « Un nouveau code a été envoyé. Vérifie ta boîte mail. », bouton « Renvoyer dans … » désactivé, compte à rebours reparti à 10:00, un email de plus dans Mailpit. Le compteur d'essais **ne repart pas** : le 6e échec annonce « 4 essais restants », le 7e « 3 » (un nouveau lot de cinq aurait dit 4 puis 3 aussi… la preuve est que le serveur n'a pas rouvert un blocage entre les deux) |
+| WEB-INS-9 | Activation du compte avec le bon code | **Conforme** — le dernier email porte un code différent du premier ; le collage (un vrai événement `paste`) remplit les six cases ; `POST /auth/register/verify` 2xx, `/fr/login?verified=1`, bandeau « Compte activé » / « Ton adresse est vérifiée. Connecte-toi avec ton mot de passe pour commencer. », email « Bienvenue ». **En base** (`inspect-user.ts`) : deux lignes `ConsentLog`, `TERMS` et `PRIVACY`, version `2026-04-26`, horodatage serveur (même milliseconde que la création), IP et navigateur portés ; `preferredLocale: "fr"` ; une empreinte de mot de passe présente |
+| WEB-INS-10 | Une adresse déjà utilisée est refusée | **Conforme après correction** → `ANO-WEB-18` ; refus serveur (≥ 400), « Un compte existe déjà avec cet e-mail » sous le champ, adresse inchangée, aucun email ni pour l'adresse existante ni pour la nouvelle |
+| WEB-INS-11 | « Recommencer » abandonne l'inscription en attente | **Conforme** — « Trompé d'adresse e-mail ? » puis « Recommencer » : la confirmation exacte « Sûr·e ? Tu devras recommencer toute l'inscription depuis le début. », `POST /auth/register/cancel` 2xx, retour sur `/fr/register`, les cinq champs vides, la case décochée |
+| WEB-INS-12 | Le bouton Google sans configuration | **Conforme** — sur `/fr/register` et `/fr/login` : « Connexion Google bientôt disponible », désactivé, un clic forcé ne change pas l'adresse |
+| WEB-INS-13 à 16 | Le parcours Google (nouvelle personne, accord, rattachement, adresse non vérifiée) | **⏭** — `NEXT_PUBLIC_GOOGLE_CLIENT_ID` absente (cahier § 2.6, état voulu). Et même posée, la fenêtre de consentement Google ne se pilote pas : ces quatre fiches se jouent **à la main** le jour où la clé est renseignée ; le spec les déclare pour que le compte reste juste |
+
+### À trancher (produit)
+
+- **L'écran du code masque l'adresse.** « Nous avons envoyé un code à 6 chiffres à :
+  `n*********5@r***.dev` » — `maskEmail` (`lib/auth/email-mask.ts`), premier et dernier caractère
+  de la partie locale, première lettre du domaine, motif d'Apple / Stripe / Wise. Le cahier
+  attendait « l'adresse saisie ». Le masquage est un choix délibéré (l'écran peut être photographié
+  ou partagé) et la personne vient de taper l'adresse : recommandation, **garder le masquage** et
+  corriger le cahier. Le spec vérifie premier caractère, `@` et domaine.
+- **La phrase du cas e.** `01/01/2000!` n'a aucune lettre : la première règle manquante, dans
+  l'ordre du produit, est la minuscule ; la règle « date » (`simpleDate`) vient après. Le cahier
+  attendait « ce n'est pas une date valable ». Deux lectures possibles : l'ordre actuel est
+  cohérent (on nomme d'abord ce qui manque) ; ou une saisie qui ressemble à une date mérite la
+  phrase « date » d'abord, plus parlante. Le spec accepte les deux ; à trancher.
+- **« Deviens Voyageur » comme titre d'un écran d'inscription générique** (note du cahier) — un
+  Expéditeur qui s'inscrit ne devient pas Voyageur. « Crée ton compte Yamba » serait plus juste ;
+  écart de libellé mineur.
+- **« Créer un compte » absent de l'en-tête desktop** — déjà posé au chapitre 5.1.
+
+### Pièges de poste payés ici
+
+- **Le `role="alert"` qui n'est pas le tien.** En développement, Next 16 monte son indicateur
+  « Open Next.js Dev Tools » avec `role="alert"`, hors du `<main>`. Une assertion « aucune alerte
+  visible » sur toute la page est fausse sur tout poste de développement : viser
+  `page.locator("main")` avant `[role="alert"]`. Premier passage de WEB-INS-2 : ✘ pour cette
+  seule raison.
+- **Un script appelé par le harnais ne se vérifie qu'en l'exécutant.** `inspect-user.ts` est
+  lancé par `execFileSync` (`tsx`, sans typecheck) : un `select` sur un champ que le modèle n'a
+  pas (`isVerified`) ne casse qu'à l'exécution — au bout de trois minutes de scénario, sur la
+  dernière assertion. Lancer le script seul sur un compte du seed avant de le brancher.
+- **Les comptes `neuf-<horodatage>@recette.yamba.dev` restent en base** (un par exécution des
+  fiches 6, 10, 11 — la fiche 10 n'en crée pas, la 11 laisse une inscription en attente
+  annulée). Sans conséquence (piège 22 du handoff) ; le cahier réserve « le compte neuf » au
+  chapitre 5.13 : ce sera celui de la dernière exécution, ou un compte créé pour l'occasion.
+
+---
 
 ## Chapitre 5.12 — Réserver : l'assistant en quatre étapes
 

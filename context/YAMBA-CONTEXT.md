@@ -610,13 +610,20 @@ Ordre de demarrage : auth -> trip -> gateway.
   desktop du visiteur sans « Creer un compte » ni « Rechercher un trajet ». Piege de poste : la cle
   Google Maps n'accepte que `localhost` comme referent. Harnais : 32 scenarios verts. PR **#265**
   (empilee sur #264). Reste : 5.2 a 5.32, 02-ADMIN.
-- 10/09 (fin de matinee) : **CHAPITRE 5.2 (WEB-INS, inscription) EN COURS — ARRET** sur la branche
-  `chore/recette-web-5-2` (empilee sur #265). Spec ecrit (16 fiches, 13-16 ⏭ sans Google), premier
-  passage 6 ✓ / 3 ✘ / 4 ⏭, les trois ✘ diagnostiques (faux positif harnais sur l'alerte Next Dev
-  Tools ; adresse masquee sur l'ecran du code = ecart ; message « Connectez-vous » vouvoie =
-  ANO-WEB-18 a ouvrir). Nouveau script `inspect-user.ts` (preuves en base). Le handoff
-  `YAMBA-CONTEXT-HANDOFF-RECETTE-WEB-2026-09-09.md` dit exactement ou reprendre. Consigne redite :
-  AUCUNE attribution Claude dans les commits/PR (les 4 commits de #265 ont ete reecrits).
+- 10/09 (soir) : **CHAPITRE 5.2 DU CAHIER 01-WEB — WEB-INS, L'INSCRIPTION (branche
+  `chore/recette-web-5-2`, empilee sur #265)** — 16 fiches : 12 jouees CONFORMES, 4 ⏭ (parcours
+  Google 13-16, sans `NEXT_PUBLIC_GOOGLE_CLIENT_ID` et non pilotable : a la main le jour venu),
+  `apps/e2e/src/chapitres/web-ins.spec.ts`. Les fiches 6-9 = UN scenario (compte cree, bloque
+  cinq codes faux, code renvoye, active) avec une vraie minute de blocage. Une anomalie mineure
+  close : ANO-WEB-18 (« Connectez-vous ou utilisez » vouvoyait dans `registerCodeMessage`).
+  Trois ecarts de cahier a trancher : l'ecran du code MASQUE l'adresse (`maskEmail`, recommande :
+  garder), cas e du mot de passe (« minuscule » avant « date », ordre `CHECK_ORDER`), titre
+  « Deviens Voyageur » sur un ecran generique. Preuves en base par le nouveau
+  `packages/libs/prisma/scripts/inspect-user.ts` (ConsentLog TERMS + PRIVACY @2026-04-26,
+  preferredLocale fr, hasPassword). Pieges : le `role="alert"` de l'indicateur Next Dev Tools
+  (viser `main`) ; un script lance par `execFileSync` se verifie seul d'abord (`isVerified`
+  inexistant, casse a la derniere assertion). Harnais : 45 scenarios (41 joues, 4 ⏭). PR
+  **#__PR__** (empilee sur #265). Reste : 5.3 a 5.32, 02-ADMIN. AUCUNE attribution Claude.
 - 04/09 : C-PR6b feat/c6b-admin-alerts (D59 3A / 4A, A129–A131) — neuf regles de seuil
   (evaluateAlerts pur, instantane de dix compteurs), GET /admin/alerts sans etat (accueil
   admin), cron horaire avec dedoublonnage Redis SET NX (un email par regle et par jour, Redis

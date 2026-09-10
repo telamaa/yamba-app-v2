@@ -4240,3 +4240,88 @@ les pages légales : le cadre devient un `<div>`.
 
 trip-service **257 → 260** (`lib/place-text.spec.ts`). `apps/e2e` : **32 scénarios** verts sur le
 poste (20 + WEB-ACC ×12). user-ui et trip-service : typecheck vert.
+
+---
+
+# Chapitre 5.2 du cahier 01-WEB : l'inscription, seize fiches et une preuve en base
+
+*(PR `chore/recette-web-5-2`, 10/09/2026.)*
+
+## Ce qui a été fait
+
+Le deuxième chapitre « fiches » du cahier 01-WEB : `WEB-INS` (inscription par code email,
+consentement, Google). Seize fiches ; douze se jouent par le harnais
+(`apps/e2e/src/chapitres/web-ins.spec.ts`), quatre (le parcours Google, 13 à 16) sont déclarées
+`⏭` tant que `NEXT_PUBLIC_GOOGLE_CLIENT_ID` n'est pas posée — et resteront à jouer à la main
+ensuite, la fenêtre de consentement Google ne se pilotant pas. Une anomalie mineure (ANO-WEB-18,
+un « Connectez-vous » qui vouvoyait), close dans la PR ; trois écarts de cahier consignés (adresse
+masquée sur l'écran du code, ordre des règles de mot de passe sur une date, titre « Deviens
+Voyageur »).
+
+```
+apps/e2e/src/chapitres/web-ins.spec.ts            NOUVEAU — 16 fiches ; aides : formulaire() (le <form> de la PAGE, pas celui
+                                                    d'une fenêtre de connexion), remplir(), erreurSous() (#<champ>-error),
+                                                    creerMonCompte() (rend la réponse de POST /auth/register ou null),
+                                                    jusquAuCode(), saisirLeCode() (six cases + « Valider mon code »),
+                                                    collerLeCode() (un vrai événement paste), codeDe()
+apps/e2e/src/fixtures/compte-neuf.ts              compteNeuf(prenom, nom) : un compte par exécution (neuf-<horodatage>@recette.yamba.dev)
+apps/e2e/src/fixtures/jeu-essai.ts                inspecterCompte(email) → inspect-user.ts par execFileSync ; type CompteInspecte
+packages/libs/prisma/scripts/inspect-user.ts      NOUVEAU — ce que la base sait d'un compte, en JSON, sans secret
+                                                    (consentements, preferredLocale, hasPassword, identités)
+apps/user-ui/src/lib/auth/auth-error-codes.ts     registerCodeMessage tutoie (ANO-WEB-18)
+context/YAMBA-RECETTE-WEB-RESULTATS.md            ANO-WEB-18, chapitre 5.2, à trancher, pièges
+```
+
+## Comment le chapitre est construit
+
+**Une histoire en quatre fiches.** Les fiches 6 à 9 décrivent le même compte — créé, bloqué
+après cinq codes faux, code renvoyé, activé. Le barème de blocage (7) ne se comprend qu'après la
+création (6) et avant le renvoi (8) : elles sont jouées dans UN scénario, chaque fiche en
+`test.step`, pour que le rapport Playwright nomme l'étape qui tombe. Le blocage dure une vraie
+minute et le scénario l'attend (`toBeEnabled({ timeout: 75_000 })`) ; le simuler reviendrait à ne
+pas tester la règle. `test.setTimeout(8 * 60_000)`.
+
+**Une adresse par exécution.** `compteNeuf()` fabrique `neuf-<horodatage>@recette.yamba.dev`.
+Le cahier propose `recette+neuf@seed.yamba.dev` en dur ; un compte créé la veille ferait tomber la
+fiche 6 sur « adresse déjà utilisée ». Mailpit accepte tout domaine, la base de développement
+garde les comptes (sans conséquence).
+
+**Le compteur qui ne repart pas.** Après cinq échecs et un renvoi de code, le sixième échec
+annonce « 4 essais restants » — exactement ce qu'un PREMIER échec d'un nouveau lot dirait. La
+preuve n'est pas dans le chiffre du 6e mais dans le 7e (« 3 ») et dans l'absence de nouveau
+blocage entre les deux : le serveur compte 6 puis 7, pas 1 puis 2.
+
+**La preuve en base.** Le cahier demande de vérifier `ConsentLog` et `preferredLocale` — ce que
+l'écran ne montre pas. `inspect-user.ts` répond une ligne JSON sans rien de secret (jamais
+l'empreinte, seulement `hasPassword`) ; le harnais l'appelle par `execFileSync` (`tsx`,
+`--env-file=.env`) et lit la dernière ligne. Le premier passage a payé le prix d'un script non
+exécuté seul : un `select` sur `isVerified`, champ que `User` n'a pas, ne casse qu'à
+l'exécution — sur la dernière assertion du scénario, trois minutes après son début.
+
+**Le collage.** « Le collage doit remplir les six cases d'un coup » : `collerLeCode()` construit
+un `DataTransfer`, y pose le texte et dispatche un `ClipboardEvent("paste")` sur la première
+case — un vrai événement, celui que le composant écoute ; six `fill()` prouveraient autre chose.
+
+## ANO-WEB-18
+
+`registerCodeMessage` est antérieur au passage au tutoiement (décision du 03/09) ; les phrases
+voisines des règles de mot de passe sont impersonnelles (« Le mot de passe doit… ») et n'avaient
+rien à changer — la seule qui s'adresse à la personne avait échappé. « Connecte-toi ou utilise
+« Mot de passe oublié ». » ; la version anglaise ne bouge pas.
+
+## Ce que le harnais a appris
+
+- **Le `role="alert"` qui n'est pas le tien.** Next 16 monte en développement l'indicateur
+  « Open Next.js Dev Tools » avec `role="alert"`, hors `<main>`. « Aucune alerte visible » se
+  vérifie dans `page.locator("main")`, jamais sur la page entière.
+- **Un formulaire se vise par la page.** Une fenêtre de connexion peut monter un second `<form>`
+  avec les mêmes `id` (observation du chapitre 6) : `page.locator("main form").first()`.
+- **Le libellé n'est pas la donnée, encore.** L'écran du code affiche `maskEmail(email)` ; le
+  spec vérifie premier caractère, `@` et domaine — et le rapport consigne l'écart de cahier au
+  lieu de plier l'assertion en silence.
+- **Un script externe se lance seul avant d'être branché** (voir « la preuve en base »).
+
+## Tests
+
+Aucun test unitaire ajouté (une chaîne de message). `apps/e2e` : **45 scénarios** (41 joués,
+4 `⏭` Google) — 32 + WEB-INS ×13. user-ui : typecheck vert.
