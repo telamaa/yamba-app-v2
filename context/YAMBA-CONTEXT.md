@@ -595,7 +595,7 @@ Ordre de demarrage : auth -> trip -> gateway.
   menu visiteur ; corrige : redirections serveur des bouchons, quatre liens vers
   `/carrier/onboarding`. Ecarts cahier : l'aeroport n'est pas un jalon public ; « aucun SMS »
   est un fait de plateforme. 20 scenarios e2e verts. **Chapitre 6 clos** (6 parcours, 100
-  etapes, ANO-WEB-08 a 11). Reste : les 32 chapitres 5.x, 02-ADMIN.
+  etapes, ANO-WEB-08 a 11). PR **#264**. Reste : les 32 chapitres 5.x, 02-ADMIN.
 - 04/09 : C-PR6b feat/c6b-admin-alerts (D59 3A / 4A, A129–A131) — neuf regles de seuil
   (evaluateAlerts pur, instantane de dix compteurs), GET /admin/alerts sans etat (accueil
   admin), cron horaire avec dedoublonnage Redis SET NX (un email par regle et par jour, Redis
