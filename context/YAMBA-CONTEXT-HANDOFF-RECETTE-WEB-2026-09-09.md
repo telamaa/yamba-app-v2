@@ -9,7 +9,7 @@ tourne sur le poste, ce qui reste à faire, et les pièges déjà payés qu'il n
 > **2.** ~~monter la fixture de session administrateur~~ **FAIT** (`seed-admins.ts` + `navigateurAdmin`) ;
 > **3.** ~~finir WEB-E2E-1 en entier, ouvrir la PR~~ **FAIT — PR #259 mergée** ;
 > **4.** les cinq autres parcours du chapitre 6 : ~~E2E-2~~ **FAIT, #260 mergée**, ~~E2E-3~~ **FAIT, #261 mergée**, ~~E2E-4~~ **FAIT, PR #262** (17 checks verts, à merger), ~~E2E-5~~ **FAIT, PR #263** (empilée sur #262, ANO-WEB-10 close), ~~E2E-6~~ **FAIT, PR #264** (ANO-WEB-11 close) — **le chapitre 6 est clos** ;
-> **5.** les 32 chapitres du cahier **01-WEB** (326 fiches) — **5.1 FAIT** (branche `chore/recette-web-5-1`, 12 fiches conformes, ANO-WEB-12 à 17 closes, PR à ouvrir sur `dev`) ; suite : 5.2 → 5.32 dans l'ordre du cahier ;
+> **5.** les 32 chapitres du cahier **01-WEB** (326 fiches) — **5.1 FAIT** (branche `chore/recette-web-5-1`, 12 fiches conformes, ANO-WEB-12 à 17 closes, **PR #265** sur `dev`, empilée sur #264) ; suite : 5.2 → 5.32 dans l'ordre du cahier ;
 > **6.** le cahier **02-ADMIN** (110 fiches) — 19 fiches de sécurité d'accès, 91 fiches d'écrans.
 >
 > **La question Elasticsearch vient APRÈS la recette** — consigne explicite du 09/09/2026. Rien
@@ -238,7 +238,8 @@ Pièges payés sur les étapes 11 à 29, pour ne pas les repayer :
    clos.** Suite : les 32 chapitres 5.x du cahier 01-WEB, par famille (point 4 ci-dessous).
 
 4. **Les 32 chapitres 5.x du cahier 01-WEB** (326 fiches), par famille. ~~5.1~~ **FAIT** (`chore/recette-web-5-1`,
-   `apps/e2e/src/chapitres/web-acc.spec.ts`, rapport « Chapitre 5.1 ») — suivant : **5.2 `WEB-INS`** (inscription,
+   `apps/e2e/src/chapitres/web-acc.spec.ts`, rapport « Chapitre 5.1 », **PR #265** sur `dev`, empilée sur #264 —
+   merger dans l'ordre #262, #263, #264, #265) — suivant : **5.2 `WEB-INS`** (inscription,
    16 fiches : `compte-neuf.ts` et `pages/inscription.ts` existent déjà). Huit d'entre eux
    s'appuient sur le back-office (tableau du handoff précédent : suspendre, masquer, valider un
    billet, abaisser un paramètre, relire les signalés, ouvrir l'arbitrage, maintenance) — la

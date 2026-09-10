@@ -608,8 +608,8 @@ Ordre de demarrage : auth -> trip -> gateway.
   des comptes qui ne sont pas les notres), ANO-WEB-16 (`<html lang="fr">` sur /en : `getLocale()`
   + `HtmlLang`), ANO-WEB-17 (deux `<main>` imbriques sur les pages legales). A trancher : l'en-tete
   desktop du visiteur sans « Creer un compte » ni « Rechercher un trajet ». Piege de poste : la cle
-  Google Maps n'accepte que `localhost` comme referent. Harnais : 32 scenarios verts. Reste : 5.2 a
-  5.32, 02-ADMIN.
+  Google Maps n'accepte que `localhost` comme referent. Harnais : 32 scenarios verts. PR **#265**
+  (empilee sur #264). Reste : 5.2 a 5.32, 02-ADMIN.
 - 04/09 : C-PR6b feat/c6b-admin-alerts (D59 3A / 4A, A129–A131) — neuf regles de seuil
   (evaluateAlerts pur, instantane de dix compteurs), GET /admin/alerts sans etat (accueil
   admin), cron horaire avec dedoublonnage Redis SET NX (un email par regle et par jour, Redis
