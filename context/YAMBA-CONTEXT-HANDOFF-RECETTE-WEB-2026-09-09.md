@@ -8,7 +8,7 @@ tourne sur le poste, ce qui reste à faire, et les pièges déjà payés qu'il n
 > **1.** ~~corriger le harnais avec `storageState`~~ **FAIT** (§ 4 bis) ;
 > **2.** ~~monter la fixture de session administrateur~~ **FAIT** (`seed-admins.ts` + `navigateurAdmin`) ;
 > **3.** ~~finir WEB-E2E-1 en entier, ouvrir la PR~~ **FAIT — PR #259 mergée** ;
-> **4.** les cinq autres parcours du chapitre 6 : ~~E2E-2~~ **FAIT, #260 mergée**, ~~E2E-3~~ **FAIT, #261 mergée**, ~~E2E-4~~ **FAIT, PR #262** (17 checks verts, à merger), ~~E2E-5~~ **FAIT, PR #263** (empilée sur #262, ANO-WEB-10 close), puis E2E-6 ;
+> **4.** les cinq autres parcours du chapitre 6 : ~~E2E-2~~ **FAIT, #260 mergée**, ~~E2E-3~~ **FAIT, #261 mergée**, ~~E2E-4~~ **FAIT, PR #262** (17 checks verts, à merger), ~~E2E-5~~ **FAIT, PR #263** (empilée sur #262, ANO-WEB-10 close), ~~E2E-6~~ **FAIT** (branche `chore/e2e-parcours-6`, ANO-WEB-11 close, PR à ouvrir) — **le chapitre 6 est clos** ;
 > **5.** les 32 chapitres du cahier **01-WEB** (326 fiches) ;
 > **6.** le cahier **02-ADMIN** (110 fiches) — 19 fiches de sécurité d'accès, 91 fiches d'écrans.
 >
@@ -173,6 +173,12 @@ Pièges payés sur les étapes 11 à 29, pour ne pas les repayer :
     faits identique) passait AVANT correction : le refus ne recalculait pas la réputation. Devant
     un test vert du premier coup, chercher ce qui aurait dû pouvoir le faire échouer ; au besoin,
     prouver en base avec un script jetable (`npx tsx --env-file=.env ./x.ts`, puis le supprimer).
+25. **Un `Link` Next navigue côté client** : `networkidle` se résout avant la navigation ; attendre
+    `toHaveURL`. Et viser un libellé DANS son bloc — l'en-tête et le pied de page portent les
+    mêmes mots (« Envoyer un colis », « Devenir Voyageur »).
+26. **Ce qu'un cahier « connecté » ne voit jamais, c'est l'entrée du visiteur** : les bouchons
+    `/become/*` ont survécu à toute la recette parce que 5.6 se joue avec João. Les parcours sans
+    compte (destinataire, visiteur) sont ceux qui trouvent ces trous.
 24. **Un modèle de lecture peut contredire la machine.** Un compteur qui filtre sur un statut
     d'arrivée (`CANCELLED` + `closedBy`) voit toutes les transitions qui y mènent — y compris
     celles que la machine déclare « sans pénalité ». À chaque transition ajoutée, relire les
@@ -206,10 +212,10 @@ Pièges payés sur les étapes 11 à 29, pour ne pas les repayer :
    Son diff porte les deux parcours tant que #262 n'est pas mergée, et se réduit seul après.
    Merger #262 d'abord, puis compter les 17 checks de #263 et la merger.
 
-   **Le dernier parcours du chapitre 6** : le parcours du destinataire (E2E-6), qui se joue en
-   parallèle de E2E-1 dans le navigateur C — `suivi-destinataire.ts` couvre déjà la page ; il
-   reste la mention de confidentialité, le bloc d'acquisition, le jeton altéré, et la preuve
-   qu'aucun email ni SMS ne part vers le destinataire.
+   ~~E2E-6 (destinataire)~~ **FAIT** — 9 étapes, 1 min 00, `ANO-WEB-11` close (majeure : quatre
+   entrées « Devenir Voyageur » menaient à un bouchon « Become a carrier (UI only) » ou à un 404).
+   Branche `chore/e2e-parcours-6`, empilée sur `chore/e2e-parcours-5` : ouvrir la PR sur `dev`,
+   compter, merger — dans l'ordre #262, #263, puis celle-ci. **Le chapitre 6 est clos.**
 
 4. **Les 32 chapitres 5.x du cahier 01-WEB** (326 fiches), par famille. Huit d'entre eux
    s'appuient sur le back-office (tableau du handoff précédent : suspendre, masquer, valider un

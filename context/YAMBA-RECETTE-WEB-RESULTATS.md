@@ -278,6 +278,33 @@ Contre-épreuve : WEB-E2E-5 étape 7 — ligne de faits lue AVANT la réservatio
                  `pickupRefusedAt` posé, ancien filtre 1 → nouveau filtre 0.
 ```
 
+```
+ANO-WEB-11
+Fiche          : parcours WEB-E2E-6 étape 7 (chapitres 5.20, 5.6 et 5.31) · Gravité : MAJEURE · ÉTAT : CLOSE
+Attendu        : « Devenir Voyageur », dans le bloc d'acquisition de la page destinataire, mène à
+                 l'écran « Devenir Voyageur » (WEB-VOY-1 : l'assistant d'onboarding — et, sans
+                 compte, la porte de connexion d'abord).
+Obtenu         : une page bouchon, en anglais : « Become a carrier (UI only) ». Même sort pour
+                 `/become/shipper` (« Become a seller (UI only) »). Et le « Devenir Voyageur » du
+                 pied de page et du menu « Découvrir » (visiteur) visait `/become-yamber`, qui
+                 répond 404 (« futur » depuis la migration i18n).
+Impact         : le premier geste d'acquisition d'un futur Voyageur — depuis la page destinataire,
+                 l'accueil (appel final), le pied de page et le menu visiteur — aboutit sur du
+                 vide. Aucun cahier ne le couvrait avant ce parcours (5.6 se joue connecté).
+Cause          : `apps/user-ui/src/app/[locale]/become/{carrier,shipper}/page.tsx` sont des
+                 bouchons de la migration next-intl (commit « migrate to next-intl ») jamais
+                 remplacés ; la page marketing `/become-yamber` n'a jamais été écrite. Quatre
+                 liens pointaient dessus.
+Correction     : les deux bouchons deviennent des redirections (`redirect` de next-intl) vers
+                 l'écran réel — `/carrier/onboarding` et `/search` — pour les liens déjà
+                 partagés ; les quatre liens (page destinataire, accueil, pied de page, menu
+                 visiteur) visent directement `/carrier/onboarding`. L'assistant envoie un
+                 visiteur à `/login?redirect=/carrier/onboarding`, puis le ramène.
+Contre-épreuve : WEB-E2E-6 étape 7 — « Envoyer un colis » → `/fr/search` ; « Devenir Voyageur »
+                 → `/fr/login?redirect=/carrier/onboarding`. `curl` : `/fr/become/carrier` 307
+                 → `/fr/carrier/onboarding`, `/fr/become/shipper` 307 → `/fr/search`.
+```
+
 ---
 
 ## Chapitre 5.12 — Réserver : l'assistant en quatre étapes
@@ -436,7 +463,41 @@ Contre-épreuve : WEB-E2E-5 étape 7 — ligne de faits lue AVANT la réservatio
 
 ---
 
+## Chapitre 6 — WEB-E2E-6, le parcours du destinataire · **CONFORME** (9 étapes, 1 min 00)
+
+Le tronc de WEB-E2E-1 est rejoué (réservation, acceptation, lien de suivi, prise en charge,
+jalons, remise) et la page du destinataire — un visiteur, navigateur C — est rechargée à chaque pas.
+
+| Étape du cahier | Ce qui est éprouvé | Verdict |
+|---|---|---|
+| 1 | Le lien reçu | **Conforme** — « Ton colis arrive, Clarisse », « Aminata t'envoie un colis avec Thomas N., Voyageur Yamba, de Paris à Brazzaville. », Départ / Arrivée prévue, frise de cinq jalons, aide de l'étape |
+| 2 | Adresse, numéro, code, photo, montant | **Conforme** — absents de l'écran ET du code source (numéro du destinataire, montant payé, lieux de remise du trajet, `ik.imagekit.io`, aucune image) ; l'API sert exactement les huit clés du contrat `PublicTrackingResponse` |
+| 3 | La frise après chaque jalon | **Conforme** — « Colis récupéré par Thomas » / « Le colis voyage avec Thomas. », puis « En route » au décollage ; l'aéroport ne fait pas bouger la page (voir écarts) ; le code de livraison, connu du harnais, n'apparaît nulle part |
+| 4 | L'atterrissage | **Conforme** — « Arrivé à Brazzaville » · « Thomas est arrivé. Il te contacte pour convenir de la remise : prépare le code que Aminata t'a donné. » |
+| 5 | La remise | **Conforme** — « Colis remis » · « Le colis t'a été remis. Bonne réception ! », cinq jalons datés |
+| 6 | La mention de confidentialité | **Conforme** — texte exact, lien vers `/fr/legal/privacy` |
+| 7 | Le bloc d'acquisition | **Conforme après correction** → `ANO-WEB-11` ; « Envoyer un colis » → recherche, « Devenir Voyageur » → porte de connexion puis onboarding |
+| 8 | Un caractère du jeton altéré | **Conforme** — « Ce lien de suivi n'est plus valide », sans prénom ni corridor ; le 404 de l'API est identique pour un jeton altéré et un jeton inventé |
+| 9 | Rien n'a été envoyé au destinataire | **Conforme** — adresse email déclarée exprès à la réservation : aucun email ; chaque email de la campagne va à un compte membre ; aucun émetteur de SMS n'existe sur la plateforme |
+
+### Deux écarts assumés, écrits dans le parcours
+
+- Étape 3 : « Je suis à l'aéroport » n'est pas un jalon public (D69 : `IN_TRANSIT` naît au
+  décollage, `ARRIVED` à l'atterrissage). La page ne bouge pas à l'aéroport ; le cahier dit « à
+  chaque jalon confirmé » — à préciser.
+- Étape 9 : « aucun SMS » est un fait de plateforme (aucune dépendance, aucun appel), pas une
+  observation de recette ; le harnais prouve l'absence d'email et l'adressage exclusif aux membres.
+
+**Le chapitre 6 est clos** : six parcours, 100 étapes, tous conformes, quatre anomalies
+majeures corrigées en chemin (ANO-WEB-08 à 11).
+
+---
+
 ## Observations (pas des anomalies, mais à savoir)
+
+- **`/become-yamber` reste « futur »** (commentaire du layout marketing) : la page de présentation
+  « Devenir Voyageur » n'existe pas ; depuis ANO-WEB-11, ses quatre entrées mènent à l'onboarding.
+  Le jour où la page marketing s'écrit, les liens y reviennent.
 
 - **Depuis ANO-WEB-05, le cron de rejeu des versements paie les deals terminés du seed restés
   « en attente »** (ils portent désormais `capturedAt`) : c'est le comportement réel du produit,

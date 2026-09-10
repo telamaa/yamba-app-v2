@@ -2662,3 +2662,49 @@ refus, avec la raison choisie par le Voyageur traduite dans sa langue, puis celu
 | 37 | Emails de l'Expéditrice | refus avec la raison traduite, puis remboursement intégral, sans le mot « retenue » | oui |
 | 38 | Page publique du Voyageur avant / après | ligne de faits identique | oui |
 | 39 | Trajet du Voyageur | kilos rendus, ligne du deal « Annulé » | oui |
+
+---
+
+# Le destinataire — ce que WEB-E2E-6 fait respecter
+
+*(PR `chore/e2e-parcours-6`, 10/09/2026 — cahier 01-WEB chapitre 6, D69, RGP-02.)*
+
+## Le besoin
+
+Le destinataire n'a pas de compte, n'a rien demandé, et n'a qu'un lien que l'Expéditeur lui a
+transmis. Il doit savoir où en est le colis et quoi préparer — et ne rien apprendre d'autre :
+ni adresse, ni numéro, ni code, ni photo, ni montant. Yamba ne lui écrit jamais.
+
+## Les règles
+
+**RG-WEB-34 — La page de suivi ne dit que l'essentiel.** Prénoms, corridor, dates, frise et
+aide de l'étape ; rien d'autre, ni à l'écran, ni dans le code source, ni dans l'API (liste de
+clés fermée). *(D69.)*
+
+**RG-WEB-35 — L'aide change avec l'étape.** À l'atterrissage, elle demande de préparer le code ;
+à la remise, elle dit « Bonne réception ! ».
+
+**RG-WEB-36 — L'origine des données est dite.** La mention de confidentialité nomme
+l'Expéditeur, ce qu'il a confié, à qui, et quand c'est effacé ; elle mène à la politique de
+confidentialité. *(RGP-02.)*
+
+**RG-WEB-37 — Un lien altéré ne révèle rien.** « Ce lien de suivi n'est plus valide », sans
+prénom ni corridor ; l'API répond la même chose pour un jeton altéré et un jeton inventé.
+
+**RG-WEB-38 — Yamba n'écrit jamais au destinataire.** Aucun email, aucun SMS ; le lien est
+partagé par l'Expéditeur seul.
+
+**RG-WEB-39 — Le bloc d'acquisition mène à de vrais écrans.** « Envoyer un colis » ouvre la
+recherche ; « Devenir Voyageur » ouvre l'onboarding (la porte de connexion d'abord, sans compte).
+*(ANO-WEB-11.)*
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| 40 | Lien ouvert à chaque jalon | frise et aide qui progressent, cinq jalons datés à la remise | oui |
+| 41 | Écran, source, API | aucun code, numéro, montant, lieu, photo ; huit clés exactement | oui |
+| 42 | Mention de confidentialité | texte exact, lien vers la politique | oui |
+| 43 | Bloc d'acquisition | recherche ; porte de connexion puis onboarding | oui |
+| 44 | Jeton altéré d'un caractère | « plus valide », sans rien de plus, 404 identique à un jeton inventé | oui |
+| 45 | Boîte du destinataire | aucun email ; tous les emails vont à des membres | oui |

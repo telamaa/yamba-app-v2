@@ -584,6 +584,18 @@ Ordre de demarrage : auth -> trip -> gateway.
   les deux parties. deal-service **576** tests (+1), plateforme 990. Ecarts cahier : sujet de
   l'email « n'a pas pu etre pris en charge », kilos lus a l'API. 19 scenarios e2e verts.
   PR **#263** (empilee sur #262). Reste : E2E-6, les 32 chapitres 5.x, 02-ADMIN.
+- 10/09 : **WEB-E2E-6, LE DESTINATAIRE (branche `chore/e2e-parcours-6`)** — sixieme et dernier
+  parcours du chapitre 6, vert : 9 etapes, 1 min 00 (le tronc de E2E-1 rejoue, la page publique
+  rechargee a chaque jalon : titre, corridor, dates, frise, aide qui change ; rien de plus a
+  l'ecran NI dans le code source NI dans l'API — liste de cles FERMEE du contrat ; mention de
+  confidentialite et son lien ; bloc d'acquisition ; jeton altere = 404 uniforme ; aucun email
+  au destinataire, dont l'adresse a ete declaree expres). **ANO-WEB-11 (majeure)** : « Devenir
+  Voyageur » menait a un bouchon de la migration i18n (« Become a carrier (UI only) ») depuis la
+  page destinataire et l'accueil, et a un 404 (`/become-yamber`) depuis le pied de page et le
+  menu visiteur ; corrige : redirections serveur des bouchons, quatre liens vers
+  `/carrier/onboarding`. Ecarts cahier : l'aeroport n'est pas un jalon public ; « aucun SMS »
+  est un fait de plateforme. 20 scenarios e2e verts. **Chapitre 6 clos** (6 parcours, 100
+  etapes, ANO-WEB-08 a 11). Reste : les 32 chapitres 5.x, 02-ADMIN.
 - 04/09 : C-PR6b feat/c6b-admin-alerts (D59 3A / 4A, A129–A131) — neuf regles de seuil
   (evaluateAlerts pur, instantane de dix compteurs), GET /admin/alerts sans etat (accueil
   admin), cron horaire avec dedoublonnage Redis SET NX (un email par regle et par jour, Redis

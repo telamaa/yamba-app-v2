@@ -4094,3 +4094,56 @@ Aucun DTO n'expose la marque : elle sert la réputation, pas les écrans.
 deal-service : **576** tests (+1 : la requête des faits Voyageur exclut la marque, absent compris ;
 la marque et le recalcul sont vérifiés dans le spec du transport). Plateforme : 990.
 `apps/e2e` : **19 scénarios** verts sur le poste (harnais ×6, WEB-CNX ×3, WEB-RSV ×5, WEB-E2E-1 à 5).
+
+---
+
+# WEB-E2E-6 : le destinataire, et quatre liens qui menaient à un bouchon
+
+*(PR `chore/e2e-parcours-6`, 10/09/2026.)*
+
+## Ce qui a été fait
+
+Le sixième et dernier parcours du chapitre 6 (gravité majeure) : la page publique de suivi
+(D69) rechargée à chaque pas du colis, par un visiteur qui n'a qu'un lien. Neuf étapes, 1 min 00.
+Le chapitre 6 est clos.
+
+```
+apps/e2e/src/pages/suivi-destinataire.ts   + aideCourante(), jalonsAtteints(), neReveleRien(secrets) (écran + source),
+                                             clesServiesParLApi() (liste fermée), mentionDeConfidentialite(),
+                                             suivreLeLienDAcquisition(), lienInvalide(), refusDeLApi()
+apps/e2e/src/parcours/web-e2e-6.spec.ts
+```
+
+## Une anomalie produit, corrigée — ANO-WEB-11
+
+`/become/carrier` et `/become/shipper` étaient deux bouchons de la migration next-intl —
+« Become a carrier (UI only) » — jamais remplacés, et `/become-yamber` (pied de page, menu
+visiteur) n'a jamais existé. Quatre entrées « Devenir Voyageur » menaient à du vide : la page
+destinataire, l'appel final de l'accueil, le pied de page, le menu « Découvrir ».
+
+La correction tient en six fichiers : les deux bouchons deviennent des **redirections
+serveur** (`redirect` de `@/i18n/navigation`, qui garde la locale) vers l'écran réel —
+`/carrier/onboarding` et `/search` — pour tout lien déjà partagé ; les quatre liens visent
+directement l'onboarding. L'assistant d'onboarding envoie déjà un visiteur à
+`/login?redirect=/carrier/onboarding` et le ramène après connexion : c'est l'écran attendu par
+WEB-VOY-1.
+
+## Ce que le harnais a appris
+
+- **Une absence se prouve sur trois surfaces.** Le texte de l'écran, le code source
+  (`page.content()` — une donnée peut être dans le HTML sans être visible), et la réponse de
+  l'API dont les clés sont comparées à une liste FERMÉE : toute clé ajoutée au contrat fait
+  échouer le parcours, ce qui est le but.
+- **Les secrets connus se cherchent nommément.** Le harnais connaît le code de livraison, le
+  numéro du destinataire, le montant payé et les lieux de remise du trajet : `neReveleRien()`
+  les reçoit et les cherche, en plus des motifs génériques.
+- **Un `Link` Next navigue côté client** : `networkidle` ne dit rien de la navigation, on attend
+  l'URL attendue (`toHaveURL`). Et l'en-tête du site porte les mêmes libellés que le bloc
+  d'acquisition : on vise le lien DANS le bloc.
+- **Un 404 uniforme se prouve par comparaison** : le corps de la réponse pour un jeton altéré
+  d'un caractère est identique, octet pour octet, à celui d'un jeton inventé.
+
+## Tests
+
+`apps/e2e` : **20 scénarios** verts sur le poste (harnais ×6, WEB-CNX ×3, WEB-RSV ×5, WEB-E2E-1 à 6).
+user-ui : typecheck vert. Aucun service modifié.
