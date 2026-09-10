@@ -623,7 +623,7 @@ Ordre de demarrage : auth -> trip -> gateway.
   preferredLocale fr, hasPassword). Pieges : le `role="alert"` de l'indicateur Next Dev Tools
   (viser `main`) ; un script lance par `execFileSync` se verifie seul d'abord (`isVerified`
   inexistant, casse a la derniere assertion). Harnais : 45 scenarios (41 joues, 4 ⏭). PR
-  **#__PR__** (empilee sur #265). Reste : 5.3 a 5.32, 02-ADMIN. AUCUNE attribution Claude.
+  **#266** (empilee sur #265). Reste : 5.3 a 5.32, 02-ADMIN. AUCUNE attribution Claude.
 - 04/09 : C-PR6b feat/c6b-admin-alerts (D59 3A / 4A, A129–A131) — neuf regles de seuil
   (evaluateAlerts pur, instantane de dix compteurs), GET /admin/alerts sans etat (accueil
   admin), cron horaire avec dedoublonnage Redis SET NX (un email par regle et par jour, Redis
