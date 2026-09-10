@@ -2623,3 +2623,42 @@ attente affichent le bandeau et les motifs ; aucun code n'est demandé ni envoy�
 | 32 | Profil, tableau de bord, page publique, export | aucun score, aucun niveau de risque, aucun point | oui |
 | 33 | Session expirée puis un geste | fenêtre par-dessus la page, reconnexion sur place, geste refait | oui |
 | 34 | Supprimer mon compte avec un deal en cours | bandeau, motifs, aucune porte, aucun email | oui |
+
+---
+
+# Le refus au pickup — ce que WEB-E2E-5 fait respecter
+
+*(PR `chore/e2e-parcours-5`, 10/09/2026 — cahier 01-WEB chapitre 6, A40, D39, D29 ①.)*
+
+## Le besoin
+
+Au rendez-vous de prise en charge, le Voyageur ouvre le colis. S'il ne correspond pas à ce qui a
+été déclaré, il doit pouvoir le **refuser sans se pénaliser** : c'est la garantie qui rend la
+vérification possible. L'Expéditrice est remboursée en entier, tout de suite, et prévenue ; les
+kilos reviennent au trajet ; et rien de ce refus ne vient noircir la page publique du Voyageur.
+
+## Les règles
+
+**RG-WEB-30 — Un refus au pickup rembourse tout.** Le paiement capturé à l'acceptation est
+remboursé intégralement, avant toute écriture en base ; « Mes envois » dit « Annulée »,
+Finances « Remboursé {total} le {date} », sans retenue. *(A40, D39.)*
+
+**RG-WEB-31 — Le refus est expliqué, dans l'ordre.** L'Expéditrice reçoit d'abord l'email du
+refus, avec la raison choisie par le Voyageur traduite dans sa langue, puis celui du remboursement
+émis, du montant intégral.
+
+**RG-WEB-32 — Un refus au pickup n'est pas une annulation fautive.** La ligne de faits du Voyageur
+(« n annulations tardives ») ne bouge pas, ni maintenant ni au prochain recalcul de réputation.
+*(ANO-WEB-10.)*
+
+**RG-WEB-33 — Les kilos refusés reviennent au trajet**, immédiatement, sans geste du Voyageur.
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| 35 | Deal accepté, « Refuser le colis », raison, confirmation | fenêtre avec le rappel « ne pénalise jamais ta réputation », toast, statut CANCELLED, remboursement = total | oui |
+| 36 | Mes envois, Finances de l'Expéditrice | « Annulée » ; « Remboursé {total} le … », aucune retenue | oui |
+| 37 | Emails de l'Expéditrice | refus avec la raison traduite, puis remboursement intégral, sans le mot « retenue » | oui |
+| 38 | Page publique du Voyageur avant / après | ligne de faits identique | oui |
+| 39 | Trajet du Voyageur | kilos rendus, ligne du deal « Annulé » | oui |

@@ -4025,3 +4025,72 @@ blob est relu en JSON avant d'être relancé. L'export RGPD était inutilisable 
 
 `apps/e2e` : **18 scénarios** verts sur le poste (harnais ×6, WEB-CNX ×3, WEB-RSV ×5, WEB-E2E-1 à 4).
 user-ui : typecheck et i18n verts. Aucun service modifié.
+
+---
+
+# WEB-E2E-5 : le refus au pickup, et une annulation qui n'en était pas une
+
+*(PR `chore/e2e-parcours-5`, 10/09/2026.)*
+
+## Ce qui a été fait
+
+Le cinquième parcours du cahier 01-WEB (gravité majeure) : un deal accepté et capturé, puis
+refusé par le Voyageur à la prise en charge — remboursement intégral, kilos rendus, deux emails,
+et une ligne de faits qui ne bouge pas. Huit étapes, 1 min 06.
+
+```
+apps/e2e/src/pages/transport-voyageur.ts   + refuserLeColis() : l'écran de prise en charge, la fenêtre, la raison, le toast, la réponse du serveur
+apps/e2e/src/pages/profil-public.ts        la page publique d'un membre : le publicSlug (via /auth/me), la ligne de faits, le compte d'annulations tardives
+apps/e2e/src/pages/mes-trajets.ts          + kilosRestants() partagé (sorti de web-e2e-3, qui l'importe désormais)
+apps/e2e/src/parcours/web-e2e-5.spec.ts
+```
+
+## Une anomalie produit, corrigée — ANO-WEB-10
+
+La machine d'états déclare le refus au pickup **sans pénalité** (`refusePickup` : `FULL_REFUND`,
+`RELEASE_CAPACITY`, `NOTIFY_SHIPPER` — pas de `PENALIZE_CARRIER`). Mais la réputation (D29 ①)
+est un **modèle de lecture** recalculé à part, dans `apps/deal-service/src/services/reputation.service.ts`,
+et sa requête des « annulations tardives » du Voyageur disait : `status: CANCELLED, closedBy:
+CARRIER, acceptedAt ≠ null`. Un refus au pickup coche les trois. Comme l'annulation ANN-02 par
+le Voyageur n'existe pas encore côté service (ANO-WEB-07, lot à part), ce compteur ne comptait
+en pratique **que** des refus au pickup — l'inverse exact de son intention.
+
+Pourquoi personne ne l'avait vu : le refus ne déclenchait aucun recalcul. La page publique
+restait juste jusqu'au prochain fait de réputation (un deal terminé, un avis révélé), où le refus
+apparaissait rétroactivement comme une annulation fautive. La première version du parcours passait
+donc « pour rien » (piège 7 du handoff : une assertion doit pouvoir échouer) ; la preuve a été
+faite en base — l'ancien filtre comptait 1 sur le deal refusé, le nouveau 0.
+
+Trois gestes, dans trois fichiers :
+
+1. **Une marque en base.** `Booking.pickupRefusedAt DateTime?` (`prisma/schema.prisma`). La raison
+   du refus est facultative (`pickupRefusalReason` peut être `null` sur un vrai refus), elle ne
+   pouvait pas servir de discriminant. `refusePickup` pose la marque avec `now` dans la même
+   transaction que le reste (`deal-transport.service.ts`).
+2. **Une requête qui exclut la marque, champ absent compris.** Les deals antérieurs à la marque
+   n'ont pas le champ ; sur Mongo, `pickupRefusedAt: null` ne les verrait pas (piège payé six
+   fois). D'où `OR: [{ pickupRefusedAt: null }, { pickupRefusedAt: { isSet: false } }]`.
+3. **Le refus recalcule la réputation des deux parties** (`recomputeBookingParties`, best effort,
+   comme l'annulation tardive) : la page publique dit vrai tout de suite, et l'étape 7 du parcours
+   devient une vraie relecture avant / après.
+
+Aucun DTO n'expose la marque : elle sert la réputation, pas les écrans.
+
+## Ce que le harnais a appris
+
+- **Une relecture « inchangé » n'a de valeur que si le produit a eu l'occasion de changer.** La
+  ligne de faits est lue avant la réservation et après le refus ; c'est le recalcul déclenché par
+  le refus qui rend la comparaison probante. Sans lui, l'assertion passait par inertie.
+- **Deux fenêtres pour un seul geste.** La modale (desktop) et le tiroir (mobile) portent toutes
+  deux `role="dialog"` ; le tiroir fermé est `aria-hidden`, donc absent de l'arbre des rôles.
+  On vise la fenêtre ouverte par son titre, et on confirme DANS la fenêtre — « Refuser le colis »
+  est aussi le bouton du pied de page.
+- **Le remboursement se prouve par la réponse du serveur ET par l'écran.** `refundAmountCents`
+  de `POST /deals/:id/pickup/refuse` égale le total lu à l'étape 1 ; la ligne Finances écrit le
+  même montant ; l'email de remboursement ne contient pas le mot « retenue ».
+
+## Tests
+
+deal-service : **576** tests (+1 : la requête des faits Voyageur exclut la marque, absent compris ;
+la marque et le recalcul sont vérifiés dans le spec du transport). Plateforme : 990.
+`apps/e2e` : **19 scénarios** verts sur le poste (harnais ×6, WEB-CNX ×3, WEB-RSV ×5, WEB-E2E-1 à 5).

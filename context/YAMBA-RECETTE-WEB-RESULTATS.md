@@ -251,6 +251,33 @@ Contre-épreuve : WEB-E2E-4 étape 10 — porte, code « Ton code de confirmatio
                  aucune trace de score).
 ```
 
+```
+ANO-WEB-10
+Fiche          : parcours WEB-E2E-5 étape 7 (chapitre 5.27, D29 ①, A40) · Gravité : MAJEURE · ÉTAT : CLOSE
+Attendu        : un refus au pickup n'ajoute AUCUNE annulation à la ligne de faits du Voyageur
+                 (« Refuser un colis non conforme ne pénalise jamais ta réputation. »).
+Obtenu         : la ligne de faits comptait comme « annulation tardive » TOUT deal CANCELLED
+                 clos par le Voyageur après acceptation — c'est-à-dire, aujourd'hui, chaque
+                 refus au pickup et rien d'autre (l'annulation ANN-02 par le Voyageur n'est pas
+                 encore ouverte, ANO-WEB-07). Le refus ne déclenchait pas de recalcul : la page
+                 restait juste, jusqu'au prochain fait de réputation (un deal terminé, un avis),
+                 où le refus surgissait comme une annulation fautive. Le parcours passait « pour
+                 rien » avant correction ; en base, l'ancien filtre comptait 1, le nouveau 0.
+Cause          : `reputation.service.ts` (`carrierFacts`) filtrait sur `status: CANCELLED,
+                 closedBy: CARRIER, acceptedAt ≠ null`, sans distinguer le refus au pickup —
+                 la raison du refus étant facultative, rien en base ne le marquait à coup sûr.
+                 La machine, elle, dit « sans pénalité » (effets de `refusePickup`, A40).
+Correction     : `prisma/schema.prisma` — `Booking.pickupRefusedAt` (marque du refus, posée par
+                 `refusePickup` avec `now`) ; `reputation.service.ts` — les annulations tardives
+                 du Voyageur excluent la marque, champ ABSENT compris (`OR` + `isSet: false`,
+                 piège Mongo) ; `deal-transport.service.ts` — le refus recalcule la réputation
+                 des deux parties (comme l'annulation), pour que la page publique dise vrai tout
+                 de suite. Tests : deal-service 575 → 576 (la requête, la marque, le recalcul).
+Contre-épreuve : WEB-E2E-5 étape 7 — ligne de faits lue AVANT la réservation et APRÈS le refus :
+                 identiques (« 0 annulation tardive ») ; en base, sur le deal refusé :
+                 `pickupRefusedAt` posé, ancien filtre 1 → nouveau filtre 0.
+```
+
 ---
 
 ## Chapitre 5.12 — Réserver : l'assistant en quatre étapes
@@ -384,6 +411,28 @@ Contre-épreuve : WEB-E2E-4 étape 10 — porte, code « Ton code de confirmatio
   de la clé Redis de la session ; la supprimer, c'est l'avoir laissée expirer), consignée.
 - Étape 13 : le cahier dit « Appareils connectés », l'écran s'intitule « Sessions actives »
   (sous-titre « Les appareils connectés à ton compte »). Le cahier à aligner.
+
+---
+
+## Chapitre 6 — WEB-E2E-5, le refus au pickup et le remboursement · **CONFORME** (8 étapes, 1 min 06)
+
+| Étape du cahier | Ce qui est éprouvé | Verdict |
+|---|---|---|
+| 1 | Aminata réserve 2 kg, taille S sur `fih` (Bruxelles → Kinshasa, tarif par catégorie) | **Conforme** — total lu à l'écran (22,00 €), suivi ouvert |
+| 2 | Joséphine accepte | **Conforme** — « Bloqué chez Yamba », email « est acceptée », kilos réservés (API) |
+| 3 | « Refuser le colis » depuis la prise en charge | **Conforme** — « Refuser ce colis ? », « Refuser un colis non conforme ne pénalise jamais ta réputation. », « Le Deal sera annulé et Aminata intégralement remboursée. » |
+| 4 | Raison « Le contenu ne correspond pas à la déclaration », confirmation | **Conforme** — toast « Colis refusé. Aminata a été notifiée et sera remboursée. », 200 `CANCELLED`, `refundAmountCents` = total |
+| 5 | Mes envois, Finances | **Conforme** — « Annulée » ; « Remboursé 22,00 € le … », sans retenue |
+| 6 | Mailpit | **Conforme** — « Ton colis Bruxelles → Kinshasa n'a pas pu être pris en charge » avec la raison traduite, puis « Remboursement émis … » du montant intégral, sans un mot de retenue, dans cet ordre |
+| 7 | Page publique de Joséphine | **Conforme après correction** → `ANO-WEB-10` ; ligne de faits identique avant / après |
+| 8 | Mes trajets | **Conforme** — ligne du deal « Annulé », kilos rendus (API) |
+
+### Deux écarts assumés, écrits dans le parcours
+
+- Étape 6 : le cahier dit « refus à la remise » ; le sujet réel est « Ton colis … n'a pas pu
+  être pris en charge » — la raison traduite est dans le corps. Copie du cahier à aligner.
+- Étape 8 : « Mes trajets » n'affiche pas les kilos restants (écart déjà consigné en WEB-E2E-3) ;
+  ils sont lus à l'API du trajet, avant, après l'acceptation, après le refus.
 
 ---
 

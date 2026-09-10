@@ -1,4 +1,4 @@
-# Handoff — recette navigateur (cahiers 01-WEB / 02-ADMIN) · 09/09/2026
+# Handoff — recette navigateur (cahiers 01-WEB / 02-ADMIN) · 09/09/2026 (mis à jour le 10/09)
 
 *Ce document sert à REPRENDRE le chantier après une pause. Il dit où en est la campagne, ce qui
 tourne sur le poste, ce qui reste à faire, et les pièges déjà payés qu'il ne faut pas repayer.*
@@ -8,7 +8,7 @@ tourne sur le poste, ce qui reste à faire, et les pièges déjà payés qu'il n
 > **1.** ~~corriger le harnais avec `storageState`~~ **FAIT** (§ 4 bis) ;
 > **2.** ~~monter la fixture de session administrateur~~ **FAIT** (`seed-admins.ts` + `navigateurAdmin`) ;
 > **3.** ~~finir WEB-E2E-1 en entier, ouvrir la PR~~ **FAIT — PR #259 mergée** ;
-> **4.** les cinq autres parcours du chapitre 6 : ~~E2E-2~~ **FAIT, #260 mergée**, ~~E2E-3~~ **FAIT, #261 mergée**, ~~E2E-4~~ **FAIT** (branche `chore/e2e-parcours-4`, PR à ouvrir), puis E2E-5, E2E-6 ;
+> **4.** les cinq autres parcours du chapitre 6 : ~~E2E-2~~ **FAIT, #260 mergée**, ~~E2E-3~~ **FAIT, #261 mergée**, ~~E2E-4~~ **FAIT, PR #262** (17 checks verts, à merger), ~~E2E-5~~ **FAIT** (branche `chore/e2e-parcours-5`, ANO-WEB-10 close, PR à ouvrir après le merge de #262), puis E2E-6 ;
 > **5.** les 32 chapitres du cahier **01-WEB** (326 fiches) ;
 > **6.** le cahier **02-ADMIN** (110 fiches) — 19 fiches de sécurité d'accès, 91 fiches d'écrans.
 >
@@ -26,7 +26,7 @@ tourne sur le poste, ce qui reste à faire, et les pièges déjà payés qu'il n
 |---|---|
 | **Cahier n° 4 — tâches planifiées** (90 fiches) | **CLOS.** 9 anomalies, 9 closes. PR **#256** + docs **#257**, mergées. Décisions **D76** et **D77** gravées au registre. Rapport : `context/YAMBA-RECETTE-CRONS-RESULTATS.md` |
 | **Harnais de recette navigateur** (Playwright) | **MERGÉ** — PR **#258**. Avec `ANO-WEB-01` (bloquante) et `ANO-WEB-02` (majeure), toutes deux closes |
-| **Parcours transactionnels** | **#259 MERGÉ** (WEB-E2E-1) · **#260 MERGÉ** (WEB-E2E-2, ANO-WEB-04, ANO-WEB-05) · **#261 MERGÉ** (WEB-E2E-3, ANO-WEB-06 ; ANO-WEB-07 tranchée) · **WEB-E2E-4 vert** sur `chore/e2e-parcours-4`, PR à ouvrir (ANO-WEB-08, ANO-WEB-09 closes) · #259 : WEB-E2E-1 passe **en entier** (29 étapes, 1 min 24), sessions mémorisées, fixture admin, `ANO-WEB-03` (majeure) close, 15 scénarios verts en 3 min 06 |
+| **Parcours transactionnels** | **#259 MERGÉ** (WEB-E2E-1) · **#260 MERGÉ** (WEB-E2E-2, ANO-WEB-04, ANO-WEB-05) · **#261 MERGÉ** (WEB-E2E-3, ANO-WEB-06 ; ANO-WEB-07 tranchée) · **PR #262 ouverte, 17/17 verts** (WEB-E2E-4, ANO-WEB-08, ANO-WEB-09 closes) · **WEB-E2E-5 vert** sur `chore/e2e-parcours-5` (8 étapes, 1 min 06, ANO-WEB-10 close — la réputation comptait le refus au pickup comme une annulation tardive) · #259 : WEB-E2E-1 passe **en entier** (29 étapes, 1 min 24), sessions mémorisées, fixture admin, `ANO-WEB-03` (majeure) close, 15 scénarios verts en 3 min 06 |
 
 Rapport de la campagne navigateur : `context/YAMBA-RECETTE-WEB-RESULTATS.md`.
 
@@ -169,6 +169,14 @@ Pièges payés sur les étapes 11 à 29, pour ne pas les repayer :
     (manœuvre) ET retirer le cookie `access_token` ; puis un clic qui appelle l'API.
 22. **Un compte neuf par exécution** (`compte-neuf.ts`) : la base en garde un de plus à chaque
     passage — sans conséquence, mais à savoir pour les compteurs du back-office.
+23. **Un « inchangé » ne prouve rien si rien n'a pu le changer.** L'étape 7 de E2E-5 (ligne de
+    faits identique) passait AVANT correction : le refus ne recalculait pas la réputation. Devant
+    un test vert du premier coup, chercher ce qui aurait dû pouvoir le faire échouer ; au besoin,
+    prouver en base avec un script jetable (`npx tsx --env-file=.env ./x.ts`, puis le supprimer).
+24. **Un modèle de lecture peut contredire la machine.** Un compteur qui filtre sur un statut
+    d'arrivée (`CANCELLED` + `closedBy`) voit toutes les transitions qui y mènent — y compris
+    celles que la machine déclare « sans pénalité ». À chaque transition ajoutée, relire les
+    requêtes qui filtrent sur son statut.
 19. **Une manœuvre se joue là où le produit la lit** : le barème d'annulation lit le départ figé
     dans le deal — avancer le trajet APRÈS la réservation ne change rien. Sans `nx dev admin-ui`, `navigateurAdmin` attend
     un écran qui n'existe pas.
@@ -187,12 +195,19 @@ Pièges payés sur les étapes 11 à 29, pour ne pas les repayer :
    `chore/e2e-parcours-4`) ; l'annulation d'un deal par le Voyageur = lot à part. **PR #261 mergée.**
 
    ~~E2E-4 (compte neuf)~~ **FAIT** — 14 étapes, 1 min 06, `ANO-WEB-08` et `ANO-WEB-09` closes,
-   message D72 corrigé. Branche `chore/e2e-parcours-4` : **ouvrir la PR**, compter, merger.
+   message D72 corrigé. **PR #262 ouverte, 17 checks verts** : la merger (la fusion par le harnais
+   a été refusée par le classifieur du poste — `gh pr merge 262 --merge` à la main).
 
-   **Les deux derniers parcours du chapitre 6** : refus au pickup (E2E-5), parcours du
-   destinataire (E2E-6). Les objets de page
-   existants (réservation, fil, transport, suivi, signalement, médiation) couvrent la plus grande
-   part de leurs écrans.
+   ~~E2E-5 (refus au pickup)~~ **FAIT** — 8 étapes, 1 min 06, `ANO-WEB-10` close (majeure : la
+   réputation comptait tout refus au pickup comme une annulation tardive au prochain recalcul ;
+   marque `Booking.pickupRefusedAt`, requête qui l'exclut, refus qui recalcule). Branche
+   `chore/e2e-parcours-5`, empilée sur `chore/e2e-parcours-4` : **ouvrir la PR après le merge de
+   #262** (sinon le diff porte les deux parcours), compter, merger.
+
+   **Le dernier parcours du chapitre 6** : le parcours du destinataire (E2E-6), qui se joue en
+   parallèle de E2E-1 dans le navigateur C — `suivi-destinataire.ts` couvre déjà la page ; il
+   reste la mention de confidentialité, le bloc d'acquisition, le jeton altéré, et la preuve
+   qu'aucun email ni SMS ne part vers le destinataire.
 
 4. **Les 32 chapitres 5.x du cahier 01-WEB** (326 fiches), par famille. Huit d'entre eux
    s'appuient sur le back-office (tableau du handoff précédent : suspendre, masquer, valider un
