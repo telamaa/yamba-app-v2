@@ -201,9 +201,10 @@ Pièges payés sur les étapes 11 à 29, pour ne pas les repayer :
    ~~E2E-5 (refus au pickup)~~ **FAIT** — 8 étapes, 1 min 06, `ANO-WEB-10` close (majeure : la
    réputation comptait tout refus au pickup comme une annulation tardive au prochain recalcul ;
    marque `Booking.pickupRefusedAt`, requête qui l'exclut, refus qui recalcule). Branche
-   `chore/e2e-parcours-5`, empilée sur `chore/e2e-parcours-4` : **PR #263 ouverte, base
-   `chore/e2e-parcours-4`** (GitHub la recible sur `dev` au merge de #262). Merger #262, puis
-   compter les 17 checks de #263 et la merger.
+   `chore/e2e-parcours-5`, empilée sur `chore/e2e-parcours-4` : **PR #263 ouverte sur `dev`**
+   (la CI ne tourne que sur les PR vers `dev` / `main` : une base intermédiaire donnait 0 check).
+   Son diff porte les deux parcours tant que #262 n'est pas mergée, et se réduit seul après.
+   Merger #262 d'abord, puis compter les 17 checks de #263 et la merger.
 
    **Le dernier parcours du chapitre 6** : le parcours du destinataire (E2E-6), qui se joue en
    parallèle de E2E-1 dans le navigateur C — `suivi-destinataire.ts` couvre déjà la page ; il
