@@ -1043,6 +1043,75 @@ Correction     : la variable est passée (`BookingTrackingLinkCard`).
 Contre-épreuve : WEB-PIC-8/9/10 : aucun texte commençant par « bookingTracker. » sur le suivi.
 ```
 
+```
+ANO-WEB-55
+Fiche          : WEB-COD-3, WEB-COD-4 (chapitre 5.17) · Gravité : MINEURE · ÉTAT : CLOSE
+Attendu        : « Copier le code » → toast « Code copié ! » ; « Copier le message » → toast « Message copié ! ».
+Obtenu         : « Code copié ! » existait au catalogue (`pickedUp.code.copied`) et n'était JAMAIS rendu : seule
+                 l'icône du bouton changeait deux secondes, l'`aria-label` restait « Copier le code ». Le message,
+                 lui, ne changeait que le libellé du bouton. Même famille qu'ANO-WEB-51 : de la copie écrite,
+                 jamais branchée.
+Correction     : `BookingCodeCard` — toast + `aria-label` / `title` basculés sur « Code copié ! » ;
+                 `BookingShareCode` — toast « Message copié ! » en plus du libellé.
+Contre-épreuve : WEB-COD-3 (le toast, le presse-papiers = six chiffres), WEB-COD-4 (le libellé).
+```
+
+```
+ANO-WEB-56
+Fiche          : WEB-COD-4 (chapitre 5.17) · Gravité : MAJEURE · ÉTAT : CLOSE
+Attendu        : « WhatsApp » s'ouvre SUR LE NUMÉRO SAISI À LA RÉSERVATION, message pré-rempli ; « SMS » de même.
+Obtenu         : `https://wa.me/?text=…` et `sms:?&body=…` — sans destinataire : l'Expéditrice devait chercher
+                 Clarisse dans ses contacts, alors que `recipient.phoneE164` est servi à l'Expéditeur (D69) et que
+                 la carte du lien de suivi (`BookingTrackingLinkCard`) le faisait déjà. Idem pour « Repartager »
+                 de la phase voyage (`SenderCodeCard`).
+Correction     : `BookingShareCode` et `SenderCodeCard` : `wa.me/<chiffres>?text=` et `sms:<numéro>?&body=` ;
+                 sans numéro, le lien reste ouvert (l'utilisatrice choisit le contact).
+Contre-épreuve : WEB-COD-4 : `window.open` capturé → `wa.me/242061234567`, `text` = le message copié.
+```
+
+```
+ANO-WEB-57
+Fiche          : WEB-COD-5, WEB-COD-6 (chapitre 5.17) · Gravité : MINEURE · ÉTAT : CLOSE
+Attendu        : après une régénération, « 4 régénérations restantes » ; après la cinquième, « Aucune
+                 régénération restante » et le bouton inactif.
+Obtenu         : le compteur ne vivait QUE dans la boîte de confirmation (« Régénérer le code ? … · 4
+                 régénérations restantes ») : invisible après le geste, et « Aucune régénération restante »
+                 impossible à lire — le bouton inactif n'ouvre plus la boîte. La forme plurielle `=0` du
+                 message était inatteignable.
+Correction     : le compteur est rendu en permanence sous l'avertissement de confidentialité
+                 (`BookingCodeCard`) et sous l'aide de la carte compacte (`SenderCodeCard`).
+Contre-épreuve : WEB-COD-5 (« 5 » puis « 4 régénérations restantes »), WEB-COD-6 (4 → 3 → 2 → 1 → « Aucune »).
+```
+
+```
+ANO-WEB-58
+Fiche          : WEB-COD-6 (chapitre 5.17) · Gravité : MINEURE · ÉTAT : CLOSE
+Attendu        : un essai forcé au-delà du plafond → « Tu as atteint la limite de régénérations. Contacte le
+                 support si besoin. »
+Obtenu         : le serveur refuse bien (409, `details.code = CODE_REGENERATION_LIMIT`, prouvé par l'API) et
+                 `booking-tracker.api.ts` le traduit en `BookingApiError.code` — mais les deux cartes
+                 ignoraient ce code et affichaient « Erreur lors de la régénération. Réessaye. » Le message
+                 du plafond ne sortait que du garde-fou CLIENT (`regenerationsLeft <= 0`), inatteignable
+                 puisque le bouton est déjà inactif. Cas réel : un second onglet resté sur « 1 régénération
+                 restante ».
+Correction     : `catch (e)` des deux cartes : `CODE_REGENERATION_LIMIT` → `toastMaxReached`, et la boîte
+                 de confirmation se ferme.
+Contre-épreuve : WEB-COD-6 : l'onglet en retard clique « Oui, régénérer », 409 relu, le message du cahier,
+                 le code inchangé après rechargement, « Aucune régénération restante ».
+```
+
+```
+ANO-WEB-59
+Fiche          : WEB-COD-3 (chapitre 5.17) · Gravité : MINEURE · ÉTAT : CLOSE
+Attendu        : quand la copie échoue (pas de `navigator.clipboard` hors HTTPS — le LAN de recette en http),
+                 l'échec est dit, et dit juste.
+Obtenu         : « Copier le code » en échec affichait « Erreur lors de la régénération. Réessaye. » (le
+                 `toastError` d'une autre action) ; « Copier le message » échouait en silence.
+Correction     : clé `pickedUp.code.copyFailed` (FR / EN) : « Copie impossible sur ce navigateur — sélectionne le
+                 code et copie-le à la main. » sur les deux boutons.
+Contre-épreuve : WEB-COD-3, second navigateur sans presse-papiers : le message, jamais « régénération ».
+```
+
 ---
 
 ## Chapitre 5.1 — Découverte, accueil et navigation · **CONFORME** (12 fiches, 1 min 24)
@@ -2250,6 +2319,82 @@ jalons sont attendus sur la REQUÊTE (cinq secondes de repentir chacun), jamais 
   ne garde que le dernier fichier joué : lire les annotations tout de suite, ou les consigner dans le
   rapport de recette au fil de l'eau.
 - **Les crons du poste écrivent aux comptes du seed** : « aucun email » se prouve sur le SUJET.
+
+## Chapitre 5.17 — Le code de livraison · **CONFORME** (8 fiches jouées, 4 après correction · 5 anomalies closes dont 1 MAJEURE · 8 scénarios en série, 1 min 48)
+
+`web-cod.spec.ts`. `bzv-accepted` (Pauline ↔ Thomas) pour « pas encore de code », `bzv-picked` (Aminata ↔
+Thomas, code `742891`) pour tout le reste, `bzv-delivered` (João ↔ Thomas) pour l'après-remise. Le
+presse-papiers est observé en mémoire de page, `window.open` est capturé (WhatsApp) ; les liens `sms:` /
+`mailto:` ne sont pas cliqués (ils ouvriraient Messages / Mail du poste).
+
+| Fiche | Ce qui est éprouvé | Verdict | Preuve |
+|---|---|---|---|
+| WEB-COD-1 | Le code n'existe pas avant la prise en charge | **Conforme** — carte « Ton code de livraison », badge « En attente », « Tu recevras ton code à 6 chiffres dès que Thomas confirmera la prise en charge de ton colis. Tu le transmettras à Clarisse pour valider la livraison. » ; aucun groupe de chiffres, aucun bloc à six chiffres, ni « Copier » ni « Régénérer », le code du seed absent de la source |
+| WEB-COD-2 | Le code apparaît chez l'Expéditrice seule | **Conforme** — Aminata : « CODE À TRANSMETTRE À CLARISSE », « 742 891 », « Copier le code », « Régénérer le code », « Garde ce code confidentiel. Tu peux le régénérer si tu penses qu'il a fuité. » ; Thomas : **neuf sources fouillées** (deal, écran de livraison, notifications — texte ET source HTML —, fil de messagerie, `GET /deals/:id`, `GET /notifications`) : aucune occurrence de `742891` ni de « 742 891 » |
+| WEB-COD-3 | Copier le code | **Conforme après correction** → `ANO-WEB-55`, `ANO-WEB-59` ; toast « Code copié ! », presse-papiers = `742891` (sans espace) ; sans presse-papiers : « Copie impossible sur ce navigateur — sélectionne le code et copie-le à la main. » |
+| WEB-COD-4 | Partager le code au destinataire | **Conforme après correction** → `ANO-WEB-56` ; « Partage le code à Clarisse » / « Le message est pré-rempli, tu n'as qu'à envoyer » ; message copié = « Bonjour Clarisse ! Ton colis arrive avec Thomas (Paris → Brazzaville). Pour le récupérer, donne-lui ce code : 742891. Bisous ! », « Message copié ! » ; WhatsApp → `wa.me/242061234567?text=<le message>` ; SMS et Email présents, objet « Code de retrait de ton colis Yamba » lu au catalogue. **Constat** : « Message copié ! » est un libellé de bouton (et depuis ANO-WEB-55 un toast) ; `sms:` / `mailto:` non cliqués |
+| WEB-COD-5 | Régénérer le code | **Conforme après correction** → `ANO-WEB-57` ; « 5 régénérations restantes » ; « Régénérer le code ? » / « L'ancien code ne fonctionnera plus. Pense à renvoyer le nouveau à Clarisse. » / « Annuler » (referme) / « Oui, régénérer » ; toast « Nouveau code généré ! N'oublie pas de le renvoyer à Clarisse. » ; nouveau code à six chiffres ≠ 742891 ; « 4 régénérations restantes » ; après rechargement le code affiché est le nouveau, l'ancien absent ; email « Nouveau code pour ton envoi Paris → Brazzaville » (« Un nouveau code a été généré », « Il te reste 4 régénération(s) ») **sans l'ancien ni le nouveau code** ; Thomas : aucun email de régénération |
+| WEB-COD-6 | Le plafond de cinq régénérations | **Conforme après correction** → `ANO-WEB-57`, `ANO-WEB-58` ; 4 → 3 → 2 → 1 régénération restante, puis « Aucune régénération restante » et le bouton inactif ; essai forcé par l'API : 409 `CODE_REGENERATION_LIMIT` ; essai forcé par l'écran (second onglet resté sur « 1 restante ») : 409 relu, « Tu as atteint la limite de régénérations. Contacte le support si besoin. », le code inchangé après rechargement |
+| WEB-COD-7 | Le Voyageur ne régénère pas | **Conforme** — quatre écrans (deal, livraison, accepté, prise en charge) : aucun bouton ni lien de régénération, le mot n'est pas rendu, l'appel `code/regenerate` absent de la page. **Constat** : la SOURCE des pages Voyageur porte tout le catalogue `bookingTracker` (textes de l'Expéditeur compris) — sérialisation next-intl |
+| WEB-COD-8 | Après la remise, le code disparaît | **Conforme** — « Code de livraison saisi par Thomas et validé », badge « Code validé » (nom accessible), plus de « CODE À TRANSMETTRE », aucun bloc à six chiffres, ni « Copier » ni « Régénérer », le code du seed absent de la source |
+
+### À trancher (produit)
+
+- **« Message copié ! » / « Code copié ! »** : le cahier attend des toasts ; l'écran changeait le libellé ou
+  l'icône. Les deux existent désormais (ANO-WEB-55) — amender le cahier ou retenir une seule forme.
+- **SMS et Email** ne sont pas cliqués par le harnais (ils ouvrent les applications du poste) ; l'objet est
+  vérifié au catalogue. Des liens `<a href="sms:…">` / `<a href="mailto:…">` les rendraient prouvables sans
+  clic (regard d'expert COD-4).
+- **Le badge « Code validé »** est une icône dont « Code validé » est le nom accessible (`aria-label`,
+  `title`), pas un texte visible — amender le cahier ou rendre le texte.
+- **« Livraison estimée — »** sur le suivi d'Aminata (bzv-picked) : même cause qu'ANO-WEB-53 (instantané sans
+  `arrivalAt`), déjà ouverte.
+
+### Regard d'expert — optimisations et améliorations (une ligne par fiche)
+
+- **COD-1** — La carte « En attente » est juste ; son en-tête de fichier dit encore « plus tard ce
+  composant affichera le code » alors qu'une autre carte le fait : rafraîchir le commentaire, et proposer
+  dès ce stade « prévenir Clarisse qu'un code va arriver » (le numéro est déjà là) — petit.
+- **COD-2** — Neuf sources fouillées à la main ; la vraie garantie est la liste blanche du DTO Voyageur :
+  un test qui énumère les clés INTERDITES (`deliveryCode`, `deliveryCodeEncrypted`, `deliveryCodeHash`)
+  sur chaque DTO non-Expéditeur, s'il n'existe pas déjà, vaut plus que toute fouille — petit.
+- **COD-3** — `navigator.clipboard` n'existe qu'en contexte sécurisé : sur le LAN en http, la copie est
+  impossible (ANO-WEB-59 dit désormais pourquoi). Un repli par sélection du texte (`Selection` +
+  `execCommand("copy")`, encore supporté) rendrait la copie possible partout — petit.
+- **COD-4** — Quatre boutons JS pour quatre liens : des `<a href>` (`wa.me`, `sms:`, `mailto:`) donnent
+  le clic droit, l'appui long, le clavier, aucun JS, et un harnais qui lit l'`href` sans ouvrir Mail —
+  petit ; et si l'email du destinataire est saisi à la réservation, le mettre dans `mailto:` — petit.
+- **COD-5** — L'email de sécurité est bon (D43 : jamais le code) ; la régénération n'a PAS de
+  notification dans la cloche (`booking.code_regenerated: "NONE"`) — un événement de sécurité mérite
+  une ligne en cloche — petit.
+- **COD-6** — Le plafond `MAX_CODE_REGENERATIONS = 5` est une constante partagée front / serveur : la
+  porter au catalogue des réglages (`delivery.maxCodeRegenerations`, D62) et la servir dans le DTO
+  Expéditeur (`codeRegenerationsLeft`) pour que le front n'écrive plus « 5 » — moyen.
+- **COD-7** — next-intl sérialise TOUT l'espace `bookingTracker` dans chaque page, écrans Voyageur
+  compris (textes de l'Expéditeur, mots-clés de l'autre rôle) : sélectionner les espaces par route
+  (`getMessages` + `pick`) allège les pages et cloisonne la copie — moyen.
+- **COD-8** — Le badge « Code validé » n'est lisible que par un lecteur d'écran : rendre le texte à
+  côté de l'icône — petit.
+- **Transversal** — Trois des cinq anomalies sont encore de la copie non branchée ou du **retour
+  d'action qui n'existe que dans un état transitoire** (toast jamais rendu, compteur enfermé dans une
+  boîte de confirmation, erreur serveur traduite puis ignorée). Règle à tenir : tout retour du serveur
+  qui porte un `details.code` traduit DOIT avoir un lecteur ; le test de rendu des vues avec un deal
+  fixture (proposé en 5.16) prendrait les deux premiers en une seconde — moyen.
+
+### Pièges de poste payés ici
+
+- **Les toasts s'empilent cinq secondes** : deux régénérations rapprochées = deux « Nouveau code
+  généré ! » — viser `.last()`.
+- **Le client rejoue une requête après un 401** (jeton de la session mémorisée expiré, rafraîchi par
+  `api-client`) : `waitForResponse` doit ignorer le 401 et attendre la réponse définitive, sinon le test
+  lit « 401 » pour un geste qui a réussi.
+- **Un bouton dé-grisé à la main n'est pas un essai forcé** : React ré-applique `disabled` au rendu
+  suivant. L'essai forcé honnête est un second onglet resté sur l'état d'avant.
+- **« Absent de la source » ne vaut rien sur une page next-intl** : le catalogue entier y est sérialisé.
+  Viser le chemin d'API (`code/regenerate`) et l'interface rendue, pas un libellé.
+- **Ne jamais cliquer `sms:` / `mailto:`** sur le Chrome du poste : Messages et Mail s'ouvrent.
+- **Les crons écrivent aux comptes du seed** (versement à Thomas pendant l'attente) : l'absence d'email
+  se prouve sur le SUJET.
 
 ## Chapitre 6 — WEB-E2E-1, le nominal complet · **CONFORME** (29 étapes, 1 min 24)
 

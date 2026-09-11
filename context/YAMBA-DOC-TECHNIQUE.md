@@ -5492,3 +5492,94 @@ et format (`PHOTO_MIME_TYPES`) à la sélection, avec les textes `errors.uploadT
 Plateforme inchangée (996 + auth 229). `apps/e2e` : **186 scénarios** (178 + WEB-PIC ×8). Typecheck
 user-ui (`tsc -p apps/user-ui`) et harnais verts ; miroir i18n vert.
 
+---
+
+# Chapitre 5.17 du cahier 01-WEB : le code de livraison — le retour d'action qui n'existe que dans un état transitoire
+
+*(PR `chore/recette-web-5-17`, 11/09/2026.)*
+
+## Ce qui a été fait
+
+Le dix-septième chapitre « fiches » du cahier 01-WEB : `WEB-COD` (l'apparition du code, sa copie, son
+partage, sa régénération et son plafond, ce que le Voyageur ne voit jamais, l'après-remise). Huit fiches
+jouées et conformes (quatre après correction), cinq anomalies closes (`ANO-WEB-56` MAJEURE, `55`, `57`,
+`58`, `59` mineures). Aucune correction côté service : le serveur était juste partout (code chez
+l'Expéditrice seule, 409 `CODE_REGENERATION_LIMIT`, email sans le code).
+
+```
+apps/e2e/src/chapitres/web-cod.spec.ts                                            8 scénarios en série, 1 min 48
+apps/user-ui/src/components/booking/booking-tracker/views/picked-up/BookingCodeCard.tsx     ANO-WEB-55 (toast + aria-label), 57 (compteur permanent), 58 (409 traduit), 59 (échec de copie)
+apps/user-ui/src/components/booking/booking-tracker/views/picked-up/BookingShareCode.tsx    ANO-WEB-56 (wa.me/<numéro>, sms:<numéro>), 55 (toast), 59
+apps/user-ui/src/components/booking/booking-tracker/views/in-transit/SenderCodeCard.tsx     ANO-WEB-56 (repartager), 57, 58
+apps/user-ui/messages/{fr,en}/bookingTracker.json                                 `pickedUp.code.copyFailed` (ANO-WEB-59)
+```
+
+## ANO-WEB-56 : le numéro était là, le lien ne le prenait pas
+
+`BookingShareCode` ouvrait `https://wa.me/?text=…` et `sms:?&body=…` : message pré-rempli, destinataire à
+chercher. Or le DTO Expéditeur porte `recipient.phoneE164` depuis D69, et la carte du lien de suivi
+(`BookingTrackingLinkCard`) construisait déjà `wa.me/<chiffres>` et `sms:<numéro>`. Les deux cartes du code
+(phase pickup et phase voyage) font maintenant pareil :
+
+```ts
+// apps/user-ui/src/components/booking/booking-tracker/views/picked-up/BookingShareCode.tsx
+const phone = booking.recipient.phoneE164 ?? "";
+const whatsappTarget = phone.replace(/[^\d]/g, "");            // wa.me veut les chiffres, sans « + »
+window.open(`https://wa.me/${whatsappTarget}?text=${encodeURIComponent(message)}`, "_blank");
+window.location.href = `sms:${phone}?&body=${encodeURIComponent(message)}`;   // « ?& » : iOS et Android
+```
+
+Sans numéro, le lien reste ouvert : l'utilisatrice choisit le contact, comme avant.
+
+## ANO-WEB-57 et ANO-WEB-58 : un compteur enfermé, une erreur traduite puis ignorée
+
+Le compteur « {n} régénérations restantes » n'était rendu QUE dans la boîte de confirmation : après le
+geste, plus de compteur ; après la cinquième, le bouton inactif n'ouvre plus la boîte, donc « Aucune
+régénération restante » (la forme `=0` du message ICU) était inatteignable. Le compteur vit maintenant sous
+l'avertissement de confidentialité, en permanence.
+
+Le serveur refuse la sixième par un 409 `CODE_REGENERATION_LIMIT` ; `booking-tracker.api.ts` le
+traduisait déjà en `BookingApiError.code` — et les cartes faisaient `catch {}` sans le lire :
+
+```ts
+} catch (e) {
+  const plafond = e instanceof BookingApiError && e.code === "CODE_REGENERATION_LIMIT";
+  toast.error(t(plafond ? "pickedUp.code.toastMaxReached" : "pickedUp.code.toastError"));
+  if (plafond) setConfirmingRegen(false);
+}
+```
+
+Le cas qui le déclenche est réel : un second onglet resté sur « 1 régénération restante ». Règle à
+retenir : **un `details.code` traduit par la couche API doit avoir un lecteur dans la vue**, sinon la
+traduction est du code mort.
+
+## ANO-WEB-55 et ANO-WEB-59 : dire ce qui vient de se passer, et dire juste
+
+« Code copié ! » existait au catalogue et n'était jamais rendu (seule l'icône changeait, l'`aria-label`
+restait « Copier le code ») ; le message n'avait qu'un libellé de bouton. Les deux ont un toast, et
+l'`aria-label` bascule. À l'échec (pas de `navigator.clipboard` hors contexte sécurisé — le LAN en http),
+le bouton du code affichait « Erreur lors de la régénération. Réessaye. » — le `toastError` d'une autre
+action — et celui du message se taisait : nouvelle clé `pickedUp.code.copyFailed`, FR et EN.
+
+## Le harnais
+
+- Le presse-papiers est observé en mémoire de page (`fixtures/presse-papiers.ts`) ; `window.open` est
+  capturé par un `addInitScript` (`__ouverturesYamba`) et l'URL WhatsApp est relue avec `new URL()` —
+  hôte, chemin (le numéro), paramètre `text`.
+- `sms:` et `mailto:` ne sont pas cliqués (Messages / Mail du poste s'ouvriraient) : l'objet de l'email
+  est lu au catalogue FR.
+- La fiche 2 fouille neuf sources côté Voyageur (texte ET source HTML de trois pages, le fil, deux
+  réponses d'API) ; la fiche 7 constate que la source porte tout le catalogue `bookingTracker` — l'assertion
+  vise l'interface rendue et le chemin d'API, pas un libellé.
+- La fiche 6 ouvre un second onglet avant la dernière régénération : c'est lui l'« essai forcé »
+  (React ré-applique `disabled` à un bouton dé-grisé à la main).
+- `waitForResponse` ignore le 401 : la session mémorisée expire, `api-client` rafraîchit et rejoue.
+- Les toasts s'empilent cinq secondes : `.last()`.
+- L'identifiant du deal est posé paresseusement (`dealPicked(jeuEssai)`) : chaque fiche reste jouable seule
+  (`--grep`), le seed étant rejoué par `beforeAll`.
+
+## Tests
+
+Plateforme inchangée (996 + auth 229). `apps/e2e` : **194 scénarios** (186 + WEB-COD ×8). Typecheck
+user-ui (`tsc -p apps/user-ui`) et harnais verts ; miroir i18n vert (nouvelle clé `copyFailed` FR / EN).
+

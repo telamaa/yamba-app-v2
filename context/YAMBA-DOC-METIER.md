@@ -3694,3 +3694,56 @@ envoie un email** (« préviens le destinataire »), sans le code.
 | 219 | Transit et jalons | une carte, ordre, cinq secondes, non répétables | oui |
 | 220 | Côté Expéditrice | bannières, cloche, un seul email | oui (ANO-WEB-54 close ; ANO-WEB-53 ouverte) |
 
+---
+
+# Le code de livraison — ce que le chapitre 5.17 fait respecter
+
+*(PR `chore/recette-web-5-17`, 11/09/2026 — cahier 01-WEB chapitre 5.17, WEB-COD-1 à 8.)*
+
+## Le besoin
+
+Le code à six chiffres est la clé de la remise : il naît à la prise en charge, chez l'Expéditrice seule,
+qui le transmet au destinataire par le canal de son choix. Elle peut le régénérer si elle pense qu'il a
+fuité (cinq fois au plus), et le Voyageur ne le voit jamais — ni à l'écran, ni dans une notification, ni
+dans un email, ni dans le fil. Après la remise, il disparaît.
+
+## Les règles
+
+**RG-WEB-184 — Avant la prise en charge, aucun chiffre** : la carte « Ton code de livraison » porte le badge
+« En attente » et explique quand le code viendra et à qui le transmettre.
+
+**RG-WEB-185 — Le code n'est lisible que par l'Expéditrice** (« CODE À TRANSMETTRE À {destinataire} »,
+« Copier le code », « Régénérer le code », l'avertissement de confidentialité) ; côté Voyageur, il n'apparaît
+sur aucun écran, dans aucune notification, dans aucune réponse d'API.
+
+**RG-WEB-186 — Copier dit ce qui s'est passé** : « Code copié ! » (six chiffres, sans espace) ; en cas
+d'échec de copie, un message qui parle de copie.
+
+**RG-WEB-187 — Partager, c'est pré-remplir vers le bon destinataire** : le message (« Bonjour {destinataire} !
+Ton colis arrive avec {Voyageur} ({route})… ») ; WhatsApp et SMS s'ouvrent sur le numéro saisi à la
+réservation ; l'email a pour objet « Code de retrait de ton colis Yamba ».
+
+**RG-WEB-188 — Régénérer demande confirmation, prévient et compte** : « L'ancien code ne fonctionnera plus.
+Pense à renvoyer le nouveau à {destinataire}. », toast, compteur toujours visible (« 4 régénérations
+restantes »), l'écran relit le serveur, un email de sécurité SANS le code.
+
+**RG-WEB-189 — Cinq régénérations, pas une de plus, côté serveur** : « Aucune régénération restante », bouton
+inactif ; un essai forcé (API ou onglet en retard) reçoit 409 `CODE_REGENERATION_LIMIT` et l'écran dit « Tu as
+atteint la limite de régénérations. Contacte le support si besoin. » Le Voyageur n'a jamais de bouton.
+
+**RG-WEB-190 — Après la remise, le code disparaît** : « Code de livraison saisi par {Voyageur} et validé »,
+badge « Code validé », ni copie ni régénération.
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| 221 | Deal accepté, pas encore pris en charge | carte « En attente », aucun chiffre | oui |
+| 222 | Deal pris en charge, côté Expéditrice puis Voyageur | code et boutons chez elle ; nulle part chez lui (neuf sources) | oui |
+| 223 | Copier le code, avec et sans presse-papiers | « Code copié ! » / message d'échec juste | oui (ANO-WEB-55, 59 closes) |
+| 224 | Partager | message pré-rempli, WhatsApp sur le numéro, objet de l'email | oui (ANO-WEB-56 close) |
+| 225 | Régénérer | confirmation, toast, compteur, relecture, email sans le code | oui (ANO-WEB-57 close) |
+| 226 | Sixième régénération (API, onglet en retard) | 409, message du plafond, code inchangé | oui (ANO-WEB-58 close) |
+| 227 | Quatre écrans Voyageur | aucun bouton de régénération | oui |
+| 228 | Deal livré | « saisi par … et validé », badge, plus de code | oui |
+

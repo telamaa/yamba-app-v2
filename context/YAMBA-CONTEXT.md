@@ -610,6 +610,27 @@ Ordre de demarrage : auth -> trip -> gateway.
   desktop du visiteur sans « Creer un compte » ni « Rechercher un trajet ». Piege de poste : la cle
   Google Maps n'accepte que `localhost` comme referent. Harnais : 32 scenarios verts. PR **#265**
   (empilee sur #264). Reste : 5.2 a 5.32, 02-ADMIN.
+- 11/09 : **CHAPITRE 5.17 DU CAHIER 01-WEB — WEB-COD, LE CODE DE LIVRAISON (branche `chore/recette-web-5-17`,
+  empilee sur #281)** — 8 fiches jouees CONFORMES (4 apres correction), 8 scenarios en serie, 1 min 48
+  (`apps/e2e/src/chapitres/web-cod.spec.ts`). CINQ ANOMALIES CLOSES, toutes front, le serveur juste partout :
+  ANO-WEB-56 MAJEURE (WhatsApp et SMS s'ouvraient SANS le numero du destinataire — `wa.me/?text=` — alors que
+  `recipient.phoneE164` est servi depuis D69 et que la carte du lien de suivi le prenait deja ; BookingShareCode +
+  SenderCodeCard), ANO-WEB-55 mineure (« Code copie ! » au catalogue, jamais rendu ; « Message copie ! » en toast
+  aussi), ANO-WEB-57 mineure (compteur de regenerations enferme dans la boite de confirmation : « Aucune
+  regeneration restante » inatteignable), ANO-WEB-58 mineure (409 CODE_REGENERATION_LIMIT traduit par la couche
+  API puis ignore par les cartes → « Erreur lors de la regeneration » ; cas reel : second onglet en retard),
+  ANO-WEB-59 mineure (echec de copie hors HTTPS = message de la regeneration ; cle `copyFailed` FR/EN). Prouve :
+  aucun chiffre avant la prise en charge ; code chez Aminata seule, NEUF sources fouillees cote Thomas (pages,
+  sources HTML, fil, API) ; presse-papiers = 742891 ; message pre-rempli exact, WhatsApp sur 242061234567 ;
+  regeneration (confirmation, toast, 4 restantes, relecture serveur, email « Nouveau code… » sans aucun code,
+  Thomas rien) ; plafond 5 (409 par l'API, message du cahier par l'onglet en retard, code inchange) ; aucun
+  bouton sur quatre ecrans Voyageur ; apres remise « saisi par Thomas et valide ». A trancher : toasts vs
+  libelles, sms:/mailto: non cliques, badge « Code valide » = nom accessible seulement, « Livraison estimee — »
+  (ANO-WEB-53). Regard d'expert : liens `<a href>` pour les quatre canaux, plafond au catalogue des reglages +
+  DTO, cloche sur la regeneration, espaces next-intl par route, test des `details.code` sans lecteur. PIEGES :
+  toasts empiles (`.last()`), 401 rejoue par api-client (filtrer dans waitForResponse), bouton de-grise a la
+  main ≠ essai force, source next-intl = catalogue entier, jamais cliquer sms:/mailto:. Harnais : 194
+  scenarios. Reste : 5.18 a 5.32, 02-ADMIN. AUCUNE attribution Claude.
 - 11/09 : **CHAPITRE 5.16 DU CAHIER 01-WEB — WEB-PIC, PRISE EN CHARGE ET JALONS DE TRANSIT (branche
   `chore/recette-web-5-16`, empilee sur #280)** — 10 fiches jouees CONFORMES (5 apres correction), 8 scenarios
   en serie, 1 min 48 (`apps/e2e/src/chapitres/web-pic.spec.ts`). CINQ ANOMALIES CLOSES : ANO-WEB-51 MAJEURE
