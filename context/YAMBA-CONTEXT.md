@@ -610,6 +610,21 @@ Ordre de demarrage : auth -> trip -> gateway.
   desktop du visiteur sans « Creer un compte » ni « Rechercher un trajet ». Piege de poste : la cle
   Google Maps n'accepte que `localhost` comme referent. Harnais : 32 scenarios verts. PR **#265**
   (empilee sur #264). Reste : 5.2 a 5.32, 02-ADMIN.
+- 11/09 : **CHAPITRE 5.3 DU CAHIER 01-WEB — WEB-CNX, CONNEXION ET SESSIONS (branche
+  `chore/recette-web-5-3`, empilee sur #266)** — 13 fiches + les 3 verifications historiques
+  d'ANO-WEB-01, `apps/e2e/src/chapitres/web-cnx.spec.ts`, 14 attendus / 0 inattendu (3 min 20).
+  Deux navigateurs A/B sur le MEME compte (Aminata) pour prouver qu'une session tuee depuis A
+  meurt dans B. Une anomalie MAJEURE OUVERTE : ANO-WEB-19 (la connexion par mot de passe n'a AUCUN
+  verrou anti-force-brute — douze 401 d'affilee, jamais un 429 ; le limiteur passerelle ignore les
+  echecs, `skipFailedRequests` ; deja releve en recette API ; fiche WEB-CNX-4 en `test.fail` ;
+  correctif = mecanique OTP, PR dediee). Une anomalie MINEURE close : ANO-WEB-20 (« Deconnecter un
+  appareil » sans message de confirmation). Ecarts consignes : atterrissage sur /fr (pas le
+  dashboard), rubrique « Sessions actives » (cahier : « Appareils connectes »), porte sudo au
+  moment du geste + code qui rejoue. Pieges : le changement de mot de passe FERME la fenetre sudo
+  (`closeSudoWindow`) — l'ordre litteral de WEB-CNX-11 est impossible ; six codes sudo/heure, un
+  par minute (nouveau `clear-sudo-locks.ts`) ; refresh standard = cookie de session, memorise = 30
+  jours (vie absolue). Harnais : 58 scenarios. PR **#267** (empilee sur #266). Reste : 5.4 a 5.32,
+  02-ADMIN. AUCUNE attribution Claude.
 - 10/09 (soir) : **CHAPITRE 5.2 DU CAHIER 01-WEB — WEB-INS, L'INSCRIPTION (branche
   `chore/recette-web-5-2`, empilee sur #265)** — 16 fiches : 12 jouees CONFORMES, 4 ⏭ (parcours
   Google 13-16, sans `NEXT_PUBLIC_GOOGLE_CLIENT_ID` et non pilotable : a la main le jour venu),

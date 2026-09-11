@@ -441,6 +441,44 @@ Contre-épreuve : WEB-INS-10 exige « Un compte existe déjà avec cet e-mail »
                  refuse `Connectez-vous|utilisez`.
 ```
 
+```
+ANO-WEB-19
+Fiche          : WEB-CNX-4 (chapitre 5.3) · Gravité : MAJEURE · ÉTAT : OUVERTE (déjà relevée en
+                 recette API, « aucune protection anti-force brute par compte sur /auth/login »)
+Attendu        : au bout d'une dizaine d'essais de connexion sur un même compte, un verrou ralentit
+                 l'attaquant — « Trop de tentatives. Réessaie dans quelques instants. »
+Obtenu         : rien. La connexion par mot de passe (`loginUser`) n'a aucun compteur par compte
+                 ni par adresse. Le seul rempart est le limiteur de la passerelle (100 requêtes /
+                 15 min par IP) — et il est déclaré `skipFailedRequests: true` : une tentative qui
+                 échoue (401) N'EST PAS comptée. Douze mauvais mots de passe d'affilée : douze 401,
+                 jamais un 429. Un attaquant qui vise un compte dispose de centaines d'essais par
+                 heure, et le titulaire n'est jamais prévenu.
+Cause          : l'OTP a ses paliers de verrou (1 min → 30 min → 24 h) et son email d'alerte ; la
+                 connexion par mot de passe n'a jamais reçu l'équivalent. `skipFailedRequests`
+                 sur le limiteur est fait pour ne pas pénaliser un membre maladroit, mais il ouvre
+                 la porte à l'essai en masse.
+Proposition    : réutiliser la mécanique OTP (compteur par `emailNormalized`, paliers, email
+                 d'alerte au deuxième palier), refus indistinguable (même corps, même statut,
+                 verrou silencieux — ANO-API-08/18). Une PR dédiée, hors recette (décision produit).
+État recette   : la fiche WEB-CNX-4 est jouée et marquée `test.fail` dans le harnais — le jour où
+                 le verrou existe, elle « passe » et Playwright le signale (retirer la marque).
+```
+
+```
+ANO-WEB-20
+Fiche          : WEB-CNX-8 (chapitre 5.3) · Gravité : MINEURE · ÉTAT : CLOSE
+Attendu        : « Déconnecter » un autre appareil affiche un message de confirmation (le cahier
+                 le demande explicitement), comme « Déconnecter les autres appareils » en a un.
+Obtenu         : la ligne disparaissait sans un mot. Un geste de sécurité réussi sans retour
+                 laisse un doute (« est-ce bien parti ? »).
+Cause          : `doRevoke` (Security.tsx) rechargeait la liste sans poser de message ; seul
+                 `doRevokeOthers` en posait un.
+Correction     : un message « Appareil déconnecté. » (clé `securityPage.sessionRevoked`, FR/EN)
+                 après une révocation à l'unité réussie — jamais quand c'est la session courante
+                 (là, on quitte la page).
+Contre-épreuve : WEB-CNX-8 lit « Appareil déconnecté. » après la révocation, et la ligne a disparu.
+```
+
 ---
 
 ## Chapitre 5.1 — Découverte, accueil et navigation · **CONFORME** (12 fiches, 1 min 24)
@@ -537,6 +575,61 @@ créé, bloqué, code renvoyé, activé) et se jouent dans un seul scénario ; l
   fiches 6, 10, 11 — la fiche 10 n'en crée pas, la 11 laisse une inscription en attente
   annulée). Sans conséquence (piège 22 du handoff) ; le cahier réserve « le compte neuf » au
   chapitre 5.13 : ce sera celui de la dernière exécution, ou un compte créé pour l'occasion.
+
+---
+
+## Chapitre 5.3 — Connexion, « Rester connecté », session, appareils · **CONFORME** (13 fiches + 3 vérifications ANO-WEB-01 · 1 anomalie majeure ouverte)
+
+Le chapitre le plus « session » du cahier : deux profils (standard 60 min / mémorisé 7 jours), la
+fenêtre « Ta session a expiré » qui se pose sur place, la liste des appareils, la porte sudo et sa
+fenêtre de 15 minutes. Les navigateurs **A** et **B** sont deux contextes connectés au MÊME compte
+(Aminata), seule façon de prouver qu'une session tuée depuis A meurt dans B. Le fichier ouvre par
+les trois vérifications d'`ANO-WEB-01` (la fenêtre de session qui bloquait l'écran de connexion,
+close le 09/09), puis les treize fiches.
+
+| Fiche | Ce qui est éprouvé | Verdict | Preuve |
+|---|---|---|---|
+| WEB-CNX-1 | L'écran de connexion | **Conforme** — « Connexion sécurisée », « Connecte-toi », le sous-titre, les deux champs et leurs indices, « Afficher le mot de passe » (qui bascule le champ en `text` puis `password`), « Oublié ? » vers `/password/forgot`, la case « Rester connecté » **décochée** avec son aide « 7 jours / 60 minutes », « Se connecter », Google, Facebook, « Pas encore membre ? Inscris-toi » |
+| WEB-CNX-2 | Identifiants incorrects, même message | **Conforme** — mauvais mot de passe et adresse inconnue : le même 401 et « E-mail ou mot de passe incorrect. » La preuve va au corps de la réponse, identique au caractère près (temps constant, ANO-API-08/18) ; aucun cookie |
+| WEB-CNX-3 | Connexion réussie, session standard | **Conforme** — en-tête membre (menu, cloche, Messages), prénom « Aminata » dans le menu, cookies `access_token` + `refresh_token`. Le cookie de rafraîchissement est un cookie de **session** (sans date) : le profil « 60 min » vit côté serveur. **Écart** : l'atterrissage est l'accueil connecté (`/fr`), pas le tableau de bord — le cahier dit « l'espace membre » |
+| WEB-CNX-4 | Trop de tentatives | **NON CONFORME** → `ANO-WEB-19` (majeure, ouverte) ; douze mauvais mots de passe : douze 401, jamais un 429. Aucun verrou par compte sur la connexion. Fiche `test.fail` dans le harnais |
+| WEB-CNX-5 | Session expirée : la fenêtre s'ouvre sur place | **Conforme** — cookies supprimés sans rechargement, une action serveur ouvre « Ta session a expiré » PAR-DESSUS le tableau de bord (adresse inchangée, pas d'écran d'erreur, pas de renvoi vers `/login`), le formulaire est DANS la fenêtre, et après reconnexion la fenêtre se ferme et la page reprend |
+| WEB-CNX-6 | « Rester connecté » ouvre l'autre profil | **Conforme** — la case cochée rend le `refresh_token` **persistant** (≈ 30 jours de vie absolue, D27/SES-02 ; l'inactivité de 7 jours vit côté serveur), là où la session standard a un cookie de session. La rubrique Sécurité de A porte « connexion mémorisée » ; celle de B (sans la case) ne la porte pas ; vu de B, la session de A la porte |
+| WEB-CNX-7 | La liste des appareils connectés | **Conforme** — au moins une ligne : « Chrome · macOS » (dérivé de l'agent utilisateur ; le cahier écrit « Chrome sur macOS »), « Dernière activité » + date, l'adresse IP, « cet appareil » sur la session courante. **Écart** : la rubrique s'appelle « Sessions actives », le cahier dit « Appareils connectés » |
+| WEB-CNX-8 | Déconnecter un autre appareil | **Conforme après correction** → `ANO-WEB-20` ; A voit deux appareils, révoque celui qui n'est pas le sien (« Appareil déconnecté. »), la ligne disparaît, et B perd sa session : sa prochaine action serveur ouvre « Ta session a expiré » |
+| WEB-CNX-9 | « Déconnecter les autres appareils » | **Conforme** — B reconnecté, A clique « Déconnecter les autres appareils » : « n appareil(s) déconnecté(s) », seule « cet appareil » reste, B perd sa session |
+| WEB-CNX-10 | La porte de confirmation d'un geste sensible | **Conforme** — changer le mot de passe répond 403 `SUDO_REQUIRED`, la porte « Confirme que c'est bien toi » s'ouvre, « M'envoyer le code » envoie « Ton code de confirmation Yamba », le code accepté **rejoue** le geste. **Écarts** : la porte se présente au moment du geste (le cahier l'attendait AVANT le formulaire) ; et le code REJOUE le geste au lieu d'« ouvrir le formulaire » — deux formulations, le fond (aucun geste sans code) tient |
+| WEB-CNX-11 | La fenêtre de 15 minutes couvre un second geste | **Conforme** — une fenêtre sudo (≈ 15 min, mesurée) couvre l'export puis le rétablissement du mot de passe SANS nouveau code. **Écart** : un changement de mot de passe FERME la fenêtre (`closeSudoWindow`) — donc l'ordre littéral du cahier (mot de passe puis export dans la même fenêtre) redemanderait un code ; la propriété « un code, plusieurs gestes » est prouvée avec des gestes qui ne la ferment pas |
+| WEB-CNX-12 | La fenêtre sudo est liée à l'appareil | **Conforme** — A ouvre sa fenêtre ; B (même compte, autre appareil) tente un geste sensible et se voit redemander un code (403 `SUDO_REQUIRED`, porte affichée). La fenêtre vaut pour un appareil, jamais pour le compte |
+| WEB-CNX-13 | Un compte suspendu ne se connecte plus | **Conforme** — la médiation suspend Marie-Claire (back-office, `users.suspension.apply`) ; sa session vivante ailleurs est **révoquée** ; l'écran refuse « Ton compte est suspendu. Consulte l'email reçu… » (401 `ACCOUNT_SUSPENDED`, aucune session), l'email « Ton compte Yamba est suspendu » arrive ; la levée rouvre la connexion. (Marie-Claire est Expéditrice : aucun trajet à retirer de la recherche) |
+
+### À trancher (produit)
+
+- **La connexion par mot de passe n'a aucun verrou anti-force-brute** (`ANO-WEB-19`). C'est le
+  point dur du chapitre, déjà relevé en recette API. Décision et PR dédiées attendues : réutiliser
+  la mécanique OTP (compteur par compte, paliers, email d'alerte), refus indistinguable.
+- **L'atterrissage après connexion** est l'accueil connecté (`/fr`), pas le tableau de bord.
+  Cohérent avec le reste du produit (le menu mène partout) ; le cahier disait « l'espace membre ».
+- **« Sessions actives » vs « Appareils connectés »** — même chose, libellé différent. Le libellé
+  actuel est correct (une session = un appareil ici) ; à harmoniser avec le cahier si l'on veut.
+- **La porte sudo se présente au moment du geste**, après le formulaire, et le code REJOUE le
+  geste plutôt que d'« ouvrir » un formulaire. Le résultat (aucun geste sans code, fenêtre de
+  15 min) est conforme ; ce sont des écarts de formulation du cahier.
+
+### Pièges de poste payés ici
+
+- **Le changement de mot de passe FERME la fenêtre sudo** (`closeSudoWindow`, D65) — l'export ne
+  la ferme pas. Bonne sécurité, mais elle défait l'ordre littéral de WEB-CNX-11 (le harnais
+  ouvre une fenêtre dédiée et y enchaîne les gestes qui ne la ferment pas).
+- **Six demandes de code sudo par heure, une par minute** (OTP anti-spam). Un harnais qui
+  redemande un code en rafale grille le quota (1 h de verrou). Règle : demander UNE fois, attendre
+  le cooldown d'une minute, redemander UNE fois — et une fenêtre couvre plusieurs gestes, donc on
+  n'en ouvre qu'une. Nouveau `packages/libs/prisma/scripts/clear-sudo-locks.ts` pour repartir
+  propre entre deux exécutions.
+- **Deux profils de cookie de rafraîchissement.** Session standard : cookie de session (`expires`
+  = −1), le « 60 min » vit côté serveur. Mémorisé : cookie persistant, `expires` ≈ +30 jours (la
+  vie ABSOLUE, pas l'inactivité de 7 jours). La distinction se lit sur le cookie ; la mention
+  « connexion mémorisée » se lit sur la session.
 
 ---
 

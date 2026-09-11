@@ -2824,3 +2824,62 @@ cahier consigné, décision recommandée : garder le masquage.)*
 | 65 | « Recommencer » | confirmation exacte, `cancel`, formulaire vide | oui |
 | 66 | Google sans clé | « Connexion Google bientôt disponible », désactivé, sur les deux écrans | oui |
 | 67 | Parcours Google | ⏭ sans clé ; à la main quand elle sera posée | ⏭ |
+
+---
+
+# Connexion et sessions — ce que le chapitre 5.3 fait respecter
+
+*(PR `chore/recette-web-5-3`, 11/09/2026 — cahier 01-WEB chapitre 5.3, WEB-CNX-1 à 13.)*
+
+## Le besoin
+
+Un membre se connecte, choisit ou non de rester connecté, voit ses appareils, en déconnecte,
+et confirme ses gestes sensibles par un code. Le tout sans jamais révéler si un compte existe,
+sans perdre sa page quand la session expire, et sans qu'un compte suspendu puisse entrer.
+
+## Les règles
+
+**RG-WEB-54 — Le même refus, que le compte existe ou non.** Un mauvais mot de passe et une
+adresse inconnue donnent le même statut (401) et le même message, au corps près (temps constant).
+
+**RG-WEB-55 — Deux profils de session.** Sans « Rester connecté » : déconnexion après 60 minutes
+sans activité (cookie de session). Avec : 7 jours d'inactivité, 30 jours de vie absolue (cookie
+persistant). La case est **décochée** par défaut.
+
+**RG-WEB-56 — La session expirée se rouvre sur place.** Quand la session meurt pendant qu'une
+page est ouverte, une fenêtre de reconnexion se pose PAR-DESSUS ; après reconnexion, la page
+reprend là où elle était. Jamais d'écran d'erreur ni de renvoi brutal.
+
+**RG-WEB-57 — Les appareils se listent et se déconnectent.** La rubrique Sécurité liste chaque
+session (navigateur + système, dernière activité, IP, « cet appareil »), permet d'en déconnecter
+une (message de confirmation) ou toutes les autres ; la session déconnectée meurt à sa prochaine
+action.
+
+**RG-WEB-58 — Un geste sensible passe par une porte, et un code ouvre une fenêtre de 15 minutes.**
+Changer le mot de passe, l'adresse, exporter ou effacer ses données répond 403 `SUDO_REQUIRED` ;
+un code envoyé par email ouvre une fenêtre de 15 minutes, **liée à l'appareil**, qui couvre les
+gestes suivants sans nouveau code — sauf le changement de mot de passe (ou d'adresse), qui la
+referme.
+
+**RG-WEB-59 — Un compte suspendu ne se connecte plus.** La connexion est refusée
+(« Ton compte est suspendu… »), les sessions vivantes sont révoquées, et un email l'explique.
+
+**RG-WEB-60 — (dette) La connexion par mot de passe doit avoir un verrou anti-force-brute.**
+*(ANO-WEB-19, ouverte : à ce jour aucun verrou par compte ; décision et PR dédiées.)*
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| 68 | Écran de connexion | mentions, champs, « Afficher le mot de passe », « Oublié ? », case décochée + aide, Google/Facebook, « Inscris-toi » | oui |
+| 69 | Mauvais mot de passe / adresse inconnue | même 401, même corps, aucun cookie | oui |
+| 70 | Connexion standard | en-tête membre, prénom, cookies ; refresh = cookie de session | oui |
+| 71 | Douze mauvais essais | un verrou (429) | **non — ANO-WEB-19** |
+| 72 | Cookies supprimés + action serveur | « Ta session a expiré » sur place, formulaire dans la fenêtre, reprise | oui |
+| 73 | « Rester connecté » | cookie persistant (≈ 30 j), « connexion mémorisée » sur la session | oui |
+| 74 | Appareils connectés | navigateur+système, activité, IP, « cet appareil » | oui |
+| 75 | Déconnecter un appareil / tous les autres | message, ligne(s) disparue(s), B perd sa session | oui |
+| 76 | Geste sensible | 403 SUDO_REQUIRED, porte, code, geste rejoué | oui |
+| 77 | Second geste dans les 15 min | aucun nouveau code | oui (fenêtre dédiée, cf. écart) |
+| 78 | Fenêtre sudo depuis un autre appareil | code redemandé | oui |
+| 79 | Compte suspendu | refus, sessions révoquées, email | oui |

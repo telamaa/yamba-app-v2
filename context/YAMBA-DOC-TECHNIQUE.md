@@ -4325,3 +4325,87 @@ rien à changer — la seule qui s'adresse à la personne avait échappé. « Co
 
 Aucun test unitaire ajouté (une chaîne de message). `apps/e2e` : **45 scénarios** (41 joués,
 4 `⏭` Google) — 32 + WEB-INS ×13. user-ui : typecheck vert.
+
+---
+
+# Chapitre 5.3 du cahier 01-WEB : connexion, sessions, porte sudo — treize fiches et une vraie faille
+
+*(PR `chore/recette-web-5-3`, 11/09/2026.)*
+
+## Ce qui a été fait
+
+Le troisième chapitre « fiches » du cahier 01-WEB : `WEB-CNX` (connexion, « Rester connecté »,
+session expirée, appareils connectés, porte de confirmation). Treize fiches, toutes jouées, plus
+les trois vérifications historiques d'`ANO-WEB-01` conservées en tête du fichier
+(`apps/e2e/src/chapitres/web-cnx.spec.ts`). Douze fiches conformes ; une anomalie **majeure
+ouverte** (ANO-WEB-19 : aucune protection anti-force-brute sur la connexion) — décision et PR
+dédiées, hors recette ; une anomalie **mineure close** (ANO-WEB-20 : pas de message après avoir
+déconnecté un appareil) ; plusieurs écarts de cahier consignés.
+
+```
+apps/e2e/src/chapitres/web-cnx.spec.ts            13 fiches + ANO-WEB-01 ; aides : formulaire(), seConnecter(),
+                                                    erreurDeConnexion(), sessionsParApi(), ouvrirLaSecurite(),
+                                                    lignesAppareils()/ligneCetAppareil(), fenetreSessionExpiree(),
+                                                    actionServeurSansRechargement(), ouvrirFenetreSudo() (tolérante au cooldown)
+apps/e2e/src/fixtures/yamba.ts                     navigateurConnecte accepte { memoriser } → coche « Rester connecté » (implique parEcran)
+apps/user-ui/src/app/[locale]/dashboard/dashboard.copy.ts  securityPage.sessionRevoked (« Appareil déconnecté. »)   (ANO-WEB-20)
+apps/user-ui/src/components/dashboard/sections/Security.tsx  doRevoke pose le message                                (ANO-WEB-20)
+packages/libs/prisma/scripts/clear-sudo-locks.ts  NOUVEAU — purge les verrous OTP sudo d'un compte (rerun propre)
+context/YAMBA-RECETTE-WEB-RESULTATS.md            ANO-WEB-19, 20, chapitre 5.3, à trancher, pièges
+```
+
+## ANO-WEB-19 — la connexion par mot de passe n'a aucun verrou
+
+C'est la trouvaille du chapitre, et elle était déjà écrite dans le cahier de recette API. L'OTP a
+ses paliers de verrou (1 min → 30 min → 24 h) et un email d'alerte ; `loginUser`, lui, n'a rien.
+Le seul rempart est le limiteur de la passerelle (100 requêtes / 15 min par IP), déclaré
+`skipFailedRequests: true` : une tentative en échec n'est PAS comptée. Douze mauvais mots de passe
+d'affilée donnent douze 401 et jamais un 429. La fiche WEB-CNX-4 est jouée et marquée `test.fail` :
+le jour où le verrou existe, elle « passe » et Playwright le signale. Correctif proposé (PR
+dédiée) : la mécanique OTP réutilisée, compteur par `emailNormalized`, email d'alerte, refus
+indistinguable (même corps, même statut — ANO-API-08/18).
+
+## Ce que la mécanique sudo a imposé au harnais
+
+La porte de confirmation (D65) est un objet plus subtil qu'il n'y paraît, et trois de ses
+propriétés ont façonné le test :
+
+1. **Un changement de mot de passe FERME la fenêtre sudo** (`closeSudoWindow`), l'export ne la
+   ferme pas. L'ordre littéral du cahier (WEB-CNX-11 : « suite immédiate » de WEB-CNX-10, donc
+   export après un changement de mot de passe) redemanderait donc un code. C'est une bonne
+   sécurité, pas un bug. Le harnais ouvre UNE fenêtre dédiée et y enchaîne les gestes qui ne la
+   ferment pas (export, puis le rétablissement du mot de passe en dernier).
+2. **Six codes sudo par heure, un par minute** (anti-spam OTP). Une première version du test
+   sondait `/auth/me/sudo/request` toutes les trois secondes pour « attendre » le cooldown : elle
+   a grillé le quota (verrou d'une heure). La règle : demander UNE fois, attendre le cooldown
+   d'une minute, redemander UNE fois — et comme une fenêtre couvre plusieurs gestes, on n'en
+   ouvre qu'une.
+3. **La fenêtre est liée au `jti`** de la session (donc à l'appareil), pas au compte : `verifySudo`
+   pose `sudo:<userId>:<jti>`, `requireSudo` lit le même `jti`. WEB-CNX-12 le prouve avec deux
+   contextes.
+
+## Deux profils de session, lus sur le cookie
+
+Le cookie de rafraîchissement dit tout : session standard = cookie de **session** (`expires` = −1,
+le « 60 min » d'inactivité vit côté serveur) ; « Rester connecté » = cookie **persistant**,
+`expires` ≈ +30 jours — la vie ABSOLUE (D27/SES-02), pas l'inactivité de 7 jours. La première
+version du test attendait « ≈ 7 jours » sur le cookie : faux, c'est 30. La mention « connexion
+mémorisée » de la page Sécurité, elle, se lit sur la session (`rememberMe`), pas sur le cookie.
+
+## Ce que le harnais a appris
+
+- **Deux navigateurs, un compte.** A et B sont deux `BrowserContext` connectés à Aminata : c'est
+  la seule façon de prouver qu'une session tuée depuis A meurt dans B (WEB-CNX-8, 9). Le harnais
+  connecte toujours par l'écran (`parEcran`), jamais depuis la mémoire, puisque les fiches parlent
+  de la naissance et de la mort des sessions.
+- **Une action serveur sans rechargement**, c'est un lien de la barre latérale du tableau de bord
+  (navigation côté client ; la section qui arrive interroge l'API) — pas un `reload`, qui ne
+  prouverait pas « la page ne change pas ».
+- **Rendre le mot de passe quoi qu'il arrive.** WEB-CNX-10 change le mot de passe d'Aminata ; un
+  `finally` le rétablit, et si la fenêtre sudo a été fermée entre-temps, il en rouvre une. Un
+  échec de rétablissement lève une erreur explicite (« rejouer seed-deals.ts »).
+
+## Tests
+
+Aucun test unitaire ajouté (un libellé). `apps/e2e` : le chapitre 5.3 fait passer le harnais à
+**58 scénarios** (45 + WEB-CNX ×13). user-ui : typecheck vert.
