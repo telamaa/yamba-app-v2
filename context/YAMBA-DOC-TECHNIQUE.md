@@ -5139,3 +5139,81 @@ aurait pris 1, 2 et 3 avant la recette.
 
 Plateforme inchangée (994 + auth 229). `apps/e2e` : **143 scénarios** (131 + WEB-RSV ×12, dont
 1 `⏭`). Typecheck user-ui et harnais verts.
+
+---
+
+# Chapitre 5.13 du cahier 01-WEB : les plafonds du compte neuf — le levier mesuré, l'écran qui ne se contredit plus
+
+*(PR `chore/recette-web-5-13`, 11/09/2026.)*
+
+## Ce qui a été fait
+
+Le treizième chapitre « fiches » du cahier 01-WEB : `WEB-TRU` (CNF-06 / D71 — les trois plafonds
+d'un compte de moins de 30 jours sans trois envois terminés). Cinq fiches jouées et conformes (une
+après correction), une anomalie mineure close (`ANO-WEB-40`, observée au chapitre 5.12 et réservée
+à celui-ci).
+
+```
+apps/e2e/src/chapitres/web-tru.spec.ts                      5 scénarios en série, 2 min 00
+apps/user-ui/src/components/booking/BookingWizard.tsx       ANO-WEB-40 (« Payer » grisé sans autorisation)
+apps/user-ui/src/components/booking/BookingMobile.tsx       ANO-WEB-40
+```
+
+## Ce que le chapitre ajoute au parcours WEB-E2E-4
+
+Le parcours prouvait les refus (450 €, 12 kg, la sixième) ; le chapitre prouve aussi **ce qui passe
+juste sous le plafond** (250 €, 8 kg), le **compte ancien** sans plafond (Aminata, 12 kg à 450 €,
+DTO relu : `weightKg: 12`, `declaredValueCents: 45000`), et trois preuves nouvelles :
+
+1. **Le levier du back-office** (`[TRU7]`). L'OPS du seed (`navigateurAdmin("exploitation")`) écrit
+   `trust.newAccount.maxShipmentsPerMonth` 5 → 6 par `PATCH /admin/settings` (`changes`, `reason`
+   ≥ 20, `expectedVersion`). Puis le harnais clique **« Réessayer »** sur la carte de paiement toutes
+   les cinq secondes (`expect.poll` + `waitForResponse` sur `POST /deals/payment-intents`) jusqu'à ce
+   que l'intention soit acceptée : **6 s** après l'écriture (journal `AdminAction` `SETTING_CHANGED`
+   12:48:24,3 → `Booking.createdAt` 12:48:29,9), sous la contrainte « < 30 s » du lecteur de
+   paramètres (cache mémoire, D62). La remise à 5 est dans un `finally`, avec un `expectedVersion`
+   relu (le verrou a bougé), et la valeur est relue après.
+2. **Les réponses brutes de l'API au membre** : `/auth/me`, `/me/bookings`, `/deals/:id` ne contiennent
+   ni `trustScore`, ni `riskLevel`, ni `caps`, ni `capsReason` — le score est calculé à la lecture et
+   jamais servi (D71 ②), la whitelist des DTO le garantit, le harnais le vérifie.
+3. **Le suivi d'un envoi** et « Mes envois » rejoignent la liste des écrans fouillés (tableau de bord,
+   profil, page publique) ; l'export de données passe par la porte sudo comme au chapitre 6.
+
+## ANO-WEB-40 : un bouton qui contredit l'encadré
+
+À l'étape 4, le bouton principal du récapitulatif (`BookingSummarySidebar` / `BookingBottomSheet`)
+n'était grisé que pendant l'envoi (`isSubmitting`). Après un refus de plafond, la carte affichait
+l'encadré et « Réessayer » — et le bouton « Payer 32,20 € » restait actif à côté (sans danger : le
+serveur refuse aussi la demande, et `submit` sort si `!intent` — mais l'écran se contredisait). Même
+cause pour le « clic muet » avant le retour de l'intention (piège 18 du handoff). Une seule règle,
+dans les deux wizards :
+
+```ts
+// ANO-WEB-40 (D71) : à l'étape 4, « Payer » attend l'autorisation de paiement — et reste grisé
+// quand elle a été refusée (plafond du compte neuf) : le bouton ne contredit plus l'encadré.
+const ctaDisabled = isSubmitting || (step === 4 && !checkout.intent);
+```
+
+Le page object `tenterDeReserver` n'a pas bougé : il lisait déjà le texte du mode test avant de
+cliquer (Playwright attend un bouton actif), et la contre-épreuve est `toBeDisabled()` sur le bouton
+**visible** (`getByRole("button", { name: /^Payer/ }).filter({ visible: true })` — la feuille mobile
+est aussi dans le DOM sur écran large).
+
+## Le harnais
+
+- Mode **série** : la fiche 1 crée le compte par l'écran d'inscription (`Inscription.creer`, code
+  Mailpit) et le garde en module ; chaque fiche suivante ouvre un navigateur neuf et se connecte par
+  l'écran (`connexion`), le compte n'étant pas du seed.
+- Les demandes sont réparties sur `bzv-perkg`, `fih`, `gru`, `yul`, `bzv-upcoming` (capacités
+  restantes lues dans le seed : `gru` n'a que 7 kg libres) ; Aminata prend 12 kg sur `bzv-perkg`
+  après les 4 kg du compte neuf.
+- `mesReservations` (`GET /me/bookings`) compte avant et après chaque tentative : un refus qui
+  aurait laissé une trace se verrait.
+- Attention : `--reporter=list` sur la ligne de commande **remplace** le rapport HTML du
+  `playwright.config.ts` ; les annotations ne sont alors écrites nulle part.
+
+## Tests
+
+Plateforme inchangée (994 + auth 229). `apps/e2e` : **148 scénarios** (143 + WEB-TRU ×5). Typecheck
+user-ui et harnais verts.
+

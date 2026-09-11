@@ -610,6 +610,23 @@ Ordre de demarrage : auth -> trip -> gateway.
   desktop du visiteur sans « Creer un compte » ni « Rechercher un trajet ». Piege de poste : la cle
   Google Maps n'accepte que `localhost` comme referent. Harnais : 32 scenarios verts. PR **#265**
   (empilee sur #264). Reste : 5.2 a 5.32, 02-ADMIN.
+- 11/09 : **CHAPITRE 5.13 DU CAHIER 01-WEB — WEB-TRU, LES PLAFONDS DU COMPTE NEUF (branche
+  `chore/recette-web-5-13`, empilee sur #277)** — 5 fiches jouees CONFORMES (1 apres correction), 5 scenarios
+  en serie, 2 min 00 (`apps/e2e/src/chapitres/web-tru.spec.ts`). Compte neuf cree par l'ecran en fiche 1 ;
+  450 € et 12 kg refuses A L'INTENTION (avant tout argent, rien nulle part), 250 € et 8 kg PASSENT, cinq
+  demandes puis la sixieme refusee des l'autorisation ; LEVIER DU BACK-OFFICE prouve ([TRU7]) : l'OPS releve
+  `trust.newAccount.maxShipmentsPerMonth` 5 -> 6 par PATCH /admin/settings, « Reessayer » toutes les 5 s,
+  la sixieme passe 6 s apres l'ecriture (journal SETTING_CHANGED -> Booking.createdAt), remise a 5 dans un
+  finally ; Aminata (90 j) reserve 12 kg a 450 € sans refus ; AUCUNE fuite du score sur cinq ecrans, trois
+  reponses d'API brutes (/auth/me, /me/bookings, /deals/:id) et l'export. ANO-WEB-40 mineure close (« Payer »
+  actif a cote de l'encadre de refus et avant le retour de l'intention : `ctaDisabled = isSubmitting ||
+  (step === 4 && !intent)` dans BookingWizard et BookingMobile). A trancher : message de plafond generique
+  (cahier) vs cible (catalogue D62 « le membre lit le plafond dans le message »), compteur mensuel qui compte
+  aussi les demandes declinees/expirees, levier joue en relevant (pas en abaissant), compte de travail
+  `neuf-<horodatage>@`. Regard d'expert : servir les PLAFONDS (pas le score) dans /auth/me pour borner des
+  l'etape 1 (decision de registre), test de contrat « le DTO Expediteur ne porte aucune cle de
+  TrustAssessment », cache 60 s des signaux par membre. Harnais : 148 scenarios. Reste : 5.14 a 5.32,
+  02-ADMIN. AUCUNE attribution Claude.
 - 11/09 : **CHAPITRE 5.12 DU CAHIER 01-WEB — WEB-RSV, L'ASSISTANT EN QUATRE ETAPES ET LE DEVIS (branche
   `chore/recette-web-5-12`, empilee sur #276)** — 22 fiches : 21 jouees CONFORMES (7 apres correction), 1 skip
   (carte refusee, fournisseur FAKE), 12 scenarios en 2 min 05 (`apps/e2e/src/chapitres/web-rsv-devis.spec.ts`,

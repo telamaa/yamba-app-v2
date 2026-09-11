@@ -3475,3 +3475,51 @@ l'ouverture ; l'assistant survit à un rechargement.
 | 188 | Propre trajet | refus à l'ouverture | oui (ANO-WEB-35 close) |
 | 189 | Parti / masqué | refus à l'ouverture / introuvable | oui (ANO-WEB-38 close) |
 | 190 | Rechargement | saisies retrouvées | oui |
+
+---
+
+# Les plafonds du compte neuf — ce que le chapitre 5.13 fait respecter
+
+*(PR `chore/recette-web-5-13`, 11/09/2026 — cahier 01-WEB chapitre 5.13, WEB-TRU-1 à 5.)*
+
+## Le besoin
+
+Un compte de moins de 30 jours qui n'a pas trois envois terminés ne peut pas engager la plateforme
+au-delà de ce qu'un premier essai justifie : 300 € déclarés, 10 kg, cinq envois par mois. Le refus
+tombe avant tout argent, avec un message unique et sans jugement ; un compte ancien n'a aucun
+plafond ; le score interne qui fonde ces niveaux ne se voit jamais.
+
+## Les règles
+
+**RG-WEB-153 — Trois plafonds pour un compte neuf** (moins de 30 jours ET moins de trois envois
+terminés) : 300 € déclarés par colis, 10 kg par colis, cinq demandes par mois civil — les trois
+sont des paramètres de la plateforme (`trust.newAccount.*`, D62).
+
+**RG-WEB-154 — Le refus tombe à l'autorisation de paiement**, avant tout débit, toute empreinte,
+tout email : rien n'est créé, « Mes envois » et Finances restent vides.
+
+**RG-WEB-155 — Un seul message pour les trois plafonds**, tutoyé, qui dit que le plafond se lève
+avec les premiers envois terminés ; à côté, « Réessayer » — et jamais un bouton « Payer » actif.
+
+**RG-WEB-156 — La valeur ou le poids corrigés juste sous le plafond passent** ; la cinquième demande
+du mois passe, la sixième est refusée.
+
+**RG-WEB-157 — Un paramètre modifié par le back-office prend effet en moins de 30 secondes**, est
+journalisé (`SETTING_CHANGED`, motif ≥ 20 caractères, verrou de version) et prévient les super
+administrateurs par email ; il n'est jamais rétroactif.
+
+**RG-WEB-158 — Un compte ancien n'a aucun plafond** : 12 kg à 450 € passent sans refus.
+
+**RG-WEB-159 — Le score interne n'est jamais visible ni servi au membre** : ni sur un écran, ni dans
+l'export de ses données, ni dans une réponse d'API ; le seul signal est le message de plafond.
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| 191 | 450 € déclarés, compte neuf | refus à l'intention, message, rien nulle part ; 250 € passe | oui (ANO-WEB-40 close) |
+| 192 | 12 kg, compte neuf | refus, même message ; 8 kg passe | oui |
+| 193 | Sixième demande du mois | refusée dès l'autorisation ; plafond relevé par l'OPS → passe en 6 s ; remis | oui |
+| 194 | Compte de 90 jours, 12 kg à 450 € | aucun refus | oui |
+| 195 | Écrans, API, export du compte neuf | aucun score, niveau, point, plafond chiffré | oui |
+
