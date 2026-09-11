@@ -43,6 +43,9 @@ export default function BookingMobile({ trip, onCloseAction }: Props) {
   const [showErrors, setShowErrors] = useState(false);
   const checkout = useBookingCheckout({ draft, trip, step, clear });
   const isSubmitting = checkout.isSubmitting;
+  // ANO-WEB-40 (D71) : à l'étape 4, « Payer » attend l'autorisation de paiement — et reste grisé quand elle a été
+  // refusée (plafond du compte neuf) : le bouton ne contredit plus l'encadré de refus.
+  const ctaDisabled = isSubmitting || (step === 4 && !checkout.intent);
 
   const errors = useMemo<ValidationErrors>(() => {
     if (!showErrors) return EMPTY_ERRORS;
@@ -129,7 +132,7 @@ export default function BookingMobile({ trip, onCloseAction }: Props) {
         price={price}
         currentStep={step}
         ctaPrimaryLabel={ctaLabel}
-        ctaPrimaryDisabled={isSubmitting}
+        ctaPrimaryDisabled={ctaDisabled}
         ctaIsLock={step === 4}
         onCtaPrimaryAction={step < 4 ? nextStep : handleSubmit}
         showBackButton={step > 1}
