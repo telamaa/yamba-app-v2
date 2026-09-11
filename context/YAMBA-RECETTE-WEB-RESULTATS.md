@@ -908,6 +908,67 @@ Correction     : `DealDetail.recipientFirstName` (toujours servi) posé par l'ad
 Contre-épreuve : WEB-DEA-9 : la phrase du cahier mot pour mot avec « Clarisse » ; jamais « révèle à Hall ».
 ```
 
+```
+ANO-WEB-45
+Fiche          : WEB-MSG-6, WEB-MSG-10 (chapitre 5.15) · Gravité : MINEURE · ÉTAT : CLOSE
+Attendu        : un refus de la messagerie (code de livraison dans le message, créneau hors bornes) se lit
+                 en français sous la saisie : « le code se donne en main propre », « au moins 30 minutes »…
+Obtenu         : « This message contains the delivery code. Give it in person, never in writing. » et
+                 « Invalid meeting slot. » : le fil et le panneau de rendez-vous affichaient le `message`
+                 ANGLAIS de l'API (`err.response.data.message`) tel quel.
+Correction     : les deux composants traduisent le `details.code` du refus (A146) — `DELIVERY_CODE_IN_MESSAGE`,
+                 `INVALID_MEETUP_SLOT` + `reason` (`TOO_SOON` / `TOO_FAR` / `WINDOW_TOO_LONG`), `MEETUP_CHANGED`,
+                 `CONVERSATION_READ_ONLY` — nouvelles clés `messaging.errors.*` (FR + EN), repli sur le
+                 message générique existant.
+Contre-épreuve : WEB-MSG-6 : « Ce message contient le code de livraison. Il se donne en main propre, jamais
+                 par écrit. » ; WEB-MSG-10 : « …au moins 30 minutes à l'avance. », « …dans les 90 jours. »,
+                 « …12 heures au plus. ».
+```
+
+```
+ANO-WEB-46
+Fiche          : WEB-MSG-6 (chapitre 5.15) · Gravité : BLOQUANTE · ÉTAT : CLOSE
+Attendu        : le code de livraison ne circule JAMAIS par écrit (D43 / D61 4A) : « Le code : 742 891 » est
+                 refusé comme « le code est 742891 ».
+Obtenu         : « Le code : 742 891 » PASSAIT (201, dans le fil) : `sixDigitCandidates` ne lisait que les
+                 six chiffres collés (`\b\d{6}\b`) ; un espace, un tiret ou un point entre les chiffres
+                 suffisait à contourner la garde — l'invariant était rompu.
+Correction     : `message-guard.rules.ts` retire les séparateurs entre chiffres (espace, point, tiret,
+                 apostrophe, barre) avant une seconde lecture : « 742 891 », « 74-28-91 », « 7 4 2 8 9 1 »
+                 deviennent des candidats (toujours trois au plus, bcrypt) ; un téléphone (dix chiffres)
+                 ou une date (huit) n'en produisent pas. +1 test unitaire (message-service 43).
+Contre-épreuve : WEB-MSG-6 : les deux formes refusées (400 `DELIVERY_CODE_IN_MESSAGE`), « mon numéro de vol
+                 est 123456 » passe.
+```
+
+```
+ANO-WEB-47
+Fiche          : WEB-MSG-13 (chapitre 5.15) · Gravité : MAJEURE · ÉTAT : CLOSE
+Attendu        : après un rendez-vous confirmé, l'un des deux peut en proposer un autre (changer l'heure ou
+                 le lieu) et l'autre l'accepter — le raccourci du cahier (un rendez-vous dans 40 minutes
+                 après celui de MSG-11) le suppose.
+Obtenu         : la nouvelle proposition était INVISIBLE : le panneau n'affiche que « le rendez-vous qui
+                 compte » (`nextMeetupOf`), et la règle préférait toujours le prochain ACCEPTÉ ; l'autre
+                 partie ne voyait jamais « À confirmer par vous » — impossible de replanifier.
+Correction     : `nextMeetupOf` fait primer une proposition PLUS RÉCENTE que l'acceptation (une
+                 re-proposition) ; accepter une re-proposition annule le précédent confirmé du même type
+                 (un seul rendez-vous confirmé par type : l'ancre du numéro et la liste ne balancent plus).
+                 +1 test unitaire (message-service 44). Candidat registre : compléter D61 1A.
+Contre-épreuve : WEB-MSG-13 : Pauline propose à +40 min, Thomas lit « À confirmer par vous », accepte ;
+                 « Voir le numéro » répond 200.
+```
+
+```
+ANO-WEB-48
+Fiche          : WEB-MSG-22 (chapitre 5.15) · Gravité : MINEURE · ÉTAT : CLOSE
+Attendu        : un tiers qui ouvre l'adresse d'un fil lit « La conversation n'a pas pu être ouverte. » ;
+                 rien du fil n'est révélé.
+Obtenu         : l'API refuse bien (403 `NOT_A_PARTY`, aucun contenu) mais l'écran restait sur
+                 « Chargement… » sans fin : `ConversationThread` ne rendait que `isLoading || !data`.
+Correction     : `isError` → « La conversation n'a pas pu être ouverte. » (clé `open.failed`, déjà là).
+Contre-épreuve : WEB-MSG-22 : Aminata sur le fil de Pauline — l'API 403, la phrase à l'écran, aucun message.
+```
+
 ---
 
 ## Chapitre 5.1 — Découverte, accueil et navigation · **CONFORME** (12 fiches, 1 min 24)
@@ -1923,6 +1984,128 @@ le refus se joue sur `bzv-pending`, l'expiration sur `gru-pending` (manœuvre co
 - **`nx typecheck user-ui` / `admin-ui`** : la cible inférée par `@nx/js/typescript` a disparu sur le
   poste en cours de session (les services l'ont encore) ; la CI lance `tsc -p apps/user-ui` directement —
   `npx tsc --noEmit -p apps/user-ui/tsconfig.json` est l'équivalent.
+
+## Chapitre 5.15 — Messagerie, rendez-vous et numéro de téléphone · **CONFORME** (22 fiches jouées, 4 après correction · 4 anomalies closes dont 1 BLOQUANTE et 1 MAJEURE · 21 scénarios en série, 3 min 24)
+
+`web-msg.spec.ts`. Le fil par deal (D61) de bout en bout, deux navigateurs (A = Pauline, B = Thomas) sur
+`bzv-accepted` ; les gardes sur `bzv-picked` (Aminata ↔ Thomas, code 742891), le litige sur
+`bzv-disputed`, la fenêtre de 14 jours sur `bzv-completed` (manœuvre consignée), la relance par les
+scripts de recette `relance-eligible.ts` + `relance.ts` (le cron des 5 minutes, forcé). deal-service en
+FAKE ; la passerelle relancée en bundle en cours de campagne (limiteur, voir pièges).
+
+| Fiche | Ce qui est éprouvé | Verdict | Preuve |
+|---|---|---|---|
+| WEB-MSG-1 | La liste des conversations | **Conforme** — « Thomas », « Paris → Brazzaville », le dernier message (« Bonjour, parfait. Je propose le terminal 2E… »), le rendez-vous « · à confirmer » ; écran large : liste à gauche, premier fil ouvert à droite ; bulle de l'en-tête « 1 » chez Thomas (un message non lu), vide chez Pauline (à jour). **Constats** : pas le RÔLE de l'interlocuteur sur la ligne ; « Choisissez une conversation. » ne s'affiche que sans aucun fil (le premier s'ouvre seul) |
+| WEB-MSG-2 | L'état vide | **Conforme** — Mai : « Aucune conversation » / « Une conversation s'ouvre dès qu'un Voyageur accepte votre colis, ou dès que vous acceptez une demande. », « Choisissez une conversation. » |
+| WEB-MSG-3 | Pas de fil avant l'acceptation | **Conforme (écart)** — `GET /conversations/by-deal/<bzv-pending>` → **403 `CONVERSATION_NOT_OPEN`**, aucun fil créé. **Écart** : le suivi d'une demande en attente n'a AUCUN bouton de message (le cahier attend un bouton qui explique) |
+| WEB-MSG-4 | Envoyer un message | **Conforme** — bulle à droite chez l'auteur, fil groupé par jour (« jeudi 11 septembre »), placeholder « Écrire un message… », « Le code de livraison se donne en main propre, jamais par écrit. » ; chez Thomas le message arrive **sans rechargement** (≈ 3 s), à gauche ; notification « Nouveau message » / « Paris → Brazzaville · « Bonjour Thomas, le colis est prêt. » » ; Thomas répond, Pauline le voit |
+| WEB-MSG-5 | Les réponses rapides | **Conforme** — les neuf puces du cahier ; « Je suis en route. » remplit la saisie, aucune requête, aucune bulle ; bascule **par le sélecteur de l'en-tête** (préférence enregistrée, D44) : « I'm on my way. », « Call me when you arrive. », « Write a message… », puis retour FR. **Constat** : la langue est celle du COMPTE, pas de l'adresse (`/en` seul ne change rien) ; après la bascule, la liste des réponses reste en français jusqu'au rechargement (cache non invalidé) |
+| WEB-MSG-6 | Le code ne s'écrit jamais | **Conforme après correction** → `ANO-WEB-46` (BLOQUANTE : « Le code : 742 891 » passait) et `ANO-WEB-45` (texte anglais sous la saisie) ; « le code est 742891 » et « Le code : 742 891 » → **400 `DELIVERY_CODE_IN_MESSAGE`**, « Ce message contient le code de livraison. Il se donne en main propre, jamais par écrit. », aucune bulle ; « mon numéro de vol est 123456 » passe |
+| WEB-MSG-7 | Coordonnées repérées, pas bloquées | **Conforme** — « appelle-moi au 06 12 34 56 78 » et « écris-moi à moi@exemple.fr » partent, aucune alerte, aucun toast ; côté équipe (`GET /admin/conversations/by-deal`, session SUPPORT) : les deux messages portent `flaggedContact: true` |
+| WEB-MSG-8 | Proposer un rendez-vous | **Conforme** — Thomas (« Proposer un autre », une proposition du seed existe) : type Remise du colis, lieu, précisions, J+3 10:00–11:00 → « En attente de l'autre personne », ligne système « Un rendez-vous a été proposé. » ; Pauline : « À confirmer par vous » + « Accepter » |
+| WEB-MSG-9 | Pas d'auto-acceptation | **Conforme** — chez l'auteur : aucun « Accepter », « Proposer un autre » seul |
+| WEB-MSG-10 | Les bornes | **Conforme après correction** → `ANO-WEB-45` ; +10 min → 400 `INVALID_MEETUP_SLOT` `TOO_SOON` « Le rendez-vous doit commencer au moins 30 minutes à l'avance. » ; +120 j → `TOO_FAR` « …dans les 90 jours. » ; 20 h → `WINDOW_TOO_LONG` « Un rendez-vous dure 12 heures au plus. » |
+| WEB-MSG-11 | Contre-proposer puis accepter | **Conforme** — Pauline 12:00–13:00 : **une seule** proposition PICKUP ouverte (la précédente annulée, DTO), « En attente de l'autre personne » ; Thomas accepte : « Confirmé », « Le rendez-vous est confirmé. » |
+| WEB-MSG-12 | Le numéro s'ouvre tard | **Conforme** — « Voir le numéro » à J+3 : 400 `TOO_EARLY`, « Le numéro s'affiche à partir du {jour} {heure} (2 h avant le rendez-vous confirmé ou le départ). », aucun numéro. **Constat** : sans rendez-vous confirmé (yul-accepted), l'ancre de repli est le DÉPART (« à partir du lundi 14 septembre 14:43 ») ; le message « Proposez et confirmez un rendez-vous ci-dessous » n'apparaît que sans départ connu |
+| WEB-MSG-13 | Le numéro à l'heure, trace unique | **Conforme après correction** → `ANO-WEB-47` (MAJEURE : une proposition après confirmation était invisible) ; Pauline propose +40 min, Thomas accepte ; « Voir le numéro » → 200, « Numéro de Thomas : +33612345601 » (lien `tel:`), **une** ligne « Le numéro de téléphone a été affiché. », bouton désactivé, toujours une ligne après rechargement |
+| WEB-MSG-14 | « Appeler » ne compose jamais | **Conforme** — aucun `tel:` sur « Mon Deal accepté » ; « Appeler » → `/dashboard/messages?conversation=…&focus=phone`, bandeau du numéro (ou de son heure) en avant |
+| WEB-MSG-15 | Les sept boutons | **Conforme** — « Envoyer un message à Thomas » (accepté), « Message à Thomas » (pris en charge), « Envoyer un message » (transit), côté Voyageur « Envoyer un message » (accepté), « Message » (pickup), « Envoyer un message » (transit), « Écrire à Aminata » (livraison) : chacun ouvre **le fil du deal** (`conversation=` = `by-deal`), jamais un second |
+| WEB-MSG-16 | Signaler un message | **Conforme** — « Signaler un message » / intro ; **quatre** motifs (liste déroulante) ; « Merci, le signalement est transmis à notre équipe. » (201) ; le même message : **409** « Tu as déjà signalé ce message. » ; le fil inchangé ; Thomas ne reçoit rien qui parle de signalement |
+| WEB-MSG-17 | Pas ses propres messages | **Conforme** — aucun bouton de signalement sur ses bulles |
+| WEB-MSG-18 | Aucune suppression | **Conforme** — ni supprimer, ni modifier |
+| WEB-MSG-19 | Lecture seule en litige | **Conforme** — Chinwe : « Un litige est en cours : les échanges passent par la médiation. », saisie absente, fil lisible |
+| WEB-MSG-20 | Fermé 14 jours après la fin | **Conforme** — terminé il y a 2 jours : ouvert ; fin reculée à J−15 (manœuvre) : « Cette conversation est fermée à l'écriture. Vous pouvez toujours la relire. », saisie absente |
+| WEB-MSG-21 | L'email de relance | **Conforme** — deux messages de Thomas, Pauline n'ouvre pas ; passe forcée : `sent: 1`, « Thomas t'a écrit à propos de Paris → Brazzaville », **sans le texte** ; seconde passe : `sent: 0`, un seul email ; notification in-app immédiate. **Écart** : la bulle de l'en-tête dit « 8 » = MESSAGES non lus d'une seule conversation (le cahier attend les CONVERSATIONS) |
+| WEB-MSG-22 | Un tiers ne voit pas le fil | **Conforme après correction** → `ANO-WEB-48` ; API 403 sans contenu ; « La conversation n'a pas pu être ouverte. », aucun message |
+
+### À trancher (produit)
+
+- **La bulle de l'en-tête compte les messages** (`totalUnread` = somme des `unreadCount`), le cahier
+  veut les **conversations** non lues. Une ligne : `items.filter(i => i.unreadCount > 0).length`.
+- **Pas de bouton « message » sur une demande en attente** : le cahier attend un bouton qui explique
+  (« La conversation s'ouvre une fois le deal accepté. ») ; la clé existe (`open.notOpenYet`), le
+  suivi « pending » ne l'affiche pas. Ajouter le bouton grisé avec ce texte — petit.
+- **La langue des réponses rapides suit le compte** (D44), pas l'adresse : le cahier dit « bascule en
+  anglais », ce qui marche par le sélecteur (qui enregistre) ; amender le cahier. Et invalider la
+  liste au changement de langue — petit.
+- **Le rôle de l'interlocuteur** absent de la liste (« Thomas » sans « Voyageur ») — petit.
+- **Sans rendez-vous, l'ancre du numéro est le départ** : cohérent avec la règle (D61 3A « ou le
+  départ »), mais le message « Proposez et confirmez… » du cahier n'existe alors jamais pour un vrai
+  trajet. Amender le cahier.
+- **La re-proposition après confirmation** (ANO-WEB-47) est une décision : compléter D61 1A
+  (« une proposition plus récente que l'acceptation prime ; l'accepter remplace le confirmé »).
+
+### Regard d'expert — optimisations et améliorations (une ligne par fiche)
+
+- **MSG-1** — La liste ne dit pas le rôle ni l'état du deal (accepté, pris en charge) : un sous-titre
+  « Voyageur · pris en charge » — petit. Le premier fil s'ouvre seul sur écran large et se marque lu :
+  un membre qui ouvre « Messages » « lit » sans lire — ne marquer lu qu'à la visibilité réelle du fil
+  (IntersectionObserver) — moyen.
+- **MSG-2** — Bon. Un bouton « Voir mes envois / mes trajets » sous l'état vide — petit.
+- **MSG-3** — Servir `conversation: { canOpen, reason }` dans le DTO du deal pour que CHAQUE écran
+  affiche le bon bouton sans deviner — petit.
+- **MSG-4** — Le fil se rafraîchit toutes les 3 s en polling : sur mobile, coûteux en batterie et en
+  requêtes ; WebSocket ou SSE à partir d'un seuil (D61 le prévoit) ; en attendant, ralentir hors
+  focus (`refetchIntervalInBackground: false`) — petit.
+- **MSG-5** — Les réponses rapides sont fixes ; les filtrer par étape (`kind` PICKUP / DELIVERY existe
+  déjà dans la liste) selon le statut du deal — petit.
+- **MSG-6** — La garde compare jusqu'à trois candidats en bcrypt (≈ 3 × 70 ms) à chaque message avec
+  chiffres ; garder une empreinte rapide (HMAC du code) à côté du bcrypt pour un premier tri — moyen.
+  Et écrire « sept-quatre-deux… » passe toujours : la garde couvre l'écrit courant, pas la ruse ;
+  c'est la règle (D61 4A), à rappeler dans le cahier.
+- **MSG-7** — Les messages repérés ne remontent que dans la lecture admin d'un dossier ; une file
+  « coordonnées repérées » (comme les signalements) éviterait de les chercher — moyen.
+- **MSG-8** — Le formulaire de rendez-vous n'a pas de valeur par défaut (type, lieu du deal) :
+  pré-remplir le lieu avec le lieu de remise choisi à la réservation — petit.
+- **MSG-9** — Bon. Dire à l'auteur « Pauline n'a pas encore répondu » avec l'heure de la proposition — petit.
+- **MSG-10** — Les bornes vivent dans `meetup.rules.ts` (constantes) : en faire des réglages D62
+  (`messaging.meetupMinLeadMinutes`…) — petit ; les messages d'erreur devraient lire la borne
+  courante plutôt que « 30 minutes » en dur — petit (lié).
+- **MSG-11** — Une contre-proposition annule silencieusement la précédente : une ligne système
+  « la proposition de 10:00 a été remplacée » — petit.
+- **MSG-12** — Le bandeau annonce l'heure d'ouverture sans compte à rebours ; réutiliser
+  `useExpiryCountdown` — petit.
+- **MSG-13** — La révélation est tracée côté serveur (`phoneReveal`) : la faire figurer dans
+  l'historique admin du deal (`/admin/deals/:id/history`) — petit.
+- **MSG-14** — Bon : jamais de `tel:` hors du fil. Le libellé « Appeler » promet un appel ; « Voir le
+  numéro » serait plus honnête — petit.
+- **MSG-15** — Sept libellés différents pour le même geste (« Envoyer un message à Thomas », « Message
+  à Thomas », « Écrire à Aminata »…) : un composant `ContactThreadButton` partagé — petit, et il
+  supprime la classe de défaut « bouton qui ne mène nulle part ».
+- **MSG-16** — Le signalement ne prévient pas l'auteur (bien) ni le signaleur d'une suite : un email
+  « ton signalement est clos » à la revue admin — moyen.
+- **MSG-17/18** — Bon. Prévoir « modifier dans les 2 minutes » (typo) sans supprimer, avec historique ?
+  À trancher, pas urgent.
+- **MSG-19** — Le fil en lecture seule pendant un litige n'offre pas de lien vers la médiation : un
+  bouton « Donner ma version » (dossier) — petit.
+- **MSG-20** — La fenêtre de 14 jours est un réglage D62 (`messaging.writeDaysAfterEnd`) : l'afficher
+  dans le bandeau (« fermée depuis le … ») — petit.
+- **MSG-21** — La relance ne cite pas le message (bon, D61 6A) ; elle pourrait citer le prénom et
+  l'heure du dernier message — petit. `relance-eligible` remet `lastReadAt` à null : le compteur
+  de non-lus grimpe (8) — c'est l'outil de recette, pas le produit.
+- **MSG-22** — Le 403 est propre ; l'écran pourrait proposer « Retour à mes conversations » — petit.
+- **Transversal** — Quatre anomalies dont une BLOQUANTE sur une garde de sécurité (ANO-WEB-46) :
+  la règle pure avait ses tests, mais aucun test n'essayait la forme « 742 891 » ; règle de revue :
+  **tout filtre de sécurité se teste avec ses contournements évidents** (séparateurs, casse, accents,
+  homoglyphes). Et deux fois le même motif (ANO-WEB-45) : le `message` anglais de l'API affiché au
+  membre — un `grep "response?.data?.message"` dans le front en trouvera d'autres.
+
+### Pièges de poste payés ici
+
+- **La bulle de l'en-tête se lit AVANT d'ouvrir la messagerie** : sur écran large, le premier fil
+  s'ouvre seul et se marque lu.
+- **`getByText` compte la zone de saisie** (sa valeur) : « le message n'apparaît pas dans le fil » se
+  prouve par l'absence de BULLE (`.justify-end, .justify-start`), pas par un compte de textes.
+- **Les motifs de signalement sont une liste déroulante** (`selectOption`), pas des radios.
+- **Deux fils confirment deux fois** : après une re-proposition acceptée, deux lignes « Le
+  rendez-vous est confirmé. » — `.last()`.
+- **Le limiteur de la passerelle** : après treize passages d'un chapitre à trois comptes connectés
+  par l'écran, `POST /auth/login` répond 429 — relancer la passerelle (en bundle : `cd apps/api-gateway
+  && node --env-file=../../.env dist/main.js`) remet les compteurs à zéro.
+- **Les crons du poste écrivent aux comptes du seed** (versement « 26,00 € en route… ») : « il n'est
+  pas prévenu » se prouve sur le SUJET des emails, pas sur leur absence.
+- **`nx serve` recompile message-service à chaud** ; la passe `relance.ts` importe le service : elle
+  tourne avec le code du disque, pas avec le bundle servi.
 
 ## Chapitre 6 — WEB-E2E-1, le nominal complet · **CONFORME** (29 étapes, 1 min 24)
 

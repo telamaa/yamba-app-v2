@@ -3582,3 +3582,67 @@ n'apparaît jamais côté Voyageur, ni à l'écran ni dans le DTO.
 | 203 | États fermés | bandeau + aucune action | oui |
 | 204 | Mon Deal accepté | blocs, code secret nommé Clarisse, aucun code | oui (ANO-WEB-44 close) |
 
+---
+
+# Messagerie, rendez-vous et numéro de téléphone — ce que le chapitre 5.15 fait respecter
+
+*(PR `chore/recette-web-5-15`, 11/09/2026 — cahier 01-WEB chapitre 5.15, WEB-MSG-1 à 22.)*
+
+## Le besoin
+
+Une fois le deal accepté, les deux parties s'organisent dans un fil unique par deal : messages,
+rendez-vous proposés et confirmés, numéro de téléphone révélé au bon moment. Le code de livraison n'y
+circule jamais, les coordonnées y sont repérées sans être bloquées, un message se signale mais ne se
+supprime pas, le fil est une pièce du dossier de médiation.
+
+## Les règles
+
+**RG-WEB-169 — Un fil par deal, créé à l'acceptation, jamais avant** (403 `CONVERSATION_NOT_OPEN`) ; la
+liste montre l'interlocuteur, le corridor, le dernier message et le rendez-vous à confirmer ; un compte
+sans deal engagé lit un état vide expliqué.
+
+**RG-WEB-170 — Un message part et arrive sans rechargement** (actualisation ≈ 3 s), à droite chez
+l'auteur, groupé par jour, avec une notification in-app ; les réponses rapides (neuf, dans la langue du
+compte) remplissent la saisie sans envoyer.
+
+**RG-WEB-171 — Le code de livraison ne s'écrit jamais**, collé (« 742891 ») ou aéré (« 742 891 »,
+« 74-28-91 ») : le message est refusé avec un texte en français, rien n'entre dans le fil ; un autre
+groupe de six chiffres passe.
+
+**RG-WEB-172 — Les coordonnées (téléphone, email) sont repérées, pas bloquées** : le message part sans
+alerte pour l'auteur, l'équipe le voit marqué.
+
+**RG-WEB-173 — Le rendez-vous est un objet** : proposé par l'un, accepté par l'autre (jamais par son
+auteur), au moins 30 minutes à l'avance, au plus 90 jours, 12 heures au plus — les refus se lisent en
+français ; une contre-proposition remplace la proposition ouverte du même type ; une proposition
+postérieure à une confirmation prime et, acceptée, remplace le confirmé ; chaque étape laisse une ligne
+système.
+
+**RG-WEB-174 — Le numéro s'ouvre 2 heures avant le rendez-vous de remise confirmé (ou le départ)**,
+jamais avant (400 `TOO_EARLY`, heure d'ouverture annoncée) ; révélé, il laisse UNE ligne système par
+lecteur ; « Appeler » ouvre le fil, ne compose jamais ; les sept boutons de contact mènent au même fil.
+
+**RG-WEB-175 — Un message de l'autre partie se signale** (quatre motifs, jamais deux fois, l'auteur
+n'est pas prévenu) ; ses propres messages ne se signalent pas ; aucun message ne se supprime ni ne se
+modifie.
+
+**RG-WEB-176 — Le fil est en lecture seule pendant un litige et 14 jours après la fin du deal** ; il
+reste lisible ; un tiers ne l'ouvre pas (403, « La conversation n'a pas pu être ouverte. »).
+
+**RG-WEB-177 — La relance email des messages non lus** part après 15 minutes, au plus une par heure et
+par conversation, sans citer le message ; la notification in-app, elle, est immédiate.
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| 205 | Liste, état vide, pas de fil avant acceptation | conforme, 403 | oui (écart : pas de bouton sur une demande en attente) |
+| 206 | Envoyer, réponses rapides FR/EN | bulle, notification, saisie remplie | oui |
+| 207 | Code de livraison collé ou aéré | refusé, texte FR, jamais dans le fil | oui (ANO-WEB-46 BLOQUANTE close, ANO-WEB-45 close) |
+| 208 | Coordonnées | passent, repérées côté équipe | oui |
+| 209 | Rendez-vous : proposer, bornes, contre-proposer, accepter | états, lignes système, une seule proposition | oui (ANO-WEB-45 close) |
+| 210 | Numéro trop tôt / à l'heure / « Appeler » / sept boutons | 400 puis 200, une ligne, jamais `tel:` hors du fil | oui (ANO-WEB-47 close) |
+| 211 | Signaler, jamais le sien, aucune suppression | 201 puis 409, rien ne change | oui |
+| 212 | Litige, 14 jours, tiers | lecture seule, fermé, 403 + phrase | oui (ANO-WEB-48 close) |
+| 213 | Relance email | un email sans le texte, pas deux par heure | oui (écart : la bulle compte les messages) |
+

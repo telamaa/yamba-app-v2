@@ -610,6 +610,26 @@ Ordre de demarrage : auth -> trip -> gateway.
   desktop du visiteur sans « Creer un compte » ni « Rechercher un trajet ». Piege de poste : la cle
   Google Maps n'accepte que `localhost` comme referent. Harnais : 32 scenarios verts. PR **#265**
   (empilee sur #264). Reste : 5.2 a 5.32, 02-ADMIN.
+- 11/09 : **CHAPITRE 5.15 DU CAHIER 01-WEB — WEB-MSG, MESSAGERIE, RENDEZ-VOUS ET NUMERO (branche
+  `chore/recette-web-5-15`, empilee sur #279)** — 22 fiches jouees CONFORMES (4 apres correction), 21 scenarios
+  en serie, 3 min 24 (`apps/e2e/src/chapitres/web-msg.spec.ts`, deux navigateurs Pauline / Thomas sur
+  bzv-accepted). QUATRE ANOMALIES CLOSES : **ANO-WEB-46 BLOQUANTE** (« Le code : 742 891 » PASSAIT — la garde
+  ne lisait que six chiffres colles ; separateurs retires avant lecture, message-guard.rules + test),
+  **ANO-WEB-47 MAJEURE** (apres un rendez-vous confirme, une nouvelle proposition etait invisible donc jamais
+  acceptable — `nextMeetupOf` fait primer une proposition plus recente que l'acceptation, accepter remplace
+  le confirme du meme type ; candidat registre D61 1A), ANO-WEB-45 mineure (le `message` ANGLAIS de l'API
+  affiche sous la saisie et dans le panneau — `details.code` traduit, cles messaging.errors.* FR/EN),
+  ANO-WEB-48 mineure (fil refuse a un tiers = « Chargement… » sans fin — `isError`). Prouve : bulle a
+  droite + fil groupe par jour + arrivee sans rechargement + notification ; 9 reponses rapides qui remplissent
+  sans envoyer, langue du COMPTE (D44, bascule par le selecteur) ; coordonnees reperees (flaggedContact vu par
+  le SUPPORT) ; rendez-vous (bornes 30 min / 90 j / 12 h en francais, une seule proposition, confirme) ;
+  numero : 400 TOO_EARLY puis 200 a moins de 2 h, une ligne systeme unique ; « Appeler » ouvre le fil ; sept
+  boutons -> le meme fil ; signalement (4 motifs, 409 la seconde fois, l'auteur pas prevenu) ; litige et 14 j
+  en lecture seule ; relance (un email sans le texte, pas deux par heure). A trancher : la bulle compte les
+  MESSAGES (cahier : conversations) ; pas de bouton message sur une demande en attente ; role absent de la
+  liste ; sans rendez-vous l'ancre du numero est le depart. Plateforme de tests **996** (message 44). Harnais :
+  178 scenarios. Poste : passerelle relancee en bundle (429 apres treize passages). Reste : 5.16 a 5.32,
+  02-ADMIN. AUCUNE attribution Claude.
 - 11/09 : **CHAPITRE 5.14 DU CAHIER 01-WEB — WEB-DEA, LA DEMANDE COTE VOYAGEUR (branche
   `chore/recette-web-5-14`, empilee sur #278)** — 9 fiches jouees CONFORMES (3 apres correction), 9 scenarios
   en serie, 2 min 20 (`apps/e2e/src/chapitres/web-dea.spec.ts`). Demandes creees par l'assistant (32,20 /

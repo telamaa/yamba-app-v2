@@ -5305,3 +5305,104 @@ user-ui (`tsc -p apps/user-ui`, comme la CI) et harnais verts. Poste : la cible 
 des deux fronts Next a disparu en cours de session (les services l'ont encore) — `npx tsc --noEmit -p
 apps/user-ui/tsconfig.json` est l'équivalent exact de la CI.
 
+---
+
+# Chapitre 5.15 du cahier 01-WEB : la messagerie — une garde de sécurité contournable par un espace, et trois écrans qui parlaient anglais ou se taisaient
+
+*(PR `chore/recette-web-5-15`, 11/09/2026.)*
+
+## Ce qui a été fait
+
+Le quinzième chapitre « fiches » du cahier 01-WEB : `WEB-MSG` (le fil par deal, D61). Vingt-deux fiches
+jouées et conformes (quatre après correction), quatre anomalies closes — `ANO-WEB-46` **BLOQUANTE**,
+`ANO-WEB-47` MAJEURE, `ANO-WEB-45` et `ANO-WEB-48` mineures. Plateforme de tests : message-service
+42 → **44** (996 au total).
+
+```
+apps/e2e/src/chapitres/web-msg.spec.ts                             21 scénarios en série (22 fiches), 3 min 24
+apps/e2e/src/pages/fil-messagerie.ts                               accepterRendezVous : la dernière ligne « confirmé »
+apps/message-service/src/lib/message-guard.rules.ts               ANO-WEB-46 (séparateurs entre chiffres retirés)
+apps/message-service/src/lib/message-guard.rules.spec.ts          +1
+apps/message-service/src/lib/meetup.rules.ts                      ANO-WEB-47 (une re-proposition prime)
+apps/message-service/src/lib/meetup.rules.spec.ts                 +1
+apps/message-service/src/services/conversation.service.ts         ANO-WEB-47 (accepter remplace le confirmé du même type)
+apps/user-ui/src/components/dashboard/messages/ConversationThread.tsx   ANO-WEB-45 (code → texte), ANO-WEB-48 (isError)
+apps/user-ui/src/components/dashboard/messages/MeetupPanel.tsx    ANO-WEB-45 (bornes traduites)
+apps/user-ui/messages/{fr,en}/messaging.json                       clés errors.*
+```
+
+## ANO-WEB-46 : « Le code : 742 891 » passait
+
+La garde du code de livraison (D43 / D61 4A) extrayait les groupes de six chiffres avec `\b\d{6}\b`
+et les comparait au hash bcrypt du deal. Six chiffres collés étaient refusés ; un espace, un tiret ou
+un point entre les chiffres — la façon la plus naturelle d'écrire un code — passait. L'invariant
+« le code ne circule jamais par écrit » était rompu par la forme la plus courante.
+
+```ts
+// apps/message-service/src/lib/message-guard.rules.ts
+const DIGIT_SEPARATOR = /(?<=\d)[\s.\-–_'’/]+(?=\d)/g;
+export function sixDigitCandidates(text: string): string[] {
+  const isolated = text.match(SIX_DIGITS) ?? [];
+  const collapsed = text.replace(DIGIT_SEPARATOR, "").match(SIX_DIGITS) ?? [];   // « 742 891 » → « 742891 »
+  return [...new Set([...isolated, ...collapsed])].slice(0, MAX_CODE_CANDIDATES); // trois bcrypt au plus
+}
+```
+
+Un téléphone (« 06 12 34 56 78 » → dix chiffres) et une date (« 11 09 2026 » → huit) ne forment
+toujours pas un groupe de six isolé : les coordonnées restent repérées, pas bloquées (D61 5A). La
+leçon de revue : **un filtre de sécurité se teste avec ses contournements évidents** — la règle avait
+ses tests, aucun n'essayait la forme aérée.
+
+## ANO-WEB-47 : une re-proposition invisible
+
+Le panneau de rendez-vous n'affiche que « le rendez-vous qui compte » (`nextMeetupOf`) et la règle
+préférait TOUJOURS le prochain accepté. Après une confirmation, une nouvelle proposition (changer
+l'heure ou le lieu) n'apparaissait chez personne : impossible de replanifier. Deux changements :
+
+1. `nextMeetupOf` fait primer une proposition **plus récente que l'acceptation**
+   (`createdAt > acceptedAt ?? createdAt`) — c'est une re-proposition, elle doit être acceptable ;
+2. `acceptMeetup` annule les autres rendez-vous ACCEPTÉS du même type : **un seul confirmé par type**,
+   l'ancre du numéro (`revealPhone`, `thread`) et la liste ne balancent plus entre deux.
+
+Candidat registre : compléter D61 1A avec cette règle.
+
+## ANO-WEB-45 : le `message` anglais de l'API sous la saisie
+
+Le fil (`send`) et le panneau (`submit`) affichaient `err.response.data.message` — la phrase ANGLAISE
+de l'API — au membre. Les deux lisent désormais `details.code` (A146 : le code atteint le client) et
+traduisent : `DELIVERY_CODE_IN_MESSAGE`, `INVALID_MEETUP_SLOT` + `reason` (`TOO_SOON` / `TOO_FAR` /
+`WINDOW_TOO_LONG`), `MEETUP_CHANGED`, `CONVERSATION_READ_ONLY` — clés `messaging.errors.*` en FR et EN,
+repli sur les messages génériques existants. Un `grep "response?.data?.message"` dans le front est le
+prochain geste utile.
+
+## ANO-WEB-48 : « Chargement… » sans fin
+
+`ConversationThread` ne rendait que `isLoading || !data` : un fil refusé (403 `NOT_A_PARTY`) ou
+introuvable restait sur « Chargement… ». `isError` → « La conversation n'a pas pu être ouverte. »
+(clé déjà présente). L'API, elle, refusait proprement sans rien révéler.
+
+## Le harnais
+
+- Deux navigateurs (Pauline, Thomas) sur `bzv-accepted` ; le fil est demandé à l'API
+  (`FilMessagerie.identifiantDuFil`) ; la bulle de l'en-tête se lit AVANT d'ouvrir la messagerie
+  (sur écran large le premier fil s'ouvre seul et se marque lu).
+- La langue des réponses rapides suit le COMPTE (D44) : la fiche bascule par le sélecteur de
+  l'en-tête (qui enregistre la préférence), puis revient en français.
+- Les refus sont lus sur la réponse (`400` + code) ET sous la saisie (le texte traduit) ; « le
+  message n'apparaît pas dans le fil » se prouve par l'absence de BULLE (`getByText` compte la
+  valeur de la zone de saisie).
+- Les coordonnées repérées se prouvent côté équipe : `GET /admin/conversations/by-deal/:id`
+  (session SUPPORT) → `flaggedContact: true` sur les deux messages.
+- Le numéro « à l'heure » : Pauline propose à +40 min, Thomas accepte (ANO-WEB-47 nécessaire),
+  « Voir le numéro » → 200, ligne système unique même après rechargement.
+- La relance : `scripts/recette/relance-eligible.ts <fil> SHIPPER` (dernier message vieilli d'une
+  heure) puis `relance.ts` deux fois (`sent: 1` puis `sent: 0`) ; l'email est vérifié SANS le texte.
+- La fenêtre de 14 jours : `completedAt` / `closedAt` reculés à J−15 par une manœuvre consignée.
+- Le limiteur de la passerelle a répondu 429 après treize passages : passerelle relancée en bundle.
+
+## Tests
+
+message-service **44** (+2 : ANO-WEB-46, ANO-WEB-47) → plateforme **996** (+ auth 229). `apps/e2e` :
+**178 scénarios** (157 + WEB-MSG ×21). Typecheck user-ui (`tsc -p apps/user-ui`), message-service et
+harnais verts ; miroir i18n vert.
+
