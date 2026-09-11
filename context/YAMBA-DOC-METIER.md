@@ -2581,3 +2581,180 @@ Voyageur peut faire. *(ANO-WEB-07, ouverte.)*
 | 27 | Fenêtre d'annulation à moins de 48 h | 15,96 € remboursés, retenue 15,96 € reversée, « Garder » sans effet | oui |
 | 28 | Annulation confirmée | toast, ligne « Annulée », Finances des deux côtés (15,96 € / 14,25 €), kilos rendus, quatre emails | oui |
 | 29 | Le Voyageur tente d'annuler son trajet | refus 409 avec le nombre de deals vivants | oui (conseil inapplicable : ANO-WEB-07) |
+
+---
+
+# Le compte neuf — ce que WEB-E2E-4 fait respecter
+
+*(PR `chore/e2e-parcours-4`, 09/09/2026 — cahier 01-WEB chapitre 6, CNF-06 / D71, D63, D65, SES-01.)*
+
+## Le besoin
+
+Un compte neuf est plafonné pendant trente jours, et ces plafonds doivent tomber **avant** tout
+argent — jamais après une autorisation bancaire. Le score qui les décide ne se montre à
+personne : ni à l'écran, ni dans l'export des données. Et la vie ordinaire du compte doit tenir
+ses promesses : une session qui expire, ses appareils, une suppression bloquée tant qu'un deal
+est en cours.
+
+## Les règles
+
+**RG-WEB-25 — Un plafond refuse avant tout paiement.** Valeur déclarée, poids et nombre
+d'envois du mois sont contrôlés à la demande d'intention de paiement ; rien n'est autorisé, aucune
+ligne Finances, aucun email. *(ANO-WEB-08.)*
+
+**RG-WEB-26 — Le score de confiance n'existe pour personne.** Aucune page du membre, aucune page
+publique, aucun export ne le mentionne. *(D71.)*
+
+**RG-WEB-27 — L'export des données passe par la porte, puis se télécharge.** Le refus
+`SUDO_REQUIRED` ouvre la porte, quel que soit le format de réponse demandé. *(ANO-WEB-09.)*
+
+**RG-WEB-28 — Une session expirée se rattrape sur place.** La fenêtre se pose par-dessus la
+page, la reconnexion ne la quitte pas, et le membre refait son geste.
+
+**RG-WEB-29 — La suppression est bloquée avant toute porte.** Un deal en cours ou une demande en
+attente affichent le bandeau et les motifs ; aucun code n'est demandé ni envoyé.
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| 30 | Inscription, code, connexion sans « Rester connecté » | compte activé, bienvenue, cookie de session sans expiration | oui |
+| 31 | 450 € / 12 kg / sixième demande du mois | refus à l'intention, message unique, rien nulle part | oui |
+| 32 | Profil, tableau de bord, page publique, export | aucun score, aucun niveau de risque, aucun point | oui |
+| 33 | Session expirée puis un geste | fenêtre par-dessus la page, reconnexion sur place, geste refait | oui |
+| 34 | Supprimer mon compte avec un deal en cours | bandeau, motifs, aucune porte, aucun email | oui |
+
+---
+
+# Le refus au pickup — ce que WEB-E2E-5 fait respecter
+
+*(PR `chore/e2e-parcours-5`, 10/09/2026 — cahier 01-WEB chapitre 6, A40, D39, D29 ①.)*
+
+## Le besoin
+
+Au rendez-vous de prise en charge, le Voyageur ouvre le colis. S'il ne correspond pas à ce qui a
+été déclaré, il doit pouvoir le **refuser sans se pénaliser** : c'est la garantie qui rend la
+vérification possible. L'Expéditrice est remboursée en entier, tout de suite, et prévenue ; les
+kilos reviennent au trajet ; et rien de ce refus ne vient noircir la page publique du Voyageur.
+
+## Les règles
+
+**RG-WEB-30 — Un refus au pickup rembourse tout.** Le paiement capturé à l'acceptation est
+remboursé intégralement, avant toute écriture en base ; « Mes envois » dit « Annulée »,
+Finances « Remboursé {total} le {date} », sans retenue. *(A40, D39.)*
+
+**RG-WEB-31 — Le refus est expliqué, dans l'ordre.** L'Expéditrice reçoit d'abord l'email du
+refus, avec la raison choisie par le Voyageur traduite dans sa langue, puis celui du remboursement
+émis, du montant intégral.
+
+**RG-WEB-32 — Un refus au pickup n'est pas une annulation fautive.** La ligne de faits du Voyageur
+(« n annulations tardives ») ne bouge pas, ni maintenant ni au prochain recalcul de réputation.
+*(ANO-WEB-10.)*
+
+**RG-WEB-33 — Les kilos refusés reviennent au trajet**, immédiatement, sans geste du Voyageur.
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| 35 | Deal accepté, « Refuser le colis », raison, confirmation | fenêtre avec le rappel « ne pénalise jamais ta réputation », toast, statut CANCELLED, remboursement = total | oui |
+| 36 | Mes envois, Finances de l'Expéditrice | « Annulée » ; « Remboursé {total} le … », aucune retenue | oui |
+| 37 | Emails de l'Expéditrice | refus avec la raison traduite, puis remboursement intégral, sans le mot « retenue » | oui |
+| 38 | Page publique du Voyageur avant / après | ligne de faits identique | oui |
+| 39 | Trajet du Voyageur | kilos rendus, ligne du deal « Annulé » | oui |
+
+---
+
+# Le destinataire — ce que WEB-E2E-6 fait respecter
+
+*(PR `chore/e2e-parcours-6`, 10/09/2026 — cahier 01-WEB chapitre 6, D69, RGP-02.)*
+
+## Le besoin
+
+Le destinataire n'a pas de compte, n'a rien demandé, et n'a qu'un lien que l'Expéditeur lui a
+transmis. Il doit savoir où en est le colis et quoi préparer — et ne rien apprendre d'autre :
+ni adresse, ni numéro, ni code, ni photo, ni montant. Yamba ne lui écrit jamais.
+
+## Les règles
+
+**RG-WEB-34 — La page de suivi ne dit que l'essentiel.** Prénoms, corridor, dates, frise et
+aide de l'étape ; rien d'autre, ni à l'écran, ni dans le code source, ni dans l'API (liste de
+clés fermée). *(D69.)*
+
+**RG-WEB-35 — L'aide change avec l'étape.** À l'atterrissage, elle demande de préparer le code ;
+à la remise, elle dit « Bonne réception ! ».
+
+**RG-WEB-36 — L'origine des données est dite.** La mention de confidentialité nomme
+l'Expéditeur, ce qu'il a confié, à qui, et quand c'est effacé ; elle mène à la politique de
+confidentialité. *(RGP-02.)*
+
+**RG-WEB-37 — Un lien altéré ne révèle rien.** « Ce lien de suivi n'est plus valide », sans
+prénom ni corridor ; l'API répond la même chose pour un jeton altéré et un jeton inventé.
+
+**RG-WEB-38 — Yamba n'écrit jamais au destinataire.** Aucun email, aucun SMS ; le lien est
+partagé par l'Expéditeur seul.
+
+**RG-WEB-39 — Le bloc d'acquisition mène à de vrais écrans.** « Envoyer un colis » ouvre la
+recherche ; « Devenir Voyageur » ouvre l'onboarding (la porte de connexion d'abord, sans compte).
+*(ANO-WEB-11.)*
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| 40 | Lien ouvert à chaque jalon | frise et aide qui progressent, cinq jalons datés à la remise | oui |
+| 41 | Écran, source, API | aucun code, numéro, montant, lieu, photo ; huit clés exactement | oui |
+| 42 | Mention de confidentialité | texte exact, lien vers la politique | oui |
+| 43 | Bloc d'acquisition | recherche ; porte de connexion puis onboarding | oui |
+| 44 | Jeton altéré d'un caractère | « plus valide », sans rien de plus, 404 identique à un jeton inventé | oui |
+| 45 | Boîte du destinataire | aucun email ; tous les emails vont à des membres | oui |
+
+---
+
+# L'accueil du visiteur — ce que le chapitre 5.1 fait respecter
+
+*(PR `chore/recette-web-5-1`, 10/09/2026 — cahier 01-WEB chapitre 5.1, WEB-ACC-1 à 12.)*
+
+## Le besoin
+
+Un visiteur arrive sur l'accueil sans compte. Il doit comprendre le produit en une page, chercher
+un trajet en trois champs, changer de langue et de thème, lire les textes légaux, et n'être
+trompé par rien : ni par un bouton qui ne fait rien, ni par une icône qui mène ailleurs. C'est le
+premier geste de tout le monde, et aucun parcours du chapitre 6 ne le couvrait (ils entrent par
+l'adresse d'un trajet).
+
+## Les règles
+
+**RG-WEB-40 — « Rechercher » cherche.** Depuis l'accueil, deux villes et « Rechercher » ouvrent
+la page de résultats, qui interroge exactement ce qui a été saisi — sans second clic.
+*(ANO-WEB-12.)*
+
+**RG-WEB-41 — Une ville choisie dans la liste est cherchée par son nom.** Le libellé « Ville,
+Pays » est une aide à la lecture ; la recherche compare la ville. Le pays tapé à la main reste
+cherché tel quel. *(ANO-WEB-13.)*
+
+**RG-WEB-42 — La première liste de suggestions vient, quel que soit le rythme de frappe.**
+*(ANO-WEB-14.)*
+
+**RG-WEB-43 — Ce qui n'existe pas encore est annoncé comme tel.** Les réseaux sociaux portent
+« Bientôt disponible » et ne mènent nulle part tant que les comptes n'existent pas. *(ANO-WEB-15.)*
+
+**RG-WEB-44 — La langue affichée est la langue déclarée.** `<html lang>` suit la bascule, au
+rendu comme après un clic. *(ANO-WEB-16.)*
+
+**RG-WEB-45 — La porte d'identité se referme sans conséquence.** « Plus tard », Échap et le
+fond referment ; la page est intacte, rien n'est parti vers le serveur.
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| 46 | Accueil visiteur | en-tête, barre, pied de page, aucun squelette, console propre hors sonde | oui |
+| 47 | FR → EN → FR, rechargement | `/en` puis `/fr`, `lang` fidèle, aucune clé brute | oui |
+| 48 | Thème sombre | conservé au rechargement, contraste AA, retour au clair | oui |
+| 49 | CGU, confidentialité | un texte, un seul `main` | oui |
+| 50 | Icônes sociales | « Bientôt disponible », aucun onglet | oui |
+| 51 | « Partager un trajet » puis trois fermetures | porte par-dessus la page, refermée sans requête | oui |
+| 52 | Paris → Brazzaville depuis l'accueil | `/search`, titre, deux trajets du seed | oui |
+| 53 | Inversion puis « Rechercher » | Brazzaville → Paris, aucun trajet | oui |
+| 54 | Accueil connecté, déconnexion | menu utilisateur ; puis « Connexion », cookies absents | oui |

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
+import { useRouter } from "@/i18n/navigation";
 import TripSearchBar from "@/components/search/TripSearchBar";
 import HeroSectionSkeleton from "@/components/home/skeleton/HeroSectionSkeleton";
 
@@ -80,6 +81,7 @@ function HeroImage({ image }: { image: HeroImage }) {
 }
 
 export default function HeroSection() {
+  const router = useRouter();
   const t = useTranslations("home.hero");
   const [isLoading, setIsLoading] = useState(true);
   const heroImage = useRandomHeroImage();
@@ -162,7 +164,10 @@ export default function HeroSection() {
       </div>
 
       {/* Search bar — sticky avec mode auto + disableCompact pour rester en mode expanded */}
-      <TripSearchBar mode="auto" stickyOnScroll={true} disableCompact={true} />
+      {/* Recette 01-WEB 5.1 (WEB-ACC-9) : sans `onSearchAction`, « Rechercher » ne faisait qu'un
+          console.log — le visiteur restait sur l'accueil. Le brouillon est déjà en sessionStorage
+          (clé partagée) : la page de résultats l'interroge en arrivant. */}
+      <TripSearchBar mode="auto" stickyOnScroll={true} disableCompact={true} onSearchAction={() => router.push("/search")} />
 
       {/* Espace après search avant section suivante */}
       <div className="h-12 md:h-16" />

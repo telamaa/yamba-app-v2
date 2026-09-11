@@ -198,7 +198,7 @@ Contre-épreuve : WEB-E2E-3 étape 4 — « Nouveau message » chez chacun des d
 
 ```
 ANO-WEB-07
-Fiche          : parcours WEB-E2E-3 étape 15 (chapitre 5.7, D72) · Gravité : MAJEURE · ÉTAT : OUVERTE (arbitrage)
+Fiche          : parcours WEB-E2E-3 étape 15 (chapitre 5.7, D72) · Gravité : MAJEURE · ÉTAT : TRANCHÉE le 09/09 — message corrigé (« Mes trajets »), annulation par le Voyageur = lot à part (registre)
 Attendu        : le refus d'annuler un trajet qui porte un deal vivant dit au Voyageur quoi faire.
 Obtenu         : « Ce trajet porte encore 2 deals en cours : annule-les d'abord depuis « Mes
                  deals ». Chaque Expéditeur sera remboursé intégralement. » — or **« Mes deals »
@@ -215,7 +215,254 @@ Proposition    : (1) tout de suite, le message renvoie vers « Mes trajets » (o
                  registre. Décision attendue.
 ```
 
+
+```
+ANO-WEB-08
+Fiche          : parcours WEB-E2E-4 étape 3 (chapitre 5.13, CNF-06 / D71) · Gravité : MAJEURE · ÉTAT : CLOSE
+Attendu        : un compte neuf qui déclare 450 € est refusé « AVANT tout paiement ».
+Obtenu         : l'assistant n'envoyait pas la valeur déclarée à la demande d'intention de
+                 paiement (`createPaymentIntent` postait les seuls champs du devis) : le plafond
+                 « valeur déclarée » n'était vérifié qu'à la création du deal, APRÈS le clic
+                 « Payer » — donc après l'autorisation bancaire avec Stripe. Les deux autres
+                 plafonds (poids, nombre par mois) tombaient bien à l'intention.
+Cause          : le contrat prévoit `declaredValueCents` sur l'intention depuis ANO-API-12
+                 (« l'assistant connaît cette valeur avant de payer : il l'envoie ») ; le front
+                 ne l'envoyait pas. Régression de l'anomalie de la campagne API.
+Correction     : `apps/user-ui/src/services/booking.api.ts` — l'intention part avec la valeur
+                 déclarée (même conversion que la création du deal, factorisée).
+Contre-épreuve : WEB-E2E-4 étape 3 — 450 € : refus dans la carte de l'étape 4 (409 à
+                 l'intention), aucune ligne Finances, aucun email ; étapes 5 et 8 inchangées.
+```
+
+```
+ANO-WEB-09
+Fiche          : parcours WEB-E2E-4 étape 10 (chapitre 5.30, RGPD D63 / sudo D65) · Gravité : MAJEURE · ÉTAT : CLOSE
+Attendu        : « Télécharger mes données » ouvre la porte par code, puis télécharge le JSON.
+Obtenu         : « Impossible pour le moment, réessaie. » — la porte ne s'ouvrait JAMAIS :
+                 l'export est inutilisable pour tout membre (le droit d'accès RGPD, en pratique).
+Cause          : l'export demande la réponse en `blob` ; le refus 403 `SUDO_REQUIRED` arrive lui
+                 aussi en blob, et `isSudoRequired` ne lisait pas le code dans un blob. Même
+                 sort pour le 429 « une fois par 24 h ».
+Correction     : `apps/user-ui/src/services/privacy.api.ts` — un corps d'erreur en blob est
+                 relu en JSON avant d'être relancé ; la porte s'ouvre, le code arrive par email,
+                 le fichier se télécharge.
+Contre-épreuve : WEB-E2E-4 étape 10 — porte, code « Ton code de confirmation Yamba », fichier
+                 `yamba-mes-donnees-….json` (format `yamba-data-export/1`, 5 réservations,
+                 aucune trace de score).
+```
+
+```
+ANO-WEB-10
+Fiche          : parcours WEB-E2E-5 étape 7 (chapitre 5.27, D29 ①, A40) · Gravité : MAJEURE · ÉTAT : CLOSE
+Attendu        : un refus au pickup n'ajoute AUCUNE annulation à la ligne de faits du Voyageur
+                 (« Refuser un colis non conforme ne pénalise jamais ta réputation. »).
+Obtenu         : la ligne de faits comptait comme « annulation tardive » TOUT deal CANCELLED
+                 clos par le Voyageur après acceptation — c'est-à-dire, aujourd'hui, chaque
+                 refus au pickup et rien d'autre (l'annulation ANN-02 par le Voyageur n'est pas
+                 encore ouverte, ANO-WEB-07). Le refus ne déclenchait pas de recalcul : la page
+                 restait juste, jusqu'au prochain fait de réputation (un deal terminé, un avis),
+                 où le refus surgissait comme une annulation fautive. Le parcours passait « pour
+                 rien » avant correction ; en base, l'ancien filtre comptait 1, le nouveau 0.
+Cause          : `reputation.service.ts` (`carrierFacts`) filtrait sur `status: CANCELLED,
+                 closedBy: CARRIER, acceptedAt ≠ null`, sans distinguer le refus au pickup —
+                 la raison du refus étant facultative, rien en base ne le marquait à coup sûr.
+                 La machine, elle, dit « sans pénalité » (effets de `refusePickup`, A40).
+Correction     : `prisma/schema.prisma` — `Booking.pickupRefusedAt` (marque du refus, posée par
+                 `refusePickup` avec `now`) ; `reputation.service.ts` — les annulations tardives
+                 du Voyageur excluent la marque, champ ABSENT compris (`OR` + `isSet: false`,
+                 piège Mongo) ; `deal-transport.service.ts` — le refus recalcule la réputation
+                 des deux parties (comme l'annulation), pour que la page publique dise vrai tout
+                 de suite. Tests : deal-service 575 → 576 (la requête, la marque, le recalcul).
+Contre-épreuve : WEB-E2E-5 étape 7 — ligne de faits lue AVANT la réservation et APRÈS le refus :
+                 identiques (« 0 annulation tardive ») ; en base, sur le deal refusé :
+                 `pickupRefusedAt` posé, ancien filtre 1 → nouveau filtre 0.
+```
+
+```
+ANO-WEB-11
+Fiche          : parcours WEB-E2E-6 étape 7 (chapitres 5.20, 5.6 et 5.31) · Gravité : MAJEURE · ÉTAT : CLOSE
+Attendu        : « Devenir Voyageur », dans le bloc d'acquisition de la page destinataire, mène à
+                 l'écran « Devenir Voyageur » (WEB-VOY-1 : l'assistant d'onboarding — et, sans
+                 compte, la porte de connexion d'abord).
+Obtenu         : une page bouchon, en anglais : « Become a carrier (UI only) ». Même sort pour
+                 `/become/shipper` (« Become a seller (UI only) »). Et le « Devenir Voyageur » du
+                 pied de page et du menu « Découvrir » (visiteur) visait `/become-yamber`, qui
+                 répond 404 (« futur » depuis la migration i18n).
+Impact         : le premier geste d'acquisition d'un futur Voyageur — depuis la page destinataire,
+                 l'accueil (appel final), le pied de page et le menu visiteur — aboutit sur du
+                 vide. Aucun cahier ne le couvrait avant ce parcours (5.6 se joue connecté).
+Cause          : `apps/user-ui/src/app/[locale]/become/{carrier,shipper}/page.tsx` sont des
+                 bouchons de la migration next-intl (commit « migrate to next-intl ») jamais
+                 remplacés ; la page marketing `/become-yamber` n'a jamais été écrite. Quatre
+                 liens pointaient dessus.
+Correction     : les deux bouchons deviennent des redirections (`redirect` de next-intl) vers
+                 l'écran réel — `/carrier/onboarding` et `/search` — pour les liens déjà
+                 partagés ; les quatre liens (page destinataire, accueil, pied de page, menu
+                 visiteur) visent directement `/carrier/onboarding`. L'assistant envoie un
+                 visiteur à `/login?redirect=/carrier/onboarding`, puis le ramène.
+Contre-épreuve : WEB-E2E-6 étape 7 — « Envoyer un colis » → `/fr/search` ; « Devenir Voyageur »
+                 → `/fr/login?redirect=/carrier/onboarding`. `curl` : `/fr/become/carrier` 307
+                 → `/fr/carrier/onboarding`, `/fr/become/shipper` 307 → `/fr/search`.
+```
+
+```
+ANO-WEB-12
+Fiche          : WEB-ACC-9 (chapitre 5.1) · Gravité : BLOQUANTE · ÉTAT : CLOSE
+Attendu        : sur l'accueil, deux villes choisies, « Rechercher » ouvre `/search` avec le titre
+                 « Trajets pour Paris → Brazzaville » et les trajets du jeu d'essai.
+Obtenu         : rien. Le bouton « Rechercher » de l'accueil ne faisait qu'un `console.log`
+                 (« [TripSearchBar] Search: … ») : le visiteur restait sur l'accueil, sans message.
+                 Et même en ouvrant `/search` à la main, la page interrogeait un brouillon VIDE
+                 (« 0 résultats » sous une barre qui affichait pourtant Paris → Brazzaville) : il
+                 fallait cliquer « Rechercher » une seconde fois.
+Impact         : le premier geste du produit pour tout visiteur desktop. Aucun parcours du
+                 chapitre 6 ne le couvrait : ils entrent par l'adresse d'un trajet.
+Cause          : `HeroSection` montait `<TripSearchBar>` sans `onSearchAction` (le composant
+                 documente ce défaut comme « comportement par défaut : log ») ; et
+                 `SearchResultsView` initialisait son brouillon interrogé par `useState` vide, sans
+                 lire le brouillon que la barre mémorise en `sessionStorage` (`trip-search`).
+Correction     : `onSearchAction={() => router.push("/search")}` sur l'accueil ; la clé, le
+                 brouillon initial et la version du brouillon sont exportés par `TripSearchBar`
+                 (`TRIP_SEARCH_STORAGE_KEY`) et `SearchResultsView` interroge CE brouillon
+                 (`usePersistedFormState`, même clé) — en arrivant, les résultats correspondent à
+                 la saisie, sans second clic.
+Contre-épreuve : WEB-ACC-9 — `/fr/search`, « Trajets pour Paris → Brazzaville, République du
+                 Congo », 2 cartes. WEB-ACC-10 — inversion, « Rechercher », « Trajets pour
+                 Brazzaville, République du Congo → Paris », 0 carte (état vide, WEB-RCH-9).
+```
+
+```
+ANO-WEB-13
+Fiche          : WEB-ACC-9 (chapitre 5.1 ; touche 5.9 et 5.10) · Gravité : BLOQUANTE · ÉTAT : CLOSE
+Attendu        : une ville choisie dans la liste de l'autocomplétion trouve les trajets qui en
+                 partent ou y arrivent.
+Obtenu         : « 0 résultats » pour Paris → Brazzaville alors que l'API en rend deux pour
+                 `to=Brazzaville`. La liste pose le libellé normalisé « Ville, Pays »
+                 (« Brazzaville, République du Congo ») dans le champ, et c'est ce libellé entier
+                 que la recherche comparait à `destinationCity` ET `destinationCountry` par un
+                 `contains` : il n'est contenu dans aucun des deux. Toute ville ÉTRANGÈRE choisie
+                 dans la liste donnait zéro résultat — Paris passait parce que Google omet le pays
+                 du domicile (« Paris » tout court).
+Impact         : la recherche par autocomplétion, c'est-à-dire la recherche telle qu'on l'utilise.
+                 Les alertes de route (5.10) portent le même libellé.
+Cause          : `apps/trip-service/src/controllers/trip-search.controller.ts`, `buildBaseWhere` :
+                 `contains: params.to` sur le texte brut.
+Correction     : `apps/trip-service/src/lib/place-text.ts`, `placeSearchTerm(text)` : le terme
+                 cherché est le premier segment avant une virgule (la ville) ; le pays qui suit est
+                 une aide à la lecture, pas un critère — il dépend de la langue de l'écran
+                 (« République du Congo » / « Republic of the Congo ») alors que la base porte le
+                 pays dans la langue du Voyageur qui a publié. Un texte tapé à la main (« Congo »)
+                 reste cherché tel quel. Trois tests unitaires (trip-service 257 → 260).
+Contre-épreuve : `GET /api/trips/search?from=Paris&to=Brazzaville%2C%20République%20du%20Congo`
+                 → `totalCount` 0 avant, 2 après. WEB-ACC-9 vert.
+```
+
+```
+ANO-WEB-14
+Fiche          : WEB-ACC-9 (chapitre 5.1 ; touche 5.7, 5.9, 5.10, 5.12) · Gravité : MAJEURE · ÉTAT : CLOSE
+Attendu        : taper « Paris » dans un champ de ville fait apparaître des propositions.
+Obtenu         : sur une page fraîche, un visiteur qui tape « Paris » d'une traite (5 frappes à
+                 60 ms) ne voit RIEN — ni liste, ni sablier, ni message — tant qu'il ne frappe pas
+                 une lettre de plus. À 250 ms par frappe, la liste vient. Mesuré quatre fois.
+Impact         : la première recherche de chaque visite, pour quiconque tape vite : le champ
+                 paraît mort. Les mêmes champs servent à publier un trajet et à créer une alerte.
+Cause          : `apps/user-ui/src/lib/googlePlaces.ts` chargeait l'API Google avec
+                 `loading=async` et attendait l'événement `load` du `<script>` — qui arrive AVANT
+                 que `google.maps.importLibrary` n'existe. La toute première requête de
+                 suggestions (celle qui déclenche le chargement) échouait sur
+                 « importLibrary is not a function » ; les suivantes trouvaient la bibliothèque
+                 prête. Et `CityAutocomplete` avalait l'erreur (`catch {}`) : aucune trace nulle
+                 part, ni pour l'utilisateur ni pour le développeur.
+Correction     : le chargeur passe `callback=__yambaGoogleMapsReady` (le contrat de Google pour
+                 `loading=async`) et ne se résout que là ; « prêt » se lit sur
+                 `typeof google.maps.importLibrary === "function"`, pas sur `window.google.maps` ;
+                 un chargeur déjà posé est attendu par sondage (15 s) ; un échec de chargement
+                 laisse retenter. Le `catch` du composant journalise (`console.warn`).
+Contre-épreuve : les quatre rythmes de frappe donnent 5 propositions ; WEB-ACC-9 et 10 verts.
+```
+
+```
+ANO-WEB-15
+Fiche          : WEB-ACC-6 (chapitre 5.1) · Gravité : MINEURE · ÉTAT : CLOSE
+Attendu        : les icônes sociales du pied de page portent « Bientôt disponible » et ne mènent
+                 nulle part.
+Obtenu         : elles ouvraient un nouvel onglet vers `https://instagram.com/yamba`,
+                 `https://x.com/yamba`, `https://facebook.com/yamba` — des comptes qui ne sont pas
+                 ceux de Yamba.
+Cause          : `apps/user-ui/src/components/layout/Footer.tsx`, `SOCIAL_LINKS_ENABLED = true`.
+                 L'état « inactif » (info-bulle, curseur, aucun lien) était écrit, pas activé.
+Correction     : `SOCIAL_LINKS_ENABLED = false` — le jour où les comptes existent, une constante
+                 et trois adresses.
+Contre-épreuve : WEB-ACC-6 — `title="Bientôt disponible"` sur les trois, aucun `window.open`,
+                 aucun onglet, adresse inchangée.
+```
+
+```
+ANO-WEB-16
+Fiche          : WEB-ACC-2 (chapitre 5.1 ; touche 5.31 et 5.32) · Gravité : MINEURE · ÉTAT : CLOSE
+Attendu        : sur `/en`, la page est en anglais — jusqu'à l'attribut `lang` du document, que
+                 les lecteurs d'écran (voix), les correcteurs et la traduction automatique lisent.
+Obtenu         : `<html lang="fr">` sur `/en`, au rendu serveur comme après la bascule.
+Cause          : `app/layout.tsx` écrivait `lang="fr"` en dur, avec un commentaire promettant
+                 que « le layout de locale le mettra à jour » — rien ne le faisait. Et une bascule
+                 FR ⇄ EN est une navigation côté client : le layout racine, partagé, ne se
+                 re-rend pas.
+Correction     : le layout racine lit `getLocale()` (next-intl) pour le rendu serveur ;
+                 `components/layout/HtmlLang.tsx` (client, monté dans le layout de locale) aligne
+                 `document.documentElement.lang` après chaque bascule.
+Contre-épreuve : `curl /en` → `lang="en"`, `/fr` → `lang="fr"` ; WEB-ACC-2 lit `lang="en"` après
+                 le clic.
+```
+
+```
+ANO-WEB-17
+Fiche          : WEB-ACC-5 (chapitre 5.1 ; touche 5.31) · Gravité : MINEURE · ÉTAT : CLOSE
+Attendu        : une page = un repère « contenu principal » (`<main>`).
+Obtenu         : deux `<main>` imbriqués sur `/legal/terms` et `/legal/privacy` : celui du
+                 groupe `(marketing)` et celui du cadre `legal/layout.tsx`. Invalide en HTML, et
+                 un lecteur d'écran annonce deux « contenus principaux ».
+Correction     : le cadre légal devient un `<div>`.
+Contre-épreuve : WEB-ACC-5 compte UN `main` sur chacune des deux pages.
+```
+
 ---
+
+## Chapitre 5.1 — Découverte, accueil et navigation · **CONFORME** (12 fiches, 1 min 24)
+
+| Fiche | Ce qui est éprouvé | Verdict | Preuve |
+|---|---|---|---|
+| WEB-ACC-1 | L'accueil du visiteur : en-tête, barre de recherche, pied de page, aucun squelette, console | **Conforme** — logo, « Partager un trajet », « Connexion » ; deux villes et une date ; « Découvrir / Entreprise / Légal » et la phrase de marque ; aucun `animate-pulse` après 5 s. Console : deux lignes 401 (sonde de session, voir observations), rien d'autre. **Écart** : l'en-tête desktop ne porte ni « Rechercher un trajet » ni « Créer un compte » (ils n'existent que dans la feuille mobile) — décision à prendre, voir « à trancher » |
+| WEB-ACC-2 | Bascule FR → EN | **Conforme après correction** → `ANO-WEB-16` ; `/en`, `lang="en"`, en-tête, barre et pied de page en anglais, **aucune clé brute** dans les deux langues (balayage de tous les nœuds de texte). **Écart** : le sélecteur est un « FR \| EN » segmenté (libellés « Français » / « English »), sans info-bulle « Changer de langue » — la clé `header.toggleLanguage` existe et n'est pas utilisée |
+| WEB-ACC-3 | Retour au français, persistance | **Conforme** — `/fr` après rechargement ; la racine `/` revient sur `/fr` |
+| WEB-ACC-4 | Thème clair / sombre | **Conforme** — classe `dark` posée, conservée au rechargement, retirée au retour ; contraste titre / fond mesuré en sombre : **20,2:1** (AA ≥ 4,5). Le bouton de l'en-tête est une bascule (une icône) ; « Mode clair / Mode sombre » nommés vivent dans le menu mobile |
+| WEB-ACC-5 | Les textes légaux | **Conforme après correction** → `ANO-WEB-17` ; `/fr/legal/terms` et `/fr/legal/privacy`, un titre, plus de 500 caractères, un seul `main` |
+| WEB-ACC-6 | Réseaux sociaux inactifs | **Conforme après correction** → `ANO-WEB-15` |
+| WEB-ACC-7 | « Partager un trajet » ouvre la porte | **Conforme** — fenêtre par-dessus l'accueil (adresse inchangée), titre et sous-titre exacts, e-mail + mot de passe + Google, « Plus tard » et la croix |
+| WEB-ACC-8 | « Plus tard », Échap, clic sur le fond | **Conforme** — les trois gestes ferment ; adresse inchangée, aucune écriture vers l'API, aucune erreur |
+| WEB-ACC-9 | La recherche depuis l'accueil | **Conforme après correction** → `ANO-WEB-12`, `ANO-WEB-13`, `ANO-WEB-14` ; « Trajets pour Paris → Brazzaville, République du Congo », **2 cartes** (le cahier en annonce trois : `bzv-inflight` est parti, la recherche ne le montre pas — cahier à corriger) |
+| WEB-ACC-10 | Intervertir départ et destination | **Conforme** — les deux champs s'échangent ; **écart** : les résultats se recalculent au clic « Rechercher », pas d'office (le cahier les attendait recalculés) ; puis « Trajets pour Brazzaville → Paris », 0 carte |
+| WEB-ACC-11 | L'accueil connecté | **Conforme** — plus de « Connexion » ni « Créer un compte » ; cloche, « Messages », « Menu utilisateur » ; le menu porte Mon compte, Mes envois, Mes trajets, Mes favoris, Notifications, Messages, Centre d'aide, Déconnexion. **Écarts** : « Centre d'aide » (le cahier dit « Aide ») ; les intitulés de section et les préférences langue / apparence ne sont rendus que dans la feuille mobile — sur desktop, la langue et le thème sont dans l'en-tête à côté du menu |
+| WEB-ACC-12 | La déconnexion | **Conforme** — `POST /auth/logout` 200, « Connexion » de retour, cookies `access_token` / `refresh_token` absents, le rechargement ne réouvre rien |
+
+### À trancher (produit)
+
+- **L'en-tête desktop d'un visiteur** ne propose que « Partager un trajet » et « Connexion ».
+  Pas de « Créer un compte » (il faut passer par l'écran de connexion), pas de « Rechercher un
+  trajet » (la barre de l'accueil est le seul chemin ; depuis une autre page, le logo). Le cahier
+  attend les deux. Recommandation : un « Créer un compte » plein (mangue) à droite de
+  « Connexion », comme la feuille mobile le fait déjà ; « Rechercher un trajet » en lien texte à
+  gauche. Une décision de produit, pas une régression : rien n'a été changé.
+
+### Pièges de poste payés ici
+
+- **La clé Google Maps est restreinte par référent HTTP à `localhost`.** Sur l'adresse LAN du
+  poste (`http://192.168.1.155:3000`), Places répond 403 « Requests from referer … are blocked »
+  et le champ reste muet — sans message (voir ANO-WEB-14 pour le `catch` muet). Les deux fiches
+  d'autocomplétion se jouent en visiteur : le harnais ouvre le même front par `localhost`
+  (`E2E_GOOGLE_ORIGIN` pour un poste monté autrement). Pour tester depuis un téléphone, ajouter
+  l'origine LAN aux référents autorisés de la clé.
+- **`fill()` ne déclenche aucune requête d'autocomplétion** ; la liste ne vient qu'au fil des
+  frappes (`pressSequentially`).
 
 ## Chapitre 5.12 — Réserver : l'assistant en quatre étapes
 
@@ -322,9 +569,92 @@ Proposition    : (1) tout de suite, le message renvoie vers « Mes trajets » (o
 - Étape 4 : le libellé « Nouveau message » est celui posé par la correction ANO-WEB-06 (le
   cahier ne nommait pas le titre).
 
+## Chapitre 6 — WEB-E2E-4, le compte neuf plafonné · **CONFORME** (14 étapes, 1 min 06)
+
+| Étape du cahier | Ce qui est éprouvé | Verdict |
+|---|---|---|
+| 1 | Inscription, code reçu, activation, bienvenue | **Conforme** — « Ton code d'activation Yamba », « Compte activé », « Bienvenue sur Yamba » |
+| 2 | Connexion sans « Rester connecté » | **Conforme** — cookie de rafraîchissement de session (sans date d'expiration) |
+| 3 – 4 | 450 € déclarés | **Conforme après correction** → `ANO-WEB-08` ; refus à l'intention, « Aucun paiement pour l'instant », aucun email |
+| 5 | 12 kg | **Conforme** — refus à l'intention (plafond de poids) |
+| 6 – 7 | Cinq demandes dans le mois (bzv-perkg, fih, gru, yul, bzv-upcoming) | **Conforme** |
+| 8 | La sixième | **Conforme** — refusée, même message |
+| 9 | Profil, tableau de bord, page publique | **Conforme** — aucun « score », « niveau de risque », « points » |
+| 10 | Export de mes données par la porte | **Conforme après correction** → `ANO-WEB-09` ; JSON `yamba-data-export/1`, aucune trace du score |
+| 11 | Thomas accepte | **Conforme** — email « est acceptée », notification |
+| 12 | Session inactive plus d'une heure, puis un geste | **Conforme** (manœuvre SES-01 consignée) — fenêtre « Ta session a expiré » par-dessus la page, reconnexion sur place, page inchangée, session de retour ; le geste est refait à la main (voir écarts) |
+| 13 | Appareils connectés | **Conforme** — « Chrome · … · cet appareil », « Dernière activité … · ::1 » (l'écran s'intitule « Sessions actives », voir écarts) |
+| 14 | Supprimer mon compte | **Conforme** — bandeau ambre, les deux motifs (deal en cours, demande en attente), aucune porte, aucun email |
+
+### Trois écarts assumés, écrits dans le parcours
+
+- Étape 12 : « le geste reprend » — le produit ne rejoue pas l'action qui a échoué ; il
+  rafraîchit les données de la page. Le harnais vérifie l'URL inchangée, la session de retour, et
+  que le même geste refait passe. Copie du cahier à ajuster, ou évolution produit à décider.
+- Étape 12 : l'heure d'inactivité est simulée (SES-01 : le délai d'inactivité EST la durée de vie
+  de la clé Redis de la session ; la supprimer, c'est l'avoir laissée expirer), consignée.
+- Étape 13 : le cahier dit « Appareils connectés », l'écran s'intitule « Sessions actives »
+  (sous-titre « Les appareils connectés à ton compte »). Le cahier à aligner.
+
+---
+
+## Chapitre 6 — WEB-E2E-5, le refus au pickup et le remboursement · **CONFORME** (8 étapes, 1 min 06)
+
+| Étape du cahier | Ce qui est éprouvé | Verdict |
+|---|---|---|
+| 1 | Aminata réserve 2 kg, taille S sur `fih` (Bruxelles → Kinshasa, tarif par catégorie) | **Conforme** — total lu à l'écran (22,00 €), suivi ouvert |
+| 2 | Joséphine accepte | **Conforme** — « Bloqué chez Yamba », email « est acceptée », kilos réservés (API) |
+| 3 | « Refuser le colis » depuis la prise en charge | **Conforme** — « Refuser ce colis ? », « Refuser un colis non conforme ne pénalise jamais ta réputation. », « Le Deal sera annulé et Aminata intégralement remboursée. » |
+| 4 | Raison « Le contenu ne correspond pas à la déclaration », confirmation | **Conforme** — toast « Colis refusé. Aminata a été notifiée et sera remboursée. », 200 `CANCELLED`, `refundAmountCents` = total |
+| 5 | Mes envois, Finances | **Conforme** — « Annulée » ; « Remboursé 22,00 € le … », sans retenue |
+| 6 | Mailpit | **Conforme** — « Ton colis Bruxelles → Kinshasa n'a pas pu être pris en charge » avec la raison traduite, puis « Remboursement émis … » du montant intégral, sans un mot de retenue, dans cet ordre |
+| 7 | Page publique de Joséphine | **Conforme après correction** → `ANO-WEB-10` ; ligne de faits identique avant / après |
+| 8 | Mes trajets | **Conforme** — ligne du deal « Annulé », kilos rendus (API) |
+
+### Deux écarts assumés, écrits dans le parcours
+
+- Étape 6 : le cahier dit « refus à la remise » ; le sujet réel est « Ton colis … n'a pas pu
+  être pris en charge » — la raison traduite est dans le corps. Copie du cahier à aligner.
+- Étape 8 : « Mes trajets » n'affiche pas les kilos restants (écart déjà consigné en WEB-E2E-3) ;
+  ils sont lus à l'API du trajet, avant, après l'acceptation, après le refus.
+
+---
+
+## Chapitre 6 — WEB-E2E-6, le parcours du destinataire · **CONFORME** (9 étapes, 1 min 00)
+
+Le tronc de WEB-E2E-1 est rejoué (réservation, acceptation, lien de suivi, prise en charge,
+jalons, remise) et la page du destinataire — un visiteur, navigateur C — est rechargée à chaque pas.
+
+| Étape du cahier | Ce qui est éprouvé | Verdict |
+|---|---|---|
+| 1 | Le lien reçu | **Conforme** — « Ton colis arrive, Clarisse », « Aminata t'envoie un colis avec Thomas N., Voyageur Yamba, de Paris à Brazzaville. », Départ / Arrivée prévue, frise de cinq jalons, aide de l'étape |
+| 2 | Adresse, numéro, code, photo, montant | **Conforme** — absents de l'écran ET du code source (numéro du destinataire, montant payé, lieux de remise du trajet, `ik.imagekit.io`, aucune image) ; l'API sert exactement les huit clés du contrat `PublicTrackingResponse` |
+| 3 | La frise après chaque jalon | **Conforme** — « Colis récupéré par Thomas » / « Le colis voyage avec Thomas. », puis « En route » au décollage ; l'aéroport ne fait pas bouger la page (voir écarts) ; le code de livraison, connu du harnais, n'apparaît nulle part |
+| 4 | L'atterrissage | **Conforme** — « Arrivé à Brazzaville » · « Thomas est arrivé. Il te contacte pour convenir de la remise : prépare le code que Aminata t'a donné. » |
+| 5 | La remise | **Conforme** — « Colis remis » · « Le colis t'a été remis. Bonne réception ! », cinq jalons datés |
+| 6 | La mention de confidentialité | **Conforme** — texte exact, lien vers `/fr/legal/privacy` |
+| 7 | Le bloc d'acquisition | **Conforme après correction** → `ANO-WEB-11` ; « Envoyer un colis » → recherche, « Devenir Voyageur » → porte de connexion puis onboarding |
+| 8 | Un caractère du jeton altéré | **Conforme** — « Ce lien de suivi n'est plus valide », sans prénom ni corridor ; le 404 de l'API est identique pour un jeton altéré et un jeton inventé |
+| 9 | Rien n'a été envoyé au destinataire | **Conforme** — adresse email déclarée exprès à la réservation : aucun email ; chaque email de la campagne va à un compte membre ; aucun émetteur de SMS n'existe sur la plateforme |
+
+### Deux écarts assumés, écrits dans le parcours
+
+- Étape 3 : « Je suis à l'aéroport » n'est pas un jalon public (D69 : `IN_TRANSIT` naît au
+  décollage, `ARRIVED` à l'atterrissage). La page ne bouge pas à l'aéroport ; le cahier dit « à
+  chaque jalon confirmé » — à préciser.
+- Étape 9 : « aucun SMS » est un fait de plateforme (aucune dépendance, aucun appel), pas une
+  observation de recette ; le harnais prouve l'absence d'email et l'adressage exclusif aux membres.
+
+**Le chapitre 6 est clos** : six parcours, 100 étapes, tous conformes, quatre anomalies
+majeures corrigées en chemin (ANO-WEB-08 à 11).
+
 ---
 
 ## Observations (pas des anomalies, mais à savoir)
+
+- **`/become-yamber` reste « futur »** (commentaire du layout marketing) : la page de présentation
+  « Devenir Voyageur » n'existe pas ; depuis ANO-WEB-11, ses quatre entrées mènent à l'onboarding.
+  Le jour où la page marketing s'écrit, les liens y reviennent.
 
 - **Depuis ANO-WEB-05, le cron de rejeu des versements paie les deals terminés du seed restés
   « en attente »** (ils portent désormais `capturedAt`) : c'est le comportement réel du produit,
@@ -332,6 +662,13 @@ Proposition    : (1) tout de suite, le message renvoie vers « Mes trajets » (o
   l'heure suivante, et son email « … en route vers ton compte » arrive au Voyageur en plein
   parcours (WEB-E2E-1 étape 25 vise désormais le montant de SON deal). À garder en tête pour le
   chapitre 5.26 : rejouer le seed juste avant.
+- **L'assistant de réservation garde son brouillon et son étape en `sessionStorage`** : après
+  un refus à l'étape 4, rouvrir `/trips/[id]/book` rouvre directement l'étape 4 avec l'ancien
+  colis. Pratique pour un membre qui revient ; à connaître pour la recette (le harnais oublie le
+  brouillon à l'ouverture). Chapitre 5.12.
+- **Après un refus de plafond, la carte de paiement montre encore un bouton « Payer »** à côté
+  de l'encadré de refus. Il ne mène nulle part de dangereux (le serveur refuse aussi le deal),
+  mais il contredit l'encadré. Mineure, chapitre 5.13.
 - **« Payer » cliqué avant le retour de l'intention de paiement ne fait rien**, sans message :
   le bouton est actif dès l'affichage de l'étape 4, l'intention arrive une seconde plus tard.
   Le harnais attend le texte du mode test (qui porte le montant de l'intention) ; un humain
@@ -392,3 +729,16 @@ Proposition    : (1) tout de suite, le message renvoie vers « Mes trajets » (o
   que l'écran n'ait posé son écoute : l'utilisateur voit simplement l'interface déconnectée.
   Comportement acceptable, mais non documenté — et il explique pourquoi le scénario « je reviens
   le lendemain » ne montre jamais la fenêtre.
+- **Deux lignes rouges 401 dans la console de tout visiteur** (`/auth/me` puis
+  `/auth/refresh`) à chaque page : c'est le front qui demande « qui suis-je ? ». Depuis
+  ANO-WEB-01, un marqueur `yamba:session` distingue le membre du visiteur ; il permettrait de ne
+  pas sonder quand il est absent — une requête de moins par page, et une console propre.
+  Chapitre 5.3.
+- **Quatre `role="dialog" aria-modal="true"` vivent en permanence dans le DOM** (les feuilles de
+  la recherche mobile : « Modifier la recherche », « Départ », « Destination », « Quand
+  partez-vous ? »), montées fermées et masquées par CSS (`translateX(100%)`, `md:hidden`).
+  Masquées visuellement, pas pour l'arbre d'accessibilité sur mobile (`aria-hidden` absent) : un
+  lecteur d'écran peut y entrer. Chapitre 5.31.
+- **Le cahier annonce « au moins les trois trajets Paris → Brazzaville » en WEB-ACC-9** ;
+  `bzv-inflight` est parti (J−6) et la recherche ne montre que l'avenir : deux cartes. À corriger
+  dans le cahier (§ 2.4 le dit déjà).
