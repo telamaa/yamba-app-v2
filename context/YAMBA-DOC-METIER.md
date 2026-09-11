@@ -3698,7 +3698,7 @@ envoie un email** (« préviens le destinataire »), sans le code.
 
 # Le code de livraison — ce que le chapitre 5.17 fait respecter
 
-*(PR `chore/recette-web-5-17`, 11/09/2026 — cahier 01-WEB chapitre 5.17, WEB-COD-1 à 8.)*
+*(PR `chore/recette-web-5-17` (#282), 11/09/2026 — cahier 01-WEB chapitre 5.17, WEB-COD-1 à 8.)*
 
 ## Le besoin
 

@@ -630,7 +630,7 @@ Ordre de demarrage : auth -> trip -> gateway.
   DTO, cloche sur la regeneration, espaces next-intl par route, test des `details.code` sans lecteur. PIEGES :
   toasts empiles (`.last()`), 401 rejoue par api-client (filtrer dans waitForResponse), bouton de-grise a la
   main ≠ essai force, source next-intl = catalogue entier, jamais cliquer sms:/mailto:. Harnais : 194
-  scenarios. Reste : 5.18 a 5.32, 02-ADMIN. AUCUNE attribution Claude.
+  scenarios. PR **#282** (empilee sur #281). Reste : 5.18 a 5.32, 02-ADMIN. AUCUNE attribution Claude.
 - 11/09 : **CHAPITRE 5.16 DU CAHIER 01-WEB — WEB-PIC, PRISE EN CHARGE ET JALONS DE TRANSIT (branche
   `chore/recette-web-5-16`, empilee sur #280)** — 10 fiches jouees CONFORMES (5 apres correction), 8 scenarios
   en serie, 1 min 48 (`apps/e2e/src/chapitres/web-pic.spec.ts`). CINQ ANOMALIES CLOSES : ANO-WEB-51 MAJEURE

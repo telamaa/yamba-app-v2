@@ -5496,7 +5496,7 @@ user-ui (`tsc -p apps/user-ui`) et harnais verts ; miroir i18n vert.
 
 # Chapitre 5.17 du cahier 01-WEB : le code de livraison — le retour d'action qui n'existe que dans un état transitoire
 
-*(PR `chore/recette-web-5-17`, 11/09/2026.)*
+*(PR `chore/recette-web-5-17` (#282), 11/09/2026.)*
 
 ## Ce qui a été fait
 
