@@ -610,6 +610,17 @@ Ordre de demarrage : auth -> trip -> gateway.
   desktop du visiteur sans « Creer un compte » ni « Rechercher un trajet ». Piege de poste : la cle
   Google Maps n'accepte que `localhost` comme referent. Harnais : 32 scenarios verts. PR **#265**
   (empilee sur #264). Reste : 5.2 a 5.32, 02-ADMIN.
+- 11/09 : **CHAPITRE 5.4 DU CAHIER 01-WEB — WEB-MDP, MOT DE PASSE ET ADRESSE EMAIL (branche
+  `chore/recette-web-5-4`, empilee sur #267)** — 6 fiches en 4 scenarios, toutes CONFORMES,
+  AUCUNE anomalie (`apps/e2e/src/chapitres/web-mdp.spec.ts`). Comptes NEUFS crees + actives par le
+  harnais (`creerCompteActive`), jamais le seed (le chapitre change mot de passe ET adresse de
+  facon definitive). Couvre : mot de passe oublie qui ne revele rien (aucun email pour une adresse
+  inconnue), reinitialisation par code 10 min (nouveau OK / ancien KO), changement de mot de passe
+  (refus PASSWORD_SAME_AS_CURRENT, email, autres sessions fermees), changement d'adresse (code sur
+  la NOUVELLE adresse, ancienne seulement informee sans code, EMAIL_ALREADY_USED, autres sessions
+  fermees). Piege : un mot de passe de test ne doit contenir ni prenom ni nom du compte
+  (PASSWORD_CONTAINS_PERSONAL_INFO). Harnais : 62 scenarios. PR **#268** (empilee sur #267). Reste :
+  5.5 a 5.32, 02-ADMIN. AUCUNE attribution Claude.
 - 11/09 : **CHAPITRE 5.3 DU CAHIER 01-WEB — WEB-CNX, CONNEXION ET SESSIONS (branche
   `chore/recette-web-5-3`, empilee sur #266)** — 13 fiches + les 3 verifications historiques
   d'ANO-WEB-01, `apps/e2e/src/chapitres/web-cnx.spec.ts`, 14 attendus / 0 inattendu (3 min 20).

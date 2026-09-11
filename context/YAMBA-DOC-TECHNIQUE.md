@@ -4409,3 +4409,62 @@ mémorisée » de la page Sécurité, elle, se lit sur la session (`rememberMe`)
 
 Aucun test unitaire ajouté (un libellé). `apps/e2e` : le chapitre 5.3 fait passer le harnais à
 **58 scénarios** (45 + WEB-CNX ×13). user-ui : typecheck vert.
+
+---
+
+# Chapitre 5.4 du cahier 01-WEB : mot de passe et adresse email — des comptes jetables
+
+*(PR `chore/recette-web-5-4`, 11/09/2026.)*
+
+## Ce qui a été fait
+
+Le quatrième chapitre « fiches » du cahier 01-WEB : `WEB-MDP` (mot de passe oublié, changement de
+mot de passe, changement d'adresse email). Six fiches, jouées en quatre scénarios
+(`apps/e2e/src/chapitres/web-mdp.spec.ts`), toutes conformes — **aucune anomalie**.
+
+```
+apps/e2e/src/chapitres/web-mdp.spec.ts   NOUVEAU — 6 fiches ; aides : creerCompteActive() (register + activation par
+                                           code), connecter(), ouvrirLaSecurite(), ouvrirFenetreSudo() (autonome, cooldown),
+                                           sessionVivante(), codeDe()
+context/YAMBA-RECETTE-WEB-RESULTATS.md   section chapitre 5.4 (aucune anomalie), pièges
+```
+
+## Le principe : des comptes qui ne survivent pas au test
+
+Ce chapitre change des mots de passe ET une adresse email **définitivement**. Le faire sur un
+compte du seed le laisserait cassé, et fausserait `seed-output.json`. Chaque scénario crée donc
+son propre compte neuf (`compteNeuf()` → `neuf-<horodatage>@recette.yamba.dev`) et l'active par le
+vrai parcours (registration + code email, `creerCompteActive`). Un compte par test, jeté ensuite ;
+la base de développement les garde sans conséquence (piège 22). Bénéfice de bord : sur une adresse
+neuve, tous les compteurs d'OTP (activation, réinitialisation, sudo, changement d'adresse) sont
+vierges — aucun verrou hérité d'un run précédent.
+
+## Ce que chaque flux impose
+
+- **Mot de passe oublié (WEB-MDP-1/2/3)** — trois écrans : `/password/forgot` (adresse →
+  `sessionStorage`, `/auth/password/forgot`), `/password/verify` (code, `/auth/password/verify`),
+  `/password/reset` (nouveau mot de passe, `/auth/password/reset`). La réponse ne révèle jamais si
+  le compte existe : une adresse inexistante fait avancer l'écran et n'envoie aucun email. Les
+  règles de force valent aussi ici (`abc` → « au moins 8 caractères »).
+- **Changer son mot de passe (WEB-MDP-4)** — derrière la porte sudo : le nouveau doit différer de
+  l'actuel (`PASSWORD_SAME_AS_CURRENT`, un refus qui NE ferme PAS la fenêtre), puis un mot de
+  passe valide déclenche l'email « Ton mot de passe Yamba a été modifié » et **ferme toutes les
+  autres sessions** (le second navigateur meurt, la courante reste).
+- **Changer son adresse (WEB-MDP-5/6)** — le code part **sur la nouvelle adresse** (jamais sur
+  l'ancienne) ; une adresse déjà prise est refusée avant tout envoi (`EMAIL_ALREADY_USED`) ; après
+  confirmation, l'adresse du compte change, l'**ancienne** reçoit une simple information « …a
+  changé » **sans code**, les autres sessions tombent, et la connexion se fait avec la nouvelle
+  adresse. `requestEmailChange` exige la fenêtre sudo mais ne la ferme pas ; `confirmEmailChange`
+  la ferme.
+
+## Un piège de mot de passe de test
+
+Le premier jet du nouveau mot de passe, `Yamba-Recette-…`, contenait le prénom « Recette » du
+compte neuf : refus `PASSWORD_CONTAINS_PERSONAL_INFO`. La règle de force compare le mot de passe au
+prénom, au nom et à l'adresse — un mot de passe d'essai se choisit à l'écart de ces valeurs
+(`Kola-Mangue-7x-Teal!`).
+
+## Tests
+
+Aucun test unitaire ajouté. `apps/e2e` : le chapitre 5.4 porte le harnais à **62 scénarios**
+(58 + WEB-MDP ×4). Harnais : typecheck vert.

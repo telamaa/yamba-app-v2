@@ -2883,3 +2883,49 @@ referme.
 | 77 | Second geste dans les 15 min | aucun nouveau code | oui (fenêtre dédiée, cf. écart) |
 | 78 | Fenêtre sudo depuis un autre appareil | code redemandé | oui |
 | 79 | Compte suspendu | refus, sessions révoquées, email | oui |
+
+---
+
+# Mot de passe et adresse email — ce que le chapitre 5.4 fait respecter
+
+*(PR `chore/recette-web-5-4`, 11/09/2026 — cahier 01-WEB chapitre 5.4, WEB-MDP-1 à 6.)*
+
+## Le besoin
+
+Un visiteur qui a oublié son mot de passe le réinitialise par un code, sans qu'on lui dise si son
+compte existe. Un membre change son mot de passe et son adresse email en confirmant son identité,
+et ces gestes ferment ses autres sessions.
+
+## Les règles
+
+**RG-WEB-61 — « Mot de passe oublié » ne révèle rien.** La réponse est la même pour une adresse
+connue et une adresse inconnue ; aucun email ne part pour une adresse inconnue.
+
+**RG-WEB-62 — La réinitialisation passe par un code de 10 minutes.** Le code arrive par email,
+les règles de force du mot de passe s'appliquent, et l'ancien mot de passe cesse de fonctionner.
+
+**RG-WEB-63 — Un nouveau mot de passe doit différer de l'actuel.** Le changement est refusé sinon
+(`PASSWORD_SAME_AS_CURRENT`).
+
+**RG-WEB-64 — Changer son mot de passe ferme les autres sessions.** Un email de confirmation
+part ; toutes les autres sessions tombent ; la session courante reste.
+
+**RG-WEB-65 — Le code de changement d'adresse va sur la NOUVELLE adresse.** Une adresse déjà prise
+est refusée avant tout envoi ; l'adresse du compte ne change qu'après confirmation du code reçu
+sur la nouvelle adresse.
+
+**RG-WEB-66 — L'ancienne adresse est informée, jamais sollicitée.** Après le changement, l'ancienne
+reçoit une information « …a changé » sans lien ni code ; les autres sessions tombent ; la connexion
+se fait avec la nouvelle adresse.
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| 80 | Oublié : adresse inconnue | écran avance, aucun email | oui |
+| 81 | Réinitialisation | code 10 min, règles de force, nouveau OK / ancien KO | oui |
+| 82 | « Retour à la connexion » | retour à /login | oui |
+| 83 | Changer le mot de passe : identique | refus PASSWORD_SAME_AS_CURRENT | oui |
+| 84 | Changer le mot de passe : valide | email, autres sessions fermées, courante ouverte | oui |
+| 85 | Changer l'adresse : prise / libre | refus EMAIL_ALREADY_USED ; code sur la nouvelle ; compte inchangé | oui |
+| 86 | Confirmer l'adresse | adresse changée, ancienne informée sans code, autres sessions fermées, connexion sur la nouvelle | oui |

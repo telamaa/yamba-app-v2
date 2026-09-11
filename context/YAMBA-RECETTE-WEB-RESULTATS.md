@@ -633,6 +633,39 @@ close le 09/09), puis les treize fiches.
 
 ---
 
+## Chapitre 5.4 — Mot de passe et adresse email · **CONFORME** (6 fiches, aucune anomalie)
+
+Tout se joue sur des comptes **neufs**, créés et activés par le harnais (`compteNeuf()` +
+activation par code) — jamais le seed : le chapitre change des mots de passe ET une adresse email
+de façon définitive. Six fiches jouées en quatre scénarios ; aucune anomalie.
+
+| Fiche | Ce qui est éprouvé | Verdict | Preuve |
+|---|---|---|---|
+| WEB-MDP-1 | Mot de passe oublié ne révèle rien | **Conforme** — une adresse inexistante fait avancer l'écran vers `/password/verify` (le serveur répond OK sans dire si le compte existe), et **aucun email** ne part |
+| WEB-MDP-2 | Réinitialisation complète | **Conforme** — code « Ton code de réinitialisation Yamba » (validité 10 min annoncée), les règles de force s'appliquent (`abc` → « au moins 8 caractères »), le nouveau mot de passe passe et l'ancien échoue (401) |
+| WEB-MDP-3 | « Retour à la connexion » | **Conforme** — depuis l'écran « Mot de passe oublié ? », le lien ramène à `/fr/login` |
+| WEB-MDP-4 | Changer son mot de passe | **Conforme** — sous la fenêtre sudo : le nouveau doit différer de l'actuel (400 `PASSWORD_SAME_AS_CURRENT`), puis un mot de passe valide passe, l'email « Ton mot de passe Yamba a été modifié » arrive, les AUTRES sessions sont fermées (le second navigateur meurt) et la courante reste ouverte |
+| WEB-MDP-5 | Changer son adresse : première étape | **Conforme** — une adresse déjà prise est refusée (`EMAIL_ALREADY_USED`) avant tout envoi ; une adresse libre reçoit « Confirme ta nouvelle adresse email Yamba » **sur la nouvelle adresse**, et l'adresse du compte ne change pas encore |
+| WEB-MDP-6 | Changer son adresse : confirmation | **Conforme** — le code confirme, l'adresse du compte devient la nouvelle, l'**ancienne** reçoit « L'adresse email de ton compte Yamba a changé » **sans aucun code**, les autres sessions sont fermées, et la connexion se fait désormais avec la nouvelle adresse |
+
+### À trancher (produit)
+
+- Aucun écart de produit relevé sur ce chapitre : le comportement suit le cahier.
+
+### Pièges de poste payés ici
+
+- **Le mot de passe d'essai ne doit contenir aucune donnée personnelle du compte.** Un premier
+  jet (`Yamba-Recette-…`) contenait le prénom « Recette » du compte neuf → refus
+  `PASSWORD_CONTAINS_PERSONAL_INFO`. La règle de force regarde prénom, nom et adresse : un mot de
+  passe de test se choisit à l'écart de ces valeurs.
+- **Méthode.** Les gestes derrière la porte sudo (changement de mot de passe et d'adresse) sont
+  déclenchés par l'API une fois la fenêtre ouverte, la porte elle-même ayant été éprouvée à
+  l'écran au chapitre 5.3 ; l'écran Sécurité est bien ouvert et la fenêtre sudo obtenue par les
+  endpoints autonomes (un code par minute). Les preuves qui comptent — refus, emails, sessions
+  fermées, adresse du compte — sont toutes vérifiées.
+
+---
+
 ## Chapitre 5.12 — Réserver : l'assistant en quatre étapes
 
 | Fiche | Ce qui est éprouvé | Verdict | Preuve |
