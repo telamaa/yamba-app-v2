@@ -2929,3 +2929,59 @@ se fait avec la nouvelle adresse.
 | 84 | Changer le mot de passe : valide | email, autres sessions fermées, courante ouverte | oui |
 | 85 | Changer l'adresse : prise / libre | refus EMAIL_ALREADY_USED ; code sur la nouvelle ; compte inchangé | oui |
 | 86 | Confirmer l'adresse | adresse changée, ancienne informée sans code, autres sessions fermées, connexion sur la nouvelle | oui |
+
+---
+
+# Profil, avatar et page publique — ce que le chapitre 5.5 fait respecter
+
+*(PR `chore/recette-web-5-5`, 11/09/2026 — cahier 01-WEB chapitre 5.5, WEB-PRO-1 à 10.)*
+
+## Le besoin
+
+Un membre tient son profil (nom, date de naissance, avatar) et décide de ce qui est public.
+Un Voyageur a en plus un nom affiché et une présentation. La page publique montre une identité
+lisible et une réputation honnête, sans jamais exposer la date de naissance ni inventer une note.
+
+## Les règles
+
+**RG-WEB-67 — Les champs Voyageur sont réservés aux Voyageurs.** « Nom affiché » et « présentation »
+(≤ 300 caractères) n'existent que pour un compte qui a une page Voyageur.
+
+**RG-WEB-68 — Prénom et nom : de 2 à 40 caractères.** Hors bornes, refus sous le champ, rien n'est
+écrit ; un prénom valide se reflète aussitôt dans le menu utilisateur.
+
+**RG-WEB-69 — 16 ans au moins, et la date de naissance ne s'affiche jamais.** Moins de 16 ans
+(`TOO_YOUNG`) ou date future (`IN_THE_FUTURE`) sont refusés ; la date sert Stripe, jamais la page
+publique.
+
+**RG-WEB-70 — L'avatar : 2 Mo au plus, formats image.** Un fichier trop lourd est refusé côté
+navigateur, sans requête ; le retrait rend l'initiale par défaut partout et l'ancien fichier
+devient introuvable chez l'hébergeur.
+
+**RG-WEB-71 — La réputation est honnête ou tait sa jeunesse.** Un Voyageur sans avis est
+« Nouveau Voyageur » (« Moins de 3 Deals terminés. »), jamais « ⭐ 0.0 · 0 deals ».
+
+**RG-WEB-72 — L'adresse publique ne change jamais.** `/u/<slug>` est stable : un lien partagé ne
+meurt pas, même après un changement de profil.
+
+**RG-WEB-73 — Masquer sa page n'est pas se cacher d'un deal.** Masquée, la page renvoie 404 aux
+autres ; le propriétaire la voit avec une mention « masquée » (ANO-WEB-21) ; ses trajets publiés
+restent visibles, avec son prénom.
+
+**RG-WEB-74 — La ville est affichée sur choix.** « Afficher ma ville » la montre puis la cache,
+sans toucher au reste.
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| 87 | Profil Expéditeur pur | champs de base, deux bascules, pas de champs Voyageur | oui |
+| 88 | Profil Voyageur | nom affiché, présentation /300, « Voir mon profil public » | oui |
+| 89 | Prénom 1 / 41 / valide | refus sous le champ ; valide reflété dans le menu | oui |
+| 90 | Date 12 ans / future / 30 ans | TOO_YOUNG / IN_THE_FUTURE / accepté ; jamais affichée | oui |
+| 91 | Avatar > 2 Mo | refus navigateur, aucune requête | oui |
+| 92 | Avatar réel (upload/retrait) | affiché puis retiré, ancien fichier introuvable | ⏭ (ImageKit) |
+| 93 | Page publique Voyageur | identité, niveau nommé, pas de « 0.0 », Suivre, Signaler | oui |
+| 94 | Adresse stable | `/u/slug` répond après un changement ; identité « Prénom N. » | oui (écart : nom affiché non montré) |
+| 95 | Masquer la page | 404 visiteur, bannière propriétaire, trajet visible | oui |
+| 96 | Afficher / masquer la ville | apparaît puis disparaît | ⏭ (seed sans ville) |

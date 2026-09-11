@@ -4468,3 +4468,60 @@ prénom, au nom et à l'adresse — un mot de passe d'essai se choisit à l'éca
 
 Aucun test unitaire ajouté. `apps/e2e` : le chapitre 5.4 porte le harnais à **62 scénarios**
 (58 + WEB-MDP ×4). Harnais : typecheck vert.
+
+---
+
+# Chapitre 5.5 du cahier 01-WEB : profil, avatar et page publique — le drapeau qu'on n'affichait pas
+
+*(PR `chore/recette-web-5-5`, 11/09/2026.)*
+
+## Ce qui a été fait
+
+Le cinquième chapitre « fiches » du cahier 01-WEB : `WEB-PRO` (écran Profil, bornes des champs,
+avatar, page publique `/u/<slug>` et sa visibilité). Dix fiches ; huit jouées et conformes, deux
+`⏭` (avatar réel sur ImageKit, et « Afficher ma ville » que le seed ne peut pas alimenter). Une
+anomalie mineure trouvée et **corrigée** : `ANO-WEB-21`.
+
+```
+apps/e2e/src/chapitres/web-pro.spec.ts                       NOUVEAU — 10 fiches ; instantané/restauration du profil,
+                                                               garde-fou avatar (Buffer 2,05 Mo, aucune requête)
+apps/user-ui/src/lib/public-user.types.ts                    PublicUser.hidden ajouté (déjà présent dans la réponse API)  (ANO-WEB-21)
+apps/user-ui/src/components/users/profile/UserProfileView.tsx bannière « masquée » quand user.hidden                       (ANO-WEB-21)
+apps/user-ui/messages/{fr,en}/user-profile.json              clé hiddenBanner                                              (ANO-WEB-21)
+context/YAMBA-RECETTE-WEB-RESULTATS.md                       ANO-WEB-21, chapitre 5.5, à trancher, observations, pièges
+```
+
+## ANO-WEB-21 — un drapeau serveur que le front ignorait
+
+Quand un membre masque sa page publique, l'API `getUserPublic` répond 404 à tout le monde SAUF au
+propriétaire, à qui elle renvoie la page avec `hidden: true` (D67 1A). Le propriétaire voyait donc
+sa page — mais sans aucune mention qu'elle était masquée, parce que le front ne portait même pas ce
+drapeau : `hidden` était absent du type `PublicUser`, et rien ne le lisait. Encore une intention
+écrite côté serveur qu'aucun rendu n'honorait (le même motif que ANO-WEB-01 et 16). Correctif
+minimal : `hidden` déclaré au type (la valeur arrivait déjà), et une bannière en tête de
+`UserProfileView`.
+
+## Le garde-fou d'avatar, sans écriture externe
+
+WEB-PRO-5 et 6 téléversent sur ImageKit (service externe réel) : le harnais joue le seul geste qui
+n'écrit rien — le refus, côté navigateur, d'un fichier de plus de 2 Mo. `setInputFiles` avec un
+`Buffer` de 2,05 Mo et un type `image/png` déclenche `validateFile` (`useImageKitUpload`,
+`maxSizeBytes` = 2 Mo) AVANT tout appel réseau ; on écoute les requêtes vers `imagekit` / `upload`
+/ `/auth/me/avatar` et on vérifie qu'aucune n'est partie. Le téléversement réel et le retrait (dont
+la contre-épreuve « l'ancienne image répond introuvable ») restent `⏭`, joués à la main.
+
+## Deux écarts, une observation
+
+- **La page publique identifie par « Prénom N. »**, pas par le « nom affiché » du profil
+  (`CarrierPage.name`). Le cahier attendait le nom affiché « à jour » sur la page publique. À
+  trancher ; l'identité par prénom + initiale est cohérente avec la vie privée.
+- **Le réseau et les actions vivent dans l'`<aside>`**, pas dans `<main>` : une assertion scopée à
+  `main` sur « abonnés » ou « Signaler ce profil » échoue à tort.
+- **Le seed ne pose pas de ville** sur l'adresse des Voyageurs : WEB-PRO-10 se saute proprement
+  (lecture de la ville via `/auth/me`, `test.skip` si absente). À compléter dans `seed-deals.ts`.
+
+## Tests
+
+Aucun test unitaire ajouté (un champ de type, une bannière, une clé i18n). `apps/e2e` : le chapitre
+5.5 porte le harnais à **72 scénarios** (62 + WEB-PRO ×10, dont 2 `⏭`). user-ui : typecheck vert,
+miroir i18n FR/EN respecté.

@@ -479,6 +479,24 @@ Correction     : un message « Appareil déconnecté. » (clé `securityPage.ses
 Contre-épreuve : WEB-CNX-8 lit « Appareil déconnecté. » après la révocation, et la ligne a disparu.
 ```
 
+```
+ANO-WEB-21
+Fiche          : WEB-PRO-9 (chapitre 5.5) · Gravité : MINEURE · ÉTAT : CLOSE
+Attendu        : quand un membre masque sa page publique, LUI la voit encore, avec une mention
+                 « masquée » (le cahier le demande explicitement).
+Obtenu         : le propriétaire voyait bien sa page (les autres reçoivent 404), mais SANS aucune
+                 mention : rien ne lui disait qu'elle était masquée.
+Cause          : l'API `getUserPublic` renvoie déjà `hidden: true` au seul propriétaire d'une page
+                 masquée (D67 1A), mais le front ne portait pas ce drapeau (absent du type
+                 `PublicUser`) et ne l'affichait nulle part — encore une intention côté serveur que
+                 le rendu ignorait.
+Correction     : `hidden` ajouté au type `PublicUser` (déjà présent dans la réponse), et une
+                 bannière d'avertissement en tête de `UserProfileView` quand `user.hidden`
+                 (clé i18n `userProfile.hiddenBanner`, FR/EN).
+Contre-épreuve : WEB-PRO-9 lit « Cette page est masquée… » sur la page du propriétaire, et le
+                 visiteur reçoit toujours « Profil introuvable ».
+```
+
 ---
 
 ## Chapitre 5.1 — Découverte, accueil et navigation · **CONFORME** (12 fiches, 1 min 24)
@@ -663,6 +681,49 @@ de façon définitive. Six fiches jouées en quatre scénarios ; aucune anomalie
   l'écran au chapitre 5.3 ; l'écran Sécurité est bien ouvert et la fenêtre sudo obtenue par les
   endpoints autonomes (un code par minute). Les preuves qui comptent — refus, emails, sessions
   fermées, adresse du compte — sont toutes vérifiées.
+
+---
+
+## Chapitre 5.5 — Profil, avatar et page publique · **CONFORME** (10 fiches : 8 jouées, 2 ⏭ · 1 anomalie mineure close)
+
+Les fiches qui modifient un compte du seed (prénom, date de naissance, nom affiché, bascules)
+prennent un instantané du profil au départ (`GET /auth/me/profile`) et le restaurent en `finally` —
+le seed n'est pas rejoué entre les chapitres.
+
+| Fiche | Ce qui est éprouvé | Verdict | Preuve |
+|---|---|---|---|
+| WEB-PRO-1 | Profil d'un Expéditeur pur | **Conforme** — avatar (initiale, aucune image cassée), prénom/nom/date de naissance, deux bascules (Profil public, Afficher ma ville) ; **aucun** « nom affiché » ni « présentation » (réservés aux Voyageurs) |
+| WEB-PRO-2 | Profil d'un Voyageur | **Conforme** — en plus : « nom affiché », « présentation » avec compteur `…/300`, et « Voir mon profil public » |
+| WEB-PRO-3 | Bornes du prénom | **Conforme** — 1 et 41 caractères refusés (rien n'est écrit), un message sous le champ à l'écran ; un prénom valide passe et se lit dans le menu utilisateur |
+| WEB-PRO-4 | Date de naissance : 16 ans, jamais affichée | **Conforme** — 12 ans → `TOO_YOUNG`, date future → `IN_THE_FUTURE`, 30 ans accepté ; la page publique n'affiche ni le mot « naissance » ni l'année de naissance |
+| WEB-PRO-5 | Avatar : poids | **Conforme (garde-fou)** — un fichier de 2,05 Mo est refusé côté navigateur (« Photo trop lourde (2 Mo au plus). ») **sans aucune requête** de téléversement. Le téléversement réel (500 Ko) est `⏭` (écriture ImageKit) |
+| WEB-PRO-6 | Changer / retirer l'avatar | **⏭** — écrit puis supprime un fichier sur ImageKit (service externe) : joué à la main. La suppression de l'ancien fichier (« introuvable ») est le piège des clés ImageKit du `.env` racine |
+| WEB-PRO-7 | Page publique d'un Voyageur | **Conforme** — « Thomas N. », « Membre depuis », « En tant que Voyageur » avec un niveau nommé, **aucune** note « 0.0 · 0 deals » inventée (WEB-NRG-2), « Suivre », « Signaler ce profil ». (Le bloc « Réseau » ne s'affiche qu'avec ≥ 1 abonné — Thomas n'en a aucun dans le seed) |
+| WEB-PRO-8 | Adresse publique stable | **Conforme** — après un changement de nom affiché, `/u/seed-thomas` répond toujours. **Écart** : la page publique montre l'identité « Prénom N. », JAMAIS le « nom affiché » (`CarrierPage.name`) — le cahier l'attendait « à jour » sur la page publique |
+| WEB-PRO-9 | Masquer sa page publique | **Conforme après correction** → `ANO-WEB-21` ; masquée : le visiteur reçoit « Profil introuvable » (+ « Retour à l'accueil »), le propriétaire voit sa page avec la bannière « Cette page est masquée… », et un trajet publié par Thomas reste visible et porte son prénom |
+| WEB-PRO-10 | Afficher / masquer sa ville | **⏭** — le seed ne pose aucune ville sur l'adresse Voyageur de Thomas : la bascule n'a pas de donnée à faire apparaître (observation ci-dessous). Le test lit la ville via `/auth/me` et se saute proprement si elle manque |
+
+### À trancher (produit)
+
+- **La page publique affiche « Prénom N. », pas le « nom affiché ».** Le « nom affiché »
+  (`CarrierPage.name`) se règle au profil et sert ailleurs (deals) ; la page publique, elle,
+  identifie par prénom + initiale. Le cahier attendait le nom affiché « à jour » sur la page
+  publique. À trancher : soit la page publique adopte le nom affiché, soit le cahier acte que
+  l'identité publique est prénom + initiale (recommandé : c'est cohérent avec la vie privée).
+
+### Observations
+
+- **Le seed ne pose pas de ville sur l'adresse des Voyageurs** (seules les villes de trajet
+  existent). « Afficher ma ville » n'a donc rien à montrer pour Thomas — WEB-PRO-10 se saute. À
+  compléter dans `seed-deals.ts` (une adresse principale par Voyageur) pour rendre la fiche jouable.
+
+### Pièges de poste payés ici
+
+- **La page publique n'existe que masquée pour son propriétaire** : l'API renvoie `hidden` au seul
+  propriétaire (les autres reçoivent 404). C'est ce drapeau, jusque-là non rendu, qui a mené à
+  ANO-WEB-21.
+- **Le réseau et les actions vivent dans l'`<aside>`, pas dans `<main>`** : une assertion scopée à
+  `main` sur « abonnés » / « Signaler » échoue à tort.
 
 ---
 

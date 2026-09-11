@@ -9,22 +9,22 @@ tourne sur le poste, ce qui reste à faire, et les pièges déjà payés qu'il n
 > **2.** ~~monter la fixture de session administrateur~~ **FAIT** (`seed-admins.ts` + `navigateurAdmin`) ;
 > **3.** ~~finir WEB-E2E-1 en entier, ouvrir la PR~~ **FAIT — PR #259 mergée** ;
 > **4.** les cinq autres parcours du chapitre 6 : ~~E2E-2~~ **FAIT, #260 mergée**, ~~E2E-3~~ **FAIT, #261 mergée**, ~~E2E-4~~ **FAIT, PR #262** (17 checks verts, à merger), ~~E2E-5~~ **FAIT, PR #263** (empilée sur #262, ANO-WEB-10 close), ~~E2E-6~~ **FAIT, PR #264** (ANO-WEB-11 close) — **le chapitre 6 est clos** ;
-> **5.** les 32 chapitres du cahier **01-WEB** (326 fiches) — **5.1 FAIT** (branche `chore/recette-web-5-1`, 12 fiches conformes, ANO-WEB-12 à 17 closes, **PR #265** sur `dev`, empilée sur #264) ; **5.2 FAIT** (branche `chore/recette-web-5-2`, 16 fiches : 12 conformes + 4 ⏭ Google, ANO-WEB-18 close, **PR #266** empilée sur #265) ; **5.3 FAIT** (branche `chore/recette-web-5-3`, 13 fiches + ANO-WEB-01, ANO-WEB-19 majeure OUVERTE, ANO-WEB-20 mineure close, **PR #267** empilée sur #266) ; **5.4 FAIT** (branche `chore/recette-web-5-4`, 6 fiches, aucune anomalie, **PR #268** empilée sur #267) ; suite : 5.5 → 5.32 dans l'ordre du cahier ;
+> **5.** les 32 chapitres du cahier **01-WEB** (326 fiches) — **5.1 FAIT** (branche `chore/recette-web-5-1`, 12 fiches conformes, ANO-WEB-12 à 17 closes, **PR #265** sur `dev`, empilée sur #264) ; **5.2 FAIT** (branche `chore/recette-web-5-2`, 16 fiches : 12 conformes + 4 ⏭ Google, ANO-WEB-18 close, **PR #266** empilée sur #265) ; **5.3 FAIT** (branche `chore/recette-web-5-3`, 13 fiches + ANO-WEB-01, ANO-WEB-19 majeure OUVERTE, ANO-WEB-20 mineure close, **PR #267** empilée sur #266) ; **5.4 FAIT** (branche `chore/recette-web-5-4`, 6 fiches, aucune anomalie, **PR #268** empilée sur #267) ; **5.5 FAIT** (branche `chore/recette-web-5-5`, 10 fiches : 8 jouees + 2 skip, ANO-WEB-21 close, **PR #269** empilee sur #268) ; suite : 5.6 -> 5.32 dans l'ordre du cahier ;
 > **6.** le cahier **02-ADMIN** (110 fiches) — 19 fiches de sécurité d'accès, 91 fiches d'écrans.
 >
-> **REPRISE DU 10/09/2026 (soir) — 5.2 CLOS.** Les trois ✘ du premier passage sont corrigés
-> (harnais : `main` avant `[role="alert"]` ; assertion de l'adresse masquée ; ANO-WEB-18
-> tutoiement), plus un quatrième défaut révélé au second passage : `inspect-user.ts` sélectionnait
-> `isVerified`, champ que `User` n'a pas (cassait à la dernière assertion du scénario 6-9 ; le
-> script se lance SEUL sur un compte du seed avant d'être branché). Passage final : **9 tests
-> verts (12 fiches), 4 ⏭**. Rapport, docs cumulatifs, CONTEXT, SUIVI (harnais 45 scénarios)
-> complétés. **Prochaine étape : le chapitre 5.3 (`WEB-CNX`, connexion)** — un spec
-> `web-cnx.spec.ts` existe déjà dans `apps/e2e/src/chapitres/` (écrit pour le harnais #258 :
-> vérifier ce qu'il couvre avant d'écrire), puis 5.4 → 5.32, puis 02-ADMIN. La pile se relance
-> comme au § 2 (Docker Desktop redémarre les dix-sept conteneurs des autres projets : les
-> arrêter, ne garder que `yamba-redpanda` et `yamba-mailpit`). Les comptes
-> `neuf-<horodatage>@recette.yamba.dev` restent en base (sans conséquence, piège 22). Toujours
-> AUCUNE attribution Claude dans les commits et les corps de PR.
+> **REPRISE DU 11/09/2026 — 5.3, 5.4 ET 5.5 CLOS.** Trois chapitres ajoutes le 11/09, chacun sa
+> PR empilee : **5.3 WEB-CNX** (PR #267, 13 fiches ; ANO-WEB-19 MAJEURE OUVERTE = pas de verrou
+> anti-force-brute sur la connexion par mot de passe, fiche WEB-CNX-4 en `test.fail`, correctif
+> = mecanique OTP en PR dediee ; ANO-WEB-20 close), **5.4 WEB-MDP** (PR #268, 6 fiches, aucune
+> anomalie, comptes neufs jetables), **5.5 WEB-PRO** (PR #269, 8 fiches + 2 skip ; ANO-WEB-21
+> close = banniere « masquee » du proprietaire). Rapport, docs cumulatifs, CONTEXT, SUIVI
+> (harnais **72 scenarios**) a jour. **Prochaine etape : le chapitre 5.6 (`WEB-VOY`, devenir
+> Voyageur : onboarding et Stripe)** — attention Stripe : le provider FAKE de deal-service ne
+> couvre PAS l'onboarding Stripe Connect ; verifier ce qui est jouable sur le poste avant
+> d'ecrire. Puis 5.7 -> 5.32, puis 02-ADMIN. La pile se relance comme au § 2 (arreter les dix-sept
+> conteneurs des autres projets, ne garder que `yamba-redpanda` et `yamba-mailpit`). Comptes
+> `neuf-<horodatage>@recette.yamba.dev` laisses en base (piege 22). Nouveau `clear-sudo-locks.ts`
+> pour purger les verrous OTP sudo entre deux executions. Toujours AUCUNE attribution Claude.
 
 > **La question Elasticsearch vient APRÈS la recette** — consigne explicite du 09/09/2026. Rien
 > ne se touche du côté de la recherche tant que les deux cahiers ne sont pas clos. L'analyse est

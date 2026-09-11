@@ -610,6 +610,16 @@ Ordre de demarrage : auth -> trip -> gateway.
   desktop du visiteur sans « Creer un compte » ni « Rechercher un trajet ». Piege de poste : la cle
   Google Maps n'accepte que `localhost` comme referent. Harnais : 32 scenarios verts. PR **#265**
   (empilee sur #264). Reste : 5.2 a 5.32, 02-ADMIN.
+- 11/09 : **CHAPITRE 5.5 DU CAHIER 01-WEB — WEB-PRO, PROFIL / AVATAR / PAGE PUBLIQUE (branche
+  `chore/recette-web-5-5`, empilee sur #268)** — 10 fiches : 8 jouees CONFORMES, 2 skip (avatar
+  reel ImageKit ; « Afficher ma ville » que le seed ne peut alimenter). Une anomalie MINEURE
+  trouvee et CORRIGEE : ANO-WEB-21 (page masquee : le proprietaire la voyait sans mention
+  « masquee » ; l'API renvoyait `hidden` mais le front ne le portait pas — champ ajoute a
+  `PublicUser` + banniere `UserProfileView` + cle i18n `userProfile.hiddenBanner`). Ecart a
+  trancher : la page publique montre « Prenom N. », jamais le « nom affiche ». Garde-fou avatar
+  > 2 Mo teste sans ecriture externe. Observation : `seed-deals.ts` ne pose pas de ville Voyageur.
+  Harnais : 72 scenarios. PR **#269** (empilee sur #268). Reste : 5.6 a 5.32, 02-ADMIN. AUCUNE
+  attribution Claude.
 - 11/09 : **CHAPITRE 5.4 DU CAHIER 01-WEB — WEB-MDP, MOT DE PASSE ET ADRESSE EMAIL (branche
   `chore/recette-web-5-4`, empilee sur #267)** — 6 fiches en 4 scenarios, toutes CONFORMES,
   AUCUNE anomalie (`apps/e2e/src/chapitres/web-mdp.spec.ts`). Comptes NEUFS crees + actives par le
