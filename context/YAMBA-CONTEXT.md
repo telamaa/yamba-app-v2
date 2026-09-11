@@ -610,6 +610,23 @@ Ordre de demarrage : auth -> trip -> gateway.
   desktop du visiteur sans « Creer un compte » ni « Rechercher un trajet ». Piege de poste : la cle
   Google Maps n'accepte que `localhost` comme referent. Harnais : 32 scenarios verts. PR **#265**
   (empilee sur #264). Reste : 5.2 a 5.32, 02-ADMIN.
+- 11/09 : **CHAPITRE 5.12 DU CAHIER 01-WEB — WEB-RSV, L'ASSISTANT EN QUATRE ETAPES ET LE DEVIS (branche
+  `chore/recette-web-5-12`, empilee sur #276)** — 22 fiches : 21 jouees CONFORMES (7 apres correction), 1 skip
+  (carte refusee, fournisseur FAKE), 12 scenarios en 2 min 05 (`apps/e2e/src/chapitres/web-rsv-devis.spec.ts`,
+  complete web-rsv.spec.ts et web-rsv-assistant.spec.ts). Devis verifie AU CENTIME (32,20 · 40,25 · 38,64 ·
+  11 · 38,20 · 257,60 · 42 apres divergence), kilos −2,5, emails (32,20 Expeditrice / 28,75 Voyageur),
+  dernier kilo (CAPACITY_EXCEEDED), propre trajet / parti / masque, reprise apres rechargement. SEPT
+  ANOMALIES CORRIGEES, toutes des branchements : ANO-WEB-33 MAJEURE (mot « assurance » dans un message +
+  copy mort), ANO-WEB-34 MAJEURE (poids vide : `buildInitialDraft(trip)` existait sans appelant — branchee
+  dans BookingWizard et BookingMobile), ANO-WEB-35 mineure (propre trajet refuse a l'ouverture), ANO-WEB-36
+  MAJEURE (apres QUOTE_DIVERGENCE le recap gardait l'ancien total — trajet relu via invalidateQueries),
+  ANO-WEB-37 MAJEURE (« 0 € » sous l'indice quand le devis est indisponible — indice seul), ANO-WEB-38
+  mineure (trajet parti refuse a l'ouverture), ANO-WEB-39 mineure (photo > 10 Mo refusee des la selection).
+  A trancher : decimales nulles omises (« 8 € ») et POINT decimal (« 15.5 kg », « 0.5 kg »), protection
+  ventilee (3,45 + 6) vs cumulee (9,45), 5 photos vs 6, erreurs a la tentative, indicateur « etape 1 sur 4 »
+  mobile seulement. Regard d'expert : partager le calcul du devis client/serveur, servir `bookable` dans le
+  DTO public, test de composant du wizard (aurait pris 3 anomalies sur 7). Harnais : 143 scenarios. PR
+  **#277** (empilee sur #276). Reste : 5.13 a 5.32, 02-ADMIN. AUCUNE attribution Claude.
 - 11/09 : **CHAPITRE 5.11 DU CAHIER 01-WEB — WEB-FAV, FAVORIS ET VOYAGEURS SUIVIS (branche
   `chore/recette-web-5-11`, empilee sur #275)** — 12 fiches, 12 jouees CONFORMES (3 apres correction), 12
   scenarios en serie, 1 min 50 (`apps/e2e/src/chapitres/web-fav.spec.ts`). Porte d'identite du coeur avec

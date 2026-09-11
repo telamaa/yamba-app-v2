@@ -734,6 +734,100 @@ Contre-épreuve : WEB-FAV-4 masque `yul` par le back-office, exige 409 à l'ajou
                  retrait, puis lève le masquage.
 ```
 
+```
+ANO-WEB-33
+Fiche          : WEB-RSV-10 (chapitre 5.12) · Gravité : MAJEURE (le cahier : « sa présence est une
+                 anomalie majeure ») · ÉTAT : CLOSE
+Attendu        : le mot « assurance » n'apparaît nulle part — Yamba vend une « Garantie », pas une
+                 assurance (cadre réglementaire).
+Obtenu         : « Au moins 1 photo requise avec l'assurance 500 € » (erreur de validation quand la
+                 garantie étendue est choisie sans photo) ; et cinq chaînes mortes du copy legacy
+                 (« Assurance jusqu'à 500 € », « Assurance 500 € », « Assurance », « Obligatoire avec
+                 l'assurance », « Assurance optionnelle ») prêtes à ressurgir.
+Correction     : « … avec la Garantie Yamba 500 € » (`booking.config.ts`) ; le copy legacy dit
+                 « Garantie Yamba » / « Protection » (`booking.copy.ts`).
+Contre-épreuve : WEB-RSV-10 lit le message corrigé et exige l'absence du mot dans toute la page.
+```
+
+```
+ANO-WEB-34
+Fiche          : WEB-RSV-6 (chapitre 5.12) · Gravité : MAJEURE · ÉTAT : CLOSE
+Attendu        : « Poids (kg) » pré-rempli à 2 (ou au poids mémorisé en recherche). Jamais vide.
+Obtenu         : le champ s'ouvrait VIDE (et le récapitulatif affichait « 0 € », cf. ANO-WEB-37).
+Cause          : `buildInitialDraft(trip)` (poids 2 kg ou mémorisé, première famille acceptée, lieu
+                 unique pré-sélectionné) existait dans `booking.state.ts`… et n'était appelée par
+                 personne : `BookingWizard` et `BookingMobile` faisaient `useBookingDraft()` avec le
+                 brouillon vide `initialDraft`.
+Correction     : les deux wizards passent `useMemo(() => buildInitialDraft(trip), [trip])` au hook ; la
+                 reprise `sessionStorage` garde la priorité.
+Contre-épreuve : WEB-RSV-5/6 exige « 2 » à l'ouverture (poids mémorisé effacé).
+```
+
+```
+ANO-WEB-35
+Fiche          : WEB-RSV-20 (chapitre 5.12) · Gravité : MINEURE · ÉTAT : CLOSE
+Attendu        : ouvrir `/trips/<son trajet>/book` → « Tu ne peux pas réserver ton propre trajet. »
+Obtenu         : l'assistant s'ouvrait normalement ; le refus (`OWN_TRIP`) ne tombait qu'à l'intention
+                 de paiement, quatre étapes plus loin.
+Correction     : `BookingClient` compare `user.id` à `trip.carrier.id` et affiche le message à
+                 l'ouverture (le serveur garde son refus).
+Contre-épreuve : WEB-RSV-20.
+```
+
+```
+ANO-WEB-36
+Fiche          : WEB-RSV-18 (chapitre 5.12) · Gravité : MAJEURE · ÉTAT : CLOSE
+Attendu        : après « Le prix a changé depuis ton devis. Le nouveau total est affiché — vérifie-le
+                 avant de payer. », le nouveau total EST affiché.
+Obtenu         : le message, mais le récapitulatif et le bouton « Payer » gardaient l'ancien total
+                 (32,20 €) alors que la nouvelle intention portait 42 € : le texte mentait.
+Cause          : `useBookingCheckout` ne rafraîchissait que l'intention de paiement ; le devis
+                 affiché est calculé côté client à partir du TRAJET en cache (`["public-trip", id]`),
+                 jamais relu.
+Correction     : sur `QUOTE_DIVERGENCE` / `PAYMENT_MISMATCH`, `queryClient.invalidateQueries(["public-trip", tripId])`
+                 avant de redemander l'intention : le récapitulatif recalcule (42 €).
+Contre-épreuve : WEB-RSV-18 (Joséphine passe le prix de 11,50 à 15,00 pendant qu'Aminata est à
+                 l'étape 4) : 409 `QUOTE_DIVERGENCE`, message, « Payer 42 € », aucun deal créé.
+```
+
+```
+ANO-WEB-37
+Fiche          : WEB-RSV-12 (chapitre 5.12) · Gravité : MAJEURE (WEB-NRG-2) · ÉTAT : CLOSE
+Attendu        : poids vidé → l'indice « Indique le poids du colis pour voir le prix. » et JAMAIS
+                 « 0 € », « 0,00 € » ou « — ».
+Obtenu         : l'indice… sous « Transport 0 € », « Service & protection 0 € », « Total 0 € ».
+Cause          : `computeTotal` renvoie un `PriceBreakdown` à zéros avec `quoteError` ; la colonne
+                 (`BookingSummarySidebar`) et la feuille mobile (`BookingBottomSheet`) rendaient les
+                 lignes de prix dans tous les cas, l'indice en plus.
+Correction     : quand `quote === null && quoteError`, seul l'indice est rendu (lignes et total
+                 masqués ; en mobile, l'indice remplace le montant « Total à payer »).
+Contre-épreuve : WEB-RSV-12.
+```
+
+```
+ANO-WEB-38
+Fiche          : WEB-RSV-21 (chapitre 5.12) · Gravité : MINEURE · ÉTAT : CLOSE
+Attendu        : réserver un trajet parti → « Ce trajet n'accepte plus de demandes. » (ou introuvable).
+Obtenu         : `bzv-inflight` (parti depuis 6 jours, toujours PUBLISHED) ouvrait l'assistant ; le
+                 refus (`TRIP_NOT_BOOKABLE`, « already departed ») ne tombait qu'au paiement.
+Correction     : `BookingClient` lit `publicTrip.dates.departureAt` et affiche le message à
+                 l'ouverture quand le départ est passé. (Un trajet masqué par Yamba répond 404 en
+                 public : « Trajet introuvable », déjà conforme.)
+Contre-épreuve : WEB-RSV-21.
+```
+
+```
+ANO-WEB-39
+Fiche          : WEB-RSV-9 (chapitre 5.12) · Gravité : MINEURE · ÉTAT : CLOSE
+Attendu        : une photo de plus de 10 Mo → refus explicite, aucun envoi.
+Obtenu         : la photo entrait dans la grille comme une autre ; le refus (« Une photo dépasse
+                 10 Mo… ») ne venait qu'à l'étape 4, au clic « Payer » (les photos partent au
+                 paiement). Aucun envoi, mais trois étapes plus tard.
+Correction     : `StepParcel.handleAddPhotos` filtre sur `PHOTO_MAX_SIZE_BYTES` dès la sélection et
+                 affiche le message de l'étape 4 (`step4.errors.UPLOAD_TOO_LARGE`).
+Contre-épreuve : WEB-RSV-9 : le message, deux photos toujours, aucune requête ImageKit.
+```
+
 ---
 
 ## Chapitre 5.1 — Découverte, accueil et navigation · **CONFORME** (12 fiches, 1 min 24)
@@ -1473,13 +1567,117 @@ trajet annulé ; la médiation masque `yul`. Les recherches sont posées par le 
 
 ---
 
-## Chapitre 5.12 — Réserver : l'assistant en quatre étapes
+## Chapitre 5.12 — Réserver : l'assistant en quatre étapes et le devis · **CONFORME** (22 fiches : 21 jouées, 7 après correction, 1 ⏭ · 7 anomalies closes · 12 scénarios, 2 min 05)
+
+Complète les deux fichiers du chapitre 6 (`web-rsv.spec.ts` : la porte, ANO-WEB-02 ;
+`web-rsv-assistant.spec.ts` : le nominal 32,20 € et la famille refusée) avec `web-rsv-devis.spec.ts`.
+Trajet de démonstration `bzv-perkg` (11,50 €/kg, Électronique +20 %, Alimentaire refusé, soute
+230 €), compte Aminata ; Joséphine fournit les trajets « jetables » (devis divergent, dernier kilo) ;
+deal-service sur le fournisseur **FAKE**. Le devis est vérifié **au centime** contre la note de
+calcul du cahier — et il est exact partout.
 
 | Fiche | Ce qui est éprouvé | Verdict | Preuve |
 |---|---|---|---|
-| WEB-RSV — porte | La porte de la réservation, connecté ou non | **Conforme après correction** | → `ANO-WEB-02` ; les deux libellés sont lisibles en FR et en EN, et « Se connecter » ramène bien à la réservation |
-| WEB-RSV — nominal | Les quatre étapes, de la description au paiement | **Conforme** | 2,5 kg de vêtements taille S sur `bzv-perkg` : transport **28,75 €**, service **3,45 €**, total **32,20 €** — exactement les montants du cahier. Le deal est créé (`201 POST /deals`), le suivi s'ouvre sur « En attente du Voyageur » |
-| WEB-RSV — conditions du trajet | Le refus de famille et le supplément sont tenus par l'écran | **Conforme** | « Alimentaire sec & scellé ✕ » et « Électronique & appareils +20 % » sont affichés **avant** la saisie, comme le trajet les déclare (§ 2.4) |
+| WEB-RSV-1 | La porte pour un visiteur | **Conforme** — « Connecte-toi pour réserver » + sous-titre, par-dessus la page du trajet (« Trajet proposé par Thomas N. » toujours là) ; `/book` direct : la même porte en pleine page, « Se connecter » (la suite est dans `web-rsv.spec.ts`) |
+| WEB-RSV-2 | L'entrée | **Conforme** — « Réservation », quatre étapes numérotées « 1 Colis 2 Destinataire 3 Engagement 4 Paiement », « Décris ton colis » / sous-titre, colonne de droite `sticky`, « Retour au trajet » et « Étape précédente » (dès l'étape 2). **Constat** : « étape 1 sur 4 » est l'indicateur MOBILE |
+| WEB-RSV-3 | Les lieux de rendez-vous | **Conforme** — « Tu remets le colis à Thomas » / « Le destinataire récupère le colis », un lieu de chaque côté pré-sélectionné (« Lieu convenu avec le voyageur »), « À l'aéroport », « Lieu exact » |
+| WEB-RSV-4 | Les règles d'or | **Conforme** — un `<details>` (« Voir ») : les quatre puces, « Voir la liste complète » (bouton) |
+| WEB-RSV-5 | Le produit et la famille refusée | **Conforme** — « Un colis (au kilo) », « Un bagage soute 23 kg 230 € » ; le cabine **absent** (non offert) ; « Alimentaire sec & scellé » visible, barrée (✕), désactivée, `title` « Thomas ne prend pas cette famille sur ce trajet » ; « Électronique & appareils +20 % » avant le choix |
+| WEB-RSV-6 | Le poids et sa borne | **Conforme après correction** → `ANO-WEB-34` (s'ouvrait vide) ; « 2 » à l'ouverture ; « n kg encore disponibles sur ce trajet » ; 35 → « 30 kg maximum par colis », on reste à l'étape 1 ; 30 → « Il ne reste que n kg… » ; 2,5 accepté ; infobulle « Poids déclaré… 0.5 kg minimum et jamais moins de 8 €… ≤ 10 % ». **Constats** : les erreurs se montrent à la TENTATIVE de continuer (pas au blur, le bouton n'est pas grisé) ; « 15.5 kg » et « 0.5 kg » avec un **point** |
+| WEB-RSV-7 | La taille et son coefficient | **Conforme** — libellés S / M / L (« ×1 », « ×1,1 », « ×1,25 »), « Transport · 2,5 kg × 11,50 €/kg × S 28,75 € », S = 28,75 / 3,45 / **32,20** ; L = 35,94 / 4,31 / **40,25** ; retour S |
+| WEB-RSV-8 | Le supplément et le plancher | **Conforme** — Électronique : « × S · +20 % 34,50 € » / 4,14 / **38,64** ; 0,1 kg : « 0,5 kg × 11,50 €/kg × S 8 € », « Minimum par colis appliqué : 8 € », 3 € / **11 €**. **Constat** : décimales nulles omises (« 8 € », « 11 € » ; le cahier écrit « 8,00 € ») |
+| WEB-RSV-9 | Valeur, description, photos | **Conforme après correction** → `ANO-WEB-39` ; infobulle de la valeur ; « abc » → « Décris brièvement le contenu (min. 5 caractères) » à la tentative ; deux photos → « Contenu », « Emballé » ; aide « JPEG ou PNG, max 10 Mo par photo » ; > 10 Mo → « Une photo dépasse 10 Mo… », deux photos toujours, aucune requête. **Constat** : au plus **5** photos (`MAX_PHOTOS`), le cahier écrit 6 |
+| WEB-RSV-10 | La protection du colis | **Conforme après correction** → `ANO-WEB-33` ; « Protection de base · Inclus » et « Garantie Yamba 500 € · +6 € » avec leurs textes ; garantie : transport 28,75, **« Service & protection 3,45 € » + ligne « Garantie Yamba 500 € 6 € »**, total **38,20** (le cahier cumule 9,45 : constat) ; sans photo : « Au moins 1 photo requise avec la Garantie Yamba 500 € », bloqué à l'étape 1, badge « Obligatoire avec la protection étendue » ; le mot « assurance » absent de la page |
+| WEB-RSV-11 | Le bagage entier | **Conforme** — poids et taille disparaissent ; « Transport 230 € », « Service & protection 27,60 € », **Total 257,60 €** |
+| WEB-RSV-12 | Jamais zéro | **Conforme après correction** → `ANO-WEB-37` ; poids vidé : « Indique le poids du colis pour voir le prix. » seul ; sans taille : « Choisis une taille (S, M ou L). » |
+| WEB-RSV-13 | Le destinataire | **Conforme** — « À qui livrer ? » / sous-titre ; encart « Comment se passera la livraison » (trois puces) ; le téléphone est le **premier** champ, indicatif `+33` par défaut ; `12` refusé (on reste à l'étape 2) ; `061234567` accepté ; email « (optionnel) » |
+| WEB-RSV-14 | L'engagement | **Conforme** — « Ton engagement » / « Tu certifies sur l'honneur… » ; encart de remise (vérification visuelle, refus possible « Tu seras remboursé mais le trajet sera perdu », photos croisées) ; Charte (illicite, déclaré, douanes, phrase de responsabilité) ; **une seule case** (CGV + Contrat de transport) ; sans elle on reste ; cochée → Paiement |
+| WEB-RSV-15 | Le paiement | **Conforme** — sous-titre « Le montant est autorisé maintenant… (sous 24 h) », bandeau « Mode test : aucun prestataire… L'autorisation de 32,20 € est simulée… », « Après ton paiement » (« 24h pour accepter », « 3 jours après la livraison validée… »), « Paiement sécurisé par Stripe… », « Payer 32,20 € », aucun `iframe` Stripe (un seul composant) |
+| WEB-RSV-16 | Une carte refusée | **⏭** — fournisseur FAKE (le Payment Element ne se monte pas sur l'origine `http` du poste) ; la carte `4000 0000 0000 0002` est rejouée par la recette API |
+| WEB-RSV-17 | La demande est envoyée | **Conforme** — « Demande envoyée ! Le voyageur a 24 h pour accepter. », suivi `/bookings/<id>` : « En attente du Voyageur », « Ta demande est envoyée et ton paiement est autorisé — rien n'est débité… », « Sans réponse, elle expire le … » ; kilos **−2,5** (DTO public) ; Mailpit : « Reçu : paiement autorisé… » avec 32,20 pour Aminata ; « Nouvelle demande de transport… » avec **28,75** pour Thomas, jamais 32,20. **Constat** : la date limite est « jusqu'au {date} », pas « 24 h » |
+| WEB-RSV-18 | Le devis change | **Conforme après correction** → `ANO-WEB-36` ; Joséphine passe 11,50 → 15,00 pendant qu'Aminata est à l'étape 4 : `409 QUOTE_DIVERGENCE`, « Le prix a changé depuis ton devis… », **« Payer 42 € »**, aucun deal créé |
+| WEB-RSV-19 | Le dernier kilo | **Conforme** — trajet à 2 kg, Aminata et João à l'étape 4 : A crée sa demande ; B → `409 CAPACITY_EXCEEDED`, « Il ne reste plus assez de place sur ce trajet pour ton colis. », aucune trace dans ses réservations |
+| WEB-RSV-20 | Son propre trajet | **Conforme après correction** → `ANO-WEB-35` ; Thomas sur `/book` de `bzv-perkg` : « Tu ne peux pas réserver ton propre trajet. » ; intention forcée refusée |
+| WEB-RSV-21 | Parti ou masqué | **Conforme après correction** → `ANO-WEB-38` ; `bzv-inflight` : « Ce trajet n'accepte plus de demandes. » ; `yul` masqué par la médiation : « Trajet introuvable » |
+| WEB-RSV-22 | Reprise après rechargement | **Conforme** — étapes 1 et 2 remplies, rechargement : étape 2 retrouvée, Clarisse / Mabiala, puis « Étape précédente » : 2,5 kg et la description |
+
+### À trancher (produit)
+
+- **Le format des montants et des kilos** : « 8 € » / « 42 € » (décimales nulles omises) là où la
+  page publique écrit « 26,00 € », et « 15.5 kg » / « 0.5 kg » avec un **point** en français. Un
+  seul formateur (`Intl.NumberFormat("fr-FR")`) partout — petit, mais visible à chaque écran.
+- **La protection étendue** : ventilée (3,45 + 6) à l'écran, cumulée (9,45) au cahier. La
+  ventilation est plus honnête ; amender le cahier.
+- **Cinq photos** (`MAX_PHOTOS`) contre six au cahier. Trancher, aligner l'aide.
+- **Les erreurs à la tentative** (« Continuer » n'est jamais grisé, l'erreur vient au clic) : c'est
+  un choix (ne pas bloquer un bouton sans dire pourquoi) ; le cahier attend un bouton inactif —
+  amender le cahier.
+- **« étape 1 sur 4 »** n'existe que sur mobile ; sur écran large les étapes numérotées le
+  remplacent. Amender le cahier.
+
+### Regard d'expert — optimisations et améliorations (une ligne par fiche)
+
+- **RSV-1** — La porte par-dessus la page est bonne ; « Créer un compte » navigue et perd le colis
+  (même remarque qu'en 5.11) — petit.
+- **RSV-2** — Le formulaire vit en `sessionStorage` par onglet : un membre qui rouvre dans un
+  nouvel onglet repart de zéro. `localStorage` + identifiant du trajet + date — petit.
+- **RSV-3** — Le lieu unique est pré-sélectionné sans possibilité de dire « je préfère un autre
+  point » : un champ « précision » libre pour l'Expéditeur (rendez-vous exact) — moyen.
+- **RSV-4** — « Voir la liste complète » est un bouton qui ouvre… quoi ? (non vérifié : une modale
+  probable). Un lien vers `/legal/prohibited` partageable — petit.
+- **RSV-5** — La famille refusée dit pourquoi en `title` (invisible au toucher) : un texte sous la
+  puce — petit. Le cabine absent : afficher « non proposé par Thomas » grisé (cohérent avec la
+  famille refusée) — petit.
+- **RSV-6** — Le poids par défaut est maintenant 2 kg ; ajouter des raccourcis (1 · 2 · 5 kg) —
+  petit. La borne 30 kg est une constante front : réglage D62 (`pricing.maxParcelKg`) — petit.
+- **RSV-7/8** — Le devis client (`computeTotal`) et le devis serveur (`QUOTE_DIVERGENCE`) sont
+  deux implémentations de la même règle (D17) : partager le calcul (`packages/libs/pricing`) ou
+  servir le devis par l'API à chaque changement — **moyen**, mais c'est la source de toute
+  divergence future.
+- **RSV-9** — Les photos partent au paiement : un échec de téléversement après l'autorisation
+  (« ta carte n'a pas été débitée ») est un cas limite à surveiller ; téléverser à la sélection
+  (avec suppression côté ImageKit si abandon) — moyen.
+- **RSV-10** — « Voir les conditions » de la garantie : vérifier qu'il mène à l'IPID (non joué) ;
+  et la case « exclusions affichées avant validation » : les afficher AVANT « Payer », pas seulement
+  les nommer — petit.
+- **RSV-11** — Bagage entier : dire « 23 kg consommés sur la capacité » et masquer aussi la
+  famille ? (elle reste affichée) — petit.
+- **RSV-12** — Bon après correction ; l'indice pourrait pointer le champ (focus) — petit.
+- **RSV-13** — Le numéro accepté est-il normalisé E.164 côté serveur ? (non vérifié à l'écran) ;
+  afficher « +242 61 23 45 67 » formaté dans le récap — petit.
+- **RSV-14** — Une seule case pour trois documents : exiger l'ouverture de la Charte avant de
+  cocher (scroll) — moyen ; horodater l'acceptation dans le deal (D-preuve) — vérifier.
+- **RSV-15** — En FAKE, le bandeau est clair. En Stripe, l'iframe ne se monte pas sur `http` :
+  documenter `https` en LAN (mkcert) pour rejouer RSV-16 sur le poste — moyen (outillage).
+- **RSV-17** — Emails OK ; le sujet du Voyageur pourrait porter le gain (« 28,75 € à gagner ») — petit.
+- **RSV-18** — Après divergence, dire explicitement l'ancien et le nouveau total (« 32,20 € →
+  42 € ») — petit.
+- **RSV-19** — `CAPACITY_EXCEEDED` est verrouillé par `updatedAt` (optimiste) ; un second essai
+  de B après rafraîchissement dit « Plus assez de place » — bon. Proposer le trajet suivant du
+  même corridor — petit.
+- **RSV-20/21** — Les gardes d'ouverture sont maintenant côté front ; la même liste de raisons
+  devrait venir de l'API (`bookable: { ok, reason }` dans le DTO public) pour ne pas dupliquer la
+  règle `checkTripBookable` — moyen.
+- **RSV-22** — Bon. Ajouter un « Reprendre ma réservation » sur la page du trajet quand un
+  brouillon existe — petit.
+- **Transversal** — Sept anomalies sur un écran « cœur du produit » : trois d'entre elles (poids
+  vide, 0 €, total non rafraîchi) sont des DÉFAUTS DE BRANCHEMENT entre une fabrique / un cache
+  et l'écran, pas des règles fausses. Un test de composant (Vitest + Testing Library) sur le
+  wizard avec un trajet fixture les aurait pris avant la recette — **moyen**, et le plus rentable.
+
+### Pièges de poste payés ici
+
+- **« Payer » n'existe qu'à l'étape 4** : aux étapes 1–3, le total se lit dans la colonne
+  (« Total 32,20 € »), et le libellé de transport porte le détail (« × S · +20 % 34,50 € »).
+- **Décimales nulles et point décimal** : `eur("8,00")` → `8(,00)? €`, `15[.,]5 kg`.
+- **Les kilos restants ne sont pas constants** : chaque tour de RSV-17 en prend 2,5 sur
+  `bzv-perkg` ; lire le DTO public (`GET /trips/:id/public`, `remainingKg`) — le DTO propriétaire
+  répond 403 à l'Expéditrice.
+- **Les erreurs viennent à la tentative** : cliquer « Continuer » puis lire l'erreur et vérifier
+  qu'on est resté sur l'étape.
+- **Un `<details>`** : cliquer son intitulé, pas un bouton « Voir » (il disparaît une fois ouvert).
+- **Une photo trop lourde entrait dans la grille** (ANO-WEB-39) : le « supprimer toutes les
+  photos » de la fiche 10 doit boucler tant qu'il en reste.
 
 ## Chapitre 6 — WEB-E2E-1, le nominal complet · **CONFORME** (29 étapes, 1 min 24)
 
