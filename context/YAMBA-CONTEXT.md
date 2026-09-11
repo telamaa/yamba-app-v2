@@ -610,6 +610,24 @@ Ordre de demarrage : auth -> trip -> gateway.
   desktop du visiteur sans « Creer un compte » ni « Rechercher un trajet ». Piege de poste : la cle
   Google Maps n'accepte que `localhost` comme referent. Harnais : 32 scenarios verts. PR **#265**
   (empilee sur #264). Reste : 5.2 a 5.32, 02-ADMIN.
+- 11/09 : **CHAPITRE 5.9 DU CAHIER 01-WEB — WEB-RCH, RECHERCHE / FILTRES / TRI / ETAT VIDE (branche
+  `chore/recette-web-5-9`, empilee sur #273)** — 15 fiches, 15 jouees CONFORMES (3 apres correction), 16
+  scenarios en 2 min 06 (`apps/e2e/src/chapitres/web-rch.spec.ts`) ; recherches posees par le brouillon
+  persistant de la barre (`sessionStorage` `yamba:form:trip-search`, sans Google), ordres / prix /
+  facettes confrontes a l'API. **ANO-WEB-27 BLOQUANTE CORRIGEE** : `next.config.js` sans
+  `images.remotePatterns` → `next/image` jetait sur le premier avatar ImageKit et TOUTE la page /search
+  (et la page publique) basculait sur « Cette page n'a pas pu s'afficher » (hotes ImageKit + Google
+  ajoutes ; contre-epreuve : avatar pose en base sur Thomas). **ANO-WEB-28 BLOQUANTE OUVERTE** (trouvee
+  en posant la contre-epreuve) : `Image.carrierPageId? @unique` = index unique NON epars sur Mongo → le
+  SECOND membre qui pose un avatar recoit 500 P2002 (un seul avatar possible sur la plateforme) ;
+  proposition : scinder `Image` en `UserAvatar` / `CarrierAvatar` a cle requise (candidat registre,
+  PR dediee) ; fiche en `test.fail`. Contexte donne par l'utilisateur : la RECHERCHE et l'ACCUEIL sont
+  des chantiers NON TERMINES — les ecarts consignes « a trancher » (compteur « Resultats disponibles »
+  absent, etat vide remplace par le bloc alerte, statuts des familles en infobulle, vestige « Discuter
+  avec Thomas · Bientot disponible », double arbre mobile/desktop, seed sans flightType ni coordonnees)
+  alimentent ce chantier. NOUVEAU : section « Regard d'expert — optimisations et ameliorations » par
+  fiche dans le rapport (consigne 11/09, a reconduire a chaque chapitre). Harnais : 110 scenarios. PR
+  **#274** (empilee sur #273). Reste : 5.10 a 5.32, 02-ADMIN. AUCUNE attribution Claude.
 - 11/09 : **CHAPITRE 5.8 DU CAHIER 01-WEB — WEB-DOC, JUSTIFICATIFS ET BILLET VERIFIE (branche
   `chore/recette-web-5-8`, empilee sur #272)** — 6 fiches, 6 jouees CONFORMES (2 apres correction), 6
   scenarios en 1 min (`apps/e2e/src/chapitres/web-doc.spec.ts`) ; ImageKit intercepte, admin SUPPORT

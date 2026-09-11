@@ -602,6 +602,62 @@ Contre-épreuve : WEB-DOC-2 dépose un PDF de 5 Mo + 1 octet : le message est vi
                  requête (jeton ImageKit, téléversement, enregistrement) ne part.
 ```
 
+```
+ANO-WEB-27
+Fiche          : WEB-RCH-1, 10, 11 (chapitre 5.9) · Gravité : BLOQUANTE · ÉTAT : CLOSE
+Attendu        : `/search` liste les trajets, quel que soit l'avatar des Voyageurs.
+Obtenu         : « Cette page n'a pas pu s'afficher » (page d'incident, référence, « Réessayer »)
+                 dès que la liste contenait un trajet dont le Voyageur a un avatar — la première
+                 fiche du chapitre est tombée dessus, puis « Tout effacer », puis « Réessayer ».
+                 Console : « Invalid src prop (https://ik.imagekit.io/…/avatars/….jpg) on
+                 `next/image`, hostname "ik.imagekit.io" is not configured under images in your
+                 next.config.js ». Le composant JETTE, la page entière tombe. Même carte sur la
+                 page publique du trajet et sur le profil (`UserHero`).
+Cause          : `apps/user-ui/next.config.js` n'avait aucune section `images` : `next/image`
+                 refuse tout hôte distant non déclaré. Les avatars viennent d'ImageKit (téléversement)
+                 et de Google (`payload.picture` à la connexion Google) — deux hôtes distants. Le
+                 seed n'a aucun avatar, la recette n'en avait jamais rencontré ; le poste en avait
+                 un (le compte du développeur, listé dans « Tous les trajets »).
+Correction     : `images.remotePatterns` : `ik.imagekit.io` et `lh3.googleusercontent.com`
+                 (`next.config.js`, redémarrage du front nécessaire — la config n'est pas
+                 rechargée à chaud).
+Contre-épreuve : scénario « ANO-WEB-27 » : un avatar ImageKit est posé EN BASE sur Thomas (référence
+                 seule, aucun téléversement), Paris → Brazzaville s'affiche avec sa carte, la page
+                 publique aussi, aucune erreur `next/image`, aucune page d'incident ; l'avatar est
+                 retiré quoi qu'il arrive. WEB-RCH-1 vérifie aussi l'absence de la page d'incident.
+```
+
+```
+ANO-WEB-28
+Fiche          : (contre-épreuve d'ANO-WEB-27, chapitre 5.9) · Gravité : BLOQUANTE · ÉTAT : OUVERTE
+Attendu        : chaque membre peut poser son avatar.
+Obtenu         : `POST /auth/me/avatar` répond **500** (« Something went wrong ») pour le SECOND
+                 membre de la plateforme qui pose un avatar — vérifié avec Joséphine pendant qu'un
+                 autre compte en a un. Erreur serveur : `P2002 … Image_carrierPageId_key`.
+Cause          : le modèle `Image` porte deux clés étrangères OPTIONNELLES et `@unique`
+                 (`userId` pour l'avatar d'un membre, `carrierPageId` pour celui d'une page
+                 Voyageur). Sur MongoDB, Prisma crée pour `@unique` un index unique NON ÉPARS
+                 (vérifié par `listIndexes` : `unique: true`, pas de `sparse`) : deux documents
+                 à `carrierPageId: null` entrent en collision. Le premier avatar de membre passe,
+                 le second échoue ; symétriquement pour les avatars de page Voyageur. C'est le
+                 piège « nullable unique fields on Mongo collide on null (P2002) » de CLAUDE.md,
+                 jamais payé ici parce que la recette 5.5 n'avait pas joué le téléversement réel
+                 (WEB-PRO-5/6 ⏭) et que le seed n'a aucun avatar.
+Proposition    : Prisma ne sait pas déclarer un index épars ou partiel sur Mongo. Deux voies :
+                 (A) scinder `Image` en deux modèles 1-1 sans FK optionnelle (`UserAvatar` avec
+                 `userId @unique` requis, `CarrierAvatar` avec `carrierPageId @unique` requis) —
+                 propre, une migration de données (un document aujourd'hui), les deux écrivains
+                 (`profile.controller.ts`, page Voyageur) et les lecteurs à ajuster ; (B) garder
+                 `Image`, retirer les deux `@unique` du schéma et poser à la main deux index
+                 uniques PARTIELS (`partialFilterExpression: { userId: { $type: "objectId" } }`)
+                 par script — fragile (`prisma db push` ne les connaît pas). **Recommandation :
+                 (A)**, candidat au registre (D-next), PR dédiée hors recette.
+État recette   : scénario « ANO-WEB-28 » en `test.fail` — il attend 200 ; le jour où c'est
+                 corrigé, Playwright signale que la fiche passe (retirer la marque). La
+                 contre-épreuve d'ANO-WEB-27 contourne le piège en posant `carrierPageId` (la page
+                 Voyageur de Thomas) sur l'image de test.
+```
+
 ---
 
 ## Chapitre 5.1 — Découverte, accueil et navigation · **CONFORME** (12 fiches, 1 min 24)
@@ -1032,6 +1088,142 @@ processus : `SMTP_HOST=smtp.gmail…`. C'est le piège déjà payé une fois ave
   (en-tête, `xref`, `%%EOF`) passe le filtre `accept` et `application/pdf` du hook.
 - **Le chapitre consomme le seed** (le billet en attente de `bzv-upcoming` est validé en DOC-4) :
   `test.beforeAll(() => new JeuEssai().rejouer())`, comme les parcours du chapitre 6.
+
+---
+
+
+## Chapitre 5.9 — Recherche, filtres, tri, état vide · **CONFORME** (15 fiches jouées, 3 après correction · 1 anomalie BLOQUANTE close, 1 BLOQUANTE ouverte · 16 scénarios, 2 min 06)
+
+> **Contexte donné le 11/09** : la recherche et l'accueil sont des chantiers **non terminés**. Les
+> écarts de cahier relevés ici alimentent ce chantier ; ils sont consignés « à trancher », pas
+> corrigés dans la recette (sauf ce qui casse : ANO-WEB-27).
+
+La barre de recherche s'appuie sur l'autocomplétion Google Places (hors périmètre du harnais).
+Mais ce que `/search` interroge, c'est le **brouillon persistant** de la barre (`sessionStorage`,
+`yamba:form:trip-search`, version 2) : le harnais le pose avant d'ouvrir la page, et l'écran
+cherche exactement ce qu'il aurait cherché après une saisie. Chaque ordre, chaque prix, chaque
+compte de facette est **confronté à l'API** (`/trips/search`, `/trips/search/facets`) plutôt qu'à
+une valeur codée. Le poids du colis vit en `localStorage` (`yamba.search.weightKg`). Jeu d'essai
+rejoué en tête de fichier (identifiants neufs : compteurs de vues à zéro).
+
+| Fiche | Ce qui est éprouvé | Verdict | Preuve |
+|---|---|---|---|
+| WEB-RCH-1 | La liste complète et son titre | **Conforme après correction** → `ANO-WEB-27` (la page tombait) ; « Tous les trajets disponibles », sous-titre, onglets « Tout / Avion / Train / Voiture » (avec leurs comptes), autant de cartes que `totalCount` (9 : les cinq trajets à venir du seed + les trajets du poste ; les trois partis absents), pas de « Charger plus » sous dix, jamais « 0 vue ». **Constat** : ni « Résultats disponibles » ni « n/n résultats affichés » (les clés `search.title` / `resultsShown` existent, rien ne les rend) |
+| WEB-RCH-2 | Les titres dynamiques | **Conforme** — « Trajets au départ de Paris », « Trajets à destination de Brazzaville », « Trajets le 23 septembre 2026 », « Trajets pour Paris → Brazzaville » |
+| WEB-RCH-3 | La carte d'un trajet au kilo | **Conforme** — « prix au kilo », « 11,50 €/kg », « 23 kg dispo », « ex. 2 kg ≈ 26 € tout compris » (23,00 + service plancher 3,00), « Direct », cœur « Ajouter aux favoris », aucun compteur à zéro vue, ni « — », ni « 0,00 € », ni « 0,0 » ; plancher « Colis léger … : 8 € minimum. » dans le panneau |
+| WEB-RCH-4 | « Votre colis » : 3 kg | **Conforme** — curseur à 3 : « Prix et tri calculés pour 3 kg · trajets sans assez de place exclus » ; l'API donne `totalForWeight` **38,64** (34,50 + 12 % = 4,14) et la carte l'arrondit : « ≈ 39 € tout compris pour 3 kg » (le cahier écrit 38,64 : la page publique, elle, affiche « ≈ 38,64 € ») ; « Plus assez de place » ssi `remainingKg < 3` (aucun sur le seed, capacités ≥ 15 kg) ; après rechargement : 3 kg toujours, `localStorage` = « 3 », tri « pour votre colis de 3 kg » |
+| WEB-RCH-5 | Le prix comparable sans poids | **Conforme** — « Tout effacer » : 2 kg, « Indiquez le poids… », « pour un colis de 2 kg », `bzv-perkg` « ≈ 26 € », un trajet à 9,50 €/kg « ≈ 22 € », `localStorage` vidé |
+| WEB-RCH-6 | Les trois tris | **Conforme** — chaque radio coché (`aria-checked`) donne à l'écran **l'ordre exact de l'API** pour `sort=lowestPrice` / `bestRated` / `earliest` ; départs croissants vérifiés ; tous les trajets ont un prix (rien à exclure sur le seed) ; « Mieux notés » sans note fictive |
+| WEB-RCH-7 | « Que voulez-vous envoyer ? » | **Conforme** — chaque puce porte le compte des facettes ; « Alimentaire sec & scellé » coché → `bzv-perkg` (qui le refuse) disparaît ; décoché + « Électronique & appareils » → il revient avec « Électronique & appareils : +20 % » **avant le clic** ; + « Documents & papiers » → il reste (accepte les deux) ; `bzv-upcoming` (sans position) reste compatible avec tout. Aucune puce à 0 sur ce corridor (règle « désactivée » non exercée) |
+| WEB-RCH-8 | Les filtres de confiance | **Conforme** — sur le seed les trois comptes sont à **0** (`superTripperCount`, `profileVerifiedCount`, `verifiedTicketCount`) : les trois lignes sont **masquées**, pas grisées. La branche « proposé » n'est pas exercée (aucun Super Voyageur ni profil vérifié dans le seed ; le billet validé en 5.8 a été effacé par le rejeu) |
+| WEB-RCH-9 | L'état vide | **Conforme** — Brazzaville → Paris : « Trajets pour Brazzaville → Paris », zéro carte, bloc « Aucun trajet ne correspond ? » / « Crée une alerte et reçois un email dès qu'un voyageur publie ce trajet. » / « Créer une alerte pour ce trajet ». **Constat** : « Aucun trajet trouvé » et sa phrase sont **remplacés** par ce bloc dès qu'un corridor est saisi (à trancher) |
+| WEB-RCH-10 | L'état vide dû aux filtres | **Conforme après correction** (ANO-WEB-27) — sans corridor, 30 kg au curseur : « Aucun trajet trouvé », « Aucun résultat ne correspond à vos filtres. Essayez d'en retirer pour voir plus de trajets. », « Tout effacer » ramène les cartes. **Constat** : avec un corridor saisi, le bloc alerte prend le pas et ce message ne se montre jamais |
+| WEB-RCH-11 | L'état d'erreur | **Conforme après correction** (ANO-WEB-27) — la recherche coupée au navigateur (`route.abort`) : « Une erreur est survenue », « Impossible de charger les trajets. Vérifie ta connexion et réessaie. », aucune trace technique ; le service « revenu », « Réessayer » recharge les cartes |
+| WEB-RCH-12 | La page publique d'un trajet | **Conforme** — « Trajet proposé par Thomas N. », « Avion », « Membre depuis juin 2026 », « Ce que vous pouvez envoyer avec Thomas », « Prix au kilo 11,50 €/kg », « Disponible 23 kg », huit familles (statuts en **infobulle** : « Refusé par le Voyageur » sur l'alimentaire, « Supplément de 20 % (risque) » sur l'électronique, six « Accepté »), « Bagage entier — forfait · Soute 23 kg · 230,00 € », « Estimation pour un colis de 2 kg ≈ 26,00 € tout compris (transport + service Yamba) », « Le prix définitif est fixé à la réservation. », plancher 8 €, lieux, politique d'annulation (trois lignes), objets interdits, **« Réserver »**, « Signaler cette annonce », **aucun** « Réservation bientôt disponible » ; avec 3 kg mémorisés : « Estimation pour votre colis de 3 kg (poids de votre recherche) ≈ 38,64 € ». **Constats** : « Vol direct » absent (le seed ne pose pas `flightType`), bloc CO₂ absent (le seed n'a pas de coordonnées), et un « Discuter avec Thomas · Bientôt disponible » |
+| WEB-RCH-13 | Le compteur de vues | **Conforme** — six ouvertures par le même visiteur : au plus **une** vue de plus ; un membre connecté (autre empreinte) : exactement une de plus ; la carte affiche « n vues ». Jamais 0 |
+| WEB-RCH-14 | Un trajet annulé répond « introuvable » | **Conforme** — trajet publié puis annulé par Joséphine : « Trajet introuvable », « Ce trajet n'existe pas ou n'est plus disponible. », « Retour à la recherche » ; rien ne dit « annulé » ni « masqué » ; `GET /trips/:id/public` → **404** (masquage administratif : WEB-TRJ-21) |
+| WEB-RCH-15 | Le trajet d'un compte suspendu | **Conforme** — la médiation suspend Marc : `yul` sort de Paris → Montréal (écran et API) ; en base il reste **PUBLISHED**, non masqué (`GET /admin/trips/:id`) ; levée → il revient |
+
+### À trancher (produit) — matière pour le chantier recherche / accueil
+
+- **Le compteur de résultats** (RCH-1) : « Résultats disponibles » et « {n}/{n} résultats
+  affichés » sont dans `search.json` et nulle part à l'écran. Les rendre (petit) ou retirer les
+  clés et amender le cahier.
+- **L'état vide avec un corridor** (RCH-9, RCH-10) : le bloc « Créer une alerte » remplace le
+  titre « Aucun trajet trouvé » ET le message « Aucun résultat ne correspond à vos filtres… ».
+  Afficher les deux (titre + cause + alerte), et distinguer « aucun trajet » de « aucun avec ces
+  filtres » — petit.
+- **Le prix pour un poids donné sur la carte** (RCH-4) : arrondi à l'euro (« ≈ 39 € ») là où le
+  cahier attend 38,64 € et où la page publique dit 38,64 €. Une seule règle d'affichage — petit.
+- **Les statuts des familles sur la page publique** (RCH-12) : seulement en `title` (infobulle)
+  et par le style (barré, puce « +20 % ») — invisibles au toucher et aux lecteurs d'écran. Un
+  badge texte « Refusé » / « +20 % » — petit.
+- **« Discuter avec Thomas · Bientôt disponible »** (RCH-12) : vestige d'avant D61 (la
+  conversation ne s'ouvre qu'à ACCEPTED). Le retirer, ou l'expliquer — petit.
+- **« Lieu exact »** vs « Exact » (déjà relevé en 5.7).
+
+### Regard d'expert — optimisations et améliorations (une ligne par fiche)
+
+*(Consigne du 11/09 : pour chaque test, ce qui pourrait être meilleur, pourquoi, et l'effort —
+petit / moyen / chantier.)*
+
+- **RCH-1** — Le DOM porte **deux listes complètes** (arbre mobile masqué par CSS + arbre
+  desktop) : deux fois le rendu, deux fois les cartes pour les lecteurs d'écran, des sélecteurs
+  ambigus (le harnais a dû viser « la copie visible »). Une seule liste responsive, ou un rendu
+  conditionné à `useIsMobile` — **moyen**. Les onglets de mode portent leurs comptes : bien ;
+  ajouter `aria-current` / `role="tab"` — petit.
+- **RCH-2** — Les titres suivent la locale ; le `<title>` de l'onglet et la balise `<h1>`
+  devraient dire la même chose (partage, SEO) et l'URL devrait porter les critères (`?from&to`) :
+  aujourd'hui une recherche ne se partage pas, elle vit en `sessionStorage` — **moyen**, et
+  c'est le vrai sujet du chantier recherche.
+- **RCH-3** — « ex. 2 kg ≈ 26 € » est calculé **côté front** (`pricing-example.ts`, paramètres
+  « §13 du mockup ») alors que l'API sait déjà `comparablePriceCents` (D33) et que les paramètres
+  sont des réglages (D62) : un jour les deux divergeront. Servir le prix d'exemple depuis l'API —
+  **petit**.
+- **RCH-4/5** — Le curseur seul ne permet pas 2,5 kg ; un champ numérique jumeau (comme le
+  wizard) — petit. Le poids en `localStorage` ne se partage pas (voir RCH-2). Les trajets
+  « exclus » pour capacité totale insuffisante disparaissent sans un mot : un compteur « n
+  trajets masqués pour ce poids » — petit.
+- **RCH-6** — « Mieux notés » sans aucune note trie… stablement : préciser le critère de
+  départage (date de départ) et afficher « (aucun avis) » sur le radio quand c'est le cas ;
+  laisser le tri « Prix le plus bas » exclure les trajets sans prix est bien, le dire — petit.
+- **RCH-7** — Les comptes des puces viennent des facettes calculées sur le corridor **sans** les
+  autres filtres actifs (poids, familles déjà cochées) : une puce peut annoncer 3 et donner 0.
+  Facettes conditionnées à l'état courant (« faceted search ») — **moyen**.
+- **RCH-8** — Le seed n'a ni Super Voyageur, ni profil vérifié : la branche « proposé » de ces
+  filtres n'est jamais exercée par la recette. Donner ces signaux à un Voyageur du seed — petit.
+- **RCH-9** — Le bouton « Créer une alerte » pour un VISITEUR : vérifier qu'il mène à la
+  connexion (non joué) ; proposer l'alerte aussi quand il y a des résultats mais aucun à la date
+  voulue — petit.
+- **RCH-10** — Le message « filtres » ne se montre jamais avec un corridor (voir « à trancher »)
+  ; ajouter « n résultats masqués par vos filtres » à côté de « Tout effacer » — petit.
+- **RCH-11** — L'erreur est propre. Distinguer « hors ligne » (`navigator.onLine`) de « service
+  indisponible » et réessayer seul avec un délai croissant (TanStack `retry` avec backoff) —
+  petit. L'erreur des **facettes** est silencieuse (compteurs à 0) : un état dégradé visible —
+  petit.
+- **RCH-12** — Le seed ne pose ni `flightType` ni coordonnées : « Vol direct » et le CO₂ ne sont
+  jamais vus par la recette — compléter le seed (petit). Le CO₂ est calculé côté front à partir
+  des coordonnées : le servir depuis l'API (qui sait déjà la distance pour le prix) — petit.
+  Statuts des familles accessibles (voir « à trancher »).
+- **RCH-13** — Le visiteur est une empreinte **IP + agent** : tout un bureau derrière une même
+  IP compte pour une vue par jour ; un identifiant anonyme de première partie (cookie, sans
+  donnée personnelle) serait plus juste et plus stable — **moyen**. Les vues sont lues carte par
+  carte dans Redis (`markViewsAndCountSearch`) : un `MGET` groupé si ce n'est pas déjà le cas —
+  petit.
+- **RCH-14** — Bon : 404 indistinct pour annulé / masqué / inexistant. Garder les critères de
+  recherche au retour (c'est le cas via le brouillon) et proposer « trajets similaires » sur la
+  404 — petit.
+- **RCH-15** — La sanction agit par lecture dans la recherche ; **vérifier** qu'elle agit aussi
+  sur la page publique (`GET /trips/:id/public` d'un Voyageur suspendu — non joué) et sur les
+  favoris / alertes qui pointent vers ce trajet — petit à vérifier, moyen si absent.
+- **ANO-WEB-27** — Un garde-fou durable : un test unitaire du `next.config.js` (les hôtes
+  d'avatars y sont) ou `unoptimized` pour les avatars (ImageKit sert déjà des transformations) —
+  petit ; et une **page d'erreur locale** autour des cartes (error boundary par carte) pour qu'un
+  composant qui jette ne tue pas la liste — moyen.
+- **ANO-WEB-28** — Au-delà du correctif : un test d'intégration Prisma+Mongo qui crée DEUX
+  documents pour chaque modèle portant une FK optionnelle `@unique` — le piège est connu, il
+  mérite un garde automatique — petit ; et `repair-absent-scalars` / `listIndexes` en revue de
+  schéma : tout `? @unique` est suspect — règle de relecture.
+- **Harnais** — Poser le brouillon de recherche en `sessionStorage` évite Google et rend les
+  fiches déterministes ; un `data-testid` sur les cartes et un seul arbre (voir RCH-1) rendraient
+  les sélecteurs triviaux — petit côté front.
+
+### Pièges de poste payés ici
+
+- **Deux copies de chaque carte** (mobile masqué + desktop) : `first()` tombe sur la copie
+  `hidden`. Toujours `.filter({ visible: true })` sur les cartes, le panneau de filtres, « Tout
+  effacer ».
+- **« Départ le plus tôt » est le tri par défaut** : cliquer dessus en premier ne déclenche
+  aucune requête (`waitForResponse` expire) — jouer les deux autres tris d'abord.
+- **La page d'incident masque tout** : trois fiches « échouaient » sur des symptômes différents
+  (onglet introuvable, zéro carte après « Tout effacer », zéro carte après « Réessayer ») pour la
+  même cause (ANO-WEB-27). Devant plusieurs échecs disparates sur une même page : lire
+  `pageerror` / la console AVANT de corriger les sélecteurs.
+- **Le brouillon persistant sérialise les dates avec un marqueur** (`{ __yamba_date__: iso }`,
+  `usePersistedFormState`) : à reproduire tel quel pour le titre « Trajets le … ».
+- **`innerText` et les espaces fines** : « ≈ 38,64 € » porte une espace insécable fine ;
+  comparer avec `\s*`.
+- **La 404 et la page publique n'ont pas de `<main>`** : lire `body`.
 
 ---
 

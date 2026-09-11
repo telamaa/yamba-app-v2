@@ -3183,3 +3183,90 @@ silencieux : l'échec est journalisé.
 | 128 | Billet validé | « Vérifié », badge public, email FR | oui |
 | 129 | Billet rejeté (motif) | « Rejeté », email en clair, nouveau dépôt → « En vérification » | oui |
 | 130 | Sans billet vérifié | publiable, réservable, badge absent | oui |
+
+
+---
+
+# Recherche, filtres, tri, état vide — ce que le chapitre 5.9 fait respecter
+
+*(PR `chore/recette-web-5-9` (#274), 11/09/2026 — cahier 01-WEB chapitre 5.9, WEB-RCH-1 à 15.)*
+
+## Le besoin
+
+Un Expéditeur trouve un trajet : liste complète ou corridor, prix lisible pour SON colis, tris,
+familles acceptées, filtres de confiance ; et quand il n'y a rien, une alerte. La page publique
+d'un trajet dit tout ce qu'il faut pour réserver. Ce qui a disparu ou est sanctionné disparaît
+sans rien révéler.
+
+## Les règles
+
+**RG-WEB-103 — La liste complète a un titre, un sous-titre et des onglets de mode.** « Tous les
+trajets disponibles » ; seuls les trajets EN LIGNE à venir y sont ; « Charger plus » au-delà de
+dix.
+
+**RG-WEB-104 — Le titre suit les critères.** Départ seul, arrivée seule, date seule, corridor.
+
+**RG-WEB-105 — Une carte au kilo dit le prix, la place et un exemple.** « prix au kilo »,
+« n €/kg », « n kg dispo », « ex. 2 kg ≈ … € tout compris » ; jamais un prix à zéro, jamais un
+tiret d'heure, jamais une note à 0,0 ; un compteur de vues seulement au-dessus de zéro.
+
+**RG-WEB-106 — Le poids du colis recalcule prix et tri.** Curseur 0,5–30 kg ; « Prix et tri
+calculés pour n kg · trajets sans assez de place exclus » ; « Plus assez de place » quand les
+kilos restants manquent ; exclusion quand la capacité totale manque ; poids mémorisé sur
+l'appareil et repris par la réservation.
+
+**RG-WEB-107 — Sans poids, le prix comparable est celui d'un colis de 2 kg.** transport
+`max(2 × €/kg, 8 €)` + service `max(12 %, 3 €)`.
+
+**RG-WEB-108 — Trois tris, calculés par le serveur.** Départ le plus tôt, prix le plus bas (pour
+le poids en cours, trajets sans prix exclus), mieux notés (jamais de note fictive).
+
+**RG-WEB-109 — Le filtre famille exclut les refus et annonce les suppléments avant le clic.**
+Plusieurs familles = toutes acceptées ; un trajet sans position accepte tout ; chaque puce porte
+son compte, une puce à 0 est désactivée.
+
+**RG-WEB-110 — Un filtre de confiance sans candidat est masqué, pas grisé.**
+
+**RG-WEB-111 — Une recherche sans résultat propose une alerte.** « Aucun trajet ne correspond ? »
++ « Créer une alerte pour ce trajet ». *(Écart consigné : le titre « Aucun trajet trouvé » et le
+message « filtres » sont alors remplacés — à trancher.)*
+
+**RG-WEB-112 — Une erreur de chargement est dite sans jargon et se réessaie.**
+
+**RG-WEB-113 — La page publique d'un trajet dit tout pour réserver.** Voyageur, mode, ancienneté,
+prix au kilo, place, familles avec leur statut, forfaits, estimation (2 kg ou poids mémorisé) tout
+compris, plancher, lieux, politique d'annulation, objets interdits, « Réserver », « Signaler » ;
+jamais « Réservation bientôt disponible ».
+
+**RG-WEB-114 — Une vue par visiteur et par jour.** Rien n'est affiché à zéro.
+
+**RG-WEB-115 — Un trajet disparu répond « introuvable » sans rien révéler.** Annulé, masqué ou
+inexistant : même page, même 404.
+
+**RG-WEB-116 — La suspension d'un compte retire ses trajets par lecture.** Aucune écriture sur le
+trajet ; la levée les fait revenir.
+
+**RG-WEB-117 — Un avatar distant ne fait pas tomber une page** (ANO-WEB-27) ; **tout membre peut
+poser son avatar** (ANO-WEB-28, ouverte).
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| 131 | Liste complète | titre, sous-titre, onglets, trajets à venir | oui (compteur « Résultats disponibles » absent : à trancher) |
+| 132 | Titres dynamiques | quatre formes | oui |
+| 133 | Carte au kilo | 11,50 €/kg · 23 kg · ex. 2 kg ≈ 26 € · rien à zéro | oui |
+| 134 | Poids 3 kg | 38,64 € (API) / ≈ 39 € (carte), exclusions, mémorisé | oui |
+| 135 | Tout effacer | 2 kg, 26 € / 22 € | oui |
+| 136 | Trois tris | ordre = API | oui |
+| 137 | Familles | refus exclu, +20 % annoncé, comptes | oui |
+| 138 | Confiance | lignes à 0 masquées | oui (branche « proposé » non exercée) |
+| 139 | État vide | bloc alerte | oui (titre remplacé : à trancher) |
+| 140 | Vide par filtres | message + Tout effacer | oui (jamais avec un corridor : à trancher) |
+| 141 | Erreur | message, Réessayer | oui |
+| 142 | Page publique | tout le bloc, Réserver, pas de « bientôt » | oui (statuts en infobulle : à trancher) |
+| 143 | Vues | une par visiteur/jour | oui |
+| 144 | Trajet annulé | introuvable, 404 | oui |
+| 145 | Compte suspendu | trajet absent, intact en base | oui |
+| 146 | Avatar distant | la page tient | oui (ANO-WEB-27 close) |
+| 147 | Second avatar | 200 | **non** — 500 P2002 (ANO-WEB-28 ouverte, `test.fail`) |
