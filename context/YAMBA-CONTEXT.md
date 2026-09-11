@@ -628,7 +628,7 @@ Ordre de demarrage : auth -> trip -> gateway.
   A trancher : « paye 3 jours apres » vs « J+4 » (deux formules), sous-titre mobile vs desktop, bouton
   d'appel = le numero, photos envoyees a la confirmation, le cahier elide lui-meme. Regard d'expert : script
   « cles JSON absentes du code », `onError` next-intl en echec dur en dev, test de rendu des vues Voyageur.
-  Harnais : 186 scenarios. Reste : 5.17 a 5.32, 02-ADMIN. AUCUNE attribution Claude.
+  Harnais : 186 scenarios. PR **#281** (empilee sur #280). Reste : 5.17 a 5.32, 02-ADMIN. AUCUNE attribution Claude.
 - 11/09 : **CHAPITRE 5.15 DU CAHIER 01-WEB — WEB-MSG, MESSAGERIE, RENDEZ-VOUS ET NUMERO (branche
   `chore/recette-web-5-15`, empilee sur #279)** — 22 fiches jouees CONFORMES (4 apres correction), 21 scenarios
   en serie, 3 min 24 (`apps/e2e/src/chapitres/web-msg.spec.ts`, deux navigateurs Pauline / Thomas sur

@@ -3650,7 +3650,7 @@ par conversation, sans citer le message ; la notification in-app, elle, est imm�
 
 # Prise en charge et jalons de transit — ce que le chapitre 5.16 fait respecter
 
-*(PR `chore/recette-web-5-16`, 11/09/2026 — cahier 01-WEB chapitre 5.16, WEB-PIC-1 à 10.)*
+*(PR `chore/recette-web-5-16` (#281), 11/09/2026 — cahier 01-WEB chapitre 5.16, WEB-PIC-1 à 10.)*
 
 ## Le besoin
 

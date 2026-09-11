@@ -5410,7 +5410,7 @@ harnais verts ; miroir i18n vert.
 
 # Chapitre 5.16 du cahier 01-WEB : la prise en charge et le transit — de la copie écrite mais jamais branchée
 
-*(PR `chore/recette-web-5-16`, 11/09/2026.)*
+*(PR `chore/recette-web-5-16` (#281), 11/09/2026.)*
 
 ## Ce qui a été fait
 
