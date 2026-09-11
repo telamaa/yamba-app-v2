@@ -189,12 +189,15 @@ export function getDashboardCopy(isFr: boolean) {
       emailDone: isFr ? "Adresse changée : {email}." : "Address changed: {email}.",
       sessionsSub: isFr ? "Les appareils connectés à ton compte ; déconnecte ceux que tu ne reconnais pas." : "The devices signed in to your account; sign out the ones you don't recognise.",
       revokeOthers: isFr ? "Déconnecter les autres appareils" : "Sign out other devices",
+      revokeAll: isFr ? "Déconnecter tous les appareils" : "Sign out all devices",
+      revokeAllHint: isFr ? "Ferme toutes les sessions, celle-ci comprise : tu devras te reconnecter." : "Closes every session, including this one; you will need to sign back in.",
       sessionsRevoked: isFr ? "{n} appareil(s) déconnecté(s)." : "{n} device(s) signed out.",
       thisDevice: isFr ? "cet appareil" : "this device",
       lastActivity: isFr ? "Dernière activité" : "Last activity",
       remembered: isFr ? "connexion mémorisée" : "remembered sign-in",
       revoke: isFr ? "Déconnecter" : "Sign out",
       logoutHere: isFr ? "Me déconnecter ici" : "Sign me out here",
+      logoutHereConfirm: isFr ? "Te déconnecter de cet appareil ? Tu devras te reconnecter." : "Sign out of this device? You will need to sign back in.",
     },
     // C-PR8b (D63) — mes données
     privacy: {
