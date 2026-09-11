@@ -70,21 +70,7 @@ async function ouvrirLeSuivi(page: Page, id: string): Promise<SuiviExpediteur> {
   return suivi;
 }
 
-/** Une régénération complète par l'écran : confirmation, réponse 200, nouveau code relu sur la carte. */
-async function regenererUneFois(page: Page, suivi: SuiviExpediteur): Promise<{ nouveauCode: string; toast: string }> {
-  await regenerer(page).click();
-  await expect(page.getByText("Régénérer le code ?")).toBeVisible();
-  // Le client rejoue la requête après un 401 (jeton expiré → rafraîchi) : attendre la réponse DÉFINITIVE.
-  const reponse = page.waitForResponse((r) => /\/deals\/[^/]+\/code\/regenerate$/.test(r.url()) && r.request().method() === "POST" && r.status() !== 401, { timeout: 60_000 });
-  await page.getByRole("button", { name: "Oui, régénérer" }).click();
-  const r = await reponse;
-  expect(r.status(), `POST /code/regenerate : ${await r.text()}`).toBe(200);
-  const toast = page.getByText(/Nouveau code généré !/).last(); // les toasts s'empilent 5 s : viser le dernier
-  await expect(toast).toBeVisible({ timeout: 10_000 });
-  const texteToast = normaliserEspaces(await toast.innerText());
-  const nouveauCode = await suivi.lireLeCode();
-  return { nouveauCode, toast: texteToast };
-}
+const regenererUneFois = (_page: Page, suivi: SuiviExpediteur) => suivi.regenerer(); // page object (5.17 / 5.18)
 
 async function dealBrut(contexte: Contexte, id: string): Promise<string> {
   const r = await contexte.request.get(`${api()}/deals/${id}`);
@@ -147,7 +133,7 @@ test.describe("WEB-COD — le code de livraison (chapitre 5.17)", () => {
     await messagerie.ouvrir(fil);
     sources.push({ ou: "fil de messagerie (source)", contenu: await B.page.content() });
     sources.push({ ou: "GET /deals/:id (Voyageur)", contenu: await dealBrut(B.contexte, dealId) });
-    const notifications = await B.contexte.request.get(`${api()}/notifications?limit=100`);
+    const notifications = await B.contexte.request.get(`${api()}/me/notifications?limit=100`);
     if (notifications.ok()) sources.push({ ou: "GET /notifications (Voyageur)", contenu: await notifications.text() });
     for (const s of sources) {
       expect(s.contenu, `${s.ou} : le code ne doit pas y figurer`).not.toContain(CODE_DU_SEED);
