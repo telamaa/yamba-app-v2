@@ -1,7 +1,7 @@
 import type { Request, Response, NextFunction } from "express";
 import bcrypt from "bcryptjs";
 import prisma from "@packages/libs/prisma";
-import { AuthError, ConflictError, ValidationError } from "@packages/error-handler";
+import { AuthError, ConflictError, RateLimitError, ValidationError } from "@packages/error-handler";
 import { isSupportedLocale, resolveLocale } from "@packages/api-contracts";
 
 import {
@@ -43,6 +43,10 @@ import {
 } from "../utils/session-policy";
 import { recordRegistrationConsents } from "../utils/consent/consent.helper";
 import { describeUserAgent, shortUserAgent } from "../utils/session-device";
+import { assertLoginNotLocked, clearLoginFailures, registerLoginFailure } from "../utils/login-guard"; // D78
+import { notifyNewSignIn } from "../utils/notify-sign-in"; // D78
+import { sendAuthEmail } from "../emails/send-auth-email";
+import { getAuthEmails } from "../emails/auth-emails";
 import type { SessionMeta } from "../utils/auth.helper";
 
 /** D65 2A — ce qu'une session retient de l'appareil (jamais une empreinte). */
@@ -353,7 +357,7 @@ async function issueSession(
   user: { id: string; roles: string[] },
   shouldRemember: boolean,
   meta: SessionMeta = {}
-): Promise<void> {
+): Promise<{ jti: string }> {
   clearAuthCookies(res);
 
   // D27 — nouvelle session : createdAt = now, TTL = min(inactivité, vie absolue)
@@ -382,6 +386,7 @@ async function issueSession(
 
   setCookie(res, "access_token", accessToken);
   setCookie(res, "refresh_token", refreshToken, { rememberMe: shouldRemember });
+  return { jti };
 }
 
 export const loginUser = async (req: Request, res: Response, next: NextFunction) => {
@@ -397,6 +402,10 @@ export const loginUser = async (req: Request, res: Response, next: NextFunction)
     }
 
     const emailKey = normalizeEmail(String(email));
+    // D78 — verrou anti-force-brute, AVANT tout : indexé par adresse (existante ou non), donc
+    // indistinguable ; un compte verrouillé répond 429 sans révéler s'il existe.
+    await assertLoginNotLocked(emailKey);
+
     const user = await prisma.user.findUnique({
       where: { emailNormalized: emailKey },
     });
@@ -405,12 +414,40 @@ export const loginUser = async (req: Request, res: Response, next: NextFunction)
     // adresse connue payait le hachage (≈ 168 ms) et une inconnue non (≈ 20 ms), ce qui
     // suffisait à énumérer les comptes en un appel malgré un corps identique.
     const isMatch = await comparePasswordConstantTime(String(password), user?.passwordHash);
-    if (!user || !isMatch) return next(new AuthError("Invalid email or password", { code: "INVALID_CREDENTIALS" }));
+    if (!user || !isMatch) {
+      // D78 — on compte l'échec pour TOUTE adresse (verrou indistinguable). L'alerte au titulaire
+      // n'est envoyée que si le compte existe (jamais d'email à une adresse inconnue).
+      const outcome = await registerLoginFailure(emailKey);
+      if (outcome.shouldAlert && user) {
+        void sendAuthEmail(
+          user.email,
+          user.preferredLocale,
+          getAuthEmails(user.preferredLocale).securityAlert({ scope: "login", attemptCount: outcome.attemptCount, lockSeconds: outcome.lockSeconds, supportEmail: "support@yamba.com" })
+        ).catch(() => undefined);
+      }
+      if (outcome.locked) {
+        return next(new RateLimitError("Too many attempts. Please try again later.", { type: "login", code: "TOO_MANY_ATTEMPTS", lockUntilSeconds: outcome.lockSeconds }));
+      }
+      return next(new AuthError("Invalid email or password", { code: "INVALID_CREDENTIALS" }));
+    }
     // C-PR3 (D56 2A) — un compte suspendu ne se connecte pas ; le motif est dans l'email reçu.
     if ((user as { accountStatus?: string }).accountStatus === "SUSPENDED") return next(new AuthError("Account suspended", { code: "ACCOUNT_SUSPENDED" }));
 
+    await clearLoginFailures(emailKey); // D78 — succès : le compteur repart de zéro
     const shouldRemember = Boolean(rememberMe);
-    await issueSession(res, user, shouldRemember, sessionMetaOf(req)); // D65 2A
+    const loginMeta = sessionMetaOf(req);
+    const { jti: loginJti } = await issueSession(res, user, shouldRemember, loginMeta); // D65 2A
+    // D78 — email de nouvelle connexion (nouvel appareil par défaut), en tâche de fond : aucune
+    // latence sur la réponse, échec silencieux (SMTP, géo) sans casser la connexion.
+    void notifyNewSignIn({
+      userId: user.id,
+      email: user.email,
+      firstName: user.firstName,
+      locale: user.preferredLocale,
+      device: loginMeta.device ?? describeUserAgent(undefined),
+      ip: loginMeta.ip ?? null,
+      currentJti: loginJti,
+    }).catch(() => undefined);
 
     return res.status(200).json({
       message: "Login successful!",
