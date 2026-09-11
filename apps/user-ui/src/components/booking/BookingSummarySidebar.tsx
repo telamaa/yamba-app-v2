@@ -189,6 +189,14 @@ function RecapCard({
         </>
       )}
 
+      {/* ANO-WEB-37 (recette 5.12) — devis indisponible (poids vide, taille manquante…) : l'indice, JAMAIS « 0 € » */}
+      {price.quote === null && price.quoteError ? (
+        <div className="px-5">
+          <div className="mb-1 rounded-md bg-[#FFF6E8] px-2.5 py-1.5 text-[11px] text-[#B45309] dark:bg-[#FF9900]/10 dark:text-[#FFB84D]">
+            {t(`summary.quoteHint.${price.quoteError}`)}
+          </div>
+        </div>
+      ) : (
       <div className="px-5">
         <PriceRow
             label={
@@ -229,6 +237,7 @@ function RecapCard({
           {currentStep === 4 ? t("summary.totalNoteLong") : t("summary.totalNote")}
         </div>
       </div>
+      )}
 
       <div className="mt-4 space-y-2 border-t border-slate-100 bg-slate-50 px-5 py-4 dark:border-slate-800 dark:bg-slate-900/50">
         <button
