@@ -42,7 +42,19 @@ async function carrierFacts(userId: string): Promise<ReputationFacts> {
   const [reviews, completed, late] = await Promise.all([
     prisma.review.findMany({ where: { subjectUserId: userId, kind: "AS_CARRIER", revealedAt: { not: null } }, select: { rating: true } }),
     prisma.booking.count({ where: { carrierId: userId, status: "COMPLETED", isDeleted: false } }),
-    prisma.booking.count({ where: { carrierId: userId, status: "CANCELLED", closedBy: "CARRIER", isDeleted: false, acceptedAt: { not: null } } }),
+    // ANO-WEB-10 — un refus au pickup clôt le deal par le Voyageur, mais « sans pénalité » (machine,
+    // effets de `refusePickup`) : il est exclu par sa marque `pickupRefusedAt`. Piège Prisma+Mongo :
+    // `null` ne voit pas un champ ABSENT (deals antérieurs à la marque) → `OR` avec `isSet: false`.
+    prisma.booking.count({
+      where: {
+        carrierId: userId,
+        status: "CANCELLED",
+        closedBy: "CARRIER",
+        isDeleted: false,
+        acceptedAt: { not: null },
+        OR: [{ pickupRefusedAt: null }, { pickupRefusedAt: { isSet: false } }],
+      },
+    }),
   ]);
   return { ratingsAvg: averageOf(reviews.map((r) => r.rating)), ratingsCount: reviews.length, completedDealsCount: completed, lateCancellationsCount: late };
 }

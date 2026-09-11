@@ -105,6 +105,39 @@ function toDate(dateStr: string | null | undefined): Date | undefined {
 }
 
 /**
+ * ANO-WEB-22 (recette 5.7) — repli quand les chaînes locales (`departureDateLocal`,
+ * `departureTimeLocal`…) sont ABSENTES : elles ne sont écrites que par ce wizard, donc un trajet
+ * créé par un autre canal (API, seed, futur client mobile) s'ouvrait en édition avec les dates
+ * vides (« 4 champs à compléter ») alors que `departureAt` est bien en base. On dérive alors la
+ * date et l'heure de l'instant absolu, dans le fuseau du lieu quand il est connu, sinon dans celui
+ * du navigateur (c'est le fuseau que le mapper d'écriture utilise).
+ */
+function localDateTimeParts(
+  iso: string | Date | null | undefined,
+  timeZone: string | null | undefined
+): { date?: Date; time: string } {
+  if (!iso) return { time: "" };
+  const instant = iso instanceof Date ? iso : new Date(iso);
+  if (Number.isNaN(instant.getTime())) return { time: "" };
+  const options: Intl.DateTimeFormatOptions = {
+    year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false,
+  };
+  let parts: Intl.DateTimeFormatPart[];
+  try {
+    parts = new Intl.DateTimeFormat("en-CA", { ...options, timeZone: timeZone ?? undefined }).formatToParts(instant);
+  } catch {
+    // Fuseau inconnu du moteur : on retombe sur celui du navigateur.
+    parts = new Intl.DateTimeFormat("en-CA", options).formatToParts(instant);
+  }
+  const get = (type: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === type)?.value ?? "";
+  const hour = get("hour") === "24" ? "00" : get("hour");
+  return {
+    date: toDate(`${get("year")}-${get("month")}-${get("day")}`),
+    time: `${hour}:${get("minute")}`,
+  };
+}
+
+/**
  * Build a PlaceInfo from raw trip fields.
  * Uses an object literal signature to avoid positional-arg bugs (10 fields).
  * Every field is explicitly `null` (never `undefined`) to match the strict
@@ -190,6 +223,8 @@ function mergeLocationsWithDefaults(
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function mapTripToDraft(trip: any): Draft {
+  const departureFallback = localDateTimeParts(trip.departureAt, trip.originTimezone);
+  const arrivalFallback = localDateTimeParts(trip.arrivalAt, trip.destinationTimezone);
   const transportMode = fromSnakeEnum(trip.transportMode, TRANSPORT_MAP);
 
   // ⭐ Moteur PER_KG — cents → euros ; familles absentes = ACCEPT
@@ -292,10 +327,11 @@ export function mapTripToDraft(trip: any): Draft {
       lng: trip.destinationLng ?? null,
     }),
 
-    departureDate: toDate(trip.departureDateLocal),
-    arrivalDate: toDate(trip.arrivalDateLocal),
-    departureTime: trip.departureTimeLocal ?? "",
-    arrivalTime: trip.arrivalTimeLocal ?? "",
+    // Les chaînes locales du wizard d'abord ; sinon l'instant absolu (ANO-WEB-22).
+    departureDate: toDate(trip.departureDateLocal) ?? departureFallback.date,
+    arrivalDate: toDate(trip.arrivalDateLocal) ?? arrivalFallback.date,
+    departureTime: trip.departureTimeLocal || departureFallback.time,
+    arrivalTime: trip.arrivalTimeLocal || arrivalFallback.time,
 
     flightType: fromSnakeEnum(trip.flightType, FLIGHT_TYPE_MAP),
     trainTripType: fromSnakeEnum(trip.trainTripType, TRAIN_TYPE_MAP),

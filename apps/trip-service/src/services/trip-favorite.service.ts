@@ -27,7 +27,7 @@ function favoriteError(status: 403 | 409, code: TripFavoriteErrorCode, tripId: s
 async function loadTripForFavorite(tripId: string) {
   const trip = await prisma.trip.findUnique({
     where: { id: tripId },
-    select: { id: true, userId: true, status: true, isDeleted: true },
+    select: { id: true, userId: true, status: true, isDeleted: true, hiddenByAdminAt: true },
   });
   if (!trip || trip.isDeleted) throw new NotFoundError("Trip not found.", { code: "TRIP_NOT_FOUND" });
   return trip;
@@ -40,6 +40,11 @@ export async function addFavorite(userId: string, tripId: string): Promise<TripF
   }
   if (trip.status !== "PUBLISHED") {
     throw favoriteError(409, "TRIP_NOT_FAVORITABLE", tripId, "Only published trips can be favorited.");
+  }
+  // ANO-WEB-32 (recette 5.11) — un trajet MASQUÉ par Yamba (D57) garde son statut PUBLISHED mais n'est
+  // plus disponible : il ne s'ajoute pas en favori (le retrait, lui, reste toujours possible).
+  if (trip.hiddenByAdminAt) {
+    throw favoriteError(409, "TRIP_NOT_FAVORITABLE", tripId, "This trip is no longer available.");
   }
   // Idempotent : la contrainte unique (userId, tripId) rend l'upsert sûr en concurrence.
   await prisma.tripFavorite.upsert({
