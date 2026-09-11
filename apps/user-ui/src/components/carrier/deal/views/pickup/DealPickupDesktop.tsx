@@ -9,6 +9,7 @@
 
 "use client";
 
+import { elider } from "@/lib/elision"; // ANO-WEB-49
 import { useLocale, useTranslations } from "next-intl";
 import { ArrowLeft } from "lucide-react";
 import type { DealPickupViewProps } from "./DealPickupClient";
@@ -29,8 +30,9 @@ export default function DealPickupDesktop(props: DealPickupViewProps) {
 
   const shipperFirstName = deal.shipper.firstName;
   const shipperLastInitial = deal.shipper.lastInitial;
-  const recipientFirstName =
-    deal.deliveryLocation.name.split(" ")[0] || deal.deliveryLocation.name;
+  // ANO-WEB-50 (recette 5.16, même famille qu'ANO-WEB-44) : le prénom du destinataire vient du DTO,
+  // plus du premier mot du lieu de livraison (« la remise à Brazzaville »).
+  const recipientFirstName = deal.recipientFirstName || deal.deliveryLocation.city;
   const weightKg = formatWeight(deal.parcel.weightKg, locale);
   const dateStr = formatShortDate(deal.trip.departureDate, locale);
   const hourStr = formatHour(deal.trip.departureDate, locale);
@@ -75,7 +77,7 @@ export default function DealPickupDesktop(props: DealPickupViewProps) {
                   {t("sectionTitle")}
                 </h2>
                 <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                  {t("sectionSubtitle", { shipperFirstName })}
+                  {t("sectionSubtitle", { shipperFirstName, deShipper: elider("de", shipperFirstName) })}
                 </p>
               </header>
 
