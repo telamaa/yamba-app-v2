@@ -787,6 +787,9 @@ model Booking {
   declineReason String? // refus PENDING (5 raisons — DeclineReason du contrat)
   cancelReason  String? // annulation Expéditeur (texte libre court, B2)
   pickupRefusalReason String? // refus au pickup (5 raisons — PickupRefusalReason, B3/A40)
+  /// ANO-WEB-10 — la marque d'un refus au pickup (la raison est facultative, donc ambiguë) :
+  /// la réputation exclut ces annulations, « sans pénalité » comme le dit la machine.
+  pickupRefusedAt     DateTime?
 
   // ─── Code de livraison (spec §9 — le serveur est seul juge) ───
   deliveryCodeHash    String? // bcrypt — JAMAIS dans un payload carrier (validation seule)

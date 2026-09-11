@@ -2581,3 +2581,351 @@ Voyageur peut faire. *(ANO-WEB-07, ouverte.)*
 | 27 | Fenêtre d'annulation à moins de 48 h | 15,96 € remboursés, retenue 15,96 € reversée, « Garder » sans effet | oui |
 | 28 | Annulation confirmée | toast, ligne « Annulée », Finances des deux côtés (15,96 € / 14,25 €), kilos rendus, quatre emails | oui |
 | 29 | Le Voyageur tente d'annuler son trajet | refus 409 avec le nombre de deals vivants | oui (conseil inapplicable : ANO-WEB-07) |
+
+---
+
+# Le compte neuf — ce que WEB-E2E-4 fait respecter
+
+*(PR `chore/e2e-parcours-4`, 09/09/2026 — cahier 01-WEB chapitre 6, CNF-06 / D71, D63, D65, SES-01.)*
+
+## Le besoin
+
+Un compte neuf est plafonné pendant trente jours, et ces plafonds doivent tomber **avant** tout
+argent — jamais après une autorisation bancaire. Le score qui les décide ne se montre à
+personne : ni à l'écran, ni dans l'export des données. Et la vie ordinaire du compte doit tenir
+ses promesses : une session qui expire, ses appareils, une suppression bloquée tant qu'un deal
+est en cours.
+
+## Les règles
+
+**RG-WEB-25 — Un plafond refuse avant tout paiement.** Valeur déclarée, poids et nombre
+d'envois du mois sont contrôlés à la demande d'intention de paiement ; rien n'est autorisé, aucune
+ligne Finances, aucun email. *(ANO-WEB-08.)*
+
+**RG-WEB-26 — Le score de confiance n'existe pour personne.** Aucune page du membre, aucune page
+publique, aucun export ne le mentionne. *(D71.)*
+
+**RG-WEB-27 — L'export des données passe par la porte, puis se télécharge.** Le refus
+`SUDO_REQUIRED` ouvre la porte, quel que soit le format de réponse demandé. *(ANO-WEB-09.)*
+
+**RG-WEB-28 — Une session expirée se rattrape sur place.** La fenêtre se pose par-dessus la
+page, la reconnexion ne la quitte pas, et le membre refait son geste.
+
+**RG-WEB-29 — La suppression est bloquée avant toute porte.** Un deal en cours ou une demande en
+attente affichent le bandeau et les motifs ; aucun code n'est demandé ni envoyé.
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| 30 | Inscription, code, connexion sans « Rester connecté » | compte activé, bienvenue, cookie de session sans expiration | oui |
+| 31 | 450 € / 12 kg / sixième demande du mois | refus à l'intention, message unique, rien nulle part | oui |
+| 32 | Profil, tableau de bord, page publique, export | aucun score, aucun niveau de risque, aucun point | oui |
+| 33 | Session expirée puis un geste | fenêtre par-dessus la page, reconnexion sur place, geste refait | oui |
+| 34 | Supprimer mon compte avec un deal en cours | bandeau, motifs, aucune porte, aucun email | oui |
+
+---
+
+# Le refus au pickup — ce que WEB-E2E-5 fait respecter
+
+*(PR `chore/e2e-parcours-5`, 10/09/2026 — cahier 01-WEB chapitre 6, A40, D39, D29 ①.)*
+
+## Le besoin
+
+Au rendez-vous de prise en charge, le Voyageur ouvre le colis. S'il ne correspond pas à ce qui a
+été déclaré, il doit pouvoir le **refuser sans se pénaliser** : c'est la garantie qui rend la
+vérification possible. L'Expéditrice est remboursée en entier, tout de suite, et prévenue ; les
+kilos reviennent au trajet ; et rien de ce refus ne vient noircir la page publique du Voyageur.
+
+## Les règles
+
+**RG-WEB-30 — Un refus au pickup rembourse tout.** Le paiement capturé à l'acceptation est
+remboursé intégralement, avant toute écriture en base ; « Mes envois » dit « Annulée »,
+Finances « Remboursé {total} le {date} », sans retenue. *(A40, D39.)*
+
+**RG-WEB-31 — Le refus est expliqué, dans l'ordre.** L'Expéditrice reçoit d'abord l'email du
+refus, avec la raison choisie par le Voyageur traduite dans sa langue, puis celui du remboursement
+émis, du montant intégral.
+
+**RG-WEB-32 — Un refus au pickup n'est pas une annulation fautive.** La ligne de faits du Voyageur
+(« n annulations tardives ») ne bouge pas, ni maintenant ni au prochain recalcul de réputation.
+*(ANO-WEB-10.)*
+
+**RG-WEB-33 — Les kilos refusés reviennent au trajet**, immédiatement, sans geste du Voyageur.
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| 35 | Deal accepté, « Refuser le colis », raison, confirmation | fenêtre avec le rappel « ne pénalise jamais ta réputation », toast, statut CANCELLED, remboursement = total | oui |
+| 36 | Mes envois, Finances de l'Expéditrice | « Annulée » ; « Remboursé {total} le … », aucune retenue | oui |
+| 37 | Emails de l'Expéditrice | refus avec la raison traduite, puis remboursement intégral, sans le mot « retenue » | oui |
+| 38 | Page publique du Voyageur avant / après | ligne de faits identique | oui |
+| 39 | Trajet du Voyageur | kilos rendus, ligne du deal « Annulé » | oui |
+
+---
+
+# Le destinataire — ce que WEB-E2E-6 fait respecter
+
+*(PR `chore/e2e-parcours-6`, 10/09/2026 — cahier 01-WEB chapitre 6, D69, RGP-02.)*
+
+## Le besoin
+
+Le destinataire n'a pas de compte, n'a rien demandé, et n'a qu'un lien que l'Expéditeur lui a
+transmis. Il doit savoir où en est le colis et quoi préparer — et ne rien apprendre d'autre :
+ni adresse, ni numéro, ni code, ni photo, ni montant. Yamba ne lui écrit jamais.
+
+## Les règles
+
+**RG-WEB-34 — La page de suivi ne dit que l'essentiel.** Prénoms, corridor, dates, frise et
+aide de l'étape ; rien d'autre, ni à l'écran, ni dans le code source, ni dans l'API (liste de
+clés fermée). *(D69.)*
+
+**RG-WEB-35 — L'aide change avec l'étape.** À l'atterrissage, elle demande de préparer le code ;
+à la remise, elle dit « Bonne réception ! ».
+
+**RG-WEB-36 — L'origine des données est dite.** La mention de confidentialité nomme
+l'Expéditeur, ce qu'il a confié, à qui, et quand c'est effacé ; elle mène à la politique de
+confidentialité. *(RGP-02.)*
+
+**RG-WEB-37 — Un lien altéré ne révèle rien.** « Ce lien de suivi n'est plus valide », sans
+prénom ni corridor ; l'API répond la même chose pour un jeton altéré et un jeton inventé.
+
+**RG-WEB-38 — Yamba n'écrit jamais au destinataire.** Aucun email, aucun SMS ; le lien est
+partagé par l'Expéditeur seul.
+
+**RG-WEB-39 — Le bloc d'acquisition mène à de vrais écrans.** « Envoyer un colis » ouvre la
+recherche ; « Devenir Voyageur » ouvre l'onboarding (la porte de connexion d'abord, sans compte).
+*(ANO-WEB-11.)*
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| 40 | Lien ouvert à chaque jalon | frise et aide qui progressent, cinq jalons datés à la remise | oui |
+| 41 | Écran, source, API | aucun code, numéro, montant, lieu, photo ; huit clés exactement | oui |
+| 42 | Mention de confidentialité | texte exact, lien vers la politique | oui |
+| 43 | Bloc d'acquisition | recherche ; porte de connexion puis onboarding | oui |
+| 44 | Jeton altéré d'un caractère | « plus valide », sans rien de plus, 404 identique à un jeton inventé | oui |
+| 45 | Boîte du destinataire | aucun email ; tous les emails vont à des membres | oui |
+
+---
+
+# L'accueil du visiteur — ce que le chapitre 5.1 fait respecter
+
+*(PR `chore/recette-web-5-1`, 10/09/2026 — cahier 01-WEB chapitre 5.1, WEB-ACC-1 à 12.)*
+
+## Le besoin
+
+Un visiteur arrive sur l'accueil sans compte. Il doit comprendre le produit en une page, chercher
+un trajet en trois champs, changer de langue et de thème, lire les textes légaux, et n'être
+trompé par rien : ni par un bouton qui ne fait rien, ni par une icône qui mène ailleurs. C'est le
+premier geste de tout le monde, et aucun parcours du chapitre 6 ne le couvrait (ils entrent par
+l'adresse d'un trajet).
+
+## Les règles
+
+**RG-WEB-40 — « Rechercher » cherche.** Depuis l'accueil, deux villes et « Rechercher » ouvrent
+la page de résultats, qui interroge exactement ce qui a été saisi — sans second clic.
+*(ANO-WEB-12.)*
+
+**RG-WEB-41 — Une ville choisie dans la liste est cherchée par son nom.** Le libellé « Ville,
+Pays » est une aide à la lecture ; la recherche compare la ville. Le pays tapé à la main reste
+cherché tel quel. *(ANO-WEB-13.)*
+
+**RG-WEB-42 — La première liste de suggestions vient, quel que soit le rythme de frappe.**
+*(ANO-WEB-14.)*
+
+**RG-WEB-43 — Ce qui n'existe pas encore est annoncé comme tel.** Les réseaux sociaux portent
+« Bientôt disponible » et ne mènent nulle part tant que les comptes n'existent pas. *(ANO-WEB-15.)*
+
+**RG-WEB-44 — La langue affichée est la langue déclarée.** `<html lang>` suit la bascule, au
+rendu comme après un clic. *(ANO-WEB-16.)*
+
+**RG-WEB-45 — La porte d'identité se referme sans conséquence.** « Plus tard », Échap et le
+fond referment ; la page est intacte, rien n'est parti vers le serveur.
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| 46 | Accueil visiteur | en-tête, barre, pied de page, aucun squelette, console propre hors sonde | oui |
+| 47 | FR → EN → FR, rechargement | `/en` puis `/fr`, `lang` fidèle, aucune clé brute | oui |
+| 48 | Thème sombre | conservé au rechargement, contraste AA, retour au clair | oui |
+| 49 | CGU, confidentialité | un texte, un seul `main` | oui |
+| 50 | Icônes sociales | « Bientôt disponible », aucun onglet | oui |
+| 51 | « Partager un trajet » puis trois fermetures | porte par-dessus la page, refermée sans requête | oui |
+| 52 | Paris → Brazzaville depuis l'accueil | `/search`, titre, deux trajets du seed | oui |
+| 53 | Inversion puis « Rechercher » | Brazzaville → Paris, aucun trajet | oui |
+| 54 | Accueil connecté, déconnexion | menu utilisateur ; puis « Connexion », cookies absents | oui |
+
+---
+
+# L'inscription — ce que le chapitre 5.2 fait respecter
+
+*(PR `chore/recette-web-5-2`, 10/09/2026 — cahier 01-WEB chapitre 5.2, WEB-INS-1 à 16.)*
+
+## Le besoin
+
+Une personne crée son compte avec une adresse email et un code à six chiffres. Elle doit savoir
+ce qu'on attend d'elle (champ par champ, règle par règle), ne pas pouvoir s'inscrire sans avoir
+accepté les conditions, être protégée contre quelqu'un qui devinerait son code, et pouvoir se
+tromper d'adresse sans conséquence. Le produit garde la trace de son consentement et de sa
+langue. Le parcours Google existe mais reste fermé tant que la clé n'est pas posée.
+
+## Les règles
+
+**RG-WEB-46 — Pas de compte sans consentement.** La case d'acceptation est obligatoire ; sans
+elle, rien ne part vers le serveur et un message le dit. Avec elle, deux lignes `ConsentLog`
+(`TERMS`, `PRIVACY`) portent la version des textes, l'horodatage serveur, l'adresse IP et le
+navigateur.
+
+**RG-WEB-47 — La langue de l'écran devient la langue du compte.** Un compte créé sur `/fr` porte
+`preferredLocale: "fr"` ; c'est elle qui choisit la langue des emails (D44).
+
+**RG-WEB-48 — Le code vaut dix minutes, à l'écran comme dans l'email.** Le compte à rebours
+démarre à 10:00 et l'email annonce la même validité ; un renvoi repart de 10:00 avec un NOUVEAU
+code.
+
+**RG-WEB-49 — Cinq codes faux bloquent la saisie une minute, côté serveur.** Les quatre premiers
+échecs annoncent les essais restants ; le cinquième bloque, l'écran désactive la saisie, et le
+blocage survit à un rechargement (le compteur vit sur le serveur, `OTP_LOCKED`). **Un renvoi de
+code ne rouvre pas le compteur** : le sixième échec est le sixième.
+
+**RG-WEB-50 — Une règle violée, une phrase.** Le mot de passe est jugé règle par règle dans
+l'ordre du produit (longueur, minuscule, majuscule, chiffre, spécial, date, suite, données
+personnelles) ; le message nomme la PREMIÈRE règle manquante, en une phrase, jamais « tous les
+critères ». Un indicateur de force accompagne la saisie.
+
+**RG-WEB-51 — Une adresse déjà connue est refusée sans rien envoyer.** Ni code, ni inscription
+en attente, ni email à l'adresse existante ; le message sous le champ tutoie (ANO-WEB-18).
+
+**RG-WEB-52 — Se tromper d'adresse ne coûte rien.** « Recommencer » demande confirmation, annule
+l'inscription en attente et rend un formulaire vide.
+
+**RG-WEB-53 — L'adresse en attente est affichée masquée.** L'écran du code montre
+`n*********5@r***.dev` ; un écran photographié ou partagé ne livre pas l'adresse. *(Écart de
+cahier consigné, décision recommandée : garder le masquage.)*
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| 55 | Écran d'inscription | mention de confiance, titre, cinq champs et indices, case unique à deux liens, Google et Facebook, « Connecte-toi » | oui |
+| 56 | Facebook | inerte : aucune fenêtre, requête ou erreur | oui |
+| 57 | Formulaire vide | quatre messages nommés, rien ne part | oui |
+| 58 | `pas-un-email` | « Saisis un e-mail valide. » au blur | oui |
+| 59 | Six mots de passe fautifs | une phrase chacun, une règle chacun ; indicateur de force | oui (cas e : « minuscule », écart consigné) |
+| 60 | Sans la case, puis avec | refus expliqué ; puis écran du code, 10:00 décroissant, email avec code et « 10 minutes » | oui (adresse masquée, écart consigné) |
+| 61 | Cinq codes faux, rechargement | 4 → 1 restants, blocage d'une minute, saisie désactivée, `OTP_LOCKED` après rechargement | oui |
+| 62 | Renvoi après la minute | « Code renvoyé », bouton temporisé, nouvel email, 10:00 ; 6e et 7e échecs : 4 puis 3 restants | oui |
+| 63 | Collage du bon code | six cases remplies, `/login?verified=1`, « Compte activé », email Bienvenue ; en base TERMS + PRIVACY, `fr`, mot de passe | oui |
+| 64 | Adresse d'Aminata | refus sous le champ, aucun email | oui |
+| 65 | « Recommencer » | confirmation exacte, `cancel`, formulaire vide | oui |
+| 66 | Google sans clé | « Connexion Google bientôt disponible », désactivé, sur les deux écrans | oui |
+| 67 | Parcours Google | ⏭ sans clé ; à la main quand elle sera posée | ⏭ |
+
+---
+
+# Connexion et sessions — ce que le chapitre 5.3 fait respecter
+
+*(PR `chore/recette-web-5-3`, 11/09/2026 — cahier 01-WEB chapitre 5.3, WEB-CNX-1 à 13.)*
+
+## Le besoin
+
+Un membre se connecte, choisit ou non de rester connecté, voit ses appareils, en déconnecte,
+et confirme ses gestes sensibles par un code. Le tout sans jamais révéler si un compte existe,
+sans perdre sa page quand la session expire, et sans qu'un compte suspendu puisse entrer.
+
+## Les règles
+
+**RG-WEB-54 — Le même refus, que le compte existe ou non.** Un mauvais mot de passe et une
+adresse inconnue donnent le même statut (401) et le même message, au corps près (temps constant).
+
+**RG-WEB-55 — Deux profils de session.** Sans « Rester connecté » : déconnexion après 60 minutes
+sans activité (cookie de session). Avec : 7 jours d'inactivité, 30 jours de vie absolue (cookie
+persistant). La case est **décochée** par défaut.
+
+**RG-WEB-56 — La session expirée se rouvre sur place.** Quand la session meurt pendant qu'une
+page est ouverte, une fenêtre de reconnexion se pose PAR-DESSUS ; après reconnexion, la page
+reprend là où elle était. Jamais d'écran d'erreur ni de renvoi brutal.
+
+**RG-WEB-57 — Les appareils se listent et se déconnectent.** La rubrique Sécurité liste chaque
+session (navigateur + système, dernière activité, IP, « cet appareil »), permet d'en déconnecter
+une (message de confirmation) ou toutes les autres ; la session déconnectée meurt à sa prochaine
+action.
+
+**RG-WEB-58 — Un geste sensible passe par une porte, et un code ouvre une fenêtre de 15 minutes.**
+Changer le mot de passe, l'adresse, exporter ou effacer ses données répond 403 `SUDO_REQUIRED` ;
+un code envoyé par email ouvre une fenêtre de 15 minutes, **liée à l'appareil**, qui couvre les
+gestes suivants sans nouveau code — sauf le changement de mot de passe (ou d'adresse), qui la
+referme.
+
+**RG-WEB-59 — Un compte suspendu ne se connecte plus.** La connexion est refusée
+(« Ton compte est suspendu… »), les sessions vivantes sont révoquées, et un email l'explique.
+
+**RG-WEB-60 — (dette) La connexion par mot de passe doit avoir un verrou anti-force-brute.**
+*(ANO-WEB-19, ouverte : à ce jour aucun verrou par compte ; décision et PR dédiées.)*
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| 68 | Écran de connexion | mentions, champs, « Afficher le mot de passe », « Oublié ? », case décochée + aide, Google/Facebook, « Inscris-toi » | oui |
+| 69 | Mauvais mot de passe / adresse inconnue | même 401, même corps, aucun cookie | oui |
+| 70 | Connexion standard | en-tête membre, prénom, cookies ; refresh = cookie de session | oui |
+| 71 | Douze mauvais essais | un verrou (429) | **non — ANO-WEB-19** |
+| 72 | Cookies supprimés + action serveur | « Ta session a expiré » sur place, formulaire dans la fenêtre, reprise | oui |
+| 73 | « Rester connecté » | cookie persistant (≈ 30 j), « connexion mémorisée » sur la session | oui |
+| 74 | Appareils connectés | navigateur+système, activité, IP, « cet appareil » | oui |
+| 75 | Déconnecter un appareil / tous les autres | message, ligne(s) disparue(s), B perd sa session | oui |
+| 76 | Geste sensible | 403 SUDO_REQUIRED, porte, code, geste rejoué | oui |
+| 77 | Second geste dans les 15 min | aucun nouveau code | oui (fenêtre dédiée, cf. écart) |
+| 78 | Fenêtre sudo depuis un autre appareil | code redemandé | oui |
+| 79 | Compte suspendu | refus, sessions révoquées, email | oui |
+
+---
+
+# Mot de passe et adresse email — ce que le chapitre 5.4 fait respecter
+
+*(PR `chore/recette-web-5-4`, 11/09/2026 — cahier 01-WEB chapitre 5.4, WEB-MDP-1 à 6.)*
+
+## Le besoin
+
+Un visiteur qui a oublié son mot de passe le réinitialise par un code, sans qu'on lui dise si son
+compte existe. Un membre change son mot de passe et son adresse email en confirmant son identité,
+et ces gestes ferment ses autres sessions.
+
+## Les règles
+
+**RG-WEB-61 — « Mot de passe oublié » ne révèle rien.** La réponse est la même pour une adresse
+connue et une adresse inconnue ; aucun email ne part pour une adresse inconnue.
+
+**RG-WEB-62 — La réinitialisation passe par un code de 10 minutes.** Le code arrive par email,
+les règles de force du mot de passe s'appliquent, et l'ancien mot de passe cesse de fonctionner.
+
+**RG-WEB-63 — Un nouveau mot de passe doit différer de l'actuel.** Le changement est refusé sinon
+(`PASSWORD_SAME_AS_CURRENT`).
+
+**RG-WEB-64 — Changer son mot de passe ferme les autres sessions.** Un email de confirmation
+part ; toutes les autres sessions tombent ; la session courante reste.
+
+**RG-WEB-65 — Le code de changement d'adresse va sur la NOUVELLE adresse.** Une adresse déjà prise
+est refusée avant tout envoi ; l'adresse du compte ne change qu'après confirmation du code reçu
+sur la nouvelle adresse.
+
+**RG-WEB-66 — L'ancienne adresse est informée, jamais sollicitée.** Après le changement, l'ancienne
+reçoit une information « …a changé » sans lien ni code ; les autres sessions tombent ; la connexion
+se fait avec la nouvelle adresse.
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| 80 | Oublié : adresse inconnue | écran avance, aucun email | oui |
+| 81 | Réinitialisation | code 10 min, règles de force, nouveau OK / ancien KO | oui |
+| 82 | « Retour à la connexion » | retour à /login | oui |
+| 83 | Changer le mot de passe : identique | refus PASSWORD_SAME_AS_CURRENT | oui |
+| 84 | Changer le mot de passe : valide | email, autres sessions fermées, courante ouverte | oui |
+| 85 | Changer l'adresse : prise / libre | refus EMAIL_ALREADY_USED ; code sur la nouvelle ; compte inchangé | oui |
+| 86 | Confirmer l'adresse | adresse changée, ancienne informée sans code, autres sessions fermées, connexion sur la nouvelle | oui |
