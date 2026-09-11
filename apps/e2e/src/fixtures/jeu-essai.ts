@@ -138,4 +138,32 @@ export class JeuEssai {
       timeout: 60_000,
     });
   }
+
+  /**
+   * Ce que la base sait d'un compte (`inspect-user.ts`) — pour prouver ce que l'écran ne montre
+   * pas : la langue enregistrée, le journal des consentements, l'absence de mot de passe d'un
+   * compte Google. Lecture seule, jamais d'empreinte.
+   */
+  inspecterCompte(email: string): CompteInspecte {
+    const sortie = execFileSync("npx", ["tsx", "--env-file=.env", "packages/libs/prisma/scripts/inspect-user.ts", email], {
+      cwd: RACINE,
+      encoding: "utf-8",
+      timeout: 60_000,
+    });
+    const ligne = sortie.trim().split("\n").pop() ?? "{}";
+    return JSON.parse(ligne) as CompteInspecte;
+  }
+}
+
+/** La sortie de `inspect-user.ts`. */
+export interface CompteInspecte {
+  found: boolean;
+  id?: string;
+  firstName?: string;
+  lastName?: string;
+  preferredLocale?: string;
+  hasPassword?: boolean;
+  createdAt?: string;
+  consents?: Array<{ type: string; version: string; acceptedAt: string; locale: string | null; hasIp: boolean; hasUserAgent: boolean }>;
+  identities?: Array<{ provider: string; email: string | null; createdAt: string }>;
 }

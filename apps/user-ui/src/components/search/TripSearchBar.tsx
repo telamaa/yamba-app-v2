@@ -42,13 +42,20 @@ type Props = {
 
 type FocusedField = "from" | "to" | "date" | null;
 
-const initialSearchDraft: TripSearchValue = {
+/**
+ * Le brouillon de recherche vit en `sessionStorage` sous UNE clé, partagée entre la barre
+ * (accueil, page de résultats) et la page de résultats elle-même : ce que le visiteur a saisi
+ * sur l'accueil est ce que `/search` interroge en arrivant (recette 01-WEB 5.1, WEB-ACC-9).
+ */
+export const TRIP_SEARCH_STORAGE_KEY = "trip-search";
+
+export const initialSearchDraft: TripSearchValue = {
   from: "",
   to: "",
   dateValue: null,
 };
 
-const SEARCH_VERSION = 2;
+export const SEARCH_VERSION = 2;
 const SCROLL_THRESHOLD = 120;
 const HEADER_HEIGHT = 78;
 
@@ -68,7 +75,7 @@ export default function TripSearchBar({
   const locale = useLocale();
 
   const [draft, setDraft] = usePersistedFormState<TripSearchValue>(
-    "trip-search",
+    TRIP_SEARCH_STORAGE_KEY,
     initialSearchDraft,
     { version: SEARCH_VERSION }
   );
