@@ -173,7 +173,7 @@ test.describe("WEB-RCH — recherche, filtres, tri, état vide (chapitre 5.9)", 
     expect(item?.pricePerKg).toBe(11.5);
     if (!item?.viewsCount) expect(texte).not.toMatch(/\bvues?\b/);
     // Le cœur de mise en favori (bouton dans la carte).
-    await expect(laCarte.locator("xpath=..").getByRole("button", { name: /favori/i }).filter({ visible: true }).first()).toBeVisible();
+    await expect(laCarte.getByRole("button", { name: "Ajouter aux favoris" }).filter({ visible: true }).first()).toBeVisible();
     // La mention du plancher, dans le panneau des filtres.
     await expect(page.getByText(/Colis léger \(enveloppe, passeport, lunettes…\) : 8 € minimum\./)).toBeVisible();
   });
