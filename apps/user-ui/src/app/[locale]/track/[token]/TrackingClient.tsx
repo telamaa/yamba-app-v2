@@ -111,7 +111,7 @@ function Acquisition() {
       <p className="mt-1 text-[13px] text-slate-700 dark:text-slate-300">{t("text")}</p>
       <div className="mt-3 flex flex-wrap gap-2">
         <Link href="/search" className="rounded-full bg-[#FF9900] px-4 py-2 text-[13px] font-bold text-slate-950">{t("send")}</Link>
-        <Link href="/become/carrier" className="rounded-full border border-slate-300 bg-white px-4 py-2 text-[13px] font-semibold text-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-white">{t("carry")}</Link>
+        <Link href="/carrier/onboarding" className="rounded-full border border-slate-300 bg-white px-4 py-2 text-[13px] font-semibold text-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-white">{t("carry")}</Link>
       </div>
     </section>
   );

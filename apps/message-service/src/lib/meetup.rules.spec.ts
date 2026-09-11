@@ -18,13 +18,20 @@ describe("meetup.rules (chantier F, D61 1A)", () => {
     expect(canAcceptMeetup({ status: "ACCEPTED", proposedByRole: "SHIPPER" }, "CARRIER").reason).toBe("NOT_PROPOSED");
   });
   it("le rendez-vous qui compte : le prochain accepté, sinon la dernière proposition", () => {
-    const accepted = { status: "ACCEPTED", startAt: h(5), createdAt: h(-10) };
-    const acceptedPast = { status: "ACCEPTED", startAt: h(-5), createdAt: h(-20) };
+    const accepted = { status: "ACCEPTED", startAt: h(5), createdAt: h(-10), acceptedAt: h(-2) };
+    const acceptedPast = { status: "ACCEPTED", startAt: h(-5), createdAt: h(-20), acceptedAt: h(-19) };
     const proposedOld = { status: "PROPOSED", startAt: h(8), createdAt: h(-3) };
-    const proposedNew = { status: "PROPOSED", startAt: h(9), createdAt: h(-1) };
-    expect(nextMeetupOf([acceptedPast, proposedOld, accepted, proposedNew], NOW)).toBe(accepted);
-    expect(nextMeetupOf([acceptedPast, proposedOld, proposedNew], NOW)).toBe(proposedNew);
+    expect(nextMeetupOf([acceptedPast, proposedOld, accepted], NOW)).toBe(accepted); // une proposition antérieure à l'acceptation ne prime pas
+    expect(nextMeetupOf([acceptedPast, proposedOld], NOW)).toBe(proposedOld);
     expect(nextMeetupOf([acceptedPast], NOW)).toBeNull();
     expect(nextMeetupOf([], NOW)).toBeNull();
+  });
+  it("ANO-WEB-47 : une proposition plus récente que l'acceptation est une re-proposition, elle prime (pour être acceptée)", () => {
+    const accepted = { status: "ACCEPTED", startAt: h(5), createdAt: h(-10), acceptedAt: h(-2) };
+    const proposedNew = { status: "PROPOSED", startAt: h(9), createdAt: h(-1) };
+    expect(nextMeetupOf([accepted, proposedNew], NOW)).toBe(proposedNew);
+    // Sans `acceptedAt` (anciens documents), la date de création de l'accepté fait foi.
+    const acceptedLegacy = { status: "ACCEPTED", startAt: h(5), createdAt: h(-10) };
+    expect(nextMeetupOf([acceptedLegacy, proposedNew], NOW)).toBe(proposedNew);
   });
 });

@@ -84,6 +84,12 @@ export default function PickupConfirmCard({
           <Check size={15} strokeWidth={3} aria-hidden="true" />
           {isSubmitting ? t("final.submitting") : t("final.confirm")}
         </button>
+        {/* ANO-WEB-51 (recette 5.16) : un bouton inactif dit ce qui manque — les textes existaient, personne ne les rendait. */}
+        {!canConfirm && !isSubmitting && (
+          <p className="text-center text-[12px] text-amber-700 dark:text-amber-400" role="status">
+            {!checklistDone ? t("validation.checklistIncomplete") : t("validation.photoMissing")}
+          </p>
+        )}
         <button
           type="button"
           onClick={onRefuseAction}
