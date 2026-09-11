@@ -190,6 +190,7 @@ export function getDashboardCopy(isFr: boolean) {
       sessionsSub: isFr ? "Les appareils connectés à ton compte ; déconnecte ceux que tu ne reconnais pas." : "The devices signed in to your account; sign out the ones you don't recognise.",
       revokeOthers: isFr ? "Déconnecter les autres appareils" : "Sign out other devices",
       sessionsRevoked: isFr ? "{n} appareil(s) déconnecté(s)." : "{n} device(s) signed out.",
+      sessionRevoked: isFr ? "Appareil déconnecté." : "Device signed out.",
       thisDevice: isFr ? "cet appareil" : "this device",
       lastActivity: isFr ? "Dernière activité" : "Last activity",
       remembered: isFr ? "connexion mémorisée" : "remembered sign-in",

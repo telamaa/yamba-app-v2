@@ -247,7 +247,8 @@ export default function CityAutocomplete({
           if (!autoSelectIfPrefilled || hasInteractedRef.current) {
             setOpen(top.length > 0);
           }
-        } catch {
+        } catch (err) {
+          console.warn("[CityAutocomplete] suggestions indisponibles :", err);
           if (!alive) return;
           setItems([]);
           setOpen(false);
