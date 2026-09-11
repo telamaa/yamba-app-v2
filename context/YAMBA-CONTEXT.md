@@ -610,6 +610,22 @@ Ordre de demarrage : auth -> trip -> gateway.
   desktop du visiteur sans « Creer un compte » ni « Rechercher un trajet ». Piege de poste : la cle
   Google Maps n'accepte que `localhost` comme referent. Harnais : 32 scenarios verts. PR **#265**
   (empilee sur #264). Reste : 5.2 a 5.32, 02-ADMIN.
+- 11/09 : **CHAPITRE 5.10 DU CAHIER 01-WEB — WEB-ALR, ALERTES DE ROUTE (branche `chore/recette-web-5-10`,
+  empilee sur #274)** — 9 fiches, 9 jouees CONFORMES (1 apres correction), 9 scenarios en serie, 1 min 45
+  (`apps/e2e/src/chapitres/web-alr.spec.ts`). Ecran eprouve sans Google (panneau, periodes, bascules,
+  bouton desactive, cartes, prolonger, supprimer, plafond, banniere) ; alertes creees par l'API avec le
+  contrat du formulaire ; EFFET prouve par Mailpit : email FR a Aminata a la publication de Josephine,
+  jamais au Voyageur lui-meme, jamais deux fois en 24 h, villes proches < 50 km selon l'option (Orly ≈ 15 km
+  oui / non, Lille ≈ 204 km jamais, coordonnees consignees), 21e alerte refusee (ROUTE_ALERT_LIMIT).
+  Une anomalie MINEURE corrigee : ANO-WEB-29 (toast « Alerte supprimee » jamais affiche — suppression
+  optimiste, carte demontee avant la reponse, callbacks `mutate` perdus ; retours passes au niveau du hook
+  `useDeleteSavedRoute({ onSuccess, onError })`). A trancher : « Prolonger » seulement sous 7 jours,
+  « Selectionne les deux villes » inatteignable (bouton desactive), l'email d'alerte VOUVOIE (gabarit
+  `trip-published.ejs` anterieur au tutoiement), message du plafond en anglais. Regard d'expert par fiche
+  (dispatch sans outbox → a passer par l'outbox ; anti-spam par alerte et non par membre ; rayon et
+  plafond en reglages D62). Nouvelle page-objet `pages/recherche.ts` (brouillon sessionStorage) partagee
+  5.9 / 5.10. Harnais : 119 scenarios. PR **#275** (empilee sur #274). Reste : 5.11 a 5.32, 02-ADMIN.
+  AUCUNE attribution Claude.
 - 11/09 : **CHAPITRE 5.9 DU CAHIER 01-WEB — WEB-RCH, RECHERCHE / FILTRES / TRI / ETAT VIDE (branche
   `chore/recette-web-5-9`, empilee sur #273)** — 15 fiches, 15 jouees CONFORMES (3 apres correction), 16
   scenarios en 2 min 06 (`apps/e2e/src/chapitres/web-rch.spec.ts`) ; recherches posees par le brouillon

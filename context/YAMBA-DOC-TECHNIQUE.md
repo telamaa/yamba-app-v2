@@ -4908,3 +4908,82 @@ le piège en posant `carrierPageId` sur l'image de test.
 Plateforme inchangée (993 + auth 229). `apps/e2e` : **110 scénarios** (`playwright --list` ;
 94 + WEB-RCH ×16, dont 1 `test.fail`). Typecheck harnais vert ; `next.config.js` est du
 JavaScript (aucun typecheck), le front redémarré le sert.
+
+
+---
+
+# Chapitre 5.10 du cahier 01-WEB : alertes de route — l'effet d'une alerte prouvé par l'email, et le toast qu'un composant démonté ne peut plus afficher
+
+*(PR `chore/recette-web-5-10` (#275), 11/09/2026.)*
+
+## Ce qui a été fait
+
+Le dixième chapitre « fiches » du cahier 01-WEB : `WEB-ALR` (création, gestion et EFFET des
+alertes de route). Neuf fiches, neuf jouées et conformes, une après correction (`ANO-WEB-29`).
+
+```
+apps/e2e/src/chapitres/web-alr.spec.ts                 NOUVEAU — 9 scénarios en série, 1 min 45
+apps/e2e/src/pages/recherche.ts                        NOUVEAU — « poser la recherche » (brouillon sessionStorage), partagé 5.9 / 5.10
+apps/e2e/src/chapitres/web-rch.spec.ts                 importe la page-objet au lieu de ses aides locales
+apps/user-ui/src/hooks/useSavedRouteMutations.ts       ANO-WEB-29 — `useDeleteSavedRoute({ onSuccess, onError })` : retours au niveau du hook
+apps/user-ui/src/components/saved-routes/SavedRouteCard.tsx   les toasts de suppression passent par le hook
+context/YAMBA-RECETTE-WEB-RESULTATS.md                 chapitre 5.10, ANO-WEB-29, à trancher, regard d'expert
+```
+
+## Prouver l'EFFET, pas seulement l'écran
+
+Une alerte de route n'a de valeur que par l'email qu'elle déclenche. Le chapitre est donc bâti
+autour de Mailpit : Aminata porte les alertes, Joséphine publie les trajets (par l'API du
+trip-service, `publish: true`, coordonnées comprises), et chaque fiche dit ce que la boîte doit
+contenir — ou ne pas contenir (`mailpit.aucunEmailPour(adresse, 10 s)` après un `vider()`).
+
+Trois règles du serveur sont ainsi éprouvées telles qu'elles sont codées :
+
+- **l'exclusion du Voyageur** — `baseWhere.userId = { not: trip.userId }` dans
+  `dispatchTripPublishedNotifications` : Joséphine porte la même alerte que Aminata et ne reçoit
+  rien ;
+- **l'anti-spam de 24 h** — `lastNotifiedAt` filtré en JS (`NOTIFICATION_COOLDOWN_HOURS = 24`) :
+  un second trajet dans la foulée ne produit aucun email ;
+- **l'appariement à trois niveaux** (`saved-route-matching.helper.ts`) — placeId exact (100),
+  ville + pays exacts (100), pays + haversine < 50 km (70, seulement si `includeNearby`) : Orly
+  (≈ 15 km de Paris) ne déclenche rien sans l'option et déclenche avec ; Lille (≈ 204 km) jamais.
+  Subtilité : le niveau 3 exige des coordonnées valides des DEUX côtés (alerte ET trajet), donc
+  les corps d'API portent `originLat/Lng` et `destinationLat/Lng` — le seed n'en a pas.
+
+Pour que l'anti-spam d'Aminata ne masque pas le troisième cas, Lille est testée sur une alerte
+NEUVE (Pauline) : isoler la règle qu'on veut prouver de celle qui pourrait la cacher.
+
+## Le formulaire sans Google
+
+`CreateSavedRouteModal` choisit ses villes par `CityAutocomplete` (Google Places). Le harnais
+éprouve le panneau (titres, quatre périodes dont « Personnalisé » qui révèle deux dates, deux
+bascules `role="switch"` cochées avec leurs aides), le refus sans ville (le bouton « Créer
+l'alerte » est `disabled` : aucune requête, même en forçant le clic), puis ferme le panneau et
+crée l'alerte par `POST /saved-routes` avec exactement le corps que le formulaire enverrait
+(`corpsAlerte()` : villes, pays ISO, coordonnées, `latestDate` = J+90 pour « 3 mois »,
+`emailEnabled`, `includeNearby`). La carte, ses badges et le compteur sont ensuite lus à l'écran.
+
+## ANO-WEB-29 : un callback qui meurt avec son composant
+
+« Supprimer » puis « Confirmer » retirait la carte et décrémentait le compteur, mais le toast
+« Alerte supprimée » ne venait jamais (deux exécutions). La cause est dans TanStack Query :
+
+```ts
+// SavedRouteCard — AVANT
+deleteSavedRoute(savedRoute.id, { onSuccess: () => toast.success(t("deleteSuccess")) });
+// useDeleteSavedRoute — la suppression est OPTIMISTE
+onMutate: (id) => queryClient.setQueryData(["saved-routes", …], previous.filter((r) => r.id !== id)),
+```
+
+`onMutate` retire la carte de la liste avant la réponse → `SavedRouteCard` est démonté → son
+observateur de mutation est détaché → les callbacks passés à `mutate(...)` (portés par
+l'observateur) ne sont jamais appelés. Les callbacks déclarés dans `useMutation({ onSuccess })`,
+eux, sont portés par la mutation et survivent au démontage. Correctif : le hook accepte ses
+retours (`useDeleteSavedRoute({ onSuccess, onError })`) et les appelle depuis ses options ; la
+carte lui passe ses toasts et appelle `deleteSavedRoute(id)` nu. « Prolonger » et « Email
+activé » ne démontent pas la carte : leurs callbacks `mutate` restent valables.
+
+## Tests
+
+Plateforme inchangée (993 + auth 229). `apps/e2e` : **119 scénarios** (`playwright --list` ;
+110 + WEB-ALR ×9). Typecheck user-ui et harnais verts.

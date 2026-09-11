@@ -3270,3 +3270,61 @@ poser son avatar** (ANO-WEB-28, ouverte).
 | 145 | Compte suspendu | trajet absent, intact en base | oui |
 | 146 | Avatar distant | la page tient | oui (ANO-WEB-27 close) |
 | 147 | Second avatar | 200 | **non** — 500 P2002 (ANO-WEB-28 ouverte, `test.fail`) |
+
+
+---
+
+# Alertes de route — ce que le chapitre 5.10 fait respecter
+
+*(PR `chore/recette-web-5-10` (#275), 11/09/2026 — cahier 01-WEB chapitre 5.10, WEB-ALR-1 à 9.)*
+
+## Le besoin
+
+Un Expéditeur qui ne trouve pas son trajet aujourd'hui veut être prévenu le jour où un Voyageur
+le publie : il pose une alerte (corridor, période, email, villes proches), et Yamba lui écrit dès
+qu'un trajet correspond — sans le harceler, sans prévenir le Voyageur de sa propre publication.
+
+## Les règles
+
+**RG-WEB-118 — Une alerte = un corridor, une période, deux options.** Départ et arrivée
+différents, période « 3 mois » (recommandée), « 6 mois », « Sans limite » ou personnalisée ;
+« Recevoir un email » et « Inclure les trajets proches » actives par défaut.
+
+**RG-WEB-119 — Une alerte incomplète ou en double est refusée.** Sans les deux villes, rien ne
+part ; même ville → refus ; même corridor déjà actif → refus.
+
+**RG-WEB-120 — Une publication qui correspond déclenche UN email, dans la langue du membre.**
+« Nouveau trajet {départ} → {arrivée} », lien vers le trajet ; la période de l'alerte borne le
+départ du trajet.
+
+**RG-WEB-121 — Jamais au Voyageur lui-même.** Une alerte portée par l'auteur du trajet ne le
+notifie pas.
+
+**RG-WEB-122 — Jamais deux fois en 24 heures** pour une même alerte.
+
+**RG-WEB-123 — Les villes proches (< 50 km, même pays) ne comptent que si l'option est activée ;
+au-delà de 50 km, jamais.** Le niveau exact (place ou ville + pays) compte toujours.
+
+**RG-WEB-124 — Une alerte se prolonge de 6 mois et se supprime en deux gestes.** « Prolonger »
+proposé quand elle expire sous 7 jours ; « Supprimer » puis « Confirmer » ; chaque geste est
+confirmé par un message et le compteur suit.
+
+**RG-WEB-125 — Au plus 20 alertes actives par membre.** La 21ᵉ est refusée avec le plafond
+nommé.
+
+**RG-WEB-126 — La recherche propose l'alerte.** Bloc « Créer une alerte » sans résultat, bannière
+« Reste informé·e des futurs trajets » en fin de liste.
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| 148 | Écran vide | titres, état vide, « Créer ma première alerte » | oui |
+| 149 | Créer une alerte | panneau, périodes, bascules, carte avec badges | oui (villes par l'API) |
+| 150 | Refus | sans villes, même ville, doublon | oui |
+| 151 | Publication correspondante | email FR à l'Expéditrice, rien au Voyageur | oui |
+| 152 | Second trajet sous 24 h | aucun email | oui |
+| 153 | Trajets proches | rien sans l'option, email avec, jamais au-delà de 50 km | oui |
+| 154 | Prolonger / supprimer | +6 mois, suppression confirmée, compteur | oui (ANO-WEB-29 close) |
+| 155 | Plafond | 21ᵉ refusée, plafond nommé | oui |
+| 156 | Bannière de recherche | en fin de liste | oui |
