@@ -727,6 +727,54 @@ le seed n'est pas rejoué entre les chapitres.
 
 ---
 
+## Chapitre 5.6 — Devenir Voyageur : onboarding et Stripe · **CONFORME** (7 fiches : 4 jouées, 3 ⏭ · aucune anomalie)
+
+Tout se joue sur un compte NEUF (l'onboarding transforme un compte en Voyageur, et la partie Stripe
+crée un compte Express de TEST) — jamais le seed, dont les Voyageurs portent un `acct_fake_*`
+factice. Clé Stripe du poste : `sk_test_`, Connect Express **réel** en mode test.
+
+| Fiche | Ce qui est éprouvé | Verdict | Preuve |
+|---|---|---|---|
+| WEB-VOY-1 | L'entrée « Devenir Voyageur » | **Conforme** — le menu mène à la section « Devenir Voyageur » du tableau de bord, dont l'appel à l'action ouvre le wizard `/carrier/onboarding` : deux étapes « Votre profil » (active) et « Paiement » |
+| WEB-VOY-2 | L'étape « Profil » | **Conforme** — champs nom d'affichage et présentation ; un téléphone mal formé (« 12 ») est refusé sous le champ (« Numéro de téléphone invalide »). Le passage effectif se fait par l'API (l'adresse principale passe par l'autocomplétion Google et le téléphone par un composant à sélecteur de pays, hors périmètre ; le contrat serveur `POST /carrier/onboarding/profile` est vérifié) ; le badge du menu devient « Profil à compléter » |
+| WEB-VOY-3 | Publier reste possible sans onboarding complet | **Conforme** — profil fait, Stripe non : `POST /trips` (publish) répond 201 et le trajet est **PUBLISHED**. Le verrou est au moment d'accepter, pas de publier (la doc `DOC-METIER-TRIP-LIFECYCLE.md` RG-01 disait le contraire ; le code fait foi, divergence déjà tranchée) |
+| WEB-VOY-4 | « Configurer Stripe » | **Conforme** — l'étape Paiement porte « Connecter avec Stripe » et **aucun champ IBAN** dans un formulaire Yamba ; le clic crée un **vrai lien Connect** et redirige vers `connect.stripe.com` (le RIB et l'identité se saisissent chez Stripe) |
+| WEB-VOY-5 | Retour de Stripe : profil actif | **⏭** — compléter un compte Connect **Express** exige le flux HÉBERGÉ de Stripe : la plateforme ne peut pas soumettre les conditions/justificatifs par l'API (« You cannot accept the Terms of Service on behalf of Express accounts » — vérifié). Le flux hébergé est externe, lent (~7 min) et instable : hors périmètre du harnais. Manuel en mode test (voir ci-dessous) |
+| WEB-VOY-6 | Accepter sans onboarding complet est refusé | **⏭** — nécessite une demande de réservation en attente sur le trajet d'un Voyageur non finalisé (parcours de réservation, chapitre 5.12). Le verrou **D31** est vérifié côté serveur : `deal-lifecycle.service.ts` refuse l'accept avec `CARRIER_ONBOARDING_REQUIRED`, couvert par `deal-lifecycle.service.spec.ts` |
+| WEB-VOY-7 | « Voir mes virements sur Stripe » | **⏭** — la branche « tableau de bord » exige un compte Stripe COMPLET (`createLoginLink`) ; la branche « compte non finalisé » n'est pas reproductible sur un profil seul (le Portefeuille y affiche « Devenir Voyageur », pas le bouton « Voir mes virements »). Manuel |
+
+### À trancher (produit)
+
+- Aucun écart de produit : le comportement suit le cahier (et confirme que publier n'exige pas
+  Stripe — la divergence documentaire RG-01 est tranchée en faveur du code).
+
+### Automatisation Stripe — ce qui est couvert, ce qui ne l'est pas
+
+- **Couvert automatiquement (côté Yamba)** : la création d'un **vrai** compte Stripe Express de
+  test et de son lien Connect, la redirection vers `connect.stripe.com`, et l'absence de tout
+  formulaire IBAN chez Yamba (WEB-VOY-4).
+- **Non automatisé (côté Stripe)** : la complétion de l'onboarding Express. Stripe l'impose par
+  son flux hébergé (la plateforme ne peut ni accepter les CGU ni soumettre les justificatifs par
+  l'API pour un compte Express — erreur vérifiée). Le flux hébergé change souvent et prend
+  plusieurs minutes : l'inclure rendrait la recette lente et instable. **Procédure manuelle
+  (mode test)** : depuis l'étape Paiement, « Connecter avec Stripe », compléter avec un numéro de
+  test et les données de test proposées par Stripe, revenir sur
+  `/carrier/onboarding/stripe/callback` → « Voyageur actif » + email « Ton profil Voyageur est
+  actif » ; puis Finances › Portefeuille › « Voir mes virements sur Stripe » → porte sudo →
+  tableau de bord Stripe Express (nouvel onglet).
+
+### Pièges de poste payés ici
+
+- **Le seed pose des `acct_fake_*`** : toute fiche qui appelle une vraie API Stripe sur un
+  Voyageur du seed échoue. La partie Stripe se joue sur un compte neuf qui crée un vrai compte
+  Express de test.
+- **L'entrée « Devenir Voyageur » du menu** mène à `/dashboard/yamber` (récapitulatif), pas
+  directement au wizard : c'est l'appel à l'action de cette section qui ouvre `/carrier/onboarding`.
+- **Le champ téléphone du wizard** n'a pas de libellé associé accessible : le viser par
+  `input[type="tel"]`.
+
+---
+
 ## Chapitre 5.12 — Réserver : l'assistant en quatre étapes
 
 | Fiche | Ce qui est éprouvé | Verdict | Preuve |

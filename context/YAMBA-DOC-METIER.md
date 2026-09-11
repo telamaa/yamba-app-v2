@@ -2985,3 +2985,49 @@ sans toucher au reste.
 | 94 | Adresse stable | `/u/slug` répond après un changement ; identité « Prénom N. » | oui (écart : nom affiché non montré) |
 | 95 | Masquer la page | 404 visiteur, bannière propriétaire, trajet visible | oui |
 | 96 | Afficher / masquer la ville | apparaît puis disparaît | ⏭ (seed sans ville) |
+
+---
+
+# Devenir Voyageur : onboarding et Stripe — ce que le chapitre 5.6 fait respecter
+
+*(PR `chore/recette-web-5-6`, 11/09/2026 — cahier 01-WEB chapitre 5.6, WEB-VOY-1 à 7.)*
+
+## Le besoin
+
+Un membre devient Voyageur en deux étapes : son profil (nom affiché, présentation, téléphone,
+adresse), puis la connexion de son compte de paiement via Stripe. Il peut publier des trajets dès
+le profil fait ; l'argent n'est exigé qu'au moment d'accepter un deal.
+
+## Les règles
+
+**RG-WEB-75 — L'onboarding a deux étapes nommées.** « Votre profil » puis « Paiement » ; la
+seconde ne s'ouvre qu'après la première.
+
+**RG-WEB-76 — Le téléphone est contrôlé.** Un numéro mal formé est refusé sous le champ ; le
+profil enregistré fait passer le badge du menu à « Profil à compléter ».
+
+**RG-WEB-77 — Publier n'exige pas Stripe.** Un Voyageur au profil fait, sans Stripe, publie ses
+trajets. Le verrou profil+Stripe (D31) est au moment d'**accepter** une demande.
+
+**RG-WEB-78 — Le RIB se saisit chez Stripe, jamais chez Yamba.** L'étape Paiement mène à Stripe
+Connect (Express) ; aucun IBAN n'est demandé dans un formulaire Yamba.
+
+**RG-WEB-79 — Le retour de Stripe active le profil.** Une fois Stripe complété, le statut devient
+« Voyageur actif » et un email « Ton profil Voyageur est actif » part. *(Vérifié manuellement :
+la complétion Express passe par le flux hébergé de Stripe, non automatisable.)*
+
+**RG-WEB-80 — Accepter sans onboarding complet est refusé.** Le serveur répond
+`CARRIER_ONBOARDING_REQUIRED` ; rien n'est débité, la demande reste en attente. *(Verrou D31,
+testé unitairement ; recette de bout en bout avec le chapitre 5.12.)*
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| 97 | Entrée « Devenir Voyageur » | wizard, deux étapes, Profil active | oui |
+| 98 | Étape Profil | téléphone mal formé refusé ; badge « Profil à compléter » | oui |
+| 99 | Publier sans Stripe | trajet PUBLISHED | oui |
+| 100 | Étape Paiement | « Connecter avec Stripe », aucun IBAN, redirection stripe.com | oui |
+| 101 | Retour de Stripe | « Voyageur actif » + email | ⏭ manuel (Express hébergé) |
+| 102 | Accepter sans onboarding | refus, rien débité | ⏭ (5.12 ; D31 unit-testé) |
+| 103 | Voir mes virements sur Stripe | tableau de bord (nouvel onglet) / « Finalise d'abord » | ⏭ manuel |

@@ -9,7 +9,7 @@ tourne sur le poste, ce qui reste à faire, et les pièges déjà payés qu'il n
 > **2.** ~~monter la fixture de session administrateur~~ **FAIT** (`seed-admins.ts` + `navigateurAdmin`) ;
 > **3.** ~~finir WEB-E2E-1 en entier, ouvrir la PR~~ **FAIT — PR #259 mergée** ;
 > **4.** les cinq autres parcours du chapitre 6 : ~~E2E-2~~ **FAIT, #260 mergée**, ~~E2E-3~~ **FAIT, #261 mergée**, ~~E2E-4~~ **FAIT, PR #262** (17 checks verts, à merger), ~~E2E-5~~ **FAIT, PR #263** (empilée sur #262, ANO-WEB-10 close), ~~E2E-6~~ **FAIT, PR #264** (ANO-WEB-11 close) — **le chapitre 6 est clos** ;
-> **5.** les 32 chapitres du cahier **01-WEB** (326 fiches) — **5.1 FAIT** (branche `chore/recette-web-5-1`, 12 fiches conformes, ANO-WEB-12 à 17 closes, **PR #265** sur `dev`, empilée sur #264) ; **5.2 FAIT** (branche `chore/recette-web-5-2`, 16 fiches : 12 conformes + 4 ⏭ Google, ANO-WEB-18 close, **PR #266** empilée sur #265) ; **5.3 FAIT** (branche `chore/recette-web-5-3`, 13 fiches + ANO-WEB-01, ANO-WEB-19 majeure OUVERTE, ANO-WEB-20 mineure close, **PR #267** empilée sur #266) ; **5.4 FAIT** (branche `chore/recette-web-5-4`, 6 fiches, aucune anomalie, **PR #268** empilée sur #267) ; **5.5 FAIT** (branche `chore/recette-web-5-5`, 10 fiches : 8 jouees + 2 skip, ANO-WEB-21 close, **PR #269** empilee sur #268) ; suite : 5.6 -> 5.32 dans l'ordre du cahier ;
+> **5.** les 32 chapitres du cahier **01-WEB** (326 fiches) — **5.1 FAIT** (branche `chore/recette-web-5-1`, 12 fiches conformes, ANO-WEB-12 à 17 closes, **PR #265** sur `dev`, empilée sur #264) ; **5.2 FAIT** (branche `chore/recette-web-5-2`, 16 fiches : 12 conformes + 4 ⏭ Google, ANO-WEB-18 close, **PR #266** empilée sur #265) ; **5.3 FAIT** (branche `chore/recette-web-5-3`, 13 fiches + ANO-WEB-01, ANO-WEB-19 majeure OUVERTE, ANO-WEB-20 mineure close, **PR #267** empilée sur #266) ; **5.4 FAIT** (branche `chore/recette-web-5-4`, 6 fiches, aucune anomalie, **PR #268** empilée sur #267) ; **5.5 FAIT** (branche `chore/recette-web-5-5`, 10 fiches : 8 jouees + 2 skip, ANO-WEB-21 close, **PR #269** empilee sur #268) ; **5.6 FAIT** (branche `chore/recette-web-5-6`, 7 fiches : 4 jouees + 3 skip, aucune anomalie, **PR #270** empilee sur #269) ; suite : 5.7 -> 5.32 dans l'ordre du cahier ;
 > **6.** le cahier **02-ADMIN** (110 fiches) — 19 fiches de sécurité d'accès, 91 fiches d'écrans.
 >
 > **REPRISE DU 11/09/2026 — 5.3, 5.4 ET 5.5 CLOS.** Trois chapitres ajoutes le 11/09, chacun sa
@@ -18,10 +18,7 @@ tourne sur le poste, ce qui reste à faire, et les pièges déjà payés qu'il n
 > = mecanique OTP en PR dediee ; ANO-WEB-20 close), **5.4 WEB-MDP** (PR #268, 6 fiches, aucune
 > anomalie, comptes neufs jetables), **5.5 WEB-PRO** (PR #269, 8 fiches + 2 skip ; ANO-WEB-21
 > close = banniere « masquee » du proprietaire). Rapport, docs cumulatifs, CONTEXT, SUIVI
-> (harnais **72 scenarios**) a jour. **Prochaine etape : le chapitre 5.6 (`WEB-VOY`, devenir
-> Voyageur : onboarding et Stripe)** — attention Stripe : le provider FAKE de deal-service ne
-> couvre PAS l'onboarding Stripe Connect ; verifier ce qui est jouable sur le poste avant
-> d'ecrire. Puis 5.7 -> 5.32, puis 02-ADMIN. La pile se relance comme au § 2 (arreter les dix-sept
+> (harnais **76 scenarios**) a jour. **5.6 WEB-VOY CLOS** (PR #270 : 4 jouees + 3 skip, aucune anomalie ; Stripe : VOY-4 prouve le vrai lien Connect + redirection stripe.com ; completer un compte EXPRESS n'est pas automatisable, VOY-5/7 manuels — procedure au rapport). **Prochaine etape : le chapitre 5.7 (`WEB-TRJ`, publier un trajet et son cycle de vie)**. Puis 5.8 -> 5.32, puis 02-ADMIN. La pile se relance comme au § 2 (arreter les dix-sept
 > conteneurs des autres projets, ne garder que `yamba-redpanda` et `yamba-mailpit`). Comptes
 > `neuf-<horodatage>@recette.yamba.dev` laisses en base (piege 22). Nouveau `clear-sudo-locks.ts`
 > pour purger les verrous OTP sudo entre deux executions. Toujours AUCUNE attribution Claude.

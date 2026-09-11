@@ -4525,3 +4525,65 @@ la contre-épreuve « l'ancienne image répond introuvable ») restent `⏭`, jo
 Aucun test unitaire ajouté (un champ de type, une bannière, une clé i18n). `apps/e2e` : le chapitre
 5.5 porte le harnais à **72 scénarios** (62 + WEB-PRO ×10, dont 2 `⏭`). user-ui : typecheck vert,
 miroir i18n FR/EN respecté.
+
+---
+
+# Chapitre 5.6 du cahier 01-WEB : devenir Voyageur — onboarding, et les limites de Stripe Express
+
+*(PR `chore/recette-web-5-6`, 11/09/2026.)*
+
+## Ce qui a été fait
+
+Le sixième chapitre « fiches » du cahier 01-WEB : `WEB-VOY` (onboarding Voyageur en deux étapes,
+et ce qu'il conditionne). Sept fiches ; quatre jouées et conformes (`web-voy.spec.ts`), trois `⏭`
+motivées (complétion Stripe Express, refus d'accept, tableau de bord Stripe). Aucune anomalie.
+
+```
+apps/e2e/src/chapitres/web-voy.spec.ts   NOUVEAU — 4 fiches jouées + 3 ⏭ ; compte neuf créé+activé, profil via API,
+                                           trajet PER_KG publiable, redirection réelle vers connect.stripe.com
+context/YAMBA-RECETTE-WEB-RESULTATS.md   chapitre 5.6, automatisation Stripe (couvert / non couvert), pièges
+```
+
+## Ce que l'onboarding conditionne (et ce qu'il ne conditionne pas)
+
+Le résultat marquant du chapitre : **publier un trajet n'exige pas Stripe**. Un compte neuf qui a
+franchi la seule étape « Profil » (`POST /carrier/onboarding/profile` → `onboardingStep=STRIPE`)
+publie un trajet (`POST /trips` avec `publish:true` → `PUBLISHED`). Le verrou D31 (profil + Stripe
+prêts) est au moment d'**accepter** une demande, pas de publier — `createTrip` lit le `carrierPage`
+mais ne le gate pas. La vieille doc `RG-01` disait l'inverse ; le code fait foi.
+
+## La partie Stripe : jusqu'où on peut aller
+
+La clé du poste est `sk_test_` et le produit crée de **vrais** comptes Connect **Express** de test.
+Le harnais vérifie tout le côté Yamba : le clic « Connecter avec Stripe » crée le compte Express
+et son lien, redirige vers `connect.stripe.com`, et aucun IBAN n'est demandé dans un formulaire
+Yamba (WEB-VOY-4).
+
+Ce qu'on ne peut **pas** automatiser proprement : la complétion de l'onboarding Express. Deux
+tentatives ont tranché la question :
+1. **Par l'API** — impossible : pour un compte Express (`controller[requirement_collection]=stripe`),
+   la plateforme ne peut ni accepter les CGU ni soumettre les justificatifs
+   (« You cannot accept the Terms of Service on behalf of Express accounts », erreur vérifiée en
+   isolant un `accounts.update`). Stripe réserve cela à son flux hébergé.
+2. **Par le flux hébergé** — un pilotage heuristique de `connect.stripe.com` a été écrit et
+   essayé : il est lent (~7 min/exécution, vraie API Stripe) et se bloque à l'étape téléphone
+   (raccourci « numéro de test » puis « Envoyer » qui ne fait pas avancer de façon stable). Ces
+   pages changent souvent : les inclure rendrait la recette lente et fragile.
+
+**Décision d'ingénierie** : ne pas mettre le flux hébergé Stripe dans la suite. VOY-4 prouve le
+contrat Yamba ; VOY-5 (complétion → « Voyageur actif » + email) et la branche « tableau de bord »
+de VOY-7 sont documentées comme **manuelles en mode test**, avec la procédure exacte dans le
+rapport.
+
+## VOY-6 : un verrou déjà couvert au bon endroit
+
+Refuser l'acceptation d'un deal par un Voyageur non finalisé (D31) exige une demande de réservation
+en attente — le parcours de réservation du chapitre 5.12. Plutôt que de le reconstruire ici, on
+constate que la règle est **testée unitairement** : `deal-lifecycle.service.ts` répond
+`CARRIER_ONBOARDING_REQUIRED` (profil incomplet OU Stripe non prêt), couvert par
+`deal-lifecycle.service.spec.ts`. La fiche est `⏭`, à rejouer de bout en bout avec 5.12.
+
+## Tests
+
+Aucun test unitaire ajouté. `apps/e2e` : le chapitre 5.6 porte le harnais à **76 scénarios**
+(72 + WEB-VOY ×4, dont 3 `⏭`). Harnais : typecheck vert.

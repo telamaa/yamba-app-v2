@@ -610,6 +610,19 @@ Ordre de demarrage : auth -> trip -> gateway.
   desktop du visiteur sans « Creer un compte » ni « Rechercher un trajet ». Piege de poste : la cle
   Google Maps n'accepte que `localhost` comme referent. Harnais : 32 scenarios verts. PR **#265**
   (empilee sur #264). Reste : 5.2 a 5.32, 02-ADMIN.
+- 11/09 : **CHAPITRE 5.6 DU CAHIER 01-WEB — WEB-VOY, DEVENIR VOYAGEUR / ONBOARDING / STRIPE (branche
+  `chore/recette-web-5-6`, empilee sur #269)** — 7 fiches : 4 jouees CONFORMES, 3 skip motives, AUCUNE
+  anomalie (`apps/e2e/src/chapitres/web-voy.spec.ts`). Compte NEUF (l'onboarding transforme le compte ;
+  le seed porte des `acct_fake_*`). Couvre : entree « Devenir Voyageur » -> wizard 2 etapes ; etape
+  Profil (telephone mal forme refuse, badge « Profil a completer », passage par l'API) ; PUBLIER SANS
+  STRIPE (POST /trips publish -> PUBLISHED : le verrou D31 est a l'ACCEPT, pas au publish ; confirme la
+  divergence RG-01, code fait foi) ; etape Paiement (« Connecter avec Stripe », AUCUN IBAN Yamba, vrai
+  lien Connect Express test -> redirection connect.stripe.com). Skips : VOY-5 (completer un compte
+  EXPRESS impossible par l'API — « cannot accept ToS on behalf of Express » verifie — et flux heberge
+  Stripe lent/instable, procedure MANUELLE documentee), VOY-6 (demande en attente = parcours 5.12 ;
+  verrou D31 unit-teste `deal-lifecycle.service.spec.ts` `CARRIER_ONBOARDING_REQUIRED`), VOY-7 (dashboard
+  Stripe = compte complet requis). Harnais : 76 scenarios. PR **#270** (empilee sur #269). Reste : 5.7 a
+  5.32, 02-ADMIN. AUCUNE attribution Claude contributeur (Co-Authored-By) ni pied « Generated with Claude ».
 - 11/09 : **CHAPITRE 5.5 DU CAHIER 01-WEB — WEB-PRO, PROFIL / AVATAR / PAGE PUBLIQUE (branche
   `chore/recette-web-5-5`, empilee sur #268)** — 10 fiches : 8 jouees CONFORMES, 2 skip (avatar
   reel ImageKit ; « Afficher ma ville » que le seed ne peut alimenter). Une anomalie MINEURE
