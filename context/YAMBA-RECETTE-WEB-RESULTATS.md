@@ -198,7 +198,7 @@ Contre-épreuve : WEB-E2E-3 étape 4 — « Nouveau message » chez chacun des d
 
 ```
 ANO-WEB-07
-Fiche          : parcours WEB-E2E-3 étape 15 (chapitre 5.7, D72) · Gravité : MAJEURE · ÉTAT : OUVERTE (arbitrage)
+Fiche          : parcours WEB-E2E-3 étape 15 (chapitre 5.7, D72) · Gravité : MAJEURE · ÉTAT : TRANCHÉE le 09/09 — message corrigé (« Mes trajets »), annulation par le Voyageur = lot à part (registre)
 Attendu        : le refus d'annuler un trajet qui porte un deal vivant dit au Voyageur quoi faire.
 Obtenu         : « Ce trajet porte encore 2 deals en cours : annule-les d'abord depuis « Mes
                  deals ». Chaque Expéditeur sera remboursé intégralement. » — or **« Mes deals »
@@ -213,6 +213,69 @@ Proposition    : (1) tout de suite, le message renvoie vers « Mes trajets » (o
                  listés) ; (2) l'annulation d'un deal par le Voyageur (ANN-02 : remboursement
                  intégral, annulation à sa charge, réputation) — un lot à part, à graver au
                  registre. Décision attendue.
+```
+
+
+```
+ANO-WEB-08
+Fiche          : parcours WEB-E2E-4 étape 3 (chapitre 5.13, CNF-06 / D71) · Gravité : MAJEURE · ÉTAT : CLOSE
+Attendu        : un compte neuf qui déclare 450 € est refusé « AVANT tout paiement ».
+Obtenu         : l'assistant n'envoyait pas la valeur déclarée à la demande d'intention de
+                 paiement (`createPaymentIntent` postait les seuls champs du devis) : le plafond
+                 « valeur déclarée » n'était vérifié qu'à la création du deal, APRÈS le clic
+                 « Payer » — donc après l'autorisation bancaire avec Stripe. Les deux autres
+                 plafonds (poids, nombre par mois) tombaient bien à l'intention.
+Cause          : le contrat prévoit `declaredValueCents` sur l'intention depuis ANO-API-12
+                 (« l'assistant connaît cette valeur avant de payer : il l'envoie ») ; le front
+                 ne l'envoyait pas. Régression de l'anomalie de la campagne API.
+Correction     : `apps/user-ui/src/services/booking.api.ts` — l'intention part avec la valeur
+                 déclarée (même conversion que la création du deal, factorisée).
+Contre-épreuve : WEB-E2E-4 étape 3 — 450 € : refus dans la carte de l'étape 4 (409 à
+                 l'intention), aucune ligne Finances, aucun email ; étapes 5 et 8 inchangées.
+```
+
+```
+ANO-WEB-09
+Fiche          : parcours WEB-E2E-4 étape 10 (chapitre 5.30, RGPD D63 / sudo D65) · Gravité : MAJEURE · ÉTAT : CLOSE
+Attendu        : « Télécharger mes données » ouvre la porte par code, puis télécharge le JSON.
+Obtenu         : « Impossible pour le moment, réessaie. » — la porte ne s'ouvrait JAMAIS :
+                 l'export est inutilisable pour tout membre (le droit d'accès RGPD, en pratique).
+Cause          : l'export demande la réponse en `blob` ; le refus 403 `SUDO_REQUIRED` arrive lui
+                 aussi en blob, et `isSudoRequired` ne lisait pas le code dans un blob. Même
+                 sort pour le 429 « une fois par 24 h ».
+Correction     : `apps/user-ui/src/services/privacy.api.ts` — un corps d'erreur en blob est
+                 relu en JSON avant d'être relancé ; la porte s'ouvre, le code arrive par email,
+                 le fichier se télécharge.
+Contre-épreuve : WEB-E2E-4 étape 10 — porte, code « Ton code de confirmation Yamba », fichier
+                 `yamba-mes-donnees-….json` (format `yamba-data-export/1`, 5 réservations,
+                 aucune trace de score).
+```
+
+```
+ANO-WEB-10
+Fiche          : parcours WEB-E2E-5 étape 7 (chapitre 5.27, D29 ①, A40) · Gravité : MAJEURE · ÉTAT : CLOSE
+Attendu        : un refus au pickup n'ajoute AUCUNE annulation à la ligne de faits du Voyageur
+                 (« Refuser un colis non conforme ne pénalise jamais ta réputation. »).
+Obtenu         : la ligne de faits comptait comme « annulation tardive » TOUT deal CANCELLED
+                 clos par le Voyageur après acceptation — c'est-à-dire, aujourd'hui, chaque
+                 refus au pickup et rien d'autre (l'annulation ANN-02 par le Voyageur n'est pas
+                 encore ouverte, ANO-WEB-07). Le refus ne déclenchait pas de recalcul : la page
+                 restait juste, jusqu'au prochain fait de réputation (un deal terminé, un avis),
+                 où le refus surgissait comme une annulation fautive. Le parcours passait « pour
+                 rien » avant correction ; en base, l'ancien filtre comptait 1, le nouveau 0.
+Cause          : `reputation.service.ts` (`carrierFacts`) filtrait sur `status: CANCELLED,
+                 closedBy: CARRIER, acceptedAt ≠ null`, sans distinguer le refus au pickup —
+                 la raison du refus étant facultative, rien en base ne le marquait à coup sûr.
+                 La machine, elle, dit « sans pénalité » (effets de `refusePickup`, A40).
+Correction     : `prisma/schema.prisma` — `Booking.pickupRefusedAt` (marque du refus, posée par
+                 `refusePickup` avec `now`) ; `reputation.service.ts` — les annulations tardives
+                 du Voyageur excluent la marque, champ ABSENT compris (`OR` + `isSet: false`,
+                 piège Mongo) ; `deal-transport.service.ts` — le refus recalcule la réputation
+                 des deux parties (comme l'annulation), pour que la page publique dise vrai tout
+                 de suite. Tests : deal-service 575 → 576 (la requête, la marque, le recalcul).
+Contre-épreuve : WEB-E2E-5 étape 7 — ligne de faits lue AVANT la réservation et APRÈS le refus :
+                 identiques (« 0 annulation tardive ») ; en base, sur le deal refusé :
+                 `pickupRefusedAt` posé, ancien filtre 1 → nouveau filtre 0.
 ```
 
 ---
@@ -322,6 +385,55 @@ Proposition    : (1) tout de suite, le message renvoie vers « Mes trajets » (o
 - Étape 4 : le libellé « Nouveau message » est celui posé par la correction ANO-WEB-06 (le
   cahier ne nommait pas le titre).
 
+## Chapitre 6 — WEB-E2E-4, le compte neuf plafonné · **CONFORME** (14 étapes, 1 min 06)
+
+| Étape du cahier | Ce qui est éprouvé | Verdict |
+|---|---|---|
+| 1 | Inscription, code reçu, activation, bienvenue | **Conforme** — « Ton code d'activation Yamba », « Compte activé », « Bienvenue sur Yamba » |
+| 2 | Connexion sans « Rester connecté » | **Conforme** — cookie de rafraîchissement de session (sans date d'expiration) |
+| 3 – 4 | 450 € déclarés | **Conforme après correction** → `ANO-WEB-08` ; refus à l'intention, « Aucun paiement pour l'instant », aucun email |
+| 5 | 12 kg | **Conforme** — refus à l'intention (plafond de poids) |
+| 6 – 7 | Cinq demandes dans le mois (bzv-perkg, fih, gru, yul, bzv-upcoming) | **Conforme** |
+| 8 | La sixième | **Conforme** — refusée, même message |
+| 9 | Profil, tableau de bord, page publique | **Conforme** — aucun « score », « niveau de risque », « points » |
+| 10 | Export de mes données par la porte | **Conforme après correction** → `ANO-WEB-09` ; JSON `yamba-data-export/1`, aucune trace du score |
+| 11 | Thomas accepte | **Conforme** — email « est acceptée », notification |
+| 12 | Session inactive plus d'une heure, puis un geste | **Conforme** (manœuvre SES-01 consignée) — fenêtre « Ta session a expiré » par-dessus la page, reconnexion sur place, page inchangée, session de retour ; le geste est refait à la main (voir écarts) |
+| 13 | Appareils connectés | **Conforme** — « Chrome · … · cet appareil », « Dernière activité … · ::1 » (l'écran s'intitule « Sessions actives », voir écarts) |
+| 14 | Supprimer mon compte | **Conforme** — bandeau ambre, les deux motifs (deal en cours, demande en attente), aucune porte, aucun email |
+
+### Trois écarts assumés, écrits dans le parcours
+
+- Étape 12 : « le geste reprend » — le produit ne rejoue pas l'action qui a échoué ; il
+  rafraîchit les données de la page. Le harnais vérifie l'URL inchangée, la session de retour, et
+  que le même geste refait passe. Copie du cahier à ajuster, ou évolution produit à décider.
+- Étape 12 : l'heure d'inactivité est simulée (SES-01 : le délai d'inactivité EST la durée de vie
+  de la clé Redis de la session ; la supprimer, c'est l'avoir laissée expirer), consignée.
+- Étape 13 : le cahier dit « Appareils connectés », l'écran s'intitule « Sessions actives »
+  (sous-titre « Les appareils connectés à ton compte »). Le cahier à aligner.
+
+---
+
+## Chapitre 6 — WEB-E2E-5, le refus au pickup et le remboursement · **CONFORME** (8 étapes, 1 min 06)
+
+| Étape du cahier | Ce qui est éprouvé | Verdict |
+|---|---|---|
+| 1 | Aminata réserve 2 kg, taille S sur `fih` (Bruxelles → Kinshasa, tarif par catégorie) | **Conforme** — total lu à l'écran (22,00 €), suivi ouvert |
+| 2 | Joséphine accepte | **Conforme** — « Bloqué chez Yamba », email « est acceptée », kilos réservés (API) |
+| 3 | « Refuser le colis » depuis la prise en charge | **Conforme** — « Refuser ce colis ? », « Refuser un colis non conforme ne pénalise jamais ta réputation. », « Le Deal sera annulé et Aminata intégralement remboursée. » |
+| 4 | Raison « Le contenu ne correspond pas à la déclaration », confirmation | **Conforme** — toast « Colis refusé. Aminata a été notifiée et sera remboursée. », 200 `CANCELLED`, `refundAmountCents` = total |
+| 5 | Mes envois, Finances | **Conforme** — « Annulée » ; « Remboursé 22,00 € le … », sans retenue |
+| 6 | Mailpit | **Conforme** — « Ton colis Bruxelles → Kinshasa n'a pas pu être pris en charge » avec la raison traduite, puis « Remboursement émis … » du montant intégral, sans un mot de retenue, dans cet ordre |
+| 7 | Page publique de Joséphine | **Conforme après correction** → `ANO-WEB-10` ; ligne de faits identique avant / après |
+| 8 | Mes trajets | **Conforme** — ligne du deal « Annulé », kilos rendus (API) |
+
+### Deux écarts assumés, écrits dans le parcours
+
+- Étape 6 : le cahier dit « refus à la remise » ; le sujet réel est « Ton colis … n'a pas pu
+  être pris en charge » — la raison traduite est dans le corps. Copie du cahier à aligner.
+- Étape 8 : « Mes trajets » n'affiche pas les kilos restants (écart déjà consigné en WEB-E2E-3) ;
+  ils sont lus à l'API du trajet, avant, après l'acceptation, après le refus.
+
 ---
 
 ## Observations (pas des anomalies, mais à savoir)
@@ -332,6 +444,13 @@ Proposition    : (1) tout de suite, le message renvoie vers « Mes trajets » (o
   l'heure suivante, et son email « … en route vers ton compte » arrive au Voyageur en plein
   parcours (WEB-E2E-1 étape 25 vise désormais le montant de SON deal). À garder en tête pour le
   chapitre 5.26 : rejouer le seed juste avant.
+- **L'assistant de réservation garde son brouillon et son étape en `sessionStorage`** : après
+  un refus à l'étape 4, rouvrir `/trips/[id]/book` rouvre directement l'étape 4 avec l'ancien
+  colis. Pratique pour un membre qui revient ; à connaître pour la recette (le harnais oublie le
+  brouillon à l'ouverture). Chapitre 5.12.
+- **Après un refus de plafond, la carte de paiement montre encore un bouton « Payer »** à côté
+  de l'encadré de refus. Il ne mène nulle part de dangereux (le serveur refuse aussi le deal),
+  mais il contredit l'encadré. Mineure, chapitre 5.13.
 - **« Payer » cliqué avant le retour de l'intention de paiement ne fait rien**, sans message :
   le bouton est actif dès l'affichage de l'étape 4, l'intention arrive une seconde plus tard.
   Le harnais attend le texte du mode test (qui porte le montant de l'intention) ; un humain

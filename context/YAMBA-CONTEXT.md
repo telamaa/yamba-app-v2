@@ -406,7 +406,7 @@ Ordre de demarrage : auth -> trip -> gateway.
   (GET /admin/status, sondage 30 s, editeur de maintenance). Gateway aligne (alias @packages,
   tsconfig). Chantier C : SOLDE (C-PR1 → C-PR8c). Candidat registre : moniteur externe de
   disponibilite avant le lancement. MERGE 05/09 : **#182** (17 checks comptes).
-- Plateforme de tests : **989** (trip 257, deal 575, notification 115, message 42) + auth 225
+- Plateforme de tests : **990** (trip 257, deal 576, notification 115, message 42) + auth 225
   (09/09, post-campagne de recette « taches planifiees »).
 - 08/09 : **CAMPAGNE DE RECETTE API (cahier n° 3) — TERMINEE ET ACCEPTEE**. 146 fiches, 145
   jouees, 1 en ⏭ justifie (CLI Stripe absente du poste, objet atteint par des evenements
@@ -556,7 +556,34 @@ Ordre de demarrage : auth -> trip -> gateway.
   le Voyageur ne peut pas annuler un deal (403 SHIPPER_ONLY malgre ANN-02) — arbitrage demande.
   Harnais : `payer()` attend l'intention de paiement (clic muet sinon). Poste : `nx serve` tombe
   sur un changement de lib partagee (recursion Nx) → trip/notification/message en bundle.
-  17 scenarios e2e verts. PR a ouvrir. Reste : E2E-4 a E2E-6, les 32 chapitres 5.x, 02-ADMIN.
+  17 scenarios e2e verts. MERGE 09/09 : **#261** (17 checks comptes). ANO-WEB-07, decision du
+  09/09 : le message D72 renvoie vers « Mes trajets » (corrige dans la PR suivante) ; l'annulation
+  d'un deal par le Voyageur reste un lot a part. Reste : E2E-4 a E2E-6, les 32 chapitres 5.x, 02-ADMIN.
+- 09/09 : **WEB-E2E-4, LE COMPTE NEUF PLAFONNE (branche `chore/e2e-parcours-4`)** — quatrieme
+  parcours vert : 14 etapes, 1 min 06 (inscription avec code, connexion sans « Rester connecte »,
+  450 € et 12 kg refuses A L'INTENTION, cinq demandes puis la sixieme refusee, aucun score nulle
+  part, export des donnees par la porte avec telechargement reel, acceptation, session expiree
+  simulee (SES-01 : la cle Redis EST le delai d'inactivite), sessions actives, suppression
+  bloquee sans porte). **ANO-WEB-08 (majeure)** : l'intention de paiement partait sans la valeur
+  declaree — le plafond tombait apres l'autorisation bancaire (regression d'ANO-API-12) ;
+  corrige. **ANO-WEB-09 (majeure)** : l'export « Mes donnees » demandait un blob, le 403
+  SUDO_REQUIRED arrivait en blob, la porte ne s'ouvrait JAMAIS — export RGPD inutilisable ;
+  corrige. ANO-WEB-07 : message D72 corrige (« Mes trajets »). Ecarts cahier : « le geste
+  reprend » (le produit rafraichit, ne rejoue pas), « Appareils connectes » = « Sessions
+  actives ». 18 scenarios e2e verts. PR **#262** (17 checks comptes). Reste : E2E-5, E2E-6, les 32
+  chapitres 5.x, 02-ADMIN.
+- 10/09 : **WEB-E2E-5, LE REFUS AU PICKUP (branche `chore/e2e-parcours-5`)** — cinquieme parcours
+  vert : 8 etapes, 1 min 06 (reservation 22,00 € sur `fih`, acceptation et capture, « Refuser le
+  colis » avec le rappel « ne penalise jamais ta reputation », raison « contenu non conforme »,
+  toast, remboursement INTEGRAL prouve par la reponse du serveur ET la ligne Finances, deux emails
+  dans l'ordre sans le mot « retenue », ligne de faits identique avant / apres, kilos rendus).
+  **ANO-WEB-10 (majeure)** : la reputation comptait tout deal CANCELLED clos par le Voyageur apres
+  acceptation comme « annulation tardive » — donc chaque refus au pickup, au prochain recalcul
+  (la machine dit « sans penalite ») ; corrige : marque `Booking.pickupRefusedAt` posee par le
+  refus, requete des faits Voyageur qui l'exclut (absent compris, `isSet`), refus qui recalcule
+  les deux parties. deal-service **576** tests (+1), plateforme 990. Ecarts cahier : sujet de
+  l'email « n'a pas pu etre pris en charge », kilos lus a l'API. 19 scenarios e2e verts.
+  PR **#263** (empilee sur #262). Reste : E2E-6, les 32 chapitres 5.x, 02-ADMIN.
 - 04/09 : C-PR6b feat/c6b-admin-alerts (D59 3A / 4A, A129–A131) — neuf regles de seuil
   (evaluateAlerts pur, instantane de dix compteurs), GET /admin/alerts sans etat (accueil
   admin), cron horaire avec dedoublonnage Redis SET NX (un email par regle et par jour, Redis
