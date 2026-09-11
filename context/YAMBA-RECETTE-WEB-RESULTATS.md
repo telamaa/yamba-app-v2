@@ -969,6 +969,80 @@ Correction     : `isError` → « La conversation n'a pas pu être ouverte. » (
 Contre-épreuve : WEB-MSG-22 : Aminata sur le fil de Pauline — l'API 403, la phrase à l'écran, aucun message.
 ```
 
+```
+ANO-WEB-49
+Fiche          : WEB-PIC-1, WEB-PIC-2 (chapitre 5.16) · Gravité : MINEURE · ÉTAT : CLOSE
+Attendu        : « Ce que Pauline a déclaré », « la déclaration de Pauline » — et « qu'Aminata », « d'Aminata ».
+Obtenu         : « Ce qu'Pauline a déclaré », « la déclaration d'Pauline », « Le contenu correspond à ce
+                 qu'Pauline… » : l'élision était ÉCRITE dans le message (`qu''{prénom}`, `d''{prénom}`),
+                 juste devant une voyelle, fausse devant une consonne (cinq textes : prise en charge ×4,
+                 livraison ×1). Le cahier a la même faute (« ce qu'{prénom} a déclaré »).
+Correction     : `apps/user-ui/src/lib/elision.ts` (`elider("que"|"de", nom)` : voyelle ou h → élision)
+                 ; les cinq messages reçoivent `{queShipper}` / `{deShipper}` calculés par le composant.
+Contre-épreuve : WEB-PIC-1 : « Ce que Pauline a déclaré », « la déclaration de Pauline », jamais « qu'Pauline ».
+```
+
+```
+ANO-WEB-50
+Fiche          : WEB-PIC-1 (chapitre 5.16) · Gravité : MINEURE · ÉTAT : CLOSE
+Attendu        : « Tu deviens officiellement responsable du colis jusqu'à la remise à Clarisse. »
+Obtenu         : « …jusqu'à la remise à Brazzaville. » — les deux vues de prise en charge (desktop, mobile)
+                 prenaient le premier mot du lieu de livraison pour prénom (même `split(" ")[0]` qu'ANO-WEB-44).
+Correction     : `deal.recipientFirstName` (servi à toute étape depuis ANO-WEB-44), repli sur la ville.
+Contre-épreuve : WEB-PIC-1 : la phrase avec « Clarisse ».
+```
+
+```
+ANO-WEB-51
+Fiche          : WEB-PIC-2, WEB-PIC-3 (chapitre 5.16) · Gravité : MAJEURE · ÉTAT : CLOSE
+Attendu        : le bouton « Confirmer la prise en charge » inactif EXPLIQUE ce qui manque : « Coche les 5
+                 points de vérification avant de confirmer », « Ajoute au moins 1 photo avant de confirmer ».
+Obtenu         : le bouton était gris et muet ; les deux textes existaient (`validation.*`) et aucun
+                 composant ne les affichait — même motif que la carte « demandes en attente » (5.14) :
+                 de la copie écrite, jamais branchée.
+Correction     : `PickupConfirmCard` (écran large) et `PickupFooter` (mobile, via `blockingHint` calculé
+                 par `DealPickupMobile`) rendent l'indice sous le bouton tant qu'il est inactif.
+Contre-épreuve : WEB-PIC-2 (3/5 → « Coche les 5 points… »), WEB-PIC-3 (5/5 sans photo → « Ajoute au
+                 moins 1 photo… », puis actif avec une photo).
+```
+
+```
+ANO-WEB-52
+Fiche          : WEB-PIC-4 (chapitre 5.16) · Gravité : MINEURE · ÉTAT : CLOSE
+Attendu        : une photo de plus de 10 Mo est refusée à la sélection : « Une photo dépasse 10 Mo. Réduis-la
+                 ou choisis-en une autre — rien n'a été envoyé. »
+Obtenu         : la photo entrait dans la grille (« Retirer cette photo », « Photos 1 ») ; les photos ne
+                 partent qu'à la confirmation, le refus serait venu au clic « Confirmer » (ANO-WEB-39, la
+                 même dette sur l'assistant de réservation).
+Correction     : `addPhoto` (DealPickupClient) filtre taille et format à la sélection, avec les textes de
+                 `errors.uploadTooLarge` / `errors.uploadInvalidType`.
+Contre-épreuve : WEB-PIC-4 : le message, aucune vignette, aucun appel de prise en charge.
+```
+
+```
+ANO-WEB-53
+Fiche          : WEB-PIC-10 (chapitre 5.16) · Gravité : MINEURE · ÉTAT : OUVERTE
+Attendu        : après le décollage, le suivi Expéditeur dit « Thomas a décollé à 17:06 · arrivée prévue à
+                 {heure} » et la frise « vol de {durée} ».
+Obtenu         : « arrivée prévue à — », « vol de — » : l'instantané du trajet figé dans la réservation
+                 (`BookingTripSnapshot`) porte `departureAt` mais pas `arrivalAt` ; le DTO Expéditeur ne
+                 peut rien en dériver.
+Proposition    : `arrivalAt` dans l'instantané (schéma, écrit à la réservation), servi par le mapper et le
+                 contrat (`ShipperBookingView.trip.arrivalAt`, OpenAPI régénéré), lu par la bannière ; les
+                 réservations existantes gardent « — ». PR dédiée.
+```
+
+```
+ANO-WEB-54
+Fiche          : WEB-PIC-10 (chapitre 5.16) · Gravité : MINEURE · ÉTAT : CLOSE
+Attendu        : la carte « Partage le suivi à Clarisse » explique : « Un lien sans compte : Clarisse voit où
+                 en est le colis, sans ton adresse ni le code. »
+Obtenu         : la clé brute « bookingTracker.trackingLink.subtitle » à l'écran : `t("subtitle")` sans la
+                 variable `{recipientFirstName}` — next-intl rend alors le chemin de la clé.
+Correction     : la variable est passée (`BookingTrackingLinkCard`).
+Contre-épreuve : WEB-PIC-8/9/10 : aucun texte commençant par « bookingTracker. » sur le suivi.
+```
+
 ---
 
 ## Chapitre 5.1 — Découverte, accueil et navigation · **CONFORME** (12 fiches, 1 min 24)
@@ -2106,6 +2180,76 @@ FAKE ; la passerelle relancée en bundle en cours de campagne (limiteur, voir pi
   pas prévenu » se prouve sur le SUJET des emails, pas sur leur absence.
 - **`nx serve` recompile message-service à chaud** ; la passe `relance.ts` importe le service : elle
   tourne avec le code du disque, pas avec le bundle servi.
+
+## Chapitre 5.16 — Prise en charge et jalons de transit · **CONFORME** (10 fiches jouées, 5 après correction · 5 anomalies closes dont 1 MAJEURE, 1 mineure ouverte · 8 scénarios en série, 1 min 48)
+
+`web-pic.spec.ts`. `bzv-accepted` (Pauline ↔ Thomas) pour la prise en charge puis le transit,
+`yul-accepted` (Marie-Claire ↔ Marc) pour le refus ; ImageKit intercepté, deal-service en FAKE ; les
+jalons sont attendus sur la REQUÊTE (cinq secondes de repentir chacun), jamais sur un délai.
+
+| Fiche | Ce qui est éprouvé | Verdict | Preuve |
+|---|---|---|---|
+| WEB-PIC-1 | L'écran « Prise en charge du colis » | **Conforme après correction** → `ANO-WEB-49` (« qu'Pauline »), `ANO-WEB-50` (« la remise à Brazzaville ») ; depuis « Mon Deal accepté », « Confirmer la prise en charge » → `/pickup` ; titre, avertissement et sa phrase ; « Ce que Pauline a déclaré » (Catégorie Vêtements, Poids 5 kg, Valeur 120 €) ; « CONFIRMATION » avec « Vérification » et « Photos » ; les deux boutons. **Constat** : le sous-titre sur écran large est « Paris · le 21 sept. · 16h00 · face à Pauline L. » (la phrase du cahier est le sous-titre mobile) |
+| WEB-PIC-2 | La checklist en cinq points | **Conforme après correction** → `ANO-WEB-51` ; les cinq textes exacts (« …à ce que Pauline a déclaré », « (5 kg) »), « Coche chaque point après vérification physique », cinq `aria-pressed` ; 3/5 : bouton inactif + « Coche les 5 points de vérification avant de confirmer » |
+| WEB-PIC-3 | Les photos obligatoires | **Conforme après correction** → `ANO-WEB-51` ; 5/5 sans photo : inactif + « Ajoute au moins 1 photo avant de confirmer », badge « Au moins 1 obligatoire », aide « Recommandé : 1 photo du contenu déballé et 1 photo du colis emballé prêt au transport. » ; une photo → actif |
+| WEB-PIC-4 | L'échec d'un téléversement | **Conforme après correction** → `ANO-WEB-52` ; > 10 Mo : « Une photo dépasse 10 Mo… — rien n'a été envoyé. », aucune vignette ; réseau coupé (ImageKit abandonné) : « Le téléversement d'une photo a échoué… — rien n'a été envoyé. » au clic « Confirmer », aucun appel de prise en charge, le deal reste ACCEPTED. **Constat** : les photos partent à la CONFIRMATION, pas à l'ajout (l'intention « rien n'est enregistré » est tenue) |
+| WEB-PIC-5 | Confirmer la prise en charge | **Conforme** — tags « Contenu » / « Emballé », note ; toast « Prise en charge confirmée ! Pauline a reçu son code de livraison. » ; suivi de transit, « Clarisse Mabiala · Destinataire » avec le **vrai numéro** ; Pauline : notification « Thomas a pris ton colis en charge » / « …ton code de livraison est prêt dans ton suivi », email « Ton colis Paris → Brazzaville est pris en charge » **sans le code**, le code à six chiffres dans son suivi ; le code **nulle part côté Voyageur** |
+| WEB-PIC-6 | Refuser le colis | **Conforme** — « Refuser ce colis ? » / « Le Deal sera annulé et Marie-Claire intégralement remboursée. Refuser un colis non conforme ne pénalise jamais ta réputation. » ; **cinq** raisons (radios), aucun texte libre ; toast « Colis refusé. Marie-Claire a été notifiée et sera remboursée. » ; `CANCELLED`, `refundAmountCents` = total payé ; emails « n'a pas pu être pris en charge » (raison traduite) puis « Remboursement émis » avec le montant intégral ; kilos +7 ; profil public de Marc identique |
+| WEB-PIC-7 | L'écran de transit | **Conforme** — « En transit vers Brazzaville » / « Colis pris en charge il y a … · vol prévu à … » ; une seule carte « Tu es à l'aéroport ? » / « Je suis à l'aéroport » (aucun autre jalon) ; « ÉTAPES DU VOYAGE » + « Optionnel » ; carte du destinataire avec le numéro et « WhatsApp » ; « TON PAIEMENT · Versé à J+4 après livraison ». **Constat** : le bouton d'appel porte le numéro (« +242061234567 »), pas « Appeler » |
+| WEB-PIC-8 | Jalons ordonnés, non répétables | **Conforme** — aéroport → « Ton vol décolle ? » → décollage → « Tu as atterri ? » → atterrissage → « Clarisse t'a donné le code ? » + « Valider la livraison » ; après rechargement, aucun jalon passé n'est proposé, aucune dé-confirmation |
+| WEB-PIC-9 | Les cinq secondes | **Conforme** — « Annuler » dans le toast → « Annulé, rien n'a été envoyé. », aucune requête, le jalon reproposé ; puis « C'est noté ! Pauline a été prévenue. » et la requête part |
+| WEB-PIC-10 | Côté Expéditrice | **Conforme après correction** → `ANO-WEB-54` (clé i18n brute) ; aéroport : « Thomas est à l'aéroport » / « Prêt à embarquer · vol prévu à … », cloche, **aucun email** ; décollage : « En vol vers Brazzaville » / « Thomas a décollé à 17h06 · arrivée prévue à — » (→ `ANO-WEB-53` ouverte), cloche, **aucun email** ; atterrissage : « Thomas est arrivé à Brazzaville » / « Atterri à … · la remise à Clarisse approche », cloche « Thomas a atterri · préviens le destinataire », **un seul email** « Thomas a atterri… », sans le code |
+
+### À trancher (produit)
+
+- **Le délai de versement s'écrit de deux façons** : « payé 3 jours après la livraison validée » (suivi
+  Expéditeur, plusieurs textes en dur) et « Versé à J+4 après livraison » (Voyageur, réglage). Une seule
+  formule tirée du réglage `payout.delayDays` — petit, mais visible aux deux bouts.
+- **Le sous-titre de la prise en charge** : « {lieu} · le {date} · {heure} · face à … » sur écran large ; la
+  phrase du cahier n'est que mobile. Amender le cahier.
+- **Le bouton d'appel du destinataire porte le numéro**, pas « Appeler » — amender le cahier ou le libellé.
+- **Les photos partent à la confirmation** (pas à l'ajout) : l'échec réseau se voit au clic « Confirmer ».
+  Cohérent avec « rien n'est enregistré » ; amender le cahier.
+- **Le cahier élide lui-même** (« ce qu'{prénom} a déclaré ») : le corriger avec ANO-WEB-49.
+
+### Regard d'expert — optimisations et améliorations (une ligne par fiche)
+
+- **PIC-1** — Un « TODO Phase backend » survivait encore (ANO-WEB-50) : `grep -rn "split(\" \")\[0\]"
+  apps/user-ui/src` pour lister les derniers — petit, définitif.
+- **PIC-2** — Les cinq points sont cochables sans contrainte de temps ; horodater chaque coche
+  (`checklist: [{ id, at }]`) donnerait une preuve de diligence en médiation — moyen.
+- **PIC-3** — Une photo obligatoire, cinq au plus : suggérer la seconde (« et le colis emballé ? ») quand
+  une seule est là — petit.
+- **PIC-4** — Téléverser à la sélection (avec suppression ImageKit si retrait) plutôt qu'à la
+  confirmation : l'échec se voit tout de suite, la confirmation devient instantanée — moyen (même
+  proposition qu'en 5.12).
+- **PIC-5** — Le code naît à la prise en charge et l'email renvoie au suivi (bon, D43) ; l'email
+  pourrait porter un lien profond vers le suivi avec le prénom du destinataire — petit.
+- **PIC-6** — Le refus rembourse intégralement et ne pénalise pas (prouvé) ; la raison choisie n'est
+  pas visible du Voyageur après coup (écran fermé) — l'afficher dans le bandeau « Tu as refusé ce
+  colis (raison) » — petit.
+- **PIC-7** — La carte d'action unique est excellente ; le bandeau « vol prévu à » lit le départ du
+  trajet ; ajouter le compte à rebours (`flightIn` existe en JSON) — petit.
+- **PIC-8** — Les jalons sont ordonnés côté serveur (409 sinon) ; un jalon en retard (atterrissage
+  confirmé 30 h après le vol) devrait au moins avertir — petit.
+- **PIC-9** — Les cinq secondes vivent dans le client : fermer l'onglet perd la confirmation (dit par
+  le cahier). Une file locale (`localStorage`) rejouée à la réouverture — petit.
+- **PIC-10** — Un seul email (atterrissage) : bon. « arrivée prévue à — » (ANO-WEB-53) : figer
+  `arrivalAt` dans l'instantané, comme `departureAt` — petit côté données, contrat à régénérer.
+- **Transversal** — Quatre des six anomalies sont de la **copie non branchée ou dérivée** (textes
+  jamais rendus, élision écrite dans le message, clé sans variable, prénom tiré d'un lieu) : un test
+  de rendu des vues Voyageur avec un deal fixture (et `onError` de next-intl en échec dur en
+  développement) les aurait toutes prises — moyen, le plus rentable de la campagne.
+
+### Pièges de poste payés ici
+
+- **La croix de fermeture d'une fenêtre porte aussi « Annuler » en `aria-label`** : viser le bouton
+  texte (`exact: true`, `.last()`).
+- **Le bouton d'appel du destinataire s'appelle par son numéro** (`getByRole("button", { name: "+242…" })`).
+- **Le rapport HTML de Playwright** (`apps/e2e/rapport/index.html`) est écrasé à chaque passage et
+  ne garde que le dernier fichier joué : lire les annotations tout de suite, ou les consigner dans le
+  rapport de recette au fil de l'eau.
+- **Les crons du poste écrivent aux comptes du seed** : « aucun email » se prouve sur le SUJET.
 
 ## Chapitre 6 — WEB-E2E-1, le nominal complet · **CONFORME** (29 étapes, 1 min 24)
 

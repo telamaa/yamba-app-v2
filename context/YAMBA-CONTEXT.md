@@ -610,6 +610,25 @@ Ordre de demarrage : auth -> trip -> gateway.
   desktop du visiteur sans « Creer un compte » ni « Rechercher un trajet ». Piege de poste : la cle
   Google Maps n'accepte que `localhost` comme referent. Harnais : 32 scenarios verts. PR **#265**
   (empilee sur #264). Reste : 5.2 a 5.32, 02-ADMIN.
+- 11/09 : **CHAPITRE 5.16 DU CAHIER 01-WEB — WEB-PIC, PRISE EN CHARGE ET JALONS DE TRANSIT (branche
+  `chore/recette-web-5-16`, empilee sur #280)** — 10 fiches jouees CONFORMES (5 apres correction), 8 scenarios
+  en serie, 1 min 48 (`apps/e2e/src/chapitres/web-pic.spec.ts`). CINQ ANOMALIES CLOSES : ANO-WEB-51 MAJEURE
+  (le bouton « Confirmer » inactif etait muet — les textes « Coche les 5 points… » / « Ajoute au moins 1
+  photo… » existaient en JSON, jamais rendus ; indice sous le bouton, desktop + mobile), ANO-WEB-49 mineure
+  (elision ecrite dans le message : « qu'Pauline », « d'Pauline » — `apps/user-ui/src/lib/elision.ts`, cinq
+  textes reecrits en {queShipper}/{deShipper}), ANO-WEB-50 mineure (« la remise a Brazzaville » : dernier
+  `split(" ")[0]` de la maquette sur les vues pickup), ANO-WEB-52 mineure (photo > 10 Mo acceptee a la
+  selection, comme ANO-WEB-39), ANO-WEB-54 mineure (cle brute « bookingTracker.trackingLink.subtitle » :
+  variable manquante). ANO-WEB-53 mineure OUVERTE (« arrivee prevue a — » : BookingTripSnapshot sans
+  arrivalAt — schema + contrat, PR dediee). Prouve : declaration a comparer, 5 points, photo obligatoire,
+  echec reseau = rien d'enregistre (aucun POST /pickup, statut relu), confirmation (code chez Pauline seule,
+  email sans le code, numero du destinataire cote Voyageur), refus (5 raisons, remboursement integral =
+  totalShipperCents, kilos +7, profil public de Marc identique), transit (une seule carte d'action, jalons
+  ordonnes / non repetables, 5 s de repentir sans requete, bannieres + cloche + UN email a l'atterrissage).
+  A trancher : « paye 3 jours apres » vs « J+4 » (deux formules), sous-titre mobile vs desktop, bouton
+  d'appel = le numero, photos envoyees a la confirmation, le cahier elide lui-meme. Regard d'expert : script
+  « cles JSON absentes du code », `onError` next-intl en echec dur en dev, test de rendu des vues Voyageur.
+  Harnais : 186 scenarios. Reste : 5.17 a 5.32, 02-ADMIN. AUCUNE attribution Claude.
 - 11/09 : **CHAPITRE 5.15 DU CAHIER 01-WEB — WEB-MSG, MESSAGERIE, RENDEZ-VOUS ET NUMERO (branche
   `chore/recette-web-5-15`, empilee sur #279)** — 22 fiches jouees CONFORMES (4 apres correction), 21 scenarios
   en serie, 3 min 24 (`apps/e2e/src/chapitres/web-msg.spec.ts`, deux navigateurs Pauline / Thomas sur

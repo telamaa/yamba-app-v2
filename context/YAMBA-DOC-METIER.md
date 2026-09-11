@@ -3646,3 +3646,51 @@ par conversation, sans citer le message ; la notification in-app, elle, est imm�
 | 212 | Litige, 14 jours, tiers | lecture seule, fermé, 403 + phrase | oui (ANO-WEB-48 close) |
 | 213 | Relance email | un email sans le texte, pas deux par heure | oui (écart : la bulle compte les messages) |
 
+---
+
+# Prise en charge et jalons de transit — ce que le chapitre 5.16 fait respecter
+
+*(PR `chore/recette-web-5-16`, 11/09/2026 — cahier 01-WEB chapitre 5.16, WEB-PIC-1 à 10.)*
+
+## Le besoin
+
+Le Voyageur qui reçoit le colis compare ce qu'on lui remet à ce qui a été déclaré, le documente (cinq
+points, photos), puis s'engage — ou refuse sans pénalité, l'Expéditrice étant intégralement remboursée. La
+prise en charge fait naître le code de livraison chez l'Expéditrice seule. Pendant le transport, trois
+jalons facultatifs, ordonnés, non répétables, rassurent l'Expéditrice sans la noyer d'emails.
+
+## Les règles
+
+**RG-WEB-178 — L'écran de prise en charge montre la déclaration à comparer** (catégorie, poids, valeur),
+l'avertissement de responsabilité, cinq points à cocher, au moins une photo, une note libre ; le bouton
+inactif dit ce qui manque.
+
+**RG-WEB-179 — Une photo trop lourde ou d'un format inconnu est refusée à la sélection** ; un
+téléversement en échec arrête tout : aucune prise en charge n'est enregistrée.
+
+**RG-WEB-180 — Confirmer fait naître le code chez l'Expéditrice** (notification, email qui renvoie au suivi
+SANS le code, code lisible dans son suivi) ; le code n'apparaît jamais côté Voyageur ; le téléphone du
+destinataire s'ouvre au Voyageur.
+
+**RG-WEB-181 — Refuser le colis annule le deal, rembourse intégralement, rend les kilos et ne pénalise
+pas** : cinq raisons fermées, deux emails (refus avec la raison, remboursement avec le montant).
+
+**RG-WEB-182 — L'écran de transit propose une seule action : le prochain jalon logique** (aéroport,
+décollage, atterrissage, puis la remise) ; les jalons sont optionnels, ordonnés, non répétables, et
+chacun offre cinq secondes de repentir avant de partir.
+
+**RG-WEB-183 — Chaque jalon prévient l'Expéditrice à l'écran et dans la cloche ; seul l'atterrissage
+envoie un email** (« préviens le destinataire »), sans le code.
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| 214 | L'écran de prise en charge | déclaration, avertissement, cartes, boutons | oui (ANO-WEB-49, 50 closes) |
+| 215 | Trois points sur cinq, aucune photo | bouton inactif qui explique | oui (ANO-WEB-51 close) |
+| 216 | Photo > 10 Mo, réseau coupé | refus explicite, rien d'enregistré | oui (ANO-WEB-52 close) |
+| 217 | Confirmer | toast, transit, numéro ; code chez l'Expéditrice seule | oui |
+| 218 | Refuser | cinq raisons, remboursement intégral, kilos, aucune pénalité | oui |
+| 219 | Transit et jalons | une carte, ordre, cinq secondes, non répétables | oui |
+| 220 | Côté Expéditrice | bannières, cloche, un seul email | oui (ANO-WEB-54 close ; ANO-WEB-53 ouverte) |
+

@@ -5406,3 +5406,89 @@ message-service **44** (+2 : ANO-WEB-46, ANO-WEB-47) → plateforme **996** (+ a
 **178 scénarios** (157 + WEB-MSG ×21). Typecheck user-ui (`tsc -p apps/user-ui`), message-service et
 harnais verts ; miroir i18n vert.
 
+---
+
+# Chapitre 5.16 du cahier 01-WEB : la prise en charge et le transit — de la copie écrite mais jamais branchée
+
+*(PR `chore/recette-web-5-16`, 11/09/2026.)*
+
+## Ce qui a été fait
+
+Le seizième chapitre « fiches » du cahier 01-WEB : `WEB-PIC` (l'écran de prise en charge, ses refus, la
+confirmation, le refus du colis, l'écran de transit et ses jalons). Dix fiches jouées et conformes (cinq
+après correction), cinq anomalies closes (`ANO-WEB-51` MAJEURE, `49`, `50`, `52`, `54` mineures), une
+ouverte (`ANO-WEB-53`, instantané du trajet sans heure d'arrivée).
+
+```
+apps/e2e/src/chapitres/web-pic.spec.ts                                      8 scénarios en série (10 fiches), 1 min 48
+apps/user-ui/src/lib/elision.ts                                             ANO-WEB-49 (« que Pauline » / « qu'Aminata »)
+apps/user-ui/messages/{fr,en}/carrierDealPickup.json, carrierDealDeliver.json   ANO-WEB-49 ({queShipper}, {deShipper})
+apps/user-ui/src/components/carrier/deal/views/pickup/PickupDeclaredCard.tsx, PickupChecklist.tsx, DealPickupDesktop.tsx   ANO-WEB-49
+apps/user-ui/src/components/carrier/deal/views/deliver/DeliverInfoBox.tsx   ANO-WEB-49
+apps/user-ui/src/components/carrier/deal/views/pickup/DealPickupDesktop.tsx, DealPickupMobile.tsx   ANO-WEB-50 (recipientFirstName), ANO-WEB-51 (blockingHint)
+apps/user-ui/src/components/carrier/deal/views/pickup/PickupConfirmCard.tsx, PickupFooter.tsx      ANO-WEB-51 (l'indice sous le bouton inactif)
+apps/user-ui/src/components/carrier/deal/views/pickup/DealPickupClient.tsx  ANO-WEB-52 (taille et format à la sélection)
+apps/user-ui/src/components/booking/booking-tracker/shared/BookingTrackingLinkCard.tsx   ANO-WEB-54 (variable manquante)
+```
+
+## ANO-WEB-51 : un bouton gris et muet
+
+Les deux textes « Coche les 5 points de vérification avant de confirmer » et « Ajoute au moins 1 photo
+avant de confirmer » existaient dans `carrierDealPickup.json` (`validation.*`) ; aucun composant ne les
+rendait. Le bouton était simplement `disabled`. `PickupConfirmCard` (écran large) connaît
+`checkedCount` / `photoCount` et rend l'indice sous le bouton ; `PickupFooter` (mobile) reçoit un
+`blockingHint` calculé par `DealPickupMobile`. Même famille que la carte « demandes en attente » de
+l'accueil (5.14) : de la copie écrite, jamais branchée — un `grep` des clés JSON absentes du code est
+un contrôle qui vaut la peine (voir regard d'expert).
+
+## ANO-WEB-49 : l'élision n'est pas une affaire de message
+
+« Ce qu''{shipperFirstName} a déclaré » est juste devant Aminata et faux devant Pauline. ICU ne sait pas
+élider ; le composant le fait :
+
+```ts
+// apps/user-ui/src/lib/elision.ts
+export function elider(mot: "de" | "que" | "le" | "la", nom: string): string {
+  const elide = /^[aeiouyàâäéèêëîïôöùûüÿæœh]/i.test(nom.trim());   // voyelle ou h (muet par défaut)
+  if (mot === "le" || mot === "la") return elide ? `l'${nom}` : `${mot} ${nom}`;
+  return elide ? `${mot.slice(0, -1)}'${nom}` : `${mot} ${nom}`;   // « qu'Aminata », « que Pauline », « d'Aminata », « de Pauline »
+}
+```
+
+Les cinq messages reçoivent `{queShipper}` / `{deShipper}` ; l'anglais garde ses variables (ICU ignore
+les variables en trop). Le cahier a la même faute et est à corriger.
+
+## ANO-WEB-52 : la borne de taille au bon moment
+
+Comme ANO-WEB-39 sur l'assistant : les photos de prise en charge ne partent qu'à la confirmation, la
+borne de 10 Mo ne se voyait donc qu'au clic « Confirmer ». `addPhoto` filtre taille (`PHOTO_MAX_SIZE_BYTES`)
+et format (`PHOTO_MIME_TYPES`) à la sélection, avec les textes `errors.uploadTooLarge` /
+`errors.uploadInvalidType` — « rien n'a été envoyé » redevient vrai au moment où l'utilisateur agit.
+
+## ANO-WEB-50, ANO-WEB-54, ANO-WEB-53
+
+- `split(" ")[0]` sur le lieu de livraison pour nommer le destinataire — le dernier survivant de la
+  maquette (ANO-WEB-44 avait corrigé « Mon Deal accepté ») : `deal.recipientFirstName`.
+- `t("subtitle")` sans `{recipientFirstName}` : next-intl rend alors le chemin de la clé
+  (« bookingTracker.trackingLink.subtitle ») ; la variable est passée. En développement, faire échouer
+  `onError` de next-intl rendrait ce défaut impossible à manquer.
+- « arrivée prévue à — » : `BookingTripSnapshot` fige `departureAt` mais pas `arrivalAt` ; le DTO
+  Expéditeur ne peut rien dériver. Évolution de schéma + contrat, PR dédiée (ANO-WEB-53 ouverte).
+
+## Le harnais
+
+- Les fiches 1 à 4 rejouent l'écran sans confirmer (points, photo, > 10 Mo, ImageKit abandonné par
+  `page.route`) et prouvent « rien n'est enregistré » par l'absence d'appel `POST /pickup` ET le statut
+  relu (`ACCEPTED`).
+- La fiche 5 lit le code dans le suivi de Pauline (`SuiviExpediteur.lireLeCode`) et vérifie qu'il n'est
+  ni dans l'email ni dans le texte de l'écran Voyageur.
+- La fiche 6 lit le total payé dans le DTO de Marie-Claire (le DTO Voyageur ne le porte pas, 5.14) et le
+  compare au `refundAmountCents` du refus ; kilos et profil public avant / après.
+- Les fiches 8, 9, 10 sont un seul scénario à deux navigateurs : l'annulation dans les cinq secondes
+  (aucune requête), puis les trois jalons, chacun observé côté Expéditrice (bannière, cloche, Mailpit).
+
+## Tests
+
+Plateforme inchangée (996 + auth 229). `apps/e2e` : **186 scénarios** (178 + WEB-PIC ×8). Typecheck
+user-ui (`tsc -p apps/user-ui`) et harnais verts ; miroir i18n vert.
+
