@@ -15,7 +15,7 @@ import { CardSection } from "@/components/dashboard/DashboardUI";
 import PrivacySection from "@/components/dashboard/sections/PrivacySection";
 import SudoGate from "@/components/dashboard/sections/SudoGate";
 import useUser from "@/hooks/useUser";
-import { apiMessage, changePassword, confirmEmailChange, fetchMySessions, isSudoRequired, requestEmailChange, revokeOtherSessions, revokeSession, type MemberSession } from "@/services/account.api";
+import { apiMessage, changePassword, confirmEmailChange, fetchMySessions, isSudoRequired, requestEmailChange, revokeAllSessions, revokeOtherSessions, revokeSession, type MemberSession } from "@/services/account.api";
 
 type Flow = "idle" | "password" | "email";
 
@@ -98,6 +98,13 @@ export default function Security({ copy }: { copy: DashboardCopy }) {
     setMsg({ tone: "ok", text: s.sessionsRevoked.replace("{n}", String(n)) });
     loadSessions();
   }
+  async function doRevokeAll() {
+    // D78 — déconnexion partout, celle-ci comprise : on confirme, puis on quitte la session.
+    if (typeof window !== "undefined" && !window.confirm(s.revokeAllHint)) return;
+    await revokeAllSessions().catch(() => 0);
+    qc.clear();
+    router.replace("/");
+  }
 
   const pwdOk = pwd.length >= 8 && pwd === pwd2;
   const retryAfterGate = () => { setGate(false); if (flow === "password") void doPassword(); if (flow === "email") void doEmailRequest(); };
@@ -165,7 +172,12 @@ export default function Security({ copy }: { copy: DashboardCopy }) {
             <h3 className="text-[14px] font-bold text-slate-900 dark:text-white">{copy.activeSessions}</h3>
             <p className="text-[12.5px] text-slate-500 dark:text-slate-400">{s.sessionsSub}</p>
           </div>
-          {sessions && sessions.length > 1 && <button type="button" onClick={doRevokeOthers} className="rounded-lg border border-slate-300 px-3 py-1.5 text-[12.5px] dark:border-slate-700">{s.revokeOthers}</button>}
+          {sessions && sessions.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2">
+              {sessions.length > 1 && <button type="button" onClick={doRevokeOthers} className="rounded-lg border border-slate-300 px-3 py-1.5 text-[12.5px] dark:border-slate-700">{s.revokeOthers}</button>}
+              <button type="button" onClick={doRevokeAll} title={s.revokeAllHint} className="rounded-lg border border-red-300 px-3 py-1.5 text-[12.5px] font-medium text-red-700 dark:border-red-800 dark:text-red-400">{s.revokeAll}</button>
+            </div>
+          )}
         </div>
         <ul className="mt-2 divide-y divide-slate-100 dark:divide-slate-800">
           {!sessions ? <li className="py-2 text-[13px] text-slate-500">…</li> : sessions.map((sess) => (

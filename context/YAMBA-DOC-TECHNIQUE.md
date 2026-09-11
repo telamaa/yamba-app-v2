@@ -4038,6 +4038,20 @@ Résoudre une IP en ville/pays suppose de l'envoyer à un tiers ou d'embarquer u
 voie recommandée à terme est une base MaxMind GeoLite2 hors-ligne, branchable dans `geoip.ts`.
 L'appel géo vit dans le chemin asynchrone de l'email, jamais sur la connexion.
 
+## Déconnexion globale : « les autres » ET « tous »
+
+Compagnon de l'alerte de nouvelle connexion : quand l'email dit « si ce n'était pas toi, sécurise
+ton compte », il faut pouvoir couper. Deux gestes, deux intentions (on garde les deux, l'utilisateur
+choisit) :
+
+- **« Déconnecter les autres appareils »** (existait déjà, `DELETE /auth/me/sessions`) — garde la
+  session courante. Le cas courant : j'ai oublié de me déconnecter ailleurs.
+- **« Déconnecter tous les appareils »** (nouveau, `DELETE /auth/me/sessions/all`,
+  `revokeMyAllSessions`) — révoque tout, la session courante comprise, ferme la fenêtre sudo et
+  efface les cookies : l'appareil qui a cliqué est déconnecté lui aussi, et rebascule vers l'accueil
+  visiteur. Le cas « je crois mon compte compromis ». Une confirmation navigateur garde le clic.
+  La route est déclarée AVANT `/:jti` (sinon « all » y tomberait) et documentée dans l'OpenAPI.
+
 ## Tests
 
 auth-service **229 → 249** : `login-policy.spec` (barème), `geoip.spec` (IP privées, provider,

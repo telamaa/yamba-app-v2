@@ -1,6 +1,6 @@
 import express, { Router } from "express";
 import { eraseMyAccount, exportMyData, getMyErasureBlockers, requestSudoCode, updateMyPreferences } from "../controller/privacy.controller"; // C-PR8b (D63)
-import { changeMyPassword, confirmEmailChange, getSudoStatus, listMySessions, requestEmailChange, revokeMyOtherSessions, revokeMySession, verifySudo } from "../controller/account.controller"; // D65
+import { changeMyPassword, confirmEmailChange, getSudoStatus, listMySessions, requestEmailChange, revokeMyAllSessions, revokeMyOtherSessions, revokeMySession, verifySudo } from "../controller/account.controller"; // D65
 import { deleteMyAvatar, getMyProfile, setMyAvatar, updateMyProfile } from "../controller/profile.controller"; // D67
 import { makeReportController } from "../controller/report.controller"; // D68
 import {
@@ -47,6 +47,7 @@ router.post("/auth/me/sudo/verify", isAuthenticated, verifySudo);
 router.get("/auth/me/sudo", isAuthenticated, getSudoStatus);
 router.get("/auth/me/sessions", isAuthenticated, listMySessions);
 router.delete("/auth/me/sessions", isAuthenticated, revokeMyOtherSessions);
+router.delete("/auth/me/sessions/all", isAuthenticated, revokeMyAllSessions); // D78 — avant :jti (sinon « all » y tombe)
 router.delete("/auth/me/sessions/:jti", isAuthenticated, revokeMySession);
 router.post("/auth/me/password", isAuthenticated, changeMyPassword);
 router.post("/auth/me/email/request", isAuthenticated, requestEmailChange);

@@ -189,6 +189,8 @@ export function getDashboardCopy(isFr: boolean) {
       emailDone: isFr ? "Adresse changée : {email}." : "Address changed: {email}.",
       sessionsSub: isFr ? "Les appareils connectés à ton compte ; déconnecte ceux que tu ne reconnais pas." : "The devices signed in to your account; sign out the ones you don't recognise.",
       revokeOthers: isFr ? "Déconnecter les autres appareils" : "Sign out other devices",
+      revokeAll: isFr ? "Déconnecter tous les appareils" : "Sign out all devices",
+      revokeAllHint: isFr ? "Ferme toutes les sessions, celle-ci comprise : tu devras te reconnecter." : "Closes every session, including this one; you will need to sign back in.",
       sessionsRevoked: isFr ? "{n} appareil(s) déconnecté(s)." : "{n} device(s) signed out.",
       thisDevice: isFr ? "cet appareil" : "this device",
       lastActivity: isFr ? "Dernière activité" : "Last activity",

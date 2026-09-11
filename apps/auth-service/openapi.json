@@ -1242,6 +1242,55 @@
         }
       }
     },
+    "/auth/me/sessions/all": {
+      "delete": {
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "me"
+        ],
+        "summary": "Revoke ALL sessions incl. the current one (D78 — cookies cleared)",
+        "operationId": "revokeMyAllSessions",
+        "responses": {
+          "200": {
+            "description": "Revoked count (incl. current)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevokeSessionResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or expired token; suspended account (isAuthenticated)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unhandled server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnhandledError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/auth/me/sessions/{jti}": {
       "delete": {
         "security": [

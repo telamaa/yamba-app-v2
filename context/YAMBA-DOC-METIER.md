@@ -2612,6 +2612,11 @@ sécurise ton compte ». Réglable : nouvel appareil (défaut), chaque connexion
 **RG-SEC-05 — La localisation ne fuit pas par défaut.** Aucune géolocalisation tierce sans décision
 explicite de l'exploitant (RGPD) ; sinon, l'email montre l'IP seule.
 
+**RG-SEC-06 — Deux façons de se déconnecter à distance, au choix.** « Déconnecter les autres
+appareils » ferme toutes les sessions sauf celle-ci ; « Déconnecter tous les appareils » les ferme
+TOUTES, celle-ci comprise (on est alors renvoyé à l'accueil, à reconnecter). Aucune ne demande de
+sudo : sécuriser son compte ne doit pas être bloqué.
+
 ## Tests d'acceptation
 
 | # | Situation | Attendu | Vérifié |
@@ -2621,3 +2626,4 @@ explicite de l'exploitant (RGPD) ; sinon, l'email montre l'IP seule.
 | S3 | 10e échec sur un compte réel | email « tentatives de connexion », une fois | oui (règle) |
 | S4 | Connexion depuis un nouvel appareil | email quand/appareil/IP/localisation + « pas toi ? » | oui (règle) |
 | S5 | Géoloc par défaut | aucune (IP seule) ; ipapi seulement si activé | oui (unitaire) |
+| S6 | « Autres » vs « tous » les appareils | autres = courante gardée ; tous = courante coupée + retour accueil | oui |
