@@ -5587,7 +5587,7 @@ user-ui (`tsc -p apps/user-ui`) et harnais verts ; miroir i18n vert (nouvelle cl
 
 # Chapitre 5.18 du cahier 01-WEB : la remise du colis — l'étape optionnelle qui verrouillait le chemin, et l'erreur qui ne se libérait pas
 
-*(PR `chore/recette-web-5-18`, 12/09/2026.)*
+*(PR `chore/recette-web-5-18` (#283), 12/09/2026.)*
 
 ## Ce qui a été fait
 

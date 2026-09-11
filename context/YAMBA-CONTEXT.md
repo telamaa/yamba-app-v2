@@ -630,7 +630,7 @@ Ordre de demarrage : auth -> trip -> gateway.
   debloque, un composant photos pour les deux ecrans, `payoutDueAt` servi, test unitaire de l'OTP. PIEGES :
   `/me/notifications` (COD-2 corrigee, plus de `if (ok)`), deux formes du suivi Expeditrice, `expect.poll` sur
   le code apres regeneration, date « le mercredi 16 septembre », « Annuler » des autres lignes, input cache
-  apres le plafond, statut hors racine. Harnais : 201 scenarios. Reste : 5.19 a 5.32, 02-ADMIN. AUCUNE
+  apres le plafond, statut hors racine. Harnais : 201 scenarios. PR **#283** (empilee sur #282). Reste : 5.19 a 5.32, 02-ADMIN. AUCUNE
   attribution Claude.
 - 11/09 : **CHAPITRE 5.17 DU CAHIER 01-WEB — WEB-COD, LE CODE DE LIVRAISON (branche `chore/recette-web-5-17`,
   empilee sur #281)** — 8 fiches jouees CONFORMES (4 apres correction), 8 scenarios en serie, 1 min 48

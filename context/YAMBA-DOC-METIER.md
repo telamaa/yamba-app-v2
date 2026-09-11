@@ -3751,7 +3751,7 @@ badge « Code validé », ni copie ni régénération.
 
 # La remise du colis — ce que le chapitre 5.18 fait respecter
 
-*(PR `chore/recette-web-5-18`, 12/09/2026 — cahier 01-WEB chapitre 5.18, WEB-REM-1 à 7.)*
+*(PR `chore/recette-web-5-18` (#283), 12/09/2026 — cahier 01-WEB chapitre 5.18, WEB-REM-1 à 7.)*
 
 ## Le besoin
 
