@@ -19,7 +19,7 @@ type SocialLink = {
 
 const FOOTER_DISCOVER_LINKS: FooterLink[] = [
   { labelKey: "howItWorks", href: "/how-it-works" },
-  { labelKey: "becomeYamber", href: "/become-yamber" },
+  { labelKey: "becomeYamber", href: "/carrier/onboarding" },
   { labelKey: "helpFaq", href: "/help" },
 ];
 

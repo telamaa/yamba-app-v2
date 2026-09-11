@@ -3976,3 +3976,174 @@ l'annulation par le Voyageur comme un lot à part. Décision attendue.
 
 `apps/e2e` : **17 scénarios** verts sur le poste (harnais ×6, WEB-CNX ×3, WEB-RSV ×5, WEB-E2E-1 à 3).
 user-ui : typecheck et i18n verts. Aucun service modifié.
+
+---
+
+# WEB-E2E-4 : le compte neuf, deux plafonds qui tombaient trop tard, un export qui ne s'ouvrait pas
+
+*(PR `chore/e2e-parcours-4`, 09/09/2026.)*
+
+## Ce qui a été fait
+
+Le quatrième parcours du cahier 01-WEB (gravité majeure) : un compte créé sur place, plafonné
+pendant trente jours (CNF-06, D71), et la vie ordinaire du compte — export des données, session
+qui expire, appareils, suppression bloquée. Quatorze étapes, 1 min 06.
+
+```
+apps/e2e/src/fixtures/compte-neuf.ts   une adresse unique par exécution, le mot de passe de recette
+apps/e2e/src/pages/inscription.ts      formulaire, case des conditions, code à six chiffres, « Compte activé »
+apps/e2e/src/pages/securite.ts         export par la porte (téléchargement réel), sessions actives, suppression bloquée, reconnexion dans la fenêtre
+apps/e2e/src/pages/reservation.ts      + tenterDeReserver() : le refus à l'intention, le refus au clic, ou le deal
+apps/e2e/src/parcours/web-e2e-4.spec.ts
+```
+
+## Deux anomalies produit, corrigées
+
+**ANO-WEB-08** — l'intention de paiement partait sans la valeur déclarée : le plafond « valeur
+déclarée » ne tombait qu'à la création du deal, après l'autorisation bancaire. Le contrat le
+prévoyait depuis ANO-API-12 ; `booking.api.ts` l'envoie désormais (conversion factorisée).
+
+**ANO-WEB-09** — l'export « Mes données » demande la réponse en `blob` : le 403 `SUDO_REQUIRED`
+arrivait en blob, le code n'était jamais lu, la porte ne s'ouvrait jamais. Le corps d'erreur en
+blob est relu en JSON avant d'être relancé. L'export RGPD était inutilisable pour tout membre.
+
+## Ce que le harnais a appris
+
+- **Un refus peut tomber à deux moments** : à l'intention (encadré dans la carte de paiement) ou
+  au clic « Payer » (toast). `tenterDeReserver()` écoute la réponse de l'intention, puis celle
+  du deal, et rend le refus tel qu'il est écrit, ou l'identifiant du deal.
+- **L'assistant garde son brouillon en `sessionStorage`** : `ouvrir()` l'oublie et recharge.
+- **Un téléchargement réel se capture** : `page.waitForEvent("download")` armé avant le clic qui
+  déclenche l'ancre `download` sur un blob ; le fichier est relu sur le disque.
+- **Une heure d'inactivité se simule fidèlement** : SES-01 fait du délai d'inactivité la durée de
+  vie de la clé Redis `refresh_jti:<userId>:<jti>` ; la supprimer (manœuvre consignée) et
+  retirer le cookie d'accès de quinze minutes, c'est exactement l'avoir laissée expirer.
+- **La fenêtre « Ta session a expiré » embarque un formulaire complet** : on la vise par son
+  `dialog`, jamais par `#email` seul.
+
+## Tests
+
+`apps/e2e` : **18 scénarios** verts sur le poste (harnais ×6, WEB-CNX ×3, WEB-RSV ×5, WEB-E2E-1 à 4).
+user-ui : typecheck et i18n verts. Aucun service modifié.
+
+---
+
+# WEB-E2E-5 : le refus au pickup, et une annulation qui n'en était pas une
+
+*(PR `chore/e2e-parcours-5`, 10/09/2026.)*
+
+## Ce qui a été fait
+
+Le cinquième parcours du cahier 01-WEB (gravité majeure) : un deal accepté et capturé, puis
+refusé par le Voyageur à la prise en charge — remboursement intégral, kilos rendus, deux emails,
+et une ligne de faits qui ne bouge pas. Huit étapes, 1 min 06.
+
+```
+apps/e2e/src/pages/transport-voyageur.ts   + refuserLeColis() : l'écran de prise en charge, la fenêtre, la raison, le toast, la réponse du serveur
+apps/e2e/src/pages/profil-public.ts        la page publique d'un membre : le publicSlug (via /auth/me), la ligne de faits, le compte d'annulations tardives
+apps/e2e/src/pages/mes-trajets.ts          + kilosRestants() partagé (sorti de web-e2e-3, qui l'importe désormais)
+apps/e2e/src/parcours/web-e2e-5.spec.ts
+```
+
+## Une anomalie produit, corrigée — ANO-WEB-10
+
+La machine d'états déclare le refus au pickup **sans pénalité** (`refusePickup` : `FULL_REFUND`,
+`RELEASE_CAPACITY`, `NOTIFY_SHIPPER` — pas de `PENALIZE_CARRIER`). Mais la réputation (D29 ①)
+est un **modèle de lecture** recalculé à part, dans `apps/deal-service/src/services/reputation.service.ts`,
+et sa requête des « annulations tardives » du Voyageur disait : `status: CANCELLED, closedBy:
+CARRIER, acceptedAt ≠ null`. Un refus au pickup coche les trois. Comme l'annulation ANN-02 par
+le Voyageur n'existe pas encore côté service (ANO-WEB-07, lot à part), ce compteur ne comptait
+en pratique **que** des refus au pickup — l'inverse exact de son intention.
+
+Pourquoi personne ne l'avait vu : le refus ne déclenchait aucun recalcul. La page publique
+restait juste jusqu'au prochain fait de réputation (un deal terminé, un avis révélé), où le refus
+apparaissait rétroactivement comme une annulation fautive. La première version du parcours passait
+donc « pour rien » (piège 7 du handoff : une assertion doit pouvoir échouer) ; la preuve a été
+faite en base — l'ancien filtre comptait 1 sur le deal refusé, le nouveau 0.
+
+Trois gestes, dans trois fichiers :
+
+1. **Une marque en base.** `Booking.pickupRefusedAt DateTime?` (`prisma/schema.prisma`). La raison
+   du refus est facultative (`pickupRefusalReason` peut être `null` sur un vrai refus), elle ne
+   pouvait pas servir de discriminant. `refusePickup` pose la marque avec `now` dans la même
+   transaction que le reste (`deal-transport.service.ts`).
+2. **Une requête qui exclut la marque, champ absent compris.** Les deals antérieurs à la marque
+   n'ont pas le champ ; sur Mongo, `pickupRefusedAt: null` ne les verrait pas (piège payé six
+   fois). D'où `OR: [{ pickupRefusedAt: null }, { pickupRefusedAt: { isSet: false } }]`.
+3. **Le refus recalcule la réputation des deux parties** (`recomputeBookingParties`, best effort,
+   comme l'annulation tardive) : la page publique dit vrai tout de suite, et l'étape 7 du parcours
+   devient une vraie relecture avant / après.
+
+Aucun DTO n'expose la marque : elle sert la réputation, pas les écrans.
+
+## Ce que le harnais a appris
+
+- **Une relecture « inchangé » n'a de valeur que si le produit a eu l'occasion de changer.** La
+  ligne de faits est lue avant la réservation et après le refus ; c'est le recalcul déclenché par
+  le refus qui rend la comparaison probante. Sans lui, l'assertion passait par inertie.
+- **Deux fenêtres pour un seul geste.** La modale (desktop) et le tiroir (mobile) portent toutes
+  deux `role="dialog"` ; le tiroir fermé est `aria-hidden`, donc absent de l'arbre des rôles.
+  On vise la fenêtre ouverte par son titre, et on confirme DANS la fenêtre — « Refuser le colis »
+  est aussi le bouton du pied de page.
+- **Le remboursement se prouve par la réponse du serveur ET par l'écran.** `refundAmountCents`
+  de `POST /deals/:id/pickup/refuse` égale le total lu à l'étape 1 ; la ligne Finances écrit le
+  même montant ; l'email de remboursement ne contient pas le mot « retenue ».
+
+## Tests
+
+deal-service : **576** tests (+1 : la requête des faits Voyageur exclut la marque, absent compris ;
+la marque et le recalcul sont vérifiés dans le spec du transport). Plateforme : 990.
+`apps/e2e` : **19 scénarios** verts sur le poste (harnais ×6, WEB-CNX ×3, WEB-RSV ×5, WEB-E2E-1 à 5).
+
+---
+
+# WEB-E2E-6 : le destinataire, et quatre liens qui menaient à un bouchon
+
+*(PR `chore/e2e-parcours-6`, 10/09/2026.)*
+
+## Ce qui a été fait
+
+Le sixième et dernier parcours du chapitre 6 (gravité majeure) : la page publique de suivi
+(D69) rechargée à chaque pas du colis, par un visiteur qui n'a qu'un lien. Neuf étapes, 1 min 00.
+Le chapitre 6 est clos.
+
+```
+apps/e2e/src/pages/suivi-destinataire.ts   + aideCourante(), jalonsAtteints(), neReveleRien(secrets) (écran + source),
+                                             clesServiesParLApi() (liste fermée), mentionDeConfidentialite(),
+                                             suivreLeLienDAcquisition(), lienInvalide(), refusDeLApi()
+apps/e2e/src/parcours/web-e2e-6.spec.ts
+```
+
+## Une anomalie produit, corrigée — ANO-WEB-11
+
+`/become/carrier` et `/become/shipper` étaient deux bouchons de la migration next-intl —
+« Become a carrier (UI only) » — jamais remplacés, et `/become-yamber` (pied de page, menu
+visiteur) n'a jamais existé. Quatre entrées « Devenir Voyageur » menaient à du vide : la page
+destinataire, l'appel final de l'accueil, le pied de page, le menu « Découvrir ».
+
+La correction tient en six fichiers : les deux bouchons deviennent des **redirections
+serveur** (`redirect` de `@/i18n/navigation`, qui garde la locale) vers l'écran réel —
+`/carrier/onboarding` et `/search` — pour tout lien déjà partagé ; les quatre liens visent
+directement l'onboarding. L'assistant d'onboarding envoie déjà un visiteur à
+`/login?redirect=/carrier/onboarding` et le ramène après connexion : c'est l'écran attendu par
+WEB-VOY-1.
+
+## Ce que le harnais a appris
+
+- **Une absence se prouve sur trois surfaces.** Le texte de l'écran, le code source
+  (`page.content()` — une donnée peut être dans le HTML sans être visible), et la réponse de
+  l'API dont les clés sont comparées à une liste FERMÉE : toute clé ajoutée au contrat fait
+  échouer le parcours, ce qui est le but.
+- **Les secrets connus se cherchent nommément.** Le harnais connaît le code de livraison, le
+  numéro du destinataire, le montant payé et les lieux de remise du trajet : `neReveleRien()`
+  les reçoit et les cherche, en plus des motifs génériques.
+- **Un `Link` Next navigue côté client** : `networkidle` ne dit rien de la navigation, on attend
+  l'URL attendue (`toHaveURL`). Et l'en-tête du site porte les mêmes libellés que le bloc
+  d'acquisition : on vise le lien DANS le bloc.
+- **Un 404 uniforme se prouve par comparaison** : le corps de la réponse pour un jeton altéré
+  d'un caractère est identique, octet pour octet, à celui d'un jeton inventé.
+
+## Tests
+
+`apps/e2e` : **20 scénarios** verts sur le poste (harnais ×6, WEB-CNX ×3, WEB-RSV ×5, WEB-E2E-1 à 6).
+user-ui : typecheck vert. Aucun service modifié.
