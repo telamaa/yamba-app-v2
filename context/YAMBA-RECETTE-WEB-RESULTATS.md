@@ -678,6 +678,62 @@ Correction     : `useDeleteSavedRoute({ onSuccess, onError })` accepte les retou
 Contre-épreuve : WEB-ALR-7 exige le toast « Alerte supprimée » (avant : « non vu » deux fois).
 ```
 
+```
+ANO-WEB-30
+Fiche          : WEB-FAV-5 (chapitre 5.11) · Gravité : MINEURE · ÉTAT : CLOSE
+Attendu        : un favori dont le trajet est parti reste listé, avec le badge « Trajet passé ».
+Obtenu         : il reste listé, sans aucun badge — la carte d'un trajet parti depuis deux jours
+                 ressemble à toutes les autres.
+Cause          : la clé `favorites.list.pastTrip` existait dans les textes FR/EN mais n'était
+                 rendue nulle part ; et la carte de recherche (`YambaTripResult`) n'expose qu'une
+                 date FORMATÉE (« 12 juin 2026 ») — rien qu'un client puisse comparer à
+                 « maintenant » sans réinterpréter une chaîne selon la locale.
+Correction     : le contrat `YambaTripResult` porte `departureAt` (ISO 8601, optionnel — les cinq
+                 `openapi.json` sont régénérés, le registre de schémas est partagé) ; le mapper
+                 trip-service le renseigne ; `FavoriteTripsList` rend « Trajet passé » quand
+                 `departureAt < maintenant`.
+Contre-épreuve : WEB-FAV-5 met `los` (Londres → Lagos, parti depuis 2 jours, toujours PUBLISHED)
+                 en favori et lit le badge dans « Mes favoris ».
+```
+
+```
+ANO-WEB-31
+Fiche          : WEB-FAV-10 (chapitre 5.11) · Gravité : MINEURE · ÉTAT : CLOSE
+Attendu        : « Ne plus suivre » puis « Confirmer » → toast « Tu ne suis plus ce voyageur ».
+Obtenu         : la ligne disparaissait, le compteur d'abonnés baissait, aucun toast.
+Cause          : même classe qu'ANO-WEB-29 (5.10) : `useUnfollowUser.onMutate` retire la carte de
+                 « Voyageurs suivis » avant la réponse ; `FollowedTripperCard` est démonté ; les
+                 callbacks passés à `mutate(slug, { onSuccess })` sont portés par l'observateur
+                 du composant, que TanStack Query détache au démontage.
+Correction     : `useUnfollowUser({ onSuccess, onError })` accepte les retours et les appelle
+                 depuis les options du hook ; la carte lui passe ses toasts et appelle
+                 `unfollow(slug)` nu. (`FollowSidebar`, sur la page publique, ne démonte pas son
+                 bouton : inchangé.)
+Contre-épreuve : WEB-FAV-10 exige le toast.
+Règle tirée    : tout retour utilisateur d'une mutation OPTIMISTE qui retire l'élément se déclare
+                 au niveau du hook, jamais dans `mutate(...)` — troisième occurrence du motif
+                 (5.10 alertes, 5.11 suivis) : à passer en revue sur tous les `mutate(x, { onSuccess })`
+                 du front (regard d'expert).
+```
+
+```
+ANO-WEB-32
+Fiche          : WEB-FAV-4 (chapitre 5.11) · Gravité : MINEURE · ÉTAT : CLOSE
+Attendu        : « tente d'ajouter un trajet masqué » → « Ce trajet n'est plus disponible ».
+Obtenu         : `POST /trips/:id/favorite` sur `yul` masqué par la médiation répondait **200** :
+                 un trajet que personne ne peut plus voir (404 public, hors recherche) se mettait
+                 encore en favori.
+Cause          : `addFavorite` ne regardait que `status !== "PUBLISHED"` ; le masquage
+                 administratif (D57, `hiddenByAdminAt`) laisse le statut PUBLISHED — c'est
+                 précisément ce qui le distingue de la pause.
+Correction     : `loadTripForFavorite` lit `hiddenByAdminAt` ; posé → 409 `TRIP_NOT_FAVORITABLE`
+                 (« This trip is no longer available. »), le même code que pour un trajet non
+                 publié, donc le même message à l'écran. Le retrait reste toujours possible.
+                 Test unitaire ajouté (`trip-favorite.service.spec.ts`, trip-service 260 → 261).
+Contre-épreuve : WEB-FAV-4 masque `yul` par le back-office, exige 409 à l'ajout et 200 au
+                 retrait, puis lève le masquage.
+```
+
 ---
 
 ## Chapitre 5.1 — Découverte, accueil et navigation · **CONFORME** (12 fiches, 1 min 24)
@@ -1330,6 +1386,88 @@ part de l'état laissé par la précédente, et la première remet Aminata à z�
   partir d'un état déjà modifié (une alerte de moins) — rejouer le fichier entier.
 - **Un toast peut ne jamais exister** (ANO-WEB-29) : quand un retour visuel manque, regarder si
   le composant qui devait l'émettre existe encore au moment de la réponse.
+
+---
+
+
+## Chapitre 5.11 — Favoris et Voyageurs suivis · **CONFORME** (12 fiches jouées, 3 après correction · 3 anomalies mineures closes · 12 scénarios en série, 1 min 50)
+
+Le cœur et le suivi sont deux mécanismes distincts (favori privé sur un trajet ; abonnement à un
+Voyageur avec email à sa prochaine publication). Aminata joue les deux ; Thomas est le Voyageur
+suivi (et l'auteur des trajets publiés par l'API pour déclencher l'email) ; Joséphine fournit le
+trajet annulé ; la médiation masque `yul`. Les recherches sont posées par le brouillon
+`sessionStorage` (page-objet `recherche.ts`), les emails lus dans Mailpit.
+
+| Fiche | Ce qui est éprouvé | Verdict | Preuve |
+|---|---|---|---|
+| WEB-FAV-1 | Le cœur ouvre la porte d'identité | **Conforme** — visiteur : « Connecte-toi pour enregistrer un favori » + « Tes favoris sont liés à ton compte : ils te suivent sur tous tes appareils. Ce trajet t'attend après connexion. » ; connexion **dans la fenêtre** : `POST /trips/:id/favorite` part après la connexion, on reste sur `/fr/search`, le cœur est rempli, `GET /trips/favorites` contient le trajet — **le geste n'est pas perdu** |
+| WEB-FAV-2 | Ajouter et retirer | **Conforme** — cœur rempli en moins de 1,5 s (mise à jour optimiste), API à jour ; « Mes favoris » : sous-titre, la même carte (11,50 €/kg), « 1 trajet » ; retour à la recherche : « Retirer des favoris », clic → vide, « Ajouter aux favoris », API à jour |
+| WEB-FAV-3 | Pas son propre trajet | **Conforme** — Thomas sur `bzv-perkg` : le cœur est présent, le clic répond par le toast « Tu ne peux pas mettre ton propre trajet en favori » (variante « info-bulle » du cahier), `403 OWN_TRIP` |
+| WEB-FAV-4 | Un trajet indisponible | **Conforme après correction** → `ANO-WEB-32` ; favori d'un trajet annulé depuis : toujours listé, sa fiche répond « Trajet introuvable » / « Ce trajet n'existe pas ou n'est plus disponible. », ré-ajout `409 TRIP_NOT_FAVORITABLE`, retrait `200` ; trajet **masqué par Yamba** : ajout `409`, retrait `200` |
+| WEB-FAV-5 | Un favori survit à la fin du trajet | **Conforme après correction** → `ANO-WEB-30` ; `los` (parti depuis 2 jours, PUBLISHED) : ajout `200`, listé avec **« Trajet passé »** |
+| WEB-FAV-6 | L'état vide des favoris | **Conforme** — retraits par le cœur depuis la liste, rechargement : « Aucun favori pour l'instant », « Touche le cœur d'un trajet dans la recherche ou sur sa fiche pour le retrouver ici. », « Chercher un trajet » |
+| WEB-FAV-7 | Suivre un Voyageur | **Conforme** — page `/u/<slug>` de Thomas : « Suivre » → « Suivi », « n abonnés » +1 (écran et API), bascule « Me notifier au prochain trajet » cochée, « Recevoir un email dès que Thomas publie un nouveau trajet. » ; « Voyageurs suivis » : « 1 voyageur suivi », Thomas N., « 7 trajets publiés », « Prochain trajet à venir » (Paris → Brazzaville, date), badge « Voyageur », « Notifications activées ». **Constat** : la note s'écrit « 5.0 » (point) ici, « 5,0 » sur la carte de recherche |
+| WEB-FAV-8 | L'email d'abonné | **Conforme** — Thomas publie Paris → Brazzaville : email **« Thomas N. vient de publier un nouveau trajet »** à Aminata, en français, lien vers le trajet |
+| WEB-FAV-9 | Notification coupée, abonnement gardé | **Conforme** — « Notifications activées » → « Notifications désactivées », `notifyNextTrip: false` à l'API ; Thomas publie : **aucun** email (10 s) ; l'abonnement reste |
+| WEB-FAV-10 | Se désabonner | **Conforme après correction** → `ANO-WEB-31` ; « Ne plus suivre » → « Confirmer » → **« Tu ne suis plus ce voyageur »**, la ligne disparaît, abonnés −1 |
+| WEB-FAV-11 | Pas soi-même | **Conforme** — sur sa page : « Modifier mon profil », aucun « Suivre » ; appel forcé `400 CANNOT_FOLLOW_SELF` |
+| WEB-FAV-12 | L'état vide des Voyageurs suivis | **Conforme** — « Aucun voyageur suivi », « Découvre les voyageurs de la communauté… », « Découvrir des Voyageurs » |
+
+### À trancher (produit)
+
+- **Le refus « propre trajet »** (FAV-3) est un toast après le clic ; le cahier accepte aussi
+  l'absence du cœur ou une info-bulle. Cacher le cœur sur ses propres cartes (l'API sait
+  `tripper.id`, le front sait `user.id`) éviterait un geste qui ne peut que échouer — petit.
+- **La note « 5.0 »** (FAV-7) : `toFixed(1)` sans locale sur la carte « Voyageurs suivis », là où
+  la carte de recherche écrit « 5,0 ». Un seul formateur — petit.
+
+### Regard d'expert — optimisations et améliorations (une ligne par fiche)
+
+- **FAV-1** — La porte reprend le geste (A63) : très bien. Mais « Ce trajet t'attend après
+  connexion » n'est vrai que si l'on se connecte DANS la fenêtre ; « Créer un compte » navigue,
+  et l'intention est perdue (non joué : inscription = chapitre 5.2). Persister l'intention
+  (`sessionStorage`) pour la reprendre après inscription — petit.
+- **FAV-2** — Le cœur est optimiste et le compteur de « Mes favoris » suit. La liste n'est pas
+  paginée (`totalCount` = tout) : au-delà de 50 favoris, charger par pages — petit ; et « Un favori
+  est privé » : le dire aussi sur la carte (info-bulle du cœur) — petit.
+- **FAV-3** — Voir « à trancher » ; et le code `OWN_TRIP` est 403 alors que `TRIP_NOT_FAVORITABLE`
+  est 409 : deux statuts pour deux refus métier — un seul (409) rendrait l'API plus régulière — petit.
+- **FAV-4** — Le favori d'un trajet annulé reste listé mais sa carte ne le dit pas (elle ressemble
+  à un trajet vivant jusqu'au clic → 404). Un état « Plus disponible » sur la carte, comme
+  « Trajet passé » — petit (l'API `listFavoriteTrips` a `status` et `hiddenByAdminAt` sous la main).
+- **FAV-5** — « Trajet passé » est rendu ; le cœur reste actif dessus (retrait) : bien. Proposer
+  « Chercher un trajet similaire » — petit.
+- **FAV-6** — Bon. Le CTA « Chercher un trajet » pourrait reprendre la dernière recherche — petit.
+- **FAV-7** — Le compteur « n abonnés » n'apparaît qu'au-dessus de zéro (`followersCount > 0`) :
+  cohérent avec « jamais 0 vue ». Le nombre de trajets publiés vient de `carrierPage.totalTripsPublished`
+  (compteur dénormalisé, D-stats) : vérifier qu'il suit les annulations (regard 5.7) — moyen à
+  auditer.
+- **FAV-8** — L'email suit le même dispatch sans outbox que les alertes (5.10, ALR-4) : même
+  remarque, même remède (outbox + consommateur) — moyen. Sujet « vient de publier un nouveau
+  trajet » : dire le corridor dans le sujet (comme pour l'alerte) — petit.
+- **FAV-9** — La bascule est un bouton texte « Notifications activées / désactivées » : un vrai
+  `role="switch"` (comme sur la page publique) pour l'accessibilité — petit.
+- **FAV-10** — Voir ANO-WEB-31 ; et « Confirmer » se rétracte en 3 s sans le dire (même remarque
+  qu'en 5.10) — petit.
+- **FAV-11** — Bon (`CANNOT_FOLLOW_SELF`). Le bouton « Discuter · Bientôt » sur sa propre page
+  (vu en 5.9) : à retirer aussi ici — petit.
+- **FAV-12** — Bon. « Découvrir des Voyageurs » mène où ? (non joué) — vérifier qu'une page de
+  découverte existe, sinon pointer la recherche — petit.
+- **Transversal** — Troisième `mutate(x, { onSuccess: toast })` perdu par une mise à jour optimiste
+  (5.10 alertes, 5.11 suivis) : passer en revue tous les `mutate(` du front avec des callbacks
+  et un `onMutate` qui retire l'élément — petit, systématique.
+
+### Pièges de poste payés ici
+
+- **Le cœur est DANS le lien de la carte** : `carte.locator("xpath=..")` remonte au conteneur de
+  la liste et `.first()` prend le cœur de la PREMIÈRE carte — le favori partait sur
+  `bzv-upcoming` au lieu de `bzv-perkg`. Viser `carte.getByRole("button", …)`. La fiche 5.9 (RCH-3)
+  avait le même sélecteur, inoffensif là (présence seulement) — corrigé aussi.
+- **`GET /users/:slug/public`** (pas `/users/:slug`) pour le DTO public d'un membre.
+- **`nx serve trip-service` est retombé sur « Recursive task invocation »** (piège 17) après deux
+  modifications rapprochées (mapper + contrat) : port 6002 muet, passerelle en `AggregateError`.
+  Relancer `nx serve trip-service`.
+- **Capitales CSS** (« PROCHAIN TRAJET À VENIR », « VOYAGEUR ») : comparaisons sans casse.
 
 ---
 

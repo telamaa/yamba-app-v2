@@ -3328,3 +3328,63 @@ nommé.
 | 154 | Prolonger / supprimer | +6 mois, suppression confirmée, compteur | oui (ANO-WEB-29 close) |
 | 155 | Plafond | 21ᵉ refusée, plafond nommé | oui |
 | 156 | Bannière de recherche | en fin de liste | oui |
+
+
+---
+
+# Favoris et Voyageurs suivis — ce que le chapitre 5.11 fait respecter
+
+*(PR `chore/recette-web-5-11` (#276), 11/09/2026 — cahier 01-WEB chapitre 5.11, WEB-FAV-1 à 12.)*
+
+## Le besoin
+
+Un Expéditeur met un trajet de côté (favori privé, lié à son compte) et suit un Voyageur pour être
+prévenu de ses prochains trajets. Les deux gestes sont immédiats, réversibles, et ne concernent
+jamais son propre trajet ni sa propre page.
+
+## Les règles
+
+**RG-WEB-127 — Le cœur d'un visiteur ouvre la porte d'identité et REPREND le geste.** Après
+connexion dans la fenêtre, le favori est enregistré et l'on reste sur la même page.
+
+**RG-WEB-128 — Un favori s'ajoute et se retire immédiatement.** Le cœur change sans attendre ;
+« Mes favoris » liste le trajet avec la même carte que la recherche ; un favori est privé.
+
+**RG-WEB-129 — Jamais son propre trajet.** Refus dit (`OWN_TRIP`).
+
+**RG-WEB-130 — Un trajet indisponible ne s'ajoute pas ; le retrait reste toujours possible.**
+Non publié, annulé ou masqué par Yamba : `TRIP_NOT_FAVORITABLE` ; le favori existant survit et sa
+fiche répond « introuvable ».
+
+**RG-WEB-131 — Un favori survit à la fin du trajet, avec le badge « Trajet passé ».**
+
+**RG-WEB-132 — Suivre un Voyageur active, par défaut, l'email à sa prochaine publication.**
+Bouton « Suivre » → « Suivi », compteur d'abonnés, bascule « Me notifier au prochain trajet ».
+
+**RG-WEB-133 — La publication d'un Voyageur suivi envoie un email à ses abonnés notifiés**, dans
+leur langue ; l'alerte de route est un mécanisme distinct (deux emails possibles).
+
+**RG-WEB-134 — Couper la notification ne désabonne pas.** Aucun email, abonnement conservé.
+
+**RG-WEB-135 — Se désabonner se confirme et se dit.** « Ne plus suivre » → « Confirmer » → « Tu
+ne suis plus ce voyageur » ; le compteur d'abonnés suit.
+
+**RG-WEB-136 — On ne se suit pas soi-même.** Pas de bouton ; appel forcé refusé
+(`CANNOT_FOLLOW_SELF`).
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| 157 | Cœur d'un visiteur | porte, connexion dans la fenêtre, favori enregistré, même page | oui |
+| 158 | Ajouter / retirer | immédiat, liste, info-bulles | oui |
+| 159 | Propre trajet | refus dit, 403 | oui |
+| 160 | Trajet annulé | introuvable, ré-ajout 409, retrait 200 | oui |
+| 161 | Trajet masqué | ajout 409 | oui (ANO-WEB-32 close) |
+| 162 | Trajet passé | listé + « Trajet passé » | oui (ANO-WEB-30 close) |
+| 163 | Favoris vides | état vide + CTA | oui |
+| 164 | Suivre | Suivi, abonnés +1, bascule cochée, liste | oui |
+| 165 | Email d'abonné | « vient de publier un nouveau trajet », FR | oui |
+| 166 | Notification coupée | aucun email, abonnement gardé | oui |
+| 167 | Se désabonner | toast, ligne retirée, abonnés −1 | oui (ANO-WEB-31 close) |
+| 168 | Soi-même / vide | pas de Suivre, 400 ; état vide | oui |

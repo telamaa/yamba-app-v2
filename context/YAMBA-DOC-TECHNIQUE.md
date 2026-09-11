@@ -4987,3 +4987,77 @@ activé » ne démontent pas la carte : leurs callbacks `mutate` restent valable
 
 Plateforme inchangée (993 + auth 229). `apps/e2e` : **119 scénarios** (`playwright --list` ;
 110 + WEB-ALR ×9). Typecheck user-ui et harnais verts.
+
+
+---
+
+# Chapitre 5.11 du cahier 01-WEB : favoris et Voyageurs suivis — une date que le client ne pouvait pas lire, un masquage que le favori ignorait, et le même toast perdu qu'en 5.10
+
+*(PR `chore/recette-web-5-11` (#276), 11/09/2026.)*
+
+## Ce qui a été fait
+
+Le onzième chapitre « fiches » du cahier 01-WEB : `WEB-FAV` (le cœur, « Mes favoris », le suivi
+d'un Voyageur et ses notifications). Douze fiches, douze jouées et conformes, trois après
+correction (`ANO-WEB-30`, `31`, `32`).
+
+```
+apps/e2e/src/chapitres/web-fav.spec.ts                  NOUVEAU — 12 scénarios en série, 1 min 50
+apps/e2e/src/chapitres/web-rch.spec.ts                  le cœur se vise DANS le lien de la carte
+packages/libs/api-contracts/src/trip/trip-search.schema.ts   ANO-WEB-30 — `departureAt` (ISO) sur la carte de recherche
+apps/*/openapi.json (×5)                                régénérés (registre de schémas partagé)
+apps/trip-service/src/lib/trip-mappers.ts               renseigne `departureAt`
+apps/user-ui/src/components/search/search-results.types.ts   le type front
+apps/user-ui/src/components/favorites/FavoriteTripsList.tsx  badge « Trajet passé »
+apps/user-ui/src/hooks/useFollowMutations.ts            ANO-WEB-31 — `useUnfollowUser({ onSuccess, onError })`
+apps/user-ui/src/components/following/FollowedTripperCard.tsx   toasts via le hook
+apps/trip-service/src/services/trip-favorite.service.ts ANO-WEB-32 — un trajet masqué par Yamba ne se met pas en favori
+apps/trip-service/src/services/trip-favorite.service.spec.ts   +1 test (261)
+```
+
+## Le geste repris après connexion, prouvé de bout en bout
+
+La porte d'identité du cœur (`AuthGateModal`, A63) monte un `LoginForm` dans la fenêtre et, à la
+connexion, rappelle `onSignedInAction` — le bouton qui l'a ouverte rejoue `toggle.mutate({ tripId,
+next: true })`. Le harnais le prouve sans rien supposer : un visiteur clique le cœur, remplit le
+formulaire DE LA FENÊTRE (`form:has(#email)` visible — la page en monte d'autres, masqués), et
+attend le `POST /trips/:id/favorite` qui part après la connexion ; l'URL reste `/fr/search`, le
+cœur est `aria-pressed`, et `GET /trips/favorites` contient le trajet.
+
+C'est là qu'un sélecteur a menti : le favori enregistré était `bzv-upcoming`, pas `bzv-perkg`.
+Le cœur est rendu DANS le `<Link>` de la carte ; `carte.locator("xpath=..")` remontait au
+conteneur de la liste et `.first()` prenait le premier cœur venu. `carte.getByRole("button")`
+suffit — et la fiche 5.9 qui portait le même sélecteur (présence seulement) est corrigée avec.
+
+## ANO-WEB-30 : une date formatée n'est pas une date
+
+« Trajet passé » avait sa clé i18n et pas de rendu. La carte de recherche (`YambaTripResult`)
+n'expose que `travelDate` (« 12 juin 2026 » / « June 12, 2026 ») : un client ne peut pas la
+comparer à « maintenant » sans réinterpréter la chaîne selon la locale — l'erreur classique. Le
+contrat gagne `departureAt` (ISO 8601, optionnel), le mapper le renseigne
+(`new Date(trip.departureAt).toISOString()`), et `FavoriteTripsList` rend le badge quand
+`new Date(item.departureAt) < new Date()`. Le schéma est dans le registre Zod partagé : les
+cinq `openapi.json` bougent (`npm run generate:openapi`), la CI les diffe.
+
+## ANO-WEB-32 : le masquage n'est pas un statut
+
+Le masquage administratif (D57) laisse le trajet PUBLISHED — c'est ce qui le distingue de la
+pause et préserve les réservations en cours — mais `addFavorite` ne testait que le statut.
+`loadTripForFavorite` lit désormais `hiddenByAdminAt` et répond 409 `TRIP_NOT_FAVORITABLE`
+(même code que « non publié », donc même message à l'écran : « Ce trajet n'est plus
+disponible »). Le retrait reste idempotent et toujours possible. Un cas de test unitaire
+(`hiddenByAdminAt: new Date()` → 409, aucun `upsert`) porte trip-service à 261.
+
+## ANO-WEB-31 : troisième fois le même motif
+
+Comme en 5.10 (`ANO-WEB-29`) : `useUnfollowUser.onMutate` retire la carte, la carte est démontée,
+son callback `mutate(slug, { onSuccess })` n'est jamais appelé. Même correctif (retours au niveau
+du hook). Ce motif est maintenant vu deux fois en deux chapitres : le regard d'expert demande une
+revue de tous les `mutate(x, { onSuccess })` du front dont le hook a un `onMutate` qui retire
+l'élément.
+
+## Tests
+
+trip-service **261** (+1, ANO-WEB-32) — plateforme **994** ; auth 229 inchangé. `apps/e2e` :
+**131 scénarios** (119 + WEB-FAV ×12). Typecheck trip-service, user-ui et harnais verts ; OpenAPI
+régénérés.
