@@ -89,6 +89,8 @@ export default function Security({ copy }: { copy: DashboardCopy }) {
     }
   }
   async function doRevoke(sess: MemberSession) {
+    // Aligner par le risque (D78) : confirmer seulement le geste qui coupe LA session courante.
+    if (sess.current && typeof window !== "undefined" && !window.confirm(s.logoutHereConfirm)) return;
     const r = await revokeSession(sess.jti).catch(() => null);
     if (r?.current) { qc.clear(); router.replace("/"); return; }
     loadSessions();

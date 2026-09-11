@@ -197,6 +197,7 @@ export function getDashboardCopy(isFr: boolean) {
       remembered: isFr ? "connexion mémorisée" : "remembered sign-in",
       revoke: isFr ? "Déconnecter" : "Sign out",
       logoutHere: isFr ? "Me déconnecter ici" : "Sign me out here",
+      logoutHereConfirm: isFr ? "Te déconnecter de cet appareil ? Tu devras te reconnecter." : "Sign out of this device? You will need to sign back in.",
     },
     // C-PR8b (D63) — mes données
     privacy: {
