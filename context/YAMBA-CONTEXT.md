@@ -610,6 +610,21 @@ Ordre de demarrage : auth -> trip -> gateway.
   desktop du visiteur sans « Creer un compte » ni « Rechercher un trajet ». Piege de poste : la cle
   Google Maps n'accepte que `localhost` comme referent. Harnais : 32 scenarios verts. PR **#265**
   (empilee sur #264). Reste : 5.2 a 5.32, 02-ADMIN.
+- 11/09 : **CHAPITRE 5.8 DU CAHIER 01-WEB — WEB-DOC, JUSTIFICATIFS ET BILLET VERIFIE (branche
+  `chore/recette-web-5-8`, empilee sur #272)** — 6 fiches, 6 jouees CONFORMES (2 apres correction), 6
+  scenarios en 1 min (`apps/e2e/src/chapitres/web-doc.spec.ts`) ; ImageKit intercepte, admin SUPPORT
+  par l'API, emails lus dans Mailpit, seed rejoue en tete de fichier (DOC-4 consomme le billet en
+  attente de bzv-upcoming). Deux anomalies MINEURES corrigees : ANO-WEB-26 (le refus > 5 Mo etait
+  MUET : `reset()` effacait l'erreur juste apres la validation — retire dans TripDocumentsManager et
+  DocumentUpload) et ANO-WEB-25 (a 5 documents la zone de depot disparaissait sans un mot — message
+  FR/EN, prop `limitHint`, cle `docLimitReached`). Une anomalie MINEURE OUVERTE : ANO-WEB-24 (aucun
+  selecteur de TYPE de document, tout depot = TICKET_PROOF ; decision produit). PIEGE DE POSTE MAJEUR :
+  `apps/trip-service/.env` (reliquat du 13/05) portait un SMTP GMAIL REEL et ecrasait l'env racine
+  pour trip-service seul — ses emails (billet, masquage, alertes) partaient par Gmail, pas Mailpit, et
+  l'echec etait avale (`.catch(() => undefined)`). Fichier deplace dans `~/.yamba-leftovers/`, le
+  catch journalise (`admin-trips.controller.ts`), `nx run-many` relance (le parent reinjectait l'env).
+  Harnais : 94 scenarios. PR **#273** (empilee sur #272). Reste : 5.9 a 5.32, 02-ADMIN. AUCUNE
+  attribution Claude.
 - 11/09 : **CHAPITRE 5.7 DU CAHIER 01-WEB — WEB-TRJ, PUBLIER UN TRAJET ET SON CYCLE DE VIE (branche
   `chore/recette-web-5-7`, empilee sur #270)** — 21 fiches : 20 jouees CONFORMES, 1 skip (TRJ-2, Google
   Places), 14 scenarios en 1 min 36 (`apps/e2e/src/chapitres/web-trj.spec.ts`). Methode : la machine a

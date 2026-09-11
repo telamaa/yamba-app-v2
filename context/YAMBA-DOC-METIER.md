@@ -3131,3 +3131,55 @@ manquent (ANO-WEB-22).
 | 122 | Dupliquer | nouveau brouillon, original inchangé | oui |
 | 123 | Sa propre page publique | « C'est votre trajet », pas de « Réserver » | oui |
 | 124 | Masqué par Yamba | bandeau ; introuvable ; hors recherche | oui (email non vérifié) |
+
+
+---
+
+# Justificatifs et billet vérifié — ce que le chapitre 5.8 fait respecter
+
+*(PR `chore/recette-web-5-8` (#273), 11/09/2026 — cahier 01-WEB chapitre 5.8, WEB-DOC-1 à 6.)*
+
+## Le besoin
+
+Un Voyageur joint des justificatifs à son trajet (billet, itinéraire…). Le billet suit un cycle
+de vérification par l'équipe : en vérification, vérifié (badge public « Billet vérifié »), ou
+rejeté avec un motif expliqué — et il peut être redéposé. Le badge rassure l'Expéditeur ; il
+n'est jamais une condition pour publier ni pour réserver.
+
+## Les règles
+
+**RG-WEB-96 — Au plus 5 documents par trajet, 5 Mo chacun, PDF / JPG / PNG / HEIC.** Le
+navigateur refuse avant tout envoi et le dit (« Le fichier dépasse 5 Mo. ») ; à la limite, l'écran
+l'explique ; le serveur refuse de toute façon (`DOCUMENT_LIMIT_REACHED`, `DOCUMENT_TOO_LARGE`).
+
+**RG-WEB-97 — Quatre statuts de billet.** « Non soumis » → « En vérification » dès qu'un billet
+est déposé → « Vérifié » ou « Rejeté » par l'équipe ; un nouveau dépôt après rejet repasse « En
+vérification ». Retirer le dernier billet ramène à « Non soumis ».
+
+**RG-WEB-98 — Seule l'équipe valide ou rejette.** Permission `tickets.review` (SUPPORT,
+MEDIATOR) ; jamais son propre billet ; un document déjà examiné ne se réexamine pas.
+
+**RG-WEB-99 — Un rejet a toujours un motif fermé, expliqué en clair.** Illisible, dates
+différentes, nom différent, document non recevable ; l'email au Voyageur nomme le motif dans sa
+langue, jamais un code.
+
+**RG-WEB-100 — La validation se voit et s'annonce.** Statut « Vérifié » pour le Voyageur, badge
+« Billet vérifié » sur la page publique et dans la recherche, email de confirmation dans la langue
+du Voyageur.
+
+**RG-WEB-101 — Le billet ne bloque rien.** Publier et réserver fonctionnent sans billet vérifié ;
+un trajet rejeté reste en ligne.
+
+**RG-WEB-102 — Un email métier qui ne part pas laisse une trace.** Aucun envoi best-effort n'est
+silencieux : l'échec est journalisé.
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| 125 | Déposer deux justificatifs | listés ; « En vérification » | oui (type non choisissable : ANO-WEB-24 ouverte) |
+| 126 | > 5 Mo ; 6ᵉ document | refus dit, rien envoyé ; limite dite ; 400 serveur | oui |
+| 127 | Statut du billet de `bzv-upcoming` | « En vérification » | oui |
+| 128 | Billet validé | « Vérifié », badge public, email FR | oui |
+| 129 | Billet rejeté (motif) | « Rejeté », email en clair, nouveau dépôt → « En vérification » | oui |
+| 130 | Sans billet vérifié | publiable, réservable, badge absent | oui |

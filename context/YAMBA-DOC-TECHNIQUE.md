@@ -4712,3 +4712,101 @@ aucun appel réseau), calculer `departureAt` dans ce fuseau, remplir `originTime
 Plateforme inchangée (993 + auth 229). `apps/e2e` : le chapitre 5.7 porte le harnais à
 **88 scénarios** listés par `playwright --list` (74 avant, + WEB-TRJ ×14 dont 1 `⏭`).
 Typecheck user-ui (`tsc -p apps/user-ui/tsconfig.json`) et harnais verts.
+
+
+---
+
+# Chapitre 5.8 du cahier 01-WEB : justificatifs et billet vérifié — deux refus muets, et un `.env` de projet qui parlait à Gmail
+
+*(PR `chore/recette-web-5-8` (#273), 11/09/2026.)*
+
+## Ce qui a été fait
+
+Le huitième chapitre « fiches » du cahier 01-WEB : `WEB-DOC` (dépôt de justificatifs sur un
+trajet, cycle de vérification du billet, emails du back-office, badge public). Six fiches, six
+jouées et conformes — deux après correction (`ANO-WEB-25`, `ANO-WEB-26`), une anomalie ouverte
+(`ANO-WEB-24`, décision produit), et un piège de poste sérieux consigné au rapport.
+
+```
+apps/e2e/src/chapitres/web-doc.spec.ts                          NOUVEAU — 6 scénarios, ImageKit intercepté, admin SUPPORT par l'API, Mailpit
+apps/user-ui/src/components/trips/create/TripDocumentsManager.tsx  ANO-WEB-26 (plus de reset() après l'envoi) + ANO-WEB-25 (limite dite)
+apps/user-ui/src/components/trips/create/DocumentUpload.tsx        idem, prop `limitHint`
+apps/user-ui/src/components/trips/create/steps/StepTrip.tsx        passe `copy.docLimitReached(5)`
+apps/user-ui/src/components/trips/create/create-trip.copy.ts       clé `docLimitReached` (FR/EN) ; `create-trip.types.ts` la déclare
+apps/trip-service/src/controllers/admin-trips.controller.ts        l'échec d'un email de billet / masquage est journalisé, plus avalé
+context/YAMBA-RECETTE-WEB-RESULTATS.md                           chapitre 5.8, ANO-WEB-24/25/26, piège `.env` de projet
+```
+
+## Le dépôt sans écrire chez le tiers
+
+Le front téléverse chez ImageKit (XHR vers `upload.imagekit.io/api/v1/files/upload`, jeton signé
+par `GET /uploads/imagekit-auth`), puis envoie au trip-service les références rendues
+(`POST /trips/:id/documents` : `type`, `fileId`, `url`, nom, type MIME, taille). Le harnais pose
+`intercepterImageKit(page)` — la même interception que pour les photos de colis — et le reste de
+la chaîne est réel : le hook refuse un mauvais type ou plus de 5 Mo **avant tout réseau**, le
+serveur borne à 5 documents (`documents.maxDocsPerTrip`, D62) et 5 Mo (`documents.maxDocSizeMb`),
+et fait passer `ticketVerificationStatus` de `NOT_SUBMITTED` / `REJECTED` à `PENDING` dès qu'un
+`TICKET_PROOF` arrive. Un PDF minimal (en-tête, `xref`, `%%EOF`) suffit ; pour la borne de
+taille, `Buffer.concat([pdf, Buffer.alloc(5 Mo + 1 − pdf.length)])`.
+
+## ANO-WEB-26 : le refus existait, il n'était jamais affiché
+
+`useImageKitUpload.validateFile` pose bien `{ code: "TOO_LARGE", message: "Le fichier dépasse
+5 Mo." }`. Mais les deux composants de dépôt faisaient :
+
+```ts
+for (const file of filesToUpload) { const uploaded = await upload(file); … }
+reset();                       // ← setError(null) : l'erreur posée par `upload` disparaît ici
+if (inputRef.current) inputRef.current.value = "";
+```
+
+`reset()` du hook remet progression, `isUploading` **et l'erreur** à zéro. L'erreur de validation
+était donc effacée dans le même tour que sa pose : l'utilisateur choisissait un fichier trop
+lourd et rien ne se passait. Le correctif retire l'appel : le hook remet déjà l'erreur à `null` au
+**début** de chaque `upload` et `isUploading` à faux dans son `finally`, il n'y a rien à
+réinitialiser après coup. Même correction aux deux endroits (détail du trajet, wizard étape 1).
+
+## ANO-WEB-25 : une limite qui se dit
+
+À cinq documents, `canAddMore` passait à faux et la zone de dépôt disparaissait sans un mot. Un
+paragraphe la remplace : `TripDocumentsManager` a la locale (`isFr`) et rend la phrase
+directement ; `DocumentUpload` n'en a pas et reçoit une prop `limitHint`, alimentée par
+`copy.docLimitReached(5)` depuis `StepTrip`. Le type `CreateTripCopy` déclare la clé — TypeScript
+strict refuse une clé de copy non déclarée (`TS2353`), c'est voulu : le copy FR/EN reste
+exhaustif par construction.
+
+## Le piège : `apps/trip-service/.env`
+
+DOC-4 et DOC-5 attendaient un email dans Mailpit et n'en recevaient aucun — alors que la revue
+répondait 200 et que le statut changeait. Rien dans les journaux : `emailCarrier` faisait
+`sendTransactionalEmail(...).catch(() => undefined)`. Par élimination : la bibliothèque envoie
+bien en processus isolé (sonde `tsx --env-file=.env`), le fournisseur est « configuré » et
+l'utilisateur trouvé (sondes temporaires)… puis `ps eww` sur le processus trip-service :
+`SMTP_HOST=smtp.gmail…`, `SMTP_USER=…`. Un `apps/trip-service/.env` du 13 mai — gitignoré,
+oublié — portait un SMTP Gmail réel et des clés ImageKit. Nx fusionne l'env racine et celui du
+projet ; trip-service, et lui seul, envoyait ses emails par Gmail pendant que les autres services
+parlaient à Mailpit. C'est exactement le piège consigné dans CLAUDE.md pour ImageKit (upload OK
+depuis trip-service, suppression KO depuis auth-service), rejoué avec l'email.
+
+Deux remèdes : le fichier est **déplacé hors du dépôt** (`~/.yamba-leftovers/`), et le `catch`
+journalise (`console.error("[admin-trips] email « … » non envoyé à … :", message)`) — un
+best-effort se lit, il ne se tait pas. Subtilité de poste : après le déplacement, `kill` du
+service ne suffit pas, le processus parent `nx run-many` avait lu l'env du projet au démarrage et
+le réinjectait à chaque redémarrage ; il faut relancer `nx run-many` (ou `nx serve` du service).
+
+## Le back-office par l'API
+
+`POST /admin/tickets/:documentId/review` (permission `tickets.review` : SUPPORT, MEDIATOR) prend
+`{ decision: "VERIFY" | "REJECT", reason? }` — un rejet sans motif est refusé par le schéma Zod
+(`ReviewTicketRequestSchema.refine`), les motifs sont fermés (`ILLEGIBLE`, `DATES_MISMATCH`,
+`NAME_MISMATCH`, `SUSPICIOUS`) et traduits en clair dans l'email (`TICKET_REJECTION_LABELS`,
+FR/EN, langue du DESTINATAIRE). La transaction met à jour le document (`updateMany … status:
+PENDING` = verrou optimiste, `TICKET_ALREADY_REVIEWED` sinon), le trajet, et écrit le journal
+d'audit (`recordAdminAction`, D54) ; l'email part après. `ADMIN_IS_OWNER` interdit d'examiner son
+propre billet.
+
+## Tests
+
+Plateforme inchangée (993 + auth 229 ; `admin-trips.controller.spec` 6/6). `apps/e2e` : **94
+scénarios** (`playwright --list` ; 88 + WEB-DOC ×6). Typecheck user-ui, trip-service et harnais
+verts.
