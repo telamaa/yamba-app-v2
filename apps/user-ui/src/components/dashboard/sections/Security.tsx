@@ -91,6 +91,9 @@ export default function Security({ copy }: { copy: DashboardCopy }) {
   async function doRevoke(sess: MemberSession) {
     const r = await revokeSession(sess.jti).catch(() => null);
     if (r?.current) { qc.clear(); router.replace("/"); return; }
+    // ANO-WEB-20 (recette 5.3, WEB-CNX-8) — la ligne disparaissait sans un mot : un geste de
+    // sécurité mérite une confirmation, comme « Déconnecter les autres appareils » en a une.
+    if (r) setMsg({ tone: "ok", text: s.sessionRevoked });
     loadSessions();
   }
   async function doRevokeOthers() {
