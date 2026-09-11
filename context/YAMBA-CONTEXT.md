@@ -610,6 +610,28 @@ Ordre de demarrage : auth -> trip -> gateway.
   desktop du visiteur sans « Creer un compte » ni « Rechercher un trajet ». Piege de poste : la cle
   Google Maps n'accepte que `localhost` comme referent. Harnais : 32 scenarios verts. PR **#265**
   (empilee sur #264). Reste : 5.2 a 5.32, 02-ADMIN.
+- 12/09 : **CHAPITRE 5.18 DU CAHIER 01-WEB — WEB-REM, LA REMISE DU COLIS (branche `chore/recette-web-5-18`,
+  empilee sur #282)** — 7 fiches jouees CONFORMES (2 apres correction), 7 scenarios en serie, 55 s
+  (`apps/e2e/src/chapitres/web-rem.spec.ts`, sgn-picked Mai ↔ Linh, bzv-picked pour l'annulation). DEUX
+  ANOMALIES CLOSES, toutes front : ANO-WEB-60 MAJEURE (« Valider la livraison » n'existait qu'APRES les trois
+  jalons « Optionnel » — la carte-projecteur offre le chemin direct, `spotlight.deliverEarly` FR/EN),
+  ANO-WEB-61 mineure (« n tentatives restantes » / « Derniere tentative » jamais rendu ; erreur persistante a la
+  ressaisie ; effet secousse declenche par le TEXTE de l'erreur, identique d'un essai a l'autre → muet au
+  deuxieme echec ; DeliverOtpInput rearme par `attemptsUsed`, `erreurMasquee`). Prouve : ecran complet (six
+  cases 3·3, encart, aide, « Tentative 1 sur 3 ») ; 000000 / 111111 → 409 DELIVERY_CODE_INVALID, compteur,
+  aucune notification cote Mai (`GET /me/notifications` identique) ; troisieme faux → 409 DELIVERY_LOCKED,
+  « Reessaye dans 14:5x », verrou apres rechargement, BON code refuse par l'API ; regeneration de Mai (carte
+  compacte de la phase voyage) → verrou leve, essais a zero, ancien code refuse ; photos : optionnel, deux au
+  plus, envoyees a la selection ; bon code + photo → DELIVERED, succes (« 28 € … le mercredi 16 septembre »),
+  aucun « Noter », Mai cloche + email « a ete livre » (« 3 jours », sans le code), Linh cloche sans email ;
+  aucune annulation (ligne de « Mes envois », suivi, Voyageur ; API 409 / 403). A trancher : destinataire
+  toujours « elle », objet de l'email, photos a la selection vs confirmation, 409/403. Regard d'expert :
+  essais rates dans l'historique admin, plafond/verrou au catalogue des reglages, dire que regenerer
+  debloque, un composant photos pour les deux ecrans, `payoutDueAt` servi, test unitaire de l'OTP. PIEGES :
+  `/me/notifications` (COD-2 corrigee, plus de `if (ok)`), deux formes du suivi Expeditrice, `expect.poll` sur
+  le code apres regeneration, date « le mercredi 16 septembre », « Annuler » des autres lignes, input cache
+  apres le plafond, statut hors racine. Harnais : 201 scenarios. Reste : 5.19 a 5.32, 02-ADMIN. AUCUNE
+  attribution Claude.
 - 11/09 : **CHAPITRE 5.17 DU CAHIER 01-WEB — WEB-COD, LE CODE DE LIVRAISON (branche `chore/recette-web-5-17`,
   empilee sur #281)** — 8 fiches jouees CONFORMES (4 apres correction), 8 scenarios en serie, 1 min 48
   (`apps/e2e/src/chapitres/web-cod.spec.ts`). CINQ ANOMALIES CLOSES, toutes front, le serveur juste partout :

@@ -3747,3 +3747,58 @@ badge « Code validé », ni copie ni régénération.
 | 227 | Quatre écrans Voyageur | aucun bouton de régénération | oui |
 | 228 | Deal livré | « saisi par … et validé », badge, plus de code | oui |
 
+---
+
+# La remise du colis — ce que le chapitre 5.18 fait respecter
+
+*(PR `chore/recette-web-5-18`, 12/09/2026 — cahier 01-WEB chapitre 5.18, WEB-REM-1 à 7.)*
+
+## Le besoin
+
+Devant le destinataire, le Voyageur saisit le code à six chiffres ; trois erreurs bloquent la saisie un quart
+d'heure (le compteur vit sur le serveur, pas dans l'écran), l'Expéditrice peut débloquer en régénérant, une
+photo de la remise est son assurance mais jamais une obligation, et le bon code vaut livraison : l'Expéditrice
+est prévenue (cloche + email), le Voyageur aussi (cloche seule), et le versement suit la période de
+vérification. Après la prise en charge, plus personne n'annule : la seule voie est le signalement.
+
+## Les règles
+
+**RG-WEB-191 — La remise est accessible depuis le suivi de transit à tout moment** ; les jalons de vol sont
+optionnels et ne conditionnent jamais l'accès à l'écran du code.
+
+**RG-WEB-192 — L'écran du code dit tout** : « Livraison à {destinataire} » / « {ville} · à valider avec le
+code », l'encart, six cases en 3 + 3 sous « CODE DE LIVRAISON REÇU PAR {destinataire} », le bouton inactif
+tant que le code est incomplet, l'aide repliable (WhatsApp / SMS, appeler l'Expéditrice, 3 essais = 15 min).
+
+**RG-WEB-193 — Chaque code faux est compté et dit** : « Ce code n'est pas le bon… », « {n} tentatives
+restantes » puis « Dernière tentative », « Tentative n sur 3 » à la ressaisie ; les cases se vident à chaque
+échec ; un essai raté ne prévient personne.
+
+**RG-WEB-194 — Trois erreurs verrouillent 15 minutes, côté serveur** : le message et le compte à rebours,
+les cases inertes, le verrou survit au rechargement, et même le BON code est refusé (409 `DELIVERY_LOCKED`).
+
+**RG-WEB-195 — Une régénération par l'Expéditrice lève le verrou et remet les essais à zéro** ; l'ancien code
+ne vaut plus rien.
+
+**RG-WEB-196 — La photo de remise est facultative, deux au plus, envoyée avant la saisie** ; elle est visible
+de l'Expéditeur et de Yamba en cas de litige.
+
+**RG-WEB-197 — Le bon code vaut livraison** : écran de succès, versement annoncé (montant net, date au plus
+tard, 2 à 7 jours), pas de « Noter » avant la complétion ; l'Expéditrice reçoit cloche + email « 3 jours »
+sans le code, le Voyageur une cloche sans email.
+
+**RG-WEB-198 — Aucune annulation après la prise en charge**, ni à l'écran (liste, suivi, Voyageur) ni par
+l'API ; la seule voie est le signalement.
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| 229 | Suivi de transit, un seul jalon confirmé | « Valider la livraison » disponible, l'écran complet | oui (ANO-WEB-60 close) |
+| 230 | Deux codes faux | messages, compteur, ressaisie, cases vidées, aucune notification | oui (ANO-WEB-61 close) |
+| 231 | Troisième code faux, rechargement, bon code | verrou 15 min persistant, 409 même pour le bon code | oui |
+| 232 | Régénération par l'Expéditrice | verrou levé, essais à zéro, ancien code refusé | oui |
+| 233 | Photos de remise | optionnel, deux au plus, envoyées à la sélection | oui |
+| 234 | Bon code | livraison, succès, notifications, email sans le code, pas d'email Voyageur | oui |
+| 235 | Deal pris en charge | aucune annulation, écran et API | oui |
+

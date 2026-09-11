@@ -5583,3 +5583,78 @@ action — et celui du message se taisait : nouvelle clé `pickedUp.code.copyFai
 Plateforme inchangée (996 + auth 229). `apps/e2e` : **194 scénarios** (186 + WEB-COD ×8). Typecheck
 user-ui (`tsc -p apps/user-ui`) et harnais verts ; miroir i18n vert (nouvelle clé `copyFailed` FR / EN).
 
+---
+
+# Chapitre 5.18 du cahier 01-WEB : la remise du colis — l'étape optionnelle qui verrouillait le chemin, et l'erreur qui ne se libérait pas
+
+*(PR `chore/recette-web-5-18`, 12/09/2026.)*
+
+## Ce qui a été fait
+
+Le dix-huitième chapitre « fiches » du cahier 01-WEB : `WEB-REM` (l'écran de saisie du code, le barème
+d'essais, le verrou, sa levée par une régénération, la photo facultative, la livraison, l'absence
+d'annulation). Sept fiches jouées et conformes (deux après correction), deux anomalies closes
+(`ANO-WEB-60` MAJEURE, `ANO-WEB-61` mineure). Le serveur était juste partout (essais comptés côté serveur,
+verrou qui survit au rechargement, bon code refusé sous verrou, régénération qui remet à zéro, notifications
+et email de remise sans le code).
+
+```
+apps/e2e/src/chapitres/web-rem.spec.ts                                            7 scénarios en série, 55 s
+apps/e2e/src/pages/suivi-expediteur.ts                                            `regenerer()` (partagé 5.17 / 5.18), `lireLeCode()` sur les deux formes de carte
+apps/user-ui/src/components/carrier/deal/views/tracking/TrackingSpotlight.tsx     ANO-WEB-60 (chemin direct vers la remise)
+apps/user-ui/messages/{fr,en}/carrierDealTracking.json                            `spotlight.deliverEarly`
+apps/user-ui/src/components/carrier/deal/views/deliver/DeliverOtpInput.tsx        ANO-WEB-61 (compteur rendu, erreur effacée à la ressaisie, effet rearmé par le compteur)
+```
+
+## ANO-WEB-60 : « Optionnel » ne doit pas verrouiller le chemin principal
+
+La carte-projecteur du suivi de transit calcule le prochain geste (`getNextEvent`) : aéroport, décollage,
+atterrissage, puis `DELIVER`. « Valider la livraison » n'existait que dans cette dernière variante. Les trois
+jalons portent le badge « Optionnel » et l'API livre depuis `PICKED_UP` sans condition — mais l'interface,
+elle, exigeait les trois clics. La variante « jalon optionnel » offre désormais le chemin direct sous le bouton
+du jalon :
+
+```tsx
+// apps/user-ui/src/components/carrier/deal/views/tracking/TrackingSpotlight.tsx
+<span>{t("spotlight.deliverEarly", { recipientFirstName })}</span>   // « Đức est déjà devant toi ? … »
+<button type="button" onClick={onDeliverAction}>{t("spotlight.DELIVER.button")}</button>
+```
+
+Règle : un état qui masque l'action principale doit avoir une sortie explicite.
+
+## ANO-WEB-61 : trois défauts dans une seule ligne d'état
+
+`DeliverOtpInput` rendait, sous les cases, SOIT l'erreur, SOIT « Tentative n sur 3 ». Conséquences :
+`otp.attemptsLeft` (« {n} tentatives restantes » / « Dernière tentative ») n'était jamais rendu ; l'erreur
+restait pendant la ressaisie (« Tentative 2 sur 3 » ne revenait pas) ; et l'effet « secousse + cases vidées »
+dépendait du texte de l'erreur — identique d'un essai à l'autre — donc muet au deuxième échec :
+
+```ts
+// avant : useEffect(() => { … }, [errorMessage]);   — même texte, pas de nouvel effet
+useEffect(() => { … }, [errorMessage, attemptsUsed]); // le compteur signale l'échec, pas le texte
+const [erreurMasquee, setErreurMasquee] = useState(false);          // effacée au premier chiffre ressaisi
+const erreurVisible = !!errorMessage && !erreurMasquee;
+```
+
+La ligne d'état rend l'erreur + le compteur, ou « Tentative n sur 3 · n tentatives restantes ».
+
+## Le harnais
+
+- `tenter(page, code)` saisit chiffre par chiffre (`getByLabel("Chiffre n")`) et attend la réponse
+  DÉFINITIVE du `POST /deliver` (le client rejoue après un 401 de session expirée) ; le statut et le corps
+  sont relus (`DELIVERY_CODE_INVALID`, `DELIVERY_LOCKED`, `lockedUntil`).
+- Le verrou de 15 minutes n'est jamais attendu : la fiche 4 le lève par une régénération côté Mai
+  (`SuiviExpediteur.regenerer()`, désormais dans le page object et partagé avec 5.17). Le suivi de Mai est
+  la forme « phase voyage » (un jalon confirmé) : `lireLeCode()` lit la carte monumentale (aria-label) ou la
+  carte compacte (texte « 742 891 »), et `regenerer()` attend que le code affiché CHANGE (`expect.poll`) —
+  la carte relit le serveur après le toast.
+- « Un essai raté n'est pas un événement » se prouve par `GET /me/notifications` identique avant / après
+  (le chemin exact — la fiche COD-2 utilisait `/notifications` derrière un `if (ok)`, corrigée).
+- L'absence d'annulation vise la LIGNE du deal dans « Mes envois » (les autres envois gardent leur bouton)
+  et double la preuve par l'API : 409 `TRANSITION_NOT_ALLOWED` (Expéditrice), 403 (Voyageur).
+
+## Tests
+
+Plateforme inchangée (996 + auth 229). `apps/e2e` : **201 scénarios** (194 + WEB-REM ×7). Typecheck
+user-ui et harnais verts ; miroir i18n vert (`spotlight.deliverEarly` FR / EN).
+
