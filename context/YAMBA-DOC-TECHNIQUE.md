@@ -3976,3 +3976,70 @@ l'annulation par le Voyageur comme un lot à part. Décision attendue.
 
 `apps/e2e` : **17 scénarios** verts sur le poste (harnais ×6, WEB-CNX ×3, WEB-RSV ×5, WEB-E2E-1 à 3).
 user-ui : typecheck et i18n verts. Aucun service modifié.
+
+---
+
+# Sécurité de la connexion : throttling + email de nouvelle connexion (D78)
+
+*(PR `feat/login-security`, 11/09/2026 — suite d'ANO-WEB-19.)*
+
+## Le problème
+
+La connexion par mot de passe n'avait aucun rempart : le limiteur du gateway est déclaré
+`skipFailedRequests`, donc une tentative en échec n'est pas comptée — un attaquant disposait de
+centaines d'essais par heure sur un compte, sans que le titulaire ne soit prévenu. Relevé en
+recette (ANO-WEB-19), déjà noté en recette API.
+
+## Le choix : ralentir, pas exiger un code
+
+On n'ajoute PAS d'OTP à chaque connexion (friction inutile, non standard : ni Airbnb ni BlaBlaCar
+ne le font). On ajoute le standard grand public : un **throttling des échecs** par compte, et une
+**alerte de nouvelle connexion**. La 2FA reste optionnelle (déjà là pour les admins, TOTP).
+
+## Ce qui a été ajouté
+
+```
+apps/auth-service/src/utils/login-policy.ts (+ .spec)   barème pur des échecs (paliers 5/10/15 → 1min/15min/1h)
+apps/auth-service/src/utils/login-guard.ts              Redis : assertLoginNotLocked / registerLoginFailure / clearLoginFailures
+apps/auth-service/src/utils/geoip.ts (+ .spec)          isPrivateIp + resolveApproxLocation (provider inerte par défaut, RGPD)
+apps/auth-service/src/utils/session-device.ts (+ .spec) isDeviceKnown (nouvel appareil ?)
+apps/auth-service/src/utils/notify-sign-in.ts (+ .spec) email de nouvelle connexion (mode new-device/every/off)
+apps/auth-service/src/emails/auth-emails.ts             newSignIn (FR/EN) ; securityAlert étendu au scope "login"
+apps/auth-service/src/controller/auth.controller.ts     loginUser recâblé ; issueSession rend le jti
+.env.example                                            LOGIN_ALERT_MODE, GEOIP_PROVIDER
+```
+
+## Le throttling, en détail
+
+Barème pur (`login-policy.ts`) par paliers de 5 échecs cumulés (compteur 24 h, remis à zéro à la
+première réussite) : 5e échec → verrou 1 min ; 10e → 15 min + email d'alerte au titulaire ; 15e et
+au-delà → 1 h. Choix de **verrous courts** : un verrou par compte est un vecteur de déni de service
+(un tiers pourrait verrouiller la victime en tapant de faux mots de passe) ; des locks courts qui
+expirent seuls ralentissent massivement le brute-force sans jamais bloquer durablement le vrai
+titulaire. Le compteur est indexé par adresse **existante ou non** : le verrou (429
+`TOO_MANY_ATTEMPTS`, avec `lockUntilSeconds`) ne révèle jamais l'existence d'un compte. L'email
+d'alerte n'est envoyé qu'au 10e échec (2e palier) et seulement si le compte existe — jamais
+d'email à une adresse inconnue.
+
+## L'email de nouvelle connexion
+
+`newSignIn` (FR/EN) : quand, appareil (dérivé du user-agent, jamais une empreinte), IP,
+localisation approximative, et « si ce n'était pas toi → sécurise ton compte ». Envoyé en
+fire-and-forget après une connexion réussie (aucune latence sur la réponse ; un échec SMTP ou géo
+n'empêche jamais la connexion). Mode `LOGIN_ALERT_MODE` : **new-device** par défaut (email
+seulement depuis un appareil non déjà vu parmi les sessions actives — le standard, pour prévenir
+sans fatiguer), `every` (à chaque connexion), `off`.
+
+## La localisation, côté RGPD
+
+Résoudre une IP en ville/pays suppose de l'envoyer à un tiers ou d'embarquer une base. Par défaut,
+**aucune géoloc** (`GEOIP_PROVIDER=none`) : l'email montre l'IP seule, et rien ne fuit. Le provider
+`ipapi` (ip-api.com, sans clé) est activable en connaissance de cause (l'IP transite hors UE) ; la
+voie recommandée à terme est une base MaxMind GeoLite2 hors-ligne, branchable dans `geoip.ts`.
+L'appel géo vit dans le chemin asynchrone de l'email, jamais sur la connexion.
+
+## Tests
+
+auth-service **229 → 249** : `login-policy.spec` (barème), `geoip.spec` (IP privées, provider,
+best-effort), `session-device.spec` (isDeviceKnown), `notify-sign-in.spec` (mode d'alerte), plus
+le miroir des emails (newSignIn FR/EN). Build webpack et typecheck verts.
