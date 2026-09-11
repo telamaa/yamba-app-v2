@@ -5144,7 +5144,7 @@ Plateforme inchangée (994 + auth 229). `apps/e2e` : **143 scénarios** (131 + W
 
 # Chapitre 5.13 du cahier 01-WEB : les plafonds du compte neuf — le levier mesuré, l'écran qui ne se contredit plus
 
-*(PR `chore/recette-web-5-13`, 11/09/2026.)*
+*(PR `chore/recette-web-5-13` (#278), 11/09/2026.)*
 
 ## Ce qui a été fait
 

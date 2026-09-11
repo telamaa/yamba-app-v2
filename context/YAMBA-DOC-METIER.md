@@ -3480,7 +3480,7 @@ l'ouverture ; l'assistant survit à un rechargement.
 
 # Les plafonds du compte neuf — ce que le chapitre 5.13 fait respecter
 
-*(PR `chore/recette-web-5-13`, 11/09/2026 — cahier 01-WEB chapitre 5.13, WEB-TRU-1 à 5.)*
+*(PR `chore/recette-web-5-13` (#278), 11/09/2026 — cahier 01-WEB chapitre 5.13, WEB-TRU-1 à 5.)*
 
 ## Le besoin
 

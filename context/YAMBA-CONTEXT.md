@@ -626,7 +626,7 @@ Ordre de demarrage : auth -> trip -> gateway.
   `neuf-<horodatage>@`. Regard d'expert : servir les PLAFONDS (pas le score) dans /auth/me pour borner des
   l'etape 1 (decision de registre), test de contrat « le DTO Expediteur ne porte aucune cle de
   TrustAssessment », cache 60 s des signaux par membre. Harnais : 148 scenarios. Reste : 5.14 a 5.32,
-  02-ADMIN. AUCUNE attribution Claude.
+  02-ADMIN. PR **#278** (empilee sur #277). AUCUNE attribution Claude.
 - 11/09 : **CHAPITRE 5.12 DU CAHIER 01-WEB — WEB-RSV, L'ASSISTANT EN QUATRE ETAPES ET LE DEVIS (branche
   `chore/recette-web-5-12`, empilee sur #276)** — 22 fiches : 21 jouees CONFORMES (7 apres correction), 1 skip
   (carte refusee, fournisseur FAKE), 12 scenarios en 2 min 05 (`apps/e2e/src/chapitres/web-rsv-devis.spec.ts`,
