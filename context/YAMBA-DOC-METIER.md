@@ -3523,3 +3523,62 @@ l'export de ses données, ni dans une réponse d'API ; le seul signal est le mes
 | 194 | Compte de 90 jours, 12 kg à 450 € | aucun refus | oui |
 | 195 | Écrans, API, export du compte neuf | aucun score, niveau, point, plafond chiffré | oui |
 
+---
+
+# La demande côté Voyageur : accepter, refuser, expirer — ce que le chapitre 5.14 fait respecter
+
+*(PR `chore/recette-web-5-14`, 11/09/2026 — cahier 01-WEB chapitre 5.14, WEB-DEA-1 à 9.)*
+
+## Le besoin
+
+Un Voyageur qui reçoit une demande la voit partout où il agit (accueil, ses trajets, la cloche), lit
+tout ce qu'il doit savoir avant de s'engager — et rien de ce qui ne le regarde pas —, s'engage par la
+Charte, accepte (l'argent est capturé, l'Expéditrice prévenue) ou refuse sans pénalité ; une demande
+expirée ne s'accepte plus ; deux décisions concurrentes ne créent jamais deux vérités.
+
+## Les règles
+
+**RG-WEB-160 — Une demande reçue apparaît sur l'accueil, dans « Mes trajets » (bande « À traiter »,
+badge « Demande » sur le trajet) et dans la cloche**, avec le gain net, le poids et le délai restant ;
+il n'existe pas d'onglet « demandes » séparé.
+
+**RG-WEB-161 — Le Voyageur lit le net (« TU GAGNES »), jamais le total payé par l'Expéditrice ni la
+commission**, ni à l'écran ni dans ce que l'API lui répond ; le mot « assurance » n'apparaît jamais.
+
+**RG-WEB-162 — La demande dit d'où elle vient, ce qu'elle contient (catégorie, poids, valeur,
+description, photos), où remettre et livrer, et le délai de réponse** ; la puce du délai devient une
+alerte à moins de deux heures.
+
+**RG-WEB-163 — La Charte Voyageur est obligatoire** : sans la case, refus explicite ; six engagements et
+la phrase de responsabilité sont lus avant d'accepter.
+
+**RG-WEB-164 — Accepter capture le paiement et prévient l'Expéditrice** (notification, email avec le
+montant), ouvre « Mon Deal accepté » (cinq jalons, contact, paiement à J+4) et le fil de messagerie.
+
+**RG-WEB-165 — Refuser ne pénalise pas** : cinq raisons fermées, aucun texte libre, l'Expéditrice est
+prévenue (bandeau, email avec la raison), l'autorisation est levée, les kilos rendus, la réputation
+intacte.
+
+**RG-WEB-166 — Une demande dont la date limite est passée ne s'accepte plus, avant même le cron** (409)
+; le cron prévient ensuite l'Expéditrice (bandeau, email « a expiré »).
+
+**RG-WEB-167 — Deux décisions concurrentes** : la seconde est refusée (409), l'écran le dit et se relit
+sur l'état réel ; un seul débit.
+
+**RG-WEB-168 — Un deal fermé nomme son état et n'offre aucune action** ; le code de livraison
+n'apparaît jamais côté Voyageur, ni à l'écran ni dans le DTO.
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| 196 | Où la demande apparaît | accueil, Mes trajets, cloche, dates justes | oui (ANO-WEB-41 close) |
+| 197 | L'écran de la demande | blocs, net seul, puce ambre/rouge | oui (ANO-WEB-42 close ; ANO-WEB-43 ouverte) |
+| 198 | Charte obligatoire | refus sans case, six engagements | oui |
+| 199 | Accepter | écran accepté, notification, email, capture, fil | oui |
+| 200 | Refuser | cinq raisons, aucun texte libre, email, kilos, aucune pénalité | oui |
+| 201 | Expirée | 409 avant le cron, bandeau et email après | oui |
+| 202 | Deux onglets | 409, toast, relecture, un débit | oui |
+| 203 | États fermés | bandeau + aucune action | oui |
+| 204 | Mon Deal accepté | blocs, code secret nommé Clarisse, aucun code | oui (ANO-WEB-44 close) |
+

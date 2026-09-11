@@ -5217,3 +5217,91 @@ est aussi dans le DOM sur écran large).
 Plateforme inchangée (994 + auth 229). `apps/e2e` : **148 scénarios** (143 + WEB-TRU ×5). Typecheck
 user-ui et harnais verts.
 
+---
+
+# Chapitre 5.14 du cahier 01-WEB : la demande côté Voyageur — deux données servies par l'API que le front ne lisait pas
+
+*(PR `chore/recette-web-5-14`, 11/09/2026.)*
+
+## Ce qui a été fait
+
+Le quatorzième chapitre « fiches » du cahier 01-WEB : `WEB-DEA` (accepter, refuser, expirer, deux
+onglets, états fermés, « Mon Deal accepté »). Neuf fiches jouées et conformes (trois après correction),
+trois anomalies closes (`ANO-WEB-41` MAJEURE, `ANO-WEB-42` mineure, `ANO-WEB-44` MAJEURE), une ouverte
+(`ANO-WEB-43`, DTO à enrichir).
+
+```
+apps/e2e/src/chapitres/web-dea.spec.ts                          9 scénarios en série, 2 min 20
+apps/user-ui/src/components/trips/list/trip-local-dates.ts     ANO-WEB-41 (dates locales dérivées de departureAt, pure)
+apps/user-ui/src/hooks/useTrip.ts                               ANO-WEB-41 (useMyTrips / useTrip normalisent à la lecture)
+apps/user-ui/src/components/trips/list/my-trips.config.ts       ANO-WEB-41 (TripListItem : departureAt, arrivalAt, fuseaux)
+apps/user-ui/src/components/carrier/deal/deal.adapter.ts        ANO-WEB-42 (un lieu, une ligne) + ANO-WEB-44 (recipientFirstName)
+apps/user-ui/src/components/carrier/deal/deal.types.ts          ANO-WEB-44
+apps/user-ui/src/components/carrier/deal/views/accepted/*.tsx   ANO-WEB-44 (Desktop, Mobile), ANO-WEB-42 (Recap : ville non répétée)
+apps/user-ui/src/components/carrier/deal/views/settled/DealSettledView.tsx   ANO-WEB-44
+```
+
+## ANO-WEB-41 : le tableau de bord ne connaissait que les dates du wizard
+
+`TripListItem` (accueil, « Mes trajets », badge de navigation, fiche du trajet) ne portait que
+`departureDateLocal` / `departureTimeLocal` — des chaînes que SEUL le wizard de création écrit. Un
+trajet créé par l'API, le seed ou un futur client mobile n'en a pas : l'adapter des actions repliait
+sur `new Date(0)` (« jeu. 1 janv. » partout), `isTripPastDeparture(null)` répondait « pas parti » (un
+trajet parti depuis six jours dans « à venir »), le tri par date était faux. Même famille qu'ANO-WEB-22
+(le wizard en édition), côté lecture cette fois.
+
+Le remède est UNE fonction pure appliquée UNE fois, à la source :
+
+```ts
+// apps/user-ui/src/components/trips/list/trip-local-dates.ts
+export function withLocalDates<T extends TripDatesLike>(trip: T): T {
+  const dep = localDateTime(trip.departureAt, trip.originTimezone);      // « 2026-09-26 » / « 14:00 » dans le fuseau du lieu
+  const arr = localDateTime(trip.arrivalAt, trip.destinationTimezone);   // repli : fuseau du navigateur (celui du mapper d'écriture)
+  …
+  return { ...trip, departureDateLocal: trip.departureDateLocal || dep?.date || …, … }; // le wizard garde la priorité
+}
+```
+
+Branchée dans `useMyTrips` (`withLocalDatesInList(res.data)`) et `useTrip` (`withLocalDates(res.data.trip)`) :
+les sept consommateurs des chaînes locales n'ont pas bougé et sont tous corrigés. `Intl.DateTimeFormat("en-CA")`
+donne directement `AAAA-MM-JJ` ; un fuseau inconnu (`RangeError`) retombe sur le navigateur.
+
+## ANO-WEB-44 : un « TODO Phase backend » devenu un prénom
+
+« Mon Deal accepté » écrivait « Aminata le révèle à **Hall** quand tu confirmes le pickup » : le prénom
+du destinataire était `deliveryLocation.name.split(" ")[0]` (« Hall d'arrivée · Brazzaville »). L'API
+sert pourtant `recipient.firstName` dès la création — `recipientForCarrier` ne retient que le téléphone
+avant le pickup — mais l'adapter n'exposait `recipient` qu'après le pickup (philosophie É4, qui ne
+vaut que pour le téléphone). `DealDetail.recipientFirstName` est désormais toujours posé ; `recipient`
+(avec téléphone) attend toujours le pickup : les vues « livrer » et « suivi » n'ont pas changé.
+
+## ANO-WEB-42 : un lieu, une ligne
+
+`toLocation` posait `name = details || city` ET `detail = details` : la même ligne deux fois sous
+« REMISE DU COLIS », et la ligne de repli de la livraison (« Téléphone du destinataire communiqué à la
+prise en charge »), qui ne s'affiche que sans `detail`, n'apparaissait jamais. `detail` n'est gardé
+que s'il diffère de `name`. Même motif sur le récapitulatif accepté (« … · Brazzaville · Brazzaville ») :
+la ville n'est ajoutée que si le lieu ne la porte pas.
+
+## Le harnais
+
+- Les demandes vivantes sont créées par l'assistant (2,5 kg S 150 € : 32,20 / 28,75), avec photos
+  (ImageKit intercepté) pour la fiche 2 ; `bzv-pending` sert au refus, `gru-pending` à l'expiration
+  (manœuvre `scripts/recette/deal-eligible.ts <id> -1500`, puis passe forcée `scripts/recette/expire.ts`),
+  les trois deals clos du seed aux états fermés.
+- **Deux onglets « sans recharger »** : TanStack Query relit le deal au retour du focus — l'onglet 2
+  rejoue sa première lecture (`page.route` → `fulfill`) jusqu'au clic « Refuser le Deal », puis `unroute` :
+  le 409 `TRANSITION_NOT_ALLOWED`, le toast et la relecture sont ceux du produit.
+- La puce d'expiration : `expiresAt` reculé à +90 min → classe `red-*` et `role="alert"`, remis à +23 h.
+- « Aucune pénalité » : le profil public de Thomas (`GET /users/seed-thomas/public`) est comparé
+  octet pour octet avant et après le refus ; les kilos par le DTO propriétaire.
+- Ce qu'un membre ne doit pas voir se lit aussi dans les DTO : ni `totalShipperCents` / `commissionCents`
+  chez le Voyageur, ni `deliveryCode`.
+
+## Tests
+
+Plateforme inchangée (994 + auth 229). `apps/e2e` : **157 scénarios** (148 + WEB-DEA ×9). Typecheck
+user-ui (`tsc -p apps/user-ui`, comme la CI) et harnais verts. Poste : la cible inférée `nx typecheck`
+des deux fronts Next a disparu en cours de session (les services l'ont encore) — `npx tsc --noEmit -p
+apps/user-ui/tsconfig.json` est l'équivalent exact de la CI.
+

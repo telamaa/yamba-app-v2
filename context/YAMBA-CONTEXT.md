@@ -610,6 +610,26 @@ Ordre de demarrage : auth -> trip -> gateway.
   desktop du visiteur sans « Creer un compte » ni « Rechercher un trajet ». Piege de poste : la cle
   Google Maps n'accepte que `localhost` comme referent. Harnais : 32 scenarios verts. PR **#265**
   (empilee sur #264). Reste : 5.2 a 5.32, 02-ADMIN.
+- 11/09 : **CHAPITRE 5.14 DU CAHIER 01-WEB — WEB-DEA, LA DEMANDE COTE VOYAGEUR (branche
+  `chore/recette-web-5-14`, empilee sur #278)** — 9 fiches jouees CONFORMES (3 apres correction), 9 scenarios
+  en serie, 2 min 20 (`apps/e2e/src/chapitres/web-dea.spec.ts`). Demandes creees par l'assistant (32,20 /
+  28,75, photos interceptees) ; accueil / Mes trajets / cloche ; ecran de la demande bloc par bloc (net seul,
+  jamais 32,20 ni « commission », ni a l'ecran ni dans le DTO ; puce ambre puis ROUGE + role=alert sous 2 h
+  par manoeuvre) ; Charte obligatoire ; acceptation (capture « Bloque chez Yamba », notification, email, fil
+  ouvert des deux cotes) ; refus (5 raisons fermees, aucun texte libre, kilos rendus, profil public identique,
+  email avec la raison reformulee) ; expiration (409 TRANSITION_NOT_ALLOWED avant le cron, passe forcee
+  scripts/recette/expire.ts -> bandeau + email) ; deux onglets (409, toast, relecture, un seul debit) ; etats
+  fermes ; « Mon Deal accepte » (code secret, aucun code nulle part). TROIS ANOMALIES CLOSES : ANO-WEB-41
+  MAJEURE (« jeu. 1 janv. » partout : TripListItem ignorait departureAt — `trip-local-dates.ts` pur,
+  applique dans useMyTrips/useTrip), ANO-WEB-42 mineure (lieu ecrit deux fois, mention du telephone jamais
+  affichee ; ville repetee sur le recap accepte), ANO-WEB-44 MAJEURE (destinataire nomme « Hall » = premier
+  mot du lieu ; `recipientFirstName` servi a toute etape). ANO-WEB-43 mineure OUVERTE (« {n} envois »,
+  « Membre depuis » absents : DTO toCounterpart a enrichir, PR dediee). A trancher : accueil en lignes vs carte
+  « {n} demandes en attente » (copie morte), trois textes du cahier non rendus (stateLabel, COUVERTURE DU COLIS,
+  note du gain), raison reformulee dans l'email. Regard d'expert : `grep "TODO Phase"` (survivants de
+  maquette), `isExpired` dans le DTO Expediteur, ordre capture/transaction a relire. Harnais : 157 scenarios.
+  Poste : la cible `nx typecheck` des deux fronts Next a disparu (CI = tsc -p apps/user-ui, equivalent
+  `npx tsc --noEmit -p apps/user-ui/tsconfig.json`). Reste : 5.15 a 5.32, 02-ADMIN. AUCUNE attribution Claude.
 - 11/09 : **CHAPITRE 5.13 DU CAHIER 01-WEB — WEB-TRU, LES PLAFONDS DU COMPTE NEUF (branche
   `chore/recette-web-5-13`, empilee sur #277)** — 5 fiches jouees CONFORMES (1 apres correction), 5 scenarios
   en serie, 2 min 00 (`apps/e2e/src/chapitres/web-tru.spec.ts`). Compte neuf cree par l'ecran en fiche 1 ;
