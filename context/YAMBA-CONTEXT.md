@@ -610,6 +610,22 @@ Ordre de demarrage : auth -> trip -> gateway.
   desktop du visiteur sans « Creer un compte » ni « Rechercher un trajet ». Piege de poste : la cle
   Google Maps n'accepte que `localhost` comme referent. Harnais : 32 scenarios verts. PR **#265**
   (empilee sur #264). Reste : 5.2 a 5.32, 02-ADMIN.
+- 11/09 : **CHAPITRE 5.7 DU CAHIER 01-WEB — WEB-TRJ, PUBLIER UN TRAJET ET SON CYCLE DE VIE (branche
+  `chore/recette-web-5-7`, empilee sur #270)** — 21 fiches : 20 jouees CONFORMES, 1 skip (TRJ-2, Google
+  Places), 14 scenarios en 1 min 36 (`apps/e2e/src/chapitres/web-trj.spec.ts`). Methode : la machine a
+  etats est deja unit-testee (500 lignes), la recette l'EXERCE (brouillons crees par l'API, gestes,
+  `allowedActions`, recherche publique) ; le wizard est ouvert EN EDITION (`?edit=<id>`) pour eprouver
+  les etapes 2 et 3 sans Google. Une anomalie MINEURE trouvee et CORRIGEE : ANO-WEB-22 (le mapper inverse
+  du wizard ne lisait que `departureDateLocal`/`TimeLocal`, ecrits par lui seul : un trajet cree par
+  l'API ou le seed s'ouvrait en edition avec « 4 champs a completer » — repli sur `departureAt` via
+  `Intl.DateTimeFormat.formatToParts` dans le fuseau du lieu sinon du navigateur,
+  `create-trip.reverse-mapper.ts`). Une anomalie MINEURE OUVERTE : ANO-WEB-23 (le wizard n'envoie
+  aucun fuseau, `departureAt` est calcule dans le fuseau du NAVIGATEUR, le serveur retombe sur
+  Europe/Paris ; proposition : fuseau derive des coordonnees cote serveur, PR dediee, decision produit).
+  Ecarts a trancher : « Ton prix = ton net » absent de l'ecran, « Lieu exact » = « Exact », cartes de
+  lieu par mode de transport, justificatifs a l'etape 1. D72 verifie A L'ECRAN (toast « Ce trajet porte
+  encore N deals en cours ») et par l'API. Harnais : 88 scenarios (`playwright --list`). PR **#272**
+  (empilee sur #270). Reste : 5.8 a 5.32, 02-ADMIN. AUCUNE attribution Claude.
 - 11/09 : **CHAPITRE 5.6 DU CAHIER 01-WEB — WEB-VOY, DEVENIR VOYAGEUR / ONBOARDING / STRIPE (branche
   `chore/recette-web-5-6`, empilee sur #269)** — 7 fiches : 4 jouees CONFORMES, 3 skip motives, AUCUNE
   anomalie (`apps/e2e/src/chapitres/web-voy.spec.ts`). Compte NEUF (l'onboarding transforme le compte ;

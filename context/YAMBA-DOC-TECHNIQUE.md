@@ -4587,3 +4587,128 @@ constate que la règle est **testée unitairement** : `deal-lifecycle.service.ts
 
 Aucun test unitaire ajouté. `apps/e2e` : le chapitre 5.6 porte le harnais à **76 scénarios**
 (72 + WEB-VOY ×4, dont 3 `⏭`). Harnais : typecheck vert.
+
+
+---
+
+# Chapitre 5.7 du cahier 01-WEB : publier un trajet et son cycle de vie — le wizard éprouvé en édition, et un mapper inverse qui ne relisait que sa propre écriture
+
+*(PR `chore/recette-web-5-7` (#272), 11/09/2026.)*
+
+## Ce qui a été fait
+
+Le septième chapitre « fiches » du cahier 01-WEB : `WEB-TRJ` (assistant de création en trois
+étapes, gardes de publication, six statuts, actions permises, D72, masquage administratif).
+Vingt et une fiches ; vingt jouées et conformes, une `⏭` (l'étape 1 passe par Google Places).
+Une anomalie mineure trouvée et corrigée (`ANO-WEB-22`), une mineure ouverte (`ANO-WEB-23`).
+
+```
+apps/e2e/src/chapitres/web-trj.spec.ts                        NOUVEAU — 14 scénarios (13 joués + 1 ⏭), 1 min 36
+apps/e2e/src/pages/mes-trajets.ts                             ligne visée par l'id du trajet ; menu « … » rouvert si la liste s'est re-rendue
+apps/user-ui/src/components/trips/create/create-trip.reverse-mapper.ts   ANO-WEB-22 — dates dérivées de departureAt / arrivalAt
+context/YAMBA-RECETTE-WEB-RESULTATS.md                        chapitre 5.7, ANO-WEB-22, ANO-WEB-23, écarts à trancher, pièges
+```
+
+## Le choix de méthode : exercer, pas re-prouver
+
+La machine à états du trajet est déjà couverte par un test unitaire de cinq cents lignes
+(`apps/trip-service/src/services/trip-state-machine.spec.ts`). Rejouer ses tables de vérité au
+navigateur n'apporterait rien ; ce que la recette doit prouver, c'est que **le système entier**
+respecte la machine : le contrôleur applique la transition, l'outbox part, la recherche publique
+voit ou ne voit plus le trajet, l'écran lit `allowedActions` et ne décide rien. D'où la forme du
+chapitre : des brouillons créés par l'API (`POST /trips` avec `publish:false`), les gestes tentés
+(`/publish`, `/pause`, `/resume`, `/cancel`, `/restore`, `/archive`, `PUT`), les statuts et les
+codes lus, la visibilité vérifiée par `GET /trips/search?from&to`.
+
+Pour l'assistant lui-même, le verrou était l'étape 1 : l'itinéraire passe par l'autocomplétion
+Google Places, hors périmètre du harnais (décision prise en 5.2, tenue en 5.6). L'astuce du
+chapitre : **ouvrir le wizard en édition** (`/fr/trips/create?edit=<id>`) sur un brouillon créé
+par l'API. Les villes sont rendues depuis le trajet, l'étape 1 est valide, « Continuer » ouvre
+l'étape « Conditions » — et tout ce que le cahier demande aux étapes 2 et 3 (prix, curseurs,
+gain, familles, forfaits, lieux, aperçu) se vérifie sur l'interface réelle. Trois brouillons
+suffisent : le complet (11,50 €/kg, 23 kg, une famille surchargée, une refusée), un à 5 kg (les
+forfaits grisés), un à 23 kg avec un forfait soute (l'équivalent au kilo). Un brouillon `TRAIN`
+prouve que la carte « À la gare » existe.
+
+## ANO-WEB-22 : le mapper inverse ne savait relire que ce que le mapper avait écrit
+
+Première ouverture du wizard en édition sur un brouillon de l'API : « 4 champs à compléter »,
+« Date requise » ×2, « Heure requise » ×2. Les dates sont pourtant en base. La cause tient en
+quatre lignes de `create-trip.reverse-mapper.ts` :
+
+```ts
+departureDate: toDate(trip.departureDateLocal),
+arrivalDate: toDate(trip.arrivalDateLocal),
+departureTime: trip.departureTimeLocal ?? "",
+arrivalTime: trip.arrivalTimeLocal ?? "",
+```
+
+`departureDateLocal` et `departureTimeLocal` sont des chaînes (« 2026-10-01 », « 14:00 ») que le
+mapper d'écriture du wizard ajoute à côté de l'instant `departureAt` — pour ré-afficher
+exactement ce qui a été tapé. Le mapper inverse ne lisait **que** ces chaînes : un trajet venu
+d'un autre canal (l'API, le seed, un futur client mobile) n'en a pas, et son édition s'ouvrait
+avec les dates vides. Enregistrer aurait renvoyé `departureAt: null`.
+
+Le correctif est un repli, pas un remplacement — les chaînes locales gardent la priorité :
+
+```ts
+function localDateTimeParts(iso, timeZone): { date?: Date; time: string } {
+  const instant = iso instanceof Date ? iso : new Date(iso);
+  const options: Intl.DateTimeFormatOptions = { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false };
+  let parts: Intl.DateTimeFormatPart[];
+  try {
+    parts = new Intl.DateTimeFormat("en-CA", { ...options, timeZone: timeZone ?? undefined }).formatToParts(instant);
+  } catch {
+    parts = new Intl.DateTimeFormat("en-CA", options).formatToParts(instant); // fuseau inconnu → navigateur
+  }
+  const get = (type) => parts.find((p) => p.type === type)?.value ?? "";
+  const hour = get("hour") === "24" ? "00" : get("hour");
+  return { date: toDate(`${get("year")}-${get("month")}-${get("day")}`), time: `${hour}:${get("minute")}` };
+}
+// …
+departureDate: toDate(trip.departureDateLocal) ?? departureFallback.date,
+departureTime: trip.departureTimeLocal || departureFallback.time,
+```
+
+Trois détails qui comptent : `formatToParts` (pas `toLocaleString` + découpage de chaîne) donne
+chaque composant sans dépendre du format d'une locale ; le fuseau vient du lieu
+(`originTimezone`) quand il est connu et sinon du **navigateur** — c'est le fuseau que le mapper
+d'écriture utilise, donc la même convention dans les deux sens ; un fuseau que le moteur ne
+connaît pas (`RangeError`) retombe sur le navigateur au lieu de casser l'écran. `hour12:false`
+peut rendre « 24 » à minuit selon les moteurs : normalisé en « 00 ».
+
+Aucun test unitaire n'est ajouté (user-ui n'a pas de jest) ; la contre-épreuve est la fiche
+WEB-TRJ-3…9 elle-même, qui ouvre un brouillon de l'API et exige l'absence de « Date requise ».
+
+## ANO-WEB-23 : le fuseau du navigateur n'est pas celui du lieu
+
+En lisant le mapper d'écriture pour ANO-WEB-22, une seconde chose apparaît : le wizard n'envoie
+**aucun** fuseau. `toDateTimeIso(date, "14:00")` fait `setHours(14)` sur une `Date` du navigateur
+et sérialise en ISO : « 14:00 » est 14 h dans le fuseau du poste du Voyageur, pas à Bruxelles ni
+à Kinshasa. Les chaînes locales sauvent l'affichage (tout le monde voit « 14:00 »), mais
+l'instant absolu — celui que lisent les crons d'expiration et de complétion et la garde « départ
+passé » — est décalé dès que le lieu et le navigateur ne partagent pas le fuseau. Côté serveur,
+`computeDenormalizedFields` retombe sur `Europe/Paris` faute d'`originTimezone`. La fiche
+WEB-TRJ-2 est `⏭` (Google), l'anomalie est consignée ouverte avec une proposition : dériver le
+fuseau des coordonnées **côté serveur** (`originLat/Lng` existent déjà ; une table hors-ligne,
+aucun appel réseau), calculer `departureAt` dans ce fuseau, remplir `originTimezone` /
+`destinationTimezone` que les mappers d'affichage consomment déjà. Décision produit, PR dédiée.
+
+## Le harnais : trois pièges de rendu
+
+1. **`innerText` rend le texte après CSS** : « Aperçu public » est `uppercase` → « APERÇU
+   PUBLIC ». Les comparaisons sur `innerText` sont insensibles à la casse ; `getByText` lit le DOM.
+2. **Une infobulle qui se ferme au défilement** (`window.addEventListener("scroll", close, true)`)
+   contre un `click()` qui fait défiler avant de cliquer : `scrollIntoViewIfNeeded()` d'abord,
+   puis `expect.poll` qui re-clique tant que `aria-expanded` n'est pas `true`, et le contenu lu par
+   l'`id` que donne `aria-controls` (un `useId` React contient des « : », d'où `[id="…"]`).
+3. **Un menu qui se ferme parce que la liste se re-rend** (TanStack Query rafraîchit « Mes
+   trajets » après les mutations des fiches précédentes — le scénario passait seul, échouait dans
+   la suite) : la page-objet réessaie l'ouverture jusqu'à voir « Annuler ». Et comme Thomas a
+   trois trajets Paris → Brazzaville, la ligne se vise par l'`href` du lien (`…/dashboard/trips/<id>`).
+
+## Tests
+
+Plateforme inchangée (993 + auth 229). `apps/e2e` : le chapitre 5.7 porte le harnais à
+**88 scénarios** listés par `playwright --list` (74 avant, + WEB-TRJ ×14 dont 1 `⏭`).
+Typecheck user-ui (`tsc -p apps/user-ui/tsconfig.json`) et harnais verts.
