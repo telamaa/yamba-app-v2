@@ -5221,7 +5221,7 @@ user-ui et harnais verts.
 
 # Chapitre 5.14 du cahier 01-WEB : la demande côté Voyageur — deux données servies par l'API que le front ne lisait pas
 
-*(PR `chore/recette-web-5-14`, 11/09/2026.)*
+*(PR `chore/recette-web-5-14` (#279), 11/09/2026.)*
 
 ## Ce qui a été fait
 

@@ -629,7 +629,7 @@ Ordre de demarrage : auth -> trip -> gateway.
   note du gain), raison reformulee dans l'email. Regard d'expert : `grep "TODO Phase"` (survivants de
   maquette), `isExpired` dans le DTO Expediteur, ordre capture/transaction a relire. Harnais : 157 scenarios.
   Poste : la cible `nx typecheck` des deux fronts Next a disparu (CI = tsc -p apps/user-ui, equivalent
-  `npx tsc --noEmit -p apps/user-ui/tsconfig.json`). Reste : 5.15 a 5.32, 02-ADMIN. AUCUNE attribution Claude.
+  `npx tsc --noEmit -p apps/user-ui/tsconfig.json`). PR **#279** (empilee sur #278). Reste : 5.15 a 5.32, 02-ADMIN. AUCUNE attribution Claude.
 - 11/09 : **CHAPITRE 5.13 DU CAHIER 01-WEB — WEB-TRU, LES PLAFONDS DU COMPTE NEUF (branche
   `chore/recette-web-5-13`, empilee sur #277)** — 5 fiches jouees CONFORMES (1 apres correction), 5 scenarios
   en serie, 2 min 00 (`apps/e2e/src/chapitres/web-tru.spec.ts`). Compte neuf cree par l'ecran en fiche 1 ;

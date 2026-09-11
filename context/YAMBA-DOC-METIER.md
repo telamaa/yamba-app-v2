@@ -3527,7 +3527,7 @@ l'export de ses données, ni dans une réponse d'API ; le seul signal est le mes
 
 # La demande côté Voyageur : accepter, refuser, expirer — ce que le chapitre 5.14 fait respecter
 
-*(PR `chore/recette-web-5-14`, 11/09/2026 — cahier 01-WEB chapitre 5.14, WEB-DEA-1 à 9.)*
+*(PR `chore/recette-web-5-14` (#279), 11/09/2026 — cahier 01-WEB chapitre 5.14, WEB-DEA-1 à 9.)*
 
 ## Le besoin
 
