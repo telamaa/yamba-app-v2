@@ -45,8 +45,8 @@ export default function DealAcceptedDesktop({ deal, onCloseAction }: Props) {
     { id: "payout", label: t("timeline.steps.payout") },
   ];
 
-  const recipientFirstName =
-    deal.deliveryLocation.name.split(" ")[0] || deal.deliveryLocation.name;
+  // ANO-WEB-44 : le prénom du destinataire vient du DTO, plus du premier mot du lieu de livraison.
+  const recipientFirstName = deal.recipientFirstName || deal.deliveryLocation.city;
 
   const netAmount = formatAmount(deal.earnings.netForCarrier, locale);
 
