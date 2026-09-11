@@ -9,8 +9,25 @@
  * trajet qui porte encore un deal vivant est refusé (409 `TRIP_HAS_ACTIVE_DEALS`, D72) et
  * l'écran le dit, avec le nombre de deals.
  */
-import { expect, type Page } from "@playwright/test";
+import { expect, type BrowserContext, type Page } from "@playwright/test";
+import { adresseDeLApi } from "../fixtures/adresses";
 import { normaliserEspaces } from "./reservation";
+
+/**
+ * Les kilos encore disponibles d'un trajet, lus à l'API (« Mes trajets » ne les affiche pas —
+ * écart consigné en WEB-E2E-3). La vue du propriétaire (`{ success, trip }`) porte capacité et
+ * réservé ; la vue publique porte `remainingKg`.
+ */
+export async function kilosRestants(contexte: BrowserContext, tripId: string): Promise<number> {
+  const r = await contexte.request.get(`${adresseDeLApi()}/trips/${tripId}`);
+  if (!r.ok()) throw new Error(`Trajet ${tripId} : ${r.status()} ${await r.text()}`);
+  type Kilos = { remainingKg?: number; capacityKg?: number; reservedKg?: number };
+  const corps = (await r.json()) as Kilos & { trip?: Kilos };
+  const t: Kilos = corps.trip ?? corps;
+  const kg = t.remainingKg ?? (typeof t.capacityKg === "number" ? t.capacityKg - (t.reservedKg ?? 0) : undefined);
+  if (typeof kg !== "number") throw new Error(`Trajet ${tripId} : ni remainingKg ni capacityKg dans ${JSON.stringify(corps).slice(0, 200)}`);
+  return kg;
+}
 
 export class MesTrajets {
   constructor(private readonly page: Page) {}
@@ -35,11 +52,24 @@ export class MesTrajets {
    * Tente d'annuler le trajet par le menu de sa ligne. Rend le toast obtenu : le refus D72
    * (« Ce trajet porte encore n deals en cours … ») ou « Trajet annulé ».
    */
-  async tenterDAnnulerLeTrajet(corridor: string): Promise<{ statut: number; toast: string }> {
-    const ligne = this.page.locator(`a[aria-label="${corridor}"]`).first().locator("xpath=..");
+  async tenterDAnnulerLeTrajet(corridor: string, tripId?: string): Promise<{ statut: number; toast: string }> {
+    // Plusieurs trajets peuvent porter le même corridor (Thomas en a trois Paris → Brazzaville) :
+    // l'identifiant, quand il est donné, vise la bonne ligne par le `href` du lien.
+    const lien = tripId
+      ? this.page.locator(`a[aria-label="${corridor}"][href$="/dashboard/trips/${tripId}"]`)
+      : this.page.locator(`a[aria-label="${corridor}"]`);
+    const ligne = lien.first().locator("xpath=..");
     await expect(ligne).toBeVisible({ timeout: 30_000 });
-    await ligne.locator("button").last().click();
-    await this.page.getByRole("button", { name: "Annuler", exact: true }).click();
+    // Le menu « … » peut se refermer si la liste se re-rend juste après le clic (rafraîchissement
+    // TanStack Query après les mutations des fiches précédentes) : on réessaie jusqu'à le voir.
+    const entreeAnnuler = this.page.getByRole("button", { name: "Annuler", exact: true });
+    await expect.poll(async () => {
+      if (await entreeAnnuler.isVisible()) return true;
+      await ligne.locator("button").last().click();
+      await this.page.waitForTimeout(400);
+      return entreeAnnuler.isVisible();
+    }, { timeout: 20_000 }).toBe(true);
+    await entreeAnnuler.click();
     await expect(this.page.getByRole("heading", { name: "Annuler ce trajet ?" })).toBeVisible({ timeout: 15_000 });
     // Le front annule par `DELETE /trips/:id` (alias de `POST /trips/:id/cancel`, Lot 2).
     const reponse = this.page.waitForResponse(

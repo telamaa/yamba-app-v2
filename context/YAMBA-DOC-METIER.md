@@ -2581,3 +2581,1004 @@ Voyageur peut faire. *(ANO-WEB-07, ouverte.)*
 | 27 | Fenêtre d'annulation à moins de 48 h | 15,96 € remboursés, retenue 15,96 € reversée, « Garder » sans effet | oui |
 | 28 | Annulation confirmée | toast, ligne « Annulée », Finances des deux côtés (15,96 € / 14,25 €), kilos rendus, quatre emails | oui |
 | 29 | Le Voyageur tente d'annuler son trajet | refus 409 avec le nombre de deals vivants | oui (conseil inapplicable : ANO-WEB-07) |
+
+---
+
+# Le compte neuf — ce que WEB-E2E-4 fait respecter
+
+*(PR `chore/e2e-parcours-4`, 09/09/2026 — cahier 01-WEB chapitre 6, CNF-06 / D71, D63, D65, SES-01.)*
+
+## Le besoin
+
+Un compte neuf est plafonné pendant trente jours, et ces plafonds doivent tomber **avant** tout
+argent — jamais après une autorisation bancaire. Le score qui les décide ne se montre à
+personne : ni à l'écran, ni dans l'export des données. Et la vie ordinaire du compte doit tenir
+ses promesses : une session qui expire, ses appareils, une suppression bloquée tant qu'un deal
+est en cours.
+
+## Les règles
+
+**RG-WEB-25 — Un plafond refuse avant tout paiement.** Valeur déclarée, poids et nombre
+d'envois du mois sont contrôlés à la demande d'intention de paiement ; rien n'est autorisé, aucune
+ligne Finances, aucun email. *(ANO-WEB-08.)*
+
+**RG-WEB-26 — Le score de confiance n'existe pour personne.** Aucune page du membre, aucune page
+publique, aucun export ne le mentionne. *(D71.)*
+
+**RG-WEB-27 — L'export des données passe par la porte, puis se télécharge.** Le refus
+`SUDO_REQUIRED` ouvre la porte, quel que soit le format de réponse demandé. *(ANO-WEB-09.)*
+
+**RG-WEB-28 — Une session expirée se rattrape sur place.** La fenêtre se pose par-dessus la
+page, la reconnexion ne la quitte pas, et le membre refait son geste.
+
+**RG-WEB-29 — La suppression est bloquée avant toute porte.** Un deal en cours ou une demande en
+attente affichent le bandeau et les motifs ; aucun code n'est demandé ni envoyé.
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| 30 | Inscription, code, connexion sans « Rester connecté » | compte activé, bienvenue, cookie de session sans expiration | oui |
+| 31 | 450 € / 12 kg / sixième demande du mois | refus à l'intention, message unique, rien nulle part | oui |
+| 32 | Profil, tableau de bord, page publique, export | aucun score, aucun niveau de risque, aucun point | oui |
+| 33 | Session expirée puis un geste | fenêtre par-dessus la page, reconnexion sur place, geste refait | oui |
+| 34 | Supprimer mon compte avec un deal en cours | bandeau, motifs, aucune porte, aucun email | oui |
+
+---
+
+# Le refus au pickup — ce que WEB-E2E-5 fait respecter
+
+*(PR `chore/e2e-parcours-5`, 10/09/2026 — cahier 01-WEB chapitre 6, A40, D39, D29 ①.)*
+
+## Le besoin
+
+Au rendez-vous de prise en charge, le Voyageur ouvre le colis. S'il ne correspond pas à ce qui a
+été déclaré, il doit pouvoir le **refuser sans se pénaliser** : c'est la garantie qui rend la
+vérification possible. L'Expéditrice est remboursée en entier, tout de suite, et prévenue ; les
+kilos reviennent au trajet ; et rien de ce refus ne vient noircir la page publique du Voyageur.
+
+## Les règles
+
+**RG-WEB-30 — Un refus au pickup rembourse tout.** Le paiement capturé à l'acceptation est
+remboursé intégralement, avant toute écriture en base ; « Mes envois » dit « Annulée »,
+Finances « Remboursé {total} le {date} », sans retenue. *(A40, D39.)*
+
+**RG-WEB-31 — Le refus est expliqué, dans l'ordre.** L'Expéditrice reçoit d'abord l'email du
+refus, avec la raison choisie par le Voyageur traduite dans sa langue, puis celui du remboursement
+émis, du montant intégral.
+
+**RG-WEB-32 — Un refus au pickup n'est pas une annulation fautive.** La ligne de faits du Voyageur
+(« n annulations tardives ») ne bouge pas, ni maintenant ni au prochain recalcul de réputation.
+*(ANO-WEB-10.)*
+
+**RG-WEB-33 — Les kilos refusés reviennent au trajet**, immédiatement, sans geste du Voyageur.
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| 35 | Deal accepté, « Refuser le colis », raison, confirmation | fenêtre avec le rappel « ne pénalise jamais ta réputation », toast, statut CANCELLED, remboursement = total | oui |
+| 36 | Mes envois, Finances de l'Expéditrice | « Annulée » ; « Remboursé {total} le … », aucune retenue | oui |
+| 37 | Emails de l'Expéditrice | refus avec la raison traduite, puis remboursement intégral, sans le mot « retenue » | oui |
+| 38 | Page publique du Voyageur avant / après | ligne de faits identique | oui |
+| 39 | Trajet du Voyageur | kilos rendus, ligne du deal « Annulé » | oui |
+
+---
+
+# Le destinataire — ce que WEB-E2E-6 fait respecter
+
+*(PR `chore/e2e-parcours-6`, 10/09/2026 — cahier 01-WEB chapitre 6, D69, RGP-02.)*
+
+## Le besoin
+
+Le destinataire n'a pas de compte, n'a rien demandé, et n'a qu'un lien que l'Expéditeur lui a
+transmis. Il doit savoir où en est le colis et quoi préparer — et ne rien apprendre d'autre :
+ni adresse, ni numéro, ni code, ni photo, ni montant. Yamba ne lui écrit jamais.
+
+## Les règles
+
+**RG-WEB-34 — La page de suivi ne dit que l'essentiel.** Prénoms, corridor, dates, frise et
+aide de l'étape ; rien d'autre, ni à l'écran, ni dans le code source, ni dans l'API (liste de
+clés fermée). *(D69.)*
+
+**RG-WEB-35 — L'aide change avec l'étape.** À l'atterrissage, elle demande de préparer le code ;
+à la remise, elle dit « Bonne réception ! ».
+
+**RG-WEB-36 — L'origine des données est dite.** La mention de confidentialité nomme
+l'Expéditeur, ce qu'il a confié, à qui, et quand c'est effacé ; elle mène à la politique de
+confidentialité. *(RGP-02.)*
+
+**RG-WEB-37 — Un lien altéré ne révèle rien.** « Ce lien de suivi n'est plus valide », sans
+prénom ni corridor ; l'API répond la même chose pour un jeton altéré et un jeton inventé.
+
+**RG-WEB-38 — Yamba n'écrit jamais au destinataire.** Aucun email, aucun SMS ; le lien est
+partagé par l'Expéditeur seul.
+
+**RG-WEB-39 — Le bloc d'acquisition mène à de vrais écrans.** « Envoyer un colis » ouvre la
+recherche ; « Devenir Voyageur » ouvre l'onboarding (la porte de connexion d'abord, sans compte).
+*(ANO-WEB-11.)*
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| 40 | Lien ouvert à chaque jalon | frise et aide qui progressent, cinq jalons datés à la remise | oui |
+| 41 | Écran, source, API | aucun code, numéro, montant, lieu, photo ; huit clés exactement | oui |
+| 42 | Mention de confidentialité | texte exact, lien vers la politique | oui |
+| 43 | Bloc d'acquisition | recherche ; porte de connexion puis onboarding | oui |
+| 44 | Jeton altéré d'un caractère | « plus valide », sans rien de plus, 404 identique à un jeton inventé | oui |
+| 45 | Boîte du destinataire | aucun email ; tous les emails vont à des membres | oui |
+
+---
+
+# L'accueil du visiteur — ce que le chapitre 5.1 fait respecter
+
+*(PR `chore/recette-web-5-1`, 10/09/2026 — cahier 01-WEB chapitre 5.1, WEB-ACC-1 à 12.)*
+
+## Le besoin
+
+Un visiteur arrive sur l'accueil sans compte. Il doit comprendre le produit en une page, chercher
+un trajet en trois champs, changer de langue et de thème, lire les textes légaux, et n'être
+trompé par rien : ni par un bouton qui ne fait rien, ni par une icône qui mène ailleurs. C'est le
+premier geste de tout le monde, et aucun parcours du chapitre 6 ne le couvrait (ils entrent par
+l'adresse d'un trajet).
+
+## Les règles
+
+**RG-WEB-40 — « Rechercher » cherche.** Depuis l'accueil, deux villes et « Rechercher » ouvrent
+la page de résultats, qui interroge exactement ce qui a été saisi — sans second clic.
+*(ANO-WEB-12.)*
+
+**RG-WEB-41 — Une ville choisie dans la liste est cherchée par son nom.** Le libellé « Ville,
+Pays » est une aide à la lecture ; la recherche compare la ville. Le pays tapé à la main reste
+cherché tel quel. *(ANO-WEB-13.)*
+
+**RG-WEB-42 — La première liste de suggestions vient, quel que soit le rythme de frappe.**
+*(ANO-WEB-14.)*
+
+**RG-WEB-43 — Ce qui n'existe pas encore est annoncé comme tel.** Les réseaux sociaux portent
+« Bientôt disponible » et ne mènent nulle part tant que les comptes n'existent pas. *(ANO-WEB-15.)*
+
+**RG-WEB-44 — La langue affichée est la langue déclarée.** `<html lang>` suit la bascule, au
+rendu comme après un clic. *(ANO-WEB-16.)*
+
+**RG-WEB-45 — La porte d'identité se referme sans conséquence.** « Plus tard », Échap et le
+fond referment ; la page est intacte, rien n'est parti vers le serveur.
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| 46 | Accueil visiteur | en-tête, barre, pied de page, aucun squelette, console propre hors sonde | oui |
+| 47 | FR → EN → FR, rechargement | `/en` puis `/fr`, `lang` fidèle, aucune clé brute | oui |
+| 48 | Thème sombre | conservé au rechargement, contraste AA, retour au clair | oui |
+| 49 | CGU, confidentialité | un texte, un seul `main` | oui |
+| 50 | Icônes sociales | « Bientôt disponible », aucun onglet | oui |
+| 51 | « Partager un trajet » puis trois fermetures | porte par-dessus la page, refermée sans requête | oui |
+| 52 | Paris → Brazzaville depuis l'accueil | `/search`, titre, deux trajets du seed | oui |
+| 53 | Inversion puis « Rechercher » | Brazzaville → Paris, aucun trajet | oui |
+| 54 | Accueil connecté, déconnexion | menu utilisateur ; puis « Connexion », cookies absents | oui |
+
+---
+
+# L'inscription — ce que le chapitre 5.2 fait respecter
+
+*(PR `chore/recette-web-5-2`, 10/09/2026 — cahier 01-WEB chapitre 5.2, WEB-INS-1 à 16.)*
+
+## Le besoin
+
+Une personne crée son compte avec une adresse email et un code à six chiffres. Elle doit savoir
+ce qu'on attend d'elle (champ par champ, règle par règle), ne pas pouvoir s'inscrire sans avoir
+accepté les conditions, être protégée contre quelqu'un qui devinerait son code, et pouvoir se
+tromper d'adresse sans conséquence. Le produit garde la trace de son consentement et de sa
+langue. Le parcours Google existe mais reste fermé tant que la clé n'est pas posée.
+
+## Les règles
+
+**RG-WEB-46 — Pas de compte sans consentement.** La case d'acceptation est obligatoire ; sans
+elle, rien ne part vers le serveur et un message le dit. Avec elle, deux lignes `ConsentLog`
+(`TERMS`, `PRIVACY`) portent la version des textes, l'horodatage serveur, l'adresse IP et le
+navigateur.
+
+**RG-WEB-47 — La langue de l'écran devient la langue du compte.** Un compte créé sur `/fr` porte
+`preferredLocale: "fr"` ; c'est elle qui choisit la langue des emails (D44).
+
+**RG-WEB-48 — Le code vaut dix minutes, à l'écran comme dans l'email.** Le compte à rebours
+démarre à 10:00 et l'email annonce la même validité ; un renvoi repart de 10:00 avec un NOUVEAU
+code.
+
+**RG-WEB-49 — Cinq codes faux bloquent la saisie une minute, côté serveur.** Les quatre premiers
+échecs annoncent les essais restants ; le cinquième bloque, l'écran désactive la saisie, et le
+blocage survit à un rechargement (le compteur vit sur le serveur, `OTP_LOCKED`). **Un renvoi de
+code ne rouvre pas le compteur** : le sixième échec est le sixième.
+
+**RG-WEB-50 — Une règle violée, une phrase.** Le mot de passe est jugé règle par règle dans
+l'ordre du produit (longueur, minuscule, majuscule, chiffre, spécial, date, suite, données
+personnelles) ; le message nomme la PREMIÈRE règle manquante, en une phrase, jamais « tous les
+critères ». Un indicateur de force accompagne la saisie.
+
+**RG-WEB-51 — Une adresse déjà connue est refusée sans rien envoyer.** Ni code, ni inscription
+en attente, ni email à l'adresse existante ; le message sous le champ tutoie (ANO-WEB-18).
+
+**RG-WEB-52 — Se tromper d'adresse ne coûte rien.** « Recommencer » demande confirmation, annule
+l'inscription en attente et rend un formulaire vide.
+
+**RG-WEB-53 — L'adresse en attente est affichée masquée.** L'écran du code montre
+`n*********5@r***.dev` ; un écran photographié ou partagé ne livre pas l'adresse. *(Écart de
+cahier consigné, décision recommandée : garder le masquage.)*
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| 55 | Écran d'inscription | mention de confiance, titre, cinq champs et indices, case unique à deux liens, Google et Facebook, « Connecte-toi » | oui |
+| 56 | Facebook | inerte : aucune fenêtre, requête ou erreur | oui |
+| 57 | Formulaire vide | quatre messages nommés, rien ne part | oui |
+| 58 | `pas-un-email` | « Saisis un e-mail valide. » au blur | oui |
+| 59 | Six mots de passe fautifs | une phrase chacun, une règle chacun ; indicateur de force | oui (cas e : « minuscule », écart consigné) |
+| 60 | Sans la case, puis avec | refus expliqué ; puis écran du code, 10:00 décroissant, email avec code et « 10 minutes » | oui (adresse masquée, écart consigné) |
+| 61 | Cinq codes faux, rechargement | 4 → 1 restants, blocage d'une minute, saisie désactivée, `OTP_LOCKED` après rechargement | oui |
+| 62 | Renvoi après la minute | « Code renvoyé », bouton temporisé, nouvel email, 10:00 ; 6e et 7e échecs : 4 puis 3 restants | oui |
+| 63 | Collage du bon code | six cases remplies, `/login?verified=1`, « Compte activé », email Bienvenue ; en base TERMS + PRIVACY, `fr`, mot de passe | oui |
+| 64 | Adresse d'Aminata | refus sous le champ, aucun email | oui |
+| 65 | « Recommencer » | confirmation exacte, `cancel`, formulaire vide | oui |
+| 66 | Google sans clé | « Connexion Google bientôt disponible », désactivé, sur les deux écrans | oui |
+| 67 | Parcours Google | ⏭ sans clé ; à la main quand elle sera posée | ⏭ |
+
+---
+
+# Connexion et sessions — ce que le chapitre 5.3 fait respecter
+
+*(PR `chore/recette-web-5-3`, 11/09/2026 — cahier 01-WEB chapitre 5.3, WEB-CNX-1 à 13.)*
+
+## Le besoin
+
+Un membre se connecte, choisit ou non de rester connecté, voit ses appareils, en déconnecte,
+et confirme ses gestes sensibles par un code. Le tout sans jamais révéler si un compte existe,
+sans perdre sa page quand la session expire, et sans qu'un compte suspendu puisse entrer.
+
+## Les règles
+
+**RG-WEB-54 — Le même refus, que le compte existe ou non.** Un mauvais mot de passe et une
+adresse inconnue donnent le même statut (401) et le même message, au corps près (temps constant).
+
+**RG-WEB-55 — Deux profils de session.** Sans « Rester connecté » : déconnexion après 60 minutes
+sans activité (cookie de session). Avec : 7 jours d'inactivité, 30 jours de vie absolue (cookie
+persistant). La case est **décochée** par défaut.
+
+**RG-WEB-56 — La session expirée se rouvre sur place.** Quand la session meurt pendant qu'une
+page est ouverte, une fenêtre de reconnexion se pose PAR-DESSUS ; après reconnexion, la page
+reprend là où elle était. Jamais d'écran d'erreur ni de renvoi brutal.
+
+**RG-WEB-57 — Les appareils se listent et se déconnectent.** La rubrique Sécurité liste chaque
+session (navigateur + système, dernière activité, IP, « cet appareil »), permet d'en déconnecter
+une (message de confirmation) ou toutes les autres ; la session déconnectée meurt à sa prochaine
+action.
+
+**RG-WEB-58 — Un geste sensible passe par une porte, et un code ouvre une fenêtre de 15 minutes.**
+Changer le mot de passe, l'adresse, exporter ou effacer ses données répond 403 `SUDO_REQUIRED` ;
+un code envoyé par email ouvre une fenêtre de 15 minutes, **liée à l'appareil**, qui couvre les
+gestes suivants sans nouveau code — sauf le changement de mot de passe (ou d'adresse), qui la
+referme.
+
+**RG-WEB-59 — Un compte suspendu ne se connecte plus.** La connexion est refusée
+(« Ton compte est suspendu… »), les sessions vivantes sont révoquées, et un email l'explique.
+
+**RG-WEB-60 — (dette) La connexion par mot de passe doit avoir un verrou anti-force-brute.**
+*(ANO-WEB-19, ouverte : à ce jour aucun verrou par compte ; décision et PR dédiées.)*
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| 68 | Écran de connexion | mentions, champs, « Afficher le mot de passe », « Oublié ? », case décochée + aide, Google/Facebook, « Inscris-toi » | oui |
+| 69 | Mauvais mot de passe / adresse inconnue | même 401, même corps, aucun cookie | oui |
+| 70 | Connexion standard | en-tête membre, prénom, cookies ; refresh = cookie de session | oui |
+| 71 | Douze mauvais essais | un verrou (429) | **non — ANO-WEB-19** |
+| 72 | Cookies supprimés + action serveur | « Ta session a expiré » sur place, formulaire dans la fenêtre, reprise | oui |
+| 73 | « Rester connecté » | cookie persistant (≈ 30 j), « connexion mémorisée » sur la session | oui |
+| 74 | Appareils connectés | navigateur+système, activité, IP, « cet appareil » | oui |
+| 75 | Déconnecter un appareil / tous les autres | message, ligne(s) disparue(s), B perd sa session | oui |
+| 76 | Geste sensible | 403 SUDO_REQUIRED, porte, code, geste rejoué | oui |
+| 77 | Second geste dans les 15 min | aucun nouveau code | oui (fenêtre dédiée, cf. écart) |
+| 78 | Fenêtre sudo depuis un autre appareil | code redemandé | oui |
+| 79 | Compte suspendu | refus, sessions révoquées, email | oui |
+
+---
+
+# Mot de passe et adresse email — ce que le chapitre 5.4 fait respecter
+
+*(PR `chore/recette-web-5-4`, 11/09/2026 — cahier 01-WEB chapitre 5.4, WEB-MDP-1 à 6.)*
+
+## Le besoin
+
+Un visiteur qui a oublié son mot de passe le réinitialise par un code, sans qu'on lui dise si son
+compte existe. Un membre change son mot de passe et son adresse email en confirmant son identité,
+et ces gestes ferment ses autres sessions.
+
+## Les règles
+
+**RG-WEB-61 — « Mot de passe oublié » ne révèle rien.** La réponse est la même pour une adresse
+connue et une adresse inconnue ; aucun email ne part pour une adresse inconnue.
+
+**RG-WEB-62 — La réinitialisation passe par un code de 10 minutes.** Le code arrive par email,
+les règles de force du mot de passe s'appliquent, et l'ancien mot de passe cesse de fonctionner.
+
+**RG-WEB-63 — Un nouveau mot de passe doit différer de l'actuel.** Le changement est refusé sinon
+(`PASSWORD_SAME_AS_CURRENT`).
+
+**RG-WEB-64 — Changer son mot de passe ferme les autres sessions.** Un email de confirmation
+part ; toutes les autres sessions tombent ; la session courante reste.
+
+**RG-WEB-65 — Le code de changement d'adresse va sur la NOUVELLE adresse.** Une adresse déjà prise
+est refusée avant tout envoi ; l'adresse du compte ne change qu'après confirmation du code reçu
+sur la nouvelle adresse.
+
+**RG-WEB-66 — L'ancienne adresse est informée, jamais sollicitée.** Après le changement, l'ancienne
+reçoit une information « …a changé » sans lien ni code ; les autres sessions tombent ; la connexion
+se fait avec la nouvelle adresse.
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| 80 | Oublié : adresse inconnue | écran avance, aucun email | oui |
+| 81 | Réinitialisation | code 10 min, règles de force, nouveau OK / ancien KO | oui |
+| 82 | « Retour à la connexion » | retour à /login | oui |
+| 83 | Changer le mot de passe : identique | refus PASSWORD_SAME_AS_CURRENT | oui |
+| 84 | Changer le mot de passe : valide | email, autres sessions fermées, courante ouverte | oui |
+| 85 | Changer l'adresse : prise / libre | refus EMAIL_ALREADY_USED ; code sur la nouvelle ; compte inchangé | oui |
+| 86 | Confirmer l'adresse | adresse changée, ancienne informée sans code, autres sessions fermées, connexion sur la nouvelle | oui |
+
+---
+
+# Profil, avatar et page publique — ce que le chapitre 5.5 fait respecter
+
+*(PR `chore/recette-web-5-5`, 11/09/2026 — cahier 01-WEB chapitre 5.5, WEB-PRO-1 à 10.)*
+
+## Le besoin
+
+Un membre tient son profil (nom, date de naissance, avatar) et décide de ce qui est public.
+Un Voyageur a en plus un nom affiché et une présentation. La page publique montre une identité
+lisible et une réputation honnête, sans jamais exposer la date de naissance ni inventer une note.
+
+## Les règles
+
+**RG-WEB-67 — Les champs Voyageur sont réservés aux Voyageurs.** « Nom affiché » et « présentation »
+(≤ 300 caractères) n'existent que pour un compte qui a une page Voyageur.
+
+**RG-WEB-68 — Prénom et nom : de 2 à 40 caractères.** Hors bornes, refus sous le champ, rien n'est
+écrit ; un prénom valide se reflète aussitôt dans le menu utilisateur.
+
+**RG-WEB-69 — 16 ans au moins, et la date de naissance ne s'affiche jamais.** Moins de 16 ans
+(`TOO_YOUNG`) ou date future (`IN_THE_FUTURE`) sont refusés ; la date sert Stripe, jamais la page
+publique.
+
+**RG-WEB-70 — L'avatar : 2 Mo au plus, formats image.** Un fichier trop lourd est refusé côté
+navigateur, sans requête ; le retrait rend l'initiale par défaut partout et l'ancien fichier
+devient introuvable chez l'hébergeur.
+
+**RG-WEB-71 — La réputation est honnête ou tait sa jeunesse.** Un Voyageur sans avis est
+« Nouveau Voyageur » (« Moins de 3 Deals terminés. »), jamais « ⭐ 0.0 · 0 deals ».
+
+**RG-WEB-72 — L'adresse publique ne change jamais.** `/u/<slug>` est stable : un lien partagé ne
+meurt pas, même après un changement de profil.
+
+**RG-WEB-73 — Masquer sa page n'est pas se cacher d'un deal.** Masquée, la page renvoie 404 aux
+autres ; le propriétaire la voit avec une mention « masquée » (ANO-WEB-21) ; ses trajets publiés
+restent visibles, avec son prénom.
+
+**RG-WEB-74 — La ville est affichée sur choix.** « Afficher ma ville » la montre puis la cache,
+sans toucher au reste.
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| 87 | Profil Expéditeur pur | champs de base, deux bascules, pas de champs Voyageur | oui |
+| 88 | Profil Voyageur | nom affiché, présentation /300, « Voir mon profil public » | oui |
+| 89 | Prénom 1 / 41 / valide | refus sous le champ ; valide reflété dans le menu | oui |
+| 90 | Date 12 ans / future / 30 ans | TOO_YOUNG / IN_THE_FUTURE / accepté ; jamais affichée | oui |
+| 91 | Avatar > 2 Mo | refus navigateur, aucune requête | oui |
+| 92 | Avatar réel (upload/retrait) | affiché puis retiré, ancien fichier introuvable | ⏭ (ImageKit) |
+| 93 | Page publique Voyageur | identité, niveau nommé, pas de « 0.0 », Suivre, Signaler | oui |
+| 94 | Adresse stable | `/u/slug` répond après un changement ; identité « Prénom N. » | oui (écart : nom affiché non montré) |
+| 95 | Masquer la page | 404 visiteur, bannière propriétaire, trajet visible | oui |
+| 96 | Afficher / masquer la ville | apparaît puis disparaît | ⏭ (seed sans ville) |
+
+---
+
+# Devenir Voyageur : onboarding et Stripe — ce que le chapitre 5.6 fait respecter
+
+*(PR `chore/recette-web-5-6`, 11/09/2026 — cahier 01-WEB chapitre 5.6, WEB-VOY-1 à 7.)*
+
+## Le besoin
+
+Un membre devient Voyageur en deux étapes : son profil (nom affiché, présentation, téléphone,
+adresse), puis la connexion de son compte de paiement via Stripe. Il peut publier des trajets dès
+le profil fait ; l'argent n'est exigé qu'au moment d'accepter un deal.
+
+## Les règles
+
+**RG-WEB-75 — L'onboarding a deux étapes nommées.** « Votre profil » puis « Paiement » ; la
+seconde ne s'ouvre qu'après la première.
+
+**RG-WEB-76 — Le téléphone est contrôlé.** Un numéro mal formé est refusé sous le champ ; le
+profil enregistré fait passer le badge du menu à « Profil à compléter ».
+
+**RG-WEB-77 — Publier n'exige pas Stripe.** Un Voyageur au profil fait, sans Stripe, publie ses
+trajets. Le verrou profil+Stripe (D31) est au moment d'**accepter** une demande.
+
+**RG-WEB-78 — Le RIB se saisit chez Stripe, jamais chez Yamba.** L'étape Paiement mène à Stripe
+Connect (Express) ; aucun IBAN n'est demandé dans un formulaire Yamba.
+
+**RG-WEB-79 — Le retour de Stripe active le profil.** Une fois Stripe complété, le statut devient
+« Voyageur actif » et un email « Ton profil Voyageur est actif » part. *(Vérifié manuellement :
+la complétion Express passe par le flux hébergé de Stripe, non automatisable.)*
+
+**RG-WEB-80 — Accepter sans onboarding complet est refusé.** Le serveur répond
+`CARRIER_ONBOARDING_REQUIRED` ; rien n'est débité, la demande reste en attente. *(Verrou D31,
+testé unitairement ; recette de bout en bout avec le chapitre 5.12.)*
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| 97 | Entrée « Devenir Voyageur » | wizard, deux étapes, Profil active | oui |
+| 98 | Étape Profil | téléphone mal formé refusé ; badge « Profil à compléter » | oui |
+| 99 | Publier sans Stripe | trajet PUBLISHED | oui |
+| 100 | Étape Paiement | « Connecter avec Stripe », aucun IBAN, redirection stripe.com | oui |
+| 101 | Retour de Stripe | « Voyageur actif » + email | ⏭ manuel (Express hébergé) |
+| 102 | Accepter sans onboarding | refus, rien débité | ⏭ (5.12 ; D31 unit-testé) |
+| 103 | Voir mes virements sur Stripe | tableau de bord (nouvel onglet) / « Finalise d'abord » | ⏭ manuel |
+
+
+---
+
+# Publier un trajet et son cycle de vie — ce que le chapitre 5.7 fait respecter
+
+*(PR `chore/recette-web-5-7` (#272), 11/09/2026 — cahier 01-WEB chapitre 5.7, WEB-TRJ-1 à 21.)*
+
+## Le besoin
+
+Un Voyageur décrit son trajet en trois étapes (trajet, conditions, vérification), le garde en
+brouillon aussi longtemps qu'il veut, le publie quand il est complet, puis le pilote : masquer,
+remettre en ligne, annuler, restaurer, archiver, dupliquer. Ce qu'il peut faire dépend de l'état
+du trajet et de ce qu'il porte ; c'est le serveur qui le dit, l'écran ne fait que le refléter.
+
+## Les règles
+
+**RG-WEB-81 — Trois étapes, un brouillon à tout moment.** « Trajet », « Conditions »,
+« Vérification » ; « Brouillon » est disponible dès l'ouverture. Les justificatifs se déposent
+dès l'étape 1.
+
+**RG-WEB-82 — Le prix au kilo est pré-rempli et borné, la suggestion ne bloque jamais.** Curseur
+de 5 à 20 €/kg ; une ancre de marché (basse / médiane / haute) et un verdict (« Prix juste »,
+« Sous le marché », « Au-dessus ») ; tout prix reste enregistrable.
+
+**RG-WEB-83 — Le gain net suit la capacité et le prix.** Curseur de 2 à 30 kg ; « Si tes N kg
+partent — N × prix — net, versé à J+4 après livraison » ; plancher de 8 € par envoi ; tolérance de
+poids ≤ 10 % au pickup.
+
+**RG-WEB-84 — Huit familles, toutes acceptées par défaut.** Chaque famille est acceptée,
+surchargée (en %) ou refusée ; le résumé replié nomme exactement les écarts.
+
+**RG-WEB-85 — Un forfait bagage exige la capacité correspondante et un montant positif.** Soute
+23 kg, cabine 12 kg : sous le seuil la ligne est grisée (« Monte ta capacité à … ») ; au-dessus,
+un équivalent au kilo est affiché ; un forfait à 0 € est refusé par le serveur. L'incohérence
+forfait / capacité est refusée **brouillon compris** (RG-WEB-88).
+
+**RG-WEB-86 — Les lieux dépendent du mode de transport, et il en faut un de chaque pour publier.**
+Avion : aéroport et ville ; train : gare et ville. Modes « Exact », « Rayon n km », « Ville
+entière ». Sans lieu de remise ou de livraison, la publication est refusée avec son code.
+
+**RG-WEB-87 — Il n'y a pas de réservation instantanée.** Chaque demande passe par l'accord du
+Voyageur, sous 24 h.
+
+**RG-WEB-88 — Le brouillon accepte l'incomplet, sauf l'incohérence bagage.** Un brouillon avec
+le seul itinéraire est enregistré ; un forfait soute avec 5 kg de capacité est refusé même en
+brouillon.
+
+**RG-WEB-89 — Chaque garde de publication a un code, et le trajet reste en brouillon.** Date
+manquante, date passée, prix ou capacité manquants, lieu de remise ou de livraison manquant :
+refus avec `details.code`, statut inchangé.
+
+**RG-WEB-90 — Masquer et remettre en ligne sont réversibles et visibles.** Masqué = hors
+recherche, badge « Masqué » / « Hidden » ; remis en ligne = réapparaît, « En ligne » / « Online ».
+Jamais les libellés d'une version antérieure.
+
+**RG-WEB-91 — L'écran n'offre que ce que le serveur permet.** `allowedActions` fait foi : un
+brouillon ne se masque ni ne s'annule ; un trajet réservé ne se modifie pas (`TRIP_NOT_EDITABLE`
+si l'on force) ; un archivé ne se restaure pas.
+
+**RG-WEB-92 — Annuler un trajet qui porte un deal vivant est refusé (D72).** À l'écran comme par
+l'API : `409 TRIP_HAS_ACTIVE_DEALS`, le nombre de deals est nommé, le trajet reste en ligne. Un
+trajet libre s'annule, se restaure en brouillon si son départ n'est pas passé, s'archive
+irréversiblement ; dupliquer est toujours permis et crée un nouveau brouillon.
+
+**RG-WEB-93 — Le Voyageur ne réserve pas son propre trajet.** Sur sa page publique : « C'est
+votre trajet », modifier / gérer, aucun « Réserver ».
+
+**RG-WEB-94 — « Masqué par Yamba » s'impose au Voyageur.** Bandeau sur le détail ; page publique
+introuvable pour les autres ; hors recherche ; le Voyageur ne lève pas le masquage.
+
+**RG-WEB-95 — Modifier un trajet rouvre TOUTES ses valeurs, quel que soit le canal qui l'a
+créé.** Les dates et heures sont dérivées de l'instant enregistré quand les chaînes saisies
+manquent (ANO-WEB-22).
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| 104 | Ouvrir « Créer un trajet » | trois étapes, « Brouillon », trois modes | oui |
+| 105 | Étape 1 : mode, itinéraire, dates | heures locales à chaque lieu | ⏭ Google ; ANO-WEB-23 ouverte |
+| 106 | Prix au kilo | pré-rempli, 5–20, ancre et verdict | oui (« Ton prix = ton net » à trancher) |
+| 107 | Capacité et gain | 2–30, 23 × 11,50 = 264,50, J+4, 8 €, ≤ 10 % | oui |
+| 108 | Huit familles | résumé exact ; les huit dépliées | oui |
+| 109 | Forfaits bagage | grisés sous 23 / 12 kg ; ≈ €/kg ; 0 refusé | oui |
+| 110 | Lieux | rendus ; cartes par mode ; Exact / Rayon / Ville entière | oui |
+| 111 | Réservation instantanée | absente ; « ton accord sous 24 h » | oui |
+| 112 | Vérification | « Prix & capacité », « Aperçu public » | oui |
+| 113 | Publier | PUBLISHED, « En ligne », trouvable | oui |
+| 114 | Brouillon incomplet / incohérence bagage | 201 DRAFT / refus brouillon compris | oui |
+| 115 | Gardes a → f | code par garde, reste DRAFT | oui |
+| 116 | Masquer / remettre en ligne | PAUSED hors recherche, PUBLISHED de retour, badges FR/EN | oui |
+| 117 | Actions permises | selon l'état ; `edit` absent si réservé | oui |
+| 118 | Trajet réservé | `TRIP_NOT_EDITABLE` | oui |
+| 119 | Annuler avec deal vivant | 409, message, reste en ligne (écran + API) | oui |
+| 120 | Annuler un trajet libre | CANCELLED, hors recherche | oui |
+| 121 | Restaurer puis archiver | DRAFT ; ARCHIVED irréversible | oui |
+| 122 | Dupliquer | nouveau brouillon, original inchangé | oui |
+| 123 | Sa propre page publique | « C'est votre trajet », pas de « Réserver » | oui |
+| 124 | Masqué par Yamba | bandeau ; introuvable ; hors recherche | oui (email non vérifié) |
+
+
+---
+
+# Justificatifs et billet vérifié — ce que le chapitre 5.8 fait respecter
+
+*(PR `chore/recette-web-5-8` (#273), 11/09/2026 — cahier 01-WEB chapitre 5.8, WEB-DOC-1 à 6.)*
+
+## Le besoin
+
+Un Voyageur joint des justificatifs à son trajet (billet, itinéraire…). Le billet suit un cycle
+de vérification par l'équipe : en vérification, vérifié (badge public « Billet vérifié »), ou
+rejeté avec un motif expliqué — et il peut être redéposé. Le badge rassure l'Expéditeur ; il
+n'est jamais une condition pour publier ni pour réserver.
+
+## Les règles
+
+**RG-WEB-96 — Au plus 5 documents par trajet, 5 Mo chacun, PDF / JPG / PNG / HEIC.** Le
+navigateur refuse avant tout envoi et le dit (« Le fichier dépasse 5 Mo. ») ; à la limite, l'écran
+l'explique ; le serveur refuse de toute façon (`DOCUMENT_LIMIT_REACHED`, `DOCUMENT_TOO_LARGE`).
+
+**RG-WEB-97 — Quatre statuts de billet.** « Non soumis » → « En vérification » dès qu'un billet
+est déposé → « Vérifié » ou « Rejeté » par l'équipe ; un nouveau dépôt après rejet repasse « En
+vérification ». Retirer le dernier billet ramène à « Non soumis ».
+
+**RG-WEB-98 — Seule l'équipe valide ou rejette.** Permission `tickets.review` (SUPPORT,
+MEDIATOR) ; jamais son propre billet ; un document déjà examiné ne se réexamine pas.
+
+**RG-WEB-99 — Un rejet a toujours un motif fermé, expliqué en clair.** Illisible, dates
+différentes, nom différent, document non recevable ; l'email au Voyageur nomme le motif dans sa
+langue, jamais un code.
+
+**RG-WEB-100 — La validation se voit et s'annonce.** Statut « Vérifié » pour le Voyageur, badge
+« Billet vérifié » sur la page publique et dans la recherche, email de confirmation dans la langue
+du Voyageur.
+
+**RG-WEB-101 — Le billet ne bloque rien.** Publier et réserver fonctionnent sans billet vérifié ;
+un trajet rejeté reste en ligne.
+
+**RG-WEB-102 — Un email métier qui ne part pas laisse une trace.** Aucun envoi best-effort n'est
+silencieux : l'échec est journalisé.
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| 125 | Déposer deux justificatifs | listés ; « En vérification » | oui (type non choisissable : ANO-WEB-24 ouverte) |
+| 126 | > 5 Mo ; 6ᵉ document | refus dit, rien envoyé ; limite dite ; 400 serveur | oui |
+| 127 | Statut du billet de `bzv-upcoming` | « En vérification » | oui |
+| 128 | Billet validé | « Vérifié », badge public, email FR | oui |
+| 129 | Billet rejeté (motif) | « Rejeté », email en clair, nouveau dépôt → « En vérification » | oui |
+| 130 | Sans billet vérifié | publiable, réservable, badge absent | oui |
+
+
+---
+
+# Recherche, filtres, tri, état vide — ce que le chapitre 5.9 fait respecter
+
+*(PR `chore/recette-web-5-9` (#274), 11/09/2026 — cahier 01-WEB chapitre 5.9, WEB-RCH-1 à 15.)*
+
+## Le besoin
+
+Un Expéditeur trouve un trajet : liste complète ou corridor, prix lisible pour SON colis, tris,
+familles acceptées, filtres de confiance ; et quand il n'y a rien, une alerte. La page publique
+d'un trajet dit tout ce qu'il faut pour réserver. Ce qui a disparu ou est sanctionné disparaît
+sans rien révéler.
+
+## Les règles
+
+**RG-WEB-103 — La liste complète a un titre, un sous-titre et des onglets de mode.** « Tous les
+trajets disponibles » ; seuls les trajets EN LIGNE à venir y sont ; « Charger plus » au-delà de
+dix.
+
+**RG-WEB-104 — Le titre suit les critères.** Départ seul, arrivée seule, date seule, corridor.
+
+**RG-WEB-105 — Une carte au kilo dit le prix, la place et un exemple.** « prix au kilo »,
+« n €/kg », « n kg dispo », « ex. 2 kg ≈ … € tout compris » ; jamais un prix à zéro, jamais un
+tiret d'heure, jamais une note à 0,0 ; un compteur de vues seulement au-dessus de zéro.
+
+**RG-WEB-106 — Le poids du colis recalcule prix et tri.** Curseur 0,5–30 kg ; « Prix et tri
+calculés pour n kg · trajets sans assez de place exclus » ; « Plus assez de place » quand les
+kilos restants manquent ; exclusion quand la capacité totale manque ; poids mémorisé sur
+l'appareil et repris par la réservation.
+
+**RG-WEB-107 — Sans poids, le prix comparable est celui d'un colis de 2 kg.** transport
+`max(2 × €/kg, 8 €)` + service `max(12 %, 3 €)`.
+
+**RG-WEB-108 — Trois tris, calculés par le serveur.** Départ le plus tôt, prix le plus bas (pour
+le poids en cours, trajets sans prix exclus), mieux notés (jamais de note fictive).
+
+**RG-WEB-109 — Le filtre famille exclut les refus et annonce les suppléments avant le clic.**
+Plusieurs familles = toutes acceptées ; un trajet sans position accepte tout ; chaque puce porte
+son compte, une puce à 0 est désactivée.
+
+**RG-WEB-110 — Un filtre de confiance sans candidat est masqué, pas grisé.**
+
+**RG-WEB-111 — Une recherche sans résultat propose une alerte.** « Aucun trajet ne correspond ? »
++ « Créer une alerte pour ce trajet ». *(Écart consigné : le titre « Aucun trajet trouvé » et le
+message « filtres » sont alors remplacés — à trancher.)*
+
+**RG-WEB-112 — Une erreur de chargement est dite sans jargon et se réessaie.**
+
+**RG-WEB-113 — La page publique d'un trajet dit tout pour réserver.** Voyageur, mode, ancienneté,
+prix au kilo, place, familles avec leur statut, forfaits, estimation (2 kg ou poids mémorisé) tout
+compris, plancher, lieux, politique d'annulation, objets interdits, « Réserver », « Signaler » ;
+jamais « Réservation bientôt disponible ».
+
+**RG-WEB-114 — Une vue par visiteur et par jour.** Rien n'est affiché à zéro.
+
+**RG-WEB-115 — Un trajet disparu répond « introuvable » sans rien révéler.** Annulé, masqué ou
+inexistant : même page, même 404.
+
+**RG-WEB-116 — La suspension d'un compte retire ses trajets par lecture.** Aucune écriture sur le
+trajet ; la levée les fait revenir.
+
+**RG-WEB-117 — Un avatar distant ne fait pas tomber une page** (ANO-WEB-27) ; **tout membre peut
+poser son avatar** (ANO-WEB-28, ouverte).
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| 131 | Liste complète | titre, sous-titre, onglets, trajets à venir | oui (compteur « Résultats disponibles » absent : à trancher) |
+| 132 | Titres dynamiques | quatre formes | oui |
+| 133 | Carte au kilo | 11,50 €/kg · 23 kg · ex. 2 kg ≈ 26 € · rien à zéro | oui |
+| 134 | Poids 3 kg | 38,64 € (API) / ≈ 39 € (carte), exclusions, mémorisé | oui |
+| 135 | Tout effacer | 2 kg, 26 € / 22 € | oui |
+| 136 | Trois tris | ordre = API | oui |
+| 137 | Familles | refus exclu, +20 % annoncé, comptes | oui |
+| 138 | Confiance | lignes à 0 masquées | oui (branche « proposé » non exercée) |
+| 139 | État vide | bloc alerte | oui (titre remplacé : à trancher) |
+| 140 | Vide par filtres | message + Tout effacer | oui (jamais avec un corridor : à trancher) |
+| 141 | Erreur | message, Réessayer | oui |
+| 142 | Page publique | tout le bloc, Réserver, pas de « bientôt » | oui (statuts en infobulle : à trancher) |
+| 143 | Vues | une par visiteur/jour | oui |
+| 144 | Trajet annulé | introuvable, 404 | oui |
+| 145 | Compte suspendu | trajet absent, intact en base | oui |
+| 146 | Avatar distant | la page tient | oui (ANO-WEB-27 close) |
+| 147 | Second avatar | 200 | **non** — 500 P2002 (ANO-WEB-28 ouverte, `test.fail`) |
+
+
+---
+
+# Alertes de route — ce que le chapitre 5.10 fait respecter
+
+*(PR `chore/recette-web-5-10` (#275), 11/09/2026 — cahier 01-WEB chapitre 5.10, WEB-ALR-1 à 9.)*
+
+## Le besoin
+
+Un Expéditeur qui ne trouve pas son trajet aujourd'hui veut être prévenu le jour où un Voyageur
+le publie : il pose une alerte (corridor, période, email, villes proches), et Yamba lui écrit dès
+qu'un trajet correspond — sans le harceler, sans prévenir le Voyageur de sa propre publication.
+
+## Les règles
+
+**RG-WEB-118 — Une alerte = un corridor, une période, deux options.** Départ et arrivée
+différents, période « 3 mois » (recommandée), « 6 mois », « Sans limite » ou personnalisée ;
+« Recevoir un email » et « Inclure les trajets proches » actives par défaut.
+
+**RG-WEB-119 — Une alerte incomplète ou en double est refusée.** Sans les deux villes, rien ne
+part ; même ville → refus ; même corridor déjà actif → refus.
+
+**RG-WEB-120 — Une publication qui correspond déclenche UN email, dans la langue du membre.**
+« Nouveau trajet {départ} → {arrivée} », lien vers le trajet ; la période de l'alerte borne le
+départ du trajet.
+
+**RG-WEB-121 — Jamais au Voyageur lui-même.** Une alerte portée par l'auteur du trajet ne le
+notifie pas.
+
+**RG-WEB-122 — Jamais deux fois en 24 heures** pour une même alerte.
+
+**RG-WEB-123 — Les villes proches (< 50 km, même pays) ne comptent que si l'option est activée ;
+au-delà de 50 km, jamais.** Le niveau exact (place ou ville + pays) compte toujours.
+
+**RG-WEB-124 — Une alerte se prolonge de 6 mois et se supprime en deux gestes.** « Prolonger »
+proposé quand elle expire sous 7 jours ; « Supprimer » puis « Confirmer » ; chaque geste est
+confirmé par un message et le compteur suit.
+
+**RG-WEB-125 — Au plus 20 alertes actives par membre.** La 21ᵉ est refusée avec le plafond
+nommé.
+
+**RG-WEB-126 — La recherche propose l'alerte.** Bloc « Créer une alerte » sans résultat, bannière
+« Reste informé·e des futurs trajets » en fin de liste.
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| 148 | Écran vide | titres, état vide, « Créer ma première alerte » | oui |
+| 149 | Créer une alerte | panneau, périodes, bascules, carte avec badges | oui (villes par l'API) |
+| 150 | Refus | sans villes, même ville, doublon | oui |
+| 151 | Publication correspondante | email FR à l'Expéditrice, rien au Voyageur | oui |
+| 152 | Second trajet sous 24 h | aucun email | oui |
+| 153 | Trajets proches | rien sans l'option, email avec, jamais au-delà de 50 km | oui |
+| 154 | Prolonger / supprimer | +6 mois, suppression confirmée, compteur | oui (ANO-WEB-29 close) |
+| 155 | Plafond | 21ᵉ refusée, plafond nommé | oui |
+| 156 | Bannière de recherche | en fin de liste | oui |
+
+
+---
+
+# Favoris et Voyageurs suivis — ce que le chapitre 5.11 fait respecter
+
+*(PR `chore/recette-web-5-11` (#276), 11/09/2026 — cahier 01-WEB chapitre 5.11, WEB-FAV-1 à 12.)*
+
+## Le besoin
+
+Un Expéditeur met un trajet de côté (favori privé, lié à son compte) et suit un Voyageur pour être
+prévenu de ses prochains trajets. Les deux gestes sont immédiats, réversibles, et ne concernent
+jamais son propre trajet ni sa propre page.
+
+## Les règles
+
+**RG-WEB-127 — Le cœur d'un visiteur ouvre la porte d'identité et REPREND le geste.** Après
+connexion dans la fenêtre, le favori est enregistré et l'on reste sur la même page.
+
+**RG-WEB-128 — Un favori s'ajoute et se retire immédiatement.** Le cœur change sans attendre ;
+« Mes favoris » liste le trajet avec la même carte que la recherche ; un favori est privé.
+
+**RG-WEB-129 — Jamais son propre trajet.** Refus dit (`OWN_TRIP`).
+
+**RG-WEB-130 — Un trajet indisponible ne s'ajoute pas ; le retrait reste toujours possible.**
+Non publié, annulé ou masqué par Yamba : `TRIP_NOT_FAVORITABLE` ; le favori existant survit et sa
+fiche répond « introuvable ».
+
+**RG-WEB-131 — Un favori survit à la fin du trajet, avec le badge « Trajet passé ».**
+
+**RG-WEB-132 — Suivre un Voyageur active, par défaut, l'email à sa prochaine publication.**
+Bouton « Suivre » → « Suivi », compteur d'abonnés, bascule « Me notifier au prochain trajet ».
+
+**RG-WEB-133 — La publication d'un Voyageur suivi envoie un email à ses abonnés notifiés**, dans
+leur langue ; l'alerte de route est un mécanisme distinct (deux emails possibles).
+
+**RG-WEB-134 — Couper la notification ne désabonne pas.** Aucun email, abonnement conservé.
+
+**RG-WEB-135 — Se désabonner se confirme et se dit.** « Ne plus suivre » → « Confirmer » → « Tu
+ne suis plus ce voyageur » ; le compteur d'abonnés suit.
+
+**RG-WEB-136 — On ne se suit pas soi-même.** Pas de bouton ; appel forcé refusé
+(`CANNOT_FOLLOW_SELF`).
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| 157 | Cœur d'un visiteur | porte, connexion dans la fenêtre, favori enregistré, même page | oui |
+| 158 | Ajouter / retirer | immédiat, liste, info-bulles | oui |
+| 159 | Propre trajet | refus dit, 403 | oui |
+| 160 | Trajet annulé | introuvable, ré-ajout 409, retrait 200 | oui |
+| 161 | Trajet masqué | ajout 409 | oui (ANO-WEB-32 close) |
+| 162 | Trajet passé | listé + « Trajet passé » | oui (ANO-WEB-30 close) |
+| 163 | Favoris vides | état vide + CTA | oui |
+| 164 | Suivre | Suivi, abonnés +1, bascule cochée, liste | oui |
+| 165 | Email d'abonné | « vient de publier un nouveau trajet », FR | oui |
+| 166 | Notification coupée | aucun email, abonnement gardé | oui |
+| 167 | Se désabonner | toast, ligne retirée, abonnés −1 | oui (ANO-WEB-31 close) |
+| 168 | Soi-même / vide | pas de Suivre, 400 ; état vide | oui |
+
+
+---
+
+# Réserver : l'assistant en quatre étapes et le devis — ce que le chapitre 5.12 fait respecter
+
+*(PR `chore/recette-web-5-12` (#277), 11/09/2026 — cahier 01-WEB chapitre 5.12, WEB-RSV-1 à 22.)*
+
+## Le besoin
+
+Un Expéditeur décrit son colis, désigne le destinataire, s'engage, autorise le paiement. Le prix
+qu'il voit est celui que le serveur figera ; rien n'est débité avant l'accord du Voyageur ; il ne
+peut réserver ni son propre trajet, ni un trajet parti, masqué ou plein.
+
+## Les règles
+
+**RG-WEB-137 — La porte de réservation reprend le colis et le trajet après connexion.**
+
+**RG-WEB-138 — Quatre étapes nommées, deux retours distincts, un récapitulatif toujours visible.**
+
+**RG-WEB-139 — Les lieux du trajet sont proposés ; un lieu unique est pré-sélectionné ; sans lieu,
+l'écran le dit.**
+
+**RG-WEB-140 — Les règles d'or et la liste des produits interdits sont à portée de clic.**
+
+**RG-WEB-141 — Le produit dépend de l'offre du trajet** (colis au kilo, bagage soute si proposé,
+cabine si proposé) ; **une famille refusée est visible, barrée et expliquée** ; un supplément
+s'annonce avant le choix.
+
+**RG-WEB-142 — Le poids est pré-rempli (2 kg ou poids mémorisé), jamais vide ; 30 kg maximum ;
+jamais plus que les kilos restants.**
+
+**RG-WEB-143 — Le devis suit la note de calcul au centime** : taille (S ×1, M ×1,1, L ×1,25),
+supplément de famille, plancher 8 € (0,5 kg facturé minimum), service max(12 %, 3 €).
+
+**RG-WEB-144 — La description fait 5 caractères au moins ; au plus 5 photos de 10 Mo, refusées
+dès la sélection ; les deux premières sont « Contenu » et « Emballé ».**
+
+**RG-WEB-145 — Deux protections : de base (incluse) et Garantie Yamba 500 € (+6 €, photo
+obligatoire). Le mot « assurance » n'apparaît jamais.**
+
+**RG-WEB-146 — Un bagage entier est un forfait** : ni poids ni taille, service 12 %.
+
+**RG-WEB-147 — Le récapitulatif ne montre jamais zéro** : sans poids ou sans taille, un indice.
+
+**RG-WEB-148 — Le destinataire n'a pas de compte** ; téléphone d'abord (indicatif, numéro
+valide), email facultatif ; le code de livraison lui sera transmis.
+
+**RG-WEB-149 — Une seule case vaut Charte, CGV et Contrat de transport ; sans elle, pas de
+paiement.**
+
+**RG-WEB-150 — Le paiement est une autorisation** (débit à l'acceptation, sous 24 h) ; un seul
+composant de paiement ; « Payer {montant} ».
+
+**RG-WEB-151 — La demande envoyée réserve les kilos et prévient chacun de ce qui le concerne**
+(l'Expéditrice son total, le Voyageur son gain net, jamais l'inverse).
+
+**RG-WEB-152 — Le serveur a le dernier mot** : devis divergent → nouveau total affiché, rien de
+posé ; dernier kilo → refus sans trace ; son propre trajet, un trajet parti ou masqué → refus à
+l'ouverture ; l'assistant survit à un rechargement.
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| 169 | Porte visiteur | par-dessus la page, puis pleine page | oui |
+| 170 | Entrée | étapes, titres, retours, colonne collante | oui |
+| 171 | Lieux | pré-sélectionnés, types en clair | oui |
+| 172 | Règles d'or | quatre puces + liste | oui |
+| 173 | Produit / famille refusée | soute 230 €, cabine absent, refus expliqué, +20 % | oui |
+| 174 | Poids | 2 par défaut, 35 refusé, borne des kilos restants | oui (ANO-WEB-34 close) |
+| 175 | Taille | S 32,20 · L 40,25 | oui |
+| 176 | Supplément / plancher | 38,64 · 11 | oui |
+| 177 | Description / photos | min. 5 ; tags ; > 10 Mo refusé à la sélection | oui (ANO-WEB-39 close) |
+| 178 | Protection | 38,20 ; photo requise ; jamais « assurance » | oui (ANO-WEB-33 close) |
+| 179 | Bagage entier | 257,60, champs masqués | oui |
+| 180 | Jamais zéro | indices seuls | oui (ANO-WEB-37 close) |
+| 181 | Destinataire | téléphone d'abord, 12 refusé, email optionnel | oui |
+| 182 | Engagement | une case, bloqué sans elle | oui |
+| 183 | Paiement | textes, Payer 32,20 €, un seul composant | oui |
+| 184 | Carte refusée | erreur, rien créé | ⏭ (FAKE ; recette API) |
+| 185 | Demande envoyée | suivi, −2,5 kg, deux emails | oui |
+| 186 | Devis divergent | message, 42 €, rien créé | oui (ANO-WEB-36 close) |
+| 187 | Dernier kilo | A créée, B refusée sans trace | oui |
+| 188 | Propre trajet | refus à l'ouverture | oui (ANO-WEB-35 close) |
+| 189 | Parti / masqué | refus à l'ouverture / introuvable | oui (ANO-WEB-38 close) |
+| 190 | Rechargement | saisies retrouvées | oui |
+
+---
+
+# Les plafonds du compte neuf — ce que le chapitre 5.13 fait respecter
+
+*(PR `chore/recette-web-5-13` (#278), 11/09/2026 — cahier 01-WEB chapitre 5.13, WEB-TRU-1 à 5.)*
+
+## Le besoin
+
+Un compte de moins de 30 jours qui n'a pas trois envois terminés ne peut pas engager la plateforme
+au-delà de ce qu'un premier essai justifie : 300 € déclarés, 10 kg, cinq envois par mois. Le refus
+tombe avant tout argent, avec un message unique et sans jugement ; un compte ancien n'a aucun
+plafond ; le score interne qui fonde ces niveaux ne se voit jamais.
+
+## Les règles
+
+**RG-WEB-153 — Trois plafonds pour un compte neuf** (moins de 30 jours ET moins de trois envois
+terminés) : 300 € déclarés par colis, 10 kg par colis, cinq demandes par mois civil — les trois
+sont des paramètres de la plateforme (`trust.newAccount.*`, D62).
+
+**RG-WEB-154 — Le refus tombe à l'autorisation de paiement**, avant tout débit, toute empreinte,
+tout email : rien n'est créé, « Mes envois » et Finances restent vides.
+
+**RG-WEB-155 — Un seul message pour les trois plafonds**, tutoyé, qui dit que le plafond se lève
+avec les premiers envois terminés ; à côté, « Réessayer » — et jamais un bouton « Payer » actif.
+
+**RG-WEB-156 — La valeur ou le poids corrigés juste sous le plafond passent** ; la cinquième demande
+du mois passe, la sixième est refusée.
+
+**RG-WEB-157 — Un paramètre modifié par le back-office prend effet en moins de 30 secondes**, est
+journalisé (`SETTING_CHANGED`, motif ≥ 20 caractères, verrou de version) et prévient les super
+administrateurs par email ; il n'est jamais rétroactif.
+
+**RG-WEB-158 — Un compte ancien n'a aucun plafond** : 12 kg à 450 € passent sans refus.
+
+**RG-WEB-159 — Le score interne n'est jamais visible ni servi au membre** : ni sur un écran, ni dans
+l'export de ses données, ni dans une réponse d'API ; le seul signal est le message de plafond.
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| 191 | 450 € déclarés, compte neuf | refus à l'intention, message, rien nulle part ; 250 € passe | oui (ANO-WEB-40 close) |
+| 192 | 12 kg, compte neuf | refus, même message ; 8 kg passe | oui |
+| 193 | Sixième demande du mois | refusée dès l'autorisation ; plafond relevé par l'OPS → passe en 6 s ; remis | oui |
+| 194 | Compte de 90 jours, 12 kg à 450 € | aucun refus | oui |
+| 195 | Écrans, API, export du compte neuf | aucun score, niveau, point, plafond chiffré | oui |
+
+---
+
+# La demande côté Voyageur : accepter, refuser, expirer — ce que le chapitre 5.14 fait respecter
+
+*(PR `chore/recette-web-5-14` (#279), 11/09/2026 — cahier 01-WEB chapitre 5.14, WEB-DEA-1 à 9.)*
+
+## Le besoin
+
+Un Voyageur qui reçoit une demande la voit partout où il agit (accueil, ses trajets, la cloche), lit
+tout ce qu'il doit savoir avant de s'engager — et rien de ce qui ne le regarde pas —, s'engage par la
+Charte, accepte (l'argent est capturé, l'Expéditrice prévenue) ou refuse sans pénalité ; une demande
+expirée ne s'accepte plus ; deux décisions concurrentes ne créent jamais deux vérités.
+
+## Les règles
+
+**RG-WEB-160 — Une demande reçue apparaît sur l'accueil, dans « Mes trajets » (bande « À traiter »,
+badge « Demande » sur le trajet) et dans la cloche**, avec le gain net, le poids et le délai restant ;
+il n'existe pas d'onglet « demandes » séparé.
+
+**RG-WEB-161 — Le Voyageur lit le net (« TU GAGNES »), jamais le total payé par l'Expéditrice ni la
+commission**, ni à l'écran ni dans ce que l'API lui répond ; le mot « assurance » n'apparaît jamais.
+
+**RG-WEB-162 — La demande dit d'où elle vient, ce qu'elle contient (catégorie, poids, valeur,
+description, photos), où remettre et livrer, et le délai de réponse** ; la puce du délai devient une
+alerte à moins de deux heures.
+
+**RG-WEB-163 — La Charte Voyageur est obligatoire** : sans la case, refus explicite ; six engagements et
+la phrase de responsabilité sont lus avant d'accepter.
+
+**RG-WEB-164 — Accepter capture le paiement et prévient l'Expéditrice** (notification, email avec le
+montant), ouvre « Mon Deal accepté » (cinq jalons, contact, paiement à J+4) et le fil de messagerie.
+
+**RG-WEB-165 — Refuser ne pénalise pas** : cinq raisons fermées, aucun texte libre, l'Expéditrice est
+prévenue (bandeau, email avec la raison), l'autorisation est levée, les kilos rendus, la réputation
+intacte.
+
+**RG-WEB-166 — Une demande dont la date limite est passée ne s'accepte plus, avant même le cron** (409)
+; le cron prévient ensuite l'Expéditrice (bandeau, email « a expiré »).
+
+**RG-WEB-167 — Deux décisions concurrentes** : la seconde est refusée (409), l'écran le dit et se relit
+sur l'état réel ; un seul débit.
+
+**RG-WEB-168 — Un deal fermé nomme son état et n'offre aucune action** ; le code de livraison
+n'apparaît jamais côté Voyageur, ni à l'écran ni dans le DTO.
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| 196 | Où la demande apparaît | accueil, Mes trajets, cloche, dates justes | oui (ANO-WEB-41 close) |
+| 197 | L'écran de la demande | blocs, net seul, puce ambre/rouge | oui (ANO-WEB-42 close ; ANO-WEB-43 ouverte) |
+| 198 | Charte obligatoire | refus sans case, six engagements | oui |
+| 199 | Accepter | écran accepté, notification, email, capture, fil | oui |
+| 200 | Refuser | cinq raisons, aucun texte libre, email, kilos, aucune pénalité | oui |
+| 201 | Expirée | 409 avant le cron, bandeau et email après | oui |
+| 202 | Deux onglets | 409, toast, relecture, un débit | oui |
+| 203 | États fermés | bandeau + aucune action | oui |
+| 204 | Mon Deal accepté | blocs, code secret nommé Clarisse, aucun code | oui (ANO-WEB-44 close) |
+
