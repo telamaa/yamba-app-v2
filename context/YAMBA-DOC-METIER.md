@@ -3586,7 +3586,7 @@ n'apparaît jamais côté Voyageur, ni à l'écran ni dans le DTO.
 
 # Messagerie, rendez-vous et numéro de téléphone — ce que le chapitre 5.15 fait respecter
 
-*(PR `chore/recette-web-5-15`, 11/09/2026 — cahier 01-WEB chapitre 5.15, WEB-MSG-1 à 22.)*
+*(PR `chore/recette-web-5-15` (#280), 11/09/2026 — cahier 01-WEB chapitre 5.15, WEB-MSG-1 à 22.)*
 
 ## Le besoin
 

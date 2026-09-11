@@ -628,7 +628,7 @@ Ordre de demarrage : auth -> trip -> gateway.
   en lecture seule ; relance (un email sans le texte, pas deux par heure). A trancher : la bulle compte les
   MESSAGES (cahier : conversations) ; pas de bouton message sur une demande en attente ; role absent de la
   liste ; sans rendez-vous l'ancre du numero est le depart. Plateforme de tests **996** (message 44). Harnais :
-  178 scenarios. Poste : passerelle relancee en bundle (429 apres treize passages). Reste : 5.16 a 5.32,
+  178 scenarios. Poste : passerelle relancee en bundle (429 apres treize passages). PR **#280** (empilee sur #279). Reste : 5.16 a 5.32,
   02-ADMIN. AUCUNE attribution Claude.
 - 11/09 : **CHAPITRE 5.14 DU CAHIER 01-WEB — WEB-DEA, LA DEMANDE COTE VOYAGEUR (branche
   `chore/recette-web-5-14`, empilee sur #278)** — 9 fiches jouees CONFORMES (3 apres correction), 9 scenarios

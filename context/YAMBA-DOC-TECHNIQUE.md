@@ -5309,7 +5309,7 @@ apps/user-ui/tsconfig.json` est l'équivalent exact de la CI.
 
 # Chapitre 5.15 du cahier 01-WEB : la messagerie — une garde de sécurité contournable par un espace, et trois écrans qui parlaient anglais ou se taisaient
 
-*(PR `chore/recette-web-5-15`, 11/09/2026.)*
+*(PR `chore/recette-web-5-15` (#280), 11/09/2026.)*
 
 ## Ce qui a été fait
 
