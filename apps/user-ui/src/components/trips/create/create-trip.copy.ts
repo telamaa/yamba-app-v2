@@ -64,6 +64,10 @@ export function getCreateTripCopy(isFr: boolean): CreateTripCopy {
 
     docUpload: isFr ? "Justificatif" : "Proof",
     docUploadSub: isFr ? "Billet, itinéraire..." : "Ticket, itinerary...",
+    docLimitReached: (n: number) =>
+      isFr
+        ? `${n} documents maximum par trajet — retire un document pour en ajouter un autre.`
+        : `${n} documents maximum per trip — remove one to add another.`,
     docUploadHint: isFr
       ? "Badge « Voyage vérifié » après validation"
       : "'Verified trip' badge after review",
