@@ -4002,7 +4002,7 @@ ANO-WEB-74.)*
 
 # La notation croisée — ce que le chapitre 5.22 fait respecter
 
-*(PR `chore/recette-web-5-22`, 12/09/2026 — cahier 01-WEB chapitre 5.22, WEB-NOT-1 à 11.)*
+*(PR `chore/recette-web-5-22` (#287), 12/09/2026 — cahier 01-WEB chapitre 5.22, WEB-NOT-1 à 11.)*
 
 ## Le besoin
 

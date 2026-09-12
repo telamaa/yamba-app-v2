@@ -5920,7 +5920,7 @@ harnais verts ; miroir i18n vert (`cancelledByMediation`, `noteReleasedMediation
 
 # Chapitre 5.22 du cahier 01-WEB : la notation croisée — l'accueil réel en retard sur sa prévisualisation, deux états sans nom, et les avis qui survivaient au seed
 
-*(PR `chore/recette-web-5-22`, 12/09/2026.)*
+*(PR `chore/recette-web-5-22` (#287), 12/09/2026.)*
 
 ## Ce qui a été fait
 

@@ -631,7 +631,7 @@ Ordre de demarrage : auth -> trip -> gateway.
   « Plus tard (jusqu'au …) », seuil d'alerte nomme, note recue dans la cloche, `cannotRateReason` en cle,
   J+5/J+7 au catalogue, test « aucune note → aucune revelation », test du seed « zero avis orphelin ». PIEGES :
   avis survivants au seed, page publique sans session, etoiles = aria-label, HomeLive ≠ HomePreview, cron en
-  deux temps, 403 → « indisponible ». Harnais : 248 scenarios. Reste : 5.23 a 5.32, 02-ADMIN. AUCUNE
+  deux temps, 403 → « indisponible ». Harnais : 248 scenarios. PR **#287** (empilee sur #286). Reste : 5.23 a 5.32, 02-ADMIN. AUCUNE
   attribution Claude.
 - 12/09 : **CHAPITRE 5.21 DU CAHIER 01-WEB — WEB-LIT, LITIGE ET MEDIATION, VUE MEMBRE (branche
   `chore/recette-web-5-21`, empilee sur #285)** — 13 fiches jouees CONFORMES (3 apres correction), 14 scenarios en
