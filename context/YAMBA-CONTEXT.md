@@ -610,6 +610,57 @@ Ordre de demarrage : auth -> trip -> gateway.
   desktop du visiteur sans « Creer un compte » ni « Rechercher un trajet ». Piege de poste : la cle
   Google Maps n'accepte que `localhost` comme referent. Harnais : 32 scenarios verts. PR **#265**
   (empilee sur #264). Reste : 5.2 a 5.32, 02-ADMIN.
+- 12/09 : **CHAPITRE 5.27 DU CAHIER 01-WEB — WEB-ANA, LE CONSENTEMENT A LA MESURE D'AUDIENCE (branche
+  `chore/recette-web-5-27`, empilee sur #291)** — 6 fiches jouees CONFORMES (2 apres correction) + 1
+  CONTRE-EPREUVE, 7 scenarios en DEUX passes, 1 min 36 + 19 s (`apps/e2e/src/chapitres/web-ana.spec.ts`).
+  LE CAHIER DECLARE CE CHAPITRE ⏭ SANS CLE POSTHOG : on ne s'en est pas contente. Cle de recette
+  (`phc_recette_web_5_27`) + hote local `127.0.0.1:9977` dans `apps/user-ui/.env.local`, et un FAUX POSTHOG ecrit
+  pour l'occasion — `scripts/recette/collecteur-audience.ts` — qui repond comme le vrai (404 sur `config.js` pour
+  que le SDK retombe sur la variante JSON, configuration ou tout ce qui capture de lui-meme est coupe, drapeaux
+  vides, extensions INERTES mais bien formees) et journalise chaque evenement recu, une ligne de JSON par
+  evenement, en decodant les trois formes de corps (JSON nu, `data=` base64, gzip). Rien ne sort du poste, et la
+  fiche 3 lit EXACTEMENT ce que le navigateur aurait envoye. Les fiches 1 a 5 se sautent sans cle, la fiche 6
+  (« sans cle ») se saute avec : deux passes, chacune honnete sur sa precondition. ETAT LAISSE AU POSTE : les deux
+  lignes sont COMMENTEES dans `.env.local` (aucune banniere pour les chapitres suivants ni pour les parcours) — les
+  decommenter + redemarrer le front pour rejouer 1 a 5. DEUX ANOMALIES CLOSES : ANO-WEB-89 (la banniere de
+  consentement est `fixed` et ne RESERVAIT AUCUNE PLACE : sur les pages calees sur la hauteur de la fenetre — onze
+  ecrans d'authentification, vitrine, tableau de bord — elle recouvrait le bas de la carte ; mesure sur /fr/login en
+  1280x720 : « Se connecter » et « Inscris-toi » sous le dialogue, clic INTERCEPTE, aucun defilement possible, il
+  fallait repondre a la banniere pour se connecter → elle publie desormais sa hauteur dans `--yamba-consent-space`,
+  `global.css` en deduit `--yamba-viewport` = calc(100vh - cet espace), et les QUATORZE mises en page en
+  `calc(100vh-…)` s'en servent ; le contenu se recentre, la page defile, tout est rendu a la reponse),
+  ANO-WEB-90 (`search_performed`, le premier evenement du funnel D66 3A, lisait `params.origin` /
+  `params.destination` — deux cles qui N'EXISTENT PAS dans `SearchTripsParams`, ou les criteres s'appellent `from`
+  et `to` : la mesure partait TOUJOURS avec `origin: null, destination: null` et aucun corridor cherche n'etait
+  observable, alors que c'est le signal du pilotage D59/D74 ; les deux lectures etaient CASTEES, le typage ne
+  pouvait rien dire). Prouve : texte de la banniere mot pour mot + trois elements + deux boutons de MEME POIDS
+  (hauteur, largeur, police, vrai <button>) ; refus = aucune requete, aucun evenement, aucune cle `ph_…` (le SDK
+  n'a jamais demarre), banniere qui ne revient pas ; accord = `$pageview`, `search_performed` (origin « Paris »,
+  destination « Brazzaville », resultsCount numerique), `trip_viewed` (tripId), `booking_step_viewed`, `$identify`
+  (l'IDENTIFIANT seul) et AUCUNE donnee personnelle (ni prenom/nom/email du membre, ni code de livraison, ni
+  prenom/nom/numero du destinataire) ; choix repris dans un second navigateur neuf sans redemander ; retrait dans
+  « Mes donnees » enregistre sur le compte et plus rien de mesure ensuite ; sans cle, aucune banniere, aucun envoi,
+  aucune erreur de console (hors les deux 401 du sondage de session, ANO-WEB-01). A TRANCHER : la page ou l'on
+  ACCEPTE n'est jamais comptee (l'effet des pages vues ne depend que du chemin) → taux d'entree faux ; le retrait ne
+  jette pas ce qui est deja en file (un lot part apres le retrait) ; en developpement chaque page vue part en DOUBLE
+  (effets rejoues par React en StrictMode) — a verifier sur le build de production avant de lire les chiffres ; et
+  surtout **le `$pageview` porte l'URL COMPLETE** : la page publique du destinataire vit sous `/fr/track/<jeton>`,
+  donc un destinataire qui accepte la mesure enverrait LE JETON du lien de suivi au collecteur — normaliser le
+  chemin (`/fr/track/:jeton`) avant capture, CANDIDAT AU REGISTRE, a trancher avant toute activation en production.
+  Regard d'expert : banniere sans piege de focus, liste blanche des proprietes a proteger par un test comme
+  `analyticsEventsFor` cote serveur (D66), ecriture du consentement en best-effort a rejouer, jeter la file du SDK
+  au retrait + journaliser le retrait dans `ConsentLog`, interdire les `as { … }` sur un type connu (regle de revue).
+  PIEGES : un faux collecteur qui repond mal CASSE la fin de `init()` et rend la mesure muette (on prouverait une
+  absence fabriquee) ; **posthog-js REFUSE de capturer depuis un navigateur automatise** (`_is_bot()` =
+  `!!navigator.webdriver`, en silence — diagnostic obtenu en lisant le `dist` du SDK apres trois impasses), le
+  harnais masque CE seul drapeau ; **`storageState` memorise AUSSI le `localStorage`** (un consentement accepte se
+  propage aux chapitres suivants → chaque fiche repart « sans choix », l'afterAll oublie la session) ;
+  `networkidle` n'arrive jamais quand le SDK tourne (goto en delai d'attente de 120 s → `domcontentloaded`) ; un
+  evenement se rate en naviguant trop vite (attendre SON evenement par `expect.poll` sur le journal) ; Atlas a
+  lache une fois de plus (seed en echec a 180 s) et la charge du poste montait a 10 avec les dix-sept conteneurs
+  Docker etrangers relances par Docker Desktop — le back-office (3001) a ete arrete, il ne sert pas a ce chapitre.
+  Plateforme inchangee (1000 + auth 230), harnais : 287 scenarios. PR a ouvrir (empilee sur #291). Reste : 5.28 a
+  5.32, 02-ADMIN. AUCUNE attribution Claude.
 - 12/09 : **CHAPITRE 5.26 DU CAHIER 01-WEB — WEB-PRF, PREFERENCES, LANGUE ET RELANCES (branche
   `chore/recette-web-5-26`, empilee sur #290)** — 6 fiches jouees CONFORMES (3 apres correction), 6 scenarios en
   serie, 1 min 24 (`apps/e2e/src/chapitres/web-prf.spec.ts` ; Aminata pour la langue, les emails et l'ecran
