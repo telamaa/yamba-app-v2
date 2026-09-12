@@ -4324,3 +4324,56 @@ données » reste, elle, toujours affichée : elle gouverne aussi la mesure côt
   avant capture — **candidat au registre**, à trancher avant toute activation en production.
 - **En développement, chaque page vue part en double** (effets rejoués par React en `StrictMode`) : à vérifier sur
   le build de production avant d'interpréter les volumes.
+
+---
+
+# Le mode maintenance vu du membre — ce que le chapitre 5.28 fait respecter
+
+*(PR `chore/recette-web-5-28`, 13/09/2026 — cahier 01-WEB chapitre 5.28, WEB-MNT-1 à 4.)*
+
+## Le besoin
+
+Yamba doit pouvoir s'arrêter d'écrire — le temps d'une intervention — sans mentir à ses membres ni perdre d'argent
+en route. On l'annonce avant, on bascule en lecture seule, on laisse tout le monde consulter, on refuse les
+écritures **en le disant**, et on lève. Une réservation entamée pendant la bascule ne doit rien autoriser ni rien
+débiter.
+
+## Les règles
+
+**RG-WEB-276 — Une annonce n'est qu'une annonce.** Une maintenance planifiée affiche un bandeau ambre daté et ne
+bloque rien : recherche, réservation, message et publication fonctionnent normalement.
+
+**RG-WEB-277 — La lecture seule laisse TOUT lire.** Recherche, page d'un trajet, fil de messagerie, « Mes envois » :
+aucune consultation n'est empêchée, et un bandeau rouge dit l'état en toutes lettres.
+
+**RG-WEB-278 — Toute écriture est refusée, et le refus est DIT.** Réserver, écrire, publier répondent 503
+`MAINTENANCE` ; le membre lit « La plateforme est en maintenance : réessaie dans quelques minutes. » — jamais une
+erreur générique, jamais un échec muet.
+
+**RG-WEB-279 — L'authentification n'est jamais bloquée.** Se connecter, se reconnecter et rafraîchir sa session
+restent possibles pendant la maintenance (comme l'accès du back-office, qui doit pouvoir la lever).
+
+**RG-WEB-280 — La levée est immédiate à l'échelle de la plateforme** : les écritures reprennent dans les dix
+secondes, sans rechargement forcé au-delà.
+
+**RG-WEB-281 — Une réservation prise dans la bascule ne laisse rien derrière elle** : « Payer » refusé n'autorise
+aucun montant et ne crée aucune demande ; après la levée, le même geste aboutit normalement.
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| 317 | Maintenance annoncée dans 1 h | bandeau ambre daté, rien n'est bloqué | oui |
+| 318 | Lecture seule, consultation | toutes les lectures passent, bandeau rouge | oui |
+| 319 | Lecture seule, écritures | 503 pour réserver / écrire / publier, refus dit à l'écran | oui (ANO-WEB-91 close) |
+| 320 | Lecture seule, connexion | connexion et rafraîchissement possibles | oui |
+| 321 | Levée | écritures reprises en moins de 15 s, bandeau parti | oui |
+| 322 | « Payer » pendant la bascule, puis après la levée | rien d'autorisé ni créé, puis réservation normale | oui |
+
+## Ce qui reste à trancher
+
+- Le code de refus de la passerelle vit à la **racine** de la réponse, pas dans `details` (A146) : aligner.
+- Le bandeau peut arriver avec jusqu'à 60 s de retard pour un membre déjà sur sa page (rattrapé désormais par le
+  premier refus d'écriture).
+- Le message personnalisé de l'administrateur complète le bandeau mais pas le refus d'écriture.
+- Une annonce n'a pas de date de FIN : le membre ne sait pas combien de temps durera l'intervention.

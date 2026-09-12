@@ -6447,3 +6447,100 @@ la deuxième anomalie de cette campagne née d'un accès de champ jamais vérifi
 
 Aucun code de service touché : plateforme inchangée (**1000** + auth 230). `apps/e2e` : **287 scénarios**
 (280 + WEB-ANA ×6 + la contre-épreuve ANO-WEB-89). Typecheck user-ui et harnais verts ; aucune clé i18n ajoutée.
+
+---
+
+# Chapitre 5.28 du cahier 01-WEB : la maintenance — un refus que personne ne disait
+
+*(PR `chore/recette-web-5-28`, 13/09/2026.)*
+
+## Ce qui a été fait
+
+Le vingt-huitième chapitre « fiches » du cahier 01-WEB : `WEB-MNT` (le bandeau d'annonce, la lecture seule, sa levée,
+et la maintenance qui tombe pendant une réservation). Quatre fiches jouées et conformes (une après correction), une
+anomalie close (`ANO-WEB-91`).
+
+```
+apps/e2e/src/chapitres/web-mnt.spec.ts                                            4 scénarios en série, 1 min 42
+apps/user-ui/src/lib/api-client.ts                                                ANO-WEB-91 (signal `yamba:maintenance-refused`)
+apps/user-ui/src/components/layout/MaintenanceBanner.tsx                          il dit le refus et relit son état aussitôt
+```
+
+## Le montage : deux interrupteurs, trois horloges
+
+L'état de maintenance vit dans **un** document `PlatformSettings` (clé `maintenance`, D64 1A), écrit par un OPS ou un
+super administrateur avec un motif d'au moins 20 caractères, journalisé et annoncé par email. Trois horloges le
+propagent, et il faut les connaître pour lire ce chapitre :
+
+| Qui | Quoi | Rythme |
+|---|---|---|
+| Passerelle | relit le document, refuse les écritures (`503 MAINTENANCE`, `Retry-After: 300`) sauf `/api/auth/*`, `/api/admin/*`, `/api/maintenance` | **10 s** |
+| Front membre | `GET /api/maintenance` → bandeau ambre (annonce) ou rouge (lecture seule) | **60 s** |
+| Back-office | page « État des services » → l'éditeur se remonte à chaque sondage | **30 s** |
+
+Le chapitre pose l'annonce **par l'écran du back-office** (le geste du cahier) et bascule ensuite par l'API
+d'administration. Filet indispensable : `beforeAll` et `afterAll` remettent le document à plat **directement en
+base** — sans passer par une session d'administration qui pourrait, elle aussi, avoir échoué. Une maintenance
+oubliée condamnerait tous les chapitres suivants.
+
+## ANO-WEB-91 : le serveur refusait bien, l'écran ne le disait pas
+
+La passerelle fait exactement ce que D64 demande :
+
+```ts
+res.setHeader("Retry-After", String(MAINTENANCE_RETRY_AFTER_SECONDS));
+return res.status(503).json({ code: "MAINTENANCE", message: state.message.fr || "Maintenance en cours.", … });
+```
+
+Mais côté membre, chaque écran traduit **son** échec : le fil de messagerie affichait « Le message n'a pas pu être
+envoyé. », l'assistant de réservation son erreur générique. La phrase prévue pour ce cas —
+`maintenance.writeRefused`, « La plateforme est en maintenance : réessaie dans quelques minutes. », présente en FR et
+en EN depuis D64 — n'était rendue **nulle part** : une clé morte.
+
+Deux raisons de ne pas corriger écran par écran : il y en a une dizaine, et la cause n'est pas métier (elle ne dépend
+ni du geste ni de l'écran). Le projet a déjà le bon patron, celui de la session expirée (A89) : **un signal global,
+une surface qui l'écoute**.
+
+```ts
+// api-client.ts — la passerelle refuse une écriture : on le dit UNE fois, pour tout le monde
+const donnees = error.response?.data as { code?: string; details?: { code?: string } } | undefined;
+if (error.response?.status === 503 && (donnees?.code === "MAINTENANCE" || donnees?.details?.code === "MAINTENANCE")) {
+  window.dispatchEvent(new CustomEvent(MAINTENANCE_REFUSED_EVENT));
+}
+```
+
+```tsx
+// MaintenanceBanner.tsx — la surface « maintenance » écoute, dit la raison, et relit son état
+const surRefus = () => { toast.error(t("writeRefused")); void relire(); };
+```
+
+Le `relire()` n'est pas décoratif : un membre déjà sur sa page voyait le bandeau rouge jusqu'à **60 s** après la
+bascule (le sondage du front). Désormais, son premier geste refusé le lui apprend dans la seconde — la phrase **et**
+le bandeau.
+
+À noter au passage, et consigné comme axe : la passerelle rend son code à la **racine** (`code`), alors que toute la
+plateforme lit `details.code` (A146). C'est précisément pourquoi aucun écran ne le reconnaissait. Le correctif
+accepte les deux formes ; aligner la passerelle serait plus propre.
+
+## Ce que le harnais a appris ici
+
+- **Une fixture de navigateur vit le temps d'UNE fiche.** Ouvrir le navigateur d'administration dans un `beforeAll`
+  donne « Target page, context or browser has been closed » dès la fiche suivante : chaque fiche ouvre le sien (la
+  session est mémorisée, donc c'est peu coûteux).
+- **Un formulaire qui se remonte périodiquement se remplit… puis s'oublie.** L'éditeur du back-office se remonte à
+  chaque sondage (30 s) : la première version de la fiche enregistrait une annonce **sans date**, et le PUT
+  répondait 200. On attend la phrase qui n'apparaît qu'avec les données, on remplit, et l'on **vérifie la valeur**
+  (`inputValue`) avant de cliquer.
+- **`input[type="text"]` ne matche pas un `<input>` sans `type`** — les champs « Message FR / EN » du back-office.
+- **Attendre la propagation avant d'observer** : la passerelle garde son état 10 s ; chaque fiche attend que
+  `GET /api/maintenance` ait basculé avant d'ouvrir l'écran du membre, sinon on conclut « pas de bandeau » dans la
+  fenêtre de cache.
+- **Le bon compte pour le bon fil** : `bzv-accepted` est le deal de Pauline — c'est son écran qui doit tenter
+  l'écriture refusée.
+
+## Tests
+
+Aucun code de service touché : plateforme inchangée (**1000** + auth 230). `apps/e2e` : **291 scénarios**
+(287 + WEB-MNT ×4). Typecheck user-ui et harnais verts ; aucune clé i18n ajoutée (`maintenance.writeRefused` existait
+déjà — c'est bien le problème qu'elle ne servait pas).
+
