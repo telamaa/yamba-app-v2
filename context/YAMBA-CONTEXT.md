@@ -610,6 +610,33 @@ Ordre de demarrage : auth -> trip -> gateway.
   desktop du visiteur sans « Creer un compte » ni « Rechercher un trajet ». Piege de poste : la cle
   Google Maps n'accepte que `localhost` comme referent. Harnais : 32 scenarios verts. PR **#265**
   (empilee sur #264). Reste : 5.2 a 5.32, 02-ADMIN.
+- 12/09 : **CHAPITRE 5.25 DU CAHIER 01-WEB — WEB-RGP, DONNEES PERSONNELLES : EXPORT ET EFFACEMENT (branche
+  `chore/recette-web-5-25`, empilee sur #289)** — 9 fiches jouees CONFORMES (5 apres correction), 9 scenarios en
+  serie, 1 min 24 (`apps/e2e/src/chapitres/web-rgp.spec.ts` ; Aminata et Thomas pour l'ecran, l'export et les
+  bloqueurs ; un compte NEUF cree par l'ecran pour l'avertissement, la SUPPRESSION REELLE et « Membre supprime » —
+  jamais un compte du seed ; gru-completed et bzv-disputed pour l'effacement du destinataire). CINQ ANOMALIES
+  CLOSES : ANO-WEB-81 MAJEURE (la bascule « Mesure d'audience » n'existait qu'avec une cle PostHog cote FRONT et
+  lisait le localStorage, alors qu'`analyticsOptIn` est une preference du COMPTE qui gouverne aussi la capture
+  serveur D66 — ligne toujours rendue, etat servi par /auth/me, ecriture confirmee), ANO-WEB-82 (le fichier
+  d'export se telechargeait sans sa date : CORS cachait `Content-Disposition` — la passerelle l'expose),
+  ANO-WEB-83 (la messagerie affichait « Membre » pour un compte efface → `nomDeLaContrepartie` rend « Membre
+  supprime », +3 tests message = 47), ANO-WEB-84 (refus « un export par 24 h » en ANGLAIS → dit par son
+  details.code), ANO-WEB-85 (« Voir le numero » refuse ne disait rien : le motif ne vivait que dans le `title`) ;
+  JEU D'ESSAI : le journal des demandes RGPD survivait au seed (un export bloquait le suivant 24 h) → purge.
+  Prouve : ecran complet et bascules servies par le compte ; export derriere la porte (403 SUDO_REQUIRED, code,
+  fichier date) ; contenu (20 sections, role + SES montants, aucun code de livraison, aucun signalement subi,
+  avis reveles seulement, export VOYAGEUR sans aucune cle recipient) ; 24 h (400 EXPORT_RATE_LIMITED avant la
+  porte, aucun fichier, aucun code) ; bloqueurs (liste fermee, motifs servis seulement, aucun code) ; texte
+  d'avertissement mot pour mot ; suppression reelle (403 puis 200, deconnexion immediate, reconnexion 401, email
+  sans lien) ; fil intact avec « Membre supprime » et aucun chiffre de telephone ; destinataire efface a 30 jours
+  (— / +00000000000 / null, lien de suivi invalide) et deal en litige intact. A trancher : « SUPPRIMER » accepte
+  en minuscules (le champ majuscule a la frappe), quota OTP muet a l'ecran, TOO_EARLY sur un deal annule, ordre
+  des cles de l'export. Regard d'expert : date du consentement, export asynchrone pour un gros compte, borner les
+  notifications, `nextAt` a l'ecran, compte par motif de blocage, libelle « Membre supprime » partout, revoquer le
+  lien de suivi a l'effacement. PIEGES : quota OTP (6/h) qui grille au troisieme rejeu, sans message (script
+  `otp-debloquer.ts`) ; fenetre sudo liee au jti (parEcran) ; Playwright efface le telechargement a la fin de SA
+  fiche ; `nx serve` a lache message-service (relance en bundle). Harnais : 274 scenarios. Reste : 5.26 a 5.32,
+  02-ADMIN. AUCUNE attribution Claude.
 - 12/09 : **CHAPITRE 5.24 DU CAHIER 01-WEB — WEB-SIG, SIGNALER UN TRAJET, UN PROFIL, UN MESSAGE (branche
   `chore/recette-web-5-24`, empilee sur #288)** — 8 fiches jouees CONFORMES (2 apres correction), 8 scenarios en
   serie, 2 min 54 (`apps/e2e/src/chapitres/web-sig.spec.ts` ; bzv-upcoming et bzv-perkg de Thomas, profil

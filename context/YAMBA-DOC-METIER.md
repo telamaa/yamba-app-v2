@@ -4147,3 +4147,58 @@ pas révélée.
 | 292 | Annonce masquée / profil privé | introuvable (page, bouton, API) | oui (ANO-WEB-79 close) |
 | 293 | Trois auteurs | trois accusés, rien côté propriétaire, revue prioritaire, aucune sanction | oui |
 | 294 | Avis public | mailto au support avec la référence | oui |
+
+---
+
+# Données personnelles : export et effacement — ce que le chapitre 5.25 fait respecter
+
+*(PR `chore/recette-web-5-25`, 12/09/2026 — cahier 01-WEB chapitre 5.25, WEB-RGP-1 à 9.)*
+
+## Le besoin
+
+Un membre voit ce que Yamba garde, règle ses deux préférences (relances de messagerie, mesure d'audience), télécharge
+ses données une fois par 24 heures derrière une porte par code, et supprime son compte — immédiatement, irréversiblement,
+mais seulement quand plus rien n'est en cours. Ce qui reste (réservations, litiges, avis, messages) reste **sans son
+nom**. Le tiers destinataire, lui, est effacé 30 jours après la fin d'un deal terminal.
+
+## Les règles
+
+**RG-WEB-253 — L'écran « Mes données » montre deux bascules et deux cartes** ; chaque bascule reflète la préférence du
+**compte** (elle suit le membre d'un appareil à l'autre et gouverne aussi la mesure côté serveur).
+
+**RG-WEB-254 — L'export passe par la porte par code** (403 `SUDO_REQUIRED`, code à six chiffres, fenêtre de 15 minutes)
+et livre un fichier daté.
+
+**RG-WEB-255 — L'export ne contient que ce qui appartient au membre** : son rôle et ses montants, jamais un code de
+livraison, jamais les coordonnées de l'autre partie ni du destinataire quand il est Voyageur, jamais les signalements
+qui le visent ni les compteurs internes ; les avis reçus n'y sont que révélés.
+
+**RG-WEB-256 — Un seul export par 24 heures** : le refus est dit dans la langue du membre, avant la porte, sans fichier
+ni code.
+
+**RG-WEB-257 — La suppression est refusée tant que quelque chose est en cours** : les motifs viennent d'une liste
+fermée servie par le serveur, seuls les motifs applicables s'affichent, et **aucun code n'est envoyé**.
+
+**RG-WEB-258 — L'avertissement dit ce qui part et ce qui reste**, y compris que Stripe n'est pas supprimé par Yamba.
+
+**RG-WEB-259 — La suppression demande un mot de confirmation et un code**, puis déconnecte immédiatement ; l'ancienne
+adresse ne se connecte plus ; un email sans lien confirme.
+
+**RG-WEB-260 — L'autre partie garde un fil lisible où le compte effacé s'affiche « Membre supprimé »**, sans numéro.
+
+**RG-WEB-261 — Le tiers destinataire est effacé après le délai de conservation**, jamais sur un deal encore en litige ;
+son lien de suivi devient invalide.
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| 295 | Écran « Mes données » | deux bascules servies par le compte, deux cartes | oui (ANO-WEB-81 close) |
+| 296 | Télécharger | porte par code, fichier daté | oui (ANO-WEB-82 close) |
+| 297 | Contenu du fichier | rôle, montants, aucune fuite, avis révélés seulement | oui |
+| 298 | Second téléchargement | refus en français, aucun fichier, aucun code | oui (ANO-WEB-84 close) |
+| 299 | Supprimer avec un deal vivant | bandeau, motifs servis, aucun code | oui |
+| 300 | Avertissement | le texte exact | oui |
+| 301 | Supprimer un compte libre | mot + code, déconnexion, connexion refusée, email sans lien | oui |
+| 302 | Fil de la contrepartie | « Membre supprimé », aucun numéro | oui (ANO-WEB-83, 85 closes) |
+| 303 | Deal terminal + 30 jours / deal en litige | destinataire effacé, lien invalide / rien touché | oui |

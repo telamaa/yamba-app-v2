@@ -6103,3 +6103,90 @@ de droit, pas une requête mal formée.
 
 Plateforme 997 + auth **230** (+1, ANO-WEB-79). `apps/e2e` : **265 scénarios** (257 + WEB-SIG ×8). Typecheck
 auth-service, user-ui et harnais verts ; miroir i18n vert (`report.notFound` FR / EN).
+
+---
+
+# Chapitre 5.25 du cahier 01-WEB : données personnelles — la préférence lue au mauvais endroit, et l'en-tête que CORS cachait
+
+*(PR `chore/recette-web-5-25`, 12/09/2026.)*
+
+## Ce qui a été fait
+
+Le vingt-cinquième chapitre « fiches » du cahier 01-WEB : `WEB-RGP` (l'écran « Mes données », l'export derrière la
+porte par code, son contenu, la règle des 24 h, les bloqueurs de suppression, l'avertissement, la suppression réelle,
+« Membre supprimé », l'effacement du tiers destinataire). Neuf fiches jouées et conformes (cinq après correction),
+cinq anomalies closes (`ANO-WEB-81` MAJEURE, `82`, `83`, `84`, `85`) et une purge de plus au jeu d'essai.
+
+```
+apps/e2e/src/chapitres/web-rgp.spec.ts                                            9 scénarios en série, 1 min 24
+apps/user-ui/src/components/dashboard/sections/PrivacySection.tsx                 ANO-WEB-81 (bascule servie par le compte), ANO-WEB-84 (refus par son code)
+apps/user-ui/src/hooks/useUser.ts                                                 les deux préférences dans le type `User`
+apps/user-ui/src/app/[locale]/dashboard/dashboard.copy.ts                         `privacy.exportRateLimited`
+apps/api-gateway/src/main.ts                                                      ANO-WEB-82 (`exposedHeaders: Content-Disposition`)
+apps/message-service/src/lib/counterpart-label.ts (+ .spec)                        ANO-WEB-83 (« Membre supprimé ») — message 47
+apps/message-service/src/services/conversation.service.ts                         le libellé dans les deux vues (liste, fil)
+apps/user-ui/src/components/dashboard/messages/ConversationThread.tsx             ANO-WEB-85 (le refus de révélation est dit)
+packages/libs/prisma/scripts/seed-deals.ts                                        purge du journal `DataRequest`
+scripts/recette/otp-debloquer.ts                                                  lève le quota de codes (rejeu du chapitre dans l'heure)
+```
+
+## ANO-WEB-81 : une préférence a une seule source
+
+La bascule « Mesure d'audience » n'était rendue que si le FRONT portait une clé PostHog, et son état venait de
+`readConsent()` — le `localStorage` du navigateur. Or `analyticsOptIn` est une préférence **du compte** (servie par
+`/auth/me`) qui gouverne aussi la capture **serveur** (D66, `analyticsEventsFor` n'émet que pour les consentants) :
+
+- sur un déploiement où seul le serveur mesure, le membre n'avait aucun moyen de se retirer ;
+- sur un second appareil, la bascule affichait « non » alors que le compte disait « oui ».
+
+La ligne est désormais toujours rendue, son état vient du compte, l'écriture est confirmée (et revient en arrière si
+le serveur refuse) ; seule l'initialisation du PostHog navigateur reste conditionnée à la clé.
+
+## ANO-WEB-82 : ce que CORS ne donne pas
+
+Le fichier se téléchargeait sous `yamba-mes-donnees.json` au lieu de `yamba-mes-donnees-2026-09-12.json`. Le serveur
+posait pourtant le bon `Content-Disposition` : **le navigateur le cachait**. Une réponse cross-origin n'expose que six
+en-têtes ; tout le reste doit être déclaré. La passerelle expose maintenant `Content-Disposition` et `x-correlation-id`.
+
+```ts
+// apps/api-gateway/src/main.ts
+credentials: true,
+exposedHeaders: ["Content-Disposition", "x-correlation-id"],
+```
+
+## ANO-WEB-83 : nommer, pas recomposer
+
+L'effacement anonymise `firstName = "Membre"` / `lastName = "supprimé"`. La messagerie n'affiche que le prénom : le fil
+disait « Membre », qui se lit comme un prénom ordinaire. Une règle pure nomme la contrepartie, et les deux vues
+(liste et fil) l'utilisent :
+
+```ts
+// apps/message-service/src/lib/counterpart-label.ts
+export function nomDeLaContrepartie(user: { firstName?: string | null; isDeleted?: boolean | null } | null | undefined): string {
+  if (!user) return "—";
+  if (user.isDeleted) return LIBELLE_MEMBRE_SUPPRIME; // « Membre supprimé », comme le back-office
+  return user.firstName ?? "—";
+}
+```
+
+## ANO-WEB-84 et 85 : un refus se dit
+
+Le refus « un export par 24 h » arrivait en anglais (le `message` brut du serveur, affiché tel quel) : il se dit
+maintenant par son `details.code` (A146). Et dans un fil, « Voir le numéro » refusé (400 `TOO_EARLY`) ne produisait
+**rien** : le motif ne vivait que dans l'attribut `title` du bouton, le bandeau n'apparaissant qu'en arrivant par
+« Appeler » (`?focus=phone`). Un refus affiche désormais la même phrase, en ligne.
+
+## Le harnais
+
+- La suppression réelle se joue sur un compte **créé par l'écran** dans la fiche 6, qui réserve par l'API, se fait
+  accepter, écrit un message puis annule (remboursement intégral) : la fiche 7 le supprime, la fiche 8 lit son fil
+  côté Thomas. Aucun compte du jeu d'essai n'est jamais supprimé.
+- L'export du VOYAGEUR est obtenu par l'API (porte sudo + `POST /auth/me/data-export`) : c'est la seule façon de
+  prouver « aucune coordonnée du destinataire quand le membre est le Voyageur ».
+- Le quota de codes (6 par heure) est levé au démarrage du chapitre (`otp-debloquer.ts`) : sans cela, un rejeu dans
+  l'heure n'envoie aucun code **et rien ne le dit à l'écran**.
+
+## Tests
+
+Plateforme **1000** (message 47, +3) + auth 230. `apps/e2e` : **274 scénarios** (265 + WEB-RGP ×9). Typecheck
+user-ui, message-service, api-gateway et harnais verts ; miroir i18n vert.
