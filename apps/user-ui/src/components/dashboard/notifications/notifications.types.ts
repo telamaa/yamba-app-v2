@@ -19,6 +19,7 @@ import {
   Wallet,
   MessageSquare,
   type LucideIcon,
+  Scale,
 } from "lucide-react";
 
 export type NotificationListItem = {
@@ -113,6 +114,14 @@ const PRESENTATION: Record<string, Omit<NotificationPresentation, "i18nKey">> = 
   "booking.rating_revealed": { icon: PartyPopper, tone: "emerald" },
   // ANO-WEB-06 (recette WEB-E2E-3) : un message reçu s'affichait « Notification », sans titre ni extrait.
   "conversation.message_posted": { icon: MessageSquare, tone: "teal" },
+  // ANO-WEB-75 (recette 5.21) : quatre événements avaient leur texte (`copy.*`) mais pas d'entrée ici —
+  // « Décision rendue », « Code de livraison renouvelé », « Remboursement émis », « Paiement autorisé »
+  // s'affichaient « Notification » sans titre. La table de présentation est la porte du texte : les deux
+  // listes doivent rester alignées.
+  "booking.dispute_resolved": { icon: Scale, tone: "teal" },
+  "booking.code_regenerated": { icon: KeyRound, tone: "amber" },
+  "booking.refund_issued": { icon: Wallet, tone: "emerald" },
+  "booking.payment_authorized": { icon: BadgeCheck, tone: "teal" },
 };
 
 /** Fallback : un event key inconnu (18e événement futur) s'affiche

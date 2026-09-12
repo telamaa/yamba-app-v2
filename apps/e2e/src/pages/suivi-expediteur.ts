@@ -34,10 +34,36 @@ export class SuiviExpediteur {
 
   /** Étape 17 — le code à six chiffres, lu sur la carte « Code à transmettre à … ». */
   async lireLeCode(): Promise<string> {
-    await expect(this.page.getByText(/CODE À TRANSMETTRE À/)).toBeVisible({ timeout: 60_000 });
-    const bloc = this.page.getByLabel(/^\d( \d){5}$/);
-    await expect(bloc).toBeVisible();
-    return (await bloc.getAttribute("aria-label"))!.replace(/\s+/g, "");
+    // Phase pickup : la carte monumentale « CODE À TRANSMETTRE À … » (aria-label chiffre par chiffre) ;
+    // phase voyage (un jalon confirmé) : la carte compacte, le code en texte « 742 891 » (5.18).
+    const monumental = this.page.getByLabel(/^\d( \d){5}$/);
+    const compact = this.page.getByText(/^\d{3} \d{3}$/);
+    await expect(monumental.or(compact).first()).toBeVisible({ timeout: 60_000 });
+    if (await monumental.count()) return (await monumental.getAttribute("aria-label"))!.replace(/\s+/g, "");
+    return (await compact.first().innerText()).replace(/\s+/g, "");
+  }
+
+  /**
+   * 5.17 / 5.18 — une régénération complète par l'écran : « Régénérer le code », confirmation, réponse
+   * DÉFINITIVE (le client rejoue après un 401 de session expirée), toast, nouveau code relu sur la carte.
+   * Les toasts s'empilent cinq secondes : le dernier est le bon.
+   */
+  async regenerer(): Promise<{ nouveauCode: string; toast: string }> {
+    const ancien = await this.lireLeCode();
+    // « Régénérer le code » (phase pickup) ou « Régénérer » (carte compacte de la phase voyage).
+    await this.page.getByRole("button", { name: /^Régénérer( le code)?$/ }).click();
+    await expect(this.page.getByText("Régénérer le code ?")).toBeVisible();
+    const reponse = this.page.waitForResponse((r) => /\/deals\/[^/]+\/code\/regenerate$/.test(r.url()) && r.request().method() === "POST" && r.status() !== 401, { timeout: 60_000 });
+    await this.page.getByRole("button", { name: "Oui, régénérer" }).click();
+    const r = await reponse;
+    if (r.status() !== 200) throw new Error(`Régénération refusée : ${r.status()} ${await r.text()}`);
+    const toast = this.page.getByText(/Nouveau code généré !/).last();
+    await expect(toast).toBeVisible({ timeout: 10_000 });
+    const texteToast = (await toast.innerText()).replace(/\s+/g, " ").trim();
+    // La carte RELIT le serveur (invalidateQueries) : le nouveau code arrive un instant après le toast.
+    await expect.poll(() => this.lireLeCode(), { timeout: 15_000, message: "la carte affiche le nouveau code" }).not.toBe(ancien);
+    const nouveauCode = await this.lireLeCode();
+    return { nouveauCode, toast: texteToast };
   }
 
   /** Étape 18 — « Copier le message » de la carte de partage du CODE (pas celle du lien). */

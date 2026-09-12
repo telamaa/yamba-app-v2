@@ -242,11 +242,13 @@ function ReviewCard({ review }: { review: PublicReview }) {
             {formatRelativeDate(review.createdAt, locale)}
           </p>
         </div>
-        <div className="flex gap-0.5">
+        {/* ANO-WEB-78 (recette 5.22) : cinq icônes colorées sans nom — la note d'un avis public n'était lisible qu'à l'œil. */}
+        <div className="flex gap-0.5" role="img" aria-label={`${Math.round(review.rating)}/5`}>
           {Array.from({ length: 5 }).map((_, i) => (
             <Star
               key={i}
               size={11}
+              aria-hidden="true"
               className={
                 i < Math.round(review.rating)
                   ? "fill-[#FF9900] text-[#FF9900]"

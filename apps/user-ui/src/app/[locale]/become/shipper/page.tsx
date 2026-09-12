@@ -1,3 +1,7 @@
-export default function BecomeSellerPage() {
-  return <div className="mx-auto max-w-6xl px-4 py-10">Become a seller (UI only)</div>;
+import { redirect } from "@/i18n/navigation";
+
+/** ANO-WEB-11 — même bouchon que `/become/carrier` : envoyer un colis commence par la recherche. */
+export default async function BecomeShipperPage({ params }: { params: Promise<{ locale: string }> }) {
+  const { locale } = await params;
+  redirect({ href: "/search", locale });
 }
