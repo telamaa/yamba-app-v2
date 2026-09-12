@@ -635,7 +635,7 @@ Ordre de demarrage : auth -> trip -> gateway.
   « toute transition a une route et un ecran », allowedActions au Voyageur, composant de retour partage,
   refetch au focus. PIEGES : GET /trips/:id proprietaire seul, instantane du depart, deal par l'API en
   deux appels (QUOTE_DIVERGENCE → actualTotalCents), toast prefixe, route figee des deux onglets.
-  Harnais : 223 scenarios. Reste : 5.21 a 5.32, 02-ADMIN. AUCUNE attribution Claude.
+  Harnais : 223 scenarios. PR **#285** (empilee sur #284). Reste : 5.21 a 5.32, 02-ADMIN. AUCUNE attribution Claude.
 - 12/09 : **CHAPITRE 5.19 DU CAHIER 01-WEB — WEB-CNF, CONFIRMATION, COMPLETION ET VERSEMENT (branche
   `chore/recette-web-5-19`, empilee sur #283)** — 11 fiches jouees CONFORMES (4 apres correction, 1 avec
   reserve), 13 scenarios en serie dont 2 `test.fail`, 2 min 54 (`apps/e2e/src/chapitres/web-cnf.spec.ts` ;

@@ -3881,7 +3881,7 @@ carte, un relevé ou un intitulé inventés.
 
 # Les annulations — ce que le chapitre 5.20 fait respecter
 
-*(PR `chore/recette-web-5-20`, 12/09/2026 — cahier 01-WEB chapitre 5.20, WEB-ANN-1 à 9.)*
+*(PR `chore/recette-web-5-20` (#285), 12/09/2026 — cahier 01-WEB chapitre 5.20, WEB-ANN-1 à 9.)*
 
 ## Le besoin
 

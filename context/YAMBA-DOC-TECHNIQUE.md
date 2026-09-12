@@ -5773,7 +5773,7 @@ FR / EN).
 
 # Chapitre 5.20 du cahier 01-WEB : les annulations — la transition sans route ni écran, l'instantané que le barème lit, et deux restes de maquette
 
-*(PR `chore/recette-web-5-20`, 12/09/2026.)*
+*(PR `chore/recette-web-5-20` (#285), 12/09/2026.)*
 
 ## Ce qui a été fait
 
