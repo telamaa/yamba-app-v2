@@ -58,7 +58,7 @@ export default function BookingTrackingLinkCard({ booking, compact = false }: { 
   return (
     <section className={`rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950 sm:rounded-2xl ${compact ? "p-4" : "p-5"}`}>
       <div className="flex items-center gap-2 text-[14px] font-semibold text-slate-900 dark:text-white"><Link2 size={15} className="text-[#0F766E]" />{t("title", { recipientFirstName })}</div>
-      <p className="mt-1 text-[12.5px] text-slate-500 dark:text-slate-400">{t("subtitle")}</p>
+      <p className="mt-1 text-[12.5px] text-slate-500 dark:text-slate-400">{t("subtitle", { recipientFirstName })}</p>{/* ANO-WEB-54 : sans la variable, next-intl rendait la clé brute */}
       <div className="mt-3 flex flex-wrap gap-2">
         <button type="button" disabled={busy} onClick={() => share("whatsapp")} className={btn}><MessageCircle size={13} />{t("whatsapp")}</button>
         <button type="button" disabled={busy} onClick={() => share("sms")} className={btn}><MessageSquare size={13} />{t("sms")}</button>

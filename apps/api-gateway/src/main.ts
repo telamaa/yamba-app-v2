@@ -36,7 +36,10 @@ app.use(
       return callback(new Error("Not allowed by CORS: " + origin));
     },
     credentials: true,
-    // ... reste de ta config
+    // ANO-WEB-82 (recette 5.25) : sans cette ligne, le navigateur CACHE `Content-Disposition` au client
+    // (CORS n'expose que six en-têtes par défaut) — l'export de données se téléchargeait sous le nom de
+    // repli « yamba-mes-donnees.json », sans la date que le serveur avait mise.
+    exposedHeaders: ["Content-Disposition", "x-correlation-id"],
   })
 );
 

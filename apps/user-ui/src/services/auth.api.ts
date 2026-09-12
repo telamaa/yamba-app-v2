@@ -1,5 +1,6 @@
 import axios from "axios";
 import apiClient from "@/lib/api-client";
+import { getCurrentLocale } from "@/lib/current-locale";
 import { oublierSession } from "@/lib/session-marker";
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
@@ -10,6 +11,16 @@ export const authApi = axios.create({
   headers: {
     "Content-Type": "application/json",
   },
+});
+
+// ANO-WEB-87 (recette 5.26) — D44 : les flux SANS compte (code d'activation, mot de passe oublié, renvoi)
+// passent par ce client dédié, qui ne posait pas `x-locale` : leurs emails partaient toujours en français,
+// et `User.preferredLocale` naissait « fr » même pour une inscription faite en anglais. Même interception
+// que `apiClient`.
+authApi.interceptors.request.use((config) => {
+  const locale = getCurrentLocale();
+  if (locale) config.headers.set("x-locale", locale);
+  return config;
 });
 
 export type Gender = "MALE" | "FEMALE" | "OTHER";

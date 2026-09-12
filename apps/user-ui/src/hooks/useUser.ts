@@ -39,6 +39,9 @@ export type User = {
   carrierStatus?: string;
   carrierPage?: CarrierPage | null;
   avatar?: { url: string } | null;
+  /** C-PR8b (D63) / D66 — préférences servies par `/auth/me` : relances de messagerie, mesure d'audience. */
+  messagingReminderEmails?: boolean;
+  analyticsOptIn?: boolean | null;
 };
 
 type GetMeResponse = {

@@ -19,7 +19,7 @@ type SocialLink = {
 
 const FOOTER_DISCOVER_LINKS: FooterLink[] = [
   { labelKey: "howItWorks", href: "/how-it-works" },
-  { labelKey: "becomeYamber", href: "/become-yamber" },
+  { labelKey: "becomeYamber", href: "/carrier/onboarding" },
   { labelKey: "helpFaq", href: "/help" },
 ];
 
@@ -35,7 +35,7 @@ const FOOTER_LEGAL_LINKS: FooterLink[] = [
   { labelKey: "legalNotice", href: "/legal/notice" },
 ];
 
-const SOCIAL_LINKS_ENABLED: boolean = true;
+const SOCIAL_LINKS_ENABLED: boolean = false;
 
 const FOOTER_SOCIAL_LINKS: SocialLink[] = [
   { name: "instagram", href: "https://instagram.com/yamba", enabled: SOCIAL_LINKS_ENABLED },
