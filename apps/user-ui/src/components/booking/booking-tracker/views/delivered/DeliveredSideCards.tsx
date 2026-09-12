@@ -81,7 +81,11 @@ export function DeliveredPaymentCard({
 
       <p className="mt-3 text-[11px] leading-snug text-slate-500 dark:text-slate-400">
         {isConfirmed
-          ? t("delivered.payment.noteReleased", { carrierFirstName })
+          ? // ANO-WEB-64 : « Tu as confirmé la livraison » ne vaut que pour une confirmation de l'Expéditeur —
+            // une complétion automatique (SYSTEM) ou une décision de médiation dit la fin de la vérification.
+            booking.completedBy === "SHIPPER"
+            ? t("delivered.payment.noteReleased", { carrierFirstName })
+            : t("delivered.payment.noteReleasedAuto", { carrierFirstName })
           : t("delivered.payment.note", { carrierFirstName })}
       </p>
     </section>
