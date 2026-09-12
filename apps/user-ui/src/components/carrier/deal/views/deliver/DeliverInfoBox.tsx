@@ -7,6 +7,7 @@
 
 "use client";
 
+import { elider } from "@/lib/elision"; // ANO-WEB-49
 import { Info, Phone } from "lucide-react";
 import { useTranslations } from "next-intl";
 import type { ReactNode } from "react";
@@ -26,8 +27,8 @@ export function DeliverInfoBox({
   const t = useTranslations("carrierDealDeliver");
 
   const text = compact
-    ? t("infoBoxShort", { recipientFirstName, shipperFirstName })
-    : t("infoBox", { recipientFirstName, shipperFirstName });
+    ? t("infoBoxShort", { recipientFirstName, shipperFirstName, queShipper: elider("que", shipperFirstName) })
+    : t("infoBox", { recipientFirstName, shipperFirstName, queShipper: elider("que", shipperFirstName) });
 
   const boxClass =
     "flex items-start gap-2.5 rounded-2xl border border-amber-200 bg-amber-50 dark:border-amber-900/40 dark:bg-amber-950/25 " +

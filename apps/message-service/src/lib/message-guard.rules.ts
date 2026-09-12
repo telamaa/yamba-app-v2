@@ -12,10 +12,21 @@ export const SIX_DIGITS = /\b\d{6}\b/g;
 /** Au plus trois comparaisons bcrypt par message : au-delà, c'est du bruit, pas un code. */
 export const MAX_CODE_CANDIDATES = 3;
 
-/** Groupes de SIX chiffres isolés (un numéro de vol ou une date n'en produit pas). */
+/** Ce qu'on glisse entre des chiffres pour « aérer » un code : espace, point, tiret, apostrophe, barre. */
+const DIGIT_SEPARATOR = /(?<=\d)[\s.\-–_'’/]+(?=\d)/g;
+
+/**
+ * Groupes de SIX chiffres isolés (un numéro de vol ou une date n'en produit pas).
+ *
+ * ANO-WEB-46 (recette 5.15, BLOQUANTE) : « Le code : 742 891 » passait — la lecture ne voyait que les
+ * six chiffres COLLÉS. Les séparateurs entre chiffres sont retirés avant une seconde lecture :
+ * « 742 891 », « 74-28-91 », « 7 4 2 8 9 1 » deviennent des candidats. Un numéro de téléphone
+ * (dix chiffres) ou une date (huit) ne forment toujours pas un groupe de six isolé.
+ */
 export function sixDigitCandidates(text: string): string[] {
-  const found = text.match(SIX_DIGITS) ?? [];
-  return [...new Set(found)].slice(0, MAX_CODE_CANDIDATES);
+  const isolated = text.match(SIX_DIGITS) ?? [];
+  const collapsed = text.replace(DIGIT_SEPARATOR, "").match(SIX_DIGITS) ?? [];
+  return [...new Set([...isolated, ...collapsed])].slice(0, MAX_CODE_CANDIDATES);
 }
 
 const EMAIL = /[\w.+-]+@[\w-]+\.[\w.]{2,}/;

@@ -23,6 +23,11 @@ export type TripListItem = {
   arrivalDateLocal: string | null;
   departureTimeLocal: string | null;
   arrivalTimeLocal: string | null;
+  /** L'instant absolu et les fuseaux, toujours servis par l'API — source des chaînes locales quand le wizard ne les a pas écrites (ANO-WEB-41). */
+  departureAt?: string | null;
+  arrivalAt?: string | null;
+  originTimezone?: string | null;
+  destinationTimezone?: string | null;
   travelReference: string | null;
   acceptedCategories: string[];
   handDeliveryOnly: boolean;

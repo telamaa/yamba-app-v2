@@ -39,6 +39,7 @@
       "textShort": "Saisis le code que {recipientFirstName} te donne.",
       "button": "Valider la livraison"
     },
+    "deliverEarly": "{recipientFirstName} est déjà devant toi ? Tu peux passer directement à la remise :",
     "confirmedToast": "C''est noté ! {shipperFirstName} a été prévenue.",
     "undo": "Annuler",
     "undoneToast": "Annulé, rien n''a été envoyé.",
