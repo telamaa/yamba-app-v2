@@ -4,6 +4,18 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ─── La hauteur d'écran utile (ANO-WEB-89, recette 5.27) ───
+   La bannière de consentement est `fixed` en bas : sans rien, elle RECOUVRE le bouton principal
+   des écrans calés sur la hauteur de la fenêtre (mesuré : « Se connecter » et « Inscris-toi »
+   inaccessibles tant qu'on n'avait pas répondu). Elle publie donc sa hauteur dans
+   `--yamba-consent-space` (ConsentBanner), et toute mise en page qui raisonne en hauteur d'écran
+   utilise `--yamba-viewport` au lieu de `100vh` : le contenu se recentre au-dessus d'elle, et
+   retrouve toute la place dès qu'on a répondu. */
+:root {
+  --yamba-consent-space: 0px;
+  --yamba-viewport: calc(100vh - var(--yamba-consent-space));
+}
+
 /* ─── HTML/Body : masquer la scrollbar globale ─── */
 html, body {
   height: 100%;

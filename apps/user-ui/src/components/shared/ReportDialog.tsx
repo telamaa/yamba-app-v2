@@ -38,7 +38,8 @@ export default function ReportDialog({ target, onCloseAction }: { target: Report
       setState({ busy: false, done: true, error: null });
     } catch (err) {
       const status = (err as { response?: { status?: number } })?.response?.status;
-      setState({ busy: false, done: false, error: status === 409 ? t("already") : status === 400 ? t("ownTarget") : t("failed") });
+      // ANO-WEB-80 (recette 5.24) : une cible devenue invisible (404) disait « n'a pas pu être envoyé. Réessaie. » — réessayer ne sert à rien.
+      setState({ busy: false, done: false, error: status === 409 ? t("already") : status === 400 ? t("ownTarget") : status === 404 ? t("notFound") : t("failed") });
     }
   }
 

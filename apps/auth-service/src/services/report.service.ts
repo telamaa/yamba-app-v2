@@ -35,7 +35,12 @@ export function makeReportService(deps: { db?: ReportDb; sendEmail?: typeof send
   /** Résout la cible depuis son identifiant public : { id, ownerId } ou 404 si invisible. */
   async function resolveTarget(targetType: ReportTargetType, targetRef: string): Promise<{ id: string; ownerId: string }> {
     if (targetType === "TRIP") {
-      const trip = await db.trip.findFirst({ where: { id: targetRef, isDeleted: false }, select: { id: true, userId: true } });
+      // ANO-WEB-79 (recette 5.24) — une annonce MASQUÉE par Yamba (C-PR4, `hiddenByAdminAt`) n'est pas visible : la
+      // signaler répondait 201 et révélait son existence. Pitfall Mongo : `null` ne voit pas un champ ABSENT → OR isSet.
+      const trip = await db.trip.findFirst({
+        where: { id: targetRef, isDeleted: false, OR: [{ hiddenByAdminAt: null }, { hiddenByAdminAt: { isSet: false } }] },
+        select: { id: true, userId: true },
+      });
       if (!trip) throw new NotFoundError("Trip not found.", { code: "TRIP_NOT_FOUND" });
       return { id: trip.id as string, ownerId: trip.userId as string };
     }

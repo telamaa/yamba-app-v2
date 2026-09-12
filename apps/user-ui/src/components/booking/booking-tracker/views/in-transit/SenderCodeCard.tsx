@@ -13,7 +13,7 @@ import { ChevronDown, KeyRound, RefreshCw, Share2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { toast } from "sonner";
-import { regenerateDeliveryCode } from "@/components/booking/booking-tracker/booking-tracker.api";
+import { BookingApiError, regenerateDeliveryCode } from "@/components/booking/booking-tracker/booking-tracker.api";
 import {
   MAX_CODE_REGENERATIONS,
   type Booking,
@@ -52,8 +52,10 @@ export default function SenderCodeCard({
       route,
       code,
     });
+    // ANO-WEB-56 (recette 5.17) : sur le numéro saisi à la réservation (D69), comme la carte de partage.
+    const target = (booking.recipient.phoneE164 ?? "").replace(/[^\d]/g, "");
     window.open(
-      "https://wa.me/?text=" + encodeURIComponent(message),
+      "https://wa.me/" + target + "?text=" + encodeURIComponent(message),
       "_blank"
     );
   };
@@ -74,8 +76,11 @@ export default function SenderCodeCard({
         { duration: 5000 }
       );
       setConfirmingRegen(false);
-    } catch {
-      toast.error(t("pickedUp.code.toastError"));
+    } catch (e) {
+      // ANO-WEB-58 (recette 5.17) : le 409 CODE_REGENERATION_LIMIT porte son propre message.
+      const plafond = e instanceof BookingApiError && e.code === "CODE_REGENERATION_LIMIT";
+      toast.error(t(plafond ? "pickedUp.code.toastMaxReached" : "pickedUp.code.toastError"));
+      if (plafond) setConfirmingRegen(false);
     } finally {
       setIsRegenerating(false);
     }
@@ -205,11 +210,14 @@ export default function SenderCodeCard({
                   {t("senderTracking.code.regenerate")}
                 </button>
               </div>
-              {!compact && (
-                <p className="mt-2.5 text-[11.5px] leading-snug text-slate-500 dark:text-slate-400">
-                  {t("senderTracking.code.hint", { recipientFirstName })}
-                </p>
-              )}
+              {/* ANO-WEB-57 (recette 5.17) : le compteur est lisible hors de la boîte de confirmation. */}
+              <p className="mt-2.5 text-[11.5px] leading-snug text-slate-500 dark:text-slate-400">
+                {!compact && <>{t("senderTracking.code.hint", { recipientFirstName })} </>}
+                <span className="whitespace-nowrap font-semibold">
+                  {!compact && "· "}
+                  {t("pickedUp.code.regenerationsLeft", { count: regenerationsLeft })}
+                </span>
+              </p>
             </>
           )}
         </div>
