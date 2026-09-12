@@ -3,7 +3,8 @@
 import { useMemo, useState, useEffect } from "react";
 import { Search, SlidersHorizontal, X } from "lucide-react";
 import { useTranslations, useLocale } from "next-intl";
-import TripSearchBar, { type TripSearchValue } from "./TripSearchBar";
+import { usePersistedFormState } from "@/hooks/usePersistedFormState";
+import TripSearchBar, { initialSearchDraft, SEARCH_VERSION, TRIP_SEARCH_STORAGE_KEY, type TripSearchValue } from "./TripSearchBar";
 import TripResultCard from "./TripResultCard";
 import TripResultCardMobile from "./TripResultCardMobile";
 import TransportModeTabs from "./TransportModeTabs";
@@ -21,7 +22,6 @@ import type {
   SortOption,
   TransportMode,
 } from "./search-results.types";
-import type { DateValue } from "@/components/ui/SmartDatePicker";
 
 type FilterMode = "all" | TransportMode;
 
@@ -299,15 +299,14 @@ export default function SearchResultsView() {
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
 
-  const [searchDraft, setSearchDraft] = useState<{
-    from: string;
-    to: string;
-    dateValue: DateValue | null;
-  }>({
-    from: "",
-    to: "",
-    dateValue: null,
-  });
+  // Recette 01-WEB 5.1 (WEB-ACC-9) : le brouillon INTERROGÉ est celui que la barre a mémorisé
+  // (même clé de sessionStorage) — en arrivant depuis l'accueil, les résultats correspondent à
+  // ce que le visiteur vient de saisir, sans avoir à cliquer « Rechercher » une seconde fois.
+  const [searchDraft, setSearchDraft] = usePersistedFormState<TripSearchValue>(
+    TRIP_SEARCH_STORAGE_KEY,
+    initialSearchDraft,
+    { version: SEARCH_VERSION }
+  );
 
   const tripsParams = useMemo(
     () => ({

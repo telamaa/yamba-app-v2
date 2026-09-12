@@ -40,6 +40,10 @@ export function RatingDone({ context, onBackAction }: { context: RatingContext; 
   const name = context.person.firstName;
   const windowEnd = context.windowEndsAt ? format.dateTime(new Date(context.windowEndsAt), { day: "numeric", month: "long" }) : "";
   const revealed = !!context.revealedAt;
+  // ANO-WEB-77 (recette 5.22) : sans note et sans révélation, l'écran disait toujours « La fenêtre de 14 jours est
+  // passée » — y compris pour un deal en litige (fenêtre jamais ouverte). « Fermée » ne vaut que si l'échéance est passée.
+  const fenetrePassee = !!context.windowEndsAt && new Date(context.windowEndsAt).getTime() <= Date.now();
+  const indisponible = !revealed && !context.myRating && !fenetrePassee;
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-10 dark:bg-slate-950">
@@ -48,14 +52,16 @@ export function RatingDone({ context, onBackAction }: { context: RatingContext; 
           {revealed ? <Star size={30} fill="currentColor" aria-hidden="true" /> : <Lock size={26} aria-hidden="true" />}
         </div>
         <h1 className="mt-5 text-[24px] font-black tracking-tight text-slate-900 dark:text-white">
-          {revealed ? t("revealedTitle") : context.myRating ? t("sentTitle") : t("closedTitle")}
+          {revealed ? t("revealedTitle") : context.myRating ? t("sentTitle") : indisponible ? t("unavailableTitle") : t("closedTitle")}
         </h1>
         <p className="mt-2 text-[14px] leading-relaxed text-slate-600 dark:text-slate-400">
           {revealed
             ? t("revealedText", { name })
             : context.myRating
               ? t("sentText", { name, date: windowEnd })
-              : t("closedText", { name })}
+              : indisponible
+                ? t("unavailable")
+                : t("closedText", { name })}
         </p>
         <div className="mt-6 space-y-2.5">
           {context.myRating && <RatingLine label={t("mine", { name })} rating={context.myRating} />}

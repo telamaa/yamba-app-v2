@@ -80,8 +80,11 @@ export default function ShipmentsClient({
               currency: result.currencyCode,
             }).format(result.refundAmountCents / 100)
             : null;
+        // ANO-WEB-71 (5.20) : une demande EN ATTENTE n'a jamais été débitée (l'empreinte est levée, D40) —
+        // « Remboursement de 28,00 € en cours » y était un mensonge ; le remboursement ne se dit qu'après un débit.
+        const debitee = item.status !== "PENDING";
         toast.success(
-          refund
+          refund && debitee
             ? t("cancel.toastSuccessRefund", { refund })
             : t("cancel.toastSuccess"),
           { duration: 6000 }

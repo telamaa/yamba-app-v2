@@ -115,6 +115,8 @@ export type DealRequest = {
   deliveryAttemptsLeft?: number;
   deliveryLockedUntil?: string;
   recipient?: DealRecipient;
+  /** Le prénom du destinataire, servi à toute étape (ANO-WEB-44) : « Aminata le révèle à Clarisse… ». Le reste (`recipient`) attend le pickup. */
+  recipientFirstName: string;
   trackingEvents?: DealTrackingEvent[];
 
   // ✨ B4-PR3 — après la remise (A75–A78) : le front reflète, ne décide jamais.

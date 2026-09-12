@@ -56,7 +56,13 @@ export function useFollowUser() {
   });
 }
 
-export function useUnfollowUser() {
+/**
+ * ANO-WEB-31 (recette 5.11, même classe qu'ANO-WEB-29) — les retours (toast) se déclarent ICI :
+ * le désabonnement est OPTIMISTE (la carte « Voyageurs suivis » est retirée avant la réponse),
+ * le composant est démonté, et TanStack Query n'appelle jamais les callbacks passés à `mutate`
+ * d'un composant démonté. Ceux du hook survivent.
+ */
+export function useUnfollowUser(retours: { onSuccess?: () => void; onError?: () => void } = {}) {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -102,6 +108,9 @@ export function useUnfollowUser() {
 
       return { previous, previousFollowing };
     },
+    onSuccess: () => {
+      retours.onSuccess?.();
+    },
     onError: (_err, slug, context) => {
       if (context?.previous) {
         queryClient.setQueryData(["public-user", slug], context.previous);
@@ -110,6 +119,7 @@ export function useUnfollowUser() {
       if (context?.previousFollowing) {
         queryClient.setQueryData(["following"], context.previousFollowing);
       }
+      retours.onError?.();
     },
     onSettled: (_data, _err, slug) => {
       queryClient.invalidateQueries({ queryKey: ["public-user", slug] });

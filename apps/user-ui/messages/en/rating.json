@@ -123,7 +123,8 @@
     "mineMissing": "You didn't rate this Deal.",
     "theirs": "{name}'s rating",
     "theirsMissing": "{name} didn't rate this Deal.",
-    "closed": "The rating window is closed — you didn't rate {name}."
+    "closed": "The rating window is closed — you didn't rate {name}.",
+    "promptTextNoDate": "Your rating is only visible once both reviews are published."
   },
   "done": {
     "revealedTitle": "Your reviews are public",
@@ -136,6 +137,7 @@
     "theirs": "Their rating",
     "theirsMissing": "No rating received for this Deal.",
     "back": "Back to the Deal",
-    "unavailable": "This Deal can't be rated right now."
+    "unavailable": "This Deal can't be rated right now.",
+    "unavailableTitle": "Rating unavailable"
   }
 }
