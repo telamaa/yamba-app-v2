@@ -3189,6 +3189,109 @@ par `scripts/recette/otp-debloquer.ts` — sans quoi rejouer le chapitre dans l'
 - **Le journal des demandes RGPD survit au seed** : sans purge, « un export par 24 h » refuse dès la première fiche du
   passage suivant.
 
+## Chapitre 5.26 — Préférences, langue et relances · **CONFORME** (6 fiches jouées, 3 après correction · 3 anomalies closes dont 1 MAJEURE · 6 scénarios en série, 1 min 24)
+
+`web-prf.spec.ts`. Aminata (bascule de langue, emails, écran « Paramètres »), Thomas (le Voyageur francophone qui
+accepte), Pauline et `bzv-accepted` pour la relance des messages non lus (cron `unread-reminder` forcé par
+`scripts/recette/relance-eligible.ts <fil> SHIPPER` puis `relance.ts`), une adresse libre pour l'inscription en
+anglais. **Les préférences d'un compte survivent au seed** (il recrée trajets et deals, pas les réglages) : le
+chapitre les pose lui-même dans son `beforeAll` — Aminata en français **avec la relance coupée**, Thomas en français
+— et remet celles d'Aminata dans un `afterAll`.
+
+| Fiche | Ce qui est éprouvé | Verdict · Preuve |
+|---|---|---|
+| WEB-PRF-1 | La bascule de langue met à jour le compte | **Conforme** — `PATCH /auth/me/locale` → 200, l'URL passe en `/en/`, `/auth/me` sert `preferredLocale: "en"` ; après rechargement **puis déconnexion / reconnexion dans un contexte neuf** (navigateur en `fr-FR`), le compte est toujours en anglais et l'interface répond en anglais |
+| WEB-PRF-2 | L'email suit la langue du destinataire (deux navigateurs) | **Conforme** — Aminata en anglais réserve `bzv-perkg` (devis exact par `payment-intents`, puis `POST /deals`), Thomas francophone accepte : Thomas reçoit « **Nouvelle demande de transport Paris → Brazzaville** » (aucun « request »), Aminata reçoit « **Your request Paris → Brazzaville was accepted** » (aucun « acceptée »), corps en « Hello » — la langue est celle du **destinataire**, jamais celle de l'auteur du geste |
+| WEB-PRF-3 | Les emails sans compte suivent la langue de l'écran | **Conforme après correction** → `ANO-WEB-87` ; inscription réelle depuis `/en/register` → « **Your Yamba activation code** » (il partait « Ton code d'activation Yamba ») |
+| WEB-PRF-4 | Désactiver la relance des messages non lus `[RGP11]` | **Conforme** — Pauline coupe la bascule dans « Mes données » (`PATCH /auth/me/preferences`, `messagingReminderEmails: false` relu par `/auth/me`), Thomas écrit, le fil reste non lu, la passe de relance est forcée : **aucun email à Pauline**, et la notification in-app « Nouveau message » est bien là |
+| WEB-PRF-5 | L'écran « Paramètres » | **Conforme après correction** → `ANO-WEB-86` ; les quatre entrées du cahier sont là ; la bascule email affiche l'état **du serveur** (relance coupée en précondition) ; « Langue » → `PATCH /auth/me/locale` 200 dans les deux sens ; « Thème » → la classe `dark` de `<html>` apparaît puis disparaît, « Automatique » reste sélectionnable ; « Notifications email » → `PATCH /auth/me/preferences`, valeur relue côté serveur et **état conservé après rechargement** ; « Notifications push » → aucune bascule, aucun bouton |
+| WEB-PRF-6 | Une langue non prise en charge est refusée | **Conforme après correction** → `ANO-WEB-88` ; `/es` → le middleware retient une langue connue (`/fr/es`) et répond **404** avec la page introuvable de Yamba (« Cette page n'existe pas », « Chercher un trajet », « Retour à l'accueil ») ; `/en/es` donne la même page traduite (« This page does not exist ») ; plus aucune trace du 404 interne de Next, aucune clé brute |
+
+### Anomalies
+
+- **ANO-WEB-87 (MAJEURE, close)** — les flux **sans compte** (code d'activation, mot de passe oublié, renvoi du code)
+  passent par `authApi`, un client axios dédié qui ne posait **pas** l'en-tête `x-locale` — contrairement à
+  `apiClient`. Conséquence double : l'email d'activation partait **toujours en français**, et le compte naissait avec
+  `preferredLocale: "fr"` même pour une inscription faite en anglais — donc *tous* ses emails suivants aussi, jusqu'à
+  ce que le membre trouve la bascule. Le client pose désormais la même interception (D44).
+- **ANO-WEB-86 (mineure, close)** — l'écran « Paramètres » était un **reste de maquette** : « Langue » et « Thème »
+  affichaient un bouton « Changer » sans gestionnaire (`onAction` optionnel, jamais passé), et « Notifications
+  email » / « Notifications push » étaient deux bascules à `useState` local — elles bougeaient, rien n'était
+  enregistré, et l'état repartait à sa valeur d'origine au rechargement. Un membre pouvait croire avoir coupé ses
+  emails. Chaque ligne porte maintenant le réglage réel, **là où il a un effet** : la langue écrit le compte
+  (sélecteur de l'en-tête réutilisé, D44), le thème passe par next-themes avec ses trois choix (Automatique / Clair /
+  Sombre — une préférence d'affichage, sans effet serveur, donc le navigateur), « Notifications email » est branchée
+  sur `messagingReminderEmails` (D61) et le libellé dit ce qu'elle couvre **et ce qu'elle ne couvre pas** (« les
+  emails d'un Deal en cours ne se coupent pas »), « Notifications push » devient une ligne en lecture. `ToggleRow`
+  est désormais **contrôlée** (`checked` + `onChangeAction`, `role="switch"`, `aria-checked`) et `SettingRow`
+  n'affiche son bouton que si un gestionnaire existe : une bascule ou un bouton décoratif ne peut plus se glisser.
+- **ANO-WEB-88 (mineure, close)** — une adresse qui ne correspond à **aucune route** (`/es`, réécrit `/fr/es` par le
+  middleware next-intl) ne déclenche jamais `notFound()` : Next n'avait rien à afficher dans le segment `[locale]` et
+  servait son **404 interne** — « This page could not be found. », en anglais quelle que soit la langue de l'URL, sans
+  en-tête, sans pied de page et sans un lien pour revenir. La page introuvable du produit existait déjà
+  (`[locale]/not-found.tsx`, soignée en 5.3) mais restait inatteignable. Une route attrape-tout
+  `[locale]/[...rest]/page.tsx` qui appelle `notFound()` lui rend la main (façon documentée par next-intl ; les
+  routes réelles, plus spécifiques, gagnent toujours contre elle).
+
+### À trancher (produit)
+
+- **Le cahier décrit l'ancien écran** : WEB-PRF-5 attendait « Notifications email · Demandes, messages, paiements » et
+  « Notifications push · Alertes en temps réel ». Les libellés disent maintenant la vérité (relance des messages non
+  lus ; push indisponible) — **le cahier doit être amendé** (§ 5.26), ou le produit doit livrer ces deux réglages.
+- **Préférences email par famille d'événement** (demandes, messages, paiements, rappels de notation) : il n'en existe
+  qu'une, `messagingReminderEmails`. Faut-il une granularité par famille, sachant que les emails d'un Deal en cours
+  sont **contractuels** et ne doivent pas pouvoir être coupés ? **Candidat au registre (D-next)**, avec la liste
+  fermée des familles coupables.
+- **Notifications push** : rien n'est branché (ni service worker, ni abonnement, ni transport). À arbitrer avant de
+  remettre une ligne active — **candidat au registre**, dans le même geste que ci-dessus.
+- **Le thème n'est pas une préférence du compte** : il vit dans le navigateur (next-themes). Cohérent (aucun effet
+  serveur), mais un membre qui change d'appareil retrouve « Automatique ». À assumer explicitement.
+
+### Regard d'expert — optimisations et améliorations (une ligne par fiche)
+
+- **PRF-1** — La bascule écrit le compte en *best-effort* (`.catch()` silencieux) et **ne fait rien si le profil n'est
+  pas encore chargé** : la navigation a déjà eu lieu, la préférence est perdue sans que personne ne le sache (payé
+  ici : la fiche a échoué une fois pour cette raison exacte). Rejouer l'écriture après le chargement du profil, ou
+  poser la préférence côté serveur à partir du cookie `NEXT_LOCALE` — petit.
+- **PRF-2** — La langue du destinataire est respectée jusque dans le sujet : exemplaire, et c'est la conséquence
+  directe de D44 (un seul point de résolution, `resolveLocale`). Ajouter au harnais une garde qui **échoue** si un
+  nouveau modèle d'email n'a pas ses deux langues — moyen (le miroir i18n de la CI ne couvre que les `messages/`).
+- **PRF-3** — Le défaut venait d'un **second client HTTP** qui avait oublié une convention du premier. Il n'y a
+  aucune raison d'avoir deux clients axios : `authApi` n'existe que pour ne pas rejouer le refresh sur les routes
+  publiques — un `requireAuth: false` sur `apiClient` suffirait, et la convention ne pourrait plus se perdre — moyen.
+- **PRF-4** — La préférence est lue par le cron **au moment de l'envoi** (pas au moment du message) : bon choix, elle
+  vaut donc immédiatement. Elle mériterait un lien « me désabonner » dans le pied de l'email de relance lui-même —
+  petit, et c'est la voie que les clients email attendent (`List-Unsubscribe`).
+- **PRF-5** — Trois réglages, trois portées différentes (compte, navigateur, contractuel) sur un seul écran : le dire
+  à l'écran (un mot sous le titre : « ce qui suit ton compte, ce qui suit cet appareil ») éviterait la question —
+  petit. Et `SettingRow` / `ToggleRow` sont maintenant les deux seuls endroits où une ligne de réglage se dessine :
+  y ajouter un état « enregistré » / « échec » unique (au lieu du message local) — petit.
+- **PRF-6** — Le 404 du produit existait et n'était **jamais atteint** : le cas « aucune route » n'est pas couvert par
+  les fiches d'une page. Ajouter au harnais une fiche transversale qui balaie une poignée d'adresses inconnues
+  (`/es`, `/fr/inconnu`, `/fr/trips/inconnu`) et vérifie qu'aucune ne sert une page d'outil — petit.
+- **Transversal** — Les trois anomalies sont trois **conventions non portées jusqu'au bout** : un en-tête posé par un
+  client et pas par l'autre (87), un composant de maquette laissé en place et pris pour un composant de produit (86),
+  une page d'erreur écrite mais pas branchée (88). Aucune n'est un défaut de règle métier : ce sont des **surfaces
+  oubliées**. Deux gardes rendraient ces trois classes visibles : un seul client HTTP (une seule place pour les
+  conventions), et une fiche « aucune page décorative » qui refuse un `role="switch"` ou un bouton sans effet
+  réseau — moyen.
+
+### Pièges de poste payés ici
+
+- **Les préférences d'un compte survivent au seed** : Aminata arrivait avec sa relance déjà coupée par un passage
+  précédent, et la fiche 5 échouait sur son premier constat. Un chapitre qui éprouve des réglages doit **poser son
+  état de départ** (ici dans le `beforeAll`, et le remettre dans l'`afterAll`).
+- **Trois `npx tsx` de suite dépassent les 60 s** sur un poste qui recompile le front en même temps
+  (`spawnSync npx ETIMEDOUT`) : un seul processus pour tous les réglages, et un délai de 180 s.
+- **Atlas a coupé en cours de session** (`Server selection timeout: No available servers`, réplique sans primaire) :
+  le harnais échoue alors dans le `beforeAll`, et `GET /api/status` reste « down » jusqu'à 10 s après le retour (son
+  cache). Vérifier `npx tsx --env-file=.env -e "…user.count()"` avant de conclure à une régression.
+- **Le front Next finit par ne plus hydrater** après une longue série de passages (page servie en 200, formulaire
+  inerte, « le formulaire n'a jamais envoyé sa requête ») : relancer `npx nx dev user-ui` suffit.
+- **Docker Desktop relance les dix-sept conteneurs étrangers** à chaque démarrage (deux Elasticsearch à eux seuls
+  tiennent 4 Gio) : la charge moyenne monte à 6–7 et c'est ce qui produit les délais d'attente ci-dessus. Les arrêter
+  avant une campagne.
+
 ## Chapitre 6 — WEB-E2E-1, le nominal complet · **CONFORME** (29 étapes, 1 min 24)
 
 | Étape du cahier | Ce qui est éprouvé | Verdict |

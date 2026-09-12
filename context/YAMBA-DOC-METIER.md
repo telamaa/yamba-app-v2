@@ -4202,3 +4202,61 @@ son lien de suivi devient invalide.
 | 301 | Supprimer un compte libre | mot + code, déconnexion, connexion refusée, email sans lien | oui |
 | 302 | Fil de la contrepartie | « Membre supprimé », aucun numéro | oui (ANO-WEB-83, 85 closes) |
 | 303 | Deal terminal + 30 jours / deal en litige | destinataire effacé, lien invalide / rien touché | oui |
+
+---
+
+# Préférences, langue et relances — ce que le chapitre 5.26 fait respecter
+
+*(PR `chore/recette-web-5-26`, 12/09/2026 — cahier 01-WEB chapitre 5.26, WEB-PRF-1 à 6.)*
+
+## Le besoin
+
+Un membre choisit sa langue une fois : l'interface la garde, et **ses emails la suivent** — même quand le geste qui
+déclenche l'email vient de l'autre partie. Avant d'avoir un compte, c'est la langue de l'écran qui décide. Il peut
+couper la relance des messages non lus sans perdre la notification correspondante. Et l'écran « Paramètres » ne lui
+promet **que** des réglages qui existent : une bascule qui n'enregistre rien fait croire à un réglage, ce qui est pire
+que l'absence de réglage.
+
+## Les règles
+
+**RG-WEB-262 — La langue est une préférence du COMPTE.** La bascule de l'interface l'écrit (`PATCH /auth/me/locale`) :
+elle survit au rechargement, à la déconnexion et à un autre appareil.
+
+**RG-WEB-263 — La langue d'un email est celle de son DESTINATAIRE**, jamais celle de l'auteur du geste : une demande
+acceptée par un Voyageur francophone part en anglais vers une Expéditrice anglophone, et la demande reçue par le
+Voyageur part en français.
+
+**RG-WEB-264 — Sans compte, la langue de l'email est celle de la requête** (l'écran d'où part le geste) : inscription,
+mot de passe oublié, renvoi de code. La préférence du compte créé naît de cette même langue.
+
+**RG-WEB-265 — La relance des messages non lus se coupe, la notification non.** Préférence coupée, le cron n'envoie
+aucun email ; la notification in-app « Nouveau message » reste — c'est l'information, pas la relance, qui est due.
+
+**RG-WEB-266 — Un contrôle affiché est un contrôle qui écrit.** Chaque réglage de l'écran « Paramètres » a un effet
+observable et une portée annoncée : la langue et la relance email vivent sur le compte, le thème dans le navigateur.
+Un réglage qui n'existe pas (le push) s'affiche en lecture, sans bascule.
+
+**RG-WEB-267 — Les emails d'un Deal en cours ne se coupent pas** (demande, paiement, livraison) : ils sont
+contractuels. Le libellé de la préférence email le dit, au lieu de laisser croire le contraire.
+
+**RG-WEB-268 — Une adresse inconnue rend la page introuvable DU PRODUIT**, dans une langue prise en charge : jamais une
+page d'outil, jamais une langue à moitié traduite, jamais une erreur brute.
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| 304 | Bascule de langue, puis reconnexion dans un contexte neuf | interface et compte en anglais | oui |
+| 305 | Expéditrice anglophone, Voyageur francophone | chacun reçoit son email dans SA langue | oui |
+| 306 | Inscription depuis l'interface anglaise | code d'activation en anglais, compte créé en anglais | oui (ANO-WEB-87 close) |
+| 307 | Relance coupée, message non lu, passe du cron | aucun email, notification présente | oui |
+| 308 | Écran « Paramètres » | langue → compte, thème → écran, email → compte et persiste, push en lecture | oui (ANO-WEB-86 close) |
+| 309 | Adresse `/es` puis `/en/es` | 404 avec la page introuvable de Yamba, dans la langue de l'URL | oui (ANO-WEB-88 close) |
+
+## Ce qui reste à trancher
+
+- **Préférences email par famille d'événement** (demandes, messages, paiements, rappels de notation) : il n'en existe
+  qu'une. La liste des familles **coupables** doit être fermée explicitement, puisque les emails d'un Deal en cours ne
+  le sont pas (RG-WEB-267) — candidat au registre.
+- **Notifications push** : rien n'est branché. À arbitrer dans le même geste, avant de remettre une ligne active.
+- **Le thème ne suit pas le compte** : un autre appareil repart sur « Automatique ». Assumé, mais à dire au membre.
