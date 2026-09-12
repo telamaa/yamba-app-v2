@@ -5915,3 +5915,74 @@ Correction proposée (contrat, registre) : une projection par rôle du payload �
 
 Plateforme inchangée (997 + auth 229). `apps/e2e` : **237 scénarios** (223 + WEB-LIT ×14). Typecheck user-ui et
 harnais verts ; miroir i18n vert (`cancelledByMediation`, `noteReleasedMediation` FR / EN).
+
+---
+
+# Chapitre 5.22 du cahier 01-WEB : la notation croisée — l'accueil réel en retard sur sa prévisualisation, deux états sans nom, et les avis qui survivaient au seed
+
+*(PR `chore/recette-web-5-22`, 12/09/2026.)*
+
+## Ce qui a été fait
+
+Le vingt-deuxième chapitre « fiches » du cahier 01-WEB : `WEB-NOT` (où noter, l'écran, les critères par rôle, la
+note seule requise, la limite du commentaire, le double-aveugle, l'intermédiaire, une seule fois, les relances, la
+révélation à 14 jours, l'avis public). Onze fiches jouées et conformes (trois après correction), trois anomalies
+closes (`ANO-WEB-76` MAJEURE, `ANO-WEB-77`, `ANO-WEB-78` mineures) et une purge du jeu d'essai.
+
+```
+apps/e2e/src/chapitres/web-not.spec.ts                                            11 scénarios en série, 3 min 18
+apps/user-ui/src/components/dashboard/home/HomeClient.tsx                         ANO-WEB-76 (les envois réels dans « À traiter »)
+apps/user-ui/src/components/rating/RatingDone.tsx                                 ANO-WEB-77 (« indisponible » ≠ « fermée »)
+apps/user-ui/src/components/users/profile/{TripperBlock,ShipperBlock}.tsx        ANO-WEB-78 (note d'un avis nommée)
+apps/user-ui/messages/{fr,en}/rating.json                                         `done.unavailableTitle`
+packages/libs/prisma/scripts/seed-deals.ts                                        purge des Review des comptes du seed
+```
+
+## ANO-WEB-76 : deux accueils, une seule logique
+
+`HomeClient` a deux rendus : `HomePreview` (vitrine, données fictives) qui appelle `deriveHomeActions(shipments,
+carrierTrips)`, et `HomeLive` (réel) qui ne lisait que `useMyTrips` + `useMyDeals` — les actions du VOYAGEUR
+(répondre, prise en charge, livraison, noter) et les trajets en brouillon / en pause. Les envois de l'Expéditeur
+n'étaient jamais lus : un Expéditeur pur lisait « Tout est à jour, rien à traiter. » avec un deal à noter, un code
+à transmettre ou une livraison à vérifier. `HomeLive` lit désormais `getMyShipments` (TanStack, 30 s) et rend les
+actions Expéditeur (`ShipmentRow` + chip de rôle, comme la vitrine) en tête de « À traiter ».
+
+```tsx
+// apps/user-ui/src/components/dashboard/home/HomeClient.tsx
+const shipperActions = useMemo(
+  () => deriveHomeActions(shipments ?? [], []).filter((a): a is Extract<HomeAction, { role: "SHIPPER" }> => a.role === "SHIPPER"),
+  [shipments]
+);
+```
+
+## ANO-WEB-77 et 78 : deux états sans nom
+
+- **77** — `RatingDone` n'avait que trois branches (révélé / ma note existe / sinon « fermée »). Un deal en litige
+  (fenêtre jamais ouverte, `windowEndsAt` null) tombait dans « La fenêtre de 14 jours est passée ». La branche
+  « indisponible » (échéance absente ou future) rend `done.unavailableTitle` + `done.unavailable`.
+- **78** — les cinq `<Star>` d'un avis public n'avaient ni texte ni nom : `role="img"` + `aria-label="{n}/5"` sur
+  le groupe, `aria-hidden` sur les icônes — la même forme que `RatingStatusCard`.
+
+## Les avis survivaient au seed
+
+`seed-deals.ts` efface les bookings des comptes du seed mais pas leurs `Review` : chaque passage laissait des avis
+révélés sur les profils publics (25 orphelins après une matinée), et « l'avis n'est pas public avant la
+réciprocité » (NOT-6) échouait sur l'avis du passage précédent. Le seed purge les avis dont l'auteur OU le sujet est
+un compte du seed, avant les bookings, et le journalise (« n avis »).
+
+## Le harnais
+
+- Le double-aveugle se joue en deux navigateurs (A Mai, B Thomas) : après la première note, la page publique du
+  noté est lue par A (rien), `revealedAt` par l'API (null) ; après la seconde, l'écran de B dit la révélation et A
+  relit « Vos avis » ; la cloche « Les notes sont révélées » est visée par le lien du deal ; l'absence d'email se
+  prouve par `mailpit.compter` après un délai.
+- Le cron `rating` se force en deux temps (`notation-eligible.ts` pose `completedAt` / `ratingWindowEndsAt` /
+  `ratingRemindersSent`, `notation.ts` joue la passe) ; « une seule fois » = deux emails à Inês, zéro à João, et une
+  troisième passe silencieuse.
+- La page publique se lit dans un contexte neuf (`browser.newContext()`), la note par `[aria-label="5/5"]`, le
+  signalement par le `mailto:` décodé (« Signalement d'un avis (#id) »).
+
+## Tests
+
+Plateforme inchangée (997 + auth 229). `apps/e2e` : **248 scénarios** (237 + WEB-NOT ×11). Typecheck user-ui et
+harnais verts ; miroir i18n vert (`done.unavailableTitle` FR / EN).

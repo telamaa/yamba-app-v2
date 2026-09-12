@@ -610,6 +610,29 @@ Ordre de demarrage : auth -> trip -> gateway.
   desktop du visiteur sans « Creer un compte » ni « Rechercher un trajet ». Piege de poste : la cle
   Google Maps n'accepte que `localhost` comme referent. Harnais : 32 scenarios verts. PR **#265**
   (empilee sur #264). Reste : 5.2 a 5.32, 02-ADMIN.
+- 12/09 : **CHAPITRE 5.22 DU CAHIER 01-WEB — WEB-NOT, LA NOTATION CROISEE (branche `chore/recette-web-5-22`,
+  empilee sur #286)** — 11 fiches jouees CONFORMES (3 apres correction), 11 scenarios en serie, 3 min 18
+  (`apps/e2e/src/chapitres/web-not.spec.ts` ; bzv-completed Mai ↔ Thomas pour le double-aveugle et la page
+  publique en fenetre privee, gru-completed Joao ↔ Ines pour la note seule, l'intermediaire, les relances et la
+  revelation a 14 j ; cron `rating` force par `notation-eligible.ts r1|r2|reveal` + `notation.ts`). TROIS
+  ANOMALIES CLOSES : ANO-WEB-76 MAJEURE (l'accueil reel HomeLive ne derivait que les actions Voyageur — un
+  Expediteur n'avait jamais « A traiter » : noter, code, verification ; envois reels lus et fusionnes),
+  ANO-WEB-77 (deal en litige sur /rate → « La fenetre de 14 jours est passee » : RatingDone distingue
+  « indisponible » de « fermee »), ANO-WEB-78 (note d'un avis public = cinq icones sans nom → role=img
+  aria-label « 5/5 ») ; JEU D'ESSAI : les avis survivaient au seed (25 orphelins reveles sur les profils du
+  seed) → purge des Review des comptes du seed avec les bookings. Prouve : « Noter » a l'accueil / Mes envois /
+  le deal sans fenetre bloquante ; ecran sans moyenne ni volume ; criteres par role note ; note seule requise ;
+  limite 280 ; double-aveugle (rien de public avant la reciprocite, revelation au second, « Vos avis », cloche
+  sans email) ; intermediaire ; une seule fois (deja note, litige, etranger 403 traduit) ; relances J+5 / J+7 au
+  seul role muet puis silence ; revelation a 14 j sans reciprocite ; avis public (auteur, note, pouces, faits,
+  « Signaler cet avis » mailto avec l'id). A trancher : en-tete bureau sans « Donne ton avis » ni bandeau, cote
+  muet apres revelation (« Vos avis » plutot que « fenetre fermee »), etranger → « indisponible ». Regard
+  d'expert : une seule derivation d'actions pour les deux accueils, un en-tete partage, accord du feminin,
+  « Plus tard (jusqu'au …) », seuil d'alerte nomme, note recue dans la cloche, `cannotRateReason` en cle,
+  J+5/J+7 au catalogue, test « aucune note → aucune revelation », test du seed « zero avis orphelin ». PIEGES :
+  avis survivants au seed, page publique sans session, etoiles = aria-label, HomeLive ≠ HomePreview, cron en
+  deux temps, 403 → « indisponible ». Harnais : 248 scenarios. Reste : 5.23 a 5.32, 02-ADMIN. AUCUNE
+  attribution Claude.
 - 12/09 : **CHAPITRE 5.21 DU CAHIER 01-WEB — WEB-LIT, LITIGE ET MEDIATION, VUE MEMBRE (branche
   `chore/recette-web-5-21`, empilee sur #285)** — 13 fiches jouees CONFORMES (3 apres correction), 14 scenarios en
   serie dont 1 `test.fail`, 4 min 42 (`apps/e2e/src/chapitres/web-lit.spec.ts` ; sgn-picked / los-picked pour le

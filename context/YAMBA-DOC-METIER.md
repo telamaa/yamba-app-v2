@@ -3997,3 +3997,57 @@ ANO-WEB-74.)*
 | 265 | Après une décision | aucun « Noter » | oui |
 | 266 | Deux onglets | 409, retour au suivi | oui |
 | 267 | Accès sans droit | retour au suivi, aucune fuite | oui |
+
+---
+
+# La notation croisée — ce que le chapitre 5.22 fait respecter
+
+*(PR `chore/recette-web-5-22`, 12/09/2026 — cahier 01-WEB chapitre 5.22, WEB-NOT-1 à 11.)*
+
+## Le besoin
+
+Après un deal terminé, chacun peut noter l'autre pendant 14 jours : une note globale seule requise, des critères par
+rôle, un commentaire court. La notation est toujours facultative et jamais bloquante ; la personne notée est
+présentée sans sa moyenne (pas d'ancrage) ; les deux avis restent secrets jusqu'à ce que les deux aient noté ou que
+les 14 jours passent ; on ne note qu'une fois ; les relances ne vont qu'au rôle muet, deux fois puis silence ;
+l'avis révélé devient public, signé du prénom, signalable.
+
+## Les règles
+
+**RG-WEB-230 — « Noter » apparaît partout où le deal terminé apparaît** (accueil « À traiter », « Mes envois » ou
+« Mes trajets », le deal), jamais dans une fenêtre bloquante.
+
+**RG-WEB-231 — L'écran de notation ne montre ni la moyenne ni le volume de la personne notée** ; il propose cinq
+étoiles nommées, des critères propres au rôle noté (Voyageur : ponctualité, communication, soin du colis ;
+Expéditeur : clarté de la déclaration, réactivité, ponctualité), un commentaire de 280 caractères au plus.
+
+**RG-WEB-232 — La note globale est le seul champ requis** ; le bouton reste inactif tant qu'elle manque.
+
+**RG-WEB-233 — Le double-aveugle est absolu** : rien n'est public avant la réciprocité ou l'échéance ; le second
+notant apprend la révélation ; les deux reçoivent une notification, jamais un email.
+
+**RG-WEB-234 — Une seule note par deal et par rôle** ; un deal en litige n'est pas notable (« indisponible », pas
+« fermée ») ; un étranger n'obtient rien.
+
+**RG-WEB-235 — Les relances vont au seul rôle muet, à J+5 puis J+7, puis silence.**
+
+**RG-WEB-236 — À 14 jours, un avis unique est révélé** et la fenêtre se ferme des deux côtés.
+
+**RG-WEB-237 — L'avis public porte l'auteur (prénom, initiale), la note (nommée), le commentaire et les critères**,
+met la ligne de faits à jour, et se signale par email au support avec sa référence.
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| 268 | Deal terminé non noté | « Noter » à l'accueil, dans la liste, sur le deal ; aucune fenêtre bloquante | oui (ANO-WEB-76 close) |
+| 269 | Écran de notation | sans moyenne ni volume ; étoiles, critères, commentaire, publication | oui |
+| 270 | Rôle noté | critères Voyageur / Expéditeur | oui |
+| 271 | Sans étoile / étoiles seules | inactif / publié | oui |
+| 272 | 275 puis 281 caractères | alerte, blocage à 280 | oui |
+| 273 | Deux navigateurs | secret, révélation au second, « Vos avis », cloche sans email | oui |
+| 274 | Une seule partie a noté | « Note envoyée · Révélée quand … » | oui |
+| 275 | Déjà noté / litige / étranger | « envoyée » / « indisponible » / rien | oui (ANO-WEB-77 close) |
+| 276 | J+5, J+7, puis | relance, dernier rappel, silence ; jamais au rôle qui a noté | oui |
+| 277 | 14 jours, avis unique | révélé, fenêtre fermée, public | oui |
+| 278 | Page publique, sans session | auteur, note nommée, pouces, faits, signalement | oui (ANO-WEB-78 close) |

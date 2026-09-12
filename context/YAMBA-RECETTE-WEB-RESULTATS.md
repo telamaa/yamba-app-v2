@@ -2855,6 +2855,98 @@ version du Voyageur (ou 72 h) : les versions manquantes sont données par l'API.
   corps (`emailsPour` + `ouvrir`).
 - **`POST /dispute` 200, `POST /dispute/statement` 201** : ne pas généraliser un code.
 
+## Chapitre 5.22 — La notation croisée · **CONFORME** (11 fiches jouées, 3 après correction · 3 anomalies closes dont 1 MAJEURE, + une purge du jeu d'essai · 11 scénarios en série, 3 min 18)
+
+`web-not.spec.ts`. `bzv-completed` (Mai ↔ Thomas) pour le double-aveugle et la page publique ; `gru-completed`
+(João ↔ Inês) pour la note seule requise, l'état intermédiaire, les relances et la révélation sans réciprocité ;
+`bzv-disputed` (Chinwe) et le deal d'un autre compte pour « on ne note qu'une fois ». Le cron `rating` est forcé
+(`scripts/recette/notation-eligible.ts <id> r1|r2|reveal` puis `notation.ts relances|reveal`). La page publique se lit
+dans un contexte neuf, sans session (fenêtre privée).
+
+| Fiche | Ce qui est éprouvé | Verdict | Preuve |
+|---|---|---|---|
+| WEB-NOT-1 | Où « Noter » apparaît | **Conforme après correction** → `ANO-WEB-76` ; accueil : « À traiter » avec la ligne « Terminé · … Noter Thomas » ; « Mes envois » : ligne « Terminé » + « Noter Thomas » ; le deal : « Comment s'est passé ton Deal avec Thomas ? » / « Tu as jusqu'au …. Ta note ne sera visible qu'une fois les deux avis publiés. » / « Noter Thomas » ; aucune fenêtre bloquante sur les trois écrans |
+| WEB-NOT-2 | L'écran « Donne ton avis » | **Conforme** (bureau : motif barre latérale, constat) — h1 « Comment Thomas s'est-il comporté ? », carte « Thomas N. · Voyageur · Paris → Brazzaville · Terminé » — **ni moyenne ni nombre de deals** ; les cinq étoiles « Décevant » … « Excellent » ; « SUR CES POINTS PRÉCIS » avec « Bien » / « À améliorer » ; « TON COMMENTAIRE » « Optionnel · max 280 caractères » ; « PUBLICATION », « Plus tard », « Publier mon avis ». **Constat** : sur bureau, pas de titre « Donne ton avis » ni de bandeau « Ton Deal avec Thomas est terminé » (motif documenté dans `RatingDesktop`) ; l'en-tête du cahier est celui du mobile |
+| WEB-NOT-3 | Les critères dépendent du rôle noté | **Conforme** — Voyageur noté : Ponctualité au rendez-vous, Communication, Soin du colis (jamais les deux autres) ; Expéditrice notée : Clarté de la déclaration, Réactivité, Ponctualité au rendez-vous |
+| WEB-NOT-4 | La note globale est le seul champ requis | **Conforme** — sans étoile : bouton inactif + « Choisis d'abord ta note globale » ; 5 étoiles seules → « Merci pour ton retour ! », `ratedByMe`, non révélé |
+| WEB-NOT-5 | La limite du commentaire | **Conforme** — 275 → « 275 / 280 — bientôt la limite » ; 281 saisis → 280 gardés, « 280 / 280 — bientôt la limite » |
+| WEB-NOT-6 | Le double-aveugle (deux navigateurs) | **Conforme** — A publie (5 ★, trois pouces, commentaire) : « Merci pour ton retour ! » / « …voyager en confiance. » / « Thomas recevra aussi une invitation à te noter. Vos avis seront révélés une fois les deux publiés, ou le … au plus tard. » ; la page publique de Thomas ne porte pas l'avis, `revealedAt` null ; B publie : « Mai t'avait déjà noté : vos deux avis sont maintenant visibles. » ; A recharge : « Vos avis » / « Ta note pour Thomas » / « La note de Thomas » + son commentaire ; cloche « Les notes sont révélées » aux deux, **aucun email** |
+| WEB-NOT-7 | L'état intermédiaire | **Conforme** — « Note envoyée » / « Révélée quand Inês aura noté, ou le … au plus tard. », plus de « Noter » |
+| WEB-NOT-8 | On ne note qu'une fois | **Conforme après correction** → `ANO-WEB-77` ; déjà noté : « Ta note est envoyée » / « Elle sera révélée quand Inês aura noté… », plus de formulaire ; en litige : « Notation indisponible » / « Ce Deal ne peut pas être noté pour le moment. » ; autre compte : l'API refuse (403 `NOT_A_PARTY`), l'écran rend « Ce Deal ne peut pas être noté pour le moment. » + « Retour au Deal », aucune donnée du deal ni erreur brute |
+| WEB-NOT-9 | Les relances (cron) | **Conforme** — J+5 : cloche « Pense à noter João » + email « Pense à noter João » à Inês, rien à João ; J+7 : « Dernier rappel : note João » ; troisième passe : plus rien (deux emails en tout, aucun au rôle qui a noté) |
+| WEB-NOT-10 | La révélation à 14 jours sans réciprocité (cron) | **Conforme** — `revealedAt` posé, `canRate` false ; côté muet : « Vos avis · Tu n'as pas noté ce Deal. · La note de João », plus de « Noter » ; la page publique d'Inês porte « ★ 5,0 sur 1 avis » et « João S. ». **Constat** : le cahier attend « La fenêtre de notation est fermée — tu n'as pas noté João. » ; le produit montre la note reçue (ce texte ne sert que sans aucun avis) |
+| WEB-NOT-11 | L'avis révélé sur la page publique (fenêtre privée) | **Conforme après correction** → `ANO-WEB-78` ; sans session : le commentaire de Mai, « Mai T. », la note « 5/5 » (aria-label), les pouces « Ponctualité », « Communication », « Soin du colis » ; la ligne de faits « n Deals terminés · ★ x sur n avis » ; « Signaler cet avis » = `mailto:` avec « Signalement d'un avis (#id) » en objet |
+
+### Anomalies
+
+- **ANO-WEB-76 (MAJEURE, close)** — l'accueil réel (`HomeLive`) ne dérivait que les actions VOYAGEUR (deals reçus,
+  trajets en brouillon / en pause) : un Expéditeur ne voyait jamais « À traiter » (noter, transmettre le code,
+  vérifier la livraison) et lisait « Tout est à jour, rien à traiter. » — alors que la prévisualisation
+  (`deriveHomeActions`) le faisait. Les envois réels sont lus (`getMyShipments`) et fusionnés en tête.
+- **ANO-WEB-77 (mineure, close)** — l'écran de notation d'un deal en litige disait « La notation est fermée · La
+  fenêtre de 14 jours est passée » : `RatingDone` confondait « pas de note » et « fenêtre passée ». Sans échéance
+  passée : « Notation indisponible » / « Ce Deal ne peut pas être noté pour le moment. ».
+- **ANO-WEB-78 (mineure, close)** — sur la page publique, la note d'un avis était cinq icônes colorées sans nom
+  accessible ; le groupe porte `role="img"` + `aria-label="5/5"` (Voyageur et Expéditeur).
+- **Jeu d'essai** — les avis survivaient au seed (les bookings sont effacés, pas leurs `Review`) : 25 avis
+  orphelins révélés polluaient les profils publics des comptes du seed et faisaient passer « l'avis n'est pas
+  public avant la réciprocité » pour un faux. `seed-deals.ts` purge les avis des comptes du seed (auteur ou sujet)
+  avec les bookings.
+
+### À trancher (produit)
+
+- **L'en-tête de l'écran de notation sur bureau** : ni « Donne ton avis » ni bandeau « Ton Deal avec … est
+  terminé » (motif barre latérale, documenté) ; le cahier décrit le mobile. Amender le cahier ou unifier.
+- **Le côté muet après la révélation à 14 jours** : « Vos avis · Tu n'as pas noté ce Deal. · La note de … » (avec
+  la note reçue) plutôt que « La fenêtre de notation est fermée — tu n'as pas noté … » ; amender le cahier.
+- **Un étranger sur `/rate`** : « Ce Deal ne peut pas être noté pour le moment. » + « Retour au Deal » (qui mène à
+  un suivi « n'existe pas ») ; le cahier dit « un renvoi ». Acceptable ; un renvoi direct vers « Mes envois » serait
+  plus net.
+
+### Regard d'expert — optimisations et améliorations (une ligne par fiche)
+
+- **NOT-1** — Deux accueils (`HomeLive` réel, `HomePreview` de démonstration) avec deux dérivations d'actions
+  (ANO-WEB-76) : garder `deriveHomeActions` comme seule source pour les deux, la prévisualisation ne changeant que
+  les données — moyen.
+- **NOT-2** — Aucun biais d'ancrage (ni moyenne ni volume) : bien. Le bureau et le mobile n'ont pas le même
+  en-tête ; un seul composant d'en-tête, deux mises en page — petit.
+- **NOT-3** — Les critères viennent du serveur par rôle noté (`criteria` du contexte) : bien. Les descriptions
+  accordent au féminin pour l'Expéditrice (« était-elle ») quel que soit le prénom (même famille que 5.18) — petit.
+- **NOT-4** — Bouton inactif + indication : juste. « Plus tard » ne dit pas jusqu'à quand : « Plus tard (jusqu'au
+  24 septembre) » — petit.
+- **NOT-5** — La limite est bloquante à 280 et annoncée à l'approche : bien. Le seuil d'alerte (275 ?) est dans le
+  code : le porter en constante nommée avec la limite — petit.
+- **NOT-6** — Le double-aveugle est serveur (révélation atomique, `revealedAt`) : bien. Pas d'email à la
+  révélation : voulu (D52). La notification pourrait porter la note reçue (« Thomas t'a mis 4 ★ ») — petit.
+- **NOT-7** — L'échéance servie est affichée : bien. Un rappel « tu pourras relire ta note ici » — petit.
+- **NOT-8** — Le 403 est traduit par l'état « indisponible » (ANO-WEB-77 a séparé « fermée » et « indisponible ») ;
+  servir `cannotRateReason` en clé (DISPUTED, NOT_COMPLETED, WINDOW_CLOSED) plutôt qu'en phrase anglaise, et le
+  traduire — petit.
+- **NOT-9** — Relances au seul rôle muet, marquées par `ratingRemindersSent` : bien. Les J+5 / J+7 sont des
+  constantes : catalogue des réglages (`rating.reminderDays`, D62) — moyen.
+- **NOT-10** — Révélation d'un avis unique à 14 jours : conforme à D53. Un test de service « aucune note → aucune
+  révélation, aucun événement » existe-t-il ? Le vérifier — petit.
+- **NOT-11** — La page publique lit les avis révélés seulement : bien. La note en icônes sans nom (ANO-WEB-78) et
+  l'auteur en « Prénom I. » : bien ; ajouter la date absolue au survol de « aujourd'hui » — petit. Le seed
+  laissait des avis orphelins : un test du seed « zéro avis étranger aux bookings créés » — petit.
+- **Transversal** — Une anomalie majeure est encore un **écran réel en retard sur sa prévisualisation** (76, comme
+  le bandeau de 5.19) ; deux mineures sont des **états sans nom** (77 : deux causes, un texte ; 78 : une valeur
+  visible mais non nommée). Règle : une prévisualisation partage la logique du réel, jamais une copie ; toute
+  valeur affichée a un nom accessible — moyen.
+
+### Pièges de poste payés ici
+
+- **Les avis survivaient au seed** (`Review` non purgés avec les bookings) : le premier passage du chapitre a vu
+  « l'avis de Mai » public avant la réciprocité — c'était l'avis du passage précédent. Le seed purge désormais ;
+  un commentaire unique par passage reste une bonne pratique (WEB-E2E-1 suffixe par l'id du deal).
+- **La page publique se lit sans session** (`browser.newContext()`), pas avec un compte connecté.
+- **Les étoiles sont des icônes** : la note se lit dans l'aria-label (« 5/5 »), jamais dans le texte.
+- **L'accueil réel n'est pas la prévisualisation** (`/dashboard/home` = `HomeLive`) : une preuve sur la page de
+  démonstration ne vaut rien.
+- **Le cron `rating` se force en deux temps** : `notation-eligible.ts <id> r1|r2|reveal` (dates) puis
+  `notation.ts relances|reveal` ; `FORCE_COLOR=0` comme en 5.19.
+- **Le contexte de notation d'un étranger est un 403** : l'écran rend « indisponible », pas l'introuvable du suivi.
+
 ## Chapitre 6 — WEB-E2E-1, le nominal complet · **CONFORME** (29 étapes, 1 min 24)
 
 | Étape du cahier | Ce qui est éprouvé | Verdict |
