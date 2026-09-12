@@ -112,11 +112,15 @@ function toLocation(
   id: string,
   city: string
 ): DealLocation {
+  // ANO-WEB-42 (recette 5.14) : `name` reprend déjà le détail du lieu ; le répéter en `detail` affichait
+  // la même ligne deux fois (« Terminal départ · Paris / Terminal départ · Paris »), et masquait le repli
+  // de la livraison (« Téléphone du destinataire communiqué à la prise en charge »).
+  const name = place?.details || city;
   return {
     id,
     type: place ? PLACE_KIND_TO_LOCATION_TYPE[place.kind] ?? "ADDRESS" : "ADDRESS",
-    name: place?.details || city,
-    detail: place?.details ?? undefined,
+    name,
+    detail: place?.details && place.details !== name ? place.details : undefined,
     city,
   };
 }
@@ -197,6 +201,9 @@ export function toDealRequest(view: CarrierBookingViewDto): DealRequest {
       }
       : undefined,
 
+    // ANO-WEB-44 : le prénom est servi dès la création (recipientForCarrier ne retient que le téléphone
+    // avant le pickup) ; l'écran « Mon Deal accepté » écrivait le premier mot du lieu de livraison (« Hall »).
+    recipientFirstName: view.recipient?.firstName ?? "",
     recipient: pickedUp
       ? {
         firstName: view.recipient.firstName,

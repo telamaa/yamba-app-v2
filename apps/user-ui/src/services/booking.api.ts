@@ -66,6 +66,11 @@ function quoteFields(draft: Draft, trip: TripContext, price: PriceBreakdown) {
   };
 }
 
+/** « 450 » ou « 450,50 » → 45050 ; vide ou illisible → 0. */
+function declaredValueCents(draft: Draft): number {
+  return Math.round((parseFloat(draft.declaredValueEur.replace(",", ".")) || 0) * 100);
+}
+
 function placeOf(options: TripContext["pickupOptions"], id: string | null) {
   const p = options.find((o) => o.id === id);
   return p ? { kind: KIND_TO_API[p.kind] ?? "CITY_AREA", details: p.subLabel ?? null } : null;
@@ -74,7 +79,13 @@ function placeOf(options: TripContext["pickupOptions"], id: string | null) {
 export async function createPaymentIntent(draft: Draft, trip: TripContext, params?: PricingParams): Promise<PaymentIntentInfo> {
   const price = computeTotal(draft, trip, params ?? (await fetchPricingParams().catch(() => undefined))); // D62 7A — le total attendu suit les paramètres du serveur
   try {
-    const res = await axiosInstance.post<PaymentIntentInfo>("/deals/payment-intents", quoteFields(draft, trip, price));
+    // ANO-WEB-08 (recette WEB-E2E-4) : la valeur déclarée part AVEC l'intention, pour que le plafond
+    // CNF-06 « valeur déclarée » tombe avant toute autorisation bancaire — ce que le contrat
+    // demande depuis ANO-API-12 et que l'assistant n'envoyait pas.
+    const res = await axiosInstance.post<PaymentIntentInfo>("/deals/payment-intents", {
+      ...quoteFields(draft, trip, price),
+      declaredValueCents: declaredValueCents(draft),
+    });
     return res.data;
   } catch (e) {
     throw e instanceof BookingApiError ? e : toBookingError(e);
@@ -95,7 +106,7 @@ export async function createDeal(
     ...quoteFields(draft, trip, price),
     paymentIntentId,
     description: draft.description.trim(),
-    declaredValueCents: Math.round((parseFloat(draft.declaredValueEur.replace(",", ".")) || 0) * 100),
+    declaredValueCents: declaredValueCents(draft),
     // A45 : URLs ImageKit téléversées par useBookingCheckout AVANT la confirmation
     // carte (D42) — le serveur les fige dans parcel.photoUrls (max 5).
     photoUrls,

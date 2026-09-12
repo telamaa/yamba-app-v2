@@ -126,7 +126,8 @@
       "regenerating": "Regenerating…",
       "toastRegenerated": "New code generated! Don''t forget to send it to {recipientFirstName}.",
       "toastMaxReached": "You''ve reached the regeneration limit. Contact support if needed.",
-      "toastError": "Error regenerating. Try again."
+      "toastError": "Error regenerating. Try again.",
+      "copyFailed": "Copying is not available in this browser — select the code and copy it by hand."
     },
     "share": {
       "title": "Share the code with {recipientFirstName}",
@@ -247,7 +248,8 @@
       "stateBlocked": "Blocked until D+4",
       "stateReleased": "Released",
       "note": "The funds are held by Yamba. They will be paid to {carrierFirstName} after the verification period.",
-      "noteReleased": "You confirmed the delivery — the funds are being transferred to {carrierFirstName}."
+      "noteReleased": "You confirmed the delivery — the funds are being transferred to {carrierFirstName}.",
+      "noteReleasedAuto": "The verification period is over — the funds are being transferred to {carrierFirstName}."
     },
     "report": "Something wrong with this parcel?",
     "reportShort": "Something wrong?"

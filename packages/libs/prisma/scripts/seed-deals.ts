@@ -504,6 +504,9 @@ async function main() {
           completedBy: "SYSTEM",
           payoutStatus: "FAILED",
           payoutFailureReason: "CARRIER_ACCOUNT_NOT_READY",
+          // B5 : la fenêtre de notation existe sur TOUT deal terminé (ANO-WEB-65 : « Tu as jusqu'au . » sans elle)
+          ratingWindowEndsAt: new Date((m.completedAt ?? NOW).getTime() + 14 * 86_400_000),
+          ratingRemindersSent: 0,
           payoutAmountCents: (booking as unknown as { pricing: { transportCents: number } }).pricing.transportCents,
           payoutAttempts: 4,
           // C-PR5 (A111) — relance échue : le cron (ou « Relancer » dans l'admin) peut rejouer tout de suite
@@ -519,6 +522,9 @@ async function main() {
           completedBy: "SYSTEM",
           payoutStatus: "REVERSED",
           payoutFailureReason: "PROVIDER_REVERSED",
+          // B5 : la fenêtre de notation existe sur TOUT deal terminé (ANO-WEB-65 : « Tu as jusqu'au . » sans elle)
+          ratingWindowEndsAt: new Date((m.completedAt ?? NOW).getTime() + 14 * 86_400_000),
+          ratingRemindersSent: 0,
           payoutAmountCents: (booking as unknown as { pricing: { transportCents: number } }).pricing.transportCents,
           payoutSentAt: m.completedAt ?? NOW,
           payoutAttempts: 1,

@@ -123,7 +123,8 @@
     "mineMissing": "Tu n'as pas noté ce Deal.",
     "theirs": "La note de {name}",
     "theirsMissing": "{name} n'a pas noté ce Deal.",
-    "closed": "La fenêtre de notation est fermée — tu n'as pas noté {name}."
+    "closed": "La fenêtre de notation est fermée — tu n'as pas noté {name}.",
+    "promptTextNoDate": "Ta note ne sera visible qu'une fois les deux avis publiés."
   },
   "done": {
     "revealedTitle": "Vos avis sont publics",

@@ -17,7 +17,7 @@ import {
   MAX_CODE_REGENERATIONS,
   type Booking,
 } from "@/components/booking/booking-tracker/booking-tracker.types";
-import { regenerateDeliveryCode } from "@/components/booking/booking-tracker/booking-tracker.api";
+import { BookingApiError, regenerateDeliveryCode } from "@/components/booking/booking-tracker/booking-tracker.api";
 
 type Props = {
   booking: Booking;
@@ -46,9 +46,14 @@ export default function BookingCodeCard({
     try {
       await navigator.clipboard.writeText(code);
       setCopied(true);
+      // ANO-WEB-55 (recette 5.17) : « Code copié ! » existait au catalogue mais n'était jamais rendu —
+      // seule l'icône changeait. Le toast dit ce qui vient de se passer, l'icône le confirme.
+      toast.success(t("pickedUp.code.copied"), { duration: 2000 });
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      toast.error(t("pickedUp.code.toastError"));
+      // ANO-WEB-59 (recette 5.17) : l'échec de copie (pas de `navigator.clipboard` hors HTTPS, LAN)
+      // affichait « Erreur lors de la régénération » — le message d'une autre action.
+      toast.error(t("pickedUp.code.copyFailed"));
     }
   };
 
@@ -67,8 +72,12 @@ export default function BookingCodeCard({
         duration: 5000,
       });
       setConfirmingRegen(false);
-    } catch {
-      toast.error(t("pickedUp.code.toastError"));
+    } catch (e) {
+      // ANO-WEB-58 (recette 5.17) : le 409 CODE_REGENERATION_LIMIT du serveur tombait dans l'erreur
+      // générique ; le message du plafond ne sortait que du garde-fou client (bouton déjà inactif).
+      const plafond = e instanceof BookingApiError && e.code === "CODE_REGENERATION_LIMIT";
+      toast.error(t(plafond ? "pickedUp.code.toastMaxReached" : "pickedUp.code.toastError"));
+      if (plafond) setConfirmingRegen(false);
     } finally {
       setIsRegenerating(false);
     }
@@ -100,8 +109,8 @@ export default function BookingCodeCard({
           <button
             type="button"
             onClick={handleCopy}
-            aria-label={t("pickedUp.code.copy")}
-            title={t("pickedUp.code.copy")}
+            aria-label={copied ? t("pickedUp.code.copied") : t("pickedUp.code.copy")}
+            title={copied ? t("pickedUp.code.copied") : t("pickedUp.code.copy")}
             className={`flex items-center justify-center rounded-full border transition-colors ${
               compact ? "h-9 w-9" : "h-10 w-10"
             } ${
@@ -168,7 +177,12 @@ export default function BookingCodeCard({
         </div>
       ) : (
         <p className="mx-auto mt-3 max-w-md text-center text-[11.5px] leading-snug text-amber-800/90 dark:text-amber-300/90 sm:text-[12px]">
-          {t("pickedUp.code.confidentialHint")}
+          {t("pickedUp.code.confidentialHint")}{" "}
+          {/* ANO-WEB-57 (recette 5.17) : le compteur ne vivait que dans la boîte de confirmation —
+              « Aucune régénération restante » était donc impossible à lire, le bouton étant inactif. */}
+          <span className="whitespace-nowrap font-semibold">
+            · {t("pickedUp.code.regenerationsLeft", { count: regenerationsLeft })}
+          </span>
         </p>
       )}
     </section>
