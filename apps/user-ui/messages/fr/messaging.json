@@ -84,5 +84,12 @@
     "done": "Merci, le signalement est transmis à notre équipe.",
     "already": "Tu as déjà signalé ce message.",
     "failed": "Le signalement n'a pas pu être envoyé."
+  },
+  "errors": {
+    "deliveryCode": "Ce message contient le code de livraison. Il se donne en main propre, jamais par écrit.",
+    "meetupTooSoon": "Le rendez-vous doit commencer au moins 30 minutes à l'avance.",
+    "meetupTooFar": "Le rendez-vous doit avoir lieu dans les 90 jours.",
+    "meetupTooLong": "Un rendez-vous dure 12 heures au plus.",
+    "meetupChanged": "Ce rendez-vous vient de changer. Recharge la conversation."
   }
 }

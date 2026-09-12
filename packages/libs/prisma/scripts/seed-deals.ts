@@ -349,6 +349,16 @@ async function main() {
   const delD = await prisma.dispute.deleteMany({
     where: { OR: [{ shipperId: { in: seedIds } }, { carrierId: { in: seedIds } }] },
   });
+  // B5 — les avis suivent leurs bookings (recette 5.22 : sans cette purge, les avis des passages precedents
+  // restaient reveles sur les profils publics des comptes du seed — 25 avis orphelins au bout d'une matinee).
+  const delR = await prisma.review.deleteMany({
+    where: { OR: [{ authorUserId: { in: seedIds } }, { subjectUserId: { in: seedIds } }] },
+  });
+  // D68 — les signalements des comptes du seed (auteur, ou membre visé) suivent aussi : un signalement OUVERT du
+  // passage precedent rendait « Signaler ce profil » 409 des le premier clic (recette 5.24).
+  const delS = await prisma.report.deleteMany({
+    where: { OR: [{ reporterUserId: { in: seedIds } }, { targetType: "USER", targetId: { in: seedIds } }] },
+  });
   const delB = await prisma.booking.deleteMany({
     where: { OR: [{ shipperId: { in: seedIds } }, { carrierId: { in: seedIds } }] },
   });
@@ -369,7 +379,7 @@ async function main() {
     await prisma.conversation.deleteMany({ where: { id: { in: ids } } });
   }
   const delT = await prisma.trip.deleteMany({ where: { userId: { in: seedIds } } });
-  console.log(`✓ wipe : ${delB.count} bookings, ${delD.count} disputes, ${delT.count} trips (périmètre seed)`);
+  console.log(`✓ wipe : ${delB.count} bookings, ${delD.count} disputes, ${delR.count} avis, ${delS.count} signalements, ${delT.count} trips (périmètre seed)`);
 
   // 3. Trips — reservedKg = Σ poids des bookings ACTIFS (CAP-02, calculé)
   const tripIds = new Map<string, string>();
@@ -504,6 +514,9 @@ async function main() {
           completedBy: "SYSTEM",
           payoutStatus: "FAILED",
           payoutFailureReason: "CARRIER_ACCOUNT_NOT_READY",
+          // B5 : la fenêtre de notation existe sur TOUT deal terminé (ANO-WEB-65 : « Tu as jusqu'au . » sans elle)
+          ratingWindowEndsAt: new Date((m.completedAt ?? NOW).getTime() + 14 * 86_400_000),
+          ratingRemindersSent: 0,
           payoutAmountCents: (booking as unknown as { pricing: { transportCents: number } }).pricing.transportCents,
           payoutAttempts: 4,
           // C-PR5 (A111) — relance échue : le cron (ou « Relancer » dans l'admin) peut rejouer tout de suite
@@ -519,6 +532,9 @@ async function main() {
           completedBy: "SYSTEM",
           payoutStatus: "REVERSED",
           payoutFailureReason: "PROVIDER_REVERSED",
+          // B5 : la fenêtre de notation existe sur TOUT deal terminé (ANO-WEB-65 : « Tu as jusqu'au . » sans elle)
+          ratingWindowEndsAt: new Date((m.completedAt ?? NOW).getTime() + 14 * 86_400_000),
+          ratingRemindersSent: 0,
           payoutAmountCents: (booking as unknown as { pricing: { transportCents: number } }).pricing.transportCents,
           payoutSentAt: m.completedAt ?? NOW,
           payoutAttempts: 1,
