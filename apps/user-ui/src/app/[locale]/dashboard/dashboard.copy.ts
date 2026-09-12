@@ -118,10 +118,23 @@ export function getDashboardCopy(isFr: boolean) {
     language: isFr ? "Langue" : "Language",
     theme: isFr ? "Thème" : "Theme",
     themeSub: isFr ? "Automatique" : "Automatic",
+    // ANO-WEB-86 (recette 5.26) — l'écran promettait des réglages qui n'existaient pas. Les
+    // libellés disent maintenant ce que la plateforme sait faire : trois choix de thème, la
+    // seule préférence email réellement coupable (la relance des messages non lus, D61), et le
+    // push annoncé pour ce qu'il est — absent.
+    themeAuto: isFr ? "Automatique" : "Automatic",
+    themeLight: isFr ? "Clair" : "Light",
+    themeDark: isFr ? "Sombre" : "Dark",
+    themeAutoSub: isFr ? "Automatique — suit le réglage de ton appareil" : "Automatic — follows your device setting",
     emailNotif: isFr ? "Notifications email" : "Email notifications",
-    emailNotifSub: isFr ? "Demandes, messages, paiements" : "Requests, messages, payments",
+    emailNotifSub: isFr
+      ? "Relance des messages non lus. Les emails d'un Deal en cours (demande, paiement, livraison) ne se coupent pas."
+      : "Unread message reminders. Emails about an ongoing deal (request, payment, delivery) can't be turned off.",
+    emailNotifError: isFr ? "Réglage non enregistré, réessaie." : "Setting not saved, try again.",
     pushNotif: isFr ? "Notifications push" : "Push notifications",
-    pushNotifSub: isFr ? "Alertes en temps réel" : "Real-time alerts",
+    pushNotifSub: isFr
+      ? "Indisponible pour l'instant : les alertes arrivent dans la cloche et par email."
+      : "Not available yet: alerts arrive in the bell and by email.",
     thisMonth: isFr ? "ce mois" : "this month",
     // D67 — profil éditable
     profilePage: {
@@ -190,6 +203,7 @@ export function getDashboardCopy(isFr: boolean) {
       sessionsSub: isFr ? "Les appareils connectés à ton compte ; déconnecte ceux que tu ne reconnais pas." : "The devices signed in to your account; sign out the ones you don't recognise.",
       revokeOthers: isFr ? "Déconnecter les autres appareils" : "Sign out other devices",
       sessionsRevoked: isFr ? "{n} appareil(s) déconnecté(s)." : "{n} device(s) signed out.",
+      sessionRevoked: isFr ? "Appareil déconnecté." : "Device signed out.",
       thisDevice: isFr ? "cet appareil" : "this device",
       lastActivity: isFr ? "Dernière activité" : "Last activity",
       remembered: isFr ? "connexion mémorisée" : "remembered sign-in",
@@ -231,6 +245,11 @@ export function getDashboardCopy(isFr: boolean) {
       codeSent: isFr ? "Code envoyé : regarde ta boîte mail (et les spams)." : "Code sent: check your inbox (and spam).",
       codeLabel: isFr ? "Code reçu par email" : "Code received by email",
       confirmLabel: isFr ? "Tape SUPPRIMER pour confirmer" : "Type SUPPRIMER to confirm",
+      // ANO-WEB-84 (recette 5.25) : le refus arrivait en ANGLAIS (le `message` brut du serveur) — un refus métier
+      // porte un `details.code`, et c'est le front qui le dit dans la langue du membre (A146).
+      exportRateLimited: isFr
+        ? "Un seul export par 24 heures : tu pourras en redemander un demain."
+        : "One export per 24 hours: you can request another one tomorrow.",
       cancel: isFr ? "Annuler" : "Cancel",
       error: isFr ? "Impossible pour le moment, réessaie." : "Not possible right now, try again.",
     },

@@ -51,6 +51,14 @@ describe("favoris de trajets (D46, A59) — règles serveur", () => {
     expect(err.details).toEqual({ type: "favorite", code: "TRIP_NOT_FAVORITABLE", tripId: TRIP });
   });
 
+  it("trajet masqué par Yamba (PUBLISHED, hiddenByAdminAt posé) → 409 TRIP_NOT_FAVORITABLE à l'ajout (ANO-WEB-32)", async () => {
+    prismaMock.trip.findUnique.mockResolvedValue({ id: TRIP, userId: OWNER, status: "PUBLISHED", isDeleted: false, hiddenByAdminAt: new Date() });
+    const err = await addFavorite(USER, TRIP).catch((e) => e);
+    expect(err.statusCode).toBe(409);
+    expect(err.details).toEqual({ type: "favorite", code: "TRIP_NOT_FAVORITABLE", tripId: TRIP });
+    expect(prismaMock.tripFavorite.upsert).not.toHaveBeenCalled();
+  });
+
   it("le retrait est toujours possible, même sur un trajet passé (idempotent)", async () => {
     prismaMock.trip.findUnique.mockResolvedValue({ id: TRIP, userId: OWNER, status: "COMPLETED", isDeleted: false });
     await expect(removeFavorite(USER, TRIP)).resolves.toEqual({ tripId: TRIP, isFavorite: false });
