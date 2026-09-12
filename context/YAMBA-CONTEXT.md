@@ -610,6 +610,32 @@ Ordre de demarrage : auth -> trip -> gateway.
   desktop du visiteur sans « Creer un compte » ni « Rechercher un trajet ». Piege de poste : la cle
   Google Maps n'accepte que `localhost` comme referent. Harnais : 32 scenarios verts. PR **#265**
   (empilee sur #264). Reste : 5.2 a 5.32, 02-ADMIN.
+- 12/09 : **CHAPITRE 5.21 DU CAHIER 01-WEB — WEB-LIT, LITIGE ET MEDIATION, VUE MEMBRE (branche
+  `chore/recette-web-5-21`, empilee sur #285)** — 13 fiches jouees CONFORMES (3 apres correction), 14 scenarios en
+  serie dont 1 `test.fail`, 4 min 42 (`apps/e2e/src/chapitres/web-lit.spec.ts` ; sgn-picked / los-picked pour le
+  transit, bzv-delivered signale puis REMBOURSEMENT TOTAL, bzv-disputed YAM-2041 version puis PARTIEL 10 €,
+  los-disputed YAM-2042 REJET, yul-delivered deux onglets, bzv-completed acces sans droit ; trois decisions par
+  la mediatrice dans le back-office (3001), versions manquantes donnees par l'API). QUATRE ANOMALIES :
+  ANO-WEB-75 MAJEURE close (quatre evenements avec texte mais sans presentation → « Notification » sans titre :
+  Decision rendue, Code renouvele, Remboursement emis, Paiement autorise — table PRESENTATION completee),
+  ANO-WEB-73 close (remboursement total = CANCELLED : « Demande annulee · Cette demande est close » titrait la
+  decision → « Clos par la mediation »), ANO-WEB-72 close (note « TON PAIEMENT » d'un deal clos par la mediation
+  disait « periode de verification terminee » → `noteReleasedMediation` sur completedBy ADMIN) ; OUVERTE :
+  ANO-WEB-74 MAJEURE (GET /me/notifications sert refundCents ET carrierPayoutCents aux deux parties dans le
+  payload brut de dispute_resolved — projection par role a faire, registre, PR dediee ; 10 bis en test.fail).
+  Prouve : lien de transit ferme (date servie) puis ouvert ; motif verrouille (un seul radio) ; ecran de
+  signalement complet ; refus (bouton inactif, photo en cours / en echec, refus serveur simule) ; envoi (ticket
+  serveur, FROZEN, fil ferme, emails — categorie seule au Voyageur) ; ni modifiable ni retirable (409, toast) ;
+  dossier des deux cotes sans fuite ; version une seule fois ; trois decisions, chacun SON montant a l'ecran et
+  par email, cloche « Decision rendue · YAM-… » ; aucune notation ; deux onglets (409, retour au suivi) ; acces
+  sans droit (403 traduit, aucune fuite). A trancher : bouton « Donner ma version », manques « nommes sur leur
+  bloc », CANCELLED pour un remboursement total, 200 vs 201, capitales. Regard d'expert : compte a rebours
+  d'ouverture, renvoi vers le fil avant de signaler, borne du partiel, test de composant des quatre etats,
+  « ajouter une preuve plus tard », cause du refus, echeance des 72 h, projection par role des notifications,
+  test copy ↔ PRESENTATION en CI, dire pourquoi pas de note, relire au focus. PIEGES : version par l'API avant
+  de trancher, admin-ui requis, « Autre probleme » sous-texte (exact), un seul radio en transit, capitales,
+  total dans la vue du bon role, deux emails de decision visees par ticket, 200/201. Harnais : 237 scenarios.
+  Reste : 5.22 a 5.32, 02-ADMIN. AUCUNE attribution Claude.
 - 12/09 : **CHAPITRE 5.20 DU CAHIER 01-WEB — WEB-ANN, LES ANNULATIONS (branche `chore/recette-web-5-20`,
   empilee sur #284)** — 9 fiches jouees (2 apres correction, 1 avec reserve, 1 NON CONFORME), 9 scenarios en
   serie dont 1 `test.fail`, 3 min 18 (`apps/e2e/src/chapitres/web-ann.spec.ts` ; bzv-pending, bzv-accepted,

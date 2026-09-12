@@ -5846,3 +5846,72 @@ la correction est un chantier : branche CARRIER du service (remboursement intég
 
 Plateforme inchangée (997 + auth 229). `apps/e2e` : **223 scénarios** (214 + WEB-ANN ×9). Typecheck user-ui et
 harnais verts ; miroir i18n vert (aucune clé ajoutée).
+
+---
+
+# Chapitre 5.21 du cahier 01-WEB : litige et médiation, vue membre — la table de présentation en retard sur le catalogue, et les textes qui ignorent la cause de la clôture
+
+*(PR `chore/recette-web-5-21`, 12/09/2026.)*
+
+## Ce qui a été fait
+
+Le vingt-et-unième chapitre « fiches » du cahier 01-WEB : `WEB-LIT` (le signalement en transit, l'écran de
+signalement, ses refus, l'envoi, le dossier vu des deux côtés, la version du Voyageur, les trois décisions du
+back-office, la notation interdite, deux onglets, l'accès sans droit). Treize fiches jouées et conformes (trois
+après correction), quatre anomalies : trois closes (`ANO-WEB-75` MAJEURE, `ANO-WEB-72`, `ANO-WEB-73` mineures) et une
+ouverte au contrat (`ANO-WEB-74`, MAJEURE : le payload de notification aux deux rôles).
+
+```
+apps/e2e/src/chapitres/web-lit.spec.ts                                            14 scénarios en série (1 `test.fail`), 4 min 42
+apps/user-ui/src/components/dashboard/notifications/notifications.types.ts        ANO-WEB-75 (quatre entrées de présentation)
+apps/user-ui/src/components/booking/booking-tracker/views/status/BookingStatusNotice.tsx   ANO-WEB-73 (« Clos par la médiation »)
+apps/user-ui/src/components/booking/booking-tracker/views/delivered/DeliveredSideCards.tsx  ANO-WEB-72 (note du paiement sur completedBy ADMIN)
+apps/user-ui/messages/{fr,en}/bookingTracker.json                                 `statusNotice.cancelledByMediation.*`, `delivered.payment.noteReleasedMediation`
+```
+
+## ANO-WEB-75 : la porte du texte
+
+La boîte de notifications ne rend le texte d'un événement (`copy.<type>.<rôle>.title`) que si son type a une entrée
+dans `PRESENTATION` (`isKnownNotificationType`) ; sinon, le titre neutre « Notification ». Quatre événements avaient
+leur texte et pas leur entrée : « Décision rendue · YAM-… » (la fiche 10 attend cette cloche), « Code de livraison
+renouvelé », « Remboursement émis », « Paiement autorisé ». Les entrées sont ajoutées ; le regard d'expert propose
+le test qui aligne les deux listes en CI (`Object.keys(copy)` ⊆ `PRESENTATION`).
+
+## ANO-WEB-72 et 73 : deux textes qui ignoraient la cause de la clôture
+
+- **73** — un remboursement total tranché par la médiation clôt le deal en `CANCELLED` (D55). `BookingStatusNotice`
+  titrait donc « Demande annulée · Cette demande est close. Si un remboursement s'applique… Annulée le … » au-dessus
+  de « Décision rendue » — sur un colis livré. Quand `dispute.resolution` (ou `retentionDecision`) existe, la
+  clôture a son propre texte (`statusNotice.cancelledByMediation`).
+- **72** — la note du bloc « TON PAIEMENT » suivait déjà `completedBy` (ANO-WEB-64) mais ne connaissait que
+  SHIPPER / autre ; `ADMIN` recevait « la période de vérification est terminée — les fonds sont en cours de
+  versement à … », faux après un rejet ou un partiel. Troisième variante : « Clos par la médiation — le sort des
+  fonds est celui de la décision ci-dessus. »
+
+## ANO-WEB-74 : un payload servi tel quel
+
+`GET /me/notifications` renvoie, pour chaque notification, le payload de l'événement d'outbox. Pour
+`booking.dispute_resolved`, il porte `refundCents` ET `carrierPayoutCents` ; l'Expéditrice lit donc le montant versé
+au Voyageur, et réciproquement. L'écran n'affiche aucun montant (la ligne dit « lis la décision et le motif sur ton
+envoi »), mais la règle « chaque partie voit uniquement le montant qui la concerne » vaut pour la réponse brute.
+Correction proposée (contrat, registre) : une projection par rôle du payload à la lecture — liste blanche par
+événement, comme `analyticsEventsFor` (D66) — jamais un spread. Scénario 10 bis en `test.fail`.
+
+## Le harnais
+
+- Une décision n'est possible qu'après la version du Voyageur (ou 72 h) : `POST /deals/:id/dispute/statement`
+  (201) par l'API sur `los-disputed` (Adebayo) et sur le dossier de João (Thomas) avant de trancher ;
+  `bzv-disputed` reçoit la version par l'écran (fiche 9).
+- Les trois décisions passent par le back-office réel (`navigateurAdmin("mediateur")`, `MediationAdmin` :
+  file → dossier → trancher) ; chaque partie est ensuite lue à l'écran (texte, montant, motif) puis par sa cloche
+  (`a[href*=id]` + « Décision rendue · YAM-… ») et son email — Thomas en reçoit deux sur le même corridor, chacun
+  visé par son ticket dans le corps.
+- LIT-4 simule les trois cas réseau : ImageKit ralenti (route qui attend 4 s), ImageKit en échec (500), et un
+  400 sur le `POST /dispute` (le serveur réel n'est jamais atteint avec un dossier incomplet : le bouton est
+  inactif).
+- LIT-13 prouve l'étanchéité par l'absence : aucune donnée du deal, aucun code HTTP ni JSON à l'écran, l'API à 403.
+
+## Tests
+
+Plateforme inchangée (997 + auth 229). `apps/e2e` : **237 scénarios** (223 + WEB-LIT ×14). Typecheck user-ui et
+harnais verts ; miroir i18n vert (`cancelledByMediation`, `noteReleasedMediation` FR / EN).

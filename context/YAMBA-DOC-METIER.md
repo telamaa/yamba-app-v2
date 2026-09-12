@@ -3934,3 +3934,66 @@ remboursement.
 | 253 | PICKED_UP, DELIVERED | aucune annulation, 409 | oui |
 | 254 | Suivi d'un deal annulable | pas de doublon, lien vers « Mes envois » | oui (ANO-WEB-70 close) |
 | 255 | Deux onglets | 409, toast, liste relue, un seul remboursement | oui |
+
+---
+
+# Litige et médiation, vue membre — ce que le chapitre 5.21 fait respecter
+
+*(PR `chore/recette-web-5-21`, 12/09/2026 — cahier 01-WEB chapitre 5.21, WEB-LIT-1 à 13.)*
+
+## Le besoin
+
+L'Expéditeur signale un problème (en transit : « non livré » seulement, 48 h après le départ ; après la remise :
+six motifs, pendant la période de vérification), une seule fois, sans retour possible ; le paiement du Voyageur est
+gelé, le fil passe en lecture seule. Le Voyageur apprend la catégorie seule, donne sa version une seule fois.
+L'équipe tranche (rejet, partiel, total) ; chacun lit la décision et le motif, et SON montant seulement ; personne ne
+note un deal clos par la médiation. Un accès sans droit ne révèle rien.
+
+## Les règles
+
+**RG-WEB-219 — Le signalement « non livré » s'ouvre 48 h après le départ**, à une date servie par le serveur ; avant,
+le lien est fermé et dit quand il s'ouvre ; en transit, le motif est verrouillé sur « non livré ».
+
+**RG-WEB-220 — L'écran de signalement dit tout** : quatre blocs (motif, récit ≥ 50 caractères, photos ≤ 5, solution
+souhaitée), leurs badges, l'engagement sur l'honneur, la fenêtre de signalement.
+
+**RG-WEB-221 — Un dossier incomplet ne part pas** : bouton inactif tant qu'un motif, 50 caractères ou l'engagement
+manquent, ou qu'une photo est en cours ou en échec ; un refus serveur est dit.
+
+**RG-WEB-222 — L'envoi est confirmé, irréversible, numéroté** (`YAM-XXXX` servi par le serveur) ; le versement est
+gelé, le fil fermé ; l'Expéditeur reçoit l'accusé, le Voyageur un email calme avec la catégorie seule.
+
+**RG-WEB-223 — Un signalement ne se modifie ni ne se retire ; un second est refusé.**
+
+**RG-WEB-224 — Chaque partie lit le dossier à sa mesure** : l'Expéditeur son dossier complet et le FAIT de la version
+du Voyageur ; le Voyageur la catégorie, jamais le récit, les photos ni la solution souhaitée.
+
+**RG-WEB-225 — La version du Voyageur est unique, immuable, datée**, avec une échéance servie.
+
+**RG-WEB-226 — La décision est lue par les deux** (titre, motif, définitive, recours) **et chacun ne voit que son
+montant** — à l'écran, dans la cloche et par email. *(L'API des notifications sert encore les deux montants —
+ANO-WEB-74.)*
+
+**RG-WEB-227 — Un deal clos par la médiation ne se note pas**, et son suivi dit « Clos par la médiation », jamais
+« Demande annulée » ni « Tu as confirmé ».
+
+**RG-WEB-228 — Deux onglets, une vérité** : signaler après une confirmation est refusé et renvoie au suivi.
+
+**RG-WEB-229 — L'accès direct au signalement sans droit renvoie au suivi sans rien révéler.**
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| 256 | Transit < 48 h / > 48 h | lien fermé avec date / actif | oui |
+| 257 | Signaler en transit | motif verrouillé, explications | oui |
+| 258 | Écran après livraison | quatre blocs, badges, six motifs, fenêtre | oui |
+| 259 | Dossier incomplet, photo en cours / en échec, refus serveur | bouton inactif, messages | oui |
+| 260 | Envoyer | confirmation, ticket, gel, fil fermé, emails | oui |
+| 261 | Modifier / retirer / second signalement | impossible, 409, toast | oui |
+| 262 | Dossier Expéditeur / Voyageur | chacun à sa mesure, aucune fuite | oui |
+| 263 | Version du Voyageur | une fois, échéance, l'Expéditeur apprend le fait | oui |
+| 264 | Rejet / partiel / total | textes, montants par rôle, cloche, emails | oui (ANO-WEB-72, 73, 75 closes ; 74 ouverte) |
+| 265 | Après une décision | aucun « Noter » | oui |
+| 266 | Deux onglets | 409, retour au suivi | oui |
+| 267 | Accès sans droit | retour au suivi, aucune fuite | oui |
