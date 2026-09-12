@@ -635,7 +635,7 @@ Ordre de demarrage : auth -> trip -> gateway.
   test copy ↔ PRESENTATION en CI, dire pourquoi pas de note, relire au focus. PIEGES : version par l'API avant
   de trancher, admin-ui requis, « Autre probleme » sous-texte (exact), un seul radio en transit, capitales,
   total dans la vue du bon role, deux emails de decision visees par ticket, 200/201. Harnais : 237 scenarios.
-  Reste : 5.22 a 5.32, 02-ADMIN. AUCUNE attribution Claude.
+  PR **#286** (empilee sur #285). Reste : 5.22 a 5.32, 02-ADMIN. AUCUNE attribution Claude.
 - 12/09 : **CHAPITRE 5.20 DU CAHIER 01-WEB — WEB-ANN, LES ANNULATIONS (branche `chore/recette-web-5-20`,
   empilee sur #284)** — 9 fiches jouees (2 apres correction, 1 avec reserve, 1 NON CONFORME), 9 scenarios en
   serie dont 1 `test.fail`, 3 min 18 (`apps/e2e/src/chapitres/web-ann.spec.ts` ; bzv-pending, bzv-accepted,

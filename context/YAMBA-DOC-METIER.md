@@ -3939,7 +3939,7 @@ remboursement.
 
 # Litige et médiation, vue membre — ce que le chapitre 5.21 fait respecter
 
-*(PR `chore/recette-web-5-21`, 12/09/2026 — cahier 01-WEB chapitre 5.21, WEB-LIT-1 à 13.)*
+*(PR `chore/recette-web-5-21` (#286), 12/09/2026 — cahier 01-WEB chapitre 5.21, WEB-LIT-1 à 13.)*
 
 ## Le besoin
 

@@ -5851,7 +5851,7 @@ harnais verts ; miroir i18n vert (aucune clé ajoutée).
 
 # Chapitre 5.21 du cahier 01-WEB : litige et médiation, vue membre — la table de présentation en retard sur le catalogue, et les textes qui ignorent la cause de la clôture
 
-*(PR `chore/recette-web-5-21`, 12/09/2026.)*
+*(PR `chore/recette-web-5-21` (#286), 12/09/2026.)*
 
 ## Ce qui a été fait
 
