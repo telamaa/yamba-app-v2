@@ -137,6 +137,7 @@
     "theirs": "Sa note",
     "theirsMissing": "Pas de note reçue pour ce Deal.",
     "back": "Retour au Deal",
-    "unavailable": "Ce Deal ne peut pas être noté pour le moment."
+    "unavailable": "Ce Deal ne peut pas être noté pour le moment.",
+    "unavailableTitle": "Notation indisponible"
   }
 }
