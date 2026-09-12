@@ -610,6 +610,32 @@ Ordre de demarrage : auth -> trip -> gateway.
   desktop du visiteur sans « Creer un compte » ni « Rechercher un trajet ». Piege de poste : la cle
   Google Maps n'accepte que `localhost` comme referent. Harnais : 32 scenarios verts. PR **#265**
   (empilee sur #264). Reste : 5.2 a 5.32, 02-ADMIN.
+- 12/09 : **CHAPITRE 5.20 DU CAHIER 01-WEB — WEB-ANN, LES ANNULATIONS (branche `chore/recette-web-5-20`,
+  empilee sur #284)** — 9 fiches jouees (2 apres correction, 1 avec reserve, 1 NON CONFORME), 9 scenarios en
+  serie dont 1 `test.fail`, 3 min 18 (`apps/e2e/src/chapitres/web-ann.spec.ts` ; bzv-pending, bzv-accepted,
+  yul-accepted avec yul ramene a +24 h, un deal CREE PAR L'API sur bzv-perkg puis trajet ramene a −24 h,
+  bzv-picked / bzv-delivered, gru-pending deux onglets ; les manoeuvres deplacent le trajet ET l'instantane
+  `booking.trip.departureAt` que le bareme lit). QUATRE ANOMALIES : ANO-WEB-68 MAJEURE OUVERTE (aucune
+  annulation par le Voyageur : service 403 SHIPPER_ONLY alors que la machine declare cancel(CARRIER) avec
+  PENALIZE_CARRIER, aucun ecran — D72 renvoie pourtant vers « Mes trajets » pour annuler ses deals ;
+  chantier dedie + registre), ANO-WEB-69 mineure OUVERTE (apres le depart, fenetre et Paiements disent
+  « reversee au Voyageur » alors que la retenue est conservee a arbitrer : `retentionDisposition` a porter
+  par cancellationPreview et la ligne de paiement, contrat, PR dediee), ANO-WEB-70 close (« Voir le Deal
+  dans mon dashboard → » = bouton console.info des deux cotes → liens /dashboard/shipments et
+  /dashboard/trips), ANO-WEB-71 close (« Remboursement de 28,00 € en cours » sur une demande jamais debitee →
+  « Envoi annule. » seul). Prouve : demande en attente (fenetre exacte, montant servi, kilos rendus, email
+  Expeditrice, cloche seule cote Voyageur) ; accepte a > 48 h (total, deux emails + un, Paiements) ; < 48 h
+  (47,04 € → 23,52 € / 23,52 €, compensation 21,00 € = arrondi(retenue × net ÷ total), cloche + portefeuille
+  Marc) ; montant servi dans GET /me/bookings, 0 appel a l'ouverture ; apres le depart (19,32 € rembourse,
+  HELD_FOR_MEDIATION, aucun versement, trois ecrans Voyageur « conservee ») ; aucune annulation apres la
+  prise en charge (PICKED_UP et DELIVERED, ecran + API 409) ; suivi sans doublon ; deux onglets (409,
+  toast, liste relue, un seul remboursement). A trancher : bareme sur l'instantane du depart, objets
+  d'email, « lien discret », perimetre d'ANN-02. Regard d'expert : email d'annulation utile, un seul email
+  de remboursement, « dont 21,00 € pour Marc », apercu horodate, delai promis sur la retenue, test
+  « toute transition a une route et un ecran », allowedActions au Voyageur, composant de retour partage,
+  refetch au focus. PIEGES : GET /trips/:id proprietaire seul, instantane du depart, deal par l'API en
+  deux appels (QUOTE_DIVERGENCE → actualTotalCents), toast prefixe, route figee des deux onglets.
+  Harnais : 223 scenarios. Reste : 5.21 a 5.32, 02-ADMIN. AUCUNE attribution Claude.
 - 12/09 : **CHAPITRE 5.19 DU CAHIER 01-WEB — WEB-CNF, CONFIRMATION, COMPLETION ET VERSEMENT (branche
   `chore/recette-web-5-19`, empilee sur #283)** — 11 fiches jouees CONFORMES (4 apres correction, 1 avec
   reserve), 13 scenarios en serie dont 2 `test.fail`, 2 min 54 (`apps/e2e/src/chapitres/web-cnf.spec.ts` ;

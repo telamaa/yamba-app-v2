@@ -3876,3 +3876,61 @@ carte, un relevé ou un intitulé inventés.
 | 244 | Portefeuille | cartes = serveur, 7 états, aucune maquette | oui |
 | 245 | Paiements | cartes = serveur, 6 états, remboursement daté | oui (ANO-WEB-67 close) |
 | 246 | Bloc « TON PAIEMENT » avec le FAKE | aucune fausse carte | oui |
+
+---
+
+# Les annulations — ce que le chapitre 5.20 fait respecter
+
+*(PR `chore/recette-web-5-20`, 12/09/2026 — cahier 01-WEB chapitre 5.20, WEB-ANN-1 à 9.)*
+
+## Le besoin
+
+L'Expéditeur peut annuler tant que le colis n'est pas pris en charge, selon un barème que le serveur calcule et
+annonce avant le geste : tout (demande en attente, ou accepté à 48 h ou plus du départ), la moitié à moins de
+48 h (la retenue revient au Voyageur), la moitié après le départ (la retenue est conservée à arbitrer). Le
+Voyageur qui annule rembourse tout et le porte sur son profil (ANN-02). Après la prise en charge, personne
+n'annule. Le suivi ne duplique pas le geste, et deux onglets ne remboursent pas deux fois.
+
+## Les règles
+
+**RG-WEB-210 — La fenêtre d'annulation dit le montant servi par le serveur**, la raison (intégral / retenue de
+50 %), et offre « Garder l'envoi » / « Confirmer l'annulation » ; ouvrir la fenêtre ne recalcule rien.
+
+**RG-WEB-211 — Une demande en attente s'annule sans frais** : rien n'a été débité, le toast dit « Envoi annulé. »
+sans parler de remboursement, les kilos sont rendus, l'Expéditeur reçoit un email, le Voyageur une cloche seule.
+
+**RG-WEB-212 — Un deal accepté à 48 h ou plus du départ est remboursé intégralement** : toast avec le montant,
+kilos rendus, emails « annulée » puis « Remboursement émis » (montant, 5 à 10 jours ouvrés) à l'Expéditeur,
+email au Voyageur, ligne « Remboursé {montant} le {date} ».
+
+**RG-WEB-213 — À moins de 48 h, la moitié est remboursée et la retenue revient au Voyageur** : la fenêtre
+l'explique, Paiements l'écrit (« retenue … reversée au Voyageur »), le Voyageur reçoit une compensation =
+arrondi(retenue × net ÷ total), cloche + ligne de portefeuille.
+
+**RG-WEB-214 — Après le départ sans prise en charge, la moitié est remboursée et la retenue est conservée à
+arbitrer** : aucun versement automatique ; le Voyageur lit « Retenue conservée · on te contacte » partout. *(La
+fenêtre et Paiements disent encore « reversée au Voyageur » — ANO-WEB-69.)*
+
+**RG-WEB-215 — Le Voyageur peut annuler un deal accepté** : remboursement intégral, kilos rendus, annulation
+comptée sur son profil. *(Non implémenté — ANO-WEB-68.)*
+
+**RG-WEB-216 — Aucune annulation après la prise en charge**, d'aucun côté, ni à l'écran ni par l'API.
+
+**RG-WEB-217 — Le suivi ramène vers « Mes envois »** et ne propose pas une seconde annulation.
+
+**RG-WEB-218 — Une annulation refusée recharge la liste** : toast explicite, état réel, jamais un double
+remboursement.
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| 247 | Demande en attente | fenêtre, montant intégral servi, « Envoi annulé. », kilos, email / cloche | oui (ANO-WEB-71 close) |
+| 248 | Accepté à > 48 h | total, toast, kilos, trois emails, Paiements | oui |
+| 249 | Accepté à < 48 h | moitié, retenue au Voyageur, compensation au centime | oui |
+| 250 | Ouvrir la fenêtre | aucun appel, montant de la liste servie | oui |
+| 251 | Accepté, trajet parti | moitié, retenue conservée, aucun versement, écrans Voyageur | avec réserve (ANO-WEB-69) |
+| 252 | Le Voyageur annule | remboursement intégral, compteur | NON (ANO-WEB-68 ouverte) |
+| 253 | PICKED_UP, DELIVERED | aucune annulation, 409 | oui |
+| 254 | Suivi d'un deal annulable | pas de doublon, lien vers « Mes envois » | oui (ANO-WEB-70 close) |
+| 255 | Deux onglets | 409, toast, liste relue, un seul remboursement | oui |

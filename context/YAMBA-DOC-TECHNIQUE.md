@@ -5768,3 +5768,81 @@ const refundDate = iso(b.refundedAt ?? b.updatedAt);
 Plateforme **997** (deal 577, +1 ANO-WEB-67) + auth 229. `apps/e2e` : **214 scénarios** (201 + WEB-CNF ×13).
 Typecheck user-ui, deal-service et harnais verts ; miroir i18n vert (`noteReleasedAuto`, `promptTextNoDate`
 FR / EN).
+
+---
+
+# Chapitre 5.20 du cahier 01-WEB : les annulations — la transition sans route ni écran, l'instantané que le barème lit, et deux restes de maquette
+
+*(PR `chore/recette-web-5-20`, 12/09/2026.)*
+
+## Ce qui a été fait
+
+Le vingtième chapitre « fiches » du cahier 01-WEB : `WEB-ANN` (le barème ANN-01 en quatre moments, le montant
+servi, l'annulation Voyageur, rien après la prise en charge, le suivi sans doublon, deux onglets). Neuf fiches
+jouées, sept conformes (deux après correction, une avec réserve), une NON CONFORME (`ANO-WEB-68`, majeure,
+ouverte : l'annulation par le Voyageur n'existe ni au service ni à l'écran), une réserve (`ANO-WEB-69`, la
+retenue conservée dite « reversée »), deux anomalies closes (`ANO-WEB-70`, `ANO-WEB-71`).
+
+```
+apps/e2e/src/chapitres/web-ann.spec.ts                                            9 scénarios en série (1 `test.fail`), 3 min 18
+apps/e2e/src/pages/mes-envois.ts                                                  toast « Envoi annulé. » avec ou sans remboursement
+apps/user-ui/src/components/booking/booking-tracker/views/accepted/BookingAcceptedDesktop.tsx   ANO-WEB-70 (lien vers « Mes envois »)
+apps/user-ui/src/components/carrier/deal/views/accepted/DealAcceptedDesktop.tsx   ANO-WEB-70 (lien vers « Mes trajets »)
+apps/user-ui/src/components/dashboard/shipments/ShipmentsClient.tsx               ANO-WEB-71 (toast sans « remboursement » pour une demande en attente)
+```
+
+## Un deal fabriqué par l'API, en deux appels
+
+Le chapitre a besoin de quatre deals acceptés et le seed n'en a que deux. Plutôt que l'assistant (une minute
+par réservation), le harnais réserve par l'API : le premier `POST /deals/payment-intents` porte un total
+délibérément faux, le serveur répond 409 `QUOTE_DIVERGENCE` avec `actualTotalCents` (D17), le second porte le
+vrai total, puis `POST /deals` (FAKE : `clientSecret` null) et `POST /deals/:id/accept` par le Voyageur :
+
+```ts
+// apps/e2e/src/chapitres/web-ann.spec.ts
+const sonde = await contexte.request.post(`${api()}/deals/payment-intents`, { data: { ...devis, expectedTotalCents: 1 } });
+const totalCents = ((await sonde.json()) as { details: { actualTotalCents: number } }).details.actualTotalCents;
+```
+
+## Le barème lit l'instantané du deal
+
+`toCancellationPreview` et `cancel` calculent le remboursement à partir de `booking.trip.departureAt` — l'instantané
+figé à la réservation, pas le trajet. Déplacer `trip.departureAt` (WEB-E2E-3) ne change rien à un deal déjà
+créé : la manœuvre du chapitre déplace le trajet ET chaque deal (`data: { trip: { update: { departureAt } } }`
+sur le composite). Conséquence produit, à trancher : un vol repoussé après l'acceptation ne déplace pas la
+fenêtre des 48 h de l'Expéditrice.
+
+## ANO-WEB-68 : trois couches en désaccord
+
+La machine déclare `ACCEPTED --cancel(CARRIER)--> CANCELLED` (effets `FULL_REFUND`, `RELEASE_CAPACITY`,
+`PENALIZE_CARRIER`, `NOTIFY_SHIPPER`) ; le service refuse tout autre acteur que l'Expéditeur (403
+`SHIPPER_ONLY`) ; aucun écran Voyageur ne propose le geste — et le refus D72 (« annule-les d'abord depuis
+« Mes trajets » ») renvoie vers une action qui n'existe pas. Le scénario 6 est en `test.fail` (il attend 200) ;
+la correction est un chantier : branche CARRIER du service (remboursement intégral par le fournisseur, kilos,
+`closedBy`, événement, emails), écran, tests, registre.
+
+## ANO-WEB-70 et 71 : deux restes de maquette
+
+- **70** — « Voir le Deal dans mon dashboard → » était un `<button onClick={() => console.info(…)}>` dans les
+  deux vues « accepté » (Expéditeur, Voyageur) : `Link` de `@/i18n/navigation` vers `/dashboard/shipments` et
+  `/dashboard/trips`.
+- **71** — le toast choisissait « Remboursement de {montant} en cours » dès que la réponse portait
+  `refundAmountCents` ; une demande en attente n'a jamais été débitée (D40 : l'empreinte est levée, Paiements dit
+  « Jamais débité ») : le remboursement ne se dit que si `item.status !== "PENDING"`.
+
+## Le harnais
+
+- Les kilos restants se lisent par `GET /trips/:id` avec la session du VOYAGEUR (403 `NOT_TRIP_OWNER` sinon),
+  avant et après chaque annulation.
+- ANN-4 prouve « servi par le serveur » par l'absence : la liste est lue une fois (`cancellationPreview` dans
+  `GET /me/bookings`), et l'ouverture de la fenêtre ne déclenche aucune requête `/deals` ni `/bookings`.
+- ANN-3 refait l'arithmétique à partir des montants servis (`totalShipperCents`, `transportCents`) et
+  confronte `payoutAmountCents` à `arrondi(retenue × net ÷ total)` ; l'exemple du cahier (32,20 / 28,75 →
+  16,10 / 14,38) est vérifié par la même formule.
+- ANN-9 fige `GET /me/bookings*` de l'onglet 2 (`page.route` avec la réponse lue), libère avant le clic, et
+  prouve « aucun double remboursement » par `refundAmountCents` et les kilos.
+
+## Tests
+
+Plateforme inchangée (997 + auth 229). `apps/e2e` : **223 scénarios** (214 + WEB-ANN ×9). Typecheck user-ui et
+harnais verts ; miroir i18n vert (aucune clé ajoutée).
