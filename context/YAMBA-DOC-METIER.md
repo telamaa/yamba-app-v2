@@ -4152,7 +4152,7 @@ pas révélée.
 
 # Données personnelles : export et effacement — ce que le chapitre 5.25 fait respecter
 
-*(PR `chore/recette-web-5-25`, 12/09/2026 — cahier 01-WEB chapitre 5.25, WEB-RGP-1 à 9.)*
+*(PR `chore/recette-web-5-25` (#290), 12/09/2026 — cahier 01-WEB chapitre 5.25, WEB-RGP-1 à 9.)*
 
 ## Le besoin
 

@@ -6108,7 +6108,7 @@ auth-service, user-ui et harnais verts ; miroir i18n vert (`report.notFound` FR 
 
 # Chapitre 5.25 du cahier 01-WEB : données personnelles — la préférence lue au mauvais endroit, et l'en-tête que CORS cachait
 
-*(PR `chore/recette-web-5-25`, 12/09/2026.)*
+*(PR `chore/recette-web-5-25` (#290), 12/09/2026.)*
 
 ## Ce qui a été fait
 

@@ -635,7 +635,7 @@ Ordre de demarrage : auth -> trip -> gateway.
   notifications, `nextAt` a l'ecran, compte par motif de blocage, libelle « Membre supprime » partout, revoquer le
   lien de suivi a l'effacement. PIEGES : quota OTP (6/h) qui grille au troisieme rejeu, sans message (script
   `otp-debloquer.ts`) ; fenetre sudo liee au jti (parEcran) ; Playwright efface le telechargement a la fin de SA
-  fiche ; `nx serve` a lache message-service (relance en bundle). Harnais : 274 scenarios. Reste : 5.26 a 5.32,
+  fiche ; `nx serve` a lache message-service (relance en bundle). Harnais : 274 scenarios. PR **#290** (empilee sur #289). Reste : 5.26 a 5.32,
   02-ADMIN. AUCUNE attribution Claude.
 - 12/09 : **CHAPITRE 5.24 DU CAHIER 01-WEB — WEB-SIG, SIGNALER UN TRAJET, UN PROFIL, UN MESSAGE (branche
   `chore/recette-web-5-24`, empilee sur #288)** — 8 fiches jouees CONFORMES (2 apres correction), 8 scenarios en
