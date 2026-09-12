@@ -3976,3 +3976,2217 @@ l'annulation par le Voyageur comme un lot à part. Décision attendue.
 
 `apps/e2e` : **17 scénarios** verts sur le poste (harnais ×6, WEB-CNX ×3, WEB-RSV ×5, WEB-E2E-1 à 3).
 user-ui : typecheck et i18n verts. Aucun service modifié.
+
+---
+
+# WEB-E2E-4 : le compte neuf, deux plafonds qui tombaient trop tard, un export qui ne s'ouvrait pas
+
+*(PR `chore/e2e-parcours-4`, 09/09/2026.)*
+
+## Ce qui a été fait
+
+Le quatrième parcours du cahier 01-WEB (gravité majeure) : un compte créé sur place, plafonné
+pendant trente jours (CNF-06, D71), et la vie ordinaire du compte — export des données, session
+qui expire, appareils, suppression bloquée. Quatorze étapes, 1 min 06.
+
+```
+apps/e2e/src/fixtures/compte-neuf.ts   une adresse unique par exécution, le mot de passe de recette
+apps/e2e/src/pages/inscription.ts      formulaire, case des conditions, code à six chiffres, « Compte activé »
+apps/e2e/src/pages/securite.ts         export par la porte (téléchargement réel), sessions actives, suppression bloquée, reconnexion dans la fenêtre
+apps/e2e/src/pages/reservation.ts      + tenterDeReserver() : le refus à l'intention, le refus au clic, ou le deal
+apps/e2e/src/parcours/web-e2e-4.spec.ts
+```
+
+## Deux anomalies produit, corrigées
+
+**ANO-WEB-08** — l'intention de paiement partait sans la valeur déclarée : le plafond « valeur
+déclarée » ne tombait qu'à la création du deal, après l'autorisation bancaire. Le contrat le
+prévoyait depuis ANO-API-12 ; `booking.api.ts` l'envoie désormais (conversion factorisée).
+
+**ANO-WEB-09** — l'export « Mes données » demande la réponse en `blob` : le 403 `SUDO_REQUIRED`
+arrivait en blob, le code n'était jamais lu, la porte ne s'ouvrait jamais. Le corps d'erreur en
+blob est relu en JSON avant d'être relancé. L'export RGPD était inutilisable pour tout membre.
+
+## Ce que le harnais a appris
+
+- **Un refus peut tomber à deux moments** : à l'intention (encadré dans la carte de paiement) ou
+  au clic « Payer » (toast). `tenterDeReserver()` écoute la réponse de l'intention, puis celle
+  du deal, et rend le refus tel qu'il est écrit, ou l'identifiant du deal.
+- **L'assistant garde son brouillon en `sessionStorage`** : `ouvrir()` l'oublie et recharge.
+- **Un téléchargement réel se capture** : `page.waitForEvent("download")` armé avant le clic qui
+  déclenche l'ancre `download` sur un blob ; le fichier est relu sur le disque.
+- **Une heure d'inactivité se simule fidèlement** : SES-01 fait du délai d'inactivité la durée de
+  vie de la clé Redis `refresh_jti:<userId>:<jti>` ; la supprimer (manœuvre consignée) et
+  retirer le cookie d'accès de quinze minutes, c'est exactement l'avoir laissée expirer.
+- **La fenêtre « Ta session a expiré » embarque un formulaire complet** : on la vise par son
+  `dialog`, jamais par `#email` seul.
+
+## Tests
+
+`apps/e2e` : **18 scénarios** verts sur le poste (harnais ×6, WEB-CNX ×3, WEB-RSV ×5, WEB-E2E-1 à 4).
+user-ui : typecheck et i18n verts. Aucun service modifié.
+
+---
+
+# WEB-E2E-5 : le refus au pickup, et une annulation qui n'en était pas une
+
+*(PR `chore/e2e-parcours-5`, 10/09/2026.)*
+
+## Ce qui a été fait
+
+Le cinquième parcours du cahier 01-WEB (gravité majeure) : un deal accepté et capturé, puis
+refusé par le Voyageur à la prise en charge — remboursement intégral, kilos rendus, deux emails,
+et une ligne de faits qui ne bouge pas. Huit étapes, 1 min 06.
+
+```
+apps/e2e/src/pages/transport-voyageur.ts   + refuserLeColis() : l'écran de prise en charge, la fenêtre, la raison, le toast, la réponse du serveur
+apps/e2e/src/pages/profil-public.ts        la page publique d'un membre : le publicSlug (via /auth/me), la ligne de faits, le compte d'annulations tardives
+apps/e2e/src/pages/mes-trajets.ts          + kilosRestants() partagé (sorti de web-e2e-3, qui l'importe désormais)
+apps/e2e/src/parcours/web-e2e-5.spec.ts
+```
+
+## Une anomalie produit, corrigée — ANO-WEB-10
+
+La machine d'états déclare le refus au pickup **sans pénalité** (`refusePickup` : `FULL_REFUND`,
+`RELEASE_CAPACITY`, `NOTIFY_SHIPPER` — pas de `PENALIZE_CARRIER`). Mais la réputation (D29 ①)
+est un **modèle de lecture** recalculé à part, dans `apps/deal-service/src/services/reputation.service.ts`,
+et sa requête des « annulations tardives » du Voyageur disait : `status: CANCELLED, closedBy:
+CARRIER, acceptedAt ≠ null`. Un refus au pickup coche les trois. Comme l'annulation ANN-02 par
+le Voyageur n'existe pas encore côté service (ANO-WEB-07, lot à part), ce compteur ne comptait
+en pratique **que** des refus au pickup — l'inverse exact de son intention.
+
+Pourquoi personne ne l'avait vu : le refus ne déclenchait aucun recalcul. La page publique
+restait juste jusqu'au prochain fait de réputation (un deal terminé, un avis révélé), où le refus
+apparaissait rétroactivement comme une annulation fautive. La première version du parcours passait
+donc « pour rien » (piège 7 du handoff : une assertion doit pouvoir échouer) ; la preuve a été
+faite en base — l'ancien filtre comptait 1 sur le deal refusé, le nouveau 0.
+
+Trois gestes, dans trois fichiers :
+
+1. **Une marque en base.** `Booking.pickupRefusedAt DateTime?` (`prisma/schema.prisma`). La raison
+   du refus est facultative (`pickupRefusalReason` peut être `null` sur un vrai refus), elle ne
+   pouvait pas servir de discriminant. `refusePickup` pose la marque avec `now` dans la même
+   transaction que le reste (`deal-transport.service.ts`).
+2. **Une requête qui exclut la marque, champ absent compris.** Les deals antérieurs à la marque
+   n'ont pas le champ ; sur Mongo, `pickupRefusedAt: null` ne les verrait pas (piège payé six
+   fois). D'où `OR: [{ pickupRefusedAt: null }, { pickupRefusedAt: { isSet: false } }]`.
+3. **Le refus recalcule la réputation des deux parties** (`recomputeBookingParties`, best effort,
+   comme l'annulation tardive) : la page publique dit vrai tout de suite, et l'étape 7 du parcours
+   devient une vraie relecture avant / après.
+
+Aucun DTO n'expose la marque : elle sert la réputation, pas les écrans.
+
+## Ce que le harnais a appris
+
+- **Une relecture « inchangé » n'a de valeur que si le produit a eu l'occasion de changer.** La
+  ligne de faits est lue avant la réservation et après le refus ; c'est le recalcul déclenché par
+  le refus qui rend la comparaison probante. Sans lui, l'assertion passait par inertie.
+- **Deux fenêtres pour un seul geste.** La modale (desktop) et le tiroir (mobile) portent toutes
+  deux `role="dialog"` ; le tiroir fermé est `aria-hidden`, donc absent de l'arbre des rôles.
+  On vise la fenêtre ouverte par son titre, et on confirme DANS la fenêtre — « Refuser le colis »
+  est aussi le bouton du pied de page.
+- **Le remboursement se prouve par la réponse du serveur ET par l'écran.** `refundAmountCents`
+  de `POST /deals/:id/pickup/refuse` égale le total lu à l'étape 1 ; la ligne Finances écrit le
+  même montant ; l'email de remboursement ne contient pas le mot « retenue ».
+
+## Tests
+
+deal-service : **576** tests (+1 : la requête des faits Voyageur exclut la marque, absent compris ;
+la marque et le recalcul sont vérifiés dans le spec du transport). Plateforme : 990.
+`apps/e2e` : **19 scénarios** verts sur le poste (harnais ×6, WEB-CNX ×3, WEB-RSV ×5, WEB-E2E-1 à 5).
+
+---
+
+# WEB-E2E-6 : le destinataire, et quatre liens qui menaient à un bouchon
+
+*(PR `chore/e2e-parcours-6`, 10/09/2026.)*
+
+## Ce qui a été fait
+
+Le sixième et dernier parcours du chapitre 6 (gravité majeure) : la page publique de suivi
+(D69) rechargée à chaque pas du colis, par un visiteur qui n'a qu'un lien. Neuf étapes, 1 min 00.
+Le chapitre 6 est clos.
+
+```
+apps/e2e/src/pages/suivi-destinataire.ts   + aideCourante(), jalonsAtteints(), neReveleRien(secrets) (écran + source),
+                                             clesServiesParLApi() (liste fermée), mentionDeConfidentialite(),
+                                             suivreLeLienDAcquisition(), lienInvalide(), refusDeLApi()
+apps/e2e/src/parcours/web-e2e-6.spec.ts
+```
+
+## Une anomalie produit, corrigée — ANO-WEB-11
+
+`/become/carrier` et `/become/shipper` étaient deux bouchons de la migration next-intl —
+« Become a carrier (UI only) » — jamais remplacés, et `/become-yamber` (pied de page, menu
+visiteur) n'a jamais existé. Quatre entrées « Devenir Voyageur » menaient à du vide : la page
+destinataire, l'appel final de l'accueil, le pied de page, le menu « Découvrir ».
+
+La correction tient en six fichiers : les deux bouchons deviennent des **redirections
+serveur** (`redirect` de `@/i18n/navigation`, qui garde la locale) vers l'écran réel —
+`/carrier/onboarding` et `/search` — pour tout lien déjà partagé ; les quatre liens visent
+directement l'onboarding. L'assistant d'onboarding envoie déjà un visiteur à
+`/login?redirect=/carrier/onboarding` et le ramène après connexion : c'est l'écran attendu par
+WEB-VOY-1.
+
+## Ce que le harnais a appris
+
+- **Une absence se prouve sur trois surfaces.** Le texte de l'écran, le code source
+  (`page.content()` — une donnée peut être dans le HTML sans être visible), et la réponse de
+  l'API dont les clés sont comparées à une liste FERMÉE : toute clé ajoutée au contrat fait
+  échouer le parcours, ce qui est le but.
+- **Les secrets connus se cherchent nommément.** Le harnais connaît le code de livraison, le
+  numéro du destinataire, le montant payé et les lieux de remise du trajet : `neReveleRien()`
+  les reçoit et les cherche, en plus des motifs génériques.
+- **Un `Link` Next navigue côté client** : `networkidle` ne dit rien de la navigation, on attend
+  l'URL attendue (`toHaveURL`). Et l'en-tête du site porte les mêmes libellés que le bloc
+  d'acquisition : on vise le lien DANS le bloc.
+- **Un 404 uniforme se prouve par comparaison** : le corps de la réponse pour un jeton altéré
+  d'un caractère est identique, octet pour octet, à celui d'un jeton inventé.
+
+## Tests
+
+`apps/e2e` : **20 scénarios** verts sur le poste (harnais ×6, WEB-CNX ×3, WEB-RSV ×5, WEB-E2E-1 à 6).
+user-ui : typecheck vert. Aucun service modifié.
+
+---
+
+# Chapitre 5.1 du cahier 01-WEB : l'accueil du visiteur, et six anomalies derrière la première recherche
+
+*(PR `chore/recette-web-5-1`, 10/09/2026.)*
+
+## Ce qui a été fait
+
+Le premier des 32 chapitres « fiches » du cahier 01-WEB : `WEB-ACC` (découverte, accueil et
+navigation), douze fiches jouées dans l'ordre du cahier, en desktop, par le harnais
+(`apps/e2e/src/chapitres/web-acc.spec.ts`, 1 min 24). Dix passent sur le produit tel quel ; les
+deux qui touchent la recherche depuis l'accueil ont fait tomber trois anomalies (deux bloquantes,
+une majeure), et trois fiches d'apparence anodine (bascule de langue, textes légaux, réseaux
+sociaux) trois anomalies mineures. Toutes closes dans la PR.
+
+```
+apps/e2e/src/chapitres/web-acc.spec.ts         NOUVEAU — 12 fiches WEB-ACC-1 à 12 ; aides : clesBrutesAffichees()
+                                                 (balayage des nœuds de texte), ecouterLesErreurs(), lienVisible()
+                                                 (le libellé VISIBLE d'un bloc qui en porte deux), choisirUneVille()
+                                                 (frappe touche par touche + journal des réponses Google), ORIGINE_GOOGLE
+apps/user-ui/src/components/home/HeroSection.tsx          « Rechercher » → router.push("/search")             (ANO-WEB-12)
+apps/user-ui/src/components/search/TripSearchBar.tsx      exporte TRIP_SEARCH_STORAGE_KEY, initialSearchDraft, SEARCH_VERSION
+apps/user-ui/src/components/search/SearchResultsView.tsx  interroge le brouillon mémorisé (même clé)          (ANO-WEB-12)
+apps/trip-service/src/lib/place-text.ts (+ .spec.ts)      placeSearchTerm() : « Ville, Pays » → « Ville »       (ANO-WEB-13)
+apps/trip-service/src/controllers/trip-search.controller.ts  buildBaseWhere() passe from/to par placeSearchTerm()
+apps/user-ui/src/lib/googlePlaces.ts                      callback= de Google au lieu de onload ; prêt = importLibrary (ANO-WEB-14)
+apps/user-ui/src/components/search/CityAutocomplete.tsx   le catch journalise (console.warn)                    (ANO-WEB-14)
+apps/user-ui/src/components/layout/Footer.tsx             SOCIAL_LINKS_ENABLED = false                          (ANO-WEB-15)
+apps/user-ui/src/app/layout.tsx                           <html lang={await getLocale()}>                       (ANO-WEB-16)
+apps/user-ui/src/components/layout/HtmlLang.tsx           NOUVEAU — aligne document.documentElement.lang après une bascule
+apps/user-ui/src/app/[locale]/layout.tsx                  monte <HtmlLang locale={locale} />
+apps/user-ui/src/app/[locale]/(marketing)/legal/layout.tsx  <main> → <div> (plus de main imbriqué)              (ANO-WEB-17)
+context/YAMBA-RECETTE-WEB-RESULTATS.md                    ANO-WEB-12 à 17, chapitre 5.1, observations
+```
+
+## Les six anomalies, et pourquoi elles tenaient ensemble
+
+**ANO-WEB-12 (bloquante) — « Rechercher » ne cherchait pas.** `HeroSection` montait
+`<TripSearchBar>` sans `onSearchAction` ; le composant documente lui-même ce cas comme
+« comportement par défaut : log ». Le bouton faisait un `console.log` et rien d'autre. Deuxième
+moitié du même défaut : `SearchResultsView` interrogeait un brouillon `useState` VIDE, alors que la
+barre mémorise le sien en `sessionStorage` (`usePersistedFormState("trip-search")`). Correction en
+deux gestes cohérents : l'accueil navigue vers `/search`, et la page de résultats lit le MÊME
+brouillon (clé, brouillon initial et version désormais exportés par `TripSearchBar`). Une seule
+source pour ce que le visiteur a saisi ; en arrivant, les résultats correspondent.
+
+**ANO-WEB-13 (bloquante) — une ville choisie dans la liste ne trouvait rien.** L'autocomplétion
+pose « Ville, Pays » dans le champ (`CityAutocomplete.select`, « on rétablit toujours le pays »).
+La recherche comparait ce libellé ENTIER à `destinationCity` et `destinationCountry` par
+`contains` : « Brazzaville, République du Congo » n'est contenu dans aucun des deux. Toute ville
+étrangère donnait zéro résultat ; Paris passait par accident (Google omet le pays du domicile).
+La règle est désormais dans `lib/place-text.ts` : le terme cherché est le premier segment avant
+une virgule. Le pays n'est pas un critère — il est dans la langue de l'écran, la base le porte
+dans la langue du Voyageur qui a publié. Fonction pure, trois tests. Le contrôleur ne change que
+sur deux lignes.
+
+**ANO-WEB-14 (majeure) — la première liste de suggestions était perdue.** `googlePlaces.ts`
+chargeait l'API avec `loading=async` et se résolvait sur `script.onload` — qui arrive avant que
+`google.maps.importLibrary` n'existe. La toute première requête (celle qui déclenche le
+chargement) échouait sur « importLibrary is not a function » ; les suivantes trouvaient tout prêt.
+D'où un symptôme qui dépend du RYTHME de frappe : « Paris » à 60 ms par touche → rien ; à
+250 ms → la liste (chaque frappe relance, la deuxième arrive après le chargement). Le contrat de
+Google pour `loading=async` est le paramètre `callback=` : c'est lui qui dit « prêt ». Et le
+composant avalait l'erreur (`catch {}`) : il journalise maintenant.
+
+**ANO-WEB-15, 16, 17 (mineures)** — les icônes sociales ouvraient `instagram.com/yamba` (pas à
+nous) : `SOCIAL_LINKS_ENABLED = false`, l'état inactif était déjà écrit. `<html lang="fr">` sur
+`/en` : le layout racine lit `getLocale()` (rendu serveur), `HtmlLang` aligne l'attribut après une
+bascule côté client (le layout racine, partagé, ne se re-rend pas). Deux `<main>` imbriqués sur
+les pages légales : le cadre devient un `<div>`.
+
+## Ce que le harnais a appris
+
+- **Le libellé visible d'un bloc qui en porte deux.** L'en-tête et le pied de page ont chacun un
+  arbre mobile et un arbre desktop dans le DOM ; `first()` tombe souvent sur le mobile, caché.
+  `filter({ visible: true })` avant `first()`, systématiquement.
+- **Une porte se vise par son nom.** Quatre autres `role="dialog" aria-modal="true"` vivent en
+  permanence dans la page (feuilles de la recherche mobile, fermées) ; un sélecteur par rôle seul
+  en trouve cinq.
+- **`fill()` n'est pas taper.** L'autocomplétion n'interroge Google qu'au fil des frappes ;
+  `pressSequentially` — et l'échec journalise ce que Google a répondu (référent refusé, clé
+  absente), pour que le rapport dise la cause.
+- **La clé Google est restreinte par référent à `localhost`** : sur l'adresse LAN du poste,
+  Places répond 403. Les fiches d'autocomplétion se jouent en visiteur, sans cookie : le harnais
+  ouvre le même front par `localhost` (`ORIGINE_GOOGLE`, surchargeable).
+- **Les 401 de la sonde de session sont rouges dans la console de tout visiteur.** Filtrés et
+  consignés comme observation (le marqueur `yamba:session` permettrait de ne pas sonder).
+
+## Tests
+
+trip-service **257 → 260** (`lib/place-text.spec.ts`). `apps/e2e` : **32 scénarios** verts sur le
+poste (20 + WEB-ACC ×12). user-ui et trip-service : typecheck vert.
+
+---
+
+# Chapitre 5.2 du cahier 01-WEB : l'inscription, seize fiches et une preuve en base
+
+*(PR `chore/recette-web-5-2`, 10/09/2026.)*
+
+## Ce qui a été fait
+
+Le deuxième chapitre « fiches » du cahier 01-WEB : `WEB-INS` (inscription par code email,
+consentement, Google). Seize fiches ; douze se jouent par le harnais
+(`apps/e2e/src/chapitres/web-ins.spec.ts`), quatre (le parcours Google, 13 à 16) sont déclarées
+`⏭` tant que `NEXT_PUBLIC_GOOGLE_CLIENT_ID` n'est pas posée — et resteront à jouer à la main
+ensuite, la fenêtre de consentement Google ne se pilotant pas. Une anomalie mineure (ANO-WEB-18,
+un « Connectez-vous » qui vouvoyait), close dans la PR ; trois écarts de cahier consignés (adresse
+masquée sur l'écran du code, ordre des règles de mot de passe sur une date, titre « Deviens
+Voyageur »).
+
+```
+apps/e2e/src/chapitres/web-ins.spec.ts            NOUVEAU — 16 fiches ; aides : formulaire() (le <form> de la PAGE, pas celui
+                                                    d'une fenêtre de connexion), remplir(), erreurSous() (#<champ>-error),
+                                                    creerMonCompte() (rend la réponse de POST /auth/register ou null),
+                                                    jusquAuCode(), saisirLeCode() (six cases + « Valider mon code »),
+                                                    collerLeCode() (un vrai événement paste), codeDe()
+apps/e2e/src/fixtures/compte-neuf.ts              compteNeuf(prenom, nom) : un compte par exécution (neuf-<horodatage>@recette.yamba.dev)
+apps/e2e/src/fixtures/jeu-essai.ts                inspecterCompte(email) → inspect-user.ts par execFileSync ; type CompteInspecte
+packages/libs/prisma/scripts/inspect-user.ts      NOUVEAU — ce que la base sait d'un compte, en JSON, sans secret
+                                                    (consentements, preferredLocale, hasPassword, identités)
+apps/user-ui/src/lib/auth/auth-error-codes.ts     registerCodeMessage tutoie (ANO-WEB-18)
+context/YAMBA-RECETTE-WEB-RESULTATS.md            ANO-WEB-18, chapitre 5.2, à trancher, pièges
+```
+
+## Comment le chapitre est construit
+
+**Une histoire en quatre fiches.** Les fiches 6 à 9 décrivent le même compte — créé, bloqué
+après cinq codes faux, code renvoyé, activé. Le barème de blocage (7) ne se comprend qu'après la
+création (6) et avant le renvoi (8) : elles sont jouées dans UN scénario, chaque fiche en
+`test.step`, pour que le rapport Playwright nomme l'étape qui tombe. Le blocage dure une vraie
+minute et le scénario l'attend (`toBeEnabled({ timeout: 75_000 })`) ; le simuler reviendrait à ne
+pas tester la règle. `test.setTimeout(8 * 60_000)`.
+
+**Une adresse par exécution.** `compteNeuf()` fabrique `neuf-<horodatage>@recette.yamba.dev`.
+Le cahier propose `recette+neuf@seed.yamba.dev` en dur ; un compte créé la veille ferait tomber la
+fiche 6 sur « adresse déjà utilisée ». Mailpit accepte tout domaine, la base de développement
+garde les comptes (sans conséquence).
+
+**Le compteur qui ne repart pas.** Après cinq échecs et un renvoi de code, le sixième échec
+annonce « 4 essais restants » — exactement ce qu'un PREMIER échec d'un nouveau lot dirait. La
+preuve n'est pas dans le chiffre du 6e mais dans le 7e (« 3 ») et dans l'absence de nouveau
+blocage entre les deux : le serveur compte 6 puis 7, pas 1 puis 2.
+
+**La preuve en base.** Le cahier demande de vérifier `ConsentLog` et `preferredLocale` — ce que
+l'écran ne montre pas. `inspect-user.ts` répond une ligne JSON sans rien de secret (jamais
+l'empreinte, seulement `hasPassword`) ; le harnais l'appelle par `execFileSync` (`tsx`,
+`--env-file=.env`) et lit la dernière ligne. Le premier passage a payé le prix d'un script non
+exécuté seul : un `select` sur `isVerified`, champ que `User` n'a pas, ne casse qu'à
+l'exécution — sur la dernière assertion du scénario, trois minutes après son début.
+
+**Le collage.** « Le collage doit remplir les six cases d'un coup » : `collerLeCode()` construit
+un `DataTransfer`, y pose le texte et dispatche un `ClipboardEvent("paste")` sur la première
+case — un vrai événement, celui que le composant écoute ; six `fill()` prouveraient autre chose.
+
+## ANO-WEB-18
+
+`registerCodeMessage` est antérieur au passage au tutoiement (décision du 03/09) ; les phrases
+voisines des règles de mot de passe sont impersonnelles (« Le mot de passe doit… ») et n'avaient
+rien à changer — la seule qui s'adresse à la personne avait échappé. « Connecte-toi ou utilise
+« Mot de passe oublié ». » ; la version anglaise ne bouge pas.
+
+## Ce que le harnais a appris
+
+- **Le `role="alert"` qui n'est pas le tien.** Next 16 monte en développement l'indicateur
+  « Open Next.js Dev Tools » avec `role="alert"`, hors `<main>`. « Aucune alerte visible » se
+  vérifie dans `page.locator("main")`, jamais sur la page entière.
+- **Un formulaire se vise par la page.** Une fenêtre de connexion peut monter un second `<form>`
+  avec les mêmes `id` (observation du chapitre 6) : `page.locator("main form").first()`.
+- **Le libellé n'est pas la donnée, encore.** L'écran du code affiche `maskEmail(email)` ; le
+  spec vérifie premier caractère, `@` et domaine — et le rapport consigne l'écart de cahier au
+  lieu de plier l'assertion en silence.
+- **Un script externe se lance seul avant d'être branché** (voir « la preuve en base »).
+
+## Tests
+
+Aucun test unitaire ajouté (une chaîne de message). `apps/e2e` : **45 scénarios** (41 joués,
+4 `⏭` Google) — 32 + WEB-INS ×13. user-ui : typecheck vert.
+
+---
+
+# Chapitre 5.3 du cahier 01-WEB : connexion, sessions, porte sudo — treize fiches et une vraie faille
+
+*(PR `chore/recette-web-5-3`, 11/09/2026.)*
+
+## Ce qui a été fait
+
+Le troisième chapitre « fiches » du cahier 01-WEB : `WEB-CNX` (connexion, « Rester connecté »,
+session expirée, appareils connectés, porte de confirmation). Treize fiches, toutes jouées, plus
+les trois vérifications historiques d'`ANO-WEB-01` conservées en tête du fichier
+(`apps/e2e/src/chapitres/web-cnx.spec.ts`). Douze fiches conformes ; une anomalie **majeure
+ouverte** (ANO-WEB-19 : aucune protection anti-force-brute sur la connexion) — décision et PR
+dédiées, hors recette ; une anomalie **mineure close** (ANO-WEB-20 : pas de message après avoir
+déconnecté un appareil) ; plusieurs écarts de cahier consignés.
+
+```
+apps/e2e/src/chapitres/web-cnx.spec.ts            13 fiches + ANO-WEB-01 ; aides : formulaire(), seConnecter(),
+                                                    erreurDeConnexion(), sessionsParApi(), ouvrirLaSecurite(),
+                                                    lignesAppareils()/ligneCetAppareil(), fenetreSessionExpiree(),
+                                                    actionServeurSansRechargement(), ouvrirFenetreSudo() (tolérante au cooldown)
+apps/e2e/src/fixtures/yamba.ts                     navigateurConnecte accepte { memoriser } → coche « Rester connecté » (implique parEcran)
+apps/user-ui/src/app/[locale]/dashboard/dashboard.copy.ts  securityPage.sessionRevoked (« Appareil déconnecté. »)   (ANO-WEB-20)
+apps/user-ui/src/components/dashboard/sections/Security.tsx  doRevoke pose le message                                (ANO-WEB-20)
+packages/libs/prisma/scripts/clear-sudo-locks.ts  NOUVEAU — purge les verrous OTP sudo d'un compte (rerun propre)
+context/YAMBA-RECETTE-WEB-RESULTATS.md            ANO-WEB-19, 20, chapitre 5.3, à trancher, pièges
+```
+
+## ANO-WEB-19 — la connexion par mot de passe n'a aucun verrou
+
+C'est la trouvaille du chapitre, et elle était déjà écrite dans le cahier de recette API. L'OTP a
+ses paliers de verrou (1 min → 30 min → 24 h) et un email d'alerte ; `loginUser`, lui, n'a rien.
+Le seul rempart est le limiteur de la passerelle (100 requêtes / 15 min par IP), déclaré
+`skipFailedRequests: true` : une tentative en échec n'est PAS comptée. Douze mauvais mots de passe
+d'affilée donnent douze 401 et jamais un 429. La fiche WEB-CNX-4 est jouée et marquée `test.fail` :
+le jour où le verrou existe, elle « passe » et Playwright le signale. Correctif proposé (PR
+dédiée) : la mécanique OTP réutilisée, compteur par `emailNormalized`, email d'alerte, refus
+indistinguable (même corps, même statut — ANO-API-08/18).
+
+## Ce que la mécanique sudo a imposé au harnais
+
+La porte de confirmation (D65) est un objet plus subtil qu'il n'y paraît, et trois de ses
+propriétés ont façonné le test :
+
+1. **Un changement de mot de passe FERME la fenêtre sudo** (`closeSudoWindow`), l'export ne la
+   ferme pas. L'ordre littéral du cahier (WEB-CNX-11 : « suite immédiate » de WEB-CNX-10, donc
+   export après un changement de mot de passe) redemanderait donc un code. C'est une bonne
+   sécurité, pas un bug. Le harnais ouvre UNE fenêtre dédiée et y enchaîne les gestes qui ne la
+   ferment pas (export, puis le rétablissement du mot de passe en dernier).
+2. **Six codes sudo par heure, un par minute** (anti-spam OTP). Une première version du test
+   sondait `/auth/me/sudo/request` toutes les trois secondes pour « attendre » le cooldown : elle
+   a grillé le quota (verrou d'une heure). La règle : demander UNE fois, attendre le cooldown
+   d'une minute, redemander UNE fois — et comme une fenêtre couvre plusieurs gestes, on n'en
+   ouvre qu'une.
+3. **La fenêtre est liée au `jti`** de la session (donc à l'appareil), pas au compte : `verifySudo`
+   pose `sudo:<userId>:<jti>`, `requireSudo` lit le même `jti`. WEB-CNX-12 le prouve avec deux
+   contextes.
+
+## Deux profils de session, lus sur le cookie
+
+Le cookie de rafraîchissement dit tout : session standard = cookie de **session** (`expires` = −1,
+le « 60 min » d'inactivité vit côté serveur) ; « Rester connecté » = cookie **persistant**,
+`expires` ≈ +30 jours — la vie ABSOLUE (D27/SES-02), pas l'inactivité de 7 jours. La première
+version du test attendait « ≈ 7 jours » sur le cookie : faux, c'est 30. La mention « connexion
+mémorisée » de la page Sécurité, elle, se lit sur la session (`rememberMe`), pas sur le cookie.
+
+## Ce que le harnais a appris
+
+- **Deux navigateurs, un compte.** A et B sont deux `BrowserContext` connectés à Aminata : c'est
+  la seule façon de prouver qu'une session tuée depuis A meurt dans B (WEB-CNX-8, 9). Le harnais
+  connecte toujours par l'écran (`parEcran`), jamais depuis la mémoire, puisque les fiches parlent
+  de la naissance et de la mort des sessions.
+- **Une action serveur sans rechargement**, c'est un lien de la barre latérale du tableau de bord
+  (navigation côté client ; la section qui arrive interroge l'API) — pas un `reload`, qui ne
+  prouverait pas « la page ne change pas ».
+- **Rendre le mot de passe quoi qu'il arrive.** WEB-CNX-10 change le mot de passe d'Aminata ; un
+  `finally` le rétablit, et si la fenêtre sudo a été fermée entre-temps, il en rouvre une. Un
+  échec de rétablissement lève une erreur explicite (« rejouer seed-deals.ts »).
+
+## Tests
+
+Aucun test unitaire ajouté (un libellé). `apps/e2e` : le chapitre 5.3 fait passer le harnais à
+**58 scénarios** (45 + WEB-CNX ×13). user-ui : typecheck vert.
+
+---
+
+# Chapitre 5.4 du cahier 01-WEB : mot de passe et adresse email — des comptes jetables
+
+*(PR `chore/recette-web-5-4`, 11/09/2026.)*
+
+## Ce qui a été fait
+
+Le quatrième chapitre « fiches » du cahier 01-WEB : `WEB-MDP` (mot de passe oublié, changement de
+mot de passe, changement d'adresse email). Six fiches, jouées en quatre scénarios
+(`apps/e2e/src/chapitres/web-mdp.spec.ts`), toutes conformes — **aucune anomalie**.
+
+```
+apps/e2e/src/chapitres/web-mdp.spec.ts   NOUVEAU — 6 fiches ; aides : creerCompteActive() (register + activation par
+                                           code), connecter(), ouvrirLaSecurite(), ouvrirFenetreSudo() (autonome, cooldown),
+                                           sessionVivante(), codeDe()
+context/YAMBA-RECETTE-WEB-RESULTATS.md   section chapitre 5.4 (aucune anomalie), pièges
+```
+
+## Le principe : des comptes qui ne survivent pas au test
+
+Ce chapitre change des mots de passe ET une adresse email **définitivement**. Le faire sur un
+compte du seed le laisserait cassé, et fausserait `seed-output.json`. Chaque scénario crée donc
+son propre compte neuf (`compteNeuf()` → `neuf-<horodatage>@recette.yamba.dev`) et l'active par le
+vrai parcours (registration + code email, `creerCompteActive`). Un compte par test, jeté ensuite ;
+la base de développement les garde sans conséquence (piège 22). Bénéfice de bord : sur une adresse
+neuve, tous les compteurs d'OTP (activation, réinitialisation, sudo, changement d'adresse) sont
+vierges — aucun verrou hérité d'un run précédent.
+
+## Ce que chaque flux impose
+
+- **Mot de passe oublié (WEB-MDP-1/2/3)** — trois écrans : `/password/forgot` (adresse →
+  `sessionStorage`, `/auth/password/forgot`), `/password/verify` (code, `/auth/password/verify`),
+  `/password/reset` (nouveau mot de passe, `/auth/password/reset`). La réponse ne révèle jamais si
+  le compte existe : une adresse inexistante fait avancer l'écran et n'envoie aucun email. Les
+  règles de force valent aussi ici (`abc` → « au moins 8 caractères »).
+- **Changer son mot de passe (WEB-MDP-4)** — derrière la porte sudo : le nouveau doit différer de
+  l'actuel (`PASSWORD_SAME_AS_CURRENT`, un refus qui NE ferme PAS la fenêtre), puis un mot de
+  passe valide déclenche l'email « Ton mot de passe Yamba a été modifié » et **ferme toutes les
+  autres sessions** (le second navigateur meurt, la courante reste).
+- **Changer son adresse (WEB-MDP-5/6)** — le code part **sur la nouvelle adresse** (jamais sur
+  l'ancienne) ; une adresse déjà prise est refusée avant tout envoi (`EMAIL_ALREADY_USED`) ; après
+  confirmation, l'adresse du compte change, l'**ancienne** reçoit une simple information « …a
+  changé » **sans code**, les autres sessions tombent, et la connexion se fait avec la nouvelle
+  adresse. `requestEmailChange` exige la fenêtre sudo mais ne la ferme pas ; `confirmEmailChange`
+  la ferme.
+
+## Un piège de mot de passe de test
+
+Le premier jet du nouveau mot de passe, `Yamba-Recette-…`, contenait le prénom « Recette » du
+compte neuf : refus `PASSWORD_CONTAINS_PERSONAL_INFO`. La règle de force compare le mot de passe au
+prénom, au nom et à l'adresse — un mot de passe d'essai se choisit à l'écart de ces valeurs
+(`Kola-Mangue-7x-Teal!`).
+
+## Tests
+
+Aucun test unitaire ajouté. `apps/e2e` : le chapitre 5.4 porte le harnais à **62 scénarios**
+(58 + WEB-MDP ×4). Harnais : typecheck vert.
+
+---
+
+# Chapitre 5.5 du cahier 01-WEB : profil, avatar et page publique — le drapeau qu'on n'affichait pas
+
+*(PR `chore/recette-web-5-5`, 11/09/2026.)*
+
+## Ce qui a été fait
+
+Le cinquième chapitre « fiches » du cahier 01-WEB : `WEB-PRO` (écran Profil, bornes des champs,
+avatar, page publique `/u/<slug>` et sa visibilité). Dix fiches ; huit jouées et conformes, deux
+`⏭` (avatar réel sur ImageKit, et « Afficher ma ville » que le seed ne peut pas alimenter). Une
+anomalie mineure trouvée et **corrigée** : `ANO-WEB-21`.
+
+```
+apps/e2e/src/chapitres/web-pro.spec.ts                       NOUVEAU — 10 fiches ; instantané/restauration du profil,
+                                                               garde-fou avatar (Buffer 2,05 Mo, aucune requête)
+apps/user-ui/src/lib/public-user.types.ts                    PublicUser.hidden ajouté (déjà présent dans la réponse API)  (ANO-WEB-21)
+apps/user-ui/src/components/users/profile/UserProfileView.tsx bannière « masquée » quand user.hidden                       (ANO-WEB-21)
+apps/user-ui/messages/{fr,en}/user-profile.json              clé hiddenBanner                                              (ANO-WEB-21)
+context/YAMBA-RECETTE-WEB-RESULTATS.md                       ANO-WEB-21, chapitre 5.5, à trancher, observations, pièges
+```
+
+## ANO-WEB-21 — un drapeau serveur que le front ignorait
+
+Quand un membre masque sa page publique, l'API `getUserPublic` répond 404 à tout le monde SAUF au
+propriétaire, à qui elle renvoie la page avec `hidden: true` (D67 1A). Le propriétaire voyait donc
+sa page — mais sans aucune mention qu'elle était masquée, parce que le front ne portait même pas ce
+drapeau : `hidden` était absent du type `PublicUser`, et rien ne le lisait. Encore une intention
+écrite côté serveur qu'aucun rendu n'honorait (le même motif que ANO-WEB-01 et 16). Correctif
+minimal : `hidden` déclaré au type (la valeur arrivait déjà), et une bannière en tête de
+`UserProfileView`.
+
+## Le garde-fou d'avatar, sans écriture externe
+
+WEB-PRO-5 et 6 téléversent sur ImageKit (service externe réel) : le harnais joue le seul geste qui
+n'écrit rien — le refus, côté navigateur, d'un fichier de plus de 2 Mo. `setInputFiles` avec un
+`Buffer` de 2,05 Mo et un type `image/png` déclenche `validateFile` (`useImageKitUpload`,
+`maxSizeBytes` = 2 Mo) AVANT tout appel réseau ; on écoute les requêtes vers `imagekit` / `upload`
+/ `/auth/me/avatar` et on vérifie qu'aucune n'est partie. Le téléversement réel et le retrait (dont
+la contre-épreuve « l'ancienne image répond introuvable ») restent `⏭`, joués à la main.
+
+## Deux écarts, une observation
+
+- **La page publique identifie par « Prénom N. »**, pas par le « nom affiché » du profil
+  (`CarrierPage.name`). Le cahier attendait le nom affiché « à jour » sur la page publique. À
+  trancher ; l'identité par prénom + initiale est cohérente avec la vie privée.
+- **Le réseau et les actions vivent dans l'`<aside>`**, pas dans `<main>` : une assertion scopée à
+  `main` sur « abonnés » ou « Signaler ce profil » échoue à tort.
+- **Le seed ne pose pas de ville** sur l'adresse des Voyageurs : WEB-PRO-10 se saute proprement
+  (lecture de la ville via `/auth/me`, `test.skip` si absente). À compléter dans `seed-deals.ts`.
+
+## Tests
+
+Aucun test unitaire ajouté (un champ de type, une bannière, une clé i18n). `apps/e2e` : le chapitre
+5.5 porte le harnais à **72 scénarios** (62 + WEB-PRO ×10, dont 2 `⏭`). user-ui : typecheck vert,
+miroir i18n FR/EN respecté.
+
+---
+
+# Chapitre 5.6 du cahier 01-WEB : devenir Voyageur — onboarding, et les limites de Stripe Express
+
+*(PR `chore/recette-web-5-6`, 11/09/2026.)*
+
+## Ce qui a été fait
+
+Le sixième chapitre « fiches » du cahier 01-WEB : `WEB-VOY` (onboarding Voyageur en deux étapes,
+et ce qu'il conditionne). Sept fiches ; quatre jouées et conformes (`web-voy.spec.ts`), trois `⏭`
+motivées (complétion Stripe Express, refus d'accept, tableau de bord Stripe). Aucune anomalie.
+
+```
+apps/e2e/src/chapitres/web-voy.spec.ts   NOUVEAU — 4 fiches jouées + 3 ⏭ ; compte neuf créé+activé, profil via API,
+                                           trajet PER_KG publiable, redirection réelle vers connect.stripe.com
+context/YAMBA-RECETTE-WEB-RESULTATS.md   chapitre 5.6, automatisation Stripe (couvert / non couvert), pièges
+```
+
+## Ce que l'onboarding conditionne (et ce qu'il ne conditionne pas)
+
+Le résultat marquant du chapitre : **publier un trajet n'exige pas Stripe**. Un compte neuf qui a
+franchi la seule étape « Profil » (`POST /carrier/onboarding/profile` → `onboardingStep=STRIPE`)
+publie un trajet (`POST /trips` avec `publish:true` → `PUBLISHED`). Le verrou D31 (profil + Stripe
+prêts) est au moment d'**accepter** une demande, pas de publier — `createTrip` lit le `carrierPage`
+mais ne le gate pas. La vieille doc `RG-01` disait l'inverse ; le code fait foi.
+
+## La partie Stripe : jusqu'où on peut aller
+
+La clé du poste est `sk_test_` et le produit crée de **vrais** comptes Connect **Express** de test.
+Le harnais vérifie tout le côté Yamba : le clic « Connecter avec Stripe » crée le compte Express
+et son lien, redirige vers `connect.stripe.com`, et aucun IBAN n'est demandé dans un formulaire
+Yamba (WEB-VOY-4).
+
+Ce qu'on ne peut **pas** automatiser proprement : la complétion de l'onboarding Express. Deux
+tentatives ont tranché la question :
+1. **Par l'API** — impossible : pour un compte Express (`controller[requirement_collection]=stripe`),
+   la plateforme ne peut ni accepter les CGU ni soumettre les justificatifs
+   (« You cannot accept the Terms of Service on behalf of Express accounts », erreur vérifiée en
+   isolant un `accounts.update`). Stripe réserve cela à son flux hébergé.
+2. **Par le flux hébergé** — un pilotage heuristique de `connect.stripe.com` a été écrit et
+   essayé : il est lent (~7 min/exécution, vraie API Stripe) et se bloque à l'étape téléphone
+   (raccourci « numéro de test » puis « Envoyer » qui ne fait pas avancer de façon stable). Ces
+   pages changent souvent : les inclure rendrait la recette lente et fragile.
+
+**Décision d'ingénierie** : ne pas mettre le flux hébergé Stripe dans la suite. VOY-4 prouve le
+contrat Yamba ; VOY-5 (complétion → « Voyageur actif » + email) et la branche « tableau de bord »
+de VOY-7 sont documentées comme **manuelles en mode test**, avec la procédure exacte dans le
+rapport.
+
+## VOY-6 : un verrou déjà couvert au bon endroit
+
+Refuser l'acceptation d'un deal par un Voyageur non finalisé (D31) exige une demande de réservation
+en attente — le parcours de réservation du chapitre 5.12. Plutôt que de le reconstruire ici, on
+constate que la règle est **testée unitairement** : `deal-lifecycle.service.ts` répond
+`CARRIER_ONBOARDING_REQUIRED` (profil incomplet OU Stripe non prêt), couvert par
+`deal-lifecycle.service.spec.ts`. La fiche est `⏭`, à rejouer de bout en bout avec 5.12.
+
+## Tests
+
+Aucun test unitaire ajouté. `apps/e2e` : le chapitre 5.6 porte le harnais à **76 scénarios**
+(72 + WEB-VOY ×4, dont 3 `⏭`). Harnais : typecheck vert.
+
+
+---
+
+# Chapitre 5.7 du cahier 01-WEB : publier un trajet et son cycle de vie — le wizard éprouvé en édition, et un mapper inverse qui ne relisait que sa propre écriture
+
+*(PR `chore/recette-web-5-7` (#272), 11/09/2026.)*
+
+## Ce qui a été fait
+
+Le septième chapitre « fiches » du cahier 01-WEB : `WEB-TRJ` (assistant de création en trois
+étapes, gardes de publication, six statuts, actions permises, D72, masquage administratif).
+Vingt et une fiches ; vingt jouées et conformes, une `⏭` (l'étape 1 passe par Google Places).
+Une anomalie mineure trouvée et corrigée (`ANO-WEB-22`), une mineure ouverte (`ANO-WEB-23`).
+
+```
+apps/e2e/src/chapitres/web-trj.spec.ts                        NOUVEAU — 14 scénarios (13 joués + 1 ⏭), 1 min 36
+apps/e2e/src/pages/mes-trajets.ts                             ligne visée par l'id du trajet ; menu « … » rouvert si la liste s'est re-rendue
+apps/user-ui/src/components/trips/create/create-trip.reverse-mapper.ts   ANO-WEB-22 — dates dérivées de departureAt / arrivalAt
+context/YAMBA-RECETTE-WEB-RESULTATS.md                        chapitre 5.7, ANO-WEB-22, ANO-WEB-23, écarts à trancher, pièges
+```
+
+## Le choix de méthode : exercer, pas re-prouver
+
+La machine à états du trajet est déjà couverte par un test unitaire de cinq cents lignes
+(`apps/trip-service/src/services/trip-state-machine.spec.ts`). Rejouer ses tables de vérité au
+navigateur n'apporterait rien ; ce que la recette doit prouver, c'est que **le système entier**
+respecte la machine : le contrôleur applique la transition, l'outbox part, la recherche publique
+voit ou ne voit plus le trajet, l'écran lit `allowedActions` et ne décide rien. D'où la forme du
+chapitre : des brouillons créés par l'API (`POST /trips` avec `publish:false`), les gestes tentés
+(`/publish`, `/pause`, `/resume`, `/cancel`, `/restore`, `/archive`, `PUT`), les statuts et les
+codes lus, la visibilité vérifiée par `GET /trips/search?from&to`.
+
+Pour l'assistant lui-même, le verrou était l'étape 1 : l'itinéraire passe par l'autocomplétion
+Google Places, hors périmètre du harnais (décision prise en 5.2, tenue en 5.6). L'astuce du
+chapitre : **ouvrir le wizard en édition** (`/fr/trips/create?edit=<id>`) sur un brouillon créé
+par l'API. Les villes sont rendues depuis le trajet, l'étape 1 est valide, « Continuer » ouvre
+l'étape « Conditions » — et tout ce que le cahier demande aux étapes 2 et 3 (prix, curseurs,
+gain, familles, forfaits, lieux, aperçu) se vérifie sur l'interface réelle. Trois brouillons
+suffisent : le complet (11,50 €/kg, 23 kg, une famille surchargée, une refusée), un à 5 kg (les
+forfaits grisés), un à 23 kg avec un forfait soute (l'équivalent au kilo). Un brouillon `TRAIN`
+prouve que la carte « À la gare » existe.
+
+## ANO-WEB-22 : le mapper inverse ne savait relire que ce que le mapper avait écrit
+
+Première ouverture du wizard en édition sur un brouillon de l'API : « 4 champs à compléter »,
+« Date requise » ×2, « Heure requise » ×2. Les dates sont pourtant en base. La cause tient en
+quatre lignes de `create-trip.reverse-mapper.ts` :
+
+```ts
+departureDate: toDate(trip.departureDateLocal),
+arrivalDate: toDate(trip.arrivalDateLocal),
+departureTime: trip.departureTimeLocal ?? "",
+arrivalTime: trip.arrivalTimeLocal ?? "",
+```
+
+`departureDateLocal` et `departureTimeLocal` sont des chaînes (« 2026-10-01 », « 14:00 ») que le
+mapper d'écriture du wizard ajoute à côté de l'instant `departureAt` — pour ré-afficher
+exactement ce qui a été tapé. Le mapper inverse ne lisait **que** ces chaînes : un trajet venu
+d'un autre canal (l'API, le seed, un futur client mobile) n'en a pas, et son édition s'ouvrait
+avec les dates vides. Enregistrer aurait renvoyé `departureAt: null`.
+
+Le correctif est un repli, pas un remplacement — les chaînes locales gardent la priorité :
+
+```ts
+function localDateTimeParts(iso, timeZone): { date?: Date; time: string } {
+  const instant = iso instanceof Date ? iso : new Date(iso);
+  const options: Intl.DateTimeFormatOptions = { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false };
+  let parts: Intl.DateTimeFormatPart[];
+  try {
+    parts = new Intl.DateTimeFormat("en-CA", { ...options, timeZone: timeZone ?? undefined }).formatToParts(instant);
+  } catch {
+    parts = new Intl.DateTimeFormat("en-CA", options).formatToParts(instant); // fuseau inconnu → navigateur
+  }
+  const get = (type) => parts.find((p) => p.type === type)?.value ?? "";
+  const hour = get("hour") === "24" ? "00" : get("hour");
+  return { date: toDate(`${get("year")}-${get("month")}-${get("day")}`), time: `${hour}:${get("minute")}` };
+}
+// …
+departureDate: toDate(trip.departureDateLocal) ?? departureFallback.date,
+departureTime: trip.departureTimeLocal || departureFallback.time,
+```
+
+Trois détails qui comptent : `formatToParts` (pas `toLocaleString` + découpage de chaîne) donne
+chaque composant sans dépendre du format d'une locale ; le fuseau vient du lieu
+(`originTimezone`) quand il est connu et sinon du **navigateur** — c'est le fuseau que le mapper
+d'écriture utilise, donc la même convention dans les deux sens ; un fuseau que le moteur ne
+connaît pas (`RangeError`) retombe sur le navigateur au lieu de casser l'écran. `hour12:false`
+peut rendre « 24 » à minuit selon les moteurs : normalisé en « 00 ».
+
+Aucun test unitaire n'est ajouté (user-ui n'a pas de jest) ; la contre-épreuve est la fiche
+WEB-TRJ-3…9 elle-même, qui ouvre un brouillon de l'API et exige l'absence de « Date requise ».
+
+## ANO-WEB-23 : le fuseau du navigateur n'est pas celui du lieu
+
+En lisant le mapper d'écriture pour ANO-WEB-22, une seconde chose apparaît : le wizard n'envoie
+**aucun** fuseau. `toDateTimeIso(date, "14:00")` fait `setHours(14)` sur une `Date` du navigateur
+et sérialise en ISO : « 14:00 » est 14 h dans le fuseau du poste du Voyageur, pas à Bruxelles ni
+à Kinshasa. Les chaînes locales sauvent l'affichage (tout le monde voit « 14:00 »), mais
+l'instant absolu — celui que lisent les crons d'expiration et de complétion et la garde « départ
+passé » — est décalé dès que le lieu et le navigateur ne partagent pas le fuseau. Côté serveur,
+`computeDenormalizedFields` retombe sur `Europe/Paris` faute d'`originTimezone`. La fiche
+WEB-TRJ-2 est `⏭` (Google), l'anomalie est consignée ouverte avec une proposition : dériver le
+fuseau des coordonnées **côté serveur** (`originLat/Lng` existent déjà ; une table hors-ligne,
+aucun appel réseau), calculer `departureAt` dans ce fuseau, remplir `originTimezone` /
+`destinationTimezone` que les mappers d'affichage consomment déjà. Décision produit, PR dédiée.
+
+## Le harnais : trois pièges de rendu
+
+1. **`innerText` rend le texte après CSS** : « Aperçu public » est `uppercase` → « APERÇU
+   PUBLIC ». Les comparaisons sur `innerText` sont insensibles à la casse ; `getByText` lit le DOM.
+2. **Une infobulle qui se ferme au défilement** (`window.addEventListener("scroll", close, true)`)
+   contre un `click()` qui fait défiler avant de cliquer : `scrollIntoViewIfNeeded()` d'abord,
+   puis `expect.poll` qui re-clique tant que `aria-expanded` n'est pas `true`, et le contenu lu par
+   l'`id` que donne `aria-controls` (un `useId` React contient des « : », d'où `[id="…"]`).
+3. **Un menu qui se ferme parce que la liste se re-rend** (TanStack Query rafraîchit « Mes
+   trajets » après les mutations des fiches précédentes — le scénario passait seul, échouait dans
+   la suite) : la page-objet réessaie l'ouverture jusqu'à voir « Annuler ». Et comme Thomas a
+   trois trajets Paris → Brazzaville, la ligne se vise par l'`href` du lien (`…/dashboard/trips/<id>`).
+
+## Tests
+
+Plateforme inchangée (993 + auth 229). `apps/e2e` : le chapitre 5.7 porte le harnais à
+**88 scénarios** listés par `playwright --list` (74 avant, + WEB-TRJ ×14 dont 1 `⏭`).
+Typecheck user-ui (`tsc -p apps/user-ui/tsconfig.json`) et harnais verts.
+
+
+---
+
+# Chapitre 5.8 du cahier 01-WEB : justificatifs et billet vérifié — deux refus muets, et un `.env` de projet qui parlait à Gmail
+
+*(PR `chore/recette-web-5-8` (#273), 11/09/2026.)*
+
+## Ce qui a été fait
+
+Le huitième chapitre « fiches » du cahier 01-WEB : `WEB-DOC` (dépôt de justificatifs sur un
+trajet, cycle de vérification du billet, emails du back-office, badge public). Six fiches, six
+jouées et conformes — deux après correction (`ANO-WEB-25`, `ANO-WEB-26`), une anomalie ouverte
+(`ANO-WEB-24`, décision produit), et un piège de poste sérieux consigné au rapport.
+
+```
+apps/e2e/src/chapitres/web-doc.spec.ts                          NOUVEAU — 6 scénarios, ImageKit intercepté, admin SUPPORT par l'API, Mailpit
+apps/user-ui/src/components/trips/create/TripDocumentsManager.tsx  ANO-WEB-26 (plus de reset() après l'envoi) + ANO-WEB-25 (limite dite)
+apps/user-ui/src/components/trips/create/DocumentUpload.tsx        idem, prop `limitHint`
+apps/user-ui/src/components/trips/create/steps/StepTrip.tsx        passe `copy.docLimitReached(5)`
+apps/user-ui/src/components/trips/create/create-trip.copy.ts       clé `docLimitReached` (FR/EN) ; `create-trip.types.ts` la déclare
+apps/trip-service/src/controllers/admin-trips.controller.ts        l'échec d'un email de billet / masquage est journalisé, plus avalé
+context/YAMBA-RECETTE-WEB-RESULTATS.md                           chapitre 5.8, ANO-WEB-24/25/26, piège `.env` de projet
+```
+
+## Le dépôt sans écrire chez le tiers
+
+Le front téléverse chez ImageKit (XHR vers `upload.imagekit.io/api/v1/files/upload`, jeton signé
+par `GET /uploads/imagekit-auth`), puis envoie au trip-service les références rendues
+(`POST /trips/:id/documents` : `type`, `fileId`, `url`, nom, type MIME, taille). Le harnais pose
+`intercepterImageKit(page)` — la même interception que pour les photos de colis — et le reste de
+la chaîne est réel : le hook refuse un mauvais type ou plus de 5 Mo **avant tout réseau**, le
+serveur borne à 5 documents (`documents.maxDocsPerTrip`, D62) et 5 Mo (`documents.maxDocSizeMb`),
+et fait passer `ticketVerificationStatus` de `NOT_SUBMITTED` / `REJECTED` à `PENDING` dès qu'un
+`TICKET_PROOF` arrive. Un PDF minimal (en-tête, `xref`, `%%EOF`) suffit ; pour la borne de
+taille, `Buffer.concat([pdf, Buffer.alloc(5 Mo + 1 − pdf.length)])`.
+
+## ANO-WEB-26 : le refus existait, il n'était jamais affiché
+
+`useImageKitUpload.validateFile` pose bien `{ code: "TOO_LARGE", message: "Le fichier dépasse
+5 Mo." }`. Mais les deux composants de dépôt faisaient :
+
+```ts
+for (const file of filesToUpload) { const uploaded = await upload(file); … }
+reset();                       // ← setError(null) : l'erreur posée par `upload` disparaît ici
+if (inputRef.current) inputRef.current.value = "";
+```
+
+`reset()` du hook remet progression, `isUploading` **et l'erreur** à zéro. L'erreur de validation
+était donc effacée dans le même tour que sa pose : l'utilisateur choisissait un fichier trop
+lourd et rien ne se passait. Le correctif retire l'appel : le hook remet déjà l'erreur à `null` au
+**début** de chaque `upload` et `isUploading` à faux dans son `finally`, il n'y a rien à
+réinitialiser après coup. Même correction aux deux endroits (détail du trajet, wizard étape 1).
+
+## ANO-WEB-25 : une limite qui se dit
+
+À cinq documents, `canAddMore` passait à faux et la zone de dépôt disparaissait sans un mot. Un
+paragraphe la remplace : `TripDocumentsManager` a la locale (`isFr`) et rend la phrase
+directement ; `DocumentUpload` n'en a pas et reçoit une prop `limitHint`, alimentée par
+`copy.docLimitReached(5)` depuis `StepTrip`. Le type `CreateTripCopy` déclare la clé — TypeScript
+strict refuse une clé de copy non déclarée (`TS2353`), c'est voulu : le copy FR/EN reste
+exhaustif par construction.
+
+## Le piège : `apps/trip-service/.env`
+
+DOC-4 et DOC-5 attendaient un email dans Mailpit et n'en recevaient aucun — alors que la revue
+répondait 200 et que le statut changeait. Rien dans les journaux : `emailCarrier` faisait
+`sendTransactionalEmail(...).catch(() => undefined)`. Par élimination : la bibliothèque envoie
+bien en processus isolé (sonde `tsx --env-file=.env`), le fournisseur est « configuré » et
+l'utilisateur trouvé (sondes temporaires)… puis `ps eww` sur le processus trip-service :
+`SMTP_HOST=smtp.gmail…`, `SMTP_USER=…`. Un `apps/trip-service/.env` du 13 mai — gitignoré,
+oublié — portait un SMTP Gmail réel et des clés ImageKit. Nx fusionne l'env racine et celui du
+projet ; trip-service, et lui seul, envoyait ses emails par Gmail pendant que les autres services
+parlaient à Mailpit. C'est exactement le piège consigné dans CLAUDE.md pour ImageKit (upload OK
+depuis trip-service, suppression KO depuis auth-service), rejoué avec l'email.
+
+Deux remèdes : le fichier est **déplacé hors du dépôt** (`~/.yamba-leftovers/`), et le `catch`
+journalise (`console.error("[admin-trips] email « … » non envoyé à … :", message)`) — un
+best-effort se lit, il ne se tait pas. Subtilité de poste : après le déplacement, `kill` du
+service ne suffit pas, le processus parent `nx run-many` avait lu l'env du projet au démarrage et
+le réinjectait à chaque redémarrage ; il faut relancer `nx run-many` (ou `nx serve` du service).
+
+## Le back-office par l'API
+
+`POST /admin/tickets/:documentId/review` (permission `tickets.review` : SUPPORT, MEDIATOR) prend
+`{ decision: "VERIFY" | "REJECT", reason? }` — un rejet sans motif est refusé par le schéma Zod
+(`ReviewTicketRequestSchema.refine`), les motifs sont fermés (`ILLEGIBLE`, `DATES_MISMATCH`,
+`NAME_MISMATCH`, `SUSPICIOUS`) et traduits en clair dans l'email (`TICKET_REJECTION_LABELS`,
+FR/EN, langue du DESTINATAIRE). La transaction met à jour le document (`updateMany … status:
+PENDING` = verrou optimiste, `TICKET_ALREADY_REVIEWED` sinon), le trajet, et écrit le journal
+d'audit (`recordAdminAction`, D54) ; l'email part après. `ADMIN_IS_OWNER` interdit d'examiner son
+propre billet.
+
+## Tests
+
+Plateforme inchangée (993 + auth 229 ; `admin-trips.controller.spec` 6/6). `apps/e2e` : **94
+scénarios** (`playwright --list` ; 88 + WEB-DOC ×6). Typecheck user-ui, trip-service et harnais
+verts.
+
+
+---
+
+# Chapitre 5.9 du cahier 01-WEB : recherche, filtres, tri, état vide — la page qui tombait pour un avatar, et l'index unique qui n'était pas épars
+
+*(PR `chore/recette-web-5-9` (#274), 11/09/2026.)*
+
+## Ce qui a été fait
+
+Le neuvième chapitre « fiches » du cahier 01-WEB : `WEB-RCH` (l'écran `/search`, les cartes et
+leurs prix, le poids du colis, les tris, les familles, les filtres de confiance, les états vide
+et d'erreur, la page publique, le compteur de vues, un trajet disparu, un compte suspendu).
+Quinze fiches, quinze jouées et conformes — trois après correction d'une anomalie **bloquante**
+(`ANO-WEB-27`) — et une seconde anomalie bloquante trouvée en posant la contre-épreuve
+(`ANO-WEB-28`, ouverte, `test.fail`). Le rapport porte, pour la première fois, une section
+« regard d'expert » par fiche (consigne du 11/09).
+
+```
+apps/e2e/src/chapitres/web-rch.spec.ts   NOUVEAU — 16 scénarios (15 fiches + ANO-WEB-27 ; ANO-WEB-28 en test.fail), 2 min 06
+apps/user-ui/next.config.js              ANO-WEB-27 — images.remotePatterns : ik.imagekit.io, lh3.googleusercontent.com
+context/YAMBA-RECETTE-WEB-RESULTATS.md   chapitre 5.9, ANO-WEB-27/28, à trancher, regard d'expert, pièges
+```
+
+## Viser une recherche sans piloter Google
+
+La barre de recherche interroge Google Places pour les villes. Le chapitre 5.1 l'avait pilotée
+(frappe touche par touche, origine `localhost` pour le référent) ; ici il y a douze recherches
+différentes, et chaque frappe Google est lente et fragile. L'observation qui change tout : ce que
+`/search` lit en arrivant, c'est le **brouillon persistant** de la barre —
+`usePersistedFormState("trip-search")`, en `sessionStorage`, clé `yamba:form:trip-search`,
+enveloppe `{ version: 2, data: { from, to, dateValue } }`, les dates sérialisées avec un
+marqueur (`{ __yamba_date__: iso }`, rétablies en `Date` par un `reviver`). Le harnais pose ce
+brouillon par `page.addInitScript` **avant** la navigation :
+
+```ts
+await page.addInitScript(({ cle, valeur }) => { window.sessionStorage.setItem(cle, valeur); },
+  { cle: "yamba:form:trip-search", valeur: JSON.stringify({ version: 2, data }) });
+await page.goto("/fr/search");
+```
+
+et l'écran cherche exactement ce qu'il aurait cherché après une saisie. Douze recherches en
+deux minutes, sans une requête Google. Même principe pour le poids (`localStorage`,
+`yamba.search.weightKg`).
+
+Seconde règle : **rien n'est codé en dur**. L'ordre des cartes est comparé à l'ordre que rend
+`GET /trips/search?sort=…`, les comptes des puces à `GET /trips/search/facets`, le prix pour
+3 kg au `totalForWeight` de l'API (38,64) — la carte n'en montre que l'arrondi (« ≈ 39 € »).
+
+## ANO-WEB-27 : un composant qui jette tue la page
+
+Trois fiches échouaient sur trois symptômes différents (onglet introuvable, zéro carte après
+« Tout effacer », zéro carte après « Réessayer »). Le point commun n'était pas dans les
+sélecteurs mais dans la **console** : « Invalid src prop (https://ik.imagekit.io/…) on
+`next/image`, hostname "ik.imagekit.io" is not configured under images ». `next/image` refuse
+tout hôte distant absent de `images.remotePatterns` — et il refuse en **jetant**, donc la page
+entière bascule sur l'error boundary (`app/[locale]/error.tsx`, « Cette page n'a pas pu
+s'afficher »). Il suffisait qu'un Voyageur listé ait un avatar ; le seed n'en a aucun, le poste
+en avait un.
+
+Correctif : la section `images` de `next.config.js` (ImageKit + `lh3.googleusercontent.com`,
+l'hôte des avatars Google, `payload.picture`). La config n'est pas rechargée à chaud : redémarrer
+le front. Contre-épreuve durable : un scénario pose un avatar ImageKit **en base** sur Thomas
+(référence seule, aucun téléversement — `jeuEssai.manoeuvre`), ouvre la recherche et la page
+publique, exige l'absence de la page d'incident et d'erreur `next/image`, et retire l'avatar dans
+un `finally`.
+
+## ANO-WEB-28 : trouvée en posant la contre-épreuve
+
+La manœuvre `image.create({ userId })` a répondu `P2002 … Image_carrierPageId_key`. Le modèle
+`Image` sert deux relations 1-1 (`userId? @unique` pour l'avatar d'un membre, `carrierPageId?
+@unique` pour celui d'une page Voyageur) : sur MongoDB, Prisma crée pour `@unique` un index
+unique **non épars** (`listIndexes` : `unique: true`, aucun `sparse`), donc deux documents à
+`carrierPageId: null` — deux avatars de membres — sont interdits. Vérifié par l'API réelle :
+`POST /auth/me/avatar` pour Joséphine, pendant qu'un autre compte a un avatar → **500**. Un seul
+membre de la plateforme peut avoir un avatar ; c'est le piège « nullable unique fields collide on
+null » de CLAUDE.md, jamais payé ici parce que 5.5 n'avait pas joué le téléversement réel.
+
+Prisma ne sait pas déclarer un index épars ou partiel sur Mongo. La voie propre est de scinder
+`Image` en deux modèles 1-1 dont la clé est **requise** (`UserAvatar`, `CarrierAvatar`) — une
+migration d'un document, deux écrivains et les lecteurs à ajuster : candidat au registre, PR
+dédiée. La fiche est en `test.fail` (elle attend 200) ; la contre-épreuve d'ANO-WEB-27 contourne
+le piège en posant `carrierPageId` sur l'image de test.
+
+## Le harnais : ce qui a coûté
+
+- **Deux arbres** : chaque carte, chaque panneau de filtres existe deux fois (mobile masqué par
+  CSS, desktop). `first()` tombe sur la copie `hidden` → `.filter({ visible: true })` partout.
+- **Le tri par défaut** : cliquer « Départ le plus tôt » en premier ne déclenche rien.
+- **Lire `pageerror` avant de corriger des sélecteurs** quand plusieurs fiches tombent sur une
+  même page : un `test.only` de dix lignes qui imprime la console a donné la cause en quinze
+  secondes.
+
+## Tests
+
+Plateforme inchangée (993 + auth 229). `apps/e2e` : **110 scénarios** (`playwright --list` ;
+94 + WEB-RCH ×16, dont 1 `test.fail`). Typecheck harnais vert ; `next.config.js` est du
+JavaScript (aucun typecheck), le front redémarré le sert.
+
+
+---
+
+# Chapitre 5.10 du cahier 01-WEB : alertes de route — l'effet d'une alerte prouvé par l'email, et le toast qu'un composant démonté ne peut plus afficher
+
+*(PR `chore/recette-web-5-10` (#275), 11/09/2026.)*
+
+## Ce qui a été fait
+
+Le dixième chapitre « fiches » du cahier 01-WEB : `WEB-ALR` (création, gestion et EFFET des
+alertes de route). Neuf fiches, neuf jouées et conformes, une après correction (`ANO-WEB-29`).
+
+```
+apps/e2e/src/chapitres/web-alr.spec.ts                 NOUVEAU — 9 scénarios en série, 1 min 45
+apps/e2e/src/pages/recherche.ts                        NOUVEAU — « poser la recherche » (brouillon sessionStorage), partagé 5.9 / 5.10
+apps/e2e/src/chapitres/web-rch.spec.ts                 importe la page-objet au lieu de ses aides locales
+apps/user-ui/src/hooks/useSavedRouteMutations.ts       ANO-WEB-29 — `useDeleteSavedRoute({ onSuccess, onError })` : retours au niveau du hook
+apps/user-ui/src/components/saved-routes/SavedRouteCard.tsx   les toasts de suppression passent par le hook
+context/YAMBA-RECETTE-WEB-RESULTATS.md                 chapitre 5.10, ANO-WEB-29, à trancher, regard d'expert
+```
+
+## Prouver l'EFFET, pas seulement l'écran
+
+Une alerte de route n'a de valeur que par l'email qu'elle déclenche. Le chapitre est donc bâti
+autour de Mailpit : Aminata porte les alertes, Joséphine publie les trajets (par l'API du
+trip-service, `publish: true`, coordonnées comprises), et chaque fiche dit ce que la boîte doit
+contenir — ou ne pas contenir (`mailpit.aucunEmailPour(adresse, 10 s)` après un `vider()`).
+
+Trois règles du serveur sont ainsi éprouvées telles qu'elles sont codées :
+
+- **l'exclusion du Voyageur** — `baseWhere.userId = { not: trip.userId }` dans
+  `dispatchTripPublishedNotifications` : Joséphine porte la même alerte que Aminata et ne reçoit
+  rien ;
+- **l'anti-spam de 24 h** — `lastNotifiedAt` filtré en JS (`NOTIFICATION_COOLDOWN_HOURS = 24`) :
+  un second trajet dans la foulée ne produit aucun email ;
+- **l'appariement à trois niveaux** (`saved-route-matching.helper.ts`) — placeId exact (100),
+  ville + pays exacts (100), pays + haversine < 50 km (70, seulement si `includeNearby`) : Orly
+  (≈ 15 km de Paris) ne déclenche rien sans l'option et déclenche avec ; Lille (≈ 204 km) jamais.
+  Subtilité : le niveau 3 exige des coordonnées valides des DEUX côtés (alerte ET trajet), donc
+  les corps d'API portent `originLat/Lng` et `destinationLat/Lng` — le seed n'en a pas.
+
+Pour que l'anti-spam d'Aminata ne masque pas le troisième cas, Lille est testée sur une alerte
+NEUVE (Pauline) : isoler la règle qu'on veut prouver de celle qui pourrait la cacher.
+
+## Le formulaire sans Google
+
+`CreateSavedRouteModal` choisit ses villes par `CityAutocomplete` (Google Places). Le harnais
+éprouve le panneau (titres, quatre périodes dont « Personnalisé » qui révèle deux dates, deux
+bascules `role="switch"` cochées avec leurs aides), le refus sans ville (le bouton « Créer
+l'alerte » est `disabled` : aucune requête, même en forçant le clic), puis ferme le panneau et
+crée l'alerte par `POST /saved-routes` avec exactement le corps que le formulaire enverrait
+(`corpsAlerte()` : villes, pays ISO, coordonnées, `latestDate` = J+90 pour « 3 mois »,
+`emailEnabled`, `includeNearby`). La carte, ses badges et le compteur sont ensuite lus à l'écran.
+
+## ANO-WEB-29 : un callback qui meurt avec son composant
+
+« Supprimer » puis « Confirmer » retirait la carte et décrémentait le compteur, mais le toast
+« Alerte supprimée » ne venait jamais (deux exécutions). La cause est dans TanStack Query :
+
+```ts
+// SavedRouteCard — AVANT
+deleteSavedRoute(savedRoute.id, { onSuccess: () => toast.success(t("deleteSuccess")) });
+// useDeleteSavedRoute — la suppression est OPTIMISTE
+onMutate: (id) => queryClient.setQueryData(["saved-routes", …], previous.filter((r) => r.id !== id)),
+```
+
+`onMutate` retire la carte de la liste avant la réponse → `SavedRouteCard` est démonté → son
+observateur de mutation est détaché → les callbacks passés à `mutate(...)` (portés par
+l'observateur) ne sont jamais appelés. Les callbacks déclarés dans `useMutation({ onSuccess })`,
+eux, sont portés par la mutation et survivent au démontage. Correctif : le hook accepte ses
+retours (`useDeleteSavedRoute({ onSuccess, onError })`) et les appelle depuis ses options ; la
+carte lui passe ses toasts et appelle `deleteSavedRoute(id)` nu. « Prolonger » et « Email
+activé » ne démontent pas la carte : leurs callbacks `mutate` restent valables.
+
+## Tests
+
+Plateforme inchangée (993 + auth 229). `apps/e2e` : **119 scénarios** (`playwright --list` ;
+110 + WEB-ALR ×9). Typecheck user-ui et harnais verts.
+
+
+---
+
+# Chapitre 5.11 du cahier 01-WEB : favoris et Voyageurs suivis — une date que le client ne pouvait pas lire, un masquage que le favori ignorait, et le même toast perdu qu'en 5.10
+
+*(PR `chore/recette-web-5-11` (#276), 11/09/2026.)*
+
+## Ce qui a été fait
+
+Le onzième chapitre « fiches » du cahier 01-WEB : `WEB-FAV` (le cœur, « Mes favoris », le suivi
+d'un Voyageur et ses notifications). Douze fiches, douze jouées et conformes, trois après
+correction (`ANO-WEB-30`, `31`, `32`).
+
+```
+apps/e2e/src/chapitres/web-fav.spec.ts                  NOUVEAU — 12 scénarios en série, 1 min 50
+apps/e2e/src/chapitres/web-rch.spec.ts                  le cœur se vise DANS le lien de la carte
+packages/libs/api-contracts/src/trip/trip-search.schema.ts   ANO-WEB-30 — `departureAt` (ISO) sur la carte de recherche
+apps/*/openapi.json (×5)                                régénérés (registre de schémas partagé)
+apps/trip-service/src/lib/trip-mappers.ts               renseigne `departureAt`
+apps/user-ui/src/components/search/search-results.types.ts   le type front
+apps/user-ui/src/components/favorites/FavoriteTripsList.tsx  badge « Trajet passé »
+apps/user-ui/src/hooks/useFollowMutations.ts            ANO-WEB-31 — `useUnfollowUser({ onSuccess, onError })`
+apps/user-ui/src/components/following/FollowedTripperCard.tsx   toasts via le hook
+apps/trip-service/src/services/trip-favorite.service.ts ANO-WEB-32 — un trajet masqué par Yamba ne se met pas en favori
+apps/trip-service/src/services/trip-favorite.service.spec.ts   +1 test (261)
+```
+
+## Le geste repris après connexion, prouvé de bout en bout
+
+La porte d'identité du cœur (`AuthGateModal`, A63) monte un `LoginForm` dans la fenêtre et, à la
+connexion, rappelle `onSignedInAction` — le bouton qui l'a ouverte rejoue `toggle.mutate({ tripId,
+next: true })`. Le harnais le prouve sans rien supposer : un visiteur clique le cœur, remplit le
+formulaire DE LA FENÊTRE (`form:has(#email)` visible — la page en monte d'autres, masqués), et
+attend le `POST /trips/:id/favorite` qui part après la connexion ; l'URL reste `/fr/search`, le
+cœur est `aria-pressed`, et `GET /trips/favorites` contient le trajet.
+
+C'est là qu'un sélecteur a menti : le favori enregistré était `bzv-upcoming`, pas `bzv-perkg`.
+Le cœur est rendu DANS le `<Link>` de la carte ; `carte.locator("xpath=..")` remontait au
+conteneur de la liste et `.first()` prenait le premier cœur venu. `carte.getByRole("button")`
+suffit — et la fiche 5.9 qui portait le même sélecteur (présence seulement) est corrigée avec.
+
+## ANO-WEB-30 : une date formatée n'est pas une date
+
+« Trajet passé » avait sa clé i18n et pas de rendu. La carte de recherche (`YambaTripResult`)
+n'expose que `travelDate` (« 12 juin 2026 » / « June 12, 2026 ») : un client ne peut pas la
+comparer à « maintenant » sans réinterpréter la chaîne selon la locale — l'erreur classique. Le
+contrat gagne `departureAt` (ISO 8601, optionnel), le mapper le renseigne
+(`new Date(trip.departureAt).toISOString()`), et `FavoriteTripsList` rend le badge quand
+`new Date(item.departureAt) < new Date()`. Le schéma est dans le registre Zod partagé : les
+cinq `openapi.json` bougent (`npm run generate:openapi`), la CI les diffe.
+
+## ANO-WEB-32 : le masquage n'est pas un statut
+
+Le masquage administratif (D57) laisse le trajet PUBLISHED — c'est ce qui le distingue de la
+pause et préserve les réservations en cours — mais `addFavorite` ne testait que le statut.
+`loadTripForFavorite` lit désormais `hiddenByAdminAt` et répond 409 `TRIP_NOT_FAVORITABLE`
+(même code que « non publié », donc même message à l'écran : « Ce trajet n'est plus
+disponible »). Le retrait reste idempotent et toujours possible. Un cas de test unitaire
+(`hiddenByAdminAt: new Date()` → 409, aucun `upsert`) porte trip-service à 261.
+
+## ANO-WEB-31 : troisième fois le même motif
+
+Comme en 5.10 (`ANO-WEB-29`) : `useUnfollowUser.onMutate` retire la carte, la carte est démontée,
+son callback `mutate(slug, { onSuccess })` n'est jamais appelé. Même correctif (retours au niveau
+du hook). Ce motif est maintenant vu deux fois en deux chapitres : le regard d'expert demande une
+revue de tous les `mutate(x, { onSuccess })` du front dont le hook a un `onMutate` qui retire
+l'élément.
+
+## Tests
+
+trip-service **261** (+1, ANO-WEB-32) — plateforme **994** ; auth 229 inchangé. `apps/e2e` :
+**131 scénarios** (119 + WEB-FAV ×12). Typecheck trip-service, user-ui et harnais verts ; OpenAPI
+régénérés.
+
+
+---
+
+# Chapitre 5.12 du cahier 01-WEB : l'assistant de réservation — sept défauts sur l'écran cœur, tous des branchements
+
+*(PR `chore/recette-web-5-12` (#277), 11/09/2026.)*
+
+## Ce qui a été fait
+
+Le douzième chapitre « fiches » du cahier 01-WEB : `WEB-RSV` (le tunnel de réservation en quatre
+étapes et le devis). Vingt-deux fiches : vingt et une jouées et conformes (sept après correction),
+une `⏭` (carte refusée : fournisseur FAKE). Sept anomalies closes (`ANO-WEB-33` à `39`).
+
+```
+apps/e2e/src/chapitres/web-rsv-devis.spec.ts                12 scénarios, 2 min 05 (complète web-rsv.spec.ts et web-rsv-assistant.spec.ts)
+apps/user-ui/src/components/booking/booking.config.ts       ANO-WEB-33 (« Garantie Yamba », pas « assurance »)
+apps/user-ui/src/components/booking/booking.copy.ts         ANO-WEB-33 (copy legacy)
+apps/user-ui/src/components/booking/BookingWizard.tsx       ANO-WEB-34 (buildInitialDraft(trip))
+apps/user-ui/src/components/booking/BookingMobile.tsx       ANO-WEB-34
+apps/user-ui/src/app/[locale]/trips/[tripId]/book/BookingClient.tsx   ANO-WEB-35 / 38 (propre trajet, trajet parti : refus à l'ouverture)
+apps/user-ui/src/components/booking/useBookingCheckout.ts   ANO-WEB-36 (trajet relu après QUOTE_DIVERGENCE)
+apps/user-ui/src/components/booking/BookingSummarySidebar.tsx   ANO-WEB-37 (jamais « 0 € »)
+apps/user-ui/src/components/booking/BookingBottomSheet.tsx  ANO-WEB-37
+apps/user-ui/src/components/booking/steps/StepParcel.tsx    ANO-WEB-39 (photo > 10 Mo refusée à la sélection)
+```
+
+## Le devis au centime, contre la note de calcul
+
+Le cahier donne la règle (`transport = max(€/kg × poids facturable × coefficient × (1 + supplément), 8 €)`,
+`service = max(12 %, 3 €)`) et sept montants attendus. Le harnais les lit dans la colonne de droite
+(« Total 32,20 € », le détail « × S · +20 % 34,50 € », « Minimum par colis appliqué : 8 € ») et sur
+le bouton « Payer … » à l'étape 4 — tous exacts. Deux subtilités de lecture : les décimales nulles
+tombent (« 8 € », « 42 € ») et les kilos s'écrivent avec un point (« 15.5 kg ») — consignés à
+trancher, absorbés par le harnais (`eur()`, `[.,]`).
+
+## Sept anomalies, une seule famille
+
+Aucune règle de calcul n'était fausse ; les sept défauts sont des **branchements** :
+
+1. **`buildInitialDraft(trip)` n'était appelée par personne** (ANO-WEB-34) : la fabrique du
+   brouillon (poids 2 kg ou mémorisé, première famille acceptée, lieu unique pré-sélectionné)
+   existait, testée nulle part, et les deux wizards partaient du brouillon vide. `useBookingDraft(useMemo(() => buildInitialDraft(trip), [trip]))`,
+   la reprise `sessionStorage` gardant la priorité.
+2. **Le récapitulatif rendait des zéros** quand le devis était indisponible (ANO-WEB-37) :
+   `computeTotal` renvoie `{ transport: 0, …, quoteError }` et les deux composants affichaient les
+   lignes avant l'indice. Quand `quote === null && quoteError`, l'indice seul.
+3. **Le message « nouveau total affiché » mentait** (ANO-WEB-36) : le devis client se calcule sur
+   le trajet en cache TanStack (`["public-trip", id]`) ; après `QUOTE_DIVERGENCE` on redemandait
+   l'intention (bon montant) sans relire le trajet (ancien montant à l'écran).
+   `invalidateQueries` avant `refreshIntent()`.
+4. **Deux gardes serveur sans miroir à l'ouverture** (ANO-WEB-35, 38) : `checkTripBookable`
+   refuse son propre trajet et un trajet parti — à l'intention de paiement. `BookingClient`
+   applique les deux règles à l'ouverture (`user.id === trip.carrier.id`, `dates.departureAt`
+   passé) avec les messages de l'étape 4. Le regard d'expert propose de servir `bookable: { ok,
+   reason }` dans le DTO public pour ne pas dupliquer la règle.
+5. **La borne de taille des photos se jouait au paiement** (ANO-WEB-39) : le hook la vérifie à
+   l'envoi, et l'envoi part au clic « Payer ». `handleAddPhotos` filtre dès la sélection.
+6. **Le mot « assurance »** (ANO-WEB-33) dans un message de validation et cinq chaînes mortes.
+
+Leçon transversale (regard d'expert) : un test de composant sur le wizard avec un trajet fixture
+aurait pris 1, 2 et 3 avant la recette.
+
+## Le harnais
+
+- Les deux Expéditeurs du « dernier kilo » (Aminata, João) sont menés chacun à l'étape 4 sur un
+  trajet de Joséphine à **2 kg** ; A paie, B paie → `409 CAPACITY_EXCEEDED` et rien dans ses
+  réservations (`GET /me/bookings`).
+- Le devis divergent : Joséphine `PUT /trips/:id` (prix 15,00) pendant qu'Aminata est à l'étape 4.
+- Les kilos restants se lisent dans le DTO **public** (`remainingKg`) : le DTO propriétaire répond
+  403 à l'Expéditrice, et la valeur bouge à chaque tour (RSV-17 réserve 2,5 kg).
+- ImageKit intercepté pour les photos ; Mailpit pour les deux emails (32,20 chez l'Expéditrice,
+  28,75 chez le Voyageur, jamais l'inverse).
+
+## Tests
+
+Plateforme inchangée (994 + auth 229). `apps/e2e` : **143 scénarios** (131 + WEB-RSV ×12, dont
+1 `⏭`). Typecheck user-ui et harnais verts.
+
+---
+
+# Chapitre 5.13 du cahier 01-WEB : les plafonds du compte neuf — le levier mesuré, l'écran qui ne se contredit plus
+
+*(PR `chore/recette-web-5-13` (#278), 11/09/2026.)*
+
+## Ce qui a été fait
+
+Le treizième chapitre « fiches » du cahier 01-WEB : `WEB-TRU` (CNF-06 / D71 — les trois plafonds
+d'un compte de moins de 30 jours sans trois envois terminés). Cinq fiches jouées et conformes (une
+après correction), une anomalie mineure close (`ANO-WEB-40`, observée au chapitre 5.12 et réservée
+à celui-ci).
+
+```
+apps/e2e/src/chapitres/web-tru.spec.ts                      5 scénarios en série, 2 min 00
+apps/user-ui/src/components/booking/BookingWizard.tsx       ANO-WEB-40 (« Payer » grisé sans autorisation)
+apps/user-ui/src/components/booking/BookingMobile.tsx       ANO-WEB-40
+```
+
+## Ce que le chapitre ajoute au parcours WEB-E2E-4
+
+Le parcours prouvait les refus (450 €, 12 kg, la sixième) ; le chapitre prouve aussi **ce qui passe
+juste sous le plafond** (250 €, 8 kg), le **compte ancien** sans plafond (Aminata, 12 kg à 450 €,
+DTO relu : `weightKg: 12`, `declaredValueCents: 45000`), et trois preuves nouvelles :
+
+1. **Le levier du back-office** (`[TRU7]`). L'OPS du seed (`navigateurAdmin("exploitation")`) écrit
+   `trust.newAccount.maxShipmentsPerMonth` 5 → 6 par `PATCH /admin/settings` (`changes`, `reason`
+   ≥ 20, `expectedVersion`). Puis le harnais clique **« Réessayer »** sur la carte de paiement toutes
+   les cinq secondes (`expect.poll` + `waitForResponse` sur `POST /deals/payment-intents`) jusqu'à ce
+   que l'intention soit acceptée : **6 s** après l'écriture (journal `AdminAction` `SETTING_CHANGED`
+   12:48:24,3 → `Booking.createdAt` 12:48:29,9), sous la contrainte « < 30 s » du lecteur de
+   paramètres (cache mémoire, D62). La remise à 5 est dans un `finally`, avec un `expectedVersion`
+   relu (le verrou a bougé), et la valeur est relue après.
+2. **Les réponses brutes de l'API au membre** : `/auth/me`, `/me/bookings`, `/deals/:id` ne contiennent
+   ni `trustScore`, ni `riskLevel`, ni `caps`, ni `capsReason` — le score est calculé à la lecture et
+   jamais servi (D71 ②), la whitelist des DTO le garantit, le harnais le vérifie.
+3. **Le suivi d'un envoi** et « Mes envois » rejoignent la liste des écrans fouillés (tableau de bord,
+   profil, page publique) ; l'export de données passe par la porte sudo comme au chapitre 6.
+
+## ANO-WEB-40 : un bouton qui contredit l'encadré
+
+À l'étape 4, le bouton principal du récapitulatif (`BookingSummarySidebar` / `BookingBottomSheet`)
+n'était grisé que pendant l'envoi (`isSubmitting`). Après un refus de plafond, la carte affichait
+l'encadré et « Réessayer » — et le bouton « Payer 32,20 € » restait actif à côté (sans danger : le
+serveur refuse aussi la demande, et `submit` sort si `!intent` — mais l'écran se contredisait). Même
+cause pour le « clic muet » avant le retour de l'intention (piège 18 du handoff). Une seule règle,
+dans les deux wizards :
+
+```ts
+// ANO-WEB-40 (D71) : à l'étape 4, « Payer » attend l'autorisation de paiement — et reste grisé
+// quand elle a été refusée (plafond du compte neuf) : le bouton ne contredit plus l'encadré.
+const ctaDisabled = isSubmitting || (step === 4 && !checkout.intent);
+```
+
+Le page object `tenterDeReserver` n'a pas bougé : il lisait déjà le texte du mode test avant de
+cliquer (Playwright attend un bouton actif), et la contre-épreuve est `toBeDisabled()` sur le bouton
+**visible** (`getByRole("button", { name: /^Payer/ }).filter({ visible: true })` — la feuille mobile
+est aussi dans le DOM sur écran large).
+
+## Le harnais
+
+- Mode **série** : la fiche 1 crée le compte par l'écran d'inscription (`Inscription.creer`, code
+  Mailpit) et le garde en module ; chaque fiche suivante ouvre un navigateur neuf et se connecte par
+  l'écran (`connexion`), le compte n'étant pas du seed.
+- Les demandes sont réparties sur `bzv-perkg`, `fih`, `gru`, `yul`, `bzv-upcoming` (capacités
+  restantes lues dans le seed : `gru` n'a que 7 kg libres) ; Aminata prend 12 kg sur `bzv-perkg`
+  après les 4 kg du compte neuf.
+- `mesReservations` (`GET /me/bookings`) compte avant et après chaque tentative : un refus qui
+  aurait laissé une trace se verrait.
+- Attention : `--reporter=list` sur la ligne de commande **remplace** le rapport HTML du
+  `playwright.config.ts` ; les annotations ne sont alors écrites nulle part.
+
+## Tests
+
+Plateforme inchangée (994 + auth 229). `apps/e2e` : **148 scénarios** (143 + WEB-TRU ×5). Typecheck
+user-ui et harnais verts.
+
+---
+
+# Chapitre 5.14 du cahier 01-WEB : la demande côté Voyageur — deux données servies par l'API que le front ne lisait pas
+
+*(PR `chore/recette-web-5-14` (#279), 11/09/2026.)*
+
+## Ce qui a été fait
+
+Le quatorzième chapitre « fiches » du cahier 01-WEB : `WEB-DEA` (accepter, refuser, expirer, deux
+onglets, états fermés, « Mon Deal accepté »). Neuf fiches jouées et conformes (trois après correction),
+trois anomalies closes (`ANO-WEB-41` MAJEURE, `ANO-WEB-42` mineure, `ANO-WEB-44` MAJEURE), une ouverte
+(`ANO-WEB-43`, DTO à enrichir).
+
+```
+apps/e2e/src/chapitres/web-dea.spec.ts                          9 scénarios en série, 2 min 20
+apps/user-ui/src/components/trips/list/trip-local-dates.ts     ANO-WEB-41 (dates locales dérivées de departureAt, pure)
+apps/user-ui/src/hooks/useTrip.ts                               ANO-WEB-41 (useMyTrips / useTrip normalisent à la lecture)
+apps/user-ui/src/components/trips/list/my-trips.config.ts       ANO-WEB-41 (TripListItem : departureAt, arrivalAt, fuseaux)
+apps/user-ui/src/components/carrier/deal/deal.adapter.ts        ANO-WEB-42 (un lieu, une ligne) + ANO-WEB-44 (recipientFirstName)
+apps/user-ui/src/components/carrier/deal/deal.types.ts          ANO-WEB-44
+apps/user-ui/src/components/carrier/deal/views/accepted/*.tsx   ANO-WEB-44 (Desktop, Mobile), ANO-WEB-42 (Recap : ville non répétée)
+apps/user-ui/src/components/carrier/deal/views/settled/DealSettledView.tsx   ANO-WEB-44
+```
+
+## ANO-WEB-41 : le tableau de bord ne connaissait que les dates du wizard
+
+`TripListItem` (accueil, « Mes trajets », badge de navigation, fiche du trajet) ne portait que
+`departureDateLocal` / `departureTimeLocal` — des chaînes que SEUL le wizard de création écrit. Un
+trajet créé par l'API, le seed ou un futur client mobile n'en a pas : l'adapter des actions repliait
+sur `new Date(0)` (« jeu. 1 janv. » partout), `isTripPastDeparture(null)` répondait « pas parti » (un
+trajet parti depuis six jours dans « à venir »), le tri par date était faux. Même famille qu'ANO-WEB-22
+(le wizard en édition), côté lecture cette fois.
+
+Le remède est UNE fonction pure appliquée UNE fois, à la source :
+
+```ts
+// apps/user-ui/src/components/trips/list/trip-local-dates.ts
+export function withLocalDates<T extends TripDatesLike>(trip: T): T {
+  const dep = localDateTime(trip.departureAt, trip.originTimezone);      // « 2026-09-26 » / « 14:00 » dans le fuseau du lieu
+  const arr = localDateTime(trip.arrivalAt, trip.destinationTimezone);   // repli : fuseau du navigateur (celui du mapper d'écriture)
+  …
+  return { ...trip, departureDateLocal: trip.departureDateLocal || dep?.date || …, … }; // le wizard garde la priorité
+}
+```
+
+Branchée dans `useMyTrips` (`withLocalDatesInList(res.data)`) et `useTrip` (`withLocalDates(res.data.trip)`) :
+les sept consommateurs des chaînes locales n'ont pas bougé et sont tous corrigés. `Intl.DateTimeFormat("en-CA")`
+donne directement `AAAA-MM-JJ` ; un fuseau inconnu (`RangeError`) retombe sur le navigateur.
+
+## ANO-WEB-44 : un « TODO Phase backend » devenu un prénom
+
+« Mon Deal accepté » écrivait « Aminata le révèle à **Hall** quand tu confirmes le pickup » : le prénom
+du destinataire était `deliveryLocation.name.split(" ")[0]` (« Hall d'arrivée · Brazzaville »). L'API
+sert pourtant `recipient.firstName` dès la création — `recipientForCarrier` ne retient que le téléphone
+avant le pickup — mais l'adapter n'exposait `recipient` qu'après le pickup (philosophie É4, qui ne
+vaut que pour le téléphone). `DealDetail.recipientFirstName` est désormais toujours posé ; `recipient`
+(avec téléphone) attend toujours le pickup : les vues « livrer » et « suivi » n'ont pas changé.
+
+## ANO-WEB-42 : un lieu, une ligne
+
+`toLocation` posait `name = details || city` ET `detail = details` : la même ligne deux fois sous
+« REMISE DU COLIS », et la ligne de repli de la livraison (« Téléphone du destinataire communiqué à la
+prise en charge »), qui ne s'affiche que sans `detail`, n'apparaissait jamais. `detail` n'est gardé
+que s'il diffère de `name`. Même motif sur le récapitulatif accepté (« … · Brazzaville · Brazzaville ») :
+la ville n'est ajoutée que si le lieu ne la porte pas.
+
+## Le harnais
+
+- Les demandes vivantes sont créées par l'assistant (2,5 kg S 150 € : 32,20 / 28,75), avec photos
+  (ImageKit intercepté) pour la fiche 2 ; `bzv-pending` sert au refus, `gru-pending` à l'expiration
+  (manœuvre `scripts/recette/deal-eligible.ts <id> -1500`, puis passe forcée `scripts/recette/expire.ts`),
+  les trois deals clos du seed aux états fermés.
+- **Deux onglets « sans recharger »** : TanStack Query relit le deal au retour du focus — l'onglet 2
+  rejoue sa première lecture (`page.route` → `fulfill`) jusqu'au clic « Refuser le Deal », puis `unroute` :
+  le 409 `TRANSITION_NOT_ALLOWED`, le toast et la relecture sont ceux du produit.
+- La puce d'expiration : `expiresAt` reculé à +90 min → classe `red-*` et `role="alert"`, remis à +23 h.
+- « Aucune pénalité » : le profil public de Thomas (`GET /users/seed-thomas/public`) est comparé
+  octet pour octet avant et après le refus ; les kilos par le DTO propriétaire.
+- Ce qu'un membre ne doit pas voir se lit aussi dans les DTO : ni `totalShipperCents` / `commissionCents`
+  chez le Voyageur, ni `deliveryCode`.
+
+## Tests
+
+Plateforme inchangée (994 + auth 229). `apps/e2e` : **157 scénarios** (148 + WEB-DEA ×9). Typecheck
+user-ui (`tsc -p apps/user-ui`, comme la CI) et harnais verts. Poste : la cible inférée `nx typecheck`
+des deux fronts Next a disparu en cours de session (les services l'ont encore) — `npx tsc --noEmit -p
+apps/user-ui/tsconfig.json` est l'équivalent exact de la CI.
+
+---
+
+# Chapitre 5.15 du cahier 01-WEB : la messagerie — une garde de sécurité contournable par un espace, et trois écrans qui parlaient anglais ou se taisaient
+
+*(PR `chore/recette-web-5-15` (#280), 11/09/2026.)*
+
+## Ce qui a été fait
+
+Le quinzième chapitre « fiches » du cahier 01-WEB : `WEB-MSG` (le fil par deal, D61). Vingt-deux fiches
+jouées et conformes (quatre après correction), quatre anomalies closes — `ANO-WEB-46` **BLOQUANTE**,
+`ANO-WEB-47` MAJEURE, `ANO-WEB-45` et `ANO-WEB-48` mineures. Plateforme de tests : message-service
+42 → **44** (996 au total).
+
+```
+apps/e2e/src/chapitres/web-msg.spec.ts                             21 scénarios en série (22 fiches), 3 min 24
+apps/e2e/src/pages/fil-messagerie.ts                               accepterRendezVous : la dernière ligne « confirmé »
+apps/message-service/src/lib/message-guard.rules.ts               ANO-WEB-46 (séparateurs entre chiffres retirés)
+apps/message-service/src/lib/message-guard.rules.spec.ts          +1
+apps/message-service/src/lib/meetup.rules.ts                      ANO-WEB-47 (une re-proposition prime)
+apps/message-service/src/lib/meetup.rules.spec.ts                 +1
+apps/message-service/src/services/conversation.service.ts         ANO-WEB-47 (accepter remplace le confirmé du même type)
+apps/user-ui/src/components/dashboard/messages/ConversationThread.tsx   ANO-WEB-45 (code → texte), ANO-WEB-48 (isError)
+apps/user-ui/src/components/dashboard/messages/MeetupPanel.tsx    ANO-WEB-45 (bornes traduites)
+apps/user-ui/messages/{fr,en}/messaging.json                       clés errors.*
+```
+
+## ANO-WEB-46 : « Le code : 742 891 » passait
+
+La garde du code de livraison (D43 / D61 4A) extrayait les groupes de six chiffres avec `\b\d{6}\b`
+et les comparait au hash bcrypt du deal. Six chiffres collés étaient refusés ; un espace, un tiret ou
+un point entre les chiffres — la façon la plus naturelle d'écrire un code — passait. L'invariant
+« le code ne circule jamais par écrit » était rompu par la forme la plus courante.
+
+```ts
+// apps/message-service/src/lib/message-guard.rules.ts
+const DIGIT_SEPARATOR = /(?<=\d)[\s.\-–_'’/]+(?=\d)/g;
+export function sixDigitCandidates(text: string): string[] {
+  const isolated = text.match(SIX_DIGITS) ?? [];
+  const collapsed = text.replace(DIGIT_SEPARATOR, "").match(SIX_DIGITS) ?? [];   // « 742 891 » → « 742891 »
+  return [...new Set([...isolated, ...collapsed])].slice(0, MAX_CODE_CANDIDATES); // trois bcrypt au plus
+}
+```
+
+Un téléphone (« 06 12 34 56 78 » → dix chiffres) et une date (« 11 09 2026 » → huit) ne forment
+toujours pas un groupe de six isolé : les coordonnées restent repérées, pas bloquées (D61 5A). La
+leçon de revue : **un filtre de sécurité se teste avec ses contournements évidents** — la règle avait
+ses tests, aucun n'essayait la forme aérée.
+
+## ANO-WEB-47 : une re-proposition invisible
+
+Le panneau de rendez-vous n'affiche que « le rendez-vous qui compte » (`nextMeetupOf`) et la règle
+préférait TOUJOURS le prochain accepté. Après une confirmation, une nouvelle proposition (changer
+l'heure ou le lieu) n'apparaissait chez personne : impossible de replanifier. Deux changements :
+
+1. `nextMeetupOf` fait primer une proposition **plus récente que l'acceptation**
+   (`createdAt > acceptedAt ?? createdAt`) — c'est une re-proposition, elle doit être acceptable ;
+2. `acceptMeetup` annule les autres rendez-vous ACCEPTÉS du même type : **un seul confirmé par type**,
+   l'ancre du numéro (`revealPhone`, `thread`) et la liste ne balancent plus entre deux.
+
+Candidat registre : compléter D61 1A avec cette règle.
+
+## ANO-WEB-45 : le `message` anglais de l'API sous la saisie
+
+Le fil (`send`) et le panneau (`submit`) affichaient `err.response.data.message` — la phrase ANGLAISE
+de l'API — au membre. Les deux lisent désormais `details.code` (A146 : le code atteint le client) et
+traduisent : `DELIVERY_CODE_IN_MESSAGE`, `INVALID_MEETUP_SLOT` + `reason` (`TOO_SOON` / `TOO_FAR` /
+`WINDOW_TOO_LONG`), `MEETUP_CHANGED`, `CONVERSATION_READ_ONLY` — clés `messaging.errors.*` en FR et EN,
+repli sur les messages génériques existants. Un `grep "response?.data?.message"` dans le front est le
+prochain geste utile.
+
+## ANO-WEB-48 : « Chargement… » sans fin
+
+`ConversationThread` ne rendait que `isLoading || !data` : un fil refusé (403 `NOT_A_PARTY`) ou
+introuvable restait sur « Chargement… ». `isError` → « La conversation n'a pas pu être ouverte. »
+(clé déjà présente). L'API, elle, refusait proprement sans rien révéler.
+
+## Le harnais
+
+- Deux navigateurs (Pauline, Thomas) sur `bzv-accepted` ; le fil est demandé à l'API
+  (`FilMessagerie.identifiantDuFil`) ; la bulle de l'en-tête se lit AVANT d'ouvrir la messagerie
+  (sur écran large le premier fil s'ouvre seul et se marque lu).
+- La langue des réponses rapides suit le COMPTE (D44) : la fiche bascule par le sélecteur de
+  l'en-tête (qui enregistre la préférence), puis revient en français.
+- Les refus sont lus sur la réponse (`400` + code) ET sous la saisie (le texte traduit) ; « le
+  message n'apparaît pas dans le fil » se prouve par l'absence de BULLE (`getByText` compte la
+  valeur de la zone de saisie).
+- Les coordonnées repérées se prouvent côté équipe : `GET /admin/conversations/by-deal/:id`
+  (session SUPPORT) → `flaggedContact: true` sur les deux messages.
+- Le numéro « à l'heure » : Pauline propose à +40 min, Thomas accepte (ANO-WEB-47 nécessaire),
+  « Voir le numéro » → 200, ligne système unique même après rechargement.
+- La relance : `scripts/recette/relance-eligible.ts <fil> SHIPPER` (dernier message vieilli d'une
+  heure) puis `relance.ts` deux fois (`sent: 1` puis `sent: 0`) ; l'email est vérifié SANS le texte.
+- La fenêtre de 14 jours : `completedAt` / `closedAt` reculés à J−15 par une manœuvre consignée.
+- Le limiteur de la passerelle a répondu 429 après treize passages : passerelle relancée en bundle.
+
+## Tests
+
+message-service **44** (+2 : ANO-WEB-46, ANO-WEB-47) → plateforme **996** (+ auth 229). `apps/e2e` :
+**178 scénarios** (157 + WEB-MSG ×21). Typecheck user-ui (`tsc -p apps/user-ui`), message-service et
+harnais verts ; miroir i18n vert.
+
+---
+
+# Chapitre 5.16 du cahier 01-WEB : la prise en charge et le transit — de la copie écrite mais jamais branchée
+
+*(PR `chore/recette-web-5-16` (#281), 11/09/2026.)*
+
+## Ce qui a été fait
+
+Le seizième chapitre « fiches » du cahier 01-WEB : `WEB-PIC` (l'écran de prise en charge, ses refus, la
+confirmation, le refus du colis, l'écran de transit et ses jalons). Dix fiches jouées et conformes (cinq
+après correction), cinq anomalies closes (`ANO-WEB-51` MAJEURE, `49`, `50`, `52`, `54` mineures), une
+ouverte (`ANO-WEB-53`, instantané du trajet sans heure d'arrivée).
+
+```
+apps/e2e/src/chapitres/web-pic.spec.ts                                      8 scénarios en série (10 fiches), 1 min 48
+apps/user-ui/src/lib/elision.ts                                             ANO-WEB-49 (« que Pauline » / « qu'Aminata »)
+apps/user-ui/messages/{fr,en}/carrierDealPickup.json, carrierDealDeliver.json   ANO-WEB-49 ({queShipper}, {deShipper})
+apps/user-ui/src/components/carrier/deal/views/pickup/PickupDeclaredCard.tsx, PickupChecklist.tsx, DealPickupDesktop.tsx   ANO-WEB-49
+apps/user-ui/src/components/carrier/deal/views/deliver/DeliverInfoBox.tsx   ANO-WEB-49
+apps/user-ui/src/components/carrier/deal/views/pickup/DealPickupDesktop.tsx, DealPickupMobile.tsx   ANO-WEB-50 (recipientFirstName), ANO-WEB-51 (blockingHint)
+apps/user-ui/src/components/carrier/deal/views/pickup/PickupConfirmCard.tsx, PickupFooter.tsx      ANO-WEB-51 (l'indice sous le bouton inactif)
+apps/user-ui/src/components/carrier/deal/views/pickup/DealPickupClient.tsx  ANO-WEB-52 (taille et format à la sélection)
+apps/user-ui/src/components/booking/booking-tracker/shared/BookingTrackingLinkCard.tsx   ANO-WEB-54 (variable manquante)
+```
+
+## ANO-WEB-51 : un bouton gris et muet
+
+Les deux textes « Coche les 5 points de vérification avant de confirmer » et « Ajoute au moins 1 photo
+avant de confirmer » existaient dans `carrierDealPickup.json` (`validation.*`) ; aucun composant ne les
+rendait. Le bouton était simplement `disabled`. `PickupConfirmCard` (écran large) connaît
+`checkedCount` / `photoCount` et rend l'indice sous le bouton ; `PickupFooter` (mobile) reçoit un
+`blockingHint` calculé par `DealPickupMobile`. Même famille que la carte « demandes en attente » de
+l'accueil (5.14) : de la copie écrite, jamais branchée — un `grep` des clés JSON absentes du code est
+un contrôle qui vaut la peine (voir regard d'expert).
+
+## ANO-WEB-49 : l'élision n'est pas une affaire de message
+
+« Ce qu''{shipperFirstName} a déclaré » est juste devant Aminata et faux devant Pauline. ICU ne sait pas
+élider ; le composant le fait :
+
+```ts
+// apps/user-ui/src/lib/elision.ts
+export function elider(mot: "de" | "que" | "le" | "la", nom: string): string {
+  const elide = /^[aeiouyàâäéèêëîïôöùûüÿæœh]/i.test(nom.trim());   // voyelle ou h (muet par défaut)
+  if (mot === "le" || mot === "la") return elide ? `l'${nom}` : `${mot} ${nom}`;
+  return elide ? `${mot.slice(0, -1)}'${nom}` : `${mot} ${nom}`;   // « qu'Aminata », « que Pauline », « d'Aminata », « de Pauline »
+}
+```
+
+Les cinq messages reçoivent `{queShipper}` / `{deShipper}` ; l'anglais garde ses variables (ICU ignore
+les variables en trop). Le cahier a la même faute et est à corriger.
+
+## ANO-WEB-52 : la borne de taille au bon moment
+
+Comme ANO-WEB-39 sur l'assistant : les photos de prise en charge ne partent qu'à la confirmation, la
+borne de 10 Mo ne se voyait donc qu'au clic « Confirmer ». `addPhoto` filtre taille (`PHOTO_MAX_SIZE_BYTES`)
+et format (`PHOTO_MIME_TYPES`) à la sélection, avec les textes `errors.uploadTooLarge` /
+`errors.uploadInvalidType` — « rien n'a été envoyé » redevient vrai au moment où l'utilisateur agit.
+
+## ANO-WEB-50, ANO-WEB-54, ANO-WEB-53
+
+- `split(" ")[0]` sur le lieu de livraison pour nommer le destinataire — le dernier survivant de la
+  maquette (ANO-WEB-44 avait corrigé « Mon Deal accepté ») : `deal.recipientFirstName`.
+- `t("subtitle")` sans `{recipientFirstName}` : next-intl rend alors le chemin de la clé
+  (« bookingTracker.trackingLink.subtitle ») ; la variable est passée. En développement, faire échouer
+  `onError` de next-intl rendrait ce défaut impossible à manquer.
+- « arrivée prévue à — » : `BookingTripSnapshot` fige `departureAt` mais pas `arrivalAt` ; le DTO
+  Expéditeur ne peut rien dériver. Évolution de schéma + contrat, PR dédiée (ANO-WEB-53 ouverte).
+
+## Le harnais
+
+- Les fiches 1 à 4 rejouent l'écran sans confirmer (points, photo, > 10 Mo, ImageKit abandonné par
+  `page.route`) et prouvent « rien n'est enregistré » par l'absence d'appel `POST /pickup` ET le statut
+  relu (`ACCEPTED`).
+- La fiche 5 lit le code dans le suivi de Pauline (`SuiviExpediteur.lireLeCode`) et vérifie qu'il n'est
+  ni dans l'email ni dans le texte de l'écran Voyageur.
+- La fiche 6 lit le total payé dans le DTO de Marie-Claire (le DTO Voyageur ne le porte pas, 5.14) et le
+  compare au `refundAmountCents` du refus ; kilos et profil public avant / après.
+- Les fiches 8, 9, 10 sont un seul scénario à deux navigateurs : l'annulation dans les cinq secondes
+  (aucune requête), puis les trois jalons, chacun observé côté Expéditrice (bannière, cloche, Mailpit).
+
+## Tests
+
+Plateforme inchangée (996 + auth 229). `apps/e2e` : **186 scénarios** (178 + WEB-PIC ×8). Typecheck
+user-ui (`tsc -p apps/user-ui`) et harnais verts ; miroir i18n vert.
+
+---
+
+# Chapitre 5.17 du cahier 01-WEB : le code de livraison — le retour d'action qui n'existe que dans un état transitoire
+
+*(PR `chore/recette-web-5-17` (#282), 11/09/2026.)*
+
+## Ce qui a été fait
+
+Le dix-septième chapitre « fiches » du cahier 01-WEB : `WEB-COD` (l'apparition du code, sa copie, son
+partage, sa régénération et son plafond, ce que le Voyageur ne voit jamais, l'après-remise). Huit fiches
+jouées et conformes (quatre après correction), cinq anomalies closes (`ANO-WEB-56` MAJEURE, `55`, `57`,
+`58`, `59` mineures). Aucune correction côté service : le serveur était juste partout (code chez
+l'Expéditrice seule, 409 `CODE_REGENERATION_LIMIT`, email sans le code).
+
+```
+apps/e2e/src/chapitres/web-cod.spec.ts                                            8 scénarios en série, 1 min 48
+apps/user-ui/src/components/booking/booking-tracker/views/picked-up/BookingCodeCard.tsx     ANO-WEB-55 (toast + aria-label), 57 (compteur permanent), 58 (409 traduit), 59 (échec de copie)
+apps/user-ui/src/components/booking/booking-tracker/views/picked-up/BookingShareCode.tsx    ANO-WEB-56 (wa.me/<numéro>, sms:<numéro>), 55 (toast), 59
+apps/user-ui/src/components/booking/booking-tracker/views/in-transit/SenderCodeCard.tsx     ANO-WEB-56 (repartager), 57, 58
+apps/user-ui/messages/{fr,en}/bookingTracker.json                                 `pickedUp.code.copyFailed` (ANO-WEB-59)
+```
+
+## ANO-WEB-56 : le numéro était là, le lien ne le prenait pas
+
+`BookingShareCode` ouvrait `https://wa.me/?text=…` et `sms:?&body=…` : message pré-rempli, destinataire à
+chercher. Or le DTO Expéditeur porte `recipient.phoneE164` depuis D69, et la carte du lien de suivi
+(`BookingTrackingLinkCard`) construisait déjà `wa.me/<chiffres>` et `sms:<numéro>`. Les deux cartes du code
+(phase pickup et phase voyage) font maintenant pareil :
+
+```ts
+// apps/user-ui/src/components/booking/booking-tracker/views/picked-up/BookingShareCode.tsx
+const phone = booking.recipient.phoneE164 ?? "";
+const whatsappTarget = phone.replace(/[^\d]/g, "");            // wa.me veut les chiffres, sans « + »
+window.open(`https://wa.me/${whatsappTarget}?text=${encodeURIComponent(message)}`, "_blank");
+window.location.href = `sms:${phone}?&body=${encodeURIComponent(message)}`;   // « ?& » : iOS et Android
+```
+
+Sans numéro, le lien reste ouvert : l'utilisatrice choisit le contact, comme avant.
+
+## ANO-WEB-57 et ANO-WEB-58 : un compteur enfermé, une erreur traduite puis ignorée
+
+Le compteur « {n} régénérations restantes » n'était rendu QUE dans la boîte de confirmation : après le
+geste, plus de compteur ; après la cinquième, le bouton inactif n'ouvre plus la boîte, donc « Aucune
+régénération restante » (la forme `=0` du message ICU) était inatteignable. Le compteur vit maintenant sous
+l'avertissement de confidentialité, en permanence.
+
+Le serveur refuse la sixième par un 409 `CODE_REGENERATION_LIMIT` ; `booking-tracker.api.ts` le
+traduisait déjà en `BookingApiError.code` — et les cartes faisaient `catch {}` sans le lire :
+
+```ts
+} catch (e) {
+  const plafond = e instanceof BookingApiError && e.code === "CODE_REGENERATION_LIMIT";
+  toast.error(t(plafond ? "pickedUp.code.toastMaxReached" : "pickedUp.code.toastError"));
+  if (plafond) setConfirmingRegen(false);
+}
+```
+
+Le cas qui le déclenche est réel : un second onglet resté sur « 1 régénération restante ». Règle à
+retenir : **un `details.code` traduit par la couche API doit avoir un lecteur dans la vue**, sinon la
+traduction est du code mort.
+
+## ANO-WEB-55 et ANO-WEB-59 : dire ce qui vient de se passer, et dire juste
+
+« Code copié ! » existait au catalogue et n'était jamais rendu (seule l'icône changeait, l'`aria-label`
+restait « Copier le code ») ; le message n'avait qu'un libellé de bouton. Les deux ont un toast, et
+l'`aria-label` bascule. À l'échec (pas de `navigator.clipboard` hors contexte sécurisé — le LAN en http),
+le bouton du code affichait « Erreur lors de la régénération. Réessaye. » — le `toastError` d'une autre
+action — et celui du message se taisait : nouvelle clé `pickedUp.code.copyFailed`, FR et EN.
+
+## Le harnais
+
+- Le presse-papiers est observé en mémoire de page (`fixtures/presse-papiers.ts`) ; `window.open` est
+  capturé par un `addInitScript` (`__ouverturesYamba`) et l'URL WhatsApp est relue avec `new URL()` —
+  hôte, chemin (le numéro), paramètre `text`.
+- `sms:` et `mailto:` ne sont pas cliqués (Messages / Mail du poste s'ouvriraient) : l'objet de l'email
+  est lu au catalogue FR.
+- La fiche 2 fouille neuf sources côté Voyageur (texte ET source HTML de trois pages, le fil, deux
+  réponses d'API) ; la fiche 7 constate que la source porte tout le catalogue `bookingTracker` — l'assertion
+  vise l'interface rendue et le chemin d'API, pas un libellé.
+- La fiche 6 ouvre un second onglet avant la dernière régénération : c'est lui l'« essai forcé »
+  (React ré-applique `disabled` à un bouton dé-grisé à la main).
+- `waitForResponse` ignore le 401 : la session mémorisée expire, `api-client` rafraîchit et rejoue.
+- Les toasts s'empilent cinq secondes : `.last()`.
+- L'identifiant du deal est posé paresseusement (`dealPicked(jeuEssai)`) : chaque fiche reste jouable seule
+  (`--grep`), le seed étant rejoué par `beforeAll`.
+
+## Tests
+
+Plateforme inchangée (996 + auth 229). `apps/e2e` : **194 scénarios** (186 + WEB-COD ×8). Typecheck
+user-ui (`tsc -p apps/user-ui`) et harnais verts ; miroir i18n vert (nouvelle clé `copyFailed` FR / EN).
+
+---
+
+# Chapitre 5.18 du cahier 01-WEB : la remise du colis — l'étape optionnelle qui verrouillait le chemin, et l'erreur qui ne se libérait pas
+
+*(PR `chore/recette-web-5-18` (#283), 12/09/2026.)*
+
+## Ce qui a été fait
+
+Le dix-huitième chapitre « fiches » du cahier 01-WEB : `WEB-REM` (l'écran de saisie du code, le barème
+d'essais, le verrou, sa levée par une régénération, la photo facultative, la livraison, l'absence
+d'annulation). Sept fiches jouées et conformes (deux après correction), deux anomalies closes
+(`ANO-WEB-60` MAJEURE, `ANO-WEB-61` mineure). Le serveur était juste partout (essais comptés côté serveur,
+verrou qui survit au rechargement, bon code refusé sous verrou, régénération qui remet à zéro, notifications
+et email de remise sans le code).
+
+```
+apps/e2e/src/chapitres/web-rem.spec.ts                                            7 scénarios en série, 55 s
+apps/e2e/src/pages/suivi-expediteur.ts                                            `regenerer()` (partagé 5.17 / 5.18), `lireLeCode()` sur les deux formes de carte
+apps/user-ui/src/components/carrier/deal/views/tracking/TrackingSpotlight.tsx     ANO-WEB-60 (chemin direct vers la remise)
+apps/user-ui/messages/{fr,en}/carrierDealTracking.json                            `spotlight.deliverEarly`
+apps/user-ui/src/components/carrier/deal/views/deliver/DeliverOtpInput.tsx        ANO-WEB-61 (compteur rendu, erreur effacée à la ressaisie, effet rearmé par le compteur)
+```
+
+## ANO-WEB-60 : « Optionnel » ne doit pas verrouiller le chemin principal
+
+La carte-projecteur du suivi de transit calcule le prochain geste (`getNextEvent`) : aéroport, décollage,
+atterrissage, puis `DELIVER`. « Valider la livraison » n'existait que dans cette dernière variante. Les trois
+jalons portent le badge « Optionnel » et l'API livre depuis `PICKED_UP` sans condition — mais l'interface,
+elle, exigeait les trois clics. La variante « jalon optionnel » offre désormais le chemin direct sous le bouton
+du jalon :
+
+```tsx
+// apps/user-ui/src/components/carrier/deal/views/tracking/TrackingSpotlight.tsx
+<span>{t("spotlight.deliverEarly", { recipientFirstName })}</span>   // « Đức est déjà devant toi ? … »
+<button type="button" onClick={onDeliverAction}>{t("spotlight.DELIVER.button")}</button>
+```
+
+Règle : un état qui masque l'action principale doit avoir une sortie explicite.
+
+## ANO-WEB-61 : trois défauts dans une seule ligne d'état
+
+`DeliverOtpInput` rendait, sous les cases, SOIT l'erreur, SOIT « Tentative n sur 3 ». Conséquences :
+`otp.attemptsLeft` (« {n} tentatives restantes » / « Dernière tentative ») n'était jamais rendu ; l'erreur
+restait pendant la ressaisie (« Tentative 2 sur 3 » ne revenait pas) ; et l'effet « secousse + cases vidées »
+dépendait du texte de l'erreur — identique d'un essai à l'autre — donc muet au deuxième échec :
+
+```ts
+// avant : useEffect(() => { … }, [errorMessage]);   — même texte, pas de nouvel effet
+useEffect(() => { … }, [errorMessage, attemptsUsed]); // le compteur signale l'échec, pas le texte
+const [erreurMasquee, setErreurMasquee] = useState(false);          // effacée au premier chiffre ressaisi
+const erreurVisible = !!errorMessage && !erreurMasquee;
+```
+
+La ligne d'état rend l'erreur + le compteur, ou « Tentative n sur 3 · n tentatives restantes ».
+
+## Le harnais
+
+- `tenter(page, code)` saisit chiffre par chiffre (`getByLabel("Chiffre n")`) et attend la réponse
+  DÉFINITIVE du `POST /deliver` (le client rejoue après un 401 de session expirée) ; le statut et le corps
+  sont relus (`DELIVERY_CODE_INVALID`, `DELIVERY_LOCKED`, `lockedUntil`).
+- Le verrou de 15 minutes n'est jamais attendu : la fiche 4 le lève par une régénération côté Mai
+  (`SuiviExpediteur.regenerer()`, désormais dans le page object et partagé avec 5.17). Le suivi de Mai est
+  la forme « phase voyage » (un jalon confirmé) : `lireLeCode()` lit la carte monumentale (aria-label) ou la
+  carte compacte (texte « 742 891 »), et `regenerer()` attend que le code affiché CHANGE (`expect.poll`) —
+  la carte relit le serveur après le toast.
+- « Un essai raté n'est pas un événement » se prouve par `GET /me/notifications` identique avant / après
+  (le chemin exact — la fiche COD-2 utilisait `/notifications` derrière un `if (ok)`, corrigée).
+- L'absence d'annulation vise la LIGNE du deal dans « Mes envois » (les autres envois gardent leur bouton)
+  et double la preuve par l'API : 409 `TRANSITION_NOT_ALLOWED` (Expéditrice), 403 (Voyageur).
+
+## Tests
+
+Plateforme inchangée (996 + auth 229). `apps/e2e` : **201 scénarios** (194 + WEB-REM ×7). Typecheck
+user-ui et harnais verts ; miroir i18n vert (`spotlight.deliverEarly` FR / EN).
+
+---
+
+# Chapitre 5.19 du cahier 01-WEB : confirmation, complétion et versement — les textes qui ne suivaient pas la donnée, et le bandeau orphelin
+
+*(PR `chore/recette-web-5-19` (#284), 12/09/2026.)*
+
+## Ce qui a été fait
+
+Le dix-neuvième chapitre « fiches » du cahier 01-WEB : `WEB-CNF` (la période de vérification, la
+confirmation anticipée, le rappel de la veille, la complétion automatique, l'après-J+4, l'étanchéité de
+l'état du versement côté Expéditeur, les trois états du versement côté Voyageur, le portefeuille, les
+paiements, le bloc « TON PAIEMENT »). Onze fiches jouées et conformes (quatre après correction, une avec
+réserve), six anomalies : quatre closes (`ANO-WEB-66` MAJEURE, `ANO-WEB-64`, `65`, `67` mineures) et deux
+ouvertes qui touchent le contrat et la machine (`ANO-WEB-62` MAJEURE, `ANO-WEB-63` mineure) — proposées au
+registre, jamais tranchées dans un contrôleur.
+
+```
+apps/e2e/src/chapitres/web-cnf.spec.ts                                            13 scénarios en série (11 fiches + 2 `test.fail`), 2 min 54
+apps/e2e/src/pages/mes-trajets.ts                                                 `ligneDuDeal()` déplie chaque trajet (« n colis ») jusqu'à la ligne
+scripts/recette/livraison-ancienne.ts                                             recule `deliveredAt` ET `payoutDueAt` (rappel, après-J+4, cron)
+scripts/recette/versement-bloque.ts                                               refige FAILED / ACCOUNT_NOT_READY, rejeu repoussé d'un jour
+apps/user-ui/src/components/trips/list/MyTripsList.tsx                            ANO-WEB-66 (le bandeau des versements bloqués sur la vraie page)
+apps/user-ui/src/components/dashboard/trips/TripsClient.tsx                       ANO-WEB-66 (page pleine aussi, pas seulement la page vide)
+apps/user-ui/src/components/booking/booking-tracker/views/delivered/DeliveredSideCards.tsx   ANO-WEB-64 (note du paiement selon `completedBy`)
+apps/user-ui/src/components/rating/RatingStatusCard.tsx                           ANO-WEB-65 (invitation sans échéance)
+apps/user-ui/messages/{fr,en}/bookingTracker.json · rating.json                   `delivered.payment.noteReleasedAuto`, `status.promptTextNoDate`
+apps/deal-service/src/services/wallet.service.ts (+ .spec)                         ANO-WEB-67 (date de remboursement, repli sur `updatedAt`) — deal 577
+packages/libs/prisma/scripts/seed-deals.ts                                        `ratingWindowEndsAt` sur les deals -blocked / -reversed
+```
+
+## Deux crons forcés, sur le fournisseur FAKE
+
+Le chapitre dépend de `payout-bookings` (passes `reminder` et `due`, toutes les 5 minutes). Le harnais ne
+les attend jamais : `scripts/recette/payout.ts <passe>` appelle directement le service de règlement, avec
+l'environnement du processus qui l'emporte sur le `.env` (`STRIPE_SECRET_KEY=""` → FAKE, comme le bundle) :
+
+```ts
+// apps/e2e/src/chapitres/web-cnf.spec.ts
+function scriptDeRecette(nom: string, ...args: string[]): string {
+  const sortie = execFileSync("npx", ["tsx", "--env-file=.env", `scripts/recette/${nom}.ts`, ...args], {
+    cwd: RACINE, encoding: "utf-8", timeout: 120_000,
+    env: { ...process.env, STRIPE_SECRET_KEY: "", FORCE_COLOR: "0", NO_COLOR: "1" },
+  });
+  return sortie.replace(/\[[0-9;]*m/g, ""); // Playwright pose FORCE_COLOR : « 0 » sortait « [33m0[39m »
+}
+```
+
+La manœuvre de date recule `deliveredAt` ET `payoutDueAt` (le compte à rebours de l'écran est calculé dans
+le navigateur à partir de `deliveredAt` : ne bouger que l'échéance ferait mentir l'écran). Le FAKE a un
+effet de bord : le cron REJOUE le versement « bloqué » du seed et le fait partir — `versement-bloque.ts`
+refige l'échec et repousse `payoutNextRetryAt` d'un jour, juste après le seed puis avant les fiches 6 / 7.
+
+## ANO-WEB-66 : un bandeau posé dans le mauvais composant
+
+`PayoutBlockedBanner` (A75) était rendu par `TripsClient` — et seulement dans sa branche « aucun trajet ».
+Or `/dashboard/trips` rend `MyTripsList` (`components/trips/list/`), qui ne le posait pas. Un Voyageur au
+versement bloqué (le cas nominal : il A des trajets) ne voyait jamais « {montant} en attente : finalise ton
+compte Stripe ». Le bandeau est posé par la page réelle, avant « À traiter », et sur la page pleine de
+`TripsClient`. Leçon : un composant transversal se pose au niveau de la page, et deux listes de trajets pour
+une même route sont une dette (`TripsClient` ne sert plus que la prévisualisation et la section du tableau
+de bord).
+
+## ANO-WEB-64, 65, 67 : trois textes qui ne suivaient pas la donnée
+
+- **64** — `DeliveredPaymentCard` (réutilisée par la vue « terminé ») disait « Tu as confirmé la livraison »
+  à tout deal clos, même clos par le SYSTÈME (« sans signalement de ta part » deux cartes plus haut). La
+  note suit `booking.completedBy` : `noteReleased` (SHIPPER) ou `noteReleasedAuto` (le reste).
+- **65** — `RatingStatusCard` rendait `promptText` avec `date: ""` quand `windowEndsAt` était `null` :
+  « Tu as jusqu'au . ». Sans date, `promptTextNoDate`. La cause de la donnée absente est dans le seed (les
+  deals `-blocked` / `-reversed` n'écrivaient pas `ratingWindowEndsAt`) — corrigé aussi, mais le composant
+  ne doit jamais dépendre d'un seed.
+- **67** — `wallet.service` rendait `date: iso(b.refundedAt)` pour REFUNDED / PARTIALLY_REFUNDED ; sans
+  `refundedAt` la ligne disait « Remboursé 33,60 € le ». Repli sur `updatedAt` (comme RELEASED_NO_CHARGE),
+  un test qui pose `refundedAt: null`.
+
+```ts
+// apps/deal-service/src/services/wallet.service.ts
+const refundDate = iso(b.refundedAt ?? b.updatedAt);
+```
+
+## Les deux anomalies ouvertes — au registre, pas dans le code
+
+- **ANO-WEB-62** — la vue Expéditeur porte `payoutStatus` / `payoutSentAt` et `ConfirmDealResponse` rend
+  `payoutStatus` ; le contrat le dit voulu (A68 « both roles read it »). Les écrans n'en montrent rien, mais
+  la réponse brute sert `"payoutStatus":"FAILED"` à l'Expéditrice d'un deal au versement bloqué. Retirer
+  ces champs de la vue Expéditeur est un changement de contrat (OpenAPI, D-next) : scénario 6 bis en
+  `test.fail`, il passera au vert quand la décision sera prise et codée.
+- **ANO-WEB-63** — la machine retire `dispute` après `payoutDueAt` (`beforePayoutDue`) mais pas
+  `confirmEarly` ; « Confirmer la livraison » reste proposé jusqu'au passage du cron. La garde jumelle
+  coûte trois lignes et un test de machine, mais une transition est une règle du registre : scénario 5 bis
+  en `test.fail`.
+
+## Le harnais
+
+- L'ordre de jeu n'est pas celui du cahier : un seul deal livré par rôle. `bzv-delivered` sert la lecture
+  (1, 11) puis la confirmation (2) ; `yul-delivered` sert le rappel (4, échéance dans 18 h), l'après-J+4
+  (5, échéance passée de 2 h, joué tout de suite car le vrai cron passe dans les 5 minutes) puis la
+  complétion (3, passe `due` forcée — et si le vrai cron a devancé, `expect.poll` sur `COMPLETED` suffit).
+- Les preuves d'étanchéité (6, 7) lisent `body` (les pages de suivi n'ont pas de `<main>`) après avoir
+  retiré la description du colis du seed, qui dit elle-même « compte Stripe incomplet ».
+- Les totaux des cartes Finances sont comparés à `GET /me/wallet` (jamais recalculés) et chaque ligne servie
+  est visée par son lien (`/bookings/<id>`, `/carrier/deals/<id>`) et confrontée à son état exact.
+- Les notifications survivent au seed : « une seule fois » se compte par lien du deal. Les montants portent
+  une espace fine insécable avant « € » (cloches, objets d'email) : `[\s  ]?€`.
+
+## Tests
+
+Plateforme **997** (deal 577, +1 ANO-WEB-67) + auth 229. `apps/e2e` : **214 scénarios** (201 + WEB-CNF ×13).
+Typecheck user-ui, deal-service et harnais verts ; miroir i18n vert (`noteReleasedAuto`, `promptTextNoDate`
+FR / EN).
+
+---
+
+# Chapitre 5.20 du cahier 01-WEB : les annulations — la transition sans route ni écran, l'instantané que le barème lit, et deux restes de maquette
+
+*(PR `chore/recette-web-5-20` (#285), 12/09/2026.)*
+
+## Ce qui a été fait
+
+Le vingtième chapitre « fiches » du cahier 01-WEB : `WEB-ANN` (le barème ANN-01 en quatre moments, le montant
+servi, l'annulation Voyageur, rien après la prise en charge, le suivi sans doublon, deux onglets). Neuf fiches
+jouées, sept conformes (deux après correction, une avec réserve), une NON CONFORME (`ANO-WEB-68`, majeure,
+ouverte : l'annulation par le Voyageur n'existe ni au service ni à l'écran), une réserve (`ANO-WEB-69`, la
+retenue conservée dite « reversée »), deux anomalies closes (`ANO-WEB-70`, `ANO-WEB-71`).
+
+```
+apps/e2e/src/chapitres/web-ann.spec.ts                                            9 scénarios en série (1 `test.fail`), 3 min 18
+apps/e2e/src/pages/mes-envois.ts                                                  toast « Envoi annulé. » avec ou sans remboursement
+apps/user-ui/src/components/booking/booking-tracker/views/accepted/BookingAcceptedDesktop.tsx   ANO-WEB-70 (lien vers « Mes envois »)
+apps/user-ui/src/components/carrier/deal/views/accepted/DealAcceptedDesktop.tsx   ANO-WEB-70 (lien vers « Mes trajets »)
+apps/user-ui/src/components/dashboard/shipments/ShipmentsClient.tsx               ANO-WEB-71 (toast sans « remboursement » pour une demande en attente)
+```
+
+## Un deal fabriqué par l'API, en deux appels
+
+Le chapitre a besoin de quatre deals acceptés et le seed n'en a que deux. Plutôt que l'assistant (une minute
+par réservation), le harnais réserve par l'API : le premier `POST /deals/payment-intents` porte un total
+délibérément faux, le serveur répond 409 `QUOTE_DIVERGENCE` avec `actualTotalCents` (D17), le second porte le
+vrai total, puis `POST /deals` (FAKE : `clientSecret` null) et `POST /deals/:id/accept` par le Voyageur :
+
+```ts
+// apps/e2e/src/chapitres/web-ann.spec.ts
+const sonde = await contexte.request.post(`${api()}/deals/payment-intents`, { data: { ...devis, expectedTotalCents: 1 } });
+const totalCents = ((await sonde.json()) as { details: { actualTotalCents: number } }).details.actualTotalCents;
+```
+
+## Le barème lit l'instantané du deal
+
+`toCancellationPreview` et `cancel` calculent le remboursement à partir de `booking.trip.departureAt` — l'instantané
+figé à la réservation, pas le trajet. Déplacer `trip.departureAt` (WEB-E2E-3) ne change rien à un deal déjà
+créé : la manœuvre du chapitre déplace le trajet ET chaque deal (`data: { trip: { update: { departureAt } } }`
+sur le composite). Conséquence produit, à trancher : un vol repoussé après l'acceptation ne déplace pas la
+fenêtre des 48 h de l'Expéditrice.
+
+## ANO-WEB-68 : trois couches en désaccord
+
+La machine déclare `ACCEPTED --cancel(CARRIER)--> CANCELLED` (effets `FULL_REFUND`, `RELEASE_CAPACITY`,
+`PENALIZE_CARRIER`, `NOTIFY_SHIPPER`) ; le service refuse tout autre acteur que l'Expéditeur (403
+`SHIPPER_ONLY`) ; aucun écran Voyageur ne propose le geste — et le refus D72 (« annule-les d'abord depuis
+« Mes trajets » ») renvoie vers une action qui n'existe pas. Le scénario 6 est en `test.fail` (il attend 200) ;
+la correction est un chantier : branche CARRIER du service (remboursement intégral par le fournisseur, kilos,
+`closedBy`, événement, emails), écran, tests, registre.
+
+## ANO-WEB-70 et 71 : deux restes de maquette
+
+- **70** — « Voir le Deal dans mon dashboard → » était un `<button onClick={() => console.info(…)}>` dans les
+  deux vues « accepté » (Expéditeur, Voyageur) : `Link` de `@/i18n/navigation` vers `/dashboard/shipments` et
+  `/dashboard/trips`.
+- **71** — le toast choisissait « Remboursement de {montant} en cours » dès que la réponse portait
+  `refundAmountCents` ; une demande en attente n'a jamais été débitée (D40 : l'empreinte est levée, Paiements dit
+  « Jamais débité ») : le remboursement ne se dit que si `item.status !== "PENDING"`.
+
+## Le harnais
+
+- Les kilos restants se lisent par `GET /trips/:id` avec la session du VOYAGEUR (403 `NOT_TRIP_OWNER` sinon),
+  avant et après chaque annulation.
+- ANN-4 prouve « servi par le serveur » par l'absence : la liste est lue une fois (`cancellationPreview` dans
+  `GET /me/bookings`), et l'ouverture de la fenêtre ne déclenche aucune requête `/deals` ni `/bookings`.
+- ANN-3 refait l'arithmétique à partir des montants servis (`totalShipperCents`, `transportCents`) et
+  confronte `payoutAmountCents` à `arrondi(retenue × net ÷ total)` ; l'exemple du cahier (32,20 / 28,75 →
+  16,10 / 14,38) est vérifié par la même formule.
+- ANN-9 fige `GET /me/bookings*` de l'onglet 2 (`page.route` avec la réponse lue), libère avant le clic, et
+  prouve « aucun double remboursement » par `refundAmountCents` et les kilos.
+
+## Tests
+
+Plateforme inchangée (997 + auth 229). `apps/e2e` : **223 scénarios** (214 + WEB-ANN ×9). Typecheck user-ui et
+harnais verts ; miroir i18n vert (aucune clé ajoutée).
+
+---
+
+# Chapitre 5.21 du cahier 01-WEB : litige et médiation, vue membre — la table de présentation en retard sur le catalogue, et les textes qui ignorent la cause de la clôture
+
+*(PR `chore/recette-web-5-21` (#286), 12/09/2026.)*
+
+## Ce qui a été fait
+
+Le vingt-et-unième chapitre « fiches » du cahier 01-WEB : `WEB-LIT` (le signalement en transit, l'écran de
+signalement, ses refus, l'envoi, le dossier vu des deux côtés, la version du Voyageur, les trois décisions du
+back-office, la notation interdite, deux onglets, l'accès sans droit). Treize fiches jouées et conformes (trois
+après correction), quatre anomalies : trois closes (`ANO-WEB-75` MAJEURE, `ANO-WEB-72`, `ANO-WEB-73` mineures) et une
+ouverte au contrat (`ANO-WEB-74`, MAJEURE : le payload de notification aux deux rôles).
+
+```
+apps/e2e/src/chapitres/web-lit.spec.ts                                            14 scénarios en série (1 `test.fail`), 4 min 42
+apps/user-ui/src/components/dashboard/notifications/notifications.types.ts        ANO-WEB-75 (quatre entrées de présentation)
+apps/user-ui/src/components/booking/booking-tracker/views/status/BookingStatusNotice.tsx   ANO-WEB-73 (« Clos par la médiation »)
+apps/user-ui/src/components/booking/booking-tracker/views/delivered/DeliveredSideCards.tsx  ANO-WEB-72 (note du paiement sur completedBy ADMIN)
+apps/user-ui/messages/{fr,en}/bookingTracker.json                                 `statusNotice.cancelledByMediation.*`, `delivered.payment.noteReleasedMediation`
+```
+
+## ANO-WEB-75 : la porte du texte
+
+La boîte de notifications ne rend le texte d'un événement (`copy.<type>.<rôle>.title`) que si son type a une entrée
+dans `PRESENTATION` (`isKnownNotificationType`) ; sinon, le titre neutre « Notification ». Quatre événements avaient
+leur texte et pas leur entrée : « Décision rendue · YAM-… » (la fiche 10 attend cette cloche), « Code de livraison
+renouvelé », « Remboursement émis », « Paiement autorisé ». Les entrées sont ajoutées ; le regard d'expert propose
+le test qui aligne les deux listes en CI (`Object.keys(copy)` ⊆ `PRESENTATION`).
+
+## ANO-WEB-72 et 73 : deux textes qui ignoraient la cause de la clôture
+
+- **73** — un remboursement total tranché par la médiation clôt le deal en `CANCELLED` (D55). `BookingStatusNotice`
+  titrait donc « Demande annulée · Cette demande est close. Si un remboursement s'applique… Annulée le … » au-dessus
+  de « Décision rendue » — sur un colis livré. Quand `dispute.resolution` (ou `retentionDecision`) existe, la
+  clôture a son propre texte (`statusNotice.cancelledByMediation`).
+- **72** — la note du bloc « TON PAIEMENT » suivait déjà `completedBy` (ANO-WEB-64) mais ne connaissait que
+  SHIPPER / autre ; `ADMIN` recevait « la période de vérification est terminée — les fonds sont en cours de
+  versement à … », faux après un rejet ou un partiel. Troisième variante : « Clos par la médiation — le sort des
+  fonds est celui de la décision ci-dessus. »
+
+## ANO-WEB-74 : un payload servi tel quel
+
+`GET /me/notifications` renvoie, pour chaque notification, le payload de l'événement d'outbox. Pour
+`booking.dispute_resolved`, il porte `refundCents` ET `carrierPayoutCents` ; l'Expéditrice lit donc le montant versé
+au Voyageur, et réciproquement. L'écran n'affiche aucun montant (la ligne dit « lis la décision et le motif sur ton
+envoi »), mais la règle « chaque partie voit uniquement le montant qui la concerne » vaut pour la réponse brute.
+Correction proposée (contrat, registre) : une projection par rôle du payload à la lecture — liste blanche par
+événement, comme `analyticsEventsFor` (D66) — jamais un spread. Scénario 10 bis en `test.fail`.
+
+## Le harnais
+
+- Une décision n'est possible qu'après la version du Voyageur (ou 72 h) : `POST /deals/:id/dispute/statement`
+  (201) par l'API sur `los-disputed` (Adebayo) et sur le dossier de João (Thomas) avant de trancher ;
+  `bzv-disputed` reçoit la version par l'écran (fiche 9).
+- Les trois décisions passent par le back-office réel (`navigateurAdmin("mediateur")`, `MediationAdmin` :
+  file → dossier → trancher) ; chaque partie est ensuite lue à l'écran (texte, montant, motif) puis par sa cloche
+  (`a[href*=id]` + « Décision rendue · YAM-… ») et son email — Thomas en reçoit deux sur le même corridor, chacun
+  visé par son ticket dans le corps.
+- LIT-4 simule les trois cas réseau : ImageKit ralenti (route qui attend 4 s), ImageKit en échec (500), et un
+  400 sur le `POST /dispute` (le serveur réel n'est jamais atteint avec un dossier incomplet : le bouton est
+  inactif).
+- LIT-13 prouve l'étanchéité par l'absence : aucune donnée du deal, aucun code HTTP ni JSON à l'écran, l'API à 403.
+
+## Tests
+
+Plateforme inchangée (997 + auth 229). `apps/e2e` : **237 scénarios** (223 + WEB-LIT ×14). Typecheck user-ui et
+harnais verts ; miroir i18n vert (`cancelledByMediation`, `noteReleasedMediation` FR / EN).
+
+---
+
+# Chapitre 5.22 du cahier 01-WEB : la notation croisée — l'accueil réel en retard sur sa prévisualisation, deux états sans nom, et les avis qui survivaient au seed
+
+*(PR `chore/recette-web-5-22` (#287), 12/09/2026.)*
+
+## Ce qui a été fait
+
+Le vingt-deuxième chapitre « fiches » du cahier 01-WEB : `WEB-NOT` (où noter, l'écran, les critères par rôle, la
+note seule requise, la limite du commentaire, le double-aveugle, l'intermédiaire, une seule fois, les relances, la
+révélation à 14 jours, l'avis public). Onze fiches jouées et conformes (trois après correction), trois anomalies
+closes (`ANO-WEB-76` MAJEURE, `ANO-WEB-77`, `ANO-WEB-78` mineures) et une purge du jeu d'essai.
+
+```
+apps/e2e/src/chapitres/web-not.spec.ts                                            11 scénarios en série, 3 min 18
+apps/user-ui/src/components/dashboard/home/HomeClient.tsx                         ANO-WEB-76 (les envois réels dans « À traiter »)
+apps/user-ui/src/components/rating/RatingDone.tsx                                 ANO-WEB-77 (« indisponible » ≠ « fermée »)
+apps/user-ui/src/components/users/profile/{TripperBlock,ShipperBlock}.tsx        ANO-WEB-78 (note d'un avis nommée)
+apps/user-ui/messages/{fr,en}/rating.json                                         `done.unavailableTitle`
+packages/libs/prisma/scripts/seed-deals.ts                                        purge des Review des comptes du seed
+```
+
+## ANO-WEB-76 : deux accueils, une seule logique
+
+`HomeClient` a deux rendus : `HomePreview` (vitrine, données fictives) qui appelle `deriveHomeActions(shipments,
+carrierTrips)`, et `HomeLive` (réel) qui ne lisait que `useMyTrips` + `useMyDeals` — les actions du VOYAGEUR
+(répondre, prise en charge, livraison, noter) et les trajets en brouillon / en pause. Les envois de l'Expéditeur
+n'étaient jamais lus : un Expéditeur pur lisait « Tout est à jour, rien à traiter. » avec un deal à noter, un code
+à transmettre ou une livraison à vérifier. `HomeLive` lit désormais `getMyShipments` (TanStack, 30 s) et rend les
+actions Expéditeur (`ShipmentRow` + chip de rôle, comme la vitrine) en tête de « À traiter ».
+
+```tsx
+// apps/user-ui/src/components/dashboard/home/HomeClient.tsx
+const shipperActions = useMemo(
+  () => deriveHomeActions(shipments ?? [], []).filter((a): a is Extract<HomeAction, { role: "SHIPPER" }> => a.role === "SHIPPER"),
+  [shipments]
+);
+```
+
+## ANO-WEB-77 et 78 : deux états sans nom
+
+- **77** — `RatingDone` n'avait que trois branches (révélé / ma note existe / sinon « fermée »). Un deal en litige
+  (fenêtre jamais ouverte, `windowEndsAt` null) tombait dans « La fenêtre de 14 jours est passée ». La branche
+  « indisponible » (échéance absente ou future) rend `done.unavailableTitle` + `done.unavailable`.
+- **78** — les cinq `<Star>` d'un avis public n'avaient ni texte ni nom : `role="img"` + `aria-label="{n}/5"` sur
+  le groupe, `aria-hidden` sur les icônes — la même forme que `RatingStatusCard`.
+
+## Les avis survivaient au seed
+
+`seed-deals.ts` efface les bookings des comptes du seed mais pas leurs `Review` : chaque passage laissait des avis
+révélés sur les profils publics (25 orphelins après une matinée), et « l'avis n'est pas public avant la
+réciprocité » (NOT-6) échouait sur l'avis du passage précédent. Le seed purge les avis dont l'auteur OU le sujet est
+un compte du seed, avant les bookings, et le journalise (« n avis »).
+
+## Le harnais
+
+- Le double-aveugle se joue en deux navigateurs (A Mai, B Thomas) : après la première note, la page publique du
+  noté est lue par A (rien), `revealedAt` par l'API (null) ; après la seconde, l'écran de B dit la révélation et A
+  relit « Vos avis » ; la cloche « Les notes sont révélées » est visée par le lien du deal ; l'absence d'email se
+  prouve par `mailpit.compter` après un délai.
+- Le cron `rating` se force en deux temps (`notation-eligible.ts` pose `completedAt` / `ratingWindowEndsAt` /
+  `ratingRemindersSent`, `notation.ts` joue la passe) ; « une seule fois » = deux emails à Inês, zéro à João, et une
+  troisième passe silencieuse.
+- La page publique se lit dans un contexte neuf (`browser.newContext()`), la note par `[aria-label="5/5"]`, le
+  signalement par le `mailto:` décodé (« Signalement d'un avis (#id) »).
+
+## Tests
+
+Plateforme inchangée (997 + auth 229). `apps/e2e` : **248 scénarios** (237 + WEB-NOT ×11). Typecheck user-ui et
+harnais verts ; miroir i18n vert (`done.unavailableTitle` FR / EN).
+
+---
+
+# Chapitre 5.23 du cahier 01-WEB : la page destinataire — un chapitre sans anomalie, et comment prouver une absence
+
+*(PR `chore/recette-web-5-23`, 12/09/2026.)*
+
+## Ce qui a été fait
+
+Le vingt-troisième chapitre « fiches » du cahier 01-WEB : `WEB-DES` (le lien de suivi, ses canaux, la page publique,
+ce qu'elle ne montre jamais, sa progression, l'absence côté Voyageur et avant l'acceptation, le lien invalide, le
+vrai numéro côté Voyageur). Neuf fiches jouées, neuf conformes, aucune anomalie — le contrat fermé de D69 tient.
+
+```
+apps/e2e/src/chapitres/web-des.spec.ts                                            9 scénarios en série, 2 min 24
+```
+
+## Prouver une absence
+
+La moitié du chapitre affirme que quelque chose n'existe pas. Trois techniques :
+
+- **Les valeurs, pas les symboles.** Le code source d'une page next-intl embarque tout le catalogue de messages :
+  « € » y figure dans des textes génériques. Le harnais cherche les VALEURS du deal (le code `742891`, le numéro
+  E.164 et local, le nom, le montant formaté), à l'écran ET dans `page.content()`.
+- **La liste fermée.** `GET /track/:token` sert exactement huit clés (`CLES_PUBLIQUES_DU_SUIVI`) ; le test compare les
+  clés triées, pas la présence de quelques-unes.
+- **Le 404 uniforme.** Un jeton altéré et un jeton dont le destinataire a été effacé reçoivent le même corps de
+  réponse ; l'écran, le même texte ; le bloc d'acquisition reste.
+
+## Un canal qu'on ne peut pas cliquer
+
+WhatsApp ouvre une fenêtre (`window.open`, capturé par `addInitScript`) ; le SMS assigne `window.location.href =
+"sms:…"`, un schéma externe que le navigateur du poste ne journalise pas et que le harnais ne doit pas déclencher
+(il ouvrirait Messages). La preuve passe par la donnée : le lien est (re)demandé par la page et sa réponse porte
+`recipientPhoneE164`, le numéro que les DEUX canaux utilisent — comparé à celui de la réservation.
+
+```ts
+// apps/e2e/src/chapitres/web-des.spec.ts
+const reponse = page.waitForResponse((r) => r.url().includes("/tracking-link") && r.request().method() === "POST");
+await carte.getByRole("button", { name: "WhatsApp" }).click();
+const lienServi = (await (await reponse).json()) as { path: string; recipientPhoneE164: string | null };
+```
+
+## Un jeton, une fois
+
+« Le même lien est produit au second clic » se prouve à deux niveaux : dans la page, le second clic n'émet aucun
+`POST /tracking-link` (la carte garde le lien en mémoire) ; après rechargement, un nouveau POST rend le même jeton
+(le service réutilise le lien vivant du deal). L'effacement du destinataire (fiche 8) enchaîne la confirmation par
+l'API, `destinataire-eligible.ts <id> 40` (deal clos il y a 40 jours) et `destinataire.ts` (la passe de rétention).
+
+## Tests
+
+Plateforme inchangée (997 + auth 229). `apps/e2e` : **257 scénarios** (248 + WEB-DES ×9). Typecheck harnais vert ;
+aucune clé i18n ni code produit touché.
+
+---
+
+# Chapitre 5.24 du cahier 01-WEB : signaler un trajet, un profil, un message — la règle de visibilité dupliquée, et le 404 traduit à la hache
+
+*(PR `chore/recette-web-5-24`, 12/09/2026.)*
+
+## Ce qui a été fait
+
+Le vingt-quatrième chapitre « fiches » du cahier 01-WEB : `WEB-SIG` (la porte d'identité, la fenêtre de signalement
+d'une annonce, le doublon, soi-même, le profil, la cible invisible, trois signalements, l'avis). Huit fiches jouées et
+conformes (deux après correction), deux anomalies closes (`ANO-WEB-79` MAJEURE, `ANO-WEB-80` mineure) et une purge du
+jeu d'essai.
+
+```
+apps/e2e/src/chapitres/web-sig.spec.ts                                            8 scénarios en série, 2 min 54
+apps/auth-service/src/services/report.service.ts (+ .spec)                         ANO-WEB-79 (annonce masquée = introuvable) — auth 230
+apps/user-ui/src/components/shared/ReportDialog.tsx                               ANO-WEB-80 (404 → « introuvable »)
+apps/user-ui/messages/{fr,en}/common.json                                         `report.notFound`
+packages/libs/prisma/scripts/seed-deals.ts                                        purge des Report des comptes du seed
+```
+
+## ANO-WEB-79 : trois causes d'invisibilité, une seule connue
+
+`resolveTarget` chargeait un trajet par `{ id, isDeleted: false }` : une annonce MASQUÉE par Yamba (`hiddenByAdminAt`,
+C-PR4 — la recherche, la page publique et la réservation la connaissent déjà) restait signalable, `POST /reports`
+répondait 201 et l'accusé partait — l'existence de la cible était révélée par le seul succès. Le service exige
+désormais un champ null OU absent (pitfall Mongo : `null` ne voit pas un champ absent, d'où `OR isSet`) :
+
+```ts
+// apps/auth-service/src/services/report.service.ts
+const trip = await db.trip.findFirst({
+  where: { id: targetRef, isDeleted: false, OR: [{ hiddenByAdminAt: null }, { hiddenByAdminAt: { isSet: false } }] },
+  select: { id: true, userId: true },
+});
+```
+
+Le test unitaire pose un trajet masqué (404) et un trajet sans le champ (accepté). Le regard d'expert propose une règle
+de visibilité unique, partagée par les trois services qui la réinventent.
+
+## ANO-WEB-80 : traduire par le code, pas par le statut
+
+`ReportDialog` mappait 409 → « déjà signalé », 400 → « ton propre contenu », le reste → « n'a pas pu être envoyé.
+Réessaie. » Un 404 (cible disparue entre l'ouverture et l'envoi, ou masquée) invitait donc à réessayer. La branche
+404 rend `report.notFound` ; la vraie correction (à trancher) est de mapper `details.code` — `OWN_TARGET` est un refus
+de droit, pas une requête mal formée.
+
+## Le harnais
+
+- La porte d'identité se joue en fenêtre privée, puis la connexion DANS la fenêtre (le formulaire visible qui porte
+  `#email`, comme en 5.11) ; on vérifie le 200 du `POST /auth/login`, la porte fermée et l'annonce toujours ouverte.
+- « Le membre signalé n'apprend rien » se prouve sur les cloches NOUVELLES qui parlent de signalement ou de la cible
+  (le cron FAKE écrit d'autres cloches au même compte pendant la fiche) et sur les emails par sujet.
+- La cible invisible est fabriquée par l'API admin (`POST …/admin/trips/:id/hide`, contexte `navigateurAdmin`) et par
+  une manœuvre (`profilePublic: false`), toutes deux défaites dans un `finally`.
+- La file du back-office (« Prioritaire · 3 ouverts ») est lue par `GET /admin/reports?status=OPEN` avec un contexte
+  SUPPORT : trois lignes sur la cible, `openCountOnTarget = 3`, `priority = true`.
+- SIG-8 fabrique un avis révélé par l'API (`POST /deals/:id/rating` des deux côtés) et lit le `mailto:` décodé.
+
+## Tests
+
+Plateforme 997 + auth **230** (+1, ANO-WEB-79). `apps/e2e` : **265 scénarios** (257 + WEB-SIG ×8). Typecheck
+auth-service, user-ui et harnais verts ; miroir i18n vert (`report.notFound` FR / EN).
+
+---
+
+# Chapitre 5.25 du cahier 01-WEB : données personnelles — la préférence lue au mauvais endroit, et l'en-tête que CORS cachait
+
+*(PR `chore/recette-web-5-25` (#290), 12/09/2026.)*
+
+## Ce qui a été fait
+
+Le vingt-cinquième chapitre « fiches » du cahier 01-WEB : `WEB-RGP` (l'écran « Mes données », l'export derrière la
+porte par code, son contenu, la règle des 24 h, les bloqueurs de suppression, l'avertissement, la suppression réelle,
+« Membre supprimé », l'effacement du tiers destinataire). Neuf fiches jouées et conformes (cinq après correction),
+cinq anomalies closes (`ANO-WEB-81` MAJEURE, `82`, `83`, `84`, `85`) et une purge de plus au jeu d'essai.
+
+```
+apps/e2e/src/chapitres/web-rgp.spec.ts                                            9 scénarios en série, 1 min 24
+apps/user-ui/src/components/dashboard/sections/PrivacySection.tsx                 ANO-WEB-81 (bascule servie par le compte), ANO-WEB-84 (refus par son code)
+apps/user-ui/src/hooks/useUser.ts                                                 les deux préférences dans le type `User`
+apps/user-ui/src/app/[locale]/dashboard/dashboard.copy.ts                         `privacy.exportRateLimited`
+apps/api-gateway/src/main.ts                                                      ANO-WEB-82 (`exposedHeaders: Content-Disposition`)
+apps/message-service/src/lib/counterpart-label.ts (+ .spec)                        ANO-WEB-83 (« Membre supprimé ») — message 47
+apps/message-service/src/services/conversation.service.ts                         le libellé dans les deux vues (liste, fil)
+apps/user-ui/src/components/dashboard/messages/ConversationThread.tsx             ANO-WEB-85 (le refus de révélation est dit)
+packages/libs/prisma/scripts/seed-deals.ts                                        purge du journal `DataRequest`
+scripts/recette/otp-debloquer.ts                                                  lève le quota de codes (rejeu du chapitre dans l'heure)
+```
+
+## ANO-WEB-81 : une préférence a une seule source
+
+La bascule « Mesure d'audience » n'était rendue que si le FRONT portait une clé PostHog, et son état venait de
+`readConsent()` — le `localStorage` du navigateur. Or `analyticsOptIn` est une préférence **du compte** (servie par
+`/auth/me`) qui gouverne aussi la capture **serveur** (D66, `analyticsEventsFor` n'émet que pour les consentants) :
+
+- sur un déploiement où seul le serveur mesure, le membre n'avait aucun moyen de se retirer ;
+- sur un second appareil, la bascule affichait « non » alors que le compte disait « oui ».
+
+La ligne est désormais toujours rendue, son état vient du compte, l'écriture est confirmée (et revient en arrière si
+le serveur refuse) ; seule l'initialisation du PostHog navigateur reste conditionnée à la clé.
+
+## ANO-WEB-82 : ce que CORS ne donne pas
+
+Le fichier se téléchargeait sous `yamba-mes-donnees.json` au lieu de `yamba-mes-donnees-2026-09-12.json`. Le serveur
+posait pourtant le bon `Content-Disposition` : **le navigateur le cachait**. Une réponse cross-origin n'expose que six
+en-têtes ; tout le reste doit être déclaré. La passerelle expose maintenant `Content-Disposition` et `x-correlation-id`.
+
+```ts
+// apps/api-gateway/src/main.ts
+credentials: true,
+exposedHeaders: ["Content-Disposition", "x-correlation-id"],
+```
+
+## ANO-WEB-83 : nommer, pas recomposer
+
+L'effacement anonymise `firstName = "Membre"` / `lastName = "supprimé"`. La messagerie n'affiche que le prénom : le fil
+disait « Membre », qui se lit comme un prénom ordinaire. Une règle pure nomme la contrepartie, et les deux vues
+(liste et fil) l'utilisent :
+
+```ts
+// apps/message-service/src/lib/counterpart-label.ts
+export function nomDeLaContrepartie(user: { firstName?: string | null; isDeleted?: boolean | null } | null | undefined): string {
+  if (!user) return "—";
+  if (user.isDeleted) return LIBELLE_MEMBRE_SUPPRIME; // « Membre supprimé », comme le back-office
+  return user.firstName ?? "—";
+}
+```
+
+## ANO-WEB-84 et 85 : un refus se dit
+
+Le refus « un export par 24 h » arrivait en anglais (le `message` brut du serveur, affiché tel quel) : il se dit
+maintenant par son `details.code` (A146). Et dans un fil, « Voir le numéro » refusé (400 `TOO_EARLY`) ne produisait
+**rien** : le motif ne vivait que dans l'attribut `title` du bouton, le bandeau n'apparaissant qu'en arrivant par
+« Appeler » (`?focus=phone`). Un refus affiche désormais la même phrase, en ligne.
+
+## Le harnais
+
+- La suppression réelle se joue sur un compte **créé par l'écran** dans la fiche 6, qui réserve par l'API, se fait
+  accepter, écrit un message puis annule (remboursement intégral) : la fiche 7 le supprime, la fiche 8 lit son fil
+  côté Thomas. Aucun compte du jeu d'essai n'est jamais supprimé.
+- L'export du VOYAGEUR est obtenu par l'API (porte sudo + `POST /auth/me/data-export`) : c'est la seule façon de
+  prouver « aucune coordonnée du destinataire quand le membre est le Voyageur ».
+- Le quota de codes (6 par heure) est levé au démarrage du chapitre (`otp-debloquer.ts`) : sans cela, un rejeu dans
+  l'heure n'envoie aucun code **et rien ne le dit à l'écran**.
+
+## Tests
+
+Plateforme **1000** (message 47, +3) + auth 230. `apps/e2e` : **274 scénarios** (265 + WEB-RGP ×9). Typecheck
+user-ui, message-service, api-gateway et harnais verts ; miroir i18n vert.

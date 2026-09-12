@@ -37,8 +37,12 @@ export default function SavedRouteCard({ savedRoute }: Props) {
 
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
-  const { mutate: deleteSavedRoute, isPending: isDeleting } =
-    useDeleteSavedRoute();
+  // ANO-WEB-29 — les toasts de suppression sont branchés sur le HOOK (la carte est démontée par la
+  // suppression optimiste avant la réponse : un callback passé à `mutate` ne serait jamais appelé).
+  const { mutate: deleteSavedRoute, isPending: isDeleting } = useDeleteSavedRoute({
+    onSuccess: () => toast.success(t("deleteSuccess")),
+    onError: () => toast.error(t("deleteError")),
+  });
   const { mutate: extendSavedRoute, isPending: isExtending } =
     useExtendSavedRoute();
   const { mutate: updateSavedRoute, isPending: isUpdating } =
@@ -56,10 +60,7 @@ export default function SavedRouteCard({ savedRoute }: Props) {
       return;
     }
 
-    deleteSavedRoute(savedRoute.id, {
-      onSuccess: () => toast.success(t("deleteSuccess")),
-      onError: () => toast.error(t("deleteError")),
-    });
+    deleteSavedRoute(savedRoute.id);
   };
 
   const handleExtend = () => {
