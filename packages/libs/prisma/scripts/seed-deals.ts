@@ -354,6 +354,9 @@ async function main() {
   const delR = await prisma.review.deleteMany({
     where: { OR: [{ authorUserId: { in: seedIds } }, { subjectUserId: { in: seedIds } }] },
   });
+  // C-PR8b (D63) — le journal des demandes RGPD des comptes du seed : sans cette purge, un export reussi lors
+  // d'un passage precedent bloque le suivant pendant 24 h (« un export par 24 h », recette 5.25).
+  const delDR = await prisma.dataRequest.deleteMany({ where: { userId: { in: seedIds } } });
   // D68 — les signalements des comptes du seed (auteur, ou membre visé) suivent aussi : un signalement OUVERT du
   // passage precedent rendait « Signaler ce profil » 409 des le premier clic (recette 5.24).
   const delS = await prisma.report.deleteMany({
@@ -379,7 +382,7 @@ async function main() {
     await prisma.conversation.deleteMany({ where: { id: { in: ids } } });
   }
   const delT = await prisma.trip.deleteMany({ where: { userId: { in: seedIds } } });
-  console.log(`✓ wipe : ${delB.count} bookings, ${delD.count} disputes, ${delR.count} avis, ${delS.count} signalements, ${delT.count} trips (périmètre seed)`);
+  console.log(`✓ wipe : ${delB.count} bookings, ${delD.count} disputes, ${delR.count} avis, ${delS.count} signalements, ${delDR.count} demandes RGPD, ${delT.count} trips (périmètre seed)`);
 
   // 3. Trips — reservedKg = Σ poids des bookings ACTIFS (CAP-02, calculé)
   const tripIds = new Map<string, string>();
