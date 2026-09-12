@@ -482,7 +482,7 @@ export default function LoginForm({ heroVisual, variant = "page", redirectOverri
   }
 
   return (
-    <main className="lg:grid lg:grid-cols-2 lg:min-h-[calc(100vh-64px)]">
+    <main className="lg:grid lg:grid-cols-2 lg:min-h-[calc(var(--yamba-viewport)-64px)]">
       {/* LEFT — visuel desktop only */}
       <div className="hidden lg:block">
         {heroVisual && <AuthHeroVisual visual={heroVisual} />}

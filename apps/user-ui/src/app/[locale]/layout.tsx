@@ -71,7 +71,9 @@ export default async function LocaleLayout({
             {/* Recette 01-WEB 5.1 (WEB-ACC-2) : <html lang> suit la langue après une bascule côté client */}
             <HtmlLang locale={locale} />
             <Header />
-            <div className="min-h-screen bg-slate-50 pt-[78px] dark:bg-slate-950">
+            {/* ANO-WEB-89 — `pb-[var(--yamba-consent-space)]` : la bannière de consentement réserve sa place
+                (elle recouvrait le bouton principal des écrans courts) ; 0 dès qu'elle n'est plus là. */}
+            <div className="min-h-screen bg-slate-50 pt-[78px] pb-[var(--yamba-consent-space,0px)] dark:bg-slate-950">
               {/* C-PR8c (D64) — annonce / lecture seule, lu sur le gateway toutes les 60 s */}
               <MaintenanceBanner />
               {children}
