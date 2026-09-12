@@ -3806,7 +3806,7 @@ l'API ; la seule voie est le signalement.
 
 # Confirmation, complétion et versement — ce que le chapitre 5.19 fait respecter
 
-*(PR `chore/recette-web-5-19`, 12/09/2026 — cahier 01-WEB chapitre 5.19, WEB-CNF-1 à 11.)*
+*(PR `chore/recette-web-5-19` (#284), 12/09/2026 — cahier 01-WEB chapitre 5.19, WEB-CNF-1 à 11.)*
 
 ## Le besoin
 

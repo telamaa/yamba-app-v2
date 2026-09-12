@@ -639,7 +639,7 @@ Ordre de demarrage : auth -> trip -> gateway.
   examen », montant retenu affiche, sous-titres des cartes, test « jamais 4242 ». PIEGES : cron FAKE qui
   rejoue / complete, FORCE_COLOR, `tsx --env-file` et l'env du processus, notifications qui survivent au
   seed, U+202F avant €, pas de <main>, TripsClient ≠ MyTripsList, deals replies par trajet. Harnais : 214
-  scenarios. Reste : 5.20 a 5.32, 02-ADMIN. AUCUNE attribution Claude.
+  scenarios. PR **#284** (empilee sur #283). Reste : 5.20 a 5.32, 02-ADMIN. AUCUNE attribution Claude.
 - 12/09 : **CHAPITRE 5.18 DU CAHIER 01-WEB — WEB-REM, LA REMISE DU COLIS (branche `chore/recette-web-5-18`,
   empilee sur #282)** — 7 fiches jouees CONFORMES (2 apres correction), 7 scenarios en serie, 55 s
   (`apps/e2e/src/chapitres/web-rem.spec.ts`, sgn-picked Mai ↔ Linh, bzv-picked pour l'annulation). DEUX

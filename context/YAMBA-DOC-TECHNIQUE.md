@@ -5662,7 +5662,7 @@ user-ui et harnais verts ; miroir i18n vert (`spotlight.deliverEarly` FR / EN).
 
 # Chapitre 5.19 du cahier 01-WEB : confirmation, complétion et versement — les textes qui ne suivaient pas la donnée, et le bandeau orphelin
 
-*(PR `chore/recette-web-5-19`, 12/09/2026.)*
+*(PR `chore/recette-web-5-19` (#284), 12/09/2026.)*
 
 ## Ce qui a été fait
 
