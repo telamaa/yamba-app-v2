@@ -3802,3 +3802,77 @@ l'API ; la seule voie est le signalement.
 | 234 | Bon code | livraison, succès, notifications, email sans le code, pas d'email Voyageur | oui |
 | 235 | Deal pris en charge | aucune annulation, écran et API | oui |
 
+---
+
+# Confirmation, complétion et versement — ce que le chapitre 5.19 fait respecter
+
+*(PR `chore/recette-web-5-19`, 12/09/2026 — cahier 01-WEB chapitre 5.19, WEB-CNF-1 à 11.)*
+
+## Le besoin
+
+Après la remise, l'Expéditeur a trois jours pour vérifier ; le geste par défaut est de ne rien faire, la
+confirmation anticipée est définitive, le signalement gèle le paiement. Passé J+4, le système clôt et verse.
+Le Voyageur voit l'état exact de son versement (à venir, parti, bloqué par son compte Stripe, gelé,
+renversé) ; l'Expéditeur, lui, ne voit JAMAIS l'état du versement du Voyageur — seulement « le paiement est
+libéré ». Les écrans « Finances » ne recalculent rien : tout vient du serveur, et rien n'est inventé (pas de
+fausse carte, pas de données de maquette).
+
+## Les règles
+
+**RG-WEB-199 — Le suivi d'un colis livré lit avant d'agir** : bandeau, période de vérification, compte à
+rebours sobre (jamais rouge), « Tout s'est bien passé ? » avec un bouton SECONDAIRE et un conseil, le récap,
+« Comment ça marche » (confirmer / ne rien faire / signaler), une carte sobre de signalement.
+
+**RG-WEB-200 — La confirmation anticipée est définitive** : avertissement avant, confirmation en ligne
+(« Oui, tout est OK » / « Annuler »), toast, « Envoi terminé » / « Transaction close », la carte de
+signalement disparaît ; l'Expéditeur reçoit « Transaction terminée », le Voyageur une cloche et un email
+« {montant} en route vers ton compte ».
+
+**RG-WEB-201 — À J+4 sans action, le système clôt** : « Période de vérification terminée le {date}, sans
+signalement de ta part », versement lancé, les mêmes emails ; la note du paiement dit la vérification
+terminée, jamais « tu as confirmé ».
+
+**RG-WEB-202 — Le rappel de la veille est envoyé une seule fois** (cloche + email « Dernier jour pour
+vérifier ton colis »).
+
+**RG-WEB-203 — Après J+4, ni confirmation ni signalement** ; un signalement forcé est refusé (409). *(La
+confirmation reste permise jusqu'au passage du cron — ANO-WEB-63, à trancher.)*
+
+**RG-WEB-204 — L'Expéditeur ne voit jamais un échec de versement** : « Envoi terminé » / « Le paiement de
+{prénom} est libéré », aucune mention d'échec, d'attente ou de Stripe, ni au suivi ni dans Paiements. *(La
+réponse brute de l'API porte encore `payoutStatus` — ANO-WEB-62, à trancher.)*
+
+**RG-WEB-205 — Le versement bloqué est dit au Voyageur partout, en langage grossier** : carte ambre sur le
+deal avec « Finaliser mon compte Stripe », bandeau en tête de « Mes trajets » qui totalise, carte « En
+attente » et ligne dans le portefeuille ; jamais le message technique du prestataire.
+
+**RG-WEB-206 — Le versement renversé est « sous examen »** : rien n'est perdu, Yamba contacte, aucun renvoi
+automatique n'est proposé.
+
+**RG-WEB-207 — Le portefeuille du Voyageur** : trois cartes (À venir / Envoyés / En attente) et des lignes à
+état fermé (à venir, en cours d'envoi, en attente Stripe, gelé, parti, retenue conservée, sous examen),
+libellées « Transport pour {prénom} » ou « Compensation · annulation tardive de {prénom} » ; le bloc Stripe ;
+jamais une donnée de maquette.
+
+**RG-WEB-208 — Les paiements de l'Expéditeur** : trois cartes (Bloqué chez Yamba / Dépensé / Remboursé) et des
+lignes à état fermé (autorisé, bloqué, bloqué jusqu'au, libéré, jamais débité, remboursé, remboursé
+partiellement avec la retenue) ; un remboursement porte toujours une date ; les totaux viennent du serveur.
+
+**RG-WEB-209 — « TON PAIEMENT » n'affiche que ce qui est connu** : le montant débité et l'état ; jamais une
+carte, un relevé ou un intitulé inventés.
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| 236 | Deal livré, Expéditeur | l'écran complet, bouton secondaire, compte à rebours sobre | oui |
+| 237 | Confirmer la livraison | avertissement, confirmation, toast, transaction close, signalement disparu, emails + cloche | oui |
+| 238 | J+4 atteint (cron) | clos par le système, versement lancé, emails, note « vérification terminée » | oui (ANO-WEB-64 close) |
+| 239 | Échéance dans moins de 24 h (cron) | rappel cloche + email, une seule fois | oui |
+| 240 | Échéance passée, cron pas passé | pas de signalement (écran + 409) ; confirmation encore proposée | avec réserve (ANO-WEB-63 ouverte) |
+| 241 | Versement en échec, Expéditrice | aucune fuite à l'écran ; l'API brute porte encore `payoutStatus` | écrans oui, API non (ANO-WEB-62 ouverte) |
+| 242 | Versement en échec, Voyageur | carte, bandeau Mes trajets, portefeuille, rien de technique | oui (ANO-WEB-66 close) |
+| 243 | Transfert renversé | sous examen, aucun renvoi | oui |
+| 244 | Portefeuille | cartes = serveur, 7 états, aucune maquette | oui |
+| 245 | Paiements | cartes = serveur, 6 états, remboursement daté | oui (ANO-WEB-67 close) |
+| 246 | Bloc « TON PAIEMENT » avec le FAKE | aucune fausse carte | oui |

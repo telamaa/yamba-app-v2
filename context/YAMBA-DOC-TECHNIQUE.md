@@ -5658,3 +5658,113 @@ La ligne d'état rend l'erreur + le compteur, ou « Tentative n sur 3 · n tenta
 Plateforme inchangée (996 + auth 229). `apps/e2e` : **201 scénarios** (194 + WEB-REM ×7). Typecheck
 user-ui et harnais verts ; miroir i18n vert (`spotlight.deliverEarly` FR / EN).
 
+---
+
+# Chapitre 5.19 du cahier 01-WEB : confirmation, complétion et versement — les textes qui ne suivaient pas la donnée, et le bandeau orphelin
+
+*(PR `chore/recette-web-5-19`, 12/09/2026.)*
+
+## Ce qui a été fait
+
+Le dix-neuvième chapitre « fiches » du cahier 01-WEB : `WEB-CNF` (la période de vérification, la
+confirmation anticipée, le rappel de la veille, la complétion automatique, l'après-J+4, l'étanchéité de
+l'état du versement côté Expéditeur, les trois états du versement côté Voyageur, le portefeuille, les
+paiements, le bloc « TON PAIEMENT »). Onze fiches jouées et conformes (quatre après correction, une avec
+réserve), six anomalies : quatre closes (`ANO-WEB-66` MAJEURE, `ANO-WEB-64`, `65`, `67` mineures) et deux
+ouvertes qui touchent le contrat et la machine (`ANO-WEB-62` MAJEURE, `ANO-WEB-63` mineure) — proposées au
+registre, jamais tranchées dans un contrôleur.
+
+```
+apps/e2e/src/chapitres/web-cnf.spec.ts                                            13 scénarios en série (11 fiches + 2 `test.fail`), 2 min 54
+apps/e2e/src/pages/mes-trajets.ts                                                 `ligneDuDeal()` déplie chaque trajet (« n colis ») jusqu'à la ligne
+scripts/recette/livraison-ancienne.ts                                             recule `deliveredAt` ET `payoutDueAt` (rappel, après-J+4, cron)
+scripts/recette/versement-bloque.ts                                               refige FAILED / ACCOUNT_NOT_READY, rejeu repoussé d'un jour
+apps/user-ui/src/components/trips/list/MyTripsList.tsx                            ANO-WEB-66 (le bandeau des versements bloqués sur la vraie page)
+apps/user-ui/src/components/dashboard/trips/TripsClient.tsx                       ANO-WEB-66 (page pleine aussi, pas seulement la page vide)
+apps/user-ui/src/components/booking/booking-tracker/views/delivered/DeliveredSideCards.tsx   ANO-WEB-64 (note du paiement selon `completedBy`)
+apps/user-ui/src/components/rating/RatingStatusCard.tsx                           ANO-WEB-65 (invitation sans échéance)
+apps/user-ui/messages/{fr,en}/bookingTracker.json · rating.json                   `delivered.payment.noteReleasedAuto`, `status.promptTextNoDate`
+apps/deal-service/src/services/wallet.service.ts (+ .spec)                         ANO-WEB-67 (date de remboursement, repli sur `updatedAt`) — deal 577
+packages/libs/prisma/scripts/seed-deals.ts                                        `ratingWindowEndsAt` sur les deals -blocked / -reversed
+```
+
+## Deux crons forcés, sur le fournisseur FAKE
+
+Le chapitre dépend de `payout-bookings` (passes `reminder` et `due`, toutes les 5 minutes). Le harnais ne
+les attend jamais : `scripts/recette/payout.ts <passe>` appelle directement le service de règlement, avec
+l'environnement du processus qui l'emporte sur le `.env` (`STRIPE_SECRET_KEY=""` → FAKE, comme le bundle) :
+
+```ts
+// apps/e2e/src/chapitres/web-cnf.spec.ts
+function scriptDeRecette(nom: string, ...args: string[]): string {
+  const sortie = execFileSync("npx", ["tsx", "--env-file=.env", `scripts/recette/${nom}.ts`, ...args], {
+    cwd: RACINE, encoding: "utf-8", timeout: 120_000,
+    env: { ...process.env, STRIPE_SECRET_KEY: "", FORCE_COLOR: "0", NO_COLOR: "1" },
+  });
+  return sortie.replace(/\[[0-9;]*m/g, ""); // Playwright pose FORCE_COLOR : « 0 » sortait « [33m0[39m »
+}
+```
+
+La manœuvre de date recule `deliveredAt` ET `payoutDueAt` (le compte à rebours de l'écran est calculé dans
+le navigateur à partir de `deliveredAt` : ne bouger que l'échéance ferait mentir l'écran). Le FAKE a un
+effet de bord : le cron REJOUE le versement « bloqué » du seed et le fait partir — `versement-bloque.ts`
+refige l'échec et repousse `payoutNextRetryAt` d'un jour, juste après le seed puis avant les fiches 6 / 7.
+
+## ANO-WEB-66 : un bandeau posé dans le mauvais composant
+
+`PayoutBlockedBanner` (A75) était rendu par `TripsClient` — et seulement dans sa branche « aucun trajet ».
+Or `/dashboard/trips` rend `MyTripsList` (`components/trips/list/`), qui ne le posait pas. Un Voyageur au
+versement bloqué (le cas nominal : il A des trajets) ne voyait jamais « {montant} en attente : finalise ton
+compte Stripe ». Le bandeau est posé par la page réelle, avant « À traiter », et sur la page pleine de
+`TripsClient`. Leçon : un composant transversal se pose au niveau de la page, et deux listes de trajets pour
+une même route sont une dette (`TripsClient` ne sert plus que la prévisualisation et la section du tableau
+de bord).
+
+## ANO-WEB-64, 65, 67 : trois textes qui ne suivaient pas la donnée
+
+- **64** — `DeliveredPaymentCard` (réutilisée par la vue « terminé ») disait « Tu as confirmé la livraison »
+  à tout deal clos, même clos par le SYSTÈME (« sans signalement de ta part » deux cartes plus haut). La
+  note suit `booking.completedBy` : `noteReleased` (SHIPPER) ou `noteReleasedAuto` (le reste).
+- **65** — `RatingStatusCard` rendait `promptText` avec `date: ""` quand `windowEndsAt` était `null` :
+  « Tu as jusqu'au . ». Sans date, `promptTextNoDate`. La cause de la donnée absente est dans le seed (les
+  deals `-blocked` / `-reversed` n'écrivaient pas `ratingWindowEndsAt`) — corrigé aussi, mais le composant
+  ne doit jamais dépendre d'un seed.
+- **67** — `wallet.service` rendait `date: iso(b.refundedAt)` pour REFUNDED / PARTIALLY_REFUNDED ; sans
+  `refundedAt` la ligne disait « Remboursé 33,60 € le ». Repli sur `updatedAt` (comme RELEASED_NO_CHARGE),
+  un test qui pose `refundedAt: null`.
+
+```ts
+// apps/deal-service/src/services/wallet.service.ts
+const refundDate = iso(b.refundedAt ?? b.updatedAt);
+```
+
+## Les deux anomalies ouvertes — au registre, pas dans le code
+
+- **ANO-WEB-62** — la vue Expéditeur porte `payoutStatus` / `payoutSentAt` et `ConfirmDealResponse` rend
+  `payoutStatus` ; le contrat le dit voulu (A68 « both roles read it »). Les écrans n'en montrent rien, mais
+  la réponse brute sert `"payoutStatus":"FAILED"` à l'Expéditrice d'un deal au versement bloqué. Retirer
+  ces champs de la vue Expéditeur est un changement de contrat (OpenAPI, D-next) : scénario 6 bis en
+  `test.fail`, il passera au vert quand la décision sera prise et codée.
+- **ANO-WEB-63** — la machine retire `dispute` après `payoutDueAt` (`beforePayoutDue`) mais pas
+  `confirmEarly` ; « Confirmer la livraison » reste proposé jusqu'au passage du cron. La garde jumelle
+  coûte trois lignes et un test de machine, mais une transition est une règle du registre : scénario 5 bis
+  en `test.fail`.
+
+## Le harnais
+
+- L'ordre de jeu n'est pas celui du cahier : un seul deal livré par rôle. `bzv-delivered` sert la lecture
+  (1, 11) puis la confirmation (2) ; `yul-delivered` sert le rappel (4, échéance dans 18 h), l'après-J+4
+  (5, échéance passée de 2 h, joué tout de suite car le vrai cron passe dans les 5 minutes) puis la
+  complétion (3, passe `due` forcée — et si le vrai cron a devancé, `expect.poll` sur `COMPLETED` suffit).
+- Les preuves d'étanchéité (6, 7) lisent `body` (les pages de suivi n'ont pas de `<main>`) après avoir
+  retiré la description du colis du seed, qui dit elle-même « compte Stripe incomplet ».
+- Les totaux des cartes Finances sont comparés à `GET /me/wallet` (jamais recalculés) et chaque ligne servie
+  est visée par son lien (`/bookings/<id>`, `/carrier/deals/<id>`) et confrontée à son état exact.
+- Les notifications survivent au seed : « une seule fois » se compte par lien du deal. Les montants portent
+  une espace fine insécable avant « € » (cloches, objets d'email) : `[\s  ]?€`.
+
+## Tests
+
+Plateforme **997** (deal 577, +1 ANO-WEB-67) + auth 229. `apps/e2e` : **214 scénarios** (201 + WEB-CNF ×13).
+Typecheck user-ui, deal-service et harnais verts ; miroir i18n vert (`noteReleasedAuto`, `promptTextNoDate`
+FR / EN).

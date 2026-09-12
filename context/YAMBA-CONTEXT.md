@@ -610,6 +610,36 @@ Ordre de demarrage : auth -> trip -> gateway.
   desktop du visiteur sans « Creer un compte » ni « Rechercher un trajet ». Piege de poste : la cle
   Google Maps n'accepte que `localhost` comme referent. Harnais : 32 scenarios verts. PR **#265**
   (empilee sur #264). Reste : 5.2 a 5.32, 02-ADMIN.
+- 12/09 : **CHAPITRE 5.19 DU CAHIER 01-WEB — WEB-CNF, CONFIRMATION, COMPLETION ET VERSEMENT (branche
+  `chore/recette-web-5-19`, empilee sur #283)** — 11 fiches jouees CONFORMES (4 apres correction, 1 avec
+  reserve), 13 scenarios en serie dont 2 `test.fail`, 2 min 54 (`apps/e2e/src/chapitres/web-cnf.spec.ts` ;
+  bzv-delivered Joao ↔ Thomas, yul-delivered Aminata ↔ Marc, bzv-completed-blocked, bzv-reversed ; crons
+  FORCES par `scripts/recette/payout.ts reminder|due` sur le FAKE apres `livraison-ancienne.ts <id> <jours>`
+  qui recule deliveredAt ET payoutDueAt ; `versement-bloque.ts` refige l'echec que le cron FAKE ferait
+  partir). SIX ANOMALIES : ANO-WEB-66 MAJEURE close (le bandeau « {montant} en attente : finalise ton compte
+  Stripe » n'etait pose que par l'ancien TripsClient, jamais par MyTripsList = la vraie page « Mes
+  trajets »), ANO-WEB-64 close (note « Tu as confirme la livraison » sur une completion SYSTEME →
+  `noteReleasedAuto` suit `completedBy`), ANO-WEB-65 close (« Tu as jusqu'au . » : RatingStatusCard sans
+  echeance → `promptTextNoDate`, seed avec `ratingWindowEndsAt` sur -blocked / -reversed), ANO-WEB-67 close
+  (« Rembourse 33,60 € le » sans date → wallet.service replie sur updatedAt, +1 test deal = 577) ;
+  OUVERTES : ANO-WEB-62 MAJEURE (l'API sert `payoutStatus` / `payoutSentAt` a l'Expeditrice et
+  `ConfirmDealResponse.payoutStatus` — A68 « both roles read it » contre le cahier « aucune fuite » : registre,
+  PR dediee), ANO-WEB-63 mineure (apres payoutDueAt la machine retire `dispute` mais laisse `confirmEarly` :
+  « Confirmer la livraison » reste propose ≤ 5 min ; garde `beforePayoutDue` proposee, registre). Prouve :
+  ecran livre complet, bouton de confirmation SECONDAIRE, compte a rebours jamais rouge ; confirmation
+  definitive (signalement disparu, emails et cloche « 55,00 € partis vers ton compte ») ; rappel J+3 une
+  seule fois (1 puis 0) ; apres J+4 sans cron : « Signaler » absent, 0h, dispute force 409 ; completion
+  SYSTEME (« sans signalement de ta part », Marc « 18,00 € partis ») ; ecrans Expeditrice etanches (suivi +
+  Paiements) ; versement bloque (deal, bandeau, ligne, portefeuille — aucune chaine technique) ; renverse
+  (sous examen, aucun renvoi) ; portefeuille et paiements = serveur, 7 + 6 etats de ligne, aucune maquette ;
+  « TON PAIEMENT » sans fausse carte. A trancher : A68, confirmer apres J+4, deux horloges (compte a rebours
+  client), objets d'email, cle morte `booking_payout_sent.SHIPPER`. Regard d'expert : `payoutDueAt` servi,
+  retirer payoutStatus de la reponse de confirmation, journaliser le passage du cron, rappel date a l'heure
+  exacte, garde symetrique, liste blanche Expediteur, une seule liste de trajets, delai dit sur « sous
+  examen », montant retenu affiche, sous-titres des cartes, test « jamais 4242 ». PIEGES : cron FAKE qui
+  rejoue / complete, FORCE_COLOR, `tsx --env-file` et l'env du processus, notifications qui survivent au
+  seed, U+202F avant €, pas de <main>, TripsClient ≠ MyTripsList, deals replies par trajet. Harnais : 214
+  scenarios. Reste : 5.20 a 5.32, 02-ADMIN. AUCUNE attribution Claude.
 - 12/09 : **CHAPITRE 5.18 DU CAHIER 01-WEB — WEB-REM, LA REMISE DU COLIS (branche `chore/recette-web-5-18`,
   empilee sur #282)** — 7 fiches jouees CONFORMES (2 apres correction), 7 scenarios en serie, 55 s
   (`apps/e2e/src/chapitres/web-rem.spec.ts`, sgn-picked Mai ↔ Linh, bzv-picked pour l'annulation). DEUX
