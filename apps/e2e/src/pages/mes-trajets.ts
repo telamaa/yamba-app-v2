@@ -40,9 +40,11 @@ export class MesTrajets {
   /** La ligne d'un deal sous son trajet (dépliée au besoin), espaces normalisées. */
   async ligneDuDeal(dealId: string): Promise<string> {
     const ligne = this.page.locator(`a[href="/fr/carrier/deals/${dealId}"]`).first();
-    if ((await ligne.count()) === 0 || !(await ligne.isVisible())) {
-      const bascule = this.page.getByRole("button", { name: /^\d+ colis$/ }).first();
-      if (await bascule.count()) await bascule.click();
+    // Chaque trajet replie ses deals derrière « n colis » (à venir, en cours, historique) : on déplie
+    // jusqu'à voir la ligne — un deal terminé vit sous un trajet de l'historique (5.19).
+    const bascules = this.page.getByRole("button", { name: /^\d+ colis$/ });
+    for (let i = 0; i < (await bascules.count()) && !(await ligne.isVisible().catch(() => false)); i++) {
+      await bascules.nth(i).click();
     }
     await expect(ligne).toBeVisible({ timeout: 30_000 });
     return normaliserEspaces(await ligne.innerText());
