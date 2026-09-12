@@ -4099,3 +4099,51 @@ d'acquisition reste.
 | 284 | Voyageur / demande en attente | aucune carte, 403 / 409 | oui |
 | 285 | Jeton altéré / destinataire effacé | même message, même 404 | oui |
 | 286 | Écran de transit du Voyageur | le vrai numéro, appel, WhatsApp | oui |
+
+---
+
+# Signaler un trajet, un profil, un message — ce que le chapitre 5.24 fait respecter
+
+*(PR `chore/recette-web-5-24`, 12/09/2026 — cahier 01-WEB chapitre 5.24, WEB-SIG-1 à 8.)*
+
+## Le besoin
+
+Tout membre connecté peut signaler une annonce ou un profil (jamais le sien), une fois par cible tant que le dossier
+est ouvert, avec un motif propre à la cible et une précision facultative ; il reçoit un accusé (écran + email) et
+n'apprend jamais la suite ; la personne signalée n'apprend rien, rien ne change sur la cible, et trois signalements
+rendent la revue prioritaire sans sanction automatique. Une cible invisible (supprimée, masquée, privée) répond
+« introuvable ». Un avis se signale par email au support.
+
+## Les règles
+
+**RG-WEB-245 — Un signalement est toujours signé** : un visiteur passe par la porte d'identité et revient sur la cible.
+
+**RG-WEB-246 — La fenêtre de signalement dit le titre de la cible, l'introduction, les motifs de la cible** (annonce :
+illicite, arnaque, inapproprié, autre ; profil : les mêmes + usurpation), une précision facultative, puis l'accusé
+« Merci, ton signalement est bien reçu. » et un email dans la langue de l'auteur.
+
+**RG-WEB-247 — Un doublon ouvert est refusé** (« Tu as déjà signalé cet élément, notre équipe s'en occupe. »).
+
+**RG-WEB-248 — On ne signale pas son propre contenu** : aucun bouton, et l'API refuse.
+
+**RG-WEB-249 — La personne signalée n'apprend rien** : ni cloche, ni email, ni bandeau, ni sanction automatique.
+
+**RG-WEB-250 — Une cible invisible (supprimée, masquée par Yamba, profil privé) est introuvable** — son existence n'est
+pas révélée.
+
+**RG-WEB-251 — Trois signalements ouverts rendent la revue prioritaire** au back-office, sans rien changer côté membre.
+
+**RG-WEB-252 — Un avis se signale par email au support, avec sa référence** ; il n'y a pas de file dédiée.
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| 287 | Visiteur | porte d'identité, retour sur l'annonce après connexion | oui |
+| 288 | Annonce d'un autre membre | fenêtre, quatre motifs, accusé, email, annonce en ligne | oui |
+| 289 | Second signalement | 409 traduit | oui |
+| 290 | Sa propre annonce / son profil | aucun bouton, API refuse | oui |
+| 291 | Profil d'un autre membre | cinq motifs, accusé, le signalé n'apprend rien | oui |
+| 292 | Annonce masquée / profil privé | introuvable (page, bouton, API) | oui (ANO-WEB-79 close) |
+| 293 | Trois auteurs | trois accusés, rien côté propriétaire, revue prioritaire, aucune sanction | oui |
+| 294 | Avis public | mailto au support avec la référence | oui |

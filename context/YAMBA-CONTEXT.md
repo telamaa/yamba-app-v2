@@ -610,6 +610,25 @@ Ordre de demarrage : auth -> trip -> gateway.
   desktop du visiteur sans « Creer un compte » ni « Rechercher un trajet ». Piege de poste : la cle
   Google Maps n'accepte que `localhost` comme referent. Harnais : 32 scenarios verts. PR **#265**
   (empilee sur #264). Reste : 5.2 a 5.32, 02-ADMIN.
+- 12/09 : **CHAPITRE 5.24 DU CAHIER 01-WEB — WEB-SIG, SIGNALER UN TRAJET, UN PROFIL, UN MESSAGE (branche
+  `chore/recette-web-5-24`, empilee sur #288)** — 8 fiches jouees CONFORMES (2 apres correction), 8 scenarios en
+  serie, 2 min 54 (`apps/e2e/src/chapitres/web-sig.spec.ts` ; bzv-upcoming et bzv-perkg de Thomas, profil
+  seed-thomas, fih masque par l'API admin et seed-josephine rendu prive par manoeuvre — remis en l'etat en finally ;
+  file admin lue par GET /admin/reports). DEUX ANOMALIES CLOSES : ANO-WEB-79 MAJEURE (une annonce masquee par
+  Yamba se signalait — 201 — et revelait son existence : report.service exige hiddenByAdminAt null/absent, +1 test
+  auth = 230), ANO-WEB-80 (404 traduit « Reessaie » → « Cet element est introuvable… ») ; JEU D'ESSAI : les
+  Report survivaient au seed (409 au premier clic sur un profil) → purges avec les bookings et les avis. Prouve :
+  porte d'identite du visiteur avec connexion dans la fenetre ; fenetre d'annonce (titre, intro, quatre motifs sans
+  « Usurpation », precisions, accuse, email dans la langue de l'auteur, annonce toujours en ligne) ; doublon 409 ;
+  soi-meme (aucun bouton, 400 OWN_TARGET) ; profil (cinq motifs, membre signale jamais prevenu) ; cible invisible
+  (annonce masquee 404, profil masque 404) ; trois signalements = trois accuses, rien cote proprietaire, file
+  admin « 3 ouverts, prioritaire », annonce toujours publique ; avis = mailto au support avec l'id. A trancher :
+  400 pour un refus de droit, annonce en pause/annulee signalable, doublon apres traitement. Regard d'expert :
+  reprendre le geste apres connexion, compteur des precisions, 403 pour OWN_TARGET, regle de visibilite unique
+  partagee, seuil au catalogue, corps du mailto pre-rempli. PIEGES : Report survivants au seed, cron FAKE qui ecrit
+  au proprietaire (prouver par cloches nouvelles / sujet), GET /trips/:id reserve au proprietaire, masquage par
+  l'API admin + profil prive par manoeuvre en finally, session request qui expire. Harnais : 265 scenarios.
+  Reste : 5.25 a 5.32, 02-ADMIN. AUCUNE attribution Claude.
 - 12/09 : **CHAPITRE 5.23 DU CAHIER 01-WEB — WEB-DES, LA PAGE DESTINATAIRE (branche `chore/recette-web-5-23`,
   empilee sur #287)** — 9 fiches jouees CONFORMES, AUCUNE ANOMALIE, 9 scenarios en serie, 2 min 24
   (`apps/e2e/src/chapitres/web-des.spec.ts` ; bzv-picked Aminata ↔ Thomas, destinataire Clarisse +242061234567,
