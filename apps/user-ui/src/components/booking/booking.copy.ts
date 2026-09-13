@@ -70,7 +70,7 @@ export function getBookingCopy(isFr: boolean) {
       : "Ex: 3 t-shirts, 1 jumper, chocolate",
 
     photosLabel: isFr ? "Photos du colis" : "Parcel photos",
-    photosRequiredBadge: isFr ? "Obligatoire avec l'assurance" : "Required with insurance",
+    photosRequiredBadge: isFr ? "Obligatoire avec la garantie" : "Required with insurance",
     photosHint: isFr
       ? "Idéalement : une photo du contenu déballé + une du colis emballé. JPEG ou PNG, max 10 Mo par photo."
       : "Ideally: one photo of unpacked content + one of the packed parcel. JPEG or PNG, max 10 MB per photo.",
@@ -79,13 +79,13 @@ export function getBookingCopy(isFr: boolean) {
     photoTagPackaged: isFr ? "Emballé" : "Packed",
     photoRemove: isFr ? "Supprimer cette photo" : "Remove this photo",
 
-    insuranceTitle: isFr ? "Assurance optionnelle" : "Optional insurance",
+    insuranceTitle: isFr ? "Protection optionnelle" : "Optional protection",
     insuranceBasicTitle: isFr ? "Protection de base" : "Basic protection",
     insuranceBasicPrice: isFr ? "Inclus" : "Included",
     insuranceBasicDesc: isFr
       ? "Tu es protégé contre la non-livraison. Le paiement est bloqué jusqu'à la remise au destinataire."
       : "You're covered against non-delivery. Payment is held until the parcel reaches the recipient.",
-    insuranceExtendedTitle: isFr ? "Assurance jusqu'à 500 €" : "Insurance up to €500",
+    insuranceExtendedTitle: isFr ? "Garantie Yamba jusqu'à 500 €" : "Yamba Guarantee up to €500", // ANO-WEB-33 : jamais « assurance » à l'écran
     insuranceExtendedPrice: "+ 6 €",
     insuranceExtendedDesc: isFr
       ? "Perte, vol, casse pendant le transport. Vol partiel du contenu couvert."
@@ -236,8 +236,8 @@ export function getBookingCopy(isFr: boolean) {
     summaryToPayTitle: isFr ? "Tu paies" : "You pay",
     transport: isFr ? "Transport" : "Transport",
     serviceYamba: isFr ? "Service Yamba" : "Yamba service",
-    insurance: isFr ? "Assurance" : "Insurance",
-    insurance500: isFr ? "Assurance 500 €" : "Insurance €500",
+    insurance: isFr ? "Protection" : "Protection",
+    insurance500: isFr ? "Garantie Yamba 500 €" : "Yamba Guarantee €500",
     total: isFr ? "Total" : "Total",
     totalNote: isFr
       ? "Débité à acceptation par le voyageur"
@@ -260,7 +260,7 @@ export function getBookingCopy(isFr: boolean) {
     deliverySummary: isFr ? "Retrait" : "Pickup",
     recipientSummary: isFr ? "Destinataire" : "Recipient",
     charterSummary: isFr ? "Engagement" : "Commitment",
-    insuranceSummary: isFr ? "Assurance" : "Insurance",
+    insuranceSummary: isFr ? "Protection" : "Protection",
     dateSummary: isFr ? "Date" : "Date",
     routeSummary: isFr ? "Trajet" : "Route",
     directFlight: isFr ? "Direct" : "Direct",

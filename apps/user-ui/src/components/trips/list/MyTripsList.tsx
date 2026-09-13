@@ -11,6 +11,7 @@ import useUser from "@/hooks/useUser";
 import { useMyDeals } from "@/hooks/useMyDeals";
 import TripActionRow from "@/components/dashboard/trips/TripActionRow";
 import TripDealRow from "@/components/dashboard/trips/TripDealRow";
+import PayoutBlockedBanner from "@/components/dashboard/trips/PayoutBlockedBanner";
 import { deriveCarrierActions, type CarrierDealItem } from "@/components/dashboard/trips/trips.types";
 import {
   countPending,
@@ -556,10 +557,10 @@ export default function MyTripsList() {
   const groupHead = (dotClass: string, label: string, count: number) => (
     <div className="mb-2 mt-7 flex items-center gap-2 px-0.5 first:mt-0">
       <span className={"h-1.5 w-1.5 rounded-full " + dotClass} />
-      <h2 className="text-[11px] font-medium uppercase tracking-wider text-slate-400 dark:text-slate-500">
+      <h2 className="text-[11px] font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400">
         {label}
       </h2>
-      <span className="text-[11px] text-slate-300 dark:text-slate-600">
+      <span className="text-[11px] text-slate-500 dark:text-slate-400">
         · {count}
       </span>
     </div>
@@ -615,6 +616,10 @@ export default function MyTripsList() {
           onDismiss={() => setBannerDismissed(true)}
         />
       )}
+
+      {/* ANO-WEB-66 : « {montant} en attente : finalise ton compte Stripe » — le bandeau (A75) n'était posé
+          que sur l'ancien TripsClient, jamais sur cette liste : un Voyageur au versement bloqué ne le voyait pas. */}
+      <PayoutBlockedBanner />
 
       {/* À traiter — inbox dérivée, trans-trajets (A44) */}
       {actions.length > 0 && (

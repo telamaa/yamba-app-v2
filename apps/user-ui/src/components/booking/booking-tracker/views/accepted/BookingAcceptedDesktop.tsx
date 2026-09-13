@@ -9,6 +9,7 @@
 
 import { useTranslations } from "next-intl";
 import BookingTrackingLinkCard from "@/components/booking/booking-tracker/shared/BookingTrackingLinkCard"; // D69
+import { Link } from "@/i18n/navigation";
 import type { Booking } from "@/components/booking/booking-tracker/booking-tracker.types";
 import DealStepper, {
   type StepperStep,
@@ -98,13 +99,13 @@ export default function BookingAcceptedDesktop({
               <BookingTripSidebar booking={booking} />
 
               <div className="text-center">
-                <button
-                  type="button"
+                {/* ANO-WEB-70 : un bouton qui n'écrivait que dans la console — le suivi RAMÈNE vers « Mes envois » (5.20, ANN-8). */}
+                <Link
+                  href="/dashboard/shipments"
                   className="text-[12px] font-semibold text-[#185FA5] hover:text-[#0C447C] dark:text-blue-400 dark:hover:text-blue-300"
-                  onClick={() => console.info("[booking] open dashboard")}
                 >
                   {t("dashboardLink")}
-                </button>
+                </Link>
               </div>
             </div>
           </aside>

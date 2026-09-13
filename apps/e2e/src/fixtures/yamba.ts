@@ -43,15 +43,24 @@ export interface NavigateurAdmin {
 }
 
 export interface OptionsConnexion {
+  /**
+   * Ouvrir le navigateur en **écran de téléphone** (iPhone 14 : 390 × 844, tactile) — chapitre 5.30
+   * du cahier 01-WEB, qui se joue entièrement en émulation mobile, et toute fiche qui vise les
+   * arbres « mobile » du produit (`useIsMobile`). Une largeur sur mesure est acceptée
+   * (`mobile: { width: 800 }` pour la zone intermédiaire tablette, WEB-MOB-7).
+   */
+  mobile?: boolean | { width?: number; height?: number };
   /** Ignorer la session mémorisée et passer par l'écran de connexion (puis mémoriser). */
   parEcran?: boolean;
+  /** Cocher « Rester connecté sur cet appareil » (profil de session 7 jours, WEB-CNX-6) — implique `parEcran`. */
+  memoriser?: boolean;
 }
 
 export interface FixturesYamba {
   /** Ouvre un navigateur neuf et y connecte un compte du jeu d'essai. */
   navigateurConnecte: (cle: keyof typeof COMPTES, options?: OptionsConnexion) => Promise<Navigateur>;
-  /** Ouvre un navigateur neuf SANS session — le visiteur, le destinataire. */
-  navigateurVisiteur: () => Promise<Navigateur>;
+  /** Ouvre un navigateur neuf SANS session — le visiteur, le destinataire (`{ mobile: true }` pour un téléphone). */
+  navigateurVisiteur: (options?: OptionsConnexion) => Promise<Navigateur>;
   /** Ouvre un navigateur sur le back-office, connexion en deux temps (mot de passe, puis TOTP). */
   navigateurAdmin: (cle: keyof typeof COMPTES_ADMIN, options?: OptionsConnexion) => Promise<NavigateurAdmin>;
   mailpit: Mailpit;
@@ -60,13 +69,29 @@ export interface FixturesYamba {
 
 const OPTIONS_CONTEXTE = { locale: "fr-FR", timezoneId: "Europe/Paris" } as const;
 
+/** L'écran de téléphone du cahier (§ 5.30) : iPhone 14, tactile, densité 3. */
+const TELEPHONE = { largeur: 390, hauteur: 844 } as const;
+const UA_TELEPHONE =
+  "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
+
+/** Les options de contexte, éventuellement en écran de téléphone. */
+function optionsContexte(mobile?: OptionsConnexion["mobile"]): Record<string, unknown> {
+  if (!mobile) return { ...OPTIONS_CONTEXTE };
+  const taille = typeof mobile === "object" ? mobile : {};
+  const width = taille.width ?? TELEPHONE.largeur;
+  const height = taille.height ?? TELEPHONE.hauteur;
+  // `isMobile` et `hasTouch` changent ce que le produit rend (`useIsMobile`, feuilles du bas) :
+  // un simple `viewport` étroit ne suffit pas à jouer le cahier mobile.
+  return { ...OPTIONS_CONTEXTE, viewport: { width, height }, isMobile: true, hasTouch: true, deviceScaleFactor: 3, userAgent: UA_TELEPHONE };
+}
+
 /* ══ La connexion d'un membre, par l'écran ═══════════════════════════════════════════════════ */
 
 /**
  * Connexion par l'écran de connexion. Rend la page **une fois la session établie** : on attend
  * la disparition de l'écran, pas un délai arbitraire.
  */
-export async function connexion(page: Page, compte: Compte, motDePasse = MOT_DE_PASSE_SEED): Promise<void> {
+export async function connexion(page: Page, compte: Compte, motDePasse = MOT_DE_PASSE_SEED, options: { memoriser?: boolean } = {}): Promise<void> {
   // Deux pièges se cumulent ici, tous deux mesurés au montage du harnais.
   //
   // 1. Sur une adresse de réseau local, Next 16 sert d'abord un squelette SSR. Cliquer avant
@@ -82,6 +107,7 @@ export async function connexion(page: Page, compte: Compte, motDePasse = MOT_DE_
     const formulaire = page.locator("main form").first();
     await formulaire.locator("#email").fill(compte.email);
     await formulaire.locator("#password").fill(motDePasse);
+    if (options.memoriser) await formulaire.locator('input[type="checkbox"]').check();
     const reponse = page
       .waitForResponse((r) => r.url().includes("/auth/login") && r.request().method() === "POST", { timeout: 20_000 })
       .catch(() => null);
@@ -230,14 +256,14 @@ async function ouvrirSession(
 ): Promise<{ page: Page; contexte: BrowserContext }> {
   const memoire: EtatDeSession | null = options.parEcran ? null : lireSession(cleMemoire);
   if (memoire && cookieDe(memoire, cookie)) {
-    const contexte = await browser.newContext({ ...OPTIONS_CONTEXTE, storageState: memoire });
+    const contexte = await browser.newContext({ ...optionsContexte(options.mobile), storageState: memoire });
     if (await vivante(contexte)) {
       return { page: await contexte.newPage(), contexte };
     }
     await contexte.close();
     oublierSession(cleMemoire);
   }
-  const contexte = await browser.newContext(OPTIONS_CONTEXTE);
+  const contexte = await browser.newContext(optionsContexte(options.mobile));
   const page = await contexte.newPage();
   await parEcran(page);
   ecrireSession(cleMemoire, await contexte.storageState());
@@ -279,7 +305,8 @@ export const test = base.extend<FixturesYamba>({
     await use(async (cle, options = {}) => {
       const compte = COMPTES[cle];
       const cleMemoire = `membre-${cle}`;
-      const { page, contexte } = await ouvrirSession(browser, cleMemoire, "access_token", options, (p) => connexion(p, compte), sessionMembreVivante);
+      const parEcran = { ...options, parEcran: options.parEcran || Boolean(options.memoriser) };
+      const { page, contexte } = await ouvrirSession(browser, cleMemoire, "access_token", parEcran, (p) => connexion(p, compte, MOT_DE_PASSE_SEED, { memoriser: options.memoriser }), sessionMembreVivante);
       ouverts.push({ cleMemoire, cookie: "access_token", contexte });
       return { page, contexte, compte };
     });
@@ -288,8 +315,8 @@ export const test = base.extend<FixturesYamba>({
 
   navigateurVisiteur: async ({ browser }, use) => {
     const ouverts: BrowserContext[] = [];
-    await use(async () => {
-      const contexte = await browser.newContext(OPTIONS_CONTEXTE);
+    await use(async (options: OptionsConnexion = {}) => {
+      const contexte = await browser.newContext(optionsContexte(options.mobile));
       ouverts.push(contexte);
       const page = await contexte.newPage();
       return { page, contexte, compte: null };

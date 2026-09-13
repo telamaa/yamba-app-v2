@@ -11,7 +11,8 @@
 
 import { AlertTriangle, X } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useDialogFocus } from "@/hooks/useDialogFocus";
 import type { PickupRefuseReason } from "@/components/carrier/deal/deal.types";
 
 const REASONS: PickupRefuseReason[] = [
@@ -41,6 +42,9 @@ export default function PickupRefuseDialog({
                                            }: Props) {
   const t = useTranslations("carrierDealPickup");
   const [reason, setReason] = useState<PickupRefuseReason | undefined>(undefined);
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  // ANO-WEB-94 — focus piégé dans la fenêtre, rendu au geste de départ à la fermeture.
+  useDialogFocus(dialogRef, isOpen);
 
   // Body scroll lock + Esc (modal uniquement)
   useEffect(() => {
@@ -124,6 +128,7 @@ export default function PickupRefuseDialog({
   if (variant === "sheet") {
     return (
       <div
+        ref={dialogRef}
         className={`fixed inset-0 z-50 transition-opacity duration-200 ${
           isOpen ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
         }`}
@@ -131,6 +136,8 @@ export default function PickupRefuseDialog({
         role="dialog"
         aria-modal="true"
         aria-hidden={!isOpen}
+        // Toujours montée (fondu) : fermée, ses boutons restaient atteignables à la tabulation, invisibles.
+        inert={!isOpen}
       >
         <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
         <div
@@ -164,6 +171,7 @@ export default function PickupRefuseDialog({
 
   return (
     <div
+      ref={dialogRef}
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm"
       onClick={() => !isSubmitting && onCloseAction()}
       role="dialog"

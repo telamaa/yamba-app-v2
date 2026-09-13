@@ -19,12 +19,12 @@ import Footer from "@/components/layout/Footer";
  */
 export default function MarketingLayout({ children }: { children: ReactNode }) {
   return (
-    // <div className="flex min-h-[calc(100vh-78px)] flex-col">
+    // <div className="flex min-h-[calc(var(--yamba-viewport)-78px)] flex-col">
     //   <main className="flex-1">{children}</main>
     //   <Footer />
     // </div>
     <>
-      <main className="min-h-[calc(100vh-78px)]">{children}</main>
+      <main className="min-h-[calc(var(--yamba-viewport)-78px)]">{children}</main>
       <Footer />
     </>
   );

@@ -162,13 +162,13 @@
     }
   },
   "gates": {
-    "onboardingToast": "Complete your carrier profile to activate this trip",
+    "onboardingToast": "Complete your Traveler profile to activate this trip",
     "onboardingCta": "Configure",
     "stripeToast": "Configure Stripe to activate this trip and receive payments",
     "stripeCta": "Configure Stripe"
   },
   "toasts": {
-    "cancelBlocked": "This trip still has {count, plural, =1 {one deal in progress} other {# deals in progress}}: cancel them first from « My deals ». Each shipper is then refunded in full.",
+    "cancelBlocked": "This trip still has {count, plural, =1 {one deal in progress} other {# deals in progress}}: cancel them first from « My trips » (each deal is listed under its trip). Each shipper is then refunded in full.",
     "activated": "Trip activated",
     "activationFailed": "Failed to activate",
     "resumed": "Trip back online",
@@ -196,7 +196,7 @@
   },
   "banner": {
     "title": "You have {count, plural, =1 {1 draft pending} other {# drafts pending}} publication",
-    "subtitle": "Set up your carrier profile to activate your trips and receive requests.",
+    "subtitle": "Set up your Traveler profile to activate your trips and receive requests.",
     "cta": "Configure now"
   },
   "detail": {

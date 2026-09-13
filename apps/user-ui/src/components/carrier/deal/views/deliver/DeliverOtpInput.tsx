@@ -44,14 +44,21 @@ export default function DeliverOtpInput({
   const t = useTranslations("carrierDealDeliver");
   const [digits, setDigits] = useState<string[]>(Array(CODE_LENGTH).fill(""));
   const [shake, setShake] = useState(false);
+  // ANO-WEB-61 (recette 5.18) : l'erreur s'efface dès que le Voyageur ressaisit — la ligne
+  // « Tentative n sur 3 · n tentatives restantes » reprend sa place.
+  const [erreurMasquee, setErreurMasquee] = useState(false);
   const inputsRef = useRef<(HTMLInputElement | null)[]>([]);
 
   const code = digits.join("");
   const isComplete = code.length === CODE_LENGTH && digits.every((d) => d !== "");
+  const erreurVisible = !!errorMessage && !erreurMasquee;
 
-  // Shake + reset à chaque nouvelle erreur
+  // Shake + reset à chaque nouvelle erreur. Le texte est le MÊME d'un essai à l'autre (« Ce code
+  // n'est pas le bon… ») : c'est le compteur d'essais qui signale un nouvel échec (ANO-WEB-61 —
+  // sans lui, le deuxième code faux restait dans les cases, sans secousse).
   useEffect(() => {
     if (!errorMessage) return;
+    setErreurMasquee(false);
     setShake(true);
     setDigits(Array(CODE_LENGTH).fill(""));
     const timer = setTimeout(() => {
@@ -59,10 +66,11 @@ export default function DeliverOtpInput({
       inputsRef.current[0]?.focus();
     }, 500);
     return () => clearTimeout(timer);
-  }, [errorMessage]);
+  }, [errorMessage, attemptsUsed]);
 
   const handleChange = (index: number, value: string) => {
     const digit = value.replace(/\D/g, "").slice(-1);
+    if (digit && errorMessage) setErreurMasquee(true);
     setDigits((prev) => {
       const next = [...prev];
       next[index] = digit;
@@ -173,13 +181,28 @@ export default function DeliverOtpInput({
             </p>
           )}
         </div>
-      ) : errorMessage ? (
-        <p className="mt-3 text-center text-[12.5px] font-semibold text-red-700 dark:text-red-400">
-          {errorMessage}
-        </p>
+      ) : erreurVisible ? (
+        <div className="mt-3 text-center">
+          <p className="text-[12.5px] font-semibold text-red-700 dark:text-red-400">
+            {errorMessage}
+          </p>
+          {/* ANO-WEB-61 (recette 5.18) : « {n} tentatives restantes » / « Dernière tentative » existait au
+              catalogue et n'était jamais rendu — le Voyageur ne savait pas qu'il jouait sa dernière chance. */}
+          <p className="mt-1 text-[12px] font-semibold text-amber-800 dark:text-amber-300">
+            {t("otp.attemptsLeft", { count: maxAttempts - attemptsUsed })}
+          </p>
+        </div>
       ) : (
         <p className="mt-3 text-center text-[12px] text-slate-500 dark:text-slate-400">
           {t("otp.attempt", { current: attemptsUsed + 1, max: maxAttempts })}
+          {attemptsUsed > 0 && (
+            <>
+              {" · "}
+              <span className="font-semibold text-amber-800 dark:text-amber-300">
+                {t("otp.attemptsLeft", { count: maxAttempts - attemptsUsed })}
+              </span>
+            </>
+          )}
         </p>
       )}
 

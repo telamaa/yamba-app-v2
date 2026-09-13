@@ -54,8 +54,8 @@
     "product": {
       "label": "What do you want to send?",
       "parcel": "A parcel (per kg)",
-      "checkedBag": "A 23 kg checked bag",
-      "cabinBag": "A 12 kg cabin bag"
+      "checkedBag": "A checked bag 23 kg",
+      "cabinBag": "A cabin bag 12 kg"
     },
     "family": {
       "label": "Parcel family",

@@ -12,21 +12,21 @@ type Status = "loading" | "success" | "incomplete" | "error";
 
 function buildCopy(isFr: boolean) {
   return {
-    loading: isFr ? "Vérification de votre compte Stripe..." : "Verifying your Stripe account...",
+    loading: isFr ? "Vérification de ton compte Stripe..." : "Verifying your Stripe account...",
 
     successTitle: isFr ? "Stripe connecté avec succès !" : "Stripe connected successfully!",
     successSubtitle: isFr
-      ? "Votre espace est prêt. Vous pouvez maintenant publier des trajets et recevoir des paiements."
+      ? "Ton espace est prêt. Tu peux maintenant publier des trajets et recevoir des paiements."
       : "Your space is ready. You can now publish trips and receive payments.",
 
     incompleteTitle: isFr ? "Configuration Stripe incomplète" : "Stripe setup incomplete",
     incompleteSubtitle: isFr
-      ? "Il semble que la configuration de votre compte Stripe n'est pas terminée. Vous pouvez réessayer ou terminer plus tard."
+      ? "Il semble que la configuration de ton compte Stripe n'est pas terminée. Tu peux réessayer ou terminer plus tard."
       : "It looks like your Stripe account setup is not finished. You can retry or finish later.",
 
     errorTitle: isFr ? "Erreur de vérification" : "Verification error",
     errorSubtitle: isFr
-      ? "Nous n'avons pas pu vérifier le statut de votre compte Stripe. Réessayez dans quelques instants."
+      ? "Nous n'avons pas pu vérifier le statut de ton compte Stripe. Réessaie dans quelques instants."
       : "We couldn't verify your Stripe account status. Please try again in a moment.",
 
     publishTrip: isFr ? "Publier un trajet" : "Publish a trip",
