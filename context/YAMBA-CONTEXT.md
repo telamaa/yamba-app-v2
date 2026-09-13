@@ -639,7 +639,7 @@ Ordre de demarrage : auth -> trip -> gateway.
   rejoues verts ; trois fiches ANCIENNES remises d'aplomb (echouaient aussi SANS les correctifs, prouve par stash) :
   DEA-1 date en dur contre un jeu d'essai relatif, PIC-7 assertion perimee par ANO-WEB-60 (+ PIC-8 lecture avant
   rendu), ACC-5 clic apres goBack intermittent. Plateforme inchangee (1000 + auth 230), harnais : 314 scenarios. i18n :
-  `common.lightbox.open/more`, `common.authGate.close`. PR a ouvrir (empilee sur #295). Reste : 5.32, 02-ADMIN.
+  `common.lightbox.open/more`, `common.authGate.close`. PR #296 (empilee sur #295). Reste : 5.32, 02-ADMIN.
   AUCUNE attribution Claude.
 - 13/09 : **CHAPITRE 5.30 DU CAHIER 01-WEB — WEB-MOB, RESPONSIVE MOBILE (branche `chore/recette-web-5-30`,
   empilee sur #294)** — 10 fiches jouees CONFORMES (1 apres correction), 10 scenarios en serie, 1 min 06
