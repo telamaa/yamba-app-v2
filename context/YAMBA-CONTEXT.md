@@ -610,6 +610,17 @@ Ordre de demarrage : auth -> trip -> gateway.
   desktop du visiteur sans « Creer un compte » ni « Rechercher un trajet ». Piege de poste : la cle
   Google Maps n'accepte que `localhost` comme referent. Harnais : 32 scenarios verts. PR **#265**
   (empilee sur #264). Reste : 5.2 a 5.32, 02-ADMIN.
+- 13/09 : **CAHIER 02-ADMIN — § 4.1 CONNEXION EN DEUX ETAPES (branche `chore/recette-admin-4-1`, empilee sur #300)** —
+  premier chapitre du back-office : 6 fiches CONFORMES (1 apres correction), 7 scenarios en serie, 17 min
+  (`apps/e2e/src/admin/adm-sec-connexion.spec.ts`). OUTIL : `pages/journal-admin.ts` relit le journal par l'API de
+  /audit (session super admin, borne `from`, ordre chronologique) — la double verification du cahier (§ 3.4). COMPTE
+  ADMIN JETABLE (inscription + grant-admin.ts, revoque et efface en afterAll) pour SEC-2/4/5 ; codes TOTP CALCULES ;
+  attentes reelles 5 et 15 min emboitees. ANO-ADM-01 close : un compte bloque (TOO_MANY_ATTEMPTS) affichait « Code
+  invalide. » meme avec le bon code → LoginFlow lit `details.code`. ECART DOCUMENTAIRE : `ADMIN_LOGIN` cible `SESSION`
+  sans identifiant (le cahier dit USER · id) → le filtre par cible de /audit ne retrouve pas les connexions. A
+  TRANCHER : cible de ADMIN_LOGIN, regeneration des codes de secours. Deja ecrit pour § 4.3 : ADM-PRM-9 genere la
+  matrice routes × 7 comptes depuis les routeurs et ADMIN_PERMISSIONS — CONFORME (aucune garde absente). Harnais : 339
+  scenarios. PR a ouvrir. Reste : § 4.2, § 4.3 (PRM-1 a 8), § 5 a 7.
 - 13/09 : **DECISION : LE ROLE PREND LA MAJUSCULE** (branche `chore/recette-voyageur-majuscule`, empilee sur #299) —
   « Voyageur » / « Traveler » partout : 71 valeurs de messages, 33 textes du code, 1 email ; regle `role-majuscule` au
   lexique partage (CI + recette) ; 12 citations du harnais ; web-fav, web-rch, web-rsv-devis, web-lit verts.
