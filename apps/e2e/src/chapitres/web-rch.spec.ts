@@ -208,11 +208,11 @@ test.describe("WEB-RCH — recherche, filtres, tri, état vide (chapitre 5.9)", 
     await expect(page.getByText("Prix et tri calculés pour 3 kg · trajets sans assez de place exclus")).toBeVisible({ timeout: 30_000 });
     await expect(curseurPoids(page)).toHaveValue("3");
     expect(await page.evaluate(() => window.localStorage.getItem("yamba.search.weightKg"))).toBe("3");
-    await expect(page.getByText("pour votre colis de 3 kg")).toBeVisible();
+    await expect(page.getByText("pour ton colis de 3 kg")).toBeVisible();
 
     // WEB-RCH-5 : « Tout effacer » → référence 2 kg, prix comparables.
     await page.getByRole("button", { name: "Tout effacer" }).filter({ visible: true }).first().click();
-    await expect(page.getByText("Indiquez le poids : chaque trajet affichera son prix pour votre colis.")).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText("Indique le poids : chaque trajet affichera son prix pour ton colis.")).toBeVisible({ timeout: 15_000 });
     await expect(curseurPoids(page)).toHaveValue("2");
     await expect(page.getByText("pour un colis de 2 kg")).toBeVisible();
     await expect.poll(async () => (await carte(page, id).innerText()).replace(/ | /g, " "), { timeout: 30_000 }).toMatch(/ex\. 2 kg ≈ 26 € tout compris/);
@@ -315,7 +315,7 @@ test.describe("WEB-RCH — recherche, filtres, tri, état vide (chapitre 5.9)", 
     await expect.poll(async () => (await ordreDesCartes(page)).length, { timeout: 30_000 }).toBeGreaterThan(0);
     // 30 kg : aucun trajet du seed n'a la capacité → vide « à cause des filtres ».
     await curseurPoids(page).fill("30");
-    await expect(page.getByText("Aucun résultat ne correspond à vos filtres. Essayez d'en retirer pour voir plus de trajets.")).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText("Aucun résultat ne correspond à tes filtres. Retires-en pour voir plus de trajets.")).toBeVisible({ timeout: 30_000 });
     await expect(page.getByText("Aucun trajet trouvé")).toBeVisible();
     await page.getByRole("button", { name: "Tout effacer" }).filter({ visible: true }).first().click();
     await expect.poll(async () => (await ordreDesCartes(page)).length, { timeout: 30_000 }).toBeGreaterThan(0);
@@ -351,8 +351,8 @@ test.describe("WEB-RCH — recherche, filtres, tri, état vide (chapitre 5.9)", 
     const minuscule = texte.toLowerCase();
     for (const attendu of [
       "Avion", "Membre depuis",
-      "Ce que vous pouvez envoyer avec Thomas", "Prix au kilo", "11,50 €/kg", "Disponible", "23 kg",
-      "Bagage entier — forfait", "Soute 23 kg", "230,00 €",
+      "Ce que tu peux envoyer avec Thomas", "Prix au kilo", "11,50 €/kg", "Disponible", "23 kg",
+      "Bagage entier — forfait", "Bagage en soute 23 kg", "230,00 €",
       "Estimation pour un colis de 2 kg", "≈ 26,00 €", "tout compris (transport + service Yamba)", "Le prix définitif est fixé à la réservation.",
       "Colis léger (enveloppe, passeport, lunettes…) : 8 € minimum, quel que soit le poids.",
       "Lieux de remise & livraison", "Remise", "Livraison",
@@ -382,7 +382,7 @@ test.describe("WEB-RCH — recherche, filtres, tri, état vide (chapitre 5.9)", 
     // Avec un poids mémorisé (3 kg) : l'estimation et le CO₂ suivent le colis.
     await page.evaluate(() => window.localStorage.setItem("yamba.search.weightKg", "3"));
     await page.reload({ waitUntil: "domcontentloaded" });
-    await expect(page.getByText("Estimation pour votre colis de 3 kg (poids de votre recherche)")).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByText("Estimation pour ton colis de 3 kg (poids de ta recherche)")).toBeVisible({ timeout: 60_000 });
     // 3 × 11,50 = 34,50 + 12 % (4,14) = 38,64 €
     await expect(page.getByText(/≈ 38,64\s*€/).first()).toBeVisible();
   });

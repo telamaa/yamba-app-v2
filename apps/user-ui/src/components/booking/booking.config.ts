@@ -143,20 +143,20 @@ export function validateStep1(
     // D14 — famille refusée par le Voyageur
     if (draft.product === "PARCEL" && trip.familyStances[draft.family]?.mode === "REFUSE") {
       errors.family = isFr
-        ? "Le voyageur ne prend pas cette famille de colis"
-        : "The tripper does not take this parcel family";
+        ? "Le Voyageur ne prend pas cette famille de colis"
+        : "The Traveler does not take this parcel family";
     }
     // PRC-04 — bagage entier non proposé
     if (draft.product === "CHECKED_BAG_23KG" && !trip.checkedBag23PriceCents) {
-      errors.product = isFr ? "Bagage soute non proposé sur ce trajet" : "Checked bag not offered on this trip";
+      errors.product = isFr ? "Bagage en soute non proposé sur ce trajet" : "Checked bag not offered on this trip";
     }
     if (draft.product === "CABIN_BAG_12KG" && !trip.cabinBag12PriceCents) {
       errors.product = isFr ? "Bagage cabine non proposé sur ce trajet" : "Cabin bag not offered on this trip";
     }
   } else if (!trip.acceptedCategories.includes(draft.category)) {
     errors.category = isFr
-      ? "Catégorie non acceptée par le voyageur"
-      : "Category not accepted by the tripper";
+      ? "Catégorie non acceptée par le Voyageur"
+      : "Category not accepted by the Traveler";
   }
   if (draft.product === "PARCEL") {
     const w = parseWeight(draft.weightKg);

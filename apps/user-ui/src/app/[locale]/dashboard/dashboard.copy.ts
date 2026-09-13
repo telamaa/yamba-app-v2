@@ -9,7 +9,7 @@ export function getDashboardCopy(isFr: boolean) {
     // Section titles & subtitles
     trips: {
       title: isFr ? "Mes trajets" : "My trips",
-      sub: isFr ? "Gérez vos trajets publiés et en cours" : "Manage your published and active trips",
+      sub: isFr ? "Gère tes trajets publiés et en cours" : "Manage your published and active trips",
     },
     shipments: {
       title: isFr ? "Mes envois" : "My shipments",
@@ -17,11 +17,11 @@ export function getDashboardCopy(isFr: boolean) {
     },
     create: {
       title: isFr ? "Créer un trajet" : "Create a trip",
-      sub: isFr ? "Publiez un nouveau trajet et recevez des demandes" : "Publish a new trip and receive requests",
+      sub: isFr ? "Publie un nouveau trajet et reçois des demandes" : "Publish a new trip and receive requests",
     },
     messages: {
       title: "Messages",
-      sub: isFr ? "Vos conversations" : "Your conversations",
+      sub: isFr ? "Tes conversations" : "Your conversations",
     },
     notifications: {
       title: "Notifications",
@@ -30,22 +30,22 @@ export function getDashboardCopy(isFr: boolean) {
     savedRoutes: {
       title: isFr ? "Mes alertes route" : "My route alerts",
       sub: isFr
-        ? "Soyez prévenu·e dès qu'un trajet correspondant est publié"
+        ? "Sois prévenu·e dès qu'un trajet correspondant est publié"
         : "Get notified when a matching trip is published",
     },
     following: {
       title: isFr ? "Voyageurs suivis" : "Followed travelers",
       sub: isFr
-        ? "Restez à l'affût des publications de vos Voyageurs favoris"
+        ? "Reste à l'affût des publications de tes Voyageurs favoris"
         : "Stay tuned for posts from your favorite travelers",
     },
     payments: {
       title: isFr ? "Paiements" : "Payments",
-      sub: isFr ? "Historique de toutes vos transactions" : "All your transaction history",
+      sub: isFr ? "Historique de toutes tes transactions" : "All your transaction history",
     },
     wallet: {
       title: isFr ? "Portefeuille" : "Wallet",
-      sub: isFr ? "Votre compte Stripe Connect" : "Your Stripe Connect account",
+      sub: isFr ? "Ton compte Stripe Connect" : "Your Stripe Connect account",
     },
     profile: {
       title: isFr ? "Profil" : "Profile",
@@ -53,7 +53,7 @@ export function getDashboardCopy(isFr: boolean) {
     },
     yamber: {
       title: isFr ? "Devenir Voyageur" : "Become a Traveler",
-      sub: isFr ? "Rejoignez la communauté des voyageurs Yamba" : "Join the Yamba travelers community",
+      sub: isFr ? "Rejoins la communauté des Voyageurs Yamba" : "Join the Yamba travelers community",
     },
     security: {
       title: isFr ? "Sécurité" : "Security",
@@ -96,11 +96,11 @@ export function getDashboardCopy(isFr: boolean) {
     createTrip: isFr ? "Créer un trajet" : "Create a trip",
     newTrip: isFr ? "Nouveau trajet" : "New trip",
     newTripDesc: isFr
-      ? "Publiez votre prochain voyage et gagnez de l'argent en transportant des colis"
+      ? "Publie ton prochain voyage et gagne de l'argent en transportant des colis"
       : "Publish your next trip and earn money carrying parcels",
     openStripe: isFr ? "Ouvrir Stripe Dashboard" : "Open Stripe Dashboard",
     stripeDesc: isFr
-      ? "Gérez vos virements et coordonnées bancaires"
+      ? "Gère tes virements et coordonnées bancaires"
       : "Manage your transfers and bank details",
     emailVerified: isFr ? "Email vérifié" : "Email verified",
     phoneVerified: isFr ? "Tél vérifié" : "Phone verified",
@@ -108,13 +108,13 @@ export function getDashboardCopy(isFr: boolean) {
     password: isFr ? "Mot de passe" : "Password",
     passwordSub: isFr ? "Modifié il y a 3 mois" : "Changed 3 months ago",
     twoFa: isFr ? "Double authentification" : "Two-factor authentication",
-    twoFaSub: isFr ? "Ajoutez une couche de sécurité" : "Add an extra layer of security",
+    twoFaSub: isFr ? "Ajoute une couche de sécurité" : "Add an extra layer of security",
     activeSessions: isFr ? "Sessions actives" : "Active sessions",
     activeSessionsSub: isFr ? "2 appareils connectés" : "2 connected devices",
     publicProfile: isFr ? "Profil public" : "Public profile",
     publicProfileSub: isFr ? "Visible par les autres utilisateurs" : "Visible to other users",
     showCity: isFr ? "Afficher ma ville" : "Show my city",
-    showCitySub: isFr ? "Votre ville apparaît sur votre profil" : "Your city appears on your profile",
+    showCitySub: isFr ? "Ta ville apparaît sur ton profil" : "Your city appears on your profile",
     language: isFr ? "Langue" : "Language",
     theme: isFr ? "Thème" : "Theme",
     themeSub: isFr ? "Automatique" : "Automatic",

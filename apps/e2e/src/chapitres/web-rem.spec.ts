@@ -206,7 +206,7 @@ test.describe("WEB-REM — la remise du colis (chapitre 5.18)", () => {
     const corps = await texte(page);
     expect(corps).toContain("Une photo de la remise ?");
     expect(corps).toContain("Optionnel");
-    expect(corps).toContain("Optionnel, mais c'est ton assurance : le colis fermé, dans les mains du destinataire. En cas de litige « endommagé », cette photo parle pour toi.");
+    expect(corps).toContain("Optionnel, mais c'est ta meilleure preuve : le colis fermé, dans les mains du destinataire. En cas de litige « endommagé », cette photo parle pour toi.");
     expect(corps).toContain("Jusqu'à 2 photos. Elles sont visibles par l'Expéditeur dans son suivi et par Yamba en cas de litige.");
     // Deux photos, envoyées à la sélection (avant toute saisie du code) ; pas de troisième emplacement.
     const fichier = page.locator('input[type="file"]');

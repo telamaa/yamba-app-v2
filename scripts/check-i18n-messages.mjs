@@ -229,6 +229,63 @@ if (existsSync(SOURCES_DIR) && carteEspaces !== null) {
   }
 }
 
+/* ── Règle 6 : le vocabulaire (recette 5.32, WEB-VOC) ──
+ * Les VALEURS des messages ne portent ni mot de rôle refusé, ni « assurance », ni vouvoiement, ni texte
+ * vide ou « — » à la place d'une phrase. Mesuré en recette : « carrier » dans 23 chaînes anglaises (le rôle
+ * s'appelle « Traveler », A144), 41 chaînes françaises au vouvoiement, « ton assurance » sur l'écran de
+ * remise, une notification rédigée « — » / « — ». Le miroir FR/EN ne voit rien de tout cela : les deux
+ * locales peuvent être également fausses.
+ * Portée : les fichiers de messages seulement. Les textes écrits en dur dans les composants (`isFr ? … : …`)
+ * y échappent — c'est la dette que ce garde-fou pousse à résorber, pas une exemption.
+ */
+const VOCABULAIRE = {
+  fr: [
+    { motif: /\b(trippers?|yambers?|transporteurs?|travell?ers?|carriers?|shippers?)\b/i, raison: "mot de rôle refusé (« Voyageur » / « Expéditeur »)" },
+    { motif: /\b(assurances?|IPID)\b/i, raison: "« assurance » (aucun contrat d'assureur signé : « Protection », « Garantie Yamba »)" },
+    {
+      motif: /(?<![-\p{L}])(vous|votre|vos)(?![-\p{L}])/iu,
+      raison: "vouvoiement (la plateforme tutoie)",
+      // « vous » PLURIEL : les deux membres ensemble (« vous aurez tous les deux noté »).
+      sauf: /tous les deux|ensemble|vos deux|vos avis|vos profils|vous organiser|vous devez convenir/i,
+    },
+  ],
+  en: [
+    { motif: /\b(carriers?|trippers?|yambers?|travellers?)\b/i, raison: "role word refused (« Traveler » / « Shipper »)" },
+    { motif: /\b(insurance|insured|IPID)\b/i, raison: "« insurance » (no insurer contract: « Protection », « Yamba Guarantee »)" },
+  ],
+};
+function valeurs(obj, prefix = "") {
+  const out = [];
+  for (const [k, v] of Object.entries(obj)) {
+    const path = prefix ? `${prefix}.${k}` : k;
+    if (typeof v === "string") out.push([path, v]);
+    else if (v !== null && typeof v === "object") out.push(...valeurs(v, path));
+  }
+  return out;
+}
+{
+  let lues = 0;
+  for (const locale of locales) {
+    const regles = VOCABULAIRE[locale] ?? [];
+    for (const file of readdirSync(join(MESSAGES_DIR, locale)).filter((f) => f.endsWith(".json"))) {
+      let tree;
+      try {
+        tree = JSON.parse(readFileSync(join(MESSAGES_DIR, locale, file), "utf8"));
+      } catch {
+        continue; // déjà signalé par la règle 1
+      }
+      for (const [chemin, texte] of valeurs(tree)) {
+        lues += 1;
+        if (/^\s*[—–-]?\s*$/.test(texte)) fail(`[${locale}/${file}] texte vide ou « — » à la place d'une phrase : ${chemin}`);
+        for (const { motif, raison, sauf } of regles) {
+          if (motif.test(texte) && !(sauf && sauf.test(texte))) fail(`[${locale}/${file}] ${raison} : ${chemin} = « ${texte.slice(0, 90)} »`);
+        }
+      }
+    }
+  }
+  if (lues < 1000) fail(`[vocabulaire] seulement ${lues} texte(s) lu(s) : la règle 6 ne lit plus les messages`);
+}
+
 /* ── Rapport ── */
 if (errors.length > 0) {
   console.error(`✗ i18n check — ${errors.length} problème(s) :\n`);

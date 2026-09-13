@@ -9,7 +9,7 @@
                 <tr>
                     <td style="background:linear-gradient(135deg,#64748b 0%,#94a3b8 100%);padding:32px 24px;text-align:center;">
                         <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:800;letter-spacing:-0.5px;">
-                            <%= locale === "fr" ? "Votre alerte a expiré" : "Your alert has expired" %>
+                            <%= locale === "fr" ? "Ton alerte a expiré" : "Your alert has expired" %>
                         </h1>
                     </td>
                 </tr>
@@ -20,12 +20,12 @@
                         </p>
                         <p style="margin:0 0 24px 0;font-size:15px;line-height:1.6;color:#334155;">
                             <%= locale === "fr"
-                                    ? `Votre alerte pour la route <strong>${savedRoute.originCity} → ${savedRoute.destinationCity}</strong> a expiré et a été désactivée.`
+                                    ? `Ton alerte pour la route <strong>${savedRoute.originCity} → ${savedRoute.destinationCity}</strong> a expiré et a été désactivée.`
                                     : `Your alert for the route <strong>${savedRoute.originCity} → ${savedRoute.destinationCity}</strong> has expired and been disabled.` %>
                         </p>
                         <p style="margin:0 0 24px 0;font-size:14px;line-height:1.6;color:#64748b;">
                             <%= locale === "fr"
-                                    ? "Vous pouvez en créer une nouvelle à tout moment."
+                                    ? "Tu peux en créer une nouvelle à tout moment."
                                     : "You can create a new one anytime." %>
                         </p>
                         <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">

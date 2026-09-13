@@ -32,8 +32,8 @@ export const HERO_VISUALS: HeroVisual[] = [
     id: "illu-connect",
     type: "illustration",
     src: "/auth/visuals/illu-connect.svg",
-    altFr: "Illustration : un expéditeur et un transporteur connectés",
-    altEn: "Illustration: a shipper and a carrier connected",
+    altFr: "Illustration : une Expéditrice et un Voyageur connectés",
+    altEn: "Illustration: a Shipper and a Traveler connected",
   },
   // Les deux photos JPG (photo-route, photo-package) ont été retirées le
   // 03/09/2026 : les fichiers n'existaient pas dans /public/auth/visuals/ →

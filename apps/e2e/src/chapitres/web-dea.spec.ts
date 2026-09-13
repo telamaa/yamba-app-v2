@@ -217,7 +217,7 @@ test.describe("WEB-DEA — la demande côté Voyageur (chapitre 5.14)", () => {
     // La visionneuse plein écran.
     // Les vignettes sont des boutons (l'image interceptée ne se charge pas : l'icône de repli reste) —
     // le premier bouton du bloc « PHOTOS DÉCLARÉES PAR … ».
-    await page.getByText("cliquez pour agrandir").locator("xpath=ancestor::*[.//button][1]").getByRole("button").first().click();
+    await page.getByText("clique pour agrandir").locator("xpath=ancestor::*[.//button][1]").getByRole("button").first().click();
     await expect(page.getByRole("button", { name: /^(Fermer|Suivant|Précédent)$/ }).first()).toBeVisible({ timeout: 15_000 });
     await page.keyboard.press("Escape");
   });

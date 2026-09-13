@@ -70,8 +70,8 @@
   },
   "photos": {
     "title": "Une photo de la remise ?",
-    "sub": "Optionnel, mais c'est ton assurance : le colis fermé, dans les mains du destinataire. En cas de litige « endommagé », cette photo parle pour toi.",
-    "subShort": "Optionnel — ton assurance en cas de litige.",
+    "sub": "Optionnel, mais c'est ta meilleure preuve : le colis fermé, dans les mains du destinataire. En cas de litige « endommagé », cette photo parle pour toi.",
+    "subShort": "Optionnel — ta preuve en cas de litige.",
     "optional": "Optionnel",
     "add": "Ajouter",
     "remove": "Retirer cette photo",

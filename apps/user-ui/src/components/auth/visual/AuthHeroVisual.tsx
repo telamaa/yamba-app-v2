@@ -48,14 +48,14 @@ export default function AuthHeroVisual({ visual }: Props) {
       title: fr ? "Des personnes identifiées" : "Identified people",
       text: fr
         ? "Un compte vérifié pour réserver, un profil public pour chaque Voyageur."
-        : "A verified account to book, a public profile for every carrier.",
+        : "A verified account to book, a public profile for every Traveler.",
     },
     {
       icon: CreditCard,
       title: fr ? "Débité seulement si c'est accepté" : "Charged only once accepted",
       text: fr
         ? "Le paiement est autorisé à la demande et confirmé à l'acceptation du Voyageur."
-        : "Payment is authorized at request time and captured when the carrier accepts.",
+        : "Payment is authorized at request time and captured when the Traveler accepts.",
     },
     {
       icon: ShieldCheck,

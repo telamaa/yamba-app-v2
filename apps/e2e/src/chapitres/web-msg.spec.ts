@@ -146,7 +146,7 @@ test.describe("WEB-MSG — messagerie, rendez-vous et numéro (chapitre 5.15)", 
     expect(corps).toContain("· à confirmer"); // le rendez-vous proposé par Thomas
     // Sur écran large, le premier fil s'ouvre seul : liste à gauche, fil à droite.
     await expect(composer(page)).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByText("Choisissez une conversation.")).toHaveCount(0);
+    await expect(page.getByText("Choisis une conversation.")).toHaveCount(0);
     test.info().annotations.push({ type: "constat", description: "la ligne de la liste porte le prénom, le corridor, le dernier message et le rendez-vous « à confirmer » — pas le RÔLE de l'interlocuteur (Voyageur / Expéditrice) ; sur écran large le premier fil s'ouvre seul, « Choisissez une conversation. » n'apparaît que sans aucun fil" });
   });
 
@@ -154,8 +154,8 @@ test.describe("WEB-MSG — messagerie, rendez-vous et numéro (chapitre 5.15)", 
     const { page } = await navigateurConnecte("mai");
     await page.goto("/fr/dashboard/messages", { waitUntil: "networkidle" });
     await expect(page.getByText("Aucune conversation")).toBeVisible({ timeout: 60_000 });
-    await expect(page.getByText("Une conversation s'ouvre dès qu'un Voyageur accepte votre colis, ou dès que vous acceptez une demande.")).toBeVisible();
-    await expect(page.getByText("Choisissez une conversation.")).toBeVisible();
+    await expect(page.getByText("Une conversation s'ouvre dès qu'un Voyageur accepte ton colis, ou dès que tu acceptes une demande.")).toBeVisible();
+    await expect(page.getByText("Choisis une conversation.")).toBeVisible();
   });
 
   test("WEB-MSG-3 · la conversation n'existe pas avant l'acceptation", async ({ navigateurConnecte, jeuEssai }) => {
@@ -265,7 +265,7 @@ test.describe("WEB-MSG — messagerie, rendez-vous et numéro (chapitre 5.15)", 
     expect(brut.split('"flaggedContact":true').length - 1, "deux messages repérés").toBeGreaterThanOrEqual(2);
   });
 
-  test("WEB-MSG-8 · proposer un rendez-vous (Thomas), « À confirmer par vous » chez Pauline", async ({ navigateurConnecte }) => {
+  test("WEB-MSG-8 · proposer un rendez-vous (Thomas), « À confirmer par toi » chez Pauline", async ({ navigateurConnecte }) => {
     const A = await navigateurConnecte("pauline");
     const B = await navigateurConnecte("thomas");
     await new FilMessagerie(B.page).ouvrir(filAccepte);
@@ -275,7 +275,7 @@ test.describe("WEB-MSG — messagerie, rendez-vous et numéro (chapitre 5.15)", 
     await expect(B.page.getByText("En attente de l'autre personne")).toBeVisible({ timeout: 15_000 });
     await expect(B.page.getByText("Un rendez-vous a été proposé.").last()).toBeVisible();
     await new FilMessagerie(A.page).ouvrir(filAccepte);
-    await expect(A.page.getByText("À confirmer par vous")).toBeVisible({ timeout: 15_000 });
+    await expect(A.page.getByText("À confirmer par toi")).toBeVisible({ timeout: 15_000 });
     await expect(A.page.getByRole("button", { name: "Accepter", exact: true })).toBeVisible();
   });
 
@@ -334,7 +334,7 @@ test.describe("WEB-MSG — messagerie, rendez-vous et numéro (chapitre 5.15)", 
     const sans = await idFil(mc.contexte, jeuEssai.deal("yul-accepted").id);
     await new FilMessagerie(mc.page).ouvrir(sans, true);
     const texteSans = await texte(mc.page);
-    const attendu = texteSans.includes("Le numéro s'affiche 2 h avant le rendez-vous confirmé. Proposez et confirmez un rendez-vous ci-dessous.");
+    const attendu = texteSans.includes("Le numéro s'affiche 2 h avant le rendez-vous confirmé. Propose et confirme un rendez-vous ci-dessous.");
     test.info().annotations.push({ type: attendu ? "note" : "constat", description: attendu ? "sans rendez-vous : le message du cahier" : `sans rendez-vous confirmé, le bandeau dit « ${texteSans.match(/Le numéro s'affiche[^.]*\./)?.[0]} » (l'ancre de repli est le DÉPART du trajet, le message « Proposez et confirmez… » n'apparaît que sans départ connu)` });
     void contexte;
   });
@@ -476,7 +476,7 @@ test.describe("WEB-MSG — messagerie, rendez-vous et numéro (chapitre 5.15)", 
       `import db from "./packages/libs/prisma"; (async () => { const d = new Date(Date.now() - 15 * 86_400_000); await db.booking.update({ where: { id: "${deal.id}" }, data: { completedAt: d, closedAt: d } }); console.log("fin reculée à", d.toISOString()); await db.$disconnect(); })();`
     );
     await page.reload({ waitUntil: "networkidle" });
-    await expect(page.getByText("Cette conversation est fermée à l'écriture. Vous pouvez toujours la relire.")).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByText("Cette conversation est fermée à l'écriture. Tu peux toujours la relire.")).toBeVisible({ timeout: 60_000 });
     await expect(composer(page)).toHaveCount(0);
     await expect(page.getByText(/Bonjour|colis/).first(), "le fil reste lisible").toBeVisible().catch(() => undefined);
   });

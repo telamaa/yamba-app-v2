@@ -335,7 +335,10 @@ test.describe("WEB-ACC — découverte, accueil et navigation (chapitre 5.1)", (
     await ouvrirLAccueil(page);
     const requetes: string[] = [];
     page.on("request", (r) => {
-      if (r.url().includes("/api/") && r.method() !== "GET") requetes.push(`${r.method()} ${r.url()}`);
+      // `POST /auth/refresh` est la sonde de session du VISITEUR (401 sur /auth/me → tentative de rafraîchissement) :
+      // elle part quand elle veut, porte ouverte ou non — intermittent constaté le 13/09 (chapitre 5.32), y compris
+      // sans les correctifs du chapitre. Ce n'est pas une conséquence de la fermeture.
+      if (r.url().includes("/api/") && r.method() !== "GET" && !r.url().includes("/auth/refresh")) requetes.push(`${r.method()} ${r.url()}`);
     });
 
     // 1. « Plus tard »
