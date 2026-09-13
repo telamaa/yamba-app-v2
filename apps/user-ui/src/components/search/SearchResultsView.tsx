@@ -3,7 +3,8 @@
 import { useMemo, useState, useEffect } from "react";
 import { Search, SlidersHorizontal, X } from "lucide-react";
 import { useTranslations, useLocale } from "next-intl";
-import TripSearchBar, { type TripSearchValue } from "./TripSearchBar";
+import { usePersistedFormState } from "@/hooks/usePersistedFormState";
+import TripSearchBar, { initialSearchDraft, SEARCH_VERSION, TRIP_SEARCH_STORAGE_KEY, type TripSearchValue } from "./TripSearchBar";
 import TripResultCard from "./TripResultCard";
 import TripResultCardMobile from "./TripResultCardMobile";
 import TransportModeTabs from "./TransportModeTabs";
@@ -21,7 +22,6 @@ import type {
   SortOption,
   TransportMode,
 } from "./search-results.types";
-import type { DateValue } from "@/components/ui/SmartDatePicker";
 
 type FilterMode = "all" | TransportMode;
 
@@ -298,16 +298,26 @@ export default function SearchResultsView() {
 
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
+  /* ANO-WEB-93 — une fenêtre qui s'annonce comme telle se ferme par Échap : sans cela, la promesse
+     du `role="dialog"` n'est tenue qu'à moitié (et le clavier n'a aucune porte de sortie). */
+  useEffect(() => {
+    if (!mobileFiltersOpen) return;
+    const surEchap = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMobileFiltersOpen(false);
+    };
+    window.addEventListener("keydown", surEchap);
+    return () => window.removeEventListener("keydown", surEchap);
+  }, [mobileFiltersOpen]);
 
-  const [searchDraft, setSearchDraft] = useState<{
-    from: string;
-    to: string;
-    dateValue: DateValue | null;
-  }>({
-    from: "",
-    to: "",
-    dateValue: null,
-  });
+
+  // Recette 01-WEB 5.1 (WEB-ACC-9) : le brouillon INTERROGÉ est celui que la barre a mémorisé
+  // (même clé de sessionStorage) — en arrivant depuis l'accueil, les résultats correspondent à
+  // ce que le visiteur vient de saisir, sans avoir à cliquer « Rechercher » une seconde fois.
+  const [searchDraft, setSearchDraft] = usePersistedFormState<TripSearchValue>(
+    TRIP_SEARCH_STORAGE_KEY,
+    initialSearchDraft,
+    { version: SEARCH_VERSION }
+  );
 
   const tripsParams = useMemo(
     () => ({
@@ -665,7 +675,11 @@ export default function SearchResultsView() {
         </section>
 
         {mobileFiltersOpen && (
-          <div className="fixed inset-0 z-[150] bg-white dark:bg-slate-950 md:hidden">
+          /* ANO-WEB-93 (recette 5.30) — ce panneau plein écran n'était pas annoncé comme une
+             fenêtre : ni `role="dialog"`, ni `aria-modal`, ni nom. Les deux autres feuilles de la
+             recherche (`MobileSearchExperience`, `MobileFieldFullScreen`) le font déjà ; celle-ci
+             l'avait oublié — un lecteur d'écran continuait donc de parcourir la page en dessous. */
+          <div role="dialog" aria-modal="true" aria-label={t("filters.title")} className="fixed inset-0 z-[150] bg-white dark:bg-slate-950 md:hidden">
             <div className="flex h-full flex-col">
               <div className="flex items-center justify-between px-4 pb-3 pt-4">
                 <button

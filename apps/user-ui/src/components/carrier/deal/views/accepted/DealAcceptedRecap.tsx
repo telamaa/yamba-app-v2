@@ -80,10 +80,11 @@ export default function DealAcceptedRecap({ deal }: Props) {
         sub={deal.pickupLocation.detail || deal.pickupLocation.flexibilityNote}
       />
 
+      {/* ANO-WEB-42 : la ville n'est pas répétée quand le lieu la porte déjà (« Hall d'arrivée · Brazzaville ») */}
       <RecapRow
         icon={<Home size={14} aria-hidden="true" />}
         label={t("recap.deliveryLabel")}
-        value={`${deal.deliveryLocation.name} · ${deal.deliveryLocation.city}`}
+        value={deal.deliveryLocation.name.includes(deal.deliveryLocation.city) ? deal.deliveryLocation.name : `${deal.deliveryLocation.name} · ${deal.deliveryLocation.city}`}
         sub={t("recap.deliveryRecipientNote")}
         isLast
       />

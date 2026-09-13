@@ -34,7 +34,7 @@ export default function ConversationThread({
 }) {
   const t = useTranslations("messaging");
   const locale = useLocale();
-  const { data, isLoading } = useThread(conversationId);
+  const { data, isLoading, isError } = useThread(conversationId);
   const post = usePostMessage(conversationId);
   const markRead = useMarkConversationRead(conversationId);
   const reveal = useRevealPhone(conversationId);
@@ -69,6 +69,8 @@ export default function ConversationThread({
     return out;
   }, [data?.messages, locale]);
 
+  // ANO-WEB-48 (recette 5.15) : un fil refusé (tiers, 403) ou introuvable restait sur « Chargement… » sans fin.
+  if (isError) return <div className="p-6 text-[13px] text-slate-500 dark:text-slate-400">{t("open.failed")}</div>;
   if (isLoading || !data) return <div className="p-6 text-[13px] text-slate-500 dark:text-slate-400">{t("loading")}</div>;
 
   const { conversation, phone } = data;
@@ -82,8 +84,10 @@ export default function ConversationThread({
       await post.mutateAsync({ body: value });
       setBody("");
     } catch (err) {
-      const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
-      setError(message ?? t("sendFailed"));
+      // ANO-WEB-45 (recette 5.15) : le refus métier porte un `details.code` (A146) ; c'est lui qu'on traduit —
+      // jamais le `message` anglais de l'API, qui s'affichait tel quel sous la saisie.
+      const details = (err as { response?: { data?: { details?: { code?: string } } } })?.response?.data?.details;
+      setError(details?.code === "DELIVERY_CODE_IN_MESSAGE" ? t("errors.deliveryCode") : details?.code === "CONVERSATION_READ_ONLY" ? t("closed.generic") : t("sendFailed"));
     }
   }
 
@@ -111,6 +115,19 @@ export default function ConversationThread({
           {phone.revealed ? phone.phoneE164 ?? t("phone.hidden") : t("phone.reveal")}
         </button>
       </header>
+
+      {/* ANO-WEB-85 (recette 5.25) : un refus de révélation (400 TOO_EARLY, contrepartie effacée) ne disait RIEN —
+          le motif ne vivait que dans l'attribut `title` du bouton, et le bandeau n'apparaît qu'en arrivant par « Appeler ». */}
+      {reveal.isError && !focusPhone && (
+        <div className="flex items-center gap-2 border-b border-amber-200 bg-amber-50 px-3 py-2 text-[12.5px] text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-100" role="status">
+          <Phone size={13} className="shrink-0" />
+          <span>
+            {phone.opensAt
+              ? t("phone.banner.opensAt", { time: `${dayLabel(phone.opensAt, locale)} ${timeLabel(phone.opensAt, locale)}` })
+              : t("phone.banner.needsMeetup")}
+          </span>
+        </div>
+      )}
 
       {focusPhone && (
         <div className="flex flex-wrap items-center gap-2 border-b border-amber-200 bg-amber-50 px-3 py-2 text-[12.5px] text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-100">

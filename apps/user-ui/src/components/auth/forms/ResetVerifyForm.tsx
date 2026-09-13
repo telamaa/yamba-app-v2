@@ -467,7 +467,7 @@ export default function ResetVerifyForm({ heroVisual }: Props) {
     typeof attemptsLeft === "number" && attemptsLeft >= 0 && !isLocked;
 
   return (
-    <main className="lg:grid lg:grid-cols-2 lg:min-h-[calc(100vh-64px)]">
+    <main className="lg:grid lg:grid-cols-2 lg:min-h-[calc(var(--yamba-viewport)-64px)]">
       <div className="hidden lg:block">
         <AuthHeroVisual visual={heroVisual} />
       </div>
