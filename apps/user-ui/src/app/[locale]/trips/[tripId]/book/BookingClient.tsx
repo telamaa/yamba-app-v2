@@ -30,6 +30,7 @@ export default function BookingClient({ tripId }: Props) {
   const { data: publicTrip, isLoading, isError } = usePublicTrip(tripId);
   const { user, isLoading: userLoading } = useUser();
   const tBooking = useTranslations("booking.authGate");
+  const tErrors = useTranslations("booking.step4.errors");
 
   const trip = useMemo(
     () => (publicTrip ? mapPublicTripToContext(publicTrip, (k, v) => tLoc(k, v)) : null),
@@ -64,6 +65,39 @@ export default function BookingClient({ tripId }: Props) {
     );
   }
 
+  // ANO-WEB-35 (recette 5.12) — l'auteur du trajet ne peut pas le réserver : on le dit à l'OUVERTURE
+  // (le serveur le refuse de toute façon à l'intention de paiement, code OWN_TRIP).
+  // ANO-WEB-38 (recette 5.12) — un trajet déjà parti n'accepte plus de demandes : on le dit à l'OUVERTURE
+  // (le serveur le refuse à l'intention de paiement, code TRIP_NOT_BOOKABLE « already departed »).
+  const parti = !!publicTrip?.dates.departureAt && new Date(publicTrip.dates.departureAt).getTime() <= Date.now();
+  if (trip && parti) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-white px-6 text-center dark:bg-slate-950">
+        <p className="text-sm font-semibold text-slate-900 dark:text-white">{tErrors("TRIP_NOT_BOOKABLE")}</p>
+        <button
+          type="button"
+          onClick={handleClose}
+          className="rounded-full bg-[#FF9900] px-4 py-2 text-sm font-bold text-slate-950"
+        >
+          {t("back")}
+        </button>
+      </div>
+    );
+  }
+  if (trip && user.id === trip.carrier.id) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-white px-6 text-center dark:bg-slate-950">
+        <p className="text-sm font-semibold text-slate-900 dark:text-white">{tErrors("OWN_TRIP")}</p>
+        <button
+          type="button"
+          onClick={handleClose}
+          className="rounded-full bg-[#FF9900] px-4 py-2 text-sm font-bold text-slate-950"
+        >
+          {t("back")}
+        </button>
+      </div>
+    );
+  }
   if (isError || !trip) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-white px-6 text-center dark:bg-slate-950">

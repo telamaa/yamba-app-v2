@@ -43,6 +43,15 @@ describe("createReport (D68 1A/2A)", () => {
     expect(db.tables.report[0]).toMatchObject({ reporterUserId: "u-awa", targetType: "TRIP", targetId: "t1", reason: "SCAM", details: "paie hors Yamba", status: "OPEN" });
     expect(sent).toEqual(["awa@example.com|fr|Ton signalement a bien été reçu"]);
   });
+  it("ANO-WEB-79 — une annonce masquée par Yamba (hiddenByAdminAt) est introuvable pour le signalement : 404, jamais 201", async () => {
+    const masque = { ...trip, id: "t-hidden", hiddenByAdminAt: new Date("2026-09-10T00:00:00.000Z") };
+    const db = fakeDb({ user: [awa, moussa], trip: [trip, masque] });
+    const svc = makeReportService({ db, sendEmail: async () => true, trustFor: async () => null });
+    await expect(svc.createReport("u-awa", { targetType: "TRIP", targetRef: "t-hidden", reason: "OTHER" })).rejects.toMatchObject({ details: { code: "TRIP_NOT_FOUND" } });
+    // Un trajet sans le champ (antérieur à C-PR4) reste signalable : `isSet: false` le laisse passer.
+    await expect(svc.createReport("u-awa", { targetType: "TRIP", targetRef: "t1", reason: "OTHER" })).resolves.toMatchObject({ reportId: expect.any(String) });
+  });
+
   it("membre par son slug → targetId = id du membre ; page masquée ou compte effacé → 404", async () => {
     const db = fakeDb({ user: [awa, moussa, { ...awa, id: "u-hidden", publicSlug: "hidden", profilePublic: false }] });
     const svc = makeReportService({ db, sendEmail: async () => true, trustFor: async () => null });

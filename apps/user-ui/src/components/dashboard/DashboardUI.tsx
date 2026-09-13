@@ -1,7 +1,5 @@
 "use client";
 
-import { useState } from "react";
-
 const COLORS = {
   mango: "#FF9900",
   mangoTint: "#FFF6E8",
@@ -124,17 +122,27 @@ export function ListRow({
 
 /* ── Toggle row ────────────────────────────── */
 
+/**
+ * Bascule d'un réglage — CONTRÔLÉE (ANO-WEB-86, recette 5.26).
+ *
+ * Elle portait son propre `useState` : on la déplaçait, rien n'était enregistré, et l'état
+ * repartait à sa valeur d'origine au rechargement. Une bascule décorative fait croire au membre
+ * qu'il a réglé quelque chose. La valeur vient donc de l'appelant, qui l'écrit quelque part, et
+ * `role="switch"` + `aria-checked` disent l'état à un lecteur d'écran.
+ */
 export function ToggleRow({
                             label,
                             description,
-                            defaultOn = false,
+                            checked,
+                            onChangeAction,
+                            disabled = false,
                           }: {
   label: string;
   description: string;
-  defaultOn?: boolean;
+  checked: boolean;
+  onChangeAction: (next: boolean) => void;
+  disabled?: boolean;
 }) {
-  const [on, setOn] = useState(defaultOn);
-
   return (
     <div className="flex items-center justify-between py-3">
       <div>
@@ -143,49 +151,67 @@ export function ToggleRow({
       </div>
       <button
         type="button"
-        onClick={() => setOn((v) => !v)}
-        className="relative h-[22px] w-10 flex-shrink-0 rounded-full transition-colors"
-        style={{ backgroundColor: on ? COLORS.mango : undefined }}
+        role="switch"
+        aria-checked={checked}
+        aria-label={label}
+        disabled={disabled}
+        onClick={() => onChangeAction(!checked)}
+        className={`relative h-[22px] w-10 flex-shrink-0 rounded-full transition-colors ${disabled ? "cursor-not-allowed opacity-50" : ""}`}
+        style={{ backgroundColor: checked ? COLORS.mango : undefined }}
       >
-        {!on && (
+        {!checked && (
           <span className="absolute inset-0 rounded-full bg-slate-300 dark:bg-slate-600" />
         )}
         <span
           className="absolute top-[2px] left-[2px] h-[18px] w-[18px] rounded-full bg-white transition-transform"
-          style={{ transform: on ? "translateX(18px)" : "translateX(0)" }}
+          style={{ transform: checked ? "translateX(18px)" : "translateX(0)" }}
         />
       </button>
     </div>
   );
 }
 
-/* ── Setting row (with action button) ──────── */
+/* ── Setting row (bouton d'action, ou contrôle fourni) ──────── */
 
+/**
+ * Ligne de réglage. Deux formes, et aucune décorative (ANO-WEB-86, recette 5.26) :
+ *
+ *   - `onAction` + `actionLabel` → le bouton mangue habituel ;
+ *   - `control` → le vrai contrôle du réglage (sélecteur de langue, choix de thème…).
+ *
+ * Sans l'un ni l'autre, la ligne est en LECTURE : elle informe, et ne promet aucun geste. Le
+ * bouton ne s'affiche plus « au cas où » — c'est ce qui faisait un « Changer » sans effet.
+ */
 export function SettingRow({
                              label,
                              description,
                              actionLabel,
                              onAction,
+                             control,
                            }: {
   label: string;
   description: string;
-  actionLabel: string;
+  actionLabel?: string;
   onAction?: () => void;
+  control?: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center justify-between py-3">
+    <div className="flex items-center justify-between gap-3 py-3">
       <div>
         <div className="text-[13.5px] text-slate-900 dark:text-white">{label}</div>
         <div className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{description}</div>
       </div>
-      <button
-        type="button"
-        onClick={onAction}
-        className="flex-shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium text-slate-900"
-        style={{ backgroundColor: COLORS.mango }}
-      >
-        {actionLabel}
-      </button>
+      {control ??
+        (onAction && actionLabel ? (
+          <button
+            type="button"
+            onClick={onAction}
+            className="flex-shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium text-slate-900"
+            style={{ backgroundColor: COLORS.mango }}
+          >
+            {actionLabel}
+          </button>
+        ) : null)}
     </div>
   );
 }

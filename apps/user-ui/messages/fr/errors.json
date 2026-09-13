@@ -10,7 +10,8 @@
     "referenceLabel": "Référence de l'incident",
     "referenceHelp": "Communique-la au support si le problème se répète.",
     "copied": "Référence copiée",
-    "support": "Écrire au support"
+    "support": "Écrire au support",
+    "copyFailed": "Copie impossible sur ce navigateur — sélectionne la référence et copie-la à la main."
   },
   "notFound": {
     "title": "Cette page n'existe pas",

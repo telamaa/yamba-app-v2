@@ -91,8 +91,19 @@ export default function DealPickupClient({ dealId }: Props) {
   }, []);
 
   const addPhoto = useCallback((photo: PickupPhotoDraft) => {
+    // ANO-WEB-52 (recette 5.16, même famille qu'ANO-WEB-39) : la borne de taille et le format se jouent à la
+    // SÉLECTION — les photos ne partent qu'à la confirmation, une photo trop lourde entrait donc dans la grille
+    // et n'était refusée que trois cases plus loin. Rien n'est envoyé : on prévient tout de suite.
+    if (photo.file && photo.file.size > PHOTO_MAX_SIZE_BYTES) {
+      toast.error(t("errors.uploadTooLarge", { maxMb: Math.round(PHOTO_MAX_SIZE_BYTES / (1024 * 1024)) }), { duration: 6000 });
+      return;
+    }
+    if (photo.file && !PHOTO_MIME_TYPES.includes(photo.file.type.toLowerCase())) {
+      toast.error(t("errors.uploadInvalidType"), { duration: 6000 });
+      return;
+    }
     setPhotos((prev) => [...prev, photo]);
-  }, []);
+  }, [t]);
 
   const removePhoto = useCallback((photoId: string) => {
     setPhotos((prev) => prev.filter((p) => p.id !== photoId));

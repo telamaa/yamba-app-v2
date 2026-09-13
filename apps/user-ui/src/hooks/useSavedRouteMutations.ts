@@ -66,12 +66,22 @@ export function useUpdateSavedRoute() {
  * Hook : supprimer une alerte (idempotent).
  * Optimistic update : retire de la liste immédiatement, rollback si erreur.
  */
-export function useDeleteSavedRoute() {
+/**
+ * ANO-WEB-29 (recette 5.10) — les retours (toast) se passent ICI, au niveau du hook, pas dans
+ * les options de `mutate(...)` : la suppression est OPTIMISTE (`onMutate` retire la carte tout de
+ * suite), la carte est DÉMONTÉE avant la réponse, et TanStack Query n'appelle jamais les
+ * callbacks passés à `mutate` d'un composant démonté. Les callbacks du hook, eux, sont portés par
+ * la mutation elle-même et survivent au démontage.
+ */
+export function useDeleteSavedRoute(retours: { onSuccess?: () => void; onError?: () => void } = {}) {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (id: string) => {
       return apiFetch(`/saved-routes/${id}`, { method: "DELETE" });
+    },
+    onSuccess: () => {
+      retours.onSuccess?.();
     },
     onMutate: async (id: string) => {
       await queryClient.cancelQueries({ queryKey: ["saved-routes"] });
@@ -97,6 +107,7 @@ export function useDeleteSavedRoute() {
           context.previous
         );
       }
+      retours.onError?.();
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["saved-routes"] });
