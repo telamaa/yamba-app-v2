@@ -610,6 +610,38 @@ Ordre de demarrage : auth -> trip -> gateway.
   desktop du visiteur sans « Creer un compte » ni « Rechercher un trajet ». Piege de poste : la cle
   Google Maps n'accepte que `localhost` comme referent. Harnais : 32 scenarios verts. PR **#265**
   (empilee sur #264). Reste : 5.2 a 5.32, 02-ADMIN.
+- 13/09 : **CHAPITRE 5.30 DU CAHIER 01-WEB — WEB-MOB, RESPONSIVE MOBILE (branche `chore/recette-web-5-30`,
+  empilee sur #294)** — 10 fiches jouees CONFORMES (1 apres correction), 10 scenarios en serie, 1 min 06
+  (`apps/e2e/src/chapitres/web-mob.spec.ts`, emulation iPhone 14 390x844 tactile ; WEB-MOB-7 a 800 px).
+  HARNAIS : `navigateurConnecte` et `navigateurVisiteur` acceptent `{ mobile: true }` (ou `{ mobile: { width } }`) —
+  ce n'est PAS un simple `viewport` etroit : `isMobile` + `hasTouch` + agent utilisateur changent ce que le produit
+  REND (feuilles du bas, barres collantes, `useIsMobile`, doubles arbres Desktop/Mobile) ; sans eux le chapitre
+  aurait eprouve l'arbre desktop dans une fenetre etroite. DEUX GARDE-FOUS PARTAGES portent la regle generale du
+  cahier (la page ne defile jamais horizontalement) : `aucunDebordement()` NOMME l'element fautif (selecteur, bord
+  droit, largeur d'ecran) et `rienNeSortDuCadre()` EXEMPTE ce qui defile dans son propre cadre
+  (`overflow-x: auto|scroll`) — une rangee de reponses rapides a le droit de depasser, pas de pousser la page.
+  ANO-WEB-93 close (mineure) : le panneau PLEIN ECRAN des filtres de recherche n'etait pas annonce comme une
+  fenetre (ni `role="dialog"`, ni `aria-modal`, ni nom) et Echap ne le fermait pas — un lecteur d'ecran continuait de
+  parcourir la page EN DESSOUS et le clavier n'avait aucune porte de sortie ; les deux autres feuilles de la
+  recherche le faisaient deja (convention non portee jusqu'au bout). Prouve : accueil et menu (le bouton « Fermer le
+  menu » est le VOILE plein ecran) ; filtres appliques par « Voir N trajets » et fermes par Echap ; barre de
+  reservation collante qui survit au defilement ; assistant (total permanent, « Detail » / « Masquer », aucun champ
+  coupe) ; bulles de messagerie qui tiennent dans l'ecran (regression #175 / WEB-NRG-5 morte, et le harnais la
+  garde) ; croix de la porte d'identite visible sur telephone (regression WEB-NRG-3) ; colonne de droite du Voyageur
+  presente a 800 px (point aveugle des grilles `md:`/`lg:`) ; six cases du code sur une ligne avec
+  `inputmode=numeric` et collage qui remplit les six ; listes du tableau de bord sans debordement ; page
+  destinataire lisible sans session. A TRANCHER : dans la porte d'identite, TROIS controles portent le meme nom
+  accessible (« Plus tard » : croix, voile, lien) ; le piege de focus des feuilles mobiles n'est pas pose (sujet du
+  5.31) ; « le clavier ne masque pas le bouton » ne se verifie QUE sur un vrai telephone (consigne, pas simule) ;
+  la rangee de reponses rapides ne montre pas qu'elle defile. Regard d'expert : compteur de filtres actifs sur le
+  bouton « Filtres », prix POUR LE POIDS saisi dans la barre du bas, `autocomplete="one-time-code"` sur les six
+  cases, et surtout une garde automatique « tout conteneur `fixed inset-0` porte `role=dialog` » — meilleur candidat
+  d'outillage de la campagne. PIEGES : un `viewport` etroit ne suffit pas ; « Fermer le menu » est le voile (cliquer
+  en haut) ; un element peut depasser sans defaut s'il defile dans son cadre ; le titre d'une page de resultats
+  s'affiche AVANT les cartes (attendre un prix, pas une ville) ; la croix de la porte s'appelle « Plus tard » ;
+  `POST /deals/:id/tracking-link` rend un chemin RELATIF (`new URL(...)` leve « Invalid URL »). Plateforme inchangee
+  (1000 + auth 230), harnais : 306 scenarios. PR a ouvrir (empilee sur #294). Reste : 5.31, 5.32, 02-ADMIN.
+  AUCUNE attribution Claude.
 - 13/09 : **CHAPITRE 5.29 DU CAHIER 01-WEB — WEB-ERR, PAGES D'ERREUR ET PAGE INTROUVABLE (branche
   `chore/recette-web-5-29`, empilee sur #293)** — 5 fiches jouees CONFORMES (1 apres correction), 5 scenarios en
   serie, 2 min 06 (`apps/e2e/src/chapitres/web-err.spec.ts`). COMMENT ON DECLENCHE UN INCIDENT : le cahier prevoit
