@@ -3783,6 +3783,120 @@ web-pic 8/8** (les `test.fail` d'ANO-WEB-28 et 68 restent attendus). Trois éche
 - **Le suivi d'un envoi n'a pas de photos dans le jeu d'essai** : pour la visionneuse, il faut une vraie prise en
   charge (Thomas, deux photos, ImageKit interposé).
 
+## Chapitre 5.32 — Vocabulaire et cohérence de langue · **CONFORME** (6 fiches jouées, 4 après correction · 5 anomalies closes · 7 scénarios, 16 min)
+
+`web-voc.spec.ts`. Le cahier demande de **relire** les écrans déjà parcourus, pas de refaire les parcours. Le harnais
+le prend au mot : un relevé commun (`WEB-VOC-0`) ouvre **31 écrans** du cahier — visiteur, Expéditrice (Aminata),
+Voyageur (Thomas) — en **français puis en anglais** (62 relevés), et garde leur texte visible *plus* les libellés
+qu'entend un lecteur d'écran (`aria-label`, `placeholder`, `title`, `alt`). Chaque fiche interroge ce relevé avec sa
+règle et rend la liste exacte « [langue] écran (compte) : « …extrait… » ». Les emails sont relus dans Mailpit, dont
+deux **en anglais** provoqués pour l'occasion (Pauline passe en anglais, Thomas prend son colis en charge).
+
+Deux garde-fous d'instrument, payés avant de conclure : un écran « introuvable » a aussi 200 caractères (le relevé
+refuse désormais tout écran qui dit « n'existe pas ») ; et deux lectures identiques à une seconde d'écart peuvent
+tomber dans le **squelette** de chargement (« Mes envois » relevé vide) — stable = trois lectures identiques et plus
+aucun `animate-pulse`.
+
+| Fiche | Ce qui est éprouvé | Verdict · Preuve |
+|---|---|---|
+| WEB-VOC-1 | « Voyageur » / « Expéditeur » partout | **Conforme après correction** → `ANO-WEB-98` ; 62 écrans + la boîte Mailpit : aucun « transporteur », « tripper », « yamber », « Shipper » en français ; aucun « carrier », « traveller » en anglais ; aucun « Voyageur » sur un écran anglais. Le point d'attention connu est vérifié **explicitement** : l'assistant, vu par Aminata (pas encore Voyageuse), s'intitule « Devenir Voyageur » / « Become a Traveler » |
+| WEB-VOC-2 | « assurance » absent | **Conforme après correction** → `ANO-WEB-99` ; « Protection » et « Garantie Yamba » bien affichés ; les libellés de la « seconde source » (« Assurance optionnelle », « IPID ») n'existent plus nulle part |
+| WEB-VOC-3 | Un même nom pour le bagage en soute | **Conforme après correction** → `ANO-WEB-100` ; aucun envoi « soute » vivant dans le jeu d'essai (le seul est refusé, donc invisible) : la fiche **en crée un** (Aminata, trajet au kilo de Thomas, paiement FAKE) puis relit page du trajet, réservation, « Mes envois », « Mes trajets » — « Bagage en soute 23 kg » / « Checked bag 23 kg » partout. *Constat : la carte de recherche ne détaille pas les forfaits.* |
+| WEB-VOC-4 | Tutoiement constant | **Conforme après correction** → `ANO-WEB-101` ; les « vous » **pluriels** (« vous aurez tous les deux noté », « vous conviendrez ensemble ») sont légitimes et exemptés, « rendez-vous » aussi |
+| WEB-VOC-5 | Aucun texte de démonstration | **Conforme** — Finances, Notifications, Messages, Mes envois : aucune des 13 mentions guettées. *Constat corrigé : les vitrines `/dashboard/*/preview` qui les portent étaient atteignables en production par URL.* |
+| WEB-VOC-6 | Aucun libellé vide ni clé technique | **Conforme** — aucune clé (`a.b.c`), aucun `{variable}`, `undefined`, `NaN`, aucune ligne « — » seule. Le point connu (notification « le Voyageur a donné sa version » rédigée « — ») est **dormant** : l'événement est configuré « aucune notification membre » (D55) — il ne s'affiche pas, mais il est rédigé désormais |
+
+### Anomalies
+
+- **ANO-WEB-98 (majeure, close)** — **le vocabulaire des rôles fuyait de partout.**
+  - Le point d'attention du cahier **subsistait** : l'assistant s'intitulait « Devenir transporteur », son étape « Créez
+    votre espace transporteur » (« Become a carrier », « Create your carrier space »), et le toast de création de
+    trajet « Configurez votre profil transporteur ».
+  - En anglais, le rôle s'appelait **« carrier »** dans 23 messages (suivi, finances, favoris, annulation, conditions)
+    et 22 phrases d'**emails** de notification — dont la mention systématique « You are receiving this email because
+    the carrier of your Yamba shipment… ».
+  - Sur l'accueil **français**, deux étiquettes codées en dur « 📦 **Shipper** » et, en **anglais**, « ✈️ **Voyageur** » ;
+    le badge d'avatar « Voyageur vérifié » et les textes alternatifs de l'image d'accueil, en français sur les écrans
+    anglais ; « tripper » dans deux messages d'erreur de l'assistant.
+  - Correction : A144 appliquée partout (« Traveler » avec majuscule), étiquettes et textes alternatifs traduits.
+- **ANO-WEB-99 (majeure, close)** — **« ton assurance » sur l'écran de remise du colis** (« Optionnel, mais c'est ton
+  assurance… », « your insurance in a dispute ») : figuré, mais c'est exactement le mot que le cahier interdit, sur
+  un écran qu'il cite. → « ta meilleure preuve » / « your best proof ».
+- **ANO-WEB-100 (mineure, close)** — **six noms pour le bagage en soute** : « Bagage 23kg » (filtres), « Valise soute
+  23 Kg » (commun), « Bagage soute 23 kg » (mes envois, mes trajets), « Bagage en soute 23 kg » (réservation),
+  « Soute 23 kg » (page du trajet), « Un bagage soute 23 kg » (étape 1) ; en anglais « Checked 23 kg », « A 23 kg
+  checked bag », « Checked bag 23kg ». Même désordre pour la cabine. → « Bagage en soute 23 kg » / « Bagage cabine
+  12 kg », « Checked bag 23 kg » / « Cabin bag 12 kg ».
+- **ANO-WEB-101 (mineure, close)** — **le vouvoiement** : 41 messages (accueil, recherche, page de trajet,
+  messagerie, mes trajets), environ 70 textes codés en dur (création de trajet, assistant Voyageur, tableau de bord,
+  retour de Stripe, aide) et les **emails d'alerte de trajet** (« Votre alerte a expiré », « Voulez-vous la
+  prolonger ? »). Tous au tutoiement.
+- **ANO-WEB-102 (mineure, close, trouvée en relisant)** — sur la page d'un trajet, **« Voir les avis » menait à
+  `/tripper/<id>`**, une route qui n'existe pas (page introuvable). → `/u/<slug>`, et la contre-épreuve vit dans le
+  relevé.
+
+### Le garde-fou qui empêche le retour
+
+`scripts/check-i18n-messages.mjs` (check CI « i18n messages ») gagne une **règle 6** : aucune valeur de message ne
+porte un mot de rôle refusé, « assurance », du vouvoiement (hors pluriel « tous les deux / ensemble »), ni un texte
+vide ou « — ». Contre-épreuve jouée : « Become a carrier » et « Votre colis » réintroduits → le check nomme
+`en/finances.json wallet.empty.cta` et `fr/search.json filters.yourParcel`, et sort en erreur. Sa limite est écrite
+dans son en-tête : les textes codés en dur dans les composants lui échappent.
+
+### À trancher (produit)
+
+- **« expéditeurs » / « voyageurs » en minuscule** au sens générique (« Yamba connecte les expéditeurs aux
+  voyageurs ») : laissés tels quels — le rôle prend la majuscule, la foule non. À acter.
+- **Des dizaines de textes encore écrits en dur** (`isFr ? … : …`, une douzaine de fichiers rien que pour ce chapitre) hors des fichiers de messages : corrigés ici, mais
+  invisibles au garde-fou. Les migrer vers `messages/` est la seule protection durable — moyen.
+- **La carte de recherche ne dit pas qu'un trajet propose le forfait soute** : un Expéditeur qui cherche à envoyer
+  une valise doit ouvrir chaque trajet — petit, utile.
+- **Les messages d'erreur de l'API** disent « carrier » (surface publique en anglais, vocabulaire du code) : laissés
+  tels quels ; ils ne doivent jamais être affichés bruts à un membre (A146 : le client traduit `details.code`).
+
+### Regard d'expert — optimisations et améliorations (une ligne par fiche)
+
+- **VOC-1** — Le relevé multi-comptes × deux langues est réutilisable tel quel pour tout futur chapitre de
+  relecture. Jouer aussi une troisième locale le jour où elle arrive ne demande qu'une entrée de tableau — rien à faire.
+- **VOC-2** — Le mot figuré (« c'est ton assurance ») est le piège : un lexique interdit doit viser le mot, pas le
+  sens. La règle 6 le fait — rien à faire.
+- **VOC-3** — Le libellé d'un produit devrait avoir **une seule source** (`api-contracts` ou un seul fichier de
+  messages) : six fichiers portaient six variantes. Centraliser — moyen.
+- **VOC-4** — Le tutoiement s'est perdu surtout dans les textes **codés en dur** : c'est l'argument le plus concret
+  pour finir la migration i18n — moyen.
+- **VOC-5** — Les vitrines de démonstration sont maintenant introuvables en production ; les supprimer une fois le
+  chantier Stripe backend fini — petit.
+- **VOC-6** — Une notification « — » dormante reste un piège pour le jour où D55 change : la règle 6 refuse
+  désormais toute valeur vide ou « — » — rien à faire.
+- **Transversal** — Cinq anomalies, une seule cause : **deux sources de texte** (fichiers de messages et chaînes en
+  dur) dont une seule est gardée. Le garde-fou ferme la première ; la migration fermera la seconde.
+
+### Pièges de poste payés ici
+
+- **Une adresse contient le mot** : `aminata.shipper@seed.yamba.dev` n'est pas un libellé « Shipper ».
+- **Une URL contient le mot** : `/fr/carrier/deals/…` dans un email est un chemin, pas un rôle.
+- **Un écran « introuvable » passe un seuil de longueur** : vérifier aussi qu'il n'annonce pas son absence (le deal
+  `bzv-delivered` est à João, pas à Aminata).
+- **Un squelette peut être stable une seconde** : exiger trois lectures identiques et zéro `animate-pulse`.
+- **Un Voyageur ne voit pas l'assistant « Devenir Voyageur »** (écran de succès) : le relire avec un membre qui ne
+  l'est pas.
+- **Un envoi refusé n'apparaît ni dans « Mes envois » ni dans « Mes trajets »** : pour comparer un libellé, il faut un
+  envoi vivant.
+- **Corriger un texte casse les fiches qui le citent** : 20 citations mises à jour (web-rch, web-msg, fil-messagerie,
+  web-rsv-devis, web-rem, web-dea, web-trj, web-voy) trouvées par inventaire automatique — et deux de plus qu'il
+  n'a pas vues (web-alr : « correspond à votre alerte ») parce que le texte d'un gabarit EJS n'est pas entre
+  guillemets. La non-régression les a trouvées.
+
+### Non-régression rejouée
+
+web-rch 16/16, web-msg 21/21, web-rsv-devis 11/11, web-rsv 3/3, web-rem 7/7, web-dea 9/9, web-trj 13 (⏭ inchangés),
+web-voy 1 (⏭ Stripe inchangés), web-cnf 13/13, web-alr 9/9 (après mise à jour des deux citations ; le constat
+« l'email vouvoie » du 5.10 est devenu une assertion), web-not 11/11, web-mob 10/10, web-a11y 8/8, web-acc 12/12.
+**WEB-ACC-8** échouait une fois sur deux sur un `POST /auth/refresh` : rejouée **sans** les correctifs, elle échoue
+pareil — c'est la sonde de session du visiteur, pas la fermeture de la porte. Exclue de la fiche, raison écrite.
+*Axe : un visiteur qui n'a jamais eu de session ne devrait pas tenter de rafraîchissement (le marqueur
+d'ANO-WEB-01 le sait) — une requête inutile par visite, petit.*
+
 ## Chapitre 6 — WEB-E2E-1, le nominal complet · **CONFORME** (29 étapes, 1 min 24)
 
 | Étape du cahier | Ce qui est éprouvé | Verdict |

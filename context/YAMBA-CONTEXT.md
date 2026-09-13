@@ -610,6 +610,35 @@ Ordre de demarrage : auth -> trip -> gateway.
   desktop du visiteur sans « Creer un compte » ni « Rechercher un trajet ». Piege de poste : la cle
   Google Maps n'accepte que `localhost` comme referent. Harnais : 32 scenarios verts. PR **#265**
   (empilee sur #264). Reste : 5.2 a 5.32, 02-ADMIN.
+- 13/09 : **CHAPITRE 5.32 DU CAHIER 01-WEB — WEB-VOC, VOCABULAIRE ET COHERENCE DE LANGUE (branche
+  `chore/recette-web-5-32`, empilee sur #296) — DERNIER CHAPITRE DU § 5 DU CAHIER 01-WEB** — 6 fiches CONFORMES
+  (4 apres correction), 7 scenarios, 16 min (`apps/e2e/src/chapitres/web-voc.spec.ts`). METHODE : un RELEVE commun
+  (WEB-VOC-0) de 31 ecrans x FR/EN (visiteur, Aminata, Thomas) = 62 textes visibles + libelles d'accessibilite, ecrit
+  sur disque (les fiches ne sont PAS en serie) ; emails Mailpit dont deux provoques en anglais. 5 ANOMALIES CLOSES.
+  ANO-WEB-98 (MAJEURE) : vocabulaire des roles — l'assistant disait encore « Devenir transporteur » / « Creez votre
+  espace transporteur » (point connu du cahier), toast « profil transporteur », « carrier » dans 23 messages EN et 22
+  phrases d'emails EN de notification, « Shipper » en dur sur l'accueil FR et « Voyageur » en dur sur l'accueil EN,
+  badge d'avatar et alt de l'image d'accueil en francais sur les ecrans anglais, « tripper » dans l'assistant.
+  ANO-WEB-99 (MAJEURE) : « ton assurance » / « your insurance » sur l'ecran de remise. ANO-WEB-100 (mineure) : SIX
+  libelles du bagage en soute → « Bagage en soute 23 kg » / « Checked bag 23 kg » (idem cabine). ANO-WEB-101
+  (mineure) : vouvoiement — 41 messages, ~70 textes en dur (creation de trajet, assistant Voyageur, dashboard, Stripe
+  callback, aide — reecrits par un agent sur 12 fichiers) et emails d'alerte de trajet (trip-service). ANO-WEB-102
+  (mineure, trouvee en relisant) : « Voir les avis » menait a `/tripper/<id>` (404) → `/u/<slug>`. VOC-5 conforme, mais
+  les vitrines `/dashboard/*/preview` (donnees de demo) etaient atteignables en production → `notFound()` hors dev.
+  VOC-6 conforme ; la notification `booking_dispute_carrier_responded` redigee « — » est DORMANTE (NONE, D55) —
+  redigee quand meme. CI : REGLE 6 dans `scripts/check-i18n-messages.mjs` (lexique par locale sur les VALEURS des
+  messages : roles refuses, assurance, vouvoiement hors pluriel, texte vide ou « — » ; garde du garde < 1000 textes)
+  — contre-epreuve jouee. NON TOUCHE : messages d'erreur de l'API et OpenAPI (« carrier » = vocabulaire du code).
+  Harnais : 22 citations d'anciens textes mises a jour (rch, msg, fil-messagerie, rsv-devis, rem, dea, trj, voy, alr —
+  les 2 d'alr invisibles a l'inventaire : texte EJS non litteral). NON-REGRESSION : rch, msg, rsv-devis, rsv, rem,
+  dea, trj, voy, cnf, alr, not, mob, a11y, acc verts ; WEB-ACC-8 intermittente sur `POST /auth/refresh` (sonde de
+  session du visiteur, echoue aussi SANS les correctifs) → exclue avec sa raison ; axe : pas de refresh pour un
+  visiteur sans session.
+  FAUX VERTS PAYES : VOC-3 vert sans avoir vu l'objet (aucun envoi soute vivant → la fiche en cree un) ; ecran
+  « introuvable » > 200 car. ; squelette stable 1 s. A TRANCHER : minuscule generique « expediteurs/voyageurs » ;
+  migrer les textes en dur vers messages/ (seule garantie durable) ; carte de recherche muette sur le forfait soute.
+  Plateforme inchangee (1000 + auth 230 ; notification 115 et trip 261 rejoues), harnais : 321 scenarios. PR a
+  ouvrir (empilee sur #296). Reste : chapitre 7 WEB-NRG (12 fiches), cahier 02-ADMIN. AUCUNE attribution Claude.
 - 13/09 : **CHAPITRE 5.31 DU CAHIER 01-WEB — WEB-A11Y, ACCESSIBILITE CLAVIER DE BASE (branche
   `chore/recette-web-5-31`, empilee sur #295)** — 8 fiches jouees CONFORMES (4 apres correction), 8 scenarios en
   serie, 2 min (`apps/e2e/src/chapitres/web-a11y.spec.ts`, au CLAVIER REEL : Tab / Maj+Tab / Echap / Espace /
