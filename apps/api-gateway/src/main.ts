@@ -4,6 +4,7 @@ import proxy from "express-http-proxy";
 import morgan from "morgan";
 import rateLimit from "express-rate-limit";
 import { currentMaintenance, maintenanceMiddleware, publicMaintenanceHandler } from "./libs/maintenance";
+import { origineAutorisee, REFUS_ORIGINE } from "./libs/origins";
 import { aggregateStatus, probeService, serviceEntries, toPublicBody, type PublicStatusBody } from "@packages/libs/health"; // D70
 import cookieParser from "cookie-parser";
 import { randomUUID } from "crypto";
@@ -12,29 +13,16 @@ import { rateLimitMax, resolveRateLimits } from "@packages/middleware/rate-limit
 
 const app = express();
 
-app.use(
-  // cors({
-  //   // origin: ["http://localhost:3000"],
-  //   origin: ["http://localhost:3000", "http://192.168.1.155:3000"],
-  //   allowedHeaders: ["Authorization", "Content-Type"],
-  //   credentials: true,
-  // })
+// Recette 01-WEB chapitre 7 : une origine refusée est un 403 `ORIGIN_NOT_ALLOWED`, plus un 500 (voir libs/origins.ts).
+app.use((req, res, next) => {
+  if (origineAutorisee(req.headers.origin)) return next();
+  return res.status(403).json(REFUS_ORIGINE);
+});
 
+app.use(
   cors({
-    origin: (origin, callback) => {
-      // Requêtes sans origin (curl, server-side) : autoriser
-      if (!origin) return callback(null, true);
-      // 3000 = user-ui · 3001 = admin-ui (chantier C, D54). Même en proxy
-      // D48 (Next → gateway), l'en-tête Origin du navigateur est transmis :
-      // l'admin ouvert sur l'IP LAN doit donc être connu ici aussi.
-      const allowed = [
-        /^http:\/\/localhost:300[01]$/,
-        /^http:\/\/192\.168\.\d+\.\d+:300[01]$/, // Wi-Fi domestique
-        /^http:\/\/10\.\d+\.\d+\.\d+:300[01]$/, // Réseau d'entreprise
-      ];
-      if (allowed.some((re) => re.test(origin))) return callback(null, true);
-      return callback(new Error("Not allowed by CORS: " + origin));
-    },
+    // Le refus a déjà eu lieu ci-dessus : ici, toute origine qui arrive est autorisée.
+    origin: (origin, callback) => callback(null, origineAutorisee(origin)),
     credentials: true,
     // ANO-WEB-82 (recette 5.25) : sans cette ligne, le navigateur CACHE `Content-Disposition` au client
     // (CORS n'expose que six en-têtes par défaut) — l'export de données se téléchargeait sous le nom de

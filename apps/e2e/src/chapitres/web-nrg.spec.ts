@@ -55,18 +55,24 @@ test.describe("WEB-NRG — non-régression (chapitre 7)", () => {
 
   test("WEB-NRG-1 · jamais un tiret à la place de l'heure d'arrivée", async ({ navigateurVisiteur }) => {
     for (const mobile of [false, true]) {
-      const { page } = await navigateurVisiteur(mobile ? { mobile: true } : undefined);
+      const { page, contexte } = await navigateurVisiteur(mobile ? { mobile: true } : undefined);
+      /* Les cartes ATTENDUES, par l'API : « au moins une carte » passerait sur une recherche à moitié vide. */
+      const r = await contexte.request.get(`${api()}/trips/search?from=Paris&to=Brazzaville&limit=50`);
+      expect(r.ok(), "GET /trips/search").toBe(true);
+      const attendus = ((await r.json()) as { trips: Array<{ id: string }> }).trips.map((t) => t.id);
       await ouvrirLaRecherche(page, { from: "Paris", to: "Brazzaville" });
       await expect.poll(() => texte(page), { timeout: 90_000, message: "les cartes arrivent" }).toMatch(/€/);
+      await ecranPret(page);
       /* Sur chaque carte VISIBLE (chaque carte existe deux fois dans le DOM, arbre mobile et desktop) : la ligne
          d'heures ne contient ni tiret seul, ni case vide. */
-      const lignes = await page.evaluate(() =>
-        [...document.querySelectorAll<HTMLElement>('a[href*="/trips/"]')]
-          .filter((c) => c.getClientRects().length > 0)
-          .map((c) => c.innerText.split("\n").map((x) => x.trim()))
+      const cartes = await page.evaluate(() =>
+        [...document.querySelectorAll<HTMLAnchorElement>('a[href*="/trips/"]')]
+          .filter((c) => c.getClientRects().length > 0 && /\/trips\/[0-9a-f]{24}$/.test(c.getAttribute("href") ?? ""))
+          .map((c) => ({ id: (c.getAttribute("href") ?? "").split("/trips/")[1], lignes: c.innerText.split("\n").map((x) => x.trim()) }))
       );
-      expect(lignes.length, `${mobile ? "mobile" : "desktop"} : des cartes`).toBeGreaterThan(0);
-      const fautives = lignes.flatMap((l, i) => l.filter((x) => /^[—–-]$/.test(x) || /\d{1,2}[:h]\d{2}\s*[—–-]\s*$/.test(x) || /^\s*[—–-]\s*\d/.test(x)).map((x) => `carte ${i + 1} : « ${x} »`));
+      const vus = [...new Set(cartes.map((c) => c.id))];
+      expect(vus.sort(), `${mobile ? "mobile" : "desktop"} : exactement les ${attendus.length} trajets servis par l'API`).toEqual([...attendus].sort());
+      const fautives = cartes.flatMap((c, i) => c.lignes.filter((x) => /^[—–-]$/.test(x) || /\d{1,2}[:h]\d{2}\s*[—–-]\s*$/.test(x) || /^\s*[—–-]\s*\d/.test(x)).map((x) => `carte ${i + 1} : « ${x} »`));
       expect(fautives, `${mobile ? "mobile" : "desktop"} : un tiret à la place d'une heure`).toHaveLength(0);
     }
   });
@@ -91,6 +97,12 @@ test.describe("WEB-NRG — non-régression (chapitre 7)", () => {
       if (/\/kg/.test(t)) expect(t, `${cle} : un trajet au kilo montre un exemple chiffré`).toMatch(/≈\s*\d+[,.]\d{2}\s*€|≈\s*€\s*\d/);
       pages.push(cle);
     }
+    /* 2 bis. La même recherche et la même page sur TÉLÉPHONE : la carte et le récapitulatif mobiles sont d'autres arbres. */
+    const telephone = await navigateurVisiteur({ mobile: true });
+    await telephone.page.goto("/fr/search", { waitUntil: "domcontentloaded" });
+    expect(await ecranPret(telephone.page), "téléphone : recherche sans prix à zéro").not.toMatch(zero);
+    await telephone.page.goto(`/fr/trips/${jeuEssai.trajet("bzv-perkg")}`, { waitUntil: "domcontentloaded" });
+    expect(await ecranPret(telephone.page), "téléphone : page de trajet sans prix à zéro").not.toMatch(zero);
     /* 3. L'étape 1 sans poids : l'invite, jamais un total à zéro. */
     const aminata = await navigateurConnecte("aminata", { parEcran: true });
     const assistant = new AssistantReservation(aminata.page);
@@ -101,9 +113,11 @@ test.describe("WEB-NRG — non-régression (chapitre 7)", () => {
     test.info().annotations.push({ type: "note", description: `pages de trajet relues : ${pages.join(", ")}` });
   });
 
-  test("WEB-NRG-3 · la croix des quatre portes d'identité, sur téléphone", async ({ navigateurVisiteur, jeuEssai }) => {
-    test.setTimeout(6 * 60_000);
-    const { page } = await navigateurVisiteur({ mobile: true });
+  test("WEB-NRG-3 · la croix des quatre portes d'identité, sur téléphone et sur grand écran", async ({ navigateurVisiteur, jeuEssai }) => {
+    test.setTimeout(8 * 60_000);
+    /* Le cahier : « sur mobile comme sur desktop ». */
+    for (const mobile of [true, false]) {
+    const { page } = await navigateurVisiteur(mobile ? { mobile: true } : undefined);
     const verifierLaCroix = async (porte: string) => {
       const fenetre = page.locator('[role="dialog"][aria-modal="true"]').filter({ hasText: /Connecte-toi/ }).filter({ visible: true }).last();
       await expect(fenetre, `${porte} : la porte s'ouvre`).toBeVisible({ timeout: 30_000 });
@@ -135,7 +149,8 @@ test.describe("WEB-NRG — non-régression (chapitre 7)", () => {
     const partager = page.getByRole("banner").getByRole("button", { name: "Partager un trajet", exact: true }).filter({ visible: true }).first();
     await expect(partager, "le bouton de l'en-tête porte le nom complet « Partager un trajet »").toBeVisible({ timeout: 60_000 });
     await partager.click();
-    await verifierLaCroix("« Partager un trajet »");
+    await verifierLaCroix(`« Partager un trajet » (${mobile ? "téléphone" : "grand écran"})`);
+    }
   });
 
   test("WEB-NRG-4 · l'étape 1 de la réservation sur chaque trajet, sans écran blanc", async ({ navigateurConnecte, jeuEssai }) => {
@@ -152,7 +167,11 @@ test.describe("WEB-NRG — non-régression (chapitre 7)", () => {
       if (etape1 && t.includes("n'a pas précisé de lieu")) {
         expect(t, `${cle} : le message du trajet sans lieu`).toContain("Le Voyageur n'a pas précisé de lieu pour ce trajet : vous conviendrez ensemble du point de rendez-vous dans la conversation, une fois la demande acceptée.");
       }
-      releve.push(`${cle} → ${etape1 ? "étape 1" : "refus expliqué"}`);
+      if (!etape1) {
+        /* Regard d'expert du chapitre 7 : le refus propose une suite. */
+        await expect(page.getByRole("button", { name: "Chercher un autre trajet" }), `${cle} : le refus propose une suite`).toBeVisible();
+      }
+      releve.push(`${cle} → ${etape1 ? "étape 1" : "refus expliqué, avec « Chercher un autre trajet »"}`);
     }
     const plantages = console_.erreurs().filter((e) => /Cannot read properties of (undefined|null)|pageerror|is not a function|is undefined/i.test(e));
     expect(plantages, "aucune exception dans la console").toHaveLength(0);
@@ -246,7 +265,7 @@ test.describe("WEB-NRG — non-régression (chapitre 7)", () => {
     expect(vides, "WEB-NRG-12 : sections vides").toHaveLength(0);
   });
 
-  test("WEB-NRG-7 · les cinq gestes sensibles ouvrent la porte par code", async ({ navigateurConnecte, navigateurVisiteur, mailpit }) => {
+  test("WEB-NRG-7 · les cinq gestes sensibles ouvrent la porte par code", async ({ navigateurConnecte, navigateurVisiteur, mailpit, jeuEssai }) => {
     test.setTimeout(6 * 60_000);
     /* Une porte vérifiée, puis refermée SANS demander de code (quota OTP). */
     const porteOuverte = async (page: Page, geste: string, route: RegExp, declencher: () => Promise<void>) => {
@@ -290,9 +309,18 @@ test.describe("WEB-NRG — non-régression (chapitre 7)", () => {
     await securite.cliquerSupprimer();
     await expect(jetable.page.getByText("Impossible pour l'instant"), "un compte neuf n'a rien en cours").toHaveCount(0, { timeout: 15_000 });
     await jetable.page.getByPlaceholder("SUPPRIMER").fill("SUPPRIMER");
-    await porteOuverte(jetable.page, "supprimer son compte", /\/auth\/me\/(erasure|erase|account|delete)/, () =>
-      jetable.page.getByRole("button", { name: "Supprimer définitivement mon compte" }).click()
-    );
+    try {
+      await porteOuverte(jetable.page, "supprimer son compte", /\/auth\/me\/(erasure|erase|account|delete)/, () =>
+        jetable.page.getByRole("button", { name: "Supprimer définitivement mon compte" }).click()
+      );
+    } finally {
+      /* Regard d'expert du chapitre 7 : un compte jetable par exécution s'accumulait en base (piège 22). Il est
+         retiré à la fin — CE compte-là seulement, par son adresse exacte, et la manœuvre est consignée. */
+      jeuEssai.manoeuvre(
+        `purge du compte jetable de WEB-NRG-7 (${neuf.email})`,
+        `import p from "./packages/libs/prisma"; (async () => { await p.user.deleteMany({ where: { emailNormalized: ${JSON.stringify(neuf.email.toLowerCase())} } }); process.exit(0); })();`
+      );
+    }
   });
 
   test("WEB-NRG-8 · les libellés des statuts de trajet et leurs toasts", async ({ navigateurConnecte }) => {
@@ -349,6 +377,10 @@ test.describe("WEB-NRG — non-régression (chapitre 7)", () => {
     const refus = await trajets.tenterDAnnulerLeTrajet("Paris → Brazzaville", id);
     expect(refus.statut, "le serveur refuse (409)").toBe(409);
     expect(refus.toast, "le refus NOMME le nombre de deals").toMatch(/^Ce trajet porte encore (\d+|un) deals? en cours/);
+    /* Regard d'expert du chapitre 7 : le refus MÈNE aux deals à annuler. */
+    await page.getByRole("button", { name: "Voir ses deals" }).first().click();
+    await expect(page, "« Voir ses deals » ouvre le trajet").toHaveURL(new RegExp(`/dashboard/trips/${id}$`), { timeout: 30_000 });
+    await expect.poll(() => texte(page), { timeout: 60_000, message: "les deals du trajet sont listés" }).toMatch(/Aminata|Pauline|En attente|Accepté/);
     const r = await contexte.request.get(`${api()}/trips/${id}`);
     expect(((await r.json()) as { trip?: { status: string }; status?: string }).trip?.status ?? "", "le trajet reste en ligne").toBe("PUBLISHED");
   });
@@ -382,28 +414,47 @@ test.describe("WEB-NRG — non-régression (chapitre 7)", () => {
       "/fr/dashboard/notifications",
       `/fr/bookings/${jeuEssai.deal("bzv-picked").id}`,
     ];
-    const fin = Date.now() + 5 * 60_000;
-    while (Date.now() < fin) {
+    /* Phase 1 (3 min) — par RECHARGEMENT (`page.goto`) : le cas pessimiste (tout le layout remonte à chaque page). */
+    const finRechargement = Date.now() + 3 * 60_000;
+    while (Date.now() < finRechargement) {
       for (const chemin of parcours) {
-        if (Date.now() >= fin) break;
+        if (Date.now() >= finRechargement) break;
         await page.goto(chemin, { waitUntil: "domcontentloaded" });
         await page.waitForLoadState("networkidle").catch(() => undefined);
         pages += 1;
       }
     }
+    const rechargement = { pages, requetes };
+    /* Phase 2 (2 min) — par LIENS, comme un membre : la barre latérale du tableau de bord, sans rechargement.
+       Regard d'expert du chapitre 7 : la mesure par rechargement surestimait le coût réel d'une page. */
+    await page.goto("/fr/dashboard/home", { waitUntil: "networkidle" });
+    const liens = ["Mes envois", "Messages", "Notifications", "Mes favoris", "Finances", "Accueil"];
+    const finLiens = Date.now() + 2 * 60_000;
+    while (Date.now() < finLiens) {
+      for (const nom of liens) {
+        if (Date.now() >= finLiens) break;
+        await page.getByRole("link", { name: nom, exact: true }).filter({ visible: true }).first().click();
+        await page.waitForLoadState("networkidle").catch(() => undefined);
+        await page.waitForTimeout(500);
+        pages += 1;
+      }
+    }
+    const parLiens = { pages: pages - rechargement.pages, requetes: requetes - rechargement.requetes };
     expect(await page.getByText(/Trop de tentatives|Too many/).count(), "aucun message « Trop de tentatives »").toBe(0);
     expect(statuts.filter((s) => s === 429).length, `aucune réponse 429 sur ${requetes} appels`).toBe(0);
     /* Le poste de recette RELÈVE les plafonds (RATE_LIMIT_*_MAX dans .env) : « aucun 429 ici » ne dit rien de la
        production. On mesure donc le coût d'une page et on le projette sur les plafonds PAR DÉFAUT du code, à un
        rythme humain actif — une page toutes les 10 secondes, 90 pages par quart d'heure. */
-    const parPage = requetes / Math.max(1, pages);
+    const parPage = rechargement.requetes / Math.max(1, rechargement.pages);
+    const parPageLiens = parLiens.requetes / Math.max(1, parLiens.pages);
     const membreHumain = Math.round(parPage * 90);
+    expect(Math.round(parPageLiens * 90), `par liens, un membre actif tient largement sous ${RATE_LIMIT_AUTHENTICATED}`).toBeLessThan(RATE_LIMIT_AUTHENTICATED);
     expect(membreHumain, `un membre actif (90 pages / 15 min × ${parPage.toFixed(1)} appels) tient sous le plafond de production des membres (${RATE_LIMIT_AUTHENTICATED})`).toBeLessThan(RATE_LIMIT_AUTHENTICATED);
     const pagesVisiteur = Math.floor(RATE_LIMIT_ANONYMOUS / parPage);
     test.info().annotations.push({
       type: "mesure",
       description:
-        `${pages} pages, ${requetes} appels d'API en 5 min → ${parPage.toFixed(1)} appels par page ; plafond servi sur le poste ${plafondServi} / 15 min ` +
+        `par rechargement : ${rechargement.pages} pages, ${rechargement.requetes} appels → ${parPage.toFixed(1)} par page ; par liens : ${parLiens.pages} pages, ${parLiens.requetes} appels → ${parPageLiens.toFixed(1)} par page ; plafond servi sur le poste ${plafondServi} / 15 min ` +
         `(production : membres ${RATE_LIMIT_AUTHENTICATED}, visiteurs ${RATE_LIMIT_ANONYMOUS}) ; membre actif ≈ ${membreHumain} appels / 15 min ` +
         `(${Math.round((membreHumain / RATE_LIMIT_AUTHENTICATED) * 100)} % du plafond) ; un VISITEUR atteint son plafond en ≈ ${pagesVisiteur} pages / 15 min`,
     });
@@ -426,6 +477,12 @@ test.describe("WEB-NRG — non-régression (chapitre 7)", () => {
     /* Contre-épreuve : une origine étrangère n'est PAS autorisée (sinon la liste ne garde rien). */
     const etrangere = await requete.get(`${api()}/trips/search?from=Paris&to=Brazzaville`, { headers: { Origin: "https://yamba.example.org" } });
     expect(etrangere.headers()["access-control-allow-origin"], "une origine étrangère n'est pas autorisée").toBeUndefined();
+    /* Chapitre 7 : un REFUS, pas une panne — 403 avec son code, jamais 500 « Not allowed by CORS ». */
+    expect(etrangere.status(), "une origine refusée répond 403").toBe(403);
+    expect(((await etrangere.json()) as { details?: { code?: string } }).details?.code, "code ORIGIN_NOT_ALLOWED").toBe("ORIGIN_NOT_ALLOWED");
+    /* Et le refus est franc : une ÉCRITURE d'un site tiers n'atteint jamais les services. */
+    const ecriture = await requete.post(`${api()}/auth/login`, { headers: { Origin: "https://yamba.example.org" }, data: { email: "x@y.z", password: "x" } });
+    expect(ecriture.status(), "un POST d'une origine étrangère est refusé AVANT les services").toBe(403);
     constats.push(`https://yamba.example.org → ${etrangere.status()} (sans en-tête d'autorisation)`);
     test.info().annotations.push({ type: "note", description: constats.join(" ; ") });
     await requete.dispose();

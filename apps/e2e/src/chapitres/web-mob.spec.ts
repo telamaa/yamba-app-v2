@@ -130,9 +130,9 @@ test.describe("WEB-MOB — responsive mobile (chapitre 5.30)", () => {
     await rienNeSortDuCadre(page, "fil de messagerie");
     /* Les réponses rapides défilent dans LEUR cadre, pas dans la page. */
     await aucunDebordement(page, "fil, réponses rapides comprises");
-    /* Le bouton du numéro est dans l'écran (le fil d'un deal accepté le propose). */
-    const numero = page.getByRole("button", { name: "Voir le numéro" }).first();
-    if (await numero.count()) await tientDansLEcran(page, numero, "« Voir le numéro »");
+    /* « Voir le numéro », un message ENVOYÉ, le rendez-vous au lieu long et le défilement des réponses rapides sont
+       joués en entier par WEB-NRG-5 (chapitre 7) : cette fiche garde la mise en page du fil tel qu'il s'ouvre, sans
+       saut silencieux (`if (count)`) sur ce qu'elle ne prouve pas. */
   });
 
   test("WEB-MOB-6 · la croix de fermeture de la porte d'identité", async ({ navigateurVisiteur, jeuEssai }) => {
