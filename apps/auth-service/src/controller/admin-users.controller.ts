@@ -25,6 +25,7 @@ import { revokeRefreshJti } from "../utils/auth.helper";
 import { sendAuthEmail } from "../emails/send-auth-email";
 import { getAdminEmails } from "../emails/admin-emails";
 import type { AdminUsersService } from "../services/admin-users.service";
+import { makeEmailSuppressionService, type EmailSuppressionDb } from "../services/email-suppression.service";
 
 const SUPPORT_EMAIL = process.env.SUPPORT_EMAIL || "support@yamba.app";
 
@@ -44,6 +45,11 @@ function meta(req: AuthenticatedRequest) {
 function fmtDate(d: Date | null, locale: string): string | null {
   return d ? new Intl.DateTimeFormat(locale === "fr" ? "fr-FR" : "en-GB", { day: "numeric", month: "long", year: "numeric" }).format(d) : null;
 }
+
+const emailSuppression = makeEmailSuppressionService({
+  db: prisma as unknown as EmailSuppressionDb,
+  record: (tx, entry) => recordAdminAction(tx as never, entry),
+});
 
 export function makeAdminUsersController(service: AdminUsersService) {
   async function loadTarget(req: AuthenticatedRequest) {
@@ -185,17 +191,12 @@ export function makeAdminUsersController(service: AdminUsersService) {
       }
     },
 
-    /** D35 4A — lever la suppression d'une adresse après correction (journal EMAIL_SUPPRESSION_LIFTED). */
+    /** D35 4A — lever la suppression d'une adresse après correction (journal EMAIL_SUPPRESSION_LIFTED).
+     *  A155 (recette § 5.5) : motif ≥ 20 obligatoire, écriture conditionnelle (une seule ligne si deux admins lèvent en même temps). */
     async unsuppressEmail(req: AuthenticatedRequest, res: Response, next: NextFunction) {
       try {
         const user = await loadTarget(req);
-        const suppressedAt = user.emailSuppressedAt;
-        if (!suppressedAt) throw new ValidationError("This address is not suppressed.", { code: "EMAIL_NOT_SUPPRESSED" });
-        await prisma.$transaction(async (tx) => {
-          await tx.user.update({ where: { id: user.id }, data: { emailSuppressedAt: null, emailSuppressedReason: null } });
-          await recordAdminAction(tx, { adminUserId: req.user.id, action: "EMAIL_SUPPRESSION_LIFTED", targetType: "USER", targetId: user.id, before: { emailSuppressedAt: suppressedAt.toISOString(), reason: user.emailSuppressedReason }, after: { emailSuppressedAt: null }, ...meta(req) });
-        });
-        return res.status(200).json({ ok: true });
+        return res.status(200).json(await emailSuppression.lift(req.user.id, user, req.body, meta(req)));
       } catch (e) {
         return next(e);
       }

@@ -29,6 +29,7 @@ import {
   type UpdateSettingsRequest,
 } from "@packages/api-contracts";
 import { ConflictError, ForbiddenError, ValidationError } from "@packages/error-handler";
+import { reachableRecipientWhere } from "@packages/email";
 import { recordAdminAction } from "@packages/admin-audit";
 import { PLATFORM_SETTINGS_KEY } from "@packages/libs/settings";
 
@@ -137,7 +138,7 @@ export function makePlatformSettingsService(deps: {
     deps.invalidate?.();
     if (deps.notify) {
       const recipients = await deps.db.user.findMany({
-        where: { roles: { has: "ADMIN" }, adminRoles: { has: "SUPER_ADMIN" }, isDeleted: false },
+        where: { roles: { has: "ADMIN" }, adminRoles: { has: "SUPER_ADMIN" }, AND: [reachableRecipientWhere()] }, // ANO-ADM-11 : D35 4A (effacé, adresse en suppression)
         select: { id: true, email: true, firstName: true, lastName: true, preferredLocale: true },
       });
       await deps.notify({ actorId: actor.id, reset: action === "SETTINGS_RESET", reason, changes, recipients, at: now }).catch(() => undefined);

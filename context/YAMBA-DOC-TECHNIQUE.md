@@ -7585,3 +7585,118 @@ trip-service sur 6002.
 - auth-service **242** (238 + 4) · trip-service **262** (261 + 1) · deal-service **578** (577 + 1).
 - `apps/e2e` : **370 scénarios** (363 + 7), les 7 verts deux fois de suite.
 - Typecheck auth-service, trip-service, deal-service, admin-ui et harnais verts.
+
+
+---
+
+# Cahier 02-ADMIN, § 5.5 : la liste de suppression d'adresses — une règle partagée, une levée motivée, une concurrence sans 500
+
+*(PR `chore/recette-admin-5-5`, empilée sur #305, 14/09/2026.)*
+
+## Ce qui a été fait
+
+```
+packages/libs/email/src/recipient.ts                 NOUVEAU — canReceiveEmail, reachableRecipientWhere, suppressionReasonLabel
+packages/libs/email/src/index.ts                     export de recipient
+packages/libs/prisma/write-conflict-retry.ts         NOUVEAU (remonté de deal-service) — withWriteConflictRetry
+apps/deal-service/src/lib/write-conflict-retry.ts    ré-export (imports et tests inchangés)
+apps/trip-service/src/lib/carrier-mailer.ts          NOUVEAU — ANO-ADM-10 : makeCarrierMailer (+ spec, 5 tests)
+apps/trip-service/src/controllers/admin-trips.controller.ts   emailCarrier = makeCarrierMailer(…)
+apps/auth-service/src/services/email-suppression.service.ts   NOUVEAU — A155 : levée motivée, conditionnelle, rejouée (+ spec, 5 tests)
+apps/auth-service/src/controller/admin-users.controller.ts    unsuppressEmail délègue au service
+apps/auth-service/src/services/platform-settings.service.ts   ANO-ADM-11 : destinataires joignables (+ 1 test)
+apps/auth-service/src/controller/admin-status.controller.ts   ANO-ADM-11 : idem (email de maintenance)
+packages/libs/api-contracts/src/admin/admin-users.schema.ts   UnsuppressEmailRequestSchema (≥ 20)
+apps/auth-service/src/openapi/build-openapi.ts + apps/*/openapi.json   corps et 400 documentés, contrats régénérés
+apps/admin-ui/src/components/UserFileView.tsx        formulaire de levée, plainte, refus par code, message nommé
+apps/notification-service/src/lib/email-recipient.spec.ts    4 tests de la règle partagée
+apps/e2e/src/admin/adm-eml-suppression.spec.ts       4 scénarios en série
+```
+
+## Une règle écrite six fois finit par être oubliée deux fois
+
+D35 4A dit : « chaque résolveur de destinataire respecte `emailSuppressedAt` comme `isDeleted` ». Avant ce chapitre,
+chaque service réécrivait son test (`if (!u?.email || u.isDeleted || u.emailSuppressedAt)` dans notification-service,
+message-service, trip-service, deal-service, auth-service…). Un audit des appelants de `sendTransactionalEmail` /
+`sendAuthEmail` en a trouvé deux qui l'avaient oublié : `emailCarrier` (trip-service, ANO-ADM-10) et les destinataires
+super administrateurs (auth-service, ANO-ADM-11). La règle devient une fonction pure de `@packages/email` :
+
+```ts
+export function canReceiveEmail(u: EmailRecipientCandidate | null | undefined): boolean {
+  if (!u || !u.email || !u.email.trim()) return false;
+  if (u.isDeleted) return false;
+  return !u.emailSuppressedAt;
+}
+/** À combiner sous AND : un OR de l'appelant n'est jamais écrasé. */
+export function reachableRecipientWhere() {
+  return { isDeleted: false, OR: [{ emailSuppressedAt: null }, { emailSuppressedAt: { isSet: false } }] };
+}
+```
+
+Pourquoi `AND: [reachableRecipientWhere()]` plutôt qu'un étalement (`...reachableRecipientWhere()`) ? Parce que le
+fragment contient un `OR` (piège Mongo : `null` ne voit pas un champ absent) ; étalé dans une requête qui a déjà son
+`OR`, l'un écraserait l'autre en silence. Les anciens résolveurs corrects n'ont pas été réécrits (aucune valeur ajoutée,
+risque réel) : la règle sert aux nouveaux et aux corrigés.
+
+## `emailCarrier` testable : injecter ce qui touche le monde
+
+L'ancienne fonction lisait Prisma, testait `isEmailConfigured` et envoyait, dans un contrôleur non testé. Elle devient une
+fabrique à dépendances injectées qui rend un **résultat nommé** (`SENT`, `NOT_CONFIGURED`, `NO_ACCOUNT`,
+`UNREACHABLE`, `FAILED`) et journalise les deux cas silencieux :
+
+```ts
+const emailCarrier = makeCarrierMailer({
+  isConfigured: isEmailConfigured,
+  findUser: (userId) => prisma.user.findUnique({ where: { id: userId }, select: { firstName: true, email: true, preferredLocale: true, isDeleted: true, emailSuppressedAt: true } }),
+  send: (mail) => sendTransactionalEmail(mail),
+  log: (message) => console.error(message),
+});
+```
+
+## A155 : lever une suppression, motivé, conditionnel, rejoué
+
+Trois défauts de la levée, mesurés en recette : aucun motif (une plainte levée sans raison écrite), une erreur avalée par
+le bouton (`try { … } finally`), et **un 500** quand deux administrateurs lèvent en même temps — MongoDB rejette la
+transaction perdante (`P2034`, « Transaction failed due to a write conflict »). Le service :
+
+```ts
+const parsed = UnsuppressEmailRequestSchema.safeParse(body ?? {});          // 400 REASON_REQUIRED
+await withWriteConflictRetry(() => db.$transaction(async (tx) => {
+  const r = await tx.user.updateMany({ where: { id: user.id, emailSuppressedAt: suppressedAt }, data: { emailSuppressedAt: null, emailSuppressedReason: null } });
+  if (r.count === 0) throw new ValidationError("This address is not suppressed.", { code: "EMAIL_NOT_SUPPRESSED" });
+  await record(tx, { action: "EMAIL_SUPPRESSION_LIFTED", before: { emailSuppressedAt, reason }, after: { emailSuppressedAt: null, liftReason }, … });
+}));
+```
+
+L'`updateMany` conditionnel sur la date **lue** est la garde ; le réessai transforme le conflit d'infrastructure en
+réponse métier : au second essai, l'autre a levé, `count` vaut 0, le perdant reçoit 400 et le journal n'a qu'une ligne.
+`withWriteConflictRetry` existait déjà dans deal-service (ANO-API-19) ; il est remonté dans `packages/libs/prisma` —
+deal-service garde un ré-export d'une ligne pour ne toucher à aucun import.
+
+`after.liftReason` (et non `after.reason`) : `before.reason` est déjà le motif **du fournisseur** (`HARD_BOUNCE`,
+`COMPLAINT`) ; réutiliser le nom mélangerait deux informations dans le journal.
+
+## L'écran : le message doit survivre au rechargement
+
+Le formulaire de levée vit **dans** le bandeau ; quand la levée réussit — ou qu'un autre onglet l'a déjà faite — la fiche
+se recharge et le bandeau disparaît, emportant tout message local. Le message passe donc au niveau de la fiche
+(`flash`, déclaré avec les autres `useState` **avant** les `return` anticipés : l'ordre des hooks ne doit pas dépendre du
+chargement).
+
+## Le harnais : signer un webhook comme le fournisseur
+
+```ts
+const corps = JSON.stringify(evenement);                 // compact : ce qui est signé est ce qui est envoyé
+const s = signer(corps);                                 // svixSign(RESEND_WEBHOOK_SECRET, id, ts, corps) côté serveur (tsx --env-file)
+await ctx.request.post(`${adresseDeLApi()}/webhooks/email/resend`, { headers: { "svix-id": s.id, "svix-timestamp": s.ts, "svix-signature": s.signature }, data: corps });
+```
+
+Le secret n'entre jamais dans le processus Playwright : la signature est calculée par un script `tsx` qui lit le `.env`.
+
+## Tests
+
+- auth-service **248** (242 + 6), trip-service **267** (262 + 5), notification-service **119** (115 + 4), deal-service
+  **578** (inchangé ; un passage parallèle a expiré sur `deal-transport.service.spec.ts` sous charge, vert isolé et au
+  passage complet suivant).
+- `apps/e2e` : **374 scénarios** (370 + 4), les 4 verts deux fois de suite.
+- Typecheck auth, trip, deal, notification, message, gateway, admin-ui et harnais verts ; contrats OpenAPI régénérés.
