@@ -637,8 +637,7 @@ Ordre de demarrage : auth -> trip -> gateway.
   FAUX VERTS PAYES : VOC-3 vert sans avoir vu l'objet (aucun envoi soute vivant → la fiche en cree un) ; ecran
   « introuvable » > 200 car. ; squelette stable 1 s. A TRANCHER : minuscule generique « expediteurs/voyageurs » ;
   migrer les textes en dur vers messages/ (seule garantie durable) ; carte de recherche muette sur le forfait soute.
-  Plateforme inchangee (1000 + auth 230 ; notification 115 et trip 261 rejoues), harnais : 321 scenarios. PR a
-  ouvrir (empilee sur #296). Reste : chapitre 7 WEB-NRG (12 fiches), cahier 02-ADMIN. AUCUNE attribution Claude.
+  Plateforme inchangee (1000 + auth 230 ; notification 115 et trip 261 rejoues), harnais : 321 scenarios. PR #297 (empilee sur #296). Reste : chapitre 7 WEB-NRG (12 fiches), cahier 02-ADMIN. AUCUNE attribution Claude.
 - 13/09 : **CHAPITRE 5.31 DU CAHIER 01-WEB — WEB-A11Y, ACCESSIBILITE CLAVIER DE BASE (branche
   `chore/recette-web-5-31`, empilee sur #295)** — 8 fiches jouees CONFORMES (4 apres correction), 8 scenarios en
   serie, 2 min (`apps/e2e/src/chapitres/web-a11y.spec.ts`, au CLAVIER REEL : Tab / Maj+Tab / Echap / Espace /
