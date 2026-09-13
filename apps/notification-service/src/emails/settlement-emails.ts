@@ -297,7 +297,7 @@ const en: SettlementEmailDictionary = {
     };
   },
   flightArrivedShipper: (p) => {
-    const carrier = p.counterpartFirstName ?? "your carrier";
+    const carrier = p.counterpartFirstName ?? "your Traveler";
     return {
       subject: `${carrier} has landed — let the recipient of your parcel ${p.route} know`,
       content: {
@@ -310,12 +310,12 @@ const en: SettlementEmailDictionary = {
         ],
         cta: { label: "Open my tracking", url: p.ctaUrl },
         footnotes: ["The other trip steps stay in your notifications, without email."],
-        reason: "You are receiving this email because the carrier of your Yamba shipment has just arrived at destination.",
+        reason: "You are receiving this email because the Traveler carrying your Yamba shipment has just arrived at destination.",
       },
     };
   },
   completedShipper: (p) => {
-    const carrier = p.counterpartFirstName ?? "your carrier";
+    const carrier = p.counterpartFirstName ?? "your Traveler";
     return {
       subject: `Transaction completed for your shipment ${p.route}`,
       content: {
@@ -356,7 +356,7 @@ const en: SettlementEmailDictionary = {
     };
   },
   disputedShipper: (p) => {
-    const carrier = p.counterpartFirstName ?? "your carrier";
+    const carrier = p.counterpartFirstName ?? "your Traveler";
     return {
       subject: `Report ${p.ticketNumber} received for your shipment ${p.route}`,
       content: {
@@ -399,14 +399,14 @@ const en: SettlementEmailDictionary = {
     const ticket = p.ticketNumber ? `Case ${p.ticketNumber} — ` : "";
     const outcomeLine =
       p.outcome === "REJECTED"
-        ? "After reviewing both sides and the evidence, we did not uphold your report: the carrier is paid in full."
+        ? "After reviewing both sides and the evidence, we did not uphold your report: the Traveler is paid in full."
         : p.outcome === "PARTIAL_REFUND"
-          ? `After reviewing both sides and the evidence, we refund you ${p.refund}. The rest goes to the carrier.`
+          ? `After reviewing both sides and the evidence, we refund you ${p.refund}. The rest goes to the Traveler.`
           : p.outcome === "FULL_REFUND"
             ? `After reviewing both sides and the evidence, we refund you in full: ${p.refund}.`
             : p.outcome === "RESTITUTE_SHIPPER"
               ? `The cancellation retention comes back to you: ${p.refund} refunded.`
-              : "The cancellation retention goes to the carrier: nobody could attest the pickup, and they had travelled.";
+              : "The cancellation retention goes to the Traveler: nobody could attest the pickup, and they had traveled.";
     return {
       subject: `Decision on your shipment ${p.route}`,
       content: {
@@ -456,7 +456,7 @@ const en: SettlementEmailDictionary = {
     };
   },
   verificationReminderShipper: (p) => {
-    const carrier = p.counterpartFirstName ?? "your carrier";
+    const carrier = p.counterpartFirstName ?? "your Traveler";
     return {
       subject: `Last day to check your parcel ${p.route}`,
       content: {

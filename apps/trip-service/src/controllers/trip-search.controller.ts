@@ -5,6 +5,7 @@ import { recordSearch, tripViews } from "@packages/libs/redis/trip-stats";
 import redis from "@packages/libs/redis";
 import { Prisma } from "@prisma/client";
 import { sortByPriceForWeight, totalForWeightCents, transportForWeightCents, weightPricingFromSettings, type WeightPricingParams } from "../lib/price-for-weight";
+import { placeSearchTerm } from "../lib/place-text";
 import { platformSettings } from "@packages/libs/settings/default";
 import prisma from "@packages/libs/prisma";
 import { markFavorites } from "../services/trip-favorite.service";
@@ -104,20 +105,24 @@ function buildBaseWhere(
   // ─── Filtres composables (AND) ────────────────────
   const andClauses: Prisma.TripWhereInput[] = [];
 
-  if (params.from) {
+  // Le libellé « Ville, Pays » de l'autocomplétion se réduit à la ville (lib/place-text.ts) :
+  // comparé entier, il ne touchait ni la ville ni le pays → zéro résultat (WEB-ACC-9).
+  const from = placeSearchTerm(params.from);
+  if (from) {
     andClauses.push({
       OR: [
-        { originCity: { contains: params.from, mode: "insensitive" } },
-        { originCountry: { contains: params.from, mode: "insensitive" } },
+        { originCity: { contains: from, mode: "insensitive" } },
+        { originCountry: { contains: from, mode: "insensitive" } },
       ],
     });
   }
 
-  if (params.to) {
+  const to = placeSearchTerm(params.to);
+  if (to) {
     andClauses.push({
       OR: [
-        { destinationCity: { contains: params.to, mode: "insensitive" } },
-        { destinationCountry: { contains: params.to, mode: "insensitive" } },
+        { destinationCity: { contains: to, mode: "insensitive" } },
+        { destinationCountry: { contains: to, mode: "insensitive" } },
       ],
     });
   }

@@ -101,6 +101,19 @@ describe("platform-settings.service — reset et read", () => {
     await expect(svc.reset(OPS, { keys: ["pricing.commissionPct"], reason, expectedVersion: 2 })).rejects.toMatchObject({ statusCode: 403 });
     await expect(svc.reset(OPS, { keys: ["alerts.outboxLagMinutes"], reason, expectedVersion: 2 })).resolves.toMatchObject({ version: 3 });
   });
+  it("ANO-ADM-02 — rien à remettre : un profil sans aucun droit d'écriture est REFUSÉ (403), un profil qui peut écrire reçoit 400", async () => {
+    const MEDIATOR = { id: "med1", roles: ["MEDIATOR"] as const };
+    const db = fakeDb({ key: "current", values: { ...SETTINGS_DEFAULTS }, version: 2, updatedAt: new Date(), updatedByAdminId: "sa2" });
+    const svc = makePlatformSettingsService({ db });
+    // Toutes les valeurs sont déjà par défaut : le Médiateur n'a aucune portée d'écriture — refus, pas « rien à faire ».
+    await expect(svc.reset(MEDIATOR, { keys: ["pricing.commissionPct"], reason, expectedVersion: 2 })).rejects.toMatchObject({ statusCode: 403 });
+    await expect(svc.reset(MEDIATOR, { reason, expectedVersion: 2 })).rejects.toMatchObject({ statusCode: 403 });
+    // OPS peut écrire les clés d'exploitation : une remise globale sans effet reste un 400 « Nothing to reset ».
+    await expect(svc.reset(OPS, { reason, expectedVersion: 2 })).rejects.toMatchObject({ statusCode: 400 });
+    // OPS visant une clé MÉTIER déjà par défaut : il ne peut en écrire aucune → 403.
+    await expect(svc.reset(OPS, { keys: ["pricing.commissionPct"], reason, expectedVersion: 2 })).rejects.toMatchObject({ statusCode: 403 });
+    expect(db.actions).toEqual([]);
+  });
   it("read : défauts quand rien n'est stocké (version 0), puis valeurs, auteur, dernière modification groupée par version", async () => {
     const db = fakeDb();
     const svc = makePlatformSettingsService({ db });

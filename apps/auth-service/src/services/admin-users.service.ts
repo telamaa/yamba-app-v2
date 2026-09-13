@@ -7,7 +7,7 @@
  */
 import prisma from "@packages/libs/prisma";
 import { adminRolesOf, type AdminUsersQuery } from "@packages/api-contracts";
-import { OID, TICKET, USERS_CSV_COLUMNS, buildUsersOrderBy, buildUsersWhere } from "../lib/admin-users.query";
+import { OID, TICKET, USERS_CSV_COLUMNS, buildUsersOrderBy, buildUsersWhere, matchedOnFor, textSearchOr } from "../lib/admin-users.query";
 import redis from "@packages/libs/redis";
 import { NotFoundError } from "@packages/error-handler";
 import type { AdminUserFile, AdminUserSummary, AdminUsersResponse } from "@packages/api-contracts";
@@ -99,9 +99,8 @@ export function makeAdminUsersService() {
       ]);
       const hasNext = rows.length > q.limit;
       const page = hasNext ? rows.slice(0, q.limit) : rows;
-      const lower = term.toLowerCase();
       return {
-        items: page.map((r) => toSummary(r as SummaryRow, term ? (r.email.toLowerCase().includes(lower) ? "email" : "name") : null)),
+        items: page.map((r) => toSummary(r as SummaryRow, term ? matchedOnFor(r, term) : null)), // ANO-ADM-05 : « via phone » n'était jamais servi
         total,
         nextCursor: hasNext ? page[page.length - 1].id : null,
       };
@@ -142,25 +141,14 @@ export function makeAdminUsersService() {
         const rows = await prisma.user.findMany({ where: { id: { in: [booking.shipperId, booking.carrierId] } }, select: summarySelect });
         return { items: rows.map((r) => toSummary(r as SummaryRow, OID.test(term) ? "dealId" : "ticket")), total: rows.length };
       }
-      const digits = term.replace(/[^\d+]/g, "");
       const rows = await prisma.user.findMany({
-        where: {
-          OR: [
-            { emailNormalized: { contains: term.toLowerCase() } },
-            { firstName: { contains: term, mode: "insensitive" } },
-            { lastName: { contains: term, mode: "insensitive" } },
-            ...(digits.length >= 6 ? [{ phoneE164: { contains: digits } }] : []),
-          ],
-        },
+        where: { OR: textSearchOr(term) } as never, // ANO-ADM-05 : terme échappé, numéro normalisé
         orderBy: { createdAt: "desc" },
         take: limit,
         select: summarySelect,
       });
-      const lower = term.toLowerCase();
       return {
-        items: rows.map((r) =>
-          toSummary(r as SummaryRow, r.email.toLowerCase().includes(lower) ? "email" : digits.length >= 6 && (r.phoneE164 ?? "").includes(digits) ? "phone" : "name")
-        ),
+        items: rows.map((r) => toSummary(r as SummaryRow, matchedOnFor(r, term))),
         total: rows.length,
       };
     },
