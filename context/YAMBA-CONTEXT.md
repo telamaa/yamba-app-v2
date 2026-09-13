@@ -657,6 +657,20 @@ Ordre de demarrage : auth -> trip -> gateway.
   d'auth-service echoue (« Recursive task invocation ») et l'ANCIEN process repond 200 → auth-service tourne desormais en
   bundle (`node --env-file=../../.env dist/main.js`). En dev, USER_VIEWED x2 par ouverture (React StrictMode). A
   TRANCHER : dedoublonner USER_VIEWED, recherche sans accents, libelles FR des roles. Harnais 363. Reste : § 5.4 a 7.
+- 14/09 : **CAHIER 02-ADMIN — § 5.4 SANCTIONS (branche `chore/recette-admin-5-4`, empilee sur #304)** — 5 fiches ADM-SNC
+  + 2 fiches d'anomalie, CONFORMES, jouees deux fois vertes (`apps/e2e/src/admin/adm-snc-sanctions.spec.ts`, afterAll
+  remet Pauline et Thomas actifs). TROIS ANOMALIES CLOSES : ANO-ADM-07 (MAJEURE) la date « Jusqu'au » d'une sanction
+  n'etait lue par PERSONNE (403 une minute apres l'echeance) → regle pure `packages/middleware/account-status.ts`
+  (`effectiveAccountStatus`, `notSuspendedOwnerFilter`, `activeSanctionFilter`) lue par isAuthenticated,
+  requireActiveAccount, login, recherche, tuiles, fiche admin — par LECTURE (D56), sans cron ; ANO-ADM-08 (MAJEURE) le
+  trajet d'un Voyageur suspendu restait ouvert (page publique 200) et reservable par son lien → `publicTripWhere` +
+  `checkTripBookable` (TRIP_NOT_BOOKABLE) ; ANO-ADM-09 (mineure) connexion Google et renouvellement ne verifiaient pas
+  la suspension. PIEGE : dans un filtre de RELATION Prisma+Mongo, `date: { lte: now }` MATCHE null (ordre BSON) →
+  borne basse `gt: new Date(0)`. AMELIORATIONS FAITES : messages de resultat nommant le geste, refus lus par code,
+  « jusqu'au » inclus (23:59:59 locale, etait minuit UTC) + min=demain, tuile « Sanctions proposees » compte les
+  escalades, badge « Actif (sanction echue) ». A TRANCHER : motif libre envoye au membre (motifs types ?), aucun email ni
+  journal a l'echeance (acteur SYSTEM au journal), trajets d'un Voyageur restreint reservables. Tests : auth 242, trip
+  262, deal 578, harnais 370. Poste : auth, trip, deal en bundles detaches (nohup). Reste : § 5.5 a 7.
 - 13/09 : **DECISION : LE ROLE PREND LA MAJUSCULE** (branche `chore/recette-voyageur-majuscule`, empilee sur #299) —
   « Voyageur » / « Traveler » partout : 71 valeurs de messages, 33 textes du code, 1 email ; regle `role-majuscule` au
   lexique partage (CI + recette) ; 12 citations du harnais ; web-fav, web-rch, web-rsv-devis, web-lit verts.

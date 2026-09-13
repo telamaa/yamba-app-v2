@@ -7468,3 +7468,120 @@ auth-service`, arrêt du processus sur 6001, `node --env-file=../../.env dist/ma
 - auth-service **238** (235 + 3).
 - `apps/e2e` : **363 scénarios** (360 + 3), les 3 verts deux fois de suite après corrections, identiques.
 - Typecheck auth-service et harnais verts.
+
+
+---
+
+# Cahier 02-ADMIN, § 5.4 : sanctions — le statut effectif, un filtre de plus, et un piège de comparaison à null
+
+*(PR `chore/recette-admin-5-4`, empilée sur #304, 14/09/2026.)*
+
+## Ce qui a été fait
+
+Cinq fiches du cahier et deux fiches d'anomalie (7 scénarios), trois anomalies closes (`ANO-ADM-07`, `08`, `09`), cinq
+améliorations d'expert implémentées.
+
+```
+apps/e2e/src/admin/adm-snc-sanctions.spec.ts                 7 scénarios en série, afterAll = membres remis actifs
+packages/middleware/account-status.ts                        NOUVEAU — effectiveAccountStatus, notSuspendedOwnerFilter, activeSanctionFilter
+packages/middleware/isAuthenticated.ts                       ANO-ADM-07 — statut effectif
+packages/middleware/requireActiveAccount.ts                  ANO-ADM-07 — statut effectif
+apps/auth-service/src/controller/auth.controller.ts          ANO-ADM-07 connexion ; ANO-ADM-09 Google + renouvellement
+apps/auth-service/src/controller/admin-kpis.controller.ts    ANO-ADM-07 tuiles ; amélioration : escalades comptées
+apps/trip-service/src/controllers/trip-search.controller.ts  ANO-ADM-07 — suspension échue = trajets visibles
+apps/trip-service/src/lib/public-visibility.rules.ts         ANO-ADM-08 — page publique d'un suspendu : 404
+apps/deal-service/src/services/booking-request.ts            ANO-ADM-08 — TRIP_NOT_BOOKABLE si Voyageur suspendu
+apps/deal-service/src/services/deal-request.service.ts       ANO-ADM-08 — le trajet charge l'état du Voyageur
+apps/admin-ui/src/components/UserFileView.tsx                statut effectif, messages, refus par code, fin de journée, min
+apps/auth-service/src/utils/account-status.spec.ts           NOUVEAU — 4 tests
+apps/trip-service/src/lib/public-visibility.rules.spec.ts    +1 test ; apps/deal-service/src/services/booking-request.spec.ts +1 test
+```
+
+## ANO-ADM-07 : une donnée écrite que personne ne lit
+
+`suspensionUntil` était écrit par `POST /admin/users/:id/suspension`, affiché et envoyé au membre — et lu par l'export
+CSV seulement. La méthode de diagnostic tient en une commande : chercher **tous les lecteurs** d'un champ (`grep -rn
+suspensionUntil apps packages`) avant de jouer la fiche. Le correctif respecte D56 (« une sanction agit par lecture,
+jamais par écriture croisée ») : pas de cron qui remettrait `ACTIVE`, une **règle pure** que chaque garde lit.
+
+```ts
+// packages/middleware/account-status.ts
+export function effectiveAccountStatus(u: SanctionState, now: Date = new Date()): AccountStatus {
+  const status = (u.accountStatus ?? "ACTIVE") as AccountStatus;
+  if (status === "ACTIVE" || sanctionExpired(u, now)) return "ACTIVE";
+  return status;
+}
+```
+
+Les gardes (`isAuthenticated`, `requireActiveAccount`, connexion) lisent `effectiveAccountStatus(user)`. Les **requêtes**
+ne peuvent pas appeler une fonction : elles reçoivent son équivalent en filtre Prisma, écrit à côté et testé contre la
+même intention (`notSuspendedOwnerFilter` pour la recherche et la page publique, `activeSanctionFilter` pour les tuiles).
+
+## Le piège : `lte` sur une date nulle, dans un filtre de relation
+
+Premier rejeu après correction : les trajets de Thomas, suspendu **sans** date de fin, revenaient dans la recherche. Une
+sonde sur la base a isolé la cause :
+
+```
+user: { is: { accountStatus: { not: "SUSPENDED" } } }                                   → 0 trajet (attendu)
+user: { is: { OR: [{ accountStatus: { not: "SUSPENDED" } }, { suspensionUntil: { lte: now } }] } } → 3 trajets
+user: { is: { suspensionUntil: { lte: now } } }  (suspensionUntil = null)                → 3 trajets
+```
+
+Un filtre de relation Prisma sur Mongo s'exécute dans un pipeline d'agrégation (`$lookup` puis `$expr`), où la comparaison
+suit l'**ordre BSON** : `null` est inférieur à toute date, donc `null <= now` est vrai. Remède mesuré sur les quatre cas :
+
+```ts
+{ suspensionUntil: { lte: now, gt: EPOCH } }   // null : 0 · absent : 0 · fin à venir : 0 · fin passée : visibles
+```
+
+C'est le cousin des pièges déjà gravés au CLAUDE.md (`field: null` ne matche pas un champ absent) : ici, c'est l'inverse,
+une borne supérieure matche un `null`. Toute comparaison de date optionnelle dans un filtre de relation doit porter sa
+borne basse.
+
+## ANO-ADM-08 : un filtre de lecture doit couvrir toutes les portes
+
+La suspension retirait les trajets de la **recherche** (`buildBaseWhere`), mais la **page publique** (`publicTripWhere`)
+et la **réservation** (`checkTripBookable`) ne connaissaient que « publié, non supprimé, non masqué ». Deux corrections :
+
+```ts
+// trip-service — public-visibility.rules.ts
+return { id, status: "PUBLISHED", isDeleted: false, AND: [notHiddenFilter()], user: { is: notSuspendedOwnerFilter(now) } };
+
+// deal-service — booking-request.ts (TRIP_SELECT charge user.accountStatus / suspensionUntil)
+if (trip.user && effectiveAccountStatus(trip.user, now) === "SUSPENDED") {
+  throw new BookingRequestError("TRIP_NOT_BOOKABLE", "This trip is not open to requests.");
+}
+```
+
+Même code, même message qu'un trajet fermé : l'Expéditeur n'apprend pas que le Voyageur est sanctionné (403 vs 404, règle
+non négociable).
+
+## ANO-ADM-09 : trois portes d'entrée, une seule vérifiée
+
+`login` refusait un compte suspendu ; `googleSignIn` et `refreshAuthTokens` non. Les deux lisent maintenant
+`effectiveAccountStatus` ; la connexion Google refuse **avant** `issueSession` (aucun cookie posé).
+
+## Améliorations faites (UserFileView.tsx, admin-kpis.controller.ts)
+
+- `refusDeSanction(e)` lit `details.code` (A146) : cinq codes traduits, message anglais en repli.
+- Messages de résultat nommant le geste, la date et l'email envoyé.
+- `finDeJournee(jour)` : `new Date("2026-09-20T23:59:59")` (heure locale de l'écran) au lieu de `new Date("2026-09-20")`
+  (minuit **UTC** — une chaîne date seule est lue en UTC par la spécification ECMAScript, une chaîne date-heure sans
+  fuseau en heure locale) ; `min` = demain sur le champ.
+- Badge « Actif (sanction échue) » calculé depuis `suspension.until`.
+- Tuile « Sanctions proposées » : `suspensionProposedAt: { not: null }` sans condition sur le statut.
+
+## Poste
+
+auth-service, trip-service et deal-service tournent **en bundle, détachés** (`nohup … node --env-file=../../.env
+dist/main.js`, deal-service avec `STRIPE_SECRET_KEY=` pour le fournisseur FAKE). Piège vécu : après `nx build`, un
+bundle déjà lancé garde l'ancien code en mémoire (`grep -c EPOCH dist/main.js` = 4, mais le processus ne l'avait pas) —
+toujours relancer le processus après la reconstruction ; et la reconstruction sous `nx run-many serve` a fait tomber
+trip-service sur 6002.
+
+## Tests
+
+- auth-service **242** (238 + 4) · trip-service **262** (261 + 1) · deal-service **578** (577 + 1).
+- `apps/e2e` : **370 scénarios** (363 + 7), les 7 verts deux fois de suite.
+- Typecheck auth-service, trip-service, deal-service, admin-ui et harnais verts.

@@ -4891,3 +4891,61 @@ tardives, signalements, ancienneté, deals terminés, avis) ; il ne sanctionne r
   faire garde la trace brute. C'est une décision d'audit.
 - La recherche ignore les accents (« Ines » ne trouve pas « Inès ») : à décider si le support doit pouvoir s'en passer.
 - Libellés français des rôles et des statuts Voyageur dans la liste et la fiche.
+
+
+---
+
+# Back-office — sanctionner un membre, et que la sanction dise vrai jusqu'au bout (cahier 02-ADMIN § 5.4)
+
+*(PR `chore/recette-admin-5-4`, 14/09/2026 — ADM-SNC-1 à 5, ANO-ADM-07 à 09.)*
+
+## Le besoin
+
+Un membre au comportement inapproprié doit pouvoir être freiné sans que le Support décide seul, sans que ses deals en
+cours soient abandonnés, et sans que la sanction dure plus longtemps que ce qui lui a été annoncé. Tant qu'il est
+suspendu, personne ne doit pouvoir engager de l'argent sur ses trajets.
+
+## Les règles
+
+**RG-ADM-SNC-01 — Le Support propose, le Médiateur décide** : une proposition (niveau + motif de 20 à 2000 caractères)
+n'a aucun effet sur le membre ; elle apparaît en bandeau sur la fiche et dans la tuile « Sanctions proposées », y compris
+quand elle propose d'aggraver une restriction existante.
+
+**RG-ADM-SNC-02 — Restreint** : le membre ne publie plus de trajet et ne réserve plus d'envoi (`ACCOUNT_RESTRICTED`) ; il
+se connecte, ses deals en cours continuent.
+
+**RG-ADM-SNC-03 — Suspendu** : connexion refusée par tous les moyens (mot de passe, Google, session déjà ouverte,
+renouvellement : `ACCOUNT_SUSPENDED`), sessions révoquées ; ses trajets disparaissent de la recherche, leur page publique
+est introuvable, et ils ne sont plus réservables — sans que leur statut change.
+
+**RG-ADM-SNC-04 — Une date de fin est tenue** : « jusqu'au 20 septembre » inclut le 20 ; passé ce jour, la sanction ne
+s'applique plus, sans intervention. La fiche l'indique (« sanction échue ») et « Lever » la nettoie.
+
+**RG-ADM-SNC-05 — Le membre est prévenu par email** à l'application (motif, date de fin, adresse de contestation) et à la
+levée ; le support reçoit la liste des deals en cours d'un compte sanctionné.
+
+**RG-ADM-SNC-06 — Chaque geste est journalisé** (proposition, restriction, suspension, levée, avec avant et après) ; un
+refus (date passée, levée d'un compte actif, profil sans droit) n'écrit rien.
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| SNC-1 | Le Support propose une restriction pour Pauline | bouton actif à 20 caractères, pas d'« Appliquer », bandeau, tuile +1, Pauline inchangée | oui |
+| SNC-2 | Le Médiateur applique jusqu'à J+7 (après un essai de date passée) | refus en français, bandeau rouge, 403 sur les 4 créations, deals continuent, email, tuiles | oui |
+| SNC-3 | Suspendre Thomas (5 deals) | session ouverte refusée, connexion refusée, trajets hors recherche, deux emails | oui |
+| SNC-4 | Lever la suspension | badge Actif, connexion et trajets de retour, email rétabli, relever = refus | oui |
+| SNC-5 | Le Support force l'application par la console | 403, rien ne change, rien au journal | oui |
+| SNC-6 | Date de fin dépassée | le membre publie et réserve de nouveau, tuile −1, fiche « sanction échue » | oui (ANO-ADM-07 close) |
+| SNC-7 | Lien direct vers le trajet d'un suspendu | page introuvable, réservation refusée | oui (ANO-ADM-08 close) |
+
+## Ce qui reste à trancher
+
+- **Le motif envoyé au membre** est le texte libre du Médiateur : des motifs types et une note interne séparée
+  protégeraient les signalants et uniformiseraient le ton.
+- **L'échéance d'une sanction ne prévient personne** : le membre ne reçoit pas « ton compte est rétabli » et le journal
+  n'a pas de ligne, faute d'acteur « système » dans le journal admin (décision d'architecture).
+- **Les trajets d'un Voyageur restreint** restent réservables : « ni publier ni réserver » vise ses propres gestes ;
+  faut-il aussi suspendre les nouvelles demandes sur ses trajets ?
+- Confirmation avant de suspendre un compte qui a des deals en cours ; lien cliquable vers chaque deal dans l'email ops ;
+  la levée devrait-elle retirer une proposition d'escalade en attente ?
