@@ -8,7 +8,7 @@
   "oneStopIn": "1 stop · {city}",
   "stopsCount": "{count, plural, =1 {# stop} other {# stops}}",
   "remainingSlots": "{count, plural, =1 {# slot left} other {# slots left}}",
-  "newTripper": "New traveler",
+  "newTripper": "New Traveler",
   "moreCategoriesTooltip": "{count, plural, =1 {# more category} other {# more categories}}",
   "transportTabs": {
     "all": "All",
@@ -63,7 +63,7 @@
     "remainingSlots": "{count, plural, one {# slot} other {# slots}}",
     "direct": "Direct",
     "stopovers": "{count, plural, one {# stop} other {# stops}}",
-    "newTripper": "New traveler",
+    "newTripper": "New Traveler",
     "perKg": "price per kg",
     "remainingKg": "{kg} kg left",
     "example": "e.g. {kg} kg ≈ €{price} all-in",
@@ -88,8 +88,8 @@
     "phone": "Phone",
     "computer": "Computer",
     "other-electronics": "Other electronics",
-    "checked-bag-23kg": "Checked bag 23kg",
-    "cabin-bag-12kg": "Cabin bag 12kg"
+    "checked-bag-23kg": "Checked bag 23 kg",
+    "cabin-bag-12kg": "Cabin bag 12 kg"
   },
   "mobile": {
     "editSearch": "Edit search",

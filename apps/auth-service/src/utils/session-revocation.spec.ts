@@ -1,5 +1,5 @@
 /** session-revocation.spec.ts — la révocation de session est immédiate (ANO-API-07). */
-import { isSessionRevoked, sessionKey } from "@packages/middleware/session-revocation";
+import { adminSessionKey, isAdminSessionRevoked, isSessionRevoked, sessionKey } from "@packages/middleware/session-revocation";
 
 describe("sessionKey", () => {
   it("est exactement la clé posée par auth-service (une divergence rendrait la garde inerte)", () => {
@@ -24,5 +24,24 @@ describe("isSessionRevoked (ANO-API-07)", () => {
 
   it("Redis injoignable → on laisse passer : une panne de cache ne déconnecte pas la plateforme", () => {
     expect(isSessionRevoked("j1", null)).toBe(false);
+  });
+});
+
+describe("isAdminSessionRevoked (ANO-ADM-04)", () => {
+  it("la clé est celle du record de session admin", () => {
+    expect(adminSessionKey("u1", "j1")).toBe("admin_jti:u1:j1");
+  });
+
+  it("session admin présente → acceptée ; absente → révoquée dans la seconde", () => {
+    expect(isAdminSessionRevoked("j1", 1)).toBe(false);
+    expect(isAdminSessionRevoked("j1", 0)).toBe(true);
+  });
+
+  it("jeton admin sans jti (émis avant la correction) → accepté, il expire en 15 min", () => {
+    expect(isAdminSessionRevoked(undefined, 0)).toBe(false);
+  });
+
+  it("Redis injoignable → REFUS : le back-office échoue fermé, contrairement à la plateforme membre", () => {
+    expect(isAdminSessionRevoked("j1", null)).toBe(true);
   });
 });

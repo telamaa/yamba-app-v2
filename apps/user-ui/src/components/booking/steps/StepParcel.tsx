@@ -4,6 +4,8 @@ import { Lightbulb } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback } from "react";
 import { MAX_PHOTOS, isPerKgTrip } from "../booking.config";
+import { PHOTO_MAX_SIZE_BYTES } from "@/hooks/useImageKitUpload";
+import { toast } from "sonner";
 import { usePricingParams } from "@/hooks/usePricingParams";
 import { Backpack, Luggage, ShoppingBag } from "lucide-react";
 import {
@@ -107,9 +109,16 @@ export default function StepParcel({
 
   const handleAddPhotos = useCallback(
     (files: File[]) => {
+      // ANO-WEB-39 (recette 5.12) — une photo trop lourde est refusée DÈS la sélection, avec son message,
+      // et non à l'étape 4 au moment du paiement (le téléversement, lui, part au paiement).
+      const acceptees = files.filter((f) => f.size <= PHOTO_MAX_SIZE_BYTES);
+      if (acceptees.length < files.length) {
+        toast.error(t("step4.errors.UPLOAD_TOO_LARGE", { maxMb: Math.round(PHOTO_MAX_SIZE_BYTES / (1024 * 1024)) }));
+      }
+      if (acceptees.length === 0) return;
       setDraftAction((prev) => {
         const room = MAX_PHOTOS - prev.photos.length;
-        const toAdd = files.slice(0, room);
+        const toAdd = acceptees.slice(0, room);
         const newPhotos: ParcelPhoto[] = toAdd.map((file, i) => {
           const totalIndex = prev.photos.length + i;
           const previewUrl = URL.createObjectURL(file);
