@@ -8,6 +8,16 @@ describe("message-guard.rules (chantier F, D61 4A / 5A)", () => {
     expect(sixDigitCandidates("111111 222222 333333 444444")).toHaveLength(3);
     expect(sixDigitCandidates("742891 et encore 742891")).toEqual(["742891"]);
   });
+  it("ANO-WEB-46 : un code « aéré » (espaces, tirets, points) est un candidat ; un téléphone ou une date, non", () => {
+    expect(sixDigitCandidates("Le code : 742 891")).toEqual(["742891"]);
+    expect(sixDigitCandidates("74-28-91 et voilà")).toEqual(["742891"]);
+    expect(sixDigitCandidates("7 4 2 8 9 1")).toEqual(["742891"]);
+    expect(sixDigitCandidates("74.28.91")).toEqual(["742891"]);
+    expect(sixDigitCandidates("appelle-moi au 06 12 34 56 78")).toEqual([]);
+    expect(sixDigitCandidates("rendez-vous le 11 09 2026 à 10 h")).toEqual([]);
+    expect(sixDigitCandidates("mon numéro de vol est 123456")).toEqual(["123456"]);
+  });
+
   it("coordonnées : email et téléphone détectés, jamais bloquants", () => {
     expect(detectContactInfo("ecris-moi a a.b@mail.com")).toMatchObject({ hasEmail: true, flagged: true });
     expect(detectContactInfo("mon numero 06 12 34 56 78")).toMatchObject({ hasPhone: true, flagged: true });

@@ -6,6 +6,9 @@ import { aEuUneSession, marquerSessionActive, oublierSession } from "@/lib/sessi
 
 // D48 — absolu (http://…:8080/api) OU relatif (/api, proxy Next → gateway,
 // cookies first-party). Les deux formes sont acceptées telles quelles.
+/** Le signal émis quand la passerelle refuse une écriture pour cause de maintenance (ANO-WEB-91). */
+export const MAINTENANCE_REFUSED_EVENT = "yamba:maintenance-refused";
+
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ||
   "http://localhost:6001/api";
@@ -100,6 +103,20 @@ apiClient.interceptors.response.use(
 
     const shouldTryRefresh =
       is401 && requireAuth && !isRetry && !skipAuthRefresh;
+
+    // ANO-WEB-91 (recette 5.28) — la passerelle refuse toute ÉCRITURE pendant une maintenance
+    // (503 `MAINTENANCE`, D64 2A). Chaque écran affichait alors SON erreur générique (« Le message
+    // n'a pas pu être envoyé. »), et la phrase prévue pour ce cas — `maintenance.writeRefused` —
+    // n'était rendue nulle part. Un seul signal global, comme pour la session expirée (A89) : le
+    // bandeau de maintenance l'écoute, dit la vraie raison et rafraîchit son état.
+    const donnees = error.response?.data as { code?: string; details?: { code?: string } } | undefined;
+    if (
+      typeof window !== "undefined" &&
+      error.response?.status === 503 &&
+      (donnees?.code === "MAINTENANCE" || donnees?.details?.code === "MAINTENANCE")
+    ) {
+      window.dispatchEvent(new CustomEvent(MAINTENANCE_REFUSED_EVENT));
+    }
 
     if (!shouldTryRefresh) {
       return Promise.reject(error);

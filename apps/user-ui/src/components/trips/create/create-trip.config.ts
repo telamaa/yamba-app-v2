@@ -346,17 +346,17 @@ export type ValidationErrors = Record<string, string>;
 
 export function getValidationErrorsFr(isFr: boolean) {
   return {
-    transportMode: isFr ? "Choisissez un mode" : "Choose a mode",
-    flightType: isFr ? "Précisez le type" : "Specify the type",
-    trainTripType: isFr ? "Précisez le type" : "Specify the type",
-    carTripFlexibility: isFr ? "Précisez le type" : "Specify the type",
+    transportMode: isFr ? "Choisis un mode" : "Choose a mode",
+    flightType: isFr ? "Précise le type" : "Specify the type",
+    trainTripType: isFr ? "Précise le type" : "Specify the type",
+    carTripFlexibility: isFr ? "Précise le type" : "Specify the type",
     from: isFr ? "Ville de départ requise" : "Departure city required",
     to: isFr ? "Ville d'arrivée requise" : "Arrival city required",
     fromPlace: isFr
-      ? "Sélectionnez une ville dans la liste"
+      ? "Sélectionne une ville dans la liste"
       : "Select a city from the list",
     toPlace: isFr
-      ? "Sélectionnez une ville dans la liste"
+      ? "Sélectionne une ville dans la liste"
       : "Select a city from the list",
     departureDate: isFr ? "Date requise" : "Date required",
     departureDatePast: isFr
@@ -368,12 +368,12 @@ export function getValidationErrorsFr(isFr: boolean) {
       : "Arrival date must be after departure",
     departureTime: isFr ? "Heure requise" : "Time required",
     arrivalTime: isFr ? "Heure requise" : "Time required",
-    flightLayoverCities: isFr ? "Précisez la ville d'escale" : "Specify layover city",
-    trainStopCities: isFr ? "Précisez la ville" : "Specify the city",
-    categories: isFr ? "Sélectionnez au moins 1 catégorie" : "Select at least 1 category",
-    pricePerKgRequired: isFr ? "Fixez votre prix au kilo" : "Set your price per kg",
+    flightLayoverCities: isFr ? "Précise la ville d'escale" : "Specify layover city",
+    trainStopCities: isFr ? "Précise la ville" : "Specify the city",
+    categories: isFr ? "Sélectionne au moins 1 catégorie" : "Select at least 1 category",
+    pricePerKgRequired: isFr ? "Fixe ton prix au kilo" : "Set your price per kg",
     pricePerKgZero: isFr ? "Le prix au kilo doit être supérieur à 0" : "Price per kg must be greater than 0",
-    capacityRequired: isFr ? "Indiquez votre capacité en kg" : "Enter your capacity in kg",
+    capacityRequired: isFr ? "Indique ta capacité en kg" : "Enter your capacity in kg",
     capacityZero: isFr ? "La capacité doit être supérieure à 0" : "Capacity must be greater than 0",
     surchargeInvalid: isFr ? "Surcharge entre 1 et 100 %" : "Surcharge between 1 and 100%",
     bagPriceZero: isFr ? "Le forfait doit être supérieur à 0" : "Flat rate must be greater than 0",
@@ -382,13 +382,13 @@ export function getValidationErrorsFr(isFr: boolean) {
     priceZero: isFr ? "Le prix doit être supérieur à 0" : "Price must be greater than 0",
     priceEmpty: isFr ? "Prix requis" : "Price required",
     pickupLocationRequired: isFr
-      ? "Activez au moins 1 lieu de remise"
+      ? "Active au moins 1 lieu de remise"
       : "Enable at least 1 pickup location",
     deliveryLocationRequired: isFr
-      ? "Activez au moins 1 lieu de livraison"
+      ? "Active au moins 1 lieu de livraison"
       : "Enable at least 1 delivery location",
     locationDetailsEmpty: isFr
-      ? "Précisez le lieu"
+      ? "Précise le lieu"
       : "Specify the location",
   };
 }

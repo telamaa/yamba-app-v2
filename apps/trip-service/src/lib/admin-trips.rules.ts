@@ -83,4 +83,11 @@ export function buildTicketsWhere(q: TicketQueueQuery, now: Date): Record<string
 }
 /** Exports opérationnels : identifiants seulement, jamais un email ni un téléphone (D60 2A). */
 export const TRIPS_CSV_COLUMNS = ["id", "status", "originCity", "originCountryCode", "destinationCity", "destinationCountryCode", "departureAt", "publishedAt", "cancelledAt", "carrierId", "transportMode", "capacityKg", "reservedKg", "pricePerKgCents", "ticketVerificationStatus", "hiddenByAdminAt", "createdAt"] as const;
-export const TICKETS_CSV_COLUMNS = ["documentId", "tripId", "originCity", "destinationCity", "departureAt", "carrierId", "originalName", "mimeType", "status", "submittedAt"] as const;
+/** ANO-ADM-12 (A156) — `originalName` est un texte libre du membre (un nom de facture porte son numéro) : jamais exporté. */
+export const TICKETS_CSV_COLUMNS = ["documentId", "tripId", "originCity", "destinationCity", "departureAt", "carrierId", "fileExtension", "mimeType", "status", "submittedAt"] as const;
+
+/** L'extension d'un nom de fichier, en minuscules, 1 à 5 caractères alphanumériques — sinon vide. Rien d'autre du nom ne sort. */
+export function fileExtensionOf(name: string | null | undefined): string {
+  const m = /\.([A-Za-z0-9]{1,5})$/.exec((name ?? "").trim());
+  return m ? m[1].toLowerCase() : "";
+}

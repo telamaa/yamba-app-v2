@@ -1,5 +1,5 @@
 import { AdminTripsQuerySchema, TicketQueueQuerySchema } from "@packages/api-contracts";
-import { buildTicketsWhere, buildTripsOrderBy, buildTripsWhere, isTicketExpired, notHiddenFilter, ticketReviewOutcome } from "./admin-trips.rules";
+import { TICKETS_CSV_COLUMNS, buildTicketsWhere, buildTripsOrderBy, buildTripsWhere, fileExtensionOf, isTicketExpired, notHiddenFilter, ticketReviewOutcome } from "./admin-trips.rules";
 
 describe("admin-trips.rules (C-PR4, D57)", () => {
   it("ticketReviewOutcome : VERIFY → les deux statuts VERIFIED, sans motif", () => {
@@ -34,6 +34,20 @@ describe("admin-trips.rules (C-PR4, D57)", () => {
       expect(w.createdAt.lt.toISOString()).toBe("2026-09-01T10:00:00.000Z");
       expect(w.trip).toEqual({ is: { destinationCity: { contains: "Kinshasa", mode: "insensitive" } } });
       expect(buildTicketsWhere(TicketQueueQuerySchema.parse({}), now)).toEqual({ type: "TICKET_PROOF", status: "PENDING" });
+    });
+  });
+
+  describe("ANO-ADM-12 (A156) — l'export des billets ne porte aucun texte libre du membre", () => {
+    it("la colonne originalName n'existe plus ; fileExtension la remplace", () => {
+      expect(TICKETS_CSV_COLUMNS).not.toContain("originalName");
+      expect(TICKETS_CSV_COLUMNS).toContain("fileExtension");
+    });
+    it("fileExtensionOf ne rend QUE l'extension (mesuré : « sfr-facture-0752426937-0.pdf »)", () => {
+      expect(fileExtensionOf("sfr-facture-0752426937-0.pdf")).toBe("pdf");
+      expect(fileExtensionOf("Capture d’écran 2026-04-28 à 14.19.05.PNG")).toBe("png");
+      expect(fileExtensionOf("billet")).toBe("");
+      expect(fileExtensionOf("nom.0612345678")).toBe(""); // une « extension » de 10 chiffres n'est pas une extension
+      expect(fileExtensionOf(null)).toBe("");
     });
   });
 });

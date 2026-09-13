@@ -239,6 +239,8 @@ export type CreateTripCopy = {
 
   docUpload: string;
   docUploadSub: string;
+  /** ANO-WEB-25 — message quand la limite de documents est atteinte. */
+  docLimitReached: (n: number) => string;
   docUploadHint: string;
   docPending: string;
   docVerified: string;

@@ -4,9 +4,9 @@ export function getCreateTripCopy(isFr: boolean): CreateTripCopy {
   return {
     title: isFr ? "Créer un trajet" : "Create a trip",
     subtitle: isFr
-      ? "Publiez votre trajet en quelques instants."
+      ? "Publie ton trajet en quelques instants."
       : "Publish your trip in moments.",
-    firstTripTitle: isFr ? "Publiez votre premier trajet" : "Publish your first trip",
+    firstTripTitle: isFr ? "Publie ton premier trajet" : "Publish your first trip",
     firstTripSub: isFr
       ? "Ça prend 2 minutes, c'est gratuit."
       : "It takes 2 minutes, it's free.",
@@ -23,17 +23,17 @@ export function getCreateTripCopy(isFr: boolean): CreateTripCopy {
     close: isFr ? "Fermer" : "Close",
     emptyValue: isFr ? "À compléter" : "To complete",
 
-    step1Title: isFr ? "Votre trajet" : "Your trip",
+    step1Title: isFr ? "Ton trajet" : "Your trip",
     step1Sub: isFr
       ? "Mode de transport, itinéraire et dates."
       : "Transport mode, route and dates.",
-    step2Title: isFr ? "Vos conditions" : "Your conditions",
+    step2Title: isFr ? "Tes conditions" : "Your conditions",
     step2Sub: isFr
       ? "Catégories, prix et lieux de rendez-vous."
       : "Categories, pricing and meeting points.",
     step3Title: isFr ? "Vérification" : "Review",
     step3Sub: isFr
-      ? "Vérifiez et publiez votre trajet."
+      ? "Vérifie et publie ton trajet."
       : "Review and publish your trip.",
 
     plane: isFr ? "Avion" : "Plane",
@@ -64,6 +64,10 @@ export function getCreateTripCopy(isFr: boolean): CreateTripCopy {
 
     docUpload: isFr ? "Justificatif" : "Proof",
     docUploadSub: isFr ? "Billet, itinéraire..." : "Ticket, itinerary...",
+    docLimitReached: (n: number) =>
+      isFr
+        ? `${n} documents maximum par trajet — retire un document pour en ajouter un autre.`
+        : `${n} documents maximum per trip — remove one to add another.`,
     docUploadHint: isFr
       ? "Badge « Voyage vérifié » après validation"
       : "'Verified trip' badge after review",
@@ -227,15 +231,15 @@ export function getCreateTripCopy(isFr: boolean): CreateTripCopy {
       : "As seen by senders",
 
     revenueEstimate: isFr ? "Revenu estimé" : "Estimated revenue",
-    resumeDraft: isFr ? "Reprendre votre brouillon ?" : "Resume your draft?",
+    resumeDraft: isFr ? "Reprendre ton brouillon ?" : "Resume your draft?",
     resumeDraftSub: isFr
-      ? "Vous aviez commencé un trajet."
+      ? "Tu avais commencé un trajet."
       : "You had started a trip.",
     startFresh: isFr ? "Recommencer" : "Start fresh",
     popularRoute: isFr ? "Route populaire" : "Popular route",
-    almostDone: isFr ? "Vous êtes presque au bout !" : "You're almost done!",
+    almostDone: isFr ? "Tu es presque au bout !" : "You're almost done!",
     almostDoneSub: isFr
-      ? "Votre trajet est presque prêt à être publié."
+      ? "Ton trajet est presque prêt à être publié."
       : "Your trip is almost ready to publish.",
     stayAndFinish: isFr ? "Terminer" : "Finish",
     leave: isFr ? "Quitter" : "Leave",
