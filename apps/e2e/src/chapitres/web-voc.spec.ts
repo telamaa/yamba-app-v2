@@ -24,9 +24,21 @@ import { poserLaRecherche } from "../pages/recherche";
 import { FilMessagerie } from "../pages/fil-messagerie";
 import { TransportVoyageur } from "../pages/transport-voyageur";
 import { AssistantReservation } from "../pages/reservation";
+// Sans zod, importable tel quel : la liste des langues du produit, et le lexique partagé avec la CI (règle 6).
+import { SUPPORTED_LOCALES, type SupportedLocale } from "../../../../packages/libs/api-contracts/src/locale";
+
+const LANGUES = SUPPORTED_LOCALES;
+interface RegleDuLexique { id: string; motif: string; drapeaux: string; raison: string; sauf?: string }
+const LEXIQUE = JSON.parse(readFileSync(join(__dirname, "../../../../scripts/lexique-yamba.json"), "utf-8")) as Record<SupportedLocale, RegleDuLexique[]>;
+/** Une règle du lexique, compilée : le motif (drapeau global pour `matchAll`) et ses exceptions de sens. */
+function regle(langue: SupportedLocale, id: string): { motif: RegExp; sauf?: RegExp } {
+  const r = LEXIQUE[langue].find((x) => x.id === id);
+  if (!r) throw new Error(`lexique-yamba.json : règle « ${id} » absente pour ${langue}`);
+  return { motif: new RegExp(r.motif, r.drapeaux), sauf: r.sauf ? new RegExp(r.sauf, "i") : undefined };
+}
 
 type Page = Navigateur["page"];
-type Langue = "fr" | "en";
+type Langue = SupportedLocale;
 interface Ecran {
   nom: string;
   langue: Langue;
@@ -77,7 +89,11 @@ async function relever(page: Page, ecran: Omit<Ecran, "texte">, chemin: string):
   }
   expect(texte.length, `${ecran.nom} (${ecran.langue}) : l'écran a rendu du texte`).toBeGreaterThan(200);
   /* Un écran « introuvable » a aussi 200 caractères (en-tête compris) : il ne relit rien du tout. */
-  expect(texte, `${ecran.nom} (${ecran.langue}) : l'écran existe pour ce compte`).not.toMatch(/n'existe pas|doesn't exist|introuvable|Page not found|Accès refusé|Access denied/i);
+  // Les PHRASES des écrans d'absence du produit, pas des mots isolés : « mot de passe oublié » dit, à juste titre,
+  // « le message est identique même si le compte n'existe pas ».
+  expect(texte, `${ecran.nom} (${ecran.langue}) : l'écran existe pour ce compte`).not.toMatch(
+    /n'existe pas ou|n'existe plus ou|Cette page n'existe pas|introuvable|doesn't exist or|does not exist or|Page not found|not found|Accès refusé|Access denied/i
+  );
   releve.push({ ...ecran, texte });
 }
 
@@ -122,59 +138,82 @@ test.describe("WEB-VOC — vocabulaire et cohérence de langue (chapitre 5.32)",
     const litige = jeuEssai.deal("bzv-disputed").id;
     const fil = await FilMessagerie.identifiantDuFil(aminata.contexte, enTransit);
 
-    for (const l of ["fr", "en"] as const) {
-      await poserLaRecherche(visiteur.page, { from: "Paris", to: "Brazzaville" });
-      const ecransVisiteur: Array<[string, string]> = [
-        ["accueil", `/${l}`],
-        ["inscription", `/${l}/register`],
-        ["connexion", `/${l}/login`],
-        ["recherche", `/${l}/search`],
-        ["page de trajet", `/${l}/trips/${trajet}`],
-        ["page publique du Voyageur", `/${l}/u/seed-thomas`],
-        ["devenir Voyageur", `/${l}/become/carrier`],
-        ["aide", `/${l}/help`],
-      ];
-      for (const [nom, chemin] of ecransVisiteur) await relever(visiteur.page, { nom, langue: l, compte: "visiteur" }, chemin);
-      /* Trouvé en relisant la page de trajet : « Voir les avis » menait à `/tripper/<id>`, une route qui n'existe pas. */
-      await visiteur.page.goto(`/${l}/trips/${trajet}`, { waitUntil: "networkidle" });
-      const lienAvis = visiteur.page.locator('a[href*="/tripper/"], a[href*="/u/"]').filter({ hasText: /avis|review/i }).first();
-      await expect(lienAvis, "le lien vers les avis du Voyageur").toBeVisible({ timeout: 60_000 });
-      expect(await lienAvis.getAttribute("href"), "il mène à la page publique, pas à une route inexistante").toMatch(/\/u\/seed-thomas$/);
+    /* Lien de suivi du destinataire (écran sans compte) : créé par l'Expéditrice. L'API rend un chemin relatif. */
+    const creation = await aminata.contexte.request.post(`${api()}/deals/${enTransit}/tracking-link`);
+    expect(creation.ok(), `lien de suivi : ${creation.status()}`).toBe(true);
+    const servi = (await creation.json()) as { url?: string; path?: string };
+    const brut = servi.url ?? servi.path ?? "";
+    const suivi = (brut.startsWith("http") ? new URL(brut).pathname : brut).replace(/^\/(fr|en)(?=\/)/, "");
+    expect(suivi, "un chemin /track/<jeton>").toMatch(/^\/track\/[A-Za-z0-9_-]+$/);
 
-      const ecransExpeditrice: Array<[string, string]> = [
-        ["réservation (étape 1)", `/${l}/trips/${trajetParKilo}/book`],
-        ["tableau de bord", `/${l}/dashboard/home`],
-        ["mes envois", `/${l}/dashboard/shipments`],
-        ["suivi d'un envoi en attente", `/${l}/bookings/${enAttente}`],
-        ["suivi d'un envoi en transit", `/${l}/bookings/${enTransit}`],
-        ["suivi d'un envoi livré", `/${l}/bookings/${livre}`],
-        ["suivi d'un envoi terminé", `/${l}/bookings/${termine}`],
-        ["messagerie (fil)", `/${l}/dashboard/messages?conversation=${fil}`],
-        ["notifications", `/${l}/dashboard/notifications`],
-        ["finances", `/${l}/dashboard/finances`],
-        ["favoris", `/${l}/dashboard/favorites`],
-        ["profil", `/${l}/dashboard/profile`],
-        ["paramètres", `/${l}/dashboard/settings`],
-        // Le point d'attention connu du cahier : l'assistant « Devenir Voyageur », vu par un membre qui ne l'est pas
-        // encore (Thomas l'est déjà : il n'y verrait que l'écran de succès).
-        ["assistant Devenir Voyageur", `/${l}/carrier/onboarding`],
-      ];
-      for (const [nom, chemin] of ecransExpeditrice) await relever(aminata.page, { nom, langue: l, compte: "aminata" }, chemin);
-
-      const ecransVoyageur: Array<[string, string]> = [
-        ["mes trajets", `/${l}/dashboard/trips`],
-        ["demande reçue (deal)", `/${l}/carrier/deals/${enAttente}`],
-        ["deal en transit", `/${l}/carrier/deals/${enTransit}`],
-        ["remise du colis", `/${l}/carrier/deals/${enTransit}/deliver`],
-        ["deal en litige", `/${l}/carrier/deals/${litige}`],
-        ["créer un trajet", `/${l}/trips/create`],
-        ["espace Voyageur (onboarding)", `/${l}/carrier/onboarding`],
-        ["finances", `/${l}/dashboard/finances`],
-        ["notifications", `/${l}/dashboard/notifications`],
-      ];
-      for (const [nom, chemin] of ecransVoyageur) await relever(thomas.page, { nom, langue: l, compte: "thomas" }, chemin);
-
-    }
+    /* Les TROIS comptes lisent EN PARALLÈLE (un onglet chacun), chacun ses écrans dans les deux langues : le relevé
+       séquentiel prenait 11 min 30. Les langues viennent de SUPPORTED_LOCALES : une troisième sera relue sans
+       toucher la spec. */
+    const lireVisiteur = async () => {
+      for (const l of LANGUES) {
+        await poserLaRecherche(visiteur.page, { from: "Paris", to: "Brazzaville" });
+        const ecrans: Array<[string, string]> = [
+          ["accueil", `/${l}`],
+          ["inscription", `/${l}/register`],
+          ["connexion", `/${l}/login`],
+          ["mot de passe oublié", `/${l}/password/forgot`],
+          ["recherche", `/${l}/search`],
+          ["page de trajet", `/${l}/trips/${trajet}`],
+          ["page publique du Voyageur", `/${l}/u/seed-thomas`],
+          ["devenir Voyageur", `/${l}/become/carrier`],
+          ["aide", `/${l}/help`],
+          ["page destinataire (sans compte)", `/${l}${suivi}`],
+        ];
+        for (const [nom, chemin] of ecrans) await relever(visiteur.page, { nom, langue: l, compte: "visiteur" }, chemin);
+        /* Trouvé en relisant la page de trajet : « Voir les avis » menait à `/tripper/<id>`, une route qui n'existe pas. */
+        await visiteur.page.goto(`/${l}/trips/${trajet}`, { waitUntil: "networkidle" });
+        const lienAvis = visiteur.page.locator('a[href*="/tripper/"], a[href*="/u/"]').filter({ hasText: /avis|review/i }).first();
+        await expect(lienAvis, "le lien vers les avis du Voyageur").toBeVisible({ timeout: 60_000 });
+        expect(await lienAvis.getAttribute("href"), "il mène à la page publique, pas à une route inexistante").toMatch(/\/u\/seed-thomas$/);
+      }
+    };
+    const lireExpeditrice = async () => {
+      for (const l of LANGUES) {
+        const ecrans: Array<[string, string]> = [
+          ["réservation (étape 1)", `/${l}/trips/${trajetParKilo}/book`],
+          ["tableau de bord", `/${l}/dashboard/home`],
+          ["mes envois", `/${l}/dashboard/shipments`],
+          ["suivi d'un envoi en attente", `/${l}/bookings/${enAttente}`],
+          ["suivi d'un envoi en transit", `/${l}/bookings/${enTransit}`],
+          ["suivi d'un envoi livré", `/${l}/bookings/${livre}`],
+          ["signaler un problème", `/${l}/bookings/${livre}/report`],
+          ["suivi d'un envoi terminé", `/${l}/bookings/${termine}`],
+          ["noter le Voyageur", `/${l}/bookings/${termine}/rate`],
+          ["messagerie (fil)", `/${l}/dashboard/messages?conversation=${fil}`],
+          ["notifications", `/${l}/dashboard/notifications`],
+          ["finances", `/${l}/dashboard/finances`],
+          ["favoris", `/${l}/dashboard/favorites`],
+          ["profil", `/${l}/dashboard/profile`],
+          ["paramètres", `/${l}/dashboard/settings`],
+          // Le point d'attention connu du cahier : l'assistant « Devenir Voyageur », vu par un membre qui ne l'est pas
+          // encore (Thomas l'est déjà : il n'y verrait que l'écran de succès).
+          ["assistant Devenir Voyageur", `/${l}/carrier/onboarding`],
+        ];
+        for (const [nom, chemin] of ecrans) await relever(aminata.page, { nom, langue: l, compte: "aminata" }, chemin);
+      }
+    };
+    const lireVoyageur = async () => {
+      for (const l of LANGUES) {
+        const ecrans: Array<[string, string]> = [
+          ["mes trajets", `/${l}/dashboard/trips`],
+          ["demande reçue (deal)", `/${l}/carrier/deals/${enAttente}`],
+          ["deal en transit", `/${l}/carrier/deals/${enTransit}`],
+          ["remise du colis", `/${l}/carrier/deals/${enTransit}/deliver`],
+          ["deal en litige", `/${l}/carrier/deals/${litige}`],
+          ["créer un trajet", `/${l}/trips/create`],
+          ["espace Voyageur (onboarding)", `/${l}/carrier/onboarding`],
+          ["finances", `/${l}/dashboard/finances`],
+          ["notifications", `/${l}/dashboard/notifications`],
+        ];
+        for (const [nom, chemin] of ecrans) await relever(thomas.page, { nom, langue: l, compte: "thomas" }, chemin);
+      }
+    };
+    await Promise.all([lireVisiteur(), lireExpeditrice(), lireVoyageur()]);
     writeFileSync(fichierDuReleve(), JSON.stringify(releve));
     test.info().annotations.push({ type: "note", description: `${releve.length} écrans relevés (${releve.filter((e) => e.langue === "fr").length} FR, ${releve.filter((e) => e.langue === "en").length} EN)` });
   });
@@ -186,8 +225,8 @@ test.describe("WEB-VOC — vocabulaire et cohérence de langue (chapitre 5.32)",
        (A144) — « carrier » en est un synonyme refusé au même titre que « traveller ». */
     // Les adresses du jeu d'essai (`aminata.shipper@seed.yamba.dev`) contiennent le mot : ce n'est pas un libellé.
     const pasUneAdresse = /[\w.]+@[\w.]+/;
-    const fr = occurrences(/\b(trippers?|yambers?|transporteurs?|travell?ers?|carriers?|shippers?)\b/i, (e) => e.langue === "fr", pasUneAdresse);
-    const en = occurrences(/\b(carriers?|trippers?|yambers?|travellers?|transporteurs?)\b/i, (e) => e.langue === "en", pasUneAdresse);
+    // Mots refusés : `scripts/lexique-yamba.json`, la même source que la règle 6 de la CI.
+    const [fr, en] = (["fr", "en"] as const).map((l) => occurrences(regle(l, "roles").motif, (e) => e.langue === l, pasUneAdresse));
     /* Le point d'attention connu : l'assistant « Devenir Voyageur ». */
     const devenir = releve.filter((e) => e.nom === "assistant Devenir Voyageur");
     expect(devenir.length, "l'assistant « Devenir Voyageur » a été relu dans les deux langues").toBe(2);
@@ -214,7 +253,7 @@ test.describe("WEB-VOC — vocabulaire et cohérence de langue (chapitre 5.32)",
     for (const r of boite) {
       const e = await mailpit.ouvrir(r.id);
       const corps = normaliserEspaces(`${e.sujet}\n${e.texte}`);
-      const motif = /\b(tripper|yamber|transporteurs?|travellers?|carriers?)\b/gi;
+      const motif = new RegExp(`${regle("fr", "roles").motif.source}|${regle("en", "roles").motif.source}`, "gi");
       for (const m of corps.matchAll(motif)) {
         const i = m.index ?? 0;
         // `/fr/carrier/deals/…` est un CHEMIN d'URL (identifiant de code), pas un mot lu par le membre.
@@ -229,11 +268,11 @@ test.describe("WEB-VOC — vocabulaire et cohérence de langue (chapitre 5.32)",
 
   test("WEB-VOC-2 · le mot « assurance » n'apparaît pas", async ({ mailpit }) => {
     chargerLeReleve();
-    const ecrans = occurrences(/\b(assurances?|assur[ée]e?s?|IPID|insurance|insured)\b/i);
+    const ecrans = LANGUES.flatMap((l) => occurrences(regle(l, "assurance").motif, (e) => e.langue === l));
     const emails: string[] = [];
     for (const r of await mailpit.lister(200)) {
       const e = await mailpit.ouvrir(r.id);
-      if (/\b(assurance|IPID|insurance)\b/i.test(`${e.sujet} ${e.texte}`)) emails.push(`email « ${e.sujet} »`);
+      if (LANGUES.some((l) => regle(l, "assurance").motif.test(`${e.sujet} ${e.texte}`))) emails.push(`email « ${e.sujet} »`);
     }
     /* Les libellés attendus existent bien (on ne passe pas un écran vide). */
     expect(occurrences(/Garantie Yamba|Protection/i, (e) => e.langue === "fr").length, "les libellés « Protection » / « Garantie Yamba » sont affichés").toBeGreaterThan(0);
@@ -262,52 +301,83 @@ test.describe("WEB-VOC — vocabulaire et cohérence de langue (chapitre 5.32)",
     await assistant.accepterLaCharte();
     await assistant.continuer();
     await assistant.payer();
+    await expect.poll(() => aminata.page.url(), { timeout: 90_000, message: "la demande est créée" }).toMatch(/\/bookings\/[0-9a-f]{24}$/);
+    const dealCree = aminata.page.url().split("/bookings/")[1];
+    try {
 
-    const formulations = new Map<string, Set<string>>();
-    const noter = (langue: Langue, ecran: string, texte: string) => {
-      const motif =
-        langue === "fr"
-          ? /(?:un\s+)?(?:bagage|valise)(?:\s+en)?(?:\s+soute)?\s*23\s*kg|soute\s*23\s*kg/gi
-          : /(?:an?\s+)?(?:23\s*kg\s+)?checked[\s-]+bag(?:\s*23\s*kg)?|hold\s+(?:bag|luggage)(?:\s*23\s*kg)?/gi;
-      const vus = [...texte.matchAll(motif)].map((m) => m[0].trim().replace(/\s+/g, " ").replace(/^(un|an?)\s+/i, ""));
-      for (const v of new Set(vus)) {
-        const cle = `[${langue}] ${v.toLowerCase()}`;
-        if (!formulations.has(cle)) formulations.set(cle, new Set());
-        formulations.get(cle)!.add(ecran);
+      const formulations = new Map<string, Set<string>>();
+      const noter = (langue: Langue, ecran: string, texte: string) => {
+        const motif =
+          langue === "fr"
+            ? /(?:un\s+)?(?:bagage|valise)(?:\s+en)?(?:\s+soute)?\s*23\s*kg|soute\s*23\s*kg/gi
+            : /(?:an?\s+)?(?:23\s*kg\s+)?checked[\s-]+bag(?:\s*23\s*kg)?|hold\s+(?:bag|luggage)(?:\s*23\s*kg)?/gi;
+        const vus = [...texte.matchAll(motif)].map((m) => m[0].trim().replace(/\s+/g, " ").replace(/^(un|an?)\s+/i, ""));
+        for (const v of new Set(vus)) {
+          const cle = `[${langue}] ${v.toLowerCase()}`;
+          if (!formulations.has(cle)) formulations.set(cle, new Set());
+          formulations.get(cle)!.add(ecran);
+        }
+        return vus.length;
+      };
+      const lire = async (page: Page, langue: Langue, ecran: string, chemin: string, attendu = true) => {
+        const avant = releve.length;
+        await relever(page, { nom: ecran, langue, compte: "aminata" }, chemin);
+        const n = noter(langue, ecran, releve[avant].texte);
+        releve.pop(); // ces écrans servent à la fiche 3 seulement
+        if (attendu) expect(n, `[${langue}] ${ecran} : le bagage en soute est nommé`).toBeGreaterThan(0);
+      };
+      for (const l of ["fr", "en"] as const) {
+        await poserLaRecherche(visiteur.page, { from: "Paris", to: "Brazzaville" });
+        await lire(visiteur.page, l, "recherche", `/${l}/search`, false); // la carte ne détaille pas les forfaits : consigné
+        await lire(visiteur.page, l, "page du trajet", `/${l}/trips/${trajet}`);
+        await lire(aminata.page, l, "réservation (étape 1)", `/${l}/trips/${trajet}/book`);
+        await lire(aminata.page, l, "mes envois", `/${l}/dashboard/shipments`);
+        await lire(thomas.page, l, "mes trajets", `/${l}/dashboard/trips`);
       }
-      return vus.length;
-    };
-    const lire = async (page: Page, langue: Langue, ecran: string, chemin: string, attendu = true) => {
-      const avant = releve.length;
-      await relever(page, { nom: ecran, langue, compte: "aminata" }, chemin);
-      const n = noter(langue, ecran, releve[avant].texte);
-      releve.pop(); // ces écrans servent à la fiche 3 seulement
-      if (attendu) expect(n, `[${langue}] ${ecran} : le bagage en soute est nommé`).toBeGreaterThan(0);
-    };
-    for (const l of ["fr", "en"] as const) {
-      await poserLaRecherche(visiteur.page, { from: "Paris", to: "Brazzaville" });
-      await lire(visiteur.page, l, "recherche", `/${l}/search`, false); // la carte ne détaille pas les forfaits : consigné
-      await lire(visiteur.page, l, "page du trajet", `/${l}/trips/${trajet}`);
-      await lire(aminata.page, l, "réservation (étape 1)", `/${l}/trips/${trajet}/book`);
-      await lire(aminata.page, l, "mes envois", `/${l}/dashboard/shipments`);
-      await lire(thomas.page, l, "mes trajets", `/${l}/dashboard/trips`);
-    }
-    const lignes = [...formulations].map(([f, ou]) => `${f} ← ${[...ou].join(", ")}`);
-    test.info().annotations.push({ type: "note", description: lignes.join(" | ") });
-    for (const l of ["fr", "en"] as const) {
-      const distinctes = [...formulations.keys()].filter((k) => k.startsWith(`[${l}]`));
-      expect(distinctes, `${l} : une seule formulation du bagage en soute\n${lignes.join("\n")}`).toHaveLength(1);
+      const lignes = [...formulations].map(([f, ou]) => `${f} ← ${[...ou].join(", ")}`);
+      test.info().annotations.push({ type: "note", description: lignes.join(" | ") });
+      for (const l of ["fr", "en"] as const) {
+        const distinctes = [...formulations.keys()].filter((k) => k.startsWith(`[${l}]`));
+        expect(distinctes, `${l} : une seule formulation du bagage en soute\n${lignes.join("\n")}`).toHaveLength(1);
+      }
+    } finally {
+      /* La réservation n'existe que pour être relue : annulée à la fin, même en cas d'échec. Sans cela, chaque
+         exécution consommait 23 kg de `bzv-perkg` jusqu'au prochain rejeu du jeu d'essai — et faussait les
+         capacités lues par les chapitres joués ensuite. */
+      const annulation = await aminata.contexte.request.post(`${api()}/deals/${dealCree}/cancel`, { data: {} });
+      expect(annulation.ok(), `annulation de la réservation de la fiche : ${annulation.status()}`).toBe(true);
     }
   });
 
-  test("WEB-VOC-4 · le tutoiement est constant", async () => {
+  test("WEB-VOC-4 · le tutoiement est constant, à l'écran ET dans les emails", async ({ mailpit }) => {
     chargerLeReleve();
-    /* « vous » / « votre » / « vos » et les impératifs de politesse, hors « rendez-vous » (un nom commun). */
-    const vouvoiement = /(?<![-\p{L}])(vous|votre|vos)(?![-\p{L}])|\b(Vérifiez|Publiez|Choisissez|Indiquez|Ajoutez|Sélectionnez|Renseignez|Saisissez|Consultez|Contactez|Confirmez|Réservez|Découvrez|Envoyez|Gagnez|Recevez|Suivez|Connectez-vous|Créez|Entrez|Remplissez|Complétez|Modifiez|Cliquez|Précisez|Donnez|Laissez|Acceptez|Refusez|Téléchargez|Partagez|Proposez)\b/giu;
-    /* Un « vous » PLURIEL désigne les deux membres ensemble (« vous aurez tous les deux noté ») : ce n'est pas du
-       vouvoiement. Même liste d'exemptions que la règle 6 du contrôle i18n. */
-    const trouve = occurrences(vouvoiement, (e) => e.langue === "fr", /rendez-vous|tous les deux|ensemble|vos deux|vos avis|vos profils|vous organiser|vous devez convenir/i);
-    expect(trouve, `vouvoiement au milieu d'écrans tutoyés :\n${trouve.join("\n")}`).toHaveLength(0);
+    /* « vous » / « votre » / « vos » : la règle du lexique partagé avec la CI, exceptions de sens comprises (« vous
+       aurez tous les deux noté », « rendez-vous »). Les impératifs de politesse, eux, n'existent qu'ici : la CI les
+       lirait dans des phrases citées. */
+    const { motif, sauf } = regle("fr", "vouvoiement");
+    const imperatifs = /\b(Vérifiez|Publiez|Choisissez|Indiquez|Ajoutez|Sélectionnez|Renseignez|Saisissez|Consultez|Contactez|Confirmez|Réservez|Découvrez|Envoyez|Gagnez|Recevez|Suivez|Connectez-vous|Créez|Entrez|Remplissez|Complétez|Modifiez|Cliquez|Précisez|Donnez|Laissez|Acceptez|Refusez|Téléchargez|Partagez|Proposez|Réessayez|Configurez|Rejoignez)\b/u;
+    const vouvoiement = new RegExp(`${motif.source}|${imperatifs.source}`, "giu");
+    const ecrans = occurrences(vouvoiement, (e) => e.langue === "fr", sauf);
+    /* Les emails français de la boîte (le cahier ne cite que les écrans ; les emails d'alerte vouvoyaient). Un email
+       anglais n'a pas de « vous » : le motif ne s'y applique pas. */
+    const emails: string[] = [];
+    let relus = 0;
+    for (const r of await mailpit.lister(200)) {
+      const e = await mailpit.ouvrir(r.id);
+      const corps = normaliserEspaces(`${e.sujet}\n${e.texte}`);
+      if (!/[àâçéèêëîïôûùœ]/i.test(corps)) continue; // email anglais
+      relus += 1;
+      for (const m of corps.matchAll(vouvoiement)) {
+        const i = m.index ?? 0;
+        const extrait = corps.slice(Math.max(0, i - 30), i + m[0].length + 30).replace(/\n/g, " ⏎ ");
+        if (sauf?.test(extrait)) continue;
+        emails.push(`email « ${e.sujet} » : « …${extrait}… »`);
+      }
+    }
+    test.info().annotations.push({ type: "note", description: `${relus} emails français relus` });
+    expect(relus, "des emails français ont été relus").toBeGreaterThan(0);
+    const trouve = [...ecrans, ...new Set(emails)];
+    expect(trouve, `vouvoiement au milieu d'écrans et d'emails tutoyés :\n${trouve.join("\n")}`).toHaveLength(0);
   });
 
   test("WEB-VOC-5 · aucun texte de démonstration sur un écran réel", async () => {
@@ -319,9 +389,13 @@ test.describe("WEB-VOC — vocabulaire et cohérence de langue (chapitre 5.32)",
 
   test("WEB-VOC-6 · aucun libellé vide ni clé technique", async () => {
     chargerLeReleve();
-    /* Une clé technique : au moins deux points entre identifiants (`booking.status.pending`), hors adresses,
-       domaines et noms de fichiers. */
-    const cles = occurrences(/(?<![@\w.\/-])[a-z][a-zA-Z0-9]+(?:\.[a-zA-Z][a-zA-Z0-9_]+){2,}(?![\w@\/-])/, () => true, /@|https?:|www\.|\.(dev|com|fr|io|app|org|net|png|jpe?g|webp)\b/i);
+    /* Une clé technique : identifiants reliés par des points — UN seul suffit (`status.pending` passait inaperçu avec
+       l'ancien seuil de deux). Hors adresses, domaines, fichiers et abréviations (« e.g. », « i.e. », « p. ex. »). */
+    const cles = occurrences(
+      /(?<![@\w.\/-])[a-z][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)+(?![\w@\/-])/,
+      () => true,
+      /@|https?:|www\.|\.(dev|com|fr|io|app|org|net|png|jpe?g|webp|js)\b|\b(e\.g|i\.e|p\.ex|etc)\b/i
+    );
     /* Un tiret seul à la place d'un texte : une LIGNE qui ne contient que « — ». */
     const tirets: string[] = [];
     for (const e of releve) {

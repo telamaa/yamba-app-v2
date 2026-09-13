@@ -19,6 +19,8 @@
  *    Mesuré en recette navigateur : la porte « Connecte-toi pour
  *    réserver » affichait deux boutons intitulés « booking.authGate.login »
  *    et « booking.authGate.register », dans les deux langues.
+ * 6. Le vocabulaire des valeurs (lexique `scripts/lexique-yamba.json`, recette 5.32).
+ * 7. Chaque type d'événement de réservation a son texte de notification (recette 5.32).
  *
  * Usage : node scripts/check-i18n-messages.mjs
  * Sort avec le code 1 et un rapport détaillé à la moindre divergence.
@@ -238,22 +240,14 @@ if (existsSync(SOURCES_DIR) && carteEspaces !== null) {
  * Portée : les fichiers de messages seulement. Les textes écrits en dur dans les composants (`isFr ? … : …`)
  * y échappent — c'est la dette que ce garde-fou pousse à résorber, pas une exemption.
  */
-const VOCABULAIRE = {
-  fr: [
-    { motif: /\b(trippers?|yambers?|transporteurs?|travell?ers?|carriers?|shippers?)\b/i, raison: "mot de rôle refusé (« Voyageur » / « Expéditeur »)" },
-    { motif: /\b(assurances?|IPID)\b/i, raison: "« assurance » (aucun contrat d'assureur signé : « Protection », « Garantie Yamba »)" },
-    {
-      motif: /(?<![-\p{L}])(vous|votre|vos)(?![-\p{L}])/iu,
-      raison: "vouvoiement (la plateforme tutoie)",
-      // « vous » PLURIEL : les deux membres ensemble (« vous aurez tous les deux noté »).
-      sauf: /tous les deux|ensemble|vos deux|vos avis|vos profils|vous organiser|vous devez convenir/i,
-    },
-  ],
-  en: [
-    { motif: /\b(carriers?|trippers?|yambers?|travellers?)\b/i, raison: "role word refused (« Traveler » / « Shipper »)" },
-    { motif: /\b(insurance|insured|IPID)\b/i, raison: "« insurance » (no insurer contract: « Protection », « Yamba Guarantee »)" },
-  ],
-};
+/** Le lexique vit dans `scripts/lexique-yamba.json` : la recette (web-voc.spec.ts) lit LE MÊME fichier. */
+const LEXIQUE = JSON.parse(readFileSync("scripts/lexique-yamba.json", "utf8"));
+const VOCABULAIRE = Object.fromEntries(
+  ["fr", "en"].map((l) => [
+    l,
+    LEXIQUE[l].map((r) => ({ motif: new RegExp(r.motif, r.drapeaux), raison: r.raison, sauf: r.sauf ? new RegExp(r.sauf, "i") : undefined })),
+  ])
+);
 function valeurs(obj, prefix = "") {
   const out = [];
   for (const [k, v] of Object.entries(obj)) {
@@ -284,6 +278,34 @@ function valeurs(obj, prefix = "") {
     }
   }
   if (lues < 1000) fail(`[vocabulaire] seulement ${lues} texte(s) lu(s) : la règle 6 ne lit plus les messages`);
+}
+
+/* ── Règle 7 : chaque événement de réservation a son texte de notification (recette 5.32) ──
+ * Le front compose `notifications.copy.<type avec _>.<RÔLE>.{title,line}` DYNAMIQUEMENT : la règle 5 (clés
+ * littérales) ne le voit pas, et une clé absente afficherait son chemin. La liste des types vient du contrat
+ * (`BOOKING_EVENT_TYPES`, api-contracts) ; un type ajouté sans texte fait échouer la CI.
+ */
+{
+  const contrat = readFileSync("packages/libs/api-contracts/src/booking/booking-events.schema.ts", "utf8");
+  const liste = contrat.match(/BOOKING_EVENT_TYPES\s*=\s*\[([\s\S]*?)\]\s*as const/);
+  const types = liste ? [...liste[1].matchAll(/"([a-z_.]+)"/g)].map((m) => m[1]) : [];
+  if (types.length < 10) fail(`[notifications] ${types.length} type(s) d'événement lu(s) dans le contrat : la règle 7 ne lit plus BOOKING_EVENT_TYPES`);
+  const complet = (n) =>
+    n && typeof n === "object" && ((typeof n.title === "string" && typeof n.line === "string") || Object.values(n).some((x) => x && typeof x === "object" && typeof x.title === "string"));
+  for (const locale of locales) {
+    let copie;
+    try {
+      copie = JSON.parse(readFileSync(join(MESSAGES_DIR, locale, "notifications.json"), "utf8")).copy ?? {};
+    } catch {
+      continue;
+    }
+    for (const type of types) {
+      const cle = type.replace(/\./g, "_");
+      for (const role of ["SHIPPER", "CARRIER"]) {
+        if (!complet(copie[cle]?.[role])) fail(`[${locale}/notifications.json] événement « ${type} » sans texte complet pour ${role} : copy.${cle}.${role}.{title,line}`);
+      }
+    }
+  }
 }
 
 /* ── Rapport ── */
