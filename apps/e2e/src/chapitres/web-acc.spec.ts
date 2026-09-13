@@ -267,8 +267,12 @@ test.describe("WEB-ACC — découverte, accueil et navigation (chapitre 5.1)", (
 
     await page.goBack({ waitUntil: "networkidle" });
     await expect(page).toHaveURL(/\/fr$/);
-    await lienVisible(piedDePage(page), "Confidentialité").click();
-    await expect(page).toHaveURL(/\/fr\/legal\/privacy$/);
+    /* Après `goBack`, le premier clic peut partir avant que la page restaurée ait repris la main
+       (intermittent constaté le 13/09, chapitre 5.31) : on réessaie le geste, borné. */
+    await expect(async () => {
+      if (!/\/legal\/privacy$/.test(page.url())) await lienVisible(piedDePage(page), "Confidentialité").click();
+      await expect(page).toHaveURL(/\/fr\/legal\/privacy$/, { timeout: 5_000 });
+    }).toPass({ timeout: 60_000 });
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible({ timeout: 60_000 });
     const confidentialite = (await page.getByRole("main").first().innerText()).trim();
     expect(confidentialite.length, "la politique de confidentialité affiche un texte").toBeGreaterThan(500);
@@ -320,9 +324,9 @@ test.describe("WEB-ACC — découverte, accueil et navigation (chapitre 5.1)", (
     await expect(fenetre.locator("#email")).toBeVisible();
     await expect(fenetre.locator("#password")).toBeVisible();
     await expect(fenetre.locator("iframe[title*='Google'], [aria-label*='Google'], button:has-text('Google')").first()).toBeVisible();
-    // « Plus tard » (le lien) et la croix (un bouton nommé « Plus tard » lui aussi).
+    // « Plus tard » (le lien) et la croix — nommée « Fermer » depuis le chapitre 5.31 (elle s'appelait « Plus tard » elle aussi).
     await expect(fenetre.getByRole("button", { name: "Plus tard", exact: true }).filter({ hasText: "Plus tard" })).toBeVisible();
-    await expect(fenetre.locator("button[aria-label='Plus tard']:has(svg)")).toBeVisible();
+    await expect(fenetre.locator("button[aria-label='Fermer']:has(svg)")).toBeVisible();
   });
 
   test("WEB-ACC-8 · « Plus tard », Échap et clic sur le fond referment sans conséquence", async ({ navigateurVisiteur }) => {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import { Search, SlidersHorizontal, X } from "lucide-react";
 import { useTranslations, useLocale } from "next-intl";
 import { usePersistedFormState } from "@/hooks/usePersistedFormState";
@@ -22,6 +22,7 @@ import type {
   SortOption,
   TransportMode,
 } from "./search-results.types";
+import { useDialogFocus } from "@/hooks/useDialogFocus";
 
 type FilterMode = "all" | TransportMode;
 
@@ -297,6 +298,9 @@ export default function SearchResultsView() {
   };
 
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const filtresRef = useRef<HTMLDivElement | null>(null);
+  // ANO-WEB-94 — focus piégé dans la fenêtre, rendu au geste de départ à la fermeture.
+  useDialogFocus(filtresRef, mobileFiltersOpen);
 
   /* ANO-WEB-93 — une fenêtre qui s'annonce comme telle se ferme par Échap : sans cela, la promesse
      du `role="dialog"` n'est tenue qu'à moitié (et le clavier n'a aucune porte de sortie). */
@@ -679,7 +683,7 @@ export default function SearchResultsView() {
              fenêtre : ni `role="dialog"`, ni `aria-modal`, ni nom. Les deux autres feuilles de la
              recherche (`MobileSearchExperience`, `MobileFieldFullScreen`) le font déjà ; celle-ci
              l'avait oublié — un lecteur d'écran continuait donc de parcourir la page en dessous. */
-          <div role="dialog" aria-modal="true" aria-label={t("filters.title")} className="fixed inset-0 z-[150] bg-white dark:bg-slate-950 md:hidden">
+          <div ref={filtresRef} role="dialog" aria-modal="true" aria-label={t("filters.title")} className="fixed inset-0 z-[150] bg-white dark:bg-slate-950 md:hidden">
             <div className="flex h-full flex-col">
               <div className="flex items-center justify-between px-4 pb-3 pt-4">
                 <button

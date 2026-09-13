@@ -15,7 +15,7 @@ import { normaliserEspaces } from "./reservation";
 export class MesEnvois {
   constructor(private readonly page: Page) {}
 
-  private ligne(dealId: string) {
+  ligne(dealId: string) {
     return this.page.locator(`a[href="/fr/bookings/${dealId}"]`).first();
   }
 

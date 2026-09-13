@@ -61,11 +61,11 @@ function GroupHead({ label, count }: { label: string; count?: number }) {
   return (
     <div className="mb-2 flex items-center gap-2 px-0.5">
       <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
-      <h2 className="text-[11px] font-medium uppercase tracking-wider text-slate-400 dark:text-slate-500">
+      <h2 className="text-[11px] font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400">
         {label}
       </h2>
       {count !== undefined && (
-        <span className="text-[11px] text-slate-300 dark:text-slate-600">
+        <span className="text-[11px] text-slate-500 dark:text-slate-400">
           · {count}
         </span>
       )}

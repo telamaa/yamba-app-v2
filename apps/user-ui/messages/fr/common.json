@@ -171,6 +171,8 @@
     "today": "Aujourd'hui"
   },
   "lightbox": {
+    "open": "Agrandir la photo {current} sur {total}",
+    "more": "Voir {count, plural, one {# photo de plus} other {# photos de plus}}",
     "close": "Fermer",
     "previous": "Photo précédente",
     "next": "Photo suivante",
@@ -178,6 +180,7 @@
   },
   "authGate": {
     "later": "Plus tard",
+    "close": "Fermer",
     "shareTrip": {
       "title": "Connecte-toi pour partager un trajet",
       "subtitle": "Publier un trajet engage un Voyageur identifié : Yamba a besoin de savoir qui transporte. Ton trajet t'attend après connexion."

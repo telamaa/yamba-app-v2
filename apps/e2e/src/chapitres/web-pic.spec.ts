@@ -249,7 +249,12 @@ test.describe("WEB-PIC — prise en charge et jalons de transit (chapitre 5.16)"
     // Une seule carte d'action : le prochain jalon logique.
     expect(corps).toContain("Tu es à l'aéroport ?");
     await expect(page.getByRole("button", { name: "Je suis à l'aéroport" })).toBeVisible();
-    expect(await page.getByRole("button", { name: /^(L'avion décolle|J'ai atterri|Valider la livraison)$/ }).count(), "les autres jalons ne sont pas proposés").toBe(0);
+    expect(await page.getByRole("button", { name: /^(L'avion décolle|J'ai atterri)$/ }).count(), "les autres jalons ne sont pas proposés").toBe(0);
+    /* « Valider la livraison » n'est plus interdit ici : ANO-WEB-60 (chapitre 5.18) a ajouté le raccourci
+       « Clarisse est déjà devant toi ? » — les jalons sont optionnels. Il vit dans cette phrase, et nulle part ailleurs
+       (assertion périmée constatée le 13/09, chapitre 5.31). */
+    await expect(page.getByRole("button", { name: "Valider la livraison" })).toHaveCount(1);
+    expect(corps).toContain("Clarisse est déjà devant toi ? Tu peux passer directement à la remise");
     expect(corps).toContain("ÉTAPES DU VOYAGE");
     expect(corps).toContain("Optionnel");
     expect(corps).toContain("Clarisse Mabiala · Destinataire");
@@ -281,6 +286,9 @@ test.describe("WEB-PIC — prise en charge et jalons de transit (chapitre 5.16)"
 
     const suiviA = async (attendu: RegExp[]) => {
       await A.page.goto(`/fr/bookings/${dealId}`, { waitUntil: "networkidle" });
+      /* `networkidle` ne dit rien du rendu client : une lecture immédiate a rendu un corps VIDE
+         (constaté le 13/09). On attend que le premier attendu soit là, puis on lit. */
+      await expect.poll(() => texte(A.page), { timeout: 60_000, message: String(attendu[0]) }).toMatch(attendu[0]);
       const corps = await texte(A.page);
       for (const a of attendu) expect(corps, String(a)).toMatch(a);
       // ANO-WEB-54 : aucune clé i18n brute (« bookingTracker.trackingLink.subtitle ») sur le suivi.
