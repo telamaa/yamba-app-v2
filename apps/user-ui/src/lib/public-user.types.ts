@@ -130,6 +130,8 @@ export type PublicUser = {
 
   follow: PublicUserFollow;
   isOwnProfile: boolean;
+  /** D67 — le propriétaire voit sa page même masquée ; ce drapeau la signale (ANO-WEB-21). */
+  hidden?: boolean;
 };
 
 // ─── Réponses API paginées ───────────────────────────────

@@ -29,3 +29,23 @@ export function isSessionRevoked(jti: string | undefined | null, exists: number 
   if (exists === null) return false;
   return exists === 0;
 }
+
+/**
+ * ANO-ADM-04 (recette 02-ADMIN § 4.2, fiche ADM-SEC-10) — le même défaut existait côté
+ * back-office : « Révoquer » une session admin ne coupait que le rafraîchissement, le jeton
+ * d'accès restait accepté jusqu'à 15 minutes. Clé posée par auth-service (`admin-session.ts`),
+ * qui l'importe d'ici : une seule écriture, aucune divergence possible.
+ */
+export const adminSessionKey = (userId: string, jti: string): string => `admin_jti:${userId}:${jti}`;
+
+/**
+ * Même décision que `isSessionRevoked`, À UNE EXCEPTION PRÈS : Redis injoignable → REFUS.
+ * Le back-office compte une poignée de comptes à fort pouvoir, son rafraîchissement dépend
+ * déjà de Redis, et une panne du cache n'y déconnecte personne de la plateforme membre :
+ * l'échec fermé coûte peu, l'échec ouvert laisserait passer une session révoquée.
+ */
+export function isAdminSessionRevoked(jti: string | undefined | null, exists: number | null): boolean {
+  if (!jti) return false;
+  if (exists === null) return true;
+  return exists === 0;
+}

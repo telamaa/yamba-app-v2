@@ -51,6 +51,7 @@ function sessionMetaOf(req: Request): SessionMeta {
   return { ip: req.ip ?? null, userAgent: shortUserAgent(ua), device: describeUserAgent(ua) };
 }
 import { googleSignIn as googleSignInService } from "../services/google-auth.service";
+import { effectiveAccountStatus, type SanctionState } from "@packages/middleware/account-status";
 import { buildGoogleTokenVerifier } from "../services/google-token.verifier";
 import { clearAuthCookies, setCookie } from "../utils/cookies/setCookie";
 import jwt from "jsonwebtoken";
@@ -407,7 +408,8 @@ export const loginUser = async (req: Request, res: Response, next: NextFunction)
     const isMatch = await comparePasswordConstantTime(String(password), user?.passwordHash);
     if (!user || !isMatch) return next(new AuthError("Invalid email or password", { code: "INVALID_CREDENTIALS" }));
     // C-PR3 (D56 2A) — un compte suspendu ne se connecte pas ; le motif est dans l'email reçu.
-    if ((user as { accountStatus?: string }).accountStatus === "SUSPENDED") return next(new AuthError("Account suspended", { code: "ACCOUNT_SUSPENDED" }));
+    // ANO-ADM-07 — statut EFFECTIF : une suspension échue n'empêche plus la connexion.
+    if (effectiveAccountStatus(user as SanctionState) === "SUSPENDED") return next(new AuthError("Account suspended", { code: "ACCOUNT_SUSPENDED" }));
 
     const shouldRemember = Boolean(rememberMe);
     await issueSession(res, user, shouldRemember, sessionMetaOf(req)); // D65 2A
@@ -467,6 +469,12 @@ export const refreshAuthTokens = async (
     if (!user) {
       clearAuthCookies(res);
       return next(new AuthError("Unauthorized! User not found.", { code: "USER_NOT_FOUND" }));
+    }
+    // ANO-ADM-09 — un compte suspendu ne renouvelle pas ses jetons (les sessions sont révoquées à la suspension ;
+    // ceinture-bretelles pour une session ouverte entre-temps, par Google par exemple).
+    if (effectiveAccountStatus(user as SanctionState) === "SUSPENDED") {
+      clearAuthCookies(res);
+      return next(new AuthError("Account suspended", { code: "ACCOUNT_SUSPENDED" }));
     }
 
     // D27 — lecture du record de session.
@@ -875,6 +883,9 @@ export const googleSignIn = async (req: Request, res: Response, next: NextFuncti
       return res.status(200).json(result);
     }
 
+    // ANO-ADM-09 — la connexion Google ne vérifiait pas la suspension : elle ouvrait une session aussitôt
+    // refusée par chaque appel. Même refus que la connexion par mot de passe, et aucune session posée.
+    if (effectiveAccountStatus(result.user as SanctionState) === "SUSPENDED") return next(new AuthError("Account suspended", { code: "ACCOUNT_SUSPENDED" }));
     await issueSession(res, result.user, Boolean(rememberMe), sessionMetaOf(req)); // D65 2A
 
     if (result.created) {

@@ -84,5 +84,12 @@
     "done": "Thank you, the report has been sent to our team.",
     "already": "You already reported this message.",
     "failed": "The report could not be sent."
+  },
+  "errors": {
+    "deliveryCode": "This message contains the delivery code. It is given in person, never in writing.",
+    "meetupTooSoon": "The meeting must start at least 30 minutes from now.",
+    "meetupTooFar": "The meeting must take place within 90 days.",
+    "meetupTooLong": "A meeting lasts 12 hours at most.",
+    "meetupChanged": "This meeting just changed. Reload the conversation."
   }
 }

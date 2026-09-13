@@ -114,7 +114,7 @@ export default function FinalCtaSection() {
               {t("yamber.description")}
             </p>
             <Link
-              href="/become/carrier"
+              href="/carrier/onboarding"
               className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-white/20 bg-white/10 px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-white/15"
             >
               {t("yamber.cta")}

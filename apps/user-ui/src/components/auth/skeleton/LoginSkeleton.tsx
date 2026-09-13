@@ -9,7 +9,7 @@ function SkeletonBlock({ className = "" }: { className?: string }) {
 
 export default function LoginSkeleton() {
   return (
-    <main className="lg:grid lg:grid-cols-2 lg:min-h-[calc(100vh-64px)]">
+    <main className="lg:grid lg:grid-cols-2 lg:min-h-[calc(var(--yamba-viewport)-64px)]">
       {/* LEFT — visual placeholder, desktop only */}
       <div className="hidden lg:flex lg:flex-col lg:justify-between lg:gap-4 lg:bg-gradient-to-b lg:from-[#FFF7E8] lg:to-white lg:p-6 dark:lg:from-[#1F1408] dark:lg:to-slate-950">
         <div className="space-y-2">

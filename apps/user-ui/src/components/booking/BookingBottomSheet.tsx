@@ -61,7 +61,12 @@ export default function BookingBottomSheet({
               {t("summary.totalLabel")}
             </div>
             <div className="text-[18px] font-medium">
-              {formatPrice(price.total, locale)}
+              {/* ANO-WEB-37 — devis indisponible : l'indice, jamais « 0 € » */}
+              {price.quote === null && price.quoteError ? (
+                <span className="text-[12px] font-normal text-[#B45309] dark:text-[#FFB84D]">{t(`summary.quoteHint.${price.quoteError}`)}</span>
+              ) : (
+                formatPrice(price.total, locale)
+              )}
             </div>
           </div>
           <button
@@ -104,6 +109,7 @@ export default function BookingBottomSheet({
               </div>
             </div>
           </div>
+          {price.quote === null && price.quoteError ? null : (<>
           <PriceRow
             label={
               price.quote?.pricingModel === "PER_KG"
@@ -139,6 +145,7 @@ export default function BookingBottomSheet({
               locale={locale}
             />
           )}
+          </>)}
           {currentStep < 4 && (
             <div className="mt-2 border-t border-slate-200 pt-2 dark:border-slate-700">
               {draft.weightKg && (
