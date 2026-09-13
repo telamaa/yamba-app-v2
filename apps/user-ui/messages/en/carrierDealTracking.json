@@ -39,6 +39,7 @@
       "textShort": "Enter the code {recipientFirstName} gives you.",
       "button": "Validate delivery"
     },
+    "deliverEarly": "Is {recipientFirstName} already with you? You can go straight to the handover:",
     "confirmedToast": "Noted! {shipperFirstName} has been notified.",
     "undo": "Undo",
     "undoneToast": "Cancelled, nothing was sent.",

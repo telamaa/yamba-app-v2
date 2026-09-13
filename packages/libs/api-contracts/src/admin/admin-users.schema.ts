@@ -18,7 +18,7 @@ export type AccountStatus = z.infer<typeof AccountStatusSchema>;
 export const ADMIN_PERMISSIONS = {
   "disputes.read": ["MEDIATOR", "SUPPORT", "FINANCE"],
   "disputes.decide": ["MEDIATOR"],
-  "users.read": ["MEDIATOR", "SUPPORT", "FINANCE"],
+  "users.read": ["MEDIATOR", "SUPPORT", "FINANCE", "PRIVACY"], // A153 — le profil RGPD ouvre la fiche du compte qu'il exporte ou efface
   "users.suspension.propose": ["SUPPORT", "MEDIATOR"],
   "users.suspension.apply": ["MEDIATOR"],
   "audit.read": ["FINANCE"],

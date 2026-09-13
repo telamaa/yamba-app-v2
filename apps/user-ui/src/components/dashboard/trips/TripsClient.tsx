@@ -133,10 +133,10 @@ export default function TripsClient() {
   const groupHead = (dotClass: string, label: string, count: number) => (
     <div className="mb-2 mt-7 flex items-center gap-2 px-0.5 first:mt-0">
       <span className={"h-1.5 w-1.5 rounded-full " + dotClass} />
-      <h2 className="text-[11px] font-medium uppercase tracking-wider text-slate-400 dark:text-slate-500">
+      <h2 className="text-[11px] font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400">
         {label}
       </h2>
-      <span className="text-[11px] text-slate-300 dark:text-slate-600">
+      <span className="text-[11px] text-slate-500 dark:text-slate-400">
         · {count}
       </span>
     </div>
@@ -168,6 +168,10 @@ export default function TripsClient() {
           <span className="hidden sm:inline">{t("publishTrip")}</span>
         </button>
       </div>
+
+      {/* ANO-WEB-66 : le bandeau des versements bloqués n'était rendu que sur la page VIDE — un Voyageur
+          qui a des trajets (le cas normal) ne voyait jamais « {montant} en attente : finalise ton compte Stripe ». */}
+      <PayoutBlockedBanner />
 
       {/* À traiter (inbox dérivée, trans-trajets) */}
       {actions.length > 0 && (

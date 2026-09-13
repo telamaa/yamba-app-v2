@@ -8,6 +8,7 @@
 
 "use client";
 
+import { elider } from "@/lib/elision"; // ANO-WEB-49
 import { Check } from "lucide-react";
 import { useTranslations } from "next-intl";
 import type { PickupChecklistItemId } from "@/components/carrier/deal/deal.types";
@@ -47,7 +48,7 @@ export default function PickupChecklist({
       ITEMS_IDENTIFIED: t("checklist.items.ITEMS_IDENTIFIED_short"),
     }
     : {
-      CONTENT_MATCHES: t("checklist.items.CONTENT_MATCHES", { shipperFirstName }),
+      CONTENT_MATCHES: t("checklist.items.CONTENT_MATCHES", { shipperFirstName, queShipper: elider("que", shipperFirstName) }),
       WEIGHT_OK: t("checklist.items.WEIGHT_OK", { weight: weightKg }),
       NO_FORBIDDEN: t("checklist.items.NO_FORBIDDEN"),
       PACKAGING_OK: t("checklist.items.PACKAGING_OK"),

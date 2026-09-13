@@ -2,6 +2,7 @@
 "use client";
 
 import { Check } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { HEADER_COLORS } from "./header.constants";
 import type { CarrierState } from "./useHeaderUserState";
 
@@ -38,6 +39,7 @@ export default function HeaderUserAvatar({
                                            carrierState = "none",
                                            hasPendingAction = false,
                                          }: Props) {
+  const t = useTranslations("common");
   const { box, font, indicator } = SIZE_MAP[size];
   const indicatorPx = indicator;
 
@@ -68,8 +70,9 @@ export default function HeaderUserAvatar({
       )}
 
       {!hasPendingAction && carrierState === "verified" && (
+        // Chapitre 5.32 : ce libellé était écrit en français en dur, y compris sur les écrans anglais.
         <span
-          aria-label="Voyageur vérifié"
+          aria-label={t("userMenu.badges.yamberVerified")}
           className="absolute -right-0.5 -bottom-0.5 flex items-center justify-center rounded-full border-2 border-white text-white dark:border-slate-950"
           style={{
             width: indicatorPx,

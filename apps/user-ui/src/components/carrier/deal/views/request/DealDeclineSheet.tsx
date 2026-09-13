@@ -11,7 +11,8 @@
 
 import { AlertTriangle } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useDialogFocus } from "@/hooks/useDialogFocus";
 import type { DeclineReason } from "@/components/carrier/deal/deal.types";
 
 type Props = {
@@ -39,6 +40,9 @@ export default function DealDeclineSheet({
                                          }: Props) {
   const t = useTranslations("carrierDealRequest");
   const [reason, setReason] = useState<DeclineReason | undefined>(undefined);
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  // ANO-WEB-94 — focus piégé dans la fenêtre, rendu au geste de départ à la fermeture.
+  useDialogFocus(dialogRef, isOpen);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -59,6 +63,7 @@ export default function DealDeclineSheet({
 
   return (
     <div
+      ref={dialogRef}
       className={`fixed inset-0 z-50 transition-opacity duration-200 ${
         isOpen ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
       }`}
@@ -66,6 +71,8 @@ export default function DealDeclineSheet({
       role="dialog"
       aria-modal="true"
       aria-hidden={!isOpen}
+      // Toujours montée (fondu) : fermée, ses boutons restaient atteignables à la tabulation, invisibles.
+      inert={!isOpen}
     >
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
 

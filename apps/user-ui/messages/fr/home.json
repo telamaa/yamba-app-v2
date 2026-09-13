@@ -1,11 +1,16 @@
 {
   "hero": {
+    "imageAlt": {
+      "airport": "Voyageur consultant son téléphone à l'aéroport",
+      "station": "Voyageuse souriante en gare avec ses bagages",
+      "planning": "Personne planifiant son trajet sur ordinateur"
+    },
     "metric": "{count}+ colis livrés depuis 2024",
-    "titleLine1": "Et si vos colis voyageaient",
+    "titleLine1": "Et si tes colis voyageaient",
     "titleLine2": "avec",
     "titleHighlight": "quelqu'un qui part déjà",
     "titleEnd": "?",
-    "subtitle": "Yamba connecte les expéditeurs aux voyageurs partout dans le monde.",
+    "subtitle": "Yamba connecte les expéditeurs aux Voyageurs partout dans le monde.",
     "search": {
       "from": "Départ",
       "fromPlaceholder": "Paris",
@@ -32,21 +37,21 @@
       "value": "24h",
       "valueUnit": "max",
       "title": "Livraison éclair",
-      "description": "Au lieu de 3 à 5 jours avec un transporteur classique. Votre colis voyage à la vitesse d'un voyageur."
+      "description": "Au lieu de 3 à 5 jours avec un envoi classique. Ton colis voyage à la vitesse d'un Voyageur."
     },
     "ecology": {
       "tag": "Écologie",
       "value": "0",
       "valueUnit": "km en plus",
       "title": "Zéro CO₂ supplémentaire",
-      "description": "Le voyageur partait de toute façon. Yamba ne crée pas de transport, il optimise l'existant."
+      "description": "Le Voyageur partait de toute façon. Yamba ne crée pas de transport, il optimise l'existant."
     },
     "savings": {
       "tag": "Économie",
       "value": "-73",
       "valueUnit": "%",
       "title": "Jusqu'à 73% moins cher",
-      "description": "Vous partagez les frais d'un trajet déjà payé. Pas de marge sur du transport dédié."
+      "description": "Tu partages les frais d'un trajet déjà payé. Pas de marge sur du transport dédié."
     }
   },
   "liveMap": {
@@ -76,17 +81,17 @@
     "titleStart": "Un envoi en",
     "titleHighlight": "5 étapes",
     "titleEnd": ".",
-    "subtitle": "Conçu pour vous protéger à chaque étape, du paiement à la livraison.",
+    "subtitle": "Conçu pour te protéger à chaque étape, du paiement à la livraison.",
     "swipeHint": "← Glissez pour découvrir les 5 étapes →",
     "exclusivityBadge": "🔐 Exclusivité",
     "stepLabel": "ÉTAPE",
     "steps": {
       "find": {
-        "title": "Trouvez",
-        "description": "Un Voyageur qui se rend à votre destination."
+        "title": "Trouve",
+        "description": "Un Voyageur qui se rend à ta destination."
       },
       "book": {
-        "title": "Réservez",
+        "title": "Réserve",
         "description": "Paiement sécurisé via Stripe, bloqué jusqu'à la livraison."
       },
       "sign": {
@@ -94,7 +99,7 @@
         "description": "Contrat de confiance avec engagements mutuels."
       },
       "track": {
-        "title": "Suivez",
+        "title": "Suis",
         "description": "Tracking temps réel et messagerie directe."
       },
       "receive": {
@@ -146,7 +151,9 @@
         }
       },
       "shipperBenefit": "3 jours pour vérifier",
-      "yamberBenefit": "Paiement automatique garanti"
+      "yamberBenefit": "Paiement automatique garanti",
+      "shipperTag": "Expéditeur",
+      "travelerTag": "Voyageur"
     }
   },
   "reviews": {
@@ -157,7 +164,7 @@
     "titleEnd": ".",
     "items": {
       "r1": {
-        "quote": "Colis envoyé à Brazzaville pour 3 fois moins cher. La voyageuse m'a tenue au courant tout du long.",
+        "quote": "Colis envoyé à Brazzaville pour 3 fois moins cher. La Voyageuse m'a tenue au courant tout du long.",
         "name": "Aminata L.",
         "role": "Paris → Brazzaville"
       },
@@ -172,7 +179,7 @@
         "role": "Bordeaux → Madrid"
       },
       "r4": {
-        "quote": "Reçu mon colis en moins de 24h, livré en main propre par un voyageur sympa. Bluffant.",
+        "quote": "Reçu mon colis en moins de 24h, livré en main propre par un Voyageur sympa. Bluffant.",
         "name": "David K.",
         "role": "Bruxelles → Paris"
       },
@@ -190,20 +197,20 @@
       "speed": "⚡ Livraison 24h max",
       "ecology": "🌱 Zéro CO₂ supplémentaire"
     },
-    "titleStart": "Et vous, vous",
-    "titleHighlight": "attendez quoi",
+    "titleStart": "Et toi, tu",
+    "titleHighlight": "attends quoi",
     "titleEnd": "?",
-    "subtitle": "Rejoignez 12 000+ personnes qui envoient et transportent autrement.",
+    "subtitle": "Rejoins 12 000+ personnes qui envoient et transportent autrement.",
     "shipper": {
       "tag": "Pour envoyer",
-      "title": "Shipper",
-      "description": "Envoyez votre colis en 24h pour 73% moins cher qu'un transporteur classique.",
+      "title": "Expéditeur",
+      "description": "Envoie ton colis en 24h pour 73% moins cher qu'un envoi classique.",
       "cta": "Trouver un trajet"
     },
     "yamber": {
       "tag": "Pour transporter",
       "title": "Voyageur",
-      "description": "Vous voyagez déjà ? Gagnez en moyenne 120€/mois sur vos trajets prévus.",
+      "description": "Tu voyages déjà ? Gagne en moyenne 120€/mois sur tes trajets prévus.",
       "cta": "Devenir Voyageur"
     }
   }
