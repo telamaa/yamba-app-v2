@@ -626,8 +626,7 @@ Ordre de demarrage : auth -> trip -> gateway.
   `ecouterLaConsole`), `JeuEssai.tousLesTrajets()`, `MesTrajets.actionDuMenu()`, « Proposer un autre ». Pieges
   repayes : `\b` et « é », « 230,00 € » contient « 0,00 € », `count()` avant hydratation. A TRANCHER : plafond
   visiteurs ; origine refusee en 500 au lieu de 403 ; `BecomeYamber` lit aussi `stripeAccountId`. web-mob 10/10,
-  web-msg 21/21 rejoues. Plateforme inchangee (1000 + auth 230), harnais : 332 scenarios. PR a ouvrir (empilee sur
-  #297). **Le cahier 01-WEB est entierement joue** (§ 5, § 6, § 7). Reste : cahier 02-ADMIN. AUCUNE attribution
+  web-msg 21/21 rejoues. Plateforme inchangee (1000 + auth 230), harnais : 332 scenarios. PR #298 (empilee sur #297). **Le cahier 01-WEB est entierement joue** (§ 5, § 6, § 7). Reste : cahier 02-ADMIN. AUCUNE attribution
   Claude.
 - 13/09 : **CHAPITRE 5.32 DU CAHIER 01-WEB — WEB-VOC, VOCABULAIRE ET COHERENCE DE LANGUE (branche
   `chore/recette-web-5-32`, empilee sur #296) — DERNIER CHAPITRE DU § 5 DU CAHIER 01-WEB** — 6 fiches CONFORMES
