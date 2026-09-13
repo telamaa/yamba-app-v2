@@ -4377,3 +4377,62 @@ aucun montant et ne crée aucune demande ; après la levée, le même geste abou
   premier refus d'écriture).
 - Le message personnalisé de l'administrateur complète le bandeau mais pas le refus d'écriture.
 - Une annonce n'a pas de date de FIN : le membre ne sait pas combien de temps durera l'intervention.
+
+---
+
+# Pages d'erreur et page introuvable — ce que le chapitre 5.29 fait respecter
+
+*(PR `chore/recette-web-5-29`, 13/09/2026 — cahier 01-WEB chapitre 5.29, WEB-ERR-1 à 5.)*
+
+## Le besoin
+
+Quand quelque chose manque ou casse, un membre doit comprendre en une phrase ce qui se passe, savoir si son argent
+et ses affaires sont intacts, et avoir un geste évident à faire. Il ne doit jamais lire ce qui ne le concerne pas :
+un chemin de fichier, une trace de pile, un code technique, un message en anglais.
+
+## Les règles
+
+**RG-WEB-282 — Une adresse inconnue rend la page introuvable du produit** : titre, explication des causes
+ordinaires (lien erroné, trajet supprimé, profil masqué) et trois gestes — chercher un trajet, en publier un,
+rentrer à l'accueil.
+
+**RG-WEB-283 — Une ressource inexistante ne dit jamais si elle a existé** : un trajet et un profil introuvables
+reçoivent le même traitement, sans indice sur l'existence réelle.
+
+**RG-WEB-284 — Un incident technique est expliqué, jamais montré** : le membre lit qu'un incident est survenu et que
+rien n'est perdu, avec une référence courte à donner au support ; jamais la trace.
+
+**RG-WEB-285 — Dans le tunnel de réservation, la question d'argent passe AVANT tout le reste** : « Aucun paiement
+n'a été effectué. Ta carte n'a pas été débitée et aucune demande n'a été envoyée au Voyageur. » — et cette phrase
+n'apparaît QUE là, parce qu'ailleurs elle n'a pas de sens.
+
+**RG-WEB-286 — Une version publiée pendant la navigation n'est pas un bug** : le message le dit et le bouton
+propose de recharger, pas de réessayer.
+
+**RG-WEB-287 — Une action proposée doit répondre** : si la copie de la référence échoue (navigateur sans
+presse-papiers), on le dit et l'on explique quoi faire.
+
+**RG-WEB-288 — Aucun code technique n'atteint le membre**, dans aucune situation d'erreur : ni nom de fichier, ni
+trace, ni identifiant brut (`QUOTE_DIVERGENCE`, `SUDO_REQUIRED`, `P2002`…), ni anglais non traduit.
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| 323 | Adresse inconnue | 404 + page introuvable du produit, trois actions | oui |
+| 324 | Trajet / profil inexistants | textes dédiés, aucun indice | oui |
+| 325 | Incident hors tunnel | titre, réassurance, référence copiable, actions | oui |
+| 326 | Incident dans le tunnel | la phrase sur le paiement, en tête | oui |
+| 327 | Copie de la référence impossible | le refus est dit | oui (ANO-WEB-92 close) |
+| 328 | Version publiée pendant la navigation | message et bouton « Recharger la page » | oui |
+| 329 | Cinq situations d'erreur | aucun code, aucune trace, aucun anglais brut | oui |
+
+## Ce qui reste à trancher
+
+- « Écrire au support » vit **dans** le bloc de référence : sans référence, l'action disparaît. Le support doit
+  rester joignable même sans référence.
+- Le cahier attend un toast « Référence copiée » ; le produit change le libellé du bouton. Équivalent à l'usage :
+  amender le cahier.
+- La longueur de la référence varie selon son origine (Sentry ou `digest` de Next) : la normaliser.
+- Les deux routes de panne (inertes en production) restent livrées : elles donnent à la recette un moyen stable de
+  revérifier la page d'erreur. À retirer le jour où une préproduction permet de couper une dépendance pour de vrai.

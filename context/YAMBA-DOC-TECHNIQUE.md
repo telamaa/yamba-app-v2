@@ -6544,3 +6544,94 @@ Aucun code de service touché : plateforme inchangée (**1000** + auth 230). `ap
 (287 + WEB-MNT ×4). Typecheck user-ui et harnais verts ; aucune clé i18n ajoutée (`maintenance.writeRefused` existait
 déjà — c'est bien le problème qu'elle ne servait pas).
 
+
+---
+
+# Chapitre 5.29 du cahier 01-WEB : les pages d'erreur — et comment faire tomber une application qui ne tombe pas
+
+*(PR `chore/recette-web-5-29`, 13/09/2026.)*
+
+## Ce qui a été fait
+
+Le vingt-neuvième chapitre « fiches » du cahier 01-WEB : `WEB-ERR` (page introuvable, ressources inexistantes, page
+d'erreur générale dedans et hors du tunnel de réservation, variante « nouvelle version publiée », et la règle qui a
+motivé ces écrans — un membre ne voit jamais de code). Cinq fiches jouées et conformes (une après correction), une
+anomalie close (`ANO-WEB-92`).
+
+```
+apps/e2e/src/chapitres/web-err.spec.ts                                            5 scénarios en série, 2 min 06
+apps/user-ui/src/app/[locale]/dev/panne.ts                                        le déclencheur de panne, inerte en production
+apps/user-ui/src/app/[locale]/dev/erreur/page.tsx                                 panne HORS tunnel
+apps/user-ui/src/app/[locale]/bookings/dev-erreur/page.tsx                        panne DANS le tunnel (la phrase du paiement)
+apps/user-ui/src/app/[locale]/error.tsx                                           ANO-WEB-92 (l'échec de copie est dit)
+apps/user-ui/messages/{fr,en}/errors.json                                         `boundary.copyFailed`
+```
+
+## Faire tomber une application qui ne tombe pas
+
+La page d'erreur (`[locale]/error.tsx`) est une **frontière React** : elle ne s'affiche que si un rendu lève une
+exception. Encore faut-il en provoquer une. Quatre méthodes ont été essayées, mesurées, et **aucune n'a produit la
+frontière** :
+
+| Méthode | Résultat |
+|---|---|
+| Couper la passerelle (suggestion du cahier) | les écrans se chargent **côté navigateur** : chacun affiche son propre état d'erreur, la frontière ne bouge pas |
+| Réponse d'API malformée (`{"notifications": 42}`, `{"booking": null}`, `{"bookings": 42}`) | les composants sont gardés (`?? []`, états vides) : aucun rendu ne lève |
+| Charge RSC d'une navigation client en 500 | le routeur ne casse pas |
+| Morceau de code (chunk) coupé | rien tant que la page n'en charge pas ; l'unique import dynamique du produit est l'étape de paiement |
+
+**C'est une bonne nouvelle déguisée en difficulté** : les gardes tiennent. Restait donc la porte que le cahier
+prévoit explicitement — « demander à un développeur un moyen sûr de déclencher l'erreur » :
+
+```ts
+// apps/user-ui/src/app/[locale]/dev/panne.ts
+export function declencherLaPanneDeRecette(type?: string): never {
+  if (process.env.NODE_ENV === "production") notFound();
+  if (type === "chunk") { const e = new Error("Loading chunk 4229 failed (panne simulée, recette 5.29)"); e.name = "ChunkLoadError"; throw e; }
+  throw new Error("Panne simulée (recette 5.29) : cette page n'existe que hors production.");
+}
+```
+
+Deux routes l'appellent : `/[locale]/dev/erreur` et `/[locale]/bookings/dev-erreur`. La seconde n'est pas un
+doublon — la frontière n'ajoute la phrase « aucun paiement n'a été effectué » que si le chemin est sous `/book` ou
+`/bookings`, et c'est **précisément** ce comportement qu'il faut éprouver. En production, les deux répondent « page
+introuvable ». Comme la panne est levée **côté serveur**, Next fournit un `digest` : la référence d'incident existe
+même sans Sentry, ce qui permet d'éprouver tout le bloc (référence, copie, aide, lien support) sur ce poste.
+
+## ANO-WEB-92 : le bouton qui ne répond rien, au pire moment
+
+La référence d'incident se copie par `navigator.clipboard.writeText` — qui **n'existe pas hors contexte sécurisé**.
+Le code attrapait l'échec et ne faisait rien :
+
+```ts
+} catch {
+  /* presse-papiers indisponible : la référence reste lisible à l'écran */
+}
+```
+
+Le commentaire dit vrai — la référence reste affichée — mais le membre, lui, a cliqué sur « Référence de
+l'incident » et n'a rien vu se passer. Au moment où il essaie de transmettre une panne au support, un bouton muet
+est une seconde panne. Le chapitre 5.17 avait tranché exactement la même question pour le code de livraison
+(`ANO-WEB-59`) : **un échec se dit**. La page d'erreur affiche donc `errors.boundary.copyFailed`, ajoutée en FR et
+en EN (le miroir i18n de la CI est vert).
+
+Le harnais, lui, interpose un presse-papiers en mémoire de page (`observerLePressePapiers`, déjà utilisé aux
+chapitres 5.17 et 5.23) : le chemin nominal est éprouvé **et** le contenu copié est vérifié (`lirePressePapiers`),
+pas seulement le libellé qui change.
+
+## Ce que le harnais a appris ici
+
+- **`innerText` sur un `body` cloné (donc détaché) retombe sur `textContent`** : on récupère le contenu des
+  `<script>`, charge RSC comprise — des milliers de caractères qui ressemblent à une fuite technique et font échouer
+  une garde « aucune trace ». Le `body` **vivant** ne rend que ce qui est affiché, et la fenêtre d'erreur de Next
+  (un `nextjs-portal` à racine fantôme) n'en fait pas partie : c'est exactement la lecture qu'il faut.
+- **`domcontentloaded` rend la main avant le rendu** : lire le corps aussitôt donne une chaîne vide. On attend le
+  titre visé, puis on lit.
+- **Quatre échecs de provocation valent une ligne de rapport** : quand une application refuse de tomber, on ne
+  s'acharne pas — on consigne que les gardes tiennent, et on demande la porte.
+
+## Tests
+
+Aucun code de service touché : plateforme inchangée (**1000** + auth 230). `apps/e2e` : **296 scénarios**
+(291 + WEB-ERR ×5). Typecheck user-ui et harnais verts ; miroir i18n vert (`errors.boundary.copyFailed` FR/EN).
+
