@@ -636,6 +636,16 @@ Ordre de demarrage : auth -> trip -> gateway.
   auth-service 235, harnais 356. A mettre a jour dans le cahier : menu PRIVACY, formulaire « Trancher » avant 72 h,
   message « dernier super administrateur » inatteignable, tuiles non listees, « aucune alerte » sur jeu d'essai neuf.
   Reste : § 5.2 a 7.
+- 13/09 : **CAHIER 02-ADMIN — § 5.2 ALERTES DE SEUIL (branche `chore/recette-admin-5-2`, empilee sur #302)** — 4 fiches
+  CONFORMES (ALR-3 et ALR-4 partielles), aucune anomalie, aucun code produit, jouees deux fois vertes
+  (`apps/e2e/src/admin/adm-alr-alertes.spec.ts`). Methode : une alerte sans etat se PILOTE PAR SON SEUIL (PATCH
+  /admin/settings, sonde /admin/alerts pour le cache 30 s, seuils retablis en finally) ; jeu d'essai MESURE avant la
+  fiche. ALR-3 : `notifyNewAlerts` appele avec le vrai Redis hors fenetre du cron, verrous du jour purges (consigne), un
+  email puis aucun ; lendemain simule (horloge injectee + magasin memoire + EMAIL_PROVIDER=fake). ECARTS DOC : le
+  versement du seed (termine J-3) franchit deja 48 h (le cahier dit « en echec depuis 24 h ») ; litiges et renversement
+  infranchissables juste apres le seed ; DOC-METIER ALR01 perime sur le renversement. A TRANCHER : « Versements en echec
+  depuis plus de 48 h » mesure l'age de la FIN DU DEAL, pas de l'echec (libelle ou requete) ; un seed « alertes vieillies ».
+  Harnais 360. Reste : § 5.3 a 7.
 - 13/09 : **DECISION : LE ROLE PREND LA MAJUSCULE** (branche `chore/recette-voyageur-majuscule`, empilee sur #299) —
   « Voyageur » / « Traveler » partout : 71 valeurs de messages, 33 textes du code, 1 email ; regle `role-majuscule` au
   lexique partage (CI + recette) ; 12 citations du harnais ; web-fav, web-rch, web-rsv-devis, web-lit verts.

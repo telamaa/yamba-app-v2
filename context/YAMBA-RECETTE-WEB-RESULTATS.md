@@ -4471,6 +4471,54 @@ campagne pollue.
 
 ---
 
+## Cahier 02-ADMIN — § 5.2 Alertes de seuil · **CONFORME** (4 fiches · 0 anomalie · 2 fiches partielles · 3 écarts documentaires · 4 scénarios, 3 min 30)
+
+`apps/e2e/src/admin/adm-alr-alertes.spec.ts`. Les alertes n'ont pas d'état : chaque fiche **pilote une alerte par son
+seuil** (Paramètres, profil Exploitation), la lit avec un autre profil à `kpi.read`, et rétablit les seuils dans un
+`finally`. Le jeu d'essai a été **mesuré avant d'écrire la fiche** (sonde en base) : c'est ce qui a révélé que le cahier
+le suppose plus jeune qu'il n'est. Joué deux fois de suite, vert les deux fois.
+
+| Fiche | Ce qui est éprouvé | Verdict · Preuve |
+|---|---|---|
+| ADM-ALR-1 | La page existe et vit seule | **Conforme** — seuils par défaut, le jeu d'essai sert déjà `PAYOUT_FAILED_48H` (écart ci-dessous) ; seuil relevé à 336 h → état vide. Entrée « Alertes » du menu → `/alerts` ; titre et sous-titre exacts ; « Aucune alerte : versements, litiges, relais d'événements, emails et publication sont dans les clous. » ; tableau « Paramètre » / « Valeur », **11 lignes** = les seuils servis, dont `payoutFailedHours` **336** (la valeur en vigueur, pas la constante 48) ; pied « Réglables dans Paramètres › Alertes d'exploitation. Évaluées à la lecture, le … » (lien `/settings`) ; journal du lecteur : aucune ligne |
+| ADM-ALR-2 | Faire apparaître une alerte | **Conforme** — départ sans alerte de versement (336 h) ; Exploitation, `/settings`, « Versement en échec depuis » → 1, motif du cahier, « Enregistrer » ; lu par le Médiateur : groupe « Critiques · 1 », carte « Versements en échec depuis plus de 1 h · 1 concerné · PAYOUT_FAILED_48H · 1 versement(s) rejoué(s) sans succès depuis plus de 1 h. » (le code garde « 48H » : attendu) ; « Aller traiter → » → `/finances?kind=FAILED`, onglet « Versements en échec » sélectionné ; « remettre » → 48, « Enregistrer » ; journal : deux `SETTING_CHANGED SETTINGS · alerts.payoutFailedHours` (336 → 1 avec le motif, 1 → 48), `before.version` + 1 = `after.version` |
+| ADM-ALR-3 | L'email quotidien au support | **Conforme, ⏭ partiel** (lendemain simulé) — alerte active ; verrous du jour purgés (manœuvre consignée) ; passage du cron (`notifyNewAlerts`, vrai Redis) → `[PAYOUT_FAILED_48H]`, **un** email « Yamba — 1 alerte(s) (13/09/2026 22:59:40) » à `support@yamba.app`, en français, avec « Versements en échec depuis plus de 48 h », le lien `/finances?kind=FAILED` et la mention d'unicité ; clé `yamba:alerts:sent:PAYOUT_FAILED_48H:2026-09-13`, TTL ≈ 2 jours ; second passage → `[]`, **aucun** second email ; lendemain (horloge +24 h, magasin en mémoire, envoi coupé) → clé `…:2026-09-14`, la règle repart, rien de réel envoyé |
+| ADM-ALR-4 | Les liens mènent au bon filtre | **Conforme, ⏭ partiel** — tous les seuils au minimum de leurs bornes : franchies `PAYOUT_FAILED_48H` → `/finances?kind=FAILED` (onglet), `RETENTION_HELD_7D` → `/disputes?kind=RETENTION` (filtre « retenues » **sélectionné**), `ACCEPTANCE_RATE_LOW_7D` → `/pilotage` ; non franchissables sur le jeu d'essai : `REVERSAL_OPEN_48H`, `DISPUTE_UNDECIDED_72H`, `OUTBOX_PARKED`, `OUTBOX_LAGGING_15MIN`, `EMAILS_FAILED_24H`, `NO_TRIP_PUBLISHED_7D` — pour les deux à filtre, l'URL du cahier ouverte : onglet « Transferts renversés » et filtre « décidables maintenant » **sélectionnés** (non-régression ADM-NRG-2 tenue) ; journal : aucune ligne |
+
+### Écarts documentaires
+
+- **Le jeu d'essai franchit déjà le seuil de 48 h.** Le cahier (encadré « piège de recette » d'ALR-2) dit le versement
+  « en échec depuis 24 h » et suppose l'état vide ; le serveur compte les deals **terminés** depuis plus de 48 h dont le
+  versement est en échec, et `bzv-completed-blocked` est terminé à J−3 — ce que `YAMBA-DOC-METIER` (ALR01) attend. ALR-1
+  et ALR-2 se jouent en relevant d'abord le seuil. À l'étape 6 d'ALR-2, l'alerte **reste** à 48 h.
+- **Les litiges et le renversement ne franchissent aucun seuil juste après le seed** : les litiges sont créés à l'heure
+  du seed (le cahier dit « 8 h et 24 h ») et ne sont décidables qu'à 72 h ; le renversement porte `updatedAt` = heure du
+  seed. `YAMBA-DOC-METIER` (ALR01) attend encore « Transferts renversés sans décision » au seed : périmé.
+- **Le libellé du tableau des seuils** : le cahier ne précise pas la forme des clés ; l'écran affiche les noms courts
+  (`payoutFailedHours`), la page Paramètres les noms complets (`alerts.payoutFailedHours`) — à harmoniser ou à écrire.
+
+### Regard d'expert — produit ET test, une ligne par fiche
+
+- **ALR-1** — *Produit* : conforme. Les seuils affichés en clés techniques (`acceptanceRateMinRequests`) obligent à
+  traduire ; afficher le libellé du catalogue (« Taux d'acceptation : demandes minimum ») et l'unité, comme la page
+  Paramètres — petit. *Test* : l'écart volontaire (336) est la seule façon de prouver « en vigueur » — rien à faire.
+- **ALR-2** — *Produit* : **ce que mesure la règle est à trancher** — « Versements en échec depuis plus de 48 h » et
+  « rejoué(s) sans succès depuis plus de 48 h » annoncent l'âge de l'échec ; la requête mesure l'âge de la fin du deal.
+  Un versement tenté pour la première fois il y a une heure (dernière tentative du jeu d'essai : il y a 1 h) s'affiche
+  déjà « depuis plus de 48 h ». Soit le libellé devient « toujours en échec 48 h après la fin du deal », soit la requête
+  lit la date du premier échec — **moyen, décision métier**. *Test* : conforme.
+- **ALR-3** — *Produit* : l'email liste les alertes **nouvelles** du jour, pas l'état complet : un support qui ouvre le
+  second email de la journée (une autre règle) ne voit pas que la première est toujours active — ajouter « toujours
+  actives : … » — petit. Le jour se découpe en **UTC** : à Paris, une alerte apparue à 1 h 30 puis toujours active à
+  2 h 30 part deux fois dans la même nuit — petit, à connaître. *Test* : lendemain simulé par injection ; rejouer la fiche
+  un soir après 2 h confirmerait la bascule réelle — petit.
+- **ALR-4** — *Produit* : six règles ne s'observent pas après un seed ; un script `seed-alertes` (litige vieilli de 4
+  jours, renversement de 3 jours, un événement d'outbox parqué, un email en échec) rendrait l'écran démontrable en
+  formation comme en recette — moyen. *Test* : les destinations non cliquées sont vérifiées par leur URL, pas par le lien
+  réellement servi ; le seed ci-dessus fermerait ce trou — dépend du produit.
+
+---
+
 ## Observations (pas des anomalies, mais à savoir)
 
 - **`/become-yamber` reste « futur »** (commentaire du layout marketing) : la page de présentation
