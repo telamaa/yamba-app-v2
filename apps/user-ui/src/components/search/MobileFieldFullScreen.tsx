@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
+import { useDialogFocus } from "@/hooks/useDialogFocus";
 import { ChevronLeft } from "lucide-react";
 
 type Props = {
@@ -35,6 +36,9 @@ export default function MobileFieldFullScreen({
                                                 children,
                                                 bottomSlot,
                                               }: Props) {
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  // ANO-WEB-94 — focus piégé dans la fenêtre, rendu au geste de départ à la fermeture.
+  useDialogFocus(dialogRef, isOpen);
   useEffect(() => {
     if (!isOpen) return;
     const onKey = (e: KeyboardEvent) => {
@@ -46,6 +50,9 @@ export default function MobileFieldFullScreen({
 
   return (
     <div
+      ref={dialogRef}
+      // Toujours montée (glissement) : fermée, ses champs restaient atteignables à la tabulation, hors écran.
+      inert={!isOpen}
       className="fixed inset-0 z-[510] flex flex-col bg-white dark:bg-slate-950 md:hidden"
       style={{
         transform: isOpen ? "translateX(0)" : "translateX(100%)",

@@ -126,7 +126,8 @@
       "regenerating": "Regenerating…",
       "toastRegenerated": "New code generated! Don''t forget to send it to {recipientFirstName}.",
       "toastMaxReached": "You''ve reached the regeneration limit. Contact support if needed.",
-      "toastError": "Error regenerating. Try again."
+      "toastError": "Error regenerating. Try again.",
+      "copyFailed": "Copying is not available in this browser — select the code and copy it by hand."
     },
     "share": {
       "title": "Share the code with {recipientFirstName}",
@@ -247,7 +248,9 @@
       "stateBlocked": "Blocked until D+4",
       "stateReleased": "Released",
       "note": "The funds are held by Yamba. They will be paid to {carrierFirstName} after the verification period.",
-      "noteReleased": "You confirmed the delivery — the funds are being transferred to {carrierFirstName}."
+      "noteReleased": "You confirmed the delivery — the funds are being transferred to {carrierFirstName}.",
+      "noteReleasedAuto": "The verification period is over — the funds are being transferred to {carrierFirstName}.",
+      "noteReleasedMediation": "Closed by mediation — the funds follow the decision above."
     },
     "report": "Something wrong with this parcel?",
     "reportShort": "Something wrong?"
@@ -281,7 +284,7 @@
       "DAMAGED_short": "Parcel or content damaged",
       "SIGNIFICANT_DELAY": "Significantly late delivery",
       "SIGNIFICANT_DELAY_short": "Significantly late delivery",
-      "RECIPIENT_ISSUE": "{recipientFirstName} has another issue with the traveler",
+      "RECIPIENT_ISSUE": "{recipientFirstName} has another issue with the Traveler",
       "RECIPIENT_ISSUE_short": "Another issue with {carrierFirstName}",
       "OTHER": "Other issue",
       "OTHER_short": "Other",
@@ -461,18 +464,18 @@
     "backToShipments": "View my shipments",
     "ticketLine": "Ticket {ticket}",
     "awaiting": {
-      "title": "Waiting for the carrier",
-      "message": "Your request is sent and your payment is authorized — nothing is charged until the carrier accepts.",
+      "title": "Waiting for the Traveler",
+      "message": "Your request is sent and your payment is authorized — nothing is charged until the Traveler accepts.",
       "dateLine": "Without an answer, it expires on {date} and you are fully refunded."
     },
     "declined": {
       "title": "Request not accepted",
-      "message": "The carrier could not accept your request. You are not charged: the payment authorization is fully released.",
+      "message": "The Traveler could not accept your request. You are not charged: the payment authorization is fully released.",
       "dateLine": "Closed on {date}."
     },
     "expired": {
       "title": "Request expired",
-      "message": "The carrier did not answer within 24 hours. You are not charged: the payment authorization is fully released.",
+      "message": "The Traveler did not answer within 24 hours. You are not charged: the payment authorization is fully released.",
       "dateLine": "Expired on {date}."
     },
     "cancelled": {
@@ -482,13 +485,18 @@
     },
     "verified": {
       "title": "Shipment complete",
-      "message": "The delivery is confirmed and the carrier's payout is released. Thank you for shipping with Yamba.",
+      "message": "The delivery is confirmed and the Traveler's payout is released. Thank you for shipping with Yamba.",
       "dateLine": "Delivered on {date}."
     },
     "disputed": {
       "title": "Report under review",
-      "message": "Your report is recorded: the carrier payout is frozen during the review. Our team answers within 48 business hours.",
+      "message": "Your report is recorded: the Traveler's payout is frozen during the review. Our team answers within 48 business hours.",
       "dateLine": "Opened on {date}."
+    },
+    "cancelledByMediation": {
+      "title": "Closed by mediation",
+      "message": "Your report has been decided: the decision and its reason are below.",
+      "dateLine": "Closed on {date}."
     }
   },
   "completed": {
@@ -499,7 +507,7 @@
       "byMediation": "Closed by mediation on {date}: the decision is below."
     },
     "h1": "Transaction closed",
-    "h1Subtitle": "All good: your carrier's payment has been released and this deal is closed.",
+    "h1Subtitle": "All good: your Traveler's payment has been released and this deal is closed.",
     "h1SubtitleShort": "Payment released, deal closed.",
     "released": {
       "title": "{carrierFirstName}'s payment has been released",
@@ -512,8 +520,8 @@
   "disputed": {
     "banner": {
       "title": "Report in progress · case {ticket}",
-      "openedAt": "Opened on {date}. The carrier's payment is frozen during the review.",
-      "openedNoDate": "The carrier's payment is frozen during the review."
+      "openedAt": "Opened on {date}. The Traveler's payment is frozen during the review.",
+      "openedNoDate": "The Traveler's payment is frozen during the review."
     },
     "h1": "Your report",
     "h1Subtitle": "Here is what you declared and what happens next. Keep your case number for any exchange with us.",

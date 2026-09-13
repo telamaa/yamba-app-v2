@@ -21,7 +21,8 @@ import {
 } from "@/components/trips/list/my-trips.config";
 import ShipmentRow from "@/components/dashboard/shipments/ShipmentRow";
 import TripActionRow from "@/components/dashboard/trips/TripActionRow";
-import { getMyShipmentsPreview } from "@/components/dashboard/shipments/shipments.api";
+import { useQuery } from "@tanstack/react-query";
+import { getMyShipments, getMyShipmentsPreview } from "@/components/dashboard/shipments/shipments.api";
 import { getMyTrips as getMyCarrierTripsMock } from "@/components/dashboard/trips/trips.api";
 import type { ShipmentListItem } from "@/components/dashboard/shipments/shipments.types";
 import type { CarrierTripItem } from "@/components/dashboard/trips/trips.types";
@@ -60,11 +61,11 @@ function GroupHead({ label, count }: { label: string; count?: number }) {
   return (
     <div className="mb-2 flex items-center gap-2 px-0.5">
       <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
-      <h2 className="text-[11px] font-medium uppercase tracking-wider text-slate-400 dark:text-slate-500">
+      <h2 className="text-[11px] font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400">
         {label}
       </h2>
       {count !== undefined && (
-        <span className="text-[11px] text-slate-300 dark:text-slate-600">
+        <span className="text-[11px] text-slate-500 dark:text-slate-400">
           · {count}
         </span>
       )}
@@ -122,6 +123,14 @@ function HomeLive() {
   const t = useTranslations("dashboardHome");
   const { data: rawData, isLoading } = useMyTrips();
   const { data: dealViews, isLoading: dealsLoading } = useMyDeals();
+  // ANO-WEB-76 (recette 5.22) : l'accueil « live » ne dérivait que les actions VOYAGEUR (deals reçus, trajets) —
+  // un Expéditeur n'y voyait jamais « à traiter » (noter, transmettre le code, vérifier la livraison), alors que
+  // la prévisualisation (`deriveHomeActions`) le faisait. Les envois réels sont lus et fusionnés.
+  const { data: shipments, isLoading: shipmentsLoading } = useQuery({
+    queryKey: ["home", "my-shipments"],
+    queryFn: getMyShipments,
+    staleTime: 30_000,
+  });
   const [nowMs, setNowMs] = useState(() => Date.now());
 
   useEffect(() => {
@@ -166,9 +175,14 @@ function HomeLive() {
     return actions.sort((a, b) => order[a.kind] - order[b.kind]);
   }, [trips]);
 
-  if (isLoading || dealsLoading) return <HomeSkeleton />;
+  const shipperActions = useMemo(
+    () => deriveHomeActions(shipments ?? [], []).filter((a): a is Extract<HomeAction, { role: "SHIPPER" }> => a.role === "SHIPPER"),
+    [shipments]
+  );
 
-  const total = dealActions.length + liveActions.length;
+  if (isLoading || dealsLoading || shipmentsLoading) return <HomeSkeleton />;
+
+  const total = shipperActions.length + dealActions.length + liveActions.length;
 
   return (
     <>
@@ -181,6 +195,14 @@ function HomeLive() {
       {total > 0 ? (
         <section>
           <GroupHead label={t("groups.actions")} count={total} />
+          {shipperActions.map((action) => (
+            <div key={action.key} className="flex items-center gap-2">
+              <RoleChip role="SHIPPER" />
+              <div className="min-w-0 flex-1">
+                <ShipmentRow item={action.shipment} nowMs={nowMs} />
+              </div>
+            </div>
+          ))}
           {dealActions.map((action) => (
             <TripActionRow
               key={action.kind + "_" + action.dealId}

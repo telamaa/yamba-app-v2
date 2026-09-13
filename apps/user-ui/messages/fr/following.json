@@ -1,7 +1,7 @@
 {
   "page": {
     "title": "Voyageurs suivis",
-    "description": "Reste à l'affût des publications de tes voyageurs favoris."
+    "description": "Reste à l'affût des publications de tes Voyageurs favoris."
   },
   "card": {
     "tripperBadge": "Voyageur",
@@ -12,15 +12,15 @@
     "notifyOff": "Notifications désactivées",
     "unfollow": "Ne plus suivre",
     "confirmUnfollow": "Confirmer",
-    "unfollowSuccess": "Tu ne suis plus ce voyageur",
+    "unfollowSuccess": "Tu ne suis plus ce Voyageur",
     "unfollowError": "Erreur lors du désabonnement",
     "updateError": "Erreur lors de la mise à jour"
   },
   "list": {
-    "emptyTitle": "Aucun voyageur suivi",
-    "emptyDescription": "Découvre les voyageurs de la communauté et suis ceux qui correspondent à tes besoins pour être prévenu·e dès qu'ils publient un nouveau trajet.",
+    "emptyTitle": "Aucun Voyageur suivi",
+    "emptyDescription": "Découvre les Voyageurs de la communauté et suis ceux qui correspondent à tes besoins pour être prévenu·e dès qu'ils publient un nouveau trajet.",
     "emptyCta": "Découvrir des Voyageurs",
-    "count": "{count, plural, one {1 voyageur suivi} other {# voyageurs suivis}}",
+    "count": "{count, plural, one {1 Voyageur suivi} other {# Voyageurs suivis}}",
     "discoverMore": "Découvrir plus",
     "errorMessage": "Erreur lors du chargement"
   }
