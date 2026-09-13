@@ -18,6 +18,7 @@
 import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import * as Sentry from "@sentry/nextjs";
+import { toast } from "sonner";
 import { AlertTriangle, Copy, Home, RefreshCw, Check } from "lucide-react";
 import { Link, usePathname } from "@/i18n/navigation";
 
@@ -49,7 +50,10 @@ export default function LocaleError({ error, reset }: { error: Error & { digest?
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      /* presse-papiers indisponible : la référence reste lisible à l'écran */
+      // ANO-WEB-92 (recette 5.29) — la copie échouait EN SILENCE : hors contexte sécurisé,
+      // `navigator.clipboard` n'existe pas, le bouton ne répondait rien et le membre ne savait pas
+      // s'il tenait la référence. Même règle qu'ANO-WEB-59 (code de livraison) : un échec se dit.
+      toast.error(t("copyFailed"));
     }
   };
 

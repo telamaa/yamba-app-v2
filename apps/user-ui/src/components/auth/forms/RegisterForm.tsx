@@ -317,7 +317,7 @@ export default function RegisterForm({ heroVisual }: Props) {
     "dark:text-[#2DD4BF] dark:decoration-[#2DD4BF]/40 dark:hover:decoration-[#2DD4BF]";
 
   return (
-    <main className="lg:grid lg:grid-cols-2 lg:min-h-[calc(100vh-64px)]">
+    <main className="lg:grid lg:grid-cols-2 lg:min-h-[calc(var(--yamba-viewport)-64px)]">
       {/* LEFT — visuel desktop */}
       <div className="hidden lg:block">
         <AuthHeroVisual visual={heroVisual} />

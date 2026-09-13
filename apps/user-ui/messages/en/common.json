@@ -171,6 +171,8 @@
     "today": "Today"
   },
   "lightbox": {
+    "open": "Enlarge photo {current} of {total}",
+    "more": "See {count, plural, one {# more photo} other {# more photos}}",
     "close": "Close",
     "previous": "Previous photo",
     "next": "Next photo",
@@ -178,6 +180,7 @@
   },
   "authGate": {
     "later": "Not now",
+    "close": "Close",
     "shareTrip": {
       "title": "Sign in to share a trip",
       "subtitle": "Publishing a trip commits an identified carrier: Yamba needs to know who is carrying. Your trip will be waiting after sign-in."
@@ -196,7 +199,10 @@
     }
   },
   "report": {
-    "title": { "TRIP": "Report this listing", "USER": "Report this profile" },
+    "title": {
+      "TRIP": "Report this listing",
+      "USER": "Report this profile"
+    },
     "intro": "Tell us what's wrong. Our team reviews every report; the person concerned will never know who reported them.",
     "reason": "Reason",
     "reasons": {
@@ -218,6 +224,7 @@
     "ownTarget": "You can't report your own content.",
     "failed": "The report couldn't be sent. Please try again.",
     "gateTitle": "Sign in to report",
-    "gateSubtitle": "A report is always signed: it protects everyone from abuse."
+    "gateSubtitle": "A report is always signed: it protects everyone from abuse.",
+    "notFound": "This item cannot be found: it no longer exists or is no longer visible."
   }
 }

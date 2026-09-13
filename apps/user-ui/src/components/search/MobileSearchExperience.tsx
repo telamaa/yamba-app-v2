@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   ArrowLeftRight,
@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { useTranslations, useFormatter, useLocale } from "next-intl";
 import { useBottomSheet } from "@/hooks/useBottomSheet";
+import { useDialogFocus } from "@/hooks/useDialogFocus";
 import type { DateValue } from "@/components/ui/SmartDatePicker";
 import CityAutocomplete from "@/components/search/CityAutocomplete";
 import MobileFieldFullScreen from "@/components/search/MobileFieldFullScreen";
@@ -55,6 +56,9 @@ export default function MobileSearchExperience({
   const localeTag = isFr ? "fr-FR" : "en-US";
 
   const sheet = useBottomSheet();
+  const sheetRef = useRef<HTMLDivElement | null>(null);
+  // ANO-WEB-94 — focus piégé dans la fenêtre, rendu au geste de départ à la fermeture.
+  useDialogFocus(sheetRef, sheet.isOpen);
   const [activeField, setActiveField] = useState<"from" | "to" | "date" | null>(
     null
   );
@@ -173,6 +177,9 @@ export default function MobileSearchExperience({
       />
 
       <div
+        ref={sheetRef}
+        // Toujours montée (glissement) : fermée, son contenu restait atteignable à la tabulation, hors écran.
+        inert={!sheet.isOpen}
         className="fixed inset-x-0 bottom-0 z-[490] flex flex-col bg-white dark:bg-slate-950 md:hidden"
         style={{
           transform: sheet.isOpen ? "translateY(0)" : "translateY(100%)",

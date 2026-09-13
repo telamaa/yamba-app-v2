@@ -125,7 +125,7 @@ export default function TripDocumentsManager({
   const [lightbox, setLightbox] = useState<{ url: string; name: string } | null>(null);
   const toastOpts = { duration: 6000, closeButton: true };
 
-  const { upload, progress, isUploading, error, reset } =
+  const { upload, progress, isUploading, error } =
     useImageKitUpload("/trips");
 
   const canAddMore = documents.length < maxDocuments && canEdit;
@@ -201,10 +201,12 @@ export default function TripDocumentsManager({
       if (uploadedDocs.length > 0) {
         addDocs.mutate(uploadedDocs);
       }
-      reset();
+      // ANO-WEB-26 (recette 5.8) — ne PAS `reset()` ici : cela effaçait l'erreur de validation
+      // (« Le fichier dépasse 5 Mo. », « Format non supporté ») avant même qu'elle soit lue. Le
+      // prochain dépôt la remplace (le hook remet l'erreur à zéro au début de chaque envoi).
       if (inputRef.current) inputRef.current.value = "";
     },
-    [documents.length, upload, canAddMore, maxDocuments, reset, addDocs]
+    [documents.length, upload, canAddMore, maxDocuments, addDocs]
   );
 
   const handleClick = () => {
@@ -281,6 +283,14 @@ export default function TripDocumentsManager({
         </div>
       )}
 
+      {/* ANO-WEB-25 (recette 5.8) — la limite atteinte se DIT, la zone de dépôt ne disparaît pas en silence */}
+      {canEdit && !canAddMore && (
+        <p className="mb-3 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-[11px] text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">
+          {isFr
+            ? `${maxDocuments} documents maximum par trajet — supprime un document pour en ajouter un autre.`
+            : `${maxDocuments} documents maximum per trip — remove one to add another.`}
+        </p>
+      )}
       {/* Error */}
       {error && (
         <div className="mb-3 flex items-start gap-1.5 rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-[11px] text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300">
