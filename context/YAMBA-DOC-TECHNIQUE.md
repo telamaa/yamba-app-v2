@@ -2,113 +2,80 @@
 
 ---
 
-# Chapitre 5.32 du cahier 01-WEB : le vocabulaire — relire 62 écrans, et garder le lexique à la source
+# Chapitre 7 du cahier 01-WEB : la non-régression — douze gardes, et deux fonctions mortes retrouvées
 
-*(PR `chore/recette-web-5-32`, 13/09/2026.)*
+*(PR `chore/recette-web-7`, 13/09/2026.)*
 
 ## Ce qui a été fait
 
-Le dernier chapitre du § 5 du cahier 01-WEB : `WEB-VOC` (mots de rôle, « assurance », noms de catégories,
-tutoiement, textes de démonstration, libellés vides ou clés techniques). Six fiches conformes (quatre après
-correction), cinq anomalies closes (`ANO-WEB-98` à `102`), une règle de CI ajoutée.
+Le chapitre « Non-régression » du cahier 01-WEB : douze points qui ont déjà cassé, joués en un fichier
+(`web-nrg.spec.ts`, 11 scénarios — NRG-6 et 12 partagent un relevé). Tous conformes, trois après correction ; trois
+anomalies closes (`ANO-WEB-103` à `105`).
 
 ```
-apps/e2e/src/chapitres/web-voc.spec.ts                          relevé commun (62 écrans FR/EN) + 6 fiches
-apps/e2e/src/chapitres/web-{rch,msg,rsv-devis,rem,dea,trj,voy}   20 citations d'anciens textes mises à jour
-apps/e2e/src/pages/fil-messagerie.ts                            idem
-scripts/check-i18n-messages.mjs                                 RÈGLE 6 — le vocabulaire des messages
-apps/user-ui/messages/{fr,en}/*.json                            ANO-WEB-98/99/100/101 — ~90 valeurs réécrites
-apps/user-ui/src/**  (≈ 20 fichiers)                            textes en dur : tutoiement, rôles, étiquettes traduites
-apps/user-ui/src/components/trips/detail/ReviewsCard.tsx        ANO-WEB-102 — le lien des avis
-apps/user-ui/src/app/[locale]/dashboard/*/preview/page.tsx      vitrines de démo introuvables en production
-apps/notification-service/src/emails/**                         emails anglais : « Traveler »
-apps/trip-service/src/utils/templates/trip-notifications/*.ejs  emails d'alerte : tutoiement
+apps/e2e/src/chapitres/web-nrg.spec.ts                                   11 scénarios, non séquentiels
+apps/e2e/src/pages/ecran.ts                                              NOUVEAU — gardes d'écran + écoute de console
+apps/e2e/src/chapitres/web-mob.spec.ts                                   importe les gardes au lieu de les définir
+apps/e2e/src/fixtures/jeu-essai.ts                                       tousLesTrajets()
+apps/e2e/src/pages/mes-trajets.ts, fil-messagerie.ts                     actionDuMenu() ; « Proposer un autre »
+apps/user-ui/src/components/dashboard/sections/FinancesSection.tsx       ANO-WEB-103 (onglet dérivé) + ANO-WEB-104 (le serveur décide)
+apps/user-ui/src/components/layout/header/HeaderShareTripCTA.tsx         ANO-WEB-105 (nom accessible complet)
 ```
 
-## Relire, pas refaire : un relevé commun
+## ANO-WEB-104 : un front qui décidait à la place du serveur
 
-Le cahier dit « en relisant les écrans déjà parcourus ». Une fiche par écran aurait rejoué 62 navigations six
-fois. Le harnais fait donc UN relevé (`WEB-VOC-0`) et six requêtes dessus :
+```tsx
+// Avant
+const stripeAccountReady = Boolean(user?.carrierPage?.stripeAccountId);
+<button onClick={stripeAccountReady ? openStripe : () => toast.info(t("stripeMissing"))}>
+```
+
+`/auth/me` sert `carrierPage` par une **liste blanche** (règle non négociable des DTO) : `stripeOnboardingComplete`,
+`stripeChargesEnabled`… jamais `stripeAccountId`. La condition était donc toujours fausse — pour tous les
+Voyageurs, et sans aucune erreur : un toast d'information poli, un serveur jamais appelé. Le serveur, lui, fait déjà
+le bon contrôle, dans le bon ordre :
 
 ```ts
-async function texteVisible(page: Page): Promise<string> {
-  // innerText (ce qui est rendu) + ce qu'entend un lecteur d'écran, sur les éléments qui ont une boîte
-  document.querySelectorAll("[aria-label], [placeholder], [title], img[alt]") …
-}
-function occurrences(motif: RegExp, filtre = (e: Ecran) => true, exclure?: RegExp): string[]
-  // → « [en] finances (aminata) : « …retention passed on to the carrier + €14.56… » »
+await requireSudo(req);                       // 403 SUDO_REQUIRED → la porte par code
+if (!carrierPage?.stripeAccountId) return next(new ConflictError("…", { type: "carrier", code: "STRIPE_ACCOUNT_MISSING" }));
 ```
 
-Le relevé est écrit sur disque (`resultats/releve-web-voc.json`) : après l'échec d'une fiche, Playwright remplace
-le processus de travail, et un relevé gardé en mémoire serait perdu pour les suivantes. Le chapitre n'est donc
-**pas en série** — une fiche qui échoue n'empêche pas les autres de rendre leur inventaire.
+Correction : `onClick={openStripe}` toujours, et le front traduit les deux codes (`SUDO_REQUIRED` → la porte,
+`STRIPE_ACCOUNT_MISSING` → « Finalise d'abord ton compte Stripe »). C'est A146 appliquée : le code de refus arrive au
+client, le client ne devine pas.
 
-Trois garde-fous d'instrument, tous payés : un écran « introuvable » est refusé (sinon il passe le seuil de
-longueur) ; la stabilité exige trois lectures identiques et zéro `.animate-pulse` ; les adresses (`…shipper@…`) et
-les chemins d'URL (`/carrier/deals/`) ne sont pas des mots.
+## ANO-WEB-103 : `useState` n'est pas réactif
 
-## VOC-3 : créer la donnée que la fiche doit relire
-
-Le jeu d'essai n'a aucun envoi « bagage en soute » VIVANT (le seul est refusé, et un envoi refusé n'apparaît dans
-aucune liste). Une fiche « verte » sur des écrans qui ne montrent pas l'objet ne prouve rien — c'est ce qu'a fait la
-première version. La fiche réserve donc un bagage en soute sur `bzv-perkg` (assistant, paiement FAKE) et exige que
-chaque écran **nomme** l'objet avant de comparer les formulations.
-
-## La règle 6 du contrôle i18n
-
-```js
-const VOCABULAIRE = {
-  fr: [
-    { motif: /\b(trippers?|yambers?|transporteurs?|travell?ers?|carriers?|shippers?)\b/i, raison: "mot de rôle refusé" },
-    { motif: /\b(assurances?|IPID)\b/i, raison: "« assurance »" },
-    { motif: /(?<![-\p{L}])(vous|votre|vos)(?![-\p{L}])/iu, raison: "vouvoiement",
-      sauf: /tous les deux|ensemble|vos deux|vos avis|vos profils|vous organiser|vous devez convenir/i },
-  ],
-  en: [ /\b(carriers?|trippers?|yambers?|travellers?)\b/i, /\b(insurance|insured|IPID)\b/i ],
-};
-// + toute valeur vide ou « — » ; + garde du garde : moins de 1000 textes lus → erreur
+```tsx
+// Avant : évalué UNE fois, au montage — `user` n'est pas encore chargé, isCarrier vaut false
+const [tab, setTab] = useState<FinancesTab>(isCarrier ? "wallet" : "payments");
+// Après : dérivé tant que le membre n'a pas choisi
+const [choix, setTab] = useState<FinancesTab | null>(null);
+const tab: FinancesTab = choix ?? (isCarrier ? "wallet" : "payments");
 ```
 
-`(?<![-\p{L}])vous(?![-\p{L}])` : un `\b` ASCII ne suffit pas en français (« rendez-vous » contient « vous » entre
-deux frontières de mot, et `\b` ne connaît pas les lettres accentuées) ; les assertions arrière/avant avec `\p{L}`
-(drapeau `u`) excluent le trait d'union et toute lettre Unicode.
+L'argument de `useState` est une valeur **initiale** : ce qui change ensuite (ici, l'arrivée du membre) ne la met pas
+à jour. En navigation interne, le cache de TanStack Query sert `user` dès le premier rendu et le défaut disparaît ;
+à l'ouverture directe de `/dashboard/finances`, il est systématique.
 
-## La non-régression, et ce qu'un inventaire de citations ne voit pas
+## NRG-10 : mesurer contre la production, pas contre le poste
 
-Avant de jouer, un script liste chaque chaîne RETIRÉE par le diff (`git diff -U0 | grep "^-"`, littéraux entre
-guillemets ou accents graves) et la cherche dans le harnais (`grep -rnF`) : vingt citations trouvées et mises à
-jour. Il en a manqué deux, dans `web-alr.spec.ts` : le texte d'un gabarit EJS (« Un nouveau trajet correspond à
-votre alerte ») n'est pas un littéral, le script ne pouvait pas l'extraire. La non-régression les a trouvées — la
-preuve qu'un inventaire aide mais ne remplace pas le rejeu.
+Le poste relève les plafonds du limiteur (`RATE_LIMIT_ANONYMOUS_MAX=2000`, `RATE_LIMIT_AUTHENTICATED_MAX=5000`) pour
+que la recette ne se bloque pas elle-même. « Aucun 429 sur le poste » ne dit donc rien de la production. La fiche
+importe les défauts du code (`RATE_LIMIT_ANONYMOUS`, `RATE_LIMIT_AUTHENTICATED` de
+`packages/middleware/rate-limit-tier.ts`), mesure le coût d'une page (6,2 appels) et projette à un rythme humain.
+La répartition par route est publiée : `GET /api/maintenance` à 1,99 par page — un seul composant qui lit au montage,
+doublé par `page.goto` (rechargement) et le StrictMode de `next dev`. La mesure est donc pessimiste, et écrite comme
+telle.
 
-WEB-ACC-8 est tombée sur un `POST /auth/refresh` intermittent ; rejouée sans les correctifs (`git stash push --
-apps/user-ui/src apps/user-ui/messages`), elle tombait aussi. La requête est la sonde de session du visiteur ; la
-fiche l'exclut avec sa raison.
+## Les gestes sensibles sans griller le quota, ni un compte
 
-## Améliorations au GO : un lexique, une règle 7, et des fiches qui nettoient derrière elles
-
-- **`scripts/lexique-yamba.json`** : les motifs (source + drapeaux) et leurs exceptions de sens, lus par
-  `check-i18n-messages.mjs` (`new RegExp(r.motif, r.drapeaux)`) et par `web-voc.spec.ts` (`regle("fr", "vouvoiement")`).
-  Avant, la liste des « vous » pluriels existait en deux copies — la première divergence aurait donné une CI verte et
-  une recette rouge.
-- **Règle 7** : `BOOKING_EVENT_TYPES` est lu dans le contrat (`api-contracts`) par expression régulière, et chaque type
-  doit avoir `copy.<type_avec_underscores>.<SHIPPER|CARRIER>.{title,line}` (ou des sous-étapes pour
-  `tracking_event`). Garde du garde : moins de 10 types lus → erreur.
-- **VOC-3** crée une réservation puis l'annule dans un `finally` (`POST /deals/:id/cancel`) : une fiche qui
-  consomme la capacité d'un trajet du jeu d'essai fausse silencieusement les chapitres joués après elle.
-- **Relevé parallèle** : `await Promise.all([lireVisiteur(), lireExpeditrice(), lireVoyageur()])`, un onglet par
-  compte ; `LANGUES = SUPPORTED_LOCALES` importé en relatif depuis `api-contracts/src/locale.ts` (fichier sans zod).
-- **Refresh du visiteur : non fait**, voir le rapport — le marqueur localStorage n'est pas une preuve d'absence de
-  session.
-
-## Ce qui n'a PAS été touché, volontairement
-
-Les messages d'erreur de l'API (deal-service) et l'OpenAPI disent « carrier » : c'est la surface publique en
-anglais et le vocabulaire du code (CLAUDE.md). Le client ne les affiche jamais bruts (A146 : il traduit
-`details.code`).
+NRG-7 attend la réponse (`403` + `details.code === "SUDO_REQUIRED"`) et la porte à l'écran, puis s'arrête : aucun
+« M'envoyer le code ». La suppression se joue sur un compte neuf créé par la fiche : confirmer « SUPPRIMER » sur un
+compte du jeu d'essai qui aurait une fenêtre sudo ouverte l'effacerait pour de bon.
 
 ## Tests
 
-Plateforme inchangée en nombre (**1000** + auth 230) ; notification-service 115 et trip-service 261 rejoués verts
-après la réécriture des emails. `apps/e2e` : **321 scénarios** (314 + WEB-VOC ×7). Typecheck user-ui et harnais
-verts ; i18n : règle 6 verte, contre-épreuve rouge comme attendu.
+Plateforme inchangée (**1000** + auth 230) : aucun code de service touché. `apps/e2e` : **332 scénarios** (321 + 11).
+web-mob 10/10 et web-msg 21/21 rejoués après l'extraction des gardes et l'assouplissement du page object. Typecheck
+user-ui et harnais verts.
