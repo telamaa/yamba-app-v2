@@ -37,7 +37,7 @@ export function getBookingCopy(isFr: boolean) {
     deliveryBlockTitle: isFr
       ? "Le destinataire récupère le colis"
       : "The recipient picks up the parcel",
-    locationSingleHint: isFr ? "Lieu convenu avec le voyageur" : "Set by the traveler",
+    locationSingleHint: isFr ? "Lieu convenu avec le Voyageur" : "Set by the Traveler",
 
     goldenRulesTitle: isFr
       ? "Les règles d'or pour un envoi qui se passe bien"
@@ -70,7 +70,7 @@ export function getBookingCopy(isFr: boolean) {
       : "Ex: 3 t-shirts, 1 jumper, chocolate",
 
     photosLabel: isFr ? "Photos du colis" : "Parcel photos",
-    photosRequiredBadge: isFr ? "Obligatoire avec l'assurance" : "Required with insurance",
+    photosRequiredBadge: isFr ? "Obligatoire avec la garantie" : "Required with insurance",
     photosHint: isFr
       ? "Idéalement : une photo du contenu déballé + une du colis emballé. JPEG ou PNG, max 10 Mo par photo."
       : "Ideally: one photo of unpacked content + one of the packed parcel. JPEG or PNG, max 10 MB per photo.",
@@ -79,13 +79,13 @@ export function getBookingCopy(isFr: boolean) {
     photoTagPackaged: isFr ? "Emballé" : "Packed",
     photoRemove: isFr ? "Supprimer cette photo" : "Remove this photo",
 
-    insuranceTitle: isFr ? "Assurance optionnelle" : "Optional insurance",
+    insuranceTitle: isFr ? "Protection optionnelle" : "Optional protection",
     insuranceBasicTitle: isFr ? "Protection de base" : "Basic protection",
     insuranceBasicPrice: isFr ? "Inclus" : "Included",
     insuranceBasicDesc: isFr
       ? "Tu es protégé contre la non-livraison. Le paiement est bloqué jusqu'à la remise au destinataire."
       : "You're covered against non-delivery. Payment is held until the parcel reaches the recipient.",
-    insuranceExtendedTitle: isFr ? "Assurance jusqu'à 500 €" : "Insurance up to €500",
+    insuranceExtendedTitle: isFr ? "Garantie Yamba jusqu'à 500 €" : "Yamba Guarantee up to €500", // ANO-WEB-33 : jamais « assurance » à l'écran
     insuranceExtendedPrice: "+ 6 €",
     insuranceExtendedDesc: isFr
       ? "Perte, vol, casse pendant le transport. Vol partiel du contenu couvert."
@@ -107,12 +107,12 @@ export function getBookingCopy(isFr: boolean) {
       ? [
         "**Un code à 6 chiffres** te sera donné après le paiement.",
         "**Tu le transmets** au destinataire par SMS, WhatsApp ou oralement.",
-        "**Il le donne au voyageur** à la livraison. Sans ce code, le colis ne peut pas être remis.",
+        "**Il le donne au Voyageur** à la livraison. Sans ce code, le colis ne peut pas être remis.",
       ]
       : [
         "**A 6-digit code** will be given to you after payment.",
         "**You share it** with the recipient by SMS, WhatsApp or in person.",
-        "**They give it to the traveler** at delivery. Without this code, the parcel cannot be released.",
+        "**They give it to the Traveler** at delivery. Without this code, the parcel cannot be released.",
       ],
 
     recipientFirstName: isFr ? "Prénom" : "First name",
@@ -140,14 +140,14 @@ export function getBookingCopy(isFr: boolean) {
       : "What will happen when you hand over the parcel",
     handoverFlowItems: isFr
       ? [
-        "**Vérification visuelle obligatoire.** Le voyageur examinera ton colis avant d'accepter — ne sois pas surpris.",
-        "**Refus possible si non-conforme.** Si le contenu diffère de ta déclaration, le voyageur peut refuser. Tu seras remboursé mais le trajet sera perdu.",
-        "**Photos croisées.** Le voyageur prendra ses propres photos qui feront foi en cas de litige.",
+        "**Vérification visuelle obligatoire.** Le Voyageur examinera ton colis avant d'accepter — ne sois pas surpris.",
+        "**Refus possible si non-conforme.** Si le contenu diffère de ta déclaration, le Voyageur peut refuser. Tu seras remboursé mais le trajet sera perdu.",
+        "**Photos croisées.** Le Voyageur prendra ses propres photos qui feront foi en cas de litige.",
       ]
       : [
-        "**Mandatory visual inspection.** The traveler will examine your parcel before accepting — don't be surprised.",
-        "**Refusal possible if non-compliant.** If the content differs from your declaration, the traveler can refuse. You'll be refunded but the trip is lost.",
-        "**Cross-referenced photos.** The traveler will take their own photos as evidence in case of dispute.",
+        "**Mandatory visual inspection.** The Traveler will examine your parcel before accepting — don't be surprised.",
+        "**Refusal possible if non-compliant.** If the content differs from your declaration, the Traveler can refuse. You'll be refunded but the trip is lost.",
+        "**Cross-referenced photos.** The Traveler will take their own photos as evidence in case of dispute.",
       ],
 
     charterTitle: isFr ? "Charte Expéditeur" : "Shipper Charter",
@@ -169,8 +169,8 @@ export function getBookingCopy(isFr: boolean) {
         "complies with the **customs regulations** of the destination country",
       ],
     charterDisclaimer: isFr
-      ? "Toute déclaration mensongère engage ma seule responsabilité civile et pénale, à l'exclusion de celle du voyageur et de Yamba."
-      : "Any false declaration engages my sole civil and criminal liability, to the exclusion of the traveler and Yamba.",
+      ? "Toute déclaration mensongère engage ma seule responsabilité civile et pénale, à l'exclusion de celle du Voyageur et de Yamba."
+      : "Any false declaration engages my sole civil and criminal liability, to the exclusion of the Traveler and Yamba.",
     charterFullLink: isFr
       ? "Voir la charte complète et les produits interdits"
       : "See the full charter and prohibited items",
@@ -189,8 +189,8 @@ export function getBookingCopy(isFr: boolean) {
     // ============================================================
     step4Title: isFr ? "Paiement" : "Payment",
     step4Subtitle: isFr
-      ? "Tu n'es débité qu'à acceptation par le voyageur (sous 24h max)"
-      : "You're only charged when the traveler accepts (within 24h max)",
+      ? "Tu n'es débité qu'à acceptation par le Voyageur (sous 24h max)"
+      : "You're only charged when the Traveler accepts (within 24h max)",
 
     paymentMethodTitle: isFr ? "Moyen de paiement" : "Payment method",
     paymentCard: isFr ? "Carte bancaire" : "Card",
@@ -209,18 +209,18 @@ export function getBookingCopy(isFr: boolean) {
     afterPaymentTitle: isFr ? "Après ton paiement" : "After your payment",
     afterPaymentItems: isFr
       ? [
-        "Le voyageur reçoit ta demande et a **24h pour accepter**. Tu n'es débité qu'à acceptation.",
+        "Le Voyageur reçoit ta demande et a **24h pour accepter**. Tu n'es débité qu'à acceptation.",
         "Tu reçois ton **code à 6 chiffres**, à transmettre au destinataire.",
-        "Rendez-vous avec le voyageur pour la **remise du colis**, qu'il vérifiera et photographiera.",
-        "Le destinataire communique le code au voyageur à l'arrivée, qui le saisit pour valider la livraison.",
-        "**3 jours après** la livraison validée, le voyageur reçoit son paiement.",
+        "Rendez-vous avec le Voyageur pour la **remise du colis**, qu'il vérifiera et photographiera.",
+        "Le destinataire communique le code au Voyageur à l'arrivée, qui le saisit pour valider la livraison.",
+        "**3 jours après** la livraison validée, le Voyageur reçoit son paiement.",
       ]
       : [
-        "The traveler receives your request and has **24h to accept**. You're only charged on acceptance.",
+        "The Traveler receives your request and has **24h to accept**. You're only charged on acceptance.",
         "You receive your **6-digit code**, to share with the recipient.",
-        "Meet the traveler for the **handover**, where they'll inspect and photograph the parcel.",
-        "The recipient gives the code to the traveler at arrival, who enters it to confirm delivery.",
-        "**3 days after** confirmed delivery, the traveler receives their payment.",
+        "Meet the Traveler for the **handover**, where they'll inspect and photograph the parcel.",
+        "The recipient gives the code to the Traveler at arrival, who enters it to confirm delivery.",
+        "**3 days after** confirmed delivery, the Traveler receives their payment.",
       ],
 
     trustStripe: isFr
@@ -236,19 +236,19 @@ export function getBookingCopy(isFr: boolean) {
     summaryToPayTitle: isFr ? "Tu paies" : "You pay",
     transport: isFr ? "Transport" : "Transport",
     serviceYamba: isFr ? "Service Yamba" : "Yamba service",
-    insurance: isFr ? "Assurance" : "Insurance",
-    insurance500: isFr ? "Assurance 500 €" : "Insurance €500",
+    insurance: isFr ? "Protection" : "Protection",
+    insurance500: isFr ? "Garantie Yamba 500 €" : "Yamba Guarantee €500",
     total: isFr ? "Total" : "Total",
     totalNote: isFr
-      ? "Débité à acceptation par le voyageur"
-      : "Charged when the traveler accepts",
+      ? "Débité à acceptation par le Voyageur"
+      : "Charged when the Traveler accepts",
     totalNoteLong: isFr
-      ? "Le montant est autorisé maintenant et débité uniquement quand le voyageur accepte."
-      : "The amount is authorized now and only charged when the traveler accepts.",
+      ? "Le montant est autorisé maintenant et débité uniquement quand le Voyageur accepte."
+      : "The amount is authorized now and only charged when the Traveler accepts.",
     totalLabel: isFr ? "Total à payer" : "Total to pay",
     sidebarCtaHint: isFr
-      ? "Tu n'es débité qu'à acceptation par le voyageur"
-      : "You're only charged when the traveler accepts",
+      ? "Tu n'es débité qu'à acceptation par le Voyageur"
+      : "You're only charged when the Traveler accepts",
     bottomSheetDetail: isFr ? "Détail" : "Detail",
     bottomSheetHide: isFr ? "Masquer" : "Hide",
 
@@ -260,7 +260,7 @@ export function getBookingCopy(isFr: boolean) {
     deliverySummary: isFr ? "Retrait" : "Pickup",
     recipientSummary: isFr ? "Destinataire" : "Recipient",
     charterSummary: isFr ? "Engagement" : "Commitment",
-    insuranceSummary: isFr ? "Assurance" : "Insurance",
+    insuranceSummary: isFr ? "Protection" : "Protection",
     dateSummary: isFr ? "Date" : "Date",
     routeSummary: isFr ? "Trajet" : "Route",
     directFlight: isFr ? "Direct" : "Direct",

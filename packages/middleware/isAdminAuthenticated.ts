@@ -14,8 +14,10 @@
 import { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
 import prisma from "@packages/libs/prisma";
+import redis from "@packages/libs/redis";
 import { AuthError, ForbiddenError } from "@packages/error-handler";
 import type { AuthenticatedRequest } from "./isAuthenticated";
+import { adminSessionKey, isAdminSessionRevoked } from "./session-revocation";
 
 declare module "express-serve-static-core" {
   interface Request {
@@ -25,7 +27,24 @@ declare module "express-serve-static-core" {
   }
 }
 
-type AdminJwtPayload = { id: string; roles?: string[]; adm?: boolean; amr?: string[] };
+/** `jti` (ANO-ADM-04) : la session admin qui a émis ce jeton — absent des jetons d'avant la correction. */
+type AdminJwtPayload = { id: string; roles?: string[]; adm?: boolean; amr?: string[]; jti?: string };
+
+/**
+ * ANO-ADM-04 — la session existe-t-elle encore en Redis ? « Révoquer » (page Sessions) et
+ * « Se déconnecter » la suppriment : l'accès tombe dans la seconde, pas au bout des 15 minutes
+ * du jeton. Échec FERMÉ si Redis est muet (voir `isAdminSessionRevoked`).
+ */
+async function sessionAdminRevoquee(userId: string, jti: string | undefined): Promise<boolean> {
+  if (!jti) return false;
+  let exists: number | null = null;
+  try {
+    exists = await redis.exists(adminSessionKey(userId, jti));
+  } catch {
+    exists = null;
+  }
+  return isAdminSessionRevoked(jti, exists);
+}
 
 const extractToken = (req: Request): string | null => {
   const bearer = req.headers.authorization?.startsWith("Bearer ") ? req.headers.authorization.split(" ")[1] : null;
@@ -39,6 +58,9 @@ const isAdminAuthenticated = async (req: AuthenticatedRequest, res: Response, ne
     const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET!) as AdminJwtPayload;
     if (!decoded?.id || decoded.adm !== true || !decoded.amr?.includes("totp")) {
       return next(new AuthError("Unauthorized! Admin session required.", { code: "ADMIN_SESSION_REQUIRED" }));
+    }
+    if (await sessionAdminRevoquee(decoded.id, decoded.jti)) {
+      return next(new AuthError("Admin session revoked.", { code: "ADMIN_SESSION_REVOKED" }));
     }
     const user = await prisma.user.findUnique({ where: { id: decoded.id } });
     if (!user || user.isDeleted || !user.roles.includes("ADMIN") || !user.totpEnabledAt) {

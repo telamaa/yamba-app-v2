@@ -156,7 +156,7 @@ function formatDateTime(iso: string, locale: "fr" | "en"): string {
 const DECLINE_REASON_LABELS: Record<string, { fr: string; en: string }> = {
   CATEGORY_NOT_CARRIED: {
     fr: "Le Voyageur ne transporte pas ce type de colis",
-    en: "The carrier does not transport this kind of parcel",
+    en: "The Traveler does not transport this kind of parcel",
   },
   TOO_HEAVY: {
     fr: "Le colis est trop lourd pour la capacité restante",
@@ -181,7 +181,7 @@ const PICKUP_REFUSAL_REASON_LABELS: Record<string, { fr: string; en: string }> =
   },
   SUSPICIOUS_CONTENT: {
     fr: "Le contenu a paru suspect au Voyageur",
-    en: "The carrier found the content suspicious",
+    en: "The Traveler found the content suspicious",
   },
   OVERWEIGHT: {
     fr: "Le colis dépasse le poids déclaré",

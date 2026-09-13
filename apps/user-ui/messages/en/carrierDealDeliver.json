@@ -70,8 +70,8 @@
   },
   "photos": {
     "title": "A handover photo?",
-    "sub": "Optional, but it is your insurance: the sealed parcel in the recipient's hands. In a “damaged” dispute, this photo speaks for you.",
-    "subShort": "Optional — your insurance in a dispute.",
+    "sub": "Optional, but it is your best proof: the sealed parcel in the recipient's hands. In a “damaged” dispute, this photo speaks for you.",
+    "subShort": "Optional — your proof in a dispute.",
     "optional": "Optional",
     "add": "Add",
     "remove": "Remove this photo",

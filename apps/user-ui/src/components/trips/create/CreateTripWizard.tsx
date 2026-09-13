@@ -137,10 +137,10 @@ export default function CreateTripWizard() {
           type: "onboarding_required",
           message: !hasOnboarding
             ? (isFr
-              ? "Votre trajet a été sauvegardé en brouillon. Configurez votre profil transporteur pour le publier."
-              : "Your trip has been saved as a draft. Set up your carrier profile to publish it.")
+              ? "Ton trajet a été sauvegardé en brouillon. Configure ton profil Voyageur pour le publier."
+              : "Your trip has been saved as a draft. Set up your Traveler profile to publish it.")
             : (isFr
-              ? "Votre trajet a été sauvegardé en brouillon. Configurez Stripe pour pouvoir le publier et recevoir des paiements."
+              ? "Ton trajet a été sauvegardé en brouillon. Configure Stripe pour pouvoir le publier et recevoir des paiements."
               : "Your trip has been saved as a draft. Configure Stripe to publish it and receive payments."),
           persistent: true,
         });
@@ -242,7 +242,7 @@ export default function CreateTripWizard() {
               </h1>
               <p className="mt-0.5 text-[13px] text-slate-500 dark:text-slate-400">
                 {isEditMode
-                  ? (isFr ? "Modifiez les informations de votre trajet" : "Update your trip information")
+                  ? (isFr ? "Modifie les informations de ton trajet" : "Update your trip information")
                   : copy.subtitle}
               </p>
             </div>

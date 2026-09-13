@@ -111,7 +111,8 @@ async function issueAdminSession(res: Response, user: { id: string; roles: strin
   const ttl = await storeAdminSession(user.id, jti, createdAt, createdAt);
   if (ttl <= 0) throw new AuthError("Admin session could not be opened.", { code: "ADMIN_SESSION_FAILED" });
   const accessToken = jwt.sign(
-    { id: user.id, roles: user.roles, adm: true, amr: ["pwd", "totp"], adminRole: (user as { adminRole?: string | null }).adminRole ?? null, adminRoles: adminRolesOf(user as { adminRole?: string | null; adminRoles?: string[] | null }) },
+    // ANO-ADM-04 — le jeton d'accès porte le jti de sa session : isAdminAuthenticated vérifie qu'elle existe encore.
+    { id: user.id, jti, roles: user.roles, adm: true, amr: ["pwd", "totp"], adminRole: (user as { adminRole?: string | null }).adminRole ?? null, adminRoles: adminRolesOf(user as { adminRole?: string | null; adminRoles?: string[] | null }) },
     process.env.ACCESS_TOKEN_SECRET as string,
     { expiresIn: "15m" }
   );
@@ -274,7 +275,7 @@ export const adminRefresh = async (req: Request, res: Response, next: NextFuncti
       clearAdminCookies(res);
       return next(new AuthError("Admin session expired.", { code: "ADMIN_SESSION_EXPIRED" }));
     }
-    const accessToken = jwt.sign({ id: user.id, roles: user.roles, adm: true, amr: ["pwd", "totp"] }, process.env.ACCESS_TOKEN_SECRET as string, { expiresIn: "15m" });
+    const accessToken = jwt.sign({ id: user.id, jti: newJti, roles: user.roles, adm: true, amr: ["pwd", "totp"] }, process.env.ACCESS_TOKEN_SECRET as string, { expiresIn: "15m" });
     const lifetimeSeconds = Math.ceil(adminRemainingLifetimeMs(session.createdAt, loadAdminSessionPolicy(), now) / 1000);
     const refreshToken = jwt.sign({ id: user.id, jti: newJti, adm: true, sca: session.createdAt } satisfies AdminRefreshPayload, process.env.REFRESH_TOKEN_SECRET as string, { expiresIn: lifetimeSeconds });
     setAdminSessionCookies(res, accessToken, refreshToken, lifetimeSeconds * 1000);
