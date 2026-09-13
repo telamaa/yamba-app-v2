@@ -56,6 +56,8 @@ export type YambaTripResult = {
   toCityCode?: string;
   toCountry?: string;
   travelDate: string;
+  /** ISO 8601 — ANO-WEB-30 : « Trajet passé » dans les favoris. */
+  departureAt?: string;
   departureTime?: string;
   arrivalTime?: string;
   /** True si l'arrivée est le jour suivant (pour afficher +1) */

@@ -17,31 +17,17 @@
  * - étape 15 : « sinon, l'annulation passe » n'est pas atteignable sur `yul` (un deal DELIVERED
  *   d'Aminata y reste vivant) ; seule la branche du refus est jouée — c'est le cas nominal.
  */
-import type { BrowserContext } from "@playwright/test";
 import { test, expect } from "../fixtures/yamba";
 import { COMPTES } from "../fixtures/comptes";
 import { JeuEssai } from "../fixtures/jeu-essai";
-import { adresseDeLApi } from "../fixtures/adresses";
 import { AssistantReservation, normaliserEspaces } from "../pages/reservation";
 import { DemandeVoyageur } from "../pages/deal-voyageur";
 import { FilMessagerie } from "../pages/fil-messagerie";
 import { MesEnvois, enCentimes, enEuros } from "../pages/mes-envois";
 import { Finances } from "../pages/finances";
-import { MesTrajets } from "../pages/mes-trajets";
+import { MesTrajets, kilosRestants } from "../pages/mes-trajets";
 
 const DESTINATAIRE = { prenom: "Étienne", nom: "Roy", indicatif: "+1", telephone: "5145551234" };
-
-async function kilosRestants(contexte: BrowserContext, tripId: string): Promise<number> {
-  const r = await contexte.request.get(`${adresseDeLApi()}/trips/${tripId}`);
-  if (!r.ok()) throw new Error(`Trajet ${tripId} : ${r.status()} ${await r.text()}`);
-  // La vue du propriétaire (`{ success, trip }`) porte capacité et réservé ; la vue publique porte `remainingKg`.
-  type Kilos = { remainingKg?: number; capacityKg?: number; reservedKg?: number };
-  const corps = (await r.json()) as Kilos & { trip?: Kilos };
-  const t: Kilos = corps.trip ?? corps;
-  const kg = t.remainingKg ?? (typeof t.capacityKg === "number" ? t.capacityKg - (t.reservedKg ?? 0) : undefined);
-  if (typeof kg !== "number") throw new Error(`Trajet ${tripId} : ni remainingKg ni capacityKg dans ${JSON.stringify(corps).slice(0, 200)}`);
-  return kg;
-}
 
 test.describe("WEB-E2E-3 — le parcours avec annulation tardive", () => {
   test.beforeAll(() => {
@@ -172,6 +158,7 @@ test.describe("WEB-E2E-3 — le parcours avec annulation tardive", () => {
     await trajets.ouvrir();
     const refus = await trajets.tenterDAnnulerLeTrajet("Paris → Montréal");
     expect(refus.statut).toBe(409);
-    expect(refus.toast).toMatch(/^Ce trajet porte encore \d+ deals? en cours : annule-les d'abord depuis « Mes deals »\. Chaque Expéditeur sera remboursé intégralement\.$/);
+    // ANO-WEB-07 (tranchée le 09/09) : le conseil renvoie vers « Mes trajets », qui existe.
+    expect(refus.toast).toMatch(/^Ce trajet porte encore \d+ deals? en cours : annule-les d'abord depuis « Mes trajets » \(chaque deal y est listé sous son trajet\)\. Chaque Expéditeur sera remboursé intégralement\.$/);
   });
 });

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useDialogFocus } from "@/hooks/useDialogFocus";
 import { useTranslations } from "next-intl";
 import TripPricingList from "./TripPricingList";
 import {
@@ -43,6 +44,9 @@ export default function TripPricingBottomSheet({
 
   const sheetRef = useRef<HTMLDivElement | null>(null);
   const dragStartY = useRef<number | null>(null);
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  // ANO-WEB-94 — focus piégé dans la fenêtre, rendu au geste de départ à la fermeture.
+  useDialogFocus(dialogRef, isOpen);
   const [dragOffset, setDragOffset] = useState(0);
 
   useEffect(() => {
@@ -111,6 +115,7 @@ export default function TripPricingBottomSheet({
 
   return (
     <div
+      ref={dialogRef}
       className="fixed inset-0 z-[200] md:hidden"
       role="dialog"
       aria-modal="true"

@@ -46,7 +46,10 @@ async function emailCarrier(userId: string, build: (locale: string, u: { firstNa
   if (!u) return;
   const locale = resolveLocale(u.preferredLocale);
   const mail = build(locale, u);
-  await sendTransactionalEmail({ to: u.email, locale, subject: mail.subject, content: mail.content }).catch(() => undefined);
+  // Best effort, mais JAMAIS muet : un email métier qui ne part pas se lit dans les journaux (recette 5.8).
+  await sendTransactionalEmail({ to: u.email, locale, subject: mail.subject, content: mail.content }).catch((err: unknown) => {
+    console.error(`[admin-trips] email « ${mail.subject} » non envoyé à ${u.email} :`, err instanceof Error ? err.message : err);
+  });
 }
 
 async function adminNames(ids: Array<string | null | undefined>) {
