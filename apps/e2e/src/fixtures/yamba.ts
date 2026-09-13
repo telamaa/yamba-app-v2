@@ -221,9 +221,20 @@ export async function connexionAdmin(page: Page, compte: CompteAdmin, secret: st
     .toBe(true);
 }
 
+/**
+ * Marge sous laquelle un jeton d'accès mémorisé est renouvelé AVANT d'être rendu au scénario.
+ * Mesuré (ADM-PRM-2, 13/09) : la sonde `/admin/me` répondait 200, le cookie de 15 min expirait
+ * quelques secondes plus tard, et l'appel suivant partait SANS cookie (« Admin token missing »).
+ */
+const MARGE_JETON_ADMIN_S = 5 * 60;
+
 async function sessionAdminVivante(contexte: BrowserContext): Promise<boolean> {
   const api = adresseDeLApiAdmin();
   try {
+    const acces = (await contexte.cookies()).find((c) => c.name === "admin_access_token");
+    if (acces && acces.expires > 0 && acces.expires - Date.now() / 1000 < MARGE_JETON_ADMIN_S) {
+      return (await contexte.request.post(`${api}/auth/admin/refresh`, { timeout: 15_000 })).ok();
+    }
     const me = await contexte.request.get(`${api}/admin/me`, { timeout: 15_000 });
     if (me.ok()) return true;
     if (me.status() !== 401) return false;

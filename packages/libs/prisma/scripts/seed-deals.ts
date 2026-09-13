@@ -522,9 +522,11 @@ async function main() {
           ratingRemindersSent: 0,
           payoutAmountCents: (booking as unknown as { pricing: { transportCents: number } }).pricing.transportCents,
           payoutAttempts: 4,
-          // C-PR5 (A111) — relance échue : le cron (ou « Relancer » dans l'admin) peut rejouer tout de suite
-          payoutLastAttemptAt: days(-1),
-          payoutNextRetryAt: days(-1),
+          // C-PR5 (A111) — « Relancer » dans l'admin n'attend pas l'échéance. Recette 02-ADMIN § 5.1 : une relance
+          // ÉCHUE faisait partir ce versement par le cron des 5 minutes (fournisseur FAKE, compte de Thomas prêt) —
+          // la file « Versements en échec » se vidait seule entre le seed et la fiche. Relance posée à demain.
+          payoutLastAttemptAt: hours(-1),
+          payoutNextRetryAt: hours(23),
         },
       });
     } else if (b.status === "COMPLETED" && b.key.endsWith("-reversed")) {

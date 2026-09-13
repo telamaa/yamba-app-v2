@@ -4310,6 +4310,167 @@ d'authentification. Les **attentes réelles** (5 et 15 minutes) s'emboîtent : S
 
 ---
 
+## Cahier 02-ADMIN — § 4.2 Sessions et durée de vie · **CONFORME** (4 fiches, 1 après correction · 1 anomalie close · 1 fiche partielle · 4 scénarios, 49 min dont 46 d'attente)
+
+`apps/e2e/src/admin/adm-sec-sessions.spec.ts`. Une session admin est un objet à part : cookies `admin_*`, préfixe Redis
+`admin_jti:`, 45 minutes d'inactivité, 12 heures de vie absolue, révocable. Les fiches lisent **Redis** (TTL, existence
+de la clé, `createdAt`) par un script `tsx` consigné, en plus de l'écran et du journal.
+
+| Fiche | Ce qui est éprouvé | Verdict · Preuve |
+|---|---|---|
+| ADM-SEC-7 | La session membre n'ouvre aucune route admin | **Conforme** — le super administrateur connecté sur le site (`/auth/me` 200) ; `/home` du back-office → `/login` ; `GET /api/admin/kpis` avec les seuls cookies membre → **401** ; connexion admin dans le même navigateur ; `/auth/me` toujours 200, les **quatre** cookies coexistent ; journal : un seul `ADMIN_LOGIN` |
+| ADM-SEC-8 | Expiration par inactivité | **Conforme** (attente réelle) — TTL de la clé à l'ouverture > 43 min ; onglet fermé (`about:blank`), **46 minutes** ; la clé Redis a expiré d'elle-même ; `/alerts` → `/login` ; journal : **aucune** ligne |
+| ADM-SEC-9 | Vie absolue de 12 h | **Conforme, ⏭ partiel** (12 h ne tiennent pas dans une journée) — session neuve : TTL ≈ 45 min ; `refresh` → le `jti` **tourne**, l'ancien n'existe plus, `createdAt` **conservé** ; manœuvre consignée : session vieillie à 11 h 59 → renouvelée avec un TTL **≤ 60 s** ; vieillie à 12 h 01 → `refresh` **401**, l'écran renvoie à `/login` |
+| ADM-SEC-10 | Révoquer une session | **Conforme après correction** → `ANO-ADM-04` ; deux vraies sessions du Support (deux navigateurs, deux `jti` lus dans leurs jetons) ; deux emails « Nouvelle connexion au back-office Yamba » ; « Mes sessions admin », texte d'aide exact, une ligne « cette session », « ouverte le … · active le … » ; révocation de B depuis A → le jeton d'accès de B est refusé **immédiatement** (`401 ADMIN_SESSION_REVOKED`), B navigue → `/login` ; A révoque la sienne par le bouton → `/login` ; journal : `ADMIN_SESSION_REVOKED` `SESSION · jtiB` puis `SESSION · jtiA` |
+
+### Anomalie
+
+- **ANO-ADM-04 (majeure, close)** — **révoquer une session admin ne coupait pas l'accès.** La révocation supprimait
+  l'enregistrement Redis, ce qui bloquait le *renouvellement* ; mais le jeton d'accès (JWT de 15 minutes) ne désignait
+  aucune session et restait accepté : `GET /admin/kpis` avec le jeton de B, juste après sa révocation, répondait
+  **200**. Un navigateur volé gardait donc jusqu'à quinze minutes de back-office après que son titulaire l'avait
+  révoqué. Correction : le jeton d'accès porte le `jti` (ouverture et renouvellement, `admin-auth.controller.ts`) ;
+  `isAdminAuthenticated` vérifie à chaque requête que `admin_jti:<id>:<jti>` existe (`session-revocation.ts`,
+  `adminSessionKey` partagée avec l'écrivain) ; Redis injoignable → **refus** (échec fermé, voir DOC-TECHNIQUE). Les
+  jetons émis avant la correction (sans `jti`) restent acceptés jusqu'à leur expiration.
+
+### Regard d'expert — produit ET test, une ligne par fiche
+
+- **SEC-7** — *Produit* : conforme. *Test* : vérifier aussi que les cookies membre et admin n'ont pas le même `Path`
+  ni le même nom de domaine en production (ici `localhost`) — petit.
+- **SEC-8** — *Produit* : la session expire sans prévenir ; un avertissement « ta session expire dans 2 minutes »
+  éviterait de perdre un motif de décision saisi pendant 40 minutes (le formulaire « Trancher » en demande 50
+  caractères) — moyen. *Test* : 46 minutes d'attente réelle, la fiche la plus chère du cahier ; la jouer seule ou en
+  dernière, jamais au milieu d'un chapitre qui utilise le compte Médiateur — rien à faire.
+- **SEC-9** — *Produit* : conforme. *Test* : la manœuvre Redis prouve la borne sans attendre ; ce qu'elle ne prouve pas,
+  c'est qu'un renouvellement ne **ré-écrit** jamais `createdAt` sur une longue durée — couvert par l'assertion
+  « createdAt conservé » — rien à faire.
+- **SEC-10** — *Produit* : ANO-ADM-04 réglée. La page « Mes sessions » ne montre ni appareil ni adresse IP (le cahier
+  le note) : l'administrateur révoque « la ligne du dessous » à l'aveugle — les enregistrements admin devraient porter
+  `device` / `ip` comme ceux des membres (D65) — **moyen, c'est le vrai manque de l'écran**. Un bouton « Révoquer
+  toutes les autres » — petit. *Test* : la révocation de B passe par l'API de l'écran faute de pouvoir distinguer les
+  lignes ; l'ajout de l'appareil permettrait de cliquer la bonne ligne — dépend du produit.
+
+---
+
+## Cahier 02-ADMIN — § 4.3 La matrice des permissions · **CONFORME** (9 fiches + 1 fiche de contrôle, 2 après correction · 2 anomalies closes · 3 écarts documentaires · 10 scénarios, 6 min)
+
+`apps/e2e/src/admin/adm-prm-profils.spec.ts` et `adm-prm-garde-serveur.spec.ts`. Pour chaque profil : **le menu**
+(déduit du contrat `ADMIN_PERMISSIONS` ET comparé à la liste du cahier — un écart contrat/écran est fonctionnel, un écart
+contrat/cahier documentaire), **un geste réussi et journalisé**, **des refus du serveur** (un bouton caché ne prouve
+rien). Les gestes d'écriture dont le formulaire relève du § 5 passent par l'API de l'écran, et sont défaits.
+
+| Fiche | Ce qui est éprouvé | Verdict · Preuve |
+|---|---|---|
+| ADM-PRM-0 | Le miroir front de la matrice | **Conforme** (fiche ajoutée) — `apps/admin-ui/src/lib/permissions.ts` lu et comparé permission par permission à `ADMIN_PERMISSIONS` : identiques |
+| ADM-PRM-1 | Super administrateur | **Conforme** — les quinze entrées dans l'ordre ; 18 écrans ouverts, **aucun** 403 ; sa propre fiche : « (c'est toi : aucune action possible) », sanction sur soi → 403 « You cannot act on your own account. » ; journal `DATA_REQUESTS_VIEWED`, `DEAL_MONEY_VIEWED`, `USER_VIEWED` |
+| ADM-PRM-2 | Médiateur | **Conforme après correction** → `ANO-ADM-02` ; menu = contrat = cahier ; YAM-2041 : la section de décision (jamais « Ton profil lit ce dossier mais ne tranche pas ») ; fiche de Thomas : « Appliquer » ; `/admins`, `/privacy` → 403 ; `PATCH /admin/settings` d'une clé métier → 403 « Your admin profile cannot change… » ; **remise à zéro** d'une clé métier déjà par défaut → **403** (était 400) ; preuve forte : commission modifiée par le super administrateur, remise à zéro par le Médiateur **refusée**, valeur **inchangée**, puis rétablie ; `/admin/audit` et l'export nominatif → 403 ; pas de bouton d'export ; journal `DISPUTE_VIEWED BOOKING · id`, `USER_VIEWED USER · id`, rien pour les refus |
+| ADM-PRM-3 | Support | **Conforme** — menu = contrat = cahier ; le billet en attente ouvert puis **validé** ; fiche membre : « Proposer », jamais « Appliquer » ; conversation du deal lue ; `/finances`, `/pilotage`, `/audit` → 403 ; appliquer une sanction → 403 ; remise à zéro globale → 403 ; YAM-2041 : « Ton profil lit ce dossier mais ne tranche pas » ; journal `DOCUMENT_VIEWED TRIP`, `TICKET_VERIFIED TRIP`, `USER_VIEWED`, `CONVERSATION_VIEWED`, aucune sanction ni paramètre |
+| ADM-PRM-4 | Exploitation (OPS) | **Conforme** — menu = contrat = cahier ; `/settings` : « super administrateur seul » sur les clés métier ; `alerts.payoutFailedHours` modifiée puis remise ; `/status` sans 403 ; `/users`, `/disputes`, `/finances`, `/audit` → 403 ; clé métier → 403 « Your admin profile cannot change: pricing.commissionPct. » ; journal `SETTING_CHANGED SETTINGS · alerts.payoutFailedHours` avec clé et motif |
+| ADM-PRM-5 | Finance | **Conforme** — menu = contrat = cahier ; `/finances`, fiche argent, rapport mensuel, `/audit`, dossier de médiation sans 403 ; export CSV **200** `text/csv` ; conversation → 403 (vie privée) ; trancher → 403 ; jamais « Rembourser maintenant » ; journal `DEAL_MONEY_VIEWED`, `FINANCE_EXPORTED`, `DISPUTE_VIEWED` |
+| ADM-PRM-6 | Données personnelles (PRIVACY) | **Conforme après correction** → `ANO-ADM-03` / **A153** ; menu = contrat, **« Utilisateurs » en plus** du cahier ; accueil : `GET /admin/kpis` 403 (attendu) ; `/privacy` ; `/users` avec « Exporter en CSV (données personnelles) » ; fiche de Thomas avec « Effacer ce compte (RGPD) » ; proposer une sanction → 403 ; `/disputes`, `/finances`, `/trips`, `/settings` → 403 ; journal `DATA_REQUESTS_VIEWED USER` (sans id), `USER_VIEWED USER · id` |
+| ADM-PRM-7 | Cumul Support + Finance | **Conforme** — libellé « Support + Finance » ; menu = union du contrat = cahier ; `/finances`, `/tickets`, dossier sans 403 ; remboursement manuel **proposé** (100 cts) ; trancher → 403 (l'union ne crée aucun droit) ; journal `REFUND_MANUAL_PROPOSED BOOKING · id`, `after.amountCents = 100` ; jeu d'essai rejoué ensuite (aucune proposition laissée ouverte) |
+| ADM-PRM-8 | Conflits d'intérêts | **Conforme, ⏭ partiel** (cas 3, 4, 5 : aucun compte admin du jeu d'essai n'est partie à un deal — le cahier l'autorise) — cas 1 : sur soi → 403 ; cas 2 : Médiateur sur un compte admin → 403 « Only a super administrator can act on an admin account. » ; cas 6 : s'effacer → 403 ; cas 7 : retirer son accès → 403 ; cas 8 : se rétrograder → 403 « You cannot change your own profile. » ; aucune ligne de sanction, d'effacement ni de profil |
+| ADM-PRM-9 | La garde serveur, route par route | **Conforme** — **56 routes** lues dans les quatre routeurs × **7 comptes** : **377 appels**, 15 écritures sans identifiant non appelées par un compte autorisé ; **aucune** garde absente, **aucune** permission mal nommée, **aucun** refus à tort ; journal : ni écriture ni export nominatif (seulement des exports opérationnels et `DATA_REQUESTS_VIEWED`) ; export nominatif sans motif → 400 |
+
+### Anomalies
+
+- **ANO-ADM-02 (mineure, close)** — **un refus déguisé en « rien à faire ».** `POST /admin/settings/reset` sur des clés
+  déjà à leur valeur par défaut répondait **400 « Nothing to reset »** à un Médiateur, qui n'a aucune portée
+  d'écriture : la vérification de portée ne portait que sur les clés qui *changent*. Rien n'était écrit, mais la réponse
+  mentait sur la raison. Correction (`platform-settings.service.ts`) : si aucune clé visée n'est à la portée du profil,
+  403 ; un profil qui peut en écrire au moins une garde le 400.
+- **ANO-ADM-03 (majeure par la fiche, close par A153)** — **le profil Données personnelles ne pouvait pas atteindre ses
+  propres gestes.** L'export nominatif (`exports.personal`) et l'effacement (`users.erase`) vivent sur `/users` et
+  `/users/:id`, gardés par `users.read`, que PRIVACY n'avait pas ; `/privacy` renvoyait à « sa fiche », que le profil ne
+  pouvait pas ouvrir. Tranché pendant la recette : `users.read` s'ouvre à PRIVACY (contrat + miroir), lecture seule.
+  Alternative écartée : une garde « l'une de ces permissions » sur deux routes (deux régimes de permissions).
+
+### Écarts documentaires
+
+- **Menu PRIVACY** : « Utilisateurs » s'ajoute (A153) — le cahier écrit « le menu le plus court ».
+- **YAM-2041 (PRM-2)** : le cahier attend le formulaire « Trancher » ; le jeu d'essai ouvre le litige il y a un jour et
+  le Voyageur a 72 heures pour répondre, l'écran affiche donc l'échéance à la place du formulaire. La permission est
+  prouvée (section de décision, jamais le texte du lecteur).
+- **Cas 8 (PRM-8)** : le cahier attend « The last super administrator cannot be downgraded » ; le seul acteur qui puisse
+  viser le dernier super administrateur est lui-même, arrêté avant par « You cannot change your own profile. ». Le 403
+  tient ; le message du cahier est inatteignable.
+
+### Regard d'expert — produit ET test, une ligne par fiche
+
+- **PRM-0** — *Produit* : la matrice existe en deux copies manuelles ; faire importer le contrat par admin-ui (alias
+  `@packages/api-contracts` dans son `tsconfig` / `next.config`) supprimerait la copie — moyen. *Test* : tant que la copie
+  existe, la fiche la tient — rien à faire.
+- **PRM-1** — *Produit* : conforme. *Test* : les 18 écrans ne vérifient que l'absence de 403 ; y ajouter « aucune erreur
+  console » attraperait un écran cassé pour une autre raison — petit.
+- **PRM-2** — *Produit* : ANO-ADM-02 réglée ; la route `/admin/settings/reset` n'est gardée que par `settings.read` —
+  une garde « au moins une portée d'écriture » au routeur rendrait le refus lisible dans la matrice PRM-9 — petit.
+  *Test* : poser un litige ouvert depuis plus de 72 h dans le jeu d'essai permettrait de voir le vrai formulaire — petit.
+- **PRM-3** — *Produit* : conforme. *Test* : le billet validé modifie le jeu d'essai ; le chapitre suivant le rejoue
+  (`beforeAll`) — rien à faire.
+- **PRM-4** — *Produit* : conforme. *Test* : la remise de la valeur n'est pas dans un `finally` (contrairement à PRM-2) ;
+  un échec entre les deux laisserait le seuil modifié — petit, à aligner.
+- **PRM-5** — *Produit* : conforme. *Test* : l'export n'est vérifié que par son type ; lire la ligne d'en-tête du CSV et
+  l'absence d'email prouverait « identifiants seulement » — petit.
+- **PRM-6** — *Produit* : A153 confie au profil RGPD la fiche entière (TrustScore, historique des sanctions) ; une vue
+  « fiche réduite » pour PRIVACY serait plus juste au principe de minimisation — moyen, à trancher. L'accueil de PRIVACY
+  affiche le message anglais de l'API en rouge — voir § 5.1.
+- **PRM-7** — *Produit* : conforme. *Test* : rejouer tout le seed pour effacer une proposition coûte ~1 min ; une route
+  « retirer la proposition » serait aussi utile au produit (une proposition erronée reste dans la file) — petit.
+- **PRM-8** — *Produit* : un jeu d'essai sans admin partie à un deal laisse trois cas non joués ; un compte admin qui est
+  aussi Voyageur dans `seed-admins.ts` les rendrait jouables — moyen.
+- **PRM-9** — *Produit* : 56 routes, aucune garde manquante. *Test* : la lecture par expression régulière suppose la garde
+  sur la même instruction que la route ; un routeur écrit autrement échapperait à la lecture — la « garde du garde »
+  (> 50 routes) ne verrait pas la perte d'une seule — petit : compter par service.
+
+---
+
+## Cahier 02-ADMIN — § 5.1 Accueil et compteurs · **CONFORME** (3 fiches · 0 anomalie produit · 3 écarts documentaires · 3 scénarios, 2 min)
+
+`apps/e2e/src/admin/adm-acc-accueil.spec.ts` et l'outil `pages/ecran-admin.ts` (`tuilesDeLaSection` lit libellé,
+valeur, lien et couleur de chaque tuile ; `lireCoteServeur` compte en base). Trois preuves par tuile : **écran = API**
+(`GET /admin/kpis`), **API = cahier** sur les files que le jeu d'essai pose, **API = base** pour les tuiles que la
+campagne pollue.
+
+| Fiche | Ce qui est éprouvé | Verdict · Preuve |
+|---|---|---|
+| ADM-ACC-1 | Les compteurs correspondent à la réalité | **Conforme** — titre et sous-titre exacts ; **18 tuiles** en deux sections, chacune = l'API, avec son lien, ambre si > 0 dans « À traiter » ; files du jeu d'essai = cahier (litiges 2, retenues 1, billets 1, masquages 0, sanctions 0, versements en échec 1, renversés 1, remboursements 0, messages signalés 1) ; comptées en base : « Comptes » = 63, « Trajets publiés à venir » = 10 (cahier 5 — trajets publiés par les chapitres web), invitations et signalements = base ; pied « Calculé le … » ; journal : aucune ligne |
+| ADM-ACC-2 | Filtrage par profil | **Conforme** — Support et Exploitation : tuiles affichées = tuiles déduites du contrat, et les compteurs non permis servis à **`null`** (pas seulement cachés) ; Exploitation : **aucune** tuile ; PRIVACY : `GET /admin/kpis` 403 et le message de l'API en rouge à la place des tuiles ; aucune ligne de journal |
+| ADM-ACC-3 | Résumé des alertes et bandeau des paramètres | **Conforme** — jeu d'essai neuf : `PAYOUT_FAILED_48H` ; l'accueil n'en montre qu'**une ligne** (« 1 alerte de seuil … la plus grave : … Voir les alertes → », lien `/alerts`, jamais « Aller traiter → ») ; seuil relevé à 336 h depuis `/settings` avec motif ; l'accueil passe au **vert** « Aucune alerte : … » (cache ≤ 30 s) ; bandeau « Paramètres modifiés le 13/09/2026 22:18:38 par Olivier E. : alerts.payoutFailedHours — voir les paramètres » ; journal `SETTING_CHANGED SETTINGS · alerts.payoutFailedHours` avec le motif ; seuil rétabli |
+
+### Écarts documentaires
+
+- **Quatre tuiles servies que le cahier ne liste pas** : « Deals en cours », « Comptes restreints », « Comptes
+  suspendus », « Deals terminés (30 j) ».
+- **ACC-3 suppose « aucune alerte (jeu d'essai neuf) »**, mais le § 2.4 du même cahier dit que le versement en échec du
+  jeu d'essai « alimente l'alerte PAYOUT_FAILED_48H » — et c'est ce que sert le serveur. La fiche prouve les deux états.
+- **« Comptes »** : 63 en base, dont **8** administrateurs pour 7 comptes de recette — un compte admin jetable d'un
+  passage antérieur du § 4.1 est resté (pas un défaut du produit, une trace de campagne).
+
+### Défauts du harnais corrigés pendant le chapitre
+
+- **`isVisible({ timeout })` n'attend pas** : dans la boucle qui recharge l'accueil, ACC-3 lisait avant la réponse de
+  `/admin/alerts` et échouait alors que le vert était affiché (capture). → `waitFor({ state: "visible" })`.
+- **Une session mémorisée à quelques secondes de son expiration** : la sonde `/admin/me` répondait 200, le cookie de
+  15 minutes expirait juste après, et le journal était lu **sans cookie** (« Admin token missing », PRM-2 au deuxième
+  passage). → `sessionAdminVivante` renouvelle la session si le jeton d'accès expire dans moins de 5 minutes.
+
+### Regard d'expert — produit ET test, une ligne par fiche
+
+- **ACC-1** — *Produit* : conforme ; « Trajets publiés à venir » compte aussi les trajets **masqués par Yamba** ? à
+  vérifier contre `hiddenByAdminAt` — petit. *Test* : les tuiles polluées sont comptées en base avec les mêmes filtres
+  que le serveur ; si le serveur change de filtre, la fiche reste verte par construction — petit : lire le filtre dans
+  `admin-kpis.controller.ts` plutôt que le recopier.
+- **ACC-2** — *Produit* : l'accueil de PRIVACY affiche en rouge « Your admin profile does not allow this action. »
+  (anglais, ton d'erreur) là où il n'y a **rien d'anormal** : l'accueil devrait ne pas appeler `/admin/kpis` sans
+  `kpi.read` et afficher « Tes écrans : Utilisateurs, Données personnelles » — **moyen, même famille que le transversal
+  du § 4.1** (l'écran doit lire le code, pas afficher le message). *Test* : conforme.
+- **ACC-3** — *Produit* : conforme. Le cache de 30 s est invisible pour l'administrateur qui vient d'enregistrer ; un
+  « pris en compte d'ici 30 secondes » sous le bouton éviterait de croire que rien n'a changé — petit. *Test* : piège
+  `isVisible` payé, corrigé.
+
+---
+
 ## Observations (pas des anomalies, mais à savoir)
 
 - **`/become-yamber` reste « futur »** (commentaire du layout marketing) : la page de présentation

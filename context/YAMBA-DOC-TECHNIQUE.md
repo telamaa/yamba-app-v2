@@ -7143,3 +7143,166 @@ Le serveur servait déjà le bon code (A146) ; l'écran ne le lisait pas et rang
 ## Tests
 
 `apps/e2e` : **339 scénarios** (332 + 7). Plateforme inchangée (1000 + auth 230). Typecheck admin-ui et harnais verts.
+
+
+---
+
+# Cahier 02-ADMIN, § 4.2, § 4.3 et § 5.1 : sessions, permissions, accueil — et trois gardes serveur resserrées
+
+*(PR `chore/recette-admin-4-2`, empilée sur #301, 13/09/2026.)*
+
+## Ce qui a été fait
+
+Trois chapitres du back-office, 17 scénarios : les sessions (ADM-SEC-7 à 10), la matrice des permissions profil par
+profil (ADM-PRM-0 à 9) et l'accueil (ADM-ACC-1 à 3). Trois anomalies trouvées, trois closes (`ANO-ADM-02`, `03`, `04`).
+
+```
+apps/e2e/src/admin/adm-sec-sessions.spec.ts         § 4.2 — deux vraies sessions, TTL Redis lus, 46 min d'attente réelle
+apps/e2e/src/admin/adm-prm-profils.spec.ts          § 4.3 — menu = contrat = cahier, un geste réussi, des refus serveur
+apps/e2e/src/admin/adm-prm-garde-serveur.spec.ts    § 4.3 — chaque route admin × chaque compte (routeurs LUS)
+apps/e2e/src/admin/adm-acc-accueil.spec.ts          § 5.1 — écran = API = cahier, et base pour les tuiles polluées
+apps/e2e/src/pages/ecran-admin.ts                   NOUVEAU — tuilesDeLaSection, attendreLeChargement, lireCoteServeur
+apps/e2e/src/fixtures/yamba.ts                      la sonde de session admin renouvelle un jeton à < 5 min de sa fin
+packages/middleware/session-revocation.ts           ANO-ADM-04 — adminSessionKey, isAdminSessionRevoked (échec fermé)
+packages/middleware/isAdminAuthenticated.ts         ANO-ADM-04 — la session du jeton existe-t-elle encore ?
+apps/auth-service/src/controller/admin-auth.controller.ts   ANO-ADM-04 — le jeton d'accès porte le jti
+apps/auth-service/src/services/platform-settings.service.ts ANO-ADM-02 — « rien à remettre » ne masque plus un refus
+packages/libs/api-contracts/src/admin/admin-users.schema.ts ANO-ADM-03 / A153 — users.read ouvert à PRIVACY
+apps/admin-ui/src/lib/permissions.ts                        miroir front de la même matrice
+packages/libs/prisma/scripts/seed-deals.ts          la relance du versement en échec posée à +23 h
+nx.json                                             packages/**, schéma Prisma et tsconfig.base.json en sharedGlobals
+```
+
+## ANO-ADM-04 : révoquer une session admin doit couper l'accès, pas seulement le renouvellement
+
+Avant : « Révoquer » (page Mes sessions) supprimait l'enregistrement `admin_jti:<userId>:<jti>` dans Redis. Le
+**renouvellement** échouait donc bien, mais le **jeton d'accès** (un JWT signé, valable 15 minutes) ne portait aucun
+identifiant de session : `isAdminAuthenticated` le vérifiait par sa signature seule. Un navigateur volé gardait la main
+jusqu'à un quart d'heure après la révocation. La fiche ADM-SEC-10 le prouve : `GET /admin/kpis` avec le jeton de la
+session révoquée répondait **200**.
+
+Correction en trois points :
+
+```ts
+// admin-auth.controller.ts — à l'ouverture ET au renouvellement, le jeton d'accès porte le jti de sa session
+jwt.sign({ id: user.id, jti, roles: user.roles, adm: true, amr: ["pwd", "totp"], … }, ACCESS_TOKEN_SECRET, { expiresIn: "15m" });
+
+// session-revocation.ts — UNE seule définition de la clé, importée par l'écrivain (auth-service) ET le lecteur (middleware)
+export const adminSessionKey = (userId: string, jti: string): string => `admin_jti:${userId}:${jti}`;
+
+export function isAdminSessionRevoked(jti: string | undefined | null, exists: number | null): boolean {
+  if (!jti) return false;          // jeton émis avant la correction : il expire seul en 15 min
+  if (exists === null) return true; // Redis muet → REFUS (échec fermé)
+  return exists === 0;
+}
+```
+
+Pourquoi l'échec **fermé**, alors que la plateforme membre (`isSessionRevoked`) échoue **ouvert** ? Côté membre, une
+panne de Redis déconnecterait des milliers d'utilisateurs. Côté back-office, il y a une poignée de comptes à fort
+pouvoir, et leur renouvellement dépend déjà de Redis : refuser l'accès pendant la panne coûte peu, laisser passer une
+session révoquée coûterait beaucoup. La fonction de décision est **pure** (elle reçoit le résultat de `redis.exists`,
+ou `null` si l'appel a levé) : on la teste sans Redis.
+
+## ANO-ADM-02 : « rien à remettre » ne doit pas masquer « tu n'as pas le droit »
+
+`POST /admin/settings/reset` n'est gardé que par `settings.read` (tous les profils lisent les paramètres) ; la portée
+d'écriture se vérifie ensuite, clé par clé, **sur les clés qui changent**. Or, si toutes les clés visées valaient déjà
+leur défaut, la liste des changements était vide et le service répondait `400 NOTHING_TO_RESET` **avant** de
+vérifier la portée. Un Médiateur recevait donc « rien à faire » là où il devait recevoir « refusé ». Ce n'est pas une
+faille (rien n'est écrit), mais un refus qui se déguise en succès vide trompe l'écran et le testeur.
+
+```ts
+if (changes.length === 0) {
+  const peutEcrire = keys.some((key) => adminRolesAllow(actor.roles, settingDefinition(key)!.scope === "BUSINESS" ? "settings.business.write" : "settings.operations.write"));
+  if (!peutEcrire) assertScopes(actor, keys);   // 403 : aucune des clés visées n'est à sa portée
+  throw new ValidationError("Nothing to reset: …", { code: "NOTHING_TO_RESET" });
+}
+```
+
+La fiche ADM-PRM-2 le prouve aussi par la voie forte : le super administrateur **modifie** réellement la commission, le
+Médiateur tente de la remettre par défaut (403) et la valeur **reste** ; le super administrateur la rétablit dans un
+`finally`.
+
+## ANO-ADM-03 / A153 : le profil PRIVACY ne pouvait pas atteindre ses propres gestes
+
+L'export nominatif et l'effacement RGPD vivent sur `/users` et `/users/:id`, tous deux gardés par `users.read`, que
+PRIVACY n'avait pas. La décision A153 ouvre la **lecture** (le contrat et son miroir front), rien d'autre. La matrice
+vit en deux exemplaires (`admin-users.schema.ts` côté serveur, `apps/admin-ui/src/lib/permissions.ts` côté écran) :
+la fiche **ADM-PRM-0** lit les deux fichiers et exige qu'ils soient identiques. Une divergence cacherait un bouton
+autorisé ou montrerait un bouton refusé, sans qu'aucun test unitaire ne le voie.
+
+## ADM-PRM-9 : la matrice générée depuis le code
+
+Plutôt qu'une dizaine de routes choisies à la main, la fiche **lit les quatre routeurs** avec une expression
+régulière (`router.<verbe>("/admin/…", …, requireAdminPermission("…"))`), puis appelle chaque route avec chacun des
+sept comptes :
+
+- permission absente → exige `403` **et** `details.code = "ADMIN_PERMISSION_DENIED"` **et** la permission nommée ;
+- permission présente → interdit ce 403-là (un 400 ou un 404 sur un identifiant inexistant est normal).
+
+Deux sécurités : tous les identifiants sont un ObjectId valide que rien ne porte, et une **écriture sans identifiant**
+(réinitialiser, poser la maintenance, inviter) n'est appelée que par un compte à qui elle est refusée. Une route
+ajoutée demain est éprouvée sans toucher la fiche. Garde du garde : moins de 50 routes lues = la lecture a cassé.
+
+## ADM-SEC-8 et 9 : la durée de vie d'une session, prouvée par Redis
+
+- **SEC-8** (45 min d'inactivité) se joue en vrai : la fiche lit le TTL de `admin_jti:…`, ferme l'onglet
+  (`about:blank`, une page qui se rafraîchit seule fausserait l'inactivité), attend 46 minutes, constate que la clé
+  a expiré d'elle-même, puis que l'écran renvoie à `/login` et que le journal n'a **rien** écrit.
+- **SEC-9** (12 h de vie absolue) ne tient pas dans une journée. Ses deux substituts sont prouvés : le TTL d'une
+  session neuve vaut 45 min, le renouvellement fait tourner le `jti` en conservant `createdAt`. Puis une **manœuvre
+  consignée** vieillit la session à 11 h 59 dans Redis : le renouvellement suivant ne pose plus qu'un TTL ≤ 60 s ; à
+  12 h 01, il répond 401.
+
+## ADM-ACC : trois sources à comparer, pas deux
+
+Chaque tuile de l'accueil est comparée à `GET /admin/kpis` (l'écran dit ce que l'API dit), puis au cahier sur les files
+que le jeu d'essai pose exactement (litiges, billets, versements…). Les tuiles que la campagne pollue (comptes créés
+par les inscriptions des chapitres web, trajets publiés) sont comptées **à part, en base** (`lireCoteServeur`, un
+script `tsx` qui imprime une ligne `@@<json>`) : un écart au cahier y est une donnée, pas un défaut. Pour ACC-2, la
+liste des tuiles attendues par profil se **déduit** du contrat des permissions, et les compteurs d'un profil sans la
+permission doivent être servis à `null` (pas seulement cachés).
+
+**Piège payé sur la fiche ACC-3** : `locator.isVisible({ timeout })` **n'attend pas** — Playwright ignore ce
+paramètre et répond immédiatement. Dans une boucle `expect.poll` qui recharge l'accueil, la lecture tombait avant la
+réponse de `/admin/alerts` (chargée côté client, après `domcontentloaded`) : la fiche échouait alors que le résumé vert
+était bien affiché (capture de l'échec). Remplacé par `locator.waitFor({ state: "visible", timeout })`.
+
+**Second piège, au deuxième passage (PRM-2)** : `navigateurAdmin` rouvre une session mémorisée (`apps/e2e/.sessions/`)
+après une sonde `GET /admin/me`. La sonde a répondu 200 ; le cookie `admin_access_token` (`maxAge` 15 min) a expiré
+quelques secondes plus tard ; l'appel suivant est parti **sans cookie** — auth-service : « Admin token missing ». Rien à
+voir avec ANO-ADM-04 : la sonde acceptait une session à l'agonie. `sessionAdminVivante` (`apps/e2e/src/fixtures/yamba.ts`)
+renouvelle désormais la session si le jeton d'accès expire dans moins de cinq minutes :
+
+```ts
+const acces = (await contexte.cookies()).find((c) => c.name === "admin_access_token");
+if (acces && acces.expires > 0 && acces.expires - Date.now() / 1000 < MARGE_JETON_ADMIN_S) {
+  return (await contexte.request.post(`${api}/auth/admin/refresh`, { timeout: 15_000 })).ok();
+}
+```
+
+La sonde membre (`sessionMembreVivante`) a la même forme et le même risque ; elle n'a pas été touchée faute d'échec
+mesuré.
+
+## Le versement en échec du jeu d'essai partait tout seul
+
+`seed-deals.ts` posait la relance du versement en échec **échue** (`payoutNextRetryAt` = hier). Avec le fournisseur
+FAKE et le compte de Thomas prêt, le cron des 5 minutes le relançait… et réussissait : la file « Versements en échec »
+se vidait entre le seed et la fiche. La relance est posée à +23 h ; le bouton « Relancer » de l'admin n'attend pas
+l'échéance, le chapitre finances garde donc son geste.
+
+## nx.json : un test « vert » en cache après un changement dans `packages/`
+
+`packages/` n'est pas un projet Nx : l'empreinte d'`auth-service:test` ne couvre que `{projectRoot}/**` et les
+`sharedGlobals`, si bien qu'une modification de `packages/middleware/session-revocation.ts` risquait de laisser Nx
+rejouer le résultat **en cache** d'avant la modification. `packages/**/*`,
+`prisma/schema.prisma` et `tsconfig.base.json` rejoignent `sharedGlobals` : toute modification invalide le cache de
+tous les projets. Plus de recalculs, mais plus jamais un vert fantôme.
+
+## Tests
+
+- auth-service **235** (230 + 5) : `isAdminSessionRevoked` (clé, présente / absente, sans `jti`, Redis muet) et le
+  refus de la remise à zéro par un profil sans portée ; l'assertion PRIVACY rejoint `admin-permissions.spec.ts`.
+- `apps/e2e` : **356 scénarios** (339 + 17), les 17 verts sur la pile réelle (deal-service en FAKE) ; les 16 hors
+  SEC-8 rejoués une seconde fois, verts, après la correction de la sonde de session.
+- Typecheck des six projets vert.
