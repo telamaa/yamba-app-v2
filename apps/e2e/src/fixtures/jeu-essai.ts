@@ -117,6 +117,11 @@ export class JeuEssai {
     return id;
   }
 
+  /** Tous les trajets du seed, `[clé, identifiant]` — WEB-NRG-2 et 4 exigent « chaque trajet du jeu d'essai ». */
+  tousLesTrajets(): Array<[string, string]> {
+    return Object.entries(this.lire().trips);
+  }
+
   /** Un deal du seed avec tout ce que le cahier en dit (`bzv-accepted`, `sgn-picked`…). */
   deal(cle: string): DealSeed {
     const b = this.lire().bookings.find((x) => x.key === cle);

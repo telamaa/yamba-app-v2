@@ -51,6 +51,28 @@ export class MesTrajets {
   }
 
   /**
+   * Une entrée du menu « … » de la ligne d'un trajet (« Masquer », « Remettre en ligne »…), confirmée si une fenêtre
+   * le demande. Rend le texte du toast attendu (WEB-NRG-8 : le toast EST le libellé du nouveau statut).
+   */
+  async actionDuMenu(corridor: string, tripId: string, entree: RegExp, toast: RegExp): Promise<string> {
+    const ligne = this.page.locator(`a[aria-label="${corridor}"][href$="/dashboard/trips/${tripId}"]`).first().locator("xpath=..");
+    await expect(ligne).toBeVisible({ timeout: 30_000 });
+    const bouton = this.page.getByRole("button", { name: entree }).filter({ visible: true }).first();
+    await expect.poll(async () => {
+      if (await bouton.isVisible()) return true;
+      await ligne.locator("button").last().click();
+      await this.page.waitForTimeout(400);
+      return bouton.isVisible();
+    }, { timeout: 20_000 }).toBe(true);
+    await bouton.click();
+    const fenetre = this.page.getByRole("dialog").filter({ visible: true });
+    if (await fenetre.count()) await fenetre.last().getByRole("button", { name: entree }).last().click();
+    const message = this.page.getByText(toast);
+    await expect(message.first()).toBeVisible({ timeout: 15_000 });
+    return normaliserEspaces(await message.first().innerText());
+  }
+
+  /**
    * Tente d'annuler le trajet par le menu de sa ligne. Rend le toast obtenu : le refus D72
    * (« Ce trajet porte encore n deals en cours … ») ou « Trajet annulé ».
    */
