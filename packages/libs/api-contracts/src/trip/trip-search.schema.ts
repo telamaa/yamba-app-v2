@@ -71,6 +71,7 @@ export const YambaTripResultSchema = z
     toCityCode: z.string().optional(),
     toCountry: z.string().optional(),
     travelDate: z.string().meta({ example: "12 juin 2026", description: "Formaté serveur selon locale" }),
+    departureAt: z.string().datetime().optional().meta({ description: "Instant de départ (ISO 8601) — ANO-WEB-30 : permet au client de savoir qu'un trajet est passé (badge « Trajet passé » des favoris) sans interpréter la date formatée" }),
     departureTime: z.string().meta({ example: "08:00" }),
     arrivalTime: z.string().optional().meta({ example: "14:30", description: "Absent quand le trajet n'a pas d'heure d'arrivée : le front n'affiche alors rien" }),
     nextDay: z.boolean().optional().meta({ description: "Arrivée le lendemain (absent si false)" }),

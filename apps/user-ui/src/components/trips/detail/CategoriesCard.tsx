@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useTranslations, useLocale } from "next-intl";
 import {
   FileText,
@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import type { ParcelCategory, PublicTrip } from "@/lib/public-trip.types";
 import { formatPriceShort } from "@/lib/public-trip.helpers";
+import { useDialogFocus } from "@/hooks/useDialogFocus";
 
 const VISIBLE_LIMIT_MOBILE = 3;
 const VISIBLE_LIMIT_DESKTOP = 6;
@@ -64,6 +65,10 @@ export default function CategoriesCard({ trip }: Props) {
       document.body.style.overflow = "";
     };
   }, [isModalOpen]);
+
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  // ANO-WEB-94 — focus piégé dans la fenêtre, rendu au geste de départ à la fermeture.
+  useDialogFocus(dialogRef, isModalOpen);
 
   // Fermer la modal avec Escape
   useEffect(() => {
@@ -143,6 +148,7 @@ export default function CategoriesCard({ trip }: Props) {
       {/* Modal */}
       {isModalOpen && (
         <div
+          ref={dialogRef}
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
           onClick={() => setIsModalOpen(false)}
           role="dialog"

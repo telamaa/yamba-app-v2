@@ -77,7 +77,7 @@ export class FilMessagerie {
   /** Le fil reste ouvert à l'écriture (deal clos depuis moins de 14 jours) : la saisie est là, aucun bandeau. */
   async ouvrirEncoreOuvert(conversationId: string): Promise<void> {
     await this.ouvrir(conversationId);
-    await expect(this.page.getByText("Cette conversation est fermée à l'écriture. Vous pouvez toujours la relire.")).toHaveCount(0);
+    await expect(this.page.getByText("Cette conversation est fermée à l'écriture. Tu peux toujours la relire.")).toHaveCount(0);
     await expect(this.page.getByText("Cette conversation est en lecture seule.")).toHaveCount(0);
   }
 
@@ -96,10 +96,11 @@ export class FilMessagerie {
   }
 
   async accepterRendezVous(): Promise<void> {
-    await expect(this.page.getByText("À confirmer par vous")).toBeVisible({ timeout: 15_000 });
+    await expect(this.page.getByText("À confirmer par toi")).toBeVisible({ timeout: 15_000 });
     await this.page.getByRole("button", { name: "Accepter", exact: true }).click();
     await expect(this.page.getByText("Confirmé", { exact: true })).toBeVisible({ timeout: 15_000 });
-    await expect(this.page.getByText("Le rendez-vous est confirmé.")).toBeVisible();
+    // Un fil peut porter plusieurs confirmations (re-proposition acceptée, ANO-WEB-47) : la dernière ligne système.
+    await expect(this.page.getByText("Le rendez-vous est confirmé.").last()).toBeVisible();
   }
 
   /**

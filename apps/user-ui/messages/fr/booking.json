@@ -54,7 +54,7 @@
     "product": {
       "label": "Que voulez-vous envoyer ?",
       "parcel": "Un colis (au kilo)",
-      "checkedBag": "Un bagage soute 23 kg",
+      "checkedBag": "Un bagage en soute 23 kg",
       "cabinBag": "Un bagage cabine 12 kg"
     },
     "family": {

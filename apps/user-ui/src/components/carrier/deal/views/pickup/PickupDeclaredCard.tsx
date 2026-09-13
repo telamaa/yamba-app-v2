@@ -10,6 +10,7 @@
 
 "use client";
 
+import { elider } from "@/lib/elision"; // ANO-WEB-49
 import { Eye } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import type { DealRequest } from "@/components/carrier/deal/deal.types";
@@ -34,7 +35,7 @@ export default function PickupDeclaredCard({ deal, compact = false }: Props) {
       }`}
     >
       <h3 className="mb-3 text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 sm:text-[11px]">
-        {t("declared.cardLabel", { shipperFirstName })}
+        {t("declared.cardLabel", { shipperFirstName, queShipper: elider("que", shipperFirstName) })}
       </h3>
 
       <div className="mb-3 grid grid-cols-3 gap-3">

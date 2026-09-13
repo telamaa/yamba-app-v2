@@ -7,6 +7,8 @@ import apiClient from "@/lib/api-client";
 import { track } from "@/lib/analytics";
 import type { Draft } from "@/components/trips/create/create-trip.types";
 import { mapDraftToPayload } from "@/components/trips/create/create-trip.mapper";
+import { withLocalDates, withLocalDatesInList } from "@/components/trips/list/trip-local-dates"; // ANO-WEB-41
+import type { TripListItem } from "@/components/trips/list/my-trips.config";
 
 const BASE = "/trips";
 
@@ -234,7 +236,7 @@ export function useTrip(tripId: string | null) {
       const res = await apiClient.get(`${BASE}/${tripId}`, {
         requireAuth: true,
       });
-      return res.data.trip;
+      return withLocalDates(res.data.trip); // ANO-WEB-41 : dates locales dérivées de departureAt si le wizard ne les a pas écrites
     },
     enabled: !!tripId,
   });
@@ -247,7 +249,7 @@ export function useMyTrips(status?: string) {
     queryFn: async () => {
       const url = status ? `${BASE}/my?status=${status}` : `${BASE}/my`;
       const res = await apiClient.get(url, { requireAuth: true });
-      return res.data;
+      return withLocalDatesInList<TripListItem>(res.data); // ANO-WEB-41
     },
   });
 }
