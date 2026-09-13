@@ -85,6 +85,22 @@ WEB-ACC-8 est tombée sur un `POST /auth/refresh` intermittent ; rejouée sans l
 apps/user-ui/src apps/user-ui/messages`), elle tombait aussi. La requête est la sonde de session du visiteur ; la
 fiche l'exclut avec sa raison.
 
+## Améliorations au GO : un lexique, une règle 7, et des fiches qui nettoient derrière elles
+
+- **`scripts/lexique-yamba.json`** : les motifs (source + drapeaux) et leurs exceptions de sens, lus par
+  `check-i18n-messages.mjs` (`new RegExp(r.motif, r.drapeaux)`) et par `web-voc.spec.ts` (`regle("fr", "vouvoiement")`).
+  Avant, la liste des « vous » pluriels existait en deux copies — la première divergence aurait donné une CI verte et
+  une recette rouge.
+- **Règle 7** : `BOOKING_EVENT_TYPES` est lu dans le contrat (`api-contracts`) par expression régulière, et chaque type
+  doit avoir `copy.<type_avec_underscores>.<SHIPPER|CARRIER>.{title,line}` (ou des sous-étapes pour
+  `tracking_event`). Garde du garde : moins de 10 types lus → erreur.
+- **VOC-3** crée une réservation puis l'annule dans un `finally` (`POST /deals/:id/cancel`) : une fiche qui
+  consomme la capacité d'un trajet du jeu d'essai fausse silencieusement les chapitres joués après elle.
+- **Relevé parallèle** : `await Promise.all([lireVisiteur(), lireExpeditrice(), lireVoyageur()])`, un onglet par
+  compte ; `LANGUES = SUPPORTED_LOCALES` importé en relatif depuis `api-contracts/src/locale.ts` (fichier sans zod).
+- **Refresh du visiteur : non fait**, voir le rapport — le marqueur localStorage n'est pas une preuve d'absence de
+  session.
+
 ## Ce qui n'a PAS été touché, volontairement
 
 Les messages d'erreur de l'API (deal-service) et l'OpenAPI disent « carrier » : c'est la surface publique en

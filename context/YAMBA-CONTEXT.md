@@ -637,6 +637,12 @@ Ordre de demarrage : auth -> trip -> gateway.
   FAUX VERTS PAYES : VOC-3 vert sans avoir vu l'objet (aucun envoi soute vivant → la fiche en cree un) ; ecran
   « introuvable » > 200 car. ; squelette stable 1 s. A TRANCHER : minuscule generique « expediteurs/voyageurs » ;
   migrer les textes en dur vers messages/ (seule garantie durable) ; carte de recherche muette sur le forfait soute.
+  AMELIORATIONS AU GO (regard d'expert) : lexique en source unique `scripts/lexique-yamba.json` (CI regle 6 + recette) ;
+  REGLE 7 du check i18n (chaque BOOKING_EVENT_TYPES a son texte de notification, 2 roles) ; VOC-3 annule sa
+  reservation (finally) ; VOC-4 relit les emails FR ; VOC-6 detecte les cles a un seul point ; releve parallele +
+  SUPPORTED_LOCALES + 4 ecrans (70 ecrans en 8 min, gain ~40 % seulement : next dev compile page par page) ; garde
+  DEA-1 `1 janv.` bornee (aurait echoue chaque janvier). NON FAIT : refresh du visiteur conditionne au marqueur
+  localStorage = regression pour de vrais membres → D-next a proposer (indice serveur « a une session »).
   Plateforme inchangee (1000 + auth 230 ; notification 115 et trip 261 rejoues), harnais : 321 scenarios. PR #297 (empilee sur #296). Reste : chapitre 7 WEB-NRG (12 fiches), cahier 02-ADMIN. AUCUNE attribution Claude.
 - 13/09 : **CHAPITRE 5.31 DU CAHIER 01-WEB — WEB-A11Y, ACCESSIBILITE CLAVIER DE BASE (branche
   `chore/recette-web-5-31`, empilee sur #295)** — 8 fiches jouees CONFORMES (4 apres correction), 8 scenarios en

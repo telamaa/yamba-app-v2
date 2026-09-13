@@ -3854,6 +3854,30 @@ dans son en-tête : les textes codés en dur dans les composants lui échappent.
 - **Les messages d'erreur de l'API** disent « carrier » (surface publique en anglais, vocabulaire du code) : laissés
   tels quels ; ils ne doivent jamais être affichés bruts à un membre (A146 : le client traduit `details.code`).
 
+### Améliorations faites au GO du 13/09 (regard d'expert, produit ET test)
+
+| # | Amélioration | Où | Preuve |
+|---|---|---|---|
+| 1 | VOC-3 **annule** la réservation qu'elle crée (bloc `finally`) : chaque exécution consommait 23 kg de `bzv-perkg` jusqu'au prochain rejeu | `web-voc.spec.ts` | annulation 200 à chaque passage |
+| 2 | VOC-4 relit aussi les **emails français** de la boîte (la fiche ne relisait que les écrans — c'est dans les emails d'alerte que le vouvoiement se cachait) | `web-voc.spec.ts` | emails relus > 0, aucun vouvoiement |
+| 3 | **Règle 7** du contrôle i18n : chaque type de `BOOKING_EVENT_TYPES` a un texte de notification complet (titre + ligne, deux rôles). Le front compose la clé dynamiquement : la règle 5 ne la voyait pas, et un texte absent des DEUX langues échappait au miroir | `check-i18n-messages.mjs` | contre-épreuve : ligne retirée en FR et EN → refus nommé |
+| 4 | VOC-6 : une clé technique à **un seul point** (`status.pending`) est désormais détectée ; « e.g. », « i.e. », « etc. » exemptés | `web-voc.spec.ts` | 0 clé sur 70 écrans |
+| 5 | **Lexique en source unique** `scripts/lexique-yamba.json`, lu par la CI (règle 6) ET par la recette : une exemption ajoutée vaut partout | `lexique-yamba.json` | contre-épreuve « Sélectionnez votre date » → refus |
+| 6 | Revue des **dates en dur** du harnais : la garde ANO-WEB-41 de DEA-1 (`toContain("1 janv.")`) aurait échoué à tort chaque janvier (« 11 janv. » la contient) → `(?<!\d)1 janv\.` | `web-dea.spec.ts` | web-dea 9/9 |
+| 8 | Relevé **en parallèle** (un onglet par compte), langues tirées de `SUPPORTED_LOCALES`, **quatre écrans ajoutés** (mot de passe oublié, page destinataire sans compte, signaler un problème, noter le Voyageur) | `web-voc.spec.ts` | 70 écrans en 8 min 06 (62 en 11 min 30 avant) |
+
+**Écart honnête sur l'item 8** : le gain est d'environ 40 % par écran, pas le « ~4 min » annoncé — le goulot est le serveur
+`next dev` unique, qui compile chaque page à la demande ; trois onglets ne compilent pas trois fois plus vite.
+
+**Item 7 retiré, et pourquoi.** Conditionner le `POST /auth/refresh` du visiteur au marqueur de session (localStorage)
+aurait déconnecté de VRAIS membres : marqueur absent (navigation privée restrictive, stockage nettoyé, session ouverte
+avant ANO-WEB-01) mais cookie de rafraîchissement valide → plus aucune tentative, déconnexion à chaque expiration du
+jeton d'accès. La bonne réponse est serveur (un indice non sensible « a une session » posé par auth-service, lisible
+par le front) : **décision d'architecture à proposer au registre**, pas un petit correctif.
+
+Une garde de l'instrument corrigée en chemin : l'écran « mot de passe oublié » dit « le message est identique même si
+le compte n'existe pas » — la garde « écran introuvable » vise désormais les PHRASES d'absence du produit, pas les mots.
+
 ### Regard d'expert — optimisations et améliorations (une ligne par fiche)
 
 - **VOC-1** — Le relevé multi-comptes × deux langues est réutilisable tel quel pour tout futur chapitre de
