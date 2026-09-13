@@ -685,6 +685,18 @@ Ordre de demarrage : auth -> trip -> gateway.
   contre-epreuve systematique dans le harnais. OpenAPI regenere. A TRANCHER : codes de connexion / notifications de
   securite envoyes a une adresse supprimee ; seuil de rebonds temporaires ; derniers emails en echec sur la fiche.
   Tests : auth 248, trip 267, notification 119, deal 578, harnais 374. Reste : § 5.6 a 7.
+- 14/09 : **CAHIER 02-ADMIN — § 5.6 EXPORTS CSV (branche `chore/recette-admin-5-6`, empilee sur #306)** — 4 fiches
+  CONFORMES (EXP-4 ajoutee), jouees deux fois vertes (`apps/e2e/src/admin/adm-csv-exports.spec.ts`) : fichier TELECHARGE
+  par l'ecran, BOM relu, CSV PARSE, identifiants = liste de l'ecran (requete capturee, relue page par page), fouille
+  email/telephone, journal. TROIS ANOMALIES CLOSES : ANO-ADM-12 BLOQUANTE (l'export operationnel des billets livrait
+  `originalName`, texte libre du membre — mesure : « sfr-facture-0752426937-0.pdf » → colonne `fileExtension`, A156 :
+  jamais un champ libre dans un export operationnel), ANO-ADM-13 MAJEURE (export = onglet sur l'URL : jeton expire → JSON
+  401 brut, aucun rafraichissement → `downloadFile` par fetch dans `admin-ui/src/lib/api.ts`), ANO-ADM-14 (copie
+  divergente de `csvCell` en Finances). AMELIORATIONS FAITES : bibliotheque unique `@packages/libs/csv` (nombre non
+  neutralise, `EXPORT_MAX_ROWS`, `capExportRows`, en-tetes `X-Truncated` / `no-store`), troncature dite au journal et a
+  l'ecran, compteur du motif, refus par code, `INVALID_QUERY` avec code sur l'arbitrage. A TRANCHER : motif de l'export
+  nominatif dans l'URL (journaux techniques), export Finances sans plafond (§ 5.16), noms de fichiers en UTC.
+  Tests : trip 274, deal 578, auth 248, harnais 378. Reste : § 5.7 a 8.
 - 13/09 : **DECISION : LE ROLE PREND LA MAJUSCULE** (branche `chore/recette-voyageur-majuscule`, empilee sur #299) —
   « Voyageur » / « Traveler » partout : 71 valeurs de messages, 33 textes du code, 1 email ; regle `role-majuscule` au
   lexique partage (CI + recette) ; 12 citations du harnais ; web-fav, web-rch, web-rsv-devis, web-lit verts.

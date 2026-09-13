@@ -16,10 +16,10 @@ import { recordAdminAction } from "@packages/admin-audit";
 import { isEmailConfigured, sendTransactionalEmail } from "@packages/email";
 import type { AuthenticatedRequest } from "@packages/middleware/isAuthenticated";
 import { AdminTripsQuerySchema, HideTripRequestSchema, ObjectIdSchema, ReviewTicketRequestSchema, TicketQueueQuerySchema, type AdminTripFile, type AdminTripSummary, type TicketQueueItem } from "@packages/api-contracts";
-import { CSV_BOM, buildCsv, csvFilename } from "@packages/libs/csv";
+import { CSV_BOM, EXPORT_MAX_ROWS, buildCsv, capExportRows, csvFilename, csvResponseHeaders } from "@packages/libs/csv";
 import { getTripAdminEmails } from "../emails/admin-trip-emails";
 import { makeCarrierMailer } from "../lib/carrier-mailer";
-import { TICKETS_CSV_COLUMNS, TICKET_REJECTION_LABELS, TRIPS_CSV_COLUMNS, buildTicketsWhere, buildTripsOrderBy, buildTripsWhere, isTicketExpired, ticketReviewOutcome } from "../lib/admin-trips.rules";
+import { TICKETS_CSV_COLUMNS, TICKET_REJECTION_LABELS, TRIPS_CSV_COLUMNS, buildTicketsWhere, fileExtensionOf, buildTripsOrderBy, buildTripsWhere, isTicketExpired, ticketReviewOutcome } from "../lib/admin-trips.rules";
 
 const SUPPORT_EMAIL = process.env.SUPPORT_EMAIL || "support@yamba.app";
 const USER_APP_URL = (process.env.USER_APP_URL || "http://localhost:3000").replace(/\/$/, "");
@@ -113,18 +113,17 @@ export const exportTrips = async (req: AuthenticatedRequest, res: Response, next
     const parsed = AdminTripsQuerySchema.safeParse(req.query);
     if (!parsed.success) throw new ValidationError("Invalid query.", { code: "INVALID_QUERY" });
     const q = parsed.data;
-    const rows = await prisma.trip.findMany({
+    const found = await prisma.trip.findMany({
       where: buildTripsWhere(q) as never,
       orderBy: buildTripsOrderBy(q) as never,
-      take: 5000,
+      take: EXPORT_MAX_ROWS + 1,
       select: { id: true, status: true, originCity: true, originCountryCode: true, destinationCity: true, destinationCountryCode: true, departureAt: true, publishedAt: true, cancelledAt: true, userId: true, transportMode: true, capacityKg: true, reservedKg: true, pricePerKgCents: true, ticketVerificationStatus: true, hiddenByAdminAt: true, createdAt: true },
     });
+    const { rows, truncated } = capExportRows(found);
     const now = new Date();
     const { cursor: _c, limit: _l, ...filters } = q;
-    await recordAdminAction(prisma, { adminUserId: req.user.id, action: "EXPORTED", targetType: "TRIP", after: { domain: "trips", personal: false, filters, rows: rows.length }, ...meta(req) });
-    res.setHeader("Content-Type", "text/csv; charset=utf-8");
-    res.setHeader("Content-Disposition", `attachment; filename="${csvFilename("trajets", now)}"`);
-    res.setHeader("X-Row-Count", String(rows.length));
+    await recordAdminAction(prisma, { adminUserId: req.user.id, action: "EXPORTED", targetType: "TRIP", after: { domain: "trips", personal: false, filters, rows: rows.length, truncated }, ...meta(req) });
+    res.set(csvResponseHeaders(csvFilename("trajets", now), rows.length, truncated));
     res.status(200).send(CSV_BOM + buildCsv(TRIPS_CSV_COLUMNS, rows.map((t) => ({ ...t, carrierId: t.userId, status: String(t.status), transportMode: t.transportMode ? String(t.transportMode) : null, ticketVerificationStatus: String(t.ticketVerificationStatus) }))));
   } catch (e) {
     next(e);
@@ -300,17 +299,18 @@ export const exportTickets = async (req: AuthenticatedRequest, res: Response, ne
     const now = new Date();
     const parsedQ = TicketQueueQuerySchema.safeParse(req.query);
     if (!parsedQ.success) throw new ValidationError("Invalid query.", { code: "INVALID_QUERY" });
-    const rows = await prisma.tripDocument.findMany({
+    const found = await prisma.tripDocument.findMany({
       where: buildTicketsWhere(parsedQ.data, now) as never,
       orderBy: { createdAt: "asc" },
-      take: 5000,
+      take: EXPORT_MAX_ROWS + 1,
       include: { trip: { select: { id: true, originCity: true, destinationCity: true, departureAt: true, userId: true } } },
     });
-    await recordAdminAction(prisma, { adminUserId: req.user.id, action: "EXPORTED", targetType: "TRIP", after: { domain: "tickets", personal: false, filters: parsedQ.data, rows: rows.length }, ...meta(req) });
-    res.setHeader("Content-Type", "text/csv; charset=utf-8");
-    res.setHeader("Content-Disposition", `attachment; filename="${csvFilename("billets", now)}"`);
-    res.setHeader("X-Row-Count", String(rows.length));
-    res.status(200).send(CSV_BOM + buildCsv(TICKETS_CSV_COLUMNS, rows.map((d) => ({ documentId: d.id, tripId: d.trip.id, originCity: d.trip.originCity, destinationCity: d.trip.destinationCity, departureAt: d.trip.departureAt, carrierId: d.trip.userId, originalName: d.originalName, mimeType: d.mimeType, status: String(d.status), submittedAt: d.createdAt }))));
+    const { rows, truncated } = capExportRows(found);
+    await recordAdminAction(prisma, { adminUserId: req.user.id, action: "EXPORTED", targetType: "TRIP", after: { domain: "tickets", personal: false, filters: parsedQ.data, rows: rows.length, truncated }, ...meta(req) });
+    res.set(csvResponseHeaders(csvFilename("billets", now), rows.length, truncated));
+    // ANO-ADM-12 (A156) — le nom de fichier est un TEXTE LIBRE du membre (mesuré : « sfr-facture-0752426937-0.pdf ») :
+    // il ne sort jamais d'un export opérationnel. Le type du fichier se lit dans `mimeType` / `fileExtension`.
+    res.status(200).send(CSV_BOM + buildCsv(TICKETS_CSV_COLUMNS, rows.map((d) => ({ documentId: d.id, tripId: d.trip.id, originCity: d.trip.originCity, destinationCity: d.trip.destinationCity, departureAt: d.trip.departureAt, carrierId: d.trip.userId, fileExtension: fileExtensionOf(d.originalName), mimeType: d.mimeType, status: String(d.status), submittedAt: d.createdAt }))));
   } catch (e) {
     next(e);
   }

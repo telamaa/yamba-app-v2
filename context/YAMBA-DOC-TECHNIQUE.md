@@ -7700,3 +7700,94 @@ Le secret n'entre jamais dans le processus Playwright : la signature est calcul�
   passage complet suivant).
 - `apps/e2e` : **374 scénarios** (370 + 4), les 4 verts deux fois de suite.
 - Typecheck auth, trip, deal, notification, message, gateway, admin-ui et harnais verts ; contrats OpenAPI régénérés.
+
+
+---
+
+# Cahier 02-ADMIN, § 5.6 : les exports CSV — prouver le fichier, pas le bouton
+
+*(PR `chore/recette-admin-5-6`, empilée sur #306, 14/09/2026.)*
+
+## Ce qui a été fait
+
+Quatre fiches (ADM-EXP-1 à 4), conformes, trois anomalies closes (`ANO-ADM-12` bloquante, `13`, `14`), une décision
+(A156).
+
+```
+packages/libs/csv/index.ts                              csvCell (nombres non neutralisés), EXPORT_MAX_ROWS, capExportRows, csvResponseHeaders
+apps/trip-service/src/lib/csv-export.spec.ts            NOUVEAU — 5 tests de la bibliothèque (packages/ n'a pas de projet de test)
+apps/trip-service/src/lib/admin-trips.rules.ts          ANO-ADM-12 — TICKETS_CSV_COLUMNS sans originalName, fileExtensionOf (+ 2 tests)
+apps/trip-service/src/controllers/admin-trips.controller.ts   exports trajets et billets : plafond + troncature dite
+apps/auth-service/src/services/admin-users.service.ts   exportRows rend { rows, truncated }
+apps/auth-service/src/controller/admin-users.controller.ts    journal truncated, en-têtes communs
+apps/deal-service/src/controllers/admin-dispute.controller.ts  idem + INVALID_QUERY porte son code (A146)
+apps/deal-service/src/services/admin-finance.rules.ts   ANO-ADM-14 — réexporte csvCell (test étendu)
+apps/admin-ui/src/lib/api.ts                            ANO-ADM-13 — downloadFile (fetch + rafraîchissement + lien download)
+apps/admin-ui/src/components/ExportButton.tsx           refus par code, compteur du motif, lignes / troncature annoncées
+apps/e2e/src/admin/adm-csv-exports.spec.ts              4 scénarios
+```
+
+## ANO-ADM-12 : un champ libre n'est pas un identifiant
+
+D60 2A promettait des exports opérationnels « identifiants seulement ». La colonne `originalName` de l'export des
+billets était pourtant le nom du fichier **tel que le membre l'a déposé**. Une sonde en base a trouvé
+« sfr-facture-0752426937-0.pdf » : un numéro de téléphone dans un export qu'un Médiateur ou un profil Finance télécharge
+sans motif. La colonne devient `fileExtension` :
+
+```ts
+export function fileExtensionOf(name: string | null | undefined): string {
+  const m = /\.([A-Za-z0-9]{1,5})$/.exec((name ?? "").trim());
+  return m ? m[1].toLowerCase() : "";   // « nom.0612345678 » → "" : dix chiffres ne sont pas une extension
+}
+```
+
+A156 généralise : une colonne d'export opérationnel est un identifiant, une énumération, une date, un montant ou une
+ville du référentiel — jamais un champ libre.
+
+## ANO-ADM-13 : un onglet ouvert sur une URL ne sait pas rafraîchir une session
+
+`ExportButton` faisait `window.open(apiUrl(path))`. Le cookie `admin_access_token` vit 15 minutes ; passé ce délai,
+l'onglet partait avec le seul cookie de renouvellement, recevait **401** et affichait le JSON brut. Aucun code client
+ne tournait dans cet onglet pour appeler `/auth/admin/refresh`. Même chose pour un 400 ou un 403. `downloadFile` :
+
+```ts
+let res = await attempt();
+if (res.status === 401 && (await tryRefresh())) res = await attempt();   // le même rafraîchissement qu'apiFetch
+if (!res.ok) throw new ApiError(message, res.status, data);             // ExportButton le traduit par details.code
+const url = URL.createObjectURL(await res.blob());                       // puis un <a download> cliqué
+```
+
+Le nom vient de `Content-Disposition`, le nombre de lignes de `X-Row-Count`, la troncature de `X-Truncated`
+(`Access-Control-Expose-Headers` les rend lisibles même hors du proxy de même origine).
+
+## Une seule bibliothèque, et une troncature qui se dit
+
+- **ANO-ADM-14** : `admin-finance.rules.ts` avait sa propre `csvCell`, sans `\t` ni `\r` dans les préfixes neutralisés.
+  Elle réexporte désormais `@packages/libs/csv`.
+- **Un nombre n'est pas une formule** : l'ancienne `csvCell` convertissait tout en chaîne avant de tester le premier
+  caractère, `-500` devenait `'-500`, un texte dans le tableur. Seules les chaînes sont neutralisées.
+- **La troncature** : chaque export lit `EXPORT_MAX_ROWS + 1` lignes et passe par `capExportRows`, qui sait s'il en
+  restait sans compter la collection. `truncated` va au journal et dans `X-Truncated` ; l'écran affiche « Export
+  tronqué à 5 000 lignes : affine les filtres ».
+
+## La spec : prouver le fichier
+
+- **Téléchargé par l'écran**, puis relu : `dl.path()` → `Buffer` (les trois octets du BOM), puis un parseur RFC 4180
+  de trente lignes dans la spec (guillemets doublés, virgules et retours ligne encadrés).
+- **Filtres écran = fichier** : la fiche capture l'URL de la requête que la page envoie à la liste
+  (`page.waitForResponse`), retire le curseur, relit toutes les pages à `limit=100`, et compare les ensembles
+  d'identifiants.
+- **Fouille** : expressions email et téléphone (`\b0[1-9](?:[ .-]?\d{2}){4}\b`, `(?:\+|\b00)\d{8,14}\b`) vérifiées
+  d'abord sur le nom mesuré (détecté) et sur un ObjectId et une date ISO (ignorés).
+- **Contre-épreuves** : formule posée en base sur le nom de Thomas, nom piégé sur le billet en attente, cookie
+  `admin_access_token` retiré (`contexte.clearCookies({ name })`) avec la preuve du 401 que montrait l'onglet ; toutes
+  défaites en `finally`.
+- **Refus simulé** (EXP-4) : `page.route("**/admin/disputes/export**", …)` rend un 403 à la frontière réseau ; la fiche
+  vérifie le message, et qu'aucun `download` ni aucune page ne s'est ouvert.
+
+## Tests
+
+- trip-service **274** (+7 : bibliothèque CSV ×5, `fileExtensionOf` et colonnes ×2) ; deal-service 578 (test Finances
+  étendu) ; auth-service 248.
+- `apps/e2e` : **378 scénarios** (374 + 4), les 4 verts deux fois de suite.
+- Typecheck auth, trip, deal, admin-ui (tsc) et harnais verts.

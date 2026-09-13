@@ -9,6 +9,7 @@ import prisma from "@packages/libs/prisma";
 import { adminRolesOf, type AdminUsersQuery } from "@packages/api-contracts";
 import { OID, TICKET, USERS_CSV_COLUMNS, buildUsersOrderBy, buildUsersWhere, matchedOnFor, textSearchOr } from "../lib/admin-users.query";
 import redis from "@packages/libs/redis";
+import { EXPORT_MAX_ROWS, capExportRows } from "@packages/libs/csv";
 import { NotFoundError } from "@packages/error-handler";
 import type { AdminUserFile, AdminUserSummary, AdminUsersResponse } from "@packages/api-contracts";
 import { platformSettings } from "@packages/libs/settings/default";
@@ -106,19 +107,20 @@ export function makeAdminUsersService() {
       };
     },
 
-    /** Export CSV des utilisateurs (données personnelles) — SUPER_ADMIN seul, motif ≥ 20, journalisé par le contrôleur. Borné à 5 000 lignes. */
-    async exportRows(q: AdminUsersQuery): Promise<Array<Record<(typeof USERS_CSV_COLUMNS)[number], unknown>>> {
-      const rows = await prisma.user.findMany({
+    /** Export CSV des utilisateurs (données personnelles) — motif ≥ 20, journalisé par le contrôleur. Borné à EXPORT_MAX_ROWS, troncature dite (§ 5.6). */
+    async exportRows(q: AdminUsersQuery): Promise<{ rows: Array<Record<(typeof USERS_CSV_COLUMNS)[number], unknown>>; truncated: boolean }> {
+      const found = await prisma.user.findMany({
         where: buildUsersWhere(q) as never,
         orderBy: buildUsersOrderBy(q) as never,
-        take: 5000,
+        take: EXPORT_MAX_ROWS + 1,
         select: { ...summarySelect, suspendedAt: true, suspensionUntil: true, carrierPage: { select: { stripePayoutsEnabled: true } } },
       });
-      return rows.map((u) => ({
+      const { rows, truncated } = capExportRows(found);
+      return { truncated, rows: rows.map((u) => ({
         id: u.id, firstName: u.firstName, lastName: u.lastName, email: u.email, phoneE164: u.phoneE164, roles: u.roles,
         adminRoles: adminRolesOf(u as { adminRole?: string | null; adminRoles?: string[] | null }), accountStatus: u.accountStatus, carrierStatus: u.carrierStatus,
         stripeReady: !!u.carrierPage?.stripePayoutsEnabled, suspendedAt: u.suspendedAt, suspensionUntil: u.suspensionUntil, createdAt: u.createdAt,
-      }));
+      })) };
     },
 
     /** Recherche (5A) : email, prénom, nom, téléphone, identifiant de deal, ticket YAM. */

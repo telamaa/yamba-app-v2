@@ -4757,6 +4757,70 @@ deux fois de suite, vert les deux fois.
 
 ---
 
+## Cahier 02-ADMIN — § 5.6 Exports CSV · **CONFORME** (3 fiches + 1 ajoutée, 2 après correction · 3 anomalies closes dont 1 bloquante · 2 écarts documentaires · 4 scénarios, 1 min 30)
+
+`apps/e2e/src/admin/adm-csv-exports.spec.ts`. Un export est la seule porte par laquelle des données sortent du
+back-office en masse : chaque fiche prouve **le fichier**, pas le bouton. Téléchargé **par l'écran**
+(`page.waitForEvent("download")`), relu octet par octet (BOM), **parsé** (RFC 4180), comparé **à la liste de l'écran**
+(mêmes filtres : la requête de la page est capturée puis relue page par page), fouillé (expressions email et téléphone),
+et relu au journal par Finance. Trois **contre-épreuves** consignées, toutes défaites en `finally` : un nom de Voyageur
+qui est une formule, un nom de billet qui porte un numéro de téléphone, un jeton d'accès expiré. Jouée deux fois, verte
+les deux fois.
+
+| Fiche | Ce qui est éprouvé | Verdict · Preuve |
+|---|---|---|
+| ADM-EXP-1 | Export nominatif des membres | **Conforme après correction** → `ANO-ADM-13` ; profil Données personnelles, `/users` filtré « Voyageur » ; bouton rouge « Exporter en CSV (données personnelles) » ; panneau « Export nominatif : le motif est écrit au journal avec les filtres et le nombre de lignes (RGPD). » ; motif de 19 caractères → compteur « 19 / 20 », « Télécharger » inerte, et l'API répond **400** « A reason of at least 20 characters is required for a personal-data export. » (`REASON_TOO_SHORT`) ; motif valide → `yamba-utilisateurs-….csv`, **BOM EF BB BF**, les **13 colonnes** du cahier, **12 Voyageurs**, identifiants = ceux de la liste de l'écran ; nom posé à `=HYPERLINK("http://exemple.invalid","clic")` → cellule `'=HYPERLINK(…)`, encadrée et guillemets doublés ; les 6 téléphones sortent `'+33…` ; « 12 lignes exportées — …, journalisé. » ; jeton d'accès retiré → l'URL seule répond **401** (ce qu'affichait l'ancien onglet), le bouton **aboutit** ; journal : deux `EXPORTED USER` sans identifiant, `{ domain: users, personal: true, reason, filters: { role: CARRIER, … }, rows: 12, truncated: false }` ; Médiateur : aucun bouton, 403 `ADMIN_PERMISSION_DENIED` ; super administrateur : bouton présent |
+| ADM-EXP-2 | Exports opérationnels : jamais d'email ni de téléphone | **Conforme après correction** → `ANO-ADM-12` (**bloquante**) ; Finance ; `/trips` filtré PUBLISHED → **14** lignes, toutes PUBLISHED, identifiants = liste de l'écran, 17 colonnes du cahier ; `/tickets` → 10 colonnes, **`fileExtension` à la place de `originalName`** (A156), le billet au nom piégé ne livre que « pdf » ; `/disputes` → 13 colonnes, 3 dossiers ; dans les trois fichiers : BOM, **aucune** adresse email, **aucun** numéro de téléphone ; journal : `EXPORTED TRIP` (trips, `filters.status = PUBLISHED`), `EXPORTED TRIP` (tickets), `EXPORTED BOOKING` (arbitration), `personal: false`, `rows` = lignes du fichier, `truncated: false` |
+| ADM-EXP-3 | Le Support n'exporte rien | **Conforme** — `/users`, `/trips`, `/tickets`, `/disputes` chargés (liste lue par le Support), **aucun** bouton d'export ; les quatre routes → **403** `ADMIN_PERMISSION_DENIED` ; aucune ligne `EXPORTED` |
+| ADM-EXP-4 | Un refus s'affiche en français (ajoutée) | **Conforme** — le Médiateur (`exports.operational`) exporte `/disputes` pour de vrai (`yamba-a-arbitrer-….csv`) ; refus 403 simulé à la frontière réseau → « Ton profil ne permet pas cet export. », **aucun** fichier, **aucun** onglet |
+
+### Anomalies
+
+- **ANO-ADM-12 (bloquante par la fiche, close)** — **l'export « opérationnel » des billets livrait le nom de fichier
+  saisi par le membre.** RG-ADM-32 : « seuls des identifiants ». La colonne `originalName` est un texte libre ; mesuré en
+  base, un membre a déposé « sfr-facture-0752426937-0.pdf » — un numéro de téléphone. Correction : colonne remplacée par
+  `fileExtension` (`fileExtensionOf`, extension seule, sinon vide), règle générale **A156** (un export opérationnel ne
+  porte jamais un champ libre). Fichiers : `apps/trip-service/src/lib/admin-trips.rules.ts` (+ 2 tests),
+  `apps/trip-service/src/controllers/admin-trips.controller.ts`.
+- **ANO-ADM-13 (majeure, close)** — **un export après quinze minutes d'inactivité ouvrait un onglet JSON « Unauthorized ».**
+  Le bouton ouvrait un onglet sur l'URL de l'export : sans jeton d'accès valide, pas de rafraîchissement, et l'onglet
+  affichait le JSON brut ; un refus (400, 403) aussi. Correction : `downloadFile` (`apps/admin-ui/src/lib/api.ts`)
+  télécharge par `fetch` avec le même rafraîchissement de session qu'`apiFetch`, rend le fichier par un lien `download`,
+  lève une erreur lisible ; `ExportButton.tsx` affiche les refus par leur code.
+- **ANO-ADM-14 (mineure, close)** — **la file Finances avait sa propre copie de `csvCell`**, qui ne neutralisait ni la
+  tabulation ni le retour chariot. Correction : `admin-finance.rules.ts` réexporte la bibliothèque partagée (test étendu).
+
+### Écarts documentaires
+
+- **Nom des fichiers** : `yamba-utilisateurs-AAAA-MM-JJ-HH-MM-SS.csv` (le cahier écrit `utilisateurs-<date>.csv`) ;
+  l'horodatage est en **UTC** (un export à 1 h 23 à Paris le 14/09 porte « 2026-09-13-23-23-27 »).
+- **Colonnes des billets** : `fileExtension` remplace `originalName` (A156).
+
+### Défaut du harnais évité
+
+- `lireCoteServeur` pour la manœuvre : chercher « un Voyageur de recette » par son email a rendu `null` (les comptes du
+  jeu d'essai ne sont pas en `@recette`) ; la fiche vise Thomas par l'identifiant du jeu d'essai.
+
+### Regard d'expert — produit ET test, une ligne par fiche
+
+- **EXP-1** — *Faite* : téléchargement par `fetch` (session rafraîchie, refus en français), compteur « n / 20 » sous le
+  motif, « Les filtres de la liste s'appliquent au fichier », message « n lignes exportées — fichier, journalisé » ;
+  troncature **dite** (`X-Truncated`, journal `truncated`, message « Export tronqué à 5 000 lignes : affine les
+  filtres ») ; `Cache-Control: no-store` sur tous les exports ; un nombre n'est plus neutralisé (`-500` reste
+  numérique). *Proposée* : le motif voyage dans l'URL et se retrouve dans les journaux d'accès du gateway et du service —
+  passer l'export nominatif en `POST` (motif dans le corps) — moyen, contrat d'API ; nommer les fichiers en heure de Paris
+  — petit. *Test* : contre-épreuve formule + RFC 4180 + jeton expiré, faites.
+- **EXP-2** — *Faite* : A156 et `fileExtension` ; bibliothèque unique (`capExportRows`, `csvResponseHeaders`) sur les
+  quatre exports ; `INVALID_QUERY` porte enfin son code sur l'export d'arbitrage (A146). *Proposée* : l'export Finances
+  (`/admin/finances/export`, § 5.16) n'a **aucun** plafond de lignes — à borner au même `EXPORT_MAX_ROWS` au § 5.16.
+  *Test* : la fouille email/téléphone est prouvée sur le nom mesuré, et ne se déclenche pas sur un identifiant ni une date.
+- **EXP-3** — *Test* : chaque écran attend sa liste ET le profil (`/admin/me`) avant de conclure « aucun bouton » ; une
+  absence constatée trop tôt ne prouve rien — rien à faire.
+- **EXP-4** — *Faite* : la fiche elle-même (refus lisible, aucun onglet). *Proposée* : une vraie route de test du refus
+  n'existe pas sans profil dédié ; la simulation à la frontière réseau est assumée.
+
+---
+
 ## Observations (pas des anomalies, mais à savoir)
 
 - **`/become-yamber` reste « futur »** (commentaire du layout marketing) : la page de présentation
