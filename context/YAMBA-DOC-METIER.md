@@ -4495,3 +4495,62 @@ ligne, collage qui remplit tout.
 - « Le clavier ne masque pas le bouton de validation » ne se vérifie pas en émulation : à jouer sur un vrai
   téléphone.
 - La rangée de réponses rapides ne montre pas qu'elle défile (pas de dégradé de bord).
+
+---
+
+# Le clavier et les lecteurs d'écran — ce que le chapitre 5.31 fait respecter
+
+*(PR `chore/recette-web-5-31`, 13/09/2026 — cahier 01-WEB chapitre 5.31, WEB-A11Y-1 à 8.)*
+
+## Le besoin
+
+Une partie des membres n'utilise pas de souris : clavier seul, lecteur d'écran, zoom fort, ou simplement un
+ordinateur sans pavé tactile confortable. Réserver, signaler un problème ou annuler un envoi doit leur être
+possible sans piège ni devinette. Ce n'est pas un audit complet : c'est le socle en dessous duquel un membre est
+exclu.
+
+## Les règles
+
+**RG-WEB-296 — Tout se fait au clavier, et l'on voit toujours où l'on est.** Chaque élément qui reçoit le focus est
+marqué visiblement ; l'ordre suit la lecture (en-tête, contenu, pied) ; on peut toujours avancer et reculer.
+
+**RG-WEB-297 — Une fenêtre tient le focus.** Tant qu'elle est ouverte, la tabulation tourne à l'intérieur et
+n'atteint jamais la page du dessous ; une fenêtre fermée n'est plus atteignable du tout, même si elle reste
+dessinée hors de l'écran.
+
+**RG-WEB-298 — Toute fenêtre se ferme par Échap, et rend la main là où on l'a prise.** Le focus revient sur le
+bouton qui l'a ouverte. Quand deux fenêtres sont empilées, Échap ne ferme que celle du dessus.
+
+**RG-WEB-299 — Un contrôle sans texte porte un nom en langue d'interface, et deux contrôles différents ne
+portent pas le même nom.** Une croix « Fermer », une vignette « Agrandir la photo 2 sur 3 » — jamais « photo,
+photo », jamais trois boutons « Plus tard ».
+
+**RG-WEB-300 — Une erreur de saisie est attachée à son champ** : le champ est marqué en erreur et annonce son
+propre message.
+
+**RG-WEB-301 — Aucun texte d'information sous 4,5:1** (3:1 pour les grands textes), dans les deux thèmes.
+
+**RG-WEB-302 — À 200 % de zoom, rien ne se perd** : aucun défilement horizontal, aucun contenu coupé.
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| 340 | Accueil parcouru à Tab | focus visible partout, ordre en-tête → contenu → pied, aucun piège | oui |
+| 341 | Connexion sans souris | case cochée par Espace, envoi par Entrée, connexion réussie | oui |
+| 342 | Porte d'identité, signalement, annulation, filtres | Échap ferme chacune, le focus revient sur son bouton | oui (ANO-WEB-94, 95 closes) |
+| 343 | Tab ×12 dans la porte d'identité | le focus ne sort jamais | oui (ANO-WEB-94 close) |
+| 344 | Contrôles sans texte (cœur, croix, œil, langue, thème, cloche, visionneuse) | libellés français parlants et distincts | oui (ANO-WEB-96 close) |
+| 345 | Inscription validée à vide | champs marqués, message lié, atteignables au clavier | oui |
+| 346 | Mode sombre : accueil, recherche, suivi, fil de messagerie, mes envois | aucun texte sous 3:1 | oui (ANO-WEB-97 close) |
+| 347 | Zoom 200 % : accueil, suivi | aucun défilement horizontal | oui |
+
+## Ce qui reste à trancher
+
+- **Le sélecteur de langue** annonce la langue de chaque bouton (« Français », « English ») plutôt que « Changer de
+  langue » : meilleur à l'usage, à acter dans le cahier.
+- **La croix du signalement s'appelle « Annuler »**, celles de la porte et de la visionneuse « Fermer » :
+  harmoniser.
+- **Le contraste en thème clair** n'est couvert par aucune fiche, alors que le défaut des compteurs y était pire
+  (1,5:1). À ajouter au cahier.
+- **Focus sur le premier champ en erreur** à la validation d'un formulaire : non exigé, fort bénéfice.

@@ -3660,6 +3660,129 @@ l'arbre desktop dans une fenêtre étroite — et n'aurait rien prouvé.
   reconnaît à sa **position** dans la feuille (et l'on consigne le problème de nom).
 - **`POST /deals/:id/tracking-link` rend un chemin RELATIF** : `new URL(...)` lève « Invalid URL ».
 
+## Chapitre 5.31 — Accessibilité clavier de base · **CONFORME** (8 fiches jouées, 4 après correction · 4 anomalies closes · 8 scénarios en série, 2 min)
+
+`web-a11y.spec.ts`. Le cahier le dit lui-même : ce n'est **pas** un audit d'accessibilité complet, c'est le minimum
+vérifiable sans outil spécialisé. Le harnais le joue donc **au clavier réel** (`keyboard.press("Tab")`,
+`Escape`, `Space`, `Enter`), jamais par des clics déguisés, et mesure ce qu'un lecteur d'écran lirait
+(`aria-label`, `aria-labelledby`, `aria-invalid`, `aria-describedby`). Trois choix de méthode, écrits en tête de
+spec : le focus visible = un contour **ou** une ombre portée (`focus-visible:ring-*` de Tailwind pose une ombre) ;
+le contraste = calcul WCAG 2.1 en **composant** les fonds semi-transparents jusqu'au premier fond opaque ; le zoom
+à 200 % = une fenêtre **divisée par deux** (640 × 420), ce que voit un navigateur zoomé à densité égale.
+
+| Fiche | Ce qui est éprouvé | Verdict · Preuve |
+|---|---|---|
+| WEB-A11Y-1 | Parcourir l'accueil au clavier | **Conforme** — chaque arrêt de tabulation se voit (contour ou anneau), l'ordre suit la lecture **en-tête → contenu → pied** sans jamais revenir en arrière, et `Maj+Tab` quitte l'élément courant (aucun piège) |
+| WEB-A11Y-2 | Connexion au clavier | **Conforme** — e-mail, mot de passe, « Rester connecté » coché par `Espace`, « Se connecter » par `Entrée` : `POST /auth/login` 200. *Constat : « Oublié ? » s'intercale entre les deux champs (le lien vit dans la ligne du libellé) — ordre lisible, motif courant.* |
+| WEB-A11Y-3 | Fermer par Échap, focus rendu | **Conforme après correction** → `ANO-WEB-94`, `ANO-WEB-95` ; les **quatre** fenêtres du cahier — porte d'identité, signalement, confirmation d'annulation, feuille des filtres (sur téléphone : elle n'existe pas sur grand écran) — s'ouvrent à `Entrée`, reçoivent le focus, se ferment à `Échap` **et rendent le focus à l'élément exact qui les a ouvertes** |
+| WEB-A11Y-4 | Focus piégé dans la fenêtre | **Conforme après correction** → `ANO-WEB-94` ; douze tabulations dans la porte d'identité, **aucune** ne sort vers la page |
+| WEB-A11Y-5 | Libellés des contrôles sans texte | **Conforme après correction** → `ANO-WEB-96` ; cœur « Ajouter aux favoris », langue « Français » / « English », thème « Changer de thème », croix du signalement « Annuler », croix de la porte **« Fermer »** (elle s'appelait « Plus tard », constat du 5.30 réglé), œil « Afficher le mot de passe », cloche « Notifications », visionneuse « Fermer » / « Photo précédente » / « Photo suivante » — après une **vraie** prise en charge à deux photos par Thomas |
+| WEB-A11Y-6 | Champs en erreur annoncés | **Conforme** — à vide, chaque champ en erreur porte `aria-invalid="true"` **et** un `aria-describedby` qui pointe sur SON message ; un champ en erreur est atteint au clavier |
+| WEB-A11Y-7 | Contraste en mode sombre | **Conforme après correction** → `ANO-WEB-97` ; accueil, recherche, **suivi d'un envoi**, **fil de messagerie** (avec ses bulles) et « Mes envois » : aucun texte sous 3:1 |
+| WEB-A11Y-8 | Zoom à 200 % | **Conforme** — accueil et suivi d'un envoi : aucun défilement horizontal, contenu présent |
+
+### Anomalies
+
+- **ANO-WEB-94 (majeure, close)** — **aucune fenêtre modale ne gérait le focus.** Dix-neuf `role="dialog"` dans
+  l'application, zéro ligne qui lise `document.activeElement` : à l'ouverture, le focus restait sur la page ;
+  pendant, `Tab` sortait de la fenêtre vers la page masquée par le voile ; à la fermeture, il retombait sur
+  `<body>` — le membre au clavier recommençait la page depuis le haut. `aria-modal="true"` **promettait** une
+  fenêtre modale que rien ne tenait. Pire, quatre feuilles **toujours montées** (fondu ou glissement :
+  `DealDeclineSheet`, `PickupRefuseDialog` en tiroir, `MobileSearchExperience`, `MobileFieldFullScreen`) laissaient
+  leurs boutons **atteignables à la tabulation une fois fermées**, invisibles ou hors écran. Correction : un
+  crochet partagé `useDialogFocus(ref, active, onEscape?)` (entrée, boucle `Tab` / `Maj+Tab`, restitution, pile
+  pour les fenêtres empilées) posé sur **les quatorze** fenêtres modales, et `inert` sur les feuilles fermées.
+- **ANO-WEB-95 (majeure, close)** — **la fenêtre de signalement ne se fermait pas avec Échap** (ni celle du
+  signalement d'un message) : aucun gestionnaire. C'est la fenêtre qu'on ouvre quand quelque chose ne va pas — la
+  seule sortie clavier était de tabuler jusqu'à la croix. Correction : l'option `onEscape` du même crochet, qui
+  ne ferme **que la fenêtre du dessus**.
+- **ANO-WEB-96 (mineure, close)** — **chaque vignette de photo s'annonçait « photo »**, en dur, non traduit, et
+  identique pour toutes : un lecteur d'écran entendait « photo, photo » sans savoir laquelle il ouvrait ; le
+  bouton « +N » s'annonçait « +2 ». Correction : « Agrandir la photo 1 sur 2 » (précédé de la légende si elle
+  existe) et « Voir 2 photos de plus », en français et en anglais.
+- **ANO-WEB-97 (mineure, close)** — **les compteurs des en-têtes de groupe étaient illisibles** : « · 3 » en
+  `slate-600` sur `slate-900` (2,36:1) en sombre — et en `slate-300` sur blanc (**1,5:1**) en clair, que la fiche
+  ne mesure pas mais qui saute aux yeux une fois le motif repéré. Mêmes classes dans quatre listes
+  (« Mes envois », « Mes trajets », accueil du tableau de bord, liste des trajets). Correction : libellé et
+  compteur en `slate-500` / `dark:slate-400` (≥ 4,5:1 dans les deux thèmes).
+- **Constat du 5.30 réglé** — dans la porte d'identité, la croix, le voile et le lien du bas portaient tous le
+  nom « Plus tard ». La croix s'appelle désormais « Fermer » ; le voile (clic souris) sort de la tabulation et de
+  l'arbre d'accessibilité — il était le **premier arrêt** du piège de focus.
+
+### Deux faux positifs de l'instrument, corrigés avant de conclure
+
+- **Le contraste d'un fond semi-transparent.** La première mesure donnait « Tout » à **1,25:1** et « Départ le plus
+  tôt » à 2,14:1 : le calcul prenait `bg-[#FF9900]/15` pour de l'orange **plein**. Le fond réel est une teinte à
+  15 % composée sur le blanc ou le noir du dessous. La mesure empile désormais les couches jusqu'au premier fond
+  opaque et les compose — les deux « anomalies » ont disparu, la vraie (les compteurs) est restée.
+- **Des frappes perdues avant l'hydratation.** WEB-A11Y-2 envoyait `per@seed.yamba.dev` alors que le champ
+  affichait l'adresse complète : les douze premiers caractères, tapés avant que React n'attache ses écouteurs,
+  n'étaient jamais entrés dans l'état du formulaire. Ce n'est pas un défaut observable en production (hydratation
+  en quelques dizaines de millisecondes), c'est le piège n° 2 de l'en-tête de campagne — rejoué ici **au clavier**.
+
+### Non-régression rejouée, et trois fiches anciennes remises d'aplomb
+
+Les correctifs touchent quatorze fenêtres : les chapitres qui les ouvrent ont été rejoués — **web-sig 8/8,
+web-ann 9/9, web-mob 10/10, web-rch 16/16, web-msg 21/21, web-fav 12/12, web-not 11/11, web-dea 9/9, web-acc 12/12,
+web-pic 8/8** (les `test.fail` d'ANO-WEB-28 et 68 restent attendus). Trois échecs sont apparus, **aucun dû au
+5.31** — preuve faite en rejouant web-dea et web-pic sur le produit **sans** les correctifs :
+
+- **WEB-DEA-1** attendait « 26 sept. » écrit en dur, alors que le jeu d'essai place le trajet à J+15 **du rejeu** :
+  la fiche cassait dès le lendemain de son écriture. La date attendue se calcule désormais.
+- **WEB-PIC-7** interdisait tout bouton « Valider la livraison » sur l'écran de transit — mais le correctif
+  d'ANO-WEB-60 (chapitre 5.18) y a volontairement ajouté le raccourci « Clarisse est déjà devant toi ? ». Assertion
+  périmée depuis le 5.18, jamais revue parce que la fiche échouait AVANT (PIC-8 n'avait donc plus été joué).
+  Mise à jour ; et **WEB-PIC-8** lisait le suivi avant son rendu client (corps vide) : lecture par sondage.
+- **WEB-ACC-5** cliquait « Confidentialité » juste après `goBack`, parfois avant que la page restaurée reprenne la
+  main (intermittent, 1 sur 2) : geste réessayé, borné.
+
+### À trancher (produit)
+
+- **Le sélecteur de langue** est un contrôle segmenté « FR / EN » dont chaque bouton porte le nom de SA langue
+  (« Français », « English ») ; le cahier attendait « Changer de langue ». Le choix actuel est meilleur (on
+  annonce la destination, pas l'action) — à acter dans le cahier.
+- **La croix du signalement s'appelle « Annuler »** (clé `cancel` réutilisée) quand celles de la porte et de la
+  visionneuse s'appellent « Fermer » : harmoniser — petit.
+- **Le contraste en thème clair** n'est mesuré par aucune fiche ; `text-slate-400` sur blanc (2,56:1) sert encore
+  à des libellés d'information ailleurs. Une fiche « contraste en clair » ou une passe `axe-core` est le prochain
+  pas — moyen.
+
+### Regard d'expert — optimisations et améliorations (une ligne par fiche)
+
+- **A11Y-1** — L'ordre et la visibilité du focus sont sains. Ajouter un lien « Aller au contenu » (premier arrêt,
+  visible au focus) épargnerait la traversée de l'en-tête à chaque page — petit, standard.
+- **A11Y-2** — Parcours clavier complet. `enterKeyHint` est déjà posé (« suivant » / « go ») : rien à faire.
+  Déplacer « Oublié ? » sous le champ mot de passe rendrait l'ordre strictement linéaire — confort, petit.
+- **A11Y-3** — Le retour du focus est vérifié sur l'**élément** (attribut posé sur l'ouvreur), pas sur un texte :
+  deux « Annuler » cohabitent sur « Mes envois ». Généraliser `ouvrirPuisEchap()` à toute nouvelle fenêtre — petit.
+- **A11Y-4** — Le crochet est partagé : une nouvelle fenêtre qui l'oublie est le prochain défaut. Une garde de
+  source (« tout `aria-modal` appelle `useDialogFocus` ») dans le script i18n/CI le rendrait impossible — moyen, et
+  c'est la suite logique de la garde proposée au 5.30.
+- **A11Y-5** — Les libellés sont en français et parlants. Le cœur pourrait annoncer son état par `aria-pressed`
+  plutôt que par un changement de libellé — petit.
+- **A11Y-6** — Liaison champ ↔ message exemplaire. Déplacer le focus sur le **premier** champ en erreur à la
+  validation (aujourd'hui il reste sur le bouton) éviterait de le chercher — petit, fort effet au clavier.
+- **A11Y-7** — Mesure calculée, pas « à l'œil » : elle a trouvé un défaut que le mode clair avait aussi. Voir « à
+  trancher » pour le thème clair — moyen.
+- **A11Y-8** — Tient à 200 %. Jouer aussi 400 % (320 px de large, critère WCAG 1.4.10) coûte une ligne — petit.
+- **Transversal** — Trois anomalies sur quatre sont **la même** : une convention d'accessibilité posée à moitié
+  (`aria-modal` sans piège, `role="dialog"` sans Échap, `aria-label` générique). Le correctif n'est pas quatorze
+  rustines mais **un crochet** ; la prochaine étape est une garde qui oblige à s'en servir.
+
+### Pièges de poste payés ici
+
+- **Taper avant l'hydratation perd des frappes** au clavier aussi (pas seulement au clic) : attendre le premier
+  appel d'API du client avant de saisir.
+- **Un fond `…/15` n'est pas un fond** : composer les couches semi-transparentes avant de calculer un contraste.
+- **La feuille des filtres n'existe que sur téléphone** (`md:hidden`) : sur grand écran, le bouton est absent et
+  une fiche qui écrit `if (await filtres.count())` passe **sans rien éprouver**.
+- **Les feuilles de recherche restent montées hors écran** : un « dialog visible » peut désigner la mauvaise
+  fenêtre. On vise celle qui **contient le focus**.
+- **`document.activeElement` sur `<body>` rend le texte des scripts** (`((e, i, s, u…`) : c'est la signature d'un
+  focus perdu, pas d'un bug de mesure.
+- **Le suivi d'un envoi n'a pas de photos dans le jeu d'essai** : pour la visionneuse, il faut une vraie prise en
+  charge (Thomas, deux photos, ImageKit interposé).
+
 ## Chapitre 6 — WEB-E2E-1, le nominal complet · **CONFORME** (29 étapes, 1 min 24)
 
 | Étape du cahier | Ce qui est éprouvé | Verdict |
