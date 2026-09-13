@@ -10,7 +10,7 @@
     "titleLine2": "avec",
     "titleHighlight": "quelqu'un qui part déjà",
     "titleEnd": "?",
-    "subtitle": "Yamba connecte les expéditeurs aux voyageurs partout dans le monde.",
+    "subtitle": "Yamba connecte les expéditeurs aux Voyageurs partout dans le monde.",
     "search": {
       "from": "Départ",
       "fromPlaceholder": "Paris",
@@ -44,7 +44,7 @@
       "value": "0",
       "valueUnit": "km en plus",
       "title": "Zéro CO₂ supplémentaire",
-      "description": "Le voyageur partait de toute façon. Yamba ne crée pas de transport, il optimise l'existant."
+      "description": "Le Voyageur partait de toute façon. Yamba ne crée pas de transport, il optimise l'existant."
     },
     "savings": {
       "tag": "Économie",
@@ -164,7 +164,7 @@
     "titleEnd": ".",
     "items": {
       "r1": {
-        "quote": "Colis envoyé à Brazzaville pour 3 fois moins cher. La voyageuse m'a tenue au courant tout du long.",
+        "quote": "Colis envoyé à Brazzaville pour 3 fois moins cher. La Voyageuse m'a tenue au courant tout du long.",
         "name": "Aminata L.",
         "role": "Paris → Brazzaville"
       },
@@ -179,7 +179,7 @@
         "role": "Bordeaux → Madrid"
       },
       "r4": {
-        "quote": "Reçu mon colis en moins de 24h, livré en main propre par un voyageur sympa. Bluffant.",
+        "quote": "Reçu mon colis en moins de 24h, livré en main propre par un Voyageur sympa. Bluffant.",
         "name": "David K.",
         "role": "Bruxelles → Paris"
       },

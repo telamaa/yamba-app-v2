@@ -300,7 +300,7 @@ test.describe("WEB-RCH — recherche, filtres, tri, état vide (chapitre 5.9)", 
     await ouvrirLaRecherche(page, { from: "Brazzaville", to: "Paris" });
     await expect(page.getByRole("heading", { level: 1 })).toHaveText("Trajets pour Brazzaville → Paris");
     await expect(page.getByText("Aucun trajet ne correspond ?")).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByText("Crée une alerte et reçois un email dès qu'un voyageur publie ce trajet.")).toBeVisible();
+    await expect(page.getByText("Crée une alerte et reçois un email dès qu'un Voyageur publie ce trajet.")).toBeVisible();
     await expect(page.getByRole("button", { name: "Créer une alerte pour ce trajet" })).toBeVisible();
     expect(await ordreDesCartes(page)).toEqual([]);
     // Le titre « Aucun trajet trouvé » et sa phrase : le bloc « alerte » les remplace quand un

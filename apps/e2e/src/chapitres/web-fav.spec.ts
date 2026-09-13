@@ -232,7 +232,7 @@ test.describe("WEB-FAV — favoris et Voyageurs suivis (chapitre 5.11)", () => {
     expect(await mesSuivis(contexte)).toEqual(expect.arrayContaining([{ publicSlug: slug, notifyNextTrip: true }]));
 
     await ouvrirVoyageursSuivis(page);
-    await expect(page.getByText("1 voyageur suivi")).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText("1 Voyageur suivi")).toBeVisible({ timeout: 30_000 });
     const texte = await page.locator("main").innerText();
     // (`innerText` rend les intertitres en capitales CSS : comparaisons sans casse.)
     expect(texte).toMatch(/Thomas/);
@@ -278,7 +278,7 @@ test.describe("WEB-FAV — favoris et Voyageurs suivis (chapitre 5.11)", () => {
     await ouvrirVoyageursSuivis(page);
     await page.getByRole("button", { name: "Ne plus suivre" }).first().click();
     await page.getByRole("button", { name: "Confirmer" }).first().click();
-    await expect(page.getByText("Tu ne suis plus ce voyageur")).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText("Tu ne suis plus ce Voyageur")).toBeVisible({ timeout: 15_000 });
     await expect(page.getByRole("button", { name: "Ne plus suivre" })).toHaveCount(0, { timeout: 15_000 });
     await expect.poll(() => abonnes(contexte, slug), { timeout: 15_000 }).toBe(avant - 1);
     expect((await mesSuivis(contexte)).map((s) => s.publicSlug)).not.toContain(slug);
@@ -299,8 +299,8 @@ test.describe("WEB-FAV — favoris et Voyageurs suivis (chapitre 5.11)", () => {
     const { page, contexte } = await navigateurConnecte("aminata", { parEcran: true });
     for (const s of await mesSuivis(contexte)) await contexte.request.delete(`${api()}/users/${s.publicSlug}/follow`);
     await ouvrirVoyageursSuivis(page);
-    await expect(page.getByText("Aucun voyageur suivi")).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByText(/Découvre les voyageurs de la communauté et suis ceux qui correspondent à tes besoins/)).toBeVisible();
+    await expect(page.getByText("Aucun Voyageur suivi")).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText(/Découvre les Voyageurs de la communauté et suis ceux qui correspondent à tes besoins/)).toBeVisible();
     await expect(page.getByRole("link", { name: "Découvrir des Voyageurs" }).or(page.getByRole("button", { name: "Découvrir des Voyageurs" })).first()).toBeVisible();
   });
 });

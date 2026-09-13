@@ -20,7 +20,7 @@
     "locationsTitle": "Lieux de rendez-vous",
     "pickupBlockTitle": "Tu remets le colis à {carrierFirstName}",
     "deliveryBlockTitle": "Le destinataire récupère le colis",
-    "locationSingleHint": "Lieu convenu avec le voyageur",
+    "locationSingleHint": "Lieu convenu avec le Voyageur",
     "locationMissing": "Le Voyageur n'a pas précisé de lieu pour ce trajet : vous conviendrez ensemble du point de rendez-vous dans la conversation, une fois la demande acceptée.",
     "goldenRules": {
       "title": "Les règles d''or pour un envoi qui se passe bien",
@@ -59,7 +59,7 @@
     },
     "family": {
       "label": "Famille du colis",
-      "hint": "La famille dit si le voyageur l'accepte — elle ne change pas le prix au kilo, sauf supplément affiché.",
+      "hint": "La famille dit si le Voyageur l'accepte — elle ne change pas le prix au kilo, sauf supplément affiché.",
       "refused": "{carrierFirstName} ne prend pas cette famille sur ce trajet"
     },
     "size": {
@@ -105,7 +105,7 @@
       "title": "Comment se passera la livraison",
       "codeGiven": "**Un code à 6 chiffres** te sera donné après le paiement.",
       "shareIt": "**Tu le transmets** au destinataire par SMS, WhatsApp ou oralement.",
-      "handToTraveler": "**Il le donne au voyageur** à la livraison. Sans ce code, le colis ne peut pas être remis."
+      "handToTraveler": "**Il le donne au Voyageur** à la livraison. Sans ce code, le colis ne peut pas être remis."
     },
     "form": {
       "firstName": "Prénom",
@@ -123,9 +123,9 @@
     "subtitle": "Tu certifies sur l''honneur le contenu du colis",
     "handoverFlow": {
       "title": "À la remise du colis, voici ce qui se passera",
-      "visualInspection": "**Vérification visuelle obligatoire.** Le voyageur examinera ton colis avant d''accepter — ne sois pas surpris.",
-      "refusalPossible": "**Refus possible si non-conforme.** Si le contenu diffère de ta déclaration, le voyageur peut refuser. Tu seras remboursé mais le trajet sera perdu.",
-      "crossPhotos": "**Photos croisées.** Le voyageur prendra ses propres photos qui feront foi en cas de litige."
+      "visualInspection": "**Vérification visuelle obligatoire.** Le Voyageur examinera ton colis avant d''accepter — ne sois pas surpris.",
+      "refusalPossible": "**Refus possible si non-conforme.** Si le contenu diffère de ta déclaration, le Voyageur peut refuser. Tu seras remboursé mais le trajet sera perdu.",
+      "crossPhotos": "**Photos croisées.** Le Voyageur prendra ses propres photos qui feront foi en cas de litige."
     },
     "charter": {
       "title": "Charte Expéditeur",
@@ -134,7 +134,7 @@
       "noIllicit": "ne contient **aucun produit illicite**, dangereux ou interdit",
       "matchDeclared": "correspond exactement à la **catégorie, au poids et au contenu déclarés**",
       "customsCompliant": "respecte les **obligations douanières** du pays de destination",
-      "disclaimer": "Toute déclaration mensongère engage ma seule responsabilité civile et pénale, à l''exclusion de celle du voyageur et de Yamba.",
+      "disclaimer": "Toute déclaration mensongère engage ma seule responsabilité civile et pénale, à l''exclusion de celle du Voyageur et de Yamba.",
       "fullLink": "Voir la charte complète et les produits interdits"
     },
     "accept": {
@@ -148,21 +148,21 @@
   },
   "step4": {
     "title": "Paiement",
-    "subtitle": "Le montant est autorisé maintenant et débité uniquement quand le voyageur accepte (sous 24 h).",
+    "subtitle": "Le montant est autorisé maintenant et débité uniquement quand le Voyageur accepte (sous 24 h).",
     "loadingMessage": "Préparation du paiement…",
     "retry": "Réessayer",
     "testMode": "Mode test : aucun prestataire de paiement n''est configuré. L''autorisation de {amount} est simulée — clique sur « Payer » pour envoyer ta demande.",
     "stripeMissing": "Le paiement en ligne n''est pas disponible pour le moment. Réessaie dans quelques minutes.",
     "elementLoadError": "Le module de paiement n''a pas pu se charger. Vérifie ta connexion puis réessaie.",
     "confirmFailed": "Le paiement n''a pas pu être autorisé. Vérifie ta carte et réessaie.",
-    "requestSent": "Demande envoyée ! Le voyageur a 24 h pour accepter.",
+    "requestSent": "Demande envoyée ! Le Voyageur a 24 h pour accepter.",
     "errors": {
       "UPLOAD_FAILED": "Le téléversement d''une photo a échoué. Vérifie ta connexion et réessaye — ta carte n''a pas été débitée.",
       "UPLOAD_TOO_LARGE": "Une photo dépasse {maxMb} Mo. Réduis-la ou retire-la — ta carte n''a pas été débitée.",
       "UPLOAD_INVALID_TYPE": "Format de photo non pris en charge (JPG, PNG, HEIC ou WebP) — ta carte n''a pas été débitée.",
       "QUOTE_DIVERGENCE": "Le prix a changé depuis ton devis. Le nouveau total est affiché — vérifie-le avant de payer.",
       "CAPACITY_EXCEEDED": "Il ne reste plus assez de place sur ce trajet pour ton colis.",
-      "FAMILY_REFUSED": "Le voyageur n''accepte pas ce type de colis sur ce trajet.",
+      "FAMILY_REFUSED": "Le Voyageur n''accepte pas ce type de colis sur ce trajet.",
       "TRIP_NOT_BOOKABLE": "Ce trajet n''accepte plus de demandes.",
       "OWN_TRIP": "Tu ne peux pas réserver ton propre trajet.",
       "NEW_ACCOUNT_CAP": "Ton compte est récent : pour l'instant, tes envois sont plafonnés (valeur déclarée, poids et nombre par mois). Le plafond se lève avec tes premiers envois terminés.",
@@ -175,11 +175,11 @@
     },
     "afterPayment": {
       "title": "Après ton paiement",
-      "step1": "Le voyageur reçoit ta demande et a **24h pour accepter**. Tu n''es débité qu''à acceptation.",
-      "step2": "Rendez-vous avec le voyageur pour la **remise du colis**, qu''il vérifiera et photographiera.",
+      "step1": "Le Voyageur reçoit ta demande et a **24h pour accepter**. Tu n''es débité qu''à acceptation.",
+      "step2": "Rendez-vous avec le Voyageur pour la **remise du colis**, qu''il vérifiera et photographiera.",
       "step3": "Une fois le colis déposé, tu reçois ton **code à 6 chiffres**, à transmettre au destinataire.",
-      "step4": "Le destinataire communique le code au voyageur à l''arrivée, qui le saisit pour valider la livraison.",
-      "step5": "**3 jours après** la livraison validée, le voyageur reçoit son paiement."
+      "step4": "Le destinataire communique le code au Voyageur à l''arrivée, qui le saisit pour valider la livraison.",
+      "step5": "**3 jours après** la livraison validée, le Voyageur reçoit son paiement."
     },
     "trustStripe": "Paiement sécurisé par Stripe. Yamba ne stocke jamais tes données bancaires."
   },
@@ -192,10 +192,10 @@
     "insurance": "Garantie Yamba",
     "insurance500": "Garantie Yamba 500 €",
     "total": "Total",
-    "totalNote": "Débité à acceptation par le voyageur",
-    "totalNoteLong": "Le montant est autorisé maintenant et débité uniquement quand le voyageur accepte.",
+    "totalNote": "Débité à acceptation par le Voyageur",
+    "totalNoteLong": "Le montant est autorisé maintenant et débité uniquement quand le Voyageur accepte.",
     "totalLabel": "Total à payer",
-    "ctaHint": "Tu n''es débité qu''à acceptation par le voyageur",
+    "ctaHint": "Tu n''es débité qu''à acceptation par le Voyageur",
     "detail": "Détail",
     "hide": "Masquer",
     "parcel": "Colis",

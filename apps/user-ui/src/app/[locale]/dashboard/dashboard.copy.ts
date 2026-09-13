@@ -13,7 +13,7 @@ export function getDashboardCopy(isFr: boolean) {
     },
     shipments: {
       title: isFr ? "Mes envois" : "My shipments",
-      sub: isFr ? "Suis tes colis confiés aux Voyageurs" : "Track parcels entrusted to travelers",
+      sub: isFr ? "Suis tes colis confiés aux Voyageurs" : "Track parcels entrusted to Travelers",
     },
     create: {
       title: isFr ? "Créer un trajet" : "Create a trip",
@@ -34,10 +34,10 @@ export function getDashboardCopy(isFr: boolean) {
         : "Get notified when a matching trip is published",
     },
     following: {
-      title: isFr ? "Voyageurs suivis" : "Followed travelers",
+      title: isFr ? "Voyageurs suivis" : "Followed Travelers",
       sub: isFr
         ? "Reste à l'affût des publications de tes Voyageurs favoris"
-        : "Stay tuned for posts from your favorite travelers",
+        : "Stay tuned for posts from your favorite Travelers",
     },
     payments: {
       title: isFr ? "Paiements" : "Payments",
@@ -53,7 +53,7 @@ export function getDashboardCopy(isFr: boolean) {
     },
     yamber: {
       title: isFr ? "Devenir Voyageur" : "Become a Traveler",
-      sub: isFr ? "Rejoins la communauté des Voyageurs Yamba" : "Join the Yamba travelers community",
+      sub: isFr ? "Rejoins la communauté des Voyageurs Yamba" : "Join the Yamba Travelers community",
     },
     security: {
       title: isFr ? "Sécurité" : "Security",
@@ -141,8 +141,8 @@ export function getDashboardCopy(isFr: boolean) {
       firstName: isFr ? "Prénom" : "First name",
       lastName: isFr ? "Nom" : "Last name",
       birthDate: isFr ? "Date de naissance" : "Date of birth",
-      birthDateHint: isFr ? "Jamais affichée ; sert à pré-remplir Stripe pour les Voyageurs." : "Never shown; pre-fills Stripe for travelers.",
-      displayName: isFr ? "Nom affiché sur ta page Voyageur" : "Name shown on your traveler page",
+      birthDateHint: isFr ? "Jamais affichée ; sert à pré-remplir Stripe pour les Voyageurs." : "Never shown; pre-fills Stripe for Travelers.",
+      displayName: isFr ? "Nom affiché sur ta page Voyageur" : "Name shown on your Traveler page",
       bio: isFr ? "Présentation" : "About you",
       save: isFr ? "Enregistrer" : "Save",
       saved: isFr ? "Profil enregistré." : "Profile saved.",

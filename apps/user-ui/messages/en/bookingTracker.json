@@ -284,7 +284,7 @@
       "DAMAGED_short": "Parcel or content damaged",
       "SIGNIFICANT_DELAY": "Significantly late delivery",
       "SIGNIFICANT_DELAY_short": "Significantly late delivery",
-      "RECIPIENT_ISSUE": "{recipientFirstName} has another issue with the traveler",
+      "RECIPIENT_ISSUE": "{recipientFirstName} has another issue with the Traveler",
       "RECIPIENT_ISSUE_short": "Another issue with {carrierFirstName}",
       "OTHER": "Other issue",
       "OTHER_short": "Other",

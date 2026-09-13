@@ -1,6 +1,6 @@
 {
   "title": "Your parcel is on its way, {recipientFirstName}",
-  "subtitle": "{shipperFirstName} is sending you a parcel with {carrierFirstName} {carrierInitial}., a Yamba traveler, from {originCity} to {destinationCity}.",
+  "subtitle": "{shipperFirstName} is sending you a parcel with {carrierFirstName} {carrierInitial}., a Yamba Traveler, from {originCity} to {destinationCity}.",
   "departure": "Departure",
   "arrival": "Expected arrival",
   "current": "Where the parcel is",
@@ -30,6 +30,6 @@
     "title": "You too, send or carry with Yamba",
     "text": "Parcels that travel with trusted people, cheaper and faster than a traditional shipping service.",
     "send": "Send a parcel",
-    "carry": "Become a traveler"
+    "carry": "Become a Traveler"
   }
 }

@@ -111,7 +111,7 @@ test.describe("WEB-RSV — l'assistant en quatre étapes et le devis (chapitre 5
     expect(t).toContain("Lieux de rendez-vous");
     expect(t).toContain("Tu remets le colis à Thomas");
     expect(t).toContain("Le destinataire récupère le colis");
-    expect(t).toMatch(/Lieu convenu avec le voyageur/);
+    expect(t).toMatch(/Lieu convenu avec le Voyageur/);
     expect(t).toMatch(/À l'aéroport/);
     expect(t).toMatch(/Lieu exact/);
     expect(t, "jamais le message « pas de lieu » sur ce trajet").not.toContain("n'a pas précisé de lieu");
@@ -327,7 +327,7 @@ test.describe("WEB-RSV — l'assistant en quatre étapes et le devis (chapitre 5
     expect(t).toContain("Comment se passera la livraison");
     expect(t).toMatch(/Un code à 6 chiffres te sera donné après le paiement\./);
     expect(t).toMatch(/Tu le transmets au destinataire par SMS, WhatsApp ou oralement\./);
-    expect(t).toMatch(/Il le donne au voyageur à la livraison\. Sans ce code, le colis ne peut pas être remis\./);
+    expect(t).toMatch(/Il le donne au Voyageur à la livraison\. Sans ce code, le colis ne peut pas être remis\./);
     await expect(page.getByRole("button", { name: "Étape précédente" }).first()).toBeVisible();
     const indicatif = page.locator("select").first();
     await expect(indicatif).toHaveValue("+33");
@@ -359,7 +359,7 @@ test.describe("WEB-RSV — l'assistant en quatre étapes et le devis (chapitre 5
     expect(t).toMatch(/aucun produit illicite/);
     expect(t).toMatch(/catégorie, au poids et au contenu déclarés/);
     expect(t).toMatch(/obligations douanières/);
-    expect(t).toContain("Toute déclaration mensongère engage ma seule responsabilité civile et pénale, à l'exclusion de celle du voyageur et de Yamba.");
+    expect(t).toContain("Toute déclaration mensongère engage ma seule responsabilité civile et pénale, à l'exclusion de celle du Voyageur et de Yamba.");
     expect(await page.locator('input[type="checkbox"]').filter({ visible: true }).count(), "une seule case").toBe(1);
     expect(t).toMatch(/CGV/);
     expect(t).toMatch(/Contrat de transport/);
@@ -369,19 +369,19 @@ test.describe("WEB-RSV — l'assistant en quatre étapes et le devis (chapitre 5
     await assistant.continuer();
 
     // WEB-RSV-15 : le paiement (fournisseur FAKE).
-    await expect(page.getByText("Le montant est autorisé maintenant et débité uniquement quand le voyageur accepte (sous 24 h).")).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText("Le montant est autorisé maintenant et débité uniquement quand le Voyageur accepte (sous 24 h).")).toBeVisible({ timeout: 30_000 });
     await expect(page.getByText(/Mode test : aucun prestataire de paiement n'est configuré\. L'autorisation de 32,20 € est simulée/)).toBeVisible({ timeout: 30_000 });
     t = await texte(page);
     expect(t).toContain("Après ton paiement");
     expect(t).toMatch(/24h pour accepter/);
-    expect(t).toMatch(/3 jours après la livraison validée, le voyageur reçoit son paiement\./);
+    expect(t).toMatch(/3 jours après la livraison validée, le Voyageur reçoit son paiement\./);
     expect(t).toContain("Paiement sécurisé par Stripe. Yamba ne stocke jamais tes données bancaires.");
     expect(await assistant.montantAPayer()).toBe("32,20 €");
     expect(await page.locator('iframe[name^="__privateStripeFrame"]').count(), "un seul composant de paiement (aucun iframe Stripe en FAKE)").toBe(0);
 
     // WEB-RSV-17 : la demande est envoyée.
     await assistant.payer();
-    await expect(page.getByText("Demande envoyée ! Le voyageur a 24 h pour accepter.")).toBeVisible({ timeout: 30_000 }).catch(() => undefined);
+    await expect(page.getByText("Demande envoyée ! Le Voyageur a 24 h pour accepter.")).toBeVisible({ timeout: 30_000 }).catch(() => undefined);
     await expect.poll(() => page.url(), { timeout: 90_000 }).toMatch(/\/bookings\/[0-9a-f]{24}$/);
     await expect(page.getByText("En attente du Voyageur")).toBeVisible({ timeout: 30_000 });
     await expect(page.getByText(/Ta demande est envoyée et ton paiement est autorisé — rien n'est débité tant que le Voyageur n'a pas accepté\./)).toBeVisible();

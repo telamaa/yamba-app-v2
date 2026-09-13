@@ -138,7 +138,7 @@ test.describe("WEB-LIT — litige et médiation, vue membre (chapitre 5.21)", ()
     for (const badge of ["Requis", "Recommandé", "Optionnel"]) expect(corps, `badge « ${badge} »`).toContain(badge);
     expect(corps).toContain("Quel est le problème ?");
     expect(corps).toContain("Choisis la situation qui correspond le mieux");
-    for (const motif of ["Le colis n'a jamais été livré à Clarisse", "Contenu manquant ou différent de la déclaration", "Colis ou contenu endommagé", "Délai significativement dépassé", "Clarisse a un autre problème avec le voyageur", "Autre problème"]) {
+    for (const motif of ["Le colis n'a jamais été livré à Clarisse", "Contenu manquant ou différent de la déclaration", "Colis ou contenu endommagé", "Délai significativement dépassé", "Clarisse a un autre problème avec le Voyageur", "Autre problème"]) {
       await expect(page.getByRole("radio", { name: motif, exact: true }), `motif « ${motif} »`).toBeVisible();
     }
     expect(corps).toContain("Raconte-nous ce qui s'est passé");
