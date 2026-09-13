@@ -7375,3 +7375,96 @@ fournisseur est créé paresseusement par `getEmailProvider`). La règle repart 
 ## Tests
 
 `apps/e2e` : **360 scénarios** (356 + 4), les 4 verts deux fois de suite. Plateforme inchangée (auth 235).
+
+
+---
+
+# Cahier 02-ADMIN, § 5.3 : utilisateurs — une recherche qui n'échappait pas son terme, un jeu d'essai qui oubliait des compteurs
+
+*(PR `chore/recette-admin-5-3`, empilée sur #303, 13/09/2026.)*
+
+## Ce qui a été fait
+
+Trois fiches (ADM-USR-1 à 3), conformes après deux corrections (`ANO-ADM-05`, `ANO-ADM-06`).
+
+```
+apps/e2e/src/admin/adm-usr-utilisateurs.spec.ts        3 scénarios en série — jeu d'essai rejoué avant ET après
+apps/auth-service/src/lib/admin-users.query.ts         ANO-ADM-05 — escapeRegex, phoneNeedle, matchedOnFor, textSearchOr
+apps/auth-service/src/lib/admin-users.query.spec.ts    +3 tests
+apps/auth-service/src/services/admin-users.service.ts  les deux recherches passent par les mêmes fonctions
+packages/libs/prisma/scripts/seed-deals.ts             ANO-ADM-06 — compteurs internes remis à zéro au rejeu
+```
+
+## ANO-ADM-05 : `contains` est une expression régulière sur MongoDB
+
+Avec le connecteur MongoDB, Prisma traduit `{ contains: t }` en `{ $regex: t }` **sans échapper `t`**. Mesuré en base :
+
+| Terme | Résultat |
+|---|---|
+| `+33612345601` | 0 compte — le `+` initial est un quantificateur |
+| `33612345601` | 1 compte (Thomas) |
+| `a.b` | 52 comptes — le `.` vaut n'importe quel caractère |
+| `(` | erreur Mongo 51111 → 500 |
+
+Le placeholder de l'écran propose lui-même `+33…` : la recherche par téléphone ne marchait donc jamais sous sa forme
+naturelle. Correction : trois fonctions pures, testées sans base.
+
+```ts
+export function escapeRegex(term: string): string {
+  return term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** « +33 6 12 34 56 01 », « 0033612345601 », « 06 12 34 56 01 » → un morceau contenu dans « +33612345601 ». */
+export function phoneNeedle(term: string): string | null {
+  const digits = term.replace(/[^\d+]/g, "");
+  if (digits.length < 6) return null;              // règle C-PR7a inchangée
+  const bare = digits.replace(/\+/g, "");
+  if (bare.startsWith("00")) return bare.slice(2);
+  if (bare.startsWith("0")) return bare.slice(1);  // « 0 » national : « 612345601 » est contenu dans le E.164
+  return bare;
+}
+```
+
+`textSearchOr(term)` construit le `OR` (email, prénom, nom échappés ; téléphone par `phoneNeedle`) pour les **deux**
+recherches du service — `searchAdvanced`, appelée par l'écran, et `search`, l'ancienne. Second défaut corrigé au passage :
+`searchAdvanced` calculait la mention « via … » avec « email sinon name », jamais « phone » ; `matchedOnFor(row, term)`
+est désormais la seule définition.
+
+**Même défaut ailleurs, non corrigé ici** : `apps/trip-service/src/lib/admin-trips.rules.ts` et
+`trip-search.controller.ts` (recherche publique). Hors périmètre du chapitre, consigné au rapport pour le § 5.7.
+
+## ANO-ADM-06 : un rejeu qui n'efface que la moitié de l'histoire
+
+`seed-deals.ts` supprime et recrée litiges, deals et avis des comptes du seed, mais les **compteurs dénormalisés** du
+document utilisateur (`shipperDisputesLostCount`…) et de la page Voyageur (`disputesLostCount`…) survivaient. Chaque
+litige tranché en recette ajoutait donc un litige perdu « pour toujours » : mesuré 2 puis 3 pour Chinwe en trois
+passages d'USR-3, score 46 → 56. Au suivant, elle devenait « À risque » et ses réservations étaient plafonnées : les
+chapitres web de réservation auraient échoué pour une raison sans rapport. Les deux `upsert` remettent à zéro
+litiges perdus et annulations tardives (Expéditeur et Voyageur). Deals terminés et avis ne sont pas touchés : des
+écrans des chapitres web les affichent, et le seed ne les a jamais posés.
+
+## USR-2 : deux lignes de journal par ouverture, en développement
+
+La fiche charge `GET /admin/users/:id` dans un `useEffect` ; le contrôleur journalise `USER_VIEWED` à chaque `GET`. En
+développement, React 18+ en mode strict **monte deux fois** les effets : deux `GET` (vus dans les logs du gateway, par
+paires), deux lignes. La fiche accepte « au moins une par ouverture, rien d'autre » et consigne le chiffre ; le
+dédoublonnage serveur est proposé (rapport, « à trancher »).
+
+## USR-3 : le score est une somme bornée
+
+`computeTrustScore` additionne les facteurs puis borne à 0..100. Un crédit (−4 par deal terminé) masqué par le plancher
+absorbe une partie des 25 points d'un litige perdu : 0 → 21. La fiche vérifie l'invariant réel — `score =
+clamp(Σ facteurs)` et `Δ Σ = Δ facteur litiges` — plutôt que « +25 ».
+
+## Redémarrer un service sous `nx run-many` : piège de poste
+
+Modifier `auth-service` pendant que `nx run-many --target=serve` tourne a déclenché « Recursive task invocation
+detected » : la reconstruction a échoué, **l'ancien processus a continué de répondre 200 sur `/health`**. Seul un
+compteur (`grep -c escapeRegex dist/main.js`) et le rejeu de la fiche le montraient. Remède utilisé : `nx build
+auth-service`, arrêt du processus sur 6001, `node --env-file=../../.env dist/main.js`.
+
+## Tests
+
+- auth-service **238** (235 + 3).
+- `apps/e2e` : **363 scénarios** (360 + 3), les 3 verts deux fois de suite après corrections, identiques.
+- Typecheck auth-service et harnais verts.
