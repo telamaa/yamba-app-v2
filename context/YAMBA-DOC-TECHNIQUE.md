@@ -74,6 +74,18 @@ NRG-7 attend la réponse (`403` + `details.code === "SUDO_REQUIRED"`) et la port
 « M'envoyer le code ». La suppression se joue sur un compte neuf créé par la fiche : confirmer « SUPPRIMER » sur un
 compte du jeu d'essai qui aurait une fenêtre sudo ouverte l'effacerait pour de bon.
 
+## Améliorations au GO : refuser franchement, et un type qui ne ment plus
+
+- **CORS** (`apps/api-gateway/src/libs/origins.ts`) : `origineAutorisee(origin)` (pure), et un middleware AVANT `cors()`
+  qui répond `403 { details: { code: "ORIGIN_NOT_ALLOWED" } }`. Pourquoi pas simplement `callback(null, false)` ? Parce
+  que CORS protège la LECTURE de la réponse par le navigateur, pas l'EXÉCUTION de la requête : un formulaire d'un site
+  tiers enverrait son POST, et le service l'exécuterait. Le refus doit couper la requête avant le proxy — NRG-11 le
+  vérifie par un `POST /auth/login` d'une origine étrangère, refusé en 403.
+- **`useUser`** : `stripeAccountId?` retiré du type `CarrierPage`. Un champ « optionnel » dans le type d'une réponse
+  est une promesse que le compilateur ne peut pas vérifier ; retiré, toute lecture future échoue au typecheck.
+- **NRG-10** mesure en deux phases : 6,0 appels par page par rechargement, **0,8 par liens** — la seconde est celle
+  d'un membre réel.
+
 ## Tests
 
 Plateforme inchangée (**1000** + auth 230) : aucun code de service touché. `apps/e2e` : **332 scénarios** (321 + 11).

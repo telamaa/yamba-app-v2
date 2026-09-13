@@ -628,6 +628,11 @@ Ordre de demarrage : auth -> trip -> gateway.
   visiteurs ; origine refusee en 500 au lieu de 403 ; `BecomeYamber` lit aussi `stripeAccountId`. web-mob 10/10,
   web-msg 21/21 rejoues. Plateforme inchangee (1000 + auth 230), harnais : 332 scenarios. PR #298 (empilee sur #297). **Le cahier 01-WEB est entierement joue** (§ 5, § 6, § 7). Reste : cahier 02-ADMIN. AUCUNE attribution
   Claude.
+  AMELIORATIONS AU GO (branche `chore/recette-web-7-ameliorations`) : gateway 403 ORIGIN_NOT_ALLOWED avant
+  cors() (refus FRANC : un POST etranger n'atteint pas les services), BecomeYamber (libelle Stripe + `isFr = true` fige),
+  `stripeAccountId` retire du type useUser, « Chercher un autre trajet » sur un trajet ferme, « Voir ses deals » dans le
+  refus d'annulation ; tests : NRG-1 compare a l'API, NRG-2 mobile, NRG-3 desktop+mobile, NRG-7 purge son compte
+  jetable, NRG-10 par liens (0,8 appel par page, membre ≈ 7 % du plafond), NRG-11 exige 403, MOB-5 allegee.
 - 13/09 : **CHAPITRE 5.32 DU CAHIER 01-WEB — WEB-VOC, VOCABULAIRE ET COHERENCE DE LANGUE (branche
   `chore/recette-web-5-32`, empilee sur #296) — DERNIER CHAPITRE DU § 5 DU CAHIER 01-WEB** — 6 fiches CONFORMES
   (4 apres correction), 7 scenarios, 16 min (`apps/e2e/src/chapitres/web-voc.spec.ts`). METHODE : un RELEVE commun
