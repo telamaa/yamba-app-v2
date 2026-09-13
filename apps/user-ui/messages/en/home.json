@@ -1,5 +1,10 @@
 {
   "hero": {
+    "imageAlt": {
+      "airport": "Traveler checking their phone at the airport",
+      "station": "Smiling traveler at a train station with her luggage",
+      "planning": "Person planning a trip on a computer"
+    },
     "metric": "{count}+ parcels delivered since 2024",
     "titleLine1": "What if your parcels traveled",
     "titleLine2": "with",
@@ -32,7 +37,7 @@
       "value": "24h",
       "valueUnit": "max",
       "title": "Lightning delivery",
-      "description": "Instead of 3-5 days with a classic carrier. Your parcel travels at the speed of a traveler."
+      "description": "Instead of 3-5 days with a traditional shipping service. Your parcel travels at the speed of a traveler."
     },
     "ecology": {
       "tag": "Ecology",
@@ -146,7 +151,9 @@
         }
       },
       "shipperBenefit": "3 days to verify",
-      "yamberBenefit": "Automatic guaranteed payment"
+      "yamberBenefit": "Automatic guaranteed payment",
+      "shipperTag": "Shipper",
+      "travelerTag": "Traveler"
     }
   },
   "reviews": {
@@ -197,7 +204,7 @@
     "shipper": {
       "tag": "To send",
       "title": "Shipper",
-      "description": "Send your parcel in 24h for 73% less than a classic carrier.",
+      "description": "Send your parcel in 24h for 73% less than a traditional shipping service.",
       "cta": "Find a trip"
     },
     "yamber": {
