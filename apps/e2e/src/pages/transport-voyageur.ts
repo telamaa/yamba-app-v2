@@ -9,12 +9,15 @@
  *     secondes pour se raviser avant que la requête ne parte — le harnais attend la REQUÊTE,
  *     pas le temps ;
  *   - la **remise** (`/carrier/deals/[id]/deliver`) : six cases pour le code, une photo
- *     facultative, « Livraison validée ! ».
+ *     facultative, « Livraison validée ! » ;
+ *   - le **refus au pickup** (WEB-E2E-5) : depuis l'écran de prise en charge, « Refuser le colis »,
+ *     une raison facultative, et une fenêtre qui rappelle que ce refus ne pénalise jamais.
  *
  * Les cases à cocher sont habillées (`button[aria-pressed]`) : on clique le libellé.
  */
 import { expect, type Page } from "@playwright/test";
 import { intercepterImageKit, photo } from "../fixtures/photos";
+import { normaliserEspaces } from "./reservation";
 
 const POINTS_DE_CONTROLE = [/^Le contenu correspond/, /^Le poids me semble correspondre/, /^Aucun produit interdit/, /^L'emballage est correct/, /^J'ai vu et identifié/];
 
@@ -53,6 +56,35 @@ export class TransportVoyageur {
     // La page bascule d'elle-même sur le suivi du colis (statut PICKED_UP).
     await expect(this.page).toHaveURL(new RegExp(`/carrier/deals/${dealId}$`), { timeout: 60_000 });
     return texte;
+  }
+
+  /**
+   * WEB-E2E-5 § 3-4 — ouvre l'écran de prise en charge, « Refuser le colis », choisit la raison,
+   * confirme. Rend le texte de la fenêtre (pour le rappel « ne pénalise jamais ta réputation »),
+   * le toast, et le remboursement annoncé par le serveur (intégral, D39/A40).
+   *
+   * Les deux habillages de la fenêtre (modale desktop, tiroir mobile) portent `role="dialog"` :
+   * le tiroir fermé est `aria-hidden`, donc invisible aux rôles — on vise la fenêtre OUVERTE par
+   * son titre. « Refuser le colis » est AUSSI le bouton du pied de page : on confirme DANS la fenêtre.
+   */
+  async refuserLeColis(dealId: string, raison: string): Promise<{ fenetre: string; toast: string; refundAmountCents: number; status: string }> {
+    await this.page.goto(`/fr/carrier/deals/${dealId}/pickup`, { waitUntil: "networkidle" });
+    await expect(this.page.getByRole("heading", { name: "Prise en charge du colis" })).toBeVisible({ timeout: 60_000 });
+    await this.page.getByRole("button", { name: /^Refuser( le colis)?$/ }).first().click();
+
+    const fenetre = this.page.getByRole("dialog").filter({ has: this.page.getByRole("heading", { name: "Refuser ce colis ?" }) });
+    await expect(fenetre).toBeVisible({ timeout: 15_000 });
+    const texte = normaliserEspaces(await fenetre.innerText());
+    await fenetre.getByRole("radio", { name: raison }).check();
+
+    const reponse = this.page.waitForResponse((r) => /\/deals\/[^/]+\/pickup\/refuse$/.test(r.url()) && r.request().method() === "POST", { timeout: 60_000 });
+    await fenetre.getByRole("button", { name: "Refuser le colis" }).click();
+    const r = await reponse;
+    if (!r.ok()) throw new Error(`Refus au pickup refusé : ${r.status()} ${await r.text()}`);
+    const corps = (await r.json()) as { status: string; refundAmountCents: number };
+    const toast = this.page.getByText(/^Colis refusé\. .+ a été notifiée? et sera remboursée?\.$/);
+    await expect(toast).toBeVisible({ timeout: 15_000 });
+    return { fenetre: texte, toast: normaliserEspaces(await toast.innerText()), refundAmountCents: corps.refundAmountCents, status: corps.status };
   }
 
   /** Après la prise en charge, le numéro du destinataire est visible côté Voyageur (bouton d'appel). */

@@ -2,7 +2,7 @@
   "boundary": {
     "title": "This page could not be displayed",
     "message": "A technical incident occurred on our side. Nothing you did is lost: neither your account, nor your shipments, nor your trips.",
-    "booking": "No payment was made. Your card was not charged and no request was sent to the traveler.",
+    "booking": "No payment was made. Your card was not charged and no request was sent to the Traveler.",
     "outdated": "A new version of Yamba has just been released. Reload the page to get it.",
     "retry": "Try again",
     "reload": "Reload the page",
@@ -10,7 +10,8 @@
     "referenceLabel": "Incident reference",
     "referenceHelp": "Give it to support if the problem repeats.",
     "copied": "Reference copied",
-    "support": "Contact support"
+    "support": "Contact support",
+    "copyFailed": "Copying is not available in this browser — select the reference and copy it by hand."
   },
   "notFound": {
     "title": "This page does not exist",

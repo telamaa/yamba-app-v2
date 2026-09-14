@@ -1,5 +1,5 @@
 /** admin-history.service.spec.ts — fusion pure des quatre sources (C-PR6a, D59 5A) */
-import { HISTORY_PAYLOAD_WHITELIST, mergeDealHistory, whitelistPayload } from "./admin-history.service";
+import { HISTORY_PAYLOAD_WHITELIST, mergeDealHistory, redactContacts, whitelistPayload } from "./admin-history.service";
 
 const d = (s: string) => new Date(s);
 describe("admin-history (D59 5A)", () => {
@@ -9,6 +9,14 @@ describe("admin-history (D59 5A)", () => {
     expect(HISTORY_PAYLOAD_WHITELIST).not.toContain("deliveryCode");
     expect(whitelistPayload(null)).toEqual({});
     expect(whitelistPayload({ reason: "x", ignored: 1 })).toEqual({ reason: "x" });
+  });
+  it("§ 5.12 — les erreurs techniques ne citent ni l'adresse ni le numéro du destinataire", () => {
+    expect(redactContacts("550 5.1.1 <aminata.diallo@recette.yamba.dev>: mailbox unavailable")).toBe("550 5.1.1 <[adresse masquée]>: mailbox unavailable");
+    expect(redactContacts("SMS refusé pour +33 6 12 34 56 01")).toBe("SMS refusé pour [numéro masqué]");
+    expect(redactContacts("broker down (attempt 3/10)")).toBe("broker down (attempt 3/10)");
+    expect(redactContacts(null)).toBeNull();
+    const [ev] = mergeDealHistory({ outbox: [], adminActions: [], notifications: [], emails: [{ template: "t", userId: "u", status: "FAILED", sentAt: null, claimedAt: new Date("2026-09-01T10:00:00Z"), lastError: "bounce for joao@example.com" }] }, () => "SHIPPER", (x) => x);
+    expect(ev.summary).toEqual({ reason: "bounce for [adresse masquée]" });
   });
   it("mergeDealHistory : quatre sources triées, état de relais (publié / en attente / parqué), rôles et noms", () => {
     const events = mergeDealHistory(

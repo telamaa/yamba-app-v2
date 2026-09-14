@@ -1,5 +1,6 @@
 import type { Response, NextFunction } from "express";
 import prisma from "@packages/libs/prisma";
+import { equalsText } from "@packages/libs/prisma/text-search";
 import { AuthError, ForbiddenError, ValidationError } from "@packages/error-handler";
 import { AuthenticatedRequest } from "@packages/middleware/isAuthenticated";
 import {
@@ -115,8 +116,9 @@ export const createSavedRoute = async (
       where: {
         userId,
         isActive: true,
-        originCity: { equals: originCity!.trim(), mode: "insensitive" },
-        destinationCity: { equals: destinationCity!.trim(), mode: "insensitive" },
+        // ANO-ADM-15 — `equals` insensible est un `$regex` ancré : « P.ris » valait « Paris », « ( » faisait échouer la requête.
+        originCity: equalsText(originCity!.trim()),
+        destinationCity: equalsText(destinationCity!.trim()),
         originCountryCode: normalizedOriginCountryCode,
         destinationCountryCode: normalizedDestinationCountryCode,
       },

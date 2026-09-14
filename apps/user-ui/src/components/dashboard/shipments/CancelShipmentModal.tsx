@@ -14,7 +14,8 @@
 
 import { AlertTriangle, X } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
+import { useDialogFocus } from "@/hooks/useDialogFocus";
 import type { ShipmentListItem } from "./shipments.types";
 
 type Props = {
@@ -41,6 +42,9 @@ export default function CancelShipmentModal({
   const locale = useLocale();
 
   const isOpen = item !== null;
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  // ANO-WEB-94 — focus piégé dans la fenêtre, rendu au geste de départ à la fermeture.
+  useDialogFocus(dialogRef, isOpen);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -62,6 +66,7 @@ export default function CancelShipmentModal({
 
   return (
     <div
+      ref={dialogRef}
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm"
       onClick={() => !isSubmitting && onCloseAction()}
       role="dialog"

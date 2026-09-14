@@ -4,7 +4,7 @@ initSentry("auth-service");
 import express from 'express';
 import cors from "cors";
 import cookieParser from "cookie-parser";
-import {errorMiddleware} from "@packages/error-handler/error-middleware";
+import { errorMiddleware, notFoundHandler } from "@packages/error-handler/error-middleware";
 import router from "./routes/auth.router";
 import carrierRouter from "./routes/carrier.router";
 import userPublicRouter from "./routes/user-public.router";
@@ -55,6 +55,7 @@ app.use("/api", userPublicRouter);
 app.use("/api", savedRouteRouter);
 app.use("/api", adminRouter); // chantier C (D54) — /auth/admin/*, /admin/*
 
+app.use(notFoundHandler); // ANO-ADM-27 — route inconnue : 404 JSON ROUTE_NOT_FOUND, jamais la page HTML d'Express
 app.use(errorMiddleware);
 
 const port = process.env.PORT || 6001;

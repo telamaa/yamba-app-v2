@@ -9,19 +9,19 @@ export function getDashboardCopy(isFr: boolean) {
     // Section titles & subtitles
     trips: {
       title: isFr ? "Mes trajets" : "My trips",
-      sub: isFr ? "Gérez vos trajets publiés et en cours" : "Manage your published and active trips",
+      sub: isFr ? "Gère tes trajets publiés et en cours" : "Manage your published and active trips",
     },
     shipments: {
       title: isFr ? "Mes envois" : "My shipments",
-      sub: isFr ? "Suis tes colis confiés aux Voyageurs" : "Track parcels entrusted to travelers",
+      sub: isFr ? "Suis tes colis confiés aux Voyageurs" : "Track parcels entrusted to Travelers",
     },
     create: {
       title: isFr ? "Créer un trajet" : "Create a trip",
-      sub: isFr ? "Publiez un nouveau trajet et recevez des demandes" : "Publish a new trip and receive requests",
+      sub: isFr ? "Publie un nouveau trajet et reçois des demandes" : "Publish a new trip and receive requests",
     },
     messages: {
       title: "Messages",
-      sub: isFr ? "Vos conversations" : "Your conversations",
+      sub: isFr ? "Tes conversations" : "Your conversations",
     },
     notifications: {
       title: "Notifications",
@@ -30,22 +30,22 @@ export function getDashboardCopy(isFr: boolean) {
     savedRoutes: {
       title: isFr ? "Mes alertes route" : "My route alerts",
       sub: isFr
-        ? "Soyez prévenu·e dès qu'un trajet correspondant est publié"
+        ? "Sois prévenu·e dès qu'un trajet correspondant est publié"
         : "Get notified when a matching trip is published",
     },
     following: {
-      title: isFr ? "Voyageurs suivis" : "Followed travelers",
+      title: isFr ? "Voyageurs suivis" : "Followed Travelers",
       sub: isFr
-        ? "Restez à l'affût des publications de vos Voyageurs favoris"
-        : "Stay tuned for posts from your favorite travelers",
+        ? "Reste à l'affût des publications de tes Voyageurs favoris"
+        : "Stay tuned for posts from your favorite Travelers",
     },
     payments: {
       title: isFr ? "Paiements" : "Payments",
-      sub: isFr ? "Historique de toutes vos transactions" : "All your transaction history",
+      sub: isFr ? "Historique de toutes tes transactions" : "All your transaction history",
     },
     wallet: {
       title: isFr ? "Portefeuille" : "Wallet",
-      sub: isFr ? "Votre compte Stripe Connect" : "Your Stripe Connect account",
+      sub: isFr ? "Ton compte Stripe Connect" : "Your Stripe Connect account",
     },
     profile: {
       title: isFr ? "Profil" : "Profile",
@@ -53,7 +53,7 @@ export function getDashboardCopy(isFr: boolean) {
     },
     yamber: {
       title: isFr ? "Devenir Voyageur" : "Become a Traveler",
-      sub: isFr ? "Rejoignez la communauté des voyageurs Yamba" : "Join the Yamba travelers community",
+      sub: isFr ? "Rejoins la communauté des Voyageurs Yamba" : "Join the Yamba Travelers community",
     },
     security: {
       title: isFr ? "Sécurité" : "Security",
@@ -96,11 +96,11 @@ export function getDashboardCopy(isFr: boolean) {
     createTrip: isFr ? "Créer un trajet" : "Create a trip",
     newTrip: isFr ? "Nouveau trajet" : "New trip",
     newTripDesc: isFr
-      ? "Publiez votre prochain voyage et gagnez de l'argent en transportant des colis"
+      ? "Publie ton prochain voyage et gagne de l'argent en transportant des colis"
       : "Publish your next trip and earn money carrying parcels",
     openStripe: isFr ? "Ouvrir Stripe Dashboard" : "Open Stripe Dashboard",
     stripeDesc: isFr
-      ? "Gérez vos virements et coordonnées bancaires"
+      ? "Gère tes virements et coordonnées bancaires"
       : "Manage your transfers and bank details",
     emailVerified: isFr ? "Email vérifié" : "Email verified",
     phoneVerified: isFr ? "Tél vérifié" : "Phone verified",
@@ -108,28 +108,41 @@ export function getDashboardCopy(isFr: boolean) {
     password: isFr ? "Mot de passe" : "Password",
     passwordSub: isFr ? "Modifié il y a 3 mois" : "Changed 3 months ago",
     twoFa: isFr ? "Double authentification" : "Two-factor authentication",
-    twoFaSub: isFr ? "Ajoutez une couche de sécurité" : "Add an extra layer of security",
+    twoFaSub: isFr ? "Ajoute une couche de sécurité" : "Add an extra layer of security",
     activeSessions: isFr ? "Sessions actives" : "Active sessions",
     activeSessionsSub: isFr ? "2 appareils connectés" : "2 connected devices",
     publicProfile: isFr ? "Profil public" : "Public profile",
     publicProfileSub: isFr ? "Visible par les autres utilisateurs" : "Visible to other users",
     showCity: isFr ? "Afficher ma ville" : "Show my city",
-    showCitySub: isFr ? "Votre ville apparaît sur votre profil" : "Your city appears on your profile",
+    showCitySub: isFr ? "Ta ville apparaît sur ton profil" : "Your city appears on your profile",
     language: isFr ? "Langue" : "Language",
     theme: isFr ? "Thème" : "Theme",
     themeSub: isFr ? "Automatique" : "Automatic",
+    // ANO-WEB-86 (recette 5.26) — l'écran promettait des réglages qui n'existaient pas. Les
+    // libellés disent maintenant ce que la plateforme sait faire : trois choix de thème, la
+    // seule préférence email réellement coupable (la relance des messages non lus, D61), et le
+    // push annoncé pour ce qu'il est — absent.
+    themeAuto: isFr ? "Automatique" : "Automatic",
+    themeLight: isFr ? "Clair" : "Light",
+    themeDark: isFr ? "Sombre" : "Dark",
+    themeAutoSub: isFr ? "Automatique — suit le réglage de ton appareil" : "Automatic — follows your device setting",
     emailNotif: isFr ? "Notifications email" : "Email notifications",
-    emailNotifSub: isFr ? "Demandes, messages, paiements" : "Requests, messages, payments",
+    emailNotifSub: isFr
+      ? "Relance des messages non lus. Les emails d'un Deal en cours (demande, paiement, livraison) ne se coupent pas."
+      : "Unread message reminders. Emails about an ongoing deal (request, payment, delivery) can't be turned off.",
+    emailNotifError: isFr ? "Réglage non enregistré, réessaie." : "Setting not saved, try again.",
     pushNotif: isFr ? "Notifications push" : "Push notifications",
-    pushNotifSub: isFr ? "Alertes en temps réel" : "Real-time alerts",
+    pushNotifSub: isFr
+      ? "Indisponible pour l'instant : les alertes arrivent dans la cloche et par email."
+      : "Not available yet: alerts arrive in the bell and by email.",
     thisMonth: isFr ? "ce mois" : "this month",
     // D67 — profil éditable
     profilePage: {
       firstName: isFr ? "Prénom" : "First name",
       lastName: isFr ? "Nom" : "Last name",
       birthDate: isFr ? "Date de naissance" : "Date of birth",
-      birthDateHint: isFr ? "Jamais affichée ; sert à pré-remplir Stripe pour les Voyageurs." : "Never shown; pre-fills Stripe for travelers.",
-      displayName: isFr ? "Nom affiché sur ta page Voyageur" : "Name shown on your traveler page",
+      birthDateHint: isFr ? "Jamais affichée ; sert à pré-remplir Stripe pour les Voyageurs." : "Never shown; pre-fills Stripe for Travelers.",
+      displayName: isFr ? "Nom affiché sur ta page Voyageur" : "Name shown on your Traveler page",
       bio: isFr ? "Présentation" : "About you",
       save: isFr ? "Enregistrer" : "Save",
       saved: isFr ? "Profil enregistré." : "Profile saved.",
@@ -190,6 +203,7 @@ export function getDashboardCopy(isFr: boolean) {
       sessionsSub: isFr ? "Les appareils connectés à ton compte ; déconnecte ceux que tu ne reconnais pas." : "The devices signed in to your account; sign out the ones you don't recognise.",
       revokeOthers: isFr ? "Déconnecter les autres appareils" : "Sign out other devices",
       sessionsRevoked: isFr ? "{n} appareil(s) déconnecté(s)." : "{n} device(s) signed out.",
+      sessionRevoked: isFr ? "Appareil déconnecté." : "Device signed out.",
       thisDevice: isFr ? "cet appareil" : "this device",
       lastActivity: isFr ? "Dernière activité" : "Last activity",
       remembered: isFr ? "connexion mémorisée" : "remembered sign-in",
@@ -231,6 +245,11 @@ export function getDashboardCopy(isFr: boolean) {
       codeSent: isFr ? "Code envoyé : regarde ta boîte mail (et les spams)." : "Code sent: check your inbox (and spam).",
       codeLabel: isFr ? "Code reçu par email" : "Code received by email",
       confirmLabel: isFr ? "Tape SUPPRIMER pour confirmer" : "Type SUPPRIMER to confirm",
+      // ANO-WEB-84 (recette 5.25) : le refus arrivait en ANGLAIS (le `message` brut du serveur) — un refus métier
+      // porte un `details.code`, et c'est le front qui le dit dans la langue du membre (A146).
+      exportRateLimited: isFr
+        ? "Un seul export par 24 heures : tu pourras en redemander un demain."
+        : "One export per 24 hours: you can request another one tomorrow.",
       cancel: isFr ? "Annuler" : "Cancel",
       error: isFr ? "Impossible pour le moment, réessaie." : "Not possible right now, try again.",
     },
