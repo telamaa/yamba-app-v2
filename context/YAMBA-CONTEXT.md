@@ -742,6 +742,20 @@ Ordre de demarrage : auth -> trip -> gateway.
   coordonnees du destinataire au dossier. PIEGES : FAKE indexe par intent reutilise d'un seed a l'autre (comparer en
   difference) ; `nx serve` recharge le code pendant un passage « avant ». Tests : deal 586, notification 120, harnais 402.
   Reste : § 5.10 a 8.
+- 14/09 : **CAHIER 02-ADMIN — § 5.10 RETENUE D'ANNULATION TARDIVE (branche `chore/recette-admin-5-10`, empilee sur #310)**
+  — 4 scenarios CONFORMES (RET-1 compensation, RET-2 restitution, + RET-3 gardes, RET-4 ce que lisent les parties),
+  joues contre le code non corrige (RET-3 vert d'emblee : l'arbitrage de retenue etait DEJA sous le verrou A159 ; deux
+  restitutions simultanees → 200 + 409 DECISION_IN_PROGRESS, un seul remboursement emis), puis 4/4 verts deux fois
+  (`adm-ret-retenue.spec.ts`). Terrain : bzv-held paye 29,12 €, rembourse 14,56 €, retenue 14,56 € → compensation
+  13,00 € (prorata serveur), Yamba 1,56 €. ANO-ADM-25 CLOSE (mineure) : l'email a l'Expediteur d'une compensation
+  inventait une justification (« personne n'a pu attester… il s'etait deplace ») et disait la retenue « versee au
+  Voyageur » alors que Yamba en garde la commission → part Yamba dite (FR/EN, `settlement-emails.ts`, test). ANO-ADM-26
+  CLOSE (majeure, REGRESSION de ANO-ADM-23 § 5.9) : l'Expediteur lisait « Le Voyageur recoit 40,00 € » — WEB-E2E-2
+  etape 18 « chacun son montant » rejoue et rouge → plus aucun montant de l'autre partie, regle portee par les tests
+  unitaires. LECON : un gabarit partage se corrige contre TOUS ses lecteurs (parcours e2e compris). AMELIORATIONS : `RETENTION_DISPOSITION_LABEL` (dossier, fiche argent), indices qui disent la part de Yamba et le
+  total rembourse, message de decision en francais (« statut final : Annulée », « le deal reste annule »). A TRANCHER :
+  le portefeuille de l'Expediteur ne dit pas qu'une retenue attend un arbitrage ; cle d'idempotence Stripe. Tests :
+  notification 121, harnais 406. Reste : § 5.11 a 8.
 - 13/09 : **DECISION : LE ROLE PREND LA MAJUSCULE** (branche `chore/recette-voyageur-majuscule`, empilee sur #299) —
   « Voyageur » / « Traveler » partout : 71 valeurs de messages, 33 textes du code, 1 email ; regle `role-majuscule` au
   lexique partage (CI + recette) ; 12 citations du harnais ; web-fav, web-rch, web-rsv-devis, web-lit verts.

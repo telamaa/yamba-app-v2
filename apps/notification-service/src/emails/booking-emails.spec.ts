@@ -384,8 +384,25 @@ describe("contenus construits", () => {
     expect(auDela).toContain("Le Voyageur ne reçoit rien sur ce deal.");
     expect(auDela).not.toContain("Le reste est versé au Voyageur");
     const enDeca = JSON.stringify(buildBookingEmail(decision(1000, 2000), "SHIPPER", "Chinwe"));
-    expect(enDeca).toMatch(/Le Voyageur reçoit 20,00/);
+    expect(enDeca).toContain("Le reste du prix de transport est versé au Voyageur.");
+    expect(enDeca).not.toMatch(/20,00/); // ANO-ADM-26 : chacun son montant
     expect(JSON.stringify(buildBookingEmail(decision(3500, 0), "CARRIER", "Thomas"))).toContain("Aucun versement ne te revient sur ce deal.");
+  });
+
+  it("ANO-ADM-25 : l'arbitrage d'une retenue nomme le montant réel et n'invente aucune justification", () => {
+    const arbitrage = (outcome: "COMPENSATE_CARRIER" | "RESTITUTE_SHIPPER", refundCents: number, carrierPayoutCents: number) =>
+      parse(envelope("booking.dispute_resolved", { ...basePayload(), actor: "ADMIN" as const, kind: "RETENTION", ticketNumber: null, outcome, refundCents, carrierPayoutCents, reason: "Motif de recette assez long pour passer la validation du contrat de l'événement.", finalStatus: "CANCELLED", resolvedAt: "2026-07-21T10:00:00.000Z" }));
+    const exp = JSON.stringify(buildBookingEmail(arbitrage("COMPENSATE_CARRIER", 0, 1300), "SHIPPER", "Aminata"));
+    expect(exp).not.toMatch(/13,00/); // ANO-ADM-26 : jamais le montant du Voyageur chez l'Expéditeur
+    expect(exp).toContain("le Voyageur en reçoit une part en compensation, le reste correspond à la commission Yamba");
+    expect(exp).not.toMatch(/personne n'a pu attester|il s'était déplacé/);
+    expect(exp).not.toContain("Le remboursement apparaît sur ta carte");
+    const voy = JSON.stringify(buildBookingEmail(arbitrage("COMPENSATE_CARRIER", 0, 1300), "CARRIER", "Thomas"));
+    expect(voy).toMatch(/Une compensation de 13,00/);
+    expect(voy).not.toMatch(/14,56/); // et jamais le montant remboursé chez le Voyageur
+    const restit = JSON.stringify(buildBookingEmail(arbitrage("RESTITUTE_SHIPPER", 1456, 0), "SHIPPER", "Aminata"));
+    expect(restit).toMatch(/La retenue d'annulation te revient : 14,56/);
+    expect(restit).toContain("Le remboursement apparaît sur ta carte");
   });
 
   it("A13 : l'email Voyageur montre son NET (transportCents), jamais le total Expéditeur", () => {

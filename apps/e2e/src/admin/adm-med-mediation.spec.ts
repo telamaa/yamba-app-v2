@@ -321,7 +321,7 @@ test.describe("ADM-MED — médiation (cahier 02-ADMIN § 5.9)", () => {
       await recap.getByRole("button", { name: "Valider définitivement" }).click();
       const ok = page.locator("section").filter({ has: page.getByRole("heading", { name: "Décision enregistrée" }) });
       await expect(ok).toBeVisible({ timeout: 60_000 });
-      await expect(ok).toContainText(new RegExp(`Rejet : le Voyageur est payé en entier · deal COMPLETED · remboursé 0,00\\s*€ · versé ${euros(net)}\\s*€ \\(versement (envoyé|en attente d'envoi|en échec)\\)`));
+      await expect(ok).toContainText(new RegExp(`Rejet : le Voyageur est payé en entier · statut final : Terminée · remboursé 0,00\\s*€ · versé ${euros(net)}\\s*€ \\(versement (envoyé|en attente d'envoi|en échec)\\)`));
       await expect(ok).toContainText("Les deux parties sont prévenues (écran, notification, email).");
       const apres = await base(id);
       expect(apres.status).toBe("COMPLETED");

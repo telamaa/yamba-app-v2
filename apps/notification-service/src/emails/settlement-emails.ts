@@ -203,12 +203,15 @@ const fr: SettlementEmailDictionary = {
       p.outcome === "REJECTED"
         ? "Après examen des deux versions et des preuves, nous n'avons pas retenu ton signalement : le Voyageur est payé en entier."
         : p.outcome === "PARTIAL_REFUND"
-          ? `Après examen des deux versions et des preuves, nous te remboursons ${p.refund}. ${p.carrierPayout === "" ? "Le Voyageur ne reçoit rien sur ce deal." : `Le Voyageur reçoit ${p.carrierPayout}.`}` // ANO-ADM-23 : « le reste est versé au Voyageur » était faux quand le remboursement dépasse son net
+          ? `Après examen des deux versions et des preuves, nous te remboursons ${p.refund}. ${p.carrierPayout === "" ? "Le Voyageur ne reçoit rien sur ce deal." : "Le reste du prix de transport est versé au Voyageur."}` // ANO-ADM-23 : « le reste est versé au Voyageur » était faux quand le remboursement dépasse son net ; ANO-ADM-26 : jamais le MONTANT du Voyageur (chacun son montant, WEB-E2E-2 étape 18)
           : p.outcome === "FULL_REFUND"
             ? `Après examen des deux versions et des preuves, nous te remboursons la totalité : ${p.refund}.`
             : p.outcome === "RESTITUTE_SHIPPER"
               ? `La retenue d'annulation te revient : ${p.refund} sont remboursés.`
-              : "La retenue d'annulation est versée au Voyageur : personne n'a pu attester de la prise en charge, et il s'était déplacé.";
+              : // ANO-ADM-25 : l'ancienne phrase inventait une justification (« personne n'a pu attester… il s'était déplacé ») et
+                // disait la retenue « versée au Voyageur » alors que Yamba en garde la part de commission — le motif du Médiateur suffit.
+                // Chacun son montant (WEB-E2E-2, ANO-ADM-26) : l'Expéditeur ne lit jamais la somme versée au Voyageur.
+                "La retenue d'annulation ne t'est pas restituée : le Voyageur en reçoit une part en compensation, le reste correspond à la commission Yamba.";
     return {
       subject: `Décision rendue sur ton envoi ${p.route}`,
       content: {
@@ -237,7 +240,7 @@ const fr: SettlementEmailDictionary = {
           : p.outcome === "FULL_REFUND"
             ? "Après examen des deux versions et des preuves, l'Expéditeur est remboursé en totalité : aucun versement ne te revient sur ce deal."
             : p.outcome === "COMPENSATE_CARRIER"
-              ? `La retenue d'annulation te revient : ${p.carrierPayout} partent vers ton compte.`
+              ? `Une compensation de ${p.carrierPayout} te revient sur la retenue d'annulation : elle part vers ton compte.`
               : "La retenue d'annulation est restituée à l'Expéditeur : aucun versement ne te revient sur ce deal.";
     return {
       subject: `Décision rendue sur ton transport ${p.route}`,
@@ -401,12 +404,12 @@ const en: SettlementEmailDictionary = {
       p.outcome === "REJECTED"
         ? "After reviewing both sides and the evidence, we did not uphold your report: the Traveler is paid in full."
         : p.outcome === "PARTIAL_REFUND"
-          ? `After reviewing both sides and the evidence, we refund you ${p.refund}. ${p.carrierPayout === "" ? "The Traveler receives nothing on this deal." : `The Traveler receives ${p.carrierPayout}.`}`
+          ? `After reviewing both sides and the evidence, we refund you ${p.refund}. ${p.carrierPayout === "" ? "The Traveler receives nothing on this deal." : "The rest of the transport price goes to the Traveler."}` // ANO-ADM-26 : never the Traveler's amount
           : p.outcome === "FULL_REFUND"
             ? `After reviewing both sides and the evidence, we refund you in full: ${p.refund}.`
             : p.outcome === "RESTITUTE_SHIPPER"
               ? `The cancellation retention comes back to you: ${p.refund} refunded.`
-              : "The cancellation retention goes to the Traveler: nobody could attest the pickup, and they had traveled.";
+              : "The cancellation retention is not returned to you: the Traveler receives part of it as compensation, the rest is Yamba's commission."; // ANO-ADM-25, ANO-ADM-26
     return {
       subject: `Decision on your shipment ${p.route}`,
       content: {
@@ -435,7 +438,7 @@ const en: SettlementEmailDictionary = {
           : p.outcome === "FULL_REFUND"
             ? "After reviewing both sides and the evidence, the shipper is refunded in full: no payout is owed to you on this deal."
             : p.outcome === "COMPENSATE_CARRIER"
-              ? `The cancellation retention comes to you: ${p.carrierPayout} is on its way.`
+              ? `A compensation of ${p.carrierPayout} comes to you from the cancellation retention: it is on its way.`
               : "The cancellation retention goes back to the shipper: no payout is owed to you on this deal.";
     return {
       subject: `Decision on your transport ${p.route}`,
