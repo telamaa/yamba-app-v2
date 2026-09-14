@@ -37,7 +37,7 @@ export default function DealSettledView({ deal, variant, onCloseAction }: Props)
   const status = deal.status as "DELIVERED" | "COMPLETED" | "DISPUTED";
   const key = status === "DELIVERED" ? "delivered" : status === "COMPLETED" ? "completed" : "disputed";
   const shipperFirstName = deal.shipper.firstName;
-  const recipientFirstName = deal.recipient?.firstName ?? deal.deliveryLocation.name.split(" ")[0] ?? "";
+  const recipientFirstName = deal.recipient?.firstName ?? deal.recipientFirstName; // ANO-WEB-44
   const dateTime = (iso?: string) =>
     iso ? format.dateTime(new Date(iso), { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" }) : "";
 

@@ -51,44 +51,44 @@ const ONBOARDING_VERSION = 1;
 
 function buildCopy(isFr: boolean) {
   return {
-    title: isFr ? "Devenir transporteur" : "Become a carrier",
-    subtitle: isFr ? "Configurez votre espace pour publier vos premiers trajets." : "Set up your space to publish your first trips.",
-    stepProfile: isFr ? "Votre profil" : "Your profile",
+    title: isFr ? "Devenir Voyageur" : "Become a Traveler",
+    subtitle: isFr ? "Configure ton espace pour publier tes premiers trajets." : "Set up your space to publish your first trips.",
+    stepProfile: isFr ? "Ton profil" : "Your profile",
     stepStripe: isFr ? "Paiement" : "Payment",
 
-    profileTitle: isFr ? "Créez votre espace transporteur" : "Create your carrier space",
+    profileTitle: isFr ? "Crée ton espace Voyageur" : "Create your Traveler space",
     profileSubtitle: isFr ? "Ces informations seront visibles par les expéditeurs. Tous les champs sont obligatoires." : "This information will be visible to shippers. All fields are required.",
 
     nameLabel: isFr ? "Nom de l'espace" : "Space name",
     namePlaceholder: isFr ? "Ex : Marie D." : "Ex: Marie D.",
-    nameHint: isFr ? "Pré-rempli avec votre prénom. Modifiable à tout moment." : "Pre-filled with your first name. You can change it anytime.",
+    nameHint: isFr ? "Pré-rempli avec ton prénom. Modifiable à tout moment." : "Pre-filled with your first name. You can change it anytime.",
     nameRequired: isFr ? "Le nom du profil est requis" : "Profile name is required",
     nameTooShort: isFr ? "Le nom doit contenir au moins 2 caractères" : "Name must be at least 2 characters",
 
     bioLabel: isFr ? "Bio" : "Bio",
-    bioPlaceholder: isFr ? "Parlez un peu de vous, de vos trajets habituels..." : "Tell us about yourself, your usual trips...",
+    bioPlaceholder: isFr ? "Parle un peu de toi, de tes trajets habituels..." : "Tell us about yourself, your usual trips...",
     bioLimit: 500,
     bioMinLength: 20,
-    bioRequired: isFr ? "Décrivez-vous en quelques mots" : "Describe yourself in a few words",
+    bioRequired: isFr ? "Décris-toi en quelques mots" : "Describe yourself in a few words",
     bioTooShort: isFr ? "La bio doit contenir au moins 20 caractères" : "Bio must be at least 20 characters",
 
     addressLabel: isFr ? "Adresse" : "Address",
     addressPlaceholder: isFr ? "Rechercher une adresse, une ville..." : "Search an address, a city...",
     addressHint: isFr ? "Seuls la ville et le pays seront visibles publiquement." : "Only the city and country will be publicly visible.",
-    addressRequired: isFr ? "Sélectionnez une adresse dans la liste" : "Select an address from the list",
+    addressRequired: isFr ? "Sélectionne une adresse dans la liste" : "Select an address from the list",
 
     phoneLabel: isFr ? "Téléphone" : "Phone",
     phoneHint: isFr ? "Utilisé uniquement pour la coordination des livraisons." : "Used only for delivery coordination.",
     phoneRequired: isFr ? "Le téléphone est requis pour la coordination" : "Phone is required for coordination",
     phoneInvalid: isFr ? "Numéro de téléphone invalide" : "Invalid phone number",
 
-    stripeTitle: isFr ? "Recevez vos paiements" : "Receive your payments",
-    stripeSubtitle: isFr ? "Connectez votre compte bancaire via Stripe pour recevoir les paiements des expéditeurs en toute sécurité." : "Connect your bank account via Stripe to securely receive payments from shippers.",
+    stripeTitle: isFr ? "Reçois tes paiements" : "Receive your payments",
+    stripeSubtitle: isFr ? "Connecte ton compte bancaire via Stripe pour recevoir les paiements des expéditeurs en toute sécurité." : "Connect your bank account via Stripe to securely receive payments from shippers.",
     stripeConnect: isFr ? "Connecter avec Stripe" : "Connect with Stripe",
     stripeConnecting: isFr ? "Redirection vers Stripe..." : "Redirecting to Stripe...",
     stripeSkip: isFr ? "Configurer plus tard" : "Set up later",
-    stripeSkipHint: isFr ? "Vous pourrez connecter votre compte à tout moment. Vous ne pourrez pas recevoir de paiements tant que Stripe n'est pas configuré." : "You can connect your account anytime. You won't be able to receive payments until Stripe is set up.",
-    stripeSecure: isFr ? "Stripe est utilisé par des millions d'entreprises. Vos données bancaires ne transitent jamais par nos serveurs." : "Stripe is used by millions of businesses. Your banking data never passes through our servers.",
+    stripeSkipHint: isFr ? "Tu pourras connecter ton compte à tout moment. Tu ne pourras pas recevoir de paiements tant que Stripe n'est pas configuré." : "You can connect your account anytime. You won't be able to receive payments until Stripe is set up.",
+    stripeSecure: isFr ? "Stripe est utilisé par des millions d'entreprises. Tes données bancaires ne transitent jamais par nos serveurs." : "Stripe is used by millions of businesses. Your banking data never passes through our servers.",
 
     continue: isFr ? "Continuer" : "Continue",
     back: isFr ? "Retour" : "Back",
@@ -96,10 +96,10 @@ function buildCopy(isFr: boolean) {
     finishLater: isFr ? "Configurer plus tard" : "Set up later",
     saving: isFr ? "Enregistrement..." : "Saving...",
 
-    genericError: isFr ? "Une erreur est survenue. Réessayez." : "Something went wrong. Please try again.",
+    genericError: isFr ? "Une erreur est survenue. Réessaie." : "Something went wrong. Please try again.",
 
-    successTitle: isFr ? "Votre espace est prêt !" : "Your space is ready!",
-    successSubtitle: isFr ? "Vous pouvez maintenant publier votre premier trajet." : "You can now publish your first trip.",
+    successTitle: isFr ? "Ton espace est prêt !" : "Your space is ready!",
+    successSubtitle: isFr ? "Tu peux maintenant publier ton premier trajet." : "You can now publish your first trip.",
     publishTrip: isFr ? "Publier un trajet" : "Publish a trip",
     goHome: isFr ? "Retour à l'accueil" : "Go to homepage",
     goDashboard: isFr ? "Retour au dashboard" : "Back to dashboard",
@@ -369,7 +369,7 @@ export default function CarrierOnboardingWizard() {
           {isStripeOnlyMode ? (isFr ? "Configurer Stripe" : "Configure Stripe") : copy.title}
         </h1>
         <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-          {isStripeOnlyMode ? (isFr ? "Connectez votre compte bancaire pour recevoir vos paiements." : "Connect your bank account to receive payments.") : copy.subtitle}
+          {isStripeOnlyMode ? (isFr ? "Connecte ton compte bancaire pour recevoir tes paiements." : "Connect your bank account to receive payments.") : copy.subtitle}
         </p>
 
         {!isStripeOnlyMode && (

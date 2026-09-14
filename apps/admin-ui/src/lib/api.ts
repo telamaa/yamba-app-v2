@@ -68,6 +68,41 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}, opts: { 
 export const post = <T>(path: string, body?: unknown, opts?: { auth?: boolean }) =>
   apiFetch<T>(path, { method: "POST", body: body === undefined ? undefined : JSON.stringify(body) }, opts);
 export const patch = <T>(path: string, body?: unknown) => apiFetch<T>(path, { method: "PATCH", body: body === undefined ? undefined : JSON.stringify(body) });
+/**
+ * Téléchargement d'un fichier (exports CSV) par `fetch`, avec le même rafraîchissement de session qu'`apiFetch`.
+ * Recette 02-ADMIN § 5.6 (ANO-ADM-13) : l'export ouvrait un onglet sur l'URL — jeton d'accès expiré (15 min),
+ * l'onglet affichait le JSON brut « Unauthorized! », sans rafraîchissement ; un refus (400, 403) aussi.
+ * Ici : le fichier est rendu au navigateur par un lien `download`, une erreur lève une `ApiError` lisible.
+ */
+export async function downloadFile(path: string): Promise<{ filename: string; rows: number | null; truncated: boolean }> {
+  const attempt = () => fetch(`${API_BASE}${path}`, { credentials: "include", cache: "no-store" });
+  let res = await attempt();
+  if (res.status === 401 && (await tryRefresh())) res = await attempt();
+  if (!res.ok) {
+    const text = await res.text();
+    let data: unknown;
+    try {
+      data = text ? JSON.parse(text) : undefined;
+    } catch {
+      data = { message: text.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 160) };
+    }
+    if (res.status === 401 && typeof window !== "undefined") window.location.assign("/login");
+    throw new ApiError((data as { message?: string } | undefined)?.message || `Erreur ${res.status}`, res.status, data);
+  }
+  const blob = await res.blob();
+  const filename = /filename="([^"]+)"/.exec(res.headers.get("Content-Disposition") ?? "")?.[1] ?? "export.csv";
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  const rows = res.headers.get("X-Row-Count");
+  return { filename, rows: rows === null ? null : Number(rows), truncated: res.headers.get("X-Truncated") === "true" };
+}
+
 /** URL absolue d'un endpoint (téléchargements : le cookie admin suit par le proxy /api). */
 export const apiUrl = (path: string) => `${API_BASE}${path}`;
 export const del = <T>(path: string, body?: unknown) => apiFetch<T>(path, { method: "DELETE", body: body === undefined ? undefined : JSON.stringify(body) });

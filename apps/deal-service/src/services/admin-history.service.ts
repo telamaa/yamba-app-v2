@@ -31,6 +31,19 @@ export function whitelistPayload(payload: unknown): Record<string, unknown> {
   return out;
 }
 
+/**
+ * Recette 02-ADMIN § 5.12 — une erreur TECHNIQUE (SMTP, fournisseur d'email, relais) cite souvent le destinataire
+ * (« 550 5.1.1 <aminata@…>: mailbox unavailable »). La chronologie est lue par des profils qui n'ont pas la lecture des
+ * coordonnées : adresses email et numéros de téléphone y sont masqués. Pur, testé.
+ */
+export function redactContacts(text: string | null): string | null {
+  if (!text) return text;
+  return text
+    .replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, "[adresse masquée]")
+    // Un numéro, c'est 9 chiffres au moins : « 550 5.1.1 » (code SMTP) n'en est pas un.
+    .replace(/\+?\d[\d .-]{7,}\d/g, (m) => (m.replace(/\D/g, "").length >= 9 ? "[numéro masqué]" : m));
+}
+
 /** Fusion PURE des quatre sources, triée par date ; `roleOf` traduit un id en SHIPPER / CARRIER, `nameOf` un admin en nom court. */
 export function mergeDealHistory(
   input: { outbox: OutboxRow[]; adminActions: AdminActionRow[]; notifications: NotificationRow[]; emails: EmailRow[] },
@@ -48,7 +61,7 @@ export function mergeDealHistory(
       actor: typeof summary.actor === "string" ? summary.actor : null,
       recipient: null,
       summary,
-      relay: { publishedAt: o.publishedAt ? o.publishedAt.toISOString() : null, attempts: o.attempts, parked, lastError: o.lastError },
+      relay: { publishedAt: o.publishedAt ? o.publishedAt.toISOString() : null, attempts: o.attempts, parked, lastError: redactContacts(o.lastError) },
       status: o.publishedAt ? "PUBLISHED" : parked ? "PARKED" : "PENDING",
     });
   }
@@ -59,7 +72,7 @@ export function mergeDealHistory(
     events.push({ at: n.createdAt.toISOString(), source: "NOTIFICATION", type: n.type, actor: null, recipient: roleOf(n.userId), summary: {}, relay: null, status: n.readAt ? "READ" : "UNREAD" });
   }
   for (const e of input.emails) {
-    events.push({ at: (e.sentAt ?? e.claimedAt).toISOString(), source: "EMAIL", type: e.template, actor: null, recipient: roleOf(e.userId), summary: e.lastError ? { reason: e.lastError.slice(0, 200) } : {}, relay: null, status: e.status });
+    events.push({ at: (e.sentAt ?? e.claimedAt).toISOString(), source: "EMAIL", type: e.template, actor: null, recipient: roleOf(e.userId), summary: e.lastError ? { reason: redactContacts(e.lastError.slice(0, 200)) } : {}, relay: null, status: e.status });
   }
   return events.sort((x, y) => x.at.localeCompare(y.at) || x.source.localeCompare(y.source));
 }

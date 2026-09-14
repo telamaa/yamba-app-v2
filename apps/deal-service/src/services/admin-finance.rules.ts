@@ -5,8 +5,9 @@
  * échec de versement, chronologie de l'argent d'un deal, rapprochement base ↔
  * fournisseur (A112). Tout est testé dans admin-finance.rules.spec.ts.
  */
-import type { MoneyTimelineEvent, PayoutFailureKind, ReconciliationDivergenceCode } from "@packages/api-contracts";
+import type { MoneyBalance, MoneyTimelineEvent, PayoutFailureKind, ReconciliationDivergenceCode } from "@packages/api-contracts";
 import type { PaymentInspection } from "@packages/payments";
+import { csvCell } from "@packages/libs/csv";
 
 /* ── Rejeux espacés (A111) ─────────────────────────────────── */
 
@@ -101,7 +102,60 @@ export function buildMoneyTimeline(b: MoneyTimelineInput): MoneyTimelineEvent[] 
   if (b.payoutStatus === "FAILED") push(b.payoutLastAttemptAt ?? b.updatedAt, "PAYOUT_FAILED", b.payoutAmountCents ?? null, payoutFailureKind(b.payoutStatus, b.payoutFailureReason));
   if (b.payoutStatus === "REVERSED") push(b.updatedAt, "PAYOUT_REVERSED", b.payoutAmountCents ?? null, null);
   if (b.payoutReversalResolution) push(b.payoutReversalResolvedAt, "REVERSAL_RESOLVED", null, b.payoutReversalResolution);
+  // Recette § 5.12 — une empreinte jamais capturée est LIBÉRÉE à la fermeture (refus, expiration, annulation avant
+  // acceptation) : sans cette ligne, la chronologie d'un deal refusé s'arrêtait sur « Empreinte posée 67,20 € ».
+  if (!b.capturedAt && (b.status === "DECLINED" || b.status === "EXPIRED" || b.status === "CANCELLED")) push(b.closedAt, "AUTHORIZATION_RELEASED", b.pricing.totalShipperCents, b.closedBy ?? null);
   return out.sort((x, y) => x.at.localeCompare(y.at));
+}
+
+/* ── Bilan de l'argent (recette § 5.12) ────────────────────── */
+
+export type MoneyBalanceInput = {
+  status: string;
+  capturedAt?: Date | null;
+  refundAmountCents?: number | null;
+  payoutStatus?: string | null;
+  payoutAmountCents?: number | null;
+  payoutReversalResolution?: string | null;
+  retentionCents?: number | null;
+  retentionDisposition?: string | null;
+  manualRefundCents?: number | null;
+  manualRefundProposedCents?: number | null;
+  pricing: { totalShipperCents: number; transportCents: number; commissionCents: number };
+};
+
+const RUNNING = new Set(["ACCEPTED", "PICKED_UP", "DELIVERED"]);
+const CLOSED = new Set(["COMPLETED", "CANCELLED", "DECLINED", "EXPIRED"]);
+
+/**
+ * Où est chaque centime d'un deal : débité, rendu, versé, ce que la plateforme détient, et ce qui attend encore un
+ * geste. L'ANOMALIE n'est levée que sur un deal CLOS sans rien en attente : la plateforme détient plus que sa commission
+ * (argent sans destination — le cas mesuré au § 5.12 : un deal débité, annulé, jamais remboursé), ou a versé plus
+ * qu'elle n'a reçu sans geste commercial qui l'explique. Un renversement ABANDONNÉ garde la part du Voyageur par
+ * décision : ce n'est pas une anomalie.
+ */
+export function moneyBalance(b: MoneyBalanceInput): MoneyBalance {
+  const capturedCents = b.capturedAt ? b.pricing.totalShipperCents : 0;
+  const refundedCents = b.refundAmountCents ?? 0;
+  const paidOutCents = b.payoutStatus === "SENT" ? (b.payoutAmountCents ?? 0) : 0;
+  const platformHoldsCents = capturedCents - refundedCents - paidOutCents;
+  const pending: MoneyBalance["pending"] = [];
+  if (b.status === "PENDING" && !b.capturedAt) pending.push({ kind: "AUTHORIZATION_OPEN", cents: b.pricing.totalShipperCents });
+  if (RUNNING.has(b.status) && b.capturedAt) pending.push({ kind: "DEAL_IN_PROGRESS", cents: b.pricing.transportCents });
+  if (b.status === "DISPUTED" || b.payoutStatus === "FROZEN") pending.push({ kind: "PAYOUT_FROZEN", cents: b.payoutAmountCents ?? b.pricing.transportCents });
+  if (b.payoutStatus === "PENDING") pending.push({ kind: "PAYOUT_DUE", cents: b.payoutAmountCents ?? b.pricing.transportCents });
+  if (b.payoutStatus === "FAILED") pending.push({ kind: "PAYOUT_FAILED", cents: b.payoutAmountCents ?? b.pricing.transportCents });
+  if (b.payoutStatus === "REVERSED" && !b.payoutReversalResolution) pending.push({ kind: "REVERSAL_OPEN", cents: b.payoutAmountCents ?? b.pricing.transportCents });
+  if (b.retentionDisposition === "HELD_FOR_MEDIATION" && (b.retentionCents ?? 0) > 0) pending.push({ kind: "RETENTION_HELD", cents: b.retentionCents ?? 0 });
+  if ((b.manualRefundProposedCents ?? 0) > 0) pending.push({ kind: "REFUND_PROPOSED", cents: b.manualRefundProposedCents ?? 0 });
+  const settled = pending.length === 0;
+  let anomaly: MoneyBalance["anomaly"] = null;
+  if (settled && CLOSED.has(b.status)) {
+    const writtenOff = b.payoutStatus === "REVERSED" && b.payoutReversalResolution === "WRITTEN_OFF";
+    if (!writtenOff && platformHoldsCents > b.pricing.commissionCents) anomaly = "UNALLOCATED_FUNDS";
+    else if (platformHoldsCents < 0 && !(b.manualRefundCents ?? 0)) anomaly = "OVERSPENT";
+  }
+  return { capturedCents, refundedCents, paidOutCents, platformHoldsCents, pending, settled, anomaly };
 }
 
 /* ── Rapprochement (A112) ──────────────────────────────────── */
@@ -333,13 +387,11 @@ export const FINANCE_CSV_COLUMNS = [
   "disputeTicket", "paymentIntentId", "chargeId",
 ] as const;
 
-/** Une cellule CSV : guillemets doublés, virgule / retour à la ligne / guillemet ⇒ encadrée. Un préfixe de formule est neutralisé (injection tableur). */
-export function csvCell(v: unknown): string {
-  if (v === null || v === undefined) return "";
-  let s = v instanceof Date ? v.toISOString() : String(v);
-  if (/^[=+\-@]/.test(s)) s = `'${s}`;
-  return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-}
+/**
+ * Une cellule CSV — ANO-ADM-14 (recette 02-ADMIN § 5.6) : cette file avait sa propre copie, qui ne neutralisait ni la
+ * tabulation ni le retour chariot. Une seule implémentation : `@packages/libs/csv`.
+ */
+export { csvCell };
 
 /** Un deal entre dans l'export si l'un de ses faits d'argent tombe dans la période. */
 export function csvRowInRange(r: FinanceCsvRow, from: Date, to: Date): boolean {

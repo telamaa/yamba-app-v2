@@ -28,19 +28,25 @@
  * `packages/libs/prisma/scripts/repair-absent-scalars.ts`.
  */
 import { notHiddenFilter } from "./admin-trips.rules";
+import { notSuspendedOwnerFilter } from "@packages/middleware/account-status";
 
 export type PublicTripWhere = {
   id: string;
   status: "PUBLISHED";
   isDeleted: false;
   AND: Array<ReturnType<typeof notHiddenFilter>>;
+  user: { is: ReturnType<typeof notSuspendedOwnerFilter> };
 };
 
 /**
  * Filtre d'un trajet consultable par n'importe qui : publié, non supprimé,
- * non masqué par la modération. À utiliser avec `findFirst` (et non `findUnique`,
- * qui n'accepte pas de critère non unique).
+ * non masqué par la modération, et dont le Voyageur n'est pas suspendu. À utiliser
+ * avec `findFirst` (et non `findUnique`, qui n'accepte pas de critère non unique).
+ *
+ * ANO-ADM-08 (recette 02-ADMIN § 5.4) — la suspension retirait les trajets de la
+ * recherche, mais leur page publique répondait encore 200 à qui avait gardé le lien
+ * (favori, partage, email d'alerte) : le filtre de la recherche s'applique ici aussi.
  */
-export function publicTripWhere(id: string): PublicTripWhere {
-  return { id, status: "PUBLISHED", isDeleted: false, AND: [notHiddenFilter()] };
+export function publicTripWhere(id: string, now: Date = new Date()): PublicTripWhere {
+  return { id, status: "PUBLISHED", isDeleted: false, AND: [notHiddenFilter()], user: { is: notSuspendedOwnerFilter(now) } };
 }

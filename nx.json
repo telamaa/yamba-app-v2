@@ -14,7 +14,10 @@
       "!{projectRoot}/test-setup.[jt]s"
     ],
     "sharedGlobals": [
-      "{workspaceRoot}/.github/workflows/ci.yml"
+      "{workspaceRoot}/.github/workflows/ci.yml",
+      "{workspaceRoot}/packages/**/*",
+      "{workspaceRoot}/prisma/schema.prisma",
+      "{workspaceRoot}/tsconfig.base.json"
     ]
   },
   "plugins": [

@@ -61,6 +61,12 @@ export default function FavoriteTripsList() {
       <div className="space-y-3">
         {trips.map((item) => (
           <div key={item.id}>
+            {/* ANO-WEB-30 (recette 5.11) — un favori survit à la fin du trajet, et le DIT */}
+            {item.departureAt && new Date(item.departureAt) < new Date() && (
+              <span className="mb-1.5 inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                {t("pastTrip")}
+              </span>
+            )}
             <div className="md:hidden">
               <TripResultCardMobile item={item} />
             </div>

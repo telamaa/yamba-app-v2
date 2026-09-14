@@ -13,6 +13,7 @@ import { probeService, serviceEntries } from "@packages/libs/health"; // D70
 import { platformSettings } from "@packages/libs/settings/default";
 import { UpdateMaintenanceRequestSchema, resolveLocale, type AdminStatusResponse } from "@packages/api-contracts";
 import { ValidationError } from "@packages/error-handler";
+import { reachableRecipientWhere } from "@packages/email";
 import type { AuthenticatedRequest } from "@packages/middleware/isAuthenticated";
 import { sendAuthEmail } from "../emails/send-auth-email";
 import { getAdminEmails } from "../emails/admin-emails";
@@ -36,7 +37,7 @@ function zodErrors(issues: Array<{ path: PropertyKey[]; message: string }>) {
 async function notifySuperAdmins(n: { actorId: string; before: { enabled: boolean }; after: { enabled: boolean; scheduledAt: string | null; messageFr: string }; reason: string }): Promise<void> {
   const [actor, admins] = await Promise.all([
     prisma.user.findUnique({ where: { id: n.actorId }, select: { firstName: true, lastName: true } }),
-    prisma.user.findMany({ where: { roles: { has: "ADMIN" }, adminRoles: { has: "SUPER_ADMIN" }, isDeleted: false }, select: { email: true, firstName: true, preferredLocale: true } }),
+    prisma.user.findMany({ where: { roles: { has: "ADMIN" }, adminRoles: { has: "SUPER_ADMIN" }, AND: [reachableRecipientWhere()] } /* ANO-ADM-11 : D35 4A */, select: { email: true, firstName: true, preferredLocale: true } }),
   ]);
   const byName = actor ? `${actor.firstName} ${actor.lastName.charAt(0)}.` : "un administrateur";
   await Promise.all(
