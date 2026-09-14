@@ -11,6 +11,7 @@
  */
 import type { NextFunction, Response } from "express";
 import prisma from "@packages/libs/prisma";
+import { withWriteConflictRetry } from "@packages/libs/prisma/write-conflict-retry";
 import { ForbiddenError, NotFoundError, ValidationError } from "@packages/error-handler";
 import { recordAdminAction } from "@packages/admin-audit";
 import { isEmailConfigured, sendTransactionalEmail } from "@packages/email";
@@ -19,7 +20,7 @@ import { AdminTripsQuerySchema, HideTripRequestSchema, ObjectIdSchema, ReviewTic
 import { CSV_BOM, EXPORT_MAX_ROWS, buildCsv, capExportRows, csvFilename, csvResponseHeaders } from "@packages/libs/csv";
 import { getTripAdminEmails } from "../emails/admin-trip-emails";
 import { makeCarrierMailer } from "../lib/carrier-mailer";
-import { TICKETS_CSV_COLUMNS, TICKET_REJECTION_LABELS, TRIPS_CSV_COLUMNS, buildTicketsWhere, fileExtensionOf, buildTripsOrderBy, buildTripsWhere, isTicketExpired, ticketReviewOutcome } from "../lib/admin-trips.rules";
+import { TICKETS_CSV_COLUMNS, TICKET_REJECTION_LABELS, TRIPS_CSV_COLUMNS, buildTicketsWhere, fileExtensionOf, buildTripsOrderBy, buildTripsWhere, effectiveTicketStatus, isTicketExpired, notHiddenFilter, ticketReviewOutcome } from "../lib/admin-trips.rules";
 
 const SUPPORT_EMAIL = process.env.SUPPORT_EMAIL || "support@yamba.app";
 const USER_APP_URL = (process.env.USER_APP_URL || "http://localhost:3000").replace(/\/$/, "");
@@ -65,7 +66,8 @@ export const listTrips = async (req: AuthenticatedRequest, res: Response, next: 
     const parsed = AdminTripsQuerySchema.safeParse(req.query);
     if (!parsed.success) throw new ValidationError("Invalid query.", { code: "INVALID_QUERY" });
     const q = parsed.data;
-    const where = buildTripsWhere(q);
+    const now = new Date();
+    const where = buildTripsWhere(q, now);
     const [rows, total] = await Promise.all([
       prisma.trip.findMany({
         where: where as never,
@@ -95,7 +97,7 @@ export const listTrips = async (req: AuthenticatedRequest, res: Response, next: 
       departureAt: iso(t.departureAt),
       transportMode: t.transportMode ? String(t.transportMode) : null,
       carrier: { id: t.user.id, firstName: t.user.firstName, lastName: t.user.lastName, accountStatus: String(t.user.accountStatus) },
-      ticketVerificationStatus: String(t.ticketVerificationStatus),
+      ticketVerificationStatus: effectiveTicketStatus({ ticketVerificationStatus: String(t.ticketVerificationStatus), departureAt: t.departureAt }, now), // ANO-ADM-16
       hidden: !!t.hiddenByAdminAt,
       hideProposed: !!t.hideProposedAt && !t.hiddenByAdminAt,
       activeBookingsCount: activeBy.get(t.id) ?? 0,
@@ -162,7 +164,7 @@ export const getTripFile = async (req: AuthenticatedRequest, res: Response, next
       publishedAt: iso(t.publishedAt),
       cancelledAt: iso(t.cancelledAt),
       carrier: { id: t.user.id, firstName: t.user.firstName, lastName: t.user.lastName, email: t.user.email, accountStatus: String(t.user.accountStatus), carrierStatus: String(t.user.carrierStatus) },
-      ticketVerificationStatus: String(t.ticketVerificationStatus),
+      ticketVerificationStatus: effectiveTicketStatus({ ticketVerificationStatus: String(t.ticketVerificationStatus), departureAt: t.departureAt }, new Date()), // ANO-ADM-16
       hidden: t.hiddenByAdminAt ? { at: t.hiddenByAdminAt.toISOString(), reason: t.hiddenReason ?? "", byAdmin: nameOf(t.hiddenByAdminId) } : null,
       hideProposal: t.hideProposedAt && !t.hiddenByAdminAt ? { reason: t.hideProposedReason ?? "", byAdmin: nameOf(t.hideProposedByAdminId), at: t.hideProposedAt.toISOString() } : null,
       documents: t.documents.map((d) => ({
@@ -208,11 +210,20 @@ export const proposeHide = async (req: AuthenticatedRequest, res: Response, next
     const t = await loadTripForAdmin(req);
     const parsed = HideTripRequestSchema.safeParse(req.body);
     if (!parsed.success) throw new ValidationError("Invalid request", { errors: zodErrors(parsed.error.issues) });
+    // ANO-ADM-17 — proposer de masquer un trajet DÉJÀ masqué était accepté : la proposition, invisible tant que le trajet
+    // est masqué, ressurgissait au rétablissement comme une demande en cours. Refus, et écriture conditionnelle.
+    if (t.hiddenByAdminAt) throw new ValidationError("This trip is already hidden.", { code: "TRIP_ALREADY_HIDDEN" });
     const now = new Date();
-    await prisma.$transaction(async (tx) => {
-      await tx.trip.update({ where: { id: t.id }, data: { hideProposedReason: parsed.data.reason, hideProposedByAdminId: req.user.id, hideProposedAt: now } });
-      await recordAdminAction(tx, { adminUserId: req.user.id, action: "TRIP_HIDE_PROPOSED", targetType: "TRIP", targetId: t.id, after: { reason: parsed.data.reason }, ...meta(req) });
-    });
+    const previous = await prisma.trip.findUnique({ where: { id: t.id }, select: { hideProposedAt: true, hideProposedReason: true, hideProposedByAdminId: true } });
+    // P2034 (mesuré, ADM-TRJ-4 bis) : la base rejette l'une des deux transactions simultanées ; au réessai, la garde
+    // conditionnelle répond proprement 400.
+    await withWriteConflictRetry(() => prisma.$transaction(async (tx) => {
+      const r = await tx.trip.updateMany({ where: { id: t.id, ...notHiddenFilter() } as never, data: { hideProposedReason: parsed.data.reason, hideProposedByAdminId: req.user.id, hideProposedAt: now } });
+      if (r.count !== 1) throw new ValidationError("This trip is already hidden.", { code: "TRIP_ALREADY_HIDDEN" });
+      // Amélioration § 5.7 — une proposition qui en REMPLACE une autre garde la trace de la précédente au journal.
+      const before = previous?.hideProposedAt ? { reason: previous.hideProposedReason, byAdminId: previous.hideProposedByAdminId, at: previous.hideProposedAt.toISOString() } : undefined;
+      await recordAdminAction(tx, { adminUserId: req.user.id, action: "TRIP_HIDE_PROPOSED", targetType: "TRIP", targetId: t.id, ...(before ? { before } : {}), after: { reason: parsed.data.reason }, ...meta(req) });
+    }));
     res.status(200).json({ ok: true, proposedAt: now.toISOString() });
   } catch (e) {
     next(e);
@@ -226,13 +237,18 @@ export const hideTrip = async (req: AuthenticatedRequest, res: Response, next: N
     if (!parsed.success) throw new ValidationError("Invalid request", { errors: zodErrors(parsed.error.issues) });
     if (t.hiddenByAdminAt) throw new ValidationError("This trip is already hidden.", { code: "TRIP_ALREADY_HIDDEN" });
     const now = new Date();
-    await prisma.$transaction(async (tx) => {
-      await tx.trip.update({
-        where: { id: t.id },
+    // P2034 (mesuré, ADM-TRJ-4 bis) : la base rejette l'une des deux transactions simultanées ; au réessai, la garde
+    // conditionnelle répond proprement 400.
+    await withWriteConflictRetry(() => prisma.$transaction(async (tx) => {
+      // Amélioration § 5.7 — écriture CONDITIONNELLE : deux « Masquer » simultanés passaient tous deux la lecture
+      // ci-dessus (deux lignes TRIP_HIDDEN, deux emails au Voyageur). Le second reçoit maintenant le même 400.
+      const r = await tx.trip.updateMany({
+        where: { id: t.id, ...notHiddenFilter() } as never,
         data: { hiddenByAdminAt: now, hiddenReason: parsed.data.reason, hiddenByAdminId: req.user.id, hideProposedReason: null, hideProposedByAdminId: null, hideProposedAt: null },
       });
+      if (r.count !== 1) throw new ValidationError("This trip is already hidden.", { code: "TRIP_ALREADY_HIDDEN" });
       await recordAdminAction(tx, { adminUserId: req.user.id, action: "TRIP_HIDDEN", targetType: "TRIP", targetId: t.id, after: { reason: parsed.data.reason }, ...meta(req) });
-    });
+    }));
     await emailCarrier(t.userId, (locale, u) => getTripAdminEmails(locale).tripHidden({ firstName: u.firstName, route: route(t), tripUrl: `${USER_APP_URL}/${locale}/trips/${t.id}`, supportEmail: SUPPORT_EMAIL }));
     res.status(200).json({ ok: true, hiddenAt: now.toISOString() });
   } catch (e) {
@@ -246,10 +262,13 @@ export const unhideTrip = async (req: AuthenticatedRequest, res: Response, next:
     if (!t.hiddenByAdminAt) throw new ValidationError("This trip is not hidden.", { code: "TRIP_NOT_HIDDEN" });
     const parsed = HideTripRequestSchema.safeParse(req.body);
     if (!parsed.success) throw new ValidationError("Invalid request", { errors: zodErrors(parsed.error.issues) });
-    await prisma.$transaction(async (tx) => {
-      await tx.trip.update({ where: { id: t.id }, data: { hiddenByAdminAt: null, hiddenReason: null, hiddenByAdminId: null } });
+    // P2034 (mesuré, ADM-TRJ-4 bis) : la base rejette l'une des deux transactions simultanées ; au réessai, la garde
+    // conditionnelle répond proprement 400.
+    await withWriteConflictRetry(() => prisma.$transaction(async (tx) => {
+      const r = await tx.trip.updateMany({ where: { id: t.id, hiddenByAdminAt: { not: null } } as never, data: { hiddenByAdminAt: null, hiddenReason: null, hiddenByAdminId: null } });
+      if (r.count !== 1) throw new ValidationError("This trip is not hidden.", { code: "TRIP_NOT_HIDDEN" }); // même garde que le masquage
       await recordAdminAction(tx, { adminUserId: req.user.id, action: "TRIP_UNHIDDEN", targetType: "TRIP", targetId: t.id, after: { reason: parsed.data.reason }, ...meta(req) });
-    });
+    }));
     await emailCarrier(t.userId, (locale, u) => getTripAdminEmails(locale).tripUnhidden({ firstName: u.firstName, route: route(t), tripUrl: `${USER_APP_URL}/${locale}/trips/${t.id}`, supportEmail: SUPPORT_EMAIL }));
     res.status(200).json({ ok: true });
   } catch (e) {

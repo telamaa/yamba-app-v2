@@ -4,6 +4,7 @@
  * Traduit la requête validée en `where` / `orderBy` Prisma. Testé sans base.
  */
 import type { AdminUsersQuery } from "@packages/api-contracts";
+import { escapeRegex } from "@packages/libs/prisma/text-search";
 
 export const OID = /^[a-f0-9]{24}$/i;
 export const TICKET = /^YAM-\d{4,6}$/i;
@@ -12,10 +13,9 @@ export const TICKET = /^YAM-\d{4,6}$/i;
  * ANO-ADM-05 (recette 02-ADMIN § 5.3) — sur MongoDB, Prisma traduit `contains` en `$regex` SANS échapper le terme :
  * « +33612345601 » devenait une expression dont le `+` initial est un quantificateur (zéro résultat), un « . » d'email
  * valait « n'importe quel caractère », une « ( » faisait échouer la requête. Tout terme libre passe par ici.
+ * Recette § 5.7 (ANO-ADM-15) : la fonction vit dans `packages/libs/prisma/text-search.ts`, partagée avec trip-service.
  */
-export function escapeRegex(term: string): string {
-  return term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
+export { escapeRegex };
 
 /**
  * Le numéro cherché, réduit à ses chiffres significatifs pour un `contains` sur `phoneE164` : sans « + », sans préfixe
