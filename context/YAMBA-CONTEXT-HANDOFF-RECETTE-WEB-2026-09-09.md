@@ -3,6 +3,16 @@
 *Ce document sert à REPRENDRE le chantier après une pause. Il dit où en est la campagne, ce qui
 tourne sur le poste, ce qui reste à faire, et les pièges déjà payés qu'il ne faut pas repayer.*
 
+> ## ▶ 14/09/2026 (nuit) — § 5.16 LIVRÉ
+>
+> PR #316 (§ 5.15) : CI 17/17, non-régression 72/72. Branche `chore/recette-admin-5-16` empilée sur #316 : 5 scénarios
+> ADM-RPT verts deux fois, contre-épreuve rouge sur RPT-4 / RPT-5, ANO-ADM-37, 38 (majeures), 39 closes, **A166**
+> (`Booking.refunds`). Chiffres : deal **635** (invariant Σ liste = cumul inclus), harnais **437** ; dernière anomalie ANO-ADM-39 ; dernier chapitre
+> d'apprentissage **174**. `repair-absent-lists.ts` a été joué sur la base locale (refunds, deliveryPhotoUrls) — à jouer sur
+> toute base partagée après merge. Pièges : un `test.fail` d'anomalie ouverte s'affiche ✘ dans le reporter `list` mais
+> compte « passed » au résumé — lire le décompte, pas les croix ; WEB-PIC-6 dépend de l'heure (compteur de réputation du
+> jeu d'essai contre le cron d'auto-complétion) : verte rejouée seule. Suite : § 5.17 (pilotage).
+>
 > ## ▶ REPRISE DU 14/09/2026 (soir) — § 5.15 LIVRÉ, § 5.16 EN COURS
 >
 > Le WIP `b5b6f31` a été relu, vérifié et remplacé par un commit propre sur `chore/recette-admin-5-15` (PR empilée sur

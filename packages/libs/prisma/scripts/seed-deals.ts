@@ -6,6 +6,7 @@ import {
   encryptDeliveryCode,
   hashDeliveryCode,
 } from "../../delivery-code/src/index";
+import { REPUTATION_PARAMS } from "../../api-contracts/src/booking/booking-rating.schema";
 
 /**
  * Mot de passe DEV commun aux 12 users du seed (PR5) : Yamba-Dev-2026!
@@ -495,6 +496,8 @@ async function main() {
         recipient: b.recipient,
         pickup: b.pickup ? { ...b.pickup, checklist: SEED_CHECKLIST } : undefined,
         trackingEvents: b.trackingEvents ?? [],
+        refunds: [], // A166 — jamais absente
+        deliveryPhotoUrls: [], // recette § 5.16 — le seed la laissait absente (23 documents réparés), comme l'API avant A85
         // D43 — un vrai code (haché + chiffré) dès qu'il y a eu pickup.
         ...(b.pickup
           ? { deliveryCodeHash: seedCodeHash, deliveryCodeEncrypted: encryptDeliveryCode(SEED_DELIVERY_CODE) }
@@ -582,6 +585,7 @@ async function main() {
           chargeId: `ch_fake_seed_${b.key}`,
           refundedAt: closedAt,
           refundAmountCents: pricing.totalShipperCents - retentionCents,
+          refunds: [{ refundId: null, amountCents: pricing.totalShipperCents - retentionCents, refundedAt: closedAt, kind: "CANCELLATION" }], // A166
           retentionCents,
           retentionDisposition: "HELD_FOR_MEDIATION",
         },
@@ -595,7 +599,12 @@ async function main() {
       const closedAt = (b.milestones as { closedAt?: Date }).closedAt ?? NOW;
       await prisma.booking.update({
         where: { id: booking.id },
-        data: { refundedAt: closedAt, refundAmountCents: pricing.totalShipperCents, refundId: `re_fake_seed_${b.key}` },
+        data: {
+          refundedAt: closedAt,
+          refundAmountCents: pricing.totalShipperCents,
+          refundId: `re_fake_seed_${b.key}`,
+          refunds: [{ refundId: `re_fake_seed_${b.key}`, amountCents: pricing.totalShipperCents, refundedAt: closedAt, kind: "CANCELLATION" }], // A166
+        },
       });
     }
     // Chantier F (D61) — un fil vivant sur le deal accepte : recette FCH01+ sans rien creer a la main.
@@ -659,6 +668,34 @@ async function main() {
     });
   }
   console.log(`✓ ${BOOKINGS.length} bookings\n`);
+
+  // 4bis. Recette 02-ADMIN § 5.16 — la réputation dénormalisée RECALCULÉE sur les deals recréés. Le rejeu ne remettait à
+  // zéro que les annulations et les litiges perdus : un deal terminé par une fiche précédente (WEB-CNF) laissait
+  // `completedDealsCount: 1` sur un Voyageur qui n'en avait plus aucun, et le premier recalcul réel (refus au pickup,
+  // WEB-PIC-6) « changeait » son profil. Mêmes faits que `apps/deal-service/src/services/reputation.service.ts`
+  // (le jeu d'essai ne crée aucun avis), seuils par défaut du contrat.
+  const levelOf = (t: { confirmedMinDeals: number }, completed: number) => (completed >= t.confirmedMinDeals ? "CONFIRMED" : "NEW");
+  for (const u of USERS) {
+    const userId = userIds.get(u.key)!;
+    const [shipperCompleted, shipperLate] = await Promise.all([
+      prisma.booking.count({ where: { shipperId: userId, status: "COMPLETED", isDeleted: false } }),
+      prisma.booking.count({ where: { shipperId: userId, status: "CANCELLED", isDeleted: false, retentionCents: { gt: 0 } } }),
+    ]);
+    await prisma.user.update({
+      where: { id: userId },
+      data: { shipperRatingsAvg: 0, shipperRatingsCount: 0, shipperCompletedDealsCount: shipperCompleted, shipperLateCancellationsCount: shipperLate, shipperReputationLevel: levelOf(REPUTATION_PARAMS.shipper, shipperCompleted) },
+    });
+    if (!u.carrier) continue;
+    const [carrierCompleted, carrierLate] = await Promise.all([
+      prisma.booking.count({ where: { carrierId: userId, status: "COMPLETED", isDeleted: false } }),
+      prisma.booking.count({ where: { carrierId: userId, status: "CANCELLED", closedBy: "CARRIER", isDeleted: false, acceptedAt: { not: null }, OR: [{ pickupRefusedAt: null }, { pickupRefusedAt: { isSet: false } }] } }),
+    ]);
+    await prisma.carrierPage.update({
+      where: { userId },
+      data: { ratingsAvg: 0, ratingsCount: 0, completedDealsCount: carrierCompleted, lateCancellationsCount: carrierLate, reputationLevel: levelOf(REPUTATION_PARAMS.carrier, carrierCompleted), isSuperCarrier: false },
+    });
+  }
+  console.log(`✓ réputation recalculée sur les deals recréés (${USERS.length} membres)\n`);
 
   // 5. Sortie — table console + seed-output.json (successeur des magic IDs)
   console.table(output.map(({ key, status, corridor, id }) => ({ key, status, corridor, id })));

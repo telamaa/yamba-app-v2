@@ -796,6 +796,23 @@ Ordre de demarrage : auth -> trip -> gateway.
   sur le Fake + manoeuvres base). AMELIORATIONS : carte qui nomme le fournisseur, aide FR par divergence, statuts FR,
   refus par code, journal « Rapprochement fournisseur ». PIEGE : la memoire du Fake survit au rejeu du jeu d'essai (une
   fiche constate l'etat initial, ne l'exige pas). Tests : deal 598, harnais 419. Reste : § 5.14 a 8.
+- 14/09 : **CAHIER 02-ADMIN — § 5.16 RAPPORT MENSUEL ET EXPORT FINANCES (branche `chore/recette-admin-5-16`, empilee sur
+  #316)** — 5 scenarios CONFORMES (RPT-1, 2, 3 du cahier + RPT-4 « un mois clos ne change pas », RPT-5 annulation avant
+  capture), verts deux fois. CONTRE-EPREUVE avant le code (pile encore sur le serveur du § 5.15) : RPT-4 et RPT-5 ROUGES.
+  ANO-ADM-37 CLOSE (majeure) : chaque remboursement ecrasait `refundedAt` / `refundId` → 10 € rembourses le 15 aout puis
+  5 € aujourd'hui : aout 10,00 € x1 → 0,00 € x0 (mois clos modifie, export non reproductible, premier refundId perdu).
+  ANO-ADM-38 CLOSE (majeure) : une annulation AVANT capture (cumul = total, rien debite) comptait 28 € en « Rembourse » et
+  levait OVERSPENT sur la fiche argent. A166 (valide par le fondateur) : `Booking.refunds: BookingRefund[]` (refundId,
+  amountCents, refundedAt, kind CANCELLATION / PICKUP_REFUSED / DISPUTE / RETENTION_RESTITUTION / MANUAL), ecrite en
+  entier par les cinq chemins dans la transaction du cumul (`withRefund`, qui materialise l'ancien remboursement d'un
+  document anterieur en LEGACY A SA DATE avant de l'ecraser), lue par `refundEntries` (vide sans capture) : rapport,
+  CSV (+ `refundCount`, `refundedInPeriodCents`), chronologie, bilan, fiche argent `payment.refunds`. ANO-ADM-39 CLOSE
+  (mineure) : l'export finances ouvrait encore un onglet (`window.open`, echappe au correctif ANO-ADM-13 du § 5.6) →
+  `downloadFile`, periode verifiee a l'ecran, refus par code, nombre de lignes. AMELIORATIONS : pied du rapport en UTC au
+  dernier jour inclus, fichier nomme au dernier jour inclus, liste des remboursements sur la fiche argent, seed
+  `deliveryPhotoUrls: []` (23 documents sans la liste). INVARIANT Σ liste = cumul (demande du fondateur) :
+  `refundListExcessCents`, anomalie de bilan REFUND_RECORDS_MISMATCH, verifie et contre-eprouve par ADM-ARG-3. A TRANCHER : mois UTC ou Paris ; geste commercial = charge ou
+  moins-revenu ; historique des VERSEMENTS (re-verser ecrase payoutSentAt). Tests : deal 635, harnais 437. Reste : § 5.17 a 8.
 - 14/09 : **CAHIER 02-ADMIN — § 5.15 REMBOURSEMENT MANUEL EN DEUX GESTES (branche `chore/recette-admin-5-15`, empilee
   sur #315)** — reprise du WIP `b5b6f31` interrompu a l'arret du poste : relu, verifie (typecheck CI x8, tests, OpenAPI,
   i18n), rejoue. 6 scenarios CONFORMES (REM-1, 2, 3 du cahier + REM-4 trois applications simultanees, REM-5 proposition

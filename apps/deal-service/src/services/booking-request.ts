@@ -263,5 +263,6 @@ export function buildBookingSnapshots(args: {
     // recette réelle. Les listes existent dès la création.
     trackingEvents: [],
     deliveryPhotoUrls: [],
+    refunds: [], // A166
   };
 }

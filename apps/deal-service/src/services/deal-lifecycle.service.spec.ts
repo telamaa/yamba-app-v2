@@ -391,6 +391,22 @@ describe("C — cancel Expéditeur (ANN-01, D39)", () => {
     expect(result.refundAmountCents).toBe(2957);
   });
 
+  it("A166 — ACCEPTED : le remboursement entre dans la liste ; PENDING : l'empreinte libérée n'y entre pas", async () => {
+    const { provider, intentId } = await makeProviderWithAuth();
+    await provider.capture(intentId);
+    prismaMock.booking.findUnique.mockResolvedValue(
+      makeBookingRecord({ status: "ACCEPTED", paymentIntentId: intentId, departureAt: hoursFromNow(12) })
+    );
+    await makeService(provider).cancel(SHIPPER, BOOKING_ID, {});
+    const accepted = prismaMock.booking.updateMany.mock.calls.at(-1)![0].data as { refunds: unknown; refundId: string };
+    expect(accepted.refunds).toEqual([{ refundId: accepted.refundId, amountCents: 1479, refundedAt: NOW, kind: "CANCELLATION" }]);
+
+    const pending = await makeProviderWithAuth();
+    prismaMock.booking.findUnique.mockResolvedValue(makeBookingRecord({ paymentIntentId: pending.intentId }));
+    await makeService(pending.provider).cancel(SHIPPER, BOOKING_ID, {});
+    expect(prismaMock.booking.updateMany.mock.calls.at(-1)![0].data).not.toHaveProperty("refunds");
+  });
+
   it("ACCEPTED à moins de 48 h : retenue 50 % (arrondi) — la retenue reste tracée", async () => {
     const { provider, intentId } = await makeProviderWithAuth();
     await provider.capture(intentId);

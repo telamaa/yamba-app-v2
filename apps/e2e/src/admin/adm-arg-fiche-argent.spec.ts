@@ -29,7 +29,7 @@ type Page = NavigateurAdmin["page"];
 type Fiche = {
   id: string; status: string; disputeTicket: string | null;
   pricing: { totalShipperCents: number; transportCents: number; commissionCents: number; premiumCents: number; currencyCode: string; pricingModel: string; weightKg: number };
-  payment: { intentId: string | null; chargeId: string | null; capturedAt: string | null; refundAmountCents: number | null };
+  payment: { intentId: string | null; chargeId: string | null; capturedAt: string | null; refundAmountCents: number | null; refunds?: Array<{ amountCents: number }> };
   payout: { status: string | null; amountCents: number | null; attempts: number; failureKind: string | null; nextRetryAt: string | null };
   carrier: { id: string; stripeAccountIdMasked: string | null; stripePayoutsEnabled: boolean | null };
   retention: { cents: number; disposition: string | null } | null;
@@ -165,6 +165,9 @@ test.describe("ADM-ARG — fiche argent d'un deal (cahier 02-ADMIN § 5.12)", ()
       if (p.transportCents + p.commissionCents + p.premiumCents !== p.totalShipperCents) ecarts.push(`${d.key} : payé ≠ net + commission + prime`);
       if ((fiche.payment.refundAmountCents ?? 0) > p.totalShipperCents) ecarts.push(`${d.key} : remboursé > payé`);
       if (fiche.payment.refundAmountCents && !fiche.payment.capturedAt) ecarts.push(`${d.key} : remboursé sans débit`);
+      // Recette § 5.16 (A166) — invariant Σ liste = cumul : chaque remboursement réel est dans la liste, et rien de plus.
+      const liste = (fiche.payment.refunds ?? []).reduce((acc, r) => acc + r.amountCents, 0);
+      if (liste !== (fiche.payment.capturedAt ? (fiche.payment.refundAmountCents ?? 0) : 0)) ecarts.push(`${d.key} : Σ remboursements listés ${euros(liste)} ≠ cumul ${euros(fiche.payment.refundAmountCents ?? 0)}`);
       const b = fiche.balance;
       if (!b) { ecarts.push(`${d.key} : aucun bilan servi`); continue; }
       if (b.capturedCents - b.refundedCents - b.paidOutCents !== b.platformHoldsCents) ecarts.push(`${d.key} : bilan qui n'additionne pas`);
@@ -178,12 +181,22 @@ test.describe("ADM-ARG — fiche argent d'un deal (cahier 02-ADMIN § 5.12)", ()
     const annule = jeuEssai.deal("bzv-cancelled");
     lireCoteServeur(`
       import prisma from "./packages/libs/prisma";
-      (async () => { await prisma.booking.update({ where: { id: "${annule.id}" }, data: { refundAmountCents: null, refundedAt: null, refundId: null } }); console.log("@@true"); process.exit(0); })();`);
+      (async () => { await prisma.booking.update({ where: { id: "${annule.id}" }, data: { refundAmountCents: null, refundedAt: null, refundId: null, refunds: [] /* A166 (§ 5.16) : la liste aussi */ } }); console.log("@@true"); process.exit(0); })();`);
     process.stdout.write(`   ↳ manœuvre base : remboursement retiré de bzv-cancelled (${annule.id}) — ADM-ARG-3, rejoué en afterAll\n`);
     const { fiche: fautive } = await lireFiche(fin.contexte, annule.id);
     expect(fautive!.balance, "le bilan signale l'argent sans destination").toMatchObject({ platformHoldsCents: fautive!.pricing.totalShipperCents, settled: true, anomaly: "UNALLOCATED_FUNDS" });
     await fin.page.goto(`${bo()}/deals/${annule.id}`, { waitUntil: "domcontentloaded" });
     await expect(fin.page.getByText(/^Argent sans destination : le deal est clos/), "l'écran l'affiche en rouge").toBeVisible({ timeout: 60_000 });
+    /* Contre-épreuve de l'invariant Σ liste = cumul (§ 5.16) : le cumul remis à zéro, la liste gardée. */
+    const incoherent = jeuEssai.deal("bzv-held");
+    lireCoteServeur(`
+      import prisma from "./packages/libs/prisma";
+      (async () => { await prisma.booking.update({ where: { id: "${incoherent.id}" }, data: { refundAmountCents: null } }); console.log("@@true"); process.exit(0); })();`);
+    process.stdout.write(`   ↳ manœuvre base : cumul remis à zéro, liste gardée sur bzv-held (${incoherent.id}) — ADM-ARG-3, rejoué en afterAll\n`);
+    const { fiche: douteuse } = await lireFiche(fin.contexte, incoherent.id);
+    expect(douteuse!.balance?.anomaly, "le bilan signale la liste qui dépasse le cumul").toBe("REFUND_RECORDS_MISMATCH");
+    await fin.page.goto(`${bo()}/deals/${incoherent.id}`, { waitUntil: "domcontentloaded" });
+    await expect(fin.page.getByText(/^Remboursements incohérents : la liste des remboursements enregistre plus que le cumul/), "l'écran le dit").toBeVisible({ timeout: 60_000 });
   });
 
   test("ADM-ARG-4 · le bilan et les libellés en français sur la fiche (ajoutée)", async ({ navigateurAdmin, jeuEssai }) => {

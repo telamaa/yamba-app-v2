@@ -225,6 +225,7 @@ export const MONEY_PENDING_LABEL: Record<string, string> = {
 };
 export const MONEY_ANOMALY_LABEL: Record<string, string> = {
   UNALLOCATED_FUNDS: "Argent sans destination : le deal est clos, rien n'est en attente, et la plateforme détient plus que sa commission.",
+  REFUND_RECORDS_MISMATCH: "Remboursements incohérents : la liste des remboursements enregistre plus que le cumul du deal. Rapproche avec le fournisseur avant tout geste d'argent.",
   OVERSPENT: "La plateforme a versé et remboursé plus qu'elle n'a reçu, sans geste commercial qui l'explique.",
 };
 export const ACTOR_LABEL: Record<string, string> = { SHIPPER: "par l'Expéditeur", CARRIER: "par le Voyageur", SYSTEM: "automatique", ADMIN: "par un admin" };
@@ -233,7 +234,7 @@ export const HISTORY_STATUS_LABEL: Record<string, string> = { PUBLISHED: "publi�
 /** Le détail d'une ligne de chronologie de l'argent, lisible : acteur, issue de retenue, nature d'échec, décision de renversement. */
 export function timelineDetailLabel(detail: string | null): string | null {
   if (!detail) return null;
-  return ACTOR_LABEL[detail] ?? RETENTION_DISPOSITION_LABEL[detail] ?? PAYOUT_FAILURE_LABEL[detail] ?? (detail === "RESENT" ? "re-versé" : detail === "WRITTEN_OFF" ? "abandonné" : detail);
+  return ACTOR_LABEL[detail] ?? RETENTION_DISPOSITION_LABEL[detail] ?? PAYOUT_FAILURE_LABEL[detail] ?? REFUND_KIND_LABEL[detail] ?? (detail === "RESENT" ? "re-versé" : detail === "WRITTEN_OFF" ? "abandonné" : detail);
 }
 const AFTER_KEY_LABEL: Record<string, string> = { amountCents: "montant", totalRefundedCents: "cumul remboursé", refundedCents: "remboursé", reason: "motif", outcome: "issue", divergences: "divergences", provider: "fournisseur", payoutStatus: "versement", refundId: "remboursement", transferId: "transfert", previousTransferId: "transfert renversé", providerError: "échec" };
 /** § 5.13 — valeurs codées du journal qui ont un libellé. */
@@ -281,3 +282,41 @@ export function manualRefundRefusal(e: { status?: number; data?: unknown; messag
   if (e?.status === 400) return { text: "Demande refusée : vérifie le montant et le motif (50 caractères au moins).", reload: false };
   return { text: "Action impossible pour le moment. Recharge la fiche avant de réessayer : elle dit si l'argent est parti.", reload: true };
 }
+
+/* ── Recette § 5.16 — rapport mensuel et export finances ─────────────── */
+
+const DAY_MS = 86_400_000;
+/** « du 1 oct. 2025 au 30 sept. 2026 (mois UTC) » — la borne de fin servie est EXCLUE (1er du mois suivant, minuit UTC) :
+ *  on affiche le dernier jour inclus, en UTC, jamais « au 01 oct. 2026, 02:00 » (heure locale d'une borne exclue). */
+export function reportPeriodLabel(fromIso: string, toExclusiveIso: string): string {
+  const f = new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+  return `Du ${f.format(new Date(fromIso))} au ${f.format(new Date(new Date(toExclusiveIso).getTime() - DAY_MS))} (mois UTC)`;
+}
+
+/** Période d'export saisie en jours inclus (AAAA-MM-JJ) : null si acceptable, sinon la raison en français (au plus 366 jours). */
+export function exportPeriodProblem(from: string, to: string, maxDays = 366): string | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) return "Choisis une date de début et une date de fin.";
+  const days = (Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / DAY_MS + 1;
+  if (days < 1) return "La fin précède le début : choisis une date de fin postérieure.";
+  if (days > maxDays) return `Période trop longue : ${days} jours, ${maxDays} au plus. Exporte en plusieurs fois.`;
+  return null;
+}
+
+/** Un refus d'export finances, en français selon son code (A146). */
+export function financeExportRefusal(e: { status?: number; data?: unknown } | null | undefined): string {
+  const code = (e?.data as { details?: { code?: string } } | undefined)?.details?.code;
+  if (code === "PERIOD_TOO_LONG") return "Période trop longue : 366 jours au plus. Exporte en plusieurs fois.";
+  if (code === "INVALID_PERIOD") return "Période invalide : la fin doit suivre le début.";
+  if (code === "ADMIN_PERMISSION_DENIED" || e?.status === 403) return "Ton profil ne permet pas l'export finances.";
+  return "L'export n'a pas pu être produit. Réessaie ; rien n'a été téléchargé.";
+}
+
+/** A166 — nature d'un remboursement (fiche argent, chronologie). */
+export const REFUND_KIND_LABEL: Record<string, string> = {
+  CANCELLATION: "annulation",
+  PICKUP_REFUSED: "colis refusé au pickup",
+  DISPUTE: "décision de litige",
+  RETENTION_RESTITUTION: "retenue restituée",
+  MANUAL: "geste commercial",
+  LEGACY: "antérieur à la liste (date du dernier remboursement)",
+};

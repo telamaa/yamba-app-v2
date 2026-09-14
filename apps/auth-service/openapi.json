@@ -21172,14 +21172,15 @@
                 "type": "string",
                 "enum": [
                   "UNALLOCATED_FUNDS",
-                  "OVERSPENT"
+                  "OVERSPENT",
+                  "REFUND_RECORDS_MISMATCH"
                 ]
               },
               {
                 "type": "null"
               }
             ],
-            "description": "deal clos, rien en attente, et la plateforme détient plus que sa commission (UNALLOCATED_FUNDS) ou a versé plus qu'elle n'a reçu (OVERSPENT)"
+            "description": "deal clos, rien en attente, et la plateforme détient plus que sa commission (UNALLOCATED_FUNDS) ou a versé plus qu'elle n'a reçu (OVERSPENT) ; à tout moment, la liste des remboursements enregistre plus que le cumul (REFUND_RECORDS_MISMATCH, recette § 5.16)"
           }
         },
         "required": [
@@ -21425,6 +21426,53 @@
                     "type": "null"
                   }
                 ]
+              },
+              "refunds": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "refundId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "amountCents": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "refundedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "CANCELLATION",
+                        "PICKUP_REFUSED",
+                        "DISPUTE",
+                        "RETENTION_RESTITUTION",
+                        "MANUAL",
+                        "LEGACY"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "refundId",
+                    "amountCents",
+                    "refundedAt",
+                    "kind"
+                  ],
+                  "additionalProperties": false
+                },
+                "description": "Recette § 5.16 (A166) — chaque remboursement réel, à sa date ; LEGACY = part du cumul antérieure à la liste. Vide sur un deal jamais capturé."
               }
             },
             "required": [
@@ -21434,7 +21482,8 @@
               "capturedAt",
               "refundedAt",
               "refundAmountCents",
-              "refundId"
+              "refundId",
+              "refunds"
             ],
             "additionalProperties": false
           },

@@ -8,6 +8,7 @@
 import type { MoneyBalance, MoneyTimelineEvent, PayoutFailureKind, ReconciliationDivergenceCode } from "@packages/api-contracts";
 import type { PaymentInspection } from "@packages/payments";
 import { csvCell } from "@packages/libs/csv";
+import { refundEntries, refundedTotalCents, refundListExcessCents, type RefundHistorySource } from "../lib/booking-refunds";
 
 /* ── Rejeux espacés (A111) ─────────────────────────────────── */
 
@@ -82,7 +83,7 @@ export function payoutFailureDetail(reason: string | null | undefined): string |
 
 /* ── Chronologie de l'argent ───────────────────────────────── */
 
-export type MoneyTimelineInput = {
+export type MoneyTimelineInput = RefundHistorySource & {
   requestedAt: Date;
   capturedAt?: Date | null;
   refundedAt?: Date | null;
@@ -117,7 +118,8 @@ export function buildMoneyTimeline(b: MoneyTimelineInput): MoneyTimelineEvent[] 
   push(b.requestedAt, "AUTHORIZED", b.pricing.totalShipperCents, null);
   push(b.capturedAt, "CAPTURED", b.pricing.totalShipperCents, null);
   push(b.disputedAt, "DISPUTED", null, b.disputeTicket ?? null);
-  push(b.refundedAt, "REFUNDED", b.refundAmountCents ?? null, null);
+  // A166 — une ligne par remboursement réel, à sa date, avec sa nature (un deal jamais capturé n'en a aucun).
+  for (const r of refundEntries(b)) push(r.refundedAt, "REFUNDED", r.amountCents, r.kind);
   if (b.status === "COMPLETED") push(b.completedAt, "COMPLETED", null, b.completedBy ?? null);
   if (b.status === "CANCELLED") push(b.closedAt, "CANCELLED", null, b.closedBy ?? null);
   if ((b.retentionCents ?? 0) > 0) {
@@ -136,7 +138,7 @@ export function buildMoneyTimeline(b: MoneyTimelineInput): MoneyTimelineEvent[] 
 
 /* ── Bilan de l'argent (recette § 5.12) ────────────────────── */
 
-export type MoneyBalanceInput = {
+export type MoneyBalanceInput = RefundHistorySource & {
   status: string;
   capturedAt?: Date | null;
   refundAmountCents?: number | null;
@@ -162,7 +164,8 @@ const CLOSED = new Set(["COMPLETED", "CANCELLED", "DECLINED", "EXPIRED"]);
  */
 export function moneyBalance(b: MoneyBalanceInput): MoneyBalance {
   const capturedCents = b.capturedAt ? b.pricing.totalShipperCents : 0;
-  const refundedCents = b.refundAmountCents ?? 0;
+  // A166 — les remboursements RÉELS : une annulation avant capture pose un cumul sans argent débité.
+  const refundedCents = refundedTotalCents(b);
   const paidOutCents = b.payoutStatus === "SENT" ? (b.payoutAmountCents ?? 0) : 0;
   const platformHoldsCents = capturedCents - refundedCents - paidOutCents;
   const pending: MoneyBalance["pending"] = [];
@@ -181,6 +184,9 @@ export function moneyBalance(b: MoneyBalanceInput): MoneyBalance {
     if (!writtenOff && platformHoldsCents > b.pricing.commissionCents) anomaly = "UNALLOCATED_FUNDS";
     else if (platformHoldsCents < 0 && !(b.manualRefundCents ?? 0)) anomaly = "OVERSPENT";
   }
+  // Recette § 5.16 — invariant Σ liste = cumul : une liste qui enregistre plus que le cumul rend le bilan lui-même douteux.
+  // Priorité sur les autres anomalies, à tout moment de la vie du deal (pas seulement clos).
+  if (refundListExcessCents(b) > 0) anomaly = "REFUND_RECORDS_MISMATCH";
   return { capturedCents, refundedCents, paidOutCents, platformHoldsCents, pending, settled, anomaly };
 }
 
@@ -240,7 +246,7 @@ export function maskAccountId(id: string | null | undefined): string | null {
 
 /* ══ C-PR5b (D58 5A) — rapport mensuel par devise, pur ═══════ */
 
-export type FinanceReportRow = {
+export type FinanceReportRow = RefundHistorySource & {
   id: string;
   status: string;
   pricing: { totalShipperCents: number; transportCents: number; commissionCents: number; premiumCents: number; currencyCode: string };
@@ -292,7 +298,7 @@ export function monthStartUtc(now: Date, monthsBack: number): Date {
 
 /**
  * Agrège les faits d'argent par mois (UTC) et par devise. Chaque fait est daté par SON champ :
- * capture → capturedAt, remboursement → refundedAt, versement → payoutSentAt, revenu → completedAt,
+ * capture → capturedAt, remboursement → sa date dans la liste `refunds` (A166), versement → payoutSentAt, revenu → completedAt,
  * retenue → closedAt. Un deal peut donc compter dans plusieurs mois (capturé en mars, terminé en avril).
  * Aucun frais fournisseur ici (pas en base) : le comptable rapproche avec l'export Stripe.
  */
@@ -315,9 +321,12 @@ export function buildFinanceReport(rows: FinanceReportRow[], from: Date, to: Dat
       m.capturedCents += r.pricing.totalShipperCents;
       m.capturedCount += 1;
     }
-    if (inRange(r.refundedAt, from, to) && (r.refundAmountCents ?? 0) > 0) {
-      const m = get(r.refundedAt!, cur);
-      m.refundedCents += r.refundAmountCents ?? 0;
+    // ANO-ADM-37 (A166) — chaque remboursement dans SON mois ; le cumul daté du dernier remboursement déplaçait les
+    // précédents, et une annulation avant capture (rien débité) comptait comme un remboursement.
+    for (const refund of refundEntries(r)) {
+      if (!inRange(refund.refundedAt, from, to)) continue;
+      const m = get(refund.refundedAt, cur);
+      m.refundedCents += refund.amountCents;
       m.refundCount += 1;
     }
     if ((r.payoutStatus === "SENT" || r.payoutStatus === "REVERSED") && inRange(r.payoutSentAt, from, to)) {
@@ -411,6 +420,8 @@ export const FINANCE_CSV_COLUMNS = [
   "payoutStatus", "payoutAmountCents", "payoutSentAt", "transferId",
   "retentionCents", "retentionDisposition", "completedAt", "completedBy", "closedAt", "closedBy",
   "disputeTicket", "paymentIntentId", "chargeId",
+  // A166 — la période lue par le comptable : combien de remboursements au total, combien rendu DANS la période.
+  "refundCount", "refundedInPeriodCents",
 ] as const;
 
 /**
@@ -421,10 +432,10 @@ export { csvCell };
 
 /** Un deal entre dans l'export si l'un de ses faits d'argent tombe dans la période. */
 export function csvRowInRange(r: FinanceCsvRow, from: Date, to: Date): boolean {
-  return inRange(r.capturedAt, from, to) || inRange(r.refundedAt, from, to) || inRange(r.payoutSentAt, from, to) || inRange(r.completedAt, from, to) || inRange(r.closedAt, from, to);
+  return inRange(r.capturedAt, from, to) || refundEntries(r).some((x) => inRange(x.refundedAt, from, to)) || inRange(r.payoutSentAt, from, to) || inRange(r.completedAt, from, to) || inRange(r.closedAt, from, to);
 }
 
-export function buildFinanceCsv(rows: FinanceCsvRow[]): string {
+export function buildFinanceCsv(rows: FinanceCsvRow[], period?: { from: Date; to: Date }): string {
   const lines = [FINANCE_CSV_COLUMNS.join(",")];
   for (const r of rows) {
     const cells: unknown[] = [
@@ -434,6 +445,8 @@ export function buildFinanceCsv(rows: FinanceCsvRow[]): string {
       r.payoutStatus, r.payoutAmountCents, r.payoutSentAt, r.transferId,
       r.retentionCents, r.retentionDisposition, r.completedAt, r.completedBy, r.closedAt, r.closedBy,
       r.disputeTicket, r.paymentIntentId, r.chargeId,
+      refundEntries(r).length,
+      period ? refundEntries(r).filter((x) => inRange(x.refundedAt, period.from, period.to)).reduce((sum, x) => sum + x.amountCents, 0) : null,
     ];
     lines.push(cells.map(csvCell).join(","));
   }

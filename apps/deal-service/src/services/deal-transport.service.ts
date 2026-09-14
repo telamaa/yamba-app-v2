@@ -24,6 +24,7 @@
  */
 
 import { refundIdempotencyKey } from "../lib/refund-idempotency"; // A165
+import { withRefund } from "../lib/booking-refunds"; // A166
 import prisma from "@packages/libs/prisma";
 import { ForbiddenError } from "@packages/error-handler";
 import type { PaymentProvider } from "@packages/payments";
@@ -156,6 +157,7 @@ export function makeDealTransportService(provider: PaymentProvider, clock: () =>
           refundedAt: now,
           refundAmountCents: total,
           refundId, // C-PR5 (D58) — rapprochement exact
+          refunds: withRefund(booking, { refundId, amountCents: total, refundedAt: now, kind: "PICKUP_REFUSED" }), // A166
         },
         releaseKg: true,
         events: [

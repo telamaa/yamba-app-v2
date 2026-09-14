@@ -28,6 +28,7 @@
  */
 
 import { refundIdempotencyKey } from "../lib/refund-idempotency"; // A165
+import { withRefund } from "../lib/booking-refunds"; // A166
 import prisma from "@packages/libs/prisma";
 import { ForbiddenError } from "@packages/error-handler";
 import type { PaymentProvider } from "@packages/payments";
@@ -320,6 +321,8 @@ export function makeDealLifecycleService(
           refundedAt: now,
           refundAmountCents,
           ...(refundId ? { refundId } : {}),
+          // A166 — seul un remboursement CAPTURÉ entre dans la liste ; libérer une empreinte n'en est pas un.
+          ...(wasAccepted ? { refunds: withRefund(booking, { refundId, amountCents: refundAmountCents, refundedAt: now, kind: "CANCELLATION" }) } : {}),
           ...(retention
             ? {
                 retentionCents: retention.retentionCents,
