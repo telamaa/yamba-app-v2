@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { ApiError, apiFetch, post } from "@/lib/api";
-import { ACTION_LABEL, ACTOR_LABEL, BOOKING_STATUS_LABEL, DIVERGENCE_LABEL, HISTORY_STATUS_LABEL, MONEY_ANOMALY_LABEL, MONEY_PENDING_LABEL, PAYOUT_FAILURE_LABEL, PAYOUT_STATUS_LABEL, PRICING_MODEL_LABEL, RETENTION_DISPOSITION_LABEL, TIMELINE_LABEL, adminAfterSummary, dateTime, money, timelineDetailLabel } from "@/lib/format";
+import { ACTION_LABEL, ACTOR_LABEL, BOOKING_STATUS_LABEL, DIVERGENCE_HELP, DIVERGENCE_LABEL, INTENT_STATUS_LABEL, PROVIDER_LABEL, REFUND_STATUS_LABEL, HISTORY_STATUS_LABEL, MONEY_ANOMALY_LABEL, MONEY_PENDING_LABEL, PAYOUT_FAILURE_LABEL, PAYOUT_STATUS_LABEL, PRICING_MODEL_LABEL, RETENTION_DISPOSITION_LABEL, TIMELINE_LABEL, adminAfterSummary, dateTime, money, timelineDetailLabel } from "@/lib/format";
 import { can } from "@/lib/permissions";
 import type { AdminDealMoneyFile, AdminMe, DealHistoryResponse, PaymentReconciliation } from "@/lib/types";
 
@@ -17,6 +17,8 @@ export default function DealMoneyView({ dealId }: { dealId: string }) {
   const [denied, setDenied] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [recon, setRecon] = useState<PaymentReconciliation | null>(null);
+  /** Recette § 5.13 — le refus du rapprochement s'affiche DANS sa carte, en français, selon son code. */
+  const [reconError, setReconError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const load = useCallback(() => {
     apiFetch<AdminDealMoneyFile>(`/admin/deals/${dealId}/money`).then(setFile).catch((e) => {
@@ -47,9 +49,10 @@ export default function DealMoneyView({ dealId }: { dealId: string }) {
   const cur = file.pricing.currencyCode;
 
   async function reconcile() {
-    setBusy(true); setMsg(null);
+    if (busy) return;
+    setBusy(true); setMsg(null); setReconError(null); setRecon(null);
     try { setRecon(await post<PaymentReconciliation>(`/admin/deals/${dealId}/money/reconcile`)); }
-    catch (e) { setMsg(e instanceof ApiError ? `${e.status} : ${e.message}` : "Rapprochement impossible."); }
+    catch (e) { setReconError(reconcileRefusal(e)); }
     finally { setBusy(false); }
   }
   async function retry() {
@@ -122,21 +125,23 @@ export default function DealMoneyView({ dealId }: { dealId: string }) {
       </Card>
 
       <Card title="Rapprochement avec le fournisseur" className="mt-5">
-        <p className="text-[12px] text-slate-500">Lecture seule chez Stripe : l'état réel du paiement, des remboursements et du transfert, comparé à la base. Journalisé. Rien n'est modifié.</p>
-        {file.allowedActions.reconcile ? <button disabled={busy} onClick={reconcile} className="mt-2 rounded-lg border border-slate-300 px-3 py-1.5 text-[12.5px] disabled:opacity-50">Rapprocher maintenant</button> : <p className="mt-2 text-[12.5px] text-slate-500">Aucun paiement à rapprocher.</p>}
+        {/* § 5.13 — le texte nomme le fournisseur réellement interrogé : en local, c'est Fake, pas Stripe. */}
+        <p className="text-[12px] text-slate-500">Lecture seule chez {PROVIDER_LABEL[file.payment.provider ?? ""] ?? "le fournisseur"} : l&apos;état réel du paiement, des remboursements et du transfert, comparé à la base. Journalisé. Rien n&apos;est modifié.</p>
+        {file.allowedActions.reconcile ? <button disabled={busy} onClick={reconcile} className="mt-2 rounded-lg border border-slate-300 px-3 py-1.5 text-[12.5px] disabled:opacity-50">{busy ? "Rapprochement en cours…" : "Rapprocher maintenant"}</button> : <p className="mt-2 text-[12.5px] text-slate-500">Aucun paiement à rapprocher.</p>}
+        {reconError && <p role="alert" className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-[12.5px] text-amber-900">{reconError}</p>}
         {recon && (
           <div className="mt-3 text-[12.5px]">
-            <p className="text-slate-500">{recon.provider} · vérifié le {dateTime(recon.checkedAt)}</p>
+            <p className="text-slate-500">{PROVIDER_LABEL[recon.provider] ?? recon.provider} · vérifié le {dateTime(recon.checkedAt)} · rien n&apos;a été modifié en base</p>
             {recon.live && (
               <div className="mt-1 space-y-0.5">
-                <Row k="Paiement" v={`${recon.live.intentStatus} · ${money(recon.live.amountCents, cur)} autorisés · ${money(recon.live.amountReceivedCents, cur)} encaissés`} />
-                <Row k="Remboursements" v={recon.live.refunds.length === 0 ? "aucun" : recon.live.refunds.map((r) => `${money(r.amountCents, cur)} (${r.status})`).join(", ")} />
+                <Row k="Paiement" v={<span title={recon.live.intentStatus}>{`${INTENT_STATUS_LABEL[recon.live.intentStatus] ?? recon.live.intentStatus} · ${money(recon.live.amountCents, cur)} autorisés · ${money(recon.live.amountReceivedCents, cur)} encaissés`}</span>} />
+                <Row k="Remboursements" v={recon.live.refunds.length === 0 ? "aucun" : recon.live.refunds.map((r) => `${money(r.amountCents, cur)} (${REFUND_STATUS_LABEL[r.status] ?? r.status})`).join(", ")} />
                 <Row k="Transfert" v={recon.live.transfer ? `${money(recon.live.transfer.amountCents, cur)}${recon.live.transfer.reversedCents > 0 ? ` · renversé ${money(recon.live.transfer.reversedCents, cur)}` : ""}` : "aucun"} />
               </div>
             )}
             {recon.divergences.length === 0 ? <p className="mt-2 rounded-lg bg-emerald-50 px-3 py-2 text-emerald-800">Base et fournisseur concordent.</p> : (
               <ul className="mt-2 space-y-1">
-                {recon.divergences.map((d, i) => <li key={i} className="rounded-lg bg-red-50 px-3 py-2 text-red-800"><b>{DIVERGENCE_LABEL[d.code] ?? d.code}</b>{d.dbCents != null || d.liveCents != null ? <span className="ml-1 text-[11.5px]">(base {d.dbCents != null ? money(d.dbCents, cur) : "—"} · fournisseur {d.liveCents != null ? money(d.liveCents, cur) : "—"})</span> : null}<div className="text-[11.5px] text-red-700">{d.message}</div></li>)}
+                {recon.divergences.map((d, i) => <li key={i} className="rounded-lg bg-red-50 px-3 py-2 text-red-800"><b title={d.code}>{DIVERGENCE_LABEL[d.code] ?? d.code}</b>{d.dbCents != null || d.liveCents != null ? <span className="ml-1 text-[11.5px]">(base {d.dbCents != null ? money(d.dbCents, cur) : "—"} · fournisseur {d.liveCents != null ? money(d.liveCents, cur) : "—"})</span> : null}<div className="text-[11.5px] text-red-700" title={d.message}>{DIVERGENCE_HELP[d.code] ?? d.message}</div></li>)}
               </ul>
             )}
           </div>
@@ -296,6 +301,17 @@ function BalanceCard({ file }: { file: AdminDealMoneyFile }) {
   );
 }
 function Mono({ v }: { v: string | null }) { return v ? <span className="font-mono text-[11px]">{v}</span> : <span>—</span>; }
+/** Recette § 5.13 — le refus du rapprochement, lu par son code (A146), jamais « 503 : The payment provider… ». */
+function reconcileRefusal(e: unknown): string {
+  if (!(e instanceof ApiError)) return "Rapprochement impossible : vérifie ta connexion et réessaie.";
+  const code = (e.data as { details?: { code?: string } } | undefined)?.details?.code;
+  if (code === "PROVIDER_UNAVAILABLE") return "Le fournisseur de paiement ne répond pas : rien n'a été comparé (tentative journalisée). Réessaie dans quelques minutes.";
+  if (code === "NO_PAYMENT_TO_RECONCILE") return "Ce deal n'a aucun paiement à rapprocher.";
+  if (e.status === 403) return "Ton profil ne rapproche pas l'argent (réservé à Finance et Médiateur).";
+  if (e.status === 404) return "Deal introuvable : il a peut-être été supprimé. Recharge la page.";
+  return "Rapprochement impossible pour l'instant : réessaie, puis signale-le si cela persiste.";
+}
+
 function Card({ title, children, className = "" }: { title: string; children: React.ReactNode; className?: string }) {
   return <section className={`rounded-xl border border-slate-200 bg-white p-4 ${className}`}><h2 className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">{title}</h2><div className="mt-2 space-y-1.5">{children}</div></section>;
 }

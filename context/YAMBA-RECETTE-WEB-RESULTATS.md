@@ -5292,6 +5292,67 @@ ADM-RET et ADM-FIN (qui lisent la même fiche) rejouées.
   arrivé » directement dans le dossier de médiation, pour ne pas changer d'écran — petit. *Test* : la preuve serveur
   (403 / 200) précède la preuve écran ; le journal prouve qu'aucune lecture d'argent n'a eu lieu.
 
+## Cahier 02-ADMIN — § 5.13 Rapprochement avec le fournisseur · **CONFORME** (1 fiche + 1 partielle + 1 ajoutée · 2 anomalies closes · 8 améliorations · 3 écarts documentaires · 3 scénarios, 1 min 30)
+
+`apps/e2e/src/admin/adm-rap-rapprochement.spec.ts`. La promesse de l'écran tient en une phrase — « Rien n'est modifié » —
+et la fiche la prouve trois fois : le **document Mongo** du deal relu avant et après, la **fiche argent** identique (hors
+journal, qui ne gagne que des lectures), et le **fournisseur** : un intent qu'il ne connaît pas doit rester inconnu
+après la lecture. Terrain **sondé** avant la spec : les 26 deals rapprochés un par un par l'API (le Fake vit dans la
+mémoire du processus deal-service). Garde de sécurité : chaque geste qui émet de l'argent est précédé d'un rapprochement
+qui exige `provider: "FAKE"` (un lanceur `nx serve --all` peut reprendre le port 6003 avec la clé Stripe). Fiches jouées
+contre le code non corrigé (RAP-1 rouge sur son défaut), puis vertes deux fois de suite ; ADM-ARG, FIN, RET (adaptée) et
+MED rejouées vertes (27/27).
+
+| Fiche | Ce qui est éprouvé | Verdict · Preuve |
+|---|---|---|
+| ADM-RAP-1 | Rapprocher avec le Fake (local) | **Conforme après correction** → `ANO-ADM-31` ; texte de la carte (nomme désormais « le fournisseur de test (Fake) ») ; « Rapprocher maintenant » → `INTENT_NOT_FOUND`, `live` nul, « Paiement introuvable chez le fournisseur » avec son explication en français ; **second** rapprochement : toujours introuvable ; document du deal identique octet pour octet ; fiche argent identique, journal enrichi de `DEAL_MONEY_VIEWED` et `DEAL_RECONCILED` seulement ; deux lignes `DEAL_RECONCILED BOOKING · id` `{ provider: "FAKE", divergences: ["INTENT_NOT_FOUND"] }` ; deal sans paiement (manœuvre sur `bzv-declined`) : « Aucun paiement à rapprocher. », pas de bouton, 400 « This deal has no payment to reconcile. » `NO_PAYMENT_TO_RECONCILE`, rien au journal |
+| ADM-RAP-2 | Détecter une divergence réelle | **⏭ partiel, conforme** — substitut du cahier **vérifié** : les neuf codes figurent dans les tests unitaires du deal-service. En plus, sur la pile locale : versement relancé (transfert Fake réel) et remboursement manuel de 1 € appliqué par le super administrateur (le Fake connaît alors l'intent), puis base décalée par manœuvres consignées → **`REFUND_NOT_RECORDED`** (le code bloquant du cahier, base L−100 · fournisseur L), `REFUND_RECORDED_NOT_LIVE` (L+400 · L), `TRANSFER_AMOUNT_MISMATCH` (2 700 · 2 600), `TRANSFER_MARKED_REVERSED_BUT_LIVE_OK` ; à l'écran : libellé, deux montants, geste en français, « empreinte posée », « réussi » ; aucune lecture n'a écrit ; jeu d'essai rejoué |
+| ADM-RAP-3 (ajoutée) | Les gardes | **Conforme** — Support : 403 `ADMIN_PERMISSION_DENIED` et vue « Chronologie du deal » sans bouton ; Médiateur (`finances.read`) rapproche ; deal inexistant 404, identifiant invalide 400 ; une seule ligne de journal (le Médiateur) |
+
+### Anomalies
+
+- **ANO-ADM-31 (majeure, close — A163)** — **la lecture créait l'état qu'elle lisait.** `FakePaymentProvider.inspect`
+  passait par `retrieve`, qui « adopte » tout intent `pi_fake_seed_*` inconnu en le matérialisant AUTHORIZED à 0 €. Le
+  rapprochement d'un deal du jeu d'essai répondait donc `CAPTURE_RECORDED_NOT_LIVE` + `TRANSFER_MISSING` (mesuré sur
+  22 deals) au lieu de `INTENT_NOT_FOUND`, et laissait derrière lui un intent que la base n'avait jamais eu chez le
+  fournisseur. Correction (`packages/libs/payments/src/index.ts`) : `inspect` lit la mémoire sans adopter ; un intent
+  jamais vu est introuvable, comme chez Stripe. Tests : `payment-provider.spec.ts`.
+- **ANO-ADM-32 (majeure, close — A163)** — **une panne se lisait « paiement introuvable ».** Le service classait toute
+  erreur du fournisseur en `INTENT_NOT_FOUND` (message anglais brut en prime) et Stripe `transfers.retrieve` avalait toute
+  erreur en « transfert manquant » : une clé révoquée ou un réseau coupé faisaient accuser un paiement et un transfert
+  parfaitement réels. Établie par lecture du code (le Fake ne tombe pas en panne). Correction : `PaymentIntentNotFoundError`
+  et `isStripeResourceMissing` (seule l'absence vaut « introuvable ») ; toute autre erreur → **503 `PROVIDER_UNAVAILABLE`**,
+  tentative journalisée, rien comparé (`admin-finance.service.ts`, contrat OpenAPI). Tests : `admin-finance.service.spec.ts`,
+  `payment-provider.spec.ts`.
+
+### Écarts documentaires
+
+- « Lecture seule chez **Stripe** » : l'écran nomme le fournisseur réellement interrogé (« le fournisseur de test (Fake) »
+  en local).
+- « Un deal `PENDING` » n'a pas de paiement selon le cahier : tous les deals du jeu d'essai portent un intent ; l'état
+  « sans paiement » est posé par manœuvre.
+- ADM-RAP-2 annonçait trois codes injouables en local : quatre divergences (dont `REFUND_NOT_RECORDED`) le sont, par un
+  geste d'argent réel sur le Fake puis une manœuvre sur la base.
+
+### Regard d'expert — produit ET test, une ligne par fiche
+
+- **RAP-1** — *Faites* : texte qui nomme le fournisseur ; explication et geste en français sous chaque divergence (le
+  message anglais du serveur passe en infobulle) ; statuts de paiement et de remboursement en français ; refus lus par
+  leur code dans la carte (`PROVIDER_UNAVAILABLE`, `NO_PAYMENT_TO_RECONCILE`, 403, 404) ; « Rapprochement en cours… »
+  et plus de double envoi ; « rien n'a été modifié en base » sous le résultat ; journal « Rapprochement fournisseur » au
+  lieu de « Rapprochement Stripe ». *Test* : la comparaison « avant / après » exclut le journal de la fiche et vérifie
+  qu'il ne gagne QUE des lectures — plus fort qu'une égalité brute. *Proposée* : les libellés de divergence disent encore
+  « chez Stripe » — petit.
+- **RAP-2** — *Faite* : la lecture d'un transfert ne confond plus absence et panne. *Proposées* : sur `INTENT_NOT_FOUND`,
+  vérifier quand même le transfert connu en base (un transfert sans paiement est l'écart le plus grave) — moyen ; le seed
+  pourrait déclarer ses intents au Fake avec leur montant et leur capture, pour que le bruit `CAPTURE_RECORDED_NOT_LIVE`
+  disparaisse des rapprochements locaux — moyen. *Test* : la mémoire du Fake survit au rejeu du jeu d'essai — la fiche
+  constate l'état initial au lieu de l'exiger, et RAP-1 choisit un deal dont l'intent est encore inconnu.
+- **RAP-3** — *Proposée* : un délai minimal entre deux rapprochements d'un même deal (chaque clic appelle Stripe trois
+  fois) — petit. *Test* : conforme.
+
+---
+
 ## Observations (pas des anomalies, mais à savoir)
 
 - **`/become-yamber` reste « futur »** (commentaire du layout marketing) : la page de présentation

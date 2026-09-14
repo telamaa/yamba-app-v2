@@ -101,6 +101,25 @@ export type PaymentInspection = {
   transfer: { id: string; amountCents: number; reversedCents: number; createdAt: string | null } | null;
 };
 
+/**
+ * Recette 02-ADMIN § 5.13 (ANO-ADM-32) — « le fournisseur ne connaît pas ce paiement » est une RÉPONSE, pas une panne.
+ * `inspect` jette cette erreur-là seulement dans ce cas ; toute autre erreur (réseau, clé, limite de débit) remonte
+ * telle quelle, et le rapprochement la dit « fournisseur indisponible » au lieu de « paiement introuvable ».
+ */
+export class PaymentIntentNotFoundError extends Error {
+  readonly code = "INTENT_NOT_FOUND" as const;
+  constructor(readonly intentId: string) {
+    super(`The payment provider does not know this payment intent: ${intentId}`);
+    this.name = "PaymentIntentNotFoundError";
+  }
+}
+
+/** Vrai si l'erreur Stripe dit « cette ressource n'existe pas » (et rien d'autre). */
+export function isStripeResourceMissing(err: unknown): boolean {
+  const e = err as { code?: unknown; statusCode?: unknown; type?: unknown } | null;
+  return !!e && (e.code === "resource_missing" || (e.statusCode === 404 && e.type === "StripeInvalidRequestError"));
+}
+
 export interface PaymentProvider {
   readonly name: PaymentProviderName;
   authorize(input: AuthorizeInput): Promise<PaymentAuthorization>;
@@ -213,15 +232,24 @@ export class StripePaymentProvider implements PaymentProvider {
   }
 
   async inspect(input: { intentId: string; transferId?: string | null }): Promise<PaymentInspection> {
-    const pi = await this.stripe.paymentIntents.retrieve(input.intentId);
+    let pi: Stripe.PaymentIntent;
+    try {
+      pi = await this.stripe.paymentIntents.retrieve(input.intentId);
+    } catch (err) {
+      if (isStripeResourceMissing(err)) throw new PaymentIntentNotFoundError(input.intentId);
+      throw err; // panne, clé, limite : pas « introuvable » (ANO-ADM-32)
+    }
     const refunds = await this.stripe.refunds.list({ payment_intent: input.intentId, limit: 100 });
     let transfer: PaymentInspection["transfer"] = null;
     if (input.transferId) {
       try {
         const t = await this.stripe.transfers.retrieve(input.transferId);
         transfer = { id: t.id, amountCents: t.amount, reversedCents: t.amount_reversed, createdAt: new Date(t.created * 1000).toISOString() };
-      } catch {
-        transfer = null; // introuvable = divergence signalée par le rapprochement, pas une erreur
+      } catch (err) {
+        // Introuvable = divergence TRANSFER_MISSING signalée par le rapprochement. Une PANNE n'est pas une absence :
+        // l'avaler ferait accuser un transfert parfaitement réel (ANO-ADM-32).
+        if (!isStripeResourceMissing(err)) throw err;
+        transfer = null;
       }
     }
     return {
@@ -348,7 +376,12 @@ export class FakePaymentProvider implements PaymentProvider {
   private readonly reversedByTransfer = new Map<string, number>();
 
   async inspect(input: { intentId: string; transferId?: string | null }): Promise<PaymentInspection> {
-    const a = await this.retrieve(input.intentId);
+    // ANO-ADM-31 — lecture SEULE : pas d'`adoptSeeded` ici. `retrieve` matérialise un intent seedé inconnu (utile aux
+    // gestes du dev) ; le rapprochement, lui, créait ainsi l'état qu'il prétendait lire (AUTHORIZED, 0 €) et accusait la
+    // base de divergences inventées. Un intent que ce processus n'a jamais vu est « introuvable », comme chez Stripe.
+    const known = this.intents.get(input.intentId);
+    if (!known) throw new PaymentIntentNotFoundError(input.intentId);
+    const a = { ...known };
     const t = input.transferId ? this.transfers.find((x) => x.transferId === input.transferId) ?? null : null;
     return {
       provider: "FAKE",

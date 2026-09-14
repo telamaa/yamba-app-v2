@@ -61,11 +61,14 @@ const base = (id: string) => lireCoteServeur<Base>(`
   })();`);
 
 /** Ce que le fournisseur a RÉELLEMENT émis (FAKE en mémoire du deal-service, cumulé d'un rejeu à l'autre : on compare). */
-async function fournisseur(ctx: Contexte, id: string): Promise<{ refunds: number[]; transfer: number | null }> {
+async function fournisseur(ctx: Contexte, id: string): Promise<{ refunds: number[]; transfer: number | null; introuvable: boolean }> {
   const r = await ctx.request.post(`${api()}/admin/deals/${id}/money/reconcile`);
   expect(r.ok(), `reconcile : ${r.status()}`).toBe(true);
-  const live = ((await r.json()) as { live: { refunds: Array<{ amountCents: number }>; transfer: { amountCents: number } | null } | null }).live;
-  return { refunds: (live?.refunds ?? []).map((x) => x.amountCents), transfer: live?.transfer?.amountCents ?? null };
+  const corps = (await r.json()) as { live: { refunds: Array<{ amountCents: number }>; transfer: { amountCents: number } | null } | null; divergences: Array<{ code: string }> };
+  const live = corps.live;
+  /* § 5.13 (ANO-ADM-31) : le rapprochement n'adopte plus un intent seedé. Tant qu'aucun geste de remboursement ne l'a fait
+     connaître au Fake, il est « introuvable » et rien n'est lu chez lui (comme chez Stripe pour un intent inconnu). */
+  return { refunds: (live?.refunds ?? []).map((x) => x.amountCents), transfer: live?.transfer?.amountCents ?? null, introuvable: corps.divergences.some((d) => d.code === "INTENT_NOT_FOUND") };
 }
 
 const somme = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
@@ -174,7 +177,12 @@ test.describe("ADM-RET — retenue d'annulation tardive (cahier 02-ADMIN § 5.10
     /* Fournisseur : aucun remboursement émis ; le transfert, s'il est parti, porte le prorata. */
     const f1 = await fournisseur(sup.contexte, id);
     expect(somme(f1.refunds) - somme(f0.refunds), "aucun remboursement chez le fournisseur").toBe(0);
-    if (b.payoutStatus === "SENT") expect(f1.transfer, "transfert = prorata").toBe(attendu);
+    if (b.payoutStatus === "SENT" && f1.introuvable) {
+      /* Compensation sans remboursement : aucun geste n'a fait connaître l'intent seedé au Fake (ANO-ADM-31, § 5.13) ; le
+         transfert est lu chez le fournisseur par ADM-RAP-2, ici on s'en tient à la base. */
+      expect((b as unknown as { transferId?: string }).transferId, "un transfert Fake réel en base").toMatch(/^tr_fake_/);
+      test.info().annotations.push({ type: "constat", description: "intent seedé inconnu du Fake (lecture seule depuis § 5.13) : transfert vérifié en base, lecture fournisseur prouvée par ADM-RAP-2" });
+    } else if (b.payoutStatus === "SENT") expect(f1.transfer, "transfert = prorata").toBe(attendu);
     /* 6. Fiche argent. */
     await page.goto(`${bo()}/deals/${id}`, { waitUntil: "domcontentloaded" });
     await expect(page.getByText(/^Retenue$/).first()).toBeVisible({ timeout: 60_000 });

@@ -1,7 +1,7 @@
 /**
  * payment-provider.spec.ts — le fournisseur Fake (D11/D30) et le factory
  */
-import { FakePaymentProvider, createPaymentProviderFromEnv } from "@packages/payments";
+import { FakePaymentProvider, PaymentIntentNotFoundError, createPaymentProviderFromEnv, isStripeResourceMissing } from "@packages/payments";
 
 describe("FakePaymentProvider", () => {
   it("authorize → AUTHORIZED immédiatement, métadonnées conservées, sans clientSecret", async () => {
@@ -77,6 +77,23 @@ describe("createPaymentProviderFromEnv", () => {
     p._reverseTransferForTest(t.transferId);
     expect((await p.inspect({ intentId: a.intentId, transferId: t.transferId })).transfer?.reversedCents).toBe(2000);
     expect((await p.inspect({ intentId: a.intentId, transferId: "tr_unknown" })).transfer).toBeNull();
-    await expect(p.inspect({ intentId: "pi_nope" })).rejects.toThrow(/Unknown/);
+    await expect(p.inspect({ intentId: "pi_nope" })).rejects.toBeInstanceOf(PaymentIntentNotFoundError);
+  });
+  it("ANO-ADM-31 : inspect n'adopte JAMAIS un intent seedé — la lecture ne crée pas l'état qu'elle lit", async () => {
+    const p = new FakePaymentProvider();
+    await expect(p.inspect({ intentId: "pi_fake_seed_bzv-completed" })).rejects.toBeInstanceOf(PaymentIntentNotFoundError);
+    // second passage : toujours inconnu (avant : AUTHORIZED à 0 €, adopté par la première lecture)
+    await expect(p.inspect({ intentId: "pi_fake_seed_bzv-completed" })).rejects.toMatchObject({ code: "INTENT_NOT_FOUND", intentId: "pi_fake_seed_bzv-completed" });
+    // un GESTE (retrieve / capture) matérialise l'intent seedé : le rapprochement lit alors ce que le geste a produit
+    await p.capture("pi_fake_seed_bzv-completed");
+    expect(await p.inspect({ intentId: "pi_fake_seed_bzv-completed" })).toMatchObject({ status: "CAPTURED" });
+  });
+  it("ANO-ADM-32 : seule l'erreur Stripe « resource_missing » vaut « introuvable » ; une panne reste une panne", () => {
+    expect(isStripeResourceMissing({ type: "StripeInvalidRequestError", code: "resource_missing", statusCode: 404 })).toBe(true);
+    expect(isStripeResourceMissing({ type: "StripeInvalidRequestError", statusCode: 404 })).toBe(true);
+    expect(isStripeResourceMissing({ type: "StripeConnectionError", message: "ECONNRESET" })).toBe(false);
+    expect(isStripeResourceMissing({ type: "StripeAuthenticationError", statusCode: 401 })).toBe(false);
+    expect(isStripeResourceMissing({ type: "StripeRateLimitError", statusCode: 429 })).toBe(false);
+    expect(isStripeResourceMissing(null)).toBe(false);
   });
 });
