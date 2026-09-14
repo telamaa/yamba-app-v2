@@ -13,7 +13,7 @@ export type AdminPermission =
 const MATRIX: Record<AdminPermission, AdminRole[]> = {
   "disputes.read": ["MEDIATOR", "SUPPORT", "FINANCE"],
   "disputes.decide": ["MEDIATOR"],
-  "users.read": ["MEDIATOR", "SUPPORT", "FINANCE"],
+  "users.read": ["MEDIATOR", "SUPPORT", "FINANCE", "PRIVACY"],
   "users.suspension.propose": ["SUPPORT", "MEDIATOR"],
   "users.suspension.apply": ["MEDIATOR"],
   "audit.read": ["FINANCE"],

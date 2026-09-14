@@ -5,8 +5,10 @@
  * échec de versement, chronologie de l'argent d'un deal, rapprochement base ↔
  * fournisseur (A112). Tout est testé dans admin-finance.rules.spec.ts.
  */
-import type { MoneyTimelineEvent, PayoutFailureKind, ReconciliationDivergenceCode } from "@packages/api-contracts";
+import type { MoneyBalance, MoneyTimelineEvent, PayoutFailureKind, ReconciliationDivergenceCode } from "@packages/api-contracts";
 import type { PaymentInspection } from "@packages/payments";
+import { csvCell } from "@packages/libs/csv";
+import { refundEntries, refundedTotalCents, refundListExcessCents, type RefundHistorySource } from "../lib/booking-refunds";
 
 /* ── Rejeux espacés (A111) ─────────────────────────────────── */
 
@@ -36,6 +38,32 @@ export function payoutRetryDueFilter(now: Date): { OR: Array<Record<string, unkn
   return { OR: [{ payoutNextRetryAt: { isSet: false } }, { payoutNextRetryAt: null }, { payoutNextRetryAt: { lte: now } }] };
 }
 
+/* ── Jamais deux fois (recette § 5.14, A164) ───────────────── */
+
+/**
+ * Faut-il demander au fournisseur si un transfert est DÉJÀ parti avant d'en émettre un ? Oui dès qu'une tentative a eu
+ * lieu : un échec « fournisseur » peut cacher un transfert réellement émis (réponse perdue, course), et la clé
+ * d'idempotence ne protège que 24 h chez Stripe — le rejeu quotidien (A111) la dépasse. Première tentative : non (rien
+ * n'a pu partir, et l'appel coûterait sur chaque versement).
+ */
+export function payoutNeedsTransferLookup(booking: { payoutAttempts?: number | null; transferId?: string | null }): boolean {
+  return (booking.payoutAttempts ?? 0) > 0 || !!booking.transferId;
+}
+
+/**
+ * Le transfert vivant à ADOPTER au lieu d'en émettre un nouveau : même montant, même motif (livraison / compensation),
+ * jamais renversé, même partiellement (un transfert renversé est justement celui qu'un « re-verser » remplace).
+ */
+export function adoptableTransfer(
+  existing: Array<{ id: string; amountCents: number; reversedCents: number; metadata: Record<string, string> }>,
+  expected: { bookingId: string; amountCents: number; reason: string }
+): { id: string } | null {
+  const live = existing.filter(
+    (t) => t.reversedCents === 0 && t.amountCents === expected.amountCents && (!t.metadata.bookingId || t.metadata.bookingId === expected.bookingId) && (!t.metadata.reason || t.metadata.reason === expected.reason)
+  );
+  return live.length > 0 ? { id: live[0].id } : null;
+}
+
 /* ── Nature d'un échec ─────────────────────────────────────── */
 
 export function payoutFailureKind(payoutStatus: string | null | undefined, reason: string | null | undefined): PayoutFailureKind | null {
@@ -55,7 +83,7 @@ export function payoutFailureDetail(reason: string | null | undefined): string |
 
 /* ── Chronologie de l'argent ───────────────────────────────── */
 
-export type MoneyTimelineInput = {
+export type MoneyTimelineInput = RefundHistorySource & {
   requestedAt: Date;
   capturedAt?: Date | null;
   refundedAt?: Date | null;
@@ -90,7 +118,8 @@ export function buildMoneyTimeline(b: MoneyTimelineInput): MoneyTimelineEvent[] 
   push(b.requestedAt, "AUTHORIZED", b.pricing.totalShipperCents, null);
   push(b.capturedAt, "CAPTURED", b.pricing.totalShipperCents, null);
   push(b.disputedAt, "DISPUTED", null, b.disputeTicket ?? null);
-  push(b.refundedAt, "REFUNDED", b.refundAmountCents ?? null, null);
+  // A166 — une ligne par remboursement réel, à sa date, avec sa nature (un deal jamais capturé n'en a aucun).
+  for (const r of refundEntries(b)) push(r.refundedAt, "REFUNDED", r.amountCents, r.kind);
   if (b.status === "COMPLETED") push(b.completedAt, "COMPLETED", null, b.completedBy ?? null);
   if (b.status === "CANCELLED") push(b.closedAt, "CANCELLED", null, b.closedBy ?? null);
   if ((b.retentionCents ?? 0) > 0) {
@@ -101,7 +130,64 @@ export function buildMoneyTimeline(b: MoneyTimelineInput): MoneyTimelineEvent[] 
   if (b.payoutStatus === "FAILED") push(b.payoutLastAttemptAt ?? b.updatedAt, "PAYOUT_FAILED", b.payoutAmountCents ?? null, payoutFailureKind(b.payoutStatus, b.payoutFailureReason));
   if (b.payoutStatus === "REVERSED") push(b.updatedAt, "PAYOUT_REVERSED", b.payoutAmountCents ?? null, null);
   if (b.payoutReversalResolution) push(b.payoutReversalResolvedAt, "REVERSAL_RESOLVED", null, b.payoutReversalResolution);
+  // Recette § 5.12 — une empreinte jamais capturée est LIBÉRÉE à la fermeture (refus, expiration, annulation avant
+  // acceptation) : sans cette ligne, la chronologie d'un deal refusé s'arrêtait sur « Empreinte posée 67,20 € ».
+  if (!b.capturedAt && (b.status === "DECLINED" || b.status === "EXPIRED" || b.status === "CANCELLED")) push(b.closedAt, "AUTHORIZATION_RELEASED", b.pricing.totalShipperCents, b.closedBy ?? null);
   return out.sort((x, y) => x.at.localeCompare(y.at));
+}
+
+/* ── Bilan de l'argent (recette § 5.12) ────────────────────── */
+
+export type MoneyBalanceInput = RefundHistorySource & {
+  status: string;
+  capturedAt?: Date | null;
+  refundAmountCents?: number | null;
+  payoutStatus?: string | null;
+  payoutAmountCents?: number | null;
+  payoutReversalResolution?: string | null;
+  retentionCents?: number | null;
+  retentionDisposition?: string | null;
+  manualRefundCents?: number | null;
+  manualRefundProposedCents?: number | null;
+  pricing: { totalShipperCents: number; transportCents: number; commissionCents: number };
+};
+
+const RUNNING = new Set(["ACCEPTED", "PICKED_UP", "DELIVERED"]);
+const CLOSED = new Set(["COMPLETED", "CANCELLED", "DECLINED", "EXPIRED"]);
+
+/**
+ * Où est chaque centime d'un deal : débité, rendu, versé, ce que la plateforme détient, et ce qui attend encore un
+ * geste. L'ANOMALIE n'est levée que sur un deal CLOS sans rien en attente : la plateforme détient plus que sa commission
+ * (argent sans destination — le cas mesuré au § 5.12 : un deal débité, annulé, jamais remboursé), ou a versé plus
+ * qu'elle n'a reçu sans geste commercial qui l'explique. Un renversement ABANDONNÉ garde la part du Voyageur par
+ * décision : ce n'est pas une anomalie.
+ */
+export function moneyBalance(b: MoneyBalanceInput): MoneyBalance {
+  const capturedCents = b.capturedAt ? b.pricing.totalShipperCents : 0;
+  // A166 — les remboursements RÉELS : une annulation avant capture pose un cumul sans argent débité.
+  const refundedCents = refundedTotalCents(b);
+  const paidOutCents = b.payoutStatus === "SENT" ? (b.payoutAmountCents ?? 0) : 0;
+  const platformHoldsCents = capturedCents - refundedCents - paidOutCents;
+  const pending: MoneyBalance["pending"] = [];
+  if (b.status === "PENDING" && !b.capturedAt) pending.push({ kind: "AUTHORIZATION_OPEN", cents: b.pricing.totalShipperCents });
+  if (RUNNING.has(b.status) && b.capturedAt) pending.push({ kind: "DEAL_IN_PROGRESS", cents: b.pricing.transportCents });
+  if (b.status === "DISPUTED" || b.payoutStatus === "FROZEN") pending.push({ kind: "PAYOUT_FROZEN", cents: b.payoutAmountCents ?? b.pricing.transportCents });
+  if (b.payoutStatus === "PENDING") pending.push({ kind: "PAYOUT_DUE", cents: b.payoutAmountCents ?? b.pricing.transportCents });
+  if (b.payoutStatus === "FAILED") pending.push({ kind: "PAYOUT_FAILED", cents: b.payoutAmountCents ?? b.pricing.transportCents });
+  if (b.payoutStatus === "REVERSED" && !b.payoutReversalResolution) pending.push({ kind: "REVERSAL_OPEN", cents: b.payoutAmountCents ?? b.pricing.transportCents });
+  if (b.retentionDisposition === "HELD_FOR_MEDIATION" && (b.retentionCents ?? 0) > 0) pending.push({ kind: "RETENTION_HELD", cents: b.retentionCents ?? 0 });
+  if ((b.manualRefundProposedCents ?? 0) > 0) pending.push({ kind: "REFUND_PROPOSED", cents: b.manualRefundProposedCents ?? 0 });
+  const settled = pending.length === 0;
+  let anomaly: MoneyBalance["anomaly"] = null;
+  if (settled && CLOSED.has(b.status)) {
+    const writtenOff = b.payoutStatus === "REVERSED" && b.payoutReversalResolution === "WRITTEN_OFF";
+    if (!writtenOff && platformHoldsCents > b.pricing.commissionCents) anomaly = "UNALLOCATED_FUNDS";
+    else if (platformHoldsCents < 0 && !(b.manualRefundCents ?? 0)) anomaly = "OVERSPENT";
+  }
+  // Recette § 5.16 — invariant Σ liste = cumul : une liste qui enregistre plus que le cumul rend le bilan lui-même douteux.
+  // Priorité sur les autres anomalies, à tout moment de la vie du deal (pas seulement clos).
+  if (refundListExcessCents(b) > 0) anomaly = "REFUND_RECORDS_MISMATCH";
+  return { capturedCents, refundedCents, paidOutCents, platformHoldsCents, pending, settled, anomaly };
 }
 
 /* ── Rapprochement (A112) ──────────────────────────────────── */
@@ -160,7 +246,7 @@ export function maskAccountId(id: string | null | undefined): string | null {
 
 /* ══ C-PR5b (D58 5A) — rapport mensuel par devise, pur ═══════ */
 
-export type FinanceReportRow = {
+export type FinanceReportRow = RefundHistorySource & {
   id: string;
   status: string;
   pricing: { totalShipperCents: number; transportCents: number; commissionCents: number; premiumCents: number; currencyCode: string };
@@ -212,7 +298,7 @@ export function monthStartUtc(now: Date, monthsBack: number): Date {
 
 /**
  * Agrège les faits d'argent par mois (UTC) et par devise. Chaque fait est daté par SON champ :
- * capture → capturedAt, remboursement → refundedAt, versement → payoutSentAt, revenu → completedAt,
+ * capture → capturedAt, remboursement → sa date dans la liste `refunds` (A166), versement → payoutSentAt, revenu → completedAt,
  * retenue → closedAt. Un deal peut donc compter dans plusieurs mois (capturé en mars, terminé en avril).
  * Aucun frais fournisseur ici (pas en base) : le comptable rapproche avec l'export Stripe.
  */
@@ -235,9 +321,12 @@ export function buildFinanceReport(rows: FinanceReportRow[], from: Date, to: Dat
       m.capturedCents += r.pricing.totalShipperCents;
       m.capturedCount += 1;
     }
-    if (inRange(r.refundedAt, from, to) && (r.refundAmountCents ?? 0) > 0) {
-      const m = get(r.refundedAt!, cur);
-      m.refundedCents += r.refundAmountCents ?? 0;
+    // ANO-ADM-37 (A166) — chaque remboursement dans SON mois ; le cumul daté du dernier remboursement déplaçait les
+    // précédents, et une annulation avant capture (rien débité) comptait comme un remboursement.
+    for (const refund of refundEntries(r)) {
+      if (!inRange(refund.refundedAt, from, to)) continue;
+      const m = get(refund.refundedAt, cur);
+      m.refundedCents += refund.amountCents;
       m.refundCount += 1;
     }
     if ((r.payoutStatus === "SENT" || r.payoutStatus === "REVERSED") && inRange(r.payoutSentAt, from, to)) {
@@ -331,22 +420,22 @@ export const FINANCE_CSV_COLUMNS = [
   "payoutStatus", "payoutAmountCents", "payoutSentAt", "transferId",
   "retentionCents", "retentionDisposition", "completedAt", "completedBy", "closedAt", "closedBy",
   "disputeTicket", "paymentIntentId", "chargeId",
+  // A166 — la période lue par le comptable : combien de remboursements au total, combien rendu DANS la période.
+  "refundCount", "refundedInPeriodCents",
 ] as const;
 
-/** Une cellule CSV : guillemets doublés, virgule / retour à la ligne / guillemet ⇒ encadrée. Un préfixe de formule est neutralisé (injection tableur). */
-export function csvCell(v: unknown): string {
-  if (v === null || v === undefined) return "";
-  let s = v instanceof Date ? v.toISOString() : String(v);
-  if (/^[=+\-@]/.test(s)) s = `'${s}`;
-  return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-}
+/**
+ * Une cellule CSV — ANO-ADM-14 (recette 02-ADMIN § 5.6) : cette file avait sa propre copie, qui ne neutralisait ni la
+ * tabulation ni le retour chariot. Une seule implémentation : `@packages/libs/csv`.
+ */
+export { csvCell };
 
 /** Un deal entre dans l'export si l'un de ses faits d'argent tombe dans la période. */
 export function csvRowInRange(r: FinanceCsvRow, from: Date, to: Date): boolean {
-  return inRange(r.capturedAt, from, to) || inRange(r.refundedAt, from, to) || inRange(r.payoutSentAt, from, to) || inRange(r.completedAt, from, to) || inRange(r.closedAt, from, to);
+  return inRange(r.capturedAt, from, to) || refundEntries(r).some((x) => inRange(x.refundedAt, from, to)) || inRange(r.payoutSentAt, from, to) || inRange(r.completedAt, from, to) || inRange(r.closedAt, from, to);
 }
 
-export function buildFinanceCsv(rows: FinanceCsvRow[]): string {
+export function buildFinanceCsv(rows: FinanceCsvRow[], period?: { from: Date; to: Date }): string {
   const lines = [FINANCE_CSV_COLUMNS.join(",")];
   for (const r of rows) {
     const cells: unknown[] = [
@@ -356,6 +445,8 @@ export function buildFinanceCsv(rows: FinanceCsvRow[]): string {
       r.payoutStatus, r.payoutAmountCents, r.payoutSentAt, r.transferId,
       r.retentionCents, r.retentionDisposition, r.completedAt, r.completedBy, r.closedAt, r.closedBy,
       r.disputeTicket, r.paymentIntentId, r.chargeId,
+      refundEntries(r).length,
+      period ? refundEntries(r).filter((x) => inRange(x.refundedAt, period.from, period.to)).reduce((sum, x) => sum + x.amountCents, 0) : null,
     ];
     lines.push(cells.map(csvCell).join(","));
   }
@@ -377,4 +468,17 @@ export function manualRefundBounds(b: { status: string; capturedAt?: Date | null
   if (!b.capturedAt || !b.paymentIntentId) return { maxRefundableCents: 0, allowed: false, reason: "Nothing was captured on this deal." };
   if (maxRefundableCents <= 0) return { maxRefundableCents: 0, allowed: false, reason: "This deal is already fully refunded." };
   return { maxRefundableCents, allowed: true, reason: null };
+}
+
+/**
+ * Recette 02-ADMIN § 5.15 (A165) — une proposition de remboursement manuel peut devenir FAUSSE : un autre remboursement
+ * (annulation, décision, geste appliqué ailleurs) a réduit le reste remboursable, ou le deal ne peut plus rien recevoir.
+ * La proposition reste visible (son auteur, son motif sont au journal) mais se dit caduque, avec la raison ; l'appliquer
+ * telle quelle est refusé par les bornes (`REFUND_ABOVE_MAX` / `REFUND_NOT_ALLOWED`).
+ */
+export type ManualRefundProposalStaleness = { stale: boolean; staleReason: "ABOVE_REMAINING" | "NOT_REFUNDABLE" | null };
+export function manualRefundProposalStaleness(proposedCents: number, bounds: ManualRefundBounds): ManualRefundProposalStaleness {
+  if (!bounds.allowed) return { stale: true, staleReason: "NOT_REFUNDABLE" };
+  if (proposedCents > bounds.maxRefundableCents) return { stale: true, staleReason: "ABOVE_REMAINING" };
+  return { stale: false, staleReason: null };
 }

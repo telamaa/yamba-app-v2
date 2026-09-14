@@ -59,6 +59,7 @@ const TRIP_SELECT = {
   status: true,
   isDeleted: true,
   hiddenByAdminAt: true, // C-PR4 (D57) — lecture seule
+  user: { select: { accountStatus: true, suspensionUntil: true } }, // ANO-ADM-08 — Voyageur suspendu = non réservable
   departureAt: true,
   originCity: true,
   originCountryCode: true,

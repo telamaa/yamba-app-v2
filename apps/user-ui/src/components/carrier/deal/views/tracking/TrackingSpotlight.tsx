@@ -205,6 +205,24 @@ export default function TrackingSpotlight({
         <Check size={14} strokeWidth={3} aria-hidden="true" />
         {t(`spotlight.${next}.button`)}
       </button>
+      {/* ANO-WEB-60 (recette 5.18) : les jalons sont OPTIONNELS (badge « Optionnel », API libre) mais
+          « Valider la livraison » n'apparaissait qu'après l'atterrissage — trois jalons de fait
+          obligatoires pour atteindre l'écran du code. Le chemin direct reste toujours ouvert. */}
+      <p
+        className={`mt-3 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-center text-slate-600 dark:text-slate-400 ${
+          compact ? "text-[12px]" : "text-[12.5px]"
+        }`}
+      >
+        <span>{t("spotlight.deliverEarly", { recipientFirstName })}</span>
+        <button
+          type="button"
+          onClick={onDeliverAction}
+          className="inline-flex items-center gap-1 font-semibold text-emerald-700 underline-offset-2 hover:underline dark:text-emerald-400"
+        >
+          <PackageCheck size={13} aria-hidden="true" />
+          {t("spotlight.DELIVER.button")}
+        </button>
+      </p>
     </section>
   );
 }

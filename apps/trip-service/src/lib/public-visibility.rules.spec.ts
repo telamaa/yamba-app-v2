@@ -35,4 +35,11 @@ describe("publicTripWhere — un trajet invisible est introuvable, pas jeté apr
     expect(s).toContain('"isDeleted":false');
     expect(s).not.toContain('"isDeleted":{');
   });
+
+  it("ANO-ADM-08 — le trajet d'un Voyageur suspendu est introuvable par son lien, sauf suspension échue", () => {
+    const now = new Date("2026-09-14T10:00:00Z");
+    expect(publicTripWhere(ID, now).user).toEqual({
+      is: { OR: [{ accountStatus: { not: "SUSPENDED" } }, { suspensionUntil: { lte: now, gt: new Date(0) } }] },
+    });
+  });
 });

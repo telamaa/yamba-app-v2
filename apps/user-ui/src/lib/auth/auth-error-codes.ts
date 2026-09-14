@@ -115,7 +115,7 @@ export function passwordCodeMessage(fr: boolean, code: PasswordRuleCode): string
 export function registerCodeMessage(fr: boolean, code: "EMAIL_ALREADY_USED"): string {
   if (code === "EMAIL_ALREADY_USED") {
     return fr
-      ? "Un compte existe déjà avec cet e-mail. Connectez-vous ou utilisez « Mot de passe oublié »."
+      ? "Un compte existe déjà avec cet e-mail. Connecte-toi ou utilise « Mot de passe oublié »."
       : "An account already exists with this email. Sign in or use “Forgot password”.";
   }
   return fr ? "Inscription impossible pour le moment." : "Unable to sign up right now.";

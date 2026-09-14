@@ -79,5 +79,7 @@ export const BOOKING_LIFECYCLE_ERROR_CODES = [
   "DELIVERY_CODE_UNAVAILABLE", // PICKED_UP sans hash (enregistrement antérieur à B3)
   "TRACKING_STEP_NOT_ALLOWED", // séquence stricte AT_AIRPORT → FLIGHT_DEPARTED → FLIGHT_ARRIVED (A39)
   "CODE_REGENERATION_LIMIT", // plafond MAX_CODE_REGENERATIONS (5) atteint, ou hors PICKED_UP
+  // ANO-ADM-22 (A159) — une autre décision d'argent est en cours d'enregistrement sur ce deal (verrou Redis)
+  "DECISION_IN_PROGRESS",
 ] as const;
 export type BookingLifecycleErrorCode = (typeof BOOKING_LIFECYCLE_ERROR_CODES)[number];

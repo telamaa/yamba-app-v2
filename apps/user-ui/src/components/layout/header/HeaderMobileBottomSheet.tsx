@@ -11,6 +11,7 @@ import HeaderThemeToggle from "./HeaderThemeToggle";
 import HeaderUserMenuContent from "./HeaderUserMenuContent";
 import { HEADER_COLORS, HEADER_Z_INDEX } from "./header.constants";
 import type { HeaderUserState } from "./useHeaderUserState";
+import { useDialogFocus } from "@/hooks/useDialogFocus";
 
 type Props = {
   open: boolean;
@@ -49,6 +50,8 @@ export default function HeaderMobileBottomSheet({
                                                 }: Props) {
   const t = useTranslations("common");
   const sheetRef = useRef<HTMLDivElement | null>(null);
+  // ANO-WEB-94 — focus piégé dans la fenêtre, rendu au geste de départ à la fermeture.
+  useDialogFocus(sheetRef, open);
   const [dragY, setDragY] = useState(0);
   const dragStartY = useRef<number | null>(null);
 

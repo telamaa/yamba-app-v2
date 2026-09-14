@@ -36,7 +36,7 @@ export function makeAdminFinanceController(service: AdminFinanceService) {
     async listQueue(req: AuthenticatedRequest, res: Response, next: NextFunction) {
       try {
         const kind = FinanceQueueKindSchema.safeParse(req.query.kind ?? "FAILED");
-        if (!kind.success) throw new ValidationError("Invalid queue kind.");
+        if (!kind.success) throw new ValidationError("Invalid queue kind.", { code: "INVALID_QUEUE_KIND", allowed: FinanceQueueKindSchema.options }); // recette § 5.11 — tout refus porte un code
         res.status(200).json(await service.listQueue(kind.data));
       } catch (e) {
         next(e);

@@ -1,0 +1,51 @@
+{
+  "_lisezmoi": "Lexique de Yamba (recette 5.32, WEB-VOC). SOURCE UNIQUE lue par la règle 6 de scripts/check-i18n-messages.mjs ET par apps/e2e/src/chapitres/web-voc.spec.ts : une exemption ajoutée ici vaut pour la CI et pour la recette. Les motifs sont des RegExp JavaScript (source + drapeaux).",
+  "fr": [
+    {
+      "id": "roles",
+      "motif": "\\b(trippers?|yambers?|transporteurs?|travell?ers?|carriers?|shippers?)\\b",
+      "drapeaux": "i",
+      "raison": "mot de rôle refusé (« Voyageur » / « Expéditeur »)"
+    },
+    {
+      "id": "assurance",
+      "motif": "\\b(assurances?|IPID)\\b",
+      "drapeaux": "i",
+      "raison": "« assurance » (aucun contrat d'assureur signé : « Protection », « Garantie Yamba »)"
+    },
+    {
+      "id": "vouvoiement",
+      "motif": "(?<![-\\p{L}])(vous|votre|vos)(?![-\\p{L}])",
+      "drapeaux": "iu",
+      "raison": "vouvoiement (la plateforme tutoie)",
+      "sauf": "rendez-vous|tous les deux|ensemble|vos deux|vos avis|vos profils|vous organiser|vous devez convenir",
+      "_sauf": "« vous » PLURIEL : les deux membres ensemble (« vous aurez tous les deux noté ») ; « rendez-vous » est un nom commun."
+    },
+    {
+      "id": "role-majuscule",
+      "motif": "(?<![\\p{L}-])voyageu(r|rs|se|ses)(?![\\p{L}])",
+      "drapeaux": "u",
+      "raison": "le rôle prend la majuscule : « Voyageur » (décision du 13/09, recette 5.32 → chapitre 7)"
+    }
+  ],
+  "en": [
+    {
+      "id": "roles",
+      "motif": "\\b(carriers?|trippers?|yambers?|travellers?)\\b",
+      "drapeaux": "i",
+      "raison": "role word refused (« Traveler » / « Shipper »)"
+    },
+    {
+      "id": "assurance",
+      "motif": "\\b(insurance|insured|IPID)\\b",
+      "drapeaux": "i",
+      "raison": "« insurance » (no insurer contract: « Protection », « Yamba Guarantee »)"
+    },
+    {
+      "id": "role-majuscule",
+      "motif": "(?<![\\p{L}-])travelers?(?![\\p{L}])",
+      "drapeaux": "u",
+      "raison": "the role is capitalized: « Traveler » (decision of 13/09)"
+    }
+  ]
+}
