@@ -37,6 +37,32 @@ export function payoutRetryDueFilter(now: Date): { OR: Array<Record<string, unkn
   return { OR: [{ payoutNextRetryAt: { isSet: false } }, { payoutNextRetryAt: null }, { payoutNextRetryAt: { lte: now } }] };
 }
 
+/* ── Jamais deux fois (recette § 5.14, A164) ───────────────── */
+
+/**
+ * Faut-il demander au fournisseur si un transfert est DÉJÀ parti avant d'en émettre un ? Oui dès qu'une tentative a eu
+ * lieu : un échec « fournisseur » peut cacher un transfert réellement émis (réponse perdue, course), et la clé
+ * d'idempotence ne protège que 24 h chez Stripe — le rejeu quotidien (A111) la dépasse. Première tentative : non (rien
+ * n'a pu partir, et l'appel coûterait sur chaque versement).
+ */
+export function payoutNeedsTransferLookup(booking: { payoutAttempts?: number | null; transferId?: string | null }): boolean {
+  return (booking.payoutAttempts ?? 0) > 0 || !!booking.transferId;
+}
+
+/**
+ * Le transfert vivant à ADOPTER au lieu d'en émettre un nouveau : même montant, même motif (livraison / compensation),
+ * jamais renversé, même partiellement (un transfert renversé est justement celui qu'un « re-verser » remplace).
+ */
+export function adoptableTransfer(
+  existing: Array<{ id: string; amountCents: number; reversedCents: number; metadata: Record<string, string> }>,
+  expected: { bookingId: string; amountCents: number; reason: string }
+): { id: string } | null {
+  const live = existing.filter(
+    (t) => t.reversedCents === 0 && t.amountCents === expected.amountCents && (!t.metadata.bookingId || t.metadata.bookingId === expected.bookingId) && (!t.metadata.reason || t.metadata.reason === expected.reason)
+  );
+  return live.length > 0 ? { id: live[0].id } : null;
+}
+
 /* ── Nature d'un échec ─────────────────────────────────────── */
 
 export function payoutFailureKind(payoutStatus: string | null | undefined, reason: string | null | undefined): PayoutFailureKind | null {

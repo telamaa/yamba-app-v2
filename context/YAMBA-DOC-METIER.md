@@ -5446,3 +5446,61 @@ seulement, jamais de données de carte).
   aujourd'hui, un écart n'existe que si quelqu'un clique.
 - Sur « paiement introuvable », vérifier quand même le transfert enregistré (un versement sans paiement connu est l'écart
   le plus grave).
+
+
+---
+
+# Back-office — relancer un versement, clore un renversement : jamais deux fois l'argent du Voyageur (cahier 02-ADMIN § 5.14)
+
+*(PR `chore/recette-admin-5-14`, 14/09/2026 — ADM-VER-1 à 4.)*
+
+## Le besoin
+
+Quand le versement d'un Voyageur échoue (compte non prêt, refus bancaire), Finance ou le Médiateur doit pouvoir le
+relancer sans attendre le rejeu automatique ; quand la banque renvoie l'argent (renversement), quelqu'un doit décider de
+le re-verser ou d'assumer la perte. Dans les deux cas, la seule chose inacceptable est de **payer deux fois**.
+
+## Les règles
+
+**RG-ADM-VER-01 — Relancer, c'est rejouer le même versement** : même montant figé, même clé chez le fournisseur ; plusieurs
+relances, simultanées ou non, produisent un seul transfert et un seul avis de versement. Chaque relance exécutée est
+journalisée avec son issue.
+
+**RG-ADM-VER-02 — On ne relance qu'un versement dû** : deal terminé ou annulé tardivement, versement en échec ou en
+attente ; sinon refus nommé. Une partie au deal ne relance pas.
+
+**RG-ADM-VER-03 — Un échec n'efface jamais un envoi** : si deux tentatives se croisent et que l'une réussit, le versement
+reste « envoyé », quelle que soit l'erreur reçue par l'autre.
+
+**RG-ADM-VER-04 — Avant de réémettre, on demande au fournisseur** si un transfert vivant existe déjà pour ce deal ; s'il
+existe, il est repris tel quel. Si le fournisseur ne peut pas répondre, rien ne part : le versement attend le rejeu
+suivant (A164).
+
+**RG-ADM-VER-05 — Un renversement se clôt une fois, avec un motif d'au moins 20 caractères** : « Re-verser » émet un
+**nouveau** transfert ; « Abandonner » n'envoie rien et trace le manque à gagner. La seconde décision est refusée.
+L'identifiant du transfert renversé reste au journal.
+
+**RG-ADM-VER-06 — L'écran dit la vérité du moment** : un geste refusé parce qu'un autre administrateur vient d'agir le dit en
+français et recharge la fiche ; un double clic n'envoie qu'une demande.
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| VER-1 | Relancer le versement en échec | envoyé, tentatives +1, transfert enregistré, une ligne de journal ; deal accepté ou versement déjà envoyé : refus nommé | oui |
+| VER-1 bis | Double clic sur « Relancer » | une seule demande, un seul versement | oui |
+| VER-1 ter | Quatre relances simultanées | un seul transfert, un seul avis, compteur +1 | oui |
+| VER-2 | Re-verser un renversement | nouveau transfert, clôture tracée, sortie de la file, second clic refusé | oui |
+| VER-2 bis | Deux re-versements simultanés | un seul nouveau transfert | oui |
+| VER-3 | Abandonner un renversement | rien n'est envoyé, clôture tracée, sortie de la file | oui |
+| VER-4 | Décider sur un écran périmé | refus en français, fiche rechargée | oui |
+| VER-5 | Tentatives croisées dont une échoue au fournisseur ; clé oubliée par le fournisseur | versement toujours « envoyé » ; transfert existant repris | oui (tests unitaires — non jouable avec le fournisseur de test) |
+
+## Ce qui reste à trancher
+
+- **Prévenir le Voyageur d'un renversement abandonné** : aujourd'hui, « Abandonner » ne lui envoie rien ; il ne sait pas que
+  l'argent ne viendra pas.
+- **Journal par clic ou par versement** : quatre relances simultanées écrivent quatre lignes `PAYOUT_RETRIED` « envoyé »
+  pour un seul transfert (conforme au cahier, bruyant à la relecture).
+- **Idempotence côté serveur** : conserver nos propres clés et leur issue (au lieu de s'en remettre aux 24 h du
+  fournisseur), à étudier si d'autres gestes d'argent en ont besoin (remboursement manuel, § 5.15).

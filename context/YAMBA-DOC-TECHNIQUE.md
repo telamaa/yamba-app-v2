@@ -8446,3 +8446,104 @@ journalisée : un administrateur a bien demandé à lire l'argent chez le fourni
 - deal-service **598** (+3) : Fake sans adoption, `isStripeResourceMissing`, 503 journalisé.
 - `apps/e2e` : **419 scénarios** (416 + 3), 3/3 verts deux fois ; ADM-ARG, FIN, RET (adaptée), MED rejouées (27/27).
 - Typecheck deal-service, admin-ui, harnais verts ; les cinq `openapi.json` régénérés (503 du rapprochement).
+
+
+---
+
+# Cahier 02-ADMIN, § 5.14 : versements — rejeu et renversement, et l'argent qui ne part jamais deux fois
+
+*(PR `chore/recette-admin-5-14`, empilée sur #314, 14/09/2026.)*
+
+## Ce qui a été fait
+
+Sept scénarios (ADM-VER-1, 2, 3 du cahier ; VER-1 bis, VER-1 ter, VER-2 bis, VER-4 ajoutées), une anomalie bloquante
+close (`ANO-ADM-33`), une décision (`A164`), sept améliorations.
+
+```
+apps/e2e/src/admin/adm-ver-versements.spec.ts                 7 scénarios — jeu d'essai rejoué avant chacun
+packages/libs/payments/src/index.ts                           A164 — findTransfers (Stripe transfers.list, Fake) ; aide _forgetIdempotencyKeysForTest
+apps/deal-service/src/services/deal-settlement.service.ts     ANO-ADM-33 — échec conditionnel + relecture ; A164 — adopter le transfert vivant
+apps/deal-service/src/services/admin-finance.rules.ts         A164 — payoutNeedsTransferLookup, adoptableTransfer (purs)
+apps/deal-service/src/services/admin-finance.service.ts       journal PAYOUT_REVERSAL_RESOLVED : previousTransferId
+apps/admin-ui/src/lib/format.ts                               payoutReasonLabel, payoutRefusalMessage, libellé « transfert renversé »
+apps/admin-ui/src/components/DealMoneyView.tsx                garde de double clic (ref), messages, formulaire de renversement
+apps/admin-ui/src/components/FinanceQueues.tsx                même lecteur de refus, motif d'échec lisible
+```
+
+## Ce que la recette a mesuré d'abord
+
+Les six premiers scénarios ont été joués contre le code non corrigé : **tous verts**. Quatre `POST /payout/retry` lancés
+ensemble rendaient quatre fois `200 SENT` avec le **même** `transferId`, un seul événement `booking.payout_sent`, un
+compteur à +1 ; deux « Re-verser » simultanés, `200 + 400`. La protection locale est réelle : la clé d'idempotence
+(`payout:<id>`) fait rendre au fournisseur le transfert existant, et l'écriture `SENT` est conditionnelle
+(`payoutStatus ∈ {PENDING, FAILED}`). Le défaut n'était pas là où la fiche regardait.
+
+## ANO-ADM-33 : l'échec écrasait le succès
+
+```ts
+// avant — markPayoutFailed
+await prisma.booking.updateMany({ where: { id: booking.id, status: booking.status }, data: { payoutStatus: "FAILED", … } });
+```
+
+Deux exécuteurs sur le même versement (un admin qui relance pendant le passage du cron, ou deux admins) : A obtient le
+transfert et écrit `SENT` ; B, dont la requête arrive pendant que la clé est « en cours », reçoit de Stripe une erreur 409
+(`idempotency_error`) et écrit `FAILED` **par-dessus** — `transferId` compris, alors que l'argent est parti. Au rejeu
+suivant, si la clé a expiré (24 h chez Stripe ; le rejeu passe à une tentative par jour après 24 essais), un second
+transfert part. Correction :
+
+```ts
+const written = await prisma.booking.updateMany({
+  where: { id: booking.id, status: booking.status, payoutStatus: { in: ["PENDING", "FAILED"] } },
+  data: { payoutStatus: "FAILED", … },
+});
+if (written.count === 0) {
+  const current = await prisma.booking.findUnique({ where: { id: booking.id }, select: { payoutStatus: true, transferId: true } });
+  if (current?.payoutStatus === "SENT") return { payoutStatus: "SENT", transferId: current.transferId ?? null, reason: null };
+}
+```
+
+Le Fake ne sait pas répondre « clé en cours » : la preuve est unitaire (`deal-settlement.service.spec.ts`, « ANO-ADM-33 :
+course… »).
+
+## A164 : demander au fournisseur avant de réémettre
+
+```ts
+if (provider.findTransfers && payoutNeedsTransferLookup(booking)) {        // une tentative a déjà eu lieu
+  try { adopted = adoptableTransfer(await provider.findTransfers(booking.id), { bookingId: booking.id, amountCents, reason }); }
+  catch (err) { return markPayoutFailed(booking, `PROVIDER_ERROR:transfer lookup failed — ${message}`, now); }
+}
+if (adopted) transferId = adopted.id;                                       // aucun nouvel appel à transfer()
+else { … provider.transfer({ …, transferGroup: booking.id, idempotencyKey }) … }
+```
+
+- `findTransfers` est **optionnel** dans l'interface : un fournisseur (ou une doublure de test) qui ne l'offre pas n'est
+  pas consulté.
+- `adoptableTransfer` n'adopte qu'un transfert **vivant** : même montant, même motif (`DELIVERY` / `LATE_CANCELLATION`),
+  même deal si les métadonnées le disent, `reversedCents === 0`. C'est ce qui laisse « Re-verser » émettre un nouveau
+  transfert après un renversement : l'ancien est renversé, donc ignoré.
+- Première tentative : pas de recherche (rien n'a pu partir ; on évite un appel sur chaque versement).
+- Recherche en panne : on écrit l'échec et on **n'émet rien** — le rejeu repassera.
+
+## Les améliorations
+
+- **Refus lus par leur code** (`payoutRefusalMessage`) : `PAYOUT_NOT_RETRYABLE` et `REVERSAL_NOT_OPEN` disent « traité
+  entre-temps » et **rechargent** la fiche ; `ADMIN_IS_PARTY`, `NO_PAYOUT_FOR_STATUS`, permission, motif. Plus jamais
+  `400 : This payout is not an open reversal.`. Pour une erreur réseau, le message ne promet pas que rien n'est parti : il
+  demande de recharger la fiche.
+- **Motif d'échec lisible** (`payoutReasonLabel`) : « compte Stripe du Voyageur non prêt », « refus du fournisseur
+  (…message…) », et le nouveau cas « le fournisseur n'a pas pu dire si un transfert était déjà parti ».
+- **Garde de double clic synchrone** (`useRef`) sur « Relancer le versement » et le formulaire de renversement.
+- **Message de succès** qui nomme montant, Voyageur et identifiant de transfert.
+- **Formulaire de renversement** : le fournisseur réel (« le fournisseur de test (Fake) » en local, comme le rapprochement
+  du § 5.13), compteur `n / 20`, conséquence de chaque bouton écrite sous les boutons.
+- **Journal** : `PAYOUT_REVERSAL_RESOLVED.after.previousTransferId` — « Re-verser » remplace `transferId` en base, l'identifiant
+  du transfert renversé (à retrouver dans le tableau de bord Stripe) ne survivait nulle part.
+
+## Tests
+
+- deal-service **607** (+9) : ANO-ADM-33 (course), A164 (adoption, exclusions, pas de recherche à la première tentative,
+  recherche en panne, bout en bout sur le Fake avec clé oubliée), règles pures, `findTransfers` du Fake, journal
+  `previousTransferId`. Un passage parallèle a échoué une fois sous charge (`admin-finance.service.spec.ts`), vert en
+  isolé et sur deux passages complets suivants (parallèle et `--runInBand`).
+- `apps/e2e` : **426 scénarios** (419 + 7).
+- Typecheck deal-service, admin-ui, harnais verts ; aucun contrat OpenAPI modifié.

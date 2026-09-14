@@ -388,7 +388,9 @@ export function makeAdminFinanceService(provider: PaymentProvider, settlement: D
       await withWriteConflictRetry(() => prisma.$transaction(async (tx) => {
         const written = await tx.booking.updateMany({ where: { id, payoutStatus: "REVERSED", ...UNRESOLVED_REVERSAL } as never, data: data as never });
         if (written.count === 0) throw new ValidationError("This payout is not an open reversal.", { code: "REVERSAL_NOT_OPEN" });
-        await recordAdminAction(tx, audit(admin, "PAYOUT_REVERSAL_RESOLVED", id, { outcome: input.outcome, reason: input.reason }));
+        // Recette § 5.14 — « re-verser » écrase `transferId` par le nouveau transfert : l'identifiant du transfert RENVERSÉ
+        // ne survivrait nulle part (tableau de bord du fournisseur, litige bancaire). Le journal le garde.
+        await recordAdminAction(tx, audit(admin, "PAYOUT_REVERSAL_RESOLVED", id, { outcome: input.outcome, reason: input.reason, previousTransferId: booking.transferId ?? null }));
       }));
       if (input.outcome === "WRITTEN_OFF") return { outcome: "WRITTEN_OFF", payoutStatus: "REVERSED", reason: null };
       const fresh = await loadBookingForWrite(id);

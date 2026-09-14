@@ -1,15 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ApiError, apiFetch, post } from "@/lib/api";
-import { ACTION_LABEL, ACTOR_LABEL, BOOKING_STATUS_LABEL, DIVERGENCE_HELP, DIVERGENCE_LABEL, INTENT_STATUS_LABEL, PROVIDER_LABEL, REFUND_STATUS_LABEL, HISTORY_STATUS_LABEL, MONEY_ANOMALY_LABEL, MONEY_PENDING_LABEL, PAYOUT_FAILURE_LABEL, PAYOUT_STATUS_LABEL, PRICING_MODEL_LABEL, RETENTION_DISPOSITION_LABEL, TIMELINE_LABEL, adminAfterSummary, dateTime, money, timelineDetailLabel } from "@/lib/format";
+import { ACTION_LABEL, ACTOR_LABEL, BOOKING_STATUS_LABEL, DIVERGENCE_HELP, DIVERGENCE_LABEL, INTENT_STATUS_LABEL, PROVIDER_LABEL, REFUND_STATUS_LABEL, HISTORY_STATUS_LABEL, MONEY_ANOMALY_LABEL, MONEY_PENDING_LABEL, PAYOUT_FAILURE_LABEL, PAYOUT_STATUS_LABEL, PRICING_MODEL_LABEL, RETENTION_DISPOSITION_LABEL, TIMELINE_LABEL, adminAfterSummary, dateTime, money, payoutReasonLabel, payoutRefusalMessage, timelineDetailLabel } from "@/lib/format";
 import { can } from "@/lib/permissions";
 import type { AdminDealMoneyFile, AdminMe, DealHistoryResponse, PaymentReconciliation } from "@/lib/types";
 
 const MIN_REASON = 20;
 
 export default function DealMoneyView({ dealId }: { dealId: string }) {
+  const inFlight = useRef(false);
   const [file, setFile] = useState<AdminDealMoneyFile | null>(null);
   const [me, setMe] = useState<AdminMe | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -56,13 +57,20 @@ export default function DealMoneyView({ dealId }: { dealId: string }) {
     finally { setBusy(false); }
   }
   async function retry() {
+    // Recette § 5.14 — un double clic part AVANT que `busy` ne soit rendu : la garde est un ref, synchrone.
+    if (inFlight.current) return;
+    inFlight.current = true;
     setBusy(true); setMsg(null);
     try {
-      const r = await post<{ payoutStatus: string; reason: string | null }>(`/admin/deals/${dealId}/payout/retry`);
-      setMsg(r.payoutStatus === "SENT" ? "Versement envoyé." : `Toujours en échec : ${r.reason ?? "motif inconnu"}.`);
+      const r = await post<{ payoutStatus: string; reason: string | null; transferId: string | null }>(`/admin/deals/${dealId}/payout/retry`);
+      const amount = money(file!.payout.amountCents ?? file!.pricing.transportCents, cur);
+      setMsg(r.payoutStatus === "SENT" ? `Versement envoyé : ${amount} à ${file!.carrier.firstName} (transfert ${r.transferId ?? "—"}).` : `Toujours en échec : ${payoutReasonLabel(r.reason)}. Le rejeu automatique repassera.`);
       load();
-    } catch (e) { setMsg(e instanceof ApiError ? `${e.status} : ${e.message}` : "Relance impossible."); }
-    finally { setBusy(false); }
+    } catch (e) {
+      const refusal = payoutRefusalMessage(e instanceof ApiError ? e : null);
+      setMsg(refusal.text);
+      if (refusal.reload) load();
+    } finally { inFlight.current = false; setBusy(false); }
   }
 
   return (
@@ -110,7 +118,7 @@ export default function DealMoneyView({ dealId }: { dealId: string }) {
           <div className="mt-2 flex flex-wrap gap-2">
             {file.allowedActions.retryPayout && can(me?.adminRoles, "payouts.retry") && <button disabled={busy} onClick={retry} className="rounded-lg bg-slate-900 px-3 py-1.5 text-[12.5px] font-semibold text-white disabled:opacity-50">Relancer le versement</button>}
           </div>
-          {file.allowedActions.resolveReversal && can(me?.adminRoles, "payouts.resolve") && <ReversalForm dealId={dealId} onDone={(m) => { setMsg(m); load(); }} />}
+          {file.allowedActions.resolveReversal && can(me?.adminRoles, "payouts.resolve") && <ReversalForm dealId={dealId} provider={file.payment.provider} amount={money(file.payout.amountCents ?? file.pricing.transportCents, cur)} onDone={(m) => { setMsg(m); load(); }} />}
         </Card>
       </div>
 
@@ -167,28 +175,38 @@ export default function DealMoneyView({ dealId }: { dealId: string }) {
   );
 }
 
-function ReversalForm({ dealId, onDone }: { dealId: string; onDone: (msg: string) => void }) {
+function ReversalForm({ dealId, provider, amount, onDone }: { dealId: string; provider: string | null; amount: string; onDone: (msg: string) => void }) {
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const inFlight = useRef(false);
   async function run(outcome: "RESENT" | "WRITTEN_OFF") {
+    if (inFlight.current) return; // recette § 5.14 : un double clic n'envoie qu'une décision
+    inFlight.current = true;
     setBusy(true); setErr(null);
     try {
       const r = await post<{ outcome: string; payoutStatus: string | null; reason: string | null }>(`/admin/deals/${dealId}/payout/reversal`, { outcome, reason: reason.trim() });
-      onDone(outcome === "RESENT" ? (r.payoutStatus === "SENT" ? "Nouveau transfert envoyé." : `Re-versement en échec : ${r.reason ?? "motif inconnu"} — il sera rejoué.`) : "Renversement abandonné, clos.");
-    } catch (e) { setErr(e instanceof ApiError ? `${e.status} : ${e.message}` : "Action impossible."); }
-    finally { setBusy(false); }
+      onDone(outcome === "RESENT" ? (r.payoutStatus === "SENT" ? `Nouveau transfert envoyé : ${amount}, renversement clos.` : `Re-versement en échec : ${payoutReasonLabel(r.reason)} — il sera rejoué.`) : "Renversement abandonné, clos : le manque à gagner est tracé au journal.");
+    } catch (e) {
+      const refusal = payoutRefusalMessage(e instanceof ApiError ? e : null);
+      if (refusal.reload) onDone(refusal.text);
+      else setErr(refusal.text);
+    } finally { inFlight.current = false; setBusy(false); }
   }
-  const ok = reason.trim().length >= MIN_REASON && !busy;
+  const length = reason.trim().length;
+  const ok = length >= MIN_REASON && !busy;
   return (
     <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
-      <p className="text-[12px] text-amber-900">Transfert renversé par Stripe : l'argent est revenu à la plateforme. Décide, avec un motif ({MIN_REASON} caractères au moins).</p>
+      {/* Recette § 5.14 — le fournisseur réellement en jeu (Fake en local), comme le rapprochement (§ 5.13). */}
+      <p className="text-[12px] text-amber-900">Transfert renversé par {PROVIDER_LABEL[provider ?? ""] ?? "le fournisseur"} : l&apos;argent est revenu à la plateforme. Décide, avec un motif ({MIN_REASON} caractères au moins).</p>
       <textarea value={reason} onChange={(e) => setReason(e.target.value.slice(0, 2000))} rows={2} placeholder="Motif (RIB corrigé, compte fermé, fraude…)" className="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2 text-[12.5px]" />
+      <p className={`text-[11px] ${length >= MIN_REASON ? "text-slate-500" : "text-amber-800"}`}>{length} / {MIN_REASON}</p>
       <div className="mt-2 flex flex-wrap gap-2">
         <button disabled={!ok} onClick={() => run("RESENT")} className="rounded-lg bg-emerald-700 px-3 py-1.5 text-[12.5px] font-semibold text-white disabled:opacity-50">Re-verser</button>
         <button disabled={!ok} onClick={() => run("WRITTEN_OFF")} className="rounded-lg bg-red-700 px-3 py-1.5 text-[12.5px] font-semibold text-white disabled:opacity-50">Abandonner</button>
       </div>
-      {err && <p className="mt-2 text-[12px] text-red-700">{err}</p>}
+      <p className="mt-1.5 text-[11px] text-amber-900/80">« Re-verser » émet un NOUVEAU transfert de {amount} (nouvelle clé). « Abandonner » clôt sans rien envoyer : l&apos;argent reste à la plateforme, le manque à gagner est tracé.</p>
+      {err && <p role="alert" className="mt-2 text-[12px] text-red-700">{err}</p>}
     </div>
   );
 }

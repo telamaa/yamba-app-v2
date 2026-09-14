@@ -153,7 +153,7 @@ describe("retryPayout (3A-a) — par l'exécuteur unique", () => {
 
 describe("resolveReversal (3A-b)", () => {
   it("RESENT : PENDING + nouvelle clé d'idempotence + clôture dans une transaction avec le journal, puis l'exécuteur", async () => {
-    prismaMock.booking.findUnique.mockResolvedValue(record({ payoutStatus: "REVERSED" }));
+    prismaMock.booking.findUnique.mockResolvedValue(record({ payoutStatus: "REVERSED", transferId: "tr_reversed_1" }));
     prismaMock.booking.updateMany.mockResolvedValue({ count: 1 });
     (settlement as { executePayout: jest.Mock }).executePayout.mockResolvedValue({ payoutStatus: "SENT", transferId: "tr_10", reason: null });
     const r = await makeService().resolveReversal(ADMIN, ID, { outcome: "RESENT", reason: "Le Voyageur a corrigé son RIB, on renvoie." });
@@ -161,7 +161,8 @@ describe("resolveReversal (3A-b)", () => {
     const u = prismaMock.booking.updateMany.mock.calls[0][0];
     expect(u.where).toEqual({ id: ID, payoutStatus: "REVERSED", OR: [{ payoutReversalResolution: { isSet: false } }, { payoutReversalResolution: null }] });
     expect(u.data).toMatchObject({ payoutStatus: "PENDING", payoutIdempotencyKey: `payout:${ID}:resend:${NOW.getTime()}`, payoutReversalResolution: "RESENT", payoutReversalResolvedByAdminId: ADMIN.id });
-    expect(recordAdminAction).toHaveBeenCalledWith(prismaMock, expect.objectContaining({ action: "PAYOUT_REVERSAL_RESOLVED", after: expect.objectContaining({ outcome: "RESENT" }) }));
+    // Recette § 5.14 — l'identifiant du transfert renversé survit dans le journal (la base le remplace par le nouveau)
+    expect(recordAdminAction).toHaveBeenCalledWith(prismaMock, expect.objectContaining({ action: "PAYOUT_REVERSAL_RESOLVED", after: expect.objectContaining({ outcome: "RESENT", previousTransferId: "tr_reversed_1" }) }));
     expect((settlement as { executePayout: jest.Mock }).executePayout).toHaveBeenCalledTimes(1);
   });
   it("WRITTEN_OFF : clôture seule, rien n'est renvoyé ; déjà clos → 400", async () => {

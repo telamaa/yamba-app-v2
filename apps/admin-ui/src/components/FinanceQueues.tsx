@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ApiError, apiFetch, post } from "@/lib/api";
-import { BOOKING_STATUS_LABEL, PAYOUT_FAILURE_LABEL, dateTime, money } from "@/lib/format";
+import { BOOKING_STATUS_LABEL, PAYOUT_FAILURE_LABEL, dateTime, money, payoutReasonLabel, payoutRefusalMessage } from "@/lib/format";
 import { can } from "@/lib/permissions";
 import type { AdminMe, FinanceQueueItem, FinanceQueueKind, FinanceQueueResponse } from "@/lib/types";
 
@@ -63,14 +63,13 @@ export default function FinanceQueues() {
     setBusy(it.bookingId);
     try {
       const r = await post<{ payoutStatus: string; reason: string | null }>(`/admin/deals/${it.bookingId}/payout/retry`);
-      setMsg(r.payoutStatus === "SENT" ? `Versement de ${money(it.amountCents, it.currencyCode)} envoyé à ${it.carrier.firstName}.` : `Toujours en échec : ${r.reason ?? "motif inconnu"}.`);
+      setMsg(r.payoutStatus === "SENT" ? `Versement de ${money(it.amountCents, it.currencyCode)} envoyé à ${it.carrier.firstName}.` : `Toujours en échec : ${payoutReasonLabel(r.reason)}. Le rejeu automatique repassera.`);
       load();
     } catch (e) {
-      const code = codeOf(e);
-      if (code === "PAYOUT_NOT_RETRYABLE" || code === "NO_PAYOUT_FOR_STATUS") {
-        setMsg("Rien à relancer : ce versement n'est plus en échec. La file est rechargée.");
-        load();
-      } else setMsg(e instanceof ApiError ? `Relance impossible (${e.status}) : ${e.message}` : "Relance impossible.");
+      // Recette § 5.14 — un seul lecteur des refus de versement pour la file et la fiche argent.
+      const refusal = payoutRefusalMessage(e instanceof ApiError ? e : null);
+      setMsg(refusal.text);
+      if (refusal.reload) load();
     } finally {
       setBusy(null);
     }
