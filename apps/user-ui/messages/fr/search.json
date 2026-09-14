@@ -8,7 +8,7 @@
   "oneStopIn": "1 escale · {city}",
   "stopsCount": "{count, plural, =1 {# escale} other {# escales}}",
   "remainingSlots": "{count, plural, =1 {# place restante} other {# places restantes}}",
-  "newTripper": "Nouveau voyageur",
+  "newTripper": "Nouveau Voyageur",
   "moreCategoriesTooltip": "{count, plural, =1 {# autre catégorie} other {# autres catégories}}",
   "transportTabs": {
     "all": "Tout",
@@ -39,11 +39,11 @@
     "showLess": "Voir moins",
     "families": "Que voulez-vous envoyer ?",
     "lowestPriceHint": "pour un colis de 2 kg",
-    "yourParcel": "Votre colis",
+    "yourParcel": "Ton colis",
     "weight": "Poids du colis",
-    "weightHint": "Indiquez le poids : chaque trajet affichera son prix pour votre colis.",
+    "weightHint": "Indique le poids : chaque trajet affichera son prix pour ton colis.",
     "weightHintActive": "Prix et tri calculés pour {kg} kg · trajets sans assez de place exclus",
-    "lowestPriceHintWeight": "pour votre colis de {kg} kg",
+    "lowestPriceHintWeight": "pour ton colis de {kg} kg",
     "lightParcel": "Colis léger (enveloppe, passeport, lunettes…) : {min} € minimum."
   },
   "departureTimes": {
@@ -54,8 +54,8 @@
   },
   "emptyState": {
     "title": "Aucun trajet trouvé",
-    "noResults": "Aucun trajet n'est disponible pour cette recherche. Essayez de modifier votre date ou destination.",
-    "withFilters": "Aucun résultat ne correspond à vos filtres. Essayez d'en retirer pour voir plus de trajets."
+    "noResults": "Aucun trajet n'est disponible pour cette recherche. Essaie de modifier ta date ou ta destination.",
+    "withFilters": "Aucun résultat ne correspond à tes filtres. Retires-en pour voir plus de trajets."
   },
   "card": {
     "fromPrice": "dès",
@@ -63,7 +63,7 @@
     "remainingSlots": "{count, plural, one {# place} other {# places}}",
     "direct": "Direct",
     "stopovers": "{count, plural, one {# escale} other {# escales}}",
-    "newTripper": "Nouveau voyageur",
+    "newTripper": "Nouveau Voyageur",
     "perKg": "prix au kilo",
     "remainingKg": "{kg} kg dispo",
     "example": "ex. {kg} kg ≈ {price} € tout compris",
@@ -88,8 +88,8 @@
     "phone": "Téléphone",
     "computer": "Ordinateur",
     "other-electronics": "Autres électroniques",
-    "checked-bag-23kg": "Bagage 23kg",
-    "cabin-bag-12kg": "Bagage cabine 12kg"
+    "checked-bag-23kg": "Bagage en soute 23 kg",
+    "cabin-bag-12kg": "Bagage cabine 12 kg"
   },
   "mobile": {
     "editSearch": "Modifier la recherche",

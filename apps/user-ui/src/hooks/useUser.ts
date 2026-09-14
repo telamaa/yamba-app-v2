@@ -7,7 +7,9 @@ export type CarrierPage = {
   bio?: string | null;
   phoneE164?: string | null;
   onboardingStep: "PROFILE" | "STRIPE" | "COMPLETE";
-  stripeAccountId?: string | null;
+  // PAS de `stripeAccountId` : /auth/me ne le sert jamais (liste blanche du DTO). Le déclarer « optionnel » a laissé le
+  // front décider sur un champ toujours absent — ANO-WEB-104 (lien Stripe mort pour tous les Voyageurs, recette 01-WEB
+  // chapitre 7). Le serveur décide ; le front lit `onboardingStep` et les drapeaux Stripe ci-dessous.
   stripeOnboardingComplete?: boolean;
   stripeChargesEnabled?: boolean;
   primaryAddress?: {
@@ -39,6 +41,9 @@ export type User = {
   carrierStatus?: string;
   carrierPage?: CarrierPage | null;
   avatar?: { url: string } | null;
+  /** C-PR8b (D63) / D66 — préférences servies par `/auth/me` : relances de messagerie, mesure d'audience. */
+  messagingReminderEmails?: boolean;
+  analyticsOptIn?: boolean | null;
 };
 
 type GetMeResponse = {

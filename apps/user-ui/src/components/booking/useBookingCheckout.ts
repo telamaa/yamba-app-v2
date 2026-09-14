@@ -12,6 +12,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { useRouter } from "@/i18n/navigation";
@@ -38,6 +39,7 @@ const KNOWN_CODES = new Set([
 ]);
 
 export function useBookingCheckout(args: { draft: Draft; trip: TripContext; step: Step; clear: () => void }) {
+  const queryClient = useQueryClient();
   const { draft, trip, step, clear } = args;
   // A45 — photos déclarées : upload direct ImageKit (D42), dossier dédié
   const { uploadDetailed } = useImageKitUpload("/bookings/declared", {
@@ -136,13 +138,16 @@ export function useBookingCheckout(args: { draft: Draft; trip: TripContext; step
       toast.error(errorMessage(e));
       if (e instanceof BookingApiError && (e.code === "QUOTE_DIVERGENCE" || e.code === "PAYMENT_MISMATCH")) {
         // Le prix a bougé : nouvelle autorisation sur le nouveau total, rien n'est débité.
+        // ANO-WEB-36 (recette 5.12) — et le TRAJET est relu : sans cela le récapitulatif et le bouton
+        // « Payer » gardaient l'ancien total alors que le message annonçait le nouveau.
+        void queryClient.invalidateQueries({ queryKey: ["public-trip", trip.tripId] });
         setIntent(null);
         void refreshIntent();
       }
     } finally {
       setIsSubmitting(false);
     }
-  }, [isSubmitting, intent, draft, trip, clear, router, t, errorMessage, refreshIntent, uploadDetailed]);
+  }, [isSubmitting, intent, draft, trip, clear, router, t, errorMessage, refreshIntent, uploadDetailed, queryClient]);
 
   return { intent, intentLoading, intentError, refreshIntent, registerConfirm, submit, isSubmitting };
 }

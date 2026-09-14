@@ -98,7 +98,7 @@ export default function ForgotPasswordForm({ heroVisual }: Props) {
   };
 
   return (
-    <main className="lg:grid lg:grid-cols-2 lg:min-h-[calc(100vh-64px)]">
+    <main className="lg:grid lg:grid-cols-2 lg:min-h-[calc(var(--yamba-viewport)-64px)]">
       {/* LEFT — visuel desktop */}
       <div className="hidden lg:block">
         <AuthHeroVisual visual={heroVisual} />
