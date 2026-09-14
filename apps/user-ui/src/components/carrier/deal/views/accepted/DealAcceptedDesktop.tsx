@@ -12,6 +12,7 @@
 "use client";
 
 import { useLocale, useTranslations } from "next-intl";
+import { Link } from "@/i18n/navigation";
 import type { DealRequest } from "@/components/carrier/deal/deal.types";
 import DealNextStepsTip from "@/components/carrier/deal/shared/DealNextStepsTip";
 import DealStepper, {
@@ -45,8 +46,8 @@ export default function DealAcceptedDesktop({ deal, onCloseAction }: Props) {
     { id: "payout", label: t("timeline.steps.payout") },
   ];
 
-  const recipientFirstName =
-    deal.deliveryLocation.name.split(" ")[0] || deal.deliveryLocation.name;
+  // ANO-WEB-44 : le prénom du destinataire vient du DTO, plus du premier mot du lieu de livraison.
+  const recipientFirstName = deal.recipientFirstName || deal.deliveryLocation.city;
 
   const netAmount = formatAmount(deal.earnings.netForCarrier, locale);
 
@@ -110,13 +111,13 @@ export default function DealAcceptedDesktop({ deal, onCloseAction }: Props) {
               <DealTripSidebar deal={deal} />
 
               <div className="text-center">
-                <button
-                  type="button"
+                {/* ANO-WEB-70 : même bouton mort côté Voyageur — vers « Mes trajets ». */}
+                <Link
+                  href="/dashboard/trips"
                   className="text-[12px] font-semibold text-[#185FA5] hover:text-[#0C447C] dark:text-blue-400 dark:hover:text-blue-300"
-                  onClick={() => console.info("[deal] open dashboard")}
                 >
                   {t("dashboardLink")}
-                </button>
+                </Link>
               </div>
             </div>
           </aside>

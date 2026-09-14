@@ -55,6 +55,23 @@ export function evaluateAlerts(s: OpsSnapshot, now: Date, T: AlertThresholds = A
   return out;
 }
 
+/**
+ * ANO-ADM-24 — litiges « décidables et toujours sans décision depuis plus de `thresholdHours` ». Décidable = même règle que
+ * l'écran de médiation (`isDisputeDecidable`) : dès la version du Voyageur, sinon à l'ouverture + `responseDelayHours`
+ * (le paramètre, jamais une constante).
+ */
+export function countUndecidedDisputes(
+  disputes: Array<{ openedAt: Date; carrierRespondedAt: Date | null }>,
+  now: Date,
+  responseDelayHours: number,
+  thresholdHours: number
+): number {
+  return disputes.filter((d) => {
+    const decidableSince = d.carrierRespondedAt ?? new Date(d.openedAt.getTime() + responseDelayHours * 3_600_000);
+    return now.getTime() - decidableSince.getTime() > thresholdHours * 3_600_000;
+  }).length;
+}
+
 /** Clé de dédoublonnage : une alerte par règle et par jour (UTC) — le cron n'envoie l'email qu'à la première apparition. */
 export const alertSentKey = (rule: string, now: Date) => `yamba:alerts:sent:${rule}:${now.toISOString().slice(0, 10)}`;
 export const ALERT_SENT_TTL_SECONDS = 2 * 86_400;

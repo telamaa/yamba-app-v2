@@ -14,7 +14,7 @@ import type { NextFunction, Response } from "express";
 import prisma from "@packages/libs/prisma";
 import { adminRolesOf, isSuperAdmin } from "../utils/admin-roles";
 import { AdminUsersQuerySchema, EXPORT_REASON_MIN_LENGTH } from "@packages/api-contracts";
-import { CSV_BOM, buildCsv, csvFilename } from "@packages/libs/csv";
+import { CSV_BOM, buildCsv, csvFilename, csvResponseHeaders } from "@packages/libs/csv";
 import { USERS_CSV_COLUMNS } from "../lib/admin-users.query";
 import { ForbiddenError, NotFoundError, ValidationError } from "@packages/error-handler";
 import { recordAdminAction } from "@packages/admin-audit";
@@ -25,6 +25,7 @@ import { revokeRefreshJti } from "../utils/auth.helper";
 import { sendAuthEmail } from "../emails/send-auth-email";
 import { getAdminEmails } from "../emails/admin-emails";
 import type { AdminUsersService } from "../services/admin-users.service";
+import { makeEmailSuppressionService, type EmailSuppressionDb } from "../services/email-suppression.service";
 
 const SUPPORT_EMAIL = process.env.SUPPORT_EMAIL || "support@yamba.app";
 
@@ -44,6 +45,11 @@ function meta(req: AuthenticatedRequest) {
 function fmtDate(d: Date | null, locale: string): string | null {
   return d ? new Intl.DateTimeFormat(locale === "fr" ? "fr-FR" : "en-GB", { day: "numeric", month: "long", year: "numeric" }).format(d) : null;
 }
+
+const emailSuppression = makeEmailSuppressionService({
+  db: prisma as unknown as EmailSuppressionDb,
+  record: (tx, entry) => recordAdminAction(tx as never, entry),
+});
 
 export function makeAdminUsersController(service: AdminUsersService) {
   async function loadTarget(req: AuthenticatedRequest) {
@@ -85,13 +91,11 @@ export function makeAdminUsersController(service: AdminUsersService) {
         if (!parsed.success) throw new ValidationError("Invalid query.", { code: "INVALID_QUERY" });
         const reason = typeof req.query.reason === "string" ? req.query.reason.trim() : "";
         if (reason.length < EXPORT_REASON_MIN_LENGTH) throw new ValidationError(`A reason of at least ${EXPORT_REASON_MIN_LENGTH} characters is required for a personal-data export.`, { code: "REASON_TOO_SHORT" });
-        const rows = await service.exportRows(parsed.data);
+        const { rows, truncated } = await service.exportRows(parsed.data);
         const now = new Date();
         const { cursor: _c, limit: _l, ...filters } = parsed.data;
-        await recordAdminAction(prisma, { adminUserId: req.user.id, action: "EXPORTED", targetType: "USER", after: { domain: "users", personal: true, reason, filters, rows: rows.length }, ip: req.ip ?? null, userAgent: req.headers["user-agent"] ?? null });
-        res.setHeader("Content-Type", "text/csv; charset=utf-8");
-        res.setHeader("Content-Disposition", `attachment; filename="${csvFilename("utilisateurs", now)}"`);
-        res.setHeader("X-Row-Count", String(rows.length));
+        await recordAdminAction(prisma, { adminUserId: req.user.id, action: "EXPORTED", targetType: "USER", after: { domain: "users", personal: true, reason, filters, rows: rows.length, truncated }, ip: req.ip ?? null, userAgent: req.headers["user-agent"] ?? null });
+        res.set(csvResponseHeaders(csvFilename("utilisateurs", now), rows.length, truncated));
         res.status(200).send(CSV_BOM + buildCsv(USERS_CSV_COLUMNS, rows));
       } catch (e) {
         next(e);
@@ -185,17 +189,12 @@ export function makeAdminUsersController(service: AdminUsersService) {
       }
     },
 
-    /** D35 4A — lever la suppression d'une adresse après correction (journal EMAIL_SUPPRESSION_LIFTED). */
+    /** D35 4A — lever la suppression d'une adresse après correction (journal EMAIL_SUPPRESSION_LIFTED).
+     *  A155 (recette § 5.5) : motif ≥ 20 obligatoire, écriture conditionnelle (une seule ligne si deux admins lèvent en même temps). */
     async unsuppressEmail(req: AuthenticatedRequest, res: Response, next: NextFunction) {
       try {
         const user = await loadTarget(req);
-        const suppressedAt = user.emailSuppressedAt;
-        if (!suppressedAt) throw new ValidationError("This address is not suppressed.", { code: "EMAIL_NOT_SUPPRESSED" });
-        await prisma.$transaction(async (tx) => {
-          await tx.user.update({ where: { id: user.id }, data: { emailSuppressedAt: null, emailSuppressedReason: null } });
-          await recordAdminAction(tx, { adminUserId: req.user.id, action: "EMAIL_SUPPRESSION_LIFTED", targetType: "USER", targetId: user.id, before: { emailSuppressedAt: suppressedAt.toISOString(), reason: user.emailSuppressedReason }, after: { emailSuppressedAt: null }, ...meta(req) });
-        });
-        return res.status(200).json({ ok: true });
+        return res.status(200).json(await emailSuppression.lift(req.user.id, user, req.body, meta(req)));
       } catch (e) {
         return next(e);
       }

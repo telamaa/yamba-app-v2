@@ -7,9 +7,11 @@
 import type { NextFunction, Response } from "express";
 import { ForbiddenError } from "@packages/error-handler";
 import type { AuthenticatedRequest } from "./isAuthenticated";
+import { effectiveAccountStatus, type SanctionState } from "./account-status";
 
 const requireActiveAccount = (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
-  const status = (req.user as { accountStatus?: string } | undefined)?.accountStatus ?? "ACTIVE";
+  // ANO-ADM-07 — statut EFFECTIF : une restriction dont la date de fin est passée ne bloque plus.
+  const status = effectiveAccountStatus((req.user as SanctionState | undefined) ?? {});
   if (status === "RESTRICTED" || status === "SUSPENDED") {
     // D-5 : passe par le middleware d'erreur commun ; le code reste servi en tête ET dans `details`.
     return next(

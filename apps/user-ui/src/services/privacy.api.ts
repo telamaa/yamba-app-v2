@@ -15,7 +15,23 @@ export async function fetchErasureBlockers(): Promise<ErasureCheck> {
 
 /** Télécharge le fichier JSON (le navigateur ne peut pas suivre un Content-Disposition en XHR : on crée le lien nous-mêmes). */
 export async function downloadMyData(): Promise<{ filename: string }> {
-  const res = await apiClient.post<Blob>("/auth/me/data-export", {}, { requireAuth: true, responseType: "blob" });
+  let res;
+  try {
+    res = await apiClient.post<Blob>("/auth/me/data-export", {}, { requireAuth: true, responseType: "blob" });
+  } catch (e) {
+    // ANO-WEB-09 (recette WEB-E2E-4) : avec `responseType: "blob"`, un refus (403 SUDO_REQUIRED,
+    // 429 « une fois par 24 h ») arrive lui aussi en Blob — `isSudoRequired` ne lisait jamais le
+    // code, la porte ne s'ouvrait pas et l'export était inutilisable. On relit le corps en JSON.
+    const r = (e as { response?: { data?: unknown } }).response;
+    if (r && typeof Blob !== "undefined" && r.data instanceof Blob) {
+      try {
+        r.data = JSON.parse(await r.data.text());
+      } catch {
+        /* corps non JSON : on laisse l'erreur telle quelle */
+      }
+    }
+    throw e;
+  }
   const disposition = String(res.headers?.["content-disposition"] ?? "");
   const filename = /filename="([^"]+)"/.exec(disposition)?.[1] ?? "yamba-mes-donnees.json";
   const url = URL.createObjectURL(res.data);

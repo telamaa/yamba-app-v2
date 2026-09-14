@@ -165,6 +165,10 @@ describe("C-PR5b (D58 5A) — rapport mensuel, export CSV, bornes du rembourseme
     expect(csvCell(null)).toBe("");
     expect(csvCell('a,"b"')).toBe('"a,""b"""');
     expect(csvCell("=SUM(A1)")).toBe("'=SUM(A1)");
+    // ANO-ADM-14 — la copie locale oubliait la tabulation et le retour chariot ; la bibliothèque partagée les neutralise.
+    expect(csvCell("\t=1+1")).toBe("'\t=1+1");
+    expect(csvCell("\r=1+1")).toBe(`"'\r=1+1"`);
+    expect(csvCell(-120)).toBe("-120");
     expect(csvCell(d("2026-09-01T00:00:00Z"))).toBe("2026-09-01T00:00:00.000Z");
     const row = { id: "a", status: "COMPLETED", pricing: P, shipperId: "s", carrierId: "c", trip: { originCity: "Paris", destinationCity: "Brazzaville", departureAt: d("2026-09-01T00:00:00Z") }, capturedAt: d("2026-08-20T10:00:00Z"), completedAt: d("2026-09-02T10:00:00Z") };
     expect(csvRowInRange(row, FROM, TO)).toBe(true);

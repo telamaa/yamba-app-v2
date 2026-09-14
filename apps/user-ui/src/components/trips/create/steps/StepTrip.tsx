@@ -470,6 +470,7 @@ export default function StepTrip({
           onRemoveAction={handleRemoveDoc}
           label={copy.docUpload}
           hint={copy.docUploadSub}
+          limitHint={copy.docLimitReached(5)}
         />
       </div>
       </Accordion>

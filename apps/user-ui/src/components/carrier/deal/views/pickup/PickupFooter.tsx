@@ -18,6 +18,8 @@ type Props = {
   shipperFirstName: string;
   recipientFirstName: string;
   canConfirm: boolean;
+  /** ANO-WEB-51 : ce qui manque pour confirmer (points, photo) — affiché sous les boutons quand ils sont inactifs. */
+  blockingHint?: string | null;
   isSubmitting?: boolean;
   onRefuseAction: () => void;
   onConfirmAction: () => void;
@@ -28,6 +30,7 @@ export default function PickupFooter({
                                        shipperFirstName,
                                        recipientFirstName,
                                        canConfirm,
+                                       blockingHint = null,
                                        isSubmitting = false,
                                        onRefuseAction,
                                        onConfirmAction,
@@ -61,6 +64,9 @@ export default function PickupFooter({
             {isSubmitting ? t("final.submitting") : t("final.confirm")}
           </button>
         </div>
+        {!canConfirm && !isSubmitting && blockingHint && (
+          <p className="mt-2 text-center text-[11.5px] text-amber-700 dark:text-amber-400" role="status">{blockingHint}</p>
+        )}
       </div>
     );
   }
@@ -96,6 +102,9 @@ export default function PickupFooter({
           {isSubmitting ? t("final.submitting") : t("final.confirm")}
         </button>
       </div>
+      {!canConfirm && !isSubmitting && blockingHint && (
+        <p className="mt-3 text-center text-[12px] text-amber-700 dark:text-amber-400" role="status">{blockingHint}</p>
+      )}
     </div>
   );
 }

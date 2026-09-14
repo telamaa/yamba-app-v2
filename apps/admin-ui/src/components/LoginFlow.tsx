@@ -24,6 +24,12 @@ function describeError(err: unknown, prefix: string): string {
   return `${prefix} : ${err instanceof Error ? err.message : "erreur réseau"} — le gateway (8080) et auth-service (6001) tournent-ils ?`;
 }
 
+/** Le `details.code` d'un refus du serveur (A146 : il atteint le client). */
+function codeDuRefus(err: unknown): string | undefined {
+  const data = err instanceof ApiError ? (err.data as { details?: { code?: unknown } } | undefined) : undefined;
+  return typeof data?.details?.code === "string" ? data.details.code : undefined;
+}
+
 export default function LoginFlow() {
   const router = useRouter();
   const [stage, setStage] = useState<Stage>("PASSWORD");
@@ -71,7 +77,13 @@ export default function LoginFlow() {
         router.replace("/home");
       }
     } catch (err) {
-      if (err instanceof ApiError && err.status === 401 && /expired|required/i.test(err.message)) {
+      const code = codeDuRefus(err);
+      if (code === "TOO_MANY_ATTEMPTS") {
+        // ANO-ADM-01 (recette 02-ADMIN § 4.1, ADM-SEC-5) : un compte bloqué après cinq échecs affichait « Code invalide. »
+        // — même avec le BON code. L'admin réessayait sans savoir qu'il était bloqué pour quinze minutes.
+        setError("Trop de tentatives : ce compte est bloqué pendant 15 minutes. Réessaie ensuite avec un nouveau code.");
+      } else if (code === "ADMIN_PREAUTH_EXPIRED" || code === "ADMIN_PREAUTH_REQUIRED" || (err instanceof ApiError && err.status === 401 && /expired|required/i.test(err.message))) {
+        // Le code du serveur d'abord ; le message anglais reste un repli (un libellé n'est pas un contrat).
         setError("Délai dépassé : recommence depuis le mot de passe.");
         setStage("PASSWORD");
       } else {

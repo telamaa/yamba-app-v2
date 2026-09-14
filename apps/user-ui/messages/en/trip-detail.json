@@ -1,5 +1,6 @@
 {
   "back": "Back to results",
+  "findAnother": "Find another trip",
   "trippedBy": "Trip offered by {firstName} {lastInitial}.",
   "travelReference": "Ref.",
   "detourPossible": "Detour possible",
@@ -65,7 +66,7 @@
     "cancellation": {
       "title": "Cancellation policy",
       "full": "Full refund up to 48 h before departure",
-      "half": "Less than 48 h before departure: partial refund (a retention goes to the carrier)",
+      "half": "Less than 48 h before departure: partial refund (a retention goes to the Traveler)",
       "none": "After the parcel handover: no cancellation, only a dispute"
     },
     "prohibited": {
@@ -114,11 +115,11 @@
     "notEnough": "Not enough room left for a {kg} kg parcel",
     "families": "Parcel families",
     "accepted": "Accepted",
-    "refused": "Refused by the carrier",
+    "refused": "Refused by the Traveler",
     "surcharge": "{pct}% surcharge (risk)",
     "bags": "Whole bag — flat rate",
-    "checkedBag": "Checked 23 kg",
-    "cabinBag": "Cabin 12 kg",
+    "checkedBag": "Checked bag 23 kg",
+    "cabinBag": "Cabin bag 12 kg",
     "family": {
       "DOCUMENTS_PAPERS": "Documents & papers",
       "CLOTHES_TEXTILE": "Clothes & textile",

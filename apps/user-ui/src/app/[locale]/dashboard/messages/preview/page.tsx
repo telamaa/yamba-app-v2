@@ -1,3 +1,4 @@
+import { notFound } from "next/navigation";
 import { setRequestLocale } from "next-intl/server";
 import { FlaskConical } from "lucide-react";
 import MessagesPreview from "@/components/dashboard/messages/MessagesPreview";
@@ -6,6 +7,9 @@ type Props = { params: Promise<{ locale: string }> };
 
 /** PREVIEW mock, non liée dans la nav. Cible visuelle du chantier Stripe backend. */
 export default async function FinancesPreviewPage({ params }: Props) {
+  // Chapitre 5.32 : une vitrine de DONNÉES DE DÉMONSTRATION (« Visa ···4242 », « YAMBA*COLIS », « Léa K. »)
+  // n'a rien à faire en production, même non liée : introuvable hors développement.
+  if (process.env.NODE_ENV === "production") notFound();
   const { locale } = await params;
   setRequestLocale(locale);
 
