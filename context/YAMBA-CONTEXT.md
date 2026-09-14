@@ -712,6 +712,21 @@ Ordre de demarrage : auth -> trip -> gateway.
   n/20, remplacement de proposition garde l'ancienne en `before`, « c'est ton propre trajet », statuts/mode/reservations
   en francais, q et villes lus dans l'URL. A TRANCHER : accepter une demande PENDING sur un trajet masque ; recherche
   insensible aux accents. Tests : trip 282, auth 248, harnais 385. Reste : § 5.8 a 8.
+- 14/09 : **CAHIER 02-ADMIN — § 5.8 BILLETS A VERIFIER (branche `chore/recette-admin-5-8`, empilee sur #308)** — 8
+  scenarios CONFORMES (BIL-1 a 4 du cahier + 5 a 8 ajoutees), CHAQUE fiche jouee AVANT correction (BIL-1, 5, 6, 7, 8
+  rouges sur leur defaut) puis 8/8 verts deux fois (`adm-bil-billets.spec.ts`). TROIS ANOMALIES CLOSES : ANO-ADM-19
+  MAJEURE (le badge public « Billet vérifié » etait ECRIT geste par geste : un 2e billet rejete passait en REJECTED un
+  trajet dont le 1er restait verifie ; supprimer le billet verifie gardait le badge → statut DEDUIT des billets,
+  `apps/trip-service/src/lib/ticket-status.rules.ts` `tripTicketStatusFromDocuments`, recalcule dans la transaction de
+  decision et au depot/suppression `syncTripTicketStatus`), ANO-ADM-20 (file et export pas alignes, trajet annule « a
+  verifier », 200 billets partis masquaient un billet a venir, decision acceptee sur trajet parti → `buildTicketsWhere`
+  decidables + `departedTicketsWhere` a part, 400 TICKET_TRIP_DEPARTED/CLOSED), ANO-ADM-21 MAJEURE (A158 : changer la
+  date ou une ville gardait le badge → `changedTicketFacts` rouvre les billets verifies). AMELIORATIONS FAITES : sa propre
+  carte sans boutons, refus par code + rechargement, motif nomme, anti double clic, message hors chargement, mode et type
+  de fichier ; documents en francais sur la fiche trajet ; conflit d'interets avant « deja traite » ; retry P2034. A
+  TRANCHER : URL ImageKit publiques et permanentes (fichiers prives + URL signees) ; prevenir le Voyageur que modifier
+  date/ville retire le badge ; rouvrir un rejet « dates » quand les dates sont corrigees. Tests : trip 292, harnais 393.
+  Reste : § 5.9 a 8.
 - 13/09 : **DECISION : LE ROLE PREND LA MAJUSCULE** (branche `chore/recette-voyageur-majuscule`, empilee sur #299) —
   « Voyageur » / « Traveler » partout : 71 valeurs de messages, 33 textes du code, 1 email ; regle `role-majuscule` au
   lexique partage (CI + recette) ; 12 citations du harnais ; web-fav, web-rch, web-rsv-devis, web-lit verts.

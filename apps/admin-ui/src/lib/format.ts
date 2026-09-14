@@ -119,6 +119,10 @@ export const TICKET_REASON_LABEL: Record<string, string> = {
 // ANO-ADM-16 — « expiré » : billet en attente d'un trajet déjà parti (le serveur le calcule, `effectiveTicketStatus`).
 export const TICKET_STATUS_LABEL: Record<string, string> = { NOT_SUBMITTED: "aucun billet", PENDING: "à vérifier", VERIFIED: "vérifié", REJECTED: "rejeté", EXPIRED: "expiré (trajet parti)" };
 /** Recette § 5.7 — statut et mode d'un trajet en français ; le code reste lisible au survol (`title`). */
+/** Recette § 5.8 — types de documents d'un trajet, en français (le code reste lisible au survol). */
+export const DOCUMENT_TYPE_LABEL: Record<string, string> = { TICKET_PROOF: "Billet", ITINERARY_PROOF: "Itinéraire", VEHICLE_PROOF: "Véhicule", IDENTITY_PROOF: "Pièce d'identité", OTHER: "Autre" };
+/** Recette § 5.8 — le type de fichier d'un billet, lu avant de l'ouvrir (PDF, image). */
+export const DOCUMENT_MIME_LABEL = (mime: string): string => (mime === "application/pdf" ? "PDF" : mime.startsWith("image/") ? `image ${mime.slice(6).toUpperCase()}` : mime);
 export const TRIP_STATUS_LABEL: Record<string, string> = { DRAFT: "Brouillon", PUBLISHED: "Publié", PAUSED: "En pause", COMPLETED: "Terminé", CANCELLED: "Annulé", ARCHIVED: "Archivé" };
 export const TRANSPORT_MODE_LABEL: Record<string, string> = { PLANE: "Avion", TRAIN: "Train", CAR: "Voiture" };
 /** Statuts d'une réservation, tels que l'admin les lit (9 statuts de la machine D37/D39/D55). */

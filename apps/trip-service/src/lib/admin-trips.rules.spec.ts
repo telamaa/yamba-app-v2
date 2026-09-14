@@ -1,5 +1,5 @@
 import { AdminTripsQuerySchema, TicketQueueQuerySchema } from "@packages/api-contracts";
-import { TICKETS_CSV_COLUMNS, buildTicketsWhere, buildTripsOrderBy, buildTripsWhere, effectiveTicketStatus, fileExtensionOf, isTicketExpired, notHiddenFilter, ticketReviewOutcome } from "./admin-trips.rules";
+import { TICKETS_CSV_COLUMNS, buildTicketsWhere, departedTicketsWhere, buildTripsOrderBy, buildTripsWhere, effectiveTicketStatus, fileExtensionOf, isTicketExpired, notHiddenFilter, ticketReviewOutcome } from "./admin-trips.rules";
 
 describe("admin-trips.rules (C-PR4, D57)", () => {
   it("ticketReviewOutcome : VERIFY → les deux statuts VERIFIED, sans motif", () => {
@@ -32,8 +32,8 @@ describe("admin-trips.rules (C-PR4, D57)", () => {
       const now = new Date("2026-09-04T10:00:00Z");
       const w = buildTicketsWhere(TicketQueueQuerySchema.parse({ olderThanDays: "3", destinationCity: "Kinshasa" }), now) as { createdAt: { lt: Date }; trip: unknown };
       expect(w.createdAt.lt.toISOString()).toBe("2026-09-01T10:00:00.000Z");
-      expect(w.trip).toEqual({ is: { destinationCity: { contains: "Kinshasa", mode: "insensitive" } } });
-      expect(buildTicketsWhere(TicketQueueQuerySchema.parse({}), now)).toEqual({ type: "TICKET_PROOF", status: "PENDING" });
+      expect(w.trip).toMatchObject({ is: { destinationCity: { contains: "Kinshasa", mode: "insensitive" } } });
+      expect(buildTicketsWhere(TicketQueueQuerySchema.parse({}), now)).toMatchObject({ type: "TICKET_PROOF", status: "PENDING" });
     });
   });
 
@@ -44,7 +44,7 @@ describe("admin-trips.rules (C-PR4, D57)", () => {
       expect(w.originCity).toEqual({ contains: "P\\.ris", mode: "insensitive" });
       expect(w.destinationCity).toEqual({ contains: "a\\+b", mode: "insensitive" });
       const t = buildTicketsWhere(TicketQueueQuerySchema.parse({ originCity: "(" }), new Date()) as { trip: unknown };
-      expect(t.trip).toEqual({ is: { originCity: { contains: "\\(", mode: "insensitive" } } });
+      expect(t.trip).toMatchObject({ is: { originCity: { contains: "\\(", mode: "insensitive" } } });
     });
   });
 
@@ -77,6 +77,22 @@ describe("admin-trips.rules (C-PR4, D57)", () => {
       expect(fileExtensionOf("billet")).toBe("");
       expect(fileExtensionOf("nom.0612345678")).toBe(""); // une « extension » de 10 chiffres n'est pas une extension
       expect(fileExtensionOf(null)).toBe("");
+    });
+  });
+
+  describe("ANO-ADM-20 — la file et l'export ne proposent que des billets décidables", () => {
+    it("buildTicketsWhere : trajet vivant, non supprimé, à venir ou sans date (null OU absent)", () => {
+      const now = new Date("2026-09-14T10:00:00Z");
+      const w = buildTicketsWhere(TicketQueueQuerySchema.parse({}), now) as { trip: { is: Record<string, unknown> } };
+      expect(w.trip.is).toEqual({
+        isDeleted: false,
+        status: { in: ["DRAFT", "PUBLISHED", "PAUSED"] },
+        OR: [{ departureAt: { gte: now } }, { departureAt: null }, { departureAt: { isSet: false } }],
+      });
+    });
+    it("departedTicketsWhere : supprimé OU parti, avec la borne basse qui écarte les dates nulles", () => {
+      const now = new Date("2026-09-14T10:00:00Z");
+      expect(departedTicketsWhere(now)).toEqual({ type: "TICKET_PROOF", status: "PENDING", trip: { is: { OR: [{ isDeleted: true }, { departureAt: { gt: new Date(0), lt: now } }] } } });
     });
   });
 });

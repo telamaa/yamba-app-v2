@@ -5115,3 +5115,62 @@ route) : « ( » ne provoque jamais d'erreur, « . » ne trouve pas tout.
 - **Recherche insensible aux accents** (« Brazzavillé », « Orleans ») — déjà relevé au § 5.3.
 - Le cahier est à mettre à jour : messages nommés au lieu de « Fait. », statuts en français, carte « Masquage » présente
   sur son propre trajet, libellé « expiré (trajet parti) ».
+
+
+---
+
+# Back-office — un badge « Billet vérifié » qui dit toujours vrai (cahier 02-ADMIN § 5.8)
+
+*(PR `chore/recette-admin-5-8`, 14/09/2026 — ADM-BIL-1 à 8.)*
+
+## Le besoin
+
+Un Expéditeur choisit plus volontiers un Voyageur dont l'équipe a vérifié le billet. Ce badge ne bloque rien, mais il
+promet quelque chose : quelqu'un a comparé un vrai billet aux dates, aux villes et au nom affichés. L'équipe doit pouvoir
+le faire vite, sans pouvoir se tromper de billet ni vérifier le sien, et la promesse doit tomber d'elle-même quand elle
+n'est plus vraie.
+
+## Les règles
+
+**RG-ADM-BIL-01 — La file ne propose que des billets à décider** : billets en attente de trajets encore à venir, non
+annulés, non terminés, non supprimés, les plus anciens d'abord ; l'export dit la même chose. Un billet dont le trajet est
+parti sort de la file et l'écran le signale une fois.
+
+**RG-ADM-BIL-02 — Ouvrir un billet est une consultation de donnée personnelle** : une ligne de journal par ouverture.
+
+**RG-ADM-BIL-03 — Valider ou rejeter avec un motif fermé** (document illisible, dates, nom, document non recevable) ;
+le Voyageur est prévenu par email dans sa langue, le motif en clair ; un rejet n'est pas définitif, un nouveau dépôt
+revient dans la file.
+
+**RG-ADM-BIL-04 — On ne vérifie pas son propre billet** : l'écran ne le propose pas, le serveur le refuse.
+
+**RG-ADM-BIL-05 — Le badge est la synthèse des billets du trajet** : un billet vérifié suffit ; rejeter un autre billet ne
+l'efface pas ; supprimer le billet vérifié le retire.
+
+**RG-ADM-BIL-06 — Changer un fait vérifié retire le badge** : si le Voyageur modifie la date de départ ou une ville, ses
+billets vérifiés repassent en attente et reviennent dans la file ; les autres modifications (prix, lieux de remise) ne
+touchent pas au badge (A158).
+
+**RG-ADM-BIL-07 — Une décision par billet** : deux administrateurs sur le même billet, le premier décide, le second est
+prévenu en clair et sa file se recharge.
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| BIL-1 | File, filtres, trajet parti, trajet annulé | une carte ; filtres justes ; parti et annulé hors file et hors export | oui (ANO-ADM-20 close) |
+| BIL-2 | Ouvrir le billet | nouvel onglet, une ligne de journal | oui |
+| BIL-3 | Valider | badge public, email, rejeu refusé, une ligne | oui |
+| BIL-4 | Rejeter (dates), puis redéposer | quatre motifs, email avec motif, retour dans la file | oui |
+| BIL-5 | Son propre billet | ni bouton ni décision possible | oui (amélioration) |
+| BIL-6 | Deux billets : un vérifié, un rejeté ; puis le vérifié supprimé | badge conservé, puis retiré | oui (ANO-ADM-19 close) |
+| BIL-7 | Date ou ville changée après vérification | badge retiré, billet de retour dans la file | oui (ANO-ADM-21 close) |
+| BIL-8 | Deux administrateurs sur le même billet | une décision, un refus lisible | oui |
+
+## Ce qui reste à trancher
+
+- **Les billets sont servis par des adresses publiques et permanentes** (ImageKit) : la trace au journal ne couvre que
+  l'ouverture par l'écran. Des fichiers privés à adresse signée de courte durée fermeraient ce trou (change le dépôt côté
+  membre).
+- **Prévenir le Voyageur** qu'une modification de date ou de ville retire son badge (avant d'enregistrer, et par email).
+- **Un billet rejeté pour « dates »** doit-il revenir en vérification quand le Voyageur corrige ses dates, sans redépôt ?
