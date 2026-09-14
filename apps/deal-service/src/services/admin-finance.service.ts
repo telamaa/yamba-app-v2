@@ -8,9 +8,9 @@
  * Chaque geste est journalisé dans la MÊME transaction que son écriture.
  */
 import prisma from "@packages/libs/prisma";
-import { NotFoundError, ValidationError } from "@packages/error-handler";
+import { AppError, NotFoundError, ValidationError } from "@packages/error-handler";
 import { recordAdminAction } from "@packages/admin-audit";
-import type { PaymentProvider } from "@packages/payments";
+import { PaymentIntentNotFoundError, type PaymentProvider } from "@packages/payments";
 import type {
   AdminDealMoneyFile,
   FinanceQueueItem,
@@ -24,6 +24,7 @@ import type {
   ResolveReversalResponse,
   RetryPayoutResponse,
 } from "@packages/api-contracts";
+import { FINANCE_QUEUE_PAGE, FinanceQueueKindSchema, financeQueueWhere } from "@packages/api-contracts";
 import { BookingLifecycleError, baseEventPayload } from "./booking-lifecycle";
 import { BOOKING_WRITE_SELECT, applyBookingTransition, loadBookingForWrite, toBookingForWrite, type BookingForWrite } from "./booking-write";
 import type { DealSettlementService } from "./deal-settlement.service";
@@ -37,6 +38,7 @@ import {
   csvRowInRange,
   manualRefundBounds,
   maskAccountId,
+  moneyBalance,
   monthStartUtc,
   payoutFailureDetail,
   payoutFailureKind,
@@ -138,20 +140,6 @@ type MoneyRecord = {
 const EXPORT_MAX_DAYS = 366;
 
 const UNRESOLVED_REVERSAL = { OR: [{ payoutReversalResolution: { isSet: false } }, { payoutReversalResolution: null }] };
-
-function queueWhere(kind: FinanceQueueKind): Record<string, unknown> {
-  switch (kind) {
-    case "FAILED":
-      return { status: { in: ["COMPLETED", "CANCELLED"] }, payoutStatus: "FAILED" };
-    case "REVERSED":
-      return { payoutStatus: "REVERSED", ...UNRESOLVED_REVERSAL };
-    case "HELD":
-      return { status: "CANCELLED", retentionDisposition: "HELD_FOR_MEDIATION" };
-    case "PROPOSED_REFUNDS":
-      return { manualRefundProposedCents: { gt: 0 } };
-  }
-}
-
 async function namesOf(ids: string[]): Promise<Map<string, { firstName: string; lastName: string }>> {
   const clean = [...new Set(ids.filter(Boolean))];
   const rows = clean.length ? await prisma.user.findMany({ where: { id: { in: clean } }, select: { id: true, firstName: true, lastName: true } }) : [];
@@ -179,12 +167,19 @@ export function makeAdminFinanceService(provider: PaymentProvider, settlement: D
     /* ── Files d'exception (2A) ──────────────────────────────── */
     async listQueue(kind: FinanceQueueKind): Promise<FinanceQueueResponse> {
       const now = clock();
-      const rows = (await prisma.booking.findMany({
-        where: { isDeleted: false, ...queueWhere(kind) } as never,
-        select: MONEY_SELECT,
-        take: 200,
-        orderBy: { updatedAt: "asc" },
-      })) as unknown as MoneyRecord[];
+      // Recette § 5.11 — le filtre est celui des tuiles de l'accueil (`financeQueueWhere`), et le compte de chaque file
+      // part avec la réponse : l'écran affiche « n » sur chaque onglet et dit quand la liste est tronquée.
+      const kinds = FinanceQueueKindSchema.options;
+      const [rows, ...sizes] = await Promise.all([
+        prisma.booking.findMany({
+          where: financeQueueWhere(kind) as never,
+          select: MONEY_SELECT,
+          take: FINANCE_QUEUE_PAGE,
+          orderBy: { updatedAt: "asc" },
+        }) as unknown as Promise<MoneyRecord[]>,
+        ...kinds.map((k) => prisma.booking.count({ where: financeQueueWhere(k) as never })),
+      ]);
+      const counts = Object.fromEntries(kinds.map((k, i) => [k, sizes[i]])) as FinanceQueueResponse["counts"];
       const moneyKind = kind === "FAILED" || kind === "REVERSED";
       const [names, ready] = await Promise.all([namesOf(rows.flatMap((b) => [b.shipperId, b.carrierId])), moneyKind ? stripeReadiness(rows.map((b) => b.carrierId)) : Promise.resolve(new Map())]);
       const items: FinanceQueueItem[] = rows.map((b) => {
@@ -208,7 +203,7 @@ export function makeAdminFinanceService(provider: PaymentProvider, settlement: D
           since: ((kind === "PROPOSED_REFUNDS" ? b.manualRefundProposedAt : null) ?? b.completedAt ?? b.closedAt ?? b.updatedAt ?? now).toISOString(),
         };
       });
-      return { kind, items, generatedAt: now.toISOString() };
+      return { kind, items, counts, truncated: counts[kind] > items.length, generatedAt: now.toISOString() };
     },
 
     /* ── Fiche argent (4A) ───────────────────────────────────── */
@@ -288,6 +283,7 @@ export function makeAdminFinanceService(provider: PaymentProvider, settlement: D
           closedBy: b.closedBy ?? null,
         },
         timeline: buildMoneyTimeline(b),
+        balance: moneyBalance(b),
         adminActions: actions.map((a) => ({ id: a.id, at: a.createdAt.toISOString(), admin: nameOf(a.adminUserId), action: a.action, after: a.after ?? null })),
         manualRefund: {
           maxRefundableCents: refundBounds.maxRefundableCents,
@@ -334,7 +330,14 @@ export function makeAdminFinanceService(provider: PaymentProvider, settlement: D
           insp
         );
       } catch (err) {
-        divergences = [{ code: "INTENT_NOT_FOUND", message: `The provider could not return this payment: ${err instanceof Error ? err.message : String(err)}`.slice(0, 300), dbCents: null, liveCents: null }];
+        // ANO-ADM-32 — « introuvable » est une réponse du fournisseur ; une panne n'en est pas une. Avant, toute erreur
+        // (réseau, clé révoquée, limite de débit) s'affichait « Paiement introuvable chez le fournisseur » : l'admin
+        // cherchait un paiement perdu là où Stripe était simplement injoignable.
+        if (!(err instanceof PaymentIntentNotFoundError) && (err as { name?: string } | null)?.name !== "PaymentIntentNotFoundError") {
+          await recordAdminAction(prisma, audit(admin, "DEAL_RECONCILED", id, { provider: provider.name, divergences: [], providerError: "PROVIDER_UNAVAILABLE" }));
+          throw new AppError("The payment provider could not be reached: nothing was compared, try again later.", 503, true, { code: "PROVIDER_UNAVAILABLE" });
+        }
+        divergences = [{ code: "INTENT_NOT_FOUND", message: "The payment provider does not know this payment intent.", dbCents: null, liveCents: null }];
       }
       await recordAdminAction(prisma, audit(admin, "DEAL_RECONCILED", id, { provider: provider.name, divergences: divergences.map((d) => d.code) }));
       return { provider: provider.name, checkedAt: now.toISOString(), live, divergences };
@@ -385,7 +388,9 @@ export function makeAdminFinanceService(provider: PaymentProvider, settlement: D
       await withWriteConflictRetry(() => prisma.$transaction(async (tx) => {
         const written = await tx.booking.updateMany({ where: { id, payoutStatus: "REVERSED", ...UNRESOLVED_REVERSAL } as never, data: data as never });
         if (written.count === 0) throw new ValidationError("This payout is not an open reversal.", { code: "REVERSAL_NOT_OPEN" });
-        await recordAdminAction(tx, audit(admin, "PAYOUT_REVERSAL_RESOLVED", id, { outcome: input.outcome, reason: input.reason }));
+        // Recette § 5.14 — « re-verser » écrase `transferId` par le nouveau transfert : l'identifiant du transfert RENVERSÉ
+        // ne survivrait nulle part (tableau de bord du fournisseur, litige bancaire). Le journal le garde.
+        await recordAdminAction(tx, audit(admin, "PAYOUT_REVERSAL_RESOLVED", id, { outcome: input.outcome, reason: input.reason, previousTransferId: booking.transferId ?? null }));
       }));
       if (input.outcome === "WRITTEN_OFF") return { outcome: "WRITTEN_OFF", payoutStatus: "REVERSED", reason: null };
       const fresh = await loadBookingForWrite(id);

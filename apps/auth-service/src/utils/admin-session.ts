@@ -6,11 +6,13 @@
  * TTL = politique admin (min(inactivité 45 min, vie absolue 12 h)).
  */
 import redis from "@packages/libs/redis";
+import { adminSessionKey } from "@packages/middleware/session-revocation";
 import { adminSessionTtlSeconds, loadAdminSessionPolicy } from "./admin-session-policy";
 
 export type AdminSessionRecord = { createdAt: number; lastActivityAt: number };
 
-const key = (userId: string, jti: string) => `admin_jti:${userId}:${jti}`;
+/** ANO-ADM-04 — la clé vient du middleware qui la relit : une seule écriture. */
+const key = adminSessionKey;
 
 /** Retourne le TTL posé (0 = session absolument expirée, rien n'est écrit). */
 export async function storeAdminSession(userId: string, jti: string, createdAt: number, now: number = Date.now()): Promise<number> {

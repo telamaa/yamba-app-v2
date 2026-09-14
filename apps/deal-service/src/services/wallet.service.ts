@@ -144,10 +144,13 @@ export function toPaymentItem(b: WalletBookingRecord, counterparts: WalletCounte
       // Rien débité (annulé en PENDING) : l'empreinte a disparu, pas un remboursement.
       if (!b.capturedAt) return { ...base, state: "RELEASED_NO_CHARGE", date: iso(b.refundedAt ?? b.updatedAt) };
       const refund = b.refundAmountCents ?? total;
+      // ANO-WEB-67 (5.19) : sans `refundedAt` (enregistrement antérieur, remboursement en cours), la ligne disait
+      // « Remboursé 33,60 € le » — la date de clôture est le repli, jamais une date vide.
+      const refundDate = iso(b.refundedAt ?? b.updatedAt);
       if (refund < total) {
-        return { ...base, state: "PARTIALLY_REFUNDED", refundAmountCents: refund, retentionCents: total - refund, date: iso(b.refundedAt) };
+        return { ...base, state: "PARTIALLY_REFUNDED", refundAmountCents: refund, retentionCents: total - refund, date: refundDate };
       }
-      return { ...base, state: "REFUNDED", refundAmountCents: refund, date: iso(b.refundedAt) };
+      return { ...base, state: "REFUNDED", refundAmountCents: refund, date: refundDate };
     }
     default: // DECLINED / EXPIRED : jamais capturé
       return { ...base, state: "RELEASED_NO_CHARGE", date: iso(b.refundedAt ?? b.updatedAt) };

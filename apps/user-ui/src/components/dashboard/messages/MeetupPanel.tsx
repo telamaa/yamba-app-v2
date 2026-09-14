@@ -53,8 +53,19 @@ export default function MeetupPanel({ thread }: { thread: ConversationThread }) 
       setOpen(false);
       setForm({ ...form, placeLabel: "", placeDetails: "", startAt: "", endAt: "" });
     } catch (err) {
-      const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
-      setError(message ?? t("meetup.proposeFailed"));
+      // ANO-WEB-45 (recette 5.15) : les bornes (30 min / 90 j / 12 h) se disent dans la langue du lecteur,
+      // à partir du `details` du refus (A146) — plus jamais le `message` anglais de l'API.
+      const details = (err as { response?: { data?: { details?: { code?: string; reason?: string } } } })?.response?.data?.details;
+      const bornes: Record<string, string> = { TOO_SOON: t("errors.meetupTooSoon"), TOO_FAR: t("errors.meetupTooFar"), WINDOW_TOO_LONG: t("errors.meetupTooLong") };
+      setError(
+        details?.code === "INVALID_MEETUP_SLOT" && details.reason && bornes[details.reason]
+          ? bornes[details.reason]
+          : details?.code === "MEETUP_CHANGED"
+            ? t("errors.meetupChanged")
+            : details?.code === "CONVERSATION_READ_ONLY"
+              ? t("closed.generic")
+              : t("meetup.proposeFailed")
+      );
     }
   }
 

@@ -46,6 +46,15 @@ export class AssistantReservation {
   /** Ouvre l'assistant directement — le clic « Réserver » est éprouvé ailleurs (WEB-TRJ). */
   async ouvrir(tripId: string): Promise<void> {
     await this.page.goto(`/fr/trips/${tripId}/book`, { waitUntil: "networkidle" });
+    // L'assistant garde son brouillon et son étape en `sessionStorage` (useBookingDraft) : après
+    // une tentative refusée, il rouvre à l'étape 4. Le cahier repart d'une description neuve :
+    // on oublie le brouillon et on recharge — comme un membre qui rouvre un nouvel onglet.
+    const reprise = await this.page.evaluate(() => {
+      const cles = Object.keys(window.sessionStorage).filter((k) => k.startsWith("booking"));
+      cles.forEach((k) => window.sessionStorage.removeItem(k));
+      return cles.length;
+    });
+    if (reprise > 0) await this.page.reload({ waitUntil: "networkidle" });
     await expect(this.page.getByText("Décris ton colis")).toBeVisible({ timeout: 60_000 });
   }
 
@@ -137,6 +146,41 @@ export class AssistantReservation {
       }
     }
     throw new Error("« Payer » a été cliqué deux fois sans qu'aucune demande de réservation ne parte.");
+  }
+
+  /**
+   * Une réservation qui PEUT être refusée par un plafond (compte neuf, CNF-06 / D71). On déroule
+   * jusqu'à l'étape 4, puis on lit ce qui arrive : le refus dans la carte de paiement (le plafond
+   * tombe à l'intention de paiement — avant tout argent), le refus en toast (au clic « Payer »),
+   * ou la demande créée. Rend le refus tel qu'il est écrit, ou l'identifiant du deal.
+   */
+  async tenterDeReserver(tripId: string, colis: Colis, destinataire: Destinataire): Promise<{ refus: string | null; dealId: string | null; intentionRefusee: boolean }> {
+    await this.ouvrir(tripId);
+    await this.decrireLeColis(colis);
+    await this.continuer();
+    await this.decrireLeDestinataire(destinataire);
+    await this.continuer();
+    await this.accepterLaCharte();
+    const intention = this.page
+      .waitForResponse((r) => r.url().includes("/deals/payment-intents") && r.request().method() === "POST", { timeout: 60_000 })
+      .catch(() => null);
+    await this.continuer();
+    const refus = this.page.getByText(/^Ton compte est récent : pour l'instant/);
+    const r = await intention;
+    if (r && !r.ok()) {
+      await expect(refus.first()).toBeVisible({ timeout: 15_000 });
+      return { refus: normaliserEspaces(await refus.first().innerText()), dealId: null, intentionRefusee: true };
+    }
+    await expect(this.page.getByText(/Mode test : aucun prestataire de paiement/)).toBeVisible({ timeout: 30_000 });
+    const demande = this.page.waitForResponse((rr) => /\/deals$/.test(rr.url()) && rr.request().method() === "POST", { timeout: 60_000 });
+    await this.page.getByRole("button", { name: /^Payer / }).click();
+    const d = await demande;
+    if (!d.ok()) {
+      await expect(refus.first()).toBeVisible({ timeout: 15_000 });
+      return { refus: normaliserEspaces(await refus.first().innerText()), dealId: null, intentionRefusee: false };
+    }
+    await expect.poll(() => this.page.url(), { timeout: 90_000 }).toMatch(/\/bookings\/[0-9a-f]{24}$/);
+    return { refus: null, dealId: this.page.url().split("/bookings/")[1], intentionRefusee: false };
   }
 
   /**

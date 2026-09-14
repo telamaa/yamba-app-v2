@@ -295,7 +295,11 @@ async function main() {
       // `publicSlug` aussi à la mise à jour : les comptes du seed antérieurs au profil public
       // (`/u/[slug]`) restaient sans slug, et `/u/seed-thomas` répondait « Profil introuvable »
       // (recette WEB-E2E-1, étape 29).
-      update: { firstName: u.firstName, lastName: u.lastName, roles: u.roles, passwordHash: SEED_PASSWORD_HASH, createdAt: days(-90), publicSlug: `seed-${u.key}` },
+      // Recette 02-ADMIN § 5.3 (ADM-USR-3) : les compteurs INTERNES qui aggravent le TrustScore (D71) survivaient au
+      // rejeu — chaque litige tranché en recette ajoutait 25 points à Chinwe pour toujours (0 → 1 → 2 → 3 litiges perdus
+      // en trois passages) jusqu'à la faire passer « À risque », plafonds CNF-06 compris. Ils repartent de zéro, comme
+      // les litiges et les annulations qu'ils résument (wipe plus bas). Deals terminés et avis : non touchés.
+      update: { firstName: u.firstName, lastName: u.lastName, roles: u.roles, passwordHash: SEED_PASSWORD_HASH, createdAt: days(-90), publicSlug: `seed-${u.key}`, shipperDisputesLostCount: 0, shipperLateCancellationsCount: 0 },
       create: {
         firstName: u.firstName,
         lastName: u.lastName,
@@ -327,6 +331,8 @@ async function main() {
         stripeOnboardingComplete: true,
         stripeChargesEnabled: true,
         stripePayoutsEnabled: true,
+        disputesLostCount: 0, // ADM-USR-3 — même remise à zéro côté Voyageur (voir l'upsert des users)
+        lateCancellationsCount: 0,
       },
       create: {
         userId,
@@ -349,6 +355,19 @@ async function main() {
   const delD = await prisma.dispute.deleteMany({
     where: { OR: [{ shipperId: { in: seedIds } }, { carrierId: { in: seedIds } }] },
   });
+  // B5 — les avis suivent leurs bookings (recette 5.22 : sans cette purge, les avis des passages precedents
+  // restaient reveles sur les profils publics des comptes du seed — 25 avis orphelins au bout d'une matinee).
+  const delR = await prisma.review.deleteMany({
+    where: { OR: [{ authorUserId: { in: seedIds } }, { subjectUserId: { in: seedIds } }] },
+  });
+  // C-PR8b (D63) — le journal des demandes RGPD des comptes du seed : sans cette purge, un export reussi lors
+  // d'un passage precedent bloque le suivant pendant 24 h (« un export par 24 h », recette 5.25).
+  const delDR = await prisma.dataRequest.deleteMany({ where: { userId: { in: seedIds } } });
+  // D68 — les signalements des comptes du seed (auteur, ou membre visé) suivent aussi : un signalement OUVERT du
+  // passage precedent rendait « Signaler ce profil » 409 des le premier clic (recette 5.24).
+  const delS = await prisma.report.deleteMany({
+    where: { OR: [{ reporterUserId: { in: seedIds } }, { targetType: "USER", targetId: { in: seedIds } }] },
+  });
   const delB = await prisma.booking.deleteMany({
     where: { OR: [{ shipperId: { in: seedIds } }, { carrierId: { in: seedIds } }] },
   });
@@ -369,7 +388,7 @@ async function main() {
     await prisma.conversation.deleteMany({ where: { id: { in: ids } } });
   }
   const delT = await prisma.trip.deleteMany({ where: { userId: { in: seedIds } } });
-  console.log(`✓ wipe : ${delB.count} bookings, ${delD.count} disputes, ${delT.count} trips (périmètre seed)`);
+  console.log(`✓ wipe : ${delB.count} bookings, ${delD.count} disputes, ${delR.count} avis, ${delS.count} signalements, ${delDR.count} demandes RGPD, ${delT.count} trips (périmètre seed)`);
 
   // 3. Trips — reservedKg = Σ poids des bookings ACTIFS (CAP-02, calculé)
   const tripIds = new Map<string, string>();
@@ -504,11 +523,16 @@ async function main() {
           completedBy: "SYSTEM",
           payoutStatus: "FAILED",
           payoutFailureReason: "CARRIER_ACCOUNT_NOT_READY",
+          // B5 : la fenêtre de notation existe sur TOUT deal terminé (ANO-WEB-65 : « Tu as jusqu'au . » sans elle)
+          ratingWindowEndsAt: new Date((m.completedAt ?? NOW).getTime() + 14 * 86_400_000),
+          ratingRemindersSent: 0,
           payoutAmountCents: (booking as unknown as { pricing: { transportCents: number } }).pricing.transportCents,
           payoutAttempts: 4,
-          // C-PR5 (A111) — relance échue : le cron (ou « Relancer » dans l'admin) peut rejouer tout de suite
-          payoutLastAttemptAt: days(-1),
-          payoutNextRetryAt: days(-1),
+          // C-PR5 (A111) — « Relancer » dans l'admin n'attend pas l'échéance. Recette 02-ADMIN § 5.1 : une relance
+          // ÉCHUE faisait partir ce versement par le cron des 5 minutes (fournisseur FAKE, compte de Thomas prêt) —
+          // la file « Versements en échec » se vidait seule entre le seed et la fiche. Relance posée à demain.
+          payoutLastAttemptAt: hours(-1),
+          payoutNextRetryAt: hours(23),
         },
       });
     } else if (b.status === "COMPLETED" && b.key.endsWith("-reversed")) {
@@ -519,6 +543,9 @@ async function main() {
           completedBy: "SYSTEM",
           payoutStatus: "REVERSED",
           payoutFailureReason: "PROVIDER_REVERSED",
+          // B5 : la fenêtre de notation existe sur TOUT deal terminé (ANO-WEB-65 : « Tu as jusqu'au . » sans elle)
+          ratingWindowEndsAt: new Date((m.completedAt ?? NOW).getTime() + 14 * 86_400_000),
+          ratingRemindersSent: 0,
           payoutAmountCents: (booking as unknown as { pricing: { transportCents: number } }).pricing.transportCents,
           payoutSentAt: m.completedAt ?? NOW,
           payoutAttempts: 1,
@@ -558,6 +585,17 @@ async function main() {
           retentionCents,
           retentionDisposition: "HELD_FOR_MEDIATION",
         },
+      });
+    }
+    if (b.status === "CANCELLED" && !b.key.endsWith("-held") && (b.milestones as { acceptedAt?: Date }).acceptedAt) {
+      // Recette 02-ADMIN § 5.12 (ANO-ADM-30) — un deal ACCEPTÉ (donc débité) puis annulé par l'Expéditeur plus de 48 h
+      // avant le départ est remboursé en entier, comme le fait `deal-lifecycle.service.ts` (ANN-01). Le jeu d'essai
+      // posait le débit sans le remboursement : la fiche argent montrait 33,60 € encaissés sur un deal clos, sans destination.
+      const pricing = (booking as unknown as { pricing: { totalShipperCents: number } }).pricing;
+      const closedAt = (b.milestones as { closedAt?: Date }).closedAt ?? NOW;
+      await prisma.booking.update({
+        where: { id: booking.id },
+        data: { refundedAt: closedAt, refundAmountCents: pricing.totalShipperCents, refundId: `re_fake_seed_${b.key}` },
       });
     }
     // Chantier F (D61) — un fil vivant sur le deal accepte : recette FCH01+ sans rien creer a la main.

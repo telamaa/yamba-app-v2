@@ -6,7 +6,8 @@
  * Un motif, des précisions facultatives, un envoi. Le serveur refuse son propre message,
  * un message système et le doublon (409) : le dialogue affiche ces refus tels quels.
  */
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { useDialogFocus } from "@/hooks/useDialogFocus";
 import { useTranslations } from "next-intl";
 import { Flag, X } from "lucide-react";
 import { useReportMessage } from "@/hooks/useMessaging";
@@ -21,6 +22,9 @@ export default function ReportMessageDialog({ conversationId, message, onCloseAc
   const [reason, setReason] = useState<ReportMessageInput["reason"]>("OFF_PLATFORM");
   const [details, setDetails] = useState("");
   const [state, setState] = useState<{ done: boolean; error: string | null }>({ done: false, error: null });
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  // ANO-WEB-94/95 — focus piégé dans la fenêtre, rendu au geste de départ, et Échap ferme (il ne faisait rien).
+  useDialogFocus(dialogRef, true, onCloseAction);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -35,7 +39,7 @@ export default function ReportMessageDialog({ conversationId, message, onCloseAc
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-3 sm:items-center" role="dialog" aria-modal="true" aria-labelledby="report-title">
+    <div ref={dialogRef} className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-3 sm:items-center" role="dialog" aria-modal="true" aria-labelledby="report-title">
       <form onSubmit={submit} className="w-full max-w-md rounded-2xl bg-white p-4 shadow-xl dark:bg-slate-900">
         <div className="flex items-start justify-between gap-3">
           <h2 id="report-title" className="flex items-center gap-2 text-[15px] font-semibold text-slate-900 dark:text-white">

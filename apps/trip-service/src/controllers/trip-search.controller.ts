@@ -1,12 +1,15 @@
 import type { Request, Response, NextFunction } from "express";
 import { resolveViewerLocale, type SupportedLocale } from "@packages/api-contracts";
 import { notHiddenFilter } from "../lib/admin-trips.rules";
+import { notSuspendedOwnerFilter } from "@packages/middleware/account-status";
 import { recordSearch, tripViews } from "@packages/libs/redis/trip-stats";
 import redis from "@packages/libs/redis";
 import { Prisma } from "@prisma/client";
 import { sortByPriceForWeight, totalForWeightCents, transportForWeightCents, weightPricingFromSettings, type WeightPricingParams } from "../lib/price-for-weight";
+import { placeSearchTerm } from "../lib/place-text";
 import { platformSettings } from "@packages/libs/settings/default";
 import prisma from "@packages/libs/prisma";
+import { containsText } from "@packages/libs/prisma/text-search";
 import { markFavorites } from "../services/trip-favorite.service";
 import { ValidationError } from "@packages/error-handler";
 import {
@@ -80,7 +83,8 @@ function buildBaseWhere(
     // C-PR3 (D56 2A) — les trajets d'un compte SUSPENDU disparaissent de la recherche
     // sans écriture croisée (le trip-service ne touche pas au Trip d'un autre domaine).
     // `not` matche aussi les documents sans le champ (comptes antérieurs à C-PR3).
-    user: { is: { accountStatus: { not: "SUSPENDED" } } },
+    // ANO-ADM-07 — une suspension dont la date de fin est passée ne cache plus rien.
+    user: { is: notSuspendedOwnerFilter() },
     // C-PR4 (D57 3A) — « masqué par Yamba » : absent OU null (pitfall Mongo).
     ...notHiddenFilter(),
   };
@@ -104,20 +108,25 @@ function buildBaseWhere(
   // ─── Filtres composables (AND) ────────────────────
   const andClauses: Prisma.TripWhereInput[] = [];
 
-  if (params.from) {
+  // Le libellé « Ville, Pays » de l'autocomplétion se réduit à la ville (lib/place-text.ts) :
+  // comparé entier, il ne touchait ni la ville ni le pays → zéro résultat (WEB-ACC-9).
+  const from = placeSearchTerm(params.from);
+  if (from) {
     andClauses.push({
       OR: [
-        { originCity: { contains: params.from, mode: "insensitive" } },
-        { originCountry: { contains: params.from, mode: "insensitive" } },
+        // ANO-ADM-15 — saisie d'un visiteur : « ( » faisait tomber la recherche (500), « . » rendait tout.
+        { originCity: containsText(from) },
+        { originCountry: containsText(from) },
       ],
     });
   }
 
-  if (params.to) {
+  const to = placeSearchTerm(params.to);
+  if (to) {
     andClauses.push({
       OR: [
-        { destinationCity: { contains: params.to, mode: "insensitive" } },
-        { destinationCountry: { contains: params.to, mode: "insensitive" } },
+        { destinationCity: containsText(to) },
+        { destinationCountry: containsText(to) },
       ],
     });
   }

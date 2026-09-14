@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { useLocale } from "next-intl";
 import { Globe, CreditCard, AlertCircle, CheckCircle2 } from "lucide-react";
 import useUser from "@/hooks/useUser";
 import { DashboardCopy } from "@/app/[locale]/dashboard/dashboard.copy";
@@ -19,7 +20,9 @@ export default function BecomeYamber({ copy }: { copy: DashboardCopy }) {
   // Stripe status — use actual flags, not just stripeAccountId
   const stripeConfigured =
     carrierPage?.stripeOnboardingComplete && carrierPage?.stripeChargesEnabled;
-  const stripeAccountExists = !!carrierPage?.stripeAccountId;
+  // Chapitre 7 (recette 01-WEB) : `stripeAccountId` n'est JAMAIS servi par /auth/me (liste blanche) — le libellé
+  // « Configuration incomplète » ne s'affichait donc jamais. L'étape d'onboarding, elle, est servie.
+  const stripeAccountExists = carrierPage?.onboardingStep === "STRIPE" || (carrierPage?.onboardingStep === "COMPLETE" && !stripeConfigured);
 
   // Address display
   const addressDisplay = carrierPage?.primaryAddress
@@ -44,7 +47,8 @@ export default function BecomeYamber({ copy }: { copy: DashboardCopy }) {
   };
 
   // Banner message based on actual status
-  const isFr = true; // Will be derived from copy context
+  // Chapitre 7 : `const isFr = true` figeait ce bandeau en français, y compris sur l'écran anglais.
+  const isFr = useLocale() === "fr";
   const getBannerConfig = () => {
     if (!hasCarrier || !carrierPage) return null;
 
@@ -64,7 +68,7 @@ export default function BecomeYamber({ copy }: { copy: DashboardCopy }) {
     return {
       icon: AlertCircle,
       text: isFr
-        ? "Profil actif · Stripe non configuré — vous ne pouvez pas encore recevoir de paiements"
+        ? "Profil actif · Stripe non configuré — tu ne peux pas encore recevoir de paiements"
         : "Profile active · Stripe not configured — you cannot receive payments yet",
       bg: "bg-amber-50 dark:bg-amber-500/10",
       border: "border-amber-200 dark:border-amber-800",
@@ -137,12 +141,12 @@ export default function BecomeYamber({ copy }: { copy: DashboardCopy }) {
                 <div className="flex-1">
                   <p className="text-[14px] font-medium text-amber-800 dark:text-amber-300">
                     {isFr
-                      ? "Configurez Stripe pour recevoir vos paiements"
+                      ? "Configure Stripe pour recevoir tes paiements"
                       : "Configure Stripe to receive payments"}
                   </p>
                   <p className="mt-1 text-[13px] text-amber-600 dark:text-amber-400">
                     {isFr
-                      ? "Connectez votre compte bancaire via Stripe pour recevoir les paiements des expéditeurs."
+                      ? "Connecte ton compte bancaire via Stripe pour recevoir les paiements des expéditeurs."
                       : "Connect your bank account via Stripe to receive payments from shippers."}
                   </p>
                   <button

@@ -4579,6 +4579,12 @@
             "example": "12 juin 2026",
             "description": "Formaté serveur selon locale"
           },
+          "departureAt": {
+            "description": "Instant de départ (ISO 8601) — ANO-WEB-30 : permet au client de savoir qu'un trajet est passé (badge « Trajet passé » des favoris) sans interpréter la date formatée",
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          },
           "departureTime": {
             "type": "string",
             "example": "08:00"
@@ -14464,6 +14470,21 @@
         ],
         "additionalProperties": false
       },
+      "UnsuppressEmailRequest": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "minLength": 20,
+            "maxLength": 2000,
+            "description": "Why the address can receive emails again (corrected, member request…) — journaled"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "additionalProperties": false
+      },
       "InviteAdminRequest": {
         "type": "object",
         "properties": {
@@ -15837,7 +15858,7 @@
             "type": "string",
             "format": "date-time",
             "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
-            "description": "Depuis quand l'exception existe (fin du deal ou dernière écriture)"
+            "description": "Depuis quand l'exception existe : date de proposition (PROPOSED_REFUNDS), sinon fin du deal (COMPLETED) ou annulation (CANCELLED)"
           }
         },
         "required": [
@@ -15872,6 +15893,43 @@
               "$ref": "#/components/schemas/FinanceQueueItem"
             }
           },
+          "counts": {
+            "type": "object",
+            "properties": {
+              "FAILED": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "REVERSED": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "HELD": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "PROPOSED_REFUNDS": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "FAILED",
+              "REVERSED",
+              "HELD",
+              "PROPOSED_REFUNDS"
+            ],
+            "additionalProperties": false,
+            "description": "Taille réelle de CHAQUE file, avec les mêmes filtres que les tuiles de l'accueil (recette § 5.11)"
+          },
+          "truncated": {
+            "type": "boolean",
+            "description": "Vrai quand la file compte plus de lignes que les 200 servies"
+          },
           "generatedAt": {
             "type": "string",
             "format": "date-time",
@@ -15881,6 +15939,8 @@
         "required": [
           "kind",
           "items",
+          "counts",
+          "truncated",
           "generatedAt"
         ],
         "additionalProperties": false
@@ -15899,7 +15959,8 @@
           "PAYOUT_REVERSED",
           "REVERSAL_RESOLVED",
           "RETENTION",
-          "RETENTION_DECIDED"
+          "RETENTION_DECIDED",
+          "AUTHORIZATION_RELEASED"
         ]
       },
       "MoneyTimelineEvent": {
@@ -15941,6 +16002,98 @@
           "kind",
           "amountCents",
           "detail"
+        ],
+        "additionalProperties": false
+      },
+      "MoneyPendingKind": {
+        "type": "string",
+        "enum": [
+          "AUTHORIZATION_OPEN",
+          "DEAL_IN_PROGRESS",
+          "PAYOUT_DUE",
+          "PAYOUT_FROZEN",
+          "PAYOUT_FAILED",
+          "REVERSAL_OPEN",
+          "RETENTION_HELD",
+          "REFUND_PROPOSED"
+        ]
+      },
+      "MoneyBalance": {
+        "type": "object",
+        "properties": {
+          "capturedCents": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "débité chez l'Expéditeur (0 tant que rien n'est capturé)"
+          },
+          "refundedCents": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "rendu à l'Expéditeur, tous remboursements cumulés"
+          },
+          "paidOutCents": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "versé au Voyageur et non renversé"
+          },
+          "platformHoldsCents": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "débité − remboursé − versé : ce que la plateforme détient pour ce deal"
+          },
+          "pending": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "$ref": "#/components/schemas/MoneyPendingKind"
+                },
+                "cents": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "kind",
+                "cents"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "settled": {
+            "type": "boolean",
+            "description": "plus rien n'est en attente"
+          },
+          "anomaly": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "UNALLOCATED_FUNDS",
+                  "OVERSPENT"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "deal clos, rien en attente, et la plateforme détient plus que sa commission (UNALLOCATED_FUNDS) ou a versé plus qu'elle n'a reçu (OVERSPENT)"
+          }
+        },
+        "required": [
+          "capturedCents",
+          "refundedCents",
+          "paidOutCents",
+          "platformHoldsCents",
+          "pending",
+          "settled",
+          "anomaly"
         ],
         "additionalProperties": false
       },
@@ -16509,6 +16662,9 @@
               "$ref": "#/components/schemas/MoneyTimelineEvent"
             }
           },
+          "balance": {
+            "$ref": "#/components/schemas/MoneyBalance"
+          },
           "adminActions": {
             "type": "array",
             "items": {
@@ -16676,6 +16832,7 @@
           "retention",
           "dates",
           "timeline",
+          "balance",
           "adminActions",
           "manualRefund",
           "allowedActions"

@@ -5,7 +5,7 @@
  * (c'est lui qui est testé dans deal-settlement.service.spec — ici on vérifie qu'on passe PAR lui).
  */
 const prismaMock = {
-  booking: { findUnique: jest.fn(), findMany: jest.fn(), updateMany: jest.fn() },
+  booking: { findUnique: jest.fn(), findMany: jest.fn(), updateMany: jest.fn(), count: jest.fn() },
   dispute: { findMany: jest.fn() },
   user: { findMany: jest.fn() },
   carrierPage: { findMany: jest.fn() },
@@ -48,6 +48,7 @@ beforeEach(() => {
   prismaMock.carrierPage.findMany.mockResolvedValue([{ userId: CARRIER_ID, stripeAccountId: "acct_1ABCDEFGHIJKLMNO", stripePayoutsEnabled: true }]);
   prismaMock.adminAction.findMany.mockResolvedValue([]);
   prismaMock.dispute.findMany.mockResolvedValue([]);
+  prismaMock.booking.count.mockResolvedValue(0);
   prismaMock.$transaction.mockImplementation(async (fn: (tx: typeof prismaMock) => Promise<void>) => fn(prismaMock));
 });
 
@@ -65,6 +66,21 @@ describe("listQueue (2A)", () => {
     prismaMock.booking.findMany.mockResolvedValue([record({ status: "CANCELLED", payoutStatus: null, retentionCents: 1478, retentionDisposition: "HELD_FOR_MEDIATION" })]);
     const q = await makeService().listQueue("HELD");
     expect(q.items[0]).toMatchObject({ kind: "HELD", amountCents: 1478, carrier: { stripeReady: null } });
+  });
+  it("recette § 5.11 — sert le compte de CHAQUE file avec les filtres partagés (ceux des tuiles) et dit quand la liste est tronquée", async () => {
+    const { financeQueueWhere } = await import("@packages/api-contracts");
+    prismaMock.booking.findMany.mockResolvedValue([record()]);
+    const sizes: Record<string, number> = { FAILED: 250, REVERSED: 1, HELD: 0, PROPOSED_REFUNDS: 3 };
+    prismaMock.booking.count.mockImplementation(async (args: { where: Record<string, unknown> }) => {
+      const kind = (["FAILED", "REVERSED", "HELD", "PROPOSED_REFUNDS"] as const).find((k) => JSON.stringify(financeQueueWhere(k)) === JSON.stringify(args.where));
+      return kind ? sizes[kind] : -1;
+    });
+    const q = await makeService().listQueue("FAILED");
+    expect(q.counts).toEqual({ FAILED: 250, REVERSED: 1, HELD: 0, PROPOSED_REFUNDS: 3 });
+    expect(q.truncated).toBe(true);
+    expect(prismaMock.booking.findMany.mock.calls[0][0]).toMatchObject({ where: financeQueueWhere("FAILED"), take: 200 });
+    sizes.FAILED = 1;
+    expect((await makeService().listQueue("FAILED")).truncated).toBe(false);
   });
 });
 
@@ -105,6 +121,16 @@ describe("reconcileDeal (A112) — lecture seule", () => {
     const r = await makeService().reconcileDeal(ADMIN, ID);
     expect(r.live).toBeNull();
     expect(r.divergences[0].code).toBe("INTENT_NOT_FOUND");
+    expect(r.divergences[0].message).toBe("The payment provider does not know this payment intent.");
+  });
+  it("ANO-ADM-32 : une PANNE du fournisseur n'est pas « paiement introuvable » → 503 PROVIDER_UNAVAILABLE, tentative journalisée, base intacte", async () => {
+    const provider = new FakePaymentProvider();
+    jest.spyOn(provider, "inspect").mockRejectedValue(Object.assign(new Error("connect ECONNRESET"), { type: "StripeConnectionError" }));
+    prismaMock.booking.findUnique.mockResolvedValue(record({ paymentIntentId: "pi_live" }));
+    recordAdminAction.mockClear();
+    await expect(makeService(provider).reconcileDeal(ADMIN, ID)).rejects.toMatchObject({ statusCode: 503, details: { code: "PROVIDER_UNAVAILABLE" } });
+    expect(recordAdminAction).toHaveBeenCalledWith(prismaMock, expect.objectContaining({ action: "DEAL_RECONCILED", after: { provider: "FAKE", divergences: [], providerError: "PROVIDER_UNAVAILABLE" } }));
+    expect(prismaMock.booking.updateMany).not.toHaveBeenCalled();
   });
 });
 
@@ -127,7 +153,7 @@ describe("retryPayout (3A-a) — par l'exécuteur unique", () => {
 
 describe("resolveReversal (3A-b)", () => {
   it("RESENT : PENDING + nouvelle clé d'idempotence + clôture dans une transaction avec le journal, puis l'exécuteur", async () => {
-    prismaMock.booking.findUnique.mockResolvedValue(record({ payoutStatus: "REVERSED" }));
+    prismaMock.booking.findUnique.mockResolvedValue(record({ payoutStatus: "REVERSED", transferId: "tr_reversed_1" }));
     prismaMock.booking.updateMany.mockResolvedValue({ count: 1 });
     (settlement as { executePayout: jest.Mock }).executePayout.mockResolvedValue({ payoutStatus: "SENT", transferId: "tr_10", reason: null });
     const r = await makeService().resolveReversal(ADMIN, ID, { outcome: "RESENT", reason: "Le Voyageur a corrigé son RIB, on renvoie." });
@@ -135,7 +161,8 @@ describe("resolveReversal (3A-b)", () => {
     const u = prismaMock.booking.updateMany.mock.calls[0][0];
     expect(u.where).toEqual({ id: ID, payoutStatus: "REVERSED", OR: [{ payoutReversalResolution: { isSet: false } }, { payoutReversalResolution: null }] });
     expect(u.data).toMatchObject({ payoutStatus: "PENDING", payoutIdempotencyKey: `payout:${ID}:resend:${NOW.getTime()}`, payoutReversalResolution: "RESENT", payoutReversalResolvedByAdminId: ADMIN.id });
-    expect(recordAdminAction).toHaveBeenCalledWith(prismaMock, expect.objectContaining({ action: "PAYOUT_REVERSAL_RESOLVED", after: expect.objectContaining({ outcome: "RESENT" }) }));
+    // Recette § 5.14 — l'identifiant du transfert renversé survit dans le journal (la base le remplace par le nouveau)
+    expect(recordAdminAction).toHaveBeenCalledWith(prismaMock, expect.objectContaining({ action: "PAYOUT_REVERSAL_RESOLVED", after: expect.objectContaining({ outcome: "RESENT", previousTransferId: "tr_reversed_1" }) }));
     expect((settlement as { executePayout: jest.Mock }).executePayout).toHaveBeenCalledTimes(1);
   });
   it("WRITTEN_OFF : clôture seule, rien n'est renvoyé ; déjà clos → 400", async () => {
