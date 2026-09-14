@@ -37,7 +37,13 @@ export default function PrivacySection({ copy }: { copy: DashboardCopy }) {
   useEffect(() => {
     if (user && typeof (user as { messagingReminderEmails?: boolean }).messagingReminderEmails === "boolean") setReminders((user as { messagingReminderEmails?: boolean }).messagingReminderEmails as boolean);
   }, [user]);
-  useEffect(() => { setAnalytics(readConsent() === "granted"); }, [user]);
+  // ANO-WEB-81 (recette 5.25) : la bascule reflétait le consentement du NAVIGATEUR (localStorage) ; la vérité est la
+  // préférence du compte (`analyticsOptIn`, D66) — elle gouverne aussi la capture SERVEUR et suit le membre d'un
+  // appareil à l'autre. Le consentement local ne sert que de repli (visiteur, préférence jamais posée).
+  useEffect(() => {
+    const serveur = user?.analyticsOptIn;
+    setAnalytics(typeof serveur === "boolean" ? serveur : readConsent() === "granted");
+  }, [user]);
 
   async function start(next: Flow) {
     setFlow(next);
@@ -63,6 +69,7 @@ export default function PrivacySection({ copy }: { copy: DashboardCopy }) {
       setFlow("idle");
     } catch (e) {
       if (isSudoRequired(e)) setGate(true);
+      else if (codeDe(e) === "EXPORT_RATE_LIMITED") setMsg({ tone: "err", text: p.exportRateLimited });
       else setMsg({ tone: "err", text: errorText(e) ?? p.error });
     } finally {
       setBusy(false);
@@ -94,8 +101,15 @@ export default function PrivacySection({ copy }: { copy: DashboardCopy }) {
     const next = !analytics;
     setAnalytics(next);
     writeConsent(next ? "granted" : "denied");
-    if (next) void ensureAnalytics(); else disableAnalytics();
-    updateMyPreferences({ analyticsOptIn: next }).catch(() => undefined);
+    if (analyticsConfigured()) {
+      if (next) void ensureAnalytics(); else disableAnalytics();
+    }
+    try {
+      await updateMyPreferences({ analyticsOptIn: next });
+      qc.invalidateQueries({ queryKey: ["user"] });
+    } catch {
+      setAnalytics(!next); // la préférence n'a pas pris : la bascule ne ment pas
+    }
   }
   async function toggleReminders() {
     const next = !reminders;
@@ -126,7 +140,9 @@ export default function PrivacySection({ copy }: { copy: DashboardCopy }) {
             <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition ${reminders ? "left-[22px]" : "left-0.5"}`} />
           </button>
         </div>
-        {analyticsConfigured() && (
+        {/* ANO-WEB-81 : la bascule était masquée sans clé PostHog côté FRONT, alors que `analyticsOptIn` gouverne aussi la
+            mesure côté SERVEUR (D66) : sur un déploiement où seul le serveur mesure, le membre ne pouvait plus se retirer. */}
+        {(
           <div className="flex items-center justify-between gap-3 border-t border-slate-100 px-4 py-3 dark:border-slate-800">
             <div>
               <p className="text-[13.5px] font-medium text-slate-900 dark:text-white">{p.analytics}</p>
@@ -192,6 +208,13 @@ export default function PrivacySection({ copy }: { copy: DashboardCopy }) {
       )}
     </div>
   );
+}
+
+/** Le `details.code` d'un refus métier (A146) — le front dit le refus dans la langue du membre. */
+function codeDe(e: unknown): string | null {
+  return (e as { response?: { data?: { details?: { code?: string }; code?: string } } })?.response?.data?.details?.code
+    ?? (e as { response?: { data?: { code?: string } } })?.response?.data?.code
+    ?? null;
 }
 
 function errorText(e: unknown): string | null {

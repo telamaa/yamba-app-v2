@@ -10,7 +10,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { apiFetch, ApiError } from "@/lib/api";
-import { CATEGORY_LABEL, OUTCOME_LABEL, RESOLUTION_LABEL, STEP_LABEL, dateTime, money } from "@/lib/format";
+import { CATEGORY_LABEL, OUTCOME_LABEL, PARCEL_CATEGORY_LABEL, PAYOUT_STATUS_LABEL, RESOLUTION_LABEL, STEP_LABEL, dateTime, money } from "@/lib/format";
 import DecisionForm from "./DecisionForm";
 import { can } from "@/lib/permissions";
 import type { AdminMe } from "@/lib/types";
@@ -25,11 +25,13 @@ export default function DisputeFileView({ bookingId }: { bookingId: string }) {
     apiFetch<AdminMe>("/admin/me").then(setMe).catch(() => undefined);
   }, []);
 
+  const [version, setVersion] = useState(0);
   useEffect(() => {
     apiFetch<AdminDisputeFile>(`/admin/disputes/${bookingId}`)
       .then(setFile)
-      .catch((e) => setError(e instanceof ApiError && e.status === 404 ? "Ce deal n'est pas en attente d'arbitrage." : e.message));
-  }, [bookingId]);
+      // A160 : un dossier tranché se relit ; un 404 ne concerne plus qu'un deal jamais passé en médiation.
+      .catch((e) => setError(e instanceof ApiError && e.status === 404 ? "Ce deal n'est jamais passé en médiation." : e.message));
+  }, [bookingId, version]);
 
   if (error) return <p className="text-[13px] text-red-700">{error}</p>;
   if (!file) return <p className="text-[13px] text-slate-500">Chargement du dossier…</p>;
@@ -69,7 +71,7 @@ export default function DisputeFileView({ bookingId }: { bookingId: string }) {
           <Row k="Commission Yamba" v={money(file.money.commissionCents, cur)} />
           {file.money.premiumCents > 0 && <Row k="Prime protection" v={money(file.money.premiumCents, cur)} />}
           <Row k="Capturé" v={dateTime(file.money.capturedAt)} />
-          <Row k="Versement" v={file.money.payoutStatus ?? "—"} />
+          <Row k="Versement" v={file.money.payoutStatus ? PAYOUT_STATUS_LABEL[file.money.payoutStatus] ?? file.money.payoutStatus : "—"} />
           {file.money.refundAmountCents != null && <Row k="Remboursé" v={`${money(file.money.refundAmountCents, cur)} · ${dateTime(file.money.refundedAt)}`} />}
           {file.money.retentionCents != null && <Row k="Retenue" v={`${money(file.money.retentionCents, cur)} · ${file.money.retentionDisposition ?? ""}`} />}
         </Card>
@@ -86,7 +88,7 @@ export default function DisputeFileView({ bookingId }: { bookingId: string }) {
       </div>
 
       <Card title="Colis déclaré" className="mt-5">
-        <Row k="Catégorie" v={file.parcel.category} />
+        <Row k="Catégorie" v={PARCEL_CATEGORY_LABEL[file.parcel.category] ?? file.parcel.category} />
         <Row k="Description" v={file.parcel.description} />
         <Row k="Valeur déclarée" v={money(file.parcel.declaredValueCents, cur)} />
         <Row k="Poids" v={`${file.parcel.weightKg} kg`} />
@@ -142,7 +144,7 @@ export default function DisputeFileView({ bookingId }: { bookingId: string }) {
       )}
 
       <div className="mt-5">
-        <DecisionForm file={file} canDecide={can(me?.adminRoles, "disputes.decide")} />
+        <DecisionForm file={file} canDecide={can(me?.adminRoles, "disputes.decide")} onDecidedAction={() => setVersion((n) => n + 1)} />
       </div>
     </div>
   );

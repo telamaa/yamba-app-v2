@@ -98,5 +98,6 @@
     },
     "report": "Signaler cet avis",
     "reportSubject": "Signalement d'un avis (#{id})"
-  }
+  },
+  "hiddenBanner": "Cette page est masquée : toi seul·e la vois. Réactive « Profil public » dans ton profil pour la rendre visible aux autres."
 }

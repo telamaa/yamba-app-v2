@@ -16,6 +16,7 @@
 import { createEmailProviderFromEnv, type EmailProvider, type SendResult } from "./provider";
 export * from "./provider";
 export * from "./webhook";
+export * from "./recipient"; // D35 4A — ANO-ADM-10 / 11 : une seule règle de destinataire joignable
 import ejs from "ejs";
 import path from "path";
 import { LAYOUT_EJS, NOTICE_STYLES, type EmailContent } from "./layout";

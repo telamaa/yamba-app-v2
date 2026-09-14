@@ -1,4 +1,4 @@
-import { ALERT_THRESHOLDS, alertSentKey, evaluateAlerts, type OpsSnapshot } from "./ops-alerts.rules";
+import { ALERT_THRESHOLDS, alertSentKey, countUndecidedDisputes, evaluateAlerts, type OpsSnapshot } from "./ops-alerts.rules";
 
 const NOW = new Date("2026-09-04T10:00:00.000Z");
 const calm = (): OpsSnapshot => ({ failedPayoutsOverThreshold: 0, undecidedDisputesOverThreshold: 0, heldRetentionsOverThreshold: 0, openReversalsOverThreshold: 0, parkedOutbox: 0, oldestUnpublishedAt: null, failedEmailsInWindow: 0, lastTripPublishedAt: new Date("2026-09-03T10:00:00Z"), requestsInWindow: 10, acceptedInWindow: 8 });
@@ -25,5 +25,21 @@ describe("ops-alerts.rules (C-PR6b, D59 3A)", () => {
   });
   it("alertSentKey : une clé par règle et par jour UTC", () => {
     expect(alertSentKey("OUTBOX_PARKED", NOW)).toBe("yamba:alerts:sent:OUTBOX_PARKED:2026-09-04");
+  });
+});
+
+describe("countUndecidedDisputes (ANO-ADM-24) — la décidabilité de l'écran de médiation, pas 72 h en dur", () => {
+  const h = (n: number) => new Date(NOW.getTime() - n * 3_600_000);
+  it("délai de réponse abaissé à 24 h : un litige ouvert il y a 100 h est décidable depuis 76 h → compté au seuil de 72 h", () => {
+    expect(countUndecidedDisputes([{ openedAt: h(100), carrierRespondedAt: null }], NOW, 24, 72)).toBe(1);
+    // l'ancien calcul (ouverture + 72 h) le voyait décidable depuis 28 h seulement : pas d'alerte
+    expect(countUndecidedDisputes([{ openedAt: h(100), carrierRespondedAt: null }], NOW, 72, 72)).toBe(0);
+  });
+  it("version du Voyageur reçue : décidable dès sa réponse, quel que soit le délai", () => {
+    expect(countUndecidedDisputes([{ openedAt: h(80), carrierRespondedAt: h(73) }], NOW, 336, 72)).toBe(1);
+    expect(countUndecidedDisputes([{ openedAt: h(80), carrierRespondedAt: h(71) }], NOW, 336, 72)).toBe(0);
+  });
+  it("borne exclusive : décidable depuis exactement le seuil → pas encore", () => {
+    expect(countUndecidedDisputes([{ openedAt: h(144), carrierRespondedAt: null }], NOW, 72, 72)).toBe(0);
   });
 });
