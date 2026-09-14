@@ -66,6 +66,9 @@ export default function HeaderShareTripCTA({ variant = "desktop" }: Props) {
       <button
         type="button"
         onClick={handleShareTrip}
+        // Chapitre 7 (WEB-NRG-3) : le libellé visible est raccourci sur téléphone ; seul, « Partager » ne dit pas QUOI
+        // à un lecteur d'écran. Le nom complet contient le mot visible (WCAG 2.5.3, « label in name »).
+        aria-label={t("shareTrip")}
         className={`${baseClass} rounded-full border px-3 py-1.5 text-[12px]`}
         style={{
           borderColor: HEADER_COLORS.mango,

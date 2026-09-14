@@ -1,7 +1,7 @@
 {
   "page": {
-    "title": "Followed travelers",
-    "description": "Stay tuned for posts from your favorite travelers."
+    "title": "Followed Travelers",
+    "description": "Stay tuned for posts from your favorite Travelers."
   },
   "card": {
     "tripperBadge": "Traveler",
@@ -12,15 +12,15 @@
     "notifyOff": "Notifications off",
     "unfollow": "Unfollow",
     "confirmUnfollow": "Confirm",
-    "unfollowSuccess": "You no longer follow this traveler",
+    "unfollowSuccess": "You no longer follow this Traveler",
     "unfollowError": "Error while unfollowing",
     "updateError": "Error while updating"
   },
   "list": {
-    "emptyTitle": "No traveler followed yet",
-    "emptyDescription": "Discover travelers in the community and follow the ones who match your needs to get notified as soon as they publish a new trip.",
-    "emptyCta": "Discover travelers",
-    "count": "{count, plural, one {1 followed traveler} other {# followed travelers}}",
+    "emptyTitle": "No Traveler followed yet",
+    "emptyDescription": "Discover Travelers in the community and follow the ones who match your needs to get notified as soon as they publish a new trip.",
+    "emptyCta": "Discover Travelers",
+    "count": "{count, plural, one {1 followed Traveler} other {# followed Travelers}}",
     "discoverMore": "Discover more",
     "errorMessage": "Error while loading"
   }

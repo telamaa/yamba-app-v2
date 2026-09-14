@@ -2,6 +2,7 @@ import "./global.css";
 import { Plus_Jakarta_Sans } from "next/font/google";
 import { Toaster } from "sonner";
 import React from "react";
+import { getLocale } from "next-intl/server";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 
 const plusJakarta = Plus_Jakarta_Sans({
@@ -18,8 +19,10 @@ export const metadata = {
 /**
  * Root layout — MUST contain <html> and <body> tags (Next.js 16 requirement).
  *
- * The <html lang="..."> attribute will be updated dynamically by the locale layout
- * when it's available, but we put a sensible default here.
+ * The <html lang="..."> attribute carries the REQUEST locale (`getLocale()`, resolved by
+ * next-intl from the `[locale]` segment / middleware). It used to be hard-coded to "fr" with a
+ * promise that the locale layout would update it — nothing ever did (recette 01-WEB 5.1,
+ * WEB-ACC-2 : `/en` was served with `lang="fr"`).
  *
  * All providers and UI chrome are in app/[locale]/layout.tsx — SAUF le
  * ThemeProvider (next-themes) : il vit ICI, au-dessus du segment [locale].
@@ -28,13 +31,14 @@ export const metadata = {
  * « Encountered a script tag while rendering React component » (React 19).
  * Le root layout, lui, ne se remonte jamais.
  */
-export default function RootLayout({
+export default async function RootLayout({
                                      children,
                                    }: {
   children: React.ReactNode;
 }) {
+  const locale = await getLocale();
   return (
-    <html lang="fr" className={plusJakarta.variable} suppressHydrationWarning>
+    <html lang={locale} className={plusJakarta.variable} suppressHydrationWarning>
     <body className="min-h-screen bg-white font-sans text-slate-900 dark:bg-slate-950 dark:text-slate-50">
     <ThemeProvider>{children}</ThemeProvider>
     <Toaster

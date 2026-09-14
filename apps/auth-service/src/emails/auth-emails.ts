@@ -437,7 +437,7 @@ const en: AuthEmailDictionary = {
       greeting: greet(firstName, false),
       paragraphs: [
         "Your Yamba account has been created. You are now part of a community that makes parcel delivery simpler and more human.",
-        "Send a parcel: find a traveler on a trip that suits you. Become a Traveler: publish your trips and earn money carrying parcels. Explore: discover trips available near you.",
+        "Send a parcel: find a Traveler on a trip that suits you. Become a Traveler: publish your trips and earn money carrying parcels. Explore: discover trips available near you.",
       ],
       notice: {
         tone: "info",

@@ -1,5 +1,6 @@
 {
   "back": "Retour aux résultats",
+  "findAnother": "Chercher un autre trajet",
   "trippedBy": "Trajet proposé par {firstName} {lastInitial}.",
   "travelReference": "Réf.",
   "detourPossible": "Détour possible",
@@ -57,7 +58,7 @@
   },
   "reviews": {
     "title": "Ce qu'on dit de {firstName}",
-    "empty": "{firstName} a reçu {count, plural, =1 {# avis} other {# avis}} sur Yamba. Consultez son profil pour les lire en détail.",
+    "empty": "{firstName} a reçu {count, plural, =1 {# avis} other {# avis}} sur Yamba. Consulte son profil pour les lire en détail.",
     "viewAll": "Voir les {count, plural, =1 {# avis} other {# avis}}"
   },
   "conditions": {
@@ -80,7 +81,7 @@
     "comingSoon": "Réservation bientôt disponible",
     "comingSoonDescription": "Le système de réservation sera lancé très prochainement.",
     "trust": {
-      "noCharge": "Aucun montant ne vous sera débité avant l''accord",
+      "noCharge": "Aucun montant ne te sera débité avant l''accord",
       "protection": "Protection Yamba disponible",
       "co2": "~{kg} kg de CO₂ évités"
     },
@@ -100,14 +101,14 @@
     "description": "Impossible de charger ce trajet pour le moment."
   },
   "owner": {
-    "title": "C'est votre trajet",
+    "title": "C'est ton trajet",
     "subtitle": "Les Expéditeurs voient cette page telle quelle.",
     "edit": "Modifier le trajet",
     "dashboard": "Gérer dans mon tableau de bord"
   },
   "offer": {
-    "title": "Ce que vous pouvez envoyer avec {firstName}",
-    "hint": "Un seul prix au kilo, quel que soit le contenu. Vérifiez ci-dessous que votre type de colis est accepté : certains ont un supplément, d'autres sont refusés.",
+    "title": "Ce que tu peux envoyer avec {firstName}",
+    "hint": "Un seul prix au kilo, quel que soit le contenu. Vérifie ci-dessous que ton type de colis est accepté : certains ont un supplément, d'autres sont refusés.",
     "perKg": "Prix au kilo",
     "available": "Disponible",
     "example": "Estimation pour un colis de {kg} kg : ≈ {price} tout compris · prix définitif à la réservation",
@@ -117,8 +118,8 @@
     "refused": "Refusé par le Voyageur",
     "surcharge": "Supplément de {pct} % (risque)",
     "bags": "Bagage entier — forfait",
-    "checkedBag": "Soute 23 kg",
-    "cabinBag": "Cabine 12 kg",
+    "checkedBag": "Bagage en soute 23 kg",
+    "cabinBag": "Bagage cabine 12 kg",
     "family": {
       "DOCUMENTS_PAPERS": "Documents & papiers",
       "CLOTHES_TEXTILE": "Vêtements & textile",
@@ -129,10 +130,10 @@
       "TOYS_CHILDCARE": "Jouets & puériculture",
       "MISC_ACCESSORIES": "Accessoires & divers"
     },
-    "exampleFromSearch": "Estimation pour un colis de {kg} kg (poids de votre recherche) : ≈ {price} tout compris · prix définitif à la réservation",
+    "exampleFromSearch": "Estimation pour un colis de {kg} kg (poids de ta recherche) : ≈ {price} tout compris · prix définitif à la réservation",
     "estimateLabel": "Estimation",
     "estimateLabel2": "Estimation pour un colis de {kg} kg",
-    "estimateLabelFromSearch": "Estimation pour votre colis de {kg} kg (poids de votre recherche)",
+    "estimateLabelFromSearch": "Estimation pour ton colis de {kg} kg (poids de ta recherche)",
     "allIn": "tout compris (transport + service Yamba)",
     "finalAtBooking": "Le prix définitif est fixé à la réservation.",
     "lightParcel": "Colis léger (enveloppe, passeport, lunettes…) : {min} € minimum, quel que soit le poids."

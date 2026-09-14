@@ -5737,7 +5737,7 @@
         "tags": [
           "admin"
         ],
-        "summary": "Lift an email suppression after a bounce / complaint (D35 4A, journaled)",
+        "summary": "Lift an email suppression after a bounce / complaint (D35 4A, journaled) — reason required (A155), conditional write",
         "operationId": "unsuppressEmail",
         "parameters": [
           {
@@ -5750,6 +5750,16 @@
             "description": "User id"
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UnsuppressEmailRequest"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Done",
@@ -5757,6 +5767,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/OkResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request (ValidationError — details.errors per field when available)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -9612,6 +9632,12 @@
             "type": "string",
             "example": "12 juin 2026",
             "description": "Formaté serveur selon locale"
+          },
+          "departureAt": {
+            "description": "Instant de départ (ISO 8601) — ANO-WEB-30 : permet au client de savoir qu'un trajet est passé (badge « Trajet passé » des favoris) sans interpréter la date formatée",
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
           },
           "departureTime": {
             "type": "string",
@@ -19491,6 +19517,21 @@
             "type": "string",
             "minLength": 20,
             "maxLength": 2000
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "additionalProperties": false
+      },
+      "UnsuppressEmailRequest": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "minLength": 20,
+            "maxLength": 2000,
+            "description": "Why the address can receive emails again (corrected, member request…) — journaled"
           }
         },
         "required": [
