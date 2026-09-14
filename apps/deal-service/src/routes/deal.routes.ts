@@ -31,6 +31,8 @@ import { makeAdminHistoryService } from "../services/admin-history.service";
 import { makeOpsAlertsController } from "../controllers/ops-alerts.controller";
 import { makeOpsAlertsService } from "../services/ops-alerts.service";
 import { makeDealMediationService } from "../services/deal-mediation.service";
+import redis from "@packages/libs/redis";
+import type { DecisionLockStore } from "../lib/decision-lock";
 import { makeTrackingLinkController } from "../controllers/tracking-link.controller"; // D69
 import { makeTrackingLinkService } from "../services/tracking-link.service";
 
@@ -97,7 +99,7 @@ router.post("/deals/:id/dispute", isAuthenticated, dealSettlement.dispute);
 
 // ── B5 : notation mutuelle double-aveugle (D53) ──────────────
 // C-PR2 (D55) — la version du Voyageur, une fois, pendant que le dossier est ouvert.
-const dealMediation = makeDealMediationController(makeDealMediationService(paymentProvider, dealSettlementService));
+const dealMediation = makeDealMediationController(makeDealMediationService(paymentProvider, dealSettlementService, undefined, undefined, redis as unknown as DecisionLockStore)); // ANO-ADM-22 : verrou de décision
 router.post("/deals/:id/dispute/statement", isAuthenticated, dealMediation.respond);
 // D69 — page destinataire : lien de suivi (Expéditeur) et lecture publique (sans session)
 const trackingLink = makeTrackingLinkController(makeTrackingLinkService());

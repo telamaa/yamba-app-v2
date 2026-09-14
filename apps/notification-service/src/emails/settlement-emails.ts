@@ -203,7 +203,7 @@ const fr: SettlementEmailDictionary = {
       p.outcome === "REJECTED"
         ? "Après examen des deux versions et des preuves, nous n'avons pas retenu ton signalement : le Voyageur est payé en entier."
         : p.outcome === "PARTIAL_REFUND"
-          ? `Après examen des deux versions et des preuves, nous te remboursons ${p.refund}. Le reste est versé au Voyageur.`
+          ? `Après examen des deux versions et des preuves, nous te remboursons ${p.refund}. ${p.carrierPayout === "" ? "Le Voyageur ne reçoit rien sur ce deal." : `Le Voyageur reçoit ${p.carrierPayout}.`}` // ANO-ADM-23 : « le reste est versé au Voyageur » était faux quand le remboursement dépasse son net
           : p.outcome === "FULL_REFUND"
             ? `Après examen des deux versions et des preuves, nous te remboursons la totalité : ${p.refund}.`
             : p.outcome === "RESTITUTE_SHIPPER"
@@ -401,7 +401,7 @@ const en: SettlementEmailDictionary = {
       p.outcome === "REJECTED"
         ? "After reviewing both sides and the evidence, we did not uphold your report: the Traveler is paid in full."
         : p.outcome === "PARTIAL_REFUND"
-          ? `After reviewing both sides and the evidence, we refund you ${p.refund}. The rest goes to the Traveler.`
+          ? `After reviewing both sides and the evidence, we refund you ${p.refund}. ${p.carrierPayout === "" ? "The Traveler receives nothing on this deal." : `The Traveler receives ${p.carrierPayout}.`}`
           : p.outcome === "FULL_REFUND"
             ? `After reviewing both sides and the evidence, we refund you in full: ${p.refund}.`
             : p.outcome === "RESTITUTE_SHIPPER"

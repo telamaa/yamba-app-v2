@@ -5174,3 +5174,73 @@ prévenu en clair et sa file se recharge.
   membre).
 - **Prévenir le Voyageur** qu'une modification de date ou de ville retire son badge (avant d'enregistrer, et par email).
 - **Un billet rejeté pour « dates »** doit-il revenir en vérification quand le Voyageur corrige ses dates, sans redépôt ?
+
+
+---
+
+# Back-office — trancher un litige une fois, avec les bons montants, et pouvoir relire la décision (cahier 02-ADMIN § 5.9)
+
+*(PR `chore/recette-admin-5-9`, 14/09/2026 — ADM-MED-1 à 9. Les règles de fond de la médiation sont RG-MED-*, plus haut ;
+ce chapitre en éprouve l'écran et l'exécution.)*
+
+## Le besoin
+
+Un litige oppose deux membres et engage de l'argent. Le médiateur doit voir tout le dossier sans le code de livraison,
+attendre la version du Voyageur (ou l'échéance), trancher une seule fois, et que chaque partie reçoive exactement ce qui
+a été décidé — ni plus, ni deux fois. Les équipes qui viennent après (Finance, Support) doivent pouvoir relire la décision.
+
+## Les règles
+
+**RG-ADM-MED-01 — La file montre les litiges et retenues en attente, avec l'état de décidabilité de chacun** ; ses
+compteurs sont ceux de la file entière, quels que soient les filtres, et restent visibles quand un filtre ne rend rien.
+
+**RG-ADM-MED-02 — Le dossier ne montre jamais le code de livraison**, ni à l'écran ni dans les données chargées ; sa
+consultation est journalisée ; la conversation des parties n'est accessible qu'aux profils qui la lisent.
+
+**RG-ADM-MED-03 — Un litige ne se tranche qu'après la version du Voyageur ou l'échéance du délai de réponse** (paramètre
+« Délai de réponse au litige ») ; avant, le serveur refuse en donnant la date à partir de laquelle la décision sera possible.
+
+**RG-ADM-MED-04 — Une décision est unique, même si deux administrateurs valident au même instant** : une seule est
+enregistrée, **un seul remboursement part** ; l'autre est refusée sans qu'aucun argent ne bouge.
+
+**RG-ADM-MED-05 — Les montants sont ceux du serveur** : rejet (Voyageur payé en entier, Yamba garde commission et prime),
+partiel (entre 1 centime et le total moins 1 centime ; Voyageur = net − remboursement, jamais négatif), total (tout rendu,
+commission comprise) ; les trois flux totalisent toujours le montant payé.
+
+**RG-ADM-MED-06 — L'argent part avant l'enregistrement** : le remboursement d'abord, puis la décision, puis le versement ;
+un échec de versement ne bloque jamais une décision.
+
+**RG-ADM-MED-07 — La partie condamnée porte un fait interne** : l'Expéditeur sur un rejet, le Voyageur dès qu'il y a
+remboursement. Un deal clos par médiation ne se note pas.
+
+**RG-ADM-MED-08 — Chaque partie reçoit un email juste** : l'issue, le montant qui la concerne, le motif intégral ; si le
+Voyageur ne reçoit rien, l'email de l'Expéditeur le dit.
+
+**RG-ADM-MED-09 — Un dossier tranché se relit** (décision, motif, montants), journalisé ; il ne figure plus dans la file.
+
+**RG-ADM-MED-10 — L'alerte « litiges décidables sans décision » suit la même règle de décidabilité que l'écran**, paramètre
+de délai compris.
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| MED-1 | File, filtres, liens d'alerte | compteurs fixes, états de décidabilité, filtres présélectionnés | oui |
+| MED-2 | Ouvrir YAM-2041 | tous les blocs, aucun code de livraison, lecture journalisée | oui |
+| MED-3 | Support, avant l'échéance, bornes, motif court, Finance | refus à chaque étape, rien d'enregistré | oui |
+| MED-4 | Rejet | Voyageur payé, Expéditeur condamné, deux emails, décision unique | oui |
+| MED-5 | Partiel après la version du Voyageur | un remboursement du montant, Voyageur condamné, portefeuille juste | oui |
+| MED-6 | Total | deal annulé, tout rendu, Voyageur condamné | oui |
+| MED-7 | Deux décisions simultanées | une décision, **un** remboursement | oui (ANO-ADM-22 close) |
+| MED-8 | Relire un dossier tranché | décision affichée, lecture journalisée | oui (A160) |
+| MED-9 | Partiel supérieur au net | l'Expéditeur lit que le Voyageur ne reçoit rien | oui (ANO-ADM-23 close) |
+
+## Ce qui reste à trancher
+
+- **Remboursement manuel appliqué et annulations remboursées** : même risque de double remboursement en concurrence (non
+  mesuré ici) — les passer sous le même verrou (§ 5.15).
+- **Reprise après panne** entre le remboursement et l'enregistrement : une clé d'idempotence chez le fournisseur éviterait
+  un second remboursement au nouvel essai.
+- **Coordonnées du destinataire au dossier** (téléphone, adresse) pour un litige « non livré » : utiles au médiateur, mais
+  données personnelles d'un tiers.
+- **Montrer qui perd le litige** dans le récapitulatif avant validation.

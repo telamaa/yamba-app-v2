@@ -9,12 +9,46 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ApiError, post } from "@/lib/api";
-import { RESOLUTION_LABEL, money } from "@/lib/format";
+import { PAYOUT_STATUS_LABEL, RESOLUTION_LABEL, money } from "@/lib/format";
 import type { AdminDisputeFile, AdminResolutionResponse, DisputeResolutionOutcome, RetentionArbitrationOutcome } from "@/lib/types";
 
 const MIN_REASON = 50;
 
-export default function DecisionForm({ file, canDecide = true }: { file: AdminDisputeFile; canDecide?: boolean }) {
+/** Montant saisi en euros (« 15 », « 15,5 », « 1 234,50 ») → centimes ; NaN si illisible. */
+function parseEurosToCents(saisie: string): number {
+  const propre = saisie.replace(/[\s\u00a0\u202f]/g, "").replace(",", ".");
+  if (!/^\d+(\.\d{1,2})?$/.test(propre)) return NaN;
+  return Math.round(Number(propre) * 100);
+}
+
+/**
+ * Un refus du serveur, en français et par son code (A146) — jamais « 409 : The carrier still has time… ». La décision est
+ * irréversible : le médiateur doit savoir si RIEN n'est parti (délai, verrou, bornes) ou s'il doit vérifier la fiche argent.
+ */
+function refusDeDecision(e: unknown): string {
+  if (!(e instanceof ApiError)) return "Décision impossible : le serveur ne répond pas. Rien n'a été enregistré ; recharge le dossier avant de réessayer.";
+  const details = (e.data as { details?: { code?: string; decidableAt?: string } } | undefined)?.details;
+  switch (details?.code) {
+    case "TRANSITION_NOT_ALLOWED":
+      return details.decidableAt
+        ? `Le délai de réponse du Voyageur court encore : décision possible à partir du ${new Date(details.decidableAt).toLocaleString("fr-FR")}.`
+        : "Ce dossier a déjà été tranché, ou son statut a changé : recharge la page.";
+    case "DECISION_IN_PROGRESS":
+      return "Une autre décision est en cours d'enregistrement sur ce dossier : rien n'est parti de ton côté. Recharge la page dans quelques secondes.";
+    case "PARTIAL_REFUND_OUT_OF_BOUNDS":
+      return "Le montant du remboursement partiel est hors bornes : rien n'a été enregistré.";
+    case "PAYMENT_STATE_CONFLICT":
+      return "Le remboursement n'a pas pu être émis par le fournisseur de paiement : rien n'a été enregistré. Vérifie la fiche argent avant de réessayer.";
+    case "ADMIN_IS_PARTY":
+      return "Tu es partie à ce deal : un autre administrateur doit trancher.";
+    case "ADMIN_PERMISSION_DENIED":
+      return "Ton profil ne permet pas de trancher (médiateur ou super administrateur).";
+    default:
+      return `Décision refusée (${e.status}) : ${e.message}`;
+  }
+}
+
+export default function DecisionForm({ file, canDecide = true, onDecidedAction }: { file: AdminDisputeFile; canDecide?: boolean; onDecidedAction?: () => void }) {
   const router = useRouter();
   const cur = file.money.currencyCode;
   const total = file.money.totalShipperCents;
@@ -29,7 +63,7 @@ export default function DecisionForm({ file, canDecide = true }: { file: AdminDi
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<AdminResolutionResponse | null>(null);
 
-  const refundCents = Math.round(Number(refundEur.replace(",", ".")) * 100);
+  const refundCents = parseEurosToCents(refundEur);
   const partialValid = Number.isInteger(refundCents) && refundCents >= 1 && refundCents <= total - 1;
 
   // Les flux, calculés comme le serveur (D54 3A) — le récapitulatif ne doit jamais mentir.
@@ -59,8 +93,9 @@ export default function DecisionForm({ file, canDecide = true }: { file: AdminDi
         : await post<AdminResolutionResponse>(`/admin/disputes/${file.bookingId}/retention`, { outcome, reason: reason.trim() });
       setDone(r);
       setConfirming(false);
+      onDecidedAction?.(); // le dossier se recharge : la décision rendue s'affiche, le bandeau d'attente disparaît
     } catch (e) {
-      setError(e instanceof ApiError ? `${e.status} : ${e.message}` : "Décision impossible.");
+      setError(refusDeDecision(e));
       setConfirming(false);
     } finally {
       setBusy(false);
@@ -73,7 +108,7 @@ export default function DecisionForm({ file, canDecide = true }: { file: AdminDi
         <h2 className="text-[13px] font-bold text-emerald-900">Décision enregistrée</h2>
         <p className="mt-1 text-[13px] text-emerald-900">
           {RESOLUTION_LABEL[done.outcome] ?? done.outcome} · deal {done.finalStatus} · remboursé {money(done.refundCents, cur)} · versé {money(done.carrierPayoutCents, cur)}
-          {done.payoutStatus ? ` (versement ${done.payoutStatus})` : ""}
+          {done.payoutStatus ? ` (versement ${PAYOUT_STATUS_LABEL[done.payoutStatus] ?? done.payoutStatus})` : ""}
         </p>
         <p className="mt-1 text-[12px] text-emerald-800">Les deux parties sont prévenues (écran, notification, email).</p>
         <button onClick={() => router.push("/disputes")} className="mt-3 rounded-lg bg-slate-900 px-3 py-1.5 text-[12.5px] font-semibold text-white">Retour à la file</button>
@@ -81,13 +116,17 @@ export default function DecisionForm({ file, canDecide = true }: { file: AdminDi
     );
   }
 
+  // Un dossier tranché le dit à TOUS les profils : « ton profil ne tranche pas » n'apprend rien sur un dossier clos.
+  if (file.dispute?.resolution || file.retentionDecision) {
+    return <section className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-[13px] text-slate-600">Ce dossier est déjà tranché.</section>;
+  }
   if (!canDecide) {
     return <section className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-[13px] text-slate-600">Ton profil lit ce dossier mais ne tranche pas (médiateur ou super administrateur).</section>;
   }
   if (!file.canDecide) {
     return (
       <section className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-[13px] text-slate-600">
-        {file.dispute?.resolution || file.retentionDecision ? "Ce dossier est déjà tranché." : `Décision possible à partir du ${file.decidableAt ? new Date(file.decidableAt).toLocaleString("fr-FR") : "—"} (délai de réponse laissé au Voyageur), ou dès sa réponse.`}
+        {`Décision possible à partir du ${file.decidableAt ? new Date(file.decidableAt).toLocaleString("fr-FR") : "—"} (délai de réponse laissé au Voyageur), ou dès sa réponse.`}
       </section>
     );
   }

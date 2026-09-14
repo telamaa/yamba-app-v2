@@ -377,6 +377,17 @@ describe("matrice email (A35)", () => {
 /* ── Contenus : frontière A13, raisons, montants ─────────────── */
 
 describe("contenus construits", () => {
+  it("ANO-ADM-23 : un remboursement partiel au-delà du net ne dit jamais « le reste est versé au Voyageur »", () => {
+    const decision = (refundCents: number, carrierPayoutCents: number) =>
+      parse(envelope("booking.dispute_resolved", { ...basePayload(), actor: "ADMIN" as const, kind: "DISPUTE", ticketNumber: "YAM-2041", outcome: "PARTIAL_REFUND", refundCents, carrierPayoutCents, reason: "Motif de recette assez long pour passer la validation du contrat de l'événement.", finalStatus: "COMPLETED", resolvedAt: "2026-07-21T10:00:00.000Z" }));
+    const auDela = JSON.stringify(buildBookingEmail(decision(3500, 0), "SHIPPER", "Chinwe"));
+    expect(auDela).toContain("Le Voyageur ne reçoit rien sur ce deal.");
+    expect(auDela).not.toContain("Le reste est versé au Voyageur");
+    const enDeca = JSON.stringify(buildBookingEmail(decision(1000, 2000), "SHIPPER", "Chinwe"));
+    expect(enDeca).toMatch(/Le Voyageur reçoit 20,00/);
+    expect(JSON.stringify(buildBookingEmail(decision(3500, 0), "CARRIER", "Thomas"))).toContain("Aucun versement ne te revient sur ce deal.");
+  });
+
   it("A13 : l'email Voyageur montre son NET (transportCents), jamais le total Expéditeur", () => {
     const built = buildBookingEmail(parse(requestedEvent()), "CARRIER", "Awa")!;
     const serialized = JSON.stringify(built);
