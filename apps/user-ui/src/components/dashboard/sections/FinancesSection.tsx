@@ -34,7 +34,11 @@ export default function FinancesSection({ copy }: { copy: DashboardCopy }) {
   const router = useRouter();
   const { user } = useUser();
   const isCarrier = Boolean(user?.roles?.includes("CARRIER"));
-  const [tab, setTab] = useState<FinancesTab>(isCarrier ? "wallet" : "payments");
+  // ANO-WEB-103 (chapitre 7) : `useState(isCarrier ? … : …)` n'était évalué qu'au MONTAGE, avant que le membre soit
+  // chargé — un Voyageur qui ouvrait Finances directement restait sur « Paiements » (vide), sans ses gains ni le lien
+  // Stripe. L'onglet est désormais DÉRIVÉ tant que le membre n'a rien choisi.
+  const [choix, setTab] = useState<FinancesTab | null>(null);
+  const tab: FinancesTab = choix ?? (isCarrier ? "wallet" : "payments");
   const { data, isPending, isError, refetch } = useWallet();
 
   const chipBase = "rounded-full px-3.5 py-1.5 text-[12.5px] font-semibold transition-colors ";
@@ -80,8 +84,6 @@ function WalletTab({ data, isCarrier, locale, sudoCopy, onBecomeCarrierAction }:
   onBecomeCarrierAction: () => void;
 }) {
   const t = useTranslations("finances.wallet");
-  const { user } = useUser();
-  const stripeAccountReady = Boolean(user?.carrierPage?.stripeAccountId);
   const [opening, setOpening] = useState(false);
   const cur = data.currencyCode;
 
@@ -95,6 +97,7 @@ function WalletTab({ data, isCarrier, locale, sudoCopy, onBecomeCarrierAction }:
       window.open(res.data.url, "_blank", "noopener,noreferrer");
     } catch (e) {
       if (isSudoRequired(e)) setStripeGate(true);
+      else if ((e as { response?: { data?: { details?: { code?: string } } } })?.response?.data?.details?.code === "STRIPE_ACCOUNT_MISSING") toast.info(t("stripeMissing"));
       else toast.error(t("stripeError"));
     } finally {
       setOpening(false);
@@ -132,7 +135,10 @@ function WalletTab({ data, isCarrier, locale, sudoCopy, onBecomeCarrierAction }:
           <p className="text-[12.5px] text-slate-600 dark:text-slate-400">{t("stripeHint")}</p>
           <button
             type="button"
-            onClick={stripeAccountReady ? openStripe : () => toast.info(t("stripeMissing"))}
+            // ANO-WEB-104 (chapitre 7) : le bouton testait `carrierPage.stripeAccountId`, que /auth/me ne sert JAMAIS (liste
+            // blanche) — tous les Voyageurs voyaient « Finalise d'abord ton compte Stripe », le serveur n'était jamais appelé.
+            // Le serveur décide (porte par code, puis STRIPE_ACCOUNT_MISSING) ; le front traduit.
+            onClick={openStripe}
             disabled={opening}
             className="inline-flex min-h-[38px] items-center justify-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3.5 text-[12.5px] font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
           >

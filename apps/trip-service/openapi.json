@@ -6037,6 +6037,12 @@
             "example": "12 juin 2026",
             "description": "Formaté serveur selon locale"
           },
+          "departureAt": {
+            "description": "Instant de départ (ISO 8601) — ANO-WEB-30 : permet au client de savoir qu'un trajet est passé (badge « Trajet passé » des favoris) sans interpréter la date formatée",
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          },
           "departureTime": {
             "type": "string",
             "example": "08:00"
@@ -12797,7 +12803,7 @@
           "REFUNDED",
           "PARTIALLY_REFUNDED"
         ],
-        "description": "AUTHORIZED = hold placed, nothing debited (PENDING request) · HELD = captured, kept by Yamba until completion (ACCEPTED/PICKED_UP/DELIVERED/DISPUTED) · RELEASED = completed, carrier paid · RELEASED_NO_CHARGE = declined / expired / cancelled before capture, the hold simply vanished · REFUNDED = captured then refunded in full · PARTIALLY_REFUNDED = late cancellation, ANN-01 retention kept"
+        "description": "AUTHORIZED = hold placed, nothing debited (PENDING request) · HELD = captured, kept by Yamba until completion (ACCEPTED/PICKED_UP/DELIVERED/DISPUTED) · RELEASED = completed, carrier paid · RELEASED_NO_CHARGE = declined / expired / cancelled before capture, the hold simply vanished · REFUNDED = captured then refunded in full · PARTIALLY_REFUNDED = part of the payment returned: late cancellation (ANN-01 retention kept) or a refund after completion (mediation, commercial gesture) — see partialKind"
       },
       "WalletPaymentItem": {
         "type": "object",
@@ -12871,7 +12877,35 @@
                 "type": "null"
               }
             ],
-            "description": "PARTIALLY_REFUNDED: amount kept (ANN-01)"
+            "description": "PARTIALLY_REFUNDED after a LATE_CANCELLATION only: the ANN-01 retention kept for the carrier"
+          },
+          "keptCents": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "PARTIALLY_REFUNDED: what the shipper finally paid (total − refunded), whatever the reason (02-ADMIN § 5.15)"
+          },
+          "partialKind": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "LATE_CANCELLATION",
+                  "AFTER_COMPLETION"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "PARTIALLY_REFUNDED: why only part was returned — a late cancellation retention, or a refund after the deal was completed (never a retention)"
           },
           "currencyCode": {
             "type": "string"
@@ -12900,6 +12934,8 @@
           "amountCents",
           "refundAmountCents",
           "retentionCents",
+          "keptCents",
+          "partialKind",
           "currencyCode",
           "date"
         ],
@@ -12918,7 +12954,7 @@
             "type": "integer",
             "minimum": -9007199254740991,
             "maximum": 9007199254740991,
-            "description": "Σ RELEASED totals + retentions of PARTIALLY_REFUNDED"
+            "description": "Σ RELEASED totals + kept parts of PARTIALLY_REFUNDED"
           },
           "refundedCents": {
             "type": "integer",
@@ -15922,6 +15958,21 @@
         ],
         "additionalProperties": false
       },
+      "UnsuppressEmailRequest": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "minLength": 20,
+            "maxLength": 2000,
+            "description": "Why the address can receive emails again (corrected, member request…) — journaled"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "additionalProperties": false
+      },
       "InviteAdminRequest": {
         "type": "object",
         "properties": {
@@ -17295,7 +17346,18 @@
             "type": "string",
             "format": "date-time",
             "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
-            "description": "Depuis quand l'exception existe (fin du deal ou dernière écriture)"
+            "description": "Depuis quand l'exception existe : date de proposition (PROPOSED_REFUNDS), sinon fin du deal (COMPLETED) ou annulation (CANCELLED)"
+          },
+          "proposalStale": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "PROPOSED_REFUNDS : la proposition est devenue impossible (A165) ; null pour les autres files"
           }
         },
         "required": [
@@ -17314,7 +17376,8 @@
           "lastAttemptAt",
           "nextRetryAt",
           "disputeTicket",
-          "since"
+          "since",
+          "proposalStale"
         ],
         "additionalProperties": false
       },
@@ -17330,6 +17393,43 @@
               "$ref": "#/components/schemas/FinanceQueueItem"
             }
           },
+          "counts": {
+            "type": "object",
+            "properties": {
+              "FAILED": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "REVERSED": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "HELD": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "PROPOSED_REFUNDS": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "FAILED",
+              "REVERSED",
+              "HELD",
+              "PROPOSED_REFUNDS"
+            ],
+            "additionalProperties": false,
+            "description": "Taille réelle de CHAQUE file, avec les mêmes filtres que les tuiles de l'accueil (recette § 5.11)"
+          },
+          "truncated": {
+            "type": "boolean",
+            "description": "Vrai quand la file compte plus de lignes que les 200 servies"
+          },
           "generatedAt": {
             "type": "string",
             "format": "date-time",
@@ -17339,6 +17439,8 @@
         "required": [
           "kind",
           "items",
+          "counts",
+          "truncated",
           "generatedAt"
         ],
         "additionalProperties": false
@@ -17357,7 +17459,8 @@
           "PAYOUT_REVERSED",
           "REVERSAL_RESOLVED",
           "RETENTION",
-          "RETENTION_DECIDED"
+          "RETENTION_DECIDED",
+          "AUTHORIZATION_RELEASED"
         ]
       },
       "MoneyTimelineEvent": {
@@ -17399,6 +17502,98 @@
           "kind",
           "amountCents",
           "detail"
+        ],
+        "additionalProperties": false
+      },
+      "MoneyPendingKind": {
+        "type": "string",
+        "enum": [
+          "AUTHORIZATION_OPEN",
+          "DEAL_IN_PROGRESS",
+          "PAYOUT_DUE",
+          "PAYOUT_FROZEN",
+          "PAYOUT_FAILED",
+          "REVERSAL_OPEN",
+          "RETENTION_HELD",
+          "REFUND_PROPOSED"
+        ]
+      },
+      "MoneyBalance": {
+        "type": "object",
+        "properties": {
+          "capturedCents": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "débité chez l'Expéditeur (0 tant que rien n'est capturé)"
+          },
+          "refundedCents": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "rendu à l'Expéditeur, tous remboursements cumulés"
+          },
+          "paidOutCents": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "versé au Voyageur et non renversé"
+          },
+          "platformHoldsCents": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "débité − remboursé − versé : ce que la plateforme détient pour ce deal"
+          },
+          "pending": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "$ref": "#/components/schemas/MoneyPendingKind"
+                },
+                "cents": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "kind",
+                "cents"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "settled": {
+            "type": "boolean",
+            "description": "plus rien n'est en attente"
+          },
+          "anomaly": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "UNALLOCATED_FUNDS",
+                  "OVERSPENT"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "deal clos, rien en attente, et la plateforme détient plus que sa commission (UNALLOCATED_FUNDS) ou a versé plus qu'elle n'a reçu (OVERSPENT)"
+          }
+        },
+        "required": [
+          "capturedCents",
+          "refundedCents",
+          "paidOutCents",
+          "platformHoldsCents",
+          "pending",
+          "settled",
+          "anomaly"
         ],
         "additionalProperties": false
       },
@@ -17967,6 +18162,9 @@
               "$ref": "#/components/schemas/MoneyTimelineEvent"
             }
           },
+          "balance": {
+            "$ref": "#/components/schemas/MoneyBalance"
+          },
           "adminActions": {
             "type": "array",
             "items": {
@@ -18034,13 +18232,33 @@
                         "type": "string",
                         "format": "date-time",
                         "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                      },
+                      "stale": {
+                        "type": "boolean",
+                        "description": "Recette § 5.15 (A165) — la proposition dépasse le reste remboursable ou le deal ne peut plus rien recevoir"
+                      },
+                      "staleReason": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "ABOVE_REMAINING",
+                              "NOT_REFUNDABLE"
+                            ]
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
                       }
                     },
                     "required": [
                       "amountCents",
                       "reason",
                       "byAdmin",
-                      "at"
+                      "at",
+                      "stale",
+                      "staleReason"
                     ],
                     "additionalProperties": false
                   },
@@ -18134,6 +18352,7 @@
           "retention",
           "dates",
           "timeline",
+          "balance",
           "adminActions",
           "manualRefund",
           "allowedActions"

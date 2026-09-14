@@ -28,8 +28,21 @@ export function useTripsSearch(params: SearchTripsParams) {
         cursor: pageParam,
         limit: params.limit ?? PAGE_SIZE,
       });
-      // D66 3A — le funnel commence ici (première page seulement)
-      if (!pageParam) void track("search_performed", { origin: (params as { origin?: string }).origin ?? null, destination: (params as { destination?: string }).destination ?? null, weightKg: (params as { weightKg?: number }).weightKg ?? null, resultsCount: page.trips?.length ?? 0, hasMore: Boolean(page.nextCursor) });
+      // D66 3A — le funnel commence ici (première page seulement).
+      // ANO-WEB-90 (recette 5.27) : l'événement lisait `params.origin` / `params.destination`, deux
+      // clés qui n'existent pas dans `SearchTripsParams` (elles s'appellent `from` et `to`) — la
+      // mesure partait donc TOUJOURS avec `origin: null, destination: null`, et aucun corridor
+      // recherché n'était observable. Les noms de propriétés restent `origin` / `destination`
+      // (contrat de la mesure, en anglais) : seule la lecture est corrigée.
+      if (!pageParam) {
+        void track("search_performed", {
+          origin: params.from ?? null,
+          destination: params.to ?? null,
+          weightKg: params.weightKg ?? null,
+          resultsCount: page.trips?.length ?? 0,
+          hasMore: Boolean(page.nextCursor),
+        });
+      }
       return page;
     },
     initialPageParam: null as string | null,

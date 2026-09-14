@@ -62,7 +62,8 @@
       "RELEASED": "Libéré le {date} · transaction close",
       "RELEASED_NO_CHARGE": "Jamais débité · l'empreinte a disparu",
       "REFUNDED": "Remboursé {amount} le {date}",
-      "PARTIALLY_REFUNDED": "Remboursé {amount} le {date} · retenue {retention} reversée au Voyageur"
+      "PARTIALLY_REFUNDED": "Remboursé {amount} le {date} · retenue {retention} reversée au Voyageur",
+      "PARTIALLY_REFUNDED_AFTER_COMPLETION": "Remboursé {amount} le {date} · {kept} ont réglé ton envoi"
     }
   },
   "unknownName": "un membre"

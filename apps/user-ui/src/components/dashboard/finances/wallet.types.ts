@@ -42,6 +42,9 @@ export type WalletPaymentItem = {
   amountCents: number;
   refundAmountCents: number | null;
   retentionCents: number | null;
+  /** Recette 02-ADMIN § 5.15 (ANO-ADM-36) — ce que l'Expéditeur a finalement payé, et pourquoi le remboursement est partiel. */
+  keptCents?: number | null;
+  partialKind?: "LATE_CANCELLATION" | "AFTER_COMPLETION" | null;
   currencyCode: string;
   date: string | null;
 };

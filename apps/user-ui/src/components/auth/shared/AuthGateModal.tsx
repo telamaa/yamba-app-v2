@@ -19,6 +19,7 @@ import { Lock, X } from "lucide-react";
 import { useRouter } from "@/i18n/navigation";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import LoginForm from "@/components/auth/forms/LoginForm";
+import { useDialogFocus } from "@/hooks/useDialogFocus";
 
 type Props = {
   open: boolean;
@@ -37,6 +38,9 @@ export default function AuthGateModal({ open, onCloseAction, title, subtitle, re
   const router = useRouter();
   const isMobile = useIsMobile();
   const panelRef = useRef<HTMLDivElement | null>(null);
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  // ANO-WEB-94 — le focus reste dans la porte tant qu'elle est ouverte, et revient sur le geste de départ.
+  useDialogFocus(dialogRef, open);
 
   const handleSignedIn = () => {
     onCloseAction();
@@ -79,6 +83,7 @@ export default function AuthGateModal({ open, onCloseAction, title, subtitle, re
   // (cœur favori) — rendue dans l'ancre, chaque clic naviguerait.
   return createPortal(
     <div
+      ref={dialogRef}
       className={`fixed inset-0 z-[210] flex ${isMobile ? "items-end" : "items-center justify-center p-4"}`}
       role="dialog"
       onClick={(e) => e.stopPropagation()}
@@ -86,9 +91,13 @@ export default function AuthGateModal({ open, onCloseAction, title, subtitle, re
       aria-labelledby="auth-gate-title"
       aria-describedby="auth-gate-subtitle"
     >
+      {/* Le voile ferme à la souris, mais ce n'est pas une commande de plus pour le clavier ni pour un
+          lecteur d'écran : la croix et « Plus tard » suffisent (chapitre 5.31 — il était le PREMIER arrêt
+          de tabulation de la fenêtre, et portait le même nom que les deux autres). */}
       <button
         type="button"
-        aria-label={t("later")}
+        aria-hidden="true"
+        tabIndex={-1}
         onClick={onCloseAction}
         className="absolute inset-0 bg-slate-900/50 backdrop-blur-[2px]"
       />
@@ -100,7 +109,9 @@ export default function AuthGateModal({ open, onCloseAction, title, subtitle, re
         <button
           type="button"
           onClick={onCloseAction}
-          aria-label={t("later")}
+          // Chapitre 5.31 — la croix s'appelait « Plus tard », comme le lien du bas et le voile : trois
+          // contrôles, un seul nom. Une croix FERME.
+          aria-label={t("close")}
           className={`absolute inline-flex items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100 ${isMobile ? "right-3 top-2 h-8 w-8" : "right-4 top-4 h-9 w-9"}`}
         >
           <X size={isMobile ? 17 : 18} />

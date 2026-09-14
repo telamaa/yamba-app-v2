@@ -22,6 +22,9 @@ const prismaMock = {
   $transaction: jest.fn(),
 };
 jest.mock("@packages/libs/prisma", () => ({ __esModule: true, default: prismaMock }), { virtual: true });
+// ANO-WEB-10 — le refus au pickup recalcule la réputation des deux parties (pour prouver qu'elle ne bouge pas).
+const recomputeBookingParties = jest.fn().mockResolvedValue(undefined);
+jest.mock("./reputation.service", () => ({ recomputeBookingParties: (...a: unknown[]) => recomputeBookingParties(...a) }));
 
 import { ForbiddenError, NotFoundError } from "@packages/error-handler";
 import { FakePaymentProvider, type PaymentProvider } from "@packages/payments";
@@ -199,7 +202,7 @@ describe("B — refusePickup (A40)", () => {
     const result = await makeService(provider).refusePickup(CARRIER, BOOKING_ID, { reason: "SUSPICIOUS_CONTENT" });
 
     // L'argent d'abord : remboursement INTÉGRAL demandé au fournisseur sur l'intent CAPTURÉ.
-    expect(refundSpy).toHaveBeenCalledWith(intentId, 2957);
+    expect(refundSpy).toHaveBeenCalledWith(intentId, 2957, { idempotencyKey: `yamba:refund:pickup-refused:${BOOKING_ID}:2957` }); // A165
     expect(refundSpy.mock.invocationCallOrder[0]).toBeLessThan(prismaMock.$transaction.mock.invocationCallOrder[0]);
     const { where, data } = lastUpdate();
     expect(where).toEqual({ id: BOOKING_ID, status: "ACCEPTED" });
@@ -208,10 +211,12 @@ describe("B — refusePickup (A40)", () => {
       closedAt: NOW,
       closedBy: "CARRIER",
       pickupRefusalReason: "SUSPICIOUS_CONTENT",
+      pickupRefusedAt: NOW, // ANO-WEB-10 — la marque que la réputation exclut
       refundedAt: NOW,
       refundAmountCents: 2957,
       refundId: expect.stringMatching(/^re_fake_/), // C-PR5 (D58) — rapprochement exact
     });
+    expect(recomputeBookingParties).toHaveBeenCalledWith(expect.objectContaining({ shipperId: SHIPPER_ID, carrierId: CARRIER_ID }));
     expect(prismaMock.trip.updateMany).toHaveBeenCalledWith({
       where: { id: TRIP_ID, reservedKg: { gte: 2 } },
       data: { reservedKg: { decrement: 2 } },
@@ -227,6 +232,7 @@ describe("B — refusePickup (A40)", () => {
     prismaMock.booking.findUnique.mockResolvedValue(makeBookingRecord({ paymentIntentId: intentId }));
     await makeService(provider).refusePickup(CARRIER, BOOKING_ID, {});
     expect(lastUpdate().data.pickupRefusalReason).toBeNull();
+    expect(lastUpdate().data.pickupRefusedAt).toEqual(NOW); // sans raison, la marque du refus est là quand même
     await expect(makeService(provider).refusePickup(SHIPPER, BOOKING_ID, {})).rejects.toBeInstanceOf(ForbiddenError);
   });
 

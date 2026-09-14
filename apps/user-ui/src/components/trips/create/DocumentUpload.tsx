@@ -21,6 +21,8 @@ type Props = {
   label?: string;
   hint?: string;
   maxDocuments?: number;
+  /** ANO-WEB-25 — message affiché quand `maxDocuments` est atteint (le composant n'a pas de locale). */
+  limitHint?: string;
 };
 
 const MANGO = "#FF9900";
@@ -93,11 +95,12 @@ export default function DocumentUpload({
                                          label = "Proof",
                                          hint = "Ticket, itinerary...",
                                          maxDocuments = 5,
+                                         limitHint = "Maximum reached — remove a document to add another.",
                                        }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [lightbox, setLightbox] = useState<{ url: string; name: string } | null>(null);
-  const { upload, progress, isUploading, error, reset } =
+  const { upload, progress, isUploading, error } =
     useImageKitUpload("/trips");
 
   const canAddMore = documents.length < maxDocuments;
@@ -130,10 +133,12 @@ export default function DocumentUpload({
       if (newDocs.length > 0) {
         onAddAction(newDocs);
       }
-      reset();
+      // ANO-WEB-26 (recette 5.8) — ne PAS `reset()` ici : cela effaçait l'erreur de validation
+      // (« Le fichier dépasse 5 Mo. », « Format non supporté ») avant même qu'elle soit lue. Le
+      // prochain dépôt la remplace (le hook remet l'erreur à zéro au début de chaque envoi).
       if (inputRef.current) inputRef.current.value = "";
     },
-    [documents.length, onAddAction, upload, canAddMore, maxDocuments, reset]
+    [documents.length, onAddAction, upload, canAddMore, maxDocuments]
   );
 
   const handleDrop = useCallback(
@@ -234,6 +239,12 @@ export default function DocumentUpload({
         </div>
       )}
 
+      {/* ANO-WEB-25 (recette 5.8) — la limite atteinte se DIT */}
+      {!canAddMore && (
+        <p className="mb-3 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-[11px] text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">
+          {limitHint}
+        </p>
+      )}
       {error && (
         <div className="mt-2 flex items-start gap-1.5 rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-[11px] text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300">
           <AlertCircle size={12} className="mt-0.5 flex-shrink-0" />

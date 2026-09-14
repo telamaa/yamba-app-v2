@@ -283,7 +283,7 @@ describe("A — accept (capture D39, gate D31)", () => {
     await expect(makeService(provider).accept(CARRIER, BOOKING_ID, { charterAccepted: true })).rejects.toMatchObject({
       code: "TRANSITION_NOT_ALLOWED",
     });
-    expect(refundSpy).toHaveBeenCalledWith(intentId);
+    expect(refundSpy).toHaveBeenCalledWith(intentId, undefined, { idempotencyKey: `yamba:refund:capture-rollback:${BOOKING_ID}:full` }); // A165
   });
 });
 
@@ -386,7 +386,7 @@ describe("C — cancel Expéditeur (ANN-01, D39)", () => {
 
     const result = await makeService(provider).cancel(SHIPPER, BOOKING_ID, {});
 
-    expect(refundSpy).toHaveBeenCalledWith(intentId, 2957);
+    expect(refundSpy).toHaveBeenCalledWith(intentId, 2957, { idempotencyKey: `yamba:refund:cancel:${BOOKING_ID}:2957` }); // A165
     expect(writtenEventPayload("booking.cancelled")).toMatchObject({ wasAccepted: true });
     expect(result.refundAmountCents).toBe(2957);
   });
@@ -401,7 +401,7 @@ describe("C — cancel Expéditeur (ANN-01, D39)", () => {
 
     const result = await makeService(provider).cancel(SHIPPER, BOOKING_ID, {});
 
-    expect(refundSpy).toHaveBeenCalledWith(intentId, 1479); // 2957 × 50 % arrondi
+    expect(refundSpy).toHaveBeenCalledWith(intentId, 1479, { idempotencyKey: `yamba:refund:cancel:${BOOKING_ID}:1479` }); // 2957 × 50 % arrondi — A165 : clé par geste
     expect(prismaMock.booking.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ refundAmountCents: 1479 }) })
     );

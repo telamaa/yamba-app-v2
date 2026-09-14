@@ -406,7 +406,7 @@ Ordre de demarrage : auth -> trip -> gateway.
   (GET /admin/status, sondage 30 s, editeur de maintenance). Gateway aligne (alias @packages,
   tsconfig). Chantier C : SOLDE (C-PR1 → C-PR8c). Candidat registre : moniteur externe de
   disponibilite avant le lancement. MERGE 05/09 : **#182** (17 checks comptes).
-- Plateforme de tests : **989** (trip 257, deal 575, notification 115, message 42) + auth 225
+- Plateforme de tests : **990** (trip 257, deal 576, notification 115, message 42) + auth 225
   (09/09, post-campagne de recette « taches planifiees »).
 - 08/09 : **CAMPAGNE DE RECETTE API (cahier n° 3) — TERMINEE ET ACCEPTEE**. 146 fiches, 145
   jouees, 1 en ⏭ justifie (CLI Stripe absente du poste, objet atteint par des evenements
@@ -556,7 +556,1007 @@ Ordre de demarrage : auth -> trip -> gateway.
   le Voyageur ne peut pas annuler un deal (403 SHIPPER_ONLY malgre ANN-02) — arbitrage demande.
   Harnais : `payer()` attend l'intention de paiement (clic muet sinon). Poste : `nx serve` tombe
   sur un changement de lib partagee (recursion Nx) → trip/notification/message en bundle.
-  17 scenarios e2e verts. PR a ouvrir. Reste : E2E-4 a E2E-6, les 32 chapitres 5.x, 02-ADMIN.
+  17 scenarios e2e verts. MERGE 09/09 : **#261** (17 checks comptes). ANO-WEB-07, decision du
+  09/09 : le message D72 renvoie vers « Mes trajets » (corrige dans la PR suivante) ; l'annulation
+  d'un deal par le Voyageur reste un lot a part. Reste : E2E-4 a E2E-6, les 32 chapitres 5.x, 02-ADMIN.
+- 09/09 : **WEB-E2E-4, LE COMPTE NEUF PLAFONNE (branche `chore/e2e-parcours-4`)** — quatrieme
+  parcours vert : 14 etapes, 1 min 06 (inscription avec code, connexion sans « Rester connecte »,
+  450 € et 12 kg refuses A L'INTENTION, cinq demandes puis la sixieme refusee, aucun score nulle
+  part, export des donnees par la porte avec telechargement reel, acceptation, session expiree
+  simulee (SES-01 : la cle Redis EST le delai d'inactivite), sessions actives, suppression
+  bloquee sans porte). **ANO-WEB-08 (majeure)** : l'intention de paiement partait sans la valeur
+  declaree — le plafond tombait apres l'autorisation bancaire (regression d'ANO-API-12) ;
+  corrige. **ANO-WEB-09 (majeure)** : l'export « Mes donnees » demandait un blob, le 403
+  SUDO_REQUIRED arrivait en blob, la porte ne s'ouvrait JAMAIS — export RGPD inutilisable ;
+  corrige. ANO-WEB-07 : message D72 corrige (« Mes trajets »). Ecarts cahier : « le geste
+  reprend » (le produit rafraichit, ne rejoue pas), « Appareils connectes » = « Sessions
+  actives ». 18 scenarios e2e verts. PR **#262** (17 checks comptes). Reste : E2E-5, E2E-6, les 32
+  chapitres 5.x, 02-ADMIN.
+- 10/09 : **WEB-E2E-5, LE REFUS AU PICKUP (branche `chore/e2e-parcours-5`)** — cinquieme parcours
+  vert : 8 etapes, 1 min 06 (reservation 22,00 € sur `fih`, acceptation et capture, « Refuser le
+  colis » avec le rappel « ne penalise jamais ta reputation », raison « contenu non conforme »,
+  toast, remboursement INTEGRAL prouve par la reponse du serveur ET la ligne Finances, deux emails
+  dans l'ordre sans le mot « retenue », ligne de faits identique avant / apres, kilos rendus).
+  **ANO-WEB-10 (majeure)** : la reputation comptait tout deal CANCELLED clos par le Voyageur apres
+  acceptation comme « annulation tardive » — donc chaque refus au pickup, au prochain recalcul
+  (la machine dit « sans penalite ») ; corrige : marque `Booking.pickupRefusedAt` posee par le
+  refus, requete des faits Voyageur qui l'exclut (absent compris, `isSet`), refus qui recalcule
+  les deux parties. deal-service **576** tests (+1), plateforme 990. Ecarts cahier : sujet de
+  l'email « n'a pas pu etre pris en charge », kilos lus a l'API. 19 scenarios e2e verts.
+  PR **#263** (empilee sur #262). Reste : E2E-6, les 32 chapitres 5.x, 02-ADMIN.
+- 10/09 : **WEB-E2E-6, LE DESTINATAIRE (branche `chore/e2e-parcours-6`)** — sixieme et dernier
+  parcours du chapitre 6, vert : 9 etapes, 1 min 00 (le tronc de E2E-1 rejoue, la page publique
+  rechargee a chaque jalon : titre, corridor, dates, frise, aide qui change ; rien de plus a
+  l'ecran NI dans le code source NI dans l'API — liste de cles FERMEE du contrat ; mention de
+  confidentialite et son lien ; bloc d'acquisition ; jeton altere = 404 uniforme ; aucun email
+  au destinataire, dont l'adresse a ete declaree expres). **ANO-WEB-11 (majeure)** : « Devenir
+  Voyageur » menait a un bouchon de la migration i18n (« Become a carrier (UI only) ») depuis la
+  page destinataire et l'accueil, et a un 404 (`/become-yamber`) depuis le pied de page et le
+  menu visiteur ; corrige : redirections serveur des bouchons, quatre liens vers
+  `/carrier/onboarding`. Ecarts cahier : l'aeroport n'est pas un jalon public ; « aucun SMS »
+  est un fait de plateforme. 20 scenarios e2e verts. **Chapitre 6 clos** (6 parcours, 100
+  etapes, ANO-WEB-08 a 11). PR **#264**. Reste : les 32 chapitres 5.x, 02-ADMIN.
+- 10/09 : **CHAPITRE 5.1 DU CAHIER 01-WEB — WEB-ACC, L'ACCUEIL DU VISITEUR (branche
+  `chore/recette-web-5-1`)** — premier des 32 chapitres « fiches », 12 fiches conformes en 1 min 24
+  (`apps/e2e/src/chapitres/web-acc.spec.ts`). Six anomalies trouvees et closes : ANO-WEB-12
+  (BLOQUANTE : « Rechercher » de l'accueil ne faisait qu'un console.log, et /search interrogeait un
+  brouillon vide), ANO-WEB-13 (BLOQUANTE : le libelle « Ville, Pays » de l'autocompletion compare
+  entier par `contains` → zero resultat pour toute ville etrangere ; `lib/place-text.ts`,
+  `placeSearchTerm`, trip-service 257 → 260), ANO-WEB-14 (MAJEURE : `loading=async` + `onload` →
+  la premiere requete de suggestions echouait sur « importLibrary is not a function », symptome
+  dependant du rythme de frappe ; `callback=` de Google), ANO-WEB-15 (icones sociales actives vers
+  des comptes qui ne sont pas les notres), ANO-WEB-16 (`<html lang="fr">` sur /en : `getLocale()`
+  + `HtmlLang`), ANO-WEB-17 (deux `<main>` imbriques sur les pages legales). A trancher : l'en-tete
+  desktop du visiteur sans « Creer un compte » ni « Rechercher un trajet ». Piege de poste : la cle
+  Google Maps n'accepte que `localhost` comme referent. Harnais : 32 scenarios verts. PR **#265**
+  (empilee sur #264). Reste : 5.2 a 5.32, 02-ADMIN.
+- 13/09 : **CAHIER 02-ADMIN — § 4.1 CONNEXION EN DEUX ETAPES (branche `chore/recette-admin-4-1`, empilee sur #300)** —
+  premier chapitre du back-office : 6 fiches CONFORMES (1 apres correction), 7 scenarios en serie, 17 min
+  (`apps/e2e/src/admin/adm-sec-connexion.spec.ts`). OUTIL : `pages/journal-admin.ts` relit le journal par l'API de
+  /audit (session super admin, borne `from`, ordre chronologique) — la double verification du cahier (§ 3.4). COMPTE
+  ADMIN JETABLE (inscription + grant-admin.ts, revoque et efface en afterAll) pour SEC-2/4/5 ; codes TOTP CALCULES ;
+  attentes reelles 5 et 15 min emboitees. ANO-ADM-01 close : un compte bloque (TOO_MANY_ATTEMPTS) affichait « Code
+  invalide. » meme avec le bon code → LoginFlow lit `details.code`. ECART DOCUMENTAIRE : `ADMIN_LOGIN` cible `SESSION`
+  sans identifiant (le cahier dit USER · id) → le filtre par cible de /audit ne retrouve pas les connexions. A
+  TRANCHER : cible de ADMIN_LOGIN, regeneration des codes de secours. Deja ecrit pour § 4.3 : ADM-PRM-9 genere la
+  matrice routes × 7 comptes depuis les routeurs et ADMIN_PERMISSIONS — CONFORME (aucune garde absente). Harnais : 339
+  scenarios. PR a ouvrir. Reste : § 4.2, § 4.3 (PRM-1 a 8), § 5 a 7.
+- 13/09 : **CAHIER 02-ADMIN — § 4.2 SESSIONS, § 4.3 PERMISSIONS, § 5.1 ACCUEIL (branche `chore/recette-admin-4-2`,
+  empilee sur #301)** — 17 scenarios verts sur la pile reelle : ADM-SEC-7 a 10 (SEC-8 = 46 min d'attente reelle, SEC-9 =
+  substituts + session vieillie a 11 h 59 dans Redis), ADM-PRM-0 a 9 (PRM-0 = miroir front de la matrice identique au
+  contrat ; PRM-9 = chaque route admin des quatre routeurs × les sept comptes), ADM-ACC-1 a 3 (ecran = API = cahier,
+  tuiles polluees comptees en base). TROIS ANOMALIES CLOSES : ANO-ADM-04 (MAJEURE — revoquer une session admin ne
+  coupait que le renouvellement, le jeton d'acces restait accepte 15 min → le jeton porte le `jti`, `isAdminAuthenticated`
+  verifie `admin_jti:<id>:<jti>` a chaque requete, echec FERME si Redis est muet), ANO-ADM-02 (un Mediateur recevait
+  400 « Nothing to reset » au lieu de 403 sur une remise a zero de cles deja par defaut), ANO-ADM-03 (PRIVACY ne pouvait
+  pas ouvrir la fiche ou vivent export et effacement → A153, `users.read` ouvert a PRIVACY). Aussi : seed-deals pose la
+  relance du versement en echec a +23 h (le cron FAKE vidait la file), `nx.json` sharedGlobals += `packages/**`, schema
+  Prisma, tsconfig.base (cache de test perime). Pieges harnais : `isVisible({ timeout })` n'attend pas → `waitFor` ; la sonde de
+  session admin acceptait un cookie a quelques secondes de son expiration → renouvellement a < 5 min.
+  auth-service 235, harnais 356. A mettre a jour dans le cahier : menu PRIVACY, formulaire « Trancher » avant 72 h,
+  message « dernier super administrateur » inatteignable, tuiles non listees, « aucune alerte » sur jeu d'essai neuf.
+  Reste : § 5.2 a 7.
+- 13/09 : **CAHIER 02-ADMIN — § 5.2 ALERTES DE SEUIL (branche `chore/recette-admin-5-2`, empilee sur #302)** — 4 fiches
+  CONFORMES (ALR-3 et ALR-4 partielles), aucune anomalie, aucun code produit, jouees deux fois vertes
+  (`apps/e2e/src/admin/adm-alr-alertes.spec.ts`). Methode : une alerte sans etat se PILOTE PAR SON SEUIL (PATCH
+  /admin/settings, sonde /admin/alerts pour le cache 30 s, seuils retablis en finally) ; jeu d'essai MESURE avant la
+  fiche. ALR-3 : `notifyNewAlerts` appele avec le vrai Redis hors fenetre du cron, verrous du jour purges (consigne), un
+  email puis aucun ; lendemain simule (horloge injectee + magasin memoire + EMAIL_PROVIDER=fake). ECARTS DOC : le
+  versement du seed (termine J-3) franchit deja 48 h (le cahier dit « en echec depuis 24 h ») ; litiges et renversement
+  infranchissables juste apres le seed ; DOC-METIER ALR01 perime sur le renversement. A TRANCHER : « Versements en echec
+  depuis plus de 48 h » mesure l'age de la FIN DU DEAL, pas de l'echec (libelle ou requete) ; un seed « alertes vieillies ».
+  Harnais 360. Reste : § 5.3 a 7.
+- 13/09 : **CAHIER 02-ADMIN — § 5.3 UTILISATEURS (branche `chore/recette-admin-5-3`, empilee sur #303)** — 3 fiches
+  CONFORMES (USR-1 et USR-3 apres correction), jouees deux fois identiques (`apps/e2e/src/admin/adm-usr-utilisateurs.spec.ts`).
+  ANO-ADM-05 (MAJEURE, close) : Prisma+Mongo `contains` = `$regex` NON echappe → `+33612345601` = 0 resultat, `a.b` = 52,
+  `(` = erreur 500 ; et `searchAdvanced` n'annoncait jamais « via phone » → `escapeRegex` / `phoneNeedle` / `matchedOnFor` /
+  `textSearchOr` dans `apps/auth-service/src/lib/admin-users.query.ts` (+3 tests, auth 238). ANO-ADM-06 (mineure,
+  outillage, close) : `seed-deals.ts` ne remettait pas a zero litiges perdus / annulations tardives (User + CarrierPage) →
+  Chinwe 0→2→3 litiges perdus, score vers « A risque ». MEME DEFAUT regex dans trip-service (`admin-trips.rules.ts`,
+  `trip-search.controller.ts`) : a traiter au § 5.7. PIEGE DE POSTE : sous `nx run-many serve`, la reconstruction
+  d'auth-service echoue (« Recursive task invocation ») et l'ANCIEN process repond 200 → auth-service tourne desormais en
+  bundle (`node --env-file=../../.env dist/main.js`). En dev, USER_VIEWED x2 par ouverture (React StrictMode). A
+  TRANCHER : dedoublonner USER_VIEWED, recherche sans accents, libelles FR des roles. Harnais 363. Reste : § 5.4 a 7.
+- 14/09 : **CAHIER 02-ADMIN — § 5.4 SANCTIONS (branche `chore/recette-admin-5-4`, empilee sur #304)** — 5 fiches ADM-SNC
+  + 2 fiches d'anomalie, CONFORMES, jouees deux fois vertes (`apps/e2e/src/admin/adm-snc-sanctions.spec.ts`, afterAll
+  remet Pauline et Thomas actifs). TROIS ANOMALIES CLOSES : ANO-ADM-07 (MAJEURE) la date « Jusqu'au » d'une sanction
+  n'etait lue par PERSONNE (403 une minute apres l'echeance) → regle pure `packages/middleware/account-status.ts`
+  (`effectiveAccountStatus`, `notSuspendedOwnerFilter`, `activeSanctionFilter`) lue par isAuthenticated,
+  requireActiveAccount, login, recherche, tuiles, fiche admin — par LECTURE (D56), sans cron ; ANO-ADM-08 (MAJEURE) le
+  trajet d'un Voyageur suspendu restait ouvert (page publique 200) et reservable par son lien → `publicTripWhere` +
+  `checkTripBookable` (TRIP_NOT_BOOKABLE) ; ANO-ADM-09 (mineure) connexion Google et renouvellement ne verifiaient pas
+  la suspension. PIEGE : dans un filtre de RELATION Prisma+Mongo, `date: { lte: now }` MATCHE null (ordre BSON) →
+  borne basse `gt: new Date(0)`. AMELIORATIONS FAITES : messages de resultat nommant le geste, refus lus par code,
+  « jusqu'au » inclus (23:59:59 locale, etait minuit UTC) + min=demain, tuile « Sanctions proposees » compte les
+  escalades, badge « Actif (sanction echue) ». A TRANCHER : motif libre envoye au membre (motifs types ?), aucun email ni
+  journal a l'echeance (acteur SYSTEM au journal), trajets d'un Voyageur restreint reservables. Tests : auth 242, trip
+  262, deal 578, harnais 370. Poste : auth, trip, deal en bundles detaches (nohup). Reste : § 5.5 a 7.
+- 14/09 : **CAHIER 02-ADMIN — § 5.5 SUPPRESSION D'ADRESSE EMAIL (branche `chore/recette-admin-5-5`, empilee sur #305)** —
+  ADM-EML-1 + 3 fiches de preuve (EML-0 webhook signe, EML-2 plainte/concurrence/droits, EML-3 emails super admin),
+  CONFORMES, jouees deux fois vertes (`apps/e2e/src/admin/adm-eml-suppression.spec.ts`). La suppression nait du VRAI
+  webhook Svix signe (secret du poste, via la passerelle) ; « aucun email » prouve par deux envois reels attendus puis
+  absents, « repartent » par un envoi recu. DEUX ANOMALIES CLOSES : ANO-ADM-10 (MAJEURE) `emailCarrier` de trip-service
+  (billet, masquage) ignorait `emailSuppressedAt` ET `isDeleted` → `lib/carrier-mailer.ts` ; ANO-ADM-11 (mineure) emails
+  aux super admins (parametres, maintenance) → filtre joignable. + 500 sur deux levees simultanees (P2034). A155 : levee
+  MOTIVEE (>= 20, `after.liftReason`), ecriture conditionnelle + `withWriteConflictRetry` (remonte dans
+  `packages/libs/prisma`, re-export deal-service) ; regle partagee `canReceiveEmail` / `reachableRecipientWhere` dans
+  `@packages/email` (fragment a combiner sous AND). AMELIORATIONS FAITES : formulaire de levee, avertissement plainte,
+  refus par code, message qui survit au rechargement, bouton aligne sur SUPER_ADMIN_ONLY, « motif non renseigne »,
+  contre-epreuve systematique dans le harnais. OpenAPI regenere. A TRANCHER : codes de connexion / notifications de
+  securite envoyes a une adresse supprimee ; seuil de rebonds temporaires ; derniers emails en echec sur la fiche.
+  Tests : auth 248, trip 267, notification 119, deal 578, harnais 374. Reste : § 5.6 a 7.
+- 14/09 : **CAHIER 02-ADMIN — § 5.6 EXPORTS CSV (branche `chore/recette-admin-5-6`, empilee sur #306)** — 4 fiches
+  CONFORMES (EXP-4 ajoutee), jouees deux fois vertes (`apps/e2e/src/admin/adm-csv-exports.spec.ts`) : fichier TELECHARGE
+  par l'ecran, BOM relu, CSV PARSE, identifiants = liste de l'ecran (requete capturee, relue page par page), fouille
+  email/telephone, journal. TROIS ANOMALIES CLOSES : ANO-ADM-12 BLOQUANTE (l'export operationnel des billets livrait
+  `originalName`, texte libre du membre — mesure : « sfr-facture-0752426937-0.pdf » → colonne `fileExtension`, A156 :
+  jamais un champ libre dans un export operationnel), ANO-ADM-13 MAJEURE (export = onglet sur l'URL : jeton expire → JSON
+  401 brut, aucun rafraichissement → `downloadFile` par fetch dans `admin-ui/src/lib/api.ts`), ANO-ADM-14 (copie
+  divergente de `csvCell` en Finances). AMELIORATIONS FAITES : bibliotheque unique `@packages/libs/csv` (nombre non
+  neutralise, `EXPORT_MAX_ROWS`, `capExportRows`, en-tetes `X-Truncated` / `no-store`), troncature dite au journal et a
+  l'ecran, compteur du motif, refus par code, `INVALID_QUERY` avec code sur l'arbitrage. A TRANCHER : motif de l'export
+  nominatif dans l'URL (journaux techniques), export Finances sans plafond (§ 5.16), noms de fichiers en UTC.
+  Tests : trip 274, deal 578, auth 248, harnais 378. Reste : § 5.7 a 8.
+- 14/09 : **CAHIER 02-ADMIN — § 5.7 TRAJETS : LISTE, FICHE, MASQUAGE (branche `chore/recette-admin-5-7`, empilee sur #307)**
+  — 7 scenarios CONFORMES (TRJ-1 a 5 + ANO-ADM-15 + TRJ-4 bis), joues deux fois verts (`adm-trj-trajets.spec.ts`) :
+  effet reel du masquage cote public (recherche, page publique 404) et membre (bandeau, TRIP_NOT_BOOKABLE, deal accepte
+  lisible), emails, journal. QUATRE ANOMALIES CLOSES : ANO-ADM-15 MAJEURE (Prisma+Mongo traduit contains/startsWith/
+  equals insensible en `$regex` SANS echapper : « ( » → 500 sur la recherche PUBLIQUE et ses facettes, « . » → 41/41,
+  « P.ris » = doublon d'alerte route → module partage `packages/libs/prisma/text-search.ts` `escapeRegex`/`containsText`/
+  `equalsText`, A157, branche dans admin-trips.rules, trip-search, saved-route ; auth `admin-users.query` le reexporte),
+  ANO-ADM-16 (billet « a verifier » sur 5 trajets partis → `effectiveTicketStatus` EXPIRED a la lecture + borne de
+  depart du filtre), ANO-ADM-17 (proposer sur un trajet masque accepte, ressurgissait au retablissement → 400),
+  ANO-ADM-18 (email de masquage sans lien vers le trajet). CONCURRENCE : deux « Masquer » simultanes → 200 + 500 P2034 →
+  `updateMany` garde par l'etat + `withWriteConflictRetry` (200 + 400, une ligne, un email). AMELIORATIONS FAITES : motif
+  vide au depart (le retablissement journalisait le motif de la proposition), messages nommes, refus par code, compteur
+  n/20, remplacement de proposition garde l'ancienne en `before`, « c'est ton propre trajet », statuts/mode/reservations
+  en francais, q et villes lus dans l'URL. A TRANCHER : accepter une demande PENDING sur un trajet masque ; recherche
+  insensible aux accents. Tests : trip 282, auth 248, harnais 385. Reste : § 5.8 a 8.
+- 14/09 : **CAHIER 02-ADMIN — § 5.8 BILLETS A VERIFIER (branche `chore/recette-admin-5-8`, empilee sur #308)** — 8
+  scenarios CONFORMES (BIL-1 a 4 du cahier + 5 a 8 ajoutees), CHAQUE fiche jouee AVANT correction (BIL-1, 5, 6, 7, 8
+  rouges sur leur defaut) puis 8/8 verts deux fois (`adm-bil-billets.spec.ts`). TROIS ANOMALIES CLOSES : ANO-ADM-19
+  MAJEURE (le badge public « Billet vérifié » etait ECRIT geste par geste : un 2e billet rejete passait en REJECTED un
+  trajet dont le 1er restait verifie ; supprimer le billet verifie gardait le badge → statut DEDUIT des billets,
+  `apps/trip-service/src/lib/ticket-status.rules.ts` `tripTicketStatusFromDocuments`, recalcule dans la transaction de
+  decision et au depot/suppression `syncTripTicketStatus`), ANO-ADM-20 (file et export pas alignes, trajet annule « a
+  verifier », 200 billets partis masquaient un billet a venir, decision acceptee sur trajet parti → `buildTicketsWhere`
+  decidables + `departedTicketsWhere` a part, 400 TICKET_TRIP_DEPARTED/CLOSED), ANO-ADM-21 MAJEURE (A158 : changer la
+  date ou une ville gardait le badge → `changedTicketFacts` rouvre les billets verifies). AMELIORATIONS FAITES : sa propre
+  carte sans boutons, refus par code + rechargement, motif nomme, anti double clic, message hors chargement, mode et type
+  de fichier ; documents en francais sur la fiche trajet ; conflit d'interets avant « deja traite » ; retry P2034. A
+  TRANCHER : URL ImageKit publiques et permanentes (fichiers prives + URL signees) ; prevenir le Voyageur que modifier
+  date/ville retire le badge ; rouvrir un rejet « dates » quand les dates sont corrigees. Tests : trip 292, harnais 393.
+  Reste : § 5.9 a 8.
+- 14/09 : **CAHIER 02-ADMIN — § 5.9 MEDIATION (branche `chore/recette-admin-5-9`, empilee sur #309)** — 9 scenarios
+  CONFORMES (MED-1 a 6 du cahier + 7 a 9 ajoutees), joues contre le code non corrige puis 9/9 verts deux fois
+  (`adm-med-mediation.spec.ts`, 5 preuves par decision dont les remboursements REELLEMENT emis, lus par la fiche argent).
+  Manoeuvres : `dispute.responseDelayHours` a 12 h (min du catalogue) et version du Voyageur deposee par Adebayo.
+  TROIS ANOMALIES CLOSES : ANO-ADM-22 BLOQUANTE (deux decisions simultanees remboursaient DEUX FOIS — mesure : 7,84 € et
+  15,68 € emis, un seul en base ; l'argent part avant la transaction, le verrou optimiste ne protege que la base → A159
+  verrou Redis par deal pris AVANT toute lecture, `apps/deal-service/src/lib/decision-lock.ts`, 409 DECISION_IN_PROGRESS,
+  echec ferme sans magasin), ANO-ADM-23 (email « le reste est verse au Voyageur » quand il ne recoit rien), ANO-ADM-24
+  (alerte « litiges decidables » : 72 h en dur au lieu du parametre → `countUndecidedDisputes`). AMELIORATIONS : A160
+  dossier tranche relisible (`fileKindOf`) ; refus par code et traduits, montant « 1 234,50 », rechargement apres
+  decision, statut du versement et categorie en francais, compteurs de file toujours visibles, libelle reel du parametre.
+  A TRANCHER : meme verrou pour le remboursement manuel (§ 5.15) et les annulations ; cle d'idempotence Stripe ;
+  coordonnees du destinataire au dossier. PIEGES : FAKE indexe par intent reutilise d'un seed a l'autre (comparer en
+  difference) ; `nx serve` recharge le code pendant un passage « avant ». Tests : deal 586, notification 120, harnais 402.
+  Reste : § 5.10 a 8.
+- 14/09 : **CAHIER 02-ADMIN — § 5.10 RETENUE D'ANNULATION TARDIVE (branche `chore/recette-admin-5-10`, empilee sur #310)**
+  — 4 scenarios CONFORMES (RET-1 compensation, RET-2 restitution, + RET-3 gardes, RET-4 ce que lisent les parties),
+  joues contre le code non corrige (RET-3 vert d'emblee : l'arbitrage de retenue etait DEJA sous le verrou A159 ; deux
+  restitutions simultanees → 200 + 409 DECISION_IN_PROGRESS, un seul remboursement emis), puis 4/4 verts deux fois
+  (`adm-ret-retenue.spec.ts`). Terrain : bzv-held paye 29,12 €, rembourse 14,56 €, retenue 14,56 € → compensation
+  13,00 € (prorata serveur), Yamba 1,56 €. ANO-ADM-25 CLOSE (mineure) : l'email a l'Expediteur d'une compensation
+  inventait une justification (« personne n'a pu attester… il s'etait deplace ») et disait la retenue « versee au
+  Voyageur » alors que Yamba en garde la commission → part Yamba dite (FR/EN, `settlement-emails.ts`, test). ANO-ADM-26
+  CLOSE (majeure, REGRESSION de ANO-ADM-23 § 5.9) : l'Expediteur lisait « Le Voyageur recoit 40,00 € » — WEB-E2E-2
+  etape 18 « chacun son montant » rejoue et rouge → plus aucun montant de l'autre partie, regle portee par les tests
+  unitaires. LECON : un gabarit partage se corrige contre TOUS ses lecteurs (parcours e2e compris). AMELIORATIONS : `RETENTION_DISPOSITION_LABEL` (dossier, fiche argent), indices qui disent la part de Yamba et le
+  total rembourse, message de decision en francais (« statut final : Annulée », « le deal reste annule »). A TRANCHER :
+  le portefeuille de l'Expediteur ne dit pas qu'une retenue attend un arbitrage ; cle d'idempotence Stripe. Tests :
+  notification 121, harnais 406. Reste : § 5.11 a 8.
+- 14/09 : **CAHIER 02-ADMIN — § 5.11 FINANCES, LES FILES D'EXCEPTION (branche `chore/recette-admin-5-11`, empilee sur
+  #311)** — 5 scenarios CONFORMES (FIN-1 quatre onglets, FIN-2 Support, + FIN-3 message brut du fournisseur, FIN-4 tuiles
+  = files, FIN-5 erreurs de l'API), joues contre le code non corrige (FIN-3 vert d'emblee : le motif du fournisseur ne
+  sort jamais de l'admin), puis 5/5 verts deux fois (`adm-fin-files.spec.ts`). Terrain : 1 · 1 · 1 · 0 ; le versement
+  en echec porte « compte non pret » alors que le compte de Thomas est pret. Le rejeu « Relancer » ne double pas
+  l'argent (cle d'idempotence de l'executeur, respectee par FAKE comme par Stripe) — preuve de concurrence laissee au
+  § 5.14. ANO-ADM-27 CLOSE (mineure, A161) : toute route inconnue des cinq services (et donc de la passerelle) servait
+  la page HTML d'Express « Cannot GET … » → `notFoundHandler` 404 JSON `ROUTE_NOT_FOUND`. ANO-ADM-28 CLOSE (mineure) :
+  le Support (kpi.read) lisait l'alerte « Versements en echec… » dont la carte menait a /finances, qui lui repond 403
+  → carte sans lien, « transmets a Finance ou Mediateur ». AMELIORATIONS : `financeQueueWhere` partage file + tuiles
+  (A161), compte de chaque file sur son onglet, `truncated`, onglet ecrit dans l'adresse, statut du deal en francais,
+  « Depuis » qui dit quelle date (fin du deal / annule le / propose le), indice « le compte est pret depuis : Relancer
+  peut aboutir », refus en francais (« Ton profil ne donne pas acces aux finances. »), « Relancer » sans double envoi et
+  message qui nomme le montant, `INVALID_QUEUE_KIND`, sous-titre exact. Tests : auth 249, deal 587, harnais 411.
+  Reste : § 5.12 a 8.
+- 14/09 : **CAHIER 02-ADMIN — § 5.12 FICHE ARGENT D'UN DEAL (branche `chore/recette-admin-5-12`, empilee sur #312)** —
+  5 scenarios CONFORMES (ARG-1 fiche, ARG-2 chronologie, + ARG-3 invariants comptables sur les 23 deals avec
+  contre-epreuve, ARG-4 bilan et libelles, ARG-5 Support), joues contre le code non corrige (ARG-1 vert d'emblee), puis
+  verts trois fois (`adm-arg-fiche-argent.spec.ts`) ; ADM-RET et ADM-FIN rejouees (14/14). Terrain SONDE en base avant
+  la spec. ANO-ADM-29 CLOSE (majeure) : le Support (deals.history.read sans finances.read) ne voyait que « 403 : Your
+  admin profile… » sur /deals/:id → vue reduite « Chronologie du deal », lien du dossier qui dit ce qu'il ouvre.
+  ANO-ADM-30 CLOSE (jeu d'essai) : bzv-cancelled debite puis annule, jamais rembourse → seed rembourse. A162 : bilan de
+  l'argent serveur (`moneyBalance`, anomalie `UNALLOCATED_FUNDS` / `OVERSPENT`), `AUTHORIZATION_RELEASED` dans la
+  chronologie de l'argent. AMELIORATIONS : `redactContacts` (erreurs techniques de la chronologie sans adresse ni
+  numero), statut / modele / acteurs / etats de relais en francais, actions admin resumees en clair, erreurs nommees
+  (« Deal introuvable. »). PIEGE DE PILE : un `nx run-many --target=serve --all` (lance le 13/09 22:33) a repris le port
+  6003 avec le fournisseur STRIPE pendant le redemarrage du bundle FAKE → PAYMENT_STATE_CONFLICT au rejeu de RET-2 ;
+  verifier `lsof -iTCP:6003` + `ps` apres chaque relance. Tests : deal 595, harnais 416. Reste : § 5.13 a 8.
+- 14/09 : **CAHIER 02-ADMIN — § 5.13 RAPPROCHEMENT AVEC LE FOURNISSEUR (branche `chore/recette-admin-5-13`, empilee sur
+  #313)** — 3 scenarios CONFORMES (RAP-1, RAP-2 partielle Stripe reel, + RAP-3 gardes), joues contre le code non corrige
+  (RAP-1 rouge), puis verts deux fois (`adm-rap-rapprochement.spec.ts`) ; ARG, FIN, RET (adaptee), MED rejouees (27/27).
+  Terrain SONDE : 26 deals rapproches par l'API. ANO-ADM-31 CLOSE (majeure) : `FakePaymentProvider.inspect` passait par
+  `retrieve` → adoptait les intents seedes (AUTHORIZED 0 EUR) → fausses divergences CAPTURE_RECORDED_NOT_LIVE /
+  TRANSFER_MISSING et une lecture qui ecrit. ANO-ADM-32 CLOSE (majeure) : toute erreur fournisseur lue « paiement
+  introuvable », `transfers.retrieve` avalait toute erreur → `PaymentIntentNotFoundError` + `isStripeResourceMissing`,
+  panne = 503 PROVIDER_UNAVAILABLE journalise. A163. RAP-2 prouve en local REFUND_NOT_RECORDED (le code bloquant du
+  cahier), REFUND_RECORDED_NOT_LIVE, TRANSFER_AMOUNT_MISMATCH, TRANSFER_MARKED_REVERSED_BUT_LIVE_OK (geste d'argent reel
+  sur le Fake + manoeuvres base). AMELIORATIONS : carte qui nomme le fournisseur, aide FR par divergence, statuts FR,
+  refus par code, journal « Rapprochement fournisseur ». PIEGE : la memoire du Fake survit au rejeu du jeu d'essai (une
+  fiche constate l'etat initial, ne l'exige pas). Tests : deal 598, harnais 419. Reste : § 5.14 a 8.
+- 14/09 : **CAHIER 02-ADMIN — § 5.15 REMBOURSEMENT MANUEL EN DEUX GESTES (branche `chore/recette-admin-5-15`, empilee
+  sur #315)** — reprise du WIP `b5b6f31` interrompu a l'arret du poste : relu, verifie (typecheck CI x8, tests, OpenAPI,
+  i18n), rejoue. 6 scenarios CONFORMES (REM-1, 2, 3 du cahier + REM-4 trois applications simultanees, REM-5 proposition
+  caduque, REM-6 saisie FR et ecran perime), verts deux fois. CONTRE-EPREUVE par worktree a `5b35ef9` (deal +
+  notification non corriges, ecran de la branche) : REM-2 et REM-4 ROUGES. ANO-ADM-34 CLOSE (BLOQUANTE) : trois
+  « Rembourser maintenant » simultanes → 3 remboursements chez le fournisseur, 1 en base, deux 409 TRANSITION_NOT_ALLOWED
+  (le verrou conditionnel du cumul protegeait la base, pas l'argent parti avant, D39). A165 : verrou de decision du deal
+  (meme cle que la mediation, A159) avant toute lecture, 409 DECISION_IN_PROGRESS, echec ferme sans verrou ; cle
+  d'idempotence fournisseur `refundIdempotencyKey` sur TOUS les remboursements (manuel avec cumul lu, annulation, refus au
+  pickup, mediation, retenue, retour de capture) ; proposition caduque servie (`stale`, `staleReason`, `proposalStale`).
+  ANO-ADM-35 CLOSE (majeure) : l'email d'un geste commercial annoncait « Annulation a moins de 48 h : une retenue de
+  34,20 € » → `commercialGesture` (acteur ADMIN), paragraphe FR/EN. ANO-ADM-36 CLOSE (majeure) : portefeuille « retenue
+  reversee au Voyageur » pour tout remboursement partiel apres la fin du deal (geste, mediation) → `partialKind`,
+  `keptCents` au contrat, libelle « {garde} ont regle ton envoi ». AMELIORATIONS : saisie FR partagee (`parseEurosToCents`),
+  garde ref, refus par code (`manualRefundRefusal`, recharge), caducite a l'ecran et en file, compteur de motif,
+  remplacement signale, refundId dans le message. Harnais : WEB-CNF-10 (libelle AFTER_COMPLETION). Tests : deal 615,
+  notification 122, harnais 432. Reste : § 5.16 a 8.
+- 14/09 : **CAHIER 02-ADMIN — § 5.14 VERSEMENTS : REJEU ET RENVERSEMENT (branche `chore/recette-admin-5-14`, empilee sur
+  #314)** — 7 scenarios CONFORMES (VER-1, 2, 3 du cahier + VER-1 bis double clic, VER-1 ter quatre relances simultanees,
+  VER-2 bis deux re-versements simultanes, VER-4 ecran perime), joues contre le code non corrige (6/6 verts : le parcours
+  et la concurrence LOCALE tenaient), puis verts deux fois ; ARG, FIN, RET, RAP, MED rejouees (33/33). Quatre relances simultanees
+  → 4 × 200 SENT, MEME transfert, UN `booking.payout_sent`, compteur +1 ; deux re-versements → 200 + 400. ANO-ADM-33 CLOSE
+  (bloquante, trouvee a la lecture du code, prouvee en tests unitaires : le Fake ne simule pas la course fournisseur) :
+  `markPayoutFailed` ecrivait FAILED sur `{id, status}` seulement → un executeur concurrent recevant le 409 Stripe « cle en
+  cours » ecrasait le SENT de l'autre, transfert reel compris ; le rejeu suivant, cle expiree (24 h), aurait verse DEUX
+  fois. A164 : ecriture conditionnelle `payoutStatus ∈ {PENDING, FAILED}` + relecture ; apres une tentative,
+  `PaymentProvider.findTransfers` (optionnel, Stripe `transfers.list` + Fake) → le transfert vivant du deal est ADOPTE
+  (`adoptableTransfer`) ; recherche en panne → rien n'est emis. AMELIORATIONS : refus des gestes de versement en
+  francais par code (`payoutRefusalMessage`, recharge sur ecran perime), motif d'echec lisible (`payoutReasonLabel`),
+  garde de double clic par ref, message qui nomme montant / Voyageur / transfert, formulaire de renversement qui nomme le
+  fournisseur reel (Fake en local) + compteur n/20 + consequence de chaque bouton, journal `previousTransferId`.
+  Tests : deal 607, harnais 426. Reste : § 5.15 a 8.
+- 13/09 : **DECISION : LE ROLE PREND LA MAJUSCULE** (branche `chore/recette-voyageur-majuscule`, empilee sur #299) —
+  « Voyageur » / « Traveler » partout : 71 valeurs de messages, 33 textes du code, 1 email ; regle `role-majuscule` au
+  lexique partage (CI + recette) ; 12 citations du harnais ; web-fav, web-rch, web-rsv-devis, web-lit verts.
+- 13/09 : **CHAPITRE 7 DU CAHIER 01-WEB — WEB-NRG, NON-REGRESSION (branche `chore/recette-web-7`, empilee sur #297)**
+  — 12 fiches CONFORMES (3 apres correction), 11 scenarios NON sequentiels (`apps/e2e/src/chapitres/web-nrg.spec.ts`,
+  NRG-6 et 12 partagent un releve console + textes). 3 ANOMALIES CLOSES. ANO-WEB-104 (MAJEURE) : « Voir mes
+  virements sur Stripe » testait `carrierPage.stripeAccountId`, que `/auth/me` ne sert JAMAIS (liste blanche) → TOUS
+  les Voyageurs voyaient « Finalise d'abord ton compte Stripe », serveur jamais appele, porte sudo jamais atteinte ;
+  le bouton appelle maintenant toujours le serveur (SUDO_REQUIRED puis STRIPE_ACCOUNT_MISSING traduits). ANO-WEB-103
+  (mineure) : Finances s'ouvrait sur « Paiements » chez un Voyageur (`useState(isCarrier ? …)` fige au montage, avant
+  le chargement du membre) → onglet derive. ANO-WEB-105 (mineure) : bouton mobile « Partager » sans nom complet →
+  aria-label « Partager un trajet ». NRG-10 MESURE : 6,2 appels d'API par page ; projete sur les plafonds de
+  PRODUCTION (le poste les releve a 5000/2000) : membre actif ≈ 56 % de 1000, visiteur ≈ 16 pages / 15 min —
+  mesure pessimiste (`page.goto` recharge + StrictMode double `GET /api/maintenance`) → a remesurer sur build de
+  production. NRG-7 : cinq portes sudo verifiees SANS demander de code ; la suppression sur un COMPTE NEUF JETABLE
+  (destructif si une fenetre sudo etait ouverte). HARNAIS : `pages/ecran.ts` (gardes d'ecran extraites de web-mob +
+  `ecouterLaConsole`), `JeuEssai.tousLesTrajets()`, `MesTrajets.actionDuMenu()`, « Proposer un autre ». Pieges
+  repayes : `\b` et « é », « 230,00 € » contient « 0,00 € », `count()` avant hydratation. A TRANCHER : plafond
+  visiteurs ; origine refusee en 500 au lieu de 403 ; `BecomeYamber` lit aussi `stripeAccountId`. web-mob 10/10,
+  web-msg 21/21 rejoues. Plateforme inchangee (1000 + auth 230), harnais : 332 scenarios. PR #298 (empilee sur #297). **Le cahier 01-WEB est entierement joue** (§ 5, § 6, § 7). Reste : cahier 02-ADMIN. AUCUNE attribution
+  Claude.
+  AMELIORATIONS AU GO (branche `chore/recette-web-7-ameliorations`) : gateway 403 ORIGIN_NOT_ALLOWED avant
+  cors() (refus FRANC : un POST etranger n'atteint pas les services), BecomeYamber (libelle Stripe + `isFr = true` fige),
+  `stripeAccountId` retire du type useUser, « Chercher un autre trajet » sur un trajet ferme, « Voir ses deals » dans le
+  refus d'annulation ; tests : NRG-1 compare a l'API, NRG-2 mobile, NRG-3 desktop+mobile, NRG-7 purge son compte
+  jetable, NRG-10 par liens (0,8 appel par page, membre ≈ 7 % du plafond), NRG-11 exige 403, MOB-5 allegee.
+- 13/09 : **CHAPITRE 5.32 DU CAHIER 01-WEB — WEB-VOC, VOCABULAIRE ET COHERENCE DE LANGUE (branche
+  `chore/recette-web-5-32`, empilee sur #296) — DERNIER CHAPITRE DU § 5 DU CAHIER 01-WEB** — 6 fiches CONFORMES
+  (4 apres correction), 7 scenarios, 16 min (`apps/e2e/src/chapitres/web-voc.spec.ts`). METHODE : un RELEVE commun
+  (WEB-VOC-0) de 31 ecrans x FR/EN (visiteur, Aminata, Thomas) = 62 textes visibles + libelles d'accessibilite, ecrit
+  sur disque (les fiches ne sont PAS en serie) ; emails Mailpit dont deux provoques en anglais. 5 ANOMALIES CLOSES.
+  ANO-WEB-98 (MAJEURE) : vocabulaire des roles — l'assistant disait encore « Devenir transporteur » / « Creez votre
+  espace transporteur » (point connu du cahier), toast « profil transporteur », « carrier » dans 23 messages EN et 22
+  phrases d'emails EN de notification, « Shipper » en dur sur l'accueil FR et « Voyageur » en dur sur l'accueil EN,
+  badge d'avatar et alt de l'image d'accueil en francais sur les ecrans anglais, « tripper » dans l'assistant.
+  ANO-WEB-99 (MAJEURE) : « ton assurance » / « your insurance » sur l'ecran de remise. ANO-WEB-100 (mineure) : SIX
+  libelles du bagage en soute → « Bagage en soute 23 kg » / « Checked bag 23 kg » (idem cabine). ANO-WEB-101
+  (mineure) : vouvoiement — 41 messages, ~70 textes en dur (creation de trajet, assistant Voyageur, dashboard, Stripe
+  callback, aide — reecrits par un agent sur 12 fichiers) et emails d'alerte de trajet (trip-service). ANO-WEB-102
+  (mineure, trouvee en relisant) : « Voir les avis » menait a `/tripper/<id>` (404) → `/u/<slug>`. VOC-5 conforme, mais
+  les vitrines `/dashboard/*/preview` (donnees de demo) etaient atteignables en production → `notFound()` hors dev.
+  VOC-6 conforme ; la notification `booking_dispute_carrier_responded` redigee « — » est DORMANTE (NONE, D55) —
+  redigee quand meme. CI : REGLE 6 dans `scripts/check-i18n-messages.mjs` (lexique par locale sur les VALEURS des
+  messages : roles refuses, assurance, vouvoiement hors pluriel, texte vide ou « — » ; garde du garde < 1000 textes)
+  — contre-epreuve jouee. NON TOUCHE : messages d'erreur de l'API et OpenAPI (« carrier » = vocabulaire du code).
+  Harnais : 22 citations d'anciens textes mises a jour (rch, msg, fil-messagerie, rsv-devis, rem, dea, trj, voy, alr —
+  les 2 d'alr invisibles a l'inventaire : texte EJS non litteral). NON-REGRESSION : rch, msg, rsv-devis, rsv, rem,
+  dea, trj, voy, cnf, alr, not, mob, a11y, acc verts ; WEB-ACC-8 intermittente sur `POST /auth/refresh` (sonde de
+  session du visiteur, echoue aussi SANS les correctifs) → exclue avec sa raison ; axe : pas de refresh pour un
+  visiteur sans session.
+  FAUX VERTS PAYES : VOC-3 vert sans avoir vu l'objet (aucun envoi soute vivant → la fiche en cree un) ; ecran
+  « introuvable » > 200 car. ; squelette stable 1 s. A TRANCHER : minuscule generique « expediteurs/voyageurs » ;
+  migrer les textes en dur vers messages/ (seule garantie durable) ; carte de recherche muette sur le forfait soute.
+  AMELIORATIONS AU GO (regard d'expert) : lexique en source unique `scripts/lexique-yamba.json` (CI regle 6 + recette) ;
+  REGLE 7 du check i18n (chaque BOOKING_EVENT_TYPES a son texte de notification, 2 roles) ; VOC-3 annule sa
+  reservation (finally) ; VOC-4 relit les emails FR ; VOC-6 detecte les cles a un seul point ; releve parallele +
+  SUPPORTED_LOCALES + 4 ecrans (70 ecrans en 8 min, gain ~40 % seulement : next dev compile page par page) ; garde
+  DEA-1 `1 janv.` bornee (aurait echoue chaque janvier). NON FAIT : refresh du visiteur conditionne au marqueur
+  localStorage = regression pour de vrais membres → D-next a proposer (indice serveur « a une session »).
+  Plateforme inchangee (1000 + auth 230 ; notification 115 et trip 261 rejoues), harnais : 321 scenarios. PR #297 (empilee sur #296). Reste : chapitre 7 WEB-NRG (12 fiches), cahier 02-ADMIN. AUCUNE attribution Claude.
+- 13/09 : **CHAPITRE 5.31 DU CAHIER 01-WEB — WEB-A11Y, ACCESSIBILITE CLAVIER DE BASE (branche
+  `chore/recette-web-5-31`, empilee sur #295)** — 8 fiches jouees CONFORMES (4 apres correction), 8 scenarios en
+  serie, 2 min (`apps/e2e/src/chapitres/web-a11y.spec.ts`, au CLAVIER REEL : Tab / Maj+Tab / Echap / Espace /
+  Entree). 4 ANOMALIES CLOSES. ANO-WEB-94 (MAJEURE) : AUCUNE fenetre modale ne gerait le focus (19 `role="dialog"`,
+  zero lecture de `document.activeElement`) — ni entree, ni boucle, ni restitution (retour sur `<body>`) ; et 4
+  feuilles toujours montees (DealDeclineSheet, PickupRefuseDialog tiroir, MobileSearchExperience,
+  MobileFieldFullScreen) restaient atteignables a la tabulation une fois fermees. Correction : crochet partage
+  `apps/user-ui/src/hooks/useDialogFocus.ts` (`useDialogFocus(ref, active, onEscape?)` : entree, boucle Tab/Maj+Tab,
+  restitution si le focus est perdu, PILE de module pour les fenetres empilees, `onEscape` lu par REFERENCE — une
+  fleche en ligne en dependance relancerait l'effet a chaque frappe et rendrait le focus a l'ouvreur en pleine
+  saisie) pose sur les 14 fenetres modales, + `inert={!isOpen}` sur les 4 feuilles. ANO-WEB-95 (MAJEURE) : les
+  fenetres de SIGNALEMENT (annonce/profil, message) ne se fermaient pas avec Echap. ANO-WEB-96 (mineure) : chaque
+  vignette de photo s'annoncait « photo » (en dur, non traduit, identique) → « Agrandir la photo 1 sur 2 », « +N »
+  → « Voir N photos de plus ». ANO-WEB-97 (mineure) : compteurs des en-tetes de groupe a 2,36:1 en sombre ET 1,5:1
+  en clair (4 listes) → `text-slate-500 dark:text-slate-400`. Constat du 5.30 REGLE : la croix de la porte
+  d'identite s'appelle « Fermer » (elle s'appelait « Plus tard » comme le voile et le lien) ; le voile sort de la
+  tabulation (`aria-hidden` + `tabIndex=-1`, clic conserve) — web-acc et web-mob mis a jour. La spec initiale
+  sous-jouait le cahier (1 fenetre sur 4 en A11Y-3, filtres sautes sur grand ecran via `if (count())`, pas de croix
+  ni de visionneuse en A11Y-5, pas de suivi en A11Y-7) : completee. Deux FAUX POSITIFS de l'instrument corriges
+  avant de conclure (fond semi-transparent pris pour opaque ; frappes perdues avant hydratation). A TRANCHER :
+  selecteur de langue nomme par langue (« Francais ») et non « Changer de langue » (meilleur, a acter) ; croix du
+  signalement « Annuler » vs « Fermer » ailleurs ; contraste en THEME CLAIR non couvert par le cahier. Regard
+  d'expert : lien « Aller au contenu », focus sur le premier champ en erreur, garde de source « tout aria-modal
+  appelle useDialogFocus », jouer 400 %. PIEGES : composer les fonds `…/15` avant un contraste ; viser la fenetre qui
+  CONTIENT le focus (feuilles hors ecran « visibles ») ; `activeElement.textContent` = du JS → focus sur `<body>` ;
+  la feuille des filtres est `md:hidden`. NON-REGRESSION : sig, ann, mob, rch, msg, fav, not, dea, acc, pic
+  rejoues verts ; trois fiches ANCIENNES remises d'aplomb (echouaient aussi SANS les correctifs, prouve par stash) :
+  DEA-1 date en dur contre un jeu d'essai relatif, PIC-7 assertion perimee par ANO-WEB-60 (+ PIC-8 lecture avant
+  rendu), ACC-5 clic apres goBack intermittent. Plateforme inchangee (1000 + auth 230), harnais : 314 scenarios. i18n :
+  `common.lightbox.open/more`, `common.authGate.close`. PR #296 (empilee sur #295). Reste : 5.32, 02-ADMIN.
+  AUCUNE attribution Claude.
+- 13/09 : **CHAPITRE 5.30 DU CAHIER 01-WEB — WEB-MOB, RESPONSIVE MOBILE (branche `chore/recette-web-5-30`,
+  empilee sur #294)** — 10 fiches jouees CONFORMES (1 apres correction), 10 scenarios en serie, 1 min 06
+  (`apps/e2e/src/chapitres/web-mob.spec.ts`, emulation iPhone 14 390x844 tactile ; WEB-MOB-7 a 800 px).
+  HARNAIS : `navigateurConnecte` et `navigateurVisiteur` acceptent `{ mobile: true }` (ou `{ mobile: { width } }`) —
+  ce n'est PAS un simple `viewport` etroit : `isMobile` + `hasTouch` + agent utilisateur changent ce que le produit
+  REND (feuilles du bas, barres collantes, `useIsMobile`, doubles arbres Desktop/Mobile) ; sans eux le chapitre
+  aurait eprouve l'arbre desktop dans une fenetre etroite. DEUX GARDE-FOUS PARTAGES portent la regle generale du
+  cahier (la page ne defile jamais horizontalement) : `aucunDebordement()` NOMME l'element fautif (selecteur, bord
+  droit, largeur d'ecran) et `rienNeSortDuCadre()` EXEMPTE ce qui defile dans son propre cadre
+  (`overflow-x: auto|scroll`) — une rangee de reponses rapides a le droit de depasser, pas de pousser la page.
+  ANO-WEB-93 close (mineure) : le panneau PLEIN ECRAN des filtres de recherche n'etait pas annonce comme une
+  fenetre (ni `role="dialog"`, ni `aria-modal`, ni nom) et Echap ne le fermait pas — un lecteur d'ecran continuait de
+  parcourir la page EN DESSOUS et le clavier n'avait aucune porte de sortie ; les deux autres feuilles de la
+  recherche le faisaient deja (convention non portee jusqu'au bout). Prouve : accueil et menu (le bouton « Fermer le
+  menu » est le VOILE plein ecran) ; filtres appliques par « Voir N trajets » et fermes par Echap ; barre de
+  reservation collante qui survit au defilement ; assistant (total permanent, « Detail » / « Masquer », aucun champ
+  coupe) ; bulles de messagerie qui tiennent dans l'ecran (regression #175 / WEB-NRG-5 morte, et le harnais la
+  garde) ; croix de la porte d'identite visible sur telephone (regression WEB-NRG-3) ; colonne de droite du Voyageur
+  presente a 800 px (point aveugle des grilles `md:`/`lg:`) ; six cases du code sur une ligne avec
+  `inputmode=numeric` et collage qui remplit les six ; listes du tableau de bord sans debordement ; page
+  destinataire lisible sans session. A TRANCHER : dans la porte d'identite, TROIS controles portent le meme nom
+  accessible (« Plus tard » : croix, voile, lien) ; le piege de focus des feuilles mobiles n'est pas pose (sujet du
+  5.31) ; « le clavier ne masque pas le bouton » ne se verifie QUE sur un vrai telephone (consigne, pas simule) ;
+  la rangee de reponses rapides ne montre pas qu'elle defile. Regard d'expert : compteur de filtres actifs sur le
+  bouton « Filtres », prix POUR LE POIDS saisi dans la barre du bas, `autocomplete="one-time-code"` sur les six
+  cases, et surtout une garde automatique « tout conteneur `fixed inset-0` porte `role=dialog` » — meilleur candidat
+  d'outillage de la campagne. PIEGES : un `viewport` etroit ne suffit pas ; « Fermer le menu » est le voile (cliquer
+  en haut) ; un element peut depasser sans defaut s'il defile dans son cadre ; le titre d'une page de resultats
+  s'affiche AVANT les cartes (attendre un prix, pas une ville) ; la croix de la porte s'appelle « Plus tard » ;
+  `POST /deals/:id/tracking-link` rend un chemin RELATIF (`new URL(...)` leve « Invalid URL »). Plateforme inchangee
+  (1000 + auth 230), harnais : 306 scenarios. PR a ouvrir (empilee sur #294). Reste : 5.31, 5.32, 02-ADMIN.
+  AUCUNE attribution Claude.
+- 13/09 : **CHAPITRE 5.29 DU CAHIER 01-WEB — WEB-ERR, PAGES D'ERREUR ET PAGE INTROUVABLE (branche
+  `chore/recette-web-5-29`, empilee sur #293)** — 5 fiches jouees CONFORMES (1 apres correction), 5 scenarios en
+  serie, 2 min 06 (`apps/e2e/src/chapitres/web-err.spec.ts`). COMMENT ON DECLENCHE UN INCIDENT : le cahier prevoit
+  « demander a un developpeur un moyen sur de declencher l'erreur » — deux routes de recette le font,
+  `/[locale]/dev/erreur` (hors tunnel) et `/[locale]/bookings/dev-erreur` (dedans, car la frontiere n'ajoute la
+  phrase sur le paiement que sous `/book` ou `/bookings`), toutes deux INTROUVABLES EN PRODUCTION (`notFound()` des
+  que `NODE_ENV === "production"`) ; `?type=chunk` porte la signature d'un morceau de code manquant (version publiee
+  pendant la navigation). QUATRE METHODES ESSAYEES ET ECARTEES, et c'est un resultat : couper la passerelle ne fait
+  PAS tomber la frontiere (les ecrans chargent cote navigateur et affichent leurs propres etats d'erreur), pas plus
+  qu'une charge d'API malformee, qu'une charge RSC en 500, ou qu'un chunk coupe sur une page qui n'en charge pas —
+  L'APPLICATION EST GARDEE PARTOUT OU ON L'A POUSSEE. ANO-WEB-92 close (mineure) : la copie de la reference
+  d'incident echouait EN SILENCE (`navigator.clipboard` n'existe pas hors contexte securise, le `catch` ne faisait
+  rien) — le bouton restait muet au moment precis ou le membre veut transmettre la panne au support ; meme regle
+  qu'ANO-WEB-59 : un echec se dit (`errors.boundary.copyFailed`, FR + EN, miroir i18n vert). Prouve : page
+  introuvable (404, titre, texte exact, trois actions, aucune trace, plus jamais le 404 interne de Next — acquis
+  d'ANO-WEB-88) ; « Trajet introuvable » et « Profil introuvable » avec leurs phrases exactes et aucun indice sur
+  l'existence reelle ; page d'erreur generale avec sa reference (le `digest` de Next suffit, meme sans Sentry),
+  copiable — CONTENU DU PRESSE-PAPIERS VERIFIE — son aide et le lien support ; la reassurance paiement EN TETE dans
+  le tunnel et absente ailleurs ; la variante « nouvelle version » qui remplace le message ET le bouton
+  (« Recharger la page », « Reessayer » disparait) ; et cinq situations d'erreur (trajet inexistant, service muet,
+  session expiree, formulaire refuse, refus metier CODE) sans un seul chemin de fichier, trace, identifiant brut
+  (QUOTE_DIVERGENCE, SUDO_REQUIRED, P2002, PrismaClient) ni anglais non traduit. A TRANCHER : « Ecrire au support »
+  vit DANS le bloc de reference (sans reference, l'action disparait — trou fonctionnel) ; le cahier attend un toast
+  « Reference copiee » alors que le produit change le libelle du bouton (amender le cahier) ; la longueur de la
+  reference varie selon son origine (Sentry 8 caracteres / `digest` variable) ; les deux routes de panne restent
+  livrees (inertes en production) — a retirer le jour ou une preproduction permet de couper une dependance pour de
+  vrai. Regard d'expert : sortir le lien support du bloc, joindre le chemin de la page au courriel pre-rempli,
+  recharger automatiquement apres trois secondes sur « nouvelle version », rendre la garde « aucun code technique »
+  automatique. PIEGES : **`innerText` sur un `body` CLONE (detache) retombe sur `textContent`** et rend le contenu
+  des `<script>` — charge RSC comprise, ce qui ressemble a une fuite technique ; le `body` VIVANT ne rend que ce qui
+  est affiche et exclut la fenetre d'erreur de Next (`nextjs-portal` a racine fantome) ; `domcontentloaded` rend la
+  main AVANT le rendu (lire le corps aussitot donne une chaine vide) ; le presse-papiers doit etre interpose en
+  memoire de page sur l'adresse LAN. Plateforme inchangee (1000 + auth 230), harnais : 296 scenarios. PR a ouvrir
+  (empilee sur #293). Reste : 5.30 a 5.32, 02-ADMIN. AUCUNE attribution Claude.
+- 13/09 : **CHAPITRE 5.28 DU CAHIER 01-WEB — WEB-MNT, LE MODE MAINTENANCE VU DU MEMBRE (branche
+  `chore/recette-web-5-28`, empilee sur #292)** — 4 fiches jouees CONFORMES (1 apres correction), 4 scenarios en
+  serie, 1 min 42 (`apps/e2e/src/chapitres/web-mnt.spec.ts` ; l'annonce est posee PAR L'ECRAN du back-office
+  « Etat des services » avec le profil OPS, les bascules suivantes par l'API d'administration). TROIS HORLOGES a
+  connaitre : la passerelle relit le document `maintenance` toutes les 10 s, le front membre sonde
+  `GET /api/maintenance` toutes les 60 s, l'editeur du back-office se remonte toutes les 30 s. FILET : le
+  `beforeAll` et l'`afterAll` remettent le document a plat DIRECTEMENT EN BASE — une maintenance oubliee
+  condamnerait tous les chapitres suivants. ANO-WEB-91 close (mineure) : la passerelle refusait bien les ecritures
+  (503 `MAINTENANCE` + `Retry-After`, D64 2A) mais LE MEMBRE NE L'APPRENAIT PAS — chaque ecran affichait son erreur
+  generique (mesure dans un fil : « Le message n'a pas pu etre envoye. ») et la phrase prevue,
+  `maintenance.writeRefused`, n'etait rendue NULLE PART (cle morte dans les deux dictionnaires depuis D64) ; cause
+  racine : la passerelle pose son code A LA RACINE de la reponse alors que toute la plateforme lit `details.code`
+  (A146). Corrige comme la session expiree (A89) : `api-client` emet `yamba:maintenance-refused` (code a la racine
+  OU dans `details`), le bandeau de maintenance l'ecoute, DIT la raison et relit son etat sans attendre son sondage
+  — effet secondaire heureux, le bandeau rouge arrive dans la seconde au lieu d'une minute. Prouve : bandeau AMBRE
+  date sur une annonce (et rien n'est bloque, un message part) ; bandeau ROUGE au texte exact ; toutes les LECTURES
+  passent (recherche avec resultats, page d'un trajet, fil, « Mes envois ») ; reserver / ecrire / publier repondent
+  503 et le refus est DIT ; connexion et rafraichissement intacts (routes d'authentification exemptees) ; levee
+  appliquee par la passerelle en MOINS DE 15 s avec reprise immediate des ecritures ; et « Payer » sous maintenance
+  a l'etape 4 d'une reservation ne cree RIEN (aucune autorisation, aucun deal), puis aboutit normalement apres la
+  levee. A TRANCHER : aligner le code de refus de la passerelle sur `details.code` ; le retard de 60 s du bandeau
+  pour un membre deja sur sa page (desormais rattrape par le premier refus) ; le message personnalise de l'admin qui
+  ne suit pas jusqu'au refus d'ecriture ; une annonce sans date de FIN. Regard d'expert : deux occurrences font un
+  patron (signal global + surface qui l'ecoute) a documenter ; exposer l'instant du dernier rafraichissement dans
+  `GET /api/maintenance` ; afficher au back-office le nombre de reservations en cours d'autorisation avant de
+  basculer. PIEGES : **une fixture de navigateur vit le temps d'UNE fiche** (le navigateur d'administration ouvert
+  dans un `beforeAll` donne « browser has been closed » a la fiche suivante) ; **un formulaire qui se remonte
+  periodiquement se remplit puis s'oublie** (l'annonce partait SANS DATE et le PUT repondait 200 — verifier
+  `inputValue` avant de cliquer) ; `input[type="text"]` ne matche pas un `<input>` sans attribut `type` ; attendre
+  que la passerelle ait bascule avant d'observer l'ecran du membre ; le fil de `bzv-accepted` appartient a PAULINE ;
+  les resultats de recherche arrivent apres le titre. Plateforme inchangee (1000 + auth 230), harnais : 291
+  scenarios. PR a ouvrir (empilee sur #292). Reste : 5.29 a 5.32, 02-ADMIN. AUCUNE attribution Claude.
+- 12/09 : **CHAPITRE 5.27 DU CAHIER 01-WEB — WEB-ANA, LE CONSENTEMENT A LA MESURE D'AUDIENCE (branche
+  `chore/recette-web-5-27`, empilee sur #291)** — 6 fiches jouees CONFORMES (2 apres correction) + 1
+  CONTRE-EPREUVE, 7 scenarios en DEUX passes, 1 min 36 + 19 s (`apps/e2e/src/chapitres/web-ana.spec.ts`).
+  LE CAHIER DECLARE CE CHAPITRE ⏭ SANS CLE POSTHOG : on ne s'en est pas contente. Cle de recette
+  (`phc_recette_web_5_27`) + hote local `127.0.0.1:9977` dans `apps/user-ui/.env.local`, et un FAUX POSTHOG ecrit
+  pour l'occasion — `scripts/recette/collecteur-audience.ts` — qui repond comme le vrai (404 sur `config.js` pour
+  que le SDK retombe sur la variante JSON, configuration ou tout ce qui capture de lui-meme est coupe, drapeaux
+  vides, extensions INERTES mais bien formees) et journalise chaque evenement recu, une ligne de JSON par
+  evenement, en decodant les trois formes de corps (JSON nu, `data=` base64, gzip). Rien ne sort du poste, et la
+  fiche 3 lit EXACTEMENT ce que le navigateur aurait envoye. Les fiches 1 a 5 se sautent sans cle, la fiche 6
+  (« sans cle ») se saute avec : deux passes, chacune honnete sur sa precondition. ETAT LAISSE AU POSTE : les deux
+  lignes sont COMMENTEES dans `.env.local` (aucune banniere pour les chapitres suivants ni pour les parcours) — les
+  decommenter + redemarrer le front pour rejouer 1 a 5. DEUX ANOMALIES CLOSES : ANO-WEB-89 (la banniere de
+  consentement est `fixed` et ne RESERVAIT AUCUNE PLACE : sur les pages calees sur la hauteur de la fenetre — onze
+  ecrans d'authentification, vitrine, tableau de bord — elle recouvrait le bas de la carte ; mesure sur /fr/login en
+  1280x720 : « Se connecter » et « Inscris-toi » sous le dialogue, clic INTERCEPTE, aucun defilement possible, il
+  fallait repondre a la banniere pour se connecter → elle publie desormais sa hauteur dans `--yamba-consent-space`,
+  `global.css` en deduit `--yamba-viewport` = calc(100vh - cet espace), et les QUATORZE mises en page en
+  `calc(100vh-…)` s'en servent ; le contenu se recentre, la page defile, tout est rendu a la reponse),
+  ANO-WEB-90 (`search_performed`, le premier evenement du funnel D66 3A, lisait `params.origin` /
+  `params.destination` — deux cles qui N'EXISTENT PAS dans `SearchTripsParams`, ou les criteres s'appellent `from`
+  et `to` : la mesure partait TOUJOURS avec `origin: null, destination: null` et aucun corridor cherche n'etait
+  observable, alors que c'est le signal du pilotage D59/D74 ; les deux lectures etaient CASTEES, le typage ne
+  pouvait rien dire). Prouve : texte de la banniere mot pour mot + trois elements + deux boutons de MEME POIDS
+  (hauteur, largeur, police, vrai <button>) ; refus = aucune requete, aucun evenement, aucune cle `ph_…` (le SDK
+  n'a jamais demarre), banniere qui ne revient pas ; accord = `$pageview`, `search_performed` (origin « Paris »,
+  destination « Brazzaville », resultsCount numerique), `trip_viewed` (tripId), `booking_step_viewed`, `$identify`
+  (l'IDENTIFIANT seul) et AUCUNE donnee personnelle (ni prenom/nom/email du membre, ni code de livraison, ni
+  prenom/nom/numero du destinataire) ; choix repris dans un second navigateur neuf sans redemander ; retrait dans
+  « Mes donnees » enregistre sur le compte et plus rien de mesure ensuite ; sans cle, aucune banniere, aucun envoi,
+  aucune erreur de console (hors les deux 401 du sondage de session, ANO-WEB-01). A TRANCHER : la page ou l'on
+  ACCEPTE n'est jamais comptee (l'effet des pages vues ne depend que du chemin) → taux d'entree faux ; le retrait ne
+  jette pas ce qui est deja en file (un lot part apres le retrait) ; en developpement chaque page vue part en DOUBLE
+  (effets rejoues par React en StrictMode) — a verifier sur le build de production avant de lire les chiffres ; et
+  surtout **le `$pageview` porte l'URL COMPLETE** : la page publique du destinataire vit sous `/fr/track/<jeton>`,
+  donc un destinataire qui accepte la mesure enverrait LE JETON du lien de suivi au collecteur — normaliser le
+  chemin (`/fr/track/:jeton`) avant capture, CANDIDAT AU REGISTRE, a trancher avant toute activation en production.
+  Regard d'expert : banniere sans piege de focus, liste blanche des proprietes a proteger par un test comme
+  `analyticsEventsFor` cote serveur (D66), ecriture du consentement en best-effort a rejouer, jeter la file du SDK
+  au retrait + journaliser le retrait dans `ConsentLog`, interdire les `as { … }` sur un type connu (regle de revue).
+  PIEGES : un faux collecteur qui repond mal CASSE la fin de `init()` et rend la mesure muette (on prouverait une
+  absence fabriquee) ; **posthog-js REFUSE de capturer depuis un navigateur automatise** (`_is_bot()` =
+  `!!navigator.webdriver`, en silence — diagnostic obtenu en lisant le `dist` du SDK apres trois impasses), le
+  harnais masque CE seul drapeau ; **`storageState` memorise AUSSI le `localStorage`** (un consentement accepte se
+  propage aux chapitres suivants → chaque fiche repart « sans choix », l'afterAll oublie la session) ;
+  `networkidle` n'arrive jamais quand le SDK tourne (goto en delai d'attente de 120 s → `domcontentloaded`) ; un
+  evenement se rate en naviguant trop vite (attendre SON evenement par `expect.poll` sur le journal) ; Atlas a
+  lache une fois de plus (seed en echec a 180 s) et la charge du poste montait a 10 avec les dix-sept conteneurs
+  Docker etrangers relances par Docker Desktop — le back-office (3001) a ete arrete, il ne sert pas a ce chapitre.
+  Plateforme inchangee (1000 + auth 230), harnais : 287 scenarios. PR a ouvrir (empilee sur #291). Reste : 5.28 a
+  5.32, 02-ADMIN. AUCUNE attribution Claude.
+- 12/09 : **CHAPITRE 5.26 DU CAHIER 01-WEB — WEB-PRF, PREFERENCES, LANGUE ET RELANCES (branche
+  `chore/recette-web-5-26`, empilee sur #290)** — 6 fiches jouees CONFORMES (3 apres correction), 6 scenarios en
+  serie, 1 min 24 (`apps/e2e/src/chapitres/web-prf.spec.ts` ; Aminata pour la langue, les emails et l'ecran
+  « Parametres », Thomas le Voyageur francophone qui accepte, Pauline + bzv-accepted pour la relance des messages
+  non lus, une adresse libre pour l'inscription en anglais). TROIS ANOMALIES CLOSES : ANO-WEB-87 MAJEURE (`authApi`,
+  le SECOND client axios des flux SANS compte — activation, mot de passe oublie, renvoi — ne posait pas l'en-tete
+  `x-locale` : ces emails partaient toujours en francais ET le compte naissait `preferredLocale: "fr"` meme pour une
+  inscription en anglais, donc tous ses emails suivants aussi ; meme interception que `apiClient`, D44),
+  ANO-WEB-86 (l'ecran « Parametres » etait un reste de MAQUETTE : « Changer » sans gestionnaire sur la langue et le
+  theme, et deux bascules a `useState` local — elles bougeaient, rien n'etait enregistre, l'etat repartait a zero au
+  rechargement, un membre pouvait croire avoir coupe ses emails ; chaque ligne porte desormais le vrai reglage LA OU
+  IL A UN EFFET : langue → le COMPTE (PATCH /auth/me/locale, selecteur de l'en-tete reutilise), theme → le
+  NAVIGATEUR (next-themes, trois choix Automatique/Clair/Sombre), « Notifications email » → `messagingReminderEmails`
+  (D61, la seule preference email qui existe) avec un libelle qui dit aussi ce qu'elle NE couvre pas (les emails d'un
+  Deal en cours sont contractuels), « Notifications push » → ligne en LECTURE, rien n'est branche ; `ToggleRow` est
+  desormais CONTROLEE (`checked` + `onChangeAction`, `role="switch"`, `aria-checked`) et `SettingRow` n'affiche son
+  bouton que si un gestionnaire existe — une bascule decorative n'est plus exprimable), ANO-WEB-88 (une adresse qui
+  ne correspond a AUCUNE route — `/es`, reecrit `/fr/es` par le middleware next-intl — ne declenche jamais
+  `notFound()` : Next servait son 404 INTERNE « This page could not be found. », en anglais, sans en-tete ni lien de
+  retour, alors que `[locale]/not-found.tsx` existait depuis 5.3 ; route attrape-tout `[locale]/[...rest]`).
+  Prouve : langue enregistree sur le compte et tenue apres reconnexion dans un contexte neuf ; email TOUJOURS dans la
+  langue du DESTINATAIRE (Thomas « Nouvelle demande de transport Paris → Brazzaville », Aminata « Your request
+  Paris → Brazzaville was accepted » — le geste vient pourtant de l'autre partie) ; inscription en /en → « Your Yamba
+  activation code » ; relance coupee → AUCUN email et notification in-app presente ; ecran « Parametres » (les quatre
+  entrees, bascule servie par le SERVEUR, PATCH dans les deux sens, classe `dark` de <html>, etat conserve apres
+  rechargement, aucun controle sur le push) ; /es et /en/es → 404 avec la page introuvable de Yamba dans la langue de
+  l'URL. A trancher : le CAHIER decrit l'ancien ecran (§ 5.26 amende), preferences email par FAMILLE d'evenement +
+  push = candidats au registre (liste fermee des familles coupables, les emails d'un Deal en cours ne le sont pas),
+  le theme ne suit pas le compte. Regard d'expert : la bascule de langue n'ecrit `if (user)` (cliquer trop tot navigue
+  sans rien enregistrer), UN SEUL client HTTP au lieu de deux, `List-Unsubscribe` dans l'email de relance, dire la
+  portee des reglages a l'ecran, fiche transversale « aucune page decorative / aucune adresse inconnue servie par un
+  404 d'outil ». PIEGES : les PREFERENCES survivent au seed (Aminata arrivait avec sa relance deja coupee — le
+  chapitre pose son etat de depart dans son beforeAll et le remet dans son afterAll) ; trois `npx tsx` de suite
+  depassent 60 s (`spawnSync npx ETIMEDOUT`) → un seul processus ; Atlas a coupe en cours de session (replique sans
+  primaire) et `GET /api/status` reste « down » 10 s (son cache) ; le front Next finit par ne plus hydrater apres une
+  longue serie (relancer `nx dev user-ui`) ; Docker Desktop relance les 17 conteneurs etrangers a chaque demarrage
+  (deux Elasticsearch = 4 Gio, charge 6-7). Plateforme inchangee (1000 + auth 230), harnais : 280 scenarios.
+  PR a ouvrir (empilee sur #290). Reste : 5.27 a 5.32, 02-ADMIN. AUCUNE attribution Claude.
+- 12/09 : **CHAPITRE 5.25 DU CAHIER 01-WEB — WEB-RGP, DONNEES PERSONNELLES : EXPORT ET EFFACEMENT (branche
+  `chore/recette-web-5-25`, empilee sur #289)** — 9 fiches jouees CONFORMES (5 apres correction), 9 scenarios en
+  serie, 1 min 24 (`apps/e2e/src/chapitres/web-rgp.spec.ts` ; Aminata et Thomas pour l'ecran, l'export et les
+  bloqueurs ; un compte NEUF cree par l'ecran pour l'avertissement, la SUPPRESSION REELLE et « Membre supprime » —
+  jamais un compte du seed ; gru-completed et bzv-disputed pour l'effacement du destinataire). CINQ ANOMALIES
+  CLOSES : ANO-WEB-81 MAJEURE (la bascule « Mesure d'audience » n'existait qu'avec une cle PostHog cote FRONT et
+  lisait le localStorage, alors qu'`analyticsOptIn` est une preference du COMPTE qui gouverne aussi la capture
+  serveur D66 — ligne toujours rendue, etat servi par /auth/me, ecriture confirmee), ANO-WEB-82 (le fichier
+  d'export se telechargeait sans sa date : CORS cachait `Content-Disposition` — la passerelle l'expose),
+  ANO-WEB-83 (la messagerie affichait « Membre » pour un compte efface → `nomDeLaContrepartie` rend « Membre
+  supprime », +3 tests message = 47), ANO-WEB-84 (refus « un export par 24 h » en ANGLAIS → dit par son
+  details.code), ANO-WEB-85 (« Voir le numero » refuse ne disait rien : le motif ne vivait que dans le `title`) ;
+  JEU D'ESSAI : le journal des demandes RGPD survivait au seed (un export bloquait le suivant 24 h) → purge.
+  Prouve : ecran complet et bascules servies par le compte ; export derriere la porte (403 SUDO_REQUIRED, code,
+  fichier date) ; contenu (20 sections, role + SES montants, aucun code de livraison, aucun signalement subi,
+  avis reveles seulement, export VOYAGEUR sans aucune cle recipient) ; 24 h (400 EXPORT_RATE_LIMITED avant la
+  porte, aucun fichier, aucun code) ; bloqueurs (liste fermee, motifs servis seulement, aucun code) ; texte
+  d'avertissement mot pour mot ; suppression reelle (403 puis 200, deconnexion immediate, reconnexion 401, email
+  sans lien) ; fil intact avec « Membre supprime » et aucun chiffre de telephone ; destinataire efface a 30 jours
+  (— / +00000000000 / null, lien de suivi invalide) et deal en litige intact. A trancher : « SUPPRIMER » accepte
+  en minuscules (le champ majuscule a la frappe), quota OTP muet a l'ecran, TOO_EARLY sur un deal annule, ordre
+  des cles de l'export. Regard d'expert : date du consentement, export asynchrone pour un gros compte, borner les
+  notifications, `nextAt` a l'ecran, compte par motif de blocage, libelle « Membre supprime » partout, revoquer le
+  lien de suivi a l'effacement. PIEGES : quota OTP (6/h) qui grille au troisieme rejeu, sans message (script
+  `otp-debloquer.ts`) ; fenetre sudo liee au jti (parEcran) ; Playwright efface le telechargement a la fin de SA
+  fiche ; `nx serve` a lache message-service (relance en bundle). Harnais : 274 scenarios. PR **#290** (empilee sur #289). Reste : 5.26 a 5.32,
+  02-ADMIN. AUCUNE attribution Claude.
+- 12/09 : **CHAPITRE 5.24 DU CAHIER 01-WEB — WEB-SIG, SIGNALER UN TRAJET, UN PROFIL, UN MESSAGE (branche
+  `chore/recette-web-5-24`, empilee sur #288)** — 8 fiches jouees CONFORMES (2 apres correction), 8 scenarios en
+  serie, 2 min 54 (`apps/e2e/src/chapitres/web-sig.spec.ts` ; bzv-upcoming et bzv-perkg de Thomas, profil
+  seed-thomas, fih masque par l'API admin et seed-josephine rendu prive par manoeuvre — remis en l'etat en finally ;
+  file admin lue par GET /admin/reports). DEUX ANOMALIES CLOSES : ANO-WEB-79 MAJEURE (une annonce masquee par
+  Yamba se signalait — 201 — et revelait son existence : report.service exige hiddenByAdminAt null/absent, +1 test
+  auth = 230), ANO-WEB-80 (404 traduit « Reessaie » → « Cet element est introuvable… ») ; JEU D'ESSAI : les
+  Report survivaient au seed (409 au premier clic sur un profil) → purges avec les bookings et les avis. Prouve :
+  porte d'identite du visiteur avec connexion dans la fenetre ; fenetre d'annonce (titre, intro, quatre motifs sans
+  « Usurpation », precisions, accuse, email dans la langue de l'auteur, annonce toujours en ligne) ; doublon 409 ;
+  soi-meme (aucun bouton, 400 OWN_TARGET) ; profil (cinq motifs, membre signale jamais prevenu) ; cible invisible
+  (annonce masquee 404, profil masque 404) ; trois signalements = trois accuses, rien cote proprietaire, file
+  admin « 3 ouverts, prioritaire », annonce toujours publique ; avis = mailto au support avec l'id. A trancher :
+  400 pour un refus de droit, annonce en pause/annulee signalable, doublon apres traitement. Regard d'expert :
+  reprendre le geste apres connexion, compteur des precisions, 403 pour OWN_TARGET, regle de visibilite unique
+  partagee, seuil au catalogue, corps du mailto pre-rempli. PIEGES : Report survivants au seed, cron FAKE qui ecrit
+  au proprietaire (prouver par cloches nouvelles / sujet), GET /trips/:id reserve au proprietaire, masquage par
+  l'API admin + profil prive par manoeuvre en finally, session request qui expire. Harnais : 265 scenarios.
+  Reste : 5.25 a 5.32, 02-ADMIN. AUCUNE attribution Claude.
+- 12/09 : **CHAPITRE 5.23 DU CAHIER 01-WEB — WEB-DES, LA PAGE DESTINATAIRE (branche `chore/recette-web-5-23`,
+  empilee sur #287)** — 9 fiches jouees CONFORMES, AUCUNE ANOMALIE, 9 scenarios en serie, 2 min 24
+  (`apps/e2e/src/chapitres/web-des.spec.ts` ; bzv-picked Aminata ↔ Thomas, destinataire Clarisse +242061234567,
+  code 742891 ; bzv-pending pour « pas de lien avant l'acceptation » ; page publique lue sans session,
+  presse-papiers et window.open observes, `sms:` jamais clique — numero prouve par `recipientPhoneE164` de la
+  reponse partagee par les deux canaux ; effacement du destinataire par `destinataire-eligible.ts` +
+  `destinataire.ts`). Prouve : lien cree une fois (un seul POST pour deux clics, meme jeton apres
+  rechargement), message et « Copie ! » ; WhatsApp wa.me/242061234567 avec le message ; page publique complete
+  (titre, sous-titre avec initiale, dates, frise de cinq jalons, confidentialite + lien, acquisition) ; rien de
+  revele (ecran, code source — valeurs du deal, jamais « € » qui vit dans le catalogue —, `noindex`, 8 cles
+  fermees de GET /track/:token) ; progression en deux navigateurs (aeroport prive, decollage, atterrissage, remise) ;
+  aucune carte cote Voyageur (403) ni avant l'acceptation (409) ; lien invalide = jeton altere OU destinataire
+  efface → meme message, meme 404 ; vrai numero cote Voyageur (bouton nomme par le numero). A trancher : « Colis
+  pris en charge » = acceptation sur la page publique, bouton d'appel nomme par le numero, SMS par assignation de
+  location plutot qu'un lien. Regard d'expert : revocation du lien par l'Expeditrice, SMS en href, fermer
+  ANO-WEB-53 (arrivalAt), test de contrat sur la liste fermee, polling doux de la page, mention « le lien
+  apparaitra a l'acceptation », revoquer le lien a l'effacement, « Appeler {numero} ». PIEGES : source next-intl =
+  tout le catalogue, `sms:` non observable, bouton nomme par le numero, page sans session, effacement en deux
+  temps. Harnais : 257 scenarios. Reste : 5.24 a 5.32, 02-ADMIN. AUCUNE attribution Claude.
+- 12/09 : **CHAPITRE 5.22 DU CAHIER 01-WEB — WEB-NOT, LA NOTATION CROISEE (branche `chore/recette-web-5-22`,
+  empilee sur #286)** — 11 fiches jouees CONFORMES (3 apres correction), 11 scenarios en serie, 3 min 18
+  (`apps/e2e/src/chapitres/web-not.spec.ts` ; bzv-completed Mai ↔ Thomas pour le double-aveugle et la page
+  publique en fenetre privee, gru-completed Joao ↔ Ines pour la note seule, l'intermediaire, les relances et la
+  revelation a 14 j ; cron `rating` force par `notation-eligible.ts r1|r2|reveal` + `notation.ts`). TROIS
+  ANOMALIES CLOSES : ANO-WEB-76 MAJEURE (l'accueil reel HomeLive ne derivait que les actions Voyageur — un
+  Expediteur n'avait jamais « A traiter » : noter, code, verification ; envois reels lus et fusionnes),
+  ANO-WEB-77 (deal en litige sur /rate → « La fenetre de 14 jours est passee » : RatingDone distingue
+  « indisponible » de « fermee »), ANO-WEB-78 (note d'un avis public = cinq icones sans nom → role=img
+  aria-label « 5/5 ») ; JEU D'ESSAI : les avis survivaient au seed (25 orphelins reveles sur les profils du
+  seed) → purge des Review des comptes du seed avec les bookings. Prouve : « Noter » a l'accueil / Mes envois /
+  le deal sans fenetre bloquante ; ecran sans moyenne ni volume ; criteres par role note ; note seule requise ;
+  limite 280 ; double-aveugle (rien de public avant la reciprocite, revelation au second, « Vos avis », cloche
+  sans email) ; intermediaire ; une seule fois (deja note, litige, etranger 403 traduit) ; relances J+5 / J+7 au
+  seul role muet puis silence ; revelation a 14 j sans reciprocite ; avis public (auteur, note, pouces, faits,
+  « Signaler cet avis » mailto avec l'id). A trancher : en-tete bureau sans « Donne ton avis » ni bandeau, cote
+  muet apres revelation (« Vos avis » plutot que « fenetre fermee »), etranger → « indisponible ». Regard
+  d'expert : une seule derivation d'actions pour les deux accueils, un en-tete partage, accord du feminin,
+  « Plus tard (jusqu'au …) », seuil d'alerte nomme, note recue dans la cloche, `cannotRateReason` en cle,
+  J+5/J+7 au catalogue, test « aucune note → aucune revelation », test du seed « zero avis orphelin ». PIEGES :
+  avis survivants au seed, page publique sans session, etoiles = aria-label, HomeLive ≠ HomePreview, cron en
+  deux temps, 403 → « indisponible ». Harnais : 248 scenarios. PR **#287** (empilee sur #286). Reste : 5.23 a 5.32, 02-ADMIN. AUCUNE
+  attribution Claude.
+- 12/09 : **CHAPITRE 5.21 DU CAHIER 01-WEB — WEB-LIT, LITIGE ET MEDIATION, VUE MEMBRE (branche
+  `chore/recette-web-5-21`, empilee sur #285)** — 13 fiches jouees CONFORMES (3 apres correction), 14 scenarios en
+  serie dont 1 `test.fail`, 4 min 42 (`apps/e2e/src/chapitres/web-lit.spec.ts` ; sgn-picked / los-picked pour le
+  transit, bzv-delivered signale puis REMBOURSEMENT TOTAL, bzv-disputed YAM-2041 version puis PARTIEL 10 €,
+  los-disputed YAM-2042 REJET, yul-delivered deux onglets, bzv-completed acces sans droit ; trois decisions par
+  la mediatrice dans le back-office (3001), versions manquantes donnees par l'API). QUATRE ANOMALIES :
+  ANO-WEB-75 MAJEURE close (quatre evenements avec texte mais sans presentation → « Notification » sans titre :
+  Decision rendue, Code renouvele, Remboursement emis, Paiement autorise — table PRESENTATION completee),
+  ANO-WEB-73 close (remboursement total = CANCELLED : « Demande annulee · Cette demande est close » titrait la
+  decision → « Clos par la mediation »), ANO-WEB-72 close (note « TON PAIEMENT » d'un deal clos par la mediation
+  disait « periode de verification terminee » → `noteReleasedMediation` sur completedBy ADMIN) ; OUVERTE :
+  ANO-WEB-74 MAJEURE (GET /me/notifications sert refundCents ET carrierPayoutCents aux deux parties dans le
+  payload brut de dispute_resolved — projection par role a faire, registre, PR dediee ; 10 bis en test.fail).
+  Prouve : lien de transit ferme (date servie) puis ouvert ; motif verrouille (un seul radio) ; ecran de
+  signalement complet ; refus (bouton inactif, photo en cours / en echec, refus serveur simule) ; envoi (ticket
+  serveur, FROZEN, fil ferme, emails — categorie seule au Voyageur) ; ni modifiable ni retirable (409, toast) ;
+  dossier des deux cotes sans fuite ; version une seule fois ; trois decisions, chacun SON montant a l'ecran et
+  par email, cloche « Decision rendue · YAM-… » ; aucune notation ; deux onglets (409, retour au suivi) ; acces
+  sans droit (403 traduit, aucune fuite). A trancher : bouton « Donner ma version », manques « nommes sur leur
+  bloc », CANCELLED pour un remboursement total, 200 vs 201, capitales. Regard d'expert : compte a rebours
+  d'ouverture, renvoi vers le fil avant de signaler, borne du partiel, test de composant des quatre etats,
+  « ajouter une preuve plus tard », cause du refus, echeance des 72 h, projection par role des notifications,
+  test copy ↔ PRESENTATION en CI, dire pourquoi pas de note, relire au focus. PIEGES : version par l'API avant
+  de trancher, admin-ui requis, « Autre probleme » sous-texte (exact), un seul radio en transit, capitales,
+  total dans la vue du bon role, deux emails de decision visees par ticket, 200/201. Harnais : 237 scenarios.
+  PR **#286** (empilee sur #285). Reste : 5.22 a 5.32, 02-ADMIN. AUCUNE attribution Claude.
+- 12/09 : **CHAPITRE 5.20 DU CAHIER 01-WEB — WEB-ANN, LES ANNULATIONS (branche `chore/recette-web-5-20`,
+  empilee sur #284)** — 9 fiches jouees (2 apres correction, 1 avec reserve, 1 NON CONFORME), 9 scenarios en
+  serie dont 1 `test.fail`, 3 min 18 (`apps/e2e/src/chapitres/web-ann.spec.ts` ; bzv-pending, bzv-accepted,
+  yul-accepted avec yul ramene a +24 h, un deal CREE PAR L'API sur bzv-perkg puis trajet ramene a −24 h,
+  bzv-picked / bzv-delivered, gru-pending deux onglets ; les manoeuvres deplacent le trajet ET l'instantane
+  `booking.trip.departureAt` que le bareme lit). QUATRE ANOMALIES : ANO-WEB-68 MAJEURE OUVERTE (aucune
+  annulation par le Voyageur : service 403 SHIPPER_ONLY alors que la machine declare cancel(CARRIER) avec
+  PENALIZE_CARRIER, aucun ecran — D72 renvoie pourtant vers « Mes trajets » pour annuler ses deals ;
+  chantier dedie + registre), ANO-WEB-69 mineure OUVERTE (apres le depart, fenetre et Paiements disent
+  « reversee au Voyageur » alors que la retenue est conservee a arbitrer : `retentionDisposition` a porter
+  par cancellationPreview et la ligne de paiement, contrat, PR dediee), ANO-WEB-70 close (« Voir le Deal
+  dans mon dashboard → » = bouton console.info des deux cotes → liens /dashboard/shipments et
+  /dashboard/trips), ANO-WEB-71 close (« Remboursement de 28,00 € en cours » sur une demande jamais debitee →
+  « Envoi annule. » seul). Prouve : demande en attente (fenetre exacte, montant servi, kilos rendus, email
+  Expeditrice, cloche seule cote Voyageur) ; accepte a > 48 h (total, deux emails + un, Paiements) ; < 48 h
+  (47,04 € → 23,52 € / 23,52 €, compensation 21,00 € = arrondi(retenue × net ÷ total), cloche + portefeuille
+  Marc) ; montant servi dans GET /me/bookings, 0 appel a l'ouverture ; apres le depart (19,32 € rembourse,
+  HELD_FOR_MEDIATION, aucun versement, trois ecrans Voyageur « conservee ») ; aucune annulation apres la
+  prise en charge (PICKED_UP et DELIVERED, ecran + API 409) ; suivi sans doublon ; deux onglets (409,
+  toast, liste relue, un seul remboursement). A trancher : bareme sur l'instantane du depart, objets
+  d'email, « lien discret », perimetre d'ANN-02. Regard d'expert : email d'annulation utile, un seul email
+  de remboursement, « dont 21,00 € pour Marc », apercu horodate, delai promis sur la retenue, test
+  « toute transition a une route et un ecran », allowedActions au Voyageur, composant de retour partage,
+  refetch au focus. PIEGES : GET /trips/:id proprietaire seul, instantane du depart, deal par l'API en
+  deux appels (QUOTE_DIVERGENCE → actualTotalCents), toast prefixe, route figee des deux onglets.
+  Harnais : 223 scenarios. PR **#285** (empilee sur #284). Reste : 5.21 a 5.32, 02-ADMIN. AUCUNE attribution Claude.
+- 12/09 : **CHAPITRE 5.19 DU CAHIER 01-WEB — WEB-CNF, CONFIRMATION, COMPLETION ET VERSEMENT (branche
+  `chore/recette-web-5-19`, empilee sur #283)** — 11 fiches jouees CONFORMES (4 apres correction, 1 avec
+  reserve), 13 scenarios en serie dont 2 `test.fail`, 2 min 54 (`apps/e2e/src/chapitres/web-cnf.spec.ts` ;
+  bzv-delivered Joao ↔ Thomas, yul-delivered Aminata ↔ Marc, bzv-completed-blocked, bzv-reversed ; crons
+  FORCES par `scripts/recette/payout.ts reminder|due` sur le FAKE apres `livraison-ancienne.ts <id> <jours>`
+  qui recule deliveredAt ET payoutDueAt ; `versement-bloque.ts` refige l'echec que le cron FAKE ferait
+  partir). SIX ANOMALIES : ANO-WEB-66 MAJEURE close (le bandeau « {montant} en attente : finalise ton compte
+  Stripe » n'etait pose que par l'ancien TripsClient, jamais par MyTripsList = la vraie page « Mes
+  trajets »), ANO-WEB-64 close (note « Tu as confirme la livraison » sur une completion SYSTEME →
+  `noteReleasedAuto` suit `completedBy`), ANO-WEB-65 close (« Tu as jusqu'au . » : RatingStatusCard sans
+  echeance → `promptTextNoDate`, seed avec `ratingWindowEndsAt` sur -blocked / -reversed), ANO-WEB-67 close
+  (« Rembourse 33,60 € le » sans date → wallet.service replie sur updatedAt, +1 test deal = 577) ;
+  OUVERTES : ANO-WEB-62 MAJEURE (l'API sert `payoutStatus` / `payoutSentAt` a l'Expeditrice et
+  `ConfirmDealResponse.payoutStatus` — A68 « both roles read it » contre le cahier « aucune fuite » : registre,
+  PR dediee), ANO-WEB-63 mineure (apres payoutDueAt la machine retire `dispute` mais laisse `confirmEarly` :
+  « Confirmer la livraison » reste propose ≤ 5 min ; garde `beforePayoutDue` proposee, registre). Prouve :
+  ecran livre complet, bouton de confirmation SECONDAIRE, compte a rebours jamais rouge ; confirmation
+  definitive (signalement disparu, emails et cloche « 55,00 € partis vers ton compte ») ; rappel J+3 une
+  seule fois (1 puis 0) ; apres J+4 sans cron : « Signaler » absent, 0h, dispute force 409 ; completion
+  SYSTEME (« sans signalement de ta part », Marc « 18,00 € partis ») ; ecrans Expeditrice etanches (suivi +
+  Paiements) ; versement bloque (deal, bandeau, ligne, portefeuille — aucune chaine technique) ; renverse
+  (sous examen, aucun renvoi) ; portefeuille et paiements = serveur, 7 + 6 etats de ligne, aucune maquette ;
+  « TON PAIEMENT » sans fausse carte. A trancher : A68, confirmer apres J+4, deux horloges (compte a rebours
+  client), objets d'email, cle morte `booking_payout_sent.SHIPPER`. Regard d'expert : `payoutDueAt` servi,
+  retirer payoutStatus de la reponse de confirmation, journaliser le passage du cron, rappel date a l'heure
+  exacte, garde symetrique, liste blanche Expediteur, une seule liste de trajets, delai dit sur « sous
+  examen », montant retenu affiche, sous-titres des cartes, test « jamais 4242 ». PIEGES : cron FAKE qui
+  rejoue / complete, FORCE_COLOR, `tsx --env-file` et l'env du processus, notifications qui survivent au
+  seed, U+202F avant €, pas de <main>, TripsClient ≠ MyTripsList, deals replies par trajet. Harnais : 214
+  scenarios. PR **#284** (empilee sur #283). Reste : 5.20 a 5.32, 02-ADMIN. AUCUNE attribution Claude.
+- 12/09 : **CHAPITRE 5.18 DU CAHIER 01-WEB — WEB-REM, LA REMISE DU COLIS (branche `chore/recette-web-5-18`,
+  empilee sur #282)** — 7 fiches jouees CONFORMES (2 apres correction), 7 scenarios en serie, 55 s
+  (`apps/e2e/src/chapitres/web-rem.spec.ts`, sgn-picked Mai ↔ Linh, bzv-picked pour l'annulation). DEUX
+  ANOMALIES CLOSES, toutes front : ANO-WEB-60 MAJEURE (« Valider la livraison » n'existait qu'APRES les trois
+  jalons « Optionnel » — la carte-projecteur offre le chemin direct, `spotlight.deliverEarly` FR/EN),
+  ANO-WEB-61 mineure (« n tentatives restantes » / « Derniere tentative » jamais rendu ; erreur persistante a la
+  ressaisie ; effet secousse declenche par le TEXTE de l'erreur, identique d'un essai a l'autre → muet au
+  deuxieme echec ; DeliverOtpInput rearme par `attemptsUsed`, `erreurMasquee`). Prouve : ecran complet (six
+  cases 3·3, encart, aide, « Tentative 1 sur 3 ») ; 000000 / 111111 → 409 DELIVERY_CODE_INVALID, compteur,
+  aucune notification cote Mai (`GET /me/notifications` identique) ; troisieme faux → 409 DELIVERY_LOCKED,
+  « Reessaye dans 14:5x », verrou apres rechargement, BON code refuse par l'API ; regeneration de Mai (carte
+  compacte de la phase voyage) → verrou leve, essais a zero, ancien code refuse ; photos : optionnel, deux au
+  plus, envoyees a la selection ; bon code + photo → DELIVERED, succes (« 28 € … le mercredi 16 septembre »),
+  aucun « Noter », Mai cloche + email « a ete livre » (« 3 jours », sans le code), Linh cloche sans email ;
+  aucune annulation (ligne de « Mes envois », suivi, Voyageur ; API 409 / 403). A trancher : destinataire
+  toujours « elle », objet de l'email, photos a la selection vs confirmation, 409/403. Regard d'expert :
+  essais rates dans l'historique admin, plafond/verrou au catalogue des reglages, dire que regenerer
+  debloque, un composant photos pour les deux ecrans, `payoutDueAt` servi, test unitaire de l'OTP. PIEGES :
+  `/me/notifications` (COD-2 corrigee, plus de `if (ok)`), deux formes du suivi Expeditrice, `expect.poll` sur
+  le code apres regeneration, date « le mercredi 16 septembre », « Annuler » des autres lignes, input cache
+  apres le plafond, statut hors racine. Harnais : 201 scenarios. PR **#283** (empilee sur #282). Reste : 5.19 a 5.32, 02-ADMIN. AUCUNE
+  attribution Claude.
+- 11/09 : **CHAPITRE 5.17 DU CAHIER 01-WEB — WEB-COD, LE CODE DE LIVRAISON (branche `chore/recette-web-5-17`,
+  empilee sur #281)** — 8 fiches jouees CONFORMES (4 apres correction), 8 scenarios en serie, 1 min 48
+  (`apps/e2e/src/chapitres/web-cod.spec.ts`). CINQ ANOMALIES CLOSES, toutes front, le serveur juste partout :
+  ANO-WEB-56 MAJEURE (WhatsApp et SMS s'ouvraient SANS le numero du destinataire — `wa.me/?text=` — alors que
+  `recipient.phoneE164` est servi depuis D69 et que la carte du lien de suivi le prenait deja ; BookingShareCode +
+  SenderCodeCard), ANO-WEB-55 mineure (« Code copie ! » au catalogue, jamais rendu ; « Message copie ! » en toast
+  aussi), ANO-WEB-57 mineure (compteur de regenerations enferme dans la boite de confirmation : « Aucune
+  regeneration restante » inatteignable), ANO-WEB-58 mineure (409 CODE_REGENERATION_LIMIT traduit par la couche
+  API puis ignore par les cartes → « Erreur lors de la regeneration » ; cas reel : second onglet en retard),
+  ANO-WEB-59 mineure (echec de copie hors HTTPS = message de la regeneration ; cle `copyFailed` FR/EN). Prouve :
+  aucun chiffre avant la prise en charge ; code chez Aminata seule, NEUF sources fouillees cote Thomas (pages,
+  sources HTML, fil, API) ; presse-papiers = 742891 ; message pre-rempli exact, WhatsApp sur 242061234567 ;
+  regeneration (confirmation, toast, 4 restantes, relecture serveur, email « Nouveau code… » sans aucun code,
+  Thomas rien) ; plafond 5 (409 par l'API, message du cahier par l'onglet en retard, code inchange) ; aucun
+  bouton sur quatre ecrans Voyageur ; apres remise « saisi par Thomas et valide ». A trancher : toasts vs
+  libelles, sms:/mailto: non cliques, badge « Code valide » = nom accessible seulement, « Livraison estimee — »
+  (ANO-WEB-53). Regard d'expert : liens `<a href>` pour les quatre canaux, plafond au catalogue des reglages +
+  DTO, cloche sur la regeneration, espaces next-intl par route, test des `details.code` sans lecteur. PIEGES :
+  toasts empiles (`.last()`), 401 rejoue par api-client (filtrer dans waitForResponse), bouton de-grise a la
+  main ≠ essai force, source next-intl = catalogue entier, jamais cliquer sms:/mailto:. Harnais : 194
+  scenarios. PR **#282** (empilee sur #281). Reste : 5.18 a 5.32, 02-ADMIN. AUCUNE attribution Claude.
+- 11/09 : **CHAPITRE 5.16 DU CAHIER 01-WEB — WEB-PIC, PRISE EN CHARGE ET JALONS DE TRANSIT (branche
+  `chore/recette-web-5-16`, empilee sur #280)** — 10 fiches jouees CONFORMES (5 apres correction), 8 scenarios
+  en serie, 1 min 48 (`apps/e2e/src/chapitres/web-pic.spec.ts`). CINQ ANOMALIES CLOSES : ANO-WEB-51 MAJEURE
+  (le bouton « Confirmer » inactif etait muet — les textes « Coche les 5 points… » / « Ajoute au moins 1
+  photo… » existaient en JSON, jamais rendus ; indice sous le bouton, desktop + mobile), ANO-WEB-49 mineure
+  (elision ecrite dans le message : « qu'Pauline », « d'Pauline » — `apps/user-ui/src/lib/elision.ts`, cinq
+  textes reecrits en {queShipper}/{deShipper}), ANO-WEB-50 mineure (« la remise a Brazzaville » : dernier
+  `split(" ")[0]` de la maquette sur les vues pickup), ANO-WEB-52 mineure (photo > 10 Mo acceptee a la
+  selection, comme ANO-WEB-39), ANO-WEB-54 mineure (cle brute « bookingTracker.trackingLink.subtitle » :
+  variable manquante). ANO-WEB-53 mineure OUVERTE (« arrivee prevue a — » : BookingTripSnapshot sans
+  arrivalAt — schema + contrat, PR dediee). Prouve : declaration a comparer, 5 points, photo obligatoire,
+  echec reseau = rien d'enregistre (aucun POST /pickup, statut relu), confirmation (code chez Pauline seule,
+  email sans le code, numero du destinataire cote Voyageur), refus (5 raisons, remboursement integral =
+  totalShipperCents, kilos +7, profil public de Marc identique), transit (une seule carte d'action, jalons
+  ordonnes / non repetables, 5 s de repentir sans requete, bannieres + cloche + UN email a l'atterrissage).
+  A trancher : « paye 3 jours apres » vs « J+4 » (deux formules), sous-titre mobile vs desktop, bouton
+  d'appel = le numero, photos envoyees a la confirmation, le cahier elide lui-meme. Regard d'expert : script
+  « cles JSON absentes du code », `onError` next-intl en echec dur en dev, test de rendu des vues Voyageur.
+  Harnais : 186 scenarios. PR **#281** (empilee sur #280). Reste : 5.17 a 5.32, 02-ADMIN. AUCUNE attribution Claude.
+- 11/09 : **CHAPITRE 5.15 DU CAHIER 01-WEB — WEB-MSG, MESSAGERIE, RENDEZ-VOUS ET NUMERO (branche
+  `chore/recette-web-5-15`, empilee sur #279)** — 22 fiches jouees CONFORMES (4 apres correction), 21 scenarios
+  en serie, 3 min 24 (`apps/e2e/src/chapitres/web-msg.spec.ts`, deux navigateurs Pauline / Thomas sur
+  bzv-accepted). QUATRE ANOMALIES CLOSES : **ANO-WEB-46 BLOQUANTE** (« Le code : 742 891 » PASSAIT — la garde
+  ne lisait que six chiffres colles ; separateurs retires avant lecture, message-guard.rules + test),
+  **ANO-WEB-47 MAJEURE** (apres un rendez-vous confirme, une nouvelle proposition etait invisible donc jamais
+  acceptable — `nextMeetupOf` fait primer une proposition plus recente que l'acceptation, accepter remplace
+  le confirme du meme type ; candidat registre D61 1A), ANO-WEB-45 mineure (le `message` ANGLAIS de l'API
+  affiche sous la saisie et dans le panneau — `details.code` traduit, cles messaging.errors.* FR/EN),
+  ANO-WEB-48 mineure (fil refuse a un tiers = « Chargement… » sans fin — `isError`). Prouve : bulle a
+  droite + fil groupe par jour + arrivee sans rechargement + notification ; 9 reponses rapides qui remplissent
+  sans envoyer, langue du COMPTE (D44, bascule par le selecteur) ; coordonnees reperees (flaggedContact vu par
+  le SUPPORT) ; rendez-vous (bornes 30 min / 90 j / 12 h en francais, une seule proposition, confirme) ;
+  numero : 400 TOO_EARLY puis 200 a moins de 2 h, une ligne systeme unique ; « Appeler » ouvre le fil ; sept
+  boutons -> le meme fil ; signalement (4 motifs, 409 la seconde fois, l'auteur pas prevenu) ; litige et 14 j
+  en lecture seule ; relance (un email sans le texte, pas deux par heure). A trancher : la bulle compte les
+  MESSAGES (cahier : conversations) ; pas de bouton message sur une demande en attente ; role absent de la
+  liste ; sans rendez-vous l'ancre du numero est le depart. Plateforme de tests **996** (message 44). Harnais :
+  178 scenarios. Poste : passerelle relancee en bundle (429 apres treize passages). PR **#280** (empilee sur #279). Reste : 5.16 a 5.32,
+  02-ADMIN. AUCUNE attribution Claude.
+- 11/09 : **CHAPITRE 5.14 DU CAHIER 01-WEB — WEB-DEA, LA DEMANDE COTE VOYAGEUR (branche
+  `chore/recette-web-5-14`, empilee sur #278)** — 9 fiches jouees CONFORMES (3 apres correction), 9 scenarios
+  en serie, 2 min 20 (`apps/e2e/src/chapitres/web-dea.spec.ts`). Demandes creees par l'assistant (32,20 /
+  28,75, photos interceptees) ; accueil / Mes trajets / cloche ; ecran de la demande bloc par bloc (net seul,
+  jamais 32,20 ni « commission », ni a l'ecran ni dans le DTO ; puce ambre puis ROUGE + role=alert sous 2 h
+  par manoeuvre) ; Charte obligatoire ; acceptation (capture « Bloque chez Yamba », notification, email, fil
+  ouvert des deux cotes) ; refus (5 raisons fermees, aucun texte libre, kilos rendus, profil public identique,
+  email avec la raison reformulee) ; expiration (409 TRANSITION_NOT_ALLOWED avant le cron, passe forcee
+  scripts/recette/expire.ts -> bandeau + email) ; deux onglets (409, toast, relecture, un seul debit) ; etats
+  fermes ; « Mon Deal accepte » (code secret, aucun code nulle part). TROIS ANOMALIES CLOSES : ANO-WEB-41
+  MAJEURE (« jeu. 1 janv. » partout : TripListItem ignorait departureAt — `trip-local-dates.ts` pur,
+  applique dans useMyTrips/useTrip), ANO-WEB-42 mineure (lieu ecrit deux fois, mention du telephone jamais
+  affichee ; ville repetee sur le recap accepte), ANO-WEB-44 MAJEURE (destinataire nomme « Hall » = premier
+  mot du lieu ; `recipientFirstName` servi a toute etape). ANO-WEB-43 mineure OUVERTE (« {n} envois »,
+  « Membre depuis » absents : DTO toCounterpart a enrichir, PR dediee). A trancher : accueil en lignes vs carte
+  « {n} demandes en attente » (copie morte), trois textes du cahier non rendus (stateLabel, COUVERTURE DU COLIS,
+  note du gain), raison reformulee dans l'email. Regard d'expert : `grep "TODO Phase"` (survivants de
+  maquette), `isExpired` dans le DTO Expediteur, ordre capture/transaction a relire. Harnais : 157 scenarios.
+  Poste : la cible `nx typecheck` des deux fronts Next a disparu (CI = tsc -p apps/user-ui, equivalent
+  `npx tsc --noEmit -p apps/user-ui/tsconfig.json`). PR **#279** (empilee sur #278). Reste : 5.15 a 5.32, 02-ADMIN. AUCUNE attribution Claude.
+- 11/09 : **CHAPITRE 5.13 DU CAHIER 01-WEB — WEB-TRU, LES PLAFONDS DU COMPTE NEUF (branche
+  `chore/recette-web-5-13`, empilee sur #277)** — 5 fiches jouees CONFORMES (1 apres correction), 5 scenarios
+  en serie, 2 min 00 (`apps/e2e/src/chapitres/web-tru.spec.ts`). Compte neuf cree par l'ecran en fiche 1 ;
+  450 € et 12 kg refuses A L'INTENTION (avant tout argent, rien nulle part), 250 € et 8 kg PASSENT, cinq
+  demandes puis la sixieme refusee des l'autorisation ; LEVIER DU BACK-OFFICE prouve ([TRU7]) : l'OPS releve
+  `trust.newAccount.maxShipmentsPerMonth` 5 -> 6 par PATCH /admin/settings, « Reessayer » toutes les 5 s,
+  la sixieme passe 6 s apres l'ecriture (journal SETTING_CHANGED -> Booking.createdAt), remise a 5 dans un
+  finally ; Aminata (90 j) reserve 12 kg a 450 € sans refus ; AUCUNE fuite du score sur cinq ecrans, trois
+  reponses d'API brutes (/auth/me, /me/bookings, /deals/:id) et l'export. ANO-WEB-40 mineure close (« Payer »
+  actif a cote de l'encadre de refus et avant le retour de l'intention : `ctaDisabled = isSubmitting ||
+  (step === 4 && !intent)` dans BookingWizard et BookingMobile). A trancher : message de plafond generique
+  (cahier) vs cible (catalogue D62 « le membre lit le plafond dans le message »), compteur mensuel qui compte
+  aussi les demandes declinees/expirees, levier joue en relevant (pas en abaissant), compte de travail
+  `neuf-<horodatage>@`. Regard d'expert : servir les PLAFONDS (pas le score) dans /auth/me pour borner des
+  l'etape 1 (decision de registre), test de contrat « le DTO Expediteur ne porte aucune cle de
+  TrustAssessment », cache 60 s des signaux par membre. Harnais : 148 scenarios. Reste : 5.14 a 5.32,
+  02-ADMIN. PR **#278** (empilee sur #277). AUCUNE attribution Claude.
+- 11/09 : **CHAPITRE 5.12 DU CAHIER 01-WEB — WEB-RSV, L'ASSISTANT EN QUATRE ETAPES ET LE DEVIS (branche
+  `chore/recette-web-5-12`, empilee sur #276)** — 22 fiches : 21 jouees CONFORMES (7 apres correction), 1 skip
+  (carte refusee, fournisseur FAKE), 12 scenarios en 2 min 05 (`apps/e2e/src/chapitres/web-rsv-devis.spec.ts`,
+  complete web-rsv.spec.ts et web-rsv-assistant.spec.ts). Devis verifie AU CENTIME (32,20 · 40,25 · 38,64 ·
+  11 · 38,20 · 257,60 · 42 apres divergence), kilos −2,5, emails (32,20 Expeditrice / 28,75 Voyageur),
+  dernier kilo (CAPACITY_EXCEEDED), propre trajet / parti / masque, reprise apres rechargement. SEPT
+  ANOMALIES CORRIGEES, toutes des branchements : ANO-WEB-33 MAJEURE (mot « assurance » dans un message +
+  copy mort), ANO-WEB-34 MAJEURE (poids vide : `buildInitialDraft(trip)` existait sans appelant — branchee
+  dans BookingWizard et BookingMobile), ANO-WEB-35 mineure (propre trajet refuse a l'ouverture), ANO-WEB-36
+  MAJEURE (apres QUOTE_DIVERGENCE le recap gardait l'ancien total — trajet relu via invalidateQueries),
+  ANO-WEB-37 MAJEURE (« 0 € » sous l'indice quand le devis est indisponible — indice seul), ANO-WEB-38
+  mineure (trajet parti refuse a l'ouverture), ANO-WEB-39 mineure (photo > 10 Mo refusee des la selection).
+  A trancher : decimales nulles omises (« 8 € ») et POINT decimal (« 15.5 kg », « 0.5 kg »), protection
+  ventilee (3,45 + 6) vs cumulee (9,45), 5 photos vs 6, erreurs a la tentative, indicateur « etape 1 sur 4 »
+  mobile seulement. Regard d'expert : partager le calcul du devis client/serveur, servir `bookable` dans le
+  DTO public, test de composant du wizard (aurait pris 3 anomalies sur 7). Harnais : 143 scenarios. PR
+  **#277** (empilee sur #276). Reste : 5.13 a 5.32, 02-ADMIN. AUCUNE attribution Claude.
+- 11/09 : **CHAPITRE 5.11 DU CAHIER 01-WEB — WEB-FAV, FAVORIS ET VOYAGEURS SUIVIS (branche
+  `chore/recette-web-5-11`, empilee sur #275)** — 12 fiches, 12 jouees CONFORMES (3 apres correction), 12
+  scenarios en serie, 1 min 50 (`apps/e2e/src/chapitres/web-fav.spec.ts`). Porte d'identite du coeur avec
+  geste repris apres connexion DANS la fenetre (prouve par l'API), ajout/retrait optimistes, propre trajet
+  refuse, trajet annule/masque, favori d'un trajet passe, suivi (Suivre → Suivi, abonnes, bascule),
+  email « Thomas N. vient de publier un nouveau trajet » (Mailpit), silence si notification coupee,
+  desabonnement, soi-meme refuse, etats vides. Trois anomalies MINEURES corrigees : ANO-WEB-30 (badge
+  « Trajet passe » jamais rendu — `departureAt` ISO ajoute au contrat `YambaTripResult`, OpenAPI x5
+  regeneres, badge dans `FavoriteTripsList`), ANO-WEB-31 (toast de desabonnement perdu — meme motif
+  qu'ANO-WEB-29, retours au niveau du hook `useUnfollowUser`), ANO-WEB-32 (un trajet MASQUE par Yamba
+  s'ajoutait en favori — `addFavorite` lit `hiddenByAdminAt`, +1 test unitaire : trip-service 261,
+  plateforme 994). A trancher : note « 5.0 » vs « 5,0 », refus « propre trajet » en toast. Regard
+  d'expert : revue systematique des `mutate(x, { onSuccess })` avec `onMutate` qui retire l'element
+  (troisieme occurrence) ; dispatch email sans outbox (comme 5.10). Piege : le coeur est DANS le lien de
+  la carte (selecteur corrige, aussi en 5.9) ; `nx serve trip-service` retombe sur « Recursive task
+  invocation » apres deux modifications rapprochees. Harnais : 131 scenarios. PR **#276** (empilee sur
+  #275). Reste : 5.12 a 5.32, 02-ADMIN. AUCUNE attribution Claude.
+- 11/09 : **CHAPITRE 5.10 DU CAHIER 01-WEB — WEB-ALR, ALERTES DE ROUTE (branche `chore/recette-web-5-10`,
+  empilee sur #274)** — 9 fiches, 9 jouees CONFORMES (1 apres correction), 9 scenarios en serie, 1 min 45
+  (`apps/e2e/src/chapitres/web-alr.spec.ts`). Ecran eprouve sans Google (panneau, periodes, bascules,
+  bouton desactive, cartes, prolonger, supprimer, plafond, banniere) ; alertes creees par l'API avec le
+  contrat du formulaire ; EFFET prouve par Mailpit : email FR a Aminata a la publication de Josephine,
+  jamais au Voyageur lui-meme, jamais deux fois en 24 h, villes proches < 50 km selon l'option (Orly ≈ 15 km
+  oui / non, Lille ≈ 204 km jamais, coordonnees consignees), 21e alerte refusee (ROUTE_ALERT_LIMIT).
+  Une anomalie MINEURE corrigee : ANO-WEB-29 (toast « Alerte supprimee » jamais affiche — suppression
+  optimiste, carte demontee avant la reponse, callbacks `mutate` perdus ; retours passes au niveau du hook
+  `useDeleteSavedRoute({ onSuccess, onError })`). A trancher : « Prolonger » seulement sous 7 jours,
+  « Selectionne les deux villes » inatteignable (bouton desactive), l'email d'alerte VOUVOIE (gabarit
+  `trip-published.ejs` anterieur au tutoiement), message du plafond en anglais. Regard d'expert par fiche
+  (dispatch sans outbox → a passer par l'outbox ; anti-spam par alerte et non par membre ; rayon et
+  plafond en reglages D62). Nouvelle page-objet `pages/recherche.ts` (brouillon sessionStorage) partagee
+  5.9 / 5.10. Harnais : 119 scenarios. PR **#275** (empilee sur #274). Reste : 5.11 a 5.32, 02-ADMIN.
+  AUCUNE attribution Claude.
+- 11/09 : **CHAPITRE 5.9 DU CAHIER 01-WEB — WEB-RCH, RECHERCHE / FILTRES / TRI / ETAT VIDE (branche
+  `chore/recette-web-5-9`, empilee sur #273)** — 15 fiches, 15 jouees CONFORMES (3 apres correction), 16
+  scenarios en 2 min 06 (`apps/e2e/src/chapitres/web-rch.spec.ts`) ; recherches posees par le brouillon
+  persistant de la barre (`sessionStorage` `yamba:form:trip-search`, sans Google), ordres / prix /
+  facettes confrontes a l'API. **ANO-WEB-27 BLOQUANTE CORRIGEE** : `next.config.js` sans
+  `images.remotePatterns` → `next/image` jetait sur le premier avatar ImageKit et TOUTE la page /search
+  (et la page publique) basculait sur « Cette page n'a pas pu s'afficher » (hotes ImageKit + Google
+  ajoutes ; contre-epreuve : avatar pose en base sur Thomas). **ANO-WEB-28 BLOQUANTE OUVERTE** (trouvee
+  en posant la contre-epreuve) : `Image.carrierPageId? @unique` = index unique NON epars sur Mongo → le
+  SECOND membre qui pose un avatar recoit 500 P2002 (un seul avatar possible sur la plateforme) ;
+  proposition : scinder `Image` en `UserAvatar` / `CarrierAvatar` a cle requise (candidat registre,
+  PR dediee) ; fiche en `test.fail`. Contexte donne par l'utilisateur : la RECHERCHE et l'ACCUEIL sont
+  des chantiers NON TERMINES — les ecarts consignes « a trancher » (compteur « Resultats disponibles »
+  absent, etat vide remplace par le bloc alerte, statuts des familles en infobulle, vestige « Discuter
+  avec Thomas · Bientot disponible », double arbre mobile/desktop, seed sans flightType ni coordonnees)
+  alimentent ce chantier. NOUVEAU : section « Regard d'expert — optimisations et ameliorations » par
+  fiche dans le rapport (consigne 11/09, a reconduire a chaque chapitre). Harnais : 110 scenarios. PR
+  **#274** (empilee sur #273). Reste : 5.10 a 5.32, 02-ADMIN. AUCUNE attribution Claude.
+- 11/09 : **CHAPITRE 5.8 DU CAHIER 01-WEB — WEB-DOC, JUSTIFICATIFS ET BILLET VERIFIE (branche
+  `chore/recette-web-5-8`, empilee sur #272)** — 6 fiches, 6 jouees CONFORMES (2 apres correction), 6
+  scenarios en 1 min (`apps/e2e/src/chapitres/web-doc.spec.ts`) ; ImageKit intercepte, admin SUPPORT
+  par l'API, emails lus dans Mailpit, seed rejoue en tete de fichier (DOC-4 consomme le billet en
+  attente de bzv-upcoming). Deux anomalies MINEURES corrigees : ANO-WEB-26 (le refus > 5 Mo etait
+  MUET : `reset()` effacait l'erreur juste apres la validation — retire dans TripDocumentsManager et
+  DocumentUpload) et ANO-WEB-25 (a 5 documents la zone de depot disparaissait sans un mot — message
+  FR/EN, prop `limitHint`, cle `docLimitReached`). Une anomalie MINEURE OUVERTE : ANO-WEB-24 (aucun
+  selecteur de TYPE de document, tout depot = TICKET_PROOF ; decision produit). PIEGE DE POSTE MAJEUR :
+  `apps/trip-service/.env` (reliquat du 13/05) portait un SMTP GMAIL REEL et ecrasait l'env racine
+  pour trip-service seul — ses emails (billet, masquage, alertes) partaient par Gmail, pas Mailpit, et
+  l'echec etait avale (`.catch(() => undefined)`). Fichier deplace dans `~/.yamba-leftovers/`, le
+  catch journalise (`admin-trips.controller.ts`), `nx run-many` relance (le parent reinjectait l'env).
+  Harnais : 94 scenarios. PR **#273** (empilee sur #272). Reste : 5.9 a 5.32, 02-ADMIN. AUCUNE
+  attribution Claude.
+- 11/09 : **CHAPITRE 5.7 DU CAHIER 01-WEB — WEB-TRJ, PUBLIER UN TRAJET ET SON CYCLE DE VIE (branche
+  `chore/recette-web-5-7`, empilee sur #270)** — 21 fiches : 20 jouees CONFORMES, 1 skip (TRJ-2, Google
+  Places), 14 scenarios en 1 min 36 (`apps/e2e/src/chapitres/web-trj.spec.ts`). Methode : la machine a
+  etats est deja unit-testee (500 lignes), la recette l'EXERCE (brouillons crees par l'API, gestes,
+  `allowedActions`, recherche publique) ; le wizard est ouvert EN EDITION (`?edit=<id>`) pour eprouver
+  les etapes 2 et 3 sans Google. Une anomalie MINEURE trouvee et CORRIGEE : ANO-WEB-22 (le mapper inverse
+  du wizard ne lisait que `departureDateLocal`/`TimeLocal`, ecrits par lui seul : un trajet cree par
+  l'API ou le seed s'ouvrait en edition avec « 4 champs a completer » — repli sur `departureAt` via
+  `Intl.DateTimeFormat.formatToParts` dans le fuseau du lieu sinon du navigateur,
+  `create-trip.reverse-mapper.ts`). Une anomalie MINEURE OUVERTE : ANO-WEB-23 (le wizard n'envoie
+  aucun fuseau, `departureAt` est calcule dans le fuseau du NAVIGATEUR, le serveur retombe sur
+  Europe/Paris ; proposition : fuseau derive des coordonnees cote serveur, PR dediee, decision produit).
+  Ecarts a trancher : « Ton prix = ton net » absent de l'ecran, « Lieu exact » = « Exact », cartes de
+  lieu par mode de transport, justificatifs a l'etape 1. D72 verifie A L'ECRAN (toast « Ce trajet porte
+  encore N deals en cours ») et par l'API. Harnais : 88 scenarios (`playwright --list`). PR **#272**
+  (empilee sur #270). Reste : 5.8 a 5.32, 02-ADMIN. AUCUNE attribution Claude.
+- 11/09 : **CHAPITRE 5.6 DU CAHIER 01-WEB — WEB-VOY, DEVENIR VOYAGEUR / ONBOARDING / STRIPE (branche
+  `chore/recette-web-5-6`, empilee sur #269)** — 7 fiches : 4 jouees CONFORMES, 3 skip motives, AUCUNE
+  anomalie (`apps/e2e/src/chapitres/web-voy.spec.ts`). Compte NEUF (l'onboarding transforme le compte ;
+  le seed porte des `acct_fake_*`). Couvre : entree « Devenir Voyageur » -> wizard 2 etapes ; etape
+  Profil (telephone mal forme refuse, badge « Profil a completer », passage par l'API) ; PUBLIER SANS
+  STRIPE (POST /trips publish -> PUBLISHED : le verrou D31 est a l'ACCEPT, pas au publish ; confirme la
+  divergence RG-01, code fait foi) ; etape Paiement (« Connecter avec Stripe », AUCUN IBAN Yamba, vrai
+  lien Connect Express test -> redirection connect.stripe.com). Skips : VOY-5 (completer un compte
+  EXPRESS impossible par l'API — « cannot accept ToS on behalf of Express » verifie — et flux heberge
+  Stripe lent/instable, procedure MANUELLE documentee), VOY-6 (demande en attente = parcours 5.12 ;
+  verrou D31 unit-teste `deal-lifecycle.service.spec.ts` `CARRIER_ONBOARDING_REQUIRED`), VOY-7 (dashboard
+  Stripe = compte complet requis). Harnais : 76 scenarios. PR **#270** (empilee sur #269). Reste : 5.7 a
+  5.32, 02-ADMIN. AUCUNE attribution Claude contributeur (Co-Authored-By) ni pied « Generated with Claude ».
+- 11/09 : **CHAPITRE 5.5 DU CAHIER 01-WEB — WEB-PRO, PROFIL / AVATAR / PAGE PUBLIQUE (branche
+  `chore/recette-web-5-5`, empilee sur #268)** — 10 fiches : 8 jouees CONFORMES, 2 skip (avatar
+  reel ImageKit ; « Afficher ma ville » que le seed ne peut alimenter). Une anomalie MINEURE
+  trouvee et CORRIGEE : ANO-WEB-21 (page masquee : le proprietaire la voyait sans mention
+  « masquee » ; l'API renvoyait `hidden` mais le front ne le portait pas — champ ajoute a
+  `PublicUser` + banniere `UserProfileView` + cle i18n `userProfile.hiddenBanner`). Ecart a
+  trancher : la page publique montre « Prenom N. », jamais le « nom affiche ». Garde-fou avatar
+  > 2 Mo teste sans ecriture externe. Observation : `seed-deals.ts` ne pose pas de ville Voyageur.
+  Harnais : 72 scenarios. PR **#269** (empilee sur #268). Reste : 5.6 a 5.32, 02-ADMIN. AUCUNE
+  attribution Claude.
+- 11/09 : **CHAPITRE 5.4 DU CAHIER 01-WEB — WEB-MDP, MOT DE PASSE ET ADRESSE EMAIL (branche
+  `chore/recette-web-5-4`, empilee sur #267)** — 6 fiches en 4 scenarios, toutes CONFORMES,
+  AUCUNE anomalie (`apps/e2e/src/chapitres/web-mdp.spec.ts`). Comptes NEUFS crees + actives par le
+  harnais (`creerCompteActive`), jamais le seed (le chapitre change mot de passe ET adresse de
+  facon definitive). Couvre : mot de passe oublie qui ne revele rien (aucun email pour une adresse
+  inconnue), reinitialisation par code 10 min (nouveau OK / ancien KO), changement de mot de passe
+  (refus PASSWORD_SAME_AS_CURRENT, email, autres sessions fermees), changement d'adresse (code sur
+  la NOUVELLE adresse, ancienne seulement informee sans code, EMAIL_ALREADY_USED, autres sessions
+  fermees). Piege : un mot de passe de test ne doit contenir ni prenom ni nom du compte
+  (PASSWORD_CONTAINS_PERSONAL_INFO). Harnais : 62 scenarios. PR **#268** (empilee sur #267). Reste :
+  5.5 a 5.32, 02-ADMIN. AUCUNE attribution Claude.
+- 11/09 : **CHAPITRE 5.3 DU CAHIER 01-WEB — WEB-CNX, CONNEXION ET SESSIONS (branche
+  `chore/recette-web-5-3`, empilee sur #266)** — 13 fiches + les 3 verifications historiques
+  d'ANO-WEB-01, `apps/e2e/src/chapitres/web-cnx.spec.ts`, 14 attendus / 0 inattendu (3 min 20).
+  Deux navigateurs A/B sur le MEME compte (Aminata) pour prouver qu'une session tuee depuis A
+  meurt dans B. Une anomalie MAJEURE OUVERTE : ANO-WEB-19 (la connexion par mot de passe n'a AUCUN
+  verrou anti-force-brute — douze 401 d'affilee, jamais un 429 ; le limiteur passerelle ignore les
+  echecs, `skipFailedRequests` ; deja releve en recette API ; fiche WEB-CNX-4 en `test.fail` ;
+  correctif = mecanique OTP, PR dediee). Une anomalie MINEURE close : ANO-WEB-20 (« Deconnecter un
+  appareil » sans message de confirmation). Ecarts consignes : atterrissage sur /fr (pas le
+  dashboard), rubrique « Sessions actives » (cahier : « Appareils connectes »), porte sudo au
+  moment du geste + code qui rejoue. Pieges : le changement de mot de passe FERME la fenetre sudo
+  (`closeSudoWindow`) — l'ordre litteral de WEB-CNX-11 est impossible ; six codes sudo/heure, un
+  par minute (nouveau `clear-sudo-locks.ts`) ; refresh standard = cookie de session, memorise = 30
+  jours (vie absolue). Harnais : 58 scenarios. PR **#267** (empilee sur #266). Reste : 5.4 a 5.32,
+  02-ADMIN. AUCUNE attribution Claude.
+- 10/09 (soir) : **CHAPITRE 5.2 DU CAHIER 01-WEB — WEB-INS, L'INSCRIPTION (branche
+  `chore/recette-web-5-2`, empilee sur #265)** — 16 fiches : 12 jouees CONFORMES, 4 ⏭ (parcours
+  Google 13-16, sans `NEXT_PUBLIC_GOOGLE_CLIENT_ID` et non pilotable : a la main le jour venu),
+  `apps/e2e/src/chapitres/web-ins.spec.ts`. Les fiches 6-9 = UN scenario (compte cree, bloque
+  cinq codes faux, code renvoye, active) avec une vraie minute de blocage. Une anomalie mineure
+  close : ANO-WEB-18 (« Connectez-vous ou utilisez » vouvoyait dans `registerCodeMessage`).
+  Trois ecarts de cahier a trancher : l'ecran du code MASQUE l'adresse (`maskEmail`, recommande :
+  garder), cas e du mot de passe (« minuscule » avant « date », ordre `CHECK_ORDER`), titre
+  « Deviens Voyageur » sur un ecran generique. Preuves en base par le nouveau
+  `packages/libs/prisma/scripts/inspect-user.ts` (ConsentLog TERMS + PRIVACY @2026-04-26,
+  preferredLocale fr, hasPassword). Pieges : le `role="alert"` de l'indicateur Next Dev Tools
+  (viser `main`) ; un script lance par `execFileSync` se verifie seul d'abord (`isVerified`
+  inexistant, casse a la derniere assertion). Harnais : 45 scenarios (41 joues, 4 ⏭). PR
+  **#266** (empilee sur #265). Reste : 5.3 a 5.32, 02-ADMIN. AUCUNE attribution Claude.
 - 04/09 : C-PR6b feat/c6b-admin-alerts (D59 3A / 4A, A129–A131) — neuf regles de seuil
   (evaluateAlerts pur, instantane de dix compteurs), GET /admin/alerts sans etat (accueil
   admin), cron horaire avec dedoublonnage Redis SET NX (un email par regle et par jour, Redis

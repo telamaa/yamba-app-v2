@@ -104,6 +104,12 @@ describe("checkTripBookable", () => {
     expect(code(() => checkTripBookable(trip({ hiddenByAdminAt: new Date("2026-08-30") }), "x", NOW))).toBe("TRIP_NOT_BOOKABLE");
     expect(() => checkTripBookable(trip({ hiddenByAdminAt: null }), "x", NOW)).not.toThrow();
   });
+  it("ANO-ADM-08 — Voyageur suspendu → TRIP_NOT_BOOKABLE ; restreint, ou suspension échue → réservable", () => {
+    expect(code(() => checkTripBookable(trip({ user: { accountStatus: "SUSPENDED", suspensionUntil: null } }), "x", NOW))).toBe("TRIP_NOT_BOOKABLE");
+    expect(code(() => checkTripBookable(trip({ user: { accountStatus: "SUSPENDED", suspensionUntil: new Date("2026-09-05") } }), "x", NOW))).toBe("TRIP_NOT_BOOKABLE");
+    expect(code(() => checkTripBookable(trip({ user: { accountStatus: "SUSPENDED", suspensionUntil: new Date("2026-08-31") } }), "x", NOW))).toBe("no-error");
+    expect(code(() => checkTripBookable(trip({ user: { accountStatus: "RESTRICTED", suspensionUntil: null } }), "x", NOW))).toBe("no-error");
+  });
   it("déjà parti → TRIP_NOT_BOOKABLE", () => {
     expect(code(() => checkTripBookable(trip({ departureAt: new Date("2026-08-01") }), "x", NOW))).toBe(
       "TRIP_NOT_BOOKABLE"

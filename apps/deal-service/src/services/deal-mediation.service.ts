@@ -31,6 +31,8 @@ import { applyBookingTransition, loadBookingForWrite, makeEnvelope, type Booking
 import { recomputeBookingParties } from "./reputation.service";
 import type { PayoutExecutor } from "./deal-lifecycle.service";
 import { withWriteConflictRetry } from "../lib/write-conflict-retry";
+import { withDecisionLock, type DecisionLockStore } from "../lib/decision-lock";
+import { refundIdempotencyKey } from "../lib/refund-idempotency";
 
 export type RequestingUser = { id: string };
 export type AdminActor = { id: string; ip?: string | null; userAgent?: string | null };
@@ -101,7 +103,9 @@ export function makeDealMediationService(
   provider: PaymentProvider,
   payoutExecutor: PayoutExecutor | null = null,
   clock: () => Date = () => new Date(),
-  settings: SettingsReader = platformSettings()
+  settings: SettingsReader = platformSettings(),
+  /** ANO-ADM-22 (A159) — un seul geste d'argent à la fois par deal : le Redis partagé (câblé dans deal.routes), une Map en test. */
+  lockStore: DecisionLockStore | null = null
 ) {
   async function loadDispute(bookingId: string): Promise<DisputeRow> {
     const d = await prisma.dispute.findUnique({
@@ -126,7 +130,13 @@ export function makeDealMediationService(
     });
   }
 
-  return {
+  /* Sans verrou, deux décisions simultanées émettent deux remboursements : un câblage oublié échoue FERMÉ, jamais ouvert. */
+  const requireLock = (): DecisionLockStore => {
+    if (!lockStore) throw new Error("deal-mediation: no decision lock store wired (ANO-ADM-22)");
+    return lockStore;
+  };
+
+  const gestures = {
     /* ── POST /deals/:id/dispute/statement (Voyageur) ─────────── */
     async respond(user: RequestingUser, dealId: string, input: CarrierDisputeStatementRequest): Promise<CarrierDisputeStatementResponse> {
       const now = clock();
@@ -155,7 +165,7 @@ export function makeDealMediationService(
     },
 
     /* ── POST /admin/disputes/:id/resolve ─────────────────────── */
-    async resolveDispute(admin: AdminActor, dealId: string, input: AdminResolveDisputeRequest): Promise<AdminResolutionResponse> {
+    async resolveDisputeUnlocked(admin: AdminActor, dealId: string, input: AdminResolveDisputeRequest): Promise<AdminResolutionResponse> {
       const now = clock();
       const booking = await loadBookingForWrite(dealId);
       assertNotParty(admin, booking);
@@ -184,7 +194,7 @@ export function makeDealMediationService(
       if (money.refundCents > 0) {
         if (!booking.paymentIntentId) throw new BookingLifecycleError("PAYMENT_STATE_CONFLICT", "This deal has no payment to refund.");
         try {
-          refundId = (await provider.refund(booking.paymentIntentId, money.refundCents)).refundId;
+          refundId = (await provider.refund(booking.paymentIntentId, money.refundCents, { idempotencyKey: refundIdempotencyKey("dispute", booking.id, money.refundCents) })).refundId;
         } catch {
           throw new BookingLifecycleError("PAYMENT_STATE_CONFLICT", "The refund could not be issued.");
         }
@@ -308,7 +318,7 @@ export function makeDealMediationService(
     },
 
     /* ── POST /admin/disputes/:id/retention ───────────────────── */
-    async resolveRetention(admin: AdminActor, dealId: string, input: AdminResolveRetentionRequest): Promise<AdminResolutionResponse> {
+    async resolveRetentionUnlocked(admin: AdminActor, dealId: string, input: AdminResolveRetentionRequest): Promise<AdminResolutionResponse> {
       const now = clock();
       const booking = await loadBookingForWrite(dealId);
       assertNotParty(admin, booking);
@@ -332,7 +342,7 @@ export function makeDealMediationService(
       if (restituteCents > 0) {
         if (!booking.paymentIntentId) throw new BookingLifecycleError("PAYMENT_STATE_CONFLICT", "This deal has no payment to refund.");
         try {
-          restituteRefundId = (await provider.refund(booking.paymentIntentId, restituteCents)).refundId;
+          restituteRefundId = (await provider.refund(booking.paymentIntentId, restituteCents, { idempotencyKey: refundIdempotencyKey("retention", booking.id, restituteCents) })).refundId;
         } catch {
           throw new BookingLifecycleError("PAYMENT_STATE_CONFLICT", "The refund could not be issued.");
         }
@@ -410,6 +420,15 @@ export function makeDealMediationService(
         resolvedAt: now.toISOString(),
       };
     },
+  };
+
+  return {
+    respond: gestures.respond,
+    /* Le verrou est pris AVANT toute lecture : le gagnant relit l'état à jour, le perdant n'émet rien (ANO-ADM-22). */
+    resolveDispute: (admin: AdminActor, dealId: string, input: AdminResolveDisputeRequest): Promise<AdminResolutionResponse> =>
+      withDecisionLock(requireLock(), dealId, () => gestures.resolveDisputeUnlocked(admin, dealId, input)),
+    resolveRetention: (admin: AdminActor, dealId: string, input: AdminResolveRetentionRequest): Promise<AdminResolutionResponse> =>
+      withDecisionLock(requireLock(), dealId, () => gestures.resolveRetentionUnlocked(admin, dealId, input)),
   };
 }
 export type DealMediationService = ReturnType<typeof makeDealMediationService>;

@@ -32,23 +32,72 @@ export const FinanceQueueItemSchema = z
     lastAttemptAt: z.string().datetime().nullable(),
     nextRetryAt: z.string().datetime().nullable(),
     disputeTicket: z.string().nullable(),
-    since: z.string().datetime().describe("Depuis quand l'exception existe (fin du deal ou dernière écriture)"),
+    since: z.string().datetime().describe("Depuis quand l'exception existe : date de proposition (PROPOSED_REFUNDS), sinon fin du deal (COMPLETED) ou annulation (CANCELLED)"),
+    proposalStale: z.boolean().nullable().describe("PROPOSED_REFUNDS : la proposition est devenue impossible (A165) ; null pour les autres files"),
   })
   .meta({ id: "FinanceQueueItem" });
 export type FinanceQueueItem = z.infer<typeof FinanceQueueItemSchema>;
+/** Nombre de lignes servies au plus par file ; au-delà, `truncated` le dit (recette § 5.11). */
+export const FINANCE_QUEUE_PAGE = 200;
 export const FinanceQueueResponseSchema = z
-  .object({ kind: FinanceQueueKindSchema, items: z.array(FinanceQueueItemSchema), generatedAt: z.string().datetime() })
+  .object({
+    kind: FinanceQueueKindSchema,
+    items: z.array(FinanceQueueItemSchema),
+    counts: z.object({ FAILED: z.number().int(), REVERSED: z.number().int(), HELD: z.number().int(), PROPOSED_REFUNDS: z.number().int() }).describe("Taille réelle de CHAQUE file, avec les mêmes filtres que les tuiles de l'accueil (recette § 5.11)"),
+    truncated: z.boolean().describe(`Vrai quand la file compte plus de lignes que les ${FINANCE_QUEUE_PAGE} servies`),
+    generatedAt: z.string().datetime(),
+  })
   .meta({ id: "FinanceQueueResponse" });
+
+/**
+ * Le filtre Prisma de chaque file d'argent — UNE définition, lue par la file (deal-service) ET par les tuiles de
+ * l'accueil (auth-service). Avant la recette § 5.11, les deux services écrivaient chacun le leur : la tuile « Versements
+ * en échec » comptait tout `payoutStatus: FAILED`, la file seulement les deals terminés ou annulés.
+ */
+export function financeQueueWhere(kind: FinanceQueueKind): Record<string, unknown> {
+  const base = { isDeleted: false };
+  switch (kind) {
+    case "FAILED":
+      return { ...base, status: { in: ["COMPLETED", "CANCELLED"] }, payoutStatus: "FAILED" };
+    case "REVERSED":
+      return { ...base, payoutStatus: "REVERSED", OR: [{ payoutReversalResolution: { isSet: false } }, { payoutReversalResolution: null }] };
+    case "HELD":
+      return { ...base, status: "CANCELLED", retentionDisposition: "HELD_FOR_MEDIATION" };
+    case "PROPOSED_REFUNDS":
+      return { ...base, manualRefundProposedCents: { gt: 0 } };
+  }
+}
 export type FinanceQueueResponse = z.infer<typeof FinanceQueueResponseSchema>;
 
 export const MoneyTimelineKindSchema = z
-  .enum(["AUTHORIZED", "CAPTURED", "REFUNDED", "DISPUTED", "COMPLETED", "CANCELLED", "PAYOUT_SENT", "PAYOUT_FAILED", "PAYOUT_REVERSED", "REVERSAL_RESOLVED", "RETENTION", "RETENTION_DECIDED"])
+  .enum(["AUTHORIZED", "CAPTURED", "REFUNDED", "DISPUTED", "COMPLETED", "CANCELLED", "PAYOUT_SENT", "PAYOUT_FAILED", "PAYOUT_REVERSED", "REVERSAL_RESOLVED", "RETENTION", "RETENTION_DECIDED", "AUTHORIZATION_RELEASED"])
   .meta({ id: "MoneyTimelineKind" });
 export type MoneyTimelineKind = z.infer<typeof MoneyTimelineKindSchema>;
 export const MoneyTimelineEventSchema = z
   .object({ at: z.string().datetime(), kind: MoneyTimelineKindSchema, amountCents: z.number().int().nullable(), detail: z.string().nullable() })
   .meta({ id: "MoneyTimelineEvent" });
 export type MoneyTimelineEvent = z.infer<typeof MoneyTimelineEventSchema>;
+
+/** Recette 02-ADMIN § 5.12 — ce qui reste à faire avec l'argent d'un deal (une ligne par attente). */
+export const MoneyPendingKindSchema = z
+  .enum(["AUTHORIZATION_OPEN", "DEAL_IN_PROGRESS", "PAYOUT_DUE", "PAYOUT_FROZEN", "PAYOUT_FAILED", "REVERSAL_OPEN", "RETENTION_HELD", "REFUND_PROPOSED"])
+  .meta({ id: "MoneyPendingKind" });
+export type MoneyPendingKind = z.infer<typeof MoneyPendingKindSchema>;
+export const MoneyBalanceSchema = z
+  .object({
+    capturedCents: z.number().int().describe("débité chez l'Expéditeur (0 tant que rien n'est capturé)"),
+    refundedCents: z.number().int().describe("rendu à l'Expéditeur, tous remboursements cumulés"),
+    paidOutCents: z.number().int().describe("versé au Voyageur et non renversé"),
+    platformHoldsCents: z.number().int().describe("débité − remboursé − versé : ce que la plateforme détient pour ce deal"),
+    pending: z.array(z.object({ kind: MoneyPendingKindSchema, cents: z.number().int() })),
+    settled: z.boolean().describe("plus rien n'est en attente"),
+    anomaly: z
+      .enum(["UNALLOCATED_FUNDS", "OVERSPENT"])
+      .nullable()
+      .describe("deal clos, rien en attente, et la plateforme détient plus que sa commission (UNALLOCATED_FUNDS) ou a versé plus qu'elle n'a reçu (OVERSPENT)"),
+  })
+  .meta({ id: "MoneyBalance" });
+export type MoneyBalance = z.infer<typeof MoneyBalanceSchema>;
 
 export const AdminDealMoneyFileSchema = z
   .object({
@@ -103,11 +152,22 @@ export const AdminDealMoneyFileSchema = z
       closedBy: z.string().nullable(),
     }),
     timeline: z.array(MoneyTimelineEventSchema),
+    // Recette 02-ADMIN § 5.12 — le bilan de l'argent du deal, calculé par une règle pure (`moneyBalance`) : où est chaque centime.
+    balance: MoneyBalanceSchema,
     adminActions: z.array(z.object({ id: ObjectIdSchema, at: z.string().datetime(), admin: z.string(), action: z.string(), after: z.unknown().nullable() })),
     // C-PR5b (D58 3A-c) — remboursement manuel
     manualRefund: z.object({
       maxRefundableCents: z.number().int().describe("total payé − déjà remboursé ; 0 = plus rien à rembourser"),
-      proposal: z.object({ amountCents: z.number().int(), reason: z.string(), byAdmin: z.string(), at: z.string().datetime() }).nullable(),
+      proposal: z
+        .object({
+          amountCents: z.number().int(),
+          reason: z.string(),
+          byAdmin: z.string(),
+          at: z.string().datetime(),
+          stale: z.boolean().describe("Recette § 5.15 (A165) — la proposition dépasse le reste remboursable ou le deal ne peut plus rien recevoir"),
+          staleReason: z.enum(["ABOVE_REMAINING", "NOT_REFUNDABLE"]).nullable(),
+        })
+        .nullable(),
       last: z.object({ amountCents: z.number().int(), reason: z.string(), byAdmin: z.string(), at: z.string().datetime() }).nullable(),
     }),
     allowedActions: z.object({ retryPayout: z.boolean(), resolveReversal: z.boolean(), reconcile: z.boolean(), proposeRefund: z.boolean(), applyRefund: z.boolean() }),

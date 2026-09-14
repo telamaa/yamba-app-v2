@@ -60,7 +60,11 @@ export default function BookingStatusNotice({ booking, onBackAction }: Props) {
   const t = useTranslations("bookingTracker.statusNotice");
   const format = useFormatter();
   const status = booking.status as NoticeStatus;
-  const key = MESSAGE_KEYS[status];
+  // ANO-WEB-73 (5.21) : un remboursement total tranché par la médiation clôt le deal en CANCELLED — « Demande
+  // annulée · Cette demande est close » titrait une décision rendue sur un colis livré. La clôture par la
+  // médiation a son propre texte.
+  const closParLaMediation = status === "CANCELLED" && !!(booking.dispute?.resolution || booking.retentionDecision);
+  const key = closParLaMediation ? "cancelledByMediation" : MESSAGE_KEYS[status];
   const Icon = ICONS[status];
 
   const dateIso =

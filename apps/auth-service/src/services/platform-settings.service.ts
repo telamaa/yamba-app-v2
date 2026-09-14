@@ -29,6 +29,7 @@ import {
   type UpdateSettingsRequest,
 } from "@packages/api-contracts";
 import { ConflictError, ForbiddenError, ValidationError } from "@packages/error-handler";
+import { reachableRecipientWhere } from "@packages/email";
 import { recordAdminAction } from "@packages/admin-audit";
 import { PLATFORM_SETTINGS_KEY } from "@packages/libs/settings";
 
@@ -137,7 +138,7 @@ export function makePlatformSettingsService(deps: {
     deps.invalidate?.();
     if (deps.notify) {
       const recipients = await deps.db.user.findMany({
-        where: { roles: { has: "ADMIN" }, adminRoles: { has: "SUPER_ADMIN" }, isDeleted: false },
+        where: { roles: { has: "ADMIN" }, adminRoles: { has: "SUPER_ADMIN" }, AND: [reachableRecipientWhere()] }, // ANO-ADM-11 : D35 4A (effacé, adresse en suppression)
         select: { id: true, email: true, firstName: true, lastName: true, preferredLocale: true },
       });
       await deps.notify({ actorId: actor.id, reset: action === "SETTINGS_RESET", reason, changes, recipients, at: now }).catch(() => undefined);
@@ -203,7 +204,14 @@ export function makePlatformSettingsService(deps: {
       const keys = wanted as SettingKey[];
       const cur = await current(deps.db);
       const changes: SettingsChange[] = keys.map((key) => ({ key, before: cur.values[key], after: SETTINGS_DEFAULTS[key] })).filter((c) => c.before !== c.after);
-      if (changes.length === 0) throw new ValidationError("Nothing to reset: every value already equals its default.", { code: "NOTHING_TO_RESET" });
+      if (changes.length === 0) {
+        // ANO-ADM-02 (recette 02-ADMIN § 4.3) : un profil qui ne peut écrire AUCUNE des clés visées (un Médiateur, un
+        // Support…) recevait « Nothing to reset » (400) quand elles étaient déjà à leur défaut — un refus doit se dire
+        // refus. Un profil qui peut écrire au moins une clé garde le 400 : il n'y a vraiment rien à faire.
+        const peutEcrire = keys.some((key) => adminRolesAllow(actor.roles, settingDefinition(key)!.scope === "BUSINESS" ? "settings.business.write" : "settings.operations.write"));
+        if (!peutEcrire) assertScopes(actor, keys);
+        throw new ValidationError("Nothing to reset: every value already equals its default.", { code: "NOTHING_TO_RESET" });
+      }
       assertScopes(actor, changes.map((c) => c.key));
       return commit(actor, body.expectedVersion, changes, body.reason.trim(), "SETTINGS_RESET");
     },
