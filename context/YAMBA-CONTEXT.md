@@ -756,6 +756,21 @@ Ordre de demarrage : auth -> trip -> gateway.
   total rembourse, message de decision en francais (« statut final : Annulée », « le deal reste annule »). A TRANCHER :
   le portefeuille de l'Expediteur ne dit pas qu'une retenue attend un arbitrage ; cle d'idempotence Stripe. Tests :
   notification 121, harnais 406. Reste : § 5.11 a 8.
+- 14/09 : **CAHIER 02-ADMIN — § 5.11 FINANCES, LES FILES D'EXCEPTION (branche `chore/recette-admin-5-11`, empilee sur
+  #311)** — 5 scenarios CONFORMES (FIN-1 quatre onglets, FIN-2 Support, + FIN-3 message brut du fournisseur, FIN-4 tuiles
+  = files, FIN-5 erreurs de l'API), joues contre le code non corrige (FIN-3 vert d'emblee : le motif du fournisseur ne
+  sort jamais de l'admin), puis 5/5 verts deux fois (`adm-fin-files.spec.ts`). Terrain : 1 · 1 · 1 · 0 ; le versement
+  en echec porte « compte non pret » alors que le compte de Thomas est pret. Le rejeu « Relancer » ne double pas
+  l'argent (cle d'idempotence de l'executeur, respectee par FAKE comme par Stripe) — preuve de concurrence laissee au
+  § 5.14. ANO-ADM-27 CLOSE (mineure, A161) : toute route inconnue des cinq services (et donc de la passerelle) servait
+  la page HTML d'Express « Cannot GET … » → `notFoundHandler` 404 JSON `ROUTE_NOT_FOUND`. ANO-ADM-28 CLOSE (mineure) :
+  le Support (kpi.read) lisait l'alerte « Versements en echec… » dont la carte menait a /finances, qui lui repond 403
+  → carte sans lien, « transmets a Finance ou Mediateur ». AMELIORATIONS : `financeQueueWhere` partage file + tuiles
+  (A161), compte de chaque file sur son onglet, `truncated`, onglet ecrit dans l'adresse, statut du deal en francais,
+  « Depuis » qui dit quelle date (fin du deal / annule le / propose le), indice « le compte est pret depuis : Relancer
+  peut aboutir », refus en francais (« Ton profil ne donne pas acces aux finances. »), « Relancer » sans double envoi et
+  message qui nomme le montant, `INVALID_QUEUE_KIND`, sous-titre exact. Tests : auth 249, deal 587, harnais 411.
+  Reste : § 5.12 a 8.
 - 13/09 : **DECISION : LE ROLE PREND LA MAJUSCULE** (branche `chore/recette-voyageur-majuscule`, empilee sur #299) —
   « Voyageur » / « Traveler » partout : 71 valeurs de messages, 33 textes du code, 1 email ; regle `role-majuscule` au
   lexique partage (CI + recette) ; 12 citations du harnais ; web-fav, web-rch, web-rsv-devis, web-lit verts.

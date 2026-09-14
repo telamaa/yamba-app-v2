@@ -5146,6 +5146,82 @@ Terrain mesuré : `bzv-held` (Aminata → Thomas, Paris → Brazzaville) payé 2
 
 ---
 
+## Cahier 02-ADMIN — § 5.11 Finances : les files d'exception · **CONFORME** (2 fiches + 3 ajoutées · 2 anomalies closes · 10 améliorations · 2 écarts documentaires · 5 scénarios, 1 min 30)
+
+`apps/e2e/src/admin/adm-fin-files.spec.ts`. `/finances` montre ce qui n'a pas suivi son cours. Chaque ligne se prouve
+deux fois : **l'écran = l'API de l'écran** (`GET /admin/finances/queue?kind=…`), **l'API = la base** (tuiles de
+l'accueil, jeu d'essai). Les gestes d'argent des files (Relancer, Décider, Arbitrer) ont leurs chapitres (§ 5.14, 5.15,
+5.10). Jouée d'abord contre le code non corrigé (FIN-1, 2, 4, 5 rouges, chacune sur ce qu'elle vise ; FIN-3 vert
+d'emblée), puis 5/5 verts deux fois ; ADM-ALR et ADM-ACC rejouées vertes (7/7) après les changements partagés.
+
+Terrain mesuré : files 1 · 1 · 1 · 0 (cahier : 1 · 1 · 1 · vide) — versement en échec `bzv-completed-blocked` 26,00 €,
+4 tentatives, motif `CARRIER_ACCOUNT_NOT_READY` **alors que le compte de Thomas est prêt** ; renversement `bzv-reversed`
+30,00 € ; retenue `bzv-held` 14,56 €. Le rejeu « Relancer » ne peut pas doubler l'argent : l'exécuteur unique passe une clé
+d'idempotence (`payout:<id>`), respectée par le fournisseur FAKE comme par Stripe ; la preuve de concurrence est laissée
+au § 5.14.
+
+| Fiche | Ce qui est éprouvé | Verdict · Preuve |
+|---|---|---|
+| ADM-FIN-1 | Les quatre onglets et leur contenu | **Conforme après améliorations** — sous-titre exact (corrigé : il disait le rapport « plus bas ») ; lien « Rapport mensuel et export → » ; pour chaque onglet : adresse `?kind=…` écrite au clic, indice exact, compteur de l'onglet = compte servi par l'API, colonnes « Deal / Parties / Montant / État / Depuis », lignes = API (liens deal et membres, montant, statut du deal en français, jamais le code) ; FAILED : « compte Stripe du Voyageur non prêt », « 4 tentative(s) · prochaine … », « Le compte est prêt depuis : « Relancer » peut aboutir. », « fin du deal », « Relancer » ; REVERSED : « transfert renversé par Stripe », « Décider » → `/deals/<id>` ; HELD : « retenue conservée », « annulé le », « Arbitrer » → `/disputes/<id>` ; PROPOSED_REFUNDS : « Rien à traiter. » ; pied « n ligne(s) · calculé le … » ; `?kind=REVERSED/HELD/PROPOSED_REFUNDS/NIMPORTEQUOI` → bon onglet / « Versements en échec » ; l'onglet survit au rechargement ; le Médiateur lit la file ; journal : aucune ligne |
+| ADM-FIN-2 | Le Support ne voit pas les finances | **Conforme après correction** → `ANO-ADM-28` ; pas d'entrée « Finances » ; `payoutsFailed`, `payoutsReversed`, `manualRefundProposals` servis à `null`, aucune tuile ; `/alerts` : la carte `PAYOUT_FAILED_48H` sans lien, « Ton profil n'ouvre pas cette file : transmets à Finance ou Médiateur. » ; `/finances` : « Ton profil ne donne pas accès aux finances. » ; `GET /admin/finances/queue` → 403 `ADMIN_PERMISSION_DENIED` (`finances.read`) ; le chemin du cahier `/api/admin/finances` → 404 **JSON** `ROUTE_NOT_FOUND` (`ANO-ADM-27`) ; journal : aucune ligne |
+| ADM-FIN-3 *(ajoutée)* | Le message brut du fournisseur reste à l'admin | **Conforme** (d'emblée) — manœuvre consignée : `payoutFailureReason = PROVIDER_ERROR:No such destination: 'acct_1RecetteSecret42'` ; l'admin lit « refus du fournisseur » et le message en chasse fixe, sans l'indice « compte prêt » ; Thomas et Aminata, `GET /deals/<id>` et `/me/wallet` : ni le message ni `PROVIDER_ERROR` ; jeu d'essai rejoué |
+| ADM-FIN-4 *(ajoutée)* | Tuiles de l'accueil = files | **Conforme après amélioration** — jeu d'essai : `payoutsFailed`, `payoutsReversed`, `retentionsHeld`, `manualRefundProposals` = comptes des quatre files, identiques quel que soit l'onglet lu ; Finance propose un remboursement de 1,50 € sur `bzv-completed` → tuile et file passent à 1, la ligne « 1,50 € · remboursement proposé · proposé le … · Décider » ; journal `REFUND_MANUAL_PROPOSED BOOKING · id` ; rejeu → retour à l'égalité |
+| ADM-FIN-5 *(ajoutée)* | Une erreur de l'API reste une erreur de l'API | **Conforme après correction** → `ANO-ADM-27` ; `kind=NIMPORTEQUOI` → 400 `INVALID_QUEUE_KIND` (était sans code) ; `/nexistepas-recette`, `/admin/finances`, `/trips/nexistepas-recette/zz/yy`, `/me/notifications/nexistepas/zz`, `/messages/nexistepas/zz/yy` par la passerelle → 404 JSON, aucune page HTML ; les cinq services en direct (6001 à 6005) → 404 `ROUTE_NOT_FOUND` |
+
+### Anomalies
+
+- **ANO-ADM-27 (mineure, close — A161)** — **une route inconnue répondait la page HTML d'Express.** Les cinq services
+  (et donc la passerelle, dont le repli mène à auth-service) servaient `<!DOCTYPE html>… Cannot GET /admin/finances` :
+  le framework et le chemin exposés, et un corps qu'aucun client JSON ne sait lire. Correction : `notFoundHandler`
+  (`packages/error-handler/error-middleware.ts`), monté après les routes et avant `errorMiddleware` dans les cinq
+  `main.ts` → 404 `{ status, message: "Route not found.", code: "ROUTE_NOT_FOUND", details: { code } }` ; test unitaire
+  dans `apps/auth-service/src/utils/error-details.spec.ts`.
+- **ANO-ADM-28 (mineure, close)** — **une alerte menait un profil vers un écran qui lui répond 403.** Le Support
+  (`kpi.read`, sans `finances.read`) lisait l'alerte « Versements en échec depuis plus de 48 h » ; la carte « Aller
+  traiter → » ouvrait `/finances`, refusé. Correction (`apps/admin-ui/src/components/AlertsView.tsx`) : l'alerte reste
+  lisible (tout profil de pilotage doit savoir que la plateforme souffre), le lien n'est offert qu'au profil qui ouvre la
+  destination ; les autres lisent à qui transmettre.
+
+### Améliorations faites
+
+- **Un seul filtre par file** (`financeQueueWhere`, `packages/libs/api-contracts/src/admin/admin-finances.schema.ts`) lu
+  par la file (deal-service) et les tuiles (auth-service `admin-kpis.controller.ts`) — la tuile comptait tout
+  `payoutStatus: FAILED`, la file seulement les deals terminés ou annulés (A161).
+- **Compte de chaque file** dans la réponse (`counts`) et **troncature signalée** (`truncated`, page de 200) ; test unitaire
+  (`admin-finance.service.spec.ts`) ; contrats OpenAPI régénérés.
+- **Onglets** : compteur sur chaque onglet (nom accessible inchangé), onglet écrit dans l'adresse (`router.replace`).
+- **Lignes** : statut du deal en français ; « Depuis » qui dit quelle date (fin du deal / annulé le / proposé le) ;
+  indice « Le compte est prêt depuis : « Relancer » peut aboutir. » quand le motif date d'un compte depuis finalisé.
+- **Refus** : « Ton profil ne donne pas accès aux finances. » (plus de « Chargement… » éternel sous l'erreur) ; « Relancer »
+  sans double envoi, message qui nomme le montant et le Voyageur, file rechargée quand il n'y a plus rien à relancer.
+- **API** : `INVALID_QUEUE_KIND` (avec les valeurs admises).
+- **Sous-titre** exact (quatre files, rapport à droite des onglets).
+
+### Écarts documentaires
+
+- **Badge « Stripe non prêt » absent** : le jeu d'essai pose l'échec « compte non prêt » sur un Voyageur dont le compte
+  est prêt ; le badge dit l'état ACTUEL du compte (l'écran le signale désormais par l'indice « prêt depuis »).
+- **`/api/admin/finances` n'existe pas** : l'appel direct du cahier répond 404 `ROUTE_NOT_FOUND` ; la garde se prouve sur
+  `/api/admin/finances/queue` (403).
+
+### Regard d'expert — produit ET test, une ligne par fiche
+
+- **FIN-1** — *Produit, fait* : compteurs, adresse, « Depuis » explicite, indice « compte prêt ». *Proposé* : trier
+  FAILED par ancienneté de l'ÉCHEC (première tentative) plutôt que par dernière écriture — demande un champ
+  `payoutFirstFailedAt` (même question que l'alerte du § 5.2, à trancher ensemble). *Test* : la fiche parcourt les lignes
+  servies par l'API au lieu de supposer une ligne — elle tiendra une file plus longue — rien à faire.
+- **FIN-2** — *Produit, fait* : refus en français, carte d'alerte sans lien mort. *Proposé* : l'accueil du Support
+  pourrait taire les alertes d'argent au lieu de les nommer — à trancher (un profil de pilotage doit-il voir toute la
+  santé de la plateforme ?). *Test* : la fiche prouve la garde sur la route réelle ET le 404 JSON du chemin du cahier.
+- **FIN-3** — *Produit* : conforme ; *proposé* : afficher aussi la date de la dernière tentative à côté du message brut
+  (elle est servie, pas montrée) — petit. *Test* : contre-épreuve sur les deux parties et les deux écrans membres.
+- **FIN-4** — *Produit, fait* : un filtre partagé. *Proposé* : une proposition de remboursement devenue impossible (deal
+  remboursé entre-temps) reste dans la file — la file pourrait la marquer « caduque » — petit. *Test* : l'égalité est
+  vérifiée à trois instants (seed, après geste, après rejeu), pas une fois.
+- **FIN-5** — *Produit, fait* : 404 JSON partout. *Proposé* : la passerelle pourrait répondre elle-même un 404 pour les
+  préfixes qu'elle ne route pas, au lieu de les confier à auth-service — petit. *Test* : les cinq services sont appelés en
+  direct, la passerelle ne masque donc aucun oubli.
+
 ## Observations (pas des anomalies, mais à savoir)
 
 - **`/become-yamber` reste « futur »** (commentaire du layout marketing) : la page de présentation

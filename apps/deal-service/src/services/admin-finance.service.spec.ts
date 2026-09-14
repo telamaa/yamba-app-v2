@@ -5,7 +5,7 @@
  * (c'est lui qui est testé dans deal-settlement.service.spec — ici on vérifie qu'on passe PAR lui).
  */
 const prismaMock = {
-  booking: { findUnique: jest.fn(), findMany: jest.fn(), updateMany: jest.fn() },
+  booking: { findUnique: jest.fn(), findMany: jest.fn(), updateMany: jest.fn(), count: jest.fn() },
   dispute: { findMany: jest.fn() },
   user: { findMany: jest.fn() },
   carrierPage: { findMany: jest.fn() },
@@ -48,6 +48,7 @@ beforeEach(() => {
   prismaMock.carrierPage.findMany.mockResolvedValue([{ userId: CARRIER_ID, stripeAccountId: "acct_1ABCDEFGHIJKLMNO", stripePayoutsEnabled: true }]);
   prismaMock.adminAction.findMany.mockResolvedValue([]);
   prismaMock.dispute.findMany.mockResolvedValue([]);
+  prismaMock.booking.count.mockResolvedValue(0);
   prismaMock.$transaction.mockImplementation(async (fn: (tx: typeof prismaMock) => Promise<void>) => fn(prismaMock));
 });
 
@@ -65,6 +66,21 @@ describe("listQueue (2A)", () => {
     prismaMock.booking.findMany.mockResolvedValue([record({ status: "CANCELLED", payoutStatus: null, retentionCents: 1478, retentionDisposition: "HELD_FOR_MEDIATION" })]);
     const q = await makeService().listQueue("HELD");
     expect(q.items[0]).toMatchObject({ kind: "HELD", amountCents: 1478, carrier: { stripeReady: null } });
+  });
+  it("recette § 5.11 — sert le compte de CHAQUE file avec les filtres partagés (ceux des tuiles) et dit quand la liste est tronquée", async () => {
+    const { financeQueueWhere } = await import("@packages/api-contracts");
+    prismaMock.booking.findMany.mockResolvedValue([record()]);
+    const sizes: Record<string, number> = { FAILED: 250, REVERSED: 1, HELD: 0, PROPOSED_REFUNDS: 3 };
+    prismaMock.booking.count.mockImplementation(async (args: { where: Record<string, unknown> }) => {
+      const kind = (["FAILED", "REVERSED", "HELD", "PROPOSED_REFUNDS"] as const).find((k) => JSON.stringify(financeQueueWhere(k)) === JSON.stringify(args.where));
+      return kind ? sizes[kind] : -1;
+    });
+    const q = await makeService().listQueue("FAILED");
+    expect(q.counts).toEqual({ FAILED: 250, REVERSED: 1, HELD: 0, PROPOSED_REFUNDS: 3 });
+    expect(q.truncated).toBe(true);
+    expect(prismaMock.booking.findMany.mock.calls[0][0]).toMatchObject({ where: financeQueueWhere("FAILED"), take: 200 });
+    sizes.FAILED = 1;
+    expect((await makeService().listQueue("FAILED")).truncated).toBe(false);
   });
 });
 

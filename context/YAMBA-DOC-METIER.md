@@ -5292,3 +5292,51 @@ transaction que l'écriture.
 - **Clé d'idempotence** chez le fournisseur pour la restitution (reprise après panne entre le remboursement et
   l'enregistrement).
 - Afficher dans le dossier, près des deux issues, le motif d'annulation saisi par l'Expéditeur.
+
+
+---
+
+# Back-office — les files d'argent disent combien, depuis quand, et à qui (cahier 02-ADMIN § 5.11)
+
+*(PR `chore/recette-admin-5-11`, 14/09/2026 — ADM-FIN-1 à 5.)*
+
+## Le besoin
+
+L'équipe Finance traite ce qui n'a pas suivi son cours : un Voyageur non payé, un transfert renvoyé par Stripe, une
+retenue à arbitrer, un remboursement proposé. Elle doit voir combien il y en a, depuis quand, pourquoi, et aller au bon
+écran — et un profil qui n'a pas à voir l'argent ne doit ni le voir ni être envoyé vers lui.
+
+## Les règles
+
+**RG-ADM-FIN-01 — Quatre files, un seul décompte** : la file et la tuile de l'accueil comptent exactement les mêmes
+deals ; chaque onglet affiche la taille de sa file, et l'écran dit quand il n'en montre qu'une partie.
+
+**RG-ADM-FIN-02 — Chaque ligne dit de quelle date elle part** : fin du deal, annulation ou proposition.
+
+**RG-ADM-FIN-03 — Le motif d'un échec est daté** : si le compte du Voyageur est prêt depuis l'échec, l'écran le dit.
+
+**RG-ADM-FIN-04 — Le message brut du fournisseur de paiement est réservé à l'admin** ; les deux parties ne lisent jamais
+ni ce message ni le motif interne.
+
+**RG-ADM-FIN-05 — Les finances sont réservées à Finance, Médiateur et super administrateur** ; un autre profil ne voit
+ni l'entrée, ni les tuiles, et une alerte d'argent ne l'envoie pas vers un écran refusé.
+
+**RG-ADM-FIN-06 — Une erreur de l'API reste lisible** : toute adresse inconnue répond une erreur structurée avec son
+code, jamais une page technique.
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| FIN-1 | Finance ouvre les quatre onglets | compteurs, lignes et montants exacts, bonnes actions, onglet dans l'adresse | oui |
+| FIN-2 | Support ouvre les finances ou l'alerte de versement | rien à voir, refus en français, alerte sans lien | oui |
+| FIN-3 | Le fournisseur renvoie un message technique | l'admin le lit, aucune des parties | oui |
+| FIN-4 | Une proposition de remboursement est faite | tuile et file passent ensemble à 1 | oui |
+| FIN-5 | Adresse inconnue, onglet inconnu | erreur structurée avec code | oui |
+
+## Ce qui reste à trancher
+
+- Mesurer l'ancienneté d'un versement en échec depuis le **premier échec** (nouveau champ) plutôt que depuis la fin du
+  deal — même question que l'alerte du § 5.2.
+- L'accueil du Support doit-il nommer les alertes d'argent qu'il ne peut pas traiter ?
+- Marquer « caduque » une proposition de remboursement devenue impossible.
