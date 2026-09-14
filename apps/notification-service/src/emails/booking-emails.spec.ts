@@ -497,6 +497,21 @@ describe("B4 (D52) — completed / payout_sent / disputed / verification_reminde
     expect(buildBookingEmail(full, "SHIPPER", "Naomi", { locale: "fr" })!.data.retainedForCarrier).toBeNull();
   });
 
+  it("ANO-ADM-35 (recette 02-ADMIN § 5.15) : un geste commercial d'un admin n'est ni une annulation ni une retenue — l'email le dit, sans montant du Voyageur", async () => {
+    const ejs = await import("ejs");
+    const path = await import("node:path");
+    const gesture = parse(envelope("booking.refund_issued", { ...basePayload(), actor: "ADMIN" as const, amountCents: 500, refundedAt: "2026-09-14T05:00:00.000Z" }));
+    for (const locale of ["fr", "en"] as const) {
+      const built = buildBookingEmail(gesture, "SHIPPER", "Mai", { locale })!;
+      expect(built.data).toMatchObject({ commercialGesture: true, retainedForCarrier: null });
+      const html = await ejs.renderFile(path.join(__dirname, "templates", `${built.template}.ejs`), { ...built.data, subject: built.subject, locale, firstName: "Mai", ctaUrl: "https://x" });
+      expect(html).not.toMatch(locale === "fr" ? /Annulation à moins de 48|retenue/ : /Cancellation less than 48h|retention/);
+      expect(html).toContain(locale === "fr" ? "un geste de l&#39;équipe Yamba" : "This is a gesture from the Yamba team"); // EJS échappe l'apostrophe
+    }
+    const late = parse(envelope("booking.refund_issued", { ...basePayload(), actor: "SHIPPER" as const, amountCents: 1950, refundedAt: "2026-07-19T12:00:00.000Z" }));
+    expect(buildBookingEmail(late, "SHIPPER", "Naomi", { locale: "fr" })!.data).toMatchObject({ commercialGesture: false });
+  });
+
   it("payout_sent : le Voyageur lit le MONTANT DE L'ÉVÉNEMENT et une copie honnête (2 à 7 jours) — jamais le total Expéditeur", () => {
     const built = buildBookingEmail(parse(payoutSentEvent()), "CARRIER", "Thomas", { locale: "fr" })!;
     expect(built.template).toBe("settlement/payout-sent-carrier");

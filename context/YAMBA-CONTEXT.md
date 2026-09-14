@@ -796,6 +796,23 @@ Ordre de demarrage : auth -> trip -> gateway.
   sur le Fake + manoeuvres base). AMELIORATIONS : carte qui nomme le fournisseur, aide FR par divergence, statuts FR,
   refus par code, journal « Rapprochement fournisseur ». PIEGE : la memoire du Fake survit au rejeu du jeu d'essai (une
   fiche constate l'etat initial, ne l'exige pas). Tests : deal 598, harnais 419. Reste : § 5.14 a 8.
+- 14/09 : **CAHIER 02-ADMIN — § 5.15 REMBOURSEMENT MANUEL EN DEUX GESTES (branche `chore/recette-admin-5-15`, empilee
+  sur #315)** — reprise du WIP `b5b6f31` interrompu a l'arret du poste : relu, verifie (typecheck CI x8, tests, OpenAPI,
+  i18n), rejoue. 6 scenarios CONFORMES (REM-1, 2, 3 du cahier + REM-4 trois applications simultanees, REM-5 proposition
+  caduque, REM-6 saisie FR et ecran perime), verts deux fois. CONTRE-EPREUVE par worktree a `5b35ef9` (deal +
+  notification non corriges, ecran de la branche) : REM-2 et REM-4 ROUGES. ANO-ADM-34 CLOSE (BLOQUANTE) : trois
+  « Rembourser maintenant » simultanes → 3 remboursements chez le fournisseur, 1 en base, deux 409 TRANSITION_NOT_ALLOWED
+  (le verrou conditionnel du cumul protegeait la base, pas l'argent parti avant, D39). A165 : verrou de decision du deal
+  (meme cle que la mediation, A159) avant toute lecture, 409 DECISION_IN_PROGRESS, echec ferme sans verrou ; cle
+  d'idempotence fournisseur `refundIdempotencyKey` sur TOUS les remboursements (manuel avec cumul lu, annulation, refus au
+  pickup, mediation, retenue, retour de capture) ; proposition caduque servie (`stale`, `staleReason`, `proposalStale`).
+  ANO-ADM-35 CLOSE (majeure) : l'email d'un geste commercial annoncait « Annulation a moins de 48 h : une retenue de
+  34,20 € » → `commercialGesture` (acteur ADMIN), paragraphe FR/EN. ANO-ADM-36 CLOSE (majeure) : portefeuille « retenue
+  reversee au Voyageur » pour tout remboursement partiel apres la fin du deal (geste, mediation) → `partialKind`,
+  `keptCents` au contrat, libelle « {garde} ont regle ton envoi ». AMELIORATIONS : saisie FR partagee (`parseEurosToCents`),
+  garde ref, refus par code (`manualRefundRefusal`, recharge), caducite a l'ecran et en file, compteur de motif,
+  remplacement signale, refundId dans le message. Harnais : WEB-CNF-10 (libelle AFTER_COMPLETION). Tests : deal 615,
+  notification 122, harnais 432. Reste : § 5.16 a 8.
 - 14/09 : **CAHIER 02-ADMIN — § 5.14 VERSEMENTS : REJEU ET RENVERSEMENT (branche `chore/recette-admin-5-14`, empilee sur
   #314)** — 7 scenarios CONFORMES (VER-1, 2, 3 du cahier + VER-1 bis double clic, VER-1 ter quatre relances simultanees,
   VER-2 bis deux re-versements simultanes, VER-4 ecran perime), joues contre le code non corrige (6/6 verts : le parcours

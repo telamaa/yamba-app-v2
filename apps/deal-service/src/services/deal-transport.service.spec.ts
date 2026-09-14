@@ -202,7 +202,7 @@ describe("B — refusePickup (A40)", () => {
     const result = await makeService(provider).refusePickup(CARRIER, BOOKING_ID, { reason: "SUSPICIOUS_CONTENT" });
 
     // L'argent d'abord : remboursement INTÉGRAL demandé au fournisseur sur l'intent CAPTURÉ.
-    expect(refundSpy).toHaveBeenCalledWith(intentId, 2957);
+    expect(refundSpy).toHaveBeenCalledWith(intentId, 2957, { idempotencyKey: `yamba:refund:pickup-refused:${BOOKING_ID}:2957` }); // A165
     expect(refundSpy.mock.invocationCallOrder[0]).toBeLessThan(prismaMock.$transaction.mock.invocationCallOrder[0]);
     const { where, data } = lastUpdate();
     expect(where).toEqual({ id: BOOKING_ID, status: "ACCEPTED" });

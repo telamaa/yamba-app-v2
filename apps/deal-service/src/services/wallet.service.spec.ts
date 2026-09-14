@@ -89,7 +89,9 @@ describe("Voyageur — buildCarrierWallet", () => {
 describe("Expéditeur — toPaymentItem / buildShipperWallet", () => {
   it("C-PR5b : un remboursement APRÈS la fin du deal (médiation partielle, geste commercial) se lit comme une annulation partielle", () => {
     const partial = toPaymentItem(rec({ status: "COMPLETED", capturedAt: days(-5), completedAt: days(-2), refundedAt: days(-1), refundAmountCents: 1000 }), counterparts);
-    expect(partial).toMatchObject({ state: "PARTIALLY_REFUNDED", refundAmountCents: 1000, retentionCents: 2957 - 1000, date: days(-1).toISOString() });
+    expect(partial).toMatchObject({ state: "PARTIALLY_REFUNDED", refundAmountCents: 1000, keptCents: 2957 - 1000, partialKind: "AFTER_COMPLETION", date: days(-1).toISOString() });
+    // ANO-ADM-36 — jamais une « retenue » : aucune annulation n'a eu lieu.
+    expect(partial.retentionCents).toBeNull();
     expect(toPaymentItem(rec({ status: "COMPLETED", capturedAt: days(-5), completedAt: days(-2), refundAmountCents: 2957 }), counterparts)).toMatchObject({ state: "REFUNDED" });
     expect(toPaymentItem(rec({ status: "COMPLETED", capturedAt: days(-5), completedAt: days(-2) }), counterparts)).toMatchObject({ state: "RELEASED" });
   });
@@ -101,7 +103,7 @@ describe("Expéditeur — toPaymentItem / buildShipperWallet", () => {
     expect(toPaymentItem(rec({ status: "DECLINED" }), counterparts)).toMatchObject({ state: "RELEASED_NO_CHARGE" });
     expect(toPaymentItem(rec({ status: "CANCELLED", refundAmountCents: 2957 }), counterparts)).toMatchObject({ state: "RELEASED_NO_CHARGE" }); // annulé en PENDING : jamais capturé
     expect(toPaymentItem(rec({ status: "CANCELLED", capturedAt: days(-5), refundAmountCents: 2957, refundedAt: days(-1) }), counterparts)).toMatchObject({ state: "REFUNDED", refundAmountCents: 2957 });
-    expect(toPaymentItem(rec({ status: "CANCELLED", capturedAt: days(-5), refundAmountCents: 1479, refundedAt: days(-1) }), counterparts)).toMatchObject({ state: "PARTIALLY_REFUNDED", refundAmountCents: 1479, retentionCents: 1478 });
+    expect(toPaymentItem(rec({ status: "CANCELLED", capturedAt: days(-5), refundAmountCents: 1479, refundedAt: days(-1) }), counterparts)).toMatchObject({ state: "PARTIALLY_REFUNDED", refundAmountCents: 1479, retentionCents: 1478, keptCents: 1478, partialKind: "LATE_CANCELLATION" });
   });
 
   it("ANO-WEB-67 — un remboursement sans refundedAt porte quand même une date (repli sur updatedAt), jamais « le » vide", () => {
@@ -126,6 +128,13 @@ describe("Expéditeur — toPaymentItem / buildShipperWallet", () => {
     expect(wallet.spentCents).toBe(1000 + 1478);
     expect(wallet.refundedCents).toBe(1479);
     expect(wallet.items).toHaveLength(5);
+    expect(() => ShipperWalletSchema.parse(wallet)).not.toThrow();
+  });
+  it("ANO-ADM-36 — dépensé compte la part GARDÉE d'un geste commercial après la fin du deal, sans l'appeler retenue", () => {
+    const wallet = buildShipperWallet([rec({ status: "COMPLETED", capturedAt: days(-9), completedAt: days(-2), refundedAt: days(-1), refundAmountCents: 500 })], counterparts);
+    expect(wallet.spentCents).toBe(2957 - 500);
+    expect(wallet.refundedCents).toBe(500);
+    expect(wallet.items[0]).toMatchObject({ partialKind: "AFTER_COMPLETION", retentionCents: null, keptCents: 2457 });
     expect(() => ShipperWalletSchema.parse(wallet)).not.toThrow();
   });
 });

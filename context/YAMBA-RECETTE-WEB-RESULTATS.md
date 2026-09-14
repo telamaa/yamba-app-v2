@@ -5418,6 +5418,80 @@ fois ; ADM-ARG, FIN, RET, RAP, MED rejouées avec le second passage (33/33, 17 m
   désormais le scénario complet en test unitaire. *Proposé* : un mode « chaos » du Fake piloté par variable
   d'environnement (409 sur clé en cours, réponse perdue) pour le jouer aussi en e2e — moyen.
 
+## Cahier 02-ADMIN — § 5.15 Remboursement manuel en deux gestes · **CONFORME après correction** (3 fiches + 3 ajoutées · 3 anomalies closes dont 1 bloquante · 9 améliorations · 3 écarts documentaires · 6 scénarios, 6 min)
+
+`apps/e2e/src/admin/adm-rmb-remboursement.spec.ts`. Trois questions au-delà des boutons : **l'argent peut-il partir deux
+fois ?** (appels simultanés, remboursements comptés **chez le fournisseur** par le rapprochement, qui lit sans écrire —
+§ 5.13) ; **l'Expéditeur lit-il la vérité ?** (email et portefeuille) ; **une proposition peut-elle devenir fausse ?**
+Jeu d'essai rejoué avant chaque fiche ; la mémoire du Fake survivant au rejeu, les remboursements se comptent par
+différence avec un relevé pris juste avant le geste. Deux manœuvres base consignées (ADM-REM-5, 6 : un autre
+remboursement simulé entre la proposition et l'application). **Contre-épreuve** : ADM-REM-2 et ADM-REM-4 rejouées contre
+deal-service et notification-service construits depuis `5b35ef9` (worktree séparé, écran corrigé) — **rouges** toutes
+les deux, sur les trois anomalies. Après correction : 6/6 verts, deux passages.
+
+| Fiche | Ce qui est éprouvé | Verdict · Preuve |
+|---|---|---|
+| ADM-REM-1 | Proposer (Finance) | **Conforme** — texte exact et plafond = payé − déjà remboursé ; au-dessus du plafond, « Proposer » inactif et message « Au-dessus du plafond : … au plus. » (amélioration), appel direct → 400 « At most n cents can still be refunded… » ; motif court → bouton inactif, compteur `n / 50` ; motif valide → « Remboursement proposé, en attente d'un super administrateur. (5,00 €) » ; rechargement → bandeau « Proposé : 5,00 € par … le … — motif » ; file `PROPOSED_REFUNDS` = [ce deal], 500 ; `/admin/kpis.manualRefundProposals` = 1 ; aucun « Rembourser maintenant » pour Finance ni Support ; journal `REFUND_MANUAL_PROPOSED BOOKING · id`, `after { amountCents: 500, reason }` |
+| ADM-REM-2 | Appliquer (super administrateur) | **Conforme après correction** — formulaire prérempli « 5,00 » ; « Rembourser maintenant » → 200, « Remboursé 5,00 € (cumul 5,00 €). L'Expéditeur est prévenu par email. Remboursement re_fake_… » ; fiche : cumul 500, `refundId` = celui rendu, proposition effacée, **versement du Voyageur identique** ; **un** remboursement de plus chez le fournisseur, **un** `booking.refund_issued` ; portefeuille de Mai `PARTIALLY_REFUNDED` « Remboursé 5,00 € le 14 sept. · 34,20 € ont réglé ton envoi » ; ✉ « Remboursement émis pour ton envoi Paris → Brazzaville » avec 5,00 €, sans « retenue » ni « Annulation à moins de 48 h », sans le montant du Voyageur ; chronologie : `booking.refund_issued` ; journal `REFUND_MANUAL_APPLIED { amountCents, totalRefundedCents, refundId, reason }`. **Avant** (contre-épreuve) : portefeuille « retenue 34,20 € reversée au Voyageur » (ANO-ADM-36), email « Annulation à moins de 48 h du départ : une retenue de 34,20 € s'applique… Elle revient au Voyageur » (ANO-ADM-35) |
+| ADM-REM-3 | Finance applique par appel direct | **Conforme** — 403 `ADMIN_PERMISSION_DENIED` ; paiement en base identique ; aucun remboursement de plus chez le fournisseur ; aucune ligne de journal |
+| ADM-REM-4 (ajoutée) | Trois « Rembourser maintenant » simultanés | **Conforme après correction** — `200 re_fake_… · 409 DECISION_IN_PROGRESS · 409 DECISION_IN_PROGRESS` ; **un** remboursement chez le fournisseur ; cumul 700 ; un événement, une ligne de journal. **Avant** : `200 · 409 TRANSITION_NOT_ALLOWED · 409 TRANSITION_NOT_ALLOWED` et **3 remboursements chez le fournisseur** pour un seul en base (ANO-ADM-34) |
+| ADM-REM-5 (ajoutée) | Proposition devenue impossible | **Conforme après amélioration** — proposition 30,00 €, puis 20,00 € remboursés ailleurs (manœuvre base) : fiche `stale: true`, bandeau rouge « caduque : elle dépasse ce qui reste remboursable (il reste 19,20 €). Ne l'applique pas telle quelle. » ; appel au montant proposé → 400 `REFUND_ABOVE_MAX`, rien d'émis ; badge « caduque » dans la file |
+| ADM-REM-6 (ajoutée) | Saisie à la française et écran périmé | **Conforme après amélioration** — « 1 234,50 » lu 1 234,50 € → « Au-dessus du plafond » ; « douze » → « Montant illisible : écris par exemple 12,50. » ; « 12,50 » accepté ; deal remboursé en totalité sous l'écran (manœuvre base) puis clic → « Plus aucun remboursement manuel possible sur ce deal (déjà remboursé en totalité, ou deal pas fermé). Rien n'a été émis ; la fiche est rechargée. », jamais « 400 : … » ; la fiche rechargée n'offre plus le geste ; rien d'émis |
+
+### Anomalies
+
+- **ANO-ADM-34 (bloquante, close — A165)** — **trois clics simultanés, trois remboursements.** `applyManualRefund`
+  (`apps/deal-service/src/services/admin-finance.service.ts`) lit les bornes, appelle `provider.refund` **puis** écrit le
+  cumul sous condition (`refundAmountCents` inchangé). Trois requêtes lisent le même état, passent toutes les bornes et
+  émettent toutes leur remboursement ; une seule écriture réussit, les deux autres répondent 409
+  `TRANSITION_NOT_ALLOWED` — l'argent est parti, la base ne le sait pas, l'écran dit « refus ». Le verrou conditionnel
+  protégeait la base, pas l'argent. Mesurée en contre-épreuve (3 remboursements Fake pour 1 en base). Correction : verrou
+  de décision du deal (A159) avant toute lecture, `DECISION_IN_PROGRESS` au perdant, échec fermé sans verrou ; clé
+  d'idempotence fournisseur sur **tous** les remboursements (manuel, annulation, refus au pickup, médiation, restitution
+  de retenue, retour de capture).
+- **ANO-ADM-35 (majeure, close)** — **l'email d'un geste commercial annonçait une annulation tardive et une retenue.**
+  `buildBookingEmail` (`apps/notification-service/src/emails/booking-emails.ts`) posait `retainedForCarrier` dès que le
+  montant remboursé était inférieur au total : « Annulation à moins de 48 h du départ : une retenue de 34,20 € s'applique…
+  Elle revient au Voyageur » à une Expéditrice dont l'envoi avait été livré. Correction : acteur `ADMIN` →
+  `commercialGesture: true`, pas de retenue ; paragraphe « C'est un geste de l'équipe Yamba sur ton envoi. Il ne change
+  rien pour le Voyageur, et ton envoi reste réglé. » (FR/EN).
+- **ANO-ADM-36 (majeure, close)** — **le portefeuille de l'Expéditeur appelait « retenue reversée au Voyageur » tout
+  remboursement partiel après la fin du deal** (geste commercial, médiation partielle) : `toPaymentItem`
+  (`apps/deal-service/src/services/wallet.service.ts`) réutilisait le calcul de l'annulation tardive. Correction :
+  `partialKind` (`LATE_CANCELLATION` | `AFTER_COMPLETION`) et `keptCents` au contrat ; `retentionCents` n'existe plus que
+  pour l'annulation tardive ; libellé « Remboursé {montant} le {date} · {gardé} ont réglé ton envoi » ; « Dépensé » compte
+  la part gardée. Clôt aussi l'observation « la ligne Finances d'un remboursement de médiation parle de retenue ».
+
+### Écarts documentaires
+
+- **Étape 3** : l'écran ne laisse pas cliquer « Proposer » au-dessus du plafond (bouton inactif, raison écrite) ; le 400
+  « At most n cents… » du cahier est prouvé par appel direct.
+- **Étape 7, tuile d'accueil** : lue par `/admin/kpis` (même définition de file, A161), pas à l'écran `/home`.
+- **Messages** : le succès d'application nomme en plus l'identifiant du remboursement ; celui de la proposition, le montant
+  et, le cas échéant, la proposition remplacée. Le cahier ne dit rien d'un second clic simultané : fiches REM-4 à 6 à
+  ajouter au cahier.
+
+### Regard d'expert — produit ET test, une ligne par fiche
+
+- **REM-1** — *Fait* : raison du refus sous le montant, compteur de motif, avertissement « en proposer une autre la
+  remplace (l'ancienne reste au journal) ». *Proposé* : historique des propositions remplacées dans la fiche (aujourd'hui
+  au seul journal) — petit.
+- **REM-2** — *Fait* : ANO-ADM-35, ANO-ADM-36, identifiant du remboursement dans le message, rappel « le motif reste au
+  journal, il ne lui est pas envoyé ». *À trancher* : faut-il dire à l'Expéditeur **pourquoi** il est remboursé (motif
+  libre = risque de fuite interne ; une liste de motifs publics serait plus sûre).
+- **REM-3** — *Constat* : conforme d'emblée. *Test* : rien à faire.
+- **REM-4** — *Fait* : ANO-ADM-34, A165, garde de double clic synchrone (`useRef`). *Proposé* : `commercialGesture` repose
+  sur `actor === "ADMIN"` — seul le remboursement manuel émet aujourd'hui `refund_issued` en acteur ADMIN ; un champ
+  explicite `refundKind` dans l'événement éviterait qu'un futur geste admin hérite du texte — moyen.
+- **REM-5** — *Fait* : caducité servie par le serveur (fiche + file). *À trancher* : effacer automatiquement une
+  proposition caduque, ou exiger une nouvelle proposition (aujourd'hui elle reste visible, marquée).
+- **REM-6** — *Fait* : `parseEurosToCents` partagé avec la décision de médiation, lecteur de refus par code
+  (`manualRefundRefusal`) qui recharge la fiche quand l'état a changé et ne promet pas « rien n'est parti » sur une
+  erreur inconnue. *Test* : fiche ajoutée.
+- **Transversal** — *Test* : la contre-épreuve a exigé un worktree à l'état précédent (écraser le répertoire de travail
+  est refusé) ; le Fake honorant désormais les clés de remboursement, `_forgetIdempotencyKeysForTest` couvre aussi les
+  remboursements. *Harnais* : WEB-CNF-10 recopie la table des libellés du portefeuille, cas `AFTER_COMPLETION` ajouté.
+
 ---
 
 ## Observations (pas des anomalies, mais à savoir)
@@ -5461,6 +5535,8 @@ fois ; ADM-ARG, FIN, RET, RAP, MED rejouées avec le second passage (33/33, 17 m
 - **La ligne Finances d'un remboursement de médiation parle de « retenue … reversée au
   Voyageur »** : un libellé conçu pour l'annulation tardive (`finances.state.PARTIALLY_REFUNDED`)
   réutilisé tel quel. Exact sur les montants, trompeur sur le mot. Même arbitrage de copie.
+  → **close au § 5.15 du cahier 02-ADMIN (ANO-ADM-36)** : `partialKind: AFTER_COMPLETION`, libellé « {gardé} ont réglé
+  ton envoi ».
 - **Deux formulaires de connexion coexistent dans le DOM** dès qu'une fenêtre de connexion est
   montée, avec les **mêmes identifiants** `#email` et `#password`. C'est un défaut de validité
   HTML (un `id` est unique dans un document) et une gêne pour l'accessibilité : un `label

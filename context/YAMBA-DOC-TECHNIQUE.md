@@ -8547,3 +8547,167 @@ else { … provider.transfer({ …, transferGroup: booking.id, idempotencyKey })
   isolé et sur deux passages complets suivants (parallèle et `--runInBand`).
 - `apps/e2e` : **426 scénarios** (419 + 7).
 - Typecheck deal-service, admin-ui, harnais verts ; aucun contrat OpenAPI modifié.
+
+# Cahier 02-ADMIN, § 5.15 : remboursement manuel en deux gestes — le verrou protégeait la base, pas l'argent
+
+*(PR `chore/recette-admin-5-15`, empilée sur #315, 14/09/2026.)*
+
+## Ce qui a été fait
+
+Six scénarios (ADM-REM-1, 2, 3 du cahier ; REM-4, 5, 6 ajoutées), trois anomalies closes (`ANO-ADM-34` bloquante,
+`ANO-ADM-35`, `ANO-ADM-36`), une décision (`A165`), neuf améliorations.
+
+```
+apps/e2e/src/admin/adm-rmb-remboursement.spec.ts                    6 scénarios — jeu d'essai rejoué avant chacun
+apps/e2e/src/chapitres/web-cnf.spec.ts                              WEB-CNF-10 : libellé AFTER_COMPLETION dans la table miroir
+packages/libs/payments/src/index.ts                                 A165 — refund(…, { idempotencyKey }) : Stripe + Fake qui honore la clé
+apps/deal-service/src/lib/refund-idempotency.ts (+ spec)            A165 — refundIdempotencyKey(geste, deal, montant, cumulAvant?)
+apps/deal-service/src/services/admin-finance.service.ts             ANO-ADM-34 — verrou de décision ; A165 — clé ; caducité (fiche, file)
+apps/deal-service/src/services/admin-finance.rules.ts               A165 — manualRefundProposalStaleness (pure)
+apps/deal-service/src/routes/deal.routes.ts                         Redis câblé comme magasin de verrou du service finances
+apps/deal-service/src/services/deal-lifecycle|transport|mediation   A165 — clé sur annulation, retour de capture, refus au pickup, décision, retenue
+apps/deal-service/src/services/wallet.service.ts                    ANO-ADM-36 — partialKind, keptCents ; « Dépensé » compte la part gardée
+packages/libs/api-contracts/src/booking/booking-wallet.schema.ts    keptCents, partialKind ; retentionCents réservé à l'annulation tardive
+packages/libs/api-contracts/src/admin/admin-finances.schema.ts      proposal.stale / staleReason ; FinanceQueueItem.proposalStale
+apps/notification-service/src/emails/booking-emails.ts (+ .ejs)     ANO-ADM-35 — commercialGesture, pas de retenue pour un acteur ADMIN
+apps/user-ui/…/finances/WalletRows.tsx + messages fr/en             libellé PARTIALLY_REFUNDED_AFTER_COMPLETION
+apps/admin-ui/src/components/DealMoneyView.tsx                      carte de remboursement : saisie FR, garde ref, refus par code, caducité
+apps/admin-ui/src/lib/format.ts                                     parseEurosToCents (partagé), manualRefundRefusal, REFUND_PROPOSAL_STALE_LABEL
+apps/admin-ui/src/components/FinanceQueues.tsx, DecisionForm.tsx    badge « caduque » ; parseur de montant déplacé dans format.ts
+```
+
+## Ce que la recette a mesuré d'abord — la contre-épreuve
+
+Le § 5.14 l'avait appris : une fiche verte ne prouve rien tant qu'elle n'a pas été jouée contre le code non corrigé. Ici,
+écraser les sources du répertoire de travail étant refusé, la contre-épreuve passe par un **worktree** :
+
+```sh
+git worktree add --detach <scratchpad>/wt-5-14 5b35ef9
+ln -sfn $PWD/node_modules <scratchpad>/wt-5-14/node_modules
+(cd <scratchpad>/wt-5-14 && NX_DAEMON=false npx nx run-many -t build -p deal-service,notification-service)
+# on arrête les processus des ports 6003 / 6004, on lance les bundles du worktree avec le .env racine
+```
+
+L'écran reste celui de la branche (seul le serveur change). Résultats :
+
+- **ADM-REM-4** : `200 · 409 TRANSITION_NOT_ALLOWED · 409 TRANSITION_NOT_ALLOWED` et **3 remboursements chez le
+  fournisseur** pour un seul enregistré ;
+- **ADM-REM-2** : portefeuille « Remboursé 5,00 € le 14 sept. · retenue 34,20 € reversée au Voyageur » ; email « Annulation à
+  moins de 48 h du départ : une retenue de 34,20 € s'applique… ».
+
+## ANO-ADM-34 : l'argent part avant la base, le verrou doit donc venir avant l'argent
+
+```ts
+// avant — applyManualRefund
+const raw = await loadMoney(id);                  // trois requêtes lisent refundAmountCents = null
+const bounds = manualRefundBounds(raw);           // toutes passent
+refundId = (await provider.refund(intent, amount)).refundId;   // trois remboursements réels
+await prisma.booking.updateMany({ where: { id, refundAmountCents: raw.refundAmountCents }, … }); // un seul count: 1
+```
+
+La condition sur le cumul est un verrou **optimiste** : parfait pour une écriture en base, inutile quand l'effet
+irréversible (l'appel au fournisseur, D39) a lieu **avant** l'écriture. Le remède est celui de la médiation (A159) : un
+verrou **pessimiste** court, pris avant la lecture.
+
+```ts
+async applyManualRefund(admin, id, input) {
+  if (!decisionLocks) throw new Error("admin-finance: no decision lock store wired (ANO-ADM-34)");
+  return withDecisionLock(decisionLocks, id, () => applyManualRefundUnlocked(admin, id, input));
+}
+```
+
+- `withDecisionLock` (`apps/deal-service/src/lib/decision-lock.ts`) : `SET key token PX 60000 NX`, puis suppression
+  conditionnelle par script Lua (on ne libère que son propre jeton). Clé `yamba:deal:decision:<id>` — **la même que la
+  médiation** : un remboursement manuel et une décision de litige sur le même deal s'excluent.
+- Le perdant reçoit `409 DECISION_IN_PROGRESS` **sans** appel fournisseur.
+- Sans magasin câblé, le service jette : **échec fermé**. Une doublure oubliée dans un test ou une route ne dégrade pas
+  silencieusement en « pas de verrou ».
+
+## A165 : une clé d'idempotence qui décrit le geste, pas l'instant
+
+Le verrou couvre la course ; il ne couvre pas la **reprise** : un processus qui meurt entre `provider.refund` et la
+transaction, puis un admin qui reclique. La clé fournisseur le couvre, à condition d'être **stable** pour le même geste
+et **différente** pour un geste nouveau :
+
+```ts
+export function refundIdempotencyKey(gesture, dealId, amountCents, previousRefundedCents?) {
+  const parts = ["yamba", "refund", gesture, dealId];
+  if (gesture === "manual") parts.push(`after-${previousRefundedCents ?? 0}`);
+  parts.push(String(amountCents));
+  return parts.join(":");
+}
+```
+
+- Annulation, refus au pickup, décision de litige, restitution de retenue, retour de capture : **une fois par deal** — le
+  montant suffit.
+- Remboursement manuel : répétable (deux gestes de 5 € à une semaine d'écart sont légitimes) → la clé porte le **cumul lu
+  avant le geste**. Rejoué sur le même état (rien écrit) : même clé, même remboursement. Après écriture : cumul changé,
+  nouvelle clé.
+- Le montant est dans chaque clé : Stripe refuse une clé réutilisée avec d'autres paramètres.
+- `FakePaymentProvider.refund` honore la clé (`refundsByKey`) ; `_forgetIdempotencyKeysForTest` l'oublie, comme Stripe au
+  bout de 24 h.
+
+## Proposition caduque
+
+```ts
+export function manualRefundProposalStaleness(proposedCents, bounds) {
+  if (!bounds.allowed) return { stale: true, staleReason: "NOT_REFUNDABLE" };
+  if (proposedCents > bounds.maxRefundableCents) return { stale: true, staleReason: "ABOVE_REMAINING" };
+  return { stale: false, staleReason: null };
+}
+```
+
+Calculée à la lecture (fiche argent, file `PROPOSED_REFUNDS`), jamais stockée. La fiche peint le bandeau en rouge et dit
+combien il reste ; la file porte un badge. Appliquer tel quel reste refusé par `manualRefundBounds` (`REFUND_ABOVE_MAX`).
+
+## ANO-ADM-35 et ANO-ADM-36 : un remboursement partiel n'est pas toujours une retenue
+
+Deux lecteurs du même fait avaient hérité du seul cas connu au moment de leur écriture (l'annulation tardive, ANN-01) :
+
+```ts
+// notification-service — avant
+retainedForCarrier: event.payload.amountCents < p.totalShipperCents ? formatMoney(total - amount) : null,
+// après
+commercialGesture: event.payload.actor === "ADMIN",
+retainedForCarrier: event.payload.actor !== "ADMIN" && event.payload.amountCents < p.totalShipperCents ? … : null,
+```
+
+```ts
+// deal-service, wallet — branche COMPLETED, avant
+return { ...base, state: "PARTIALLY_REFUNDED", refundAmountCents: refund, retentionCents: total - refund, … };
+// après
+return { ...base, state: "PARTIALLY_REFUNDED", refundAmountCents: refund, keptCents: total - refund, partialKind: "AFTER_COMPLETION", … };
+```
+
+Le contrat gagne `keptCents` (ce que l'Expéditeur a finalement payé, quel que soit le motif) et `partialKind` ;
+`retentionCents` ne vaut plus que pour `LATE_CANCELLATION`. `spentCents` somme `keptCents`. Le front choisit la clé
+`PARTIALLY_REFUNDED_AFTER_COMPLETION` (« {kept} ont réglé ton envoi »). Aujourd'hui seul le remboursement manuel émet
+`booking.refund_issued` en acteur `ADMIN` (la médiation n'émet pas cet événement) : c'est ce qui rend `actor === "ADMIN"`
+suffisant — un champ explicite est proposé si un autre geste admin devait l'émettre.
+
+## Les améliorations (admin-ui)
+
+- **Saisie à la française** : `parseEurosToCents` (« 12,50 », « 1 234,50 », espaces insécables) déplacé de
+  `DecisionForm.tsx` vers `lib/format.ts`, partagé ; message sous le champ (« Montant illisible… », « Au-dessus du
+  plafond : … au plus. »).
+- **Garde de double clic synchrone** (`inFlight` en `useRef`).
+- **Refus par code** (`manualRefundRefusal`) : `DECISION_IN_PROGRESS`, `REFUND_ABOVE_MAX`, `REFUND_NOT_ALLOWED`,
+  `TRANSITION_NOT_ALLOWED` rechargent la fiche et disent si de l'argent a pu partir ; `REFUND_PROVIDER_FAILED`,
+  `ADMIN_IS_PARTY`, permission, 400 restent dans la carte ; une erreur inconnue demande de recharger avant de réessayer.
+- **Caducité** affichée (bandeau rouge, badge de file), formulaire non prérempli par une proposition caduque.
+- **Compteur de motif** `n / 50` et rappel « l'Expéditeur reçoit l'email… ; le motif reste au journal ».
+- **Remplacement signalé** : « Une proposition existe déjà : en proposer une autre la remplace. »
+- **Identifiant du remboursement** dans le message de succès.
+- La carte est remontée (`key` = cumul + date de proposition) après chaque rechargement : l'état local ne survit pas à un
+  changement de fond.
+
+## Tests
+
+- deal-service **615** (+8) : ANO-ADM-34 (deux applications simultanées → un remboursement, `DECISION_IN_PROGRESS` ;
+  échec fermé sans verrou), A165 (reprise après base non écrite → même remboursement ; clés de chaque geste ; Fake qui
+  honore et oublie), caducité (règle pure, fiche, file), ANO-ADM-36 (portefeuille). Specs lifecycle / transport ajustées à
+  la nouvelle signature de `refund`.
+- notification-service **122** (+1) : ANO-ADM-35, rendu EJS FR et EN.
+- `apps/e2e` : **432 scénarios** (426 + 6) ; WEB-CNF-10 ajusté.
+- Typecheck des huit projets de la CI vert ; les cinq `openapi.json` régénérés (schémas partagés `FinanceQueueItem`,
+  `AdminDealMoneyFile`, `WalletPaymentItem`) ; miroir i18n FR/EN parfait.

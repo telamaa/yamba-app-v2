@@ -132,7 +132,7 @@ router.post("/admin/disputes/:id/resolve", isAdminAuthenticated, requireAdminPer
 router.post("/admin/disputes/:id/retention", isAdminAuthenticated, requireAdminPermission("disputes.decide"), dealMediation.resolveRetention);
 
 // ── C-PR5a (D58) : finances — files d'exception, fiche argent, rapprochement, rejeu, renversements ──
-const adminFinance = makeAdminFinanceController(makeAdminFinanceService(paymentProvider, dealSettlementService));
+const adminFinance = makeAdminFinanceController(makeAdminFinanceService(paymentProvider, dealSettlementService, undefined, redis as unknown as DecisionLockStore)); // ANO-ADM-34 : verrou de décision sur le remboursement manuel
 router.get("/admin/finances/queue", isAdminAuthenticated, requireAdminPermission("finances.read"), adminFinance.listQueue);
 router.get("/admin/deals/:id/money", isAdminAuthenticated, requireAdminPermission("finances.read"), adminFinance.getMoneyFile);
 router.post("/admin/deals/:id/money/reconcile", isAdminAuthenticated, requireAdminPermission("finances.read"), adminFinance.reconcile);

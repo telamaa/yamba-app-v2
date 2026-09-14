@@ -3,6 +3,93 @@
 *Ce document sert à REPRENDRE le chantier après une pause. Il dit où en est la campagne, ce qui
 tourne sur le poste, ce qui reste à faire, et les pièges déjà payés qu'il ne faut pas repayer.*
 
+> ## ▶ REPRISE DU 14/09/2026 (soir) — § 5.15 LIVRÉ, § 5.16 EN COURS
+>
+> Le WIP `b5b6f31` a été relu, vérifié et remplacé par un commit propre sur `chore/recette-admin-5-15` (PR empilée sur
+> #315) : 6 scénarios ADM-REM verts deux fois, contre-épreuve par **worktree** (REM-2 et REM-4 rouges sur `5b35ef9`),
+> ANO-ADM-34 (bloquante), 35, 36 closes, **A165**. Chiffres : deal 615, notification 122, harnais **432** ; dernière
+> anomalie ANO-ADM-36 ; dernier chapitre d'apprentissage **173**. Pile relancée après redémarrage : auth / trip / deal /
+> notification en bundles détachés, gateway + message sous `nx serve`. Piège de poste : premier `next dev` à froid → page
+> blanche au premier parcours membre ; précharger `/fr/login`, `/fr/dashboard/finances` avant de jouer. Contre-épreuve :
+> écraser les sources du répertoire de travail est refusé → `git worktree add --detach <scratchpad>/wt <commit>`, lien
+> `node_modules`, build, bundles du worktree sur les ports 6003/6004, puis `git worktree remove`.
+> **§ 5.16** (rapport mensuel, export) : ANO-ADM-37 identifiée à la lecture — chaque remboursement écrase `refundedAt` /
+> `refundId` (cumul seul), un mois clos change après un geste manuel ; correction validée par le fondateur : **une liste
+> des remboursements sur le deal** (A166), branche `chore/recette-admin-5-16`.
+>
+> ## ⏸ ARRÊT DU 14/09/2026 — LIRE EN PREMIER POUR REPRENDRE
+>
+> **Pourquoi l'arrêt** : le fondateur éteint le poste. Le fork du **§ 5.15** (remboursement manuel) a été interrompu en
+> cours de route.
+>
+> **Consigne en vigueur (13-14/09)** : cahier **02-ADMIN** joué **en autonomie complète**, sans attendre de GO entre les
+> chapitres : § 5.15 → § 5.26, puis **§ 6** (ADM-E2E-1 à 8), **§ 7** (ADM-NRG-1 à 7), **§ 8** (consignation, critères de
+> sortie). Pour CHAQUE fiche : corriger les anomalies (tests unitaires dans la branche) ET **implémenter les améliorations
+> d'expert** petites/moyennes (produit et test) ; seules les décisions métier structurantes restent « à trancher » /
+> registre. Aucune attribution Claude dans commits et PR.
+>
+> **Pile de PR ouvertes, toutes empilées, CI 17/17 chacune** : #301 (§ 4.1) → #302 (§ 4.2, 4.3, 5.1) → #303 (5.2) →
+> #304 (5.3) → #305 (5.4) → #306 (5.5) → #307 (5.6) → #308 (5.7) → #309 (5.8) → #310 (5.9) → #311 (5.10) → #312 (5.11) →
+> #313 (5.12) → #314 (5.13) → #315 (5.14). Toutes à merger dans l'ordre. Chiffres au § 5.14 : auth 249, trip 292,
+> notification 121, deal 607, message 47 ; harnais 426 ; registre jusqu'à **A164** ; dernière anomalie **ANO-ADM-33** ;
+> dernier chapitre d'apprentissage **172**.
+>
+> **§ 5.15 — ÉTAT EXACT** : branche `chore/recette-admin-5-15` (poussée, **pas de PR**), commit **`b5b6f31`
+> « wip … NON vérifié »** au-dessus de `5b35ef9` (§ 5.14). Contient le travail du fork interrompu : `apps/deal-service/src/lib/refund-idempotency.ts`
+> (+ spec), modifications de `admin-finance.*`, `deal-lifecycle`, `deal-mediation`, `deal-transport`, `wallet.service`,
+> `packages/libs/payments`, contrats `admin-finances` / `booking-wallet`, gabarit `refund-issued-shipper.ejs`, portefeuille
+> user-ui (`WalletRows.tsx`, messages FR/EN `finances.json`), admin-ui (`DealMoneyView`, `DecisionForm`, `FinanceQueues`,
+> `format`, `types`), les cinq `openapi.json`, et la spec `apps/e2e/src/admin/adm-rmb-remboursement.spec.ts`. **Rien n'a
+> été vérifié** : ni typecheck, ni tests unitaires, ni e2e, ni docs cumulatifs. Objectifs du chapitre (hérités) : (a)
+> « Appliquer » un remboursement manuel sous le verrou `decision-lock` (A159) — deux clics simultanés = un seul
+> remboursement ; (b) clé d'idempotence fournisseur stable pour tout remboursement (manuel, médiation, retenue) ; (c)
+> proposition devenue impossible refusée / marquée caduque. **Reprise** : relire le diff `git show b5b6f31 --stat` puis
+> le diff complet, `npx nx typecheck` + `npx nx test` deal-service / notification-service / user-ui / admin-ui,
+> `npm run generate:openapi` (CI diff), puis jouer la spec contre le code, rejouer WEB-E2E qui lisent l'email de
+> remboursement (gabarit touché) et les fiches ADM ARG / FIN / RET / RAP / MED / VER ; écrire les docs ; amender le
+> commit WIP en commit propre ; PR « Empilée sur #315 ».
+>
+> **Relancer la pile après redémarrage du Mac** (Mongo Atlas et Redis Upstash sont distants) :
+> ```sh
+> open -a Docker && docker start yamba-redpanda yamba-mailpit
+> # gateway, notification, message sous nx (NE PAS utiliser `--all`, voir piège ci-dessous)
+> npx nx run-many --target=serve --projects=api-gateway,notification-service,message-service
+> # auth, trip, deal en bundles DÉTACHÉS (reconstruire d'abord si les sources ont changé : npx nx build <service>)
+> (cd apps/auth-service && nohup node --env-file=../../.env dist/main.js > /tmp/auth-bundle.log 2>&1 &)
+> (cd apps/trip-service && nohup node --env-file=../../.env dist/main.js > /tmp/trip-bundle.log 2>&1 &)
+> (cd apps/deal-service && nohup env STRIPE_SECRET_KEY= node --env-file=../../.env dist/main.js > /tmp/deal.log 2>&1 &)
+> npx nx dev user-ui      # 3000
+> npx nx dev admin-ui     # 3001
+> ```
+> Vérifier `/health` des six ports, puis **qui tient chaque port** : `lsof -nP -iTCP:6003 -sTCP:LISTEN -t` + `ps -o
+> command= -p <pid>` doit être le bundle (`dist/main.js`), deal-service avec la clé Stripe VIDE (fournisseur FAKE).
+>
+> **Pièges de poste payés pendant le § 5** :
+> - un service lancé en tâche de fond par un agent meurt avec l'agent → toujours `nohup … &` détaché ;
+> - sous `nx run-many serve`, la reconstruction d'auth-service échoue (« Recursive task invocation ») pendant que
+>   l'ancien processus répond 200 → auth / trip / deal en bundles ;
+> - un `nx run-many --target=serve --all` (lancé le 13/09 22:33, origine inconnue) a repris le port 6003 avec le VRAI
+>   Stripe → après l'extinction il n'existe plus : ne pas relancer `--all` (ou `npm run dev`) en même temps que les bundles ;
+> - la mémoire du fournisseur FAKE survit au rejeu du jeu d'essai (tant que deal-service n'est pas redémarré) → comparer
+>   les montants à un relevé pris juste avant le geste ;
+> - gabarit d'email modifié → rejouer les WEB-E2E qui le lisent (ANO-ADM-26 trouvée ainsi) ;
+> - jouer chaque fiche contre le code NON corrigé d'abord ; une fiche verte sans contre-épreuve ne prouve rien ;
+> - ADM-SEC-8 attend 46 min réelles : la jouer seule ; `playwright --list` seulement avec `--reporter=list` (sinon le
+>   rapport HTML est écrasé).
+>
+> **À trancher accumulés** : voir chaque chapitre « À trancher » de `YAMBA-RECETTE-WEB-RESULTATS.md` (§ 4.2 → § 5.14) ;
+> les plus lourds : billets servis par URL ImageKit publiques permanentes (§ 5.8) ; ce que mesure « Versements en échec
+> depuis plus de 48 h » (§ 5.2, § 5.11) ; « Abandonner » un renversement sans événement ni message au Voyageur (§ 5.14) ;
+> codes de connexion envoyés à une adresse supprimée (§ 5.5) ; motif d'export nominatif dans l'URL (§ 5.6) ; rapprochement
+> automatique quotidien (§ 5.13).
+>
+> **Méthode d'un chapitre** (appliquée par un agent « fork » par chapitre, séquentiellement — base partagée) : branche
+> `chore/recette-admin-5-N` depuis la précédente → lire la fiche du cahier puis le code réel → mesurer le jeu d'essai →
+> spec `apps/e2e/src/admin/adm-<code>.spec.ts` (outils `pages/ecran-admin.ts`, `pages/journal-admin.ts`) → corriger +
+> améliorer avec tests unitaires → deux passages verts (reporter json pour les annotations) → docs en ajout seul (rapport,
+> DOC-TECHNIQUE, DOC-METIER, APPRENTISSAGE, CONTEXT, SUIVI, ce handoff) → commit sans attribution → PR empilée → CI
+> comptée (17).
+
 > **CONSIGNE DE REPRISE (donnée le 09/09/2026).** Dans cet ordre, sans rien intercaler :
 >
 > **1.** ~~corriger le harnais avec `storageState`~~ **FAIT** (§ 4 bis) ;

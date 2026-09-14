@@ -120,6 +120,8 @@ export function toPaymentItem(b: WalletBookingRecord, counterparts: WalletCounte
     currencyCode: b.pricing.currencyCode,
     refundAmountCents: null as number | null,
     retentionCents: null as number | null,
+    keptCents: null as number | null,
+    partialKind: null as WalletPaymentItem["partialKind"],
   };
   switch (b.status) {
     case "PENDING":
@@ -135,7 +137,10 @@ export function toPaymentItem(b: WalletBookingRecord, counterparts: WalletCounte
       // se lit comme une annulation partielle : la part gardée est « dépensée », le reste « remboursé ».
       const refund = b.refundAmountCents ?? 0;
       if (b.capturedAt && refund > 0 && refund < total) {
-        return { ...base, state: "PARTIALLY_REFUNDED", refundAmountCents: refund, retentionCents: total - refund, date: iso(b.refundedAt ?? b.completedAt) };
+        // ANO-ADM-36 (recette 02-ADMIN § 5.15) — un remboursement APRÈS la fin du deal n'est PAS une retenue d'annulation :
+        // le portefeuille disait « retenue 34,20 € reversée au Voyageur » après un geste commercial de 5 €. La part gardée
+        // a réglé l'envoi ; aucune retenue n'existe.
+        return { ...base, state: "PARTIALLY_REFUNDED", refundAmountCents: refund, keptCents: total - refund, partialKind: "AFTER_COMPLETION", date: iso(b.refundedAt ?? b.completedAt) };
       }
       if (b.capturedAt && refund >= total) return { ...base, state: "REFUNDED", refundAmountCents: refund, date: iso(b.refundedAt ?? b.completedAt) };
       return { ...base, state: "RELEASED", date: iso(b.completedAt ?? b.updatedAt) };
@@ -148,7 +153,7 @@ export function toPaymentItem(b: WalletBookingRecord, counterparts: WalletCounte
       // « Remboursé 33,60 € le » — la date de clôture est le repli, jamais une date vide.
       const refundDate = iso(b.refundedAt ?? b.updatedAt);
       if (refund < total) {
-        return { ...base, state: "PARTIALLY_REFUNDED", refundAmountCents: refund, retentionCents: total - refund, date: refundDate };
+        return { ...base, state: "PARTIALLY_REFUNDED", refundAmountCents: refund, retentionCents: total - refund, keptCents: total - refund, partialKind: "LATE_CANCELLATION", date: refundDate };
       }
       return { ...base, state: "REFUNDED", refundAmountCents: refund, date: refundDate };
     }
@@ -167,7 +172,7 @@ export function buildShipperWallet(bookings: WalletBookingRecord[], counterparts
   const refunded = items.filter((i) => i.state === "REFUNDED");
   return {
     heldCents: sum(held),
-    spentCents: sum(released) + partial.reduce((acc, i) => acc + (i.retentionCents ?? 0), 0),
+    spentCents: sum(released) + partial.reduce((acc, i) => acc + (i.keptCents ?? 0), 0),
     refundedCents: [...refunded, ...partial].reduce((acc, i) => acc + (i.refundAmountCents ?? 0), 0),
     currencyCode: bookings[0]?.pricing.currencyCode ?? "EUR",
     items,

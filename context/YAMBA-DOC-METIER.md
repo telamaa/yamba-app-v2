@@ -5504,3 +5504,64 @@ français et recharge la fiche ; un double clic n'envoie qu'une demande.
   pour un seul transfert (conforme au cahier, bruyant à la relecture).
 - **Idempotence côté serveur** : conserver nos propres clés et leur issue (au lieu de s'en remettre aux 24 h du
   fournisseur), à étudier si d'autres gestes d'argent en ont besoin (remboursement manuel, § 5.15).
+
+# Back-office — le remboursement manuel en deux gestes : un geste commercial, une seule fois, dit comme tel (cahier 02-ADMIN § 5.15)
+
+*(PR `chore/recette-admin-5-15`, 14/09/2026 — ADM-REM-1 à 6.)*
+
+## Le besoin
+
+Hors litige, Yamba doit pouvoir rendre une partie de l'argent d'un envoi terminé (retard, geste commercial). Le geste
+coûte à la plateforme, pas au Voyageur : il est donc **proposé** par Finance ou le Support et **appliqué** par un super
+administrateur. Trois exigences : l'argent ne part qu'une fois, l'Expéditeur comprend ce qu'il reçoit, et personne
+n'applique une proposition que les faits ont rendue fausse.
+
+## Les règles
+
+**RG-ADM-REM-01 — Deux gestes, deux profils** : Finance et le Support proposent (montant, motif d'au moins 50 caractères) ;
+seul le super administrateur applique, y compris par appel direct (403 sinon, rien ne bouge). Une partie au deal ne décide
+pas. Chaque geste est journalisé ; une nouvelle proposition remplace la précédente, qui reste au journal.
+
+**RG-ADM-REM-02 — Plafond** : on ne rembourse jamais plus que payé − déjà remboursé, sur un deal fermé et débité. Le
+plafond est affiché et appliqué par le serveur.
+
+**RG-ADM-REM-03 — Une seule fois** : deux applications simultanées sur le même deal n'émettent qu'un remboursement ; la
+seconde est refusée (« un autre geste d'argent est en cours ») sans rien émettre. Un remboursement manuel et une décision
+de médiation sur le même deal ne s'exécutent jamais en même temps. Un même geste rejoué après une panne rend le même
+remboursement chez le fournisseur (A165) — vrai aussi pour l'annulation, le refus au pickup, la médiation et la
+restitution de retenue.
+
+**RG-ADM-REM-04 — Le Voyageur n'est pas touché** : son versement reste identique ; aucun montant du Voyageur n'apparaît
+dans ce que reçoit l'Expéditeur.
+
+**RG-ADM-REM-05 — L'Expéditeur lit un geste, pas une annulation** : l'email « Remboursement émis » dit « C'est un geste de
+l'équipe Yamba sur ton envoi… ton envoi reste réglé », jamais « annulation » ni « retenue » ; son portefeuille affiche
+« Remboursé {montant} le {date} · {part gardée} ont réglé ton envoi ». Le motif interne ne lui est pas envoyé. Même
+lecture pour tout remboursement partiel après la fin d'un deal (médiation).
+
+**RG-ADM-REM-06 — Une proposition peut devenir caduque** : si un autre remboursement a réduit le reste, ou si le deal ne
+peut plus rien recevoir, la proposition est marquée caduque (fiche et file) avec la raison ; l'appliquer telle quelle est
+refusé.
+
+**RG-ADM-REM-07 — L'écran dit la vérité du moment** : montants saisis à la française, refus en français selon leur cause,
+fiche rechargée quand l'état a changé, en disant si de l'argent a pu partir.
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| REM-1 | Finance propose 5 € | plafond affiché, dépassement refusé, motif court refusé, bandeau, file et tuile à 1, pas de bouton d'application, journal | oui |
+| REM-2 | Le super administrateur applique | 5 € remboursés une fois, versement intact, portefeuille « ont réglé ton envoi », email sans retenue, chronologie, journal | oui (rouge avant correction) |
+| REM-3 | Finance applique par appel direct | 403, rien ne bouge, aucun journal | oui |
+| REM-4 | Trois applications simultanées | un remboursement chez le fournisseur, les autres refusés sans rien émettre | oui (3 remboursements avant correction) |
+| REM-5 | Proposition dépassée par un autre remboursement | « caduque », reste affiché, application refusée, badge de file | oui |
+| REM-6 | Saisie « 1 234,50 », « douze », « 12,50 » ; écran périmé | lecture française ; refus en français, fiche rechargée, rien d'émis | oui |
+
+## Ce qui reste à trancher
+
+- **Dire à l'Expéditeur pourquoi** il est remboursé : motif libre (risque de fuite d'une note interne) ou liste de motifs
+  publics.
+- **Proposition caduque** : l'effacer automatiquement ou la laisser visible jusqu'à une nouvelle proposition (choix
+  actuel).
+- **Nature du remboursement dans l'événement** : aujourd'hui déduite de l'acteur `ADMIN` ; un champ explicite si d'autres
+  gestes admin remboursent un jour.

@@ -250,3 +250,34 @@ export function adminAfterSummary(after: unknown, currency = "EUR"): string | nu
   }
   return parts.length ? parts.join(" · ") : null;
 }
+
+/** Montant saisi en euros (« 15 », « 15,5 », « 1 234,50 ») → centimes ; NaN si illisible. Partagé par la décision de
+ *  médiation (§ 5.9) et le remboursement manuel (§ 5.15). */
+export function parseEurosToCents(saisie: string): number {
+  const propre = saisie.replace(/[\s\u00a0\u202f]/g, "").replace(",", ".");
+  if (!/^\d+(\.\d{1,2})?$/.test(propre)) return NaN;
+  return Math.round(Number(propre) * 100);
+}
+
+/** Recette § 5.15 (A165) — pourquoi une proposition de remboursement manuel est devenue impossible. */
+export const REFUND_PROPOSAL_STALE_LABEL: Record<string, string> = {
+  ABOVE_REMAINING: "caduque : elle dépasse ce qui reste remboursable",
+  NOT_REFUNDABLE: "caduque : ce deal ne peut plus recevoir de remboursement (déjà remboursé en totalité, ou plus fermé)",
+};
+
+/**
+ * Recette § 5.15 — un refus de remboursement manuel, en français et selon son code, en disant si de l'argent est parti.
+ * `reload` : l'état du deal a changé sous l'écran (autre geste, remboursement ailleurs) — la fiche doit être relue.
+ */
+export function manualRefundRefusal(e: { status?: number; data?: unknown; message?: string } | null | undefined): { text: string; reload: boolean } {
+  const code = (e?.data as { details?: { code?: string } } | undefined)?.details?.code;
+  if (code === "DECISION_IN_PROGRESS") return { text: "Un autre geste d'argent est en cours sur ce deal : rien n'a été émis. La fiche est rechargée, vérifie avant de réessayer.", reload: true };
+  if (code === "REFUND_ABOVE_MAX") return { text: "Montant refusé : il dépasse ce qui reste remboursable sur ce deal (un remboursement a pu arriver entre-temps). Rien n'a été émis ; la fiche est rechargée.", reload: true };
+  if (code === "REFUND_NOT_ALLOWED") return { text: "Plus aucun remboursement manuel possible sur ce deal (déjà remboursé en totalité, ou deal pas fermé). Rien n'a été émis ; la fiche est rechargée.", reload: true };
+  if (code === "TRANSITION_NOT_ALLOWED") return { text: "Ce deal vient d'être remboursé par ailleurs : l'argent de ce geste a pu partir. La fiche est rechargée : vérifie le rapprochement avant tout nouveau geste.", reload: true };
+  if (code === "REFUND_PROVIDER_FAILED") return { text: "Le fournisseur de paiement a refusé le remboursement : rien n'a été enregistré. Réessaie plus tard ou vérifie le paiement.", reload: false };
+  if (code === "ADMIN_IS_PARTY") return { text: "Tu es partie à ce deal : un autre administrateur doit décider.", reload: false };
+  if (code === "ADMIN_PERMISSION_DENIED") return { text: "Ton profil ne permet pas ce geste.", reload: false };
+  if (e?.status === 400) return { text: "Demande refusée : vérifie le montant et le motif (50 caractères au moins).", reload: false };
+  return { text: "Action impossible pour le moment. Recharge la fiche avant de réessayer : elle dit si l'argent est parti.", reload: true };
+}

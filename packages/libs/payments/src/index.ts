@@ -132,7 +132,12 @@ export interface PaymentProvider {
   retrieve(intentId: string): Promise<PaymentAuthorization>;
   capture(intentId: string): Promise<PaymentAuthorization>;
   cancel(intentId: string, reason?: string): Promise<PaymentAuthorization>;
-  refund(intentId: string, amountCents?: number): Promise<{ refundId: string; amountCents: number }>;
+  /**
+   * Recette 02-ADMIN § 5.15 (A165) — `idempotencyKey` : une clé STABLE par geste (deal + nature + état lu), pour que le
+   * même geste rejoué (double clic, reprise après une panne entre l'argent et la base) rende le MÊME remboursement au lieu
+   * d'en émettre un second. Stripe l'honore 24 h ; le Fake l'honore toujours.
+   */
+  refund(intentId: string, amountCents?: number, options?: { idempotencyKey?: string }): Promise<{ refundId: string; amountCents: number }>;
   transfer(input: TransferInput): Promise<TransferResult>;
   /** Lecture seule : intent + remboursements + transfert (C-PR5). Jette si l'intent est inconnu. */
   inspect(input: { intentId: string; transferId?: string | null }): Promise<PaymentInspection>;
@@ -213,11 +218,14 @@ export class StripePaymentProvider implements PaymentProvider {
     );
   }
 
-  async refund(intentId: string, amountCents?: number) {
-    const r = await this.stripe.refunds.create({
-      payment_intent: intentId,
-      ...(amountCents !== undefined ? { amount: amountCents } : {}),
-    });
+  async refund(intentId: string, amountCents?: number, options?: { idempotencyKey?: string }) {
+    const r = await this.stripe.refunds.create(
+      {
+        payment_intent: intentId,
+        ...(amountCents !== undefined ? { amount: amountCents } : {}),
+      },
+      options?.idempotencyKey ? { idempotencyKey: options.idempotencyKey } : undefined
+    );
     return { refundId: r.id, amountCents: r.amount };
   }
 
@@ -356,13 +364,21 @@ export class FakePaymentProvider implements PaymentProvider {
   /** Remboursements émis (observables par les tests et par `inspect`). */
   private readonly refundsByIntent = new Map<string, Array<{ id: string; amountCents: number; status: string; createdAt: string | null }>>();
 
-  async refund(intentId: string, amountCents?: number) {
+  /** A165 — même clé ⇒ même remboursement, comme Stripe (qui l'oublie au bout de 24 h ; voir `_forgetIdempotencyKeysForTest`). */
+  private readonly refundsByKey = new Map<string, { refundId: string; amountCents: number }>();
+
+  async refund(intentId: string, amountCents?: number, options?: { idempotencyKey?: string }) {
+    if (options?.idempotencyKey) {
+      const known = this.refundsByKey.get(options.idempotencyKey);
+      if (known) return known;
+    }
     const a = await this.retrieve(intentId);
     const amount = amountCents ?? a.amountCents;
     const list = this.refundsByIntent.get(intentId) ?? [];
     const refundId = `re_fake_${intentId}_${list.length + 1}`;
     list.push({ id: refundId, amountCents: amount, status: "succeeded", createdAt: new Date().toISOString() });
     this.refundsByIntent.set(intentId, list);
+    if (options?.idempotencyKey) this.refundsByKey.set(options.idempotencyKey, { refundId, amountCents: amount });
     return { refundId, amountCents: amount };
   }
 
@@ -399,6 +415,7 @@ export class FakePaymentProvider implements PaymentProvider {
   /** aide aux tests (A164) : simuler une clé d'idempotence OUBLIÉE par le fournisseur (Stripe : 24 h). */
   _forgetIdempotencyKeysForTest() {
     this.transfersByKey.clear();
+    this.refundsByKey.clear();
   }
 
   private readonly reversedByTransfer = new Map<string, number>();

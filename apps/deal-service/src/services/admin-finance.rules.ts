@@ -456,3 +456,16 @@ export function manualRefundBounds(b: { status: string; capturedAt?: Date | null
   if (maxRefundableCents <= 0) return { maxRefundableCents: 0, allowed: false, reason: "This deal is already fully refunded." };
   return { maxRefundableCents, allowed: true, reason: null };
 }
+
+/**
+ * Recette 02-ADMIN § 5.15 (A165) — une proposition de remboursement manuel peut devenir FAUSSE : un autre remboursement
+ * (annulation, décision, geste appliqué ailleurs) a réduit le reste remboursable, ou le deal ne peut plus rien recevoir.
+ * La proposition reste visible (son auteur, son motif sont au journal) mais se dit caduque, avec la raison ; l'appliquer
+ * telle quelle est refusé par les bornes (`REFUND_ABOVE_MAX` / `REFUND_NOT_ALLOWED`).
+ */
+export type ManualRefundProposalStaleness = { stale: boolean; staleReason: "ABOVE_REMAINING" | "NOT_REFUNDABLE" | null };
+export function manualRefundProposalStaleness(proposedCents: number, bounds: ManualRefundBounds): ManualRefundProposalStaleness {
+  if (!bounds.allowed) return { stale: true, staleReason: "NOT_REFUNDABLE" };
+  if (proposedCents > bounds.maxRefundableCents) return { stale: true, staleReason: "ABOVE_REMAINING" };
+  return { stale: false, staleReason: null };
+}
