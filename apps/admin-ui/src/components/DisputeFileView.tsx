@@ -65,7 +65,8 @@ export default function DisputeFileView({ bookingId }: { bookingId: string }) {
         </Card>
 
         <Card title="Argent">
-          <Link href={`/deals/${bookingId}`} className="text-[12px] underline">Fiche argent complète (chronologie, rapprochement Stripe)</Link>
+          {/* Recette § 5.12 (ANO-ADM-29) — le Support lit la chronologie mais pas l'argent : le lien dit ce qu'il ouvre. */}
+          <Link href={`/deals/${bookingId}`} className="text-[12px] underline">{can(me?.adminRoles, "finances.read") ? "Fiche argent complète (chronologie, rapprochement Stripe)" : "Chronologie du deal (événements, notifications, emails)"}</Link>
           <Row k="Payé par l'Expéditeur" v={money(file.money.totalShipperCents, cur)} />
           <Row k="Net Voyageur" v={money(file.money.transportCents, cur)} />
           <Row k="Commission Yamba" v={money(file.money.commissionCents, cur)} />

@@ -5222,6 +5222,76 @@ au § 5.14.
   préfixes qu'elle ne route pas, au lieu de les confier à auth-service — petit. *Test* : les cinq services sont appelés en
   direct, la passerelle ne masque donc aucun oubli.
 
+---
+
+## Cahier 02-ADMIN — § 5.12 Fiche argent d'un deal · **CONFORME** (2 fiches + 3 ajoutées · 2 anomalies closes · 9 améliorations · 3 écarts documentaires · 5 scénarios, 1 min 20)
+
+`apps/e2e/src/admin/adm-arg-fiche-argent.spec.ts`. La fiche argent répond à « où est l'argent de ce deal ? ». Trois
+preuves : **écran = API = base** sur la fiche du cahier ; **des invariants comptables sur les 23 deals du jeu d'essai**
+(une fiche d'argent qui additionne faux, ou un deal clos dont l'argent n'a pas de destination, se voit à l'échelle du jeu
+d'essai, pas sur une fiche choisie) ; **ce qui ne sort jamais** (code de livraison, photos, coordonnées du destinataire),
+cherché dans la page ET dans les réponses d'API. Le terrain a été **sondé en base avant la spec** (prix figé, débit,
+remboursements, versement, retenue de chaque deal). Chaque fiche a d'abord été jouée contre le code non corrigé :
+ARG-1 conforme d'emblée ; ARG-2, 3, 4 et 5 rouges, chacune sur le défaut qu'elle visait. Puis 5/5 verts deux fois ;
+ADM-RET et ADM-FIN (qui lisent la même fiche) rejouées.
+
+| Fiche | Ce qui est éprouvé | Verdict · Preuve |
+|---|---|---|
+| ADM-ARG-1 | Ce que montre la fiche argent | **Conforme** — ouverte depuis `/finances?kind=FAILED` ; les dix cartes du cahier **dans l'ordre** (la carte ajoutée « Bilan de l'argent » est tolérée et consignée) ; prix figé = snapshot (29,12 € = 26,00 € + 3,12 € + 0) ; versement « en échec », 26,00 €, « compte Stripe du Voyageur non prêt », « 4 · prochaine 15 sept. 2026, 04:15 » ; compte Stripe masqué `acct_…xxxx` + « virements activés » ; **aucune** trace du code `742891`, des photos `r2.seed…`, du destinataire (nom, email, téléphone) dans la page ni dans la réponse, aucune clé `deliveryCode*` ; `pi_…` et `ch_…` en clair ici, compte masqué sur la fiche membre ; journal `DEAL_MONEY_VIEWED BOOKING · id` |
+| ADM-ARG-2 | La chronologie complète | **Conforme après amélioration** (l'état de relais s'affichait en anglais, « published ») — faits récents : Aminata annule `bzv-pending` par l'API membre, attente du relais, de la notification et de l'email ; texte d'avertissement exact ; « Charger la chronologie » → « 2 événement(s) · 3 action(s) admin · 2 notification(s) · 2 email(s) » ; étiquettes « événement », « notification », « email » ; `booking.cancelled` « publié » ; ni photo, ni destinataire, ni code dans la carte ni dans `/history` ; la chronologie de l'argent dit « Empreinte libérée » ; journal `DEAL_HISTORY_VIEWED BOOKING · id` |
+| ADM-ARG-3 *(ajoutée)* | Invariants comptables, 23 deals | **Conforme après correction** → `ANO-ADM-30` — pour chaque deal : payé = net + commission + prime, remboursé ≤ payé, jamais de remboursement sans débit, bilan qui additionne, **aucune anomalie** ; constat par deal (ex. `bzv-completed` détient 4,20 € = sa commission, `bzv-held` 14,56 € · attend `RETENTION_HELD`, `bzv-reversed` 33,60 € · attend `REVERSAL_OPEN`) ; **contre-épreuve** : le défaut d'origine remis en base (remboursement retiré de `bzv-cancelled`, manœuvre consignée) → bilan `UNALLOCATED_FUNDS`, message rouge à l'écran |
+| ADM-ARG-4 *(ajoutée)* | Bilan et libellés | **Conforme après amélioration** — `bzv-completed-blocked` : carte « Bilan de l'argent », « En attente · versement en échec » ; « Terminée » au lieu de `COMPLETED`, « au colis (catégorie) », « Terminé … (automatique) » ; `bzv-completed` : « Soldé » ; `bzv-declined` : « Empreinte libérée (jamais débitée) … (par le Voyageur) » ; identifiant inconnu → « Deal introuvable. » |
+| ADM-ARG-5 *(ajoutée)* | Le Support lit la chronologie | **Conforme après correction** → `ANO-ADM-29` — serveur : `/money` 403, `/history` 200 ; écran : depuis le dossier de médiation, le lien « Chronologie du deal » → `/deals/:id` sans message d'erreur brut, carte chargée ; journal `DEAL_HISTORY_VIEWED`, jamais `DEAL_MONEY_VIEWED` |
+
+### Anomalies
+
+- **ANO-ADM-29 (majeure par la fiche, close)** — **le Support ne pouvait pas lire la chronologie que sa permission lui
+  ouvre.** `deals.history.read` est donnée au Support (cahier ARG-2 : « Médiateur, Support, Finance ») mais la seule carte
+  qui la montre vit sur `/deals/:id`, dont l'API `/money` exige `finances.read` : la page affichait « 403 : Your admin
+  profile does not allow this action. » et rien d'autre ; le dossier de médiation proposait pourtant au Support le lien
+  « Fiche argent complète (chronologie, rapprochement Stripe) ». Correction (`DealMoneyView.tsx`) : un 403 sur l'argent
+  ouvre une **vue réduite** « Chronologie du deal » (la carte seule, avec la raison) pour qui a `deals.history.read` ; le
+  lien du dossier dit ce qu'il ouvre selon le profil (`DisputeFileView.tsx`).
+- **ANO-ADM-30 (mineure, jeu d'essai, close)** — **un deal débité, annulé, jamais remboursé.** `bzv-cancelled` (accepté
+  donc capturé, puis annulé par l'Expéditrice onze jours avant le départ) n'avait ni `refundAmountCents` ni `refundedAt` : sa fiche
+  argent montrait 33,60 € encaissés sur un deal clos, sans destination. `deal-lifecycle.service.ts` rembourse en entier
+  dans ce cas (ANN-01) ; le jeu d'essai posait le débit sans le remboursement. Correction : `seed-deals.ts` pose le
+  remboursement intégral de tout deal accepté puis annulé (hors retenue). Détectée par la sonde en base ; désormais
+  **tenue** par le bilan (ARG-3 et sa contre-épreuve).
+
+### Écarts documentaires
+
+- **Une carte de plus** : « Bilan de l'argent » (en tête), hors de la liste du cahier.
+- **« 4 tentative(s) »** : l'écran affiche « Tentatives · 4 · prochaine … » (libellé à gauche, nombre à droite).
+- **L'état de relais** : le cahier écrit « publié / en attente / parqué » — l'écran l'affichait en anglais minuscule
+  (`published`) ; c'est désormais le libellé du cahier.
+
+### Regard d'expert — produit ET test, une ligne par fiche
+
+- **ARG-1** — *Produit, fait* : statut du deal, modèle de prix et acteurs (« automatique », « par l'Expéditeur ») en
+  français ; actions admin résumées en clair (montants en euros, issue traduite) au lieu du JSON brut ; erreurs de
+  chargement nommées (« Deal introuvable. », jamais `404 : …`). *Proposé* : la ligne « Remboursé » ne montre que le
+  CUMUL et la date du dernier ; un deal remboursé deux fois (annulation puis restitution de retenue) perd la trace du
+  premier — lister chaque remboursement depuis les événements `booking.refund_issued` — moyen. *Test* : l'ordre des
+  cartes est vérifié en tolérant une carte ajoutée (consignée), et les interdits sont cherchés dans la réponse d'API
+  autant que dans la page.
+- **ARG-2** — *Produit, fait* : états de relais, de notification et d'email en français, rebonds et plaintes en rouge ;
+  **les erreurs techniques ne citent plus l'adresse ou le numéro du destinataire** (`redactContacts` : « 550 5.1.1
+  <aminata@…> » → « [adresse masquée] ») — la chronologie est lue par des profils sans accès aux coordonnées.
+  *Proposé* : les types d'événements restent techniques (`booking.cancelled`) — un libellé par type — petit. *Test* :
+  les faits sont produits par un vrai geste membre relayé, pas insérés en base.
+- **ARG-3** — *Produit, fait* : **le bilan de l'argent** (`moneyBalance`, règle pure, 6 tests) — débité, remboursé,
+  versé, détenu par la plateforme, attentes, et une **anomalie** levée sur un deal clos sans attente qui détient plus
+  que sa commission (ou a versé plus qu'il n'a reçu sans geste commercial). *Proposé* : exposer ce bilan en file
+  « Argent sans destination » dans `/finances` et en alerte de seuil — **à trancher** (une file de plus). *Test* :
+  l'invariant a sa contre-épreuve (défaut remis en base), sans quoi « aucune anomalie » ne prouvait rien.
+- **ARG-4** — *Produit, fait* : « Empreinte libérée (jamais débitée) » dans la chronologie de l'argent d'un deal refusé,
+  expiré ou annulé avant acceptation — sans elle, la dernière ligne était « Empreinte posée 67,20 € ». *Test* : trois
+  deals de natures différentes (échec, soldé, refusé).
+- **ARG-5** — *Produit, fait* : vue réduite et lien qui dit ce qu'il ouvre. *Proposé* : la même carte « Tout ce qui est
+  arrivé » directement dans le dossier de médiation, pour ne pas changer d'écran — petit. *Test* : la preuve serveur
+  (403 / 200) précède la preuve écran ; le journal prouve qu'aucune lecture d'argent n'a eu lieu.
+
 ## Observations (pas des anomalies, mais à savoir)
 
 - **`/become-yamber` reste « futur »** (commentaire du layout marketing) : la page de présentation

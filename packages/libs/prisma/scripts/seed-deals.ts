@@ -587,6 +587,17 @@ async function main() {
         },
       });
     }
+    if (b.status === "CANCELLED" && !b.key.endsWith("-held") && (b.milestones as { acceptedAt?: Date }).acceptedAt) {
+      // Recette 02-ADMIN § 5.12 (ANO-ADM-30) — un deal ACCEPTÉ (donc débité) puis annulé par l'Expéditeur plus de 48 h
+      // avant le départ est remboursé en entier, comme le fait `deal-lifecycle.service.ts` (ANN-01). Le jeu d'essai
+      // posait le débit sans le remboursement : la fiche argent montrait 33,60 € encaissés sur un deal clos, sans destination.
+      const pricing = (booking as unknown as { pricing: { totalShipperCents: number } }).pricing;
+      const closedAt = (b.milestones as { closedAt?: Date }).closedAt ?? NOW;
+      await prisma.booking.update({
+        where: { id: booking.id },
+        data: { refundedAt: closedAt, refundAmountCents: pricing.totalShipperCents, refundId: `re_fake_seed_${b.key}` },
+      });
+    }
     // Chantier F (D61) — un fil vivant sur le deal accepte : recette FCH01+ sans rien creer a la main.
     if (b.key === "bzv-accepted") {
       const shipperId = userIds.get(b.shipperKey)!;

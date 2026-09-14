@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { ApiError, apiFetch, post } from "@/lib/api";
-import { ACTION_LABEL, DIVERGENCE_LABEL, PAYOUT_FAILURE_LABEL, PAYOUT_STATUS_LABEL, RETENTION_DISPOSITION_LABEL, TIMELINE_LABEL, dateTime, money } from "@/lib/format";
+import { ACTION_LABEL, ACTOR_LABEL, BOOKING_STATUS_LABEL, DIVERGENCE_LABEL, HISTORY_STATUS_LABEL, MONEY_ANOMALY_LABEL, MONEY_PENDING_LABEL, PAYOUT_FAILURE_LABEL, PAYOUT_STATUS_LABEL, PRICING_MODEL_LABEL, RETENTION_DISPOSITION_LABEL, TIMELINE_LABEL, adminAfterSummary, dateTime, money, timelineDetailLabel } from "@/lib/format";
 import { can } from "@/lib/permissions";
 import type { AdminDealMoneyFile, AdminMe, DealHistoryResponse, PaymentReconciliation } from "@/lib/types";
 
@@ -13,14 +13,36 @@ export default function DealMoneyView({ dealId }: { dealId: string }) {
   const [file, setFile] = useState<AdminDealMoneyFile | null>(null);
   const [me, setMe] = useState<AdminMe | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /** Recette § 5.12 (ANO-ADM-29) — le profil n'ouvre pas l'argent (403) : il peut encore lire la chronologie. */
+  const [denied, setDenied] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [recon, setRecon] = useState<PaymentReconciliation | null>(null);
   const [busy, setBusy] = useState(false);
   const load = useCallback(() => {
-    apiFetch<AdminDealMoneyFile>(`/admin/deals/${dealId}/money`).then(setFile).catch((e) => setError(e instanceof ApiError ? `${e.status} : ${e.message}` : "Chargement impossible."));
+    apiFetch<AdminDealMoneyFile>(`/admin/deals/${dealId}/money`).then(setFile).catch((e) => {
+      // Recette § 5.12 — un refus se dit en français et selon sa nature, jamais « 403 : Your admin profile… ».
+      if (e instanceof ApiError && e.status === 403) setDenied(true);
+      else if (e instanceof ApiError && e.status === 404) setError("Deal introuvable. Vérifie l'identifiant, ou reviens à la file d'où tu venais.");
+      else setError(e instanceof ApiError && e.status === 400 ? "Identifiant de deal invalide." : "Chargement impossible : réessaie dans un instant.");
+    });
   }, [dealId]);
   useEffect(() => { load(); apiFetch<AdminMe>("/admin/me").then(setMe).catch(() => undefined); }, [load]);
   if (error) return <p className="text-[13px] text-red-700">{error}</p>;
+  if (denied) {
+    if (!me) return <p className="text-[13px] text-slate-500">Chargement…</p>;
+    return (
+      <div className="max-w-5xl">
+        <Link href="/disputes" className="text-[12.5px] text-slate-500 hover:underline">← À arbitrer</Link>
+        <h1 className="mt-2 text-xl font-bold">Chronologie du deal {dealId.slice(-8)}</h1>
+        <p className="mt-1 text-[13px] text-slate-500">
+          {me && can(me.adminRoles, "deals.history.read")
+            ? "Ton profil lit ce qui est arrivé à ce deal, pas son argent (réservé à Finance, Médiateur et super administrateur)."
+            : "Ton profil n'ouvre ni la fiche argent ni la chronologie de ce deal."}
+        </p>
+        {me && can(me.adminRoles, "deals.history.read") && <DealHistoryCard dealId={dealId} />}
+      </div>
+    );
+  }
   if (!file) return <p className="text-[13px] text-slate-500">Chargement…</p>;
   const cur = file.pricing.currencyCode;
 
@@ -45,10 +67,12 @@ export default function DealMoneyView({ dealId }: { dealId: string }) {
       <Link href="/finances" className="text-[12.5px] text-slate-500 hover:underline">← Finances</Link>
       <div className="mt-2 flex flex-wrap items-baseline gap-3">
         <h1 className="text-xl font-bold">{file.corridor.originCity} → {file.corridor.destinationCity}</h1>
-        <span className="text-[13px] text-slate-500">deal {file.id.slice(-8)} · {file.status}{file.disputeTicket ? ` · ${file.disputeTicket}` : ""} · départ {dateTime(file.corridor.departureAt)}</span>
+        <span className="text-[13px] text-slate-500">deal {file.id.slice(-8)} · <span title={file.status}>{BOOKING_STATUS_LABEL[file.status] ?? file.status}</span>{file.disputeTicket ? ` · ${file.disputeTicket}` : ""} · départ {dateTime(file.corridor.departureAt)}</span>
         {file.disputeTicket && <Link href={`/disputes/${file.id}`} className="text-[12.5px] underline">dossier de médiation</Link>}
       </div>
       {msg && <p className="mt-2 text-[12.5px] text-slate-700">{msg}</p>}
+
+      <BalanceCard file={file} />
 
       <div className="mt-5 grid gap-5 md:grid-cols-2">
         <Card title="Prix figé à la réservation">
@@ -56,7 +80,7 @@ export default function DealMoneyView({ dealId }: { dealId: string }) {
           <Row k="Net Voyageur" v={money(file.pricing.transportCents, cur)} />
           <Row k="Commission Yamba" v={money(file.pricing.commissionCents, cur)} />
           {file.pricing.premiumCents > 0 && <Row k="Prime protection" v={money(file.pricing.premiumCents, cur)} />}
-          <Row k="Modèle" v={`${file.pricing.pricingModel} · ${file.pricing.weightKg} kg`} />
+          <Row k="Modèle" v={`${PRICING_MODEL_LABEL[file.pricing.pricingModel] ?? file.pricing.pricingModel} · ${file.pricing.weightKg} kg`} />
         </Card>
         <Card title="Parties">
           <Row k="Expéditeur" v={<Link href={`/users/${file.shipper.id}`} className="underline">{file.shipper.firstName} {file.shipper.lastName}</Link>} />
@@ -92,7 +116,7 @@ export default function DealMoneyView({ dealId }: { dealId: string }) {
       <Card title="Chronologie de l'argent" className="mt-5">
         {file.timeline.length === 0 ? <p className="text-[12.5px] text-slate-500">Rien.</p> : (
           <ul className="space-y-1 text-[12.5px]">
-            {file.timeline.map((e, i) => <li key={i}><span className="text-slate-500">{dateTime(e.at)}</span> · <b>{TIMELINE_LABEL[e.kind] ?? e.kind}</b>{e.amountCents != null ? ` · ${money(e.amountCents, cur)}` : ""}{e.detail ? <span className="ml-1 text-slate-500">({e.detail})</span> : null}</li>)}
+            {file.timeline.map((e, i) => <li key={i}><span className="text-slate-500">{dateTime(e.at)}</span> · <b>{TIMELINE_LABEL[e.kind] ?? e.kind}</b>{e.amountCents != null ? ` · ${money(e.amountCents, cur)}` : ""}{e.detail ? <span className="ml-1 text-slate-500">({timelineDetailLabel(e.detail)})</span> : null}</li>)}
           </ul>
         )}
       </Card>
@@ -124,14 +148,14 @@ export default function DealMoneyView({ dealId }: { dealId: string }) {
           <Row k="Demandé" v={dateTime(file.dates.requestedAt)} /><Row k="Accepté" v={dateTime(file.dates.acceptedAt)} />
           <Row k="Pris en charge" v={dateTime(file.dates.pickedUpAt)} /><Row k="Livré" v={dateTime(file.dates.deliveredAt)} />
           {file.dates.disputedAt && <Row k="Litige" v={dateTime(file.dates.disputedAt)} />}
-          {file.dates.completedAt && <Row k="Terminé" v={`${dateTime(file.dates.completedAt)} (${file.dates.completedBy ?? "—"})`} />}
-          {file.dates.closedAt && <Row k="Clos" v={`${dateTime(file.dates.closedAt)} (${file.dates.closedBy ?? "—"})`} />}
+          {file.dates.completedAt && <Row k="Terminé" v={`${dateTime(file.dates.completedAt)} (${file.dates.completedBy ? (ACTOR_LABEL[file.dates.completedBy] ?? file.dates.completedBy) : "—"})`} />}
+          {file.dates.closedAt && <Row k="Clos" v={`${dateTime(file.dates.closedAt)} (${file.dates.closedBy ? (ACTOR_LABEL[file.dates.closedBy] ?? file.dates.closedBy) : "—"})`} />}
         </div>
       </Card>
       {can(me?.adminRoles, "deals.history.read") && <DealHistoryCard dealId={dealId} />}
       <Card title="Actions admin sur ce deal" className="mt-5">
         {file.adminActions.length === 0 ? <p className="text-[12.5px] text-slate-500">Aucune.</p> : (
-          <ul className="space-y-1 text-[12.5px]">{file.adminActions.map((a) => <li key={a.id}>{dateTime(a.at)} · {a.admin} · <b>{ACTION_LABEL[a.action] ?? a.action}</b>{a.after ? <span className="ml-1 font-mono text-[11px] text-slate-500">{JSON.stringify(a.after)}</span> : null}</li>)}</ul>
+          <ul className="space-y-1 text-[12.5px]">{file.adminActions.map((a) => <li key={a.id}>{dateTime(a.at)} · {a.admin} · <b>{ACTION_LABEL[a.action] ?? a.action}</b>{adminAfterSummary(a.after, cur) ? <span className="ml-1 text-[11.5px] text-slate-500">— {adminAfterSummary(a.after, cur)}</span> : null}</li>)}</ul>
         )}
       </Card>
     </div>
@@ -171,7 +195,7 @@ function DealHistoryCard({ dealId }: { dealId: string }) {
   async function load() {
     setBusy(true); setErr(null);
     try { setH(await apiFetch<DealHistoryResponse>(`/admin/deals/${dealId}/history`)); }
-    catch (e) { setErr(e instanceof ApiError ? `${e.status} : ${e.message}` : "Chargement impossible."); }
+    catch (e) { setErr(e instanceof ApiError && e.status === 403 ? "Ton profil ne lit pas la chronologie des deals." : e instanceof ApiError && e.status === 404 ? "Deal introuvable." : "Chargement impossible : réessaie dans un instant."); }
     finally { setBusy(false); }
   }
   return (
@@ -190,7 +214,7 @@ function DealHistoryCard({ dealId }: { dealId: string }) {
                 <b>{e.type}</b>
                 {e.actor && <span className="text-slate-500">par {e.actor}</span>}
                 {e.recipient && <span className="text-slate-500">→ {e.recipient === "SHIPPER" ? "Expéditeur" : "Voyageur"}</span>}
-                {e.status && <span className={`text-[11px] ${e.status === "PARKED" || e.status === "FAILED" ? "font-semibold text-red-700" : "text-slate-400"}`}>{e.status.toLowerCase()}{e.relay && e.relay.attempts > 1 ? ` · ${e.relay.attempts} essais` : ""}</span>}
+                {e.status && <span title={e.status} className={`text-[11px] ${e.status === "PARKED" || e.status === "FAILED" || e.status === "BOUNCED" || e.status === "COMPLAINED" ? "font-semibold text-red-700" : "text-slate-400"}`}>{HISTORY_STATUS_LABEL[e.status] ?? e.status.toLowerCase()}{e.relay && e.relay.attempts > 1 ? ` · ${e.relay.attempts} essais` : ""}</span>}
                 {Object.keys(e.summary).length > 0 && <span className="font-mono text-[11px] text-slate-500">{JSON.stringify(e.summary)}</span>}
                 {e.relay?.lastError && <span className="text-[11px] text-red-700">{e.relay.lastError}</span>}
               </li>
@@ -241,6 +265,33 @@ function ManualRefundCard({ file, me, onDone }: { file: AdminDealMoneyFile; me: 
           {err && <p className="mt-2 text-[12px] text-red-700">{err}</p>}
         </div>
       )}
+    </Card>
+  );
+}
+/**
+ * Recette § 5.12 — le bilan : où est chaque centime de ce deal, et ce qui attend encore un geste. Calculé par le serveur
+ * (`moneyBalance`, règle pure) ; l'écran ne fait aucune addition. Une anomalie (argent sans destination) s'affiche en rouge.
+ */
+function BalanceCard({ file }: { file: AdminDealMoneyFile }) {
+  const cur = file.pricing.currencyCode;
+  const b = file.balance;
+  return (
+    <Card title="Bilan de l'argent" className="mt-5">
+      <div className="grid gap-x-6 md:grid-cols-2">
+        <Row k="Débité chez l'Expéditeur" v={money(b.capturedCents, cur)} />
+        <Row k="Remboursé à l'Expéditeur" v={money(b.refundedCents, cur)} />
+        <Row k="Versé au Voyageur" v={money(b.paidOutCents, cur)} />
+        <Row k="Détenu par la plateforme" v={money(b.platformHoldsCents, cur)} />
+      </div>
+      {b.pending.length === 0 ? (
+        <p className="mt-2 rounded-lg bg-emerald-50 px-3 py-2 text-[12.5px] text-emerald-800">Soldé : plus rien n'attend de geste sur l'argent de ce deal.</p>
+      ) : (
+        <div className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-[12.5px] text-amber-900">
+          <b>En attente</b>
+          <ul className="mt-0.5 list-disc pl-5">{b.pending.map((x) => <li key={x.kind}>{MONEY_PENDING_LABEL[x.kind] ?? x.kind} · {money(x.cents, cur)}</li>)}</ul>
+        </div>
+      )}
+      {b.anomaly && <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-[12.5px] font-semibold text-red-800">{MONEY_ANOMALY_LABEL[b.anomaly] ?? b.anomaly} Rapproche avec le fournisseur, puis corrige par un remboursement ou un versement.</p>}
     </Card>
   );
 }

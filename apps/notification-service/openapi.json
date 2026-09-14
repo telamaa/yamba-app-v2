@@ -14980,7 +14980,8 @@
           "PAYOUT_REVERSED",
           "REVERSAL_RESOLVED",
           "RETENTION",
-          "RETENTION_DECIDED"
+          "RETENTION_DECIDED",
+          "AUTHORIZATION_RELEASED"
         ]
       },
       "MoneyTimelineEvent": {
@@ -15022,6 +15023,98 @@
           "kind",
           "amountCents",
           "detail"
+        ],
+        "additionalProperties": false
+      },
+      "MoneyPendingKind": {
+        "type": "string",
+        "enum": [
+          "AUTHORIZATION_OPEN",
+          "DEAL_IN_PROGRESS",
+          "PAYOUT_DUE",
+          "PAYOUT_FROZEN",
+          "PAYOUT_FAILED",
+          "REVERSAL_OPEN",
+          "RETENTION_HELD",
+          "REFUND_PROPOSED"
+        ]
+      },
+      "MoneyBalance": {
+        "type": "object",
+        "properties": {
+          "capturedCents": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "débité chez l'Expéditeur (0 tant que rien n'est capturé)"
+          },
+          "refundedCents": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "rendu à l'Expéditeur, tous remboursements cumulés"
+          },
+          "paidOutCents": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "versé au Voyageur et non renversé"
+          },
+          "platformHoldsCents": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "débité − remboursé − versé : ce que la plateforme détient pour ce deal"
+          },
+          "pending": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "$ref": "#/components/schemas/MoneyPendingKind"
+                },
+                "cents": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "kind",
+                "cents"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "settled": {
+            "type": "boolean",
+            "description": "plus rien n'est en attente"
+          },
+          "anomaly": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "UNALLOCATED_FUNDS",
+                  "OVERSPENT"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "deal clos, rien en attente, et la plateforme détient plus que sa commission (UNALLOCATED_FUNDS) ou a versé plus qu'elle n'a reçu (OVERSPENT)"
+          }
+        },
+        "required": [
+          "capturedCents",
+          "refundedCents",
+          "paidOutCents",
+          "platformHoldsCents",
+          "pending",
+          "settled",
+          "anomaly"
         ],
         "additionalProperties": false
       },
@@ -15590,6 +15683,9 @@
               "$ref": "#/components/schemas/MoneyTimelineEvent"
             }
           },
+          "balance": {
+            "$ref": "#/components/schemas/MoneyBalance"
+          },
           "adminActions": {
             "type": "array",
             "items": {
@@ -15757,6 +15853,7 @@
           "retention",
           "dates",
           "timeline",
+          "balance",
           "adminActions",
           "manualRefund",
           "allowedActions"

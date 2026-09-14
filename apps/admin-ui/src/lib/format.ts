@@ -104,6 +104,7 @@ export const TIMELINE_LABEL: Record<string, string> = {
   AUTHORIZED: "Empreinte posée (autorisation)", CAPTURED: "Débité (capture)", REFUNDED: "Remboursé à l'Expéditeur", DISPUTED: "Litige ouvert",
   COMPLETED: "Deal terminé", CANCELLED: "Deal annulé", PAYOUT_SENT: "Versement envoyé au Voyageur", PAYOUT_FAILED: "Versement en échec",
   PAYOUT_REVERSED: "Transfert renversé", REVERSAL_RESOLVED: "Renversement clos", RETENTION: "Retenue conservée", RETENTION_DECIDED: "Retenue arbitrée",
+  AUTHORIZATION_RELEASED: "Empreinte libérée (jamais débitée)", // recette § 5.12
 };
 export const DIVERGENCE_LABEL: Record<string, string> = {
   CAPTURE_NOT_RECORDED: "Débit chez Stripe, non enregistré en base",
@@ -161,3 +162,40 @@ export const STEP_LABEL: Record<string, string> = {
   FLIGHT_DEPARTED: "Vol parti",
   FLIGHT_ARRIVED: "Vol arrivé",
 };
+
+/* Recette § 5.12 — fiche argent en français : bilan, acteurs, modèle de prix, chronologie du deal. */
+export const MONEY_PENDING_LABEL: Record<string, string> = {
+  AUTHORIZATION_OPEN: "empreinte posée, en attente de la décision du Voyageur",
+  DEAL_IN_PROGRESS: "deal en cours : le versement partira à la fin",
+  PAYOUT_DUE: "versement dû, pas encore envoyé",
+  PAYOUT_FROZEN: "versement gelé par le litige",
+  PAYOUT_FAILED: "versement en échec",
+  REVERSAL_OPEN: "transfert renversé, décision à prendre",
+  RETENTION_HELD: "retenue à arbitrer",
+  REFUND_PROPOSED: "remboursement proposé, à appliquer",
+};
+export const MONEY_ANOMALY_LABEL: Record<string, string> = {
+  UNALLOCATED_FUNDS: "Argent sans destination : le deal est clos, rien n'est en attente, et la plateforme détient plus que sa commission.",
+  OVERSPENT: "La plateforme a versé et remboursé plus qu'elle n'a reçu, sans geste commercial qui l'explique.",
+};
+export const ACTOR_LABEL: Record<string, string> = { SHIPPER: "par l'Expéditeur", CARRIER: "par le Voyageur", SYSTEM: "automatique", ADMIN: "par un admin" };
+export const PRICING_MODEL_LABEL: Record<string, string> = { PER_CATEGORY: "au colis (catégorie)", PER_KG: "au kilo" };
+export const HISTORY_STATUS_LABEL: Record<string, string> = { PUBLISHED: "publié", PENDING: "en attente", PARKED: "parqué", READ: "lue", UNREAD: "non lue", SENT: "envoyé", DELIVERED: "remis", FAILED: "en échec", BOUNCED: "rebond", COMPLAINED: "plainte" };
+/** Le détail d'une ligne de chronologie de l'argent, lisible : acteur, issue de retenue, nature d'échec, décision de renversement. */
+export function timelineDetailLabel(detail: string | null): string | null {
+  if (!detail) return null;
+  return ACTOR_LABEL[detail] ?? RETENTION_DISPOSITION_LABEL[detail] ?? PAYOUT_FAILURE_LABEL[detail] ?? (detail === "RESENT" ? "re-versé" : detail === "WRITTEN_OFF" ? "abandonné" : detail);
+}
+const AFTER_KEY_LABEL: Record<string, string> = { amountCents: "montant", totalRefundedCents: "cumul remboursé", refundedCents: "remboursé", reason: "motif", outcome: "issue", divergences: "divergences", provider: "fournisseur", payoutStatus: "versement", refundId: "remboursement", transferId: "transfert" };
+/** Le « after » d'une action admin en une ligne lisible (montants en euros, codes traduits) ; une clé inconnue garde son nom. */
+export function adminAfterSummary(after: unknown, currency = "EUR"): string | null {
+  if (!after || typeof after !== "object") return null;
+  const parts: string[] = [];
+  for (const [k, v] of Object.entries(after as Record<string, unknown>)) {
+    if (v === null || v === undefined || (Array.isArray(v) && v.length === 0)) continue;
+    const label = AFTER_KEY_LABEL[k] ?? k;
+    const value = /Cents$/.test(k) && typeof v === "number" ? money(v, currency) : k === "outcome" && typeof v === "string" ? (RESOLUTION_LABEL[v] ?? v) : k === "payoutStatus" && typeof v === "string" ? (PAYOUT_STATUS_LABEL[v] ?? v) : Array.isArray(v) ? v.map((x) => DIVERGENCE_LABEL[String(x)] ?? String(x)).join(", ") : String(v);
+    parts.push(`${label} : ${value}`);
+  }
+  return parts.length ? parts.join(" · ") : null;
+}
