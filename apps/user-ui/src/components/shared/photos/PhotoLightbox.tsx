@@ -12,6 +12,7 @@
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useRef } from "react";
+import { useDialogFocus } from "@/hooks/useDialogFocus";
 
 export type ViewerPhoto = {
   id: string;
@@ -30,6 +31,9 @@ export default function PhotoLightbox({ photos, index, onCloseAction, onIndexCha
   const t = useTranslations("common");
   const photo = photos[index];
   const touchStartX = useRef<number | null>(null);
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  // ANO-WEB-94 — focus piégé dans la fenêtre, rendu au geste de départ à la fermeture.
+  useDialogFocus(dialogRef, Boolean(photo));
 
   const next = useCallback(
     () => onIndexChangeAction((index + 1) % photos.length),
@@ -58,6 +62,7 @@ export default function PhotoLightbox({ photos, index, onCloseAction, onIndexCha
 
   return (
     <div
+      ref={dialogRef}
       className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 backdrop-blur-sm"
       onClick={onCloseAction}
       role="dialog"

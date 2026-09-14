@@ -13,6 +13,7 @@
 
 import { ImageIcon, Package } from "lucide-react";
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import PhotoLightbox, { type ViewerPhoto } from "./PhotoLightbox";
 
 export type ThumbPhoto = ViewerPhoto & { context?: string };
@@ -48,6 +49,7 @@ type Props = {
 };
 
 export default function PhotoThumbs({ photos, tone, size = "md", max, className = "" }: Props) {
+  const t = useTranslations("common.lightbox");
   const [active, setActive] = useState<number | null>(null);
   if (photos.length === 0) return null;
 
@@ -58,7 +60,16 @@ export default function PhotoThumbs({ photos, tone, size = "md", max, className 
     <>
       <div className={"flex flex-wrap gap-2 " + className}>
         {visible.map((photo, i) => (
-          <Thumb key={photo.id} photo={photo} tone={tone} size={size} onOpenAction={() => setActive(i)} />
+          <Thumb
+            key={photo.id}
+            photo={photo}
+            tone={tone}
+            size={size}
+            // ANO-WEB-96 — chaque vignette s'annonçait « photo » (en dur, identique pour toutes) :
+            // un lecteur d'écran entendait « photo, photo ». Rang, total, et la légende si elle existe.
+            ariaLabel={[photo.label, t("open", { current: i + 1, total: photos.length })].filter(Boolean).join(" — ")}
+            onOpenAction={() => setActive(i)}
+          />
         ))}
         {hidden > 0 && (
           <button
@@ -68,7 +79,7 @@ export default function PhotoThumbs({ photos, tone, size = "md", max, className 
               SIZE[size].box +
               " flex flex-shrink-0 items-center justify-center bg-slate-100 text-[12px] font-semibold text-slate-600 ring-1 ring-slate-200 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-700"
             }
-            aria-label={`+${hidden}`}
+            aria-label={t("more", { count: hidden })}
           >
             +{hidden}
           </button>
@@ -90,11 +101,13 @@ function Thumb({
   photo,
   tone,
   size,
+  ariaLabel,
   onOpenAction,
 }: {
   photo: ThumbPhoto;
   tone: Tone;
   size: Size;
+  ariaLabel: string;
   onOpenAction: () => void;
 }) {
   const [failed, setFailed] = useState(false);
@@ -109,7 +122,7 @@ function Thumb({
         RING[tone]
       }
       style={failed ? { background: GRADIENT[tone] } : undefined}
-      aria-label={photo.label || "photo"}
+      aria-label={ariaLabel}
       title={photo.label}
     >
       {!failed ? (

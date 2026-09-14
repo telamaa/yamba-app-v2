@@ -104,6 +104,13 @@ describe("Expéditeur — toPaymentItem / buildShipperWallet", () => {
     expect(toPaymentItem(rec({ status: "CANCELLED", capturedAt: days(-5), refundAmountCents: 1479, refundedAt: days(-1) }), counterparts)).toMatchObject({ state: "PARTIALLY_REFUNDED", refundAmountCents: 1479, retentionCents: 1478 });
   });
 
+  it("ANO-WEB-67 — un remboursement sans refundedAt porte quand même une date (repli sur updatedAt), jamais « le » vide", () => {
+    const sans = rec({ status: "CANCELLED", capturedAt: days(-5), refundAmountCents: 2957, refundedAt: null, updatedAt: days(-2) });
+    expect(toPaymentItem(sans, counterparts)).toMatchObject({ state: "REFUNDED", date: days(-2).toISOString() });
+    const partiel = rec({ status: "CANCELLED", capturedAt: days(-5), refundAmountCents: 1479, refundedAt: null, updatedAt: days(-2) });
+    expect(toPaymentItem(partiel, counterparts)).toMatchObject({ state: "PARTIALLY_REFUNDED", date: days(-2).toISOString() });
+  });
+
   it("totaux : bloqué = HELD ; dépensé = RELEASED + retenues ; remboursé = remboursements réels ; contrat respecté", () => {
     const wallet = buildShipperWallet(
       [

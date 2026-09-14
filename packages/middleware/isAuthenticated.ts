@@ -4,6 +4,7 @@ import prisma from "@packages/libs/prisma";
 import redis from "@packages/libs/redis";
 import { AuthError } from "@packages/error-handler";
 import { isSessionRevoked, sessionKey } from "./session-revocation";
+import { effectiveAccountStatus, type SanctionState } from "./account-status";
 
 export type AuthenticatedRequest = Request & {
   user?: any;
@@ -106,7 +107,8 @@ const isAuthenticated = async (
       return refus(next, "Account deleted.", "ACCOUNT_DELETED");
     }
     // C-PR3 (D56 2A) — SUSPENDED : connexion refusée partout (les sessions sont révoquées à la suspension).
-    if ((user as { accountStatus?: string }).accountStatus === "SUSPENDED") {
+    // ANO-ADM-07 — statut EFFECTIF : une suspension dont la date de fin est passée ne refuse plus rien.
+    if (effectiveAccountStatus(user as SanctionState) === "SUSPENDED") {
       return refus(next, "Account suspended.", "ACCOUNT_SUSPENDED");
     }
     // ANO-API-07 — la session a-t-elle été révoquée (déconnexion, coupure d'appareil,
