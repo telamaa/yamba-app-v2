@@ -6541,3 +6541,103 @@ n'a changé hors de l'enregistrement de session, prouvé par test unitaire.
 | Harnais | specs `apps/e2e/src/admin/adm-*.spec.ts` ; chaque chapitre : contre-épreuve (corrections retirées → rouge) |
 | Motifs récurrents | gestes simultanés → 500 (P2034 non rejoué, unicité non traduite), refus serveur affichés en anglais « 4xx : … », lectures qui journalisent deux fois, pannes affichées comme « rien » |
 | Reste | § 6 (ADM-E2E-1 → 8), § 7 (ADM-NRG-1 → 7 + engagement P2034 sur `admin-users` et `admin-auth`), § 8 |
+
+---
+
+## Cahier 02-ADMIN — § 6 Cas de bout en bout · **CONFORME après correction** (8 cas · 1 anomalie majeure + 2 mineures + 1 défaut de jeu d'essai closes · 2 décisions (A190, A191) · lots du § 5.26 livrés · 8 scénarios ADM-E2E + ADM-SES-6, 7, SES-1 réalignée)
+
+Specs : `apps/e2e/src/admin/adm-e2e-bout-en-bout-1-4.spec.ts` et `adm-e2e-bout-en-bout-5-8.spec.ts` (et deux fiches ajoutées
+à `adm-ses-mes-sessions.spec.ts`). Un cas de bout en bout ne rejoue pas les fiches du § 5 : il enchaîne leurs gestes d'une
+traite avec les vrais profils (deux ou trois navigateurs admin, un à trois membres) et se conclut par le journal filtré. Les
+gestes que le cahier décrit à l'écran passent par l'écran (tuiles, file « À arbitrer », formulaire « Trancher », carte
+« Effacer ce compte », files Finances, « Rembourser maintenant », billets, masquage, « Mes sessions ») ; les effets côté
+membre sont des appels réels avec la session du membre ; les écritures de paramètres et de maintenance hors écran passent par
+l'API de l'écran (leur écran est prouvé aux § 5.20 et 5.23). Jeu d'essai rejoué avant chaque cas. Manœuvres consignées :
+A169 (litiges réalignés sous un délai de 12 h) en E2E-1 ; maintenance remise à plat en base avant et après E2E-5 ; en E2E-6,
+membre inscrit par l'écran puis garni en base (adresse, favori, notification, avatar, deal ACCEPTED copié) et deal « terminé,
+versement envoyé » posé en base (le parcours Voyageur complet est WEB-E2E-1).
+
+| Cas | Objet | Verdict |
+|---|---|---|
+| ADM-E2E-1 | Un litige, de la file à l'argent | **Conforme après correction** — tuile = compteur serveur, file « 3 affiché(s) · file entière : 2 litige(s) · 1 retenue(s) », dossier YAM-2041 décidable ; conversation « Fil (2 messages) », numéro tapé masqué, fil en lecture seule pour Chinwe (`DISPUTE_OPEN`) ; fiche du deal : versement `FROZEN`, « gelé » ; partiel = moitié du total, récapitulatif dont les trois lignes totalisent le payé ; « statut final : Terminée · remboursé … · versé … » ; deux emails, chacun son montant, motif intégral ; Thomas : litiges perdus +1, facteur de risque +25 ; tuile −1 ; rapport du mois : remboursement = montant, +1 deal terminé, revenu en hausse ; chronologie : `booking.dispute_resolved` ; seconde décision 409 ; aucune fenêtre de notation ; journal filtré sur le deal `DISPUTE_VIEWED → DEAL_MONEY_VIEWED → DISPUTE_RESOLVED (Nadia) → DEAL_HISTORY_VIEWED (Fatou)`, `CONVERSATION_VIEWED` sur la cible CONVERSATION, deux `SETTING_CHANGED`. Défauts : lien « rapprochement Stripe » (ANO-ADM-85), YAM-2041 sans fil de discussion (ANO-ADM-86) |
+| ADM-E2E-2 | Sanction proposée, appliquée, levée | **Conforme après correction** — proposition du Support : tuile 1, rien ne change pour Marc (publier et réserver passent la garde) ; le Médiateur voit « Sami » et applique ; publier / réserver → 403 `ACCOUNT_RESTRICTED`, deal en cours lisible ; suspension : `/auth/me` 401, trajets hors recherche, statut resté `PUBLISHED` ; ✉ membre et ✉ « [Yamba ops] SUSPENDED : Marc Tremblay a n deal(s) en cours » ; levée : champs effacés, reconnexion, publication, trajets de retour, ✉ « rétabli » ; journal sur Marc : `USER_SUSPENSION_PROPOSED (Sami) → USER_RESTRICTED → USER_SUSPENDED → USER_REINSTATED (Nadia)` + consultations. Défaut : l'email « restreint » citait le motif interne (ANO-ADM-87) |
+| ADM-E2E-3 | Trois signalements, priorité | **Conforme** — Aminata signale par l'écran (« Arnaque suspectée »), doublon 409, João et Chinwe 201 ; Thomas n'apprend rien (`/auth/me`, notifications) ; tuile 3, « Prioritaire · 3 ouverts » ; fiche : facteur « signalements ouverts » = 24 points (3 × 8), compte `ACTIVE` ; proposition, restriction, ✉ ; « Traité » ×3 par l'écran avec la note « restreint le … » — sous trois ouverts la ligne n'est plus prioritaire (la priorité suit le nombre d'ouverts) ; tuile 0 ; aucun email aux auteurs après la décision ; journal `PROPOSED → RESTRICTED → REPORT_REVIEWED ×3`, la note dans chaque ligne |
+| ADM-E2E-4 | Paramètre, effet < 30 s | **Conforme** — prix vu par Aminata (8 kg : sous 25 € de transport, le plancher de commission de 3 € masque 12 → 15 %) ; Exploitation : « super administrateur seul », appel direct 403 nommant la clé ; super administrateur par l'écran : « À valider — 1 modification(s) », « figure dans les CGU », « 17/20 » bouton inactif, « 1 paramètre(s) modifié(s) — version n, journalisé, super administrateurs prévenus. » ; commission servie en < 30 s (mesure au rapport de passage), ✉ super administrateurs ; le total d'Aminata diverge (`QUOTE_DIVERGENCE`, total supérieur) ; snapshot de `bzv-accepted` identique ; bandeau d'accueil ; historique « 12 % → 15 % · « motif » » ; « remettre » → 12 % ; journal `SETTINGS` : deux lignes |
+| ADM-E2E-5 | Lecture seule et levée | **Conforme** — annonce : bandeau ambre `rgb(251, 191, 36)`, rien de bloqué, ✉ « planifiée » ; lecture seule : bandeau rouge `rgb(220, 38, 38)` ; lectures (annonce, tableau de bord, conversation) 200 ; réserver / publier / message → 503 `MAINTENANCE`, `Retry-After: 300` ; connexion et déconnexion d'un membre passent ; back-office : navigation et écriture d'un paramètre ; `/api/status` 200 « maintenance » ; ✉ « activée » ; levée vue par la passerelle en < 10 s, écriture rétablie, bandeaux disparus, ✉ « levée » ; journal : trois `MAINTENANCE_CHANGED`, chacun son motif, versions consécutives |
+| ADM-E2E-6 | Effacement RGPD reçu par email | **Conforme** — compte inscrit par l'écran et garni ; carte « Effacer ce compte (RGPD) » avec le bloqueur « deal » (bouton inactif, A179 b) ; appel direct 409 ; registre « refusée » ; deal clos ; effacement par l'écran, message du cahier ; base : « Membre supprimé », `erased+<id>@anonymised.invalid`, `deleted-<id>`, `isDeleted`, adresses / favoris / notifications à 0, `ErasedAccount` 1, réservation gardée ; anciens identifiants 401 ; un seul email, sans lien, rien vers l'adresse anonymisée ; registre « faite » ; son propre compte 403 ; une seule ligne `ACCOUNT_ERASED` |
+| ADM-E2E-7 | Versement en échec → clôture | **Conforme** — seuil 1 h ; bandeau « n alertes de seuil · n critique » ; `/alerts` : carte « 1 concerné », « Aller traiter → » → `/finances?kind=FAILED` ; « Relancer » par l'écran → 200, message ; deux relances de plus : même montant figé, UN `booking.payout_sent` ; « Rapprocher » : `INTENT_NOT_FOUND`, rien modifié ; « Transferts renversés » → « Décider » → « Re-verser » : « Nouveau transfert envoyé » ; proposition de 5,00 € (Finance), « Rembourser maintenant » absent pour la Finance ; super administrateur : « Remboursé 5,00 € (cumul 5,00 €). L'Expéditeur est prévenu par email. », versement du Voyageur inchangé ; portefeuille `PARTIALLY_REFUNDED` ; rapport ≥ 5,00 € ; seuil 48 h → l'alerte disparaît ; journal : `SETTING_CHANGED`, `PAYOUT_RETRIED`, `DEAL_MONEY_VIEWED`, `DEAL_RECONCILED`, `PAYOUT_REVERSAL_RESOLVED` (`RESENT`), `REFUND_MANUAL_PROPOSED`, `REFUND_MANUAL_APPLIED` |
+| ADM-E2E-8 | Billet, masquage, lecture croisée | **Conforme** — tuile « Billets à vérifier » 1 ; « Ouvrir le billet » (onglet) ; rejet « Les dates ne correspondent pas au trajet », ✉ avec le motif ; Support : pas de « Masquer », « Proposer » → bandeau, trajet public, tuile « Masquages proposés » 1 ; Médiateur : « Masquer », « masqué par Yamba », ✉ sans motif interne ; recherche absente, page publique 404, réserver `TRIP_NOT_BOOKABLE`, Voyageur : bandeau rouge, `PUBLISHED`, deal accepté lisible ; redépôt → retour dans la file ; « Rétablir » → recherche, ✉ « de nouveau visible » ; journal du trajet : `DOCUMENT_VIEWED`, `TICKET_REJECTED`, `TRIP_VIEWED`, `TRIP_HIDE_PROPOSED`, `TRIP_HIDDEN`, `TRIP_UNHIDDEN`, deux auteurs (Sami, Nadia) |
+| ADM-SES-6 (ajoutée, lots a, b) | Autres sessions, codes de secours | **Conforme** — deux sessions (écran + API) ; « Révoquer toutes mes autres sessions » → « 1 autre session fermée. Cette session reste ouverte. », une ligne, l'autre session 401, bouton disparu ; mauvais code : « Code incorrect … », toujours sur `/sessions` ; bon code (pas suivant) : codes montrés, « Je les ai notés » les efface ; un code régénéré ouvre une session (`remainingBackupCodes` = n − 1) ; journal `ADMIN_SESSIONS_REVOKED { count: 1 }`, `ADMIN_BACKUP_CODES_REGENERATED { remaining: n }`, aucun code en clair |
+| ADM-SES-7 (ajoutée, lot d) | Renouvellements simultanés | **Conforme** — trois `POST /auth/admin/refresh` simultanés du même jeton : `[200, 200, 200]`, UNE session en Redis, les trois reçoivent le même jti |
+
+**Contre-épreuve.** Les rouges ont été vus sur le code d'origine pendant la recette : E2E-1 échouait sur le libellé du lien
+(« rapprochement Stripe ») puis sur « Fil (2 messages) » (jeu d'essai sans fil) ; E2E-2 échouait sur le motif interne dans
+l'email « restreint » ; SES-1 et SES-5 échouent contre l'écran corrigé tant qu'ils attendent l'ancien texte (réalignés). Lots
+A190 et ANO-ADM-87 : contrôleur et emails d'origine remis (tests unitaires seuls) → **6 rouges sur 20**
+(`admin-auth-sessions.controller.spec.ts` a, a, b, c, d ; `admin-emails.spec.ts` ANO-ADM-87) ; corrections remises : 20/20.
+Passages : E2E 1 → 4 puis 5 → 8 verts deux fois (8/8 au passage final, 3 min 24 + 3 min 12) ; ADM-SES 7/7 ; voisins
+ADM-CNV (5, texte de l'état « sans fil » réaligné), ADM-SNC (7), WEB-LIT (14), WEB-MSG (21) verts — WEB-MSG-1 a d'abord
+été ROUGE sur le jeu d'essai modifié (Thomas lisait « 2 » non lus au lieu de « 1 » : le nouveau fil de YAM-2041 était posé
+non lu) ; les deux parties l'ont désormais lu (`lastReadAt` après le dernier message). Les autres fiches ne passent par
+aucun code corrigé.
+
+### Anomalies
+
+- **ANO-ADM-87 (majeure) — l'email de sanction citait le motif interne.** « Motif : Recette ADM-E2E-2 : restriction appliquée
+  après relecture de la proposition. » — le formulaire d'application est prérempli avec le motif de la proposition du
+  Support, souvent nourri des signalements (qui, quoi) : le membre sanctionné lisait des notes internes, parfois de quoi
+  identifier un auteur de signalement. L'en-tête du fichier d'emails et le cahier disaient pourtant « motif générique ». Le
+  motif est retiré du type des paramètres (erreur de compilation s'il revient) ; l'email dit « un manquement aux règles
+  d'utilisation de Yamba constaté par notre équipe » et l'adresse de recours (A191). Close.
+- **ANO-ADM-85 (mineure) — « rapprochement Stripe ».** Le lien du dossier de médiation nommait Stripe alors que le § 5.13 a
+  imposé « fournisseur » (en local c'est Fake). Close.
+- **ANO-ADM-86 (mineure) — un deal sans fil s'affichait comme une erreur.** « Ce deal n'a pas de conversation. » en rouge :
+  c'est un état normal (les parties n'ont rien échangé), pas une panne. Texte « Les deux parties n'ont échangé aucun message
+  sur ce deal : il n'y a pas de fil à lire. », en gris. Close.
+- **Jeu d'essai — YAM-2041 sans conversation.** L'étape 6 d'E2E-1 (« le fil s'affiche, sans numéro ») ne pouvait pas se
+  jouer : `seed-deals.ts` pose désormais deux messages sur `bzv-disputed`, dont un numéro tapé par Chinwe. Close.
+
+### Décisions (15/09) — inscrites au registre avant le code
+
+- **A190** — lots du § 5.26 : (a) `POST /admin/me/backup-codes` sur code TOTP (jamais un code de secours), anciens codes
+  remplacés dans la transaction de la ligne `ADMIN_BACKUP_CODES_REGENERATED`, erreurs 400 / 403 et jamais 401 ; (b)
+  `DELETE /admin/me/sessions` (la courante reste, une ligne `ADMIN_SESSIONS_REVOKED { count }`) ; (c) `adminAccessClaims`
+  unique pour ouverture et renouvellement ; (d) renouvellement réclamé par `SET NX` (fenêtre de 30 s : le perdant reçoit la
+  même session). Écartés : régénérer avec un code de secours ; `DEL` puis créer (course perdue) ; retirer les claims.
+- **A191** — email de sanction à motif générique, `reason` hors du type. Proposé : catégorie de motif en liste fermée
+  (exposé des motifs spécifique sans texte libre).
+
+### Améliorations faites (au-delà du cahier)
+
+- `backupCodesWarning` dit le nouveau recours (« régénère-les depuis « Mes sessions » ») au lieu de « un super administrateur
+  devra réinitialiser ».
+- Le jeu d'essai porte un fil de litige réaliste (masquage d'un numéro prouvé de bout en bout).
+- OpenAPI : `DELETE /admin/me/sessions` et `POST /admin/me/backup-codes` documentés (la spec d'auth-service refuse une route
+  montée non documentée).
+- Harnais : deux fichiers E2E indépendants (un échec n'arrête pas les autres cas), manœuvres affichées, mesure du délai de
+  propagation et du délai de levée au rapport de passage.
+
+### Proposé, non fait
+
+- **Catégorie de motif de sanction en liste fermée** (A191) — le membre lit « escroquerie suspectée », « contenu interdit »…
+  plutôt qu'un générique ; structurant (contrat, écran, emails, doc juridique).
+- **« Détenu par la plateforme » négatif** : après un geste commercial de 5,00 € sur un deal où la commission est de 4,20 €,
+  la fiche argent affiche « −0,80 € » (Yamba paie de sa poche, c'est voulu) ; dire « avancé par Yamba 0,80 € » serait plus
+  lisible.
+- **Écriture de la maintenance par l'écran dans E2E-5** : les cas écrivent la maintenance par l'API de l'écran ; rejouer les
+  clics du § 5.23 dans le cas de bout en bout rallongerait le passage sans rien prouver de plus.
+- Le formulaire d'application d'une sanction préremplit le motif de la proposition : garder, mais le libellé du champ
+  devrait dire « motif interne (jamais envoyé au membre) ».
+
+### Écarts avec le cahier
+
+- E2E-1 étape 2 : délai minimum 12 h (le cahier dit 1 h) et, depuis A169, le paramètre ne rend plus décidable un litige
+  déjà ouvert — manœuvre consignée ; tuile « Litiges à trancher » = 1 (YAM-2042, signalé à H−8, reste non décidable).
+- E2E-1 étape 16 : `CONVERSATION_VIEWED` vise la conversation et les `SETTING_CHANGED` la clé : le filtre « cible = deal » en
+  montre quatre, pas « toutes les lignes ci-dessus ».
+- E2E-2 étape 17 : quatre gestes (proposition, restriction, suspension, levée), pas cinq.
+- E2E-3 : après le premier « Traité », la ligne n'est plus « Prioritaire » (deux ouverts) — le cahier ne le dit pas.
+- E2E-6 étape 4 : le bouton est inactif (bloqueurs affichés avant le clic, A179 b), le 409 se prouve par appel direct ;
+  étape 10 : `INVALID_CREDENTIALS` (A-décision du § 5.21), pas `ACCOUNT_DELETED` ; les trois ouvertures du registre peuvent
+  n'écrire que deux lignes (A168, lectures identiques à moins de 10 s).
+- E2E-7 étape 2 : « n alertes de seuil · n critique » (le seed porte d'autres seuils franchis).

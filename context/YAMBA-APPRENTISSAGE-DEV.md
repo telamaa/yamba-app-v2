@@ -894,3 +894,66 @@ une session mémorisée du harnais, fermée, fait échouer les fiches suivantes.
 **Pour aller plus loin.** La rotation concurrente (deux onglets renouvellent avec le même jeton) crée aujourd'hui deux jti ;
 la solution propre réclame l'ancien jti par `DEL` et, pour le perdant, renvoie les cookies du gagnant plutôt que 401 — voir
 les « refresh token families » (détection de réutilisation) du RFC 9700 (OAuth 2.0 Security BCP).
+
+## Chapitre 185 — ADM-E2E · Le bout en bout : ce qu'un test isolé ne voit pas, la promesse qu'un type tient mieux qu'un commentaire, et le verrou qui est déjà la donnée
+
+**Le problème.** Vingt-six chapitres ont vérifié chaque écran seul. Joués d'une traite, huit parcours ont encore trouvé :
+un email de sanction qui citait le motif interne, un lien qui nommait Stripe, un deal de litige sans conversation dans le
+jeu d'essai — et, en livrant les lots du § 5.26, une course entre deux onglets que la première correction perdait encore.
+
+**(1) Un test de bout en bout se conclut par une lecture croisée.** Une fiche isolée vérifie « l'écran dit X ». Un cas de
+bout en bout vérifie que QUATRE sources disent la même chose : l'écran, l'API, les emails, le journal. Le patron retenu —
+un relevé AVANT le geste, un relevé APRÈS, la différence attendue — marche même quand la source agrège (le rapport
+mensuel ne connaît pas les deals). Extrait (`apps/e2e/src/admin/adm-e2e-bout-en-bout-1-4.spec.ts`) :
+
+```ts
+const rapportAvant = await moisCourant(fin.contexte);
+await recap.getByRole("button", { name: "Valider définitivement" }).click();
+// …
+const rapportApres = await moisCourant(fin.contexte);
+expect(rapportApres.refundedCents - rapportAvant.refundedCents, "le remboursement au mois courant").toBe(montant);
+expect(rapportApres.completedCount - rapportAvant.completedCount, "le deal terminé est compté").toBe(1);
+```
+
+Piège : un jeu d'essai qui ne peut pas jouer une étape (YAM-2041 sans fil) n'est pas un défaut du produit mais il rend
+l'étape invérifiable ; on corrige le jeu d'essai, on ne saute pas l'étape.
+
+**(2) Une promesse de confidentialité se met dans le type.** Le fichier d'emails annonçait en commentaire « motif
+GÉNÉRIQUE », et le gabarit écrivait `Motif : ${p.reason}`. Un commentaire ne s'exécute pas. En retirant `reason` du type
+des paramètres, c'est le compilateur qui refuse la fuite, partout et pour toujours (`apps/auth-service/src/emails/admin-emails.ts`) :
+
+```ts
+export type AccountStatusParams = { firstName: string; until: string | null; supportEmail: string };
+```
+
+et le test le verrouille avec `// @ts-expect-error` : si quelqu'un remet `reason` dans le type, la directive devient
+inutile et `tsc` échoue. Même idée qu'une liste fermée d'actions (A183) : la règle vit là où l'outil la vérifie.
+
+**(3) Un code HTTP est un message au client, pas seulement un statut.** Le client admin traite tout 401 comme « session
+expirée » : il renouvelle, rejoue la requête, puis envoie vers `/login`. Répondre 401 à un mauvais code TOTP, pour un
+admin DÉJÀ connecté, aurait compté deux échecs et déconnecté quelqu'un qui s'est simplement trompé de chiffre. D'où 400
+`OTP_INCORRECT`. Règle : choisir le statut d'après ce que le client en fera, pas d'après le mot « auth » dans l'erreur.
+
+**(4) La course perdue par `DEL`, gagnée par `SET NX`.** Deux onglets renouvellent avec le même jeton. Première idée :
+« celui dont le `DEL` de l'ancienne session rend 1 gagne ; le perdant lit la clé de rotation et reçoit la même session ».
+Le test unitaire de la course a échoué : le gagnant efface, PUIS écrit la clé de rotation — un perdant qui lit entre les
+deux ne trouve rien. La correction fait de la clé de rotation elle-même le verrou : l'écrire est atomique et exclusif
+(`apps/auth-service/src/controller/admin-auth.controller.ts`) :
+
+```ts
+const candidate = createRefreshJti();
+const won = (await redis.set(rotatedKey(user.id, decoded.jti), candidate, "EX", ROTATION_GRACE_SECONDS, "NX")) === "OK";
+```
+
+Le perdant connaît alors le successeur dès sa première lecture ; il n'attend (au plus 500 ms) que l'écriture de la session,
+jamais une information. Principe général : quand deux acteurs doivent se mettre d'accord sur une valeur, faites de
+l'écriture de CETTE valeur le point de décision (compare-and-set), plutôt qu'une écriture voisine suivie d'une lecture.
+
+**(5) Tester une course sans horloge.** Le mock Redis du test implémente `NX` (`if (opts.includes("NX") && store.has(k))
+return null`) et les deux appels partent par `Promise.all` : les `await` intercalés suffisent à entrelacer les deux
+exécutions, sans `setTimeout` ni hasard. La contre-épreuve (contrôleur d'origine remis) rend la course rouge.
+
+**Pour aller plus loin.** Le « statement of reasons » du Digital Services Act (art. 17) demande un motif spécifique ; une
+catégorie en liste fermée, choisie à l'application de la sanction, concilie spécificité et confidentialité (proposé en
+A191). Sur la rotation : Redis `SET … NX` est le compare-and-set le plus simple ; au-delà d'un nœud, voir les limites de
+Redlock (M. Kleppmann, « How to do distributed locking »).

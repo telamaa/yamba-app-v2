@@ -181,7 +181,7 @@ export function makeAdminUsersController(service: AdminUsersService) {
         if (level === "SUSPENDED") await revokeRefreshJti(user.id);
         const locale = resolveLocale(user.preferredLocale);
         const dict = getAdminEmails(locale);
-        const params = { firstName: user.firstName, reason, until: fmtDate(until, locale), supportEmail: SUPPORT_EMAIL };
+        const params = { firstName: user.firstName, until: fmtDate(until, locale), supportEmail: SUPPORT_EMAIL }; // ANO-ADM-87 : jamais le motif interne
         if (!user.emailSuppressedAt) await sendAuthEmail(user.email, locale, level === "SUSPENDED" ? dict.accountSuspended(params) : dict.accountRestricted(params)).catch(() => undefined); // D35 4A
         await notifySupportOfActiveDeals(user, level);
         res.status(200).json({ ok: true, accountStatus: level, at: now.toISOString() });

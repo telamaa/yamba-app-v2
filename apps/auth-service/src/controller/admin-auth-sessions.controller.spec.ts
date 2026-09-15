@@ -11,12 +11,18 @@ import jwt from "jsonwebtoken";
 const store = new Map<string, string>();
 const redisMock = {
   get: jest.fn(async (k: string) => store.get(k) ?? null),
-  set: jest.fn(async (k: string, v: string) => { store.set(k, v); return "OK"; }),
+  set: jest.fn(async (k: string, v: string, ...opts: unknown[]) => {
+    if (opts.includes("NX") && store.has(k)) return null;
+    store.set(k, v);
+    return "OK";
+  }),
+  incr: jest.fn(async (k: string) => { const n = Number(store.get(k) ?? 0) + 1; store.set(k, String(n)); return n; }),
+  expire: jest.fn(async () => 1),
   del: jest.fn(async (...ks: string[]) => ks.reduce((n, k) => n + (store.delete(k) ? 1 : 0), 0)),
   exists: jest.fn(async (k: string) => (store.has(k) ? 1 : 0)),
   scan: jest.fn(async (_c: string, _m: string, pattern: string) => ["0", [...store.keys()].filter((k) => k.startsWith(pattern.replace("*", "")))]),
 };
-const prismaMock = { user: { findUnique: jest.fn() } };
+const prismaMock = { user: { findUnique: jest.fn(), update: jest.fn(async () => ({})) }, $transaction: jest.fn(async (fn: (tx: unknown) => Promise<unknown>) => fn(prismaMock)) };
 const auditMock = { recordAdminAction: jest.fn(async () => undefined), recordAdminRead: jest.fn(async () => undefined) };
 jest.mock("@packages/libs/prisma", () => ({ __esModule: true, default: prismaMock }), { virtual: true });
 jest.mock("@packages/libs/redis", () => ({ __esModule: true, default: redisMock }), { virtual: true });
@@ -110,5 +116,80 @@ describe("A188 a — une session se reconnaît : appareil et IP, gardés à la r
     await call(ctrl.adminRefresh as never, { ip: "10.0.0.9", headers: { "user-agent": UA_FIREFOX }, cookies: { admin_refresh_token: refresh(JTI_A, t) } });
     const [, valeur] = [...store.entries()].find(([k]) => k.startsWith(`admin_jti:${ID}:`))!;
     expect(JSON.parse(valeur)).toMatchObject({ ip: "10.0.0.9", device: "Firefox · Windows", userAgent: UA_FIREFOX });
+  });
+});
+
+describe("A190 (recette 02-ADMIN § 6) — lots du § 5.26", () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const totp = require("@packages/totp") as typeof import("@packages/totp");
+
+  it("c — le jeton renouvelé porte les profils admin, comme celui de l'ouverture", async () => {
+    const t = Date.now();
+    store.set(cle(JTI_A), JSON.stringify({ createdAt: t, lastActivityAt: t }));
+    prismaMock.user.findUnique.mockResolvedValue({ id: ID, roles: ["ADMIN"], isDeleted: false, totpEnabledAt: new Date(), adminRole: "FINANCE", adminRoles: ["FINANCE", "SUPPORT"] });
+    const { res } = await call(ctrl.adminRefresh as never, { cookies: { admin_refresh_token: refresh(JTI_A, t) } });
+    const acces = res.cookie.mock.calls.find((c: unknown[]) => c[0] === "admin_access_token")?.[1] as string;
+    expect(jwt.verify(acces, process.env.ACCESS_TOKEN_SECRET as string)).toMatchObject({ id: ID, adm: true, amr: ["pwd", "totp"], adminRole: "FINANCE" });
+    expect(new Set((jwt.decode(acces) as { adminRoles: string[] }).adminRoles)).toEqual(new Set(["FINANCE", "SUPPORT"]));
+  });
+
+  it("d — deux renouvellements simultanés du même jeton : UNE session suivante, les deux onglets la reçoivent", async () => {
+    const t = Date.now();
+    store.set(cle(JTI_A), JSON.stringify({ createdAt: t, lastActivityAt: t, device: "Firefox · Windows", ip: "10.0.0.7" }));
+    prismaMock.user.findUnique.mockResolvedValue({ id: ID, roles: ["ADMIN"], isDeleted: false, totpEnabledAt: new Date() });
+    const jeton = refresh(JTI_A, t);
+    const [a, b] = await Promise.all([call(ctrl.adminRefresh as never, { cookies: { admin_refresh_token: jeton } }), call(ctrl.adminRefresh as never, { cookies: { admin_refresh_token: jeton } })]);
+    expect([a.error, b.error]).toEqual([undefined, undefined]);
+    const sessions = [...store.keys()].filter((k) => k.startsWith(`admin_jti:${ID}:`));
+    expect(sessions).toHaveLength(1); // aucune session fantôme
+    const jtiDe = (r: typeof a) => (jwt.decode(r.res.cookie.mock.calls.find((c: unknown[]) => c[0] === "admin_refresh_token")?.[1] as string) as { jti: string }).jti;
+    expect(jtiDe(a)).toBe(jtiDe(b));
+    expect(sessions[0]).toBe(cle(jtiDe(a)));
+  });
+
+  it("d — hors fenêtre de grâce (aucun successeur), un vieux jeton rejoué est refusé : 401 ADMIN_SESSION_EXPIRED", async () => {
+    prismaMock.user.findUnique.mockResolvedValue({ id: ID, roles: ["ADMIN"], isDeleted: false, totpEnabledAt: new Date() });
+    const { error } = await call(ctrl.adminRefresh as never, { cookies: { admin_refresh_token: refresh(JTI_B) } });
+    expect(error).toMatchObject({ statusCode: 401, details: { code: "ADMIN_SESSION_EXPIRED" } });
+  });
+
+  it("b — révoquer toutes mes autres sessions : la courante reste, UNE ligne avec le nombre ; rien à fermer → aucune ligne", async () => {
+    const t = Date.now();
+    const JTI_C = "c".repeat(32);
+    for (const j of [JTI_A, JTI_B, JTI_C]) store.set(cle(j), JSON.stringify({ createdAt: t, lastActivityAt: t }));
+    const rq = { user: { id: ID }, cookies: { admin_refresh_token: refresh(JTI_A) } };
+    const premier = await call(ctrl.revokeOtherAdminSessions as never, rq);
+    expect(premier.res.json).toHaveBeenCalledWith({ ok: true, revoked: 2 });
+    expect([...store.keys()]).toEqual([cle(JTI_A)]);
+    expect(auditMock.recordAdminAction).toHaveBeenCalledTimes(1);
+    expect((auditMock.recordAdminAction.mock.calls[0] as unknown[])[1]).toMatchObject({ action: "ADMIN_SESSIONS_REVOKED", targetType: "SESSION", after: { count: 2 } });
+    const rejeu = await call(ctrl.revokeOtherAdminSessions as never, rq);
+    expect(rejeu.res.json).toHaveBeenCalledWith({ ok: true, revoked: 0 });
+    expect(auditMock.recordAdminAction).toHaveBeenCalledTimes(1);
+  });
+
+  it("a — régénérer ses codes : code TOTP valide → dix nouveaux codes, anciens remplacés dans la même transaction que la ligne", async () => {
+    const secret = totp.generateTotpSecret();
+    prismaMock.user.findUnique.mockResolvedValue({ id: ID, totpEnabledAt: new Date(), totpSecretEncrypted: totp.encryptTotpSecret(secret), totpLastUsedStep: null, totpBackupCodeHashes: ["h1"] });
+    const { res, error } = await call(ctrl.regenerateAdminBackupCodes as never, { user: { id: ID }, body: { code: totp.totpCode(secret) } });
+    expect(error).toBeUndefined();
+    const { backupCodes } = res.json.mock.calls[0][0] as { backupCodes: string[] };
+    expect(backupCodes.length).toBeGreaterThanOrEqual(8);
+    expect(prismaMock.$transaction).toHaveBeenCalledTimes(1);
+    const ecrit = (prismaMock.user.update.mock.calls[0] as unknown[])[0] as { data: { totpBackupCodeHashes: string[] } };
+    expect(ecrit.data.totpBackupCodeHashes).toEqual(backupCodes.map(totp.hashBackupCode));
+    expect((auditMock.recordAdminAction.mock.calls[0] as unknown[])[1]).toMatchObject({ action: "ADMIN_BACKUP_CODES_REGENERATED", before: { remaining: 1 }, after: { remaining: backupCodes.length } });
+    expect(JSON.stringify(auditMock.recordAdminAction.mock.calls)).not.toContain(backupCodes[0]); // jamais un code en clair au journal
+  });
+
+  it("a — mauvais code, ou un code de secours : 400 OTP_INCORRECT (jamais 401 : la session reste valide), rien d'écrit", async () => {
+    const secret = totp.generateTotpSecret();
+    prismaMock.user.findUnique.mockResolvedValue({ id: ID, totpEnabledAt: new Date(), totpSecretEncrypted: totp.encryptTotpSecret(secret), totpLastUsedStep: null, totpBackupCodeHashes: [] });
+    for (const code of ["000000", "ABCD-EFGH"]) {
+      const { error } = await call(ctrl.regenerateAdminBackupCodes as never, { user: { id: ID }, body: { code } });
+      expect(error).toMatchObject({ statusCode: 400, details: { code: "OTP_INCORRECT" } });
+    }
+    expect(prismaMock.user.update).not.toHaveBeenCalled();
+    expect(auditMock.recordAdminAction).not.toHaveBeenCalled();
   });
 });

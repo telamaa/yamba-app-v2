@@ -3,6 +3,23 @@
 *Ce document sert à REPRENDRE le chantier après une pause. Il dit où en est la campagne, ce qui
 tourne sur le poste, ce qui reste à faire, et les pièges déjà payés qu'il ne faut pas repayer.*
 
+> ## ▶ 15/09/2026 — § 6 LIVRÉ (cas de bout en bout)
+>
+> Branche `chore/recette-admin-6` empilée sur `chore/recette-admin-5-26` (#327) : 8 scénarios ADM-E2E en deux fichiers
+> (`adm-e2e-bout-en-bout-1-4.spec.ts`, `adm-e2e-bout-en-bout-5-8.spec.ts`, ~3 min 30 chacun, jeu d'essai rejoué avant chaque
+> cas) + ADM-SES-6, 7. ANO-ADM-87 (majeure, motif interne dans l'email de sanction), 85, 86 closes ; décisions A190 (lots du
+> § 5.26) et A191 (email de sanction générique). Chiffres : auth **342**, deal **644**, message **57**, trip **293**,
+> notification **122**, harnais **534** ; dernière anomalie ANO-ADM-87 ; dernier arbitrage A191 ; dernier chapitre
+> d'apprentissage **185**. Pas de changement de schéma ; `seed-deals.ts` pose un fil sur `bzv-disputed`. POSTE :
+> auth-service rebâti et relancé en bundle `nohup` (log `/tmp/auth-bundle.log`) ; gateway, deal (FAKE), message, trip,
+> notification inchangés ; fronts en `next dev`. Pièges : le Support et le Médiateur n'ont pas `audit.read` (lire le journal
+> avec `finance`) ; le préfixe membre de la messagerie est `/api/messages/…` ; un colis de 2 kg ne montre pas un changement
+> de commission (plancher 3 €) ; A168 coalesce deux ouvertures identiques à moins de 10 s. **PRÉPARATION § 7** (ADM-NRG-1 → 7) :
+> **ENGAGEMENT P2034** sur `admin-users` (sanctions, levée de suppression d'email, effacement) et `admin-auth` (TOTP enable,
+> régénération des codes A190 a) — rejouer avec `withWriteConflictRetry` et prouver `[200, 409, 409]` ; NRG-7 liste « les
+> cinq écarts documentaires connus » : relire les « Écarts avec le cahier » des § 5.x et § 6 dans
+> `YAMBA-RECETTE-WEB-RESULTATS.md`. À proposer au § 7 ou au § 8 : catégorie de motif de sanction en liste fermée (A191).
+>
 > ## ▶ 15/09/2026 — § 5.26 LIVRÉ — FIN DU § 5
 >
 > Branche `chore/recette-admin-5-26` empilée sur #326 : 5 scénarios ADM-SES (`adm-ses-mes-sessions.spec.ts`) + ADM-CPT-12, 13
