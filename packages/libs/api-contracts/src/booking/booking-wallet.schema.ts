@@ -66,7 +66,7 @@ export const WalletPaymentStateSchema = z.enum(WALLET_PAYMENT_STATES).meta({
     "AUTHORIZED = hold placed, nothing debited (PENDING request) · HELD = captured, kept by Yamba until completion " +
     "(ACCEPTED/PICKED_UP/DELIVERED/DISPUTED) · RELEASED = completed, carrier paid · RELEASED_NO_CHARGE = declined / expired / " +
     "cancelled before capture, the hold simply vanished · REFUNDED = captured then refunded in full · PARTIALLY_REFUNDED = " +
-    "late cancellation, ANN-01 retention kept",
+    "part of the payment returned: late cancellation (ANN-01 retention kept) or a refund after completion (mediation, commercial gesture) — see partialKind",
 });
 
 export const WalletPaymentItemSchema = z
@@ -79,7 +79,9 @@ export const WalletPaymentItemSchema = z
     state: WalletPaymentStateSchema,
     amountCents: z.number().int().meta({ description: "Total charged (or authorized) to the shipper" }),
     refundAmountCents: z.number().int().nullable().meta({ description: "REFUNDED / PARTIALLY_REFUNDED: amount returned" }),
-    retentionCents: z.number().int().nullable().meta({ description: "PARTIALLY_REFUNDED: amount kept (ANN-01)" }),
+    retentionCents: z.number().int().nullable().meta({ description: "PARTIALLY_REFUNDED after a LATE_CANCELLATION only: the ANN-01 retention kept for the carrier" }),
+    keptCents: z.number().int().nullable().meta({ description: "PARTIALLY_REFUNDED: what the shipper finally paid (total − refunded), whatever the reason (02-ADMIN § 5.15)" }),
+    partialKind: z.enum(["LATE_CANCELLATION", "AFTER_COMPLETION"]).nullable().meta({ description: "PARTIALLY_REFUNDED: why only part was returned — a late cancellation retention, or a refund after the deal was completed (never a retention)" }),
     currencyCode: z.string(),
     date: z.iso.datetime().nullable().meta({ description: "HELD (delivered): payoutDueAt · RELEASED: completedAt · REFUNDED: refundedAt · else: requestedAt" }),
   })
@@ -89,7 +91,7 @@ export type WalletPaymentItem = z.infer<typeof WalletPaymentItemSchema>;
 export const ShipperWalletSchema = z
   .object({
     heldCents: z.number().int().meta({ description: "Σ HELD — captured, not yet settled" }),
-    spentCents: z.number().int().meta({ description: "Σ RELEASED totals + retentions of PARTIALLY_REFUNDED" }),
+    spentCents: z.number().int().meta({ description: "Σ RELEASED totals + kept parts of PARTIALLY_REFUNDED" }),
     refundedCents: z.number().int().meta({ description: "Σ refunds actually returned (REFUNDED + PARTIALLY_REFUNDED)" }),
     currencyCode: z.string(),
     items: z.array(WalletPaymentItemSchema).meta({ description: "Most recent first" }),

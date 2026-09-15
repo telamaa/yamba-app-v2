@@ -8,8 +8,8 @@
  */
 import prisma from "@packages/libs/prisma";
 import { ConflictError, NotFoundError } from "@packages/error-handler";
-import { recordAdminAction } from "@packages/admin-audit";
-import type { AdminConversationResponse, AdminMessage, AdminMessageReportItem, AdminMessageReportsResponse, MessageReportReason, MessageReportStatus, ReviewMessageReportRequest } from "@packages/api-contracts";
+import { recordAdminAction, recordAdminRead, type ReadCoalescer } from "@packages/admin-audit";
+import { redactContacts, type AdminConversationResponse, type AdminMessage, type AdminMessageReportItem, type AdminMessageReportsResponse, type MessageReportReason, type MessageReportStatus, type ReviewMessageReportRequest } from "@packages/api-contracts";
 
 export type AdminActor = { id: string; ip: string | null; userAgent: string | null };
 
@@ -17,13 +17,13 @@ const iso = (d: Date | null | undefined) => (d ? d.toISOString() : null);
 
 export type AdminConversationService = ReturnType<typeof makeAdminConversationService>;
 
-export function makeAdminConversationService() {
+export function makeAdminConversationService(readCoalescer?: ReadCoalescer) {
   return {
     async viewByDeal(actor: AdminActor, bookingId: string): Promise<AdminConversationResponse> {
       const conversation = await prisma.conversation.findUnique({ where: { bookingId } });
       if (!conversation) throw new NotFoundError("This deal has no conversation.", { code: "CONVERSATION_NOT_FOUND" });
       const [booking, shipper, carrier, messages, meetups, reveals] = await Promise.all([
-        prisma.booking.findUnique({ where: { id: bookingId }, select: { status: true, trip: { select: { originCity: true, destinationCity: true, departureAt: true } } } }),
+        prisma.booking.findUnique({ where: { id: bookingId }, select: { status: true, disputedAt: true, retentionDisposition: true, retentionDecidedAt: true, trip: { select: { originCity: true, destinationCity: true, departureAt: true } } } }),
         prisma.user.findUnique({ where: { id: conversation.shipperId }, select: { id: true, firstName: true, lastName: true } }),
         prisma.user.findUnique({ where: { id: conversation.carrierId }, select: { id: true, firstName: true, lastName: true } }),
         prisma.message.findMany({ where: { conversationId: conversation.id }, orderBy: { createdAt: "asc" } }),
@@ -38,16 +38,18 @@ export function makeAdminConversationService() {
       const reportsByMessage = new Map<string, AdminMessage["reports"]>();
       for (const r of reports) {
         const list = reportsByMessage.get(r.targetId) ?? [];
-        list.push({ id: r.id, reason: r.reason as MessageReportReason, details: r.details, status: r.status as MessageReportStatus, reporterRole: roleOf(r.reporterUserId), createdAt: r.createdAt.toISOString() });
+        list.push({ id: r.id, reason: r.reason as MessageReportReason, details: redactContacts(r.details), status: r.status as MessageReportStatus, reporterRole: roleOf(r.reporterUserId), createdAt: r.createdAt.toISOString() });
         reportsByMessage.set(r.targetId, list);
       }
 
-      await recordAdminAction(prisma, { adminUserId: actor.id, action: "CONVERSATION_VIEWED", targetType: "CONVERSATION", targetId: conversation.id, after: { bookingId, messages: messages.length }, ip: actor.ip, userAgent: actor.userAgent });
+      await recordAdminRead(prisma, readCoalescer, { adminUserId: actor.id, action: "CONVERSATION_VIEWED", targetType: "CONVERSATION", targetId: conversation.id, after: { bookingId, messages: messages.length }, ip: actor.ip, userAgent: actor.userAgent });
 
       return {
         conversationId: conversation.id,
         bookingId,
         bookingStatus: booking.status,
+        // Recette § 5.18 — même définition que la file d'arbitrage (A160) : un litige a existé, ou une retenue a été (ou est) à arbitrer.
+        mediationFile: !!booking.disputedAt || booking.retentionDisposition === "HELD_FOR_MEDIATION" || !!booking.retentionDecidedAt,
         corridor: { originCity: booking.trip.originCity, destinationCity: booking.trip.destinationCity, departureAt: iso(booking.trip.departureAt) },
         shipper: { id: conversation.shipperId, firstName: shipper?.firstName ?? "—", lastName: shipper?.lastName ?? "" },
         carrier: { id: conversation.carrierId, firstName: carrier?.firstName ?? "—", lastName: carrier?.lastName ?? "" },
@@ -56,7 +58,10 @@ export function makeAdminConversationService() {
           kind: m.kind as AdminMessage["kind"],
           authorRole: m.authorRole as AdminMessage["authorRole"],
           authorId: m.authorId,
-          body: m.body,
+          // Recette § 5.18 (ANO) — la page promet « le numéro de téléphone n'apparaît jamais ici » : ce qu'un membre a TAPÉ
+          // (numéro, adresse) est masqué, la trace du partage reste lisible (« [numéro masqué] ») et le message garde son
+          // badge « coordonnées détectées ». Les messages système portent une clé, pas un texte libre.
+          body: m.kind === "TEXT" ? redactContacts(m.body) : m.body,
           photoUrls: m.photoUrls ?? [],
           systemKey: m.systemKey,
           systemData: (m.systemData as Record<string, unknown> | null) ?? null,
@@ -116,7 +121,7 @@ export function makeAdminConversationService() {
             id: r.id,
             status: r.status as MessageReportStatus,
             reason: r.reason as MessageReportReason,
-            details: r.details,
+            details: redactContacts(r.details),
             createdAt: r.createdAt.toISOString(),
             reporter: { id: r.reporterUserId, firstName: nameOf.get(r.reporterUserId) ?? "—", role: null },
             purged: true,
@@ -134,12 +139,12 @@ export function makeAdminConversationService() {
           id: r.id,
           status: r.status as MessageReportStatus,
           reason: r.reason as MessageReportReason,
-          details: r.details,
+          details: redactContacts(r.details),
           createdAt: r.createdAt.toISOString(),
           reporter: { id: r.reporterUserId, firstName: nameOf.get(r.reporterUserId) ?? "—", role: roleOf(r.reporterUserId) as "SHIPPER" | "CARRIER" },
           purged: false,
           author: { id: message.authorId, firstName: message.authorId ? nameOf.get(message.authorId) ?? "—" : "Système", role: roleOf(message.authorId) },
-          message: { id: message.id, body: message.body, createdAt: message.createdAt.toISOString() },
+          message: { id: message.id, body: redactContacts(message.body), createdAt: message.createdAt.toISOString() }, // § 5.18
           conversationId: conversation.id,
           bookingId: conversation.bookingId,
           corridor: { originCity: booking?.trip.originCity ?? "—", destinationCity: booking?.trip.destinationCity ?? "—" },

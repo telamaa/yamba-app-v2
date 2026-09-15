@@ -99,11 +99,18 @@ export function PaymentRow({ item }: { item: WalletPaymentItem }) {
   const route = `${item.corridor.originCity} → ${item.corridor.destinationCity}`;
   const date = item.date ? format.dateTime(new Date(item.date), { day: "numeric", month: "short" }) : "";
   const { tone, icon } = PAYMENT_TONE[item.state];
-  const stateKey = item.state === "HELD" && item.bookingStatus === "DELIVERED" && item.date ? "HELD_UNTIL" : item.state;
+  // ANO-ADM-36 — un remboursement après la fin du deal (médiation, geste commercial) n'est pas une retenue d'annulation.
+  const stateKey =
+    item.state === "HELD" && item.bookingStatus === "DELIVERED" && item.date
+      ? "HELD_UNTIL"
+      : item.state === "PARTIALLY_REFUNDED" && item.partialKind === "AFTER_COMPLETION"
+        ? "PARTIALLY_REFUNDED_AFTER_COMPLETION"
+        : item.state;
   const sub = t(`payments.state.${stateKey}`, {
     date,
     amount: item.refundAmountCents !== null ? formatCents(item.refundAmountCents, item.currencyCode, locale) : "",
     retention: item.retentionCents !== null ? formatCents(item.retentionCents, item.currencyCode, locale) : "",
+    kept: item.keptCents != null ? formatCents(item.keptCents, item.currencyCode, locale) : "",
   });
   const isIn = item.state === "REFUNDED" || item.state === "PARTIALLY_REFUNDED";
   const shown = isIn && item.refundAmountCents !== null ? item.refundAmountCents : item.amountCents;

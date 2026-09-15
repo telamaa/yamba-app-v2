@@ -32,6 +32,7 @@ import type {
   CreateBookingRequest,
   ParcelFamily,
 } from "@packages/api-contracts";
+import { effectiveAccountStatus, type SanctionState } from "@packages/middleware/account-status";
 
 /* ══ Erreur métier 409 avec code (le front traduit) ═══════════ */
 
@@ -54,6 +55,8 @@ export type TripForBooking = {
   isDeleted: boolean;
   /** C-PR4 (D57 3A) — masqué par Yamba : invisible ET non réservable, par lecture (aucune écriture croisée). */
   hiddenByAdminAt?: Date | null;
+  /** ANO-ADM-08 — le Voyageur : un compte SUSPENDU (sanction en cours) ne reçoit plus de demande, par lecture. */
+  user?: SanctionState | null;
   departureAt: Date | null;
   originCity: string | null;
   originCountryCode: string | null;
@@ -100,6 +103,12 @@ export function checkTripBookable(trip: TripForBooking, shipperId: string, now: 
     throw new BookingRequestError("OWN_TRIP", "You cannot book your own trip.");
   }
   if (trip.isDeleted || trip.status !== "PUBLISHED" || trip.hiddenByAdminAt) {
+    throw new BookingRequestError("TRIP_NOT_BOOKABLE", "This trip is not open to requests.");
+  }
+  // ANO-ADM-08 — la suspension retirait le trajet de la recherche, pas de la réservation par lien direct :
+  // l'Expéditeur voyait son argent autorisé pour un Voyageur qui ne pouvait même plus se connecter pour accepter.
+  // Même refus, même message qu'un trajet fermé : l'état du compte du Voyageur n'est pas révélé.
+  if (trip.user && effectiveAccountStatus(trip.user, now) === "SUSPENDED") {
     throw new BookingRequestError("TRIP_NOT_BOOKABLE", "This trip is not open to requests.");
   }
   if (!trip.departureAt || trip.departureAt.getTime() <= now.getTime()) {
@@ -254,5 +263,6 @@ export function buildBookingSnapshots(args: {
     // recette réelle. Les listes existent dès la création.
     trackingEvents: [],
     deliveryPhotoUrls: [],
+    refunds: [], // A166
   };
 }

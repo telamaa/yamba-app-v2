@@ -5,7 +5,7 @@
  * (c'est lui qui est testé dans deal-settlement.service.spec — ici on vérifie qu'on passe PAR lui).
  */
 const prismaMock = {
-  booking: { findUnique: jest.fn(), findMany: jest.fn(), updateMany: jest.fn() },
+  booking: { findUnique: jest.fn(), findMany: jest.fn(), updateMany: jest.fn(), count: jest.fn() },
   dispute: { findMany: jest.fn() },
   user: { findMany: jest.fn() },
   carrierPage: { findMany: jest.fn() },
@@ -14,7 +14,8 @@ const prismaMock = {
 };
 jest.mock("@packages/libs/prisma", () => ({ __esModule: true, default: prismaMock }), { virtual: true });
 const recordAdminAction = jest.fn();
-jest.mock("@packages/admin-audit", () => ({ recordAdminAction: (...a: unknown[]) => recordAdminAction(...a) }), { virtual: true });
+// A168 — la lecture coalescée : sans coalesceur (ici), elle écrit toujours, comme recordAdminAction.
+jest.mock("@packages/admin-audit", () => ({ recordAdminAction: (...a: unknown[]) => recordAdminAction(...a), recordAdminRead: (db: unknown, _c: unknown, input: unknown) => recordAdminAction(db, input) }), { virtual: true });
 
 import { ForbiddenError, ValidationError } from "@packages/error-handler";
 import { FakePaymentProvider } from "@packages/payments";
@@ -40,7 +41,15 @@ function record(o: Record<string, unknown> = {}) {
 }
 
 const settlement = { executePayout: jest.fn() } as never;
-const makeService = (provider = new FakePaymentProvider()) => makeAdminFinanceService(provider, settlement, () => NOW);
+/** Un Redis en mémoire pour le verrou de décision (SET NX PX + compare-and-delete). */
+function memoireVerrous() {
+  const valeurs = new Map<string, string>();
+  return {
+    async set(key: string, value: string) { if (valeurs.has(key)) return null; valeurs.set(key, value); return "OK"; },
+    async eval(_s: string, _n: number, key: string, token: string) { if (valeurs.get(key) !== token) return 0; valeurs.delete(key); return 1; },
+  };
+}
+const makeService = (provider = new FakePaymentProvider(), locks: ReturnType<typeof memoireVerrous> | null = memoireVerrous()) => makeAdminFinanceService(provider, settlement, () => NOW, locks ?? undefined);
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -48,6 +57,7 @@ beforeEach(() => {
   prismaMock.carrierPage.findMany.mockResolvedValue([{ userId: CARRIER_ID, stripeAccountId: "acct_1ABCDEFGHIJKLMNO", stripePayoutsEnabled: true }]);
   prismaMock.adminAction.findMany.mockResolvedValue([]);
   prismaMock.dispute.findMany.mockResolvedValue([]);
+  prismaMock.booking.count.mockResolvedValue(0);
   prismaMock.$transaction.mockImplementation(async (fn: (tx: typeof prismaMock) => Promise<void>) => fn(prismaMock));
 });
 
@@ -65,6 +75,21 @@ describe("listQueue (2A)", () => {
     prismaMock.booking.findMany.mockResolvedValue([record({ status: "CANCELLED", payoutStatus: null, retentionCents: 1478, retentionDisposition: "HELD_FOR_MEDIATION" })]);
     const q = await makeService().listQueue("HELD");
     expect(q.items[0]).toMatchObject({ kind: "HELD", amountCents: 1478, carrier: { stripeReady: null } });
+  });
+  it("recette § 5.11 — sert le compte de CHAQUE file avec les filtres partagés (ceux des tuiles) et dit quand la liste est tronquée", async () => {
+    const { financeQueueWhere } = await import("@packages/api-contracts");
+    prismaMock.booking.findMany.mockResolvedValue([record()]);
+    const sizes: Record<string, number> = { FAILED: 250, REVERSED: 1, HELD: 0, PROPOSED_REFUNDS: 3 };
+    prismaMock.booking.count.mockImplementation(async (args: { where: Record<string, unknown> }) => {
+      const kind = (["FAILED", "REVERSED", "HELD", "PROPOSED_REFUNDS"] as const).find((k) => JSON.stringify(financeQueueWhere(k)) === JSON.stringify(args.where));
+      return kind ? sizes[kind] : -1;
+    });
+    const q = await makeService().listQueue("FAILED");
+    expect(q.counts).toEqual({ FAILED: 250, REVERSED: 1, HELD: 0, PROPOSED_REFUNDS: 3 });
+    expect(q.truncated).toBe(true);
+    expect(prismaMock.booking.findMany.mock.calls[0][0]).toMatchObject({ where: financeQueueWhere("FAILED"), take: 200 });
+    sizes.FAILED = 1;
+    expect((await makeService().listQueue("FAILED")).truncated).toBe(false);
   });
 });
 
@@ -105,6 +130,16 @@ describe("reconcileDeal (A112) — lecture seule", () => {
     const r = await makeService().reconcileDeal(ADMIN, ID);
     expect(r.live).toBeNull();
     expect(r.divergences[0].code).toBe("INTENT_NOT_FOUND");
+    expect(r.divergences[0].message).toBe("The payment provider does not know this payment intent.");
+  });
+  it("ANO-ADM-32 : une PANNE du fournisseur n'est pas « paiement introuvable » → 503 PROVIDER_UNAVAILABLE, tentative journalisée, base intacte", async () => {
+    const provider = new FakePaymentProvider();
+    jest.spyOn(provider, "inspect").mockRejectedValue(Object.assign(new Error("connect ECONNRESET"), { type: "StripeConnectionError" }));
+    prismaMock.booking.findUnique.mockResolvedValue(record({ paymentIntentId: "pi_live" }));
+    recordAdminAction.mockClear();
+    await expect(makeService(provider).reconcileDeal(ADMIN, ID)).rejects.toMatchObject({ statusCode: 503, details: { code: "PROVIDER_UNAVAILABLE" } });
+    expect(recordAdminAction).toHaveBeenCalledWith(prismaMock, expect.objectContaining({ action: "DEAL_RECONCILED", after: { provider: "FAKE", divergences: [], providerError: "PROVIDER_UNAVAILABLE" } }));
+    expect(prismaMock.booking.updateMany).not.toHaveBeenCalled();
   });
 });
 
@@ -127,7 +162,7 @@ describe("retryPayout (3A-a) — par l'exécuteur unique", () => {
 
 describe("resolveReversal (3A-b)", () => {
   it("RESENT : PENDING + nouvelle clé d'idempotence + clôture dans une transaction avec le journal, puis l'exécuteur", async () => {
-    prismaMock.booking.findUnique.mockResolvedValue(record({ payoutStatus: "REVERSED" }));
+    prismaMock.booking.findUnique.mockResolvedValue(record({ payoutStatus: "REVERSED", transferId: "tr_reversed_1" }));
     prismaMock.booking.updateMany.mockResolvedValue({ count: 1 });
     (settlement as { executePayout: jest.Mock }).executePayout.mockResolvedValue({ payoutStatus: "SENT", transferId: "tr_10", reason: null });
     const r = await makeService().resolveReversal(ADMIN, ID, { outcome: "RESENT", reason: "Le Voyageur a corrigé son RIB, on renvoie." });
@@ -135,7 +170,8 @@ describe("resolveReversal (3A-b)", () => {
     const u = prismaMock.booking.updateMany.mock.calls[0][0];
     expect(u.where).toEqual({ id: ID, payoutStatus: "REVERSED", OR: [{ payoutReversalResolution: { isSet: false } }, { payoutReversalResolution: null }] });
     expect(u.data).toMatchObject({ payoutStatus: "PENDING", payoutIdempotencyKey: `payout:${ID}:resend:${NOW.getTime()}`, payoutReversalResolution: "RESENT", payoutReversalResolvedByAdminId: ADMIN.id });
-    expect(recordAdminAction).toHaveBeenCalledWith(prismaMock, expect.objectContaining({ action: "PAYOUT_REVERSAL_RESOLVED", after: expect.objectContaining({ outcome: "RESENT" }) }));
+    // Recette § 5.14 — l'identifiant du transfert renversé survit dans le journal (la base le remplace par le nouveau)
+    expect(recordAdminAction).toHaveBeenCalledWith(prismaMock, expect.objectContaining({ action: "PAYOUT_REVERSAL_RESOLVED", after: expect.objectContaining({ outcome: "RESENT", previousTransferId: "tr_reversed_1" }) }));
     expect((settlement as { executePayout: jest.Mock }).executePayout).toHaveBeenCalledTimes(1);
   });
   it("WRITTEN_OFF : clôture seule, rien n'est renvoyé ; déjà clos → 400", async () => {
@@ -184,7 +220,7 @@ describe("C-PR5b — rapport, export journalisé, remboursement manuel", () => {
     ]);
     const out = await makeService().exportCsv(ADMIN, new Date("2026-09-01T00:00:00Z"), new Date("2026-10-01T00:00:00Z"));
     expect(out.rows).toBe(1);
-    expect(out.filename).toBe("yamba-finances-2026-09-01-2026-10-01.csv");
+    expect(out.filename).toBe("yamba-finances-2026-09-01-2026-09-30.csv"); // § 5.16 — le dernier jour INCLUS
     expect(out.csv.split("\r\n")[1]).toContain(`${ID},COMPLETED,Paris,Brazzaville`);
     expect(recordAdminAction).toHaveBeenCalledWith(prismaMock, expect.objectContaining({ action: "FINANCE_EXPORTED", after: expect.objectContaining({ rows: 1 }) }));
     await expect(makeService().exportCsv(ADMIN, new Date("2025-01-01T00:00:00Z"), new Date("2026-09-01T00:00:00Z"))).rejects.toBeInstanceOf(ValidationError);
@@ -220,6 +256,66 @@ describe("C-PR5b — rapport, export journalisé, remboursement manuel", () => {
     expect(stored.payload).toMatchObject({ actor: "ADMIN", amountCents: 500, refundedAt: NOW.toISOString() });
     expect(recordAdminAction).toHaveBeenCalledWith(prismaMock, expect.objectContaining({ action: "REFUND_MANUAL_APPLIED", after: expect.objectContaining({ totalRefundedCents: 500 }) }));
     expect((await provider.inspect({ intentId: a.intentId })).refunds).toHaveLength(1);
+  });
+  it("A166 : le geste manuel s'AJOUTE à la liste existante (le remboursement d'annulation garde sa date et son identifiant)", async () => {
+    const provider = new FakePaymentProvider();
+    const a = await provider.authorize({ amountCents: 2957, currencyCode: "EUR", description: "t", metadata: {} });
+    await provider.capture(a.intentId);
+    const first = { refundId: "re_1", amountCents: 1000, refundedAt: new Date("2026-03-10T00:00:00Z"), kind: "CANCELLATION" };
+    prismaMock.booking.findUnique.mockResolvedValue(record({ status: "CANCELLED", paymentIntentId: a.intentId, payoutStatus: "SENT", refundAmountCents: 1000, refunds: [first], parcel: { category: "BOOKS", categoryFamily: null } }));
+    prismaMock.booking.updateMany.mockResolvedValue({ count: 1 });
+    prismaMock.outboxEvent = { create: jest.fn().mockResolvedValue({}) } as never;
+    const r = await makeService(provider).applyManualRefund(ADMIN, ID, { amountCents: 500, reason: REASON });
+    expect(prismaMock.booking.updateMany.mock.calls[0][0].data.refunds).toEqual([first, { refundId: r.refundId, amountCents: 500, refundedAt: NOW, kind: "MANUAL" }]);
+  });
+  it("ANO-ADM-34 : deux « Rembourser maintenant » simultanés → UN remboursement chez le fournisseur, l'autre 409 DECISION_IN_PROGRESS sans rien émettre", async () => {
+    const provider = new FakePaymentProvider();
+    const a = await provider.authorize({ amountCents: 2957, currencyCode: "EUR", description: "t", metadata: {} });
+    await provider.capture(a.intentId);
+    prismaMock.booking.findUnique.mockResolvedValue(record({ paymentIntentId: a.intentId, payoutStatus: "SENT", refundAmountCents: null, parcel: { category: "BOOKS", categoryFamily: null } }));
+    let liberer!: () => void;
+    const lent = new Promise<void>((r) => (liberer = r));
+    prismaMock.booking.updateMany.mockImplementation(async () => { await lent; return { count: 1 }; });
+    prismaMock.outboxEvent = { create: jest.fn().mockResolvedValue({}) } as never;
+    const svc = makeService(provider);
+    const premier = svc.applyManualRefund(ADMIN, ID, { amountCents: 500, reason: REASON });
+    const second = svc.applyManualRefund(ADMIN, ID, { amountCents: 500, reason: REASON });
+    await expect(second).rejects.toMatchObject({ statusCode: 409, details: { code: "DECISION_IN_PROGRESS" } });
+    liberer();
+    await expect(premier).resolves.toMatchObject({ refundedCents: 500 });
+    expect((await provider.inspect({ intentId: a.intentId })).refunds).toHaveLength(1);
+  });
+  it("ANO-ADM-34 : sans verrou câblé, l'application échoue FERMÉ (aucun appel fournisseur)", async () => {
+    const provider = new FakePaymentProvider();
+    const spy = jest.spyOn(provider, "refund");
+    await expect(makeService(provider, null).applyManualRefund(ADMIN, ID, { amountCents: 500, reason: REASON })).rejects.toThrow(/no decision lock store wired/);
+    expect(spy).not.toHaveBeenCalled();
+  });
+  it("A165 : la clé d'idempotence décrit le geste sur l'état lu — une reprise après une base non écrite rend le MÊME remboursement", async () => {
+    const provider = new FakePaymentProvider();
+    const a = await provider.authorize({ amountCents: 2957, currencyCode: "EUR", description: "t", metadata: {} });
+    await provider.capture(a.intentId);
+    const spy = jest.spyOn(provider, "refund");
+    prismaMock.booking.findUnique.mockResolvedValue(record({ paymentIntentId: a.intentId, payoutStatus: "SENT", refundAmountCents: 1000, parcel: { category: "BOOKS", categoryFamily: null } }));
+    prismaMock.outboxEvent = { create: jest.fn().mockResolvedValue({}) } as never;
+    prismaMock.booking.updateMany.mockResolvedValueOnce({ count: 0 }).mockResolvedValueOnce({ count: 1 });
+    const svc = makeService(provider);
+    await expect(svc.applyManualRefund(ADMIN, ID, { amountCents: 500, reason: REASON })).rejects.toMatchObject({ statusCode: 409 });
+    const r = await svc.applyManualRefund(ADMIN, ID, { amountCents: 500, reason: REASON });
+    expect(spy.mock.calls.map((c) => c[2])).toEqual([{ idempotencyKey: `yamba:refund:manual:${ID}:after-1000:500` }, { idempotencyKey: `yamba:refund:manual:${ID}:after-1000:500` }]);
+    const refunds = (await provider.inspect({ intentId: a.intentId })).refunds;
+    expect(refunds).toHaveLength(1);
+    expect(r.refundId).toBe(refunds[0].id);
+  });
+  it("A165 : une proposition qui dépasse le reste remboursable se dit caduque (fiche argent et file)", async () => {
+    const proposee = { manualRefundProposedCents: 3000, manualRefundProposedReason: REASON, manualRefundProposedByAdminId: ADMIN.id, manualRefundProposedAt: NOW };
+    prismaMock.booking.findUnique.mockResolvedValue(record({ payoutStatus: "SENT", refundAmountCents: 2000, ...proposee }));
+    const f = await makeService().getMoneyFile(ADMIN, ID);
+    expect(f.manualRefund.maxRefundableCents).toBe(957);
+    expect(f.manualRefund.proposal).toMatchObject({ amountCents: 3000, stale: true, staleReason: "ABOVE_REMAINING" });
+    prismaMock.booking.findMany.mockResolvedValue([record({ payoutStatus: "SENT", refundAmountCents: 2000, ...proposee }), record({ id: "64b0000000000000000000b9", payoutStatus: "SENT", refundAmountCents: null, ...proposee, manualRefundProposedCents: 500 })]);
+    const q = await makeService().listQueue("PROPOSED_REFUNDS");
+    expect(q.items.map((i) => i.proposalStale)).toEqual([true, false]);
   });
   it("applyManualRefund : deal non fermé (DISPUTED) → 400 avant tout appel fournisseur", async () => {
     const provider = new FakePaymentProvider();

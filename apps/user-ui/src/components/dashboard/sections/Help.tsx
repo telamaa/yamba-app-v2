@@ -7,7 +7,7 @@ import {DashboardCopy} from "@/app/[locale]/dashboard/dashboard.copy";
 
 const HELP_ITEMS_FR = [
   { title: "Comment fonctionne Yamba ?", sub: "Guide de démarrage rapide" },
-  { title: "Comment créer un trajet ?", sub: "Publier et gérer vos annonces" },
+  { title: "Comment créer un trajet ?", sub: "Publier et gérer tes annonces" },
   { title: "Paiements et remboursements", sub: "Stripe, virements et litiges" },
   { title: "Contacter le support", sub: "support@yamba.app" },
 ];

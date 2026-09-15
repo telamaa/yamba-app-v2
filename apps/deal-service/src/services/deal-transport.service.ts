@@ -23,6 +23,8 @@
  * d'état métier : pas d'événement outbox.
  */
 
+import { refundIdempotencyKey } from "../lib/refund-idempotency"; // A165
+import { withRefund } from "../lib/booking-refunds"; // A166
 import prisma from "@packages/libs/prisma";
 import { ForbiddenError } from "@packages/error-handler";
 import type { PaymentProvider } from "@packages/payments";
@@ -41,6 +43,7 @@ import { DELIVERY_LOCK_MINUTES, MAX_CODE_REGENERATIONS, MAX_DELIVERY_ATTEMPTS, P
 import { BookingLifecycleError, baseEventPayload } from "./booking-lifecycle";
 import { applyBookingTransition, loadBookingForWrite, type BookingForWrite } from "./booking-write";
 import { issueDeliveryCode, verifyDeliveryCode } from "@packages/delivery-code";
+import { recomputeBookingParties } from "./reputation.service";
 
 export type RequestingUser = { id: string };
 
@@ -137,7 +140,7 @@ export function makeDealTransportService(provider: PaymentProvider, clock: () =>
       }
       let refundId: string | null = null;
       try {
-        refundId = (await provider.refund(booking.paymentIntentId, total)).refundId;
+        refundId = (await provider.refund(booking.paymentIntentId, total, { idempotencyKey: refundIdempotencyKey("pickup-refused", booking.id, total) })).refundId;
       } catch {
         throw new BookingLifecycleError("PAYMENT_STATE_CONFLICT", "The refund could not be issued.");
       }
@@ -150,9 +153,11 @@ export function makeDealTransportService(provider: PaymentProvider, clock: () =>
           closedAt: now,
           closedBy: "CARRIER",
           pickupRefusalReason: input.reason ?? null,
+          pickupRefusedAt: now, // ANO-WEB-10 — la marque lue par la réputation
           refundedAt: now,
           refundAmountCents: total,
           refundId, // C-PR5 (D58) — rapprochement exact
+          refunds: withRefund(booking, { refundId, amountCents: total, refundedAt: now, kind: "PICKUP_REFUSED" }), // A166
         },
         releaseKg: true,
         events: [
@@ -167,6 +172,10 @@ export function makeDealTransportService(provider: PaymentProvider, clock: () =>
         ],
         now,
       });
+
+      // ANO-WEB-10 — un refus au pickup est un fait de réputation NUL : recalculer les deux parties
+      // prouve, sur la page publique, qu'aucune annulation n'est venue s'ajouter (best effort).
+      await recomputeBookingParties(booking);
 
       return { bookingId: booking.id, status: to, refundAmountCents: total, currencyCode: booking.pricing.currencyCode };
     },

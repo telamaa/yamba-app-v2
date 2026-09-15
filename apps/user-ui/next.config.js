@@ -31,6 +31,16 @@ const nextConfig = {
   // localhost — la page reste figée sur son squelette SSR. Réseaux privés
   // uniquement, sans effet en production (option de dev).
   allowedDevOrigins: ["192.168.*.*", "10.*.*.*", "172.16.*.*"],
+  // ANO-WEB-27 (recette 5.9) — `next/image` REFUSE tout hôte distant non déclaré et fait tomber la
+  // page entière (« Cette page n'a pas pu s'afficher ») : un seul Voyageur avec un avatar ImageKit
+  // suffisait à casser /search pour tout le monde. Avatars : ImageKit (téléversement) et Google
+  // (connexion Google, `payload.picture`).
+  images: {
+    remotePatterns: [
+      { protocol: "https", hostname: "ik.imagekit.io" },
+      { protocol: "https", hostname: "lh3.googleusercontent.com" },
+    ],
+  },
 
   // D48 — API en MÊME ORIGINE : quand API_PROXY_TARGET est posé (ex.
   // http://localhost:8080), Next sert /api/* en proxy vers le gateway. Le

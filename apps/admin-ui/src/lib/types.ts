@@ -212,22 +212,26 @@ export type FinanceQueueItem = {
   amountCents: number; currencyCode: string; payoutStatus: string | null; payoutAttempts: number;
   payoutFailureKind: "ACCOUNT_NOT_READY" | "PROVIDER_ERROR" | "REVERSED" | null; payoutFailureDetail: string | null;
   lastAttemptAt: string | null; nextRetryAt: string | null; disputeTicket: string | null; since: string;
+  proposalStale?: boolean | null; // recette § 5.15 (A165) — PROPOSED_REFUNDS : proposition devenue impossible
 };
-export type FinanceQueueResponse = { kind: FinanceQueueKind; items: FinanceQueueItem[]; generatedAt: string };
+export type FinanceQueueResponse = { kind: FinanceQueueKind; items: FinanceQueueItem[]; counts: Record<FinanceQueueKind, number>; truncated: boolean; generatedAt: string }; // recette § 5.11 — compte de chaque file, troncature
 export type MoneyTimelineEvent = { at: string; kind: string; amountCents: number | null; detail: string | null };
+export type MoneyPendingKind = "AUTHORIZATION_OPEN" | "DEAL_IN_PROGRESS" | "PAYOUT_DUE" | "PAYOUT_FROZEN" | "PAYOUT_FAILED" | "REVERSAL_OPEN" | "RETENTION_HELD" | "REFUND_PROPOSED";
+export type MoneyBalance = { capturedCents: number; refundedCents: number; paidOutCents: number; platformHoldsCents: number; pending: Array<{ kind: MoneyPendingKind; cents: number }>; settled: boolean; anomaly: "UNALLOCATED_FUNDS" | "OVERSPENT" | "REFUND_RECORDS_MISMATCH" | null };
 export type AdminDealMoneyFile = {
   id: string; status: string; disputeTicket: string | null;
   corridor: { originCity: string; destinationCity: string; departureAt: string | null };
   shipper: { id: string; firstName: string; lastName: string };
   carrier: { id: string; firstName: string; lastName: string; stripeAccountIdMasked: string | null; stripePayoutsEnabled: boolean | null };
   pricing: { pricingModel: string; weightKg: number; transportCents: number; commissionCents: number; premiumCents: number; totalShipperCents: number; currencyCode: string };
-  payment: { provider: string | null; intentId: string | null; chargeId: string | null; capturedAt: string | null; refundedAt: string | null; refundAmountCents: number | null; refundId: string | null };
+  payment: { provider: string | null; intentId: string | null; chargeId: string | null; capturedAt: string | null; refundedAt: string | null; refundAmountCents: number | null; refundId: string | null; refunds?: Array<{ refundId: string | null; amountCents: number; refundedAt: string; kind: string }> };
   payout: { status: string | null; amountCents: number | null; sentAt: string | null; attempts: number; failureKind: string | null; failureDetail: string | null; lastAttemptAt: string | null; nextRetryAt: string | null; transferId: string | null; reversal: { resolution: string; reason: string; at: string; byAdmin: string } | null };
   retention: { cents: number; disposition: string | null; decisionReason: string | null; decidedAt: string | null } | null;
   dates: { requestedAt: string; acceptedAt: string | null; pickedUpAt: string | null; deliveredAt: string | null; disputedAt: string | null; completedAt: string | null; completedBy: string | null; closedAt: string | null; closedBy: string | null };
   timeline: MoneyTimelineEvent[];
+  balance: MoneyBalance; // recette § 5.12 — où est chaque centime
   adminActions: Array<{ id: string; at: string; admin: string; action: string; after: unknown }>;
-  manualRefund: { maxRefundableCents: number; proposal: { amountCents: number; reason: string; byAdmin: string; at: string } | null; last: { amountCents: number; reason: string; byAdmin: string; at: string } | null };
+  manualRefund: { maxRefundableCents: number; proposal: { amountCents: number; reason: string; byAdmin: string; at: string; stale?: boolean; staleReason?: "ABOVE_REMAINING" | "NOT_REFUNDABLE" | null } | null; last: { amountCents: number; reason: string; byAdmin: string; at: string } | null };
   allowedActions: { retryPayout: boolean; resolveReversal: boolean; reconcile: boolean; proposeRefund: boolean; applyRefund: boolean };
 };
 export type FinanceReportMonth = { month: string; currencyCode: string; capturedCents: number; capturedCount: number; refundedCents: number; refundCount: number; paidOutCents: number; payoutCount: number; revenueCents: number; completedCount: number; retentionCents: number; cancelledCount: number; avgRevenuePerCompletedCents: number | null };
@@ -269,7 +273,7 @@ export type AdminChatMessage = {
   reports: { id: string; reason: MessageReportReason; details: string | null; status: MessageReportStatus; reporterRole: "SHIPPER" | "CARRIER"; createdAt: string }[];
 };
 export type AdminConversation = {
-  conversationId: string; bookingId: string; bookingStatus: string;
+  conversationId: string; bookingId: string; bookingStatus: string; mediationFile?: boolean; // § 5.18
   corridor: { originCity: string; destinationCity: string; departureAt: string | null };
   shipper: { id: string; firstName: string; lastName: string };
   carrier: { id: string; firstName: string; lastName: string };
