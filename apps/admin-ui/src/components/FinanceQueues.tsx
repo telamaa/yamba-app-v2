@@ -7,6 +7,7 @@ import { ApiError, apiFetch, post } from "@/lib/api";
 import { BOOKING_STATUS_LABEL, PAYOUT_FAILURE_LABEL, dateTime, money, payoutReasonLabel, payoutRefusalMessage } from "@/lib/format";
 import { can } from "@/lib/permissions";
 import type { AdminMe, FinanceQueueItem, FinanceQueueKind, FinanceQueueResponse } from "@/lib/types";
+import { isPermissionRefusal, useDenyPage } from "./PageAccess";
 
 const KINDS: Array<{ kind: FinanceQueueKind; label: string; hint: string }> = [
   { kind: "FAILED", label: "Versements en échec", hint: "Le cron rejoue seul (5 min, puis 30 min, 2 h, 1 jour). « Relancer » n'attend pas l'échéance." },
@@ -39,13 +40,14 @@ export default function FinanceQueues() {
   const [kind, setKind] = useState<FinanceQueueKind>(KINDS.some((k) => k.kind === initial) ? initial : "FAILED");
   const [data, setData] = useState<FinanceQueueResponse | null>(null);
   const [loadMsg, setLoadMsg] = useState<string | null>(null);
+  const deny = useDenyPage(); // décision du 15/09 : un refus de permission remplace la page entière
   const [me, setMe] = useState<AdminMe | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const load = useCallback(() => {
     setData(null);
     setLoadMsg(null);
-    apiFetch<FinanceQueueResponse>(`/admin/finances/queue?kind=${kind}`).then(setData).catch((e) => setLoadMsg(loadError(e)));
+    apiFetch<FinanceQueueResponse>(`/admin/finances/queue?kind=${kind}`).then(setData).catch((e) => (isPermissionRefusal(e) ? deny("Ton profil ne donne pas accès aux finances.") : setLoadMsg(loadError(e))));
   }, [kind]);
   useEffect(load, [load]);
   useEffect(() => { apiFetch<AdminMe>("/admin/me").then(setMe).catch(() => undefined); }, []);

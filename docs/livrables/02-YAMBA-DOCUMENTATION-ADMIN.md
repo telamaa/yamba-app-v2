@@ -660,11 +660,11 @@ Sources : `apps/admin-ui/src/components/ConversationView.tsx`, `apps/message-ser
 
 **Qui y a accès.** `reports.review` : Médiateur, Support, super administrateur.
 
-**File « Trajets et membres » (`GET /admin/reports?status=`).** Onglets à traiter / traité / sans suite, total. Une carte par signalement : badge rouge « Prioritaire · n ouverts », motif (Contenu illicite, Tentative d'arnaque, Comportement inapproprié, Usurpation d'identité, Autre), auteur (prénom) et date, type de cible (Trajet / Membre), badge de **niveau de risque interne** du membre visé ou du propriétaire du trajet (« À surveiller » ambre, « À risque » rouge ; Standard et Compte neuf ne sont pas affichés), cible cliquable (corridor → fiche trajet, prénom nom → fiche membre), « publié par … » (propriétaire), précisions, note pour le journal (facultative), « Traité », « Sans suite ».
+**File « Trajets et membres » (`GET /admin/reports?status=`).** Onglets à traiter / traité / sans suite, total. Une carte par signalement : badge rouge « Prioritaire · n ouverts », motif (Contenu illicite, Arnaque suspectée, Comportement inapproprié, Usurpation d'identité, Autre), auteur (prénom) et date, type de cible (Trajet / Membre), badge de **niveau de risque interne** du membre visé ou du propriétaire du trajet (« À surveiller » ambre, « À risque » rouge ; Standard et Compte neuf ne sont pas affichés), cible cliquable (corridor → fiche trajet, prénom nom → fiche membre), « publié par … » (propriétaire), précisions, note pour le journal (facultative), « Traité », « Sans suite ».
 
 **Priorité (RG-SIG-08, RG-TRU-06).** Une ligne est prioritaire à partir de **3 signalements ouverts** sur la même cible (tous auteurs, `REPORT_REVIEW_THRESHOLD = 3`, classe C du catalogue tant qu'il n'a qu'un consommateur) **ou** dès que le membre visé est `HIGH_RISK`, même avec un seul signalement.
 
-**File « Messages » (`GET /admin/conversations/reports?status=`).** Motif (Veut sortir de Yamba, Tentative d'arnaque, Propos déplacés / harcèlement, Autre), auteur du signalement et son rôle, corridor, citation du message signalé (auteur, rôle, date, texte), précisions, liens « Lire la conversation → » et « Fiche de … → », note, « Traité », « Sans suite ».
+**File « Messages » (`GET /admin/conversations/reports?status=`).** Motif (Veut sortir de Yamba, Arnaque suspectée, Propos déplacés / harcèlement, Autre), auteur du signalement et son rôle, corridor, citation du message signalé (auteur, rôle, date, texte), précisions, liens « Lire la conversation → » et « Fiche de … → », note, « Traité », « Sans suite ».
 
 **Gestes.**
 

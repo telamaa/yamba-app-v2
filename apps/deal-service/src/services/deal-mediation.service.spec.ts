@@ -44,6 +44,16 @@ describe("délai de réponse du Voyageur (D55 1A, 72 h)", () => {
     expect(isDisputeDecidable({ disputedAt, carrierRespondedAt: null }, new Date("2026-09-06T09:59:59Z"))).toBe(false);
     expect(isDisputeDecidable({ disputedAt, carrierRespondedAt: null }, new Date("2026-09-06T10:00:00Z"))).toBe(true);
   });
+  it("ANO-ADM-52 — l'échéance figée à l'ouverture gagne sur le paramètre courant (D62, jamais rétroactif)", () => {
+    const responseDueAt = new Date("2026-09-06T10:00:00Z"); // ouvert avec 72 h
+    // Le paramètre est ramené à 12 h après l'ouverture : l'échéance annoncée au Voyageur ne bouge pas.
+    expect(disputeResponseDeadline(disputedAt, 12, responseDueAt).toISOString()).toBe("2026-09-06T10:00:00.000Z");
+    expect(isDisputeDecidable({ disputedAt, carrierRespondedAt: null, responseDueAt }, new Date("2026-09-04T10:00:00Z"), 12)).toBe(false);
+    // Allongé à 168 h : le dossier reste décidable à son échéance d'origine.
+    expect(isDisputeDecidable({ disputedAt, carrierRespondedAt: null, responseDueAt }, new Date("2026-09-06T10:00:00Z"), 168)).toBe(true);
+    // Dossier antérieur sans échéance figée : repli sur le paramètre courant.
+    expect(disputeResponseDeadline(disputedAt, 12, null).toISOString()).toBe("2026-09-03T22:00:00.000Z");
+  });
 });
 
 describe("disputeLoser (D55 4A)", () => {

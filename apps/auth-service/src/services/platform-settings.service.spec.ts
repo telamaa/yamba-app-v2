@@ -91,6 +91,37 @@ describe("platform-settings.service — update", () => {
     await expect(svc.update(SUPER, { changes: { "pricing.commissionPct": 15 }, reason, expectedVersion: 2 })).rejects.toMatchObject({ statusCode: 409 });
     await expect(svc.update(SUPER, { changes: { "pricing.commissionPct": 15 }, reason, expectedVersion: 3 })).resolves.toMatchObject({ version: 4, changed: [{ key: "pricing.commissionPct", before: 14, after: 15 }] });
   });
+  it("ANO-ADM-51 — conflit d'écriture (P2034) : rejoué ; au réessai la version a bougé → 409 STALE_VERSION, jamais 500, aucune ligne", async () => {
+    const db = fakeDb({ key: "current", values: { ...SETTINGS_DEFAULTS }, version: 1, updatedAt: new Date(), updatedByAdminId: "sa2" });
+    const transaction = db.$transaction.bind(db);
+    let essais = 0;
+    db.$transaction = (async (fn: Parameters<typeof db.$transaction>[0]) => {
+      essais++;
+      if (essais === 1) {
+        await db.platformSettings.updateMany({ where: { key: "current", version: 1 }, data: { values: { ...SETTINGS_DEFAULTS, "alerts.outboxLagMinutes": 20 }, version: 2, updatedByAdminId: "ops1" } }); // l'autre admin a gagné
+        throw Object.assign(new Error("Transaction failed due to a write conflict or a deadlock."), { code: "P2034" });
+      }
+      return transaction(fn);
+    }) as typeof db.$transaction;
+    const notify = jest.fn().mockResolvedValue(undefined);
+    await expect(makePlatformSettingsService({ db, notify }).update(SUPER, { changes: { "pricing.commissionPct": 15 }, reason, expectedVersion: 1 })).rejects.toMatchObject({ statusCode: 409, details: { code: "STALE_VERSION" } });
+    expect(essais).toBe(2);
+    expect(db.actions).toEqual([]);
+    expect(notify).not.toHaveBeenCalled();
+  });
+  it("ANO-ADM-51 — document absent, deux créations concurrentes : la collision de clé unique (P2002) EST le verrou → 409", async () => {
+    const db = fakeDb();
+    db.platformSettings.create = async () => { throw Object.assign(new Error("Unique constraint failed on the constraint: `PlatformSettings_key_key`"), { code: "P2002" }); };
+    await expect(makePlatformSettingsService({ db }).update(OPS, { changes: { "alerts.outboxLagMinutes": 21 }, reason, expectedVersion: 0 })).rejects.toMatchObject({ statusCode: 409, details: { code: "STALE_VERSION" } });
+    expect(db.actions).toEqual([]);
+  });
+  it("une autre erreur de base n'est ni rejouée ni déguisée en 409", async () => {
+    const db = fakeDb();
+    let essais = 0;
+    db.$transaction = (async () => { essais++; throw new Error("panne"); }) as typeof db.$transaction;
+    await expect(makePlatformSettingsService({ db }).update(SUPER, { changes: { "pricing.commissionPct": 15 }, reason, expectedVersion: 0 })).rejects.toThrow("panne");
+    expect(essais).toBe(1);
+  });
 });
 
 describe("platform-settings.service — reset et read", () => {
@@ -136,5 +167,17 @@ describe("platform-settings.service — reset et read", () => {
     expect(after.values["pricing.commissionPct"]).toBe(15);
     expect(after.updatedBy).toEqual({ id: "sa1", firstName: "Ada", lastName: "Lovelace" });
     expect(after.lastChange).toMatchObject({ byName: "Ada L.", keys: expect.arrayContaining(["pricing.commissionPct", "pricing.commissionFloorCents"]) });
+  });
+  it("ANO-ADM-56 — dernière modification : une version réutilisée (document remis à zéro) ne fusionne pas deux écritures", async () => {
+    const db = fakeDb();
+    const t = (s: number) => new Date(Date.UTC(2026, 8, 15, 10, 0, s));
+    // Deux écritures « version 1 » : une ancienne (autre admin, avant la remise à zéro), la dernière.
+    db.adminAction.findMany = async () => [
+      { adminUserId: "sa1", createdAt: t(40), after: { key: "alerts.payoutFailedHours", version: 1 } },
+      { adminUserId: "ops1", createdAt: t(0), after: { key: "pricing.commissionPct", version: 1 } },
+      { adminUserId: "ops1", createdAt: t(0), after: { key: "alerts.outboxLagMinutes", version: 1 } },
+    ];
+    const r = await makePlatformSettingsService({ db, clock: () => t(50) }).read();
+    expect(r.lastChange?.keys).toEqual(["alerts.payoutFailedHours"]);
   });
 });

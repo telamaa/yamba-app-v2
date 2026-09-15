@@ -25,7 +25,7 @@ export async function collectOpsSnapshot(now: Date, T: AlertThresholds = ALERT_T
   const unresolvedReversal = { OR: [{ payoutReversalResolution: { isSet: false } }, { payoutReversalResolution: null }] };
   const [failedPayouts, disputes, held, reversals, parked, oldestUnpublished, failedEmails, lastTrip, requests, accepted] = await Promise.all([
     prisma.booking.count({ where: { isDeleted: false, payoutStatus: "FAILED", status: { in: ["COMPLETED", "CANCELLED"] }, OR: [{ completedAt: { lt: new Date(now.getTime() - T.payoutFailedHours * H) } }, { closedAt: { lt: new Date(now.getTime() - T.payoutFailedHours * H) } }] } as never }),
-    prisma.dispute.findMany({ where: { status: { in: ["OPEN", "CARRIER_RESPONDED"] } }, select: { createdAt: true, carrierRespondedAt: true, bookingId: true } }),
+    prisma.dispute.findMany({ where: { status: { in: ["OPEN", "CARRIER_RESPONDED"] } }, select: { createdAt: true, carrierRespondedAt: true, responseDueAt: true, bookingId: true } }),
     prisma.booking.count({ where: { isDeleted: false, status: "CANCELLED", retentionDisposition: "HELD_FOR_MEDIATION", closedAt: { lt: new Date(now.getTime() - T.retentionHeldDays * D) } } }),
     prisma.booking.count({ where: { isDeleted: false, payoutStatus: "REVERSED", updatedAt: { lt: new Date(now.getTime() - T.reversalOpenHours * H) }, ...unresolvedReversal } as never }),
     prisma.outboxEvent.count({ where: { OR: [{ publishedAt: null }, { publishedAt: { isSet: false } }], attempts: { gte: T.outboxParkedAttempts } } as never }),
@@ -41,7 +41,7 @@ export async function collectOpsSnapshot(now: Date, T: AlertThresholds = ALERT_T
     ? new Map((await prisma.booking.findMany({ where: { id: { in: disputes.map((d) => d.bookingId) } }, select: { id: true, disputedAt: true } })).map((b) => [b.id, b.disputedAt]))
     : new Map<string, Date | null>();
   const undecided = countUndecidedDisputes(
-    disputes.map((d) => ({ openedAt: openedAt.get(d.bookingId) ?? d.createdAt, carrierRespondedAt: d.carrierRespondedAt })),
+    disputes.map((d) => ({ openedAt: openedAt.get(d.bookingId) ?? d.createdAt, carrierRespondedAt: d.carrierRespondedAt, responseDueAt: d.responseDueAt })),
     now,
     responseDelayHours,
     T.disputeUndecidedHours

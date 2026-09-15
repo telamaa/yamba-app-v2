@@ -7,6 +7,7 @@ import { apiFetch } from "@/lib/api";
 import { TICKET_STATUS_LABEL, TRIP_STATUS_LABEL, dateTime } from "@/lib/format";
 import type { AdminMe, AdminTripSummary, AdminTripsResponse } from "@/lib/types";
 import ExportButton from "./ExportButton";
+import { isPermissionRefusal, useDenyPage } from "./PageAccess";
 
 const STATUSES = ["", "DRAFT", "PUBLISHED", "PAUSED", "COMPLETED", "CANCELLED", "ARCHIVED"];
 type Filters = { q: string; status: string; hidden: boolean; ticketPending: boolean; hideProposed: boolean; carrierId: string; from: string; to: string; originCity: string; destinationCity: string; sort: string; dir: string };
@@ -35,6 +36,7 @@ export default function TripsList() {
   const [items, setItems] = useState<AdminTripSummary[]>([]);
   const [total, setTotal] = useState(0);
   const [cursor, setCursor] = useState<string | null>(null);
+  const deny = useDenyPage(); // décision du 15/09 : un refus de permission remplace la page entière
   const [loading, setLoading] = useState(false);
   const [me, setMe] = useState<AdminMe | null>(null);
   useEffect(() => { apiFetch<AdminMe>("/admin/me").then(setMe).catch(() => undefined); }, []);
@@ -44,7 +46,7 @@ export default function TripsList() {
     if (after) p.set("cursor", after);
     apiFetch<AdminTripsResponse>(`/admin/trips?${p.toString()}`)
       .then((r) => { setItems((prev) => (after ? [...prev, ...r.items] : r.items)); setTotal(r.total); setCursor(r.nextCursor ?? null); })
-      .catch(() => { if (!after) { setItems([]); setTotal(0); } setCursor(null); })
+      .catch((e) => { if (isPermissionRefusal(e)) return deny("Ton profil ne lit pas les trajets."); if (!after) { setItems([]); setTotal(0); } setCursor(null); })
       .finally(() => setLoading(false));
   }, [f]);
   useEffect(() => { const h = setTimeout(() => load(null), 250); return () => clearTimeout(h); }, [load]);

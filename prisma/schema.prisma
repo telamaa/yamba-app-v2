@@ -911,6 +911,10 @@ model Dispute {
   carrierStatement         String?
   carrierStatementPhotoUrls String[] // ≤ 5, ImageKit deals/dispute/ (liste créée [] — pitfall Mongo)
   carrierRespondedAt       DateTime?
+  // ANO-ADM-52 (recette 02-ADMIN § 5.20, D62 « jamais rétroactif ») — échéance de la version du Voyageur FIGÉE à
+  // l'ouverture (disputedAt + dispute.responseDelayHours lu à cet instant). Absente sur un dossier antérieur : repli
+  // sur le paramètre courant (lecture, jamais d'écriture de rattrapage).
+  responseDueAt            DateTime?
 
   // ── C-PR2 (D55, 2A/7A) : la décision, gravée sur le dossier ──
   resolutionOutcome            String?   // REJECTED | PARTIAL_REFUND | FULL_REFUND

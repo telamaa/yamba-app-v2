@@ -43,3 +43,12 @@ describe("countUndecidedDisputes (ANO-ADM-24) — la décidabilité de l'écran 
     expect(countUndecidedDisputes([{ openedAt: h(144), carrierRespondedAt: null }], NOW, 72, 72)).toBe(0);
   });
 });
+describe("countUndecidedDisputes — ANO-ADM-52 : l'échéance figée à l'ouverture gagne", () => {
+  const h = (n: number) => new Date(NOW.getTime() - n * 3_600_000);
+  it("délai abaissé à 24 h après l'ouverture : un dossier figé à 72 h n'est décidable qu'à son échéance d'origine", () => {
+    // ouvert il y a 100 h, échéance figée = ouverture + 72 h = il y a 28 h → pas au seuil de 72 h
+    expect(countUndecidedDisputes([{ openedAt: h(100), carrierRespondedAt: null, responseDueAt: h(28) }], NOW, 24, 72)).toBe(0);
+    expect(countUndecidedDisputes([{ openedAt: h(100), carrierRespondedAt: null, responseDueAt: null }], NOW, 24, 72)).toBe(1);
+  });
+});
+

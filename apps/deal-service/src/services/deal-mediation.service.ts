@@ -67,14 +67,18 @@ export function computeResolutionMoney(
   return { refundCents, carrierPayoutCents, yambaKeepsCents: total - refundCents - carrierPayoutCents };
 }
 
-/** `delayHours` : paramètre `dispute.responseDelayHours` (D62) — la constante n'est que le défaut. */
-export function disputeResponseDeadline(disputedAt: Date, delayHours: number = DISPUTE_RESPONSE_DELAY_HOURS): Date {
-  return new Date(disputedAt.getTime() + delayHours * 3_600_000);
+/**
+ * `delayHours` : paramètre `dispute.responseDelayHours` (D62) — la constante n'est que le défaut.
+ * ANO-ADM-52 (recette § 5.20) — `responseDueAt` : l'échéance figée à l'ouverture du dossier. Quand elle existe, elle gagne :
+ * un changement de paramètre ne raccourcit ni n'allonge jamais le délai annoncé au Voyageur (D62, non rétroactif).
+ */
+export function disputeResponseDeadline(disputedAt: Date, delayHours: number = DISPUTE_RESPONSE_DELAY_HOURS, responseDueAt?: Date | null): Date {
+  return responseDueAt ?? new Date(disputedAt.getTime() + delayHours * 3_600_000);
 }
 
 /** Décision possible : le Voyageur a répondu, ou le délai est passé (D55 1A). */
-export function isDisputeDecidable(d: { disputedAt: Date; carrierRespondedAt: Date | null }, now: Date, delayHours: number = DISPUTE_RESPONSE_DELAY_HOURS): boolean {
-  return d.carrierRespondedAt !== null || now.getTime() >= disputeResponseDeadline(d.disputedAt, delayHours).getTime();
+export function isDisputeDecidable(d: { disputedAt: Date; carrierRespondedAt: Date | null; responseDueAt?: Date | null }, now: Date, delayHours: number = DISPUTE_RESPONSE_DELAY_HOURS): boolean {
+  return d.carrierRespondedAt !== null || now.getTime() >= disputeResponseDeadline(d.disputedAt, delayHours, d.responseDueAt).getTime();
 }
 
 /** Qui « perd » un litige (D55 4A) : l'Expéditeur si rejet, le Voyageur dès qu'il y a remboursement. */
@@ -98,6 +102,7 @@ type DisputeRow = {
   status: string;
   carrierRespondedAt: Date | null;
   resolvedAt: Date | null;
+  responseDueAt: Date | null; // ANO-ADM-52
 };
 
 export function makeDealMediationService(
@@ -111,7 +116,7 @@ export function makeDealMediationService(
   async function loadDispute(bookingId: string): Promise<DisputeRow> {
     const d = await prisma.dispute.findUnique({
       where: { bookingId },
-      select: { id: true, bookingId: true, ticketNumber: true, status: true, carrierRespondedAt: true, resolvedAt: true },
+      select: { id: true, bookingId: true, ticketNumber: true, status: true, carrierRespondedAt: true, resolvedAt: true, responseDueAt: true },
     });
     if (!d) throw new NotFoundError("Deal not found.", { code: "DEAL_NOT_FOUND" });
     return d;
@@ -182,9 +187,9 @@ export function makeDealMediationService(
       if (dispute.resolvedAt) throw new BookingLifecycleError("TRANSITION_NOT_ALLOWED", "This dispute was already decided.");
       if (!booking.disputedAt) throw new BookingLifecycleError("TRANSITION_NOT_ALLOWED", "This dispute has no opening date.");
       const delayHours = (await settings.get())["dispute.responseDelayHours"]; // D62
-      if (!isDisputeDecidable({ disputedAt: booking.disputedAt, carrierRespondedAt: dispute.carrierRespondedAt }, now, delayHours)) {
+      if (!isDisputeDecidable({ disputedAt: booking.disputedAt, carrierRespondedAt: dispute.carrierRespondedAt, responseDueAt: dispute.responseDueAt }, now, delayHours)) {
         throw new BookingLifecycleError("TRANSITION_NOT_ALLOWED", `The carrier still has time to answer (${delayHours}h after the dispute was filed).`, {
-          decidableAt: disputeResponseDeadline(booking.disputedAt, delayHours).toISOString(),
+          decidableAt: disputeResponseDeadline(booking.disputedAt, delayHours, dispute.responseDueAt).toISOString(),
         });
       }
 

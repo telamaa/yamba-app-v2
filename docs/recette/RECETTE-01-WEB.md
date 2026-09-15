@@ -3033,7 +3033,7 @@ Pour chaque ligne, part d'un brouillon complet et retire l'élément indiqué, p
 
 **Résultat attendu**
 - La fenêtre porte « Signaler un message » / « Dis-nous ce qui ne va pas. Notre équipe lira la conversation et reviendra vers toi si besoin. »
-- Les quatre motifs sont : « Veut sortir de Yamba (paiement ou envoi en dehors) », « Tentative d'arnaque », « Propos déplacés ou harcèlement », « Autre ».
+- Les quatre motifs sont : « Veut sortir de Yamba (paiement ou envoi en dehors) », « Arnaque suspectée », « Propos déplacés ou harcèlement », « Autre ».
 - Après envoi : « Merci, le signalement est transmis à notre équipe. »
 - Étape 4 : « Tu as déjà signalé ce message. »
 - **Rien ne change** dans le fil ; le message signalé reste visible ; Thomas **n'est pas prévenu**.

@@ -16,6 +16,7 @@ const prismaMock = {
   conversation: { findMany: jest.fn() },
   booking: { findMany: jest.fn() },
   user: { findMany: jest.fn() },
+  adminAction: { findMany: jest.fn() },
 };
 jest.mock("@packages/libs/prisma", () => ({ __esModule: true, default: prismaMock }), { virtual: true });
 

@@ -11,8 +11,9 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { apiFetch, patch } from "@/lib/api";
-import { CHAT_ROLE_LABEL, REPORT_REASON_LABEL, REPORT_STATUS_LABEL, dateTime, reportRefusalMessage } from "@/lib/format";
+import { CHAT_ROLE_LABEL, REPORT_REASON_LABEL, REPORT_STATUS_LABEL, dateTime, reportDecisionLine, reportRefusalMessage } from "@/lib/format";
 import type { AdminMessageReportItem, AdminMessageReportsResponse, MessageReportStatus } from "@/lib/types";
+import { isPermissionRefusal, useDenyPage } from "./PageAccess";
 
 export default function MessageReportsQueue() {
   const [status, setStatus] = useState<MessageReportStatus>("OPEN");
@@ -20,11 +21,12 @@ export default function MessageReportsQueue() {
   const [msg, setMsg] = useState<string | null>(null);
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<string | null>(null);
+  const deny = useDenyPage(); // décision du 15/09 : un refus de permission remplace la page entière
   const [failed, setFailed] = useState(false);
 
   const load = useCallback(() => {
     apiFetch<AdminMessageReportsResponse>(`/admin/conversations/reports?status=${status}`).then((d) => { setData(d); setFailed(false); })
-      .catch((e) => { setMsg(reportRefusalMessage(e).text); setFailed(true); }); // recette § 5.19 : un 403 se dit en français, jamais « 403 : … »
+      .catch((e) => { if (isPermissionRefusal(e)) return deny("Ton profil ne traite pas les signalements."); setMsg(reportRefusalMessage(e).text); setFailed(true); }); // § 5.19 + décision du 15/09 : un seul refus pour la page
   }, [status]);
   useEffect(load, [load]);
 
@@ -114,6 +116,7 @@ export default function MessageReportsQueue() {
                   </>
                 )}
               </div>
+              {item.status !== "OPEN" && <p className="mt-2 rounded-lg bg-slate-50 px-2 py-1.5 text-[12.5px] text-slate-700">{reportDecisionLine(item.status, item.decision)}</p>}
             </li>
           ))}
         </ul>

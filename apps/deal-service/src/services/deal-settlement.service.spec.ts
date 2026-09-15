@@ -427,6 +427,8 @@ describe("C — dispute : ticket, gel, dossier", () => {
       desiredOutcome: "FULL_REFUND",
       photoUrls: DISPUTE_INPUT.photoUrls,
       pledgeAcceptedAt: NOW,
+      // ANO-ADM-52 (D62) — l'échéance de la version du Voyageur est figée à l'ouverture : ouverture + 72 h (défaut).
+      responseDueAt: new Date(NOW.getTime() + 72 * 3_600_000),
     });
 
     expect(writtenEventTypes()).toEqual(["booking.disputed"]);

@@ -5,6 +5,7 @@ import { ApiError, apiFetch, del, patch, post } from "@/lib/api";
 import { dateTime } from "@/lib/format";
 import { ADMIN_ROLES, ROLE_LABEL, type AdminRole } from "@/lib/permissions";
 import type { AdminAccount } from "@/lib/types";
+import { isPermissionRefusal, useDenyPage } from "./PageAccess";
 
 const ROLE_HINT: Record<AdminRole, string> = {
   SUPER_ADMIN: "tout, comptes admin, remboursements manuels",
@@ -39,10 +40,11 @@ export default function AdminsManager() {
   const [items, setItems] = useState<AdminAccount[]>([]);
   const [form, setForm] = useState<{ email: string; firstName: string; lastName: string; adminRoles: AdminRole[] }>({ email: "", firstName: "", lastName: "", adminRoles: ["SUPPORT"] });
   const [msg, setMsg] = useState<string | null>(null);
+  const deny = useDenyPage(); // décision du 15/09 : un refus de permission remplace la page entière
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(() => {
-    apiFetch<{ items: AdminAccount[] }>("/admin/admins").then((r) => setItems(r.items)).catch(() => undefined);
+    apiFetch<{ items: AdminAccount[] }>("/admin/admins").then((r) => setItems(r.items)).catch((e) => { if (isPermissionRefusal(e)) deny("Ton profil ne gère pas les comptes admin (super administrateur seulement)."); });
   }, []);
   useEffect(load, [load]);
 

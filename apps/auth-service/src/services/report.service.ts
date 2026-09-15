@@ -10,7 +10,7 @@ import prisma from "@packages/libs/prisma";
 import { ConflictError, NotFoundError, ValidationError } from "@packages/error-handler";
 import { recordAdminAction } from "@packages/admin-audit";
 import { withWriteConflictRetry } from "@packages/libs/prisma/write-conflict-retry";
-import type { AdminReportItem, AdminReportsResponse, CreateReportRequest, CreateReportResponse, ReportStatus, ReportTargetType, ReviewReportRequest, TrustLevel } from "@packages/api-contracts";
+import { reportDecisionsFrom, type AdminReportItem, type AdminReportsResponse, type CreateReportRequest, type CreateReportResponse, type ReportDecisionLine, type ReportStatus, type ReportTargetType, type ReviewReportRequest, type TrustLevel } from "@packages/api-contracts";
 import { canReport, needsPriorityReview } from "../utils/report.rules";
 import { assessTrust } from "./admin-users.service"; // D71
 import { getAuthEmails } from "../emails/auth-emails";
@@ -22,7 +22,7 @@ export type ReportDb = {
   trip: { findFirst(args: Row): Promise<Row | null>; findMany(args: Row): Promise<Row[]> };
   user: { findFirst(args: Row): Promise<Row | null>; findMany(args: Row): Promise<Row[]> };
   report: { findFirst(args: Row): Promise<Row | null>; findMany(args: Row): Promise<Row[]>; create(args: Row): Promise<Row>; updateMany(args: Row): Promise<{ count: number }> };
-  adminAction: { create(args: Row): Promise<Row> };
+  adminAction: { create(args: Row): Promise<Row>; findMany(args: Row): Promise<Row[]> };
   $transaction<T>(fn: (tx: ReportDb) => Promise<T>): Promise<T>;
 };
 
@@ -90,6 +90,16 @@ export function makeReportService(deps: { db?: ReportDb; sendEmail?: typeof send
       // D71 — niveau de risque du membre visé (ou du propriétaire du trajet) : un HIGH_RISK passe en priorité
       const trustTargets = [...new Set([...userTargetIds, ...trips.map((t) => t.userId as string)])];
       const trustOf = new Map(await Promise.all(trustTargets.map(async (id) => [id, (await trustFor(id))?.level ?? null] as const)));
+      // Décision du 15/09 — sous « traité » / « sans suite », qui a décidé, quand et la note : la ligne de journal écrite dans
+      // la même transaction que la décision (lecture seule). Une décision sans ligne (donnée ancienne) reste sans décision.
+      let decisions = new Map<string, NonNullable<AdminReportItem["decision"]>>();
+      if (status !== "OPEN") {
+        const lines = (await db.adminAction.findMany({ where: { action: "REPORT_REVIEWED", targetType: "REPORT", targetId: { in: reports.map((r) => r.id as string) } }, select: { targetId: true, adminUserId: true, createdAt: true, after: true } })) as unknown as ReportDecisionLine[];
+        const adminIds = [...new Set(lines.map((l) => l.adminUserId))];
+        const admins = adminIds.length ? await db.user.findMany({ where: { id: { in: adminIds } }, select: { id: true, firstName: true } }) : [];
+        const adminName = new Map(admins.map((a) => [a.id as string, a.firstName as string]));
+        decisions = reportDecisionsFrom(lines, (id) => adminName.get(id));
+      }
       const items: AdminReportItem[] = [];
       for (const r of reports) {
         const targetId = r.targetId as string;
@@ -136,6 +146,7 @@ export function makeReportService(deps: { db?: ReportDb; sendEmail?: typeof send
           openCountOnTarget: count,
           priority: needsPriorityReview(count) || targetTrustLevel === "HIGH_RISK",
           targetTrustLevel,
+          decision: decisions.get(r.id as string) ?? null,
         });
       }
       return { items, total: items.length };

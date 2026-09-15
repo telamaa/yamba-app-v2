@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ApiError, apiFetch } from "@/lib/api";
 import { dateTime, money, utcPeriodLabel } from "@/lib/format";
 import type { CorridorsResponse, PilotageDrilldownResponse, PilotageMetric, PilotageSeriesPoint, PilotageSeriesResponse } from "@/lib/types";
+import { isPermissionRefusal, useDenyPage } from "./PageAccess";
 
 /* Une courbe = une mesure, une couleur (slot 1 de la palette validée), un seul axe. Agrandie : tableau dessous, clic = drill-down (D60 3A). */
 type Metric = { key: PilotageMetric; label: string; hint: string; money?: boolean };
@@ -54,17 +55,18 @@ export default function PilotageView() {
   const [months, setMonths] = useState(3);
   const [days, setDays] = useState(30);
   const [currency, setCurrency] = useState<string | null>(null);
+  const deny = useDenyPage(); // décision du 15/09 : un refus de permission remplace la page entière
   const [series, setSeries] = useState<PilotageSeriesResponse | null>(null);
   const [corridors, setCorridors] = useState<CorridorsResponse | null>(null);
   const [expanded, setExpanded] = useState<PilotageMetric | null>(null);
   const [err, setErr] = useState<string | null>(null);
   useEffect(() => {
     setSeries(null);
-    apiFetch<PilotageSeriesResponse>(`/admin/pilotage/series?granularity=${granularity}&months=${months}`).then(setSeries).catch((e) => setErr(pilotageRefusal(e)));
+    apiFetch<PilotageSeriesResponse>(`/admin/pilotage/series?granularity=${granularity}&months=${months}`).then(setSeries).catch((e) => (isPermissionRefusal(e) ? deny("Ton profil ne lit pas le pilotage.") : setErr(pilotageRefusal(e))));
   }, [granularity, months]);
   useEffect(() => {
     setCorridors(null);
-    apiFetch<CorridorsResponse>(`/admin/pilotage/corridors?days=${days}`).then(setCorridors).catch((e) => setErr(pilotageRefusal(e)));
+    apiFetch<CorridorsResponse>(`/admin/pilotage/corridors?days=${days}`).then(setCorridors).catch((e) => (isPermissionRefusal(e) ? deny("Ton profil ne lit pas le pilotage.") : setErr(pilotageRefusal(e))));
   }, [days]);
   const currencies = useMemo(() => [...new Set((series?.points ?? []).flatMap((p) => p.finance.map((f) => f.currencyCode)))].sort(), [series]);
   useEffect(() => { if (!currency && currencies.length) setCurrency(currencies[0]); }, [currencies, currency]);

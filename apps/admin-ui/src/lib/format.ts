@@ -84,7 +84,7 @@ export const ACTION_LABEL: Record<string, string> = {
 /* F-PR3 (D61 7A) — messages signalés */
 export const REPORT_REASON_LABEL: Record<string, string> = {
   OFF_PLATFORM: "Veut sortir de Yamba",
-  SCAM: "Tentative d'arnaque",
+  SCAM: "Arnaque suspectée", // décision du 15/09 (recette § 5.19) : un seul libellé, front et back-office
   HARASSMENT: "Propos déplacés / harcèlement",
   OTHER: "Autre",
   // D68 — trajets et membres
@@ -339,3 +339,13 @@ export const REFUND_KIND_LABEL: Record<string, string> = {
   MANUAL: "geste commercial",
   LEGACY: "antérieur à la liste (date du dernier remboursement)",
 };
+/**
+ * Décision du 15/09/2026 (recette § 5.19) — la ligne de décision sous « traité » / « sans suite » : qui, quand, la note.
+ * « Décision antérieure au journal » quand le serveur n'en a pas trouvé la ligne (donnée ancienne).
+ */
+export function reportDecisionLine(status: string, decision: { by: { firstName: string } | null; at: string; note: string | null } | null): string | null {
+  if (status === "OPEN") return null;
+  const verbe = status === "REVIEWED" ? "Traité" : "Classé sans suite";
+  if (!decision) return `${verbe} — décision antérieure au journal.`;
+  return `${verbe} par ${decision.by?.firstName ?? "un administrateur"} le ${dateTime(decision.at)}${decision.note ? ` · note : « ${decision.note} »` : " · sans note"}`;
+}

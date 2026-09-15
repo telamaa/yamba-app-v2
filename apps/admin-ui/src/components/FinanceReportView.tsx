@@ -6,12 +6,14 @@ import { ApiError, apiFetch, downloadFile } from "@/lib/api";
 import { CATEGORY_LABEL, dateTime, exportPeriodProblem, financeExportRefusal, money, reportPeriodLabel } from "@/lib/format";
 import { can } from "@/lib/permissions";
 import type { AdminMe, FinanceReport } from "@/lib/types";
+import { isPermissionRefusal, useDenyPage } from "./PageAccess";
 
 export default function FinanceReportView() {
   const [months, setMonths] = useState(12);
   const [report, setReport] = useState<FinanceReport | null>(null);
   const [me, setMe] = useState<AdminMe | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const deny = useDenyPage(); // décision du 15/09 : un refus de permission remplace la page entière
   const [from, setFrom] = useState(() => new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1)).toISOString().slice(0, 10));
   const [to, setTo] = useState(() => new Date().toISOString().slice(0, 10));
   const [exporting, setExporting] = useState(false);
@@ -19,7 +21,7 @@ export default function FinanceReportView() {
   useEffect(() => {
     setReport(null);
     // Recette § 5.16 — jamais « 500 : Internal… » : un refus se dit en français.
-    apiFetch<FinanceReport>(`/admin/finances/report?months=${months}`).then(setReport).catch((e) => setErr(e instanceof ApiError && e.status === 403 ? "Ton profil ne lit pas le rapport financier." : "Le rapport n'a pas pu être calculé. Recharge la page ; si le problème revient, préviens l'équipe technique."));
+    apiFetch<FinanceReport>(`/admin/finances/report?months=${months}`).then(setReport).catch((e) => isPermissionRefusal(e) ? deny("Ton profil ne lit pas le rapport financier.") : setErr(e instanceof ApiError && e.status === 403 ? "Ton profil ne lit pas le rapport financier." : "Le rapport n'a pas pu être calculé. Recharge la page ; si le problème revient, préviens l'équipe technique."));
   }, [months]);
   useEffect(() => { apiFetch<AdminMe>("/admin/me").then(setMe).catch(() => undefined); }, []);
 

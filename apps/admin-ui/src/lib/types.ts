@@ -289,6 +289,8 @@ export type AdminMessageReportItem = {
   author: { id: string | null; firstName: string; role: "SHIPPER" | "CARRIER" | "SYSTEM" } | null;
   message: { id: string; body: string | null; createdAt: string | null };
   conversationId: string | null; bookingId: string | null; corridor: { originCity: string; destinationCity: string } | null;
+  /** Décision du 15/09 — qui a décidé, quand, la note (ligne de journal) ; null si ouvert ou décision antérieure au journal. */
+  decision: ReportDecision | null;
 };
 export type AdminMessageReportsResponse = { items: AdminMessageReportItem[]; total: number };
 
@@ -307,7 +309,9 @@ export type AdminReportItem = {
   id: string; targetType: ReportTargetType; targetId: string; targetLabel: string; targetMissing: boolean; targetOwner: { id: string; firstName: string } | null;
   status: MessageReportStatus; reason: ReportReason; details: string | null; createdAt: string;
   reporter: { id: string; firstName: string }; openCountOnTarget: number; priority: boolean; targetTrustLevel: TrustLevel | null;
+  decision: ReportDecision | null; // décision du 15/09
 };
+export type ReportDecision = { by: { id: string; firstName: string } | null; at: string; note: string | null };
 export type AdminReportsResponse = { items: AdminReportItem[]; total: number };
 
 /* ── C-PR8a (D62) — paramètres de la plateforme ── */

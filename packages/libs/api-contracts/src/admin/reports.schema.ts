@@ -6,6 +6,7 @@
  * (le DTO public d'un membre ne porte pas son id) — le serveur le résout.
  */
 import { z } from "zod";
+import { ReportDecisionSchema } from "./report-decision.schema";
 import { TrustLevelSchema } from "./trust.schema"; // D71
 
 export const REPORT_TARGET_TYPES = ["TRIP", "USER"] as const;
@@ -63,6 +64,8 @@ export const AdminReportItemSchema = z
     priority: z.boolean(),
     /** D71 — niveau de risque interne du membre visé (ou du propriétaire du trajet). */
     targetTrustLevel: TrustLevelSchema.nullable(),
+    /** Décision du 15/09 — qui a décidé, quand, la note (ligne de journal) ; null pour un signalement ouvert. */
+    decision: ReportDecisionSchema.nullable(),
   })
   .meta({ id: "AdminReportItem" });
 export type AdminReportItem = z.infer<typeof AdminReportItemSchema>;

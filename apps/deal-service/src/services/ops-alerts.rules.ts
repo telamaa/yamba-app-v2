@@ -61,13 +61,13 @@ export function evaluateAlerts(s: OpsSnapshot, now: Date, T: AlertThresholds = A
  * (le paramètre, jamais une constante).
  */
 export function countUndecidedDisputes(
-  disputes: Array<{ openedAt: Date; carrierRespondedAt: Date | null }>,
+  disputes: Array<{ openedAt: Date; carrierRespondedAt: Date | null; responseDueAt?: Date | null }>,
   now: Date,
   responseDelayHours: number,
   thresholdHours: number
 ): number {
   return disputes.filter((d) => {
-    const decidableSince = d.carrierRespondedAt ?? new Date(d.openedAt.getTime() + responseDelayHours * 3_600_000);
+    const decidableSince = d.carrierRespondedAt ?? d.responseDueAt ?? new Date(d.openedAt.getTime() + responseDelayHours * 3_600_000); // ANO-ADM-52
     return now.getTime() - decidableSince.getTime() > thresholdHours * 3_600_000;
   }).length;
 }
