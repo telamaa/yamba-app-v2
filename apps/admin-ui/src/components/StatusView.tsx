@@ -11,7 +11,7 @@ import { useCallback, useEffect, useState } from "react";
 import { ApiError, apiFetch } from "@/lib/api";
 import { can } from "@/lib/permissions";
 import { dateTime } from "@/lib/format";
-import type { AdminMe, AdminStatusResponse, CronRun, MaintenanceState } from "@/lib/types";
+import type { AdminMe, AdminStatusResponse, MaintenanceState } from "@/lib/types";
 
 const POLL_MS = 30_000;
 const REASON_MIN = 20;
@@ -23,35 +23,36 @@ function ago(iso: string): string {
   if (s < 172800) return `il y a ${Math.round(s / 3600)} h`;
   return `il y a ${Math.round(s / 86400)} j`;
 }
-/** Un cron est « en retard » si son dernier battement a plus de deux fois son intervalle attendu (approx. par la fréquence lue dans l'expression cron). */
-function cronLate(c: CronRun): boolean {
-  const ageMs = Date.now() - new Date(c.ranAt).getTime();
-  const s = c.schedule ?? "";
-  const expected = /^\*\/(\d+) /.test(s) ? Number(/^\*\/(\d+) /.exec(s)![1]) * 60_000 : /^\d+ \* /.test(s) ? 3_600_000 : 86_400_000;
-  return ageMs > 2 * expected;
+/** Recette § 5.22 — un refus de relecture se dit en français (le message de l'API est en anglais). */
+function reloadFailure(e: unknown): string {
+  if (e instanceof ApiError && e.status > 0 && e.status < 500) return `refus du serveur (HTTP ${e.status})`;
+  return "le serveur n'a pas répondu";
 }
 
 export default function StatusView() {
   const [data, setData] = useState<AdminStatusResponse | null>(null);
   const [me, setMe] = useState<AdminMe | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [, setTick] = useState(0);
   const load = useCallback(() => {
-    apiFetch<AdminStatusResponse>("/admin/status").then((d) => { setData(d); setError(null); }).catch((e) => setError(e instanceof ApiError ? `${e.status} : ${e.message}` : "Chargement impossible."));
+    apiFetch<AdminStatusResponse>("/admin/status").then((d) => { setData(d); setError(null); }).catch((e) => setError(reloadFailure(e)));
   }, []);
   useEffect(() => {
     load();
     apiFetch<AdminMe>("/admin/me").then(setMe).catch(() => undefined);
     const t = setInterval(load, POLL_MS);
-    return () => clearInterval(t);
+    // Recette § 5.22 — « Relu il y a {n} s » était figé entre deux relectures : quand la relecture échoue, l'âge doit grandir.
+    const tick = setInterval(() => setTick((n) => n + 1), 5_000);
+    return () => { clearInterval(t); clearInterval(tick); };
   }, [load]);
 
-  if (error && !data) return <p className="mt-4 text-[13px] text-red-700">{error}</p>;
+  if (error && !data) return <p role="alert" className="mt-4 text-[13px] text-red-700">État des services illisible : {error}. Nouvel essai dans 30 secondes.</p>;
   if (!data) return <p className="mt-4 text-[13px] text-slate-500">Chargement…</p>;
   const down = data.services.filter((s) => !s.reachable || s.report?.status !== "ok");
   return (
     <div className="mt-4 space-y-6">
       <p className={`rounded-xl border px-3 py-2 text-[12.5px] ${down.length === 0 ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-red-200 bg-red-50 text-red-900"}`}>
-        {down.length === 0 ? "Tous les services répondent et leurs dépendances sont saines." : `${down.length} service(s) en difficulté : ${down.map((s) => s.name).join(", ")}.`} Relu {ago(data.at)}.{error ? ` Dernière tentative en échec : ${error}` : ""}
+        {down.length === 0 ? "Tous les services répondent et leurs dépendances sont saines." : `${down.length} service(s) en difficulté : ${down.map((s) => s.name).join(", ")}.`} Relu {ago(data.at)}.{error ? ` Dernière relecture en échec : ${error}.` : ""}{data.maintenance.enabled ? " Maintenance en cours : la plateforme est en lecture seule." : ""}
       </p>
 
       <section>
@@ -64,11 +65,17 @@ export default function StatusView() {
                 <p className="mt-1 text-red-800">Injoignable — {s.error ?? "aucune réponse"}</p>
               ) : (
                 <>
-                  <p className="mt-1 text-slate-600">{s.report?.status === "ok" ? "OK" : "Dégradé"} · version {s.report?.version ?? "?"} · démarré {s.report ? `il y a ${Math.round(s.report.uptimeSeconds / 60)} min` : "?"}</p>
+                  <p className="mt-1 text-slate-600">{s.report?.status === "ok" ? "OK" : "Dégradé"} · version {s.report?.version ?? "?"} · démarré {s.report ? ago(new Date(new Date(s.report.at).getTime() - s.report.uptimeSeconds * 1000).toISOString()) : "?"}</p>
                   <ul className="mt-1 space-y-0.5">
-                    {Object.entries(s.report?.checks ?? {}).map(([k, c]) => (
-                      <li key={k} className={c.ok ? "text-slate-600" : "text-red-800"}>{c.ok ? "✓" : "✗"} {k} ({c.ms} ms){c.error ? ` — ${c.error}` : ""}</li>
-                    ))}
+                    {Object.entries(s.report?.checks ?? {}).map(([k, c]) =>
+                      // Recette § 5.22 — la passerelle signale la maintenance comme une « vérification » : une coupure planifiée
+                      // n'est pas une panne, elle ne s'affiche pas en rouge (le bloc Maintenance plus bas en dit l'état).
+                      k === "maintenance" && !c.ok ? (
+                        <li key={k} className="text-amber-800">⏸ maintenance : lecture seule planifiée</li>
+                      ) : (
+                        <li key={k} className={c.ok ? "text-slate-600" : "text-red-800"}>{c.ok ? "✓" : "✗"} {k} ({c.ms} ms){c.error ? ` — ${c.error}` : ""}</li>
+                      )
+                    )}
                   </ul>
                 </>
               )}
@@ -85,13 +92,19 @@ export default function StatusView() {
         </div>
         <div className="rounded-xl border border-slate-200 bg-white p-3 text-[12.5px]">
           <b>Emails (24 h)</b>
-          <p className="mt-1 text-slate-600">{data.emails.sentLast24h} envoyé(s)</p>
+          <p className="mt-1 text-slate-600">{data.emails.sentLast24h} envoyé(s), dont {data.emails.deliveredLast24h} remis (confirmé par le fournisseur)</p>
+          <p className={data.emails.bouncedLast24h > 0 ? "text-red-800" : "text-slate-600"}>{data.emails.bouncedLast24h} rebond(s) ou plainte(s)</p>
           <p className={data.emails.failedLast24h > 0 ? "text-red-800" : "text-slate-600"}>{data.emails.failedLast24h} en échec</p>
         </div>
       </section>
 
       <section>
         <h2 className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Crons — dernier battement</h2>
+        {data.missingCrons.length > 0 && data.crons.length > 0 && (
+          <p className="mt-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-[12.5px] text-amber-900">
+            {data.missingCrons.length} cron(s) attendu(s) sans battement depuis 7 jours : {data.missingCrons.map((c) => `${c.service} · ${c.name}`).join(", ")}. Un cron qui ne laisse pas de battement est invisible ici.
+          </p>
+        )}
         {data.crons.length === 0 ? (
           <p className="mt-2 text-[12.5px] text-slate-500">Aucun battement enregistré : les crons n&apos;ont pas encore tourné depuis le déploiement (ou Redis est vide).</p>
         ) : (
@@ -100,10 +113,10 @@ export default function StatusView() {
               <thead className="bg-slate-50 text-left text-[11px] uppercase tracking-wide text-slate-500"><tr><th className="px-3 py-2">Service</th><th className="px-3 py-2">Cron</th><th className="px-3 py-2">Dernier passage</th><th className="px-3 py-2">Durée</th><th className="px-3 py-2">Résultat</th></tr></thead>
               <tbody>
                 {data.crons.map((c) => (
-                  <tr key={`${c.service}:${c.name}`} className={`border-t border-slate-100 ${!c.ok ? "bg-red-50" : cronLate(c) ? "bg-amber-50" : ""}`}>
+                  <tr key={`${c.service}:${c.name}`} className={`border-t border-slate-100 ${!c.ok ? "bg-red-50" : c.late ? "bg-amber-50" : ""}`}>
                     <td className="px-3 py-2">{c.service}</td>
                     <td className="px-3 py-2"><code>{c.name}</code>{c.schedule ? <span className="ml-1 text-[11px] text-slate-400">{c.schedule}</span> : null}</td>
-                    <td className="px-3 py-2 whitespace-nowrap">{dateTime(c.ranAt)} <span className="text-slate-500">({ago(c.ranAt)})</span>{cronLate(c) && c.ok ? <span className="ml-1 text-amber-800">en retard ?</span> : null}</td>
+                    <td className="px-3 py-2 whitespace-nowrap">{dateTime(c.ranAt)} <span className="text-slate-500">({ago(c.ranAt)})</span>{c.late ? <span className="ml-1 text-amber-800">en retard ?</span> : null}</td>
                     <td className="px-3 py-2">{c.durationMs} ms</td>
                     <td className={`px-3 py-2 ${c.ok ? "text-slate-600" : "text-red-800"}`}>{c.ok ? c.summary ?? "ok" : `échec — ${c.error}`}</td>
                   </tr>

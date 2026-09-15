@@ -46,6 +46,17 @@ export class BookingRequestError extends AppError {
   }
 }
 
+/**
+ * A179 (recette 02-ADMIN § 5.22) — clôture du compte de l'Expéditeur dans la transaction de création. L'effacement RGPD
+ * écrit ce même document `User` : MongoDB rejette l'une des deux transactions (P2034), le rejeu recompte, et une réservation
+ * ne peut plus naître sur un compte en cours d'effacement. Compte déjà effacé → 409 `ACCOUNT_DELETED`.
+ */
+export type ShipperFenceTx = { user: { updateMany(args: { where: { id: string; isDeleted: boolean }; data: { updatedAt: Date } }): Promise<{ count: number }> } };
+export async function fenceShipperAccount(tx: ShipperFenceTx, shipperId: string, now: Date): Promise<void> {
+  const fenced = await tx.user.updateMany({ where: { id: shipperId, isDeleted: false }, data: { updatedAt: now } });
+  if (fenced.count !== 1) throw new BookingRequestError("ACCOUNT_DELETED", "This account has been erased.");
+}
+
 /* ══ Vue minimale du Trip nécessaire ici (pas de dépendance Prisma) ══ */
 
 export type TripForBooking = {

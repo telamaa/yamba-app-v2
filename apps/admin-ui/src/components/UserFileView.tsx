@@ -265,6 +265,10 @@ function EraseCard({ file, onDone, onOutcome }: { file: AdminUserFile; onDone: (
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [blockers, setBlockers] = useState<ErasureBlocker[] | null>(null);
+  // A179 (recette § 5.22) — les bloqueurs se lisent AVANT le clic ; le serveur les recompte de toute façon dans la transaction.
+  useEffect(() => {
+    apiFetch<{ blockers: ErasureBlocker[] }>(`/admin/users/${file.id}/erasure-blockers`).then((r) => setBlockers(r.blockers.length ? r.blockers : null)).catch(() => undefined);
+  }, [file.id]);
   const LABEL: Record<ErasureBlocker, string> = {
     ACTIVE_DEAL: "un deal en cours",
     PENDING_REQUEST: "une demande en attente",
@@ -296,17 +300,18 @@ function EraseCard({ file, onDone, onOutcome }: { file: AdminUserFile; onDone: (
       setBusy(false);
     }
   }
-  const ok = reason.trim().length >= MIN_REASON && confirm === "EFFACER" && !busy;
+  const ok = reason.trim().length >= MIN_REASON && confirm === "EFFACER" && !busy && !blockers;
   return (
     <Card title="Effacer ce compte (RGPD)">
       <p className="text-[12.5px] text-slate-600">Immédiat et irréversible. Anonymise l'identité et les coordonnées, supprime adresses, alertes, favoris, justificatifs ; conserve réservations, litiges, avis et messages sans le nom. Refusé tant qu'un deal vit. Le motif (demande reçue le…, canal) part au journal et au registre des demandes.</p>
       <textarea value={reason} onChange={(e) => setReason(e.target.value.slice(0, 500))} rows={2} placeholder={`Motif (${MIN_REASON} caractères au moins) : demande reçue par email le …`} className="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2 text-[12.5px]" />
       <label className="mt-2 block text-[12px] text-slate-600">Tape EFFACER pour confirmer <input value={confirm} onChange={(e) => setConfirm(e.target.value.toUpperCase())} className="ml-2 w-32 rounded border border-slate-300 px-2 py-1" /></label>
       {blockers && (
-        <div className="mt-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-[12.5px] text-amber-900">
-          Refusé pour l'instant : {blockers.map((b) => LABEL[b]).join(", ")}.
+        <div role="status" className="mt-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-[12.5px] text-amber-900">
+          Effacement impossible pour l'instant : {blockers.map((b) => LABEL[b]).join(", ")}.
         </div>
       )}
+      <p className="mt-2 text-[12px]"><Link href={`/privacy?userId=${file.id}`} className="underline">Demandes de ce membre au registre</Link></p>
       <div className="mt-3">
         <button disabled={!ok} onClick={run} className="rounded-lg bg-red-800 px-3 py-1.5 text-[12.5px] font-semibold text-white disabled:opacity-50">Effacer définitivement</button>
       </div>

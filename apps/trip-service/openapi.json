@@ -21118,6 +21118,33 @@
         "additionalProperties": false,
         "description": "Sans état (D59 4A) : recalculées à chaque lecture ; le cron horaire n'envoie un email qu'à la première apparition du jour"
       },
+      "CronCatalogueEntry": {
+        "type": "object",
+        "properties": {
+          "service": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "schedule": {
+            "type": "string"
+          },
+          "intervalMs": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "service",
+          "name",
+          "schedule",
+          "intervalMs"
+        ],
+        "additionalProperties": false,
+        "description": "An expected cron (A178): service, name, cron expression, expected interval"
+      },
       "PlatformSettingsValues": {
         "type": "object",
         "properties": {
@@ -21310,8 +21337,8 @@
           "alerts.outboxParkedAttempts": {
             "type": "number",
             "minimum": 1,
-            "maximum": 100,
-            "description": "Événement parqué après (count) — D59 3A"
+            "maximum": 10,
+            "description": "Événement parqué après (count) — D59 3A · A176"
           },
           "alerts.outboxLagMinutes": {
             "type": "number",
@@ -21941,6 +21968,34 @@
           "counts"
         ],
         "additionalProperties": false
+      },
+      "ErasureCheckResponse": {
+        "type": "object",
+        "properties": {
+          "blockers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ErasureBlocker"
+            }
+          },
+          "counts": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            }
+          }
+        },
+        "required": [
+          "blockers",
+          "counts"
+        ],
+        "additionalProperties": false,
+        "description": "Why this account cannot be erased yet (empty list = erasable now). Re-checked inside the erasure transaction."
       },
       "EraseMyAccountRequest": {
         "type": "object",
@@ -22687,7 +22742,79 @@
           "crons": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/CronRun"
+              "type": "object",
+              "properties": {
+                "service": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "ranAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                },
+                "durationMs": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "ok": {
+                  "type": "boolean"
+                },
+                "summary": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "error": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "schedule": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "late": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "service",
+                "name",
+                "ranAt",
+                "durationMs",
+                "ok",
+                "summary",
+                "error",
+                "schedule",
+                "late"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "missingCrons": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CronCatalogueEntry"
             }
           },
           "outbox": {
@@ -22741,11 +22868,23 @@
                 "type": "integer",
                 "minimum": -9007199254740991,
                 "maximum": 9007199254740991
+              },
+              "deliveredLast24h": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "bouncedLast24h": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
               }
             },
             "required": [
               "failedLast24h",
-              "sentLast24h"
+              "sentLast24h",
+              "deliveredLast24h",
+              "bouncedLast24h"
             ],
             "additionalProperties": false
           },
@@ -22757,6 +22896,7 @@
           "at",
           "services",
           "crons",
+          "missingCrons",
           "outbox",
           "emails",
           "maintenance"

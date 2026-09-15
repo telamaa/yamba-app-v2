@@ -6073,3 +6073,87 @@ leurs tests unitaires et ADM-PAR-13/14 (pas de contre-épreuve navigateur rejou�
 - **Le cahier annonce « au moins les trois trajets Paris → Brazzaville » en WEB-ACC-9** ;
   `bzv-inflight` est parti (J−6) et la recherche ne montre que l'avenir : deux cartes. À corriger
   dans le cahier (§ 2.4 le dit déjà).
+
+## Cahier 02-ADMIN — § 5.22 État des services · **CONFORME après correction** (3 fiches + 4 ajoutées · 2 anomalies majeures closes + 3 défauts d'écran corrigés · 5 arbitrages délégués (A176 → A180) · lots RGPD du § 5.21 livrés · 7 scénarios ADM-ETA + ADM-RGP-7, RGP-2 réalignée)
+
+Spec : `apps/e2e/src/admin/adm-eta-etat-services.spec.ts`. La page n'est pas un outil de supervision, mais c'est le
+premier endroit où l'exploitation regarde ; le chapitre se juge à quatre promesses : **ce qui est dit est vrai** (six
+services, leurs dépendances, une panne RÉELLE en rouge), **un cron qui manque se voit**, **l'outbox ne perd rien**
+(Redpanda coupé pour de vrai), **les compteurs suivent la vie réelle d'un email**. Manœuvres consignées, toutes remises en
+place en `finally` : message-service tué puis relancé en bundle détaché ; `docker stop / start yamba-redpanda` ;
+`seed-outbox.ts` (et `--with-poison`), lignes `correlationId: "seed-outbox"` supprimées en fin de fiche ; battement Redis
+vieilli / retiré puis restauré ; un `EmailDelivery` passé `DELIVERED` puis `BOUNCED` puis remis `SENT` ; valeur hors
+bornes écrite dans `PlatformSettings` puis restaurée. Les états « dépendance en panne », « maintenance » et « état vide »
+sont obtenus en réécrivant la réponse de l'API (`page.route`) : couper Redis ou le vider couperait les sessions de tout
+le poste.
+
+| Fiche | Objet | Verdict |
+|---|---|---|
+| ADM-ETA-1 | Six services, dépendances, panne réelle | **Conforme** — bandeau vert, six cartes (`api-gateway` … `message-service`) « OK · version · démarré », `✓ mongo` / `✓ redis` ; relecture à 30 s ; message-service tué → « 1 service(s) en difficulté : message-service. » rouge, carte « Injoignable — {erreur} » ; relancé → vert ; dépendance en panne → carte ambre « Dégradé » ; aucune ligne de journal. *Amélioration faite* : « Relu il y a {n} s » n'est plus figé entre deux relectures |
+| ADM-ETA-2 | Battements de cron | **Conforme après amélioration (A178)** — colonnes, treize crons présents ; battement vieilli à 11 min → « en retard ? » ambre (calcul serveur sur le catalogue) ; battement retiré → « 1 cron(s) attendu(s) sans battement depuis 7 jours : trip-service · complete-trips. » ; état vide |
+| ADM-ETA-3 | Outbox et emails | **Conforme** — compteurs = base ; Redpanda arrêté + 6 écritures → non publiés +6, « le plus ancien il y a » ; Redpanda relancé → retour au niveau d'avant sans intervention ; poison parqué après dix essais → « parqué(s) » rouge ; bloc emails = règle A177 |
+| ADM-ETA-4 (ajoutée) | Un email remis reste envoyé | **Conforme après correction** — ANO-ADM-61 |
+| ADM-ETA-5 (ajoutée) | Seuil « parqué » ≤ relais | **Conforme après correction** — ANO-ADM-62 : borne 10, PATCH à 20 → 400, valeur stockée à 20 lue 10 |
+| ADM-ETA-6 (ajoutée) | Maintenance ≠ panne | **Conforme après correction** — la passerelle affichait « ✗ maintenance » en rouge pendant une coupure planifiée ; désormais « ⏸ maintenance : lecture seule planifiée » ambre + mention au bandeau |
+| ADM-ETA-7 (ajoutée) | Tous les profils ; relecture en échec | **Conforme après correction** — Médiation, Finance, Privacy lisent (200) ; un 502 affichait « 502 : Bad gateway » → « État des services illisible : le serveur n'a pas répondu. Nouvel essai dans 30 secondes. » |
+| ADM-RGP-2 (réalignée, A179) | Bloqueurs avant le clic | **Conforme** — bloqueurs lus à l'ouverture de la carte, dits en français, bouton inactif même motif et mot justes ; le serveur refuse toujours (409, mêmes bloqueurs) |
+| ADM-RGP-7 (ajoutée, A179) | Registre d'un membre | **Conforme** — lien « Demandes de ce membre au registre » → `/privacy?userId=` ; seules ses lignes (écran = API) ; filtre illisible → 400 ; « Tout le registre » ; lecture journalisée avec le membre en cible, bloqueurs non journalisés |
+
+**Contre-épreuve.** Services : ETA-2, ETA-4, ETA-5 joués contre les bundles d'AVANT la correction → **rouges** (pas de
+`missingCrons` ; « envoyés » 344 → 343 à la remise ; borne 100). Écran : `StatusView.tsx` d'avant remis en place (rechargé
+à chaud) → **ETA-1, ETA-2, ETA-6, ETA-7 rouges** (âge figé ; ni retard ni absent affichés ; croix rouge ; « 502 : »).
+Recomptage dans la transaction d'effacement retiré → les deux tests A179 de `privacy.service.spec.ts` **rouges**.
+Après correction : ADM-ETA 7/7 et ADM-RGP 7/7 verts, puis ADM-ETA rejoué (7/7, deuxième passage) avec les voisins
+ADM-ALR, ADM-PAR, ADM-USR, WEB-RGP, WEB-TRU : 41/42, seul ADM-PAR-2 hors délai (commission vue en 34 s par le navigateur,
+seuil 31 s, pendant que les cinq suites unitaires tournaient en parallèle) — rejouée seule : verte, 22 s API / 25 s
+navigateur. Constat de charge, pas de régression.
+
+### Anomalies
+
+- **ANO-ADM-61 (majeure) — « Emails (24 h) » ne comptait que `SENT`.** Le webhook du fournisseur (D35) fait passer un
+  email à `DELIVERED`, `BOUNCED` ou `COMPLAINED` : en production, « envoyés » retombait vers zéro au fil des remises et un
+  rebond ne se voyait nulle part. A177 : envoyés = acceptés par le fournisseur, dont remis ; rebonds / plaintes en rouge ;
+  échecs = `FAILED`. `emailCounters` (`apps/auth-service/src/utils/status.rules.ts`). Close.
+- **ANO-ADM-62 (majeure) — le seuil « parqué » pouvait dépasser le parking réel.** Les relais parquent à 10 (constante),
+  le paramètre `alerts.outboxParkedAttempts` acceptait 1 à 100 : à 20, un événement parqué n'était compté ni sur `/status`
+  ni par l'alerte `OUTBOX_PARKED`. A176 : `OUTBOX_MAX_RELAY_ATTEMPTS` partagé, borne max = 10, valeur stockée hors bornes
+  ramenée à la lecture. Close.
+- **Défauts d'écran corrigés (mineurs, sans numéro distinct)** : âge « Relu il y a » figé ; « 502 : Bad gateway » en
+  anglais ; « ✗ maintenance » rouge pendant une coupure planifiée ; « démarré il y a 1440 min » (→ « il y a 24 h ») ;
+  battement de `payout-bookings` sans résumé (« ok » seul → « n terminé(s), n versement(s) rejoué(s), n rappel(s) »).
+
+### Arbitrages délégués (15/09) — inscrits au registre avant le code
+
+- **A176** — seuil de parking : une seule source (le relais), paramètre borné, valeurs hors bornes ramenées à la lecture.
+- **A177** — compteurs d'emails sur le cycle de vie réel.
+- **A178** — catalogue des treize crons ; absents et retards calculés côté serveur ; un test d'auth-service lit les
+  fichiers `*.cron.ts` et refuse tout écart.
+- **A179** — lots du § 5.21 : bloqueurs recomptés DANS la transaction d'effacement, clôture de l'Expéditeur par la
+  réservation (écriture du même `User` → P2034 → rejeu), 409 `ACCOUNT_DELETED` ; bloqueurs lus avant le clic
+  (`GET /admin/users/:id/erasure-blockers`) ; registre filtré `?userId=`.
+- **A180** — déclenchement manuel des crons de conservation : **écarté**.
+
+### Écarts
+
+- **ETA-1** : le cahier écrit « 1 service(s) en difficulté : message » ; l'écran nomme le service entier
+  (`message-service`) — plus exact, gardé.
+- **ETA-2 étape 5** (« vider Redis ») et la dépendance en panne : jouées par réponse réécrite, pas sur le poste (sessions).
+- **ETA-3 étape 2** : l'« écriture métier » est `seed-outbox.ts` (événements construits depuis de vrais deals, validés au
+  contrat) plutôt qu'une acceptation par l'écran.
+
+### Regard d'expert — produit ET test, une ligne par fiche
+
+- **ETA-1** — *Fait* : âge vivant, uptime lisible. *Test* : un vrai `kill` et une vraie relance, relectures espacées
+  comptées (StrictMode double la première). *Proposé* : si auth-service tombe, la page entière tombe (elle y est servie) —
+  une sonde de la passerelle (`/api/status`, D70) pourrait nourrir un bandeau minimal ; c'est le rôle du moniteur externe.
+- **ETA-2** — *Fait* : A178. *Proposé* : la clé de battement vit 7 jours ; un cron quotidien arrêté depuis 8 jours
+  devient « absent » au lieu de « en retard » — cohérent, mais un historique (dernier succès ≠ dernier passage) aiderait.
+- **ETA-3** — *Test* : Redpanda coupé pour de vrai et le retour attendu sans intervention (4 min max). *Proposé* : afficher
+  l'âge du plus ancien EN ROUGE au-delà de `alerts.outboxLagMinutes` (l'alerte existe, l'écran ne la reprend pas).
+- **ETA-4** — *Fait* : A177. *Test* : stabilisation des compteurs avant la mesure (des emails partent pendant la fiche).
+- **ETA-5** — *Fait* : A176. *Proposé* : aucun.
+- **ETA-6** — *Fait* : maintenance ambre. **ETA-7** — *Fait* : refus en français, `role="alert"`.
+- **RGP-2 / RGP-7** — *Fait* : A179. *Proposé* : afficher aussi les compteurs (« 2 demandes en attente ») à côté des
+  libellés ; `counts` est déjà servi.
+
+---

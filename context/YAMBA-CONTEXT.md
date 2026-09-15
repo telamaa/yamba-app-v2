@@ -796,6 +796,19 @@ Ordre de demarrage : auth -> trip -> gateway.
   sur le Fake + manoeuvres base). AMELIORATIONS : carte qui nomme le fournisseur, aide FR par divergence, statuts FR,
   refus par code, journal « Rapprochement fournisseur ». PIEGE : la memoire du Fake survit au rejeu du jeu d'essai (une
   fiche constate l'etat initial, ne l'exige pas). Tests : deal 598, harnais 419. Reste : § 5.14 a 8.
+- 15/09 : **CAHIER 02-ADMIN — § 5.22 ETAT DES SERVICES (branche `chore/recette-admin-5-22`, empilee sur #322)** —
+  7 scenarios ADM-ETA CONFORMES (ETA-1 a 3 du cahier : service REELLEMENT tue puis relance, Redpanda REELLEMENT arrete
+  puis relance, poison parque ; + ETA-4 email remis, ETA-5 seuil parque, ETA-6 maintenance, ETA-7 profils / relecture en
+  echec) + ADM-RGP-2 realignee + ADM-RGP-7. CONTRE-EPREUVE : ETA-2, 4, 5 ROUGES sur les anciens bundles ; ETA-1, 2, 6, 7
+  ROUGES avec l'ancien StatusView ; tests A179 rouges sans le recomptage. ANO-ADM-61 CLOSE (majeure) : « Emails (24 h) »
+  ne comptait que SENT (le webhook D35 passe l'email a DELIVERED / BOUNCED) → A177. ANO-ADM-62 CLOSE (majeure) : seuil
+  « parque » reglable jusqu'a 100, relais a 10 en dur → A176 constante partagee `OUTBOX_MAX_RELAY_ATTEMPTS`, borne 10,
+  valeurs hors bornes ramenees a la lecture (`mergeSettingsValues`, toutes les cles). A178 : `CRON_CATALOGUE` (13 crons),
+  `missingCrons` + `late` calcules cote serveur, test qui lit les `*.cron.ts`. A179 (lots du § 5.21) : bloqueurs
+  recomptes DANS la transaction d'effacement + `fenceShipperAccount` (la reservation ecrit le User → P2034 → rejeu ;
+  409 `ACCOUNT_DELETED`), `GET /admin/users/:id/erasure-blockers`, registre `?userId=`. A180 : purge manuelle ECARTEE.
+  AMELIORATIONS : age « Relu il y a » vivant, refus en francais, maintenance en ambre, uptime lisible, resume du battement
+  payout-bookings. Tests : auth 282, deal 643, message 57, trip 293, notification 122, harnais 487. Reste : § 5.23 a 8.
 - 15/09 : **CAHIER 02-ADMIN — § 5.21 DONNEES PERSONNELLES / RGPD (branche `chore/recette-admin-5-21`, empilee sur #321)** —
   6 scenarios ADM-RGP (RGP-1 a 4 du cahier + RGP-5 salve d'effacements, RGP-6 profil refuse) + ADM-PAR-13 (A172) et
   ADM-PAR-14 (A173/A174), verts ; RGP deux fois. CONTRE-EPREUVE : RGP-1, 3, 5 ROUGES. ANO-ADM-57 CLOSE (majeure) : une

@@ -42,6 +42,7 @@ import {
 } from "@packages/api-contracts";
 import {
   BookingRequestError,
+  fenceShipperAccount,
   assertQuoteMatches,
   buildBookingSnapshots,
   capacityReservationWhere,
@@ -218,6 +219,7 @@ export function makeDealRequestService(provider: PaymentProvider, clock: () => D
             select: { id: true },
           });
           if (reused) throw new BookingRequestError("PAYMENT_ALREADY_USED", "This payment is already attached to a request.");
+          await fenceShipperAccount(tx, user.id, now); // A179 — jamais une réservation sur un compte en cours d'effacement
 
           // CAP-01 — réservation ATOMIQUE : la condition est dans le WHERE
           // (helper pur, robuste au champ reservedKg absent — pitfall isSet).
