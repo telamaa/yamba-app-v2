@@ -114,11 +114,48 @@ function auditValue(v: unknown): string {
  * Un tableau ou un objet imbriqué s'affichait en JSON brut (`divergences : ["CAPTURE_RECORDED_NOT_LIVE"]`, `filters : {}`),
  * et les cartes « Actions admin sur ce compte / ce trajet » affichaient tout le `after` en JSON. Une seule règle, partout.
  */
-export function auditDetail(after: unknown): string {
+export function auditDetail(after: unknown, omit: readonly string[] = []): string {
   if (!after || typeof after !== "object") return "";
   return Object.entries(after as Record<string, unknown>)
+    .filter(([k]) => !omit.includes(k) && !SECRET_KEY.test(k))
     .map(([k, v]) => `${k} : ${auditValue(v)}`)
     .join(" · ");
+}
+
+/** A187 b — jamais un secret dans un détail, même si une ligne en portait un par erreur. */
+const SECRET_KEY = /secret|hash|token|password|backup|totp/i;
+const CHANGE_KEY_LABEL: Record<string, string> = { adminRoles: "Profils", accountStatus: "Statut du compte" };
+const ADMIN_ROLE_FR: Record<string, string> = { SUPER_ADMIN: "Super administrateur", MEDIATOR: "Médiateur", SUPPORT: "Support", FINANCE: "Finance", OPS: "Exploitation", PRIVACY: "Données personnelles" };
+function changeValue(key: string, v: unknown): string {
+  if (key === "adminRoles" && Array.isArray(v)) return v.length ? v.map((r) => ADMIN_ROLE_FR[String(r)] ?? String(r)).join(" + ") : "aucun";
+  if (key === "accountStatus" && typeof v === "string") return STATUS_LABEL[v] ?? v;
+  return auditValue(v);
+}
+
+/**
+ * A187 lot b (recette § 5.25) — « avant → après », champ par champ, en français, pour une ligne qui porte un `before` :
+ * profils admin, statut de compte, paramètres (`{ key, value }`). Rend null quand rien n'a changé ou qu'il n'y a pas d'avant.
+ * Un champ retiré (révocation : `after` vide) se lit « Profils : Finance → retiré ». Les clés sensibles ne sont jamais lues.
+ */
+export function auditChange(before: unknown, after: unknown): string | null {
+  if (!before || typeof before !== "object" || Array.isArray(before)) return null;
+  const b = before as Record<string, unknown>;
+  const a = after && typeof after === "object" && !Array.isArray(after) ? (after as Record<string, unknown>) : {};
+  if ("key" in b && "value" in b) {
+    return JSON.stringify(b.value) === JSON.stringify(a.value) ? null : `${String(b.key)} : ${auditValue(b.value)} → ${"value" in a ? auditValue(a.value) : "retiré"}`;
+  }
+  const parts = Object.keys(b)
+    .filter((k) => !SECRET_KEY.test(k) && k !== "version")
+    .filter((k) => JSON.stringify(b[k]) !== JSON.stringify(a[k]))
+    .map((k) => `${CHANGE_KEY_LABEL[k] ?? k} : ${changeValue(k, b[k])} → ${k in a ? changeValue(k, a[k]) : "retiré"}`);
+  return parts.length ? parts.join(" · ") : null;
+}
+
+/** Les clés du `after` déjà dites par `auditChange` (le détail ne les répète pas). */
+export function auditChangeKeys(before: unknown): string[] {
+  if (!before || typeof before !== "object" || Array.isArray(before)) return [];
+  const keys = Object.keys(before as Record<string, unknown>);
+  return keys.includes("key") && keys.includes("value") ? ["key", "value", "version"] : keys;
 }
 
 /* F-PR3 (D61 7A) — messages signalés */
@@ -177,6 +214,22 @@ export function reportRefusalMessage(e: { status?: number; data?: unknown; messa
   if (code === "ADMIN_PERMISSION_DENIED") return { text: "Ton profil ne traite pas les signalements.", reload: false };
   if (e?.status === 400) return { text: "Décision refusée : la note est trop longue ou la décision inconnue.", reload: false };
   return { text: "Décision impossible pour le moment. Recharge la file avant de réessayer.", reload: false };
+}
+/**
+ * Recette § 5.25 — un refus de l'écran « Comptes admin » (et de la page d'invitation), lu par son code (A146). `reload` : la
+ * liste affichée est périmée (un autre administrateur a retiré ou modifié ce compte).
+ */
+export function adminAccountRefusalMessage(e: { status?: number; data?: unknown; message?: string } | null | undefined): { text: string; reload: boolean } {
+  const code = (e?.data as { details?: { code?: string } } | undefined)?.details?.code;
+  if (code === "ADMIN_IS_SELF") return { text: "Tu ne peux ni modifier ni retirer ton propre accès : un autre super administrateur doit le faire.", reload: false };
+  if (code === "LAST_SUPER_ADMIN") return { text: "Il doit rester au moins un super administrateur en service (mot de passe posé, 2FA activée). La liste est rechargée.", reload: true };
+  if (code === "ADMIN_NOT_FOUND") return { text: "Ce compte n'a plus d'accès admin. La liste est rechargée.", reload: true };
+  if (code === "ADMIN_ALREADY_GRANTED") return { text: "Ce compte a déjà un profil admin.", reload: true };
+  if (code === "ACCOUNT_DELETED") return { text: "Ce compte est supprimé : il ne peut pas recevoir d'accès admin.", reload: false };
+  if (code === "INVITATION_INVALID") return { text: "Ce lien d'invitation n'est plus valable. Demande une nouvelle invitation à un super administrateur.", reload: false };
+  if (code === "ADMIN_PERMISSION_DENIED") return { text: "Ton profil ne gère pas les comptes admin (super administrateur seulement).", reload: false };
+  if (e?.status === 400) return { text: "Demande refusée : vérifie l'adresse, le prénom, le nom (ou le mot de passe : 8 caractères au moins, sans ton nom ni ton email).", reload: false };
+  return { text: "Action impossible pour le moment. Recharge la page avant de réessayer.", reload: true };
 }
 /** D71 — seuls les niveaux qui appellent la vigilance sont affichés dans une file (cahier § 5.19 : ni « Standard » ni « Compte neuf »). */
 export const isAlertTrustLevel = (level: string | null | undefined): level is "WATCH" | "HIGH_RISK" => level === "WATCH" || level === "HIGH_RISK";

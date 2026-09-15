@@ -6342,3 +6342,103 @@ auth-service 296 (+3), deal-service 644, message-service 57.
   `SESSION`, `SETTINGS`), libellés en français. Le cahier est à aligner.
 - JRN-1 : le cahier dit « six filtres serveur » ; l'auteur est un septième filtre serveur, posé par clic (pastille).
 - JRN-2 : le cahier annonce « Rapprochement Stripe » ; le libellé est « Rapprochement fournisseur » depuis le § 5.13.
+
+## Cahier 02-ADMIN — § 5.25 Comptes admin · **CONFORME après correction** (5 fiches + 6 ajoutées · 5 anomalies majeures + 1 mineure closes · 3 décisions (A185, A186, A187) · lots du § 5.24 livrés · 11 scénarios ADM-CPT)
+
+Spec : `apps/e2e/src/admin/adm-cpt-comptes-admin.spec.ts`. L'écran `/admins` est la porte du back-office. Quatre
+promesses : **une invitation ouvre un accès, une fois**, **un compte sans mot de passe reçoit un lien pour en poser un**,
+**il reste toujours un super administrateur en service**, **l'écran parle français et ne propose pas l'impossible**.
+Manœuvres consignées : les administrateurs « jetables » dont une fiche a besoin d'une session sont posés en base
+(`creerAdminEnrole` : mot de passe du seed, secret TOTP connu — l'enrôlement par l'écran est ADM-SEC-2) ; ADM-CPT-1 retire
+la 2FA d'un compte pour montrer « 2FA à activer » ; ADM-CPT-9 vide les profils d'un compte en base pendant que l'écran est
+ouvert (« un autre admin l'a retiré ») ; ADM-CPT-8 remet le super administrateur du seed en `finally`. Chaque fiche retire
+les accès qu'elle a ouverts (la liste et la tuile « Invitations admin en attente » restent justes).
+
+| Fiche | Objet | Verdict |
+|---|---|---|
+| ADM-CPT-1 | La liste | **Conforme** — titre, sous-titre, colonnes « Nom, Email, Profils (cumulables), État » ; « invitation en attente », « 2FA active », « 2FA à activer » suivis de la date ; six cases avec indice ; tuile `pendingAdminInvites` = lignes « invitation en attente » ; lire ne journalise rien |
+| ADM-CPT-2 | Inviter un nouvel admin | **Conforme après correction** — champs requis, six cases et indices, note, « Support » par défaut, dernier profil indécochable ; « Compte créé, invitation envoyée (48 h). » ; ✉ « Ton accès au back-office Yamba », « Support + Finance », 48 h ; « Les deux mots de passe diffèrent. » ; mot de passe posé → `/login`, première étape `{ next: "SETUP" }` ; rôles `["ADMIN"]` seul ; rejeu 400 « This invitation link is invalid or expired. » et, à l'écran, « Ce lien d'invitation n'est plus valable… » (avant : le message anglais) ; `/invite` sans jeton ; journal `ADMIN_INVITED` (« Sacha S. », `existingAccount: false`) puis `ADMIN_INVITE_ACCEPTED` (« Inès I. ») |
+| ADM-CPT-3 | Adresse déjà connue | **Conforme après correction** — « Profils posés sur un compte existant, email envoyé. » ; ✉ « Accès au back-office Yamba accordé » vers `/login` ; `SHIPPER` conservé ; réinvitation 400 « This account already has an admin profile. », à l'écran « Ce compte a déjà un profil admin. » (avant : « 400 : This account… ») ; `ADMIN_INVITED` `existingAccount: true` |
+| ADM-CPT-4 | Profils et retrait | **Conforme après correction** — cocher envoie la liste complète (`["SUPPORT","FINANCE"]`), décocher la remplace (`["FINANCE"]`) ; dernier profil : aucun PATCH ; propre ligne : cases désactivées, « (toi) », pas de « Retirer » (avant : proposés, puis « 403 : You cannot… ») ; API 403 `ADMIN_IS_SELF` ×2 ; confirmation « Retirer l'accès admin de Recette CPT4 ? Sa 2FA et ses sessions admin sont supprimées. » ; profils `[]`, ADMIN retiré, TOTP et codes effacés, sessions Redis 0 ; session du retiré : `/admin/me` 401 et `/home` → `/login` ; journal `ADMIN_ROLE_CHANGED` ×2 avant/après puis `ADMIN_REVOKED` |
+| ADM-CPT-5 | Application perdue | **Conforme** — retirer puis réinviter : « accès accordé », connexion → `totp/setup` 200 (enrôlement) ; journal `ADMIN_REVOKED`, `ADMIN_INVITED` ; script `--revoke` puis `--role MEDIATOR` : profils vides entre les deux, 2FA à refaire, aucune ligne de journal |
+| ADM-CPT-6 (ajoutée) | Compte sans mot de passe réinvité ; ancien lien | **Conforme après correction** — ANO-ADM-75 : réponse `passwordRequired: false` et « accès accordé » vers un `/login` impossible ; désormais `passwordRequired: true`, ✉ lien de mot de passe, jamais « accès accordé ». ANO-ADM-76 (trouvée à la lecture du code : le jeton survivait au retrait et redevenait valable avec le profil ; prouvée par test unitaire) : l'ancien lien est refusé (400), le nouveau passe. Retrait d'un invité : `admin_invite:<jeton>` effacé |
+| ADM-CPT-7 (ajoutée) | Trois clics au même instant | **Conforme après correction** — ANO-ADM-79 : trois invitations d'une adresse inconnue `[201, 500, 500]`, désormais `[201, 400, 400]`, un compte ; ANO-ADM-77 (trouvée à la lecture : `get` → écriture → `del` ; prouvée par test unitaire — sur le code d'origine la fiche échoue plus tôt, sur les invitations) : trois acceptations `[200, 400, 400]`, une ligne `ADMIN_INVITE_ACCEPTED` |
+| ADM-CPT-8 (ajoutée) | Rétrogradations croisées | **Conforme après correction** — sur le poste, un troisième super administrateur en service existe (le compte du propriétaire) : les deux gestes passent légitimement, aucun 500, et la garde `admin-accounts` est écrite deux fois ; sans lui, l'attendu est `[200, 403]` `LAST_SUPER_ADMIN`. ANO-ADM-78 est prouvée de façon déterministe par `admin-admins.controller.spec.ts` (conflit simulé → rejeu → 403) |
+| ADM-CPT-9 (ajoutée) | Refus en français ; profil sans droit | **Conforme après correction** — compte retiré pendant que l'écran est ouvert : 404 → « Ce compte n'a plus d'accès admin. La liste est rechargée. » et la ligne disparaît (avant : « 404 : Admin account not found. », liste périmée) ; Finance : 403, un seul refus, ni formulaire ni tableau |
+| ADM-CPT-10 (ajoutée, lots a et b) | Auteur en liste ; avant → après | **Conforme après correction** — `/admin/audit/authors` : l'admin retiré présent `active: false`, trié, lisible par la Finance ; select « Auteur » → filtre serveur `adminUserId`, pastille ; « Profils : Support → Support + Finance », « Profils : Support + Finance → retiré », plus aucun « adminRoles : » dans le détail ; règle pure sur les formes réelles (statut, paramètre, clé sensible ignorée) |
+| ADM-CPT-11 (ajoutée, lot c) | Export du journal filtré | **Conforme après correction** — motif court 400 `REASON_TOO_SHORT` ; Finance et Données personnelles 403, bouton absent pour la Finance ; super administrateur : `text/csv`, en-tête des dix colonnes, seules les lignes de la cible, `'=HYPERLINK` neutralisé, aucun secret ; par l'écran : motif, téléchargement annoncé « … exportée(s) — …, journalisé » ; deux lignes `EXPORTED` `domain: "audit"` avec `filters: { targetId }`, aucune pour le refus |
+
+**Contre-épreuve.** Contrôleurs, routes, requêtes du journal et écrans d'origine remis (`git stash` sur
+`admin-admins.controller.ts`, `admin-roles.ts`, `admin-auth.controller.ts`, `admin.router.ts`, `admin-audit.query.ts`,
+`AdminsManager.tsx`, `InviteAccept.tsx`, `AuditTable.tsx` ; `format.ts` gardé pour que le harnais compile), auth-service
+rebâti, admin-ui rechargé à chaud : **CPT-2, 3, 4, 6, 7, 8, 9, 10, 11 rouges** ; CPT-1 et CPT-5 vertes (aucun code corrigé ;
+la réinvitation d'un compte AVEC mot de passe marchait). CPT-8 est rouge par la garde (non écrite), pas par l'invariant, pour
+la raison dite plus haut. Corrections remises, auth-service rebâti. Premier passage complet avec ADM-JRN, ADM-PRM, ADM-EXP,
+ADM-SEC : 35/38 — CPT-5 (borne du journal posée dans la même seconde que la réinvitation : `debutDuScenario()`), CPT-10
+(deux comptes « Recette CPT10 » d'exécutions précédentes : option visée par son identifiant) et JRN-3 (le détail d'un
+paramètre se lit désormais « clé : avant → après », A187 b) réalignées, puis vertes.
+
+### Anomalies
+
+- **ANO-ADM-75 (majeure) — un compte sans mot de passe réinvité ne pouvait plus entrer.** La branche « compte existant »
+  envoyait toujours « accès accordé » et un lien vers `/login`. Un invité retiré avant d'avoir accepté (ou un compte créé
+  par un réseau social) n'a pas de mot de passe : la procédure « retirer puis réinviter » du cahier (CPT-5) le laissait
+  dehors. Il reçoit désormais le lien pour définir son mot de passe. Close.
+- **ANO-ADM-76 (majeure) — un ancien lien d'invitation revivait.** Le jeton restait 48 h après un retrait, inoffensif
+  seulement tant que le compte n'avait pas de profil ; la réinvitation le rendait de nouveau valable (un email d'une
+  invitation annulée rouvrait l'accès). Un lien vivant par compte, effacé au retrait et remplacé à la réinvitation (A185).
+  Close.
+- **ANO-ADM-77 (majeure) — un lien d'invitation servait plusieurs fois.** Lire le jeton, écrire, puis l'effacer : trois
+  clics simultanés posaient trois mots de passe et trois lignes « Invitation acceptée ». Le jeton est réclamé avant
+  d'écrire. Close.
+- **ANO-ADM-78 (majeure) — deux rétrogradations croisées pouvaient laisser zéro super administrateur.** La garde « dernier
+  super administrateur » comptait hors transaction (et comptait une invitation en attente comme un filet) : deux super
+  administrateurs qui se rétrogradent au même instant voyaient chacun « 2 ». Comptage en service dans la transaction,
+  document de garde commun, rejeu (A186). Close.
+- **ANO-ADM-79 (majeure) — invitations simultanées → 500.** `[201, 500, 500]` (collision d'unicité non traduite) ; pour un
+  membre existant, trois promotions, trois lignes, trois emails. Désormais `[201, 400, 400]` et une seule promotion. Close.
+- **ANO-ADM-80 (mineure) — l'écran parlait anglais et proposait l'impossible.** « 403 : You cannot change your own
+  profile. », « 404 : Admin account not found. » sans recharger, message anglais sur la page d'invitation ; cases et
+  « Retirer » sur sa propre ligne ; OpenAPI annonçait 409 au lieu de 403. Refus en français par code, liste rechargée quand
+  elle est périmée, propre ligne neutralisée, contrat corrigé. Close.
+
+### Décisions (15/09) — inscrites au registre avant le code
+
+- **A185** — invitation : un lien vivant par compte (index `admin_invite_user`), réclamé à l'acceptation, lien de mot de
+  passe pour un compte sans mot de passe, `P2002` traduit en `ADMIN_ALREADY_GRANTED`, compte supprimé jamais promu.
+- **A186** — il reste toujours un super administrateur EN SERVICE (mot de passe, 2FA) : comptage dans la transaction,
+  document de garde `PlatformSettings { key: "admin-accounts" }`, rejeu des conflits. **L'engagement du § 7 sur
+  `admin-admins` est tenu ici** ; restent `admin-users` et `admin-auth`.
+- **A187** — lots du § 5.24 : auteurs du journal (`/admin/audit/authors`), « avant → après », export du journal filtré
+  réservé à `audit.read` ET `exports.personal` (le § 5.24 proposait `exports.operational` : écarté, les IP d'administrateurs
+  sont des données personnelles).
+
+### Améliorations faites (au-delà du cahier)
+
+- Propre ligne : « (toi) », cases désactivées, « ton accès » à la place de « Retirer ».
+- Message de réinvitation d'un compte sans mot de passe : « Profils posés sur un compte existant sans mot de passe : lien
+  pour en définir un envoyé (48 h). ».
+- `superAdminCount` supprimé (il comptait une invitation en attente comme un filet) ; `ADMIN_IS_SELF` refusé avant toute
+  lecture.
+- Un lien d'invitation dont l'écriture échoue est rendu pour son temps restant.
+- OpenAPI : 403 `ADMIN_IS_SELF` / `LAST_SUPER_ADMIN` sur `PATCH` et `DELETE`, 400 détaillé sur l'invitation, deux routes
+  du journal documentées.
+
+### Proposé, non fait
+
+- « Renvoyer l'invitation » sur une ligne « invitation en attente » (aujourd'hui : retirer puis réinviter, qui brouille le
+  journal) — une route `POST /admin/admins/:id/resend-invite` et une action `ADMIN_INVITE_RESENT`.
+- Un motif facultatif au retrait (« application perdue », « départ », « faute ») écrit au journal, pour lever l'ambiguïté
+  notée par le cahier (CPT-5).
+- Prévenir par email l'admin dont les profils changent ou dont l'accès est retiré (aujourd'hui : rien).
+- Afficher la date d'expiration du lien sur la ligne « invitation en attente » et la marquer « lien expiré » après 48 h.
+
+### Écarts avec le cahier
+
+- CPT-4 étape 3 : le cahier attend un 403 « en tentant » de changer sa propre ligne ; l'écran ne le propose plus (cases
+  désactivées, pas de « Retirer ») — le 403 est vérifié par l'API.
+- CPT-4 étape 4 : « s'il ne reste qu'un super administrateur, décocher son profil » est irréalisable par l'écran (on ne
+  touche pas à sa propre ligne, et viser un autre super administrateur suppose d'en être deux) ; la garde ne se déclenche
+  que sous gestes croisés ou si l'autre n'est pas en service — prouvée par test unitaire et ADM-CPT-8.
+- CPT-3 étape 5 : le refus reste **400** (le cahier), mais il est désormais aussi la réponse du perdant de deux invitations
+  simultanées.

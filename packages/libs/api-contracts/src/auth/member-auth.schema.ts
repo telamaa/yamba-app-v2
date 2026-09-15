@@ -162,7 +162,7 @@ export const AdminAuditItemSchema = z.object({ id: ObjectIdSchema, at: iso, admi
 export const AdminAuditResponseSchema = z
   .object({ items: z.array(AdminAuditItemSchema), nextCursor: ObjectIdSchema.nullable(), appliedFilters: z.array(z.string()).optional().meta({ description: "A149 — filtres réellement appliqués (une valeur mal formée est ignorée)" }) })
   .meta({ id: "AdminAuditResponse" });
-export const InviteAdminResponseSchema = z.object({ ok: z.literal(true), userId: ObjectIdSchema, existingAccount: z.boolean(), expiresInHours: z.number().int().optional() }).meta({ id: "InviteAdminResponse" });
+export const InviteAdminResponseSchema = z.object({ ok: z.literal(true), userId: ObjectIdSchema, existingAccount: z.boolean(), passwordRequired: z.boolean().meta({ description: "A185 — true when a password link was emailed (new account, or existing account without password)" }), expiresInHours: z.number().int().optional() }).meta({ id: "InviteAdminResponse" });
 export const UpdateAdminRoleResponseSchema = z.object({ ok: z.literal(true), adminRoles: z.array(z.string()), adminRole: z.string().nullable() }).meta({ id: "UpdateAdminRoleResponse" });
 export const SettingsHistoryItemSchema = z.object({ id: ObjectIdSchema, at: iso, admin: z.string(), action: z.string(), key: z.string().nullable(), before: z.number().nullable(), after: z.number().nullable(), reason: z.string().nullable(), version: z.number().int().nullable() }).meta({ id: "SettingsHistoryItem" });
 export const SettingsHistoryResponseSchema = z.object({ items: z.array(SettingsHistoryItemSchema), nextCursor: ObjectIdSchema.nullable() }).meta({ id: "SettingsHistoryResponse" });

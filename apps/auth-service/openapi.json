@@ -4264,6 +4264,233 @@
         }
       }
     },
+    "/admin/audit/authors": {
+      "get": {
+        "security": [
+          {
+            "adminCookieAuth": []
+          }
+        ],
+        "x-permission": "audit.read",
+        "tags": [
+          "admin"
+        ],
+        "summary": "Authors of the admin journal (A187) — every account that wrote at least one line, revoked admins included",
+        "operationId": "listAdminAuditAuthors",
+        "responses": {
+          "200": {
+            "description": "AdminAuditAuthors",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "active": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "active"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "items"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No ADMIN session: admin_access_token missing, expired or without amr pwd+totp (isAdminAuthenticated)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The ADMIN profile lacks the route permission (requireAdminPermission, ADMIN_PERMISSIONS matrix)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unhandled server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnhandledError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/audit/export": {
+      "get": {
+        "security": [
+          {
+            "adminCookieAuth": []
+          }
+        ],
+        "x-permission": "exports.personal",
+        "tags": [
+          "admin"
+        ],
+        "summary": "CSV export of the FILTERED admin journal (A187) — audit.read AND exports.personal, reason ≥ 20, journaled EXPORTED",
+        "description": "Same filters as GET /admin/audit. Contains admin IPs and user agents (personal data). Capped at EXPORT_MAX_ROWS, X-Truncated says so.",
+        "operationId": "exportAdminAudit",
+        "parameters": [
+          {
+            "name": "reason",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 20
+            },
+            "description": "Why this export"
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Lower bound (ISO)"
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Upper bound (ISO)"
+          },
+          {
+            "name": "adminUserId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Author"
+          },
+          {
+            "name": "action",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Action"
+          },
+          {
+            "name": "targetType",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Target type"
+          },
+          {
+            "name": "targetId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Target id or key"
+          },
+          {
+            "name": "ip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "IP"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "text/csv (BOM, RFC 4180, formula prefixes neutralised)",
+            "content": {
+              "text/csv": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request (ValidationError — details.errors per field when available)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No ADMIN session: admin_access_token missing, expired or without amr pwd+totp (isAdminAuthenticated)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The ADMIN profile lacks the route permission (requireAdminPermission, ADMIN_PERMISSIONS matrix)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unhandled server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnhandledError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/admin/settings": {
       "get": {
         "security": [
@@ -4884,7 +5111,7 @@
             }
           },
           "400": {
-            "description": "Invalid request (ValidationError — details.errors per field when available)",
+            "description": "Validation, ADMIN_ALREADY_GRANTED (also the loser of simultaneous invitations, A185), ACCOUNT_DELETED",
             "content": {
               "application/json": {
                 "schema": {
@@ -4992,7 +5219,7 @@
             }
           },
           "403": {
-            "description": "The ADMIN profile lacks the route permission (requireAdminPermission, ADMIN_PERMISSIONS matrix)",
+            "description": "ADMIN_IS_SELF, LAST_SUPER_ADMIN (A186: no other super administrator in service), or permission",
             "content": {
               "application/json": {
                 "schema": {
@@ -5068,7 +5295,7 @@
             }
           },
           "403": {
-            "description": "The ADMIN profile lacks the route permission (requireAdminPermission, ADMIN_PERMISSIONS matrix)",
+            "description": "ADMIN_IS_SELF, LAST_SUPER_ADMIN (A186: no other super administrator in service), or permission",
             "content": {
               "application/json": {
                 "schema": {
@@ -5079,16 +5306,6 @@
           },
           "404": {
             "description": "Not found (NotFoundError)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Last SUPER_ADMIN or yourself",
             "content": {
               "application/json": {
                 "schema": {
@@ -29766,6 +29983,10 @@
           "existingAccount": {
             "type": "boolean"
           },
+          "passwordRequired": {
+            "type": "boolean",
+            "description": "A185 — true when a password link was emailed (new account, or existing account without password)"
+          },
           "expiresInHours": {
             "type": "integer",
             "minimum": -9007199254740991,
@@ -29775,7 +29996,8 @@
         "required": [
           "ok",
           "userId",
-          "existingAccount"
+          "existingAccount",
+          "passwordRequired"
         ],
         "additionalProperties": false
       },

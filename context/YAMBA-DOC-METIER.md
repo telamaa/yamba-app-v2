@@ -6051,3 +6051,67 @@ leur ressemble seulement (`/api/maintenanceX`) est bloqué comme toute écriture
 **Tests d'acceptation.** ADM-JRN-1 à 4 (cahier) et 5 à 7 (ajoutées) dans `adm-jrn-journal.spec.ts` ; ADM-ETA-10
 (`adm-eta-etat-services.spec.ts`) ; ADM-MNT-7, 8 (`adm-mnt-maintenance.spec.ts`) ; exemptions et rythme du bandeau
 prouvés par `maintenance-rules.spec.ts` (auth-service).
+
+# Cahier 02-ADMIN, § 5.25 : comptes admin
+
+**Le besoin.** L'écran « Comptes admin » est la porte du back-office : le super administrateur y invite une personne, lui
+donne un ou plusieurs profils, les change, et retire l'accès. Une erreur ici ouvre le back-office à qui ne devrait pas y
+entrer, ou le ferme à tout le monde. Seul le super administrateur ouvre cet écran.
+
+**RG-ADM-CPT-01 — Inviter une adresse inconnue crée un compte sans rôle client** : le compte naît avec les profils cochés
+(au moins un), sans mot de passe, sans pouvoir publier ni réserver. Un email « Ton accès au back-office Yamba » nomme tous
+les profils et porte un lien valable 48 heures pour définir le mot de passe. La double authentification est activée à la
+première connexion.
+
+**RG-ADM-CPT-02 — Un lien d'invitation sert une fois, et un seul lien vit par compte (A185)** : le lien est consommé par
+le premier mot de passe posé, même si la personne clique trois fois au même instant (un seul mot de passe, une seule ligne
+« Invitation acceptée »). Une nouvelle invitation rend le lien précédent inutilisable ; retirer l'accès rend le lien en
+attente inutilisable. Un ancien lien ne revit jamais parce que le compte a retrouvé un profil.
+
+**RG-ADM-CPT-03 — Inviter une adresse connue** : un compte AVEC mot de passe reçoit « Accès au back-office Yamba accordé »
+et un lien vers la connexion ; il garde son rôle client. Un compte SANS mot de passe (invité retiré avant d'avoir accepté,
+compte créé par un réseau social) reçoit le lien pour définir un mot de passe — jamais un « accès accordé » vers une
+connexion où il ne peut rien saisir. Un compte qui a déjà un profil admin est refusé (« Ce compte a déjà un profil
+admin. ») ; un compte supprimé n'est jamais promu. Deux invitations simultanées de la même adresse créent un seul compte.
+
+**RG-ADM-CPT-04 — Changer les profils remplace la liste** : la sélection cochée devient la liste des profils (ce n'est pas
+une union avec l'ancienne) ; au moins un profil reste coché. Le journal écrit l'avant et l'après.
+
+**RG-ADM-CPT-05 — Personne ne touche à son propre accès** : sa propre ligne n'offre ni cases ni « Retirer » (mention
+« ton accès ») ; le serveur refuse de toute façon (403). Un autre super administrateur doit le faire.
+
+**RG-ADM-CPT-06 — Il reste toujours un super administrateur en service (A186)** : « en service » veut dire compte non
+supprimé, mot de passe posé et double authentification activée ; une invitation en attente n'est pas un filet. Rétrograder
+ou retirer un super administrateur est refusé s'il n'en reste aucun autre en service — y compris quand deux super
+administrateurs se rétrogradent l'un l'autre au même instant (l'un des deux gestes passe, l'autre est refusé).
+
+**RG-ADM-CPT-07 — Retirer l'accès efface tout ce qui est admin, jamais le compte** : profils vidés, rôle ADMIN retiré,
+secret de double authentification et codes de secours effacés, sessions admin fermées sur-le-champ, lien d'invitation en
+attente inutilisable ; le compte membre subsiste. La confirmation du navigateur l'annonce.
+
+**RG-ADM-CPT-08 — Un admin qui a perdu son application** : il n'existe pas d'écran de réinitialisation de la double
+authentification. La procédure : « Retirer », puis réinviter avec ses profils ; à la connexion suivante, l'enrôlement (code
+QR) est proposé. Le journal montre « Accès admin retiré » puis « Admin invité » (limite connue : on dirait une révocation
+pour faute). La variante par script n'écrit rien au journal et vide les profils entre ses deux commandes.
+
+**RG-ADM-CPT-09 — L'écran parle français** : chaque refus se lit en français d'après son code (soi-même, dernier super
+administrateur, compte qui n'a plus d'accès — liste rechargée —, compte déjà admin, lien d'invitation expiré) ; un profil
+sans le droit lit un seul refus en tête de page.
+
+**RG-ADM-JRN-08 — L'auteur se choisit dans une liste (A187 a)** : le filtre « Auteur » du journal propose tout compte
+auteur d'au moins une ligne, admin retiré compris (« (accès retiré) »), trié par nom ; le choix filtre en base.
+
+**RG-ADM-JRN-09 — Un changement se lit « avant → après » (A187 b)** : une ligne qui porte un état antérieur l'affiche en
+français, champ par champ — « Profils : Support → Support + Finance », « Profils : Finance → retiré », « Statut du compte :
+Actif → Suspendu », « clé du paramètre : 72 → 48 ». Une donnée sensible n'est jamais affichée.
+
+**RG-ADM-JRN-10 — Exporter le journal filtré (A187 c)** : l'export CSV reprend exactement les filtres de l'écran. Il contient
+les adresses IP et les navigateurs des administrateurs : c'est une donnée personnelle, réservée au super administrateur
+(droits de lecture du journal ET d'export nominatif), avec un motif de 20 caractères au moins écrit au journal avec les
+filtres, le nombre de lignes et la troncature (5 000 lignes au plus, dit par le fichier). La Finance lit le journal mais
+n'exporte pas ; le profil Données personnelles ne lit pas le journal. Une cellule qui commence comme une formule de tableur
+est neutralisée.
+
+**Tests d'acceptation.** ADM-CPT-1 à 5 (cahier) et 6 à 11 (ajoutées) dans `adm-cpt-comptes-admin.spec.ts` ; règles et
+gestes simultanés prouvés par `admin-accounts.rules.spec.ts` et `admin-admins.controller.spec.ts`, export et auteurs par
+`admin-audit.query.spec.ts` (auth-service).

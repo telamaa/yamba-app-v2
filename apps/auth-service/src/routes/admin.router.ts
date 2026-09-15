@@ -26,7 +26,7 @@ import {
   adminTotpSetup,
   adminTotpVerify,
   getAdminMe,
-  listAdminAudit,
+  listAdminAudit, listAdminAuditAuthors, exportAdminAudit,
   listAdminSessions,
   revokeAdminSessionById,
 } from "../controller/admin-auth.controller";
@@ -50,6 +50,8 @@ router.get("/admin/pilotage/corridors", isAdminAuthenticated, requireAdminPermis
 router.get("/admin/pilotage/drilldown", isAdminAuthenticated, requireAdminPermission("pilotage.read"), getPilotageDrilldown); // C-PR6c (D60 3A)
 router.delete("/admin/me/sessions/:jti", isAdminAuthenticated, revokeAdminSessionById);
 router.get("/admin/audit", isAdminAuthenticated, requireAdminPermission("audit.read"), listAdminAudit);
+router.get("/admin/audit/authors", isAdminAuthenticated, requireAdminPermission("audit.read"), listAdminAuditAuthors); // A187 a
+router.get("/admin/audit/export", isAdminAuthenticated, requireAdminPermission("audit.read"), requireAdminPermission("exports.personal"), exportAdminAudit); // A187 c — IP d'admins : donnée personnelle
 
 // C-PR8a (D62) — paramètres : lecture pour tous les profils, écriture bornée par portée DANS le service (une requête peut mêler métier et exploitation).
 router.get("/admin/settings", isAdminAuthenticated, requireAdminPermission("settings.read"), getSettings);
