@@ -796,6 +796,17 @@ Ordre de demarrage : auth -> trip -> gateway.
   sur le Fake + manoeuvres base). AMELIORATIONS : carte qui nomme le fournisseur, aide FR par divergence, statuts FR,
   refus par code, journal « Rapprochement fournisseur ». PIEGE : la memoire du Fake survit au rejeu du jeu d'essai (une
   fiche constate l'etat initial, ne l'exige pas). Tests : deal 598, harnais 419. Reste : § 5.14 a 8.
+- 15/09 : **CAHIER 02-ADMIN — § 5.17 PILOTAGE ET DRILLDOWN (branche `chore/recette-admin-5-17`, empilee sur #317)** — 6
+  scenarios CONFORMES (PIL-1 a 4 du cahier + PIL-5 « point = drilldown, remboursement date comme au rapport », PIL-6 fenetre
+  des corridors), verts deux fois. CONTRE-EPREUVE fiche par fiche sur le code du § 5.16 : PIL-1, 2, 4 conformes ; PIL-3, 5,
+  6 ROUGES. ANO-ADM-40 CLOSE (majeure) : le pilotage (auth-service `pilotage.rules.ts`) lisait le « Rembourse » comme le
+  rapport d'AVANT A166 → aout 0 € au pilotage / 10 € au rapport, septembre 91,16 € / 53,16 € ; drilldown « refunded » par
+  cumul. ANO-ADM-41 CLOSE (mineure) : un corridor du registre permanent des recherches ressortait dans toute fenetre, tout a
+  zero. A167 : la regle A166 (`refundEntries`…) DEMENAGE dans `@packages/api-contracts` (git mv + reexportation deal-service),
+  le pilotage l'emprunte ; drilldown « refunded » = un element par remboursement (`refundDrilldownItems`) ; corridors sans
+  activite dans la fenetre exclus. AMELIORATIONS : pied du drilldown en jours UTC (`utcPeriodLabel`, partage avec le
+  rapport), erreurs du pilotage en francais, fiche PIL-3 sur la periode la plus remplie. POSTE : coupure Redis non jouable
+  (Upstash), repli en tests unitaires. Tests : auth 252, deal 635, harnais 443. Reste : § 5.18 a 8.
 - 14/09 : **CAHIER 02-ADMIN — § 5.16 RAPPORT MENSUEL ET EXPORT FINANCES (branche `chore/recette-admin-5-16`, empilee sur
   #316)** — 5 scenarios CONFORMES (RPT-1, 2, 3 du cahier + RPT-4 « un mois clos ne change pas », RPT-5 annulation avant
   capture), verts deux fois. CONTRE-EPREUVE avant le code (pile encore sur le serveur du § 5.15) : RPT-4 et RPT-5 ROUGES.

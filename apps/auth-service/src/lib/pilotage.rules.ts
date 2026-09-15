@@ -3,7 +3,7 @@
  * ===================================================================
  * Courbes par semaine ISO ou par mois UTC, agrégats par corridor. Aucune base ni Redis ici.
  */
-import type { CorridorStat, PilotageGranularity, PilotageSeriesPoint } from "@packages/api-contracts";
+import { refundEntries, type CorridorStat, type PilotageDrilldownItem, type PilotageGranularity, type PilotageSeriesPoint, type RefundHistorySource } from "@packages/api-contracts";
 import { corridorKey } from "@packages/libs/redis/trip-stats";
 
 const DAY = 86_400_000;
@@ -60,7 +60,7 @@ export function periodsBetween(from: Date, to: Date, g: PilotageGranularity): Da
 export type SeriesInput = {
   userCreatedAts: Date[];
   tripPublishedAts: Date[];
-  bookings: Array<{
+  bookings: Array<RefundHistorySource & {
     requestedAt: Date;
     acceptedAt?: Date | null;
     deliveredAt?: Date | null;
@@ -115,7 +115,9 @@ export function buildSeries(input: SeriesInput, from: Date, to: Date, g: Pilotag
     if (b.status === "CANCELLED") { p = at(b.closedAt); if (p) { p.cancelled += 1; fin(p, cur).retentionCents += b.retentionCents ?? 0; } }
     p = at(b.capturedAt);
     if (p) { p._volume.set(cur, (p._volume.get(cur) ?? 0) + b.pricing.totalShipperCents); fin(p, cur).capturedCents += b.pricing.totalShipperCents; }
-    if ((b.refundAmountCents ?? 0) > 0) { p = at(b.refundedAt); if (p) fin(p, cur).refundedCents += b.refundAmountCents ?? 0; }
+    // A167 (recette § 5.17) — la règle du rapport, pas une copie : chaque remboursement RÉEL dans sa période (le cumul daté
+    // du dernier remboursement vidait les périodes précédentes ; une empreinte libérée comptait comme un remboursement).
+    for (const refund of refundEntries(b)) { p = at(refund.refundedAt); if (p) fin(p, cur).refundedCents += refund.amountCents; }
     if (b.payoutStatus === "SENT" || b.payoutStatus === "REVERSED") { p = at(b.payoutSentAt); if (p) fin(p, cur).paidOutCents += b.payoutAmountCents ?? 0; }
   }
   return [...points.values()].map(({ _volume, _fin, ...pt }) => ({
@@ -125,6 +127,26 @@ export function buildSeries(input: SeriesInput, from: Date, to: Date, g: Pilotag
     volume: [..._volume.entries()].sort().map(([currencyCode, capturedCents]) => ({ currencyCode, capturedCents })),
     finance: [..._fin.entries()].sort().map(([currencyCode, f]) => ({ currencyCode, ...f })),
   }));
+}
+
+/**
+ * A167 — le drilldown « Remboursé » : UN élément par remboursement réel tombé dans [start, end), avec SON montant et SA
+ * date. Un deal remboursé deux fois dans la période apparaît deux fois ; un deal remboursé le mois dernier et re-remboursé
+ * ce mois-ci n'apporte à ce mois que le second remboursement. Σ montants = point de la courbe.
+ */
+export function refundDrilldownItems(
+  bookings: Array<RefundHistorySource & { id: string; status: string; trip: { originCity: string; destinationCity: string }; pricing: { currencyCode: string } }>,
+  start: Date,
+  end: Date
+): PilotageDrilldownItem[] {
+  const items: PilotageDrilldownItem[] = [];
+  for (const b of bookings) {
+    for (const r of refundEntries(b)) {
+      if (r.refundedAt.getTime() < start.getTime() || r.refundedAt.getTime() >= end.getTime()) continue;
+      items.push({ kind: "DEAL", id: b.id, label: `${b.trip.originCity} → ${b.trip.destinationCity}`, at: r.refundedAt.toISOString(), status: b.status, amountCents: r.amountCents, currencyCode: b.pricing.currencyCode });
+    }
+  }
+  return items.sort((x, y) => x.at.localeCompare(y.at));
 }
 
 export type CorridorInput = {
@@ -174,6 +196,9 @@ export function buildCorridors(input: CorridorInput): CorridorStat[] {
   const out: CorridorStat[] = [];
   for (const r of rows.values()) {
     const s = input.stats.get(r.key);
+    // A167 (recette § 5.17, ADM-PIL-6) — le registre des corridors cherchés est PERMANENT, ses compteurs sont datés : un
+    // corridor cherché il y a six mois ressortait sur 7 jours avec des zéros. Rien dans la fenêtre = pas de ligne.
+    if (r.tripsPublished + r.requests + (s?.views ?? 0) + (s?.searches ?? 0) === 0) continue;
     const { _kgPrices, ...rest } = r;
     out.push({
       ...rest,

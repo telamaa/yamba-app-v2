@@ -14,7 +14,7 @@ import { ValidationError } from "@packages/error-handler";
 import type { AuthenticatedRequest } from "@packages/middleware/isAuthenticated";
 import { recordAdminAction } from "@packages/admin-audit";
 import { PilotageMetricSchema, type CorridorsResponse, type PilotageDrilldownItem, type PilotageDrilldownResponse, type PilotageGranularity, type PilotageSeriesResponse } from "@packages/api-contracts";
-import { buildCorridors, buildSeries, periodBounds, periodStart, nextPeriod } from "../lib/pilotage.rules";
+import { buildCorridors, buildSeries, periodBounds, periodStart, nextPeriod, refundDrilldownItems } from "../lib/pilotage.rules";
 
 export const PILOTAGE_CACHE_SECONDS = 60;
 const cacheKey = (name: string) => `yamba:pilotage:${name}`;
@@ -45,7 +45,7 @@ export const getPilotageSeries = async (req: AuthenticatedRequest, res: Response
         prisma.booking.findMany({
           where: { isDeleted: false, OR: [{ requestedAt: gte }, { acceptedAt: gte }, { deliveredAt: gte }, { completedAt: gte }, { closedAt: gte }, { disputedAt: gte }, { capturedAt: gte }, { refundedAt: gte }, { payoutSentAt: gte }] },
           // C-PR6c (D60 4A) — finances par période : remboursement, versement, retenue
-          select: { requestedAt: true, acceptedAt: true, deliveredAt: true, completedAt: true, closedAt: true, disputedAt: true, capturedAt: true, refundedAt: true, refundAmountCents: true, payoutStatus: true, payoutAmountCents: true, payoutSentAt: true, retentionCents: true, status: true, pricing: true },
+          select: { requestedAt: true, acceptedAt: true, deliveredAt: true, completedAt: true, closedAt: true, disputedAt: true, capturedAt: true, refundedAt: true, refundAmountCents: true, refundId: true, refunds: true, payoutStatus: true, payoutAmountCents: true, payoutSentAt: true, retentionCents: true, status: true, pricing: true },
         }),
         prisma.user.count({ where: { isDeleted: false } }),
         prisma.carrierPage.count({ where: { stripePayoutsEnabled: true } }),
@@ -128,13 +128,22 @@ export const getPilotageDrilldown = async (req: AuthenticatedRequest, res: Respo
       ]);
       items = rows.map((t) => ({ kind: "TRIP", id: t.id, label: `${t.originCity ?? "?"} → ${t.destinationCity ?? "?"}`, at: t.publishedAt!.toISOString(), status: String(t.status), amountCents: null, currencyCode: null }));
       total = count;
+    } else if (metric.data === "refunded") {
+      // A167 — un élément par remboursement réel de la période (liste A166). `refundedAt >= start` est un sur-ensemble : le
+      // DERNIER remboursement d'un deal est postérieur à tous les autres.
+      const rows = await prisma.booking.findMany({
+        where: { isDeleted: false, refundedAt: { gte: bounds.start } } as never,
+        select: { id: true, trip: true, status: true, pricing: true, capturedAt: true, refundedAt: true, refundAmountCents: true, refundId: true, refunds: true },
+      });
+      const all = refundDrilldownItems(rows.map((b) => ({ ...b, status: String(b.status) })), bounds.start, bounds.end);
+      total = all.length;
+      items = all.slice(0, DRILLDOWN_LIMIT);
     } else {
       const field = DEAL_DATE_FIELD[metric.data];
       const where: Record<string, unknown> = { isDeleted: false, [field]: range };
       if (metric.data === "completed" || metric.data === "revenue") where.status = "COMPLETED";
       if (metric.data === "cancelled") where.status = "CANCELLED";
       if (metric.data === "retention") { where.status = "CANCELLED"; where.retentionCents = { gt: 0 }; }
-      if (metric.data === "refunded") where.refundAmountCents = { gt: 0 };
       if (metric.data === "paidOut") where.payoutStatus = { in: ["SENT", "REVERSED"] };
       const [rows, count] = await Promise.all([
         prisma.booking.findMany({ where: where as never, orderBy: { [field]: "asc" } as never, take: DRILLDOWN_LIMIT, select: { id: true, trip: true, status: true, pricing: true, refundAmountCents: true, payoutAmountCents: true, retentionCents: true, requestedAt: true, acceptedAt: true, deliveredAt: true, completedAt: true, closedAt: true, disputedAt: true, capturedAt: true, refundedAt: true, payoutSentAt: true } }),
@@ -143,7 +152,6 @@ export const getPilotageDrilldown = async (req: AuthenticatedRequest, res: Respo
       const amount = (b: (typeof rows)[number]): number | null => {
         switch (metric.data) {
           case "captured": return b.pricing.totalShipperCents;
-          case "refunded": return b.refundAmountCents ?? null;
           case "paidOut": return b.payoutAmountCents ?? null;
           case "revenue": return b.pricing.commissionCents + b.pricing.premiumCents;
           case "retention": return b.retentionCents ?? null;

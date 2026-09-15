@@ -5579,6 +5579,66 @@ lecture du nouveau champ), **RPT-4 et RPT-5 rouges**, RPT-2 rouge à l'écran (a
   sans worktree — la pile tournait encore sur le serveur de la branche précédente ; les fiches ont été réordonnées pour
   que les preuves du rapport passent avant la lecture du nouveau champ.
 
+## Cahier 02-ADMIN — § 5.17 Pilotage et drilldown · **CONFORME après correction** (4 fiches + 2 ajoutées · 2 anomalies closes dont 1 majeure · 5 améliorations · 2 écarts · 6 scénarios, 4 min)
+
+`apps/e2e/src/admin/adm-pil-pilotage.spec.ts`. Le pilotage est une lecture du même argent que le rapport : trois
+invariants que ses courbes ne montrent pas — **courbe = rapport** (chaque mois, chaque mesure d'argent, au centime),
+**point = drilldown** (Σ des éléments = le point), **fenêtre = fenêtre** (un corridor n'apparaît que s'il a eu de
+l'activité dans la fenêtre). Compteurs Redis nourris par de vraies requêtes publiques d'un visiteur neuf (User-Agent
+propre) ; cache de 60 s attendu, jamais contourné. Jeu d'essai rejoué avant chaque fiche ; une manœuvre base (PIL-5) et une
+manœuvre Redis (PIL-6) consignées et défaites. **Contre-épreuve** sur le code du § 5.16, fiche par fiche : PIL-1, 2, 4
+conformes ; **PIL-3, 5, 6 rouges**. Après correction : 6/6 verts, deux passages.
+
+| Fiche | Ce qui est éprouvé | Verdict · Preuve |
+|---|---|---|
+| ADM-PIL-1 | Les courbes d'activité | **Conforme** — tuiles = API (63 comptes · 9 Voyageurs prêts · 10 trajets à venir) ; huit courbes exactement, libellés et indices du cahier ; « total » de chaque courbe = Σ des points servis ; « par mois » → 12 mois, « par semaine » → 3 mois ; toutes les périodes commencent un lundi, minuit UTC ; « sur » 1 / 6 / 12 / 24 / 3 mois → une lecture 200 chacun ; libellé « 7 sept. → 13 sept. 2026 » ; survol : repère pointillé et infobulle ; « calculé le … », puis « (cache) » au rechargement ; aucune ligne de journal ; Support → 403 |
+| ADM-PIL-2 | Les courbes de finances | **Conforme** — cinq courbes et indices ; pas de sélecteur de devise (une seule devise) ; les 12 mois × 5 mesures du pilotage = le rapport, au centime (revenu reconnu de septembre 14,88 €) |
+| ADM-PIL-3 | Drilldown, journal des seules inscriptions | **Conforme après amélioration** — « Agrandir » → pleine largeur, tableau « Période \| Deals terminés \| Variation », aide ; période la plus remplie (2026-W37) : 4 éléments, lien de chaque deal ; pied « 4 élément(s) · du 7 sept. 2026 au 13 sept. 2026 (UTC) » ; aucune ligne de journal ; « Inscriptions » → **une** ligne `PILOTAGE_DRILLDOWN_VIEWED USER` sans identifiant, `{ metric: signups, period, count }` ; liste bornée à 200. **Avant** : « du 14 sept. 2026, 02:00 au 21 sept. 2026, 02:00 » (heure locale, borne exclue affichée) |
+| ADM-PIL-4 | Corridors, demande sans offre | **Conforme** — colonnes du cahier ; trois recherches publiques « Nantes… → Cotonou » → ligne ambre « demande sans offre », 3 recherches, 3 sans résultat, 0 trajet ; deux vues de la page publique par le même visiteur le même jour → Paris → Brazzaville 323 → **324** (+1) ; texte explicatif ; 7 / 90 / 365 / 30 jours. ⏭ « couper Redis » : Redis distant (Upstash), repli prouvé en tests unitaires |
+| ADM-PIL-5 (ajoutée) | Point = drilldown, remboursement daté comme au rapport | **Conforme après correction** — 10 € remboursés le 15 août (document antérieur à A166), 5 € aujourd'hui, une demande annulée avant capture : août pilotage 10,00 € = rapport 10,00 € ; septembre 53,16 € = 53,16 € ; pour les deux mois et les cinq mesures d'argent, Σ drilldown = point, chaque élément daté dans sa période. **Avant** : août **0 €** au pilotage contre 10 € au rapport, septembre **91,16 €** contre 53,16 € (+10 € déplacés, +28 € d'empreinte libérée) (ANO-ADM-40) |
+| ADM-PIL-6 (ajoutée) | Fenêtre des corridors | **Conforme après correction** — un corridor inscrit au registre des recherches sans compteur dans la fenêtre : absent sur 7 jours ; aucune ligne toute à zéro. **Avant** : `ancien…>lome` listé, tout à zéro (ANO-ADM-41) |
+
+### Anomalies
+
+- **ANO-ADM-40 (majeure, close — A167)** — **le pilotage lisait l'argent comme le rapport d'avant A166.** `buildSeries`
+  (`apps/auth-service/src/lib/pilotage.rules.ts`) datait le cumul `refundAmountCents` du dernier remboursement et comptait
+  les empreintes libérées ; le drilldown « refunded » listait les deals dont `refundedAt` tombait dans la période, avec leur
+  CUMUL. Le pilotage contredisait le rapport qu'il prétend refléter (PIL-2 du cahier). Correction : la règle de A166 sort
+  dans `@packages/api-contracts` et le pilotage l'emprunte ; le drilldown rend un élément par remboursement.
+- **ANO-ADM-41 (mineure, close — A167)** — **un corridor cherché un jour ressortait dans toutes les fenêtres.** Le registre
+  des corridors cherchés (`yamba:stats:search:corridors`) est permanent ; `buildCorridors` ajoutait chacun, même sans aucun
+  compteur dans la fenêtre. Correction : pas de ligne sans trajet, demande, vue ni recherche dans la fenêtre.
+
+### Écarts
+
+- **Cahier, « drilldown… du {date} au {date} »** : l'écran dit désormais « du 7 sept. 2026 au 13 sept. 2026 (UTC) » (dernier
+  jour inclus) et, pour « Remboursé », « un élément par remboursement ».
+- **Poste** : « couper Redis » non jouable (Redis distant) — le repli de `buildCorridors` sans compteurs est couvert en test
+  unitaire ; celui du cache (`cached`, qui calcule en direct si Redis ne répond pas) est lu dans le code, pas testé —
+  *proposé* : un test du contrôleur avec un Redis qui jette.
+
+### Regard d'expert — produit ET test, une ligne par fiche
+
+- **PIL-1** — *Fait* : erreurs du pilotage en français (`pilotageRefusal`). *Proposé* : le « total » d'une courbe
+  d'inscriptions sur 24 mois mélange des périodes incomplètes (semaine en cours) — marquer la dernière période « en cours »
+  — petit.
+- **PIL-2** — *Constat* : conforme sur le jeu d'essai neuf, faux dès qu'un deal a deux remboursements (PIL-5). *Test* : la
+  comparaison courbe = rapport porte sur 12 mois × 5 mesures, pas sur un total.
+- **PIL-3** — *Fait* : pied en jours UTC (`utcPeriodLabel`, partagé avec le rapport). *Test* : la fiche ouvre la période la
+  plus remplie — un panneau vide ne prouve ni les liens ni le compteur. *Proposé* : filtrer le drilldown d'argent par la
+  devise choisie (aujourd'hui toutes devises confondues) — petit.
+- **PIL-4** — *Constat* : déduplication des vues conforme. *Proposé* : purger du registre les corridors sans recherche depuis
+  400 jours (durée de vie des compteurs) — petit ; le harnais retire les siens.
+- **PIL-5** — *Fait* : ANO-ADM-40, A167. *À trancher* : comme au § 5.16, l'historique des VERSEMENTS n'existe pas — « Versé »
+  d'un transfert renversé puis re-versé change de période.
+- **PIL-6** — *Fait* : ANO-ADM-41.
+- **Non-régression** — PIL (second passage), RPT, ARG, REM, ACC : 25/25 (7 min). Un premier lancement a eu 3 rouges
+  d'infrastructure (`PrismaClientInitializationError` au rejeu du jeu d'essai, `spawnSync npx ETIMEDOUT`) pendant une
+  coupure réseau du poste ; santé des six services et base vérifiées, relancé à l'identique.
+- **Transversal** — *Fait* : une règle d'argent, une implémentation (`packages/libs/api-contracts/src/booking/booking-refunds.ts`,
+  réexportée par deal-service). *Test* : deux invariants e2e (courbe = rapport, point = drilldown) protègent désormais
+  toute future mesure d'argent ajoutée à l'une des deux lectures.
+
 ---
 
 ## Observations (pas des anomalies, mais à savoir)

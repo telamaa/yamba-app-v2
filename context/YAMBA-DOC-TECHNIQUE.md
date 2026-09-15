@@ -8870,3 +8870,87 @@ rapport passe par `reportPeriodLabel` (UTC, borne de fin moins un jour) au lieu 
   la liste en base après une décision réelle.
 - `apps/e2e` : **437 scénarios** (432 + 5) ; ADM-ARG-3 porte l'invariant et sa contre-épreuve.
 - Typecheck des huit projets CI et du harnais ; cinq `openapi.json` régénérés (`AdminDealMoneyFile`, `MoneyBalance`).
+
+# Cahier 02-ADMIN, § 5.17 : pilotage et drilldown — une règle d'argent, une implémentation
+
+*(PR `chore/recette-admin-5-17`, empilée sur #317, 15/09/2026.)*
+
+## Ce qui a été fait
+
+Six scénarios (ADM-PIL-1 à 4 du cahier ; PIL-5, 6 ajoutées), deux anomalies closes (`ANO-ADM-40` majeure, `ANO-ADM-41`
+mineure), une décision (`A167`), cinq améliorations.
+
+```
+packages/libs/api-contracts/src/booking/booking-refunds.ts   A167 — la règle de A166 déménage (git mv), exportée par l'index
+apps/deal-service/src/lib/booking-refunds.ts                 réexportation (les imports de deal-service ne changent pas)
+apps/auth-service/src/lib/pilotage.rules.ts                  buildSeries lit refundEntries ; refundDrilldownItems ; corridors filtrés
+apps/auth-service/src/controller/admin-pilotage.controller.ts  select refunds ; branche « refunded » du drilldown
+apps/admin-ui/src/components/PilotageView.tsx                pied du drilldown en UTC, erreurs en français
+apps/admin-ui/src/lib/format.ts                              utcPeriodLabel (reportPeriodLabel s'appuie dessus)
+apps/e2e/src/admin/adm-pil-pilotage.spec.ts                  6 scénarios
+```
+
+## Ce que la recette a mesuré d'abord
+
+Chaque fiche jouée seule contre le code du § 5.16 (le mode série arrête le fichier au premier rouge) :
+- PIL-1, 2, 4 conformes — sur le jeu d'essai neuf, aucun deal n'a deux remboursements : pilotage et rapport concordent ;
+- PIL-5 : août pilotage **0 €** / rapport 10 € ; septembre **91,16 €** / 53,16 € ;
+- PIL-6 : un corridor du registre sans compteur ressort sur 7 jours, tout à zéro ;
+- PIL-3 : pied « du 14 sept. 2026, 02:00 au 21 sept. 2026, 02:00 ».
+
+## ANO-ADM-40 : la copie qui n'a pas suivi
+
+Le pilotage (auth-service) et le rapport (deal-service) calculent le même « Remboursé » dans deux services. Au § 5.16, le
+rapport a appris à lire `Booking.refunds` ; le pilotage avait sa propre ligne :
+
+```ts
+// avant — buildSeries
+if ((b.refundAmountCents ?? 0) > 0) { p = at(b.refundedAt); if (p) fin(p, cur).refundedCents += b.refundAmountCents ?? 0; }
+// après
+for (const refund of refundEntries(b)) { p = at(refund.refundedAt); if (p) fin(p, cur).refundedCents += refund.amountCents; }
+```
+
+`refundEntries` n'était pas importable par auth-service (fichier de deal-service). A167 la déplace dans
+`@packages/api-contracts`, déjà résolu par tous les services (tsconfig + alias webpack) :
+
+```sh
+git mv apps/deal-service/src/lib/booking-refunds.ts packages/libs/api-contracts/src/booking/booking-refunds.ts
+```
+
+et laisse à sa place une réexportation d'une ligne, pour ne toucher aucun import de deal-service. La spec
+`booking-refunds.spec.ts` reste dans deal-service (api-contracts n'a pas de projet de tests) et passe par la réexportation.
+
+### Le drilldown « Remboursé »
+
+```ts
+export function refundDrilldownItems(bookings, start, end): PilotageDrilldownItem[] {
+  for (const b of bookings) for (const r of refundEntries(b))
+    if (r.refundedAt in [start, end)) items.push({ kind: "DEAL", id: b.id, at: r.refundedAt, amountCents: r.amountCents, … });
+  return items.sort(par date);
+}
+```
+
+La requête prend `refundedAt >= start` (sur-ensemble : le dernier remboursement d'un deal est postérieur aux autres), le
+tri et la borne de 200 se font après. Un deal remboursé deux fois dans la période apparaît deux fois : chaque ligne est un
+fait, et Σ lignes = point.
+
+## ANO-ADM-41 : un registre permanent, des compteurs datés
+
+`searchedCorridors(redis)` rend l'ensemble `yamba:stats:search:corridors`, qui ne se vide jamais ; les compteurs
+(`…:search:corridor:<corridor>:<jour>`) vivent 400 jours et sont lus sur la fenêtre. `buildCorridors` gardait toute clé du
+registre. Désormais :
+
+```ts
+if (r.tripsPublished + r.requests + (s?.views ?? 0) + (s?.searches ?? 0) === 0) continue;
+```
+
+Redis absent → `stats` vide → un corridor seulement cherché n'apparaît pas (rien d'inventé), les corridors à trajets ou
+demandes restent.
+
+## Tests
+
+- auth-service **252** (+3) : courbe « Remboursé » par remboursement et sans empreinte libérée, drilldown un élément par
+  remboursement (Σ = point, deux remboursements du même deal), corridors sans activité exclus et Redis absent.
+- deal-service **635** (inchangé : la règle est la même, importée autrement).
+- `apps/e2e` : **443 scénarios** (437 + 6).
+- Typecheck des huit projets CI et du harnais ; OpenAPI inchangé (fonctions pures, aucun schéma).
