@@ -3,6 +3,23 @@
 *Ce document sert à REPRENDRE le chantier après une pause. Il dit où en est la campagne, ce qui
 tourne sur le poste, ce qui reste à faire, et les pièges déjà payés qu'il ne faut pas repayer.*
 
+> ## ▶ 15/09/2026 — § 5.20 LIVRÉ
+>
+> Branche `chore/recette-admin-5-20` empilée sur #320 : 12 scénarios ADM-PAR (+ ADM-SIG-10, 11, SIG-5 renforcée),
+> ANO-ADM-51, 52 (majeures), 53, 54, 55, 56 closes ; A169 (échéance de litige figée, `Dispute.responseDueAt` — `prisma
+> generate` + rebâtir deal-service), A170 (refus de page unique), A171 (décision de signalement lue au journal).
+> Décisions de l'utilisateur du 15/09 intégrées : SCAM = « Arnaque suspectée » partout ; décision visible sous
+> « traité / sans suite » ; un seul refus par page refusée. **ENGAGEMENT § 7** : le rejeu des conflits d'écriture
+> (P2034 → 500) sur `admin-admins.controller.ts`, `admin-users.controller.ts`, `admin-auth.controller.ts` se traite au
+> § 7 (salve simultanée), rien n'est codé avant. Chiffres : auth **263**, deal **637**, message **57**, trip **293**,
+> harnais **471** ; dernière anomalie ANO-ADM-56 ; dernier arbitrage A171 ; dernier chapitre d'apprentissage **178**.
+> POSTE : les quatre services touchés (auth, trip, deal FAKE, message) tournent en bundles `nohup` ; user-ui (`next dev`)
+> était tombé pendant la contre-épreuve — relancé en `nohup` depuis `apps/user-ui`. Pièges : `getByRole("alert")` attrape
+> aussi l'annonceur de route de Next (`#__next-route-announcer__`) → le chercher dans `main` ; un rejeu d'ADM-PAR-2 laisse
+> ses lignes d'historique (le journal n'est jamais purgé) → `.first()` ; A169 : un litige ouvert ne devient plus décidable
+> en abaissant le délai — `reouvrirLesLitigesSousUnDelai(h)` (`pages/ecran-admin.ts`) ; ne jamais modifier `seed-deals.ts` pendant une
+> exécution sans `prisma generate` (le seed casse et vide le jeu d'essai). Suite : § 5.21 (RGPD).
+>
 > ## ▶ 15/09/2026 — § 5.19 LIVRÉ
 >
 > Branche `chore/recette-admin-5-19` empilée sur #319 : 9 scénarios ADM-SIG, contre-épreuve rouge sur SIG-5 à 9,

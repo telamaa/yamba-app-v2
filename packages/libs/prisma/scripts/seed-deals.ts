@@ -655,6 +655,7 @@ async function main() {
           desiredOutcome: "PARTIAL_REFUND",
           photoUrls: [],
           pledgeAcceptedAt: m.disputedAt ?? NOW,
+          responseDueAt: new Date((m.disputedAt ?? NOW).getTime() + 72 * 3_600_000), // ANO-ADM-52 — échéance figée à l'ouverture (défaut 72 h)
         },
       });
     }

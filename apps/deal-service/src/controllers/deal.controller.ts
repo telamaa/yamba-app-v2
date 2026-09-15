@@ -141,6 +141,7 @@ export const getDeal = async (
               createdAt: true,
               status: true,
               carrierRespondedAt: true,
+              responseDueAt: true, // ANO-ADM-52
               resolutionOutcome: true,
               resolutionRefundCents: true,
               resolutionCarrierPayoutCents: true,

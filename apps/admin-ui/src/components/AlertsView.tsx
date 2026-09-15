@@ -13,6 +13,7 @@ import Link from "next/link";
 import { apiFetch } from "@/lib/api";
 import { can, type AdminPermission } from "@/lib/permissions";
 import type { AdminMe, OpsAlertsResponse } from "@/lib/types";
+import { isPermissionRefusal, useDenyPage } from "./PageAccess";
 
 /**
  * Recette 02-ADMIN § 5.11 — une alerte de versement menait le Support (kpi.read, sans finances.read) vers un écran qui
@@ -29,6 +30,7 @@ const destinationOf = (href: string) => DESTINATION.find((d) => href.startsWith(
 export default function AlertsView() {
   const [data, setData] = useState<OpsAlertsResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const deny = useDenyPage(); // décision du 15/09 : un refus de permission remplace la page entière
   const [me, setMe] = useState<AdminMe | null>(null);
 
   useEffect(() => {
@@ -36,7 +38,7 @@ export default function AlertsView() {
   }, []);
 
   useEffect(() => {
-    apiFetch<OpsAlertsResponse>("/admin/alerts").then(setData).catch((e) => setError(e.message));
+    apiFetch<OpsAlertsResponse>("/admin/alerts").then(setData).catch((e) => (isPermissionRefusal(e) ? deny("Ton profil ne lit pas les alertes de seuil.") : setError("Alertes indisponibles pour le moment. Recharge la page.")));
   }, []);
 
   if (error) return <p className="mt-4 text-[13px] text-red-700">{error}</p>;

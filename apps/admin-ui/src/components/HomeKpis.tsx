@@ -87,7 +87,7 @@ export default function HomeKpis() {
       )}
       {settings?.lastChange && (
         <p className="mt-5 rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-[12.5px] text-slate-800">
-          <b>Paramètres modifiés</b> le {new Date(settings.lastChange.at).toLocaleString("fr-FR")} par {settings.lastChange.byName} : {settings.lastChange.keys.join(", ")} —{" "}
+          <b>Paramètres modifiés</b> le {new Date(settings.lastChange.at).toLocaleString("fr-FR")} par {settings.lastChange.byName} : {settings.lastChange.keys.map((k) => settings.catalog.find((d) => d.key === k)?.label ?? k).join(", ") /* recette § 5.20 : le libellé, pas la clé technique */} —{" "}
           <Link href="/settings" className="underline">voir les paramètres</Link>
         </p>
       )}

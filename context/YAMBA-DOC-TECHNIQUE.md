@@ -9123,3 +9123,113 @@ le clôt (la décision ne lit pas la cible). L'écran n'affiche pas de lien vers
   rejouée.
 - `apps/e2e` : **457 scénarios** (448 + 9). Voisins rejoués : ADM-CNV (5) et WEB-SIG (8) verts.
 - Typecheck auth-service, message-service, admin-ui ; cinq `openapi.json` régénérés.
+
+
+# Cahier 02-ADMIN, § 5.20 : paramètres de la plateforme — un gagnant, un délai tenu, un refus lisible
+
+*(PR `chore/recette-admin-5-20`, empilée sur #320, 15/09/2026.)*
+
+## Ce qui a été fait
+
+Douze scénarios ADM-PAR (1 à 7 du cahier ; 8 à 12 ajoutées), six anomalies closes (`ANO-ADM-51`, `52` majeures ;
+`53`, `54`, `55`, `56` mineures), trois arbitrages (A169 échéance de litige figée, A170 refus de page unique, A171 décision de
+signalement lue au journal) et trois décisions de l'utilisateur du 15/09 intégrées comme lots à part : libellé `SCAM`
+unique, décision visible sous « traité / sans suite », refus de page unique.
+
+```
+apps/auth-service/src/services/platform-settings.service.ts     ANO-ADM-51 rejeu P2034 + P2002 → 409 STALE_VERSION ; ANO-ADM-54 codes SETTING_OUT_OF_BOUNDS / SETTINGS_INCOHERENT
+apps/auth-service/src/controller/admin-settings.controller.ts   ANO-ADM-53 valeurs de l'email par formatSettingValue ; code INVALID_SETTINGS_REQUEST
+apps/auth-service/src/emails/admin-emails.ts                    formatSettingValue(locale, unit, value)
+apps/auth-service/src/services/platform-settings.service.ts     ANO-ADM-56 « dernière modification » = même version, même auteur, même transaction
+prisma/schema.prisma                                            Dispute.responseDueAt (A169)
+apps/deal-service/src/services/deal-settlement.service.ts       responseDueAt écrit à l'ouverture
+apps/deal-service/src/services/deal-mediation.service.ts        disputeResponseDeadline / isDisputeDecidable préfèrent responseDueAt
+apps/deal-service/src/services/admin-dispute.service.ts         file et dossier : responseDueAt
+apps/deal-service/src/services/booking-view.mapper.ts           vue Voyageur : responseDeadlineAt = responseDueAt
+apps/deal-service/src/services/ops-alerts.{rules,service}.ts    alerte « litige décidable » : responseDueAt
+apps/deal-service/src/controllers/deal.controller.ts            select responseDueAt
+packages/libs/prisma/scripts/seed-deals.ts                      responseDueAt sur les litiges du jeu d'essai
+apps/admin-ui/src/lib/settings-format.ts                        settingsRefusalMessage ; aperçu « 3,00 € »
+apps/admin-ui/src/components/PlatformSettingsEditor.tsx         envoi unique (useRef), refus par code, réinitialisation périmée rechargée
+apps/admin-ui/src/components/HomeKpis.tsx                       bandeau « Paramètres modifiés » : libellés, pas les clés
+apps/trip-service/src/controllers/pricing-params.controller.ts   Cache-Control « public, no-cache » (le max-age=30 navigateur s'ajoutait au cache 30 s du lecteur)
+--- décisions du 15/09 ---
+packages/libs/api-contracts/src/admin/report-decision.schema.ts ReportDecisionSchema + reportDecisionsFrom (A171)
+packages/libs/api-contracts/src/admin/reports.schema.ts         AdminReportItem.decision
+packages/libs/api-contracts/src/messaging/messaging.schema.ts   AdminMessageReportItem.decision
+apps/auth-service/src/services/report.service.ts                décision lue au journal (REPORT_REVIEWED)
+apps/message-service/src/services/admin-conversation.service.ts décision lue au journal (MESSAGE_REPORT_REVIEWED)
+apps/admin-ui/src/lib/format.ts                                 reportDecisionLine ; SCAM « Arnaque suspectée »
+apps/admin-ui/src/components/{Reports,MessageReports}Queue.tsx  ligne de décision ; refus de page
+apps/admin-ui/src/components/PageAccess.tsx                     refus de page unique (A170)
+apps/admin-ui/src/app/(back)/<14 pages>/page.tsx                enveloppées de <PageAccess>
+apps/admin-ui/src/components/<12 écrans>.tsx                    lecture principale : 403 → useDenyPage()
+apps/user-ui/messages/{fr,en}/messaging.json                    SCAM « Arnaque suspectée » / « Suspected scam »
+docs/recette, docs/livrables                                     libellé SCAM aligné
+tests : platform-settings.service.spec (+3), admin-emails.spec (4, nouveau), report.service.spec (+1),
+        deal-mediation.service.spec (+1), ops-alerts.rules.spec (+1), deal-settlement.service.spec (ajusté),
+        admin-report-decision.spec (3, nouveau), admin-report-queue.spec (mock adminAction), pricing-params.controller.spec (1, nouveau)
+e2e   : adm-par-parametres.spec.ts (12), adm-sig-signalements.spec.ts (SIG-5 renforcée, SIG-10, SIG-11), web-msg (libellé),
+        pages/ecran-admin.ts reouvrirLesLitigesSousUnDelai (ADM-MED, ADM-RPT), adm-acc-accueil (libellé du bandeau), adm-med-mediation (MED-9 attend son email)
+```
+
+## Ce que la recette a mesuré d'abord
+
+Premier passage, sur le code du § 5.19 :
+- trois `PATCH /admin/settings` simultanés sur un document ABSENT : `[200, 500, 500]` ;
+- trois seuils modifiés par l'Exploitation : l'email français dit « 48 hours → 50 hours », « 7 days → 8 days » ;
+- une commission de 50 % saisie à l'écran : « 400 : Some values are out of bounds. — pricing.commissionPct : Must be
+  between 5 and 20 (percent). » ;
+- en lisant le code avant d'écrire la fiche PAR-9 : l'échéance d'un litige ouvert (`disputedAt + delayHours`) était
+  recalculée à chaque lecture avec le paramètre COURANT — la vue Voyageur, le dossier, la garde de décision et l'alerte.
+
+Contre-épreuve (corrections mises de côté, bundles auth / deal / message / trip rebâtis) : document absent `[200, 409, 500]`,
+présent `[200, 500, 500]` ; PAR-9 : délai ramené à 12 h → échéance du 17/09 10:25 affichée au 14/09 22:25, dans le dossier
+d'arbitrage ET dans la vue du Voyageur ; PAR-12, SIG-5, SIG-11 : aucune des quatorze pages ne rendait un bloc de refus ;
+SIG-10 : aucune décision servie.
+
+## Pourquoi un 500 quand deux administrateurs enregistrent
+
+Le verrou de version était déjà juste (`updateMany({ where: { key, version } })`, 409 si `count !== 1`). Deux accidents
+passaient à côté : (1) sur un document présent, MongoDB annule la transaction perdante (`P2034`) avant la garde — même
+cause qu'ANO-ADM-46 ; (2) sur un document ABSENT (après `seed-settings.ts`, ou au premier réglage en production), les
+trois transactions voient « pas de document » et font `create` : la clé unique `key` refuse les deux dernières (`P2002`).
+Correction : `withWriteConflictRetry` autour de la transaction (au réessai, la version a bougé → 409), et `P2002` sur
+cette écriture traduit en `ConflictError(STALE_VERSION)` — la collision de création EST le verrou.
+
+```ts
+const nextVersion = await withWriteConflictRetry(() => deps.db.$transaction(async (tx) => { … })).catch((e: unknown) => {
+  if ((e as { code?: string } | null)?.code === "P2002") throw new ConflictError("The settings changed meanwhile: reload and try again.", { code: "STALE_VERSION" });
+  throw e;
+});
+```
+
+## Pourquoi figer l'échéance d'un litige (A169)
+
+« Jamais rétroactif » (D62) était tenu pour le prix — snapshot dans le deal — mais pas pour le délai de réponse : il
+n'était stocké nulle part. Le Voyageur lit « tu as jusqu'au … » ; si l'on raccourcit le paramètre, la date qu'il a lue
+recule et le médiateur peut trancher sans sa version. `Dispute.responseDueAt` est écrit à l'ouverture ; les lecteurs font
+`dispute.responseDueAt ?? disputedAt + délai courant`. Champ optionnel : aucune migration, aucun rattrapage — un dossier
+antérieur garde le comportement d'avant jusqu'à sa clôture (lecture seulement, cf. le piège Prisma + Mongo sur les champs
+absents : ici on ne FILTRE jamais sur `responseDueAt`, on le lit).
+
+## Côté écran
+
+- `settingsRefusalMessage(e, catalog)` lit `details.code` (A146) : pour que la clé fautive atteigne l'écran en production,
+  le serveur pose désormais un code sur ses 400 (`SETTING_OUT_OF_BOUNDS`, `SETTINGS_INCOHERENT`,
+  `INVALID_SETTINGS_REQUEST`) — sans code, le middleware masque `details` en production.
+- Envoi unique : `sending = useRef(false)` testé et posé AVANT le premier `await` ; un `useState` seul ne suffit pas si
+  deux clics arrivent avant le rendu.
+- `resetAll` : même lecture du refus ; un 409 ferme le panneau, vide les saisies et recharge.
+- `PageAccess` (A170) : un contexte React fournit `deny(texte)` ; la page enveloppée se remplace par titre + refus.
+- La ligne de décision d'un signalement (`reportDecisionLine`) : « Traité par Nadia le … · note : « … » ».
+
+## Tests
+
+- auth-service **263** (+9), deal-service **637** (+2), message-service **57** (+3), trip-service **293** (+1).
+- Harnais aligné sur A169 : ADM-MED et ADM-RPT abaissaient le délai de réponse APRÈS l'ouverture pour rendre un litige
+  décidable — c'est précisément ce qui ne marche plus ; `reouvrirLesLitigesSousUnDelai(heures)` pose l'échéance en base
+  (manœuvre consignée). ADM-ACC-3, en rejouant, a révélé ANO-ADM-56 : le bandeau d'accueil groupait la dernière écriture
+  par sa seule version, réutilisée après une remise à zéro du document.
+- `apps/e2e` : **471 scénarios** (457 + 12 ADM-PAR + 2 ADM-SIG).
+- Typecheck auth, deal, message, admin-ui, user-ui, harnais ; cinq `openapi.json` régénérés (`ReportDecision`).

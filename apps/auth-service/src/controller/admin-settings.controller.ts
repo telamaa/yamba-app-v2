@@ -11,7 +11,7 @@ import { ValidationError } from "@packages/error-handler";
 import type { AuthenticatedRequest } from "@packages/middleware/isAuthenticated";
 import { platformSettings } from "@packages/libs/settings/default";
 import { sendAuthEmail } from "../emails/send-auth-email";
-import { getAdminEmails } from "../emails/admin-emails";
+import { formatSettingValue, getAdminEmails } from "../emails/admin-emails";
 import { makePlatformSettingsService, type SettingsNotification, type SettingsWriterDb } from "../services/platform-settings.service";
 
 const ADMIN_UI_URL = process.env.ADMIN_UI_URL || "http://localhost:3001";
@@ -25,12 +25,6 @@ function zodErrors(issues: Array<{ path: PropertyKey[]; message: string }>) {
 function actorOf(req: AuthenticatedRequest) {
   const roles = (req.adminRoles && req.adminRoles.length ? req.adminRoles : [req.adminRole].filter(Boolean)) as AdminRole[];
   return { id: req.user.id, roles, ip: req.ip ?? null, userAgent: req.headers["user-agent"] ?? null };
-}
-function fmt(def: ReturnType<typeof settingDefinition>, v: number): string {
-  if (!def) return String(v);
-  if (def.unit === "cents") return `${(v / 100).toFixed(2)} €`;
-  if (def.unit === "percent") return `${v} %`;
-  return `${v} ${def.unit}`;
 }
 
 /** Email à tous les SUPER_ADMIN, dans la langue de chacun (best effort). */
@@ -47,7 +41,7 @@ async function notifySuperAdmins(n: SettingsNotification): Promise<void> {
         reason: n.reason,
         changes: n.changes.map((c) => {
           const def = settingDefinition(c.key);
-          return { label: def?.label ?? c.key, before: fmt(def, c.before), after: fmt(def, c.after) };
+          return { label: def?.label ?? c.key, before: def ? formatSettingValue(locale, def.unit, c.before) : String(c.before), after: def ? formatSettingValue(locale, def.unit, c.after) : String(c.after) }; // ANO-ADM-53
         }),
         settingsUrl: `${ADMIN_UI_URL}/settings`,
         reset: n.reset,
@@ -74,7 +68,7 @@ export const getSettings = async (_req: AuthenticatedRequest, res: Response, nex
 export const updateSettings = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const parsed = UpdateSettingsRequestSchema.safeParse(req.body);
-    if (!parsed.success) throw new ValidationError("Invalid request", { errors: zodErrors(parsed.error.issues) });
+    if (!parsed.success) throw new ValidationError("Invalid request", { code: "INVALID_SETTINGS_REQUEST", errors: zodErrors(parsed.error.issues) }); // ANO-ADM-54
     return res.status(200).json(await platformSettingsService.update(actorOf(req), parsed.data));
   } catch (e) {
     return next(e);
@@ -84,7 +78,7 @@ export const updateSettings = async (req: AuthenticatedRequest, res: Response, n
 export const resetSettings = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const parsed = ResetSettingsRequestSchema.safeParse(req.body);
-    if (!parsed.success) throw new ValidationError("Invalid request", { errors: zodErrors(parsed.error.issues) });
+    if (!parsed.success) throw new ValidationError("Invalid request", { code: "INVALID_SETTINGS_REQUEST", errors: zodErrors(parsed.error.issues) }); // ANO-ADM-54
     return res.status(200).json(await platformSettingsService.reset(actorOf(req), parsed.data));
   } catch (e) {
     return next(e);

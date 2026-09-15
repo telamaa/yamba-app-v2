@@ -796,6 +796,23 @@ Ordre de demarrage : auth -> trip -> gateway.
   sur le Fake + manoeuvres base). AMELIORATIONS : carte qui nomme le fournisseur, aide FR par divergence, statuts FR,
   refus par code, journal « Rapprochement fournisseur ». PIEGE : la memoire du Fake survit au rejeu du jeu d'essai (une
   fiche constate l'etat initial, ne l'exige pas). Tests : deal 598, harnais 419. Reste : § 5.14 a 8.
+- 15/09 : **CAHIER 02-ADMIN — § 5.20 PARAMETRES DE LA PLATEFORME (branche `chore/recette-admin-5-20`, empilee sur #320)** —
+  12 scenarios CONFORMES (PAR-1 a 7 du cahier + PAR-8 salve simultanee document absent / present, PAR-9 echeance de
+  litige, PAR-10 refus a l'ecran, PAR-11 document illisible, PAR-12 page refusee), verts deux fois. CONTRE-EPREUVE : PAR-2,
+  3, 8, 9, 10, 12 ROUGES (PAR-1, 4, 5, 6, 7, 11 hors code corrige). ANO-ADM-51 CLOSE (majeure) : ecritures simultanees →
+  500 (P2002 a la creation, P2034 a la mise a jour) → rejeu + P2002 = 409 STALE_VERSION. ANO-ADM-52 CLOSE (majeure) :
+  l'echeance d'un litige OUVERT suivait le parametre courant (72 h → 12 h : date annoncee au Voyageur reculee, dossier
+  decidable) → A169 `Dispute.responseDueAt` fige a l'ouverture. ANO-ADM-53 (mineure) : email « 48 hours » → formatSettingValue.
+  ANO-ADM-54 (mineure) : refus « 400 : anglais » et 400 sans code (cle fautive masquee en production) → codes +
+  settingsRefusalMessage. ANO-ADM-55 (mineure) : reinitialisation perimee sans rechargement. ANO-ADM-56 (mineure, voisin ACC-3) : bandeau d'accueil
+  additionnant des ecritures de meme version (document remis a zero). HARNAIS : MED / RPT reouvrent les litiges sous un
+  delai (A169). AMELIORATIONS : apercu « 3,00 € »,
+  envoi unique, bandeau d'accueil en libelles, pricing params `no-cache` (le cache navigateur s'ajoutait au cache 30 s).
+  DECISIONS DU 15/09 INTEGREES : SCAM = « Arnaque suspectee » partout ; A171 decision de signalement (qui, quand, note)
+  lue au journal sous « traite / sans suite », deux files ; A170 un seul refus par page refusee (`PageAccess`, 14 pages,
+  refus du SERVEUR). ENGAGEMENT § 7 : rejeu P2034 sur admin-admins / admin-users / admin-auth. A TRANCHER : conditions
+  d'annulation figees a l'acceptation ? version monotone apres seed-settings ; reset API de l'Exploitation ; regle
+  plafond ≥ prime inatteignable. Tests : auth 263, deal 637, message 57, trip 293, harnais 471. Reste : § 5.21 a 8.
 - 15/09 : **CAHIER 02-ADMIN — § 5.19 SIGNALEMENTS (branche `chore/recette-admin-5-19`, empilee sur #319)** — 9 scenarios
   CONFORMES (SIG-1 a 5 du cahier + SIG-6 cible disparue, SIG-7 double clic / deux admins, SIG-8 salve simultanee dans les
   deux files, SIG-9 « Compte neuf »), verts deux fois. CONTRE-EPREUVE : SIG-5 a 9 ROUGES, SIG-1 a 4 hors code corrige.

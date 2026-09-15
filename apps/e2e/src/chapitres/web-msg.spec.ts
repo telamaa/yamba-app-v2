@@ -45,7 +45,7 @@ const REPONSES_RAPIDES = [
   "Le destinataire est prévenu et disponible.",
   "Appelle-moi quand tu arrives.",
 ];
-const MOTIFS_SIGNALEMENT = ["Veut sortir de Yamba (paiement ou envoi en dehors)", "Tentative d'arnaque", "Propos déplacés ou harcèlement", "Autre"];
+const MOTIFS_SIGNALEMENT = ["Veut sortir de Yamba (paiement ou envoi en dehors)", "Arnaque suspectée", "Propos déplacés ou harcèlement", "Autre"];
 const MESSAGE_A = "Bonjour Thomas, le colis est prêt.";
 const REPONSE_B = "Parfait, à demain !";
 

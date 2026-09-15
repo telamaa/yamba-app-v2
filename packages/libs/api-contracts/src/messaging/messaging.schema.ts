@@ -5,6 +5,7 @@
  * (proposé / accepté), pas une suite de messages ; le fil sert au reste.
  */
 import { z } from "zod";
+import { ReportDecisionSchema } from "../admin/report-decision.schema";
 import { ObjectIdSchema } from "../common";
 
 export const MESSAGE_MAX_LENGTH = 2000;
@@ -206,6 +207,8 @@ export const AdminMessageReportItemSchema = z
     conversationId: ObjectIdSchema.nullable(),
     bookingId: ObjectIdSchema.nullable(),
     corridor: z.object({ originCity: z.string(), destinationCity: z.string() }).nullable(),
+    /** Décision du 15/09 — qui a décidé, quand, la note (ligne de journal MESSAGE_REPORT_REVIEWED) ; null si ouvert. */
+    decision: ReportDecisionSchema.nullable(),
   })
   .meta({ id: "AdminMessageReportItem" });
 export type AdminMessageReportItem = z.infer<typeof AdminMessageReportItemSchema>;

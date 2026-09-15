@@ -73,7 +73,7 @@
     "reason": "Reason",
     "reasons": {
       "OFF_PLATFORM": "Wants to leave Yamba (payment or shipping outside)",
-      "SCAM": "Scam attempt",
+      "SCAM": "Suspected scam",
       "HARASSMENT": "Inappropriate words or harassment",
       "OTHER": "Other"
     },

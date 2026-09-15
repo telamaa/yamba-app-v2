@@ -64,3 +64,28 @@ export async function tuilesDeLaSection(page: Page, titre: string): Promise<Reco
 export async function attendreLeChargement(page: Page): Promise<void> {
   await expect(page.getByText("Chargement…")).toHaveCount(0, { timeout: 60_000 });
 }
+
+/**
+ * A169 (recette § 5.20) — l'échéance de la version du Voyageur est FIGÉE à l'ouverture du litige (`Dispute.responseDueAt`) :
+ * changer `dispute.responseDelayHours` ne rend plus décidable un litige déjà ouvert. Les fiches qui ont besoin d'un litige
+ * décidable « comme s'il avait été ouvert sous un délai de N heures » le posent explicitement : manœuvre base consignée,
+ * sur les litiges ouverts sans version du Voyageur. Rend le nombre de dossiers réalignés.
+ */
+export function reouvrirLesLitigesSousUnDelai(heures: number): number {
+  const n = lireCoteServeur<number>(`
+    import prisma from "./packages/libs/prisma";
+    (async () => {
+      const ouverts = await prisma.dispute.findMany({ where: { status: "OPEN", OR: [{ resolvedAt: null }, { resolvedAt: { isSet: false } }] }, select: { id: true, bookingId: true } });
+      const bookings = await prisma.booking.findMany({ where: { id: { in: ouverts.map((d) => d.bookingId) } }, select: { id: true, disputedAt: true } });
+      let n = 0;
+      for (const b of bookings) {
+        if (!b.disputedAt) continue;
+        await prisma.dispute.update({ where: { bookingId: b.id }, data: { responseDueAt: new Date(b.disputedAt.getTime() + ${heures} * 3_600_000) } });
+        n++;
+      }
+      console.log("@@" + n);
+      process.exit(0);
+    })();`);
+  process.stdout.write(`   ↳ manœuvre base (A169) : ${n} litige(s) ouvert(s) réaligné(s) sur un délai de ${heures} h\n`);
+  return n;
+}

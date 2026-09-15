@@ -5,12 +5,14 @@ import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import { SETTING_GROUP_LABEL, SETTING_GROUP_ORDER, formatSetting } from "@/lib/settings-format";
 import type { AdminSettingsResponse } from "@/lib/types";
+import { isPermissionRefusal, useDenyPage } from "./PageAccess";
 
 export default function SettingsDocumentation() {
   const [data, setData] = useState<AdminSettingsResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const deny = useDenyPage(); // décision du 15/09 : un refus de permission remplace la page entière
   useEffect(() => {
-    apiFetch<AdminSettingsResponse>("/admin/settings").then(setData).catch((e) => setError(e.message));
+    apiFetch<AdminSettingsResponse>("/admin/settings").then(setData).catch((e) => (isPermissionRefusal(e) ? deny("Ton profil ne lit pas les paramètres.") : setError("Documentation indisponible pour le moment. Recharge la page.")));
   }, []);
   if (error) return <p className="mt-4 text-[13px] text-red-700">{error}</p>;
   if (!data) return <p className="mt-4 text-[13px] text-slate-500">Chargement…</p>;

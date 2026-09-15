@@ -20,7 +20,7 @@ import { test, expect, type NavigateurAdmin } from "../fixtures/yamba";
 import { JeuEssai } from "../fixtures/jeu-essai";
 import { adresseDeLApi, adresseDeLApiAdmin, adresseDuBackOffice } from "../fixtures/adresses";
 import { lireLeJournal } from "../pages/journal-admin";
-import { attendreLeChargement, debutDuScenario, lireCoteServeur } from "../pages/ecran-admin";
+import { attendreLeChargement, debutDuScenario, lireCoteServeur, reouvrirLesLitigesSousUnDelai } from "../pages/ecran-admin";
 
 const api = () => adresseDeLApiAdmin();
 const bo = () => adresseDuBackOffice();
@@ -50,6 +50,7 @@ async function dossier(ctx: Contexte, id: string): Promise<Dossier> {
 
 async function poserDelai(ctx: Contexte, heures: number): Promise<void> {
   const cur = (await (await ctx.request.get(`${api()}/admin/settings`)).json()) as { version: number; values: Record<string, number> };
+  reouvrirLesLitigesSousUnDelai(heures); // A169 : l'échéance est figée à l'ouverture, le paramètre seul ne suffit plus
   if (cur.values[DELAI] === heures) return;
   const r = await ctx.request.patch(`${api()}/admin/settings`, { data: { changes: { [DELAI]: heures }, reason: "Recette ADM-MED : délai de réponse abaissé pour rendre un litige décidable.", expectedVersion: cur.version } });
   expect(r.ok(), `délai → ${heures} h : ${r.status()} ${r.ok() ? "" : await r.text()}`).toBe(true);
@@ -537,10 +538,12 @@ test.describe("ADM-MED — médiation (cahier 02-ADMIN § 5.9)", () => {
       const { totalShipperCents: total, transportCents: net } = d.money;
       const montant = net + Math.floor((total - net) / 2); // au-delà du net : le Voyageur ne reçoit rien, Yamba garde le reste
       const avant = await mailpit.compter({ pour: "chinwe.shipper@seed.yamba.dev", sujet: "Décision rendue" });
+      const avantThomas = await mailpit.compter({ pour: "thomas.carrier@seed.yamba.dev", sujet: "Décision rendue" }); // § 5.20 : attendre SON email, pas celui d'une fiche précédente
       const r = await med.contexte.request.post(`${api()}/admin/disputes/${id}/resolve`, { data: { outcome: "PARTIAL_REFUND", refundCents: montant, reason: MOTIF } });
       expect(r.ok()).toBe(true);
       expect(((await r.json()) as { carrierPayoutCents: number }).carrierPayoutCents).toBe(0);
       await expect.poll(() => mailpit.compter({ pour: "chinwe.shipper@seed.yamba.dev", sujet: "Décision rendue" }), { timeout: 90_000 }).toBe(avant + 1);
+      await expect.poll(() => mailpit.compter({ pour: "thomas.carrier@seed.yamba.dev", sujet: "Décision rendue" }), { timeout: 90_000 }).toBe(avantThomas + 1);
       const chinwe = await mailpit.attendreEmail({ pour: "chinwe.shipper@seed.yamba.dev", sujet: "Décision rendue sur ton envoi" });
       const thomas = await mailpit.attendreEmail({ pour: "thomas.carrier@seed.yamba.dev", sujet: "Décision rendue sur ton transport" });
       test.info().annotations.push({ type: "constat", description: `Chinwe : « ${chinwe.texte.replace(/\s+/g, " ").slice(0, 260)} »` });

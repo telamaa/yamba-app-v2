@@ -12,8 +12,9 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { apiFetch, patch } from "@/lib/api";
-import { REPORT_REASON_LABEL, REPORT_STATUS_LABEL, REPORT_TARGET_LABEL, TRUST_LEVEL_LABEL, dateTime, isAlertTrustLevel, reportRefusalMessage } from "@/lib/format";
+import { REPORT_REASON_LABEL, REPORT_STATUS_LABEL, REPORT_TARGET_LABEL, TRUST_LEVEL_LABEL, dateTime, isAlertTrustLevel, reportDecisionLine, reportRefusalMessage } from "@/lib/format";
 import type { AdminReportItem, AdminReportsResponse, MessageReportStatus } from "@/lib/types";
+import { isPermissionRefusal, useDenyPage } from "./PageAccess";
 
 export default function ReportsQueue() {
   const [status, setStatus] = useState<MessageReportStatus>("OPEN");
@@ -21,11 +22,12 @@ export default function ReportsQueue() {
   const [msg, setMsg] = useState<string | null>(null);
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<string | null>(null);
+  const deny = useDenyPage(); // décision du 15/09 : un refus de permission remplace la page entière
   const [failed, setFailed] = useState(false);
 
   const load = useCallback(() => {
     apiFetch<AdminReportsResponse>(`/admin/reports?status=${status}`).then((d) => { setData(d); setFailed(false); })
-      .catch((e) => { setMsg(reportRefusalMessage(e).text); setFailed(true); }); // recette § 5.19 : un 403 se dit en français, jamais « 403 : … »
+      .catch((e) => { if (isPermissionRefusal(e)) return deny("Ton profil ne traite pas les signalements."); setMsg(reportRefusalMessage(e).text); setFailed(true); }); // § 5.19 + décision du 15/09 : un seul refus pour la page
   }, [status]);
   useEffect(load, [load]);
 
@@ -94,6 +96,7 @@ export default function ReportsQueue() {
                 )}
               </p>
               {item.details && <p className="mt-2 text-[12.5px] text-slate-600">Précisions : {item.details}</p>}
+              {item.status !== "OPEN" && <p className="mt-2 rounded-lg bg-slate-50 px-2 py-1.5 text-[12.5px] text-slate-700">{reportDecisionLine(item.status, item.decision)}</p>}
               {item.status === "OPEN" && (
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                   <input

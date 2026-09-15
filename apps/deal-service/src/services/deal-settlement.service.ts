@@ -338,6 +338,8 @@ export function makeDealSettlementService(
         });
       }
 
+      // ANO-ADM-52 (D62) — l'échéance de la version du Voyageur est figée ici, avec le délai en vigueur à l'ouverture.
+      const responseDueAt = new Date(now.getTime() + (await settings.get())["dispute.responseDelayHours"] * 3_600_000); // = disputeResponseDeadline
       for (let attempt = 0; ; attempt += 1) {
         const ticketNumber = generateDisputeTicket(attempt);
         try {
@@ -376,6 +378,7 @@ export function makeDealSettlementService(
                   desiredOutcome: input.desiredOutcome ?? null,
                   photoUrls: input.photoUrls,
                   pledgeAcceptedAt: now,
+                  responseDueAt,
                 },
               });
             },

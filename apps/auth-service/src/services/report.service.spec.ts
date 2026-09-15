@@ -115,6 +115,19 @@ describe("listReports / reviewReport (D68 3A)", () => {
     await expect(svc.reviewReport(actor, "r1", { decision: "REVIEWED" })).rejects.toMatchObject({ statusCode: 409 });
     await expect(svc.reviewReport(actor, "r5", { decision: "REVIEWED" })).rejects.toMatchObject({ statusCode: 404 });
   });
+  it("décision du 15/09 — sous « traité » / « sans suite » : qui a décidé, quand, la note (ligne de journal) ; ouvert ou donnée ancienne → null", async () => {
+    const nadia = { id: "adm-nadia", firstName: "Nadia", lastName: "Médiatrice", isDeleted: false };
+    const db = fakeDb({ user: [awa, moussa, nadia], trip: [trip], report: [open("r1", "u-awa", "TRIP", "t1"), { ...open("r-ancien", "u-awa", "USER", "u-moussa"), status: "REVIEWED" }, open("r3", "u-moussa", "TRIP", "t1")] });
+    const svc = makeReportService({ db, sendEmail: async () => true, trustFor: async () => null });
+    expect((await svc.listReports("OPEN")).items.every((i) => i.decision === null)).toBe(true);
+    await svc.reviewReport({ ...actor, id: "adm-nadia" }, "r1", { decision: "REVIEWED", note: "Trajet masqué après vérification." });
+    const traites = (await svc.listReports("REVIEWED")).items;
+    expect(traites.map((i) => i.id)).toEqual(["r1", "r-ancien"]);
+    expect(traites[0].decision).toEqual({ by: { id: "adm-nadia", firstName: "Nadia" }, at: expect.any(String), note: "Trajet masqué après vérification." });
+    expect(traites[1].decision).toBeNull(); // décidé avant le journal : pas de ligne, pas d'erreur
+    await svc.reviewReport({ ...actor, id: "adm-nadia" }, "r3", { decision: "DISMISSED" });
+    expect((await svc.listReports("DISMISSED")).items[0].decision).toMatchObject({ by: { firstName: "Nadia" }, note: null });
+  });
   it("ANO-ADM-46 — conflit d'écriture (P2034) : rejoué ; au réessai l'autre décision a gagné → 409, jamais 500, aucune ligne", async () => {
     const db = fakeDb({ user: [awa, moussa], trip: [trip], report: [open("r1", "u-awa", "TRIP", "t1")] });
     const transaction = db.$transaction;
