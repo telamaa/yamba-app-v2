@@ -3,6 +3,23 @@
 *Ce document sert à REPRENDRE le chantier après une pause. Il dit où en est la campagne, ce qui
 tourne sur le poste, ce qui reste à faire, et les pièges déjà payés qu'il ne faut pas repayer.*
 
+> ## ▶ 15/09/2026 — § 5.24 LIVRÉ
+>
+> Branche `chore/recette-admin-5-24` empilée sur #324 : 7 scénarios ADM-JRN + ADM-ETA-10 + ADM-MNT-7, 8 ; ANO-ADM-68,
+> 69, 70, 74 (majeures), 71, 72, 73 closes ; décisions A183 (catalogues fermés du journal, filtres serveur) et A184 (lots du
+> § 5.23 : garde de session sur 401 seulement, bandeau 15 s / 60 s, exemptions par segment). Chiffres : auth **296**, deal
+> **644**, message **57**, trip **293**, notification **122**, harnais **506** ; dernière anomalie ANO-ADM-74 ; dernier
+> arbitrage A184 ; dernier chapitre d'apprentissage **182**. SCHÉMA : index `AdminAction [ip, createdAt]` poussé
+> (`prisma db push` fait sur le poste). POSTE : gateway et auth-service rebâtis et relancés en bundles `nohup` (logs dans
+> le scratchpad de session) ; deal (FAKE), message, trip, notification inchangés ; user-ui a un nouvel alias
+> `@packages/libs/maintenance` (tsconfig `paths` + `include`) — si user-ui a été relancé sans erreur, rien à faire.
+> ADM-ETA-10 tue et relance auth-service lui-même (comme ETA-9). Pièges : l'annonceur de route de Next porte
+> `role="alert"` (viser `[role="alert"]:not(#__next-route-announcer__)`) ; l'identifiant de cible d'une ligne `SETTINGS` est
+> la CLÉ du paramètre, d'une ligne `SESSION` un jti de 32 hex — jamais supposer un ObjectId ; la première ligne « avec
+> identifiant » du journal change d'une exécution à l'autre (JRN-1 ne prouve ANO-ADM-74 que si c'est une clé : JRN-3 le
+> prouve toujours). **ENGAGEMENT § 7** inchangé (P2034 sur admin-admins / admin-users / admin-auth). Suite : § 5.25
+> (comptes admin).
+>
 > ## ▶ 15/09/2026 — § 5.23 LIVRÉ
 >
 > Branche `chore/recette-admin-5-23` empilée sur #323 : 6 scénarios ADM-MNT + ADM-ETA-8, 9 + ADM-RGP-8, RGP-2 réalignée ;

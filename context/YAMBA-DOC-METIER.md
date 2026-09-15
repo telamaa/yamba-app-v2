@@ -6001,3 +6001,53 @@ affichées datent de ce moment. Il disparaît à la relecture suivante qui réus
 **Tests d'acceptation.** ADM-MNT-1 à 4 (cahier) et 5, 6 (ajoutées) dans `adm-mnt-maintenance.spec.ts` ; ADM-ETA-8, 9
 (`adm-eta-etat-services.spec.ts`) ; ADM-RGP-8 (`adm-rgp-donnees-personnelles.spec.ts`) ; transitions et courses prouvées
 par `maintenance.service.spec.ts` (auth-service) et la règle de retard par `ops-alerts.rules.spec.ts` (deal-service).
+
+# Cahier 02-ADMIN, § 5.24 : journal d'audit
+
+**Le besoin.** Le journal répond à « qui a fait quoi, sur quoi, quand » pour chaque geste du back-office. C'est la
+seconde preuve de tout le cahier : un écran juste avec un journal muet est non conforme. La Finance et le super
+administrateur le lisent en entier ; le Support et le Médiateur lisent seulement le journal d'une cible, en bas des fiches
+membre, trajet et argent. Le journal n'est jamais purgé.
+
+**RG-ADM-JRN-01 — Un filtre posé interroge le serveur** : période, auteur, action, type de cible, identifiant de cible et
+IP filtrent en base, sur tout le journal. Cliquer l'auteur, l'action, la cible ou l'IP d'une ligne pose le filtre
+correspondant ; l'auteur filtré apparaît en pastille « Auteur : {nom} ✕ ». Seule la recherche « contient » porte sur les
+lignes déjà chargées, et l'écran le dit.
+
+**RG-ADM-JRN-02 — Une période est la journée de l'opérateur** : « du 15 au 15 » couvre le 15 de 00:00 à 23:59:59 à
+l'heure de l'opérateur, jamais la journée UTC (qui décalait de deux heures en été).
+
+**RG-ADM-JRN-03 — Les listes proposées sont les vraies (A183)** : le filtre « Action » propose toutes les actions connues,
+en français, même quand un filtre est posé ; le filtre « Type de cible » propose exactement les types écrits (Membre, Deal,
+Trajet, Conversation, Signalement, Session admin, Paramètres). Une action ou un type nouveau sans libellé est refusé à la
+compilation.
+
+**RG-ADM-JRN-04 — Le détail se lit** : les clés du détail sont séparées par « · », les listes par des virgules ; jamais
+d'accolade ni de crochet, ni au journal ni dans les cartes « Actions admin sur … ».
+
+**RG-ADM-JRN-05 — L'écran ne ment pas** : une lecture en échec affiche « Le journal n'a pas pu être lu … » avec
+« Réessayer », jamais « Aucune action journalisée. » ; « Charger la suite » garde les filtres posés.
+
+**RG-ADM-JRN-06 — Le journal est fidèle** : une ligne par geste, avec l'admin qui a agi, l'horodatage à la seconde, l'IP et
+le user-agent (tronqué à 200 caractères) ; aucune ligne pour un geste refusé (403, 400, 404) ; lire le journal ne se
+journalise pas.
+
+**RG-ADM-JRN-07 — Accès et conservation** : `audit.read` appartient à la Finance et au super administrateur. Le Support
+et le Médiateur reçoivent un refus unique sur `/audit` (et 403 sur l'API), sans entrée « Journal » dans le menu. Aucune
+règle de rétention ne porte sur le journal admin.
+
+**RG-ADM-SES-01 — Une panne n'est pas une déconnexion (A184 a, lot du § 5.23)** : seul un refus d'authentification
+renvoie à la page de connexion. Si le service d'authentification ne répond pas, le back-office affiche « Back-office
+momentanément injoignable » avec « Réessayer » ; la session reste ouverte et reprend dès que le service revient.
+
+**RG-ADM-MNT-08 — Le bandeau membre suit la maintenance de près (A184 b)** : pendant une maintenance active ou annoncée,
+le site relit l'état toutes les 15 secondes (60 secondes sinon) ; une levée disparaît d'un onglet ouvert en moins de
+30 secondes.
+
+**RG-ADM-MNT-09 — Seuls les vrais chemins sont exemptés de la lecture seule (A184 c)** : connexion (`/api/auth`),
+back-office (`/api/admin`) et état de maintenance (`/api/maintenance`) sont exemptés par segment entier ; un chemin qui
+leur ressemble seulement (`/api/maintenanceX`) est bloqué comme toute écriture.
+
+**Tests d'acceptation.** ADM-JRN-1 à 4 (cahier) et 5 à 7 (ajoutées) dans `adm-jrn-journal.spec.ts` ; ADM-ETA-10
+(`adm-eta-etat-services.spec.ts`) ; ADM-MNT-7, 8 (`adm-mnt-maintenance.spec.ts`) ; exemptions et rythme du bandeau
+prouvés par `maintenance-rules.spec.ts` (auth-service).

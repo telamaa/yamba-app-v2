@@ -379,4 +379,38 @@ test.describe("ADM-ETA — état des services (cahier 02-ADMIN § 5.22)", () => 
     /* Retour : le bandeau disparaît à la relecture suivante. */
     await expect(page.getByRole("alert").filter({ hasText: "Service d'authentification injoignable" })).toHaveCount(0, { timeout: 60_000 });
   });
+  test("ADM-ETA-10 · auth-service arrêté : naviguer ne renvoie PAS à /login, l'écran d'indisponibilité garde la session (§ 5.23, lot a)", async ({ navigateurAdmin }) => {
+    test.setTimeout(6 * 60_000);
+    const { page } = await navigateurAdmin("exploitation");
+    await ouvrir(page);
+    await expect(page.locator("aside nav")).toBeVisible({ timeout: 60_000 });
+    const pid = pidDuPort(6001);
+    expect(pid, "auth-service tourne en bundle détaché").not.toBeNull();
+    try {
+      process.kill(Number(pid));
+      await expect.poll(() => pidDuPort(6001), { timeout: 30_000, intervals: [500] }).toBeNull();
+      /* Une navigation re-vérifie la session : 502 UPSTREAM_UNREACHABLE, jamais /login. */
+      await page.locator("aside nav").getByRole("link", { name: "Mes sessions" }).click();
+      const indispo = page.locator('[role="alert"]:not(#__next-route-announcer__)').filter({ hasText: "Back-office momentanément injoignable" });
+      await expect(indispo).toBeVisible({ timeout: 60_000 });
+      await expect(indispo).toContainText("Ta session n'est pas fermée");
+      await expect(page).not.toHaveURL(/\/login/);
+      await page.waitForTimeout(3_000);
+      await expect(page).not.toHaveURL(/\/login/);
+      /* « Réessayer » tant que le service est arrêté : l'écran reste, toujours pas de /login. */
+      await indispo.getByRole("button", { name: "Réessayer" }).click();
+      await expect(indispo.getByRole("button", { name: "Réessayer" })).toBeEnabled({ timeout: 30_000 });
+      await expect(page).not.toHaveURL(/\/login/);
+    } finally {
+      if (!(await santeOk("http://localhost:6001/health"))) {
+        const log = openSync(join(tmpdir(), "yamba-recette-eta-auth-service.log"), "a");
+        spawn("node", ["--env-file=../../.env", "dist/main.js"], { cwd: join(RACINE, "apps/auth-service"), detached: true, stdio: ["ignore", log, log] }).unref();
+        await expect.poll(() => santeOk("http://localhost:6001/health"), { timeout: 90_000, intervals: [2_000] }).toBe(true);
+      }
+    }
+    /* Retour : « Réessayer » rend la page, sans nouvelle connexion (la session a survécu). */
+    await page.locator('[role="alert"]').filter({ hasText: "Back-office momentanément injoignable" }).getByRole("button", { name: "Réessayer" }).click();
+    await expect(page.locator("aside nav")).toBeVisible({ timeout: 60_000 });
+    await expect(page).toHaveURL(/\/sessions$/);
+  });
 });

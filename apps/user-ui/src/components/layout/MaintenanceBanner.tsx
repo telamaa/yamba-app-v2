@@ -3,7 +3,8 @@
 /**
  * MaintenanceBanner.tsx — annonce et lecture seule (C-PR8c, D64 2A)
  * =================================================================
- * Lit `GET /api/maintenance` (public, servi par le gateway) toutes les 60 s. Rouge en lecture seule,
+ * Lit `GET /api/maintenance` (public, servi par le gateway) toutes les 60 s — toutes les 15 s quand une maintenance est
+ * active ou annoncée (décision du § 5.23, recette 02-ADMIN § 5.24 lot b : la levée se voyait jusqu'à une minute après). Rouge en lecture seule,
  * ambre pour une annonce à venir ; le message personnalisé de l'admin, dans la langue de la page,
  * complète la phrase traduite.
  *
@@ -15,6 +16,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { toast } from "sonner";
+import { maintenancePollMs } from "@packages/libs/maintenance";
 import apiClient, { MAINTENANCE_REFUSED_EVENT } from "@/lib/api-client";
 
 type PublicMaintenance = { enabled: boolean; message: { fr: string; en: string }; scheduledAt: string | null };
@@ -26,9 +28,13 @@ export default function MaintenanceBanner() {
   const relire = useCallback(() => apiClient.get<PublicMaintenance>("/maintenance").then((r) => setState(r.data)).catch(() => undefined), []);
   useEffect(() => {
     void relire();
-    const timer = setInterval(() => void relire(), 60_000);
-    return () => clearInterval(timer);
   }, [relire]);
+  // Le rythme suit l'état lu : le minuteur est reposé quand il change (active / annoncée → 15 s, sinon 60 s).
+  const pollMs = maintenancePollMs(state);
+  useEffect(() => {
+    const timer = setInterval(() => void relire(), pollMs);
+    return () => clearInterval(timer);
+  }, [relire, pollMs]);
   useEffect(() => {
     const surRefus = () => {
       toast.error(t("writeRefused"));

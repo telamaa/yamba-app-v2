@@ -4205,9 +4205,10 @@
             "in": "query",
             "required": false,
             "schema": {
-              "$ref": "#/components/schemas/ObjectId"
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,100}$"
             },
-            "description": "Identifiant de la cible"
+            "description": "Identifiant de la cible : ObjectId, clé de paramètre, identifiant de session (ANO-ADM-74)"
           },
           {
             "name": "ip",
@@ -29658,6 +29659,10 @@
           "admin": {
             "type": "string"
           },
+          "adminUserId": {
+            "description": "ANO-ADM-68 — author id, so the screen filters on the server",
+            "$ref": "#/components/schemas/ObjectId"
+          },
           "action": {
             "type": "string"
           },
@@ -29705,6 +29710,7 @@
           "id",
           "at",
           "admin",
+          "adminUserId",
           "action",
           "targetType",
           "targetId",

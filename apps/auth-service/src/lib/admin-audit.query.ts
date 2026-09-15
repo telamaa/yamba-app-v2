@@ -20,6 +20,13 @@ export type AuditQueryInput = {
 };
 
 const OID = /^[a-f0-9]{24}$/;
+/**
+ * ANO-ADM-74 (recette 02-ADMIN § 5.24) — l'identifiant d'une cible n'est pas toujours un ObjectId : une clé de paramètre
+ * (`pricing.commissionPct`), `maintenance`, l'identifiant d'une session admin (32 hex). Le filtre exigeait un ObjectId et
+ * IGNORAIT le reste : cliquer « Paramètres · pricing.commissionPct » rendait toutes les lignes SETTINGS. Jeu de caractères
+ * sûr, borné (pas d'opérateur, pas d'espace).
+ */
+const TARGET_ID = /^[A-Za-z0-9._:-]{1,100}$/;
 const isDate = (v: string) => !Number.isNaN(Date.parse(v));
 
 /** Le `where` Prisma correspondant. Une valeur vide ou mal formée est ignorée, jamais une erreur. */
@@ -36,7 +43,7 @@ export function buildAuditWhere(q: AuditQueryInput): Record<string, unknown> {
   if (q.adminUserId && OID.test(q.adminUserId)) where.adminUserId = q.adminUserId;
   if (q.action && /^[A-Z_]{3,60}$/.test(q.action)) where.action = q.action;
   if (q.targetType && /^[A-Z_]{3,30}$/.test(q.targetType)) where.targetType = q.targetType;
-  if (q.targetId && OID.test(q.targetId)) where.targetId = q.targetId;
+  if (q.targetId && TARGET_ID.test(q.targetId.trim())) where.targetId = q.targetId.trim();
   if (q.ip && q.ip.trim()) where.ip = q.ip.trim();
   return where;
 }

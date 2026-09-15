@@ -346,6 +346,9 @@ export const listAdminAudit = async (req: AuthenticatedRequest, res: Response, n
         id: r.id,
         at: r.createdAt.toISOString(),
         admin: byId.get(r.adminUserId) ?? r.adminUserId,
+        // ANO-ADM-68 (recette 02-ADMIN § 5.24) — l'identifiant de l'auteur : « Filtrer sur cet auteur » pose le filtre SERVEUR
+        // `adminUserId` au lieu d'une recherche dans les cinquante lignes chargées.
+        adminUserId: r.adminUserId,
         action: r.action,
         targetType: r.targetType,
         targetId: r.targetId,

@@ -339,4 +339,57 @@ test.describe("ADM-MNT — maintenance (cahier 02-ADMIN § 5.23)", () => {
     expect(await lireLeJournal(sup.contexte.request, { from: debut, action: "MAINTENANCE_CHANGED" })).toHaveLength(0);
     expect((await lire(ops.contexte)).version).toBe(avant.version);
   });
+  /* ── Lots décidés au § 5.23, livrés au § 5.24 ────────────────────────────────────────────── */
+
+  test("ADM-MNT-7 · le bandeau membre relit toutes les 15 s quand une maintenance est annoncée, toutes les 60 s sinon (lot b)", async ({ navigateurAdmin, navigateurConnecte }) => {
+    test.setTimeout(5 * 60_000);
+    const ops = await navigateurAdmin("exploitation");
+    const membre = await navigateurConnecte("pauline");
+    const lectures: number[] = [];
+    membre.page.on("request", (r) => {
+      if (/\/api\/maintenance$/.test(new URL(r.url()).pathname)) lectures.push(Date.now());
+    });
+    try {
+      /* Sans maintenance : après la lecture d'ouverture, aucune relecture avant 60 s. */
+      await membre.page.goto("/fr/dashboard/home", { waitUntil: "domcontentloaded" });
+      await expect.poll(() => lectures.length, { timeout: 60_000 }).toBeGreaterThan(0);
+      const ouverture = lectures.length;
+      await membre.page.waitForTimeout(25_000);
+      expect(lectures.length, "au repos : pas de relecture avant 60 s").toBe(ouverture);
+
+      /* Une annonce : le bandeau ambre apparaît, puis relit toutes les 15 s. */
+      const pose = await ops.contexte.request.put(`${apiAdmin()}/admin/maintenance`, { data: { enabled: false, messageFr: "Recette ADM-MNT-7.", messageEn: "", scheduledAt: new Date(Date.now() + 2 * 3_600_000).toISOString(), reason: MOTIF_DE_RECETTE("ADM-MNT-7"), expectedVersion: (await lire(ops.contexte)).version } });
+      expect(pose.status(), await pose.text()).toBe(200);
+      await attendreLaPasserelle(membre.contexte, (e) => !!e.scheduledAt, "l'annonce");
+      await membre.page.reload({ waitUntil: "domcontentloaded" });
+      await expect(bandeauMembre(membre.page)).toBeVisible({ timeout: 60_000 });
+      const depart = lectures.length;
+      await expect.poll(() => lectures.length - depart, { timeout: 50_000, intervals: [1_000] }).toBeGreaterThanOrEqual(3);
+      const ecarts = lectures.slice(-3).map((t, i, a) => (i ? t - a[i - 1] : null)).filter((x): x is number => x !== null);
+      for (const e of ecarts) expect(e, `écart entre deux relectures : ${e} ms`).toBeGreaterThanOrEqual(13_000), expect(e).toBeLessThanOrEqual(18_000);
+    } finally {
+      remettreAPlat();
+    }
+  });
+
+  test("ADM-MNT-8 · l'exemption se compare par segment : /api/maintenanceX et /api/authentic… sont bloqués (lot c)", async ({ navigateurAdmin, navigateurConnecte }) => {
+    test.setTimeout(4 * 60_000);
+    const ops = await navigateurAdmin("exploitation");
+    const membre = await navigateurConnecte("pauline");
+    try {
+      const pose = await ops.contexte.request.put(`${apiAdmin()}/admin/maintenance`, { data: { enabled: true, messageFr: "Recette ADM-MNT-8.", messageEn: "", scheduledAt: null, reason: MOTIF_DE_RECETTE("ADM-MNT-8"), expectedVersion: (await lire(ops.contexte)).version } });
+      expect(pose.status(), await pose.text()).toBe(200);
+      await attendreLaPasserelle(membre.contexte, (e) => e.enabled, "la lecture seule");
+      for (const chemin of ["/maintenanceX", "/maintenance-recette/1", "/authentic/deals", "/administration"]) {
+        const r = await membre.contexte.request.post(`${api()}${chemin}`, { data: {}, failOnStatusCode: false });
+        expect(r.status(), `POST /api${chemin} passe la lecture seule`).toBe(503);
+      }
+      /* Les vrais préfixes restent ouverts. */
+      expect((await membre.contexte.request.post(`${api()}/auth/refresh`, { failOnStatusCode: false })).status()).not.toBe(503);
+      expect((await ops.contexte.request.get(`${apiAdmin()}/admin/maintenance`)).status()).toBe(200);
+    } finally {
+      remettreAPlat();
+    }
+    await attendreLaPasserelle(membre.contexte, (e) => !e.enabled, "la levée");
+  });
 });

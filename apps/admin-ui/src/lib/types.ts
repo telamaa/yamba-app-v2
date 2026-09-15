@@ -163,6 +163,7 @@ export type AuditItem = {
   id: string;
   at: string;
   admin: string;
+  adminUserId: string; // ANO-ADM-68 — filtre serveur « auteur »
   action: string;
   targetType: string;
   targetId: string | null;

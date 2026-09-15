@@ -71,10 +71,19 @@ export const ADMIN_ACTIONS = [
 ] as const;
 export type AdminActionType = (typeof ADMIN_ACTIONS)[number];
 
+/**
+ * A183 (recette 02-ADMIN § 5.24) — les types de cible réellement écrits. Le filtre « Type de cible » du journal proposait
+ * DISPUTE, MAINTENANCE et EXPORT (jamais écrits : un litige se journalise sur son BOOKING, la maintenance et les exports sur
+ * SETTINGS / la ressource exportée) et oubliait CONVERSATION : trois choix qui rendaient toujours un journal vide, un type
+ * introuvable. Catalogue fermé, typé : un service qui écrirait hors catalogue ne compile plus.
+ */
+export const ADMIN_TARGET_TYPES = ["USER", "BOOKING", "TRIP", "CONVERSATION", "REPORT", "SESSION", "SETTINGS"] as const;
+export type AdminTargetType = (typeof ADMIN_TARGET_TYPES)[number];
+
 export type AdminActionInput = {
   adminUserId: string;
-  action: AdminActionType | (string & {});
-  targetType: "USER" | "BOOKING" | "DISPUTE" | "SESSION" | "TRIP" | "SETTINGS" | (string & {});
+  action: AdminActionType; // A183 — catalogue fermé : une action sans libellé au journal ne compile plus
+  targetType: AdminTargetType;
   targetId?: string | null;
   before?: unknown;
   after?: unknown;

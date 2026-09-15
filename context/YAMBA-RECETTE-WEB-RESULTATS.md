@@ -6252,3 +6252,93 @@ retard partagée).
 
 - MNT-4 étape 4 : le cahier dit « impossible » sans dire comment ; décision A182 : formulaire remplacé par l'explication
   et 409 côté serveur.
+
+## Cahier 02-ADMIN — § 5.24 Journal d'audit · **CONFORME après correction** (4 fiches + 3 ajoutées · 4 anomalies majeures + 3 mineures closes · 2 décisions (A183, A184) · lots du § 5.23 livrés · 7 scénarios ADM-JRN + ADM-ETA-10, ADM-MNT-7, 8)
+
+Spec : `apps/e2e/src/admin/adm-jrn-journal.spec.ts`. Le journal est la seconde vérification de chaque geste du cahier
+(§ 3.4) : un filtre qui ment invalide la preuve de tous les chapitres. Quatre promesses : **un filtre posé est un filtre
+serveur**, **les listes proposées sont les vraies**, **le détail se lit**, **l'écran ne ment pas** (panne, lecture,
+refus, accès). Manœuvres consignées : ADM-JRN-5 simule la panne du journal par `page.route` (502 JSON) ; ADM-JRN-3 joue
+trois gestes refusés (403 paramètres par le Médiateur, 400 annonce passée, 404 proposition de sanction sur un membre
+inexistant) ; ADM-ETA-10 tue auth-service puis le relance en `finally` ; ADM-MNT-7 et 8 posent une annonce puis une lecture
+seule, remises à plat en `finally`. Lecture de la base (`groupBy` des actions et types écrits, user-agent d'une ligne) par
+`lireCoteServeur`, jamais pour faire un geste.
+
+| Fiche | Objet | Verdict |
+|---|---|---|
+| ADM-JRN-1 | Six filtres serveur, cellules cliquables | **Conforme après correction** — titre et sous-titre ; colonnes « Quand, Qui, Action, Cible, Détail, IP » ; six filtres ; mention « contient » ; « 0 ligne affichée sur n chargées » ; « Tout effacer » seulement avec un filtre ; clic action → `action` dans `appliedFilters` et « Filtres serveur : action » ; états vides ; lire ne journalise rien. ANO-ADM-68 (auteur), ANO-ADM-70 (types de cible), ANO-ADM-74 (identifiant non ObjectId, première passe des voisins) |
+| ADM-JRN-2 | Libellés français | **Conforme après correction** — les 43 actions du code ont un libellé, aucun libellé orphelin, toute action et tout type présents en base sont au catalogue ; aucune forme technique sur trois pages ; « Signalement traité », « Message signalé traité ». ANO-ADM-71 : le select se réduisait aux lignes chargées |
+| ADM-JRN-3 | Complet et fidèle | **Conforme après correction** — Médiateur : une seule ligne `USER_VIEWED` sur le membre, auteur « Nadia M. », horodatage à moins de 5 s, IP renseignée, user-agent ≤ 200 caractères ; trois gestes refusés → aucune ligne ; un paramètre filtré sur SA clé (une ligne par clé) ; aucun détail avec accolade, crochet ou guillemet (journal et carte « Actions admin sur ce compte »). ANO-ADM-73, ANO-ADM-74 |
+| ADM-JRN-4 | Ni purgé ni accessible au Support | **Conforme** — Support et Médiateur : API 403, pas d'entrée « Journal », refus unique « Ton profil ne lit pas le journal des actions admin. », carte « Actions admin sur ce compte » visible ; aucune règle `retention.*` ni code de rétention ne touche `AdminAction` |
+| ADM-JRN-5 (ajoutée) | Une panne n'est pas un journal vide | **Conforme après correction** — ANO-ADM-72 : « Aucune action journalisée. » sur un 502 ; désormais « Le journal n'a pas pu être lu : le service ne répond pas pour l'instant. » et « Réessayer » qui relit |
+| ADM-JRN-6 (ajoutée) | Journées locales | **Conforme après correction** — ANO-ADM-69 : `from=2026-09-14` (minuit UTC) ; désormais `from` = minuit Europe/Paris et `to` = 23:59:59.999 en instants ISO, toutes les lignes dans la journée, « période » dans la barre |
+| ADM-JRN-7 (ajoutée) | « Charger la suite » filtrée | **Conforme** — curseur + `targetType=BOOKING` gardé, plus de 50 lignes, toutes « Deal » |
+| ADM-ETA-10 (ajoutée, lot a) | auth-service arrêté, navigation | **Conforme après correction** — avant : `/login` ; désormais « Back-office momentanément injoignable », « Ta session n'est pas fermée », « Réessayer » ; relancé → la page revient sans reconnexion |
+| ADM-MNT-7 (ajoutée, lot b) | Rythme du bandeau membre | **Conforme après correction** — au repos : aucune relecture en 25 s ; annonce posée : relectures espacées de 13 à 18 s (avant : 60 s) |
+| ADM-MNT-8 (ajoutée, lot c) | Exemptions par segment | **Conforme après correction** — en lecture seule, `POST /api/maintenanceX` et `/api/maintenance-recette/1` → 503 (avant : passaient au service, 404) ; `/api/authentic/deals`, `/api/administration` → 503 ; `/api/auth/refresh` et le back-office ouverts |
+
+**Contre-épreuve.** (1) Écrans d'origine remis (`AuditTable.tsx`, `UserFileView.tsx`, `TripFileView.tsx`, admin-ui
+rechargé à chaud, catalogues de `format.ts` gardés pour que le harnais compile) : JRN-1 (types de cible), JRN-2 (select
+réduit), JRN-3 (select sans l'action), JRN-5 (pas d'alerte), JRN-6 (date seule), JRN-7 (cible en code brut) **rouges** ;
+JRN-4 vert (aucun code corrigé). (2) `AdminShell.tsx`, `MaintenanceBanner.tsx` et `packages/libs/maintenance` d'origine,
+gateway rebâti : ETA-10, MNT-7, MNT-8 **rouges**. (3) `buildAuditWhere` d'origine, auth-service rebâti : JRN-3 **rouge**
+(clé de paramètre ignorée ; JRN-1 est resté vert, la première cible « avec identifiant » était ce jour-là un ObjectId).
+Corrections remises, bundles rebâtis : JRN 14/14 sur deux passages (`--repeat-each=2`). Voisins ADM-ETA (10), ADM-MNT (8),
+ADM-USR, ADM-TRJ avec JRN : 34/35 au premier passage, seule JRN-1 rouge (ANO-ADM-74, trouvée là). Tests unitaires :
+auth-service 296 (+3), deal-service 644, message-service 57.
+
+### Anomalies
+
+- **ANO-ADM-68 (majeure) — « Filtrer sur cet auteur » ne filtrait pas.** Le clic écrivait le nom dans la recherche
+  « contient », qui ne porte que sur les 50 lignes chargées : les gestes d'un admin au-delà de la première page étaient
+  invisibles, et ADM-JRN-3 (« filtrer sur le Médiateur, dérouler ») impossible. Le filtre serveur `adminUserId` existait
+  (A149) sans aucun écran pour s'en servir. L'API sert `adminUserId`, le clic pose le filtre, pastille « Auteur ». Close.
+- **ANO-ADM-69 (majeure) — « Du / Au » lus en UTC.** La date seule du champ était interprétée minuit UTC : « du 15 au
+  15 » couvrait le 15 à 02:00 → le 16 à 01:59 à Paris. Bornes locales envoyées en instants ISO. Close.
+- **ANO-ADM-70 (majeure) — le filtre « Type de cible » mentait.** Il proposait `DISPUTE`, `MAINTENANCE`, `EXPORT`, jamais
+  écrits (toujours un journal vide) et omettait `CONVERSATION` (écrit 82 fois). A183 : catalogue fermé, typé, en français.
+  Le cahier liste les mêmes types erronés (voir écarts). Close.
+- **ANO-ADM-74 (majeure) — un identifiant de cible non ObjectId était ignoré sans le dire.** Les paramètres se
+  journalisent sous leur clé (`pricing.commissionPct`), la maintenance sous `maintenance`, une session sous son jti :
+  `buildAuditWhere` exigeait un ObjectId, le champ restait rempli à l'écran, toutes les lignes `SETTINGS` revenaient.
+  Jeu de caractères sûr et borné ; l'écran signale un filtre saisi mais ignoré. Close.
+- **ANO-ADM-71 (mineure) — le select « Action » se réduisait aux lignes chargées** : un filtre posé cachait toutes les
+  autres actions ; une action des pages suivantes n'était pas proposée. Catalogue complet trié par libellé. Close.
+- **ANO-ADM-72 (mineure) — une panne s'affichait « Aucune action journalisée. »** ; « Charger la suite » en échec laissait
+  une promesse rejetée. Alerte française et « Réessayer » ; réponses dépassées ignorées. Close.
+- **ANO-ADM-73 (mineure) — détail en JSON brut** : `divergences : ["CAPTURE_RECORDED_NOT_LIVE",…]`, `filters : {}` au
+  journal ; `JSON.stringify(after)` entier dans les cartes « Actions admin sur ce compte / ce trajet ». `auditDetail`
+  partout. Close.
+
+### Décisions (15/09) — inscrites au registre avant le code
+
+- **A183** — catalogues `ADMIN_ACTIONS` / `ADMIN_TARGET_TYPES` fermés et typés ; l'écran propose le catalogue, pas les
+  lignes chargées ; filtres serveur ; bornes locales ; `auditDetail` ; index `[ip, createdAt]`.
+- **A184** — lots du § 5.23 : `AdminShell` ne renvoie à `/login` que sur 401 ; bandeau membre 15 s / 60 s
+  (`maintenancePollMs`) ; exemptions de la lecture seule par segment (`isExemptPath`).
+
+### Améliorations faites (au-delà du cahier)
+
+- Barre des filtres en français (« Filtres serveur : période, auteur ») au lieu des clés Prisma (`createdAt`,
+  `adminUserId`).
+- Cible affichée « Membre · id », « Paramètres · clé » ; cliquer une cible sans identifiant vide le champ ; placeholder
+  « identifiant ou clé ».
+- « Ignoré (format non reconnu) : … » pour tout champ saisi que le serveur n'a pas retenu.
+- Index `AdminAction [ip, createdAt]` (le filtre IP parcourait la collection).
+- OpenAPI : motif de `targetId` et `adminUserId` dans chaque ligne documentés.
+
+### Proposé, non fait
+
+- Exposer un filtre « Auteur » saisissable (liste des admins) et pas seulement par clic : utile pour « tout ce qu'a fait
+  X ce mois-ci » sans trouver d'abord une de ses lignes.
+- Le détail ne montre que `after` : pour `USER_RESTRICTED` ou `ADMIN_ROLE_CHANGED`, afficher « avant → après » serait
+  plus fidèle.
+- Export CSV du journal filtré (journalisé `EXPORTED`, `exports.operational`) pour les audits externes.
+
+### Écarts avec le cahier
+
+- JRN-1 étape 2 : le cahier liste `DISPUTE`, `MAINTENANCE`, `EXPORT` au select « Type de cible » — ces types ne sont
+  jamais écrits ; décision A183 : les types réellement écrits (`USER`, `BOOKING`, `TRIP`, `CONVERSATION`, `REPORT`,
+  `SESSION`, `SETTINGS`), libellés en français. Le cahier est à aligner.
+- JRN-1 : le cahier dit « six filtres serveur » ; l'auteur est un septième filtre serveur, posé par clic (pastille).
+- JRN-2 : le cahier annonce « Rapprochement Stripe » ; le libellé est « Rapprochement fournisseur » depuis le § 5.13.
