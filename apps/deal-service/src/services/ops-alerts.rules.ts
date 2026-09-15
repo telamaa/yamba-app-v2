@@ -4,7 +4,7 @@
  * Seuils en constantes versionnées (réglables en base avec C-PR8). `evaluateAlerts` reçoit un
  * instantané de compteurs et renvoie les alertes actives — sans état, testable sans base.
  */
-import type { OpsAlert } from "@packages/api-contracts";
+import { isOutboxLagging, outboxLagMinutes, type OpsAlert } from "@packages/api-contracts";
 
 export const ALERT_THRESHOLDS = {
   payoutFailedHours: 48,
@@ -43,8 +43,8 @@ export function evaluateAlerts(s: OpsSnapshot, now: Date, T: AlertThresholds = A
   if (s.heldRetentionsOverThreshold > 0) out.push({ rule: "RETENTION_HELD_7D", severity: "warning", title: "Retenues non arbitrées", detail: `${s.heldRetentionsOverThreshold} retenue(s) conservée(s) depuis plus de ${T.retentionHeldDays} j.`, count: s.heldRetentionsOverThreshold, href: "/disputes?kind=RETENTION" });
   if (s.openReversalsOverThreshold > 0) out.push({ rule: "REVERSAL_OPEN_48H", severity: "warning", title: "Transferts renversés sans décision", detail: `${s.openReversalsOverThreshold} renversement(s) ouvert(s) depuis plus de ${T.reversalOpenHours} h.`, count: s.openReversalsOverThreshold, href: "/finances?kind=REVERSED" });
   if (s.parkedOutbox > 0) out.push({ rule: "OUTBOX_PARKED", severity: "critical", title: "Événements parqués (relais)", detail: `${s.parkedOutbox} événement(s) jamais publié(s) après ${T.outboxParkedAttempts} tentatives : notifications et emails de ces deals ne partent pas.`, count: s.parkedOutbox, href: "/pilotage" });
-  const lagMin = s.oldestUnpublishedAt ? (now.getTime() - s.oldestUnpublishedAt.getTime()) / 60_000 : 0;
-  if (lagMin > T.outboxLagMinutes) out.push({ rule: "OUTBOX_LAGGING_15MIN", severity: "critical", title: "Relais outbox en retard", detail: `Le plus ancien événement non publié attend depuis ${Math.round(lagMin)} min (seuil ${T.outboxLagMinutes}). Redpanda ou le relais est arrêté ?`, count: null, href: "/pilotage" });
+  const lagMin = outboxLagMinutes(s.oldestUnpublishedAt, now); // règle partagée avec la page « État des services » (§ 5.23)
+  if (isOutboxLagging(s.oldestUnpublishedAt, now, T.outboxLagMinutes)) out.push({ rule: "OUTBOX_LAGGING_15MIN", severity: "critical", title: "Relais outbox en retard", detail: `Le plus ancien événement non publié attend depuis ${Math.round(lagMin)} min (seuil ${T.outboxLagMinutes}). Redpanda ou le relais est arrêté ?`, count: null, href: "/pilotage" });
   if (s.failedEmailsInWindow > 0) out.push({ rule: "EMAILS_FAILED_24H", severity: "warning", title: "Emails en échec", detail: `${s.failedEmailsInWindow} email(s) en échec sur ${T.emailsFailedWindowHours} h (SMTP, adresse invalide ?).`, count: s.failedEmailsInWindow, href: "/pilotage" });
   const daysSinceTrip = s.lastTripPublishedAt ? (now.getTime() - s.lastTripPublishedAt.getTime()) / 86_400_000 : Infinity;
   if (daysSinceTrip > T.noTripPublishedDays) out.push({ rule: "NO_TRIP_PUBLISHED_7D", severity: "warning", title: "Aucun trajet publié récemment", detail: s.lastTripPublishedAt ? `Dernier trajet publié il y a ${Math.floor(daysSinceTrip)} j (seuil ${T.noTripPublishedDays}). Liquidité : recruter des Voyageurs.` : "Aucun trajet n'a jamais été publié.", count: null, href: "/pilotage" });

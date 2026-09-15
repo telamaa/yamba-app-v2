@@ -102,12 +102,14 @@ test.describe("ADM-RGP — données personnelles et effacement (cahier 02-ADMIN 
     const bouton = carte.getByRole("button", { name: "Effacer définitivement" });
     const motif = carte.locator("textarea");
     const confirmation = carte.locator("input");
-    const LIBELLES: Record<string, string> = { ACTIVE_DEAL: "un deal en cours", PENDING_REQUEST: "une demande en attente", PAYOUT_PENDING: "un versement dû ou en échec", RETENTION_HELD: "une retenue en médiation", PUBLISHED_TRIP: "un trajet publié ou en pause", ADMIN_ACCOUNT: "un profil admin (à révoquer d'abord)" };
+    // § 5.23 (lot b) — chaque bloqueur porte son nombre, accordé (« 5 deals en cours », « 1 demande en attente »).
+    const pluriel = (n: number, un: string, plusieurs: string) => `${n} ${n > 1 ? plusieurs : un}`;
+    const LIBELLES: Record<string, (n: number) => string> = { ACTIVE_DEAL: (n) => pluriel(n, "deal en cours", "deals en cours"), PENDING_REQUEST: (n) => pluriel(n, "demande en attente", "demandes en attente"), PAYOUT_PENDING: (n) => pluriel(n, "versement dû ou en échec", "versements dus ou en échec"), RETENTION_HELD: (n) => pluriel(n, "retenue en médiation", "retenues en médiation"), PUBLISHED_TRIP: (n) => pluriel(n, "trajet publié ou en pause", "trajets publiés ou en pause"), ADMIN_ACCOUNT: () => "un profil admin (à révoquer d'abord)" };
     /* A179 (recette § 5.22) — les bloqueurs sont lus AVANT le clic : dits en français, et le bouton reste inactif. */
-    const lus = (await (await pri.contexte.request.get(`${api()}/admin/users/${thomas}/erasure-blockers`)).json()) as { blockers: string[] };
+    const lus = (await (await pri.contexte.request.get(`${api()}/admin/users/${thomas}/erasure-blockers`)).json()) as { blockers: string[]; counts: Record<string, number> };
     test.info().annotations.push({ type: "constat", description: `bloqueurs de Thomas : ${lus.blockers.join(", ")}` });
     expect(lus.blockers).toEqual(expect.arrayContaining(["ACTIVE_DEAL", "PUBLISHED_TRIP"]));
-    await expect(carte.getByRole("status")).toHaveText(`Effacement impossible pour l'instant : ${lus.blockers.map((b) => LIBELLES[b]).join(", ")}.`);
+    await expect(carte.getByRole("status")).toHaveText(`Effacement impossible pour l'instant : ${lus.blockers.map((b) => LIBELLES[b](lus.counts[b])).join(", ")}.`);
     /* 2. Motif trop court → inactif. */
     await motif.fill("trop court");
     await confirmation.fill("EFFACER");
@@ -348,4 +350,29 @@ test.describe("ADM-RGP — données personnelles et effacement (cahier 02-ADMIN 
     expect(vues.filter((l) => l.action === "DATA_REQUESTS_VIEWED" && l.targetId === thomas).length).toBeGreaterThanOrEqual(1);
     expect(vues.map((l) => l.action).filter((a) => !["DATA_REQUESTS_VIEWED", "USER_VIEWED", "ADMIN_LOGIN"].includes(a))).toEqual([]);
   });
+
+  test("ADM-RGP-8 · chaque bloqueur d'effacement avec son nombre, avant le clic (§ 5.23, lot b)", async ({ navigateurAdmin, jeuEssai }) => {
+    test.setTimeout(4 * 60_000);
+    const pri = await navigateurAdmin("privacy");
+    const thomas = jeuEssai.membre("thomas");
+    const lu = (await (await pri.contexte.request.get(`${api()}/admin/users/${thomas}/erasure-blockers`)).json()) as { blockers: string[]; counts: Record<string, number> };
+    expect(lu.blockers.length, "Thomas a des deals vivants dans le jeu d'essai").toBeGreaterThan(0);
+    await pri.page.goto(`${bo()}/users/${thomas}`, { waitUntil: "domcontentloaded" });
+    await attendreLeChargement(pri.page);
+    const encart = carteEffacement(pri.page).getByRole("status");
+    await expect(encart).toContainText("Effacement impossible pour l'instant :", { timeout: 60_000 });
+    const texte = (await encart.innerText()).replace(/\s+/g, " ");
+    const attendu: Record<string, (n: number) => RegExp> = {
+      ACTIVE_DEAL: (n) => new RegExp(`${n} deals? en cours`),
+      PENDING_REQUEST: (n) => new RegExp(`${n} demandes? en attente`),
+      PAYOUT_PENDING: (n) => new RegExp(`${n} versements? (dû|dus) ou en échec`),
+      RETENTION_HELD: (n) => new RegExp(`${n} retenues? en médiation`),
+      PUBLISHED_TRIP: (n) => new RegExp(`${n} trajets? publiés? ou en pause`),
+      ADMIN_ACCOUNT: () => /un profil admin/,
+    };
+    for (const b of lu.blockers) expect(texte, `${b} = ${lu.counts[b]}`).toMatch(attendu[b](lu.counts[b]));
+    if ((lu.counts.ACTIVE_DEAL ?? 0) > 1) expect(texte).toMatch(/\d+ deals en cours/); // pluriel accordé
+    await expect(carteEffacement(pri.page).getByRole("button", { name: "Effacer définitivement" })).toBeDisabled();
+  });
 });
+

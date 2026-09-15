@@ -796,6 +796,18 @@ Ordre de demarrage : auth -> trip -> gateway.
   sur le Fake + manoeuvres base). AMELIORATIONS : carte qui nomme le fournisseur, aide FR par divergence, statuts FR,
   refus par code, journal « Rapprochement fournisseur ». PIEGE : la memoire du Fake survit au rejeu du jeu d'essai (une
   fiche constate l'etat initial, ne l'exige pas). Tests : deal 598, harnais 419. Reste : § 5.14 a 8.
+- 15/09 : **CAHIER 02-ADMIN — § 5.23 MAINTENANCE (branche `chore/recette-admin-5-23`, empilee sur #323)** — 6 scenarios
+  ADM-MNT (1 a 4 du cahier + MNT-5 salve d'enregistrements, MNT-6 date passee / saisie longue) + ADM-ETA-8, 9 et ADM-RGP-8
+  (lots du § 5.22), RGP-2 realignee ; 10/10 verts, MNT deux fois (avec voisins ETA, RGP, ALR, WEB-MNT : 30/31, RGP-2
+  realignee). CONTRE-EPREUVE : les neuf fiches nouvelles ROUGES. ANO-ADM-63 CLOSE (majeure) : lever gardait l'annonce
+  (bandeau ambre, email « planifiee »). ANO-ADM-64 CLOSE (majeure) : `envOverride` lu dans l'auth-service au lieu du
+  gateway, « lever » possible pendant un forcage. ANO-ADM-65 CLOSE (majeure) : `[200, 500, 500]`. ANO-ADM-66 CLOSE
+  (majeure) : date d'annonce relue -2 h (`slice(0, 16)` UTC). ANO-ADM-67 (mineure) : date passee acceptee, saisie effacee
+  par le sondage, refus en anglais. ARBITRAGES : A181 (transitions : lever clot l'annonce, annonce a venir, email par
+  transition, 409), A182 (interrupteur lu dans la sante du gateway, ecran ferme, 409). LOTS § 5.22 : retard du relais
+  (regle `isOutboxLagging` partagee avec l'alerte), bloqueurs comptes, gateway 502 `UPSTREAM_UNREACHABLE` + bandeau
+  « Service d'authentification injoignable ». POSTE : gateway desormais en bundle detache (plus `nx serve`). Tests : auth
+  293, deal 644, message 57, trip 293, notification 122, harnais 496. Reste : § 5.24 a 8.
 - 15/09 : **CAHIER 02-ADMIN — § 5.22 ETAT DES SERVICES (branche `chore/recette-admin-5-22`, empilee sur #322)** —
   7 scenarios ADM-ETA CONFORMES (ETA-1 a 3 du cahier : service REELLEMENT tue puis relance, Redpanda REELLEMENT arrete
   puis relance, poison parque ; + ETA-4 email remis, ETA-5 seuil parque, ETA-6 maintenance, ETA-7 profils / relecture en

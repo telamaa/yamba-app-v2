@@ -349,3 +349,45 @@ export function reportDecisionLine(status: string, decision: { by: { firstName: 
   if (!decision) return `${verbe} — décision antérieure au journal.`;
   return `${verbe} par ${decision.by?.firstName ?? "un administrateur"} le ${dateTime(decision.at)}${decision.note ? ` · note : « ${decision.note} »` : " · sans note"}`;
 }
+/**
+ * Recette § 5.23 (ANO-ADM-66) — un `datetime-local` attend l'heure LOCALE « AAAA-MM-JJThh:mm ». `iso.slice(0, 16)` donnait
+ * l'heure UTC présentée comme locale : à Paris, l'annonce relue reculait de deux heures, et un second enregistrement la
+ * déplaçait vraiment.
+ */
+export function toLocalDateTimeInput(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+/** Recette § 5.23 (ANO-ADM-67) — un refus d'écriture de la maintenance, lu par son code (A146), en français. */
+export function maintenanceRefusal(e: { status?: number; data?: unknown } | null | undefined): { text: string; reload: boolean } {
+  const d = e?.data as { details?: { code?: string; errors?: Record<string, string> } } | undefined;
+  const code = d?.details?.code;
+  if (code === "STALE_VERSION") return { text: "L'état a changé entre-temps : la page est rechargée.", reload: true };
+  if (code === "MAINTENANCE_FORCED_BY_ENVIRONMENT") return { text: "L'environnement du gateway force la lecture seule : l'écran ne peut pas la lever.", reload: true };
+  if (code === "MAINTENANCE_SCHEDULE_IN_PAST") return { text: "La date annoncée est déjà passée : choisis une date à venir.", reload: false };
+  if (code === "ADMIN_PERMISSION_DENIED") return { text: "Ton profil ne modifie pas la maintenance.", reload: false };
+  if (e?.status === 400) return { text: d?.details?.errors?.reason ? "Motif trop court : 20 caractères au moins." : "Enregistrement refusé : vérifie la date et la longueur des messages (300 caractères).", reload: false };
+  return { text: "Enregistrement impossible pour le moment. Recharge la page avant de réessayer.", reload: false };
+}
+/**
+ * Recette § 5.23 (lot b du § 5.22) — un bloqueur d'effacement avec son nombre (« 2 deals en cours ») : l'admin sait d'un
+ * coup d'œil l'ampleur du travail avant de pouvoir effacer. Sans nombre connu (réponse ancienne), la forme au singulier.
+ */
+export function erasureBlockerLabel(blocker: string, count: number | undefined): string {
+  const n = count && count > 0 ? count : 1;
+  const s = n > 1 ? "s" : "";
+  const nombre = count && count > 0 ? String(count) : "un";
+  const une = count && count > 0 ? String(count) : "une";
+  switch (blocker) {
+    case "ACTIVE_DEAL": return `${nombre} deal${s} en cours`;
+    case "PENDING_REQUEST": return `${une} demande${s} en attente`;
+    case "PAYOUT_PENDING": return `${nombre} versement${s} ${n > 1 ? "dus" : "dû"} ou en échec`;
+    case "RETENTION_HELD": return `${une} retenue${s} en médiation`;
+    case "PUBLISHED_TRIP": return `${nombre} trajet${s} publié${s} ou en pause`;
+    case "ADMIN_ACCOUNT": return "un profil admin (à révoquer d'abord)";
+    default: return blocker;
+  }
+}
