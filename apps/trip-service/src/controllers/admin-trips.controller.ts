@@ -13,7 +13,8 @@ import type { NextFunction, Response } from "express";
 import prisma from "@packages/libs/prisma";
 import { withWriteConflictRetry } from "@packages/libs/prisma/write-conflict-retry";
 import { ForbiddenError, NotFoundError, ValidationError } from "@packages/error-handler";
-import { recordAdminAction } from "@packages/admin-audit";
+import { recordAdminAction, recordAdminRead } from "@packages/admin-audit";
+import redis from "@packages/libs/redis";
 import { isEmailConfigured, sendTransactionalEmail } from "@packages/email";
 import type { AuthenticatedRequest } from "@packages/middleware/isAuthenticated";
 import { AdminTripsQuerySchema, HideTripRequestSchema, ObjectIdSchema, ReviewTicketRequestSchema, TicketQueueQuerySchema, type AdminTripFile, type AdminTripSummary, type TicketQueueItem } from "@packages/api-contracts";
@@ -190,7 +191,7 @@ export const getTripFile = async (req: AuthenticatedRequest, res: Response, next
       })),
       adminActions: actions.map((a) => ({ id: a.id, at: a.createdAt.toISOString(), admin: nameOf(a.adminUserId), action: a.action, after: a.after ?? null })),
     };
-    await recordAdminAction(prisma, { adminUserId: req.user.id, action: "TRIP_VIEWED", targetType: "TRIP", targetId: id, ...meta(req) });
+    await recordAdminRead(prisma, redis, { adminUserId: req.user.id, action: "TRIP_VIEWED", targetType: "TRIP", targetId: id, ...meta(req) }); // A168 — ouverture d'écran coalescée
     res.status(200).json(file);
   } catch (e) {
     next(e);

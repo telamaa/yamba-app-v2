@@ -796,6 +796,18 @@ Ordre de demarrage : auth -> trip -> gateway.
   sur le Fake + manoeuvres base). AMELIORATIONS : carte qui nomme le fournisseur, aide FR par divergence, statuts FR,
   refus par code, journal « Rapprochement fournisseur ». PIEGE : la memoire du Fake survit au rejeu du jeu d'essai (une
   fiche constate l'etat initial, ne l'exige pas). Tests : deal 598, harnais 419. Reste : § 5.14 a 8.
+- 15/09 : **CAHIER 02-ADMIN — § 5.18 CONVERSATIONS (branche `chore/recette-admin-5-18`, empilee sur #318)** — 5 scenarios
+  CONFORMES (CNV-1, 2, 3 du cahier + CNV-4 numero tape, CNV-5 une ouverture = une ligne sur cinq ecrans), verts deux fois.
+  CONTRE-EPREUVE : les cinq ROUGES. ANO-ADM-42 CLOSE (majeure) : numero et adresse TAPES par un membre lisibles au
+  back-office sous « Le numero de telephone n'apparait jamais ici » (fil, precisions, file de moderation) → `redactContacts`
+  (deplacee dans `@packages/api-contracts`). ANO-ADM-44 CLOSE (majeure) : chaque ouverture de CINQ ecrans sensibles
+  (CONVERSATION/USER/DISPUTE/DEAL_MONEY/TRIP_VIEWED) ecrivait DEUX lignes (effet de montage rejoue par React StrictMode,
+  serveur non idempotent) → A168 `recordAdminRead` (`@packages/admin-audit`) : SET NX EX 10 par admin/action/cible, Redis
+  en panne → ligne ecrite (fail-open). ANO-ADM-43 CLOSE (mineure) : « ← Dossier du deal » → « jamais passe en mediation »
+  → « ← Fiche du deal » + « ← Dossier de mediation » si `mediationFile`. ANO-ADM-45 CLOSE (mineure) : refus d'ecran en
+  anglais pour la Finance. ECART : la route du cahier `/api/admin/conversations/<id>` n'existe pas (by-deal). HARNAIS : le
+  journal se relit avec le super admin (Mediateur / Support sans audit.read). A TRANCHER : demasquer a la demande. Tests :
+  message 51, harnais 448. Reste : § 5.19 a 8.
 - 15/09 : **CAHIER 02-ADMIN — § 5.17 PILOTAGE ET DRILLDOWN (branche `chore/recette-admin-5-17`, empilee sur #317)** — 6
   scenarios CONFORMES (PIL-1 a 4 du cahier + PIL-5 « point = drilldown, remboursement date comme au rapport », PIL-6 fenetre
   des corridors), verts deux fois. CONTRE-EPREUVE fiche par fiche sur le code du § 5.16 : PIL-1, 2, 4 conformes ; PIL-3, 5,

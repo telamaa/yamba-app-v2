@@ -5664,3 +5664,46 @@ vue compte une fois par visiteur et par jour, sans rien garder de son adresse.
 
 - **Historique des versements** (même question qu'au § 5.16).
 - **Période en cours** signalée comme incomplète dans les courbes.
+
+# Back-office — lire une conversation : une lecture tracée une fois, jamais une coordonnée (cahier 02-ADMIN § 5.18)
+
+*(PR `chore/recette-admin-5-18`, 15/09/2026 — ADM-CNV-1 à 5.)*
+
+## Le besoin
+
+Pour instruire un signalement ou un litige, le Médiateur et le Support doivent lire l'échange entre l'Expéditeur et le
+Voyageur. C'est une intrusion dans une conversation privée : elle doit être limitée aux profils qui en ont besoin, tracée
+honnêtement, et ne jamais exposer les coordonnées des membres.
+
+## Les règles
+
+**RG-ADM-CNV-01 — Qui lit** : Médiateur et Support seulement ; la Finance ne voit ni le lien ni l'écran (refus en
+français), et un refus n'écrit rien au journal.
+
+**RG-ADM-CNV-02 — Lecture seule, en entier** : aucun champ, aucun bouton ; un admin n'écrit jamais dans le fil d'un membre.
+
+**RG-ADM-CNV-03 — Aucune coordonnée** : ni le numéro d'un compte, ni un numéro ou une adresse email tapés dans un message
+ou dans les précisions d'un signalement ; ils apparaissent « [numéro masqué] » / « [adresse masquée] », et le message garde
+son badge « coordonnées détectées ». Les révélations du numéro disent qui l'a vu et quand, jamais le numéro.
+
+**RG-ADM-CNV-04 — Une ouverture, une ligne** : chaque ouverture d'un écran qui montre des données sensibles (conversation,
+membre, dossier de médiation, fiche argent, trajet) écrit une ligne au journal ; deux appels du même admin sur la même
+fiche à moins de 10 secondes n'en écrivent qu'une ; si le système de coalescence est indisponible, la ligne est écrite
+quand même (A168).
+
+**RG-ADM-CNV-05 — Des liens qui mènent quelque part** : depuis une conversation, la fiche du deal est toujours accessible ;
+le dossier de médiation seulement s'il existe.
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| CNV-1 | Lire le fil signalé | en-tête, blocs, signalement marqué, aucun numéro, aucune écriture possible, lien vers la fiche, une ligne de journal ; deal sans fil : message clair | oui (lien mort et journal doublé avant correction) |
+| CNV-2 | La Finance | pas de lien, écran et API refusés en français, aucune ligne | oui |
+| CNV-3 | Numéro révélé par un membre | « Expéditeur a vu le numéro le … », message système, numéro absent | oui |
+| CNV-4 | Numéro et adresse tapés dans un message | masqués, badge conservé | oui (en clair avant correction) |
+| CNV-5 | Trois ouvertures de cinq écrans sensibles | trois lignes chacun | oui (six avant correction) |
+
+## Ce qui reste à trancher
+
+- **Démasquer à la demande** un message signalé (preuve d'une sortie de plateforme), comme geste journalisé distinct.

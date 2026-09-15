@@ -185,13 +185,14 @@ test.describe("ADM-USR — utilisateurs : recherche et fiche (cahier 02-ADMIN §
     const premiere = (await actions.locator("li").first().innerText()).trim();
     test.info().annotations.push({ type: "constat", description: `première action listée : « ${premiere} »` });
     expect(premiere, "la consultation la plus récente en tête").toContain("Fiche consultée");
-    /* Journal : USER_VIEWED USER · Thomas (une par ouverture : deux ici). */
+    /* Journal : USER_VIEWED USER · Thomas — deux ouvertures rapprochées, une ligne (A168). */
     const lignes = (await lireLeJournal(lecteur.contexte.request, { from: debut, adminUserId: jeuEssai.admin("mediateur").id })).map((l) => `${l.action} ${l.targetType} · ${l.targetId}`);
     /* Mesuré : DEUX lignes par ouverture — en développement, React (mode strict) monte deux fois l'effet qui charge la
        fiche, et chaque GET journalise. En production, une ouverture = un GET = une ligne. */
     expect(lignes.every((l) => l === `USER_VIEWED USER · ${thomas}`), `seules des USER_VIEWED sur Thomas (${lignes.join(", ")})`).toBe(true);
-    expect(lignes.length, "au moins une par ouverture (deux ouvertures)").toBeGreaterThanOrEqual(2);
-    test.info().annotations.push({ type: "constat", description: `${lignes.length} USER_VIEWED pour 2 ouvertures (double effet React en développement)` });
+    // A168 (§ 5.18) — deux ouvertures à moins de 10 s (rechargement) = UNE lecture ; le double effet React ne compte plus.
+    expect(lignes.length, "deux ouvertures rapprochées : une ligne (A168)").toBe(1);
+    test.info().annotations.push({ type: "constat", description: `${lignes.length} USER_VIEWED pour 2 ouvertures rapprochées (A168)` });
   });
 
   test("ADM-USR-3 · le TrustScore reflète les faits", async ({ navigateurAdmin, navigateurConnecte, jeuEssai }) => {
@@ -239,7 +240,11 @@ test.describe("ADM-USR — utilisateurs : recherche et fiche (cahier 02-ADMIN §
        absorbe une partie des 25 points (mesuré : 0 → 21 avec un deal terminé à −4). */
     const somme = (f: Fiche) => f.trust.factors.reduce((a, x) => a + x.points, 0);
     expect(a2.trust.score, "score = somme des facteurs bornée à 0..100").toBe(Math.min(100, Math.max(0, somme(a2))));
-    expect(somme(a2) - somme(a1), "la somme des facteurs monte exactement des points du litige").toBe(pointsLitiges(a2) - pointsLitiges(a1));
+    // Recette § 5.18 — rejeter le litige TERMINE le deal : un deal terminé de plus pour Chinwe (−4, plafond −40). Ce
+    // mouvement était masqué par un compteur de réputation rémanent du jeu d'essai, que le seed recalcule désormais.
+    const pointsTermines = (f: Fiche) => f.trust.factors.find((x) => x.key === "completedDeals")?.points ?? 0;
+    expect(pointsTermines(a2) - pointsTermines(a1), "le deal tranché compte comme terminé : −4 (plafond −40)").toBe(Math.max(-40, pointsTermines(a1) - 4) - pointsTermines(a1));
+    expect(somme(a2) - somme(a1), "la somme des facteurs bouge exactement du litige perdu et du deal terminé").toBe(pointsLitiges(a2) - pointsLitiges(a1) + pointsTermines(a2) - pointsTermines(a1));
     if (a2.trust.score - a1.trust.score !== 25) test.info().annotations.push({ type: "écart documentaire", description: `le score passe de ${a1.trust.score} à ${a2.trust.score} (+${a2.trust.score - a1.trust.score}, pas +25) : facteurs avant ${JSON.stringify(a1.trust.factors.map((f) => [f.key, f.points]))} — le plancher 0 masquait un crédit` });
     await sup.page.goto(`${bo()}/users/${chinwe}`, { waitUntil: "domcontentloaded" });
     await attendreLeChargement(sup.page);
@@ -251,6 +256,16 @@ test.describe("ADM-USR — utilisateurs : recherche et fiche (cahier 02-ADMIN §
     const lignes = await lireLeJournal(lecteur.contexte.request, { from: debut });
     const surChinwe = lignes.filter((l) => l.targetId === chinwe).map((l) => l.action);
     expect(surChinwe.every((a) => a === "USER_VIEWED"), `seules des USER_VIEWED sur Chinwe (${surChinwe.join(", ")})`).toBe(true);
-    expect(surChinwe.length, "au moins une par ouverture (API ×3, écran ×1 — doublée en développement)").toBeGreaterThanOrEqual(4);
+    // A168 (§ 5.18) — lectures coalescées par admin sur 10 s : le Médiateur a lu trois fois par l'API (dont deux coup sur
+    // coup), le super administrateur une fois à l'écran.
+    const vuesDe = async (adminId: string) => (await lireLeJournal(lecteur.contexte.request, { from: debut, adminUserId: adminId })).filter((l) => l.targetId === chinwe && l.action === "USER_VIEWED");
+    const med3 = await vuesDe(jeuEssai.admin("mediateur").id);
+    const sup1 = await vuesDe(jeuEssai.admin("super").id);
+    test.info().annotations.push({ type: "constat", description: `USER_VIEWED sur Chinwe : Médiateur ${med3.length} (3 lectures API), super administrateur ${sup1.length} (1 écran)` });
+    expect(sup1.length, "une ouverture d'écran : une ligne").toBe(1);
+    expect(med3.length, "trois lectures API dont deux rapprochées : entre 1 et 3 lignes").toBeGreaterThanOrEqual(1);
+    expect(med3.length).toBeLessThanOrEqual(3);
+    const dates = med3.map((l) => new Date(l.at).getTime()).sort((x, y) => x - y);
+    for (let i = 1; i < dates.length; i++) expect(dates[i] - dates[i - 1], "deux lignes du même admin sont espacées d'au moins 10 s").toBeGreaterThanOrEqual(9_500);
   });
 });

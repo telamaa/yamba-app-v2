@@ -26,7 +26,8 @@ export default function ConversationView({ bookingId }: { bookingId: string }) {
   useEffect(() => {
     apiFetch<AdminConversation>(`/admin/conversations/by-deal/${bookingId}`)
       .then(setData)
-      .catch((e) => setError(e instanceof ApiError && e.status === 404 ? "Ce deal n'a pas de conversation." : e.message));
+      // Recette § 5.18 — un refus se dit en français (la Finance qui ouvre l'adresse lisait un message anglais).
+      .catch((e) => setError(e instanceof ApiError && e.status === 404 ? "Ce deal n'a pas de conversation." : e instanceof ApiError && e.status === 403 ? "Ton profil ne lit pas les conversations : c'est une garde de vie privée (Médiateur et Support seulement)." : "La conversation n'a pas pu être chargée. Recharge la page."));
   }, [bookingId]);
 
   if (error) return <p className="text-[13px] text-red-700">{error}</p>;
@@ -37,7 +38,9 @@ export default function ConversationView({ bookingId }: { bookingId: string }) {
   return (
     <div className="max-w-4xl">
       <div className="flex flex-wrap gap-3 text-[12.5px]">
-        <Link href={`/disputes/${bookingId}`} className="text-slate-500 hover:underline">← Dossier du deal</Link>
+        {/* Recette § 5.18 — « ← Dossier du deal » menait à /disputes, « Ce deal n'est jamais passé en médiation » pour tout fil hors litige. */}
+        <Link href={`/deals/${bookingId}`} className="text-slate-500 hover:underline">← Fiche du deal</Link>
+        {data.mediationFile && <Link href={`/disputes/${bookingId}`} className="text-slate-500 hover:underline">← Dossier de médiation</Link>}
         <Link href="/reports" className="text-slate-500 hover:underline">← Signalements</Link>
       </div>
       <h1 className="mt-2 text-xl font-bold">Conversation du deal</h1>

@@ -20573,6 +20573,10 @@
           "bookingStatus": {
             "type": "string"
           },
+          "mediationFile": {
+            "type": "boolean",
+            "description": "Recette § 5.18 — le deal a un dossier de médiation (litige ouvert, ou retenue arbitrée) : le lien « Dossier de médiation » ne mène jamais à « jamais passé en médiation »"
+          },
           "corridor": {
             "type": "object",
             "properties": {
@@ -20698,6 +20702,7 @@
           "conversationId",
           "bookingId",
           "bookingStatus",
+          "mediationFile",
           "corridor",
           "shipper",
           "carrier",

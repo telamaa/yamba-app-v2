@@ -8954,3 +8954,95 @@ demandes restent.
 - deal-service **635** (inchangé : la règle est la même, importée autrement).
 - `apps/e2e` : **443 scénarios** (437 + 6).
 - Typecheck des huit projets CI et du harnais ; OpenAPI inchangé (fonctions pures, aucun schéma).
+
+# Cahier 02-ADMIN, § 5.18 : conversations — ce que la page promet, le serveur le tient
+
+*(PR `chore/recette-admin-5-18`, empilée sur #318, 15/09/2026.)*
+
+## Ce qui a été fait
+
+Cinq scénarios (ADM-CNV-1, 2, 3 du cahier ; CNV-4, 5 ajoutées), quatre anomalies closes (`ANO-ADM-42`, `ANO-ADM-44`
+majeures ; `ANO-ADM-43`, `ANO-ADM-45` mineures), une décision (`A168`), quatre améliorations.
+
+```
+packages/libs/admin-audit/src/index.ts                        A168 — recordAdminRead, ReadCoalescer, readCoalesceKey
+apps/auth-service/src/controller/admin-users.controller.ts    USER_VIEWED coalescé
+apps/trip-service/src/controllers/admin-trips.controller.ts   TRIP_VIEWED coalescé
+apps/deal-service/src/services/admin-dispute.service.ts       DISPUTE_VIEWED coalescé (coalesceur injecté)
+apps/deal-service/src/services/admin-finance.service.ts       DEAL_MONEY_VIEWED coalescé (coalesceur injecté)
+apps/deal-service/src/routes/deal.routes.ts                   Redis câblé comme coalesceur des deux services
+packages/libs/api-contracts/src/admin/redact-contacts.ts      redactContacts déplacée (surcharges string → string)
+apps/deal-service/src/services/admin-history.service.ts       importe et réexporte redactContacts
+apps/message-service/src/services/admin-conversation.service.ts  ANO-ADM-42 masquage ; mediationFile ; CONVERSATION_VIEWED coalescé
+apps/message-service/src/routes/admin.router.ts               Redis câblé comme coalesceur
+packages/libs/api-contracts/src/messaging/messaging.schema.ts AdminConversationResponse.mediationFile
+apps/admin-ui/src/components/ConversationView.tsx             « ← Fiche du deal », « ← Dossier de médiation », refus en français
+apps/message-service/src/services/admin-conversation-view.spec.ts  4 tests
+apps/e2e/src/admin/adm-cnv-conversations.spec.ts              5 scénarios
+```
+
+## Ce que la recette a mesuré d'abord
+
+Les cinq fiches, jouées seules contre le code du § 5.17, étaient rouges. Une première série l'était pour une mauvaise
+raison — le harnais relisait le journal avec le compte Médiateur, qui n'a pas `audit.read` (403) ; corrigée (relecture par
+le super administrateur, cahier § 2.7), la contre-épreuve a mesuré :
+- « ← Dossier du deal » → « Ce deal n'est jamais passé en médiation. » ;
+- `CONVERSATION_VIEWED` en **deux** exemplaires par ouverture, puis 6 lignes pour 3 ouvertures sur **cinq** écrans ;
+- « Appelle-moi plutôt au 06 12 34 56 78 ou écris à thomas.perso@exemple.fr » lu par le Médiateur ;
+- la Finance ouvrant l'écran directement : message anglais du serveur.
+
+## ANO-ADM-44 / A168 : une lecture n'est pas un geste
+
+Les écrans admin chargent leur fiche dans un `useEffect` au montage ; le serveur journalise la lecture. En développement,
+React (StrictMode) monte, démonte et remonte chaque composant : l'effet part deux fois, deux requêtes, deux lignes. Garder
+chaque écran (un `useRef`) ne protégerait pas d'un rechargement réflexe ni d'un futur client. La garde va donc au serveur,
+dans la bibliothèque d'audit :
+
+```ts
+export async function recordAdminRead(db, coalescer, input, windowSeconds = READ_COALESCE_SECONDS /* 10 */) {
+  if (coalescer) {
+    let first = true;
+    try { first = (await coalescer.set(readCoalesceKey(input), "1", "EX", windowSeconds, "NX")) !== null; }
+    catch { first = true; }                  // Redis en panne : un doublon plutôt qu'une lecture perdue
+    if (!first) return false;
+  }
+  await recordAdminAction(db, input);
+  return true;
+}
+// clé : yamba:audit:read:<admin>:<action>:<type>:<cible>
+```
+
+- `ReadCoalescer` est un type structurel (`set(key, value, "EX", s, "NX")`) : la bibliothèque reste sans dépendance ;
+  ioredis convient tel quel.
+- Seules les cinq lectures déclenchées par l'**ouverture** d'un écran l'utilisent. Les lectures déclenchées par un clic
+  (document, chronologie, drilldown, exports) et tous les gestes gardent `recordAdminAction`, écrit à chaque fois.
+- Dans deal-service et message-service, le coalesceur est **injecté** (argument optionnel du service, Redis câblé par les
+  routes) : les specs qui importent ces services n'ouvrent aucune connexion Redis. La spec de la fiche argent, qui simule
+  `@packages/admin-audit`, expose `recordAdminRead` délégué au `recordAdminAction` observé.
+
+## ANO-ADM-42 : masquer ce qu'un membre a tapé
+
+```ts
+body: m.kind === "TEXT" ? redactContacts(m.body) : m.body,       // messages système : une clé, pas un texte libre
+details: redactContacts(r.details),                             // précisions d'un signalement (fil ET file de modération)
+message: { id, body: redactContacts(message.body), createdAt }, // file des messages signalés
+```
+
+`redactContacts` existait dans deal-service (§ 5.12, erreurs SMTP de la chronologie). Même principe qu'A167 : elle part
+dans `@packages/api-contracts` (`admin/redact-contacts.ts`), deal-service l'importe et la réexporte (sa spec ne change pas).
+Deux surcharges TypeScript (`string → string`, `string | null → string | null`) évitent un `?? ""` à chaque appel sur un
+champ non nullable du contrat.
+
+## ANO-ADM-43 : un lien qui dépend de l'état du deal
+
+Le contrat gagne `mediationFile` : `!!disputedAt || retentionDisposition === "HELD_FOR_MEDIATION" || !!retentionDecidedAt`
+— la définition du dossier d'arbitrage d'A160 (`fileKindOf`). L'écran affiche toujours « ← Fiche du deal » et, seulement
+si le dossier existe, « ← Dossier de médiation ».
+
+## Tests
+
+- message-service **51** (+4) : masquage (message, précisions, messages système intacts), `mediationFile`, coalescence
+  (deux lectures → une ligne, autre admin → sa ligne), `recordAdminRead` Redis en panne et sans coalesceur.
+- deal-service 635, auth-service 252, trip-service 292 — inchangés en nombre ; spec de la fiche argent ajustée.
+- `apps/e2e` : **448 scénarios** (443 + 5).
+- Typecheck des huit projets CI et du harnais ; cinq `openapi.json` régénérés (`AdminConversationResponse`).

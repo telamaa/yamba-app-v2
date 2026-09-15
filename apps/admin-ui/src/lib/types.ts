@@ -273,7 +273,7 @@ export type AdminChatMessage = {
   reports: { id: string; reason: MessageReportReason; details: string | null; status: MessageReportStatus; reporterRole: "SHIPPER" | "CARRIER"; createdAt: string }[];
 };
 export type AdminConversation = {
-  conversationId: string; bookingId: string; bookingStatus: string;
+  conversationId: string; bookingId: string; bookingStatus: string; mediationFile?: boolean; // § 5.18
   corridor: { originCity: string; destinationCity: string; departureAt: string | null };
   shipper: { id: string; firstName: string; lastName: string };
   carrier: { id: string; firstName: string; lastName: string };

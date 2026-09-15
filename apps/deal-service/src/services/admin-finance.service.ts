@@ -9,7 +9,7 @@
  */
 import prisma from "@packages/libs/prisma";
 import { AppError, NotFoundError, ValidationError } from "@packages/error-handler";
-import { recordAdminAction } from "@packages/admin-audit";
+import { recordAdminAction, recordAdminRead, type ReadCoalescer } from "@packages/admin-audit";
 import { PaymentIntentNotFoundError, type PaymentProvider } from "@packages/payments";
 import type {
   AdminDealMoneyFile,
@@ -158,7 +158,7 @@ async function stripeReadiness(carrierIds: string[]): Promise<Map<string, { acco
   return new Map(rows.map((r) => [r.userId, { accountId: r.stripeAccountId ?? null, payoutsEnabled: !!r.stripePayoutsEnabled }]));
 }
 
-export function makeAdminFinanceService(provider: PaymentProvider, settlement: DealSettlementService, clock: () => Date = () => new Date(), decisionLocks?: DecisionLockStore) {
+export function makeAdminFinanceService(provider: PaymentProvider, settlement: DealSettlementService, clock: () => Date = () => new Date(), decisionLocks?: DecisionLockStore, readCoalescer?: ReadCoalescer) {
   async function loadMoney(id: string): Promise<MoneyRecord> {
     const b = await prisma.booking.findUnique({ where: { id }, select: MONEY_SELECT });
     if (!b || b.isDeleted) throw new NotFoundError("Deal not found.", { code: "DEAL_NOT_FOUND" });
@@ -312,7 +312,7 @@ export function makeAdminFinanceService(provider: PaymentProvider, settlement: D
           applyRefund: !isParty && refundBounds.allowed,
         },
       };
-      await recordAdminAction(prisma, audit(admin, "DEAL_MONEY_VIEWED", id));
+      await recordAdminRead(prisma, readCoalescer, audit(admin, "DEAL_MONEY_VIEWED", id)); // A168 — ouverture d'écran coalescée
       return file;
     },
 

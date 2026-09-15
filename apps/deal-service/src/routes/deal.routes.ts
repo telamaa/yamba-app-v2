@@ -33,6 +33,7 @@ import { makeOpsAlertsService } from "../services/ops-alerts.service";
 import { makeDealMediationService } from "../services/deal-mediation.service";
 import redis from "@packages/libs/redis";
 import type { DecisionLockStore } from "../lib/decision-lock";
+import type { ReadCoalescer } from "@packages/admin-audit";
 import { makeTrackingLinkController } from "../controllers/tracking-link.controller"; // D69
 import { makeTrackingLinkService } from "../services/tracking-link.service";
 
@@ -124,7 +125,7 @@ router.get("/me/deals", isAuthenticated, getMyDeals);
 router.get("/me/wallet", isAuthenticated, getMyWallet);
 
 // ── Chantier C (D54) : file « à arbitrer » + dossier, ADMIN + 2FA seulement ──
-const adminDisputes = makeAdminDisputeController(makeAdminDisputeService());
+const adminDisputes = makeAdminDisputeController(makeAdminDisputeService(undefined, redis as unknown as ReadCoalescer)); // A168
 router.get("/admin/disputes", isAdminAuthenticated, requireAdminPermission("disputes.read"), adminDisputes.listQueue);
 router.get("/admin/disputes/export", isAdminAuthenticated, requireAdminPermission("exports.operational"), adminDisputes.exportCsv); // C-PR7a (D60 2A) — avant /:id
 router.get("/admin/disputes/:id", isAdminAuthenticated, requireAdminPermission("disputes.read"), adminDisputes.getFile);
@@ -132,7 +133,7 @@ router.post("/admin/disputes/:id/resolve", isAdminAuthenticated, requireAdminPer
 router.post("/admin/disputes/:id/retention", isAdminAuthenticated, requireAdminPermission("disputes.decide"), dealMediation.resolveRetention);
 
 // ── C-PR5a (D58) : finances — files d'exception, fiche argent, rapprochement, rejeu, renversements ──
-const adminFinance = makeAdminFinanceController(makeAdminFinanceService(paymentProvider, dealSettlementService, undefined, redis as unknown as DecisionLockStore)); // ANO-ADM-34 : verrou de décision sur le remboursement manuel
+const adminFinance = makeAdminFinanceController(makeAdminFinanceService(paymentProvider, dealSettlementService, undefined, redis as unknown as DecisionLockStore, redis as unknown as ReadCoalescer)); // ANO-ADM-34 : verrou de décision sur le remboursement manuel
 router.get("/admin/finances/queue", isAdminAuthenticated, requireAdminPermission("finances.read"), adminFinance.listQueue);
 router.get("/admin/deals/:id/money", isAdminAuthenticated, requireAdminPermission("finances.read"), adminFinance.getMoneyFile);
 router.post("/admin/deals/:id/money/reconcile", isAdminAuthenticated, requireAdminPermission("finances.read"), adminFinance.reconcile);

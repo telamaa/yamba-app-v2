@@ -63,9 +63,11 @@ test.describe("ADM-ARG — fiche argent d'un deal (cahier 02-ADMIN § 5.12)", ()
     test.setTimeout(6 * 60_000);
     const fin = await navigateurAdmin("finance");
     const deal = jeuEssai.deal("bzv-completed-blocked");
+    // A168 (§ 5.18) — la lecture API ci-dessous est elle-même une ouverture journalisée : le scénario commence AVANT elle,
+    // sinon l'ouverture d'écran qui suit (moins de 10 s après) est coalescée avec une ligne datée d'avant le début.
+    const debut = await debutDuScenario();
     const { fiche } = await lireFiche(fin.contexte, deal.id);
     expect(fiche, "GET /admin/deals/:id/money").toBeTruthy();
-    const debut = await debutDuScenario();
     /* 1. Depuis /finances, la fiche du deal en échec de versement. */
     const { page } = fin;
     await page.goto(`${bo()}/finances?kind=FAILED`, { waitUntil: "domcontentloaded" });
