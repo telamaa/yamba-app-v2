@@ -6442,3 +6442,102 @@ paramètre se lit désormais « clé : avant → après », A187 b) réalignées
   que sous gestes croisés ou si l'autre n'est pas en service — prouvée par test unitaire et ADM-CPT-8.
 - CPT-3 étape 5 : le refus reste **400** (le cahier), mais il est désormais aussi la réponse du perdant de deux invitations
   simultanées.
+
+---
+
+## Cahier 02-ADMIN — § 5.26 Mes sessions · **CONFORME après correction** (1 fiche + 4 ajoutées · 2 anomalies majeures + 2 mineures closes · 2 décisions (A188, A189) · lots du § 5.25 livrés · 5 scénarios ADM-SES + ADM-CPT-12, 13, CPT-4 réalignée)
+
+Spec : `apps/e2e/src/admin/adm-ses-mes-sessions.spec.ts` (et deux fiches ajoutées à `adm-cpt-comptes-admin.spec.ts`). Le
+cahier ne juge qu'un point : l'identité de l'admin vit dans la barre latérale, « Mes sessions » liste ses sessions, et le
+back-office n'offre aucun geste de compte. Le chapitre se juge pourtant à la promesse de la page elle-même — « Révoque ce
+que tu ne reconnais pas » : **on reconnaît une session**, **« Se déconnecter » ne ment jamais**, **le journal ne compte que
+ce qui a eu lieu**, **l'écran parle juste**. Manœuvres consignées : chaque fiche pose un administrateur JETABLE enrôlé en
+base (une fiche qui se déconnecte ne doit jamais fermer une session mémorisée du harnais) et lui retire l'accès en
+`finally` ; ADM-SES-5 règle en base le nombre de codes de secours (1, 0, 3) ; ADM-SES-3 et 5 simulent la panne du service
+en réécrivant la réponse de l'API dans le navigateur (502) ; ADM-CPT-12 efface en base le lien vivant pour montrer « lien
+expiré ».
+
+| Fiche | Objet | Verdict |
+|---|---|---|
+| ADM-SES-1 | Mon compte admin | **Conforme après correction** — aucune entrée « Mon compte », `/account` 404 ; barre : « Yamba · Admin », « Recette SES-1 », « Support + Finance », « Se déconnecter » ; `/sessions` : une ligne « cette session » ; aucun lien ni bouton « mot de passe », « email », « codes de secours », « régénérer » ; déconnexion → `/login`, plus aucune clé `admin_jti:`, `/home` renvoie à `/login`, une ligne `ADMIN_LOGOUT · SESSION`. Seul défaut : « Il te reste 2 code(s) de secours. » (ANO-ADM-84) |
+| ADM-SES-2 (ajoutée) | Reconnaître une session | **Conforme après correction** — ANO-ADM-81 : deux sessions, deux navigateurs, les lignes ne différaient que par leurs dates. Désormais « Chrome · macOS » et « Firefox · Windows · IP … » ; après un renouvellement de B (rotation du jti), B reste reconnaissable ; « Révoquer » sur « Firefox · Windows » : B 401, A 200 |
+| ADM-SES-3 (ajoutée) | Le serveur ne répond pas | **Conforme après correction** — ANO-ADM-82 : « Se déconnecter » sous un 502 affichait `/login` alors que `/admin/me` répondait toujours 200. Désormais « Déconnexion impossible : le service ne répond pas, ta session est toujours ouverte. » ; même règle pour « Révoquer » sa propre session (« Révocation impossible … ») ; service revenu : `/login`, zéro session |
+| ADM-SES-4 (ajoutée) | Le journal ne compte que ce qui a eu lieu | **Conforme après correction** — ANO-ADM-83 : `DELETE /admin/me/sessions/<jti inconnu>` répondait 200 et écrivait `ADMIN_SESSION_REVOKED` ; une déconnexion rejouée écrivait un second `ADMIN_LOGOUT`. Désormais 404 `ADMIN_SESSION_NOT_FOUND` sans ligne, rejeu 200 sans ligne, double clic sur « Révoquer » : une révocation ; journal `["ADMIN_LOGOUT", "ADMIN_SESSION_REVOKED"]` |
+| ADM-SES-5 (ajoutée) | L'écran parle juste | **Conforme après correction** — ANO-ADM-84 : « Il te reste 1 code de secours. » ; à zéro « Tu n'as plus de code de secours : … un super administrateur devra réinitialiser ta double authentification. » ; à trois, rien ; lecture des sessions en panne : « Impossible de lire tes sessions pour le moment. » + « Réessayer » (avant : « Aucune session. ») |
+| ADM-CPT-12 (ajoutée, lot a) | Renvoyer une invitation | **Conforme** — « lien valable jusqu'au … » ; « Renvoyer l'invitation » → « Invitation renvoyée à … : nouveau lien valable jusqu'au …, l'ancien ne sert plus. », ✉ nouveau lien, ancien lien 400, une ligne `ADMIN_INVITE_RESENT` ; lien effacé → « lien expiré », bouton présent ; invitation acceptée → 409 `ADMIN_INVITE_NOT_PENDING`, bouton absent |
+| ADM-CPT-13 (ajoutée, lots b, c) | Prévenir, motiver | **Conforme** — cocher « Finance » : ✉ « Tes profils sur le back-office Yamba ont changé », « « Support » devient « Support + Finance » », aucun lien vers le back-office ; « Retirer » avec motif : ✉ « Ton accès au back-office Yamba a été retiré » signé de l'auteur, SANS le motif ni lien ; journal `ADMIN_REVOKED` `after: { reason }` ; motif vide : retrait, aucun `after` |
+
+**Contre-épreuve.** Premier passage sur le code d'origine (auth-service et écran d'avant) : **SES-1 à 5 rouges** (SES-1 sur
+le seul pluriel ; ses étapes 1 à 3 du cahier passent — conformes). Lots : contrôleurs, routes, emails, contrats et session
+d'origine remis (`git stash`), auth-service rebâti, écran gardé : **CPT-12, CPT-13, SES-2, SES-4 rouges**. Corrections
+remises, auth-service rebâti : ADM-SES 5/5 deux fois, ADM-CPT 13/13 (CPT-4 réalignée : la confirmation du retrait est
+désormais une invite qui demande le motif). Voisins : ADM-SEC-7, SEC-10 (qui lisait « l'écran ne montre ni appareil ni
+IP »), ADM-JRN, ADM-ACC — 17/17 avec ADM-SES. ADM-SEC-8 (46 min d'attente réelle) non rejouée : aucune ligne de son chemin
+n'a changé hors de l'enregistrement de session, prouvé par test unitaire.
+
+### Anomalies
+
+- **ANO-ADM-81 (majeure) — on ne reconnaissait pas une session.** La page dit « Révoque ce que tu ne reconnais pas » et
+  l'alerte email de connexion donne IP et navigateur, mais la liste ne montrait que deux dates : révoquer « la bonne »
+  était un pari (ADM-SEC-10 révoquait par l'API, en lisant le jti dans le cookie). L'enregistrement de session porte
+  appareil, IP et user-agent, recopiés à chaque rotation (A188 a). Close.
+- **ANO-ADM-82 (majeure) — « Se déconnecter » mentait.** L'échec de l'appel était avalé et l'écran allait à `/login` : les
+  cookies `httpOnly` restaient, la session aussi ; sur un poste partagé, le suivant rouvrait le back-office par l'adresse
+  `/home`. L'écran ne quitte la page qu'après un 200 (ou un 401) et dit sinon que la session est toujours ouverte (A188 c).
+  Close.
+- **ANO-ADM-83 (mineure) — le journal comptait des gestes qui n'avaient pas eu lieu.** Déconnexion rejouée : seconde ligne
+  `ADMIN_LOGOUT` ; révocation d'une session absente : 200 et `ADMIN_SESSION_REVOKED`. `revokeAdminSession` rend désormais
+  « existait-elle ? » (A188 b). Close.
+- **ANO-ADM-84 (mineure) — l'écran parlait faux.** « 1 code(s) », rien à dire à zéro code (alors qu'aucune régénération
+  n'existe au back-office) ; une panne de lecture affichait « Aucune session. » ; « Révoquer » avalait ses erreurs. Close.
+
+### Décisions (15/09) — inscrites au registre avant le code
+
+- **A188** — sessions admin reconnaissables (appareil, IP, user-agent tronqué, recopiés à la rotation ; « Appareil
+  inconnu » pour une session d'avant) ; journal seulement pour une session réellement fermée, 404
+  `ADMIN_SESSION_NOT_FOUND` ; `/login` seulement après 200/401. Écartés : journaliser toute tentative ; effacer les cookies
+  côté client (httpOnly).
+- **A189** — lots du § 5.25 : `POST /admin/admins/:id/invite/resend` (409 `ADMIN_INVITE_NOT_PENDING`) et
+  `AdminAccount.inviteExpiresAt` ; motif FACULTATIF du retrait (≤ 500) au journal ; emails `adminRolesChanged` /
+  `adminAccessRevoked` sans lien ni motif, jamais vers un compte supprimé ou une adresse suppressionnée. Écartés : motif
+  obligatoire (retarde le retrait d'urgence) ; motif dans l'email (texte interne).
+
+### Améliorations faites (au-delà du cahier)
+
+- « Se déconnecter » devient « Déconnexion… » et ne part qu'une fois ; « Révoquer » ne part qu'une fois (double clic).
+- Une session d'avant la correction prend, à son renouvellement, l'appareil de la requête : elle devient reconnaissable
+  sans attendre une nouvelle connexion.
+- L'user-agent brut reste en Redis (tronqué à 200) ; l'écran ne reçoit que le libellé et l'IP.
+- OpenAPI : 404 de `DELETE /admin/me/sessions/{jti}`, `device` et `ip` au contrat `AdminSessionItem`, route de renvoi
+  et corps facultatif du retrait documentés.
+- Refus en français : « Cette invitation n'est plus en attente … », « Motif trop long : 500 caractères au plus. »,
+  « Cette session était déjà fermée. ».
+
+### Proposé, non fait
+
+- Régénérer ses codes de secours depuis « Mes sessions », sous une vérification TOTP fraîche (aujourd'hui : un super
+  administrateur doit retirer puis réinviter) — nouvelle route et ligne `ADMIN_BACKUP_CODES_REGENERATED`, à arbitrer.
+- « Révoquer toutes mes autres sessions » en un geste (réflexe après une alerte de connexion suspecte).
+- Le renouvellement du jeton d'accès perd les claims `adminRole` / `adminRoles` posés à l'ouverture (sans effet :
+  `isAdminAuthenticated` relit la base) — à aligner ou à retirer des deux côtés.
+- Deux onglets qui renouvellent au même instant avec le même jeton créent deux jti : une « session fantôme » visible
+  45 min dans la liste. Réclamer l'ancien jti (`DEL` = 1) sans effacer les cookies du perdant.
+
+### Écarts avec le cahier
+
+- ADM-SES-1 étape 2 : le cahier écrit « Il te reste {n} code(s) de secours. » ; l'écran accorde le pluriel et, à zéro, dit
+  le recours.
+- ADM-SES-1 : le cahier renvoie à ADM-SEC-10 pour le contenu de `/sessions` ; chaque ligne porte désormais l'appareil et
+  l'IP.
+
+### Synthèse du § 5 (cahier 02-ADMIN, chapitres 5.1 → 5.26)
+
+| Repère | Valeur |
+|---|---|
+| Chapitres | 26, tous **conformes** (dont 12 « après correction ») — § 5.1 livré avec § 4.2 / 4.3 (PR #302) |
+| PR | #302 (§ 5.1), #303 → #326 (§ 5.2 → 5.25, une par chapitre, empilées), `chore/recette-admin-5-26` (§ 5.26) |
+| Anomalies closes | **80** (ANO-ADM-05 → 84) : **4 bloquantes** (export CSV § 5.6, double remboursement § 5.9, versement § 5.14, remboursement manuel § 5.15), **42 majeures**, **34 mineures** — aucune ouverte |
+| Décisions au registre | A155 → A189 (dont A169 → A189 le 15/09, la plupart arbitrées en expert sur délégation) |
+| Harnais | specs `apps/e2e/src/admin/adm-*.spec.ts` ; chaque chapitre : contre-épreuve (corrections retirées → rouge) |
+| Motifs récurrents | gestes simultanés → 500 (P2034 non rejoué, unicité non traduite), refus serveur affichés en anglais « 4xx : … », lectures qui journalisent deux fois, pannes affichées comme « rien » |
+| Reste | § 6 (ADM-E2E-1 → 8), § 7 (ADM-NRG-1 → 7 + engagement P2034 sur `admin-users` et `admin-auth`), § 8 |

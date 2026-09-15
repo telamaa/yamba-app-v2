@@ -11,7 +11,7 @@ import isAdminAuthenticated from "@packages/middleware/isAdminAuthenticated";
 import { requireAdminPermission } from "@packages/middleware/requireAdminRole";
 import { makeAdminUsersController } from "../controller/admin-users.controller";
 import { makeAdminUsersService } from "../services/admin-users.service";
-import { acceptAdminInvite, inviteAdmin, listAdmins, revokeAdmin, updateAdminRole } from "../controller/admin-admins.controller";
+import { acceptAdminInvite, inviteAdmin, listAdmins, resendAdminInvite, revokeAdmin, updateAdminRole } from "../controller/admin-admins.controller";
 import { getAdminKpis } from "../controller/admin-kpis.controller";
 import { getSettings, getSettingsHistory, resetSettings, updateSettings } from "../controller/admin-settings.controller"; // C-PR8a (D62)
 import { adminEraseUser, adminErasureBlockers, listDataRequests } from "../controller/privacy.controller"; // C-PR8b (D63), A179
@@ -69,6 +69,7 @@ router.get("/admin/admins", isAdminAuthenticated, requireAdminPermission("admins
 router.post("/admin/admins/invite", isAdminAuthenticated, requireAdminPermission("admins.manage"), inviteAdmin);
 router.patch("/admin/admins/:id", isAdminAuthenticated, requireAdminPermission("admins.manage"), updateAdminRole);
 router.delete("/admin/admins/:id", isAdminAuthenticated, requireAdminPermission("admins.manage"), revokeAdmin);
+router.post("/admin/admins/:id/invite/resend", isAdminAuthenticated, requireAdminPermission("admins.manage"), resendAdminInvite); // A189 a
 
 // C-PR3 (D56) — utilisateurs et suspension
 const adminUsers = makeAdminUsersController(makeAdminUsersService());

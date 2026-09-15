@@ -4,6 +4,9 @@
  * - adminInvite         : invitation d'un nouvel administrateur (lien 48 h, mot de passe à définir)
  * - adminAccessGranted  : compte existant promu (lien de connexion admin)
  * - adminLoginAlert     : alerte à chaque ouverture de session admin (ip, appareil, date)
+ * - adminRolesChanged / adminAccessRevoked : A189 c — à l'admin dont les accès changent (sécurité : un compte compromis se
+ *   voit ajouter ou retirer des droits). JAMAIS de lien de connexion (on n'offre pas une porte à un compte compromis),
+ *   JAMAIS le motif du retrait (texte interne).
  * - accountRestricted / accountSuspended / accountReinstated : au membre, motif GÉNÉRIQUE
  *   (jamais le contenu d'un signalement), recours par email.
  */
@@ -15,6 +18,8 @@ export type AdminEmail = { subject: string; content: EmailContent };
 export type AdminInviteParams = { firstName: string; invitedBy: string; roleLabel: string; acceptUrl: string; expiresInHours: number; supportEmail: string };
 export type AdminAccessGrantedParams = { firstName: string; invitedBy: string; roleLabel: string; loginUrl: string; supportEmail: string };
 export type AdminLoginAlertParams = { firstName: string; at: string; ip: string; userAgent: string; sessionsUrl: string; supportEmail: string };
+export type AdminRolesChangedParams = { firstName: string; changedBy: string; before: string; after: string; supportEmail: string };
+export type AdminAccessRevokedParams = { firstName: string; revokedBy: string; supportEmail: string };
 export type AccountStatusParams = { firstName: string; reason: string; until: string | null; supportEmail: string };
 /** C-PR8a (D62 5A) — chaque modification de paramètre est annoncée à tous les SUPER_ADMIN. */
 /** `kind` (A181) : la transition choisit le sujet — lever une maintenance annoncée n'est pas une maintenance planifiée. */
@@ -25,6 +30,8 @@ export type AdminEmailDictionary = {
   adminInvite(p: AdminInviteParams): AdminEmail;
   adminAccessGranted(p: AdminAccessGrantedParams): AdminEmail;
   adminLoginAlert(p: AdminLoginAlertParams): AdminEmail;
+  adminRolesChanged(p: AdminRolesChangedParams): AdminEmail;
+  adminAccessRevoked(p: AdminAccessRevokedParams): AdminEmail;
   accountRestricted(p: AccountStatusParams): AdminEmail;
   accountSuspended(p: AccountStatusParams): AdminEmail;
   accountReinstated(p: Pick<AccountStatusParams, "firstName" | "supportEmail">): AdminEmail;
@@ -64,6 +71,30 @@ const fr: AdminEmailDictionary = {
       cta: { label: "Ouvrir le back-office", url: p.loginUrl },
       reason: "Tu reçois cet email parce qu'un super administrateur Yamba a modifié tes accès.",
       footnotes: [`Si ce n'est pas attendu, écris-nous : ${p.supportEmail}`],
+    },
+  }),
+  adminRolesChanged: (p) => ({
+    subject: "Tes profils sur le back-office Yamba ont changé",
+    content: {
+      preheader: `${p.before} → ${p.after}`,
+      title: "Profils modifiés",
+      greeting: `Bonjour ${p.firstName},`,
+      paragraphs: [`${p.changedBy} a modifié tes profils sur le back-office Yamba : « ${p.before} » devient « ${p.after} ». Tes permissions suivent dès ta prochaine action.`],
+      notice: { tone: "warning", text: "Si tu ne t'attendais pas à ce changement, préviens tout de suite le support : quelqu'un a peut-être accès à un compte super administrateur." },
+      reason: "Tu reçois cet email à chaque changement de tes accès au back-office (sécurité).",
+      footnotes: [`Signaler : ${p.supportEmail}`],
+    },
+  }),
+  adminAccessRevoked: (p) => ({
+    subject: "Ton accès au back-office Yamba a été retiré",
+    content: {
+      preheader: `Accès retiré par ${p.revokedBy}.`,
+      title: "Accès retiré",
+      greeting: `Bonjour ${p.firstName},`,
+      paragraphs: [`${p.revokedBy} a retiré ton accès au back-office Yamba. Tes sessions admin sont fermées et ta double authentification admin est supprimée.`, "Ton compte Yamba, s'il sert aussi à envoyer ou transporter des colis, n'est pas touché."],
+      notice: { tone: "info", text: "Si tu ne t'attendais pas à ce retrait, écris au support." },
+      reason: "Tu reçois cet email à chaque changement de tes accès au back-office (sécurité).",
+      footnotes: [`Une question ? ${p.supportEmail}`],
     },
   }),
   adminLoginAlert: (p) => ({
@@ -183,6 +214,30 @@ const en: AdminEmailDictionary = {
       cta: { label: "Open the back-office", url: p.loginUrl },
       reason: "You receive this email because a Yamba super administrator changed your access.",
       footnotes: [`Unexpected? Write to us: ${p.supportEmail}`],
+    },
+  }),
+  adminRolesChanged: (p) => ({
+    subject: "Your Yamba back-office profiles changed",
+    content: {
+      preheader: `${p.before} → ${p.after}`,
+      title: "Profiles changed",
+      greeting: `Hi ${p.firstName},`,
+      paragraphs: [`${p.changedBy} changed your Yamba back-office profiles: "${p.before}" becomes "${p.after}". Your permissions follow from your next action.`],
+      notice: { tone: "warning", text: "If you did not expect this change, tell support right away: someone may have access to a super administrator account." },
+      reason: "You receive this email whenever your back-office access changes (security).",
+      footnotes: [`Report: ${p.supportEmail}`],
+    },
+  }),
+  adminAccessRevoked: (p) => ({
+    subject: "Your Yamba back-office access was removed",
+    content: {
+      preheader: `Access removed by ${p.revokedBy}.`,
+      title: "Access removed",
+      greeting: `Hi ${p.firstName},`,
+      paragraphs: [`${p.revokedBy} removed your access to the Yamba back-office. Your admin sessions are closed and your admin two-factor authentication is deleted.`, "Your Yamba account, if you also use it to send or carry parcels, is not affected."],
+      notice: { tone: "info", text: "If you did not expect this, write to support." },
+      reason: "You receive this email whenever your back-office access changes (security).",
+      footnotes: [`Any question? ${p.supportEmail}`],
     },
   }),
   adminLoginAlert: (p) => ({

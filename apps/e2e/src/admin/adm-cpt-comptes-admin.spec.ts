@@ -350,7 +350,7 @@ test.describe("ADM-CPT — comptes admin (cahier 02-ADMIN § 5.25)", () => {
       const del = page.waitForResponse((x) => x.url().includes(`/api/admin/admins/${cible.id}`) && x.request().method() === "DELETE");
       await ligneDe(page, cible.email).getByRole("button", { name: "Retirer" }).click();
       expect((await del).status()).toBe(200);
-      expect(confirmation).toBe(`Retirer l'accès admin de Recette CPT4 ? Sa 2FA et ses sessions admin sont supprimées.`);
+      expect(confirmation).toBe(`Retirer l'accès admin de Recette CPT4 ? Sa 2FA et ses sessions admin sont supprimées.\nMotif (facultatif, écrit au journal) :`); // A189 b
       await expect(ligneDe(page, cible.email)).toHaveCount(0);
       const apres = etatDuCompte(cible.email)!;
       expect(apres, "le compte subsiste, sans rien d'admin").toMatchObject({ adminRoles: [], totp: false, codes: 0, sessionsAdmin: 0 });
@@ -668,6 +668,102 @@ test.describe("ADM-CPT — comptes admin (cahier 02-ADMIN § 5.25)", () => {
       const journal = (await lireLeJournal(req, { from: debut, action: "EXPORTED" })).filter((l) => (l.after as { domain?: string }).domain === "audit");
       expect(journal.length, "deux exports réussis, deux lignes ; le refus n'en écrit pas").toBe(2);
       expect(journal[0].after).toMatchObject({ domain: "audit", personal: true, reason: motif, filters: { targetId: cible.id }, truncated: false });
+    } finally {
+      await retirerParApi(req, cible.id);
+    }
+  });
+
+  /* ══ Lots décidés au § 5.25, livrés au § 5.26 (A189) ══════════════════════════════════════ */
+
+  test("ADM-CPT-12 · renvoyer une invitation en attente : validité affichée, nouveau lien, l'ancien meurt, lien expiré dit (A189 a)", async ({ navigateurAdmin, mailpit }) => {
+    test.setTimeout(4 * 60_000);
+    const sup = await navigateurAdmin("super");
+    const { page } = sup;
+    const req = sup.contexte.request;
+    const email = adresseJetable("CPT12");
+    await mailpit.vider();
+    let id: string | null = null;
+    try {
+      expect((await req.post(`${api()}/admin/admins/invite`, { data: { email, firstName: "Rémi", lastName: "Renvoi", adminRoles: ["SUPPORT"] } })).status()).toBe(201);
+      const ancien = jetonDe(lienDInvitation((await mailpit.attendreEmail({ pour: email, sujet: "Ton accès au back-office Yamba" })).texte));
+      id = etatDuCompte(email)!.id;
+      await ouvrirComptes(page);
+      const ligne = ligneDe(page, email);
+      await expect(ligne.getByTestId("invite-expiry"), "la validité du lien se lit").toHaveText(/^lien valable jusqu'au \d/);
+      const debut = await debutDuScenario();
+      await mailpit.vider();
+      const renvoi = page.waitForResponse((x) => x.url().includes(`/api/admin/admins/${id}/invite/resend`), { timeout: 60_000 });
+      await ligne.getByRole("button", { name: "Renvoyer l'invitation" }).click();
+      expect((await renvoi).status()).toBe(200);
+      await expect(messageDeLEcran(page)).toContainText(`Invitation renvoyée à ${email}`);
+      await expect(messageDeLEcran(page)).toContainText("l'ancien ne sert plus");
+      const nouveau = jetonDe(lienDInvitation((await mailpit.attendreEmail({ pour: email, sujet: "Ton accès au back-office Yamba" })).texte));
+      expect(nouveau).not.toBe(ancien);
+      const ctx = await requeteApi.newContext();
+      expect((await ctx.post(`${api()}/auth/admin/invite/accept`, { data: { token: ancien, password: MOT_DE_PASSE_INVITE } })).status(), "l'ancien lien est mort").toBe(400);
+      const journal = await lireLeJournal(req, { from: debut, action: "ADMIN_INVITE_RESENT" });
+      expect(journal.map((l) => `${l.targetType} · ${l.targetId}`), "une ligne").toEqual([`USER · ${id}`]);
+      /* Lien expiré (manœuvre : le TTL est passé) : l'écran le dit, le bouton reste. */
+      lireCoteServeur(`import r from "./packages/libs/redis"; (async () => { await r.del("admin_invite:${nouveau}", "admin_invite_user:${id}"); console.log("@@true"); process.exit(0); })();`);
+      await ouvrirComptes(page);
+      await expect(ligneDe(page, email).getByTestId("invite-expiry")).toHaveText("lien expiré");
+      await expect(ligneDe(page, email).getByRole("button", { name: "Renvoyer l'invitation" })).toBeVisible();
+      /* Renvoi puis acceptation : plus rien à renvoyer (409 par l'API, aucun bouton à l'écran). */
+      const r2 = await req.post(`${api()}/admin/admins/${id}/invite/resend`);
+      expect(r2.status()).toBe(200);
+      const dernier = jetonDe(lienDInvitation((await mailpit.attendreEmail({ pour: email, sujet: "Ton accès au back-office Yamba" })).texte));
+      expect((await ctx.post(`${api()}/auth/admin/invite/accept`, { data: { token: dernier, password: MOT_DE_PASSE_INVITE } })).status()).toBe(200);
+      await ctx.dispose();
+      const refus = await req.post(`${api()}/admin/admins/${id}/invite/resend`, { failOnStatusCode: false });
+      expect(refus.status()).toBe(409);
+      expect(((await refus.json()) as { details?: { code?: string } }).details?.code).toBe("ADMIN_INVITE_NOT_PENDING");
+      await ouvrirComptes(page);
+      await expect(ligneDe(page, email).getByRole("button", { name: "Renvoyer l'invitation" })).toHaveCount(0);
+    } finally {
+      if (id) await retirerParApi(req, id);
+    }
+  });
+
+  test("ADM-CPT-13 · l'admin dont les accès changent est prévenu (sans lien ni motif) ; le motif du retrait va au journal (A189 b, c)", async ({ navigateurAdmin, mailpit }) => {
+    test.setTimeout(4 * 60_000);
+    const sup = await navigateurAdmin("super");
+    const { page } = sup;
+    const req = sup.contexte.request;
+    const cible = creerAdminEnrole("CPT13", ["SUPPORT"]);
+    await mailpit.vider();
+    const debut = await debutDuScenario();
+    try {
+      await ouvrirComptes(page);
+      const maj = page.waitForResponse((x) => x.url().includes(`/api/admin/admins/${cible.id}`) && x.request().method() === "PATCH", { timeout: 60_000 });
+      await ligneDe(page, cible.email).getByRole("checkbox", { name: /^Finance/ }).click();
+      expect((await maj).status()).toBe(200);
+      const change = await mailpit.attendreEmail({ pour: cible.email, sujet: "Tes profils sur le back-office Yamba ont changé" });
+      expect(change.texte).toContain("« Support » devient « Support + Finance »");
+      expect(change.texte, "aucun lien vers le back-office").not.toContain(bo());
+      expect(change.texte).not.toMatch(/\/login|\/invite/);
+
+      const motif = "Recette ADM-CPT-13 : fin de mission, accès retiré.";
+      page.once("dialog", (d) => void d.accept(motif));
+      const del = page.waitForResponse((x) => x.url().includes(`/api/admin/admins/${cible.id}`) && x.request().method() === "DELETE", { timeout: 60_000 });
+      await ligneDe(page, cible.email).getByRole("button", { name: "Retirer" }).click();
+      expect((await del).status()).toBe(200);
+      const retrait = await mailpit.attendreEmail({ pour: cible.email, sujet: "Ton accès au back-office Yamba a été retiré" });
+      expect(retrait.texte).toContain("Sacha Superviseur");
+      expect(retrait.texte, "le motif est interne").not.toContain("fin de mission");
+      expect(retrait.texte).not.toContain(bo());
+
+      const lignes = await lireLeJournal(req, { from: debut, targetId: cible.id });
+      const revoque = lignes.find((l) => l.action === "ADMIN_REVOKED");
+      expect(revoque?.after, "le motif est au journal").toEqual({ reason: motif });
+      expect(lignes.map((l) => l.action)).toEqual(["ADMIN_ROLE_CHANGED", "ADMIN_REVOKED"]);
+      /* Sans motif (champ vide) : retrait possible, aucune clé « after ». */
+      const autre = creerAdminEnrole("CPT13b", ["OPS"]);
+      await ouvrirComptes(page);
+      page.once("dialog", (d) => void d.accept(""));
+      const del2 = page.waitForResponse((x) => x.url().includes(`/api/admin/admins/${autre.id}`) && x.request().method() === "DELETE", { timeout: 60_000 });
+      await ligneDe(page, autre.email).getByRole("button", { name: "Retirer" }).click();
+      expect((await del2).status()).toBe(200);
+      expect((await lireLeJournal(req, { from: debut, targetId: autre.id, action: "ADMIN_REVOKED" }))[0].after ?? null).toBeNull();
     } finally {
       await retirerParApi(req, cible.id);
     }

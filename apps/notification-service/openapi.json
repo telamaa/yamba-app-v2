@@ -13587,6 +13587,36 @@
         ],
         "additionalProperties": false
       },
+      "RevokeAdminRequest": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "description": "Optional; an empty string after trim means no reason",
+            "type": "string",
+            "maxLength": 500
+          }
+        },
+        "additionalProperties": false
+      },
+      "ResendAdminInviteResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          },
+          "inviteExpiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          }
+        },
+        "required": [
+          "ok",
+          "inviteExpiresAt"
+        ],
+        "additionalProperties": false
+      },
       "UpdateAdminRoleRequest": {
         "type": "object",
         "properties": {
@@ -13631,6 +13661,18 @@
             "type": "boolean",
             "description": "false while the invited account has no password yet"
           },
+          "inviteExpiresAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time",
@@ -13646,6 +13688,7 @@
           "adminRoles",
           "totpEnabled",
           "inviteAccepted",
+          "inviteExpiresAt",
           "createdAt"
         ],
         "additionalProperties": false
@@ -13668,13 +13711,28 @@
           },
           "current": {
             "type": "boolean"
+          },
+          "device": {
+            "type": "string"
+          },
+          "ip": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
           "jti",
           "createdAt",
           "lastActivityAt",
-          "current"
+          "current",
+          "device",
+          "ip"
         ],
         "additionalProperties": false
       },
