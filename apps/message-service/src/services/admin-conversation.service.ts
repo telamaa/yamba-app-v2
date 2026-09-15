@@ -7,6 +7,7 @@
  * Traiter un signalement écrit la décision ET la ligne de journal dans la même transaction.
  */
 import prisma from "@packages/libs/prisma";
+import { withWriteConflictRetry } from "@packages/libs/prisma/write-conflict-retry";
 import { ConflictError, NotFoundError } from "@packages/error-handler";
 import { recordAdminAction, recordAdminRead, type ReadCoalescer } from "@packages/admin-audit";
 import { redactContacts, type AdminConversationResponse, type AdminMessage, type AdminMessageReportItem, type AdminMessageReportsResponse, type MessageReportReason, type MessageReportStatus, type ReviewMessageReportRequest } from "@packages/api-contracts";
@@ -158,7 +159,8 @@ export function makeAdminConversationService(readCoalescer?: ReadCoalescer) {
       const report = await prisma.report.findFirst({ where: { id: reportId, targetType: "MESSAGE" }, select: { id: true, status: true } });
       if (!report) throw new NotFoundError("Report not found.", { code: "REPORT_NOT_FOUND" });
       if (report.status !== "OPEN") throw new ConflictError("This report has already been reviewed.", { code: "REPORT_ALREADY_REVIEWED" });
-      await prisma.$transaction(async (tx) => {
+      // ANO-ADM-46 (recette 02-ADMIN § 5.19) — P2034 sur deux décisions simultanées → 500 ; au réessai, la garde répond 409.
+      await withWriteConflictRetry(() => prisma.$transaction(async (tx) => {
         const updated = await tx.report.updateMany({ where: { id: report.id, status: "OPEN" }, data: { status: input.decision } });
         if (updated.count !== 1) throw new ConflictError("This report has already been reviewed.", { code: "REPORT_ALREADY_REVIEWED" });
         await recordAdminAction(tx, {
@@ -171,7 +173,7 @@ export function makeAdminConversationService(readCoalescer?: ReadCoalescer) {
           ip: actor.ip,
           userAgent: actor.userAgent,
         });
-      });
+      }));
       return { id: report.id, status: input.decision };
     },
   };

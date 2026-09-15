@@ -304,7 +304,7 @@ export type TrustAssessment = {
 export type ReportTargetType = "TRIP" | "USER";
 export type ReportReason = "ILLEGAL_CONTENT" | "SCAM" | "INAPPROPRIATE" | "IMPERSONATION" | "OTHER";
 export type AdminReportItem = {
-  id: string; targetType: ReportTargetType; targetId: string; targetLabel: string; targetOwner: { id: string; firstName: string } | null;
+  id: string; targetType: ReportTargetType; targetId: string; targetLabel: string; targetMissing: boolean; targetOwner: { id: string; firstName: string } | null;
   status: MessageReportStatus; reason: ReportReason; details: string | null; createdAt: string;
   reporter: { id: string; firstName: string }; openCountOnTarget: number; priority: boolean; targetTrustLevel: TrustLevel | null;
 };

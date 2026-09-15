@@ -5710,6 +5710,80 @@ Après correction : 5/5 verts, deux passages.
   `USER_VIEWED` par admin sous A168 (super administrateur 1 écran → 1 ligne ; Médiateur 3 lectures API → 1 à 3 lignes
   espacées d'au moins 10 s). Rejeux : ARG, MED, CNV, TRJ, USR verts.
 
+## Cahier 02-ADMIN — § 5.19 Signalements : deux files · **CONFORME après correction** (5 fiches + 4 ajoutées · 5 anomalies closes dont 2 majeures · 5 améliorations · 1 écart · 9 scénarios, 6 min)
+
+`apps/e2e/src/admin/adm-sig-signalements.spec.ts`. Un signalement est la parole d'un membre contre un autre. Le chapitre
+se juge à quatre garanties : **rien d'automatique** (trois signalements éclairent, ne sanctionnent pas), **rien de perdu**
+(un signalement ouvert reste dans une file tant qu'une personne ne l'a pas clos), **une décision, une fois** (double clic,
+deux admins, appels simultanés) et **l'auteur protégé**. Le premier signalement passe par l'écran du front membre, les
+suivants par l'API membre réelle ; le jeu d'essai est rejoué avant chaque fiche. **Contre-épreuve** fiche par fiche sur le
+code du § 5.18 (corrections retirées, bundles auth / message rebâtis) : **SIG-5 à 9 rouges** (SIG-5 : « Your admin profile
+does not allow this action. » + « Chargement… » sans fin ; SIG-6 : signalement absent de la file ; SIG-7 : deux `PATCH`
+pour un double clic ; SIG-8 : `[200, 500, 500]` ; SIG-9 : badge « Compte neuf »). SIG-1 à 4 ne touchent aucun code
+corrigé et sont conformes des deux côtés. Après correction : 9/9 verts, deux passages ; voisins CNV (5) et WEB-SIG (8) verts.
+
+| Fiche | Ce qui est éprouvé | Verdict · Preuve |
+|---|---|---|
+| ADM-SIG-1 | La file « Trajets et membres » | **Conforme** — Aminata signale le profil de Thomas depuis le front (« Arnaque suspectée »), accusé « Ton signalement a bien été reçu » à elle seule ; même compte, même cible → **409** ; João et Chinwe → 201. `/reports` : titre « Signalements », sections « Trajets et membres » puis « Messages » (`#messages`, « Lis la conversation avant de décider (lecture journalisée). ») ; onglets « à traiter / traité / sans suite », compteur ; carte « Tentative d'arnaque · signalé par Aminata le … · Membre », précisions, note facultative, « Traité » / « Sans suite », badge « Prioritaire · 3 ouverts » ; « Thomas Nkounkou → » mène à `/users/<id>` ; journal du Médiateur = `[USER_VIEWED <thomas>]` (la file n'écrit rien) ; aucun email à Thomas, rien des auteurs dans son `/auth/me` |
+| ADM-SIG-2 | Traiter | **Conforme** — note « Compte restreint le … après vérification » + « Traité » → « Signalement traité (journalisé). », carte sortie, présente sous « traité » ; appel direct → **409** « This report has already been reviewed. » ; « Sans suite » sans note sur un signalement de TRAJET → « Signalement classé sans suite (journalisé). » ; deux `REPORT_REVIEWED REPORT · <id>` : `before { status: "OPEN", … }`, `after { status: "REVIEWED", note }` et `{ status: "DISMISSED", note: null }` ; aucun email à la décision |
+| ADM-SIG-3 | La file « Messages » | **Conforme** — « Veut sortir de Yamba · signalé par Pauline (Expéditeur) », « Paris → Brazzaville », citation « Thomas (Voyageur) · … hors appli… », précisions « Il propose de regler hors de Yamba. » ; « Lire la conversation → » et « Fiche de Thomas → » mènent où ils disent ; « Traité » ; rappel → **409** ; même id sur `PATCH /api/admin/reports/<id>` → **404** (deux files, deux services) ; une ligne `MESSAGE_REPORT_REVIEWED` `{ status: "OPEN" }` → `{ status: "REVIEWED", note }` |
+| ADM-SIG-4 | Rien d'automatique | **Conforme** — trois signalements ouverts sur Thomas, 6 s d'attente : compte `ACTIVE`, trajets visibles inchangés (compte en base), trajet `bzv-upcoming` toujours dans la recherche, aucun email, aucune ligne de sanction ni de masquage |
+| ADM-SIG-5 | Profils sans `reports.review` | **Conforme après correction** — Finance, Exploitation, Données personnelles : pas d'entrée « Signalements », les deux files → **403**, ouverture directe → « Ton profil ne traite pas les signalements. » (sans « 403 : … »), aucune ligne hors connexion ; Médiateur et Support lisent (200). **Avant** : message anglais du serveur sous « Chargement… » perpétuel, dans les deux sections (ANO-ADM-50) |
+| ADM-SIG-6 (ajoutée) | Cible disparue | **Conforme après correction** — signalement OPEN posé en base sur un trajet inexistant (trajet purgé après le signalement) : présent dans la file, « Trajet introuvable » sans lien mort, « Sans suite » le clôt et il sort de la file. **Avant** : absent de la file, OPEN pour toujours, jamais relu (ANO-ADM-47) |
+| ADM-SIG-7 (ajoutée) | Double clic et deux admins | **Conforme après correction** — double clic natif sur « Traité » → **un** `PATCH` ; écran du Support périmé (le Médiateur a décidé par l'API) → « Ce signalement vient d'être traité par un autre administrateur : la file est rechargée. », carte disparue ; deux signalements, deux lignes. **Avant** : deux `PATCH` (ANO-ADM-49) ; le refus s'affichait « 409 : This report has already been reviewed. » sans recharger (lecture du code) |
+| ADM-SIG-8 (ajoutée) | Trois décisions simultanées par l'API, dans chaque file | **Conforme après correction** — trajets et membres `[200, 409, 409]`, messages `[200, 409, 409]`, une ligne de journal par signalement. **Avant** : `[200, 500, 500]` (ANO-ADM-46) |
+| ADM-SIG-9 (ajoutée) | « Compte neuf » n'est pas un niveau de risque | **Conforme après correction** — compte de Marc daté du jour (manœuvre base, date restaurée), niveau servi `NEW`, carte sans « Compte neuf » ni « Standard ». **Avant** : badge ambre « Compte neuf » (ANO-ADM-48) |
+
+### Anomalies
+
+- **ANO-ADM-46 (majeure, close)** — **deux décisions simultanées sur un même signalement : les perdants lisaient 500.**
+  MongoDB rejette les transactions concurrentes (Prisma `P2034`, « write conflict ») avant que la garde conditionnelle
+  (`updateMany … status: "OPEN"`) ait pu répondre. Mêmes causes dans les deux services (`report.service.ts`,
+  `admin-conversation.service.ts`). Correction : `withWriteConflictRetry` (`@packages/libs/prisma/write-conflict-retry`,
+  déjà utilisé pour ANO-API-19 et la levée de suppression du § 5.5) autour de la transaction ; au réessai la garde répond
+  409 `REPORT_ALREADY_REVIEWED`, aucune ligne de journal de trop.
+- **ANO-ADM-47 (majeure, close)** — **un signalement dont la cible a disparu sortait de la file** (`continue` sur un trajet
+  purgé ou un membre introuvable) : OPEN pour toujours, compté nulle part, relu par personne. Correction : il reste,
+  `targetMissing: true` au contrat, libellé « Trajet introuvable » / « Membre introuvable », sans lien ; il se clôt comme
+  les autres — même règle que ANO-CRON-09 pour les messages purgés.
+- **ANO-ADM-48 (mineure, close)** — le badge de niveau affichait « Compte neuf » (le filtre n'excluait que `STANDARD`),
+  contre le cahier et contre D71 : un compte neuf n'est pas un signal de risque, et le badge ambre le laissait croire.
+  Correction : `isAlertTrustLevel` — seuls « À surveiller » et « À risque » s'affichent.
+- **ANO-ADM-49 (mineure, close)** — un double clic sur « Traité » envoyait deux décisions (la seconde en 409), et tout refus
+  s'affichait « 409 : <message anglais> » sans recharger une file périmée, dans les deux files. Correction : bouton occupé
+  pendant la décision, `reportRefusalMessage` (refus lu par son code, A146) avec rechargement quand la file est périmée.
+- **ANO-ADM-50 (mineure, close)** — un profil sans `reports.review` qui ouvrait `/reports` lisait « Your admin profile
+  does not allow this action. » au-dessus d'un « Chargement… » qui ne finissait jamais, deux fois. Correction : refus en
+  français, plus de « Chargement… » après un échec.
+
+### Écart
+
+- **ADM-SIG-1** : le cahier fait choisir le motif « Tentative d'arnaque » au front membre ; le front propose « Arnaque
+  suspectée » (même code `SCAM`), le back-office l'affiche « Tentative d'arnaque ». Deux libellés pour un même motif.
+
+### Regard d'expert — produit ET test, une ligne par fiche
+
+- **SIG-1** — *Constat* : conforme. *Test* : le premier signalement passe par le vrai dialogue du front ; l'anonymat de
+  l'auteur est cherché dans le compte de la cible (`/auth/me`) et dans sa boîte, pas seulement supposé. *Proposé* :
+  aligner les deux libellés du motif `SCAM` (écart ci-dessus).
+- **SIG-2** — *Test* : « Sans suite » est joué sur un signalement de TRAJET, pour couvrir les deux types de cible avec les
+  deux décisions. *Proposé* : afficher la note et l'auteur de la décision sous les onglets « traité » / « sans suite »
+  (aujourd'hui seul le journal les connaît).
+- **SIG-3** — *Test* : la route croisée (404) prouve la frontière entre services.
+- **SIG-4** — *Test* : trajets comptés en base ET recherche membre réelle. *Proposé* : quand une cible est prioritaire,
+  un lien direct « Restreindre / masquer depuis la fiche » dans la carte — la décision reste humaine, le chemin raccourcit.
+- **SIG-5** — *Fait* : ANO-ADM-50. *Test* : une connexion rejouée pendant la fiche (session mémorisée expirée) écrit
+  `ADMIN_LOGIN` — ce n'est pas un geste sur les signalements, la fiche l'écarte. *Proposé* : la page entière (titre,
+  consigne, deux sections) reste visible pour un profil refusé ; un seul refus en tête serait plus net.
+- **SIG-6** — *Fait* : ANO-ADM-47. *Test* : la cible disparue est fabriquée en base (un identifiant qui n'existe pas),
+  sans purger un vrai trajet du jeu d'essai.
+- **SIG-7** — *Fait* : ANO-ADM-49. *Test* : les requêtes `PATCH` sont COMPTÉES au réseau ; l'affichage seul ne verrait pas
+  la seconde (elle échoue en 409 silencieux).
+- **SIG-8** — *Fait* : ANO-ADM-46. *Proposé* : trois gestes admin transactionnels n'ont pas encore le rejeu du conflit
+  d'écriture (`admin-admins.controller.ts`, `admin-users.controller.ts`, `admin-auth.controller.ts`) — à éprouver par
+  une salve simultanée au § 7 (non-régression).
+- **SIG-9** — *Fait* : ANO-ADM-48. *Test* : la date de création de Marc est déplacée puis restaurée dans un `finally`.
+
 ---
 
 ## Observations (pas des anomalies, mais à savoir)
