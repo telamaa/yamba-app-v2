@@ -39,3 +39,33 @@ describe("buildAuditWhere (A149)", () => {
     expect(appliedAuditFilters({})).toEqual([]);
   });
 });
+
+/* ── Recette 02-ADMIN § 5.25, lots du § 5.24 (A187) ─────────────────────────────────────────────── */
+import { AUDIT_CSV_COLUMNS, appliedAuditFilterValues, auditAuthors, auditCsvRow, auditQueryFrom } from "./admin-audit.query";
+import { buildCsv } from "@packages/libs/csv";
+
+describe("A187 — export du journal filtré, auteurs du filtre", () => {
+  it("auditQueryFrom ne lit que des chaînes ; appliedAuditFilterValues n'écrit au journal que les filtres RETENUS", () => {
+    const q = auditQueryFrom({ from: "2026-09-15T00:00:00.000Z", adminUserId: "pas-un-id", action: "ADMIN_REVOKED", ip: ["10.0.0.1"], targetId: "pricing.commissionPct" });
+    expect(q.ip).toBeUndefined();
+    expect(appliedAuditFilterValues(q)).toEqual({ from: "2026-09-15T00:00:00.000Z", action: "ADMIN_REVOKED", targetId: "pricing.commissionPct" });
+  });
+  it("une ligne CSV : ISO, auteur nommé, détail JSON fidèle, IP et navigateur ; une cellule piégée est neutralisée", () => {
+    const row = auditCsvRow({ createdAt: new Date("2026-09-15T10:00:00Z"), adminUserId: "a1", action: "ADMIN_ROLE_CHANGED", targetType: "USER", targetId: "u1", before: { adminRoles: ["SUPPORT"] }, after: null, ip: "10.0.0.1", userAgent: "=HYPERLINK(\"x\")" }, "Sacha Superviseur");
+    expect(row).toMatchObject({ at: "2026-09-15T10:00:00.000Z", admin: "Sacha Superviseur", before: '{"adminRoles":["SUPPORT"]}', after: "", targetId: "u1" });
+    const csv = buildCsv(AUDIT_CSV_COLUMNS, [row]);
+    expect(csv.split("\r\n")[0]).toBe(AUDIT_CSV_COLUMNS.join(","));
+    expect(csv).not.toMatch(/(^|,)=HYPERLINK/m);
+  });
+  it("auteurs : tout auteur d'une ligne, admin retiré compris (active: false), compte disparu nommé, tri par nom", () => {
+    const out = auditAuthors(["a3", "a1", "a2"], [
+      { id: "a1", firstName: "Sacha", lastName: "Superviseur", adminRole: "SUPER_ADMIN", adminRoles: ["SUPER_ADMIN"] },
+      { id: "a2", firstName: "Anaïs", lastName: "Retirée", adminRole: null, adminRoles: [] },
+    ]);
+    expect(out).toEqual([
+      { id: "a2", name: "Anaïs Retirée", active: false },
+      { id: "a3", name: "Compte introuvable", active: false },
+      { id: "a1", name: "Sacha Superviseur", active: true },
+    ]);
+  });
+});

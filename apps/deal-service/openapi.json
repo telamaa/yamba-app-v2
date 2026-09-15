@@ -26941,6 +26941,10 @@
           "existingAccount": {
             "type": "boolean"
           },
+          "passwordRequired": {
+            "type": "boolean",
+            "description": "A185 — true when a password link was emailed (new account, or existing account without password)"
+          },
           "expiresInHours": {
             "type": "integer",
             "minimum": -9007199254740991,
@@ -26950,7 +26954,8 @@
         "required": [
           "ok",
           "userId",
-          "existingAccount"
+          "existingAccount",
+          "passwordRequired"
         ],
         "additionalProperties": false
       },
