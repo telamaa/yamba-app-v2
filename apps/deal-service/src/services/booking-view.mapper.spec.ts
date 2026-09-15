@@ -323,6 +323,18 @@ describe("cancellationPreview — le serveur annonce le remboursement (ANN-01/D3
     });
   });
 
+  it("A172 — conditions figées à la création : l'aperçu les applique, quels que soient les paramètres courants ; sans snapshot → paramètres courants", () => {
+    // LATE = 28 h avant le départ. Courants 48 h / 50 % → 1500 rendus ; figés 24 h / 20 % → 100 % (seuil pas encore franchi).
+    const figee = makeBooking({ cancellationTerms: { fullRefundUntilHours: 24, lateRetentionPct: 20 } } as never);
+    const courants = { cancellation: { fullRefundUntilHours: 48, lateRetentionPct: 50 }, disputeResponseDelayHours: 72 };
+    const vue = toShipperBookingView(figee, CARRIER, LATE, null, null, courants);
+    expect(vue.cancellationPreview).toMatchObject({ refundCents: 3000, retentionCents: 0, retentionPct: 20, fullRefundUntil: "2026-08-01T14:00:00.000Z" });
+    const tardive = toShipperBookingView(figee, CARRIER, new Date("2026-08-02T00:00:00.000Z"), null, null, courants);
+    expect(tardive.cancellationPreview).toMatchObject({ refundCents: 2400, retentionCents: 600, retentionPct: 20 });
+    const ancienne = toShipperBookingView(makeBooking(), CARRIER, LATE, null, null, { ...courants, cancellation: { fullRefundUntilHours: 12, lateRetentionPct: 30 } });
+    expect(ancienne.cancellationPreview).toMatchObject({ refundCents: 3000, retentionPct: 30 });
+  });
+
   it("ACCEPTED à J-2 ou plus : 100 %", () => {
     const view = toShipperBookingView(makeBooking(), CARRIER, WELL_BEFORE);
     expect(view.cancellationPreview?.refundCents).toBe(3000);

@@ -11,6 +11,7 @@
  * `db` est injecté (structurel) : les specs jouent le tout sur un faux Prisma en mémoire.
  */
 import { recordAdminAction } from "@packages/admin-audit";
+import { withWriteConflictRetry } from "@packages/libs/prisma/write-conflict-retry";
 import { ERASURE_BLOCKERS, type DataExport, type ErasureBlocker } from "@packages/api-contracts";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -87,6 +88,13 @@ export type EraseInput = {
 };
 export type EraseResult = { erased: true; userId: string; erasedAt: Date; email: string; firstName: string; locale: string | null; fileIds: string[]; stripeAccountId: string | null };
 
+/** Le compte n'existe pas ou vient d'être effacé (par un effacement concurrent, ANO-ADM-58) — le contrôleur répond 404. */
+export class AccountNotFoundError extends Error {
+  constructor() {
+    super("ACCOUNT_NOT_FOUND");
+  }
+}
+
 export class ErasureBlockedError extends Error {
   constructor(public readonly check: ErasureCheck) {
     super("This account cannot be erased yet.");
@@ -112,9 +120,11 @@ export function makePrivacyService(deps: {
         await deps.db.dataRequest.create!({ data: { userId: input.userId, type: "ERASURE", channel: input.channel, status: "REFUSED", refusalReasons: check.blockers, requestedByAdminId: input.requestedByAdminId ?? null, reason: input.reason ?? null, ip: input.ip ?? null, userAgent: input.userAgent ?? null, requestedAt: now, completedAt: now } });
         throw new ErasureBlockedError(check);
       }
-      const result = await deps.db.$transaction(async (tx) => {
+      // ANO-ADM-58 (recette 02-ADMIN § 5.21) — trois effacements simultanés du même compte : MongoDB rejetait deux
+      // transactions (P2034) et les deux admins lisaient 500. Au réessai, la transaction trouve le compte déjà effacé → 404.
+      const result = await withWriteConflictRetry(() => deps.db.$transaction(async (tx) => {
         const user = await tx.user.findUnique!({ where: { id: input.userId }, select: { id: true, email: true, firstName: true, preferredLocale: true, isDeleted: true, carrierPage: { select: { id: true, stripeAccountId: true } } } });
-        if (!user || user.isDeleted) throw new Error("ACCOUNT_NOT_FOUND");
+        if (!user || user.isDeleted) throw new AccountNotFoundError();
         // Capturés AVANT l'anonymisation : l'email de confirmation part à l'ancienne adresse.
         const identity = { email: String(user.email), firstName: String(user.firstName), locale: (user.preferredLocale as string | null) ?? null, stripeAccountId: (user.carrierPage?.stripeAccountId as string | null) ?? null, carrierPageId: (user.carrierPage?.id as string | null) ?? null };
         const docs = await tx.tripDocument.findMany({ where: { trip: { userId: input.userId } }, select: { id: true, fileId: true } });
@@ -137,7 +147,7 @@ export function makePrivacyService(deps: {
           await recordAdminAction(tx as never, { adminUserId: input.requestedByAdminId, action: "ACCOUNT_ERASED", targetType: "USER", targetId: input.userId, after: { reason: input.reason ?? null, fileIds: fileIds.length, stripeAccountKept: !!identity.stripeAccountId }, ip: input.ip ?? null, userAgent: input.userAgent ?? null });
         }
         return { erased: true as const, userId: input.userId, erasedAt: now, email: identity.email, firstName: identity.firstName, locale: identity.locale, fileIds, stripeAccountId: identity.stripeAccountId };
-      });
+      }));
       await deps.afterErase?.(result).catch(() => undefined);
       return result;
     },

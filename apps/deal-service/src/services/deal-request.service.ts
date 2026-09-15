@@ -29,6 +29,7 @@ import type { PaymentProvider } from "@packages/payments";
 import { QuoteError, type PricingParams, type ShipperQuote } from "@packages/pricing";
 import { pricingParamsFromSettings } from "@packages/api-contracts";
 import { platformSettings } from "@packages/libs/settings/default";
+import { cancellationParamsFromSettings } from "./booking-lifecycle";
 import type { SettingsReader } from "@packages/libs/settings";
 import { withWriteConflictRetry } from "../lib/write-conflict-retry";
 import { makeTrustService, type TrustService } from "./trust.service"; // D71
@@ -175,7 +176,10 @@ export function makeDealRequestService(provider: PaymentProvider, clock: () => D
       const trip = await loadTrip(input.tripId);
       checkTripBookable(trip, user.id, now);
       await trust.assertWithinCaps(user.id, { declaredValueCents: input.declaredValueCents, weightKg: input.product === "PARCEL" ? input.weightKg ?? null : null }); // D71 — plafonds CNF-06 (valeur déclarée comprise)
-      const quote = quoteOr400(trip, input, pricingParamsFromSettings(await settings.get())); // D62
+      const settingsNow = await settings.get();
+      const quote = quoteOr400(trip, input, pricingParamsFromSettings(settingsNow)); // D62
+      // A172 — les conditions d'annulation lues au MÊME instant que le prix, figées avec lui dans la réservation.
+      const cancellationTerms = cancellationParamsFromSettings(settingsNow);
       assertQuoteMatches(quote, input.expectedTotalCents);
       const kg = kgToReserve(quote);
       checkCapacity(trip, kg);
@@ -241,6 +245,7 @@ export function makeDealRequestService(provider: PaymentProvider, clock: () => D
               expiresAt: snapshots.expiresAt,
               paymentIntentId: auth.intentId,
               paymentProvider: auth.provider,
+              cancellationTerms, // A172
             },
           });
 

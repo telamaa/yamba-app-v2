@@ -42,6 +42,7 @@ export default function UserFileView({ userId }: { userId: string }) {
   const [me, setMe] = useState<AdminMe | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [flash, setFlash] = useState<string | null>(null); // recette § 5.5 — le geste réussi se nomme
+  const [erasure, setErasure] = useState<string | null>(null); // recette § 5.21 — l'issue d'un effacement survit au rechargement de la fiche
 
   const load = useCallback(() => {
     apiFetch<AdminUserFile>(`/admin/users/${userId}`).then(setFile).catch((e) => setError(e instanceof ApiError ? `${e.status} : ${e.message}` : "Chargement impossible."));
@@ -71,6 +72,7 @@ export default function UserFileView({ userId }: { userId: string }) {
         {file.isMe && <span className="text-[11px] text-slate-500">(c'est toi : aucune action possible)</span>}
       </div>
 
+      {erasure && <p role="status" className="mt-3 rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-[12.5px] text-slate-800">{erasure}</p>}
       {flash && !file.emailSuppression && <p className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[12.5px] text-emerald-800">{flash}</p>}
       {file.emailSuppression && (
         <div className="mt-3 flex flex-wrap items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[12.5px] text-amber-900">
@@ -116,7 +118,7 @@ export default function UserFileView({ userId }: { userId: string }) {
         </Card>
         <TrustCard t={file.trust} />
         <SuspensionCard file={file} canPropose={canPropose} canApply={canApply} onDone={load} />
-        {canErase && <EraseCard file={file} onDone={load} />}
+        {canErase && <EraseCard file={file} onDone={load} onOutcome={setErasure} />}
       </div>
 
       <Card title={`Trajets (${file.activity.trips.length})`} className="mt-5">
@@ -257,7 +259,7 @@ function Row({ k, v }: { k: string; v: string }) {
 }
 
 /** C-PR8b (D63 6A) — effacement à la demande d'un membre (reçue par email) : mêmes garde-fous que côté membre, motif au journal. */
-function EraseCard({ file, onDone }: { file: AdminUserFile; onDone: () => void }) {
+function EraseCard({ file, onDone, onOutcome }: { file: AdminUserFile; onDone: () => void; onOutcome: (text: string) => void }) {
   const [reason, setReason] = useState("");
   const [confirm, setConfirm] = useState("");
   const [busy, setBusy] = useState(false);
@@ -277,11 +279,19 @@ function EraseCard({ file, onDone }: { file: AdminUserFile; onDone: () => void }
     setBlockers(null);
     try {
       await post(`/admin/users/${file.id}/erase`, { reason: reason.trim() });
-      setMsg("Compte effacé : identité et coordonnées supprimées, réservations conservées sans nom, journal écrit, email de confirmation envoyé à l'ancienne adresse.");
+      // ANO-ADM-59 — la carte disparaît avec le compte effacé : le message vit dans la fiche, pas dans la carte.
+      onOutcome("Compte effacé : identité et coordonnées supprimées, réservations conservées sans nom, journal écrit, email de confirmation envoyé à l'ancienne adresse.");
       onDone();
     } catch (e) {
       if (e instanceof ApiError && e.status === 409 && (e.data as { blockers?: ErasureBlocker[] })?.blockers) setBlockers((e.data as { blockers: ErasureBlocker[] }).blockers);
-      else setMsg(e instanceof ApiError ? `${e.status} : ${e.message}` : "Effacement impossible.");
+      // ANO-ADM-60 (recette 02-ADMIN § 5.21) — un refus s'affichait « 404 : User not found. » ; il se lit en français, et la
+      // fiche se recharge quand le compte vient d'être effacé par un autre admin (la carte disparaît avec lui).
+      else if (e instanceof ApiError && e.status === 404) {
+        onOutcome("Ce compte n'existe plus ou vient d'être effacé par un autre administrateur.");
+        onDone();
+      } else if (e instanceof ApiError && e.status === 403) setMsg("Ton profil n'efface pas de compte.");
+      else if (e instanceof ApiError && e.status === 400) setMsg("Motif refusé : 20 caractères au moins, 500 au plus.");
+      else setMsg("Effacement impossible pour le moment. Réessaie dans un instant.");
     } finally {
       setBusy(false);
     }

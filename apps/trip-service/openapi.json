@@ -21808,6 +21808,12 @@
               ],
               "additionalProperties": false
             }
+          },
+          "skipped": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "required": [

@@ -40,6 +40,7 @@ export const BOOKING_WRITE_SELECT = {
   paymentIntentId: true,
   trip: true,
   pricing: true,
+  cancellationTerms: true, // A172
   parcel: true,
   pickup: true,
   trackingEvents: true,
@@ -73,6 +74,8 @@ export const BOOKING_WRITE_SELECT = {
 
 export type BookingForWrite = {
   id: string;
+  /** A172 — conditions d'annulation figées à la création ; absentes sur les réservations antérieures. */
+  cancellationTerms?: { fullRefundUntilHours: number; lateRetentionPct: number } | null;
   tripId: string;
   shipperId: string;
   carrierId: string;

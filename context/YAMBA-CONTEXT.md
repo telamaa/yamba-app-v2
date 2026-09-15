@@ -796,6 +796,17 @@ Ordre de demarrage : auth -> trip -> gateway.
   sur le Fake + manoeuvres base). AMELIORATIONS : carte qui nomme le fournisseur, aide FR par divergence, statuts FR,
   refus par code, journal « Rapprochement fournisseur ». PIEGE : la memoire du Fake survit au rejeu du jeu d'essai (une
   fiche constate l'etat initial, ne l'exige pas). Tests : deal 598, harnais 419. Reste : § 5.14 a 8.
+- 15/09 : **CAHIER 02-ADMIN — § 5.21 DONNEES PERSONNELLES / RGPD (branche `chore/recette-admin-5-21`, empilee sur #321)** —
+  6 scenarios ADM-RGP (RGP-1 a 4 du cahier + RGP-5 salve d'effacements, RGP-6 profil refuse) + ADM-PAR-13 (A172) et
+  ADM-PAR-14 (A173/A174), verts ; RGP deux fois. CONTRE-EPREUVE : RGP-1, 3, 5 ROUGES. ANO-ADM-57 CLOSE (majeure) : une
+  ouverture du registre = deux `DATA_REQUESTS_VIEWED` → recordAdminRead (A168). ANO-ADM-58 CLOSE (majeure) : trois
+  effacements simultanes `[200, 500, 500]` → rejeu P2034 + AccountNotFoundError 404. ANO-ADM-59 (mineure) : message de
+  succes demonte avec la carte. ANO-ADM-60 (mineure) : « 404 : User not found. ». RGP-4 JOUE (service du cron appele par
+  le harnais). ARBITRAGES DELEGUES DU 15/09 LIVRES : A172 conditions d'annulation figees a la creation
+  (`Booking.cancellationTerms`, prisma generate + db push) ; A173 reset OPS dans sa portee (`skipped`) ; A174 portee avant
+  bornes ; A175 seed-settings version monotone ; invariant plafond ≥ prime garde ; recopie decideur sur Report rejetee.
+  ECARTS : connexion apres effacement = INVALID_CREDENTIALS (pas ACCOUNT_DELETED) ; retention min 7 (cahier : 0).
+  Tests : auth 270, deal 641, message 57, trip 293, harnais 479. Reste : § 5.22 a 8.
 - 15/09 : **CAHIER 02-ADMIN — § 5.20 PARAMETRES DE LA PLATEFORME (branche `chore/recette-admin-5-20`, empilee sur #320)** —
   12 scenarios CONFORMES (PAR-1 a 7 du cahier + PAR-8 salve simultanee document absent / present, PAR-9 echeance de
   litige, PAR-10 refus a l'ecran, PAR-11 document illisible, PAR-12 page refusee), verts deux fois. CONTRE-EPREUVE : PAR-2,

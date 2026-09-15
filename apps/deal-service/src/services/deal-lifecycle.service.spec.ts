@@ -391,6 +391,25 @@ describe("C — cancel Expéditeur (ANN-01, D39)", () => {
     expect(result.refundAmountCents).toBe(2957);
   });
 
+  it("A172 — paramètres changés APRÈS la création : l'annulation applique les conditions figées de la réservation", async () => {
+    const { provider, intentId } = await makeProviderWithAuth();
+    await provider.capture(intentId);
+    const refundSpy = jest.spyOn(provider, "refund");
+    // Départ dans 24 h. Paramètres courants (défauts 48 h / 50 %) → 50 % rendus ; figés à la création 12 h / 50 % → 100 %.
+    prismaMock.booking.findUnique.mockResolvedValue({ ...makeBookingRecord({ status: "ACCEPTED", paymentIntentId: intentId, departureAt: hoursFromNow(24) }), cancellationTerms: { fullRefundUntilHours: 12, lateRetentionPct: 50 } });
+    const result = await makeService(provider).cancel(SHIPPER, BOOKING_ID, {});
+    expect(refundSpy).toHaveBeenCalledWith(intentId, 2957, expect.anything());
+    expect(result.refundAmountCents).toBe(2957);
+  });
+
+  it("A172 — réservation sans conditions figées (antérieure) : les paramètres courants s'appliquent", async () => {
+    const { provider, intentId } = await makeProviderWithAuth();
+    await provider.capture(intentId);
+    prismaMock.booking.findUnique.mockResolvedValue(makeBookingRecord({ status: "ACCEPTED", paymentIntentId: intentId, departureAt: hoursFromNow(24) }));
+    const result = await makeService(provider).cancel(SHIPPER, BOOKING_ID, {});
+    expect(result.refundAmountCents).toBe(Math.round(2957 * 0.5));
+  });
+
   it("A166 — ACCEPTED : le remboursement entre dans la liste ; PENDING : l'empreinte libérée n'y entre pas", async () => {
     const { provider, intentId } = await makeProviderWithAuth();
     await provider.capture(intentId);
