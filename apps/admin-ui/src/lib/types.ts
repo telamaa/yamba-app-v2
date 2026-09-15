@@ -156,8 +156,8 @@ export type AdminUserFile = {
   adminActions: Array<{ id: string; at: string; admin: string; action: string; after: unknown }>;
   trust: TrustAssessment | null; // D71
 };
-export type AdminAccount = { id: string; firstName: string; lastName: string; email: string; adminRole: import("./permissions").AdminRole; adminRoles: import("./permissions").AdminRole[]; totpEnabled: boolean; inviteAccepted: boolean; createdAt: string };
-export type AdminSessionItem = { jti: string; createdAt: string; lastActivityAt: string; current: boolean };
+export type AdminAccount = { id: string; firstName: string; lastName: string; email: string; adminRole: import("./permissions").AdminRole; adminRoles: import("./permissions").AdminRole[]; totpEnabled: boolean; inviteAccepted: boolean; inviteExpiresAt: string | null; createdAt: string };
+export type AdminSessionItem = { jti: string; createdAt: string; lastActivityAt: string; current: boolean; device: string; ip: string | null };
 
 export type AuditItem = {
   id: string;

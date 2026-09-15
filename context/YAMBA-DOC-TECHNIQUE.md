@@ -9567,3 +9567,73 @@ lui, « un 200, un 403 `LAST_SUPER_ADMIN` ». `restaurerLeSuperAdministrateur()`
   `admin-audit.query.spec.ts` 3) ; harnais **517 scénarios** (506 + CPT 11).
 - Typecheck auth-service, admin-ui, harnais ; cinq `openapi.json` régénérés.
 - Déploiement : rebâtir auth-service ; aucun changement de schéma (le document de garde est créé à la première écriture).
+
+---
+
+# Cahier 02-ADMIN, § 5.26 : mes sessions — une session qu'on reconnaît, une déconnexion qui ne ment pas
+
+Cinq scénarios ADM-SES (1 du cahier ; 2 à 5 ajoutés) et deux fiches ADM-CPT (12, 13) pour les lots décidés au § 5.25 ;
+deux anomalies majeures et deux mineures closes (`ANO-ADM-81` à `84`) ; deux décisions inscrites au registre avant le code
+(A188, A189). Branche `chore/recette-admin-5-26`, empilée sur `chore/recette-admin-5-25`. Dernier chapitre du § 5.
+
+## Ce qui a été corrigé, et pourquoi
+
+- **Une session se reconnaît (ANO-ADM-81, A188 a)** — `AdminSessionRecord` (`apps/auth-service/src/utils/admin-session.ts`)
+  ne portait que `createdAt` / `lastActivityAt`. Il porte désormais, en option, `ip`, `userAgent` (tronqué par
+  `shortUserAgent`, 200 caractères) et `device` (`describeUserAgent`, le libellé « Chrome · macOS » de D65) :
+  `adminSessionClient(req)` les lit, `storeAdminSession(userId, jti, createdAt, now, client)` les écrit.
+  `issueAdminSession(req, res, user)` (dans `admin-auth.controller.ts`) les pose à l'ouverture ; `adminRefresh` les RECOPIE
+  depuis l'ancien enregistrement (`session.device ? session : adminSessionClient(req)`) — l'appareil d'ouverture suit la
+  session à travers les rotations du jti, et une session d'avant la correction devient reconnaissable à son premier
+  renouvellement. `listAdminSessions` sert `device` (« Appareil inconnu » si absent) et `ip` ; l'user-agent brut ne
+  quitte pas Redis. Contrat : `AdminSessionItemSchema` gagne `device` et `ip` (`admin-users.schema.ts`).
+- **Le journal ne compte que ce qui a eu lieu (ANO-ADM-83, A188 b)** — `revokeAdminSession` rend
+  `(await redis.del(clé)) === 1`. `adminLogout` n'écrit `ADMIN_LOGOUT` que si la session existait (un rejeu du même jeton
+  répond 200, sans ligne) ; `revokeAdminSessionById` répond 404 `ADMIN_SESSION_NOT_FOUND` sans ligne pour une session
+  absente. `DEL` sert ici deux fois : c'est l'effacement ET la preuve qu'il a eu lieu, sans lecture préalable (pas de
+  fenêtre entre « existe-t-elle ? » et « efface-la »).
+- **« Se déconnecter » ne ment plus (ANO-ADM-82, A188 c)** — `AdminShell.tsx` faisait
+  `await post("/auth/admin/logout").catch(() => undefined); router.replace("/login")`. Les cookies `admin_*` sont
+  `httpOnly` : seul le serveur peut les effacer ; un 502 laissait la session ouverte derrière un écran de connexion.
+  Désormais `/login` après un 200 ou un 401 (session déjà close), sinon un `role="alert"` « Déconnexion impossible : le
+  service ne répond pas, ta session est toujours ouverte. » ; le bouton passe « Déconnexion… » et ne part qu'une fois.
+  `SessionsList.tsx` applique la même règle à « Révoquer » sa propre session.
+- **L'écran parle juste (ANO-ADM-84)** — `backupCodesWarning(n)` (`apps/admin-ui/src/lib/format.ts`) accorde le pluriel et,
+  à zéro, dit le recours (un super administrateur réinitialise la double authentification) ; `SessionsList` distingue
+  « chargement », « panne » (`role="alert"` + « Réessayer ») et « liste vide », verrouille « Révoquer » pendant l'envoi et
+  lit un 404 comme « Cette session était déjà fermée. ».
+
+## Lots décidés au § 5.25 (A189)
+
+- **a. Renvoyer une invitation** — `POST /admin/admins/:id/invite/resend` (`resendAdminInvite`, `admins.manage`) :
+  `isPendingInvitation(user)` (règle pure, `admin-accounts.rules.ts` : profil admin, pas de mot de passe, non supprimé),
+  sinon 409 `ADMIN_INVITE_NOT_PENDING` ; `issueInviteToken` (A185 : l'ancien lien meurt), email `adminInvite`, ligne
+  `ADMIN_INVITE_RESENT` (ajoutée à `ADMIN_ACTIONS`, `packages/libs/admin-audit`, et à son libellé `format.ts` — la liste
+  fermée d'A183 fait échouer la compilation si l'un manque). `listAdmins` ajoute `inviteExpiresAt` (TTL Redis de
+  `admin_invite_user:<id>`, `null` sans lien vivant) ; `AdminsManager` affiche « lien valable jusqu'au … » ou « lien
+  expiré » et le bouton « Renvoyer l'invitation ».
+- **b. Motif facultatif du retrait** — `RevokeAdminRequestSchema` (`{ reason?: string }`, trim, ≤ 500) ; `revokeAdmin` écrit
+  `after: { reason }` seulement s'il est non vide. Pas de `.transform()` dans un schéma du registre Zod : le générateur
+  OpenAPI refuse (« Transforms cannot be represented in JSON Schema ») — la chaîne vide est ramenée à `undefined` dans le
+  contrôleur. À l'écran, `window.confirm` devient `window.prompt` (Annuler renonce, champ vide = sans motif).
+- **c. Emails de sécurité** — `adminRolesChanged` et `adminAccessRevoked` (`apps/auth-service/src/emails/admin-emails.ts`,
+  FR/EN, `notice` de ton `warning`), SANS `cta` ni motif. `notifyAccessChange(userId, build)` relit le compte APRÈS la
+  transaction, saute `isDeleted` / `emailSuppressedAt` (`canReceiveAccountEmail`), n'échoue jamais. `updateAdminRole`
+  n'écrit que si `rolesChanged(before, next)` (l'ordre ne compte pas).
+
+## Harnais
+
+`apps/e2e/src/admin/adm-ses-mes-sessions.spec.ts` : administrateurs jetables enrôlés en base (`creerAdminEnrole`, avec un
+nombre de codes de secours réglable), connectés par l'écran dans un contexte au user-agent choisi (`navigateurDe`) ;
+`retirerLAcces` en `finally`. SES-3 et 5 simulent la panne par `page.route(…, fulfill 502)`. ADM-CPT-12 et 13 dans
+`adm-cpt-comptes-admin.spec.ts` ; CPT-4 réalignée sur l'invite du motif. Piège de poste : `npx nx build auth-service` sans
+`--skip-sync` s'est arrêté sur la question « sync generators » en mode non interactif, sans rebâtir — le bundle relancé
+était l'ancien ; toujours vérifier une chaîne attendue dans `dist/main.js` (`grep -c`).
+
+## Vérifications
+
+- Tests : auth-service **334** (+15 : `admin-auth-sessions.controller.spec.ts` 5, `admin-admins.controller.spec.ts` +4,
+  `admin-emails.spec.ts` +3, `admin-accounts.rules.spec.ts` +3) ; harnais **524 scénarios** (517 + SES 5 + CPT 2).
+- Typecheck auth, deal, trip, message, notification, admin-ui, harnais ; cinq `openapi.json` régénérés.
+- Déploiement : rebâtir auth-service ; aucun changement de schéma ; les sessions admin ouvertes avant le déploiement
+  affichent « Appareil inconnu » jusqu'à leur premier renouvellement.

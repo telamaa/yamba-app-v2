@@ -21,7 +21,7 @@ import type { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
 import prisma from "@packages/libs/prisma";
 import { adminRolesOf } from "../utils/admin-roles";
-import { AuthError, ForbiddenError, ValidationError } from "@packages/error-handler";
+import { AuthError, ForbiddenError, NotFoundError, ValidationError } from "@packages/error-handler";
 import { recordAdminAction } from "@packages/admin-audit";
 import {
   consumeBackupCode,
@@ -40,10 +40,13 @@ import redis from "@packages/libs/redis";
 import { resolveLocale } from "@packages/api-contracts";
 import { sendAuthEmail } from "../emails/send-auth-email";
 import { getAdminEmails } from "../emails/admin-emails";
+import { UNKNOWN_DEVICE } from "../utils/session-device";
 import { adminRemainingLifetimeMs, loadAdminSessionPolicy } from "../utils/admin-session-policy";
 import {
+  adminSessionClient,
   clearTotpFailures,
   getAdminSession,
+  type AdminSessionRecord,
   registerTotpFailure,
   revokeAdminSession,
   storeAdminSession,
@@ -107,10 +110,10 @@ async function requirePreauth(req: Request) {
 }
 
 /** Ouvre la session admin : cookies + record Redis + JWT porteur de `amr: ["pwd","totp"]`. */
-async function issueAdminSession(res: Response, user: { id: string; roles: string[] }): Promise<void> {
+async function issueAdminSession(req: Request, res: Response, user: { id: string; roles: string[] }): Promise<void> {
   const createdAt = Date.now();
   const jti = createRefreshJti();
-  const ttl = await storeAdminSession(user.id, jti, createdAt, createdAt);
+  const ttl = await storeAdminSession(user.id, jti, createdAt, createdAt, adminSessionClient(req)); // A188 a
   if (ttl <= 0) throw new AuthError("Admin session could not be opened.", { code: "ADMIN_SESSION_FAILED" });
   const accessToken = jwt.sign(
     // ANO-ADM-04 — le jeton d'accès porte le jti de sa session : isAdminAuthenticated vérifie qu'elle existe encore.
@@ -186,7 +189,7 @@ export const adminTotpEnable = async (req: Request, res: Response, next: NextFun
       await recordAdminAction(tx, { adminUserId: user.id, action: "ADMIN_TOTP_ENABLED", targetType: "USER", targetId: user.id, ...clientMeta(req) });
       await recordAdminAction(tx, { adminUserId: user.id, action: "ADMIN_LOGIN", targetType: "SESSION", after: { method: "totp-setup" }, ...clientMeta(req) });
     });
-    await issueAdminSession(res, user);
+    await issueAdminSession(req, res, user);
     await sendLoginAlert(req, user);
     return res.status(200).json({ ok: true, backupCodes });
   } catch (e) {
@@ -235,7 +238,7 @@ export const adminTotpVerify = async (req: Request, res: Response, next: NextFun
     }
 
     await clearTotpFailures(user.id);
-    await issueAdminSession(res, user);
+    await issueAdminSession(req, res, user);
     await sendLoginAlert(req, user);
     return res.status(200).json({ ok: true, usedBackupCode: usedBackup, remainingBackupCodes });
   } catch (e) {
@@ -271,7 +274,8 @@ export const adminRefresh = async (req: Request, res: Response, next: NextFuncti
     // Rotation : nouveau jti, MÊME createdAt (c'est lui qui borne la vie absolue).
     const now = Date.now();
     const newJti = createRefreshJti();
-    const ttl = await storeAdminSession(user.id, newJti, session.createdAt, now);
+    // A188 a — l'appareil et l'IP d'OUVERTURE suivent la session (ceux d'une session d'avant la correction : ceux du renouvellement).
+    const ttl = await storeAdminSession(user.id, newJti, session.createdAt, now, session.device ? session : adminSessionClient(req));
     await revokeAdminSession(user.id, decoded.jti);
     if (ttl <= 0) {
       clearAdminCookies(res);
@@ -293,8 +297,9 @@ export const adminLogout = async (req: Request, res: Response, next: NextFunctio
     if (token) {
       try {
         const decoded = jwt.verify(token, process.env.REFRESH_TOKEN_SECRET as string) as AdminRefreshPayload;
-        if (decoded?.id && decoded?.jti) {
-          await revokeAdminSession(decoded.id, decoded.jti);
+        // A188 b (ANO-ADM-83) — seule une session réellement fermée se journalise : un rejeu (deuxième onglet, double clic)
+        // répond 200 sans seconde ligne.
+        if (decoded?.id && decoded?.jti && (await revokeAdminSession(decoded.id, decoded.jti))) {
           await recordAdminAction(prisma, { adminUserId: decoded.id, action: "ADMIN_LOGOUT", targetType: "SESSION", ...clientMeta(req) });
         }
       } catch {
@@ -420,7 +425,7 @@ function currentJti(req: Request): string | null {
 export const listAdminSessions = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const mine = currentJti(req);
-    const items: Array<{ jti: string; createdAt: string; lastActivityAt: string; current: boolean }> = [];
+    const items: Array<{ jti: string; createdAt: string; lastActivityAt: string; current: boolean; device: string; ip: string | null }> = [];
     let cursor = "0";
     do {
       const [nextCursor, keys] = await redis.scan(cursor, "MATCH", `admin_jti:${req.user.id}:*`, "COUNT", 100);
@@ -429,9 +434,10 @@ export const listAdminSessions = async (req: AuthenticatedRequest, res: Response
         const raw = await redis.get(key);
         if (!raw) continue;
         try {
-          const rec = JSON.parse(raw) as { createdAt: number; lastActivityAt: number };
+          const rec = JSON.parse(raw) as AdminSessionRecord;
           const jti = key.split(":").pop() as string;
-          items.push({ jti, createdAt: new Date(rec.createdAt).toISOString(), lastActivityAt: new Date(rec.lastActivityAt).toISOString(), current: jti === mine });
+          // A188 a — une session d'avant la correction n'a ni appareil ni IP : « Appareil inconnu ».
+          items.push({ jti, createdAt: new Date(rec.createdAt).toISOString(), lastActivityAt: new Date(rec.lastActivityAt).toISOString(), current: jti === mine, device: rec.device ?? UNKNOWN_DEVICE, ip: rec.ip ?? null });
         } catch {
           // record illisible : ignoré
         }
@@ -448,7 +454,8 @@ export const revokeAdminSessionById = async (req: AuthenticatedRequest, res: Res
   try {
     const jti = String(req.params.jti ?? "");
     if (!/^[a-f0-9]{32}$/.test(jti)) return next(new ValidationError("Invalid session id.", { code: "INVALID_ID" }));
-    await revokeAdminSession(req.user.id, jti);
+    // A188 b (ANO-ADM-83) — une session déjà fermée (double clic, révoquée ailleurs) : 404, aucune ligne de journal.
+    if (!(await revokeAdminSession(req.user.id, jti))) return next(new NotFoundError("Admin session not found.", { code: "ADMIN_SESSION_NOT_FOUND" }));
     await recordAdminAction(prisma, { adminUserId: req.user.id, action: "ADMIN_SESSION_REVOKED", targetType: "SESSION", targetId: jti, ...clientMeta(req) });
     if (jti === currentJti(req)) clearAdminCookies(res);
     return res.status(200).json({ ok: true });

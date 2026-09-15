@@ -3,6 +3,27 @@
 *Ce document sert à REPRENDRE le chantier après une pause. Il dit où en est la campagne, ce qui
 tourne sur le poste, ce qui reste à faire, et les pièges déjà payés qu'il ne faut pas repayer.*
 
+> ## ▶ 15/09/2026 — § 5.26 LIVRÉ — FIN DU § 5
+>
+> Branche `chore/recette-admin-5-26` empilée sur #326 : 5 scénarios ADM-SES (`adm-ses-mes-sessions.spec.ts`) + ADM-CPT-12, 13
+> (lots du § 5.25) ; ANO-ADM-81, 82 (majeures), 83, 84 (mineures) closes ; décisions A188 (sessions admin reconnaissables,
+> journal des seules sessions fermées, « Se déconnecter » après 200/401 seulement) et A189 (renvoi d'invitation,
+> `inviteExpiresAt`, motif facultatif du retrait, emails de sécurité sans lien). Chiffres : auth **334**, deal **644**, message
+> **57**, trip **293**, notification **122**, harnais **524** ; dernière anomalie ANO-ADM-84 ; dernier arbitrage A189 ; dernier
+> chapitre d'apprentissage **184**. Pas de changement de schéma. POSTE : auth-service rebâti et relancé en bundle `nohup`
+> (logs dans le scratchpad) ; gateway, deal (FAKE), message, trip, notification en bundles inchangés ; les deux fronts en
+> `next dev`. Pièges : **`npx nx build <svc>` sans `--skip-sync` s'arrête sur la question des sync generators sans rebâtir**
+> (vérifier `grep -c <chaîne nouvelle> dist/main.js` avant de relancer) ; une fiche qui se déconnecte utilise un admin
+> JETABLE (jamais une session mémorisée du harnais) ; les admins jetables `ses-*@recette.yamba.dev` et
+> `cpt-cpt12/13-*` restent en base, accès retiré. **PRÉPARATION § 6** (ADM-E2E-1 → 8, bout en bout) : les six services + deux
+> fronts + Mailpit + Redpanda (les emails de décision, de sanction et de versement passent par l'outbox et les
+> consommateurs) ; deal-service sur le paiement FAKE (E2E-7 attend `INTENT_NOT_FOUND` du Fake) ; le cahier demande de
+> **rejouer le jeu d'essai avant chaque cas** (`seed-deals.ts`, code 742891 ; `seed-settings.ts` avant E2E-4, dont
+> l'effet doit se voir en moins de 30 s = cache du lecteur de paramètres) ; maintenance à plat avant E2E-5 ; E2E-6 est un
+> effacement PAR L'ADMIN (profil Données personnelles) : refus 409 tant qu'un deal vit, puis effacement et un seul email
+> sans lien (Mailpit) ; E2E-3 a besoin de trois signalants distincts et vérifie qu'AUCUN email ne leur part. **ENGAGEMENT § 7**
+> inchangé : P2034 sur **admin-users** et **admin-auth**. Suite : § 6.
+>
 > ## ▶ 15/09/2026 — § 5.25 LIVRÉ
 >
 > Branche `chore/recette-admin-5-25` empilée sur #325 : 11 scénarios ADM-CPT (`adm-cpt-comptes-admin.spec.ts`) ; ANO-ADM-75,

@@ -6115,3 +6115,53 @@ est neutralisée.
 **Tests d'acceptation.** ADM-CPT-1 à 5 (cahier) et 6 à 11 (ajoutées) dans `adm-cpt-comptes-admin.spec.ts` ; règles et
 gestes simultanés prouvés par `admin-accounts.rules.spec.ts` et `admin-admins.controller.spec.ts`, export et auteurs par
 `admin-audit.query.spec.ts` (auth-service).
+
+---
+
+# Cahier 02-ADMIN, § 5.26 : mes sessions
+
+**Le besoin.** Un administrateur doit pouvoir voir où son compte est ouvert, fermer ce qu'il ne reconnaît pas, et se
+déconnecter en étant sûr de l'être. Un email l'alerte à chaque ouverture de session : la page « Mes sessions » est l'endroit
+où il agit.
+
+**RG-ADM-SES-01 — L'identité de l'admin vit dans la barre latérale** : « Yamba · Admin », prénom et nom, profils cumulés
+(« Support + Finance »), « Se déconnecter ». Il n'existe pas de page « Mon compte » ; le back-office n'offre ni changement de
+mot de passe, ni changement d'email, ni régénération des codes de secours (le mot de passe se change par le parcours
+membre, c'est le même compte).
+
+**RG-ADM-SES-02 — Les codes de secours restants sont annoncés** : à deux codes ou moins, « Il te reste 2 codes de
+secours. » / « Il te reste 1 code de secours. » ; à zéro, le recours est dit : un super administrateur devra réinitialiser
+la double authentification (retirer puis réinviter).
+
+**RG-ADM-SES-03 — Une session se reconnaît (A188)** : chaque ligne de « Mes sessions » nomme l'appareil (navigateur et
+système) et l'adresse IP d'ouverture, puis « ouverte le … · active le … », et marque « cette session ». L'appareil reste celui
+de l'ouverture même quand la session se renouvelle. Une session ouverte avant cette règle affiche « Appareil inconnu »
+jusqu'à son renouvellement.
+
+**RG-ADM-SES-04 — Se déconnecter, c'est être déconnecté** : l'écran ne montre la page de connexion qu'une fois la session
+fermée par le serveur. Si le service ne répond pas, l'écran reste et dit « Déconnexion impossible : … ta session est
+toujours ouverte. » ; même règle pour « Révoquer » sa propre session.
+
+**RG-ADM-SES-05 — Le journal ne compte que ce qui a eu lieu** : une déconnexion écrit une ligne « Déconnexion » seulement si
+elle ferme une session ; la rejouer (deuxième onglet, double clic) n'écrit rien. Révoquer une session déjà fermée est
+refusé (« Cette session était déjà fermée. ») et n'écrit rien.
+
+**RG-ADM-SES-06 — Une panne n'est pas une absence** : si la liste des sessions ne peut pas être lue, l'écran le dit et
+propose « Réessayer » — jamais « Aucune session. ».
+
+**RG-ADM-CPT-10 — Renvoyer une invitation en attente (A189)** : la ligne d'une invitation en attente affiche jusqu'à quand
+le lien vaut, ou « lien expiré », et propose « Renvoyer l'invitation » : un nouveau lien de 48 heures part, l'ancien ne sert
+plus, le journal écrit « Invitation renvoyée ». Une invitation déjà acceptée (ou un accès retiré) ne se renvoie pas.
+
+**RG-ADM-CPT-11 — Le retrait peut porter un motif (A189)** : au moment de « Retirer », un motif facultatif (500 caractères
+au plus) est demandé ; il est écrit au journal. Il est facultatif pour ne jamais retarder le retrait d'urgence d'un compte
+compromis.
+
+**RG-ADM-CPT-12 — L'admin dont les accès changent est prévenu (A189)** : un email « Tes profils sur le back-office Yamba
+ont changé » (avant → après, auteur) ou « Ton accès au back-office Yamba a été retiré » (auteur). Ces emails ne portent
+aucun lien de connexion (on n'ouvre pas une porte à un compte peut-être compromis) et jamais le motif (texte interne). Pas
+d'email si les profils sont les mêmes dans un autre ordre, si le compte est supprimé ou si son adresse est suppressionnée.
+
+**Tests d'acceptation.** ADM-SES-1 (cahier) et 2 à 5 (ajoutées) dans `adm-ses-mes-sessions.spec.ts` ; ADM-CPT-12 et 13
+dans `adm-cpt-comptes-admin.spec.ts` ; règles prouvées par `admin-auth-sessions.controller.spec.ts`,
+`admin-admins.controller.spec.ts`, `admin-accounts.rules.spec.ts` et `admin-emails.spec.ts` (auth-service).

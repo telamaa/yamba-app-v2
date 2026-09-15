@@ -28,6 +28,15 @@ export function inviteMode(existing: Existing): InviteMode {
   return existing.passwordHash ? { kind: "GRANT_ACCESS" } : { kind: "PASSWORD_LINK" };
 }
 
+/** A189 a — une invitation EN ATTENTE : profil admin posé, aucun mot de passe, compte non supprimé. Seule elle se renvoie. */
+export const isPendingInvitation = (u: Existing): boolean => !!u && !u.isDeleted && !u.passwordHash && (!!u.adminRole || (u.adminRoles?.length ?? 0) > 0);
+
+/** A189 c — un email de sécurité ne part pas vers un compte supprimé ni vers une adresse suppressionnée (D35). */
+export const canReceiveAccountEmail = (u: { isDeleted?: boolean | null; emailSuppressedAt?: Date | null } | null): boolean => !!u && !u.isDeleted && !u.emailSuppressedAt;
+
+/** A189 c — les profils ont-ils VRAIMENT changé ? (même liste, autre ordre : rien à annoncer) */
+export const rolesChanged = (before: readonly string[], after: readonly string[]): boolean => before.length !== after.length || before.some((r) => !after.includes(r));
+
 /** Le geste retire-t-il le profil SUPER_ADMIN de la cible ? (rétrogradation ou retrait) */
 export const removesSuperAdmin = (before: readonly string[], after: readonly string[] | null): boolean => before.includes("SUPER_ADMIN") && !(after ?? []).includes("SUPER_ADMIN");
 

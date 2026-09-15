@@ -835,3 +835,62 @@ intersection de permissions s'écrit en série de middlewares.
 Kleppmann, *Designing Data-Intensive Applications*, chapitre 7 (« Materializing conflicts ») ; la documentation MongoDB
 « Transactions and Write Conflicts » ; le patron « claim check » et `SET key value NX` pour réclamer une ressource dans
 Redis ; OWASP « CSV Injection ».
+
+## Chapitre 184 — ADM-SES · Une session qu'on reconnaît, une déconnexion qui ne ment pas : l'état qu'on transporte, l'effacement qui sert de preuve, et l'échec qu'un client ne peut pas avaler
+
+**Le problème.** La page « Mes sessions » dit « Révoque ce que tu ne reconnais pas », mais ses lignes ne portaient que deux
+dates. « Se déconnecter » affichait la page de connexion même quand le serveur n'avait rien fermé. Le journal écrivait une
+déconnexion à chaque rejeu et une révocation pour une session qui n'existait plus. Trois défauts de nature différente :
+une donnée qu'on ne transporte pas, une écriture qui ne sait pas si elle a eu lieu, un client qui confond « j'ai envoyé » et
+« c'est fait ».
+
+**(1) Un état qui doit survivre à une rotation se recopie explicitement.** Une session admin est une clé Redis
+`admin_jti:<user>:<jti>` ; à chaque renouvellement, un nouveau jti remplace l'ancien (la rotation empêche la réutilisation
+d'un jeton volé). Tout ce que l'enregistrement porte doit donc être RECOPIÉ, sinon il disparaît à la première rotation —
+c'était déjà le cas de `createdAt`, qui borne la vie absolue de 12 h. Extrait (`apps/auth-service/src/controller/admin-auth.controller.ts`,
+`adminRefresh`) : `storeAdminSession(user.id, newJti, session.createdAt, now, session.device ? session : adminSessionClient(req))`.
+Le choix est métier : l'appareil affiché est celui de l'OUVERTURE (celui que l'alerte email a nommé), pas celui du dernier
+renouvellement. Le repli sur la requête courante migre en douceur les sessions d'avant la correction, sans script.
+
+**(2) `DEL` rend un nombre : c'est une preuve, gratuite et atomique.** Écrire « déconnecté » au journal après
+`redis.del(clé)` sans regarder le résultat, c'est journaliser une intention. `DEL` rend le nombre de clés effacées ; Redis
+exécute les commandes l'une après l'autre, donc de deux requêtes concurrentes une seule lit `1`. Extrait
+(`admin-session.ts`) : `return (await redis.del(key(userId, jti))) === 1;`. Lire d'abord (`EXISTS`) puis effacer rouvrirait
+la fenêtre « vérifier puis agir » du chapitre 183 : l'effacement EST la vérification. Côté HTTP, on garde deux réponses
+distinctes : la déconnexion reste idempotente (200 à chaque rejeu — le client veut juste être dehors), la révocation d'une
+session nommée qui n'existe pas répond 404 (le geste visait quelque chose qui n'est plus là).
+
+**(3) Un cookie `httpOnly` ne s'efface que par le serveur : le client ne peut pas conclure seul.** `post(...).catch(() =>
+undefined)` puis `router.replace("/login")` transforme une panne en succès apparent. JavaScript ne voit pas les cookies
+`httpOnly` — c'est leur raison d'être (un script injecté ne peut pas voler le jeton) — donc il ne peut pas non plus les
+retirer : seule la réponse `Set-Cookie` du serveur ferme la session dans le navigateur. La règle : ne quitter l'écran
+qu'après une réponse qui PROUVE l'état voulu (200, ou 401 : déjà dehors) ; tout le reste est affiché comme un échec
+(`AdminShell.tsx`, `logout()`). Le même raisonnement vaut pour « Révoquer » sa propre session (`SessionsList.tsx`).
+
+**(4) Trois états d'une liste, pas deux.** `apiFetch(...).then(setItems).catch(() => undefined)` avec `items = []` au départ
+fait qu'une panne s'affiche « Aucune session. ». On modélise `items: T[] | null` (null = pas encore lu) et `loadError` :
+chargement, panne (avec « Réessayer »), vide, liste. C'est le même défaut que ANO-ADM-72 (journal) : un `catch` muet sur une
+lecture ment toujours dans le sens rassurant.
+
+**(5) Un schéma qui sert aussi de documentation n'a pas le droit de transformer.** Le motif facultatif du retrait voulait
+`z.string().trim().optional().transform((v) => v || undefined)`. Les schémas enregistrés dans le registre global Zod
+génèrent OpenAPI (`z.toJSONSchema`), et une transformation n'a pas de représentation JSON Schema : le test
+`build-openapi.spec.ts` a échoué. `trim()` passe (c'est une réécriture de la valeur, pas un changement de type) ; la
+normalisation « chaîne vide → absent » va dans le contrôleur (`body.data.reason || undefined`). Règle : un contrat décrit la
+forme ; ce qui change la forme appartient au code.
+
+**(6) Un email de sécurité n'est pas une porte.** Prévenir l'admin dont les profils changent protège contre un compte super
+administrateur compromis : la victime apprend qu'on lui a ajouté ou retiré des droits. Mais un bouton « Ouvrir le
+back-office » dans cet email serait exactement ce qu'un hameçonnage imiterait, et le motif du retrait est un texte interne
+qui peut nommer un collègue. Les deux gabarits (`adminRolesChanged`, `adminAccessRevoked`) n'ont ni `cta` ni motif ; le test
+`admin-emails.spec.ts` vérifie l'absence de toute URL. L'envoi part après la transaction, best effort, et saute les comptes
+supprimés et les adresses suppressionnées (`canReceiveAccountEmail`).
+
+**Pièges.** `npx nx build <projet>` peut s'arrêter sur la question interactive des « sync generators » sans rebâtir : le
+service relancé tourne sur l'ancien bundle et la recette « échoue » sur du code déjà corrigé — `--skip-sync` et un `grep -c`
+d'une chaîne nouvelle dans `dist/main.js` avant de relancer. Une fiche qui se déconnecte doit utiliser un compte jetable :
+une session mémorisée du harnais, fermée, fait échouer les fiches suivantes.
+
+**Pour aller plus loin.** La rotation concurrente (deux onglets renouvellent avec le même jeton) crée aujourd'hui deux jti ;
+la solution propre réclame l'ancien jti par `DEL` et, pour le perdant, renvoie les cookies du gagnant plutôt que 401 — voir
+les « refresh token families » (détection de réutilisation) du RFC 9700 (OAuth 2.0 Security BCP).

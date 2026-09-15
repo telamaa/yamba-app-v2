@@ -83,14 +83,32 @@ export default function AdminsManager() {
       load();
     }
   }
+  /** A189 b — motif FACULTATIF (écrit au journal, jamais dans l'email) : « Annuler » renonce, un champ vide retire sans motif. */
   async function revoke(id: string, name: string) {
-    if (!window.confirm(`Retirer l'accès admin de ${name} ? Sa 2FA et ses sessions admin sont supprimées.`)) return;
+    const answer = window.prompt(`Retirer l'accès admin de ${name} ? Sa 2FA et ses sessions admin sont supprimées.\nMotif (facultatif, écrit au journal) :`, "");
+    if (answer === null) return;
     setMsg(null);
     try {
-      await del(`/admin/admins/${id}`);
+      const reason = answer.trim();
+      await del(`/admin/admins/${id}`, reason ? { reason } : undefined);
       load();
     } catch (err) {
       refuse(err, "Retrait impossible.");
+    }
+  }
+  /** A189 a — renvoyer une invitation en attente : nouveau lien, l'ancien ne sert plus. */
+  async function resend(a: AdminAccount) {
+    if (busy) return;
+    setBusy(true);
+    setMsg(null);
+    try {
+      const r = await post<{ inviteExpiresAt: string }>(`/admin/admins/${a.id}/invite/resend`);
+      setMsg(`Invitation renvoyée à ${a.email} : nouveau lien valable jusqu'au ${dateTime(r.inviteExpiresAt)}, l'ancien ne sert plus.`);
+      load();
+    } catch (err) {
+      refuse(err, "Renvoi impossible.");
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -109,7 +127,15 @@ export default function AdminsManager() {
                   <td className="px-3 py-2 font-semibold">{a.firstName} {a.lastName}{self && <span className="ml-1 text-[11px] font-normal text-slate-500">(toi)</span>}</td>
                   <td className="px-3 py-2">{a.email}</td>
                   <td className="px-3 py-2"><RolesPicker compact disabled={self} value={a.adminRoles.length ? a.adminRoles : [a.adminRole]} onChange={(roles) => changeRoles(a.id, roles)} /></td>
-                  <td className="px-3 py-2 text-[11.5px] text-slate-600">{!a.inviteAccepted ? "invitation en attente" : a.totpEnabled ? "2FA active" : "2FA à activer"} · {dateTime(a.createdAt)}</td>
+                  <td className="px-3 py-2 text-[11.5px] text-slate-600">
+                    {!a.inviteAccepted ? "invitation en attente" : a.totpEnabled ? "2FA active" : "2FA à activer"} · {dateTime(a.createdAt)}
+                    {!a.inviteAccepted && (
+                      <span className="mt-0.5 block">
+                        <span data-testid="invite-expiry" className={a.inviteExpiresAt ? "" : "font-semibold text-amber-700"}>{a.inviteExpiresAt ? `lien valable jusqu'au ${dateTime(a.inviteExpiresAt)}` : "lien expiré"}</span>
+                        {!self && <button type="button" disabled={busy} onClick={() => resend(a)} className="ml-2 text-[11.5px] font-medium text-slate-900 underline-offset-2 hover:underline disabled:opacity-60">Renvoyer l&apos;invitation</button>}
+                      </span>
+                    )}
+                  </td>
                   <td className="px-3 py-2">{self ? <span className="text-[11px] text-slate-400" title="Un autre super administrateur doit modifier ou retirer ton accès.">ton accès</span> : <button onClick={() => revoke(a.id, `${a.firstName} ${a.lastName}`)} className="text-[12px] text-red-700 hover:underline">Retirer</button>}</td>
                 </tr>
               );

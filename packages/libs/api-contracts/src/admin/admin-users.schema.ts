@@ -256,6 +256,18 @@ export const AcceptAdminInviteRequestSchema = z
   .meta({ id: "AcceptAdminInviteRequest" });
 export type AcceptAdminInviteRequest = z.infer<typeof AcceptAdminInviteRequestSchema>;
 
+/** A189 b — motif FACULTATIF du retrait (un retrait d'urgence n'attend pas un texte) ; écrit au journal, jamais dans l'email. */
+export const RevokeAdminRequestSchema = z
+  .object({ reason: z.string().trim().max(500).optional().meta({ description: "Optional; an empty string after trim means no reason" }) })
+  .meta({ id: "RevokeAdminRequest" });
+export type RevokeAdminRequest = z.infer<typeof RevokeAdminRequestSchema>;
+
+/** A189 a — un nouveau lien d'invitation (l'ancien meurt). */
+export const ResendAdminInviteResponseSchema = z
+  .object({ ok: z.literal(true), inviteExpiresAt: z.string().datetime() })
+  .meta({ id: "ResendAdminInviteResponse" });
+export type ResendAdminInviteResponse = z.infer<typeof ResendAdminInviteResponseSchema>;
+
 export const UpdateAdminRoleRequestSchema = z.object({ adminRoles: AdminRolesSchema }).meta({ id: "UpdateAdminRoleRequest", description: "C-PR3bis : la liste complète des profils (remplace)" });
 export type UpdateAdminRoleRequest = z.infer<typeof UpdateAdminRoleRequestSchema>;
 
@@ -269,12 +281,23 @@ export const AdminAccountSchema = z
     adminRoles: z.array(AdminRoleSchema),
     totpEnabled: z.boolean(),
     inviteAccepted: z.boolean().meta({ description: "false while the invited account has no password yet" }),
+    /** A189 a — fin de validité du lien d'invitation vivant ; null = aucun lien vivant (accepté, ou expiré : à renvoyer). */
+    inviteExpiresAt: z.string().datetime().nullable(),
     createdAt: z.string().datetime(),
   })
   .meta({ id: "AdminAccount" });
 export type AdminAccount = z.infer<typeof AdminAccountSchema>;
 
 export const AdminSessionItemSchema = z
-  .object({ jti: z.string(), createdAt: z.string().datetime(), lastActivityAt: z.string().datetime(), current: z.boolean() })
+  .object({
+    jti: z.string(),
+    createdAt: z.string().datetime(),
+    lastActivityAt: z.string().datetime(),
+    current: z.boolean(),
+    /** A188 a — navigateur · système lu à l'ouverture (« Appareil inconnu » pour une session d'avant la correction). */
+    device: z.string(),
+    /** A188 a — adresse IP d'ouverture ; null pour une session d'avant la correction. */
+    ip: z.string().nullable(),
+  })
   .meta({ id: "AdminSessionItem" });
 export type AdminSessionItem = z.infer<typeof AdminSessionItemSchema>;
