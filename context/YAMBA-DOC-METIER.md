@@ -5904,3 +5904,50 @@ l'aperçu garde les conditions de la réservation), ADM-PAR-14 (reset de l'Explo
 **Points ouverts proposés.** Recompter les bloqueurs dans la transaction d'effacement (fenêtre de quelques
 millisecondes) ; montrer les bloqueurs à l'admin avant le clic ; filtre du registre par membre ; déclenchement journalisé
 des crons de conservation.
+
+# Cahier 02-ADMIN, § 5.22 : état des services
+
+**Le besoin.** L'exploitation doit savoir, d'un coup d'œil, si les services répondent, si les tâches planifiées tournent,
+si des événements attendent d'être publiés et si les emails partent. Ce n'est pas un outil de supervision (un moniteur
+externe reste nécessaire quand personne n'a la page ouverte), mais ce qu'elle affiche doit être vrai.
+
+**RG-ADM-ETA-01 — Une panne réelle se voit** : un service arrêté passe en rouge (« Injoignable ») dans les 30 secondes ;
+une dépendance en panne (base, cache) rend la carte « Dégradé » en ambre. L'âge de la dernière relecture est toujours
+exact, même quand la relecture échoue ; un échec de relecture se dit en français.
+
+**RG-ADM-ETA-02 — Une maintenance planifiée n'est pas une panne** : pendant une coupure annoncée, la passerelle n'affiche
+aucune croix rouge ; le bandeau dit que la plateforme est en lecture seule.
+
+**RG-ADM-ETA-03 — Un cron qui manque se voit (A178)** : Yamba connaît la liste de ses treize tâches planifiées ; une tâche
+sans battement depuis 7 jours est nommée en ambre ; une tâche dont le dernier passage date de plus de deux intervalles est
+marquée « en retard ? ».
+
+**RG-ADM-ETA-04 — Rien ne se perd quand la messagerie tombe** : un événement écrit pendant une coupure de Redpanda attend
+et repart seul au retour ; un événement refusé dix fois est « parqué », compté en rouge, jamais purgé.
+
+**RG-ADM-ETA-05 — Le seuil « parqué » ne dépasse jamais le relais (A176)** : le relais abandonne à 10 tentatives ; le
+paramètre d'alerte peut signaler plus tôt, jamais plus tard (1 à 10).
+
+**RG-ADM-ETA-06 — Un email remis reste un email envoyé (A177)** : « envoyés » = acceptés par le fournisseur (dont
+« remis ») ; rebonds et plaintes comptés à part, en rouge ; « en échec » = refusés avant le fournisseur.
+
+**RG-ADM-RGP-06 — Les bloqueurs se lisent avant d'effacer (A179)** : la carte d'effacement dit pourquoi le compte ne peut
+pas encore être effacé et garde le bouton inactif ; le serveur revérifie de toute façon.
+
+**RG-ADM-RGP-07 — Une réservation et un effacement ne se croisent pas (A179)** : si un membre réserve pendant qu'on efface
+son compte, l'un des deux gestes l'emporte et l'autre voit le résultat — jamais un compte effacé avec une demande en
+attente créée à la même seconde. Un compte effacé ne peut pas réserver (« Ce compte a été supprimé : la demande n'a pas
+été créée. »).
+
+**RG-ADM-RGP-08 — Le registre d'un membre** : depuis sa fiche, l'admin ouvre les seules demandes RGPD de ce membre ; la
+consultation est journalisée avec le membre en cible.
+
+**RG-ADM-RGP-09 — Pas de purge à la main (A180)** : les tâches de conservation (suppression de fils, d'événements, de
+notifications, du destinataire) ne se déclenchent pas depuis le back-office ; elles tournent à leur heure.
+
+**Tests d'acceptation.** ADM-ETA-1 à 7 (`adm-eta-etat-services.spec.ts`), ADM-RGP-2 (bloqueurs avant le clic) et
+ADM-RGP-7 (registre d'un membre) ; courses prouvées par les tests unitaires (`privacy.service.spec.ts`,
+`booking-request-fence.spec.ts`).
+
+**Points ouverts proposés.** Âge du plus ancien événement non publié en rouge au-delà de `alerts.outboxLagMinutes` ;
+compteurs de bloqueurs à côté des libellés ; bandeau minimal quand auth-service (qui sert la page) ne répond plus.

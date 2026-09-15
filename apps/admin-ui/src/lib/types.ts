@@ -348,9 +348,10 @@ export type HealthReport = { status: "ok" | "degraded"; service: string; version
 export type ServiceStatus = { name: string; url: string; reachable: boolean; ms: number; report: HealthReport | null; error: string | null };
 export type CronRun = { service: string; name: string; ranAt: string; durationMs: number; ok: boolean; summary: string | null; error: string | null; schedule: string | null };
 export type AdminStatusResponse = {
-  at: string; services: ServiceStatus[]; crons: CronRun[];
+  at: string; services: ServiceStatus[]; crons: Array<CronRun & { late: boolean }>;
+  missingCrons: Array<{ service: string; name: string; schedule: string; intervalMs: number }>; // A178
   outbox: { unpublished: number; oldestUnpublishedAt: string | null; parked: number; parkedThreshold: number };
-  emails: { failedLast24h: number; sentLast24h: number };
+  emails: { failedLast24h: number; sentLast24h: number; deliveredLast24h: number; bouncedLast24h: number }; // A177
   maintenance: MaintenanceState;
 };
 export type PublicMaintenance = { enabled: boolean; message: { fr: string; en: string }; scheduledAt: string | null };

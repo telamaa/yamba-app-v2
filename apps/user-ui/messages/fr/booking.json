@@ -169,6 +169,7 @@
       "PAYMENT_NOT_AUTHORIZED": "Le paiement n''a pas encore été autorisé. Réessaie.",
       "PAYMENT_MISMATCH": "L''autorisation ne correspond plus à ta demande. Une nouvelle autorisation est en cours.",
       "PAYMENT_ALREADY_USED": "Ce paiement est déjà rattaché à une demande.",
+      "ACCOUNT_DELETED": "Ce compte a été supprimé : la demande n'a pas été créée.",
       "UNAUTHENTICATED": "Connecte-toi pour envoyer ta demande.",
       "QUOTE_UNAVAILABLE": "Le devis n''est pas disponible pour ce colis : vérifie le poids et la taille.",
       "GENERIC": "Une erreur est survenue. Rien n''a été débité — réessaie."

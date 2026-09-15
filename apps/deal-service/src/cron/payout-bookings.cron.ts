@@ -23,14 +23,18 @@ import { withHeartbeat } from "@packages/libs/redis/cron-heartbeat";
 
 export const BOOKING_PAYOUT_CRON_SCHEDULE = "*/5 * * * *";
 
-export async function runPayoutPasses(service: DealSettlementService, logger: Logger): Promise<void> {
+export async function runPayoutPasses(service: DealSettlementService, logger: Logger): Promise<{ completed: number; retried: number; reminded: number }> {
   const completed = await service.autoCompleteDue();
   if (completed > 0) logger.info({ completed }, "Auto-completed deals past their verification window (D+4)");
   const retried = await service.retryFailedPayouts();
   if (retried > 0) logger.info({ sent: retried }, "Retried carrier payouts sent");
   const reminded = await service.sendVerificationReminders();
   if (reminded > 0) logger.info({ reminded }, "Verification reminders (D+3) emitted");
+  return { completed, retried, reminded };
 }
+
+/** Recette § 5.22 — le battement de ce cron n'avait aucun résumé (« ok » seul sur la page d'état). */
+export const payoutPassesSummary = (r: { completed: number; retried: number; reminded: number }) => `${r.completed} terminé(s), ${r.retried} versement(s) rejoué(s), ${r.reminded} rappel(s)`;
 
 export function startBookingPayoutCron(service: DealSettlementService, logger: Logger): ScheduledTask {
   let running = false;
@@ -39,7 +43,7 @@ export function startBookingPayoutCron(service: DealSettlementService, logger: L
     if (running) return; // fournée précédente encore en vol
     running = true;
     try {
-      await withHeartbeat(redis, { service: "deal-service", name: "payout-bookings", schedule: BOOKING_PAYOUT_CRON_SCHEDULE }, () => runPayoutPasses(service, logger));
+      await withHeartbeat(redis, { service: "deal-service", name: "payout-bookings", schedule: BOOKING_PAYOUT_CRON_SCHEDULE }, () => runPayoutPasses(service, logger), payoutPassesSummary);
     } catch (err) {
       logger.error({ err }, "Booking payout cron failed");
     } finally {

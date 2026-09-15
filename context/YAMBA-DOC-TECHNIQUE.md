@@ -9286,3 +9286,71 @@ Six scénarios ADM-RGP (1 à 4 du cahier ; 5 et 6 ajoutés), deux ADM-PAR ajout�
   trip 293 inchangés.
 - `apps/e2e` : **479 scénarios** (471 + 6 ADM-RGP + 2 ADM-PAR).
 - Typecheck auth, deal, admin-ui, harnais ; cinq `openapi.json` régénérés (`SettingsWriteResponse.skipped`).
+
+# Cahier 02-ADMIN, § 5.22 : état des services — dire vrai sur ce qui tourne, ce qui manque et ce qui attend
+
+Sept scénarios ADM-ETA (1 à 3 du cahier ; 4 à 7 ajoutés), ADM-RGP-2 réalignée et ADM-RGP-7 ajoutée, deux anomalies
+majeures closes (`ANO-ADM-61`, `62`), cinq arbitrages délégués (A176 → A180) dont les trois lots RGPD proposés au § 5.21.
+Branche `chore/recette-admin-5-22`, empilée sur `chore/recette-admin-5-21`.
+
+## Ce qui a été corrigé, et pourquoi
+
+- **Compteurs d'emails (A177, ANO-ADM-61)** — `apps/auth-service/src/controller/admin-status.controller.ts` lisait deux
+  `count` (`FAILED`, `SENT`). Le webhook Resend (D35, `notification-service/src/controllers/email-webhook.controller.ts`)
+  réécrit le statut en `DELIVERED` / `BOUNCED` / `COMPLAINED` : l'email sortait des deux compteurs. Désormais un seul
+  `groupBy({ by: ["status"] })` et une règle pure `emailCounters` (`apps/auth-service/src/utils/status.rules.ts`) ; le
+  contrat `AdminStatusResponse.emails` gagne `deliveredLast24h` et `bouncedLast24h`.
+- **Seuil « parqué » (A176, ANO-ADM-62)** — `OUTBOX_MAX_RELAY_ATTEMPTS = 10` naît dans
+  `packages/libs/api-contracts/src/admin/cron-catalogue.ts` ; `outbox-relay.ts` (deal) et `messaging-relay.ts` (message)
+  exportent toujours `MAX_RELAY_ATTEMPTS`, mais égal à la constante partagée ; `requeue-parked-outbox.ts` aussi. Le
+  catalogue des paramètres borne `alerts.outboxParkedAttempts` à `[1, OUTBOX_MAX_RELAY_ATTEMPTS]`, et
+  `mergeSettingsValues` ramène toute valeur stockée dans les bornes de sa clé (`Math.min(max, Math.max(min, raw))`) — une
+  valeur écrite avant le resserrement ne fuit jamais vers un consommateur.
+- **Catalogue des crons (A178)** — `CRON_CATALOGUE` (service, nom, expression, `intervalMs`), `missingCrons(runs)` et
+  `isCronLate(run, now)` purs. `GET /admin/status` sert `missingCrons` et `crons[].late` (calculé côté serveur, le front ne
+  lit plus l'expression cron par expression régulière). Garde-fou : `status.rules.spec.ts` lit
+  `apps/*/src/cron/*.cron.ts`, extrait `name: "…"` de l'appel `withHeartbeat` et `SCHEDULE = "…"`, et exige l'égalité
+  des deux ensembles — un cron ajouté sans sa ligne au catalogue (ou sans battement) casse la CI.
+- **Écran** (`apps/admin-ui/src/components/StatusView.tsx`) — un minuteur de 5 s fait vivre « Relu il y a {n} s » et les
+  âges ; `reloadFailure(e)` dit l'échec en français (`role="alert"` quand rien n'a jamais été lu) ; la vérification
+  `maintenance` de la passerelle s'affiche « ⏸ » en ambre et le bandeau mentionne la lecture seule ; « démarré » passe
+  par `ago()` ; bandeau ambre des crons absents ; bloc emails à trois lignes.
+- **Battement de `payout-bookings`** — `runPayoutPasses` rend `{ completed, retried, reminded }` et `payoutPassesSummary`
+  le résume (le battement disait « ok » seul).
+
+## A179 — l'effacement et la réservation ne se croisent plus
+
+- **Recompter dans la transaction** (`apps/auth-service/src/services/privacy.service.ts`) : la pré-vérification hors
+  transaction reste (elle inscrit le refus au registre sans ouvrir de transaction) ; DANS la transaction, après la relecture
+  du `User`, `erasureBlockers(tx, userId)` recompte. Un bloqueur découvert là lève `ErasureBlockedError` ; le `catch`
+  autour de `withWriteConflictRetry` inscrit le refus au registre HORS de la transaction annulée (`refuse(check)`).
+- **Clôture par la réservation** (`apps/deal-service/src/services/booking-request.ts`, `fenceShipperAccount`) : dans la
+  transaction de `createBooking`, `tx.user.updateMany({ where: { id, isDeleted: false }, data: { updatedAt: now } })`.
+  Pourquoi écrire ? Une transaction MongoDB lit un instantané : elle ne voit pas ce qu'une autre transaction valide après
+  son début, et deux transactions qui écrivent des documents DIFFÉRENTS ne se gênent jamais. En écrivant le même `User`
+  que l'effacement, les deux transactions entrent en conflit ; MongoDB en rejette une (P2034), `withWriteConflictRetry`
+  la rejoue et le rejeu voit l'autre. `count === 0` (compte effacé) → 409 `ACCOUNT_DELETED` (nouveau code de
+  `BOOKING_REQUEST_ERROR_CODES`, traduit FR/EN dans `messages/*/booking.json`, décrit dans l'OpenAPI de deal-service).
+- **Avant le clic** : `GET /admin/users/:id/erasure-blockers` (`adminErasureBlockers`, permission `users.erase`, contrat
+  `ErasureCheckResponse`, non journalisé) ; `EraseCard` le lit au montage, affiche les libellés et garde le bouton inactif.
+- **Registre d'un membre** : `listDataRequests` accepte `?userId=` (ObjectId sinon 400 `INVALID_ID`), la ligne
+  `DATA_REQUESTS_VIEWED` porte le membre en `targetId` ; `DataRequestsList` lit `useSearchParams()` — d'où la frontière
+  `<Suspense>` ajoutée dans `app/(back)/privacy/page.tsx` (Next refuse `useSearchParams` sans elle au rendu statique).
+- **A180** : aucun code — alternative écartée au registre.
+
+## Harnais
+
+- `adm-eta-etat-services.spec.ts` : `pidDuPort` (`lsof`), `relancerMessageService` (spawn détaché, log dans `tmpdir()`),
+  `redis(script)` via `lireCoteServeur` ; relectures « espacées » (StrictMode double la première) ; stabilisation des
+  compteurs d'emails avant ETA-4.
+- `adm-rgp-donnees-personnelles.spec.ts` : RGP-2 lit les bloqueurs avant le clic et prouve le refus serveur par appel
+  direct ; RGP-7 ajoutée.
+
+## Chiffres
+
+- auth-service **282** (+12 : `status.rules.spec.ts` ×7, `privacy.service.spec.ts` ×2 A179, `privacy-requests.controller.spec.ts` ×3) ;
+  deal-service **643** (+2, `booking-request-fence.spec.ts`) ; message 57, trip 293, notification 122 inchangés.
+- `apps/e2e` : **487 scénarios** (479 + 7 ADM-ETA + ADM-RGP-7).
+- Typecheck auth, deal, message, admin-ui, user-ui, harnais ; cinq `openapi.json` régénérés ; `YAMBA-PARAMETRES.md`
+  régénéré (borne de `alerts.outboxParkedAttempts`).
+- Déploiement : rebâtir auth, deal, message (aucun changement de schéma Prisma).

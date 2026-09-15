@@ -102,31 +102,32 @@ test.describe("ADM-RGP — données personnelles et effacement (cahier 02-ADMIN 
     const bouton = carte.getByRole("button", { name: "Effacer définitivement" });
     const motif = carte.locator("textarea");
     const confirmation = carte.locator("input");
+    const LIBELLES: Record<string, string> = { ACTIVE_DEAL: "un deal en cours", PENDING_REQUEST: "une demande en attente", PAYOUT_PENDING: "un versement dû ou en échec", RETENTION_HELD: "une retenue en médiation", PUBLISHED_TRIP: "un trajet publié ou en pause", ADMIN_ACCOUNT: "un profil admin (à révoquer d'abord)" };
+    /* A179 (recette § 5.22) — les bloqueurs sont lus AVANT le clic : dits en français, et le bouton reste inactif. */
+    const lus = (await (await pri.contexte.request.get(`${api()}/admin/users/${thomas}/erasure-blockers`)).json()) as { blockers: string[] };
+    test.info().annotations.push({ type: "constat", description: `bloqueurs de Thomas : ${lus.blockers.join(", ")}` });
+    expect(lus.blockers).toEqual(expect.arrayContaining(["ACTIVE_DEAL", "PUBLISHED_TRIP"]));
+    await expect(carte.getByRole("status")).toHaveText(`Effacement impossible pour l'instant : ${lus.blockers.map((b) => LIBELLES[b]).join(", ")}.`);
     /* 2. Motif trop court → inactif. */
     await motif.fill("trop court");
     await confirmation.fill("EFFACER");
     await expect(bouton, "motif < 20 caractères").toBeDisabled();
-    /* 3. « effacer » tapé en minuscules → mis en majuscules. */
+    /* 3. « effacer » tapé en minuscules → mis en majuscules ; motif et mot justes, le bouton reste inactif (bloqueurs). */
     await motif.fill(MOTIF);
     await confirmation.fill("");
     await confirmation.pressSequentially("effacer");
     await expect(confirmation).toHaveValue("EFFACER");
-    await expect(bouton).toBeEnabled();
+    await expect(bouton, "un compte bloqué ne s'efface pas d'un clic").toBeDisabled();
     /* Le motif est borné à 500 caractères. */
     await motif.fill("x".repeat(600));
     expect((await motif.inputValue()).length, "motif ≤ 500").toBe(500);
     await motif.fill(MOTIF);
-    /* 4-5. Le refus et sa traduction. */
-    const reponse = page.waitForResponse((r) => r.url().includes(`/admin/users/${thomas}/erase`));
-    await bouton.click();
-    const r = await reponse;
+    /* 4-5. Le serveur refuse quand même (appel direct, comme un onglet resté ouvert avant l'arrivée du deal). */
+    const r = await pri.contexte.request.post(`${api()}/admin/users/${thomas}/erase`, { data: { reason: MOTIF }, failOnStatusCode: false });
     expect(r.status(), "refus 409").toBe(409);
     const corps = (await r.json()) as { code?: string; blockers?: string[] };
-    test.info().annotations.push({ type: "constat", description: `bloqueurs de Thomas : ${corps.blockers?.join(", ")}` });
     expect(corps.code).toBe("ERASURE_BLOCKED");
-    expect(corps.blockers).toEqual(expect.arrayContaining(["ACTIVE_DEAL", "PUBLISHED_TRIP"]));
-    const LIBELLES: Record<string, string> = { ACTIVE_DEAL: "un deal en cours", PENDING_REQUEST: "une demande en attente", PAYOUT_PENDING: "un versement dû ou en échec", RETENTION_HELD: "une retenue en médiation", PUBLISHED_TRIP: "un trajet publié ou en pause", ADMIN_ACCOUNT: "un profil admin (à révoquer d'abord)" };
-    await expect(carte).toContainText(`Refusé pour l'instant : ${corps.blockers!.map((b) => LIBELLES[b]).join(", ")}.`);
+    expect(corps.blockers).toEqual(lus.blockers);
     /* 6. Le registre garde le refus. */
     await page.goto(`${bo()}/privacy`, { waitUntil: "domcontentloaded" });
     await attendreLeChargement(page);
@@ -318,5 +319,33 @@ test.describe("ADM-RGP — données personnelles et effacement (cahier 02-ADMIN 
     await expect(sup.page.getByRole("heading", { name: "Effacer ce compte (RGPD)" }), "pas de carte pour le Support").toHaveCount(0);
     const journal = await lignes((await navigateurAdmin("super")).contexte, debut, { adminUserId: jeuEssai.admin("support").id });
     expect(journal.filter((l) => ["DATA_REQUESTS_VIEWED", "ACCOUNT_ERASED"].includes(l.action)), "un refus n'écrit rien").toEqual([]);
+  });
+  test("ADM-RGP-7 · le registre d'un seul membre, depuis sa fiche (A179, ajoutée)", async ({ navigateurAdmin, jeuEssai }) => {
+    test.setTimeout(4 * 60_000);
+    const pri = await navigateurAdmin("privacy");
+    const { page } = pri;
+    const thomas = jeuEssai.membre("thomas");
+    // Un refus de Thomas au registre (appel direct, bloqué par ses deals) : le filtre a au moins une ligne à montrer.
+    expect((await pri.contexte.request.post(`${api()}/admin/users/${thomas}/erase`, { data: { reason: MOTIF }, failOnStatusCode: false })).status()).toBe(409);
+    const debut = await debutDuScenario();
+    await page.goto(`${bo()}/users/${thomas}`, { waitUntil: "domcontentloaded" });
+    await attendreLeChargement(page);
+    await carteEffacement(page).getByRole("link", { name: "Demandes de ce membre au registre" }).click();
+    await expect(page).toHaveURL(new RegExp(`/privacy\\?userId=${thomas}$`));
+    await expect(page.getByText("Demandes d'un seul membre.", { exact: false })).toBeVisible({ timeout: 60_000 });
+    const lignesEcran = page.locator("main tbody tr");
+    await expect(lignesEcran.first()).toBeVisible();
+    const api7 = (await (await pri.contexte.request.get(`${api()}/admin/privacy/requests?userId=${thomas}`)).json()) as { items: Array<{ userId: string }> };
+    expect(api7.items.length).toBeGreaterThan(0);
+    expect(new Set(api7.items.map((i) => i.userId))).toEqual(new Set([thomas]));
+    await expect(lignesEcran).toHaveCount(api7.items.length);
+    expect((await pri.contexte.request.get(`${api()}/admin/privacy/requests?userId=pas-un-id`, { failOnStatusCode: false })).status()).toBe(400);
+    /* « Tout le registre » ramène la vue complète. */
+    await page.getByRole("link", { name: "Tout le registre" }).click();
+    await expect(page.getByText("Demandes d'un seul membre.", { exact: false })).toHaveCount(0);
+    /* La consultation filtrée est journalisée avec le membre en cible ; la lecture des bloqueurs ne l'est pas. */
+    const vues = await lignes((await navigateurAdmin("super")).contexte, debut, { adminUserId: jeuEssai.admin("privacy").id });
+    expect(vues.filter((l) => l.action === "DATA_REQUESTS_VIEWED" && l.targetId === thomas).length).toBeGreaterThanOrEqual(1);
+    expect(vues.map((l) => l.action).filter((a) => !["DATA_REQUESTS_VIEWED", "USER_VIEWED", "ADMIN_LOGIN"].includes(a))).toEqual([]);
   });
 });

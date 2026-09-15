@@ -11,13 +11,14 @@ import redis from "@packages/libs/redis";
 import { listCronRuns } from "@packages/libs/redis/cron-heartbeat";
 import { probeService, serviceEntries } from "@packages/libs/health"; // D70
 import { platformSettings } from "@packages/libs/settings/default";
-import { UpdateMaintenanceRequestSchema, resolveLocale, type AdminStatusResponse } from "@packages/api-contracts";
+import { UpdateMaintenanceRequestSchema, isCronLate, missingCrons, resolveLocale, type AdminStatusResponse } from "@packages/api-contracts";
 import { ValidationError } from "@packages/error-handler";
 import { reachableRecipientWhere } from "@packages/email";
 import type { AuthenticatedRequest } from "@packages/middleware/isAuthenticated";
 import { sendAuthEmail } from "../emails/send-auth-email";
 import { getAdminEmails } from "../emails/admin-emails";
 import { makeMaintenanceService, type MaintenanceDb } from "../services/maintenance.service";
+import { emailCounters } from "../utils/status.rules";
 
 const ADMIN_UI_URL = process.env.ADMIN_UI_URL || "http://localhost:3001";
 const HEALTH_TIMEOUT_MS = 2_500;
@@ -78,22 +79,22 @@ export const getStatus = async (_req: AuthenticatedRequest, res: Response, next:
     const now = new Date();
     const dayAgo = new Date(now.getTime() - 86_400_000);
     const parkedThreshold = (await platformSettings().get())["alerts.outboxParkedAttempts"];
-    const [services, crons, unpublished, oldest, parked, failed, sent, maintenance] = await Promise.all([
+    const [services, crons, unpublished, oldest, parked, emailsByStatus, maintenance] = await Promise.all([
       Promise.all(SERVICE_URLS.map(probe)),
       listCronRuns(redis).catch(() => []),
       prisma.outboxEvent.count({ where: { OR: [{ publishedAt: null }, { publishedAt: { isSet: false } }] } as never }),
       prisma.outboxEvent.findFirst({ where: { OR: [{ publishedAt: null }, { publishedAt: { isSet: false } }] } as never, orderBy: { occurredAt: "asc" }, select: { occurredAt: true } }),
       prisma.outboxEvent.count({ where: { OR: [{ publishedAt: null }, { publishedAt: { isSet: false } }], attempts: { gte: parkedThreshold } } as never }),
-      prisma.emailDelivery.count({ where: { status: "FAILED", claimedAt: { gte: dayAgo } } }),
-      prisma.emailDelivery.count({ where: { status: "SENT", claimedAt: { gte: dayAgo } } }),
+      prisma.emailDelivery.groupBy({ by: ["status"], where: { claimedAt: { gte: dayAgo } }, _count: { _all: true } }),
       maintenanceService.read(),
     ]);
     const body: AdminStatusResponse = {
       at: now.toISOString(),
       services,
-      crons,
+      crons: crons.map((c) => ({ ...c, late: c.ok && isCronLate(c, now) })),
+      missingCrons: missingCrons(crons), // A178
+      emails: emailCounters(emailsByStatus.map((g) => ({ status: g.status, count: g._count._all }))), // A177
       outbox: { unpublished, oldestUnpublishedAt: oldest?.occurredAt.toISOString() ?? null, parked, parkedThreshold },
-      emails: { failedLast24h: failed, sentLast24h: sent },
       maintenance,
     };
     res.setHeader("Cache-Control", "no-store");

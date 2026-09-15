@@ -118,7 +118,7 @@ Règles communes : motif ≥ 20 caractères, une ligne de journal par clé (avan
 | `alerts.disputeUndecidedHours` | Litige décidable sans décision depuis | **72 h** | 1 h → 336 h | exploitation | D59 3A · A131 | deal-service |
 | `alerts.retentionHeldDays` | Retenue non arbitrée depuis | **7 j** | 1 j → 60 j | exploitation | D59 3A | deal-service |
 | `alerts.reversalOpenHours` | Renversement ouvert depuis | **48 h** | 1 h → 336 h | exploitation | D59 3A | deal-service |
-| `alerts.outboxParkedAttempts` | Événement parqué après | **10** | 1 → 100 | exploitation | D59 3A | deal-service |
+| `alerts.outboxParkedAttempts` | Événement parqué après | **10** | 1 → 10 | exploitation | D59 3A · A176 | deal-service |
 | `alerts.outboxLagMinutes` | Relais en retard depuis | **15 min** | 1 min → 1440 min | exploitation | D59 3A | deal-service |
 | `alerts.emailsFailedWindowHours` | Emails en échec : fenêtre | **24 h** | 1 h → 168 h | exploitation | D59 3A | deal-service |
 | `alerts.noTripPublishedDays` | Aucun trajet publié depuis | **7 j** | 1 j → 90 j | exploitation | D59 3A | deal-service |
@@ -130,7 +130,7 @@ Règles communes : motif ≥ 20 caractères, une ligne de journal par clé (avan
 - **Litige décidable sans décision depuis** (`alerts.disputeUndecidedHours`) — Heures après lesquelles un litige décidable et non décidé devient une alerte.
 - **Retenue non arbitrée depuis** (`alerts.retentionHeldDays`) — Jours après lesquels une retenue d'annulation non arbitrée devient une alerte.
 - **Renversement ouvert depuis** (`alerts.reversalOpenHours`) — Heures après lesquelles un renversement de versement ouvert devient une alerte.
-- **Événement parqué après** (`alerts.outboxParkedAttempts`) — Nombre de tentatives de relais à partir duquel un événement de l'outbox est considéré parqué.
+- **Événement parqué après** (`alerts.outboxParkedAttempts`) — Nombre de tentatives de relais à partir duquel un événement de l'outbox est signalé parqué. Le relais abandonne à 10 tentatives (constante de déploiement) : le seuil peut alerter plus tôt, jamais plus tard.
 - **Relais en retard depuis** (`alerts.outboxLagMinutes`) — Minutes de retard du relais d'événements à partir desquelles une alerte est levée.
 - **Emails en échec : fenêtre** (`alerts.emailsFailedWindowHours`) — Fenêtre glissante (heures) dans laquelle un email en échec déclenche l'alerte.
 - **Aucun trajet publié depuis** (`alerts.noTripPublishedDays`) — Jours sans nouvelle publication de trajet avant l'alerte de liquidité.

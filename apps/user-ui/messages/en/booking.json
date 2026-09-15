@@ -169,6 +169,7 @@
       "PAYMENT_NOT_AUTHORIZED": "The payment has not been authorized yet. Please try again.",
       "PAYMENT_MISMATCH": "The authorization no longer matches your request. A new one is being prepared.",
       "PAYMENT_ALREADY_USED": "This payment is already attached to a request.",
+      "ACCOUNT_DELETED": "This account has been deleted: the request was not created.",
       "UNAUTHENTICATED": "Sign in to send your request.",
       "QUOTE_UNAVAILABLE": "No quote is available for this parcel: check the weight and size.",
       "GENERIC": "Something went wrong. Nothing was charged — please try again."
