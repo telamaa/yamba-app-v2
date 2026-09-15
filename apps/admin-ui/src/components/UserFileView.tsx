@@ -8,7 +8,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { ApiError, apiFetch, del, post } from "@/lib/api";
-import { ACTION_LABEL, STATUS_LABEL, TRUST_LEVEL_LABEL, dateTime, money } from "@/lib/format";
+import { ACTION_LABEL, STATUS_LABEL, TRUST_LEVEL_LABEL, dateTime, erasureBlockerLabel, money } from "@/lib/format";
 import { can, isSuperAdmin, rolesLabel } from "@/lib/permissions";
 import type { AdminMe, AdminUserFile, ErasureBlocker } from "@/lib/types";
 
@@ -265,18 +265,11 @@ function EraseCard({ file, onDone, onOutcome }: { file: AdminUserFile; onDone: (
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [blockers, setBlockers] = useState<ErasureBlocker[] | null>(null);
+  const [counts, setCounts] = useState<Record<string, number>>({});
   // A179 (recette § 5.22) — les bloqueurs se lisent AVANT le clic ; le serveur les recompte de toute façon dans la transaction.
   useEffect(() => {
-    apiFetch<{ blockers: ErasureBlocker[] }>(`/admin/users/${file.id}/erasure-blockers`).then((r) => setBlockers(r.blockers.length ? r.blockers : null)).catch(() => undefined);
+    apiFetch<{ blockers: ErasureBlocker[]; counts?: Record<string, number> }>(`/admin/users/${file.id}/erasure-blockers`).then((r) => { setBlockers(r.blockers.length ? r.blockers : null); setCounts(r.counts ?? {}); }).catch(() => undefined);
   }, [file.id]);
-  const LABEL: Record<ErasureBlocker, string> = {
-    ACTIVE_DEAL: "un deal en cours",
-    PENDING_REQUEST: "une demande en attente",
-    PAYOUT_PENDING: "un versement dû ou en échec",
-    RETENTION_HELD: "une retenue en médiation",
-    PUBLISHED_TRIP: "un trajet publié ou en pause",
-    ADMIN_ACCOUNT: "un profil admin (à révoquer d'abord)",
-  };
   async function run() {
     setBusy(true);
     setMsg(null);
@@ -287,7 +280,10 @@ function EraseCard({ file, onDone, onOutcome }: { file: AdminUserFile; onDone: (
       onOutcome("Compte effacé : identité et coordonnées supprimées, réservations conservées sans nom, journal écrit, email de confirmation envoyé à l'ancienne adresse.");
       onDone();
     } catch (e) {
-      if (e instanceof ApiError && e.status === 409 && (e.data as { blockers?: ErasureBlocker[] })?.blockers) setBlockers((e.data as { blockers: ErasureBlocker[] }).blockers);
+      if (e instanceof ApiError && e.status === 409 && (e.data as { blockers?: ErasureBlocker[] })?.blockers) {
+        setBlockers((e.data as { blockers: ErasureBlocker[] }).blockers);
+        setCounts((e.data as { counts?: Record<string, number> }).counts ?? {});
+      }
       // ANO-ADM-60 (recette 02-ADMIN § 5.21) — un refus s'affichait « 404 : User not found. » ; il se lit en français, et la
       // fiche se recharge quand le compte vient d'être effacé par un autre admin (la carte disparaît avec lui).
       else if (e instanceof ApiError && e.status === 404) {
@@ -308,7 +304,7 @@ function EraseCard({ file, onDone, onOutcome }: { file: AdminUserFile; onDone: (
       <label className="mt-2 block text-[12px] text-slate-600">Tape EFFACER pour confirmer <input value={confirm} onChange={(e) => setConfirm(e.target.value.toUpperCase())} className="ml-2 w-32 rounded border border-slate-300 px-2 py-1" /></label>
       {blockers && (
         <div role="status" className="mt-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-[12.5px] text-amber-900">
-          Effacement impossible pour l'instant : {blockers.map((b) => LABEL[b]).join(", ")}.
+          Effacement impossible pour l'instant : {blockers.map((b) => erasureBlockerLabel(b, counts[b])).join(", ")}.
         </div>
       )}
       <p className="mt-2 text-[12px]"><Link href={`/privacy?userId=${file.id}`} className="underline">Demandes de ce membre au registre</Link></p>

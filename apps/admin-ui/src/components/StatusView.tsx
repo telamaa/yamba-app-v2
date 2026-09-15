@@ -10,7 +10,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { ApiError, apiFetch } from "@/lib/api";
 import { can } from "@/lib/permissions";
-import { dateTime } from "@/lib/format";
+import { dateTime, maintenanceRefusal, toLocalDateTimeInput } from "@/lib/format";
 import type { AdminMe, AdminStatusResponse, MaintenanceState } from "@/lib/types";
 
 const POLL_MS = 30_000;
@@ -23,6 +23,14 @@ function ago(iso: string): string {
   if (s < 172800) return `il y a ${Math.round(s / 3600)} h`;
   return `il y a ${Math.round(s / 86400)} j`;
 }
+/**
+ * Recette § 5.23 (lot c) — la page est servie par l'auth-service : s'il est arrêté, le gateway répond 502
+ * `UPSTREAM_UNREACHABLE`. On le dit en clair plutôt qu'une erreur brute.
+ */
+function authUnreachable(e: unknown): boolean {
+  return e instanceof ApiError && (e.data as { details?: { code?: string } } | undefined)?.details?.code === "UPSTREAM_UNREACHABLE";
+}
+const heure = (d: Date) => d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 /** Recette § 5.22 — un refus de relecture se dit en français (le message de l'API est en anglais). */
 function reloadFailure(e: unknown): string {
   if (e instanceof ApiError && e.status > 0 && e.status < 500) return `refus du serveur (HTTP ${e.status})`;
@@ -33,9 +41,13 @@ export default function StatusView() {
   const [data, setData] = useState<AdminStatusResponse | null>(null);
   const [me, setMe] = useState<AdminMe | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [authDown, setAuthDown] = useState(false);
+  const [lastOkAt, setLastOkAt] = useState<Date | null>(null);
   const [, setTick] = useState(0);
   const load = useCallback(() => {
-    apiFetch<AdminStatusResponse>("/admin/status").then((d) => { setData(d); setError(null); }).catch((e) => setError(reloadFailure(e)));
+    apiFetch<AdminStatusResponse>("/admin/status")
+      .then((d) => { setData(d); setError(null); setAuthDown(false); setLastOkAt(new Date()); })
+      .catch((e) => { setError(reloadFailure(e)); setAuthDown(authUnreachable(e)); });
   }, []);
   useEffect(() => {
     load();
@@ -46,13 +58,20 @@ export default function StatusView() {
     return () => { clearInterval(t); clearInterval(tick); };
   }, [load]);
 
-  if (error && !data) return <p role="alert" className="mt-4 text-[13px] text-red-700">État des services illisible : {error}. Nouvel essai dans 30 secondes.</p>;
+  const authBanner = authDown ? (
+    <p role="alert" className="mt-4 rounded-xl border border-red-300 bg-red-50 px-3 py-2 text-[13px] font-semibold text-red-900">
+      Service d&apos;authentification injoignable : l&apos;état des services ne peut pas être relu.{" "}
+      {lastOkAt ? `Dernière relecture réussie à ${heure(lastOkAt)} — ce qui suit date de ce moment.` : "Aucune relecture réussie depuis l'ouverture de la page."} Nouvel essai dans 30 secondes.
+    </p>
+  ) : null;
+  if (error && !data) return authBanner ?? <p role="alert" className="mt-4 text-[13px] text-red-700">État des services illisible : {error}. Nouvel essai dans 30 secondes.</p>;
   if (!data) return <p className="mt-4 text-[13px] text-slate-500">Chargement…</p>;
   const down = data.services.filter((s) => !s.reachable || s.report?.status !== "ok");
   return (
     <div className="mt-4 space-y-6">
+      {authBanner}
       <p className={`rounded-xl border px-3 py-2 text-[12.5px] ${down.length === 0 ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-red-200 bg-red-50 text-red-900"}`}>
-        {down.length === 0 ? "Tous les services répondent et leurs dépendances sont saines." : `${down.length} service(s) en difficulté : ${down.map((s) => s.name).join(", ")}.`} Relu {ago(data.at)}.{error ? ` Dernière relecture en échec : ${error}.` : ""}{data.maintenance.enabled ? " Maintenance en cours : la plateforme est en lecture seule." : ""}
+        {down.length === 0 ? "Tous les services répondent et leurs dépendances sont saines." : `${down.length} service(s) en difficulté : ${down.map((s) => s.name).join(", ")}.`} Relu {ago(data.at)}.{error && !authDown ? ` Dernière relecture en échec : ${error}.` : ""}{data.maintenance.enabled ? " Maintenance en cours : la plateforme est en lecture seule." : ""}
       </p>
 
       <section>
@@ -88,6 +107,12 @@ export default function StatusView() {
         <div className="rounded-xl border border-slate-200 bg-white p-3 text-[12.5px]">
           <b>Outbox</b>
           <p className="mt-1 text-slate-600">{data.outbox.unpublished} événement(s) non publié(s){data.outbox.oldestUnpublishedAt ? `, le plus ancien ${ago(data.outbox.oldestUnpublishedAt)}` : ""}.</p>
+          {/* Recette § 5.23 — l'âge du plus ancien non publié, en rouge au-delà du seuil de l'alerte (calculé par le serveur). */}
+          {data.outbox.oldestUnpublishedAt ? (
+            <p data-testid="outbox-lag" className={data.outbox.lagging ? "font-semibold text-red-800" : "text-slate-600"}>
+              Retard du relais : {data.outbox.lagMinutes} min {data.outbox.lagging ? `— au-delà du seuil d'alerte (${data.outbox.lagThresholdMinutes} min) : Redpanda ou le relais est arrêté ?` : `(seuil d'alerte ${data.outbox.lagThresholdMinutes} min)`}
+            </p>
+          ) : null}
           <p className={data.outbox.parked > 0 ? "text-red-800" : "text-slate-600"}>{data.outbox.parked} parqué(s) (≥ {data.outbox.parkedThreshold} tentatives).</p>
         </div>
         <div className="rounded-xl border border-slate-200 bg-white p-3 text-[12.5px]">
@@ -136,11 +161,13 @@ function MaintenanceEditor({ state, canWrite, onDone }: { state: MaintenanceStat
   const [enabled, setEnabled] = useState(state.enabled);
   const [messageFr, setMessageFr] = useState(state.messageFr);
   const [messageEn, setMessageEn] = useState(state.messageEn);
-  const [scheduledAt, setScheduledAt] = useState(state.scheduledAt ? state.scheduledAt.slice(0, 16) : "");
+  const [scheduledAt, setScheduledAt] = useState(toLocalDateTimeInput(state.scheduledAt));
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
-  useEffect(() => { setEnabled(state.enabled); setMessageFr(state.messageFr); setMessageEn(state.messageEn); setScheduledAt(state.scheduledAt ? state.scheduledAt.slice(0, 16) : ""); }, [state]);
+  // Recette § 5.23 (ANO-ADM-67) — le formulaire ne se recale que quand l'état CHANGE (version), pas à chaque sondage de
+  // 30 s : un message en cours d'écriture était effacé par la relecture suivante.
+  useEffect(() => { setEnabled(state.enabled); setMessageFr(state.messageFr); setMessageEn(state.messageEn); setScheduledAt(toLocalDateTimeInput(state.scheduledAt)); }, [state.version]);
 
   async function save() {
     setBusy(true);
@@ -151,8 +178,9 @@ function MaintenanceEditor({ state, canWrite, onDone }: { state: MaintenanceStat
       setReason("");
       onDone();
     } catch (e) {
-      setMsg(e instanceof ApiError ? (e.status === 409 ? "L'état a changé entre-temps : la page est rechargée." : `${e.status} : ${e.message}`) : "Enregistrement impossible.");
-      if (e instanceof ApiError && e.status === 409) onDone();
+      const refus = maintenanceRefusal(e instanceof ApiError ? e : null);
+      setMsg(refus.text);
+      if (refus.reload) onDone();
     } finally {
       setBusy(false);
     }
@@ -164,7 +192,10 @@ function MaintenanceEditor({ state, canWrite, onDone }: { state: MaintenanceStat
         {state.enabled ? "Plateforme en lecture seule : les membres lisent, aucune écriture ne passe (sauf connexion et back-office)." : state.scheduledAt ? `Maintenance annoncée le ${dateTime(state.scheduledAt)} : le bandeau est affiché, rien n'est bloqué.` : "Aucune maintenance en cours ni annoncée."}
         {state.updatedAt ? ` Dernière modification le ${dateTime(state.updatedAt)} par ${state.updatedBy ?? "?"} (version ${state.version}).` : ""}
       </p>
-      {canWrite ? (
+      {state.envOverride ? (
+        // A182 — l'interrupteur d'environnement l'emporte : l'écran ne propose pas un geste que le gateway ignorerait.
+        <p role="note" className="mt-2 rounded-lg border border-red-300 bg-white px-3 py-2 text-[12.5px] text-red-900">L&apos;environnement du gateway force la lecture seule (<code>MAINTENANCE_MODE=on</code>) : l&apos;écran ne peut pas la lever. Retirer la variable et relancer le gateway, puis consigner ce geste d&apos;exploitation hors application (il n&apos;écrit rien au journal).</p>
+      ) : canWrite ? (
         <div className="mt-3 space-y-2 text-[12.5px]">
           <label className="flex items-center gap-2"><input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} /> <b>Activer la lecture seule maintenant</b></label>
           <label className="block">Annoncer pour le (optionnel) <input type="datetime-local" value={scheduledAt} onChange={(e) => setScheduledAt(e.target.value)} className="ml-2 rounded border border-slate-300 px-2 py-1" /></label>

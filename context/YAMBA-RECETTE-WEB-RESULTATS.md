@@ -6157,3 +6157,98 @@ navigateur. Constat de charge, pas de régression.
   libellés ; `counts` est déjà servi.
 
 ---
+
+## Cahier 02-ADMIN — § 5.23 Maintenance · **CONFORME après correction** (4 fiches + 2 ajoutées · 4 anomalies majeures + 1 mineure closes · 2 arbitrages délégués (A181, A182) · lots du § 5.22 livrés · 6 scénarios ADM-MNT + ADM-ETA-8, 9 + ADM-RGP-8, RGP-2 réalignée)
+
+Spec : `apps/e2e/src/admin/adm-mnt-maintenance.spec.ts`. Le geste le plus lourd du back-office : une case cochée coupe
+les écritures de toute la plateforme. Quatre promesses : **une annonce prévient sans couper**, **lever c'est revenir à la
+normale**, **l'écran ne ment pas** (date, saisie, refus), **deux gestes simultanés = une décision** et l'interrupteur
+d'environnement l'emporte. Manœuvres consignées : le gateway, jusque-là servi par `nx serve`, tourne en bundle détaché ;
+ADM-MNT-4 le TUE puis le relance avec `MAINTENANCE_MODE=on` (environnement du processus, prioritaire sur `--env-file`),
+puis sans, en `finally` ; ADM-ETA-9 tue auth-service puis le relance ; ADM-ETA-8 écrit un `OutboxEvent` d'agrégat
+`recette-eta-8` (qu'aucun relais ne draine) vieilli au-delà du seuil, supprimé en `finally` ; le document `maintenance`
+est remis à plat en base avant et après le chapitre. Écriture ordinaire de membre : un message de Pauline sur le fil de
+`bzv-accepted` (jeu d'essai rejoué au `beforeAll`). Emails lus dans Mailpit pour chaque super administrateur joignable.
+
+| Fiche | Objet | Verdict |
+|---|---|---|
+| ADM-MNT-1 | Annoncer sans rien bloquer | **Conforme après correction** — « Aucune maintenance en cours ni annoncée. » ; « Enregistré : journal écrit, super administrateurs prévenus, le gateway applique dans les 10 s. » ; bandeau ambre sur les deux fronts (`rgb(251, 191, 36)` côté membre) ; message envoyé (2xx) ; email « Maintenance planifiée sur Yamba » à chaque super administrateur ; une ligne `MAINTENANCE_CHANGED` (version n → n+1, motif). ANO-ADM-66 : la date relue reculait de 2 h |
+| ADM-MNT-2 | Lecture seule | **Conforme** — effet vu par la passerelle en ≤ 11 s ; bandeau rouge (`rgb(220, 38, 38)`) et bandeau admin « Plateforme en lecture seule » ; lecture d'un trajet 200 ; message refusé 503, `Retry-After: 300`, `code` et désormais `details.code` = `MAINTENANCE` ; `/api/auth/refresh` non bloqué ; `/admin/status` 200 ; `/api/status` 200 « maintenance » ; email « Maintenance activée sur Yamba » |
+| ADM-MNT-3 | Lever | **Conforme après correction** — geste réel : formulaire pré-rempli avec l'annonce, case décochée, « Lever la maintenance ». ANO-ADM-63 : l'annonce survivait (bandeau ambre revenu, email « planifiée ») ; désormais `scheduledAt: null`, « Aucune maintenance en cours ni annoncée. », aucun bandeau sur les deux fronts, écriture 2xx en ≤ 11 s, email « Maintenance levée sur Yamba » et aucun « planifiée » |
+| ADM-MNT-4 | Verrou de version, environnement, Support | **Conforme après correction** — page périmée → 409 `STALE_VERSION`, « L'état a changé entre-temps : la page est rechargée. », une seule ligne (l'écriture de B) ; gateway relancé avec `MAINTENANCE_MODE=on` → badge « forcée par l'environnement du gateway », formulaire remplacé par l'explication, PUT → 409 `MAINTENANCE_FORCED_BY_ENVIRONMENT`, `/api/maintenance` `enabled: true`, aucune ligne de journal ; relancé sans → badge parti ; Support lit « Profil Exploitation ou super administrateur pour modifier. », pas de formulaire. ANO-ADM-64 |
+| ADM-MNT-5 (ajoutée) | Trois enregistrements simultanés | **Conforme après correction** — ANO-ADM-65 : `[200, 500, 500]` ; désormais `[200, 409, 409]` et une ligne, document présent comme absent |
+| ADM-MNT-6 (ajoutée) | Date passée, saisie longue | **Conforme après correction** — ANO-ADM-67 : annonce dans le passé acceptée ; désormais 400 `MAINTENANCE_SCHEDULE_IN_PAST` et « La date annoncée est déjà passée : choisis une date à venir. » ; la saisie survit à la relecture de 30 s ; aucune ligne, version inchangée |
+| ADM-ETA-8 (ajoutée, lot a) | Retard du relais | **Conforme** — `outbox.lagging` vrai côté serveur, « Retard du relais : n min — au-delà du seuil d'alerte (15 min) » en rouge ; événement retiré → plus de mention |
+| ADM-ETA-9 (ajoutée, lot c) | auth-service arrêté | **Conforme** — gateway : 502 JSON `UPSTREAM_UNREACHABLE` sans adresse interne (avant : 500 HTML) ; écran : « Service d'authentification injoignable : … Dernière relecture réussie à hh:mm:ss — ce qui suit date de ce moment. » ; relancé → bandeau parti |
+| ADM-RGP-8 (ajoutée, lot b) | Bloqueurs comptés | **Conforme** — « 5 deals en cours, 1 demande en attente, 1 versement dû ou en échec, 1 retenue en médiation, 3 trajets publiés ou en pause » (= `counts` de l'API), bouton inactif |
+| ADM-RGP-2 (réalignée) | Bloqueurs avant le clic | **Conforme** — libellés attendus désormais avec leur nombre |
+
+**Contre-épreuve.** Corrections retirées (`git stash` des fichiers produit : admin-ui, gateway, auth-service, contrats,
+règles), auth-service et gateway rebâtis et relancés, admin-ui rechargé à chaud : **les neuf fiches nouvelles rouges** —
+MNT-1 (champ `16:15` au lieu de `18:15`), MNT-2 (`details.code` absent), MNT-3 (`scheduledAt` conservé), MNT-4 (badge
+introuvable : l'auth-service lisait sa propre variable), MNT-5 (`200,500,500`), MNT-6 (200 au lieu de 400), ETA-8 (champ
+de seuil absent), ETA-9 (500 au lieu de 502), RGP-8 (libellés sans nombre). Corrections remises, bundles rebâtis :
+10/10 (MNT 6, ETA-8, 9, RGP-2, 8). Premier passage avec les voisins ADM-ETA, ADM-RGP, ADM-ALR et WEB-MNT : 30/31, seule
+ADM-RGP-2 rouge (libellés sans nombre attendus — régression voulue par le lot b, réalignée puis verte). Tests unitaires :
+auth-service 293 (+11 : `maintenance.service.spec.ts` 10, `maintenance-rules.spec.ts` 1), deal-service 644 (+1 : règle de
+retard partagée).
+
+### Anomalies
+
+- **ANO-ADM-63 (majeure) — lever la maintenance laissait l'annonce.** Le formulaire renvoyait la date de l'annonce
+  qui avait précédé la coupure ; le serveur l'enregistrait : bandeau ambre revenu sur les deux fronts au lieu d'un retour
+  à la normale, et l'email partait « Maintenance planifiée » (sujet choisi sur l'état d'arrivée). A181 :
+  `resolveMaintenanceWrite` efface l'annonce à la levée, `maintenanceChangeKind` choisit l'email sur la transition. Close.
+- **ANO-ADM-64 (majeure) — l'interrupteur d'environnement était lu dans le mauvais processus.** `envOverride` valait
+  `process.env.MAINTENANCE_MODE` de l'auth-service, alors que seul le gateway l'applique : gateway forcé → aucun badge,
+  formulaire actif, « lever » écrivait la base et envoyait « Maintenance levée » pendant que tout restait bloqué. A182 :
+  lu dans la santé du gateway ; écriture refusée 409 `MAINTENANCE_FORCED_BY_ENVIRONMENT` ; écran explicatif. Close.
+- **ANO-ADM-65 (majeure) — trois enregistrements simultanés : `[200, 500, 500]`.** Conflit d'écriture MongoDB non
+  rejoué (document présent) ; création concurrente du document refusée par la clé unique (absent). Rejeu
+  `withWriteConflictRetry` puis verrou de version → 409 ; `P2002` → 409 `STALE_VERSION`. Close.
+- **ANO-ADM-66 (majeure) — la date d'annonce relue reculait de deux heures.** `scheduledAt.slice(0, 16)` présentait
+  l'heure UTC comme locale dans le `datetime-local` ; un second enregistrement du formulaire déplaçait réellement
+  l'annonce annoncée aux membres. `toLocalDateTimeInput`. Close.
+- **ANO-ADM-67 (mineure) — trois défauts du formulaire.** Une annonce dans le passé était acceptée (bandeau jamais
+  affiché, email « planifiée ») ; la relecture de 30 s effaçait le message en cours de saisie (effet dépendant de l'objet
+  `state`) ; un refus s'affichait « 400 : … » en anglais. Date à venir exigée (400), effet sur `state.version`,
+  `maintenanceRefusal` en français. Close.
+
+### Arbitrages délégués (15/09) — inscrits au registre avant le code
+
+- **A181** — l'état de maintenance a des transitions : lever clôt l'annonce ; nouvelle annonce à venir ; email selon la
+  transition (activée, levée, planifiée, annonce retirée, modifiée) ; conflits → 409.
+- **A182** — l'interrupteur d'environnement se lit dans la santé du gateway et ferme l'écran (409 + explication) ;
+  alternative écartée : écrire la base « pour après ».
+
+### Lots du § 5.22 livrés
+
+- **a** — `outboxLagMinutes` / `isOutboxLagging` (`@packages/api-contracts`, `admin/cron-catalogue.ts`) : une règle pour
+  l'alerte `OUTBOX_LAGGING_15MIN` et la page ; `AdminStatusResponse.outbox` gagne `lagMinutes`, `lagThresholdMinutes`,
+  `lagging` ; `alerts.outboxLagMinutes` consommé aussi par auth-service (`YAMBA-PARAMETRES.md` régénéré).
+- **b** — `erasureBlockerLabel(blocker, count)` : « 5 deals en cours », accord du pluriel (« versements dus »).
+- **c** — gateway : middleware d'erreur après les proxys, codes réseau → 502 `UPSTREAM_UNREACHABLE` ; écran : bandeau
+  « Service d'authentification injoignable » avec l'heure de la dernière relecture réussie.
+
+### Améliorations faites (au-delà du cahier)
+
+- 503 `MAINTENANCE` : `details.code` ajouté (règle A146), `code` conservé pour les clients existants.
+- Emails de maintenance : deux transitions qui n'avaient pas de mot (« Annonce de maintenance retirée », « Maintenance
+  modifiée »), FR et EN, date au format long.
+- OpenAPI : `PUT /admin/maintenance` documente ses 400 et 409 et leurs codes.
+- `YAMBA-APPRENTISSAGE-DEV.md` : un titre « Chapitre 180 » dupliqué au-dessus du chapitre 179 retiré (seule ligne
+  supprimée des documents cumulatifs).
+
+### Proposé, non fait
+
+- `AdminShell` renvoie vers `/login` sur TOUTE erreur de `/admin/me` : auth-service arrêté au chargement d'une page →
+  page de connexion qui échoue à son tour. Ne rediriger que sur 401 et afficher le bandeau « injoignable » sinon.
+- Bandeau membre relu toutes les 60 s : une levée met jusqu'à une minute à disparaître d'un onglet ouvert (le refus
+  d'écriture, lui, relit aussitôt — ANO-WEB-91). Proposer 15 s pendant une maintenance active.
+- `MAINTENANCE_EXEMPT_PREFIXES` contient `/api/maintenance` sans barre finale : tout chemin qui commencerait ainsi serait
+  exempté ; aucun n'existe aujourd'hui.
+
+### Écarts avec le cahier
+
+- MNT-4 étape 4 : le cahier dit « impossible » sans dire comment ; décision A182 : formulaire remplacé par l'explication
+  et 409 côté serveur.

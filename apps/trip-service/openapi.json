@@ -22846,13 +22846,29 @@
                 "type": "integer",
                 "minimum": -9007199254740991,
                 "maximum": 9007199254740991
+              },
+              "lagMinutes": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "lagThresholdMinutes": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "lagging": {
+                "type": "boolean"
               }
             },
             "required": [
               "unpublished",
               "oldestUnpublishedAt",
               "parked",
-              "parkedThreshold"
+              "parkedThreshold",
+              "lagMinutes",
+              "lagThresholdMinutes",
+              "lagging"
             ],
             "additionalProperties": false
           },

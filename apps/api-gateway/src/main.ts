@@ -3,7 +3,7 @@ import cors from 'cors';
 import proxy from "express-http-proxy";
 import morgan from "morgan";
 import rateLimit from "express-rate-limit";
-import { currentMaintenance, maintenanceMiddleware, publicMaintenanceHandler } from "./libs/maintenance";
+import { currentMaintenance, maintenanceCheckError, maintenanceMiddleware, publicMaintenanceHandler } from "./libs/maintenance";
 import { origineAutorisee, REFUS_ORIGINE } from "./libs/origins";
 import { aggregateStatus, probeService, serviceEntries, toPublicBody, type PublicStatusBody } from "@packages/libs/health"; // D70
 import cookieParser from "cookie-parser";
@@ -93,7 +93,7 @@ app.use(limiter);
 app.get('/gateway-health', async (_req, res) => {
   const state = await currentMaintenance();
   res.setHeader('Cache-Control', 'no-store');
-  res.status(200).json({ status: 'ok', service: 'api-gateway', version: process.env.APP_VERSION ?? process.env.GIT_SHA ?? 'dev', uptimeSeconds: Math.floor(process.uptime()), checks: { maintenance: { ok: !state.enabled, ms: 0, error: state.enabled ? `maintenance (${state.source})` : null } }, at: new Date().toISOString() });
+  res.status(200).json({ status: 'ok', service: 'api-gateway', version: process.env.APP_VERSION ?? process.env.GIT_SHA ?? 'dev', uptimeSeconds: Math.floor(process.uptime()), checks: { maintenance: { ok: !state.enabled, ms: 0, error: maintenanceCheckError(state) } }, at: new Date().toISOString() });
 });
 app.get('/api/maintenance', publicMaintenanceHandler());
 app.use(maintenanceMiddleware());
@@ -245,6 +245,15 @@ app.use(
 // ─── Auth Service (port 6001) — catch-all ────
 // /api/auth/*, /api/carrier/* → auth-service
 app.use("/", proxy("http://localhost:6001"));
+
+// Recette 02-ADMIN § 5.23 (lot c) — un service arrêté donnait « 500 Internal Server Error » en HTML : le back-office ne
+// pouvait pas distinguer « le service est tombé » d'« il a répondu une erreur ». Connexion refusée / coupée / expirée → 502
+// `UPSTREAM_UNREACHABLE` (JSON, jamais l'adresse interne) ; toute autre erreur suit son cours.
+const UPSTREAM_DOWN = new Set(["ECONNREFUSED", "ECONNRESET", "ETIMEDOUT", "EHOSTUNREACH", "ENOTFOUND"]);
+app.use((err: { code?: string }, _req: express.Request, res: express.Response, next: express.NextFunction) => {
+  if (!err || !UPSTREAM_DOWN.has(err.code ?? "") || res.headersSent) return next(err);
+  return res.status(502).json({ message: "The upstream service is unreachable.", details: { code: "UPSTREAM_UNREACHABLE" } });
+});
 
 const port = process.env.PORT || 8080;
 const server = app.listen(port, () => {

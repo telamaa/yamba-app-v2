@@ -10,6 +10,18 @@ import { z } from "zod";
 /** A176 — le relais parque un événement après ce nombre de tentatives. Seule source : les deux relais l'importent. */
 export const OUTBOX_MAX_RELAY_ATTEMPTS = 10;
 
+/**
+ * Recette § 5.23 (lot a du § 5.22) — l'âge du plus ancien événement non publié, en minutes, et la règle « en retard ». UNE
+ * règle pour l'alerte `OUTBOX_LAGGING_15MIN` (deal-service) et la page « État des services » (auth-service) : jamais un
+ * second seuil. Strictement au-delà du seuil (`alerts.outboxLagMinutes`).
+ */
+export function outboxLagMinutes(oldestUnpublishedAt: Date | string | null, now: Date): number {
+  if (!oldestUnpublishedAt) return 0;
+  const t = typeof oldestUnpublishedAt === "string" ? Date.parse(oldestUnpublishedAt) : oldestUnpublishedAt.getTime();
+  return Number.isNaN(t) ? 0 : Math.max(0, (now.getTime() - t) / 60_000);
+}
+export const isOutboxLagging = (oldestUnpublishedAt: Date | string | null, now: Date, thresholdMinutes: number): boolean => outboxLagMinutes(oldestUnpublishedAt, now) > thresholdMinutes;
+
 const MIN = 60_000;
 const HOUR = 60 * MIN;
 const DAY = 24 * HOUR;

@@ -28,7 +28,7 @@ type Statut = {
   services: Array<{ name: string; reachable: boolean; report: { status: string; checks: Record<string, { ok: boolean }> } | null }>;
   crons: Array<{ service: string; name: string; late: boolean; ok: boolean }>;
   missingCrons: Array<{ service: string; name: string }>;
-  outbox: { unpublished: number; oldestUnpublishedAt: string | null; parked: number; parkedThreshold: number };
+  outbox: { unpublished: number; oldestUnpublishedAt: string | null; parked: number; parkedThreshold: number; lagMinutes: number; lagThresholdMinutes: number; lagging: boolean };
   emails: { sentLast24h: number; deliveredLast24h: number; bouncedLast24h: number; failedLast24h: number };
 };
 
@@ -321,5 +321,62 @@ test.describe("ADM-ETA — état des services (cahier 02-ADMIN § 5.22)", () => 
     await expect(alerte).toHaveText("État des services illisible : le serveur n'a pas répondu. Nouvel essai dans 30 secondes.", { timeout: 60_000 });
     await expect(page.getByText(/Bad gateway|502 :/)).toHaveCount(0);
     await page.unroute("**/api/admin/status");
+  });
+
+  test("ADM-ETA-8 · le retard du relais : l'âge du plus ancien non publié, en rouge au-delà du seuil de l'alerte (§ 5.23, lot a)", async ({ navigateurAdmin }) => {
+    test.setTimeout(4 * 60_000);
+    const { page, contexte } = await navigateurAdmin("exploitation");
+    const seuil = (await lireStatut(contexte)).outbox.lagThresholdMinutes;
+    // Un événement d'un agrégat qu'aucun relais ne draine (chaque relais ne lit que le sien), vieilli au-delà du seuil.
+    const id = lireCoteServeur<string>(`import p from "./packages/libs/prisma"; (async () => { const e = await p.outboxEvent.create({ data: { aggregateType: "recette-eta-8", aggregateId: "000000000000000000000000", eventType: "recette.lag", payload: {}, occurredAt: new Date(Date.now() - ${seuil + 10} * 60_000), publishedAt: null, attempts: 0 } }); console.log("@@" + JSON.stringify(e.id)); process.exit(0); })();`);
+    try {
+      const statut = await lireStatut(contexte);
+      expect(statut.outbox.lagging, "la règle partagée tranche côté serveur").toBe(true);
+      expect(statut.outbox.lagMinutes).toBeGreaterThanOrEqual(seuil + 9);
+      await ouvrir(page);
+      const ligne = blocOutbox(page).getByTestId("outbox-lag");
+      await expect(ligne).toContainText(new RegExp(`Retard du relais : \\d+ min — au-delà du seuil d'alerte \\(${seuil} min\\)`));
+      await expect(ligne, "en rouge").toHaveClass(/text-red-800/);
+    } finally {
+      lireCoteServeur(`import p from "./packages/libs/prisma"; (async () => { await p.outboxEvent.delete({ where: { id: ${JSON.stringify(id)} } }); console.log("@@1"); process.exit(0); })();`);
+    }
+    /* Sans retard : la ligne redevient neutre (ou disparaît s'il n'y a rien à publier). */
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await expect(bandeau(page)).toBeVisible({ timeout: 60_000 });
+    const apres = await lireStatut(contexte);
+    expect(apres.outbox.lagging).toBe(false);
+    await expect(blocOutbox(page).getByText(/au-delà du seuil d'alerte/)).toHaveCount(0);
+  });
+
+  test("ADM-ETA-9 · auth-service arrêté : un bandeau clair avec l'heure de la dernière relecture réussie (§ 5.23, lot c)", async ({ navigateurAdmin }) => {
+    test.setTimeout(6 * 60_000);
+    const { page } = await navigateurAdmin("exploitation");
+    await ouvrir(page);
+    const reussie = page.waitForResponse((r) => /\/api\/admin\/status$/.test(r.url()) && r.status() === 200, { timeout: 45_000 }).catch(() => null);
+    await reussie;
+    const pid = pidDuPort(6001);
+    expect(pid, "auth-service tourne en bundle détaché").not.toBeNull();
+    try {
+      process.kill(Number(pid));
+      await expect.poll(() => pidDuPort(6001), { timeout: 30_000, intervals: [500] }).toBeNull();
+      /* La réponse du gateway dit « injoignable », en JSON, sans adresse interne. */
+      const brut = await fetch("http://localhost:8080/api/admin/status");
+      expect(brut.status).toBe(502);
+      const corps = await brut.text();
+      expect(JSON.parse(corps)).toMatchObject({ details: { code: "UPSTREAM_UNREACHABLE" } });
+      expect(corps).not.toContain("localhost");
+      /* L'écran, au sondage suivant (30 s). */
+      const alerte = page.getByRole("alert").filter({ hasText: "Service d'authentification injoignable" });
+      await expect(alerte).toContainText(/Dernière relecture réussie à \d{2}:\d{2}:\d{2} — ce qui suit date de ce moment\. Nouvel essai dans 30 secondes\./, { timeout: 60_000 });
+      await expect(page.getByText(/Internal Server Error|500 :|502 :|UPSTREAM/)).toHaveCount(0);
+    } finally {
+      if (!(await santeOk("http://localhost:6001/health"))) {
+        const log = openSync(join(tmpdir(), "yamba-recette-eta-auth-service.log"), "a");
+        spawn("node", ["--env-file=../../.env", "dist/main.js"], { cwd: join(RACINE, "apps/auth-service"), detached: true, stdio: ["ignore", log, log] }).unref();
+        await expect.poll(() => santeOk("http://localhost:6001/health"), { timeout: 90_000, intervals: [2_000] }).toBe(true);
+      }
+    }
+    /* Retour : le bandeau disparaît à la relecture suivante. */
+    await expect(page.getByRole("alert").filter({ hasText: "Service d'authentification injoignable" })).toHaveCount(0, { timeout: 60_000 });
   });
 });

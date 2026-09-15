@@ -1,4 +1,5 @@
 import { ALERT_THRESHOLDS, alertSentKey, countUndecidedDisputes, evaluateAlerts, type OpsSnapshot } from "./ops-alerts.rules";
+import { isOutboxLagging, outboxLagMinutes } from "@packages/api-contracts";
 
 const NOW = new Date("2026-09-04T10:00:00.000Z");
 const calm = (): OpsSnapshot => ({ failedPayoutsOverThreshold: 0, undecidedDisputesOverThreshold: 0, heldRetentionsOverThreshold: 0, openReversalsOverThreshold: 0, parkedOutbox: 0, oldestUnpublishedAt: null, failedEmailsInWindow: 0, lastTripPublishedAt: new Date("2026-09-03T10:00:00Z"), requestsInWindow: 10, acceptedInWindow: 8 });
@@ -49,6 +50,22 @@ describe("countUndecidedDisputes — ANO-ADM-52 : l'échéance figée à l'ouver
     // ouvert il y a 100 h, échéance figée = ouverture + 72 h = il y a 28 h → pas au seuil de 72 h
     expect(countUndecidedDisputes([{ openedAt: h(100), carrierRespondedAt: null, responseDueAt: h(28) }], NOW, 24, 72)).toBe(0);
     expect(countUndecidedDisputes([{ openedAt: h(100), carrierRespondedAt: null, responseDueAt: null }], NOW, 24, 72)).toBe(1);
+  });
+});
+
+describe("isOutboxLagging / outboxLagMinutes — recette § 5.23 : UNE règle pour l'alerte et la page « État des services »", () => {
+  it("strictement au-delà du seuil ; absent → 0 ; date illisible → 0", () => {
+    const il = (min: number) => new Date(NOW.getTime() - min * 60_000);
+    expect(outboxLagMinutes(null, NOW)).toBe(0);
+    expect(outboxLagMinutes("pas une date", NOW)).toBe(0);
+    expect(outboxLagMinutes(il(20).toISOString(), NOW)).toBe(20);
+    expect(isOutboxLagging(il(15), NOW, 15)).toBe(false);
+    expect(isOutboxLagging(il(15.5), NOW, 15)).toBe(true);
+    // L'alerte et la page tranchent pareil, sur le seuil lu dans les paramètres.
+    for (const minutes of [4, 6, 16]) {
+      const alerte = evaluateAlerts({ ...calm(), oldestUnpublishedAt: il(minutes) }, NOW, { ...ALERT_THRESHOLDS, outboxLagMinutes: 5 }).some((a) => a.rule === "OUTBOX_LAGGING_15MIN");
+      expect(alerte).toBe(isOutboxLagging(il(minutes), NOW, 5));
+    }
   });
 });
 

@@ -119,7 +119,7 @@ Règles communes : motif ≥ 20 caractères, une ligne de journal par clé (avan
 | `alerts.retentionHeldDays` | Retenue non arbitrée depuis | **7 j** | 1 j → 60 j | exploitation | D59 3A | deal-service |
 | `alerts.reversalOpenHours` | Renversement ouvert depuis | **48 h** | 1 h → 336 h | exploitation | D59 3A | deal-service |
 | `alerts.outboxParkedAttempts` | Événement parqué après | **10** | 1 → 10 | exploitation | D59 3A · A176 | deal-service |
-| `alerts.outboxLagMinutes` | Relais en retard depuis | **15 min** | 1 min → 1440 min | exploitation | D59 3A | deal-service |
+| `alerts.outboxLagMinutes` | Relais en retard depuis | **15 min** | 1 min → 1440 min | exploitation | D59 3A | deal-service, auth-service |
 | `alerts.emailsFailedWindowHours` | Emails en échec : fenêtre | **24 h** | 1 h → 168 h | exploitation | D59 3A | deal-service |
 | `alerts.noTripPublishedDays` | Aucun trajet publié depuis | **7 j** | 1 j → 90 j | exploitation | D59 3A | deal-service |
 | `alerts.acceptanceRateWindowDays` | Taux d'acceptation : fenêtre | **7 j** | 1 j → 90 j | exploitation | D59 3A | deal-service |
