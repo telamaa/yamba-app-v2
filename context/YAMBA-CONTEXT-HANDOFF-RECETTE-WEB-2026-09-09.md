@@ -3,6 +3,18 @@
 *Ce document sert à REPRENDRE le chantier après une pause. Il dit où en est la campagne, ce qui
 tourne sur le poste, ce qui reste à faire, et les pièges déjà payés qu'il ne faut pas repayer.*
 
+> ## ▶ 15/09/2026 — § 5.19 LIVRÉ
+>
+> Branche `chore/recette-admin-5-19` empilée sur #319 : 9 scénarios ADM-SIG, contre-épreuve rouge sur SIG-5 à 9,
+> ANO-ADM-46, 47 (majeures), 48, 49, 50 closes, pas de décision nouvelle (le rejeu P2034 existant est réemployé).
+> Chiffres : auth **254**, message **54**, harnais **457** ; dernière anomalie ANO-ADM-50 ; dernier chapitre
+> d'apprentissage **177**. POSTE : sous `nx run-many serve`, notification-service et message-service ont échoué au build
+> (« Plugin worker exited unexpectedly ») — tous les services sauf le gateway tournent en bundles détachés
+> (`nx build` puis `nohup node --env-file=../../.env dist/main.js`). Pièges : une session admin mémorisée expirée se
+> rouvre pendant une fiche et écrit `ADMIN_LOGIN` — une fiche « aucune ligne » l'écarte ; en mode `serial`, un rouge
+> masque les fiches suivantes : la contre-épreuve se joue fiche par fiche (`--grep "ADM-SIG-6 "`). Suite : § 5.20
+> (paramètres) — trois contrôleurs admin transactionnels sans rejeu P2034 à éprouver au § 7.
+>
 > ## ▶ 15/09/2026 — § 5.18 LIVRÉ
 >
 > PR #318 (§ 5.17) : CI 17/17. Branche `chore/recette-admin-5-18` empilée sur #318 : 5 scénarios ADM-CNV, contre-épreuve

@@ -796,6 +796,18 @@ Ordre de demarrage : auth -> trip -> gateway.
   sur le Fake + manoeuvres base). AMELIORATIONS : carte qui nomme le fournisseur, aide FR par divergence, statuts FR,
   refus par code, journal « Rapprochement fournisseur ». PIEGE : la memoire du Fake survit au rejeu du jeu d'essai (une
   fiche constate l'etat initial, ne l'exige pas). Tests : deal 598, harnais 419. Reste : § 5.14 a 8.
+- 15/09 : **CAHIER 02-ADMIN — § 5.19 SIGNALEMENTS (branche `chore/recette-admin-5-19`, empilee sur #319)** — 9 scenarios
+  CONFORMES (SIG-1 a 5 du cahier + SIG-6 cible disparue, SIG-7 double clic / deux admins, SIG-8 salve simultanee dans les
+  deux files, SIG-9 « Compte neuf »), verts deux fois. CONTRE-EPREUVE : SIG-5 a 9 ROUGES, SIG-1 a 4 hors code corrige.
+  ANO-ADM-46 CLOSE (majeure) : trois decisions simultanees → `[200, 500, 500]` (P2034) dans les DEUX files →
+  `withWriteConflictRetry` autour de la transaction, au reessai la garde repond 409. ANO-ADM-47 CLOSE (majeure) : cible
+  disparue (trajet purge, membre introuvable) → signalement SORTI de la file, OPEN pour toujours → reste, `targetMissing`,
+  « Trajet introuvable », se clot. ANO-ADM-48 (mineure) : badge « Compte neuf » affiche → `isAlertTrustLevel` (WATCH /
+  HIGH_RISK seuls). ANO-ADM-49 (mineure) : double clic = deux PATCH, refus « 409 : anglais » sans rechargement →
+  bouton occupe + `reportRefusalMessage`. ANO-ADM-50 (mineure) : profil refuse → message anglais + « Chargement… » sans
+  fin. ECART : motif SCAM « Arnaque suspectee » au front, « Tentative d'arnaque » au back-office. A TRANCHER : aligner le
+  libelle ; note et auteur de la decision visibles sous « traite ». Tests : auth 254, message 54, harnais 457. Reste :
+  § 5.20 a 8.
 - 15/09 : **CAHIER 02-ADMIN — § 5.18 CONVERSATIONS (branche `chore/recette-admin-5-18`, empilee sur #318)** — 5 scenarios
   CONFORMES (CNV-1, 2, 3 du cahier + CNV-4 numero tape, CNV-5 une ouverture = une ligne sur cinq ecrans), verts deux fois.
   CONTRE-EPREUVE : les cinq ROUGES. ANO-ADM-42 CLOSE (majeure) : numero et adresse TAPES par un membre lisibles au

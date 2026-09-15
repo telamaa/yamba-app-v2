@@ -9,6 +9,7 @@
 import prisma from "@packages/libs/prisma";
 import { ConflictError, NotFoundError, ValidationError } from "@packages/error-handler";
 import { recordAdminAction } from "@packages/admin-audit";
+import { withWriteConflictRetry } from "@packages/libs/prisma/write-conflict-retry";
 import type { AdminReportItem, AdminReportsResponse, CreateReportRequest, CreateReportResponse, ReportStatus, ReportTargetType, ReviewReportRequest, TrustLevel } from "@packages/api-contracts";
 import { canReport, needsPriorityReview } from "../utils/report.rules";
 import { assessTrust } from "./admin-users.service"; // D71
@@ -95,16 +96,27 @@ export function makeReportService(deps: { db?: ReportDb; sendEmail?: typeof send
         const type = r.targetType as ReportTargetType;
         let targetLabel = "—";
         let targetOwner: AdminReportItem["targetOwner"] = null;
+        // ANO-ADM-47 (recette 02-ADMIN § 5.19) — une cible disparue (trajet purgé, document effacé) faisait sortir le
+        // signalement de la file par un `continue` : OPEN pour toujours, jamais relu par personne. Il reste dans la file,
+        // marqué `targetMissing`, et se clôt comme les autres (même règle que ANO-CRON-09 pour les messages).
+        let targetMissing = false;
         if (type === "TRIP") {
           const trip = byTrip.get(targetId);
-          if (!trip) continue; // trajet purgé : hors file
-          targetLabel = `${trip.originCity} → ${trip.destinationCity}`;
-          const owner = byUser.get(trip.userId as string);
-          targetOwner = { id: trip.userId as string, firstName: (owner?.firstName as string) ?? "—" };
+          if (trip) {
+            targetLabel = `${trip.originCity} → ${trip.destinationCity}`;
+            const owner = byUser.get(trip.userId as string);
+            targetOwner = { id: trip.userId as string, firstName: (owner?.firstName as string) ?? "—" };
+          } else {
+            targetMissing = true;
+            targetLabel = "Trajet introuvable";
+          }
         } else {
           const u = byUser.get(targetId);
-          if (!u) continue;
-          targetLabel = `${u.firstName} ${u.lastName}`.trim();
+          if (u) targetLabel = `${u.firstName} ${u.lastName}`.trim();
+          else {
+            targetMissing = true;
+            targetLabel = "Membre introuvable";
+          }
         }
         const reporter = byUser.get(r.reporterUserId as string);
         const count = openCount.get(targetId) ?? 0;
@@ -114,6 +126,7 @@ export function makeReportService(deps: { db?: ReportDb; sendEmail?: typeof send
           targetType: type,
           targetId,
           targetLabel,
+          targetMissing,
           targetOwner,
           status: r.status as ReportStatus,
           reason: r.reason as AdminReportItem["reason"],
@@ -133,7 +146,9 @@ export function makeReportService(deps: { db?: ReportDb; sendEmail?: typeof send
       const report = await db.report.findFirst({ where: { id: reportId, targetType: { in: ["TRIP", "USER"] } }, select: { id: true, status: true, targetType: true, targetId: true } });
       if (!report) throw new NotFoundError("Report not found.", { code: "REPORT_NOT_FOUND" });
       if (report.status !== "OPEN") throw new ConflictError("This report has already been reviewed.", { code: "REPORT_ALREADY_REVIEWED" });
-      await db.$transaction(async (tx) => {
+      // ANO-ADM-46 (recette 02-ADMIN § 5.19) — deux décisions simultanées : MongoDB rejette l'une des transactions (P2034) et
+      // l'admin lisait 500. Au réessai, la garde conditionnelle ci-dessous répond proprement 409.
+      await withWriteConflictRetry(() => db.$transaction(async (tx) => {
         const updated = await tx.report.updateMany({ where: { id: report.id, status: "OPEN" }, data: { status: input.decision } });
         if (updated.count !== 1) throw new ConflictError("This report has already been reviewed.", { code: "REPORT_ALREADY_REVIEWED" });
         await recordAdminAction(tx as never, {
@@ -146,7 +161,7 @@ export function makeReportService(deps: { db?: ReportDb; sendEmail?: typeof send
           ip: actor.ip,
           userAgent: actor.userAgent,
         });
-      });
+      }));
       return { id: report.id as string, status: input.decision };
     },
   };

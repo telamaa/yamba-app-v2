@@ -126,6 +126,20 @@ export function payoutRefusalMessage(e: { status?: number; data?: unknown; messa
   if (e?.status === 400) return { text: "Demande refusée : vérifie le motif (20 caractères au moins) et réessaie.", reload: false };
   return { text: "Action impossible pour le moment. Recharge la fiche avant de réessayer : elle dit si l'argent est parti.", reload: false };
 }
+/**
+ * Recette § 5.19 — un refus d'une décision de signalement (les deux files), lu par son code (A146). `reload` : la file affichée
+ * est périmée (un autre administrateur a décidé, le signalement n'existe plus).
+ */
+export function reportRefusalMessage(e: { status?: number; data?: unknown; message?: string } | null | undefined): { text: string; reload: boolean } {
+  const code = (e?.data as { details?: { code?: string } } | undefined)?.details?.code;
+  if (code === "REPORT_ALREADY_REVIEWED") return { text: "Ce signalement vient d'être traité par un autre administrateur : la file est rechargée.", reload: true };
+  if (code === "REPORT_NOT_FOUND") return { text: "Ce signalement n'existe plus : la file est rechargée.", reload: true };
+  if (code === "ADMIN_PERMISSION_DENIED") return { text: "Ton profil ne traite pas les signalements.", reload: false };
+  if (e?.status === 400) return { text: "Décision refusée : la note est trop longue ou la décision inconnue.", reload: false };
+  return { text: "Décision impossible pour le moment. Recharge la file avant de réessayer.", reload: false };
+}
+/** D71 — seuls les niveaux qui appellent la vigilance sont affichés dans une file (cahier § 5.19 : ni « Standard » ni « Compte neuf »). */
+export const isAlertTrustLevel = (level: string | null | undefined): level is "WATCH" | "HIGH_RISK" => level === "WATCH" || level === "HIGH_RISK";
 export const TIMELINE_LABEL: Record<string, string> = {
   AUTHORIZED: "Empreinte posée (autorisation)", CAPTURED: "Débité (capture)", REFUNDED: "Remboursé à l'Expéditeur", DISPUTED: "Litige ouvert",
   COMPLETED: "Deal terminé", CANCELLED: "Deal annulé", PAYOUT_SENT: "Versement envoyé au Voyageur", PAYOUT_FAILED: "Versement en échec",

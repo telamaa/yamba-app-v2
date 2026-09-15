@@ -20649,6 +20649,9 @@
           "targetLabel": {
             "type": "string"
           },
+          "targetMissing": {
+            "type": "boolean"
+          },
           "targetOwner": {
             "anyOf": [
               {
@@ -20733,6 +20736,7 @@
           "targetType",
           "targetId",
           "targetLabel",
+          "targetMissing",
           "targetOwner",
           "status",
           "reason",

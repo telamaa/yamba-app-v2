@@ -9046,3 +9046,80 @@ si le dossier existe, « ← Dossier de médiation ».
 - deal-service 635, auth-service 252, trip-service 292 — inchangés en nombre ; spec de la fiche argent ajustée.
 - `apps/e2e` : **448 scénarios** (443 + 5).
 - Typecheck des huit projets CI et du harnais ; cinq `openapi.json` régénérés (`AdminConversationResponse`).
+
+# Cahier 02-ADMIN, § 5.19 : signalements — rien de perdu, une décision une fois
+
+*(PR `chore/recette-admin-5-19`, empilée sur #319, 15/09/2026.)*
+
+## Ce qui a été fait
+
+Neuf scénarios (ADM-SIG-1 à 5 du cahier ; SIG-6 à 9 ajoutées), cinq anomalies closes (`ANO-ADM-46`, `ANO-ADM-47`
+majeures ; `ANO-ADM-48`, `49`, `50` mineures), aucune décision nouvelle : le rejeu du conflit d'écriture existant
+(ANO-API-19, remonté dans `packages/libs/prisma` au § 5.5) est réemployé.
+
+```
+apps/auth-service/src/services/report.service.ts                 ANO-ADM-46 rejeu P2034 ; ANO-ADM-47 cible disparue gardée (targetMissing)
+apps/message-service/src/services/admin-conversation.service.ts  ANO-ADM-46 rejeu P2034 (file des messages)
+packages/libs/api-contracts/src/admin/reports.schema.ts          AdminReportItem.targetMissing
+apps/admin-ui/src/lib/format.ts                                  reportRefusalMessage, isAlertTrustLevel
+apps/admin-ui/src/components/ReportsQueue.tsx                    bouton occupé, refus par code, « Trajet introuvable » sans lien, badge WATCH / HIGH_RISK seuls
+apps/admin-ui/src/components/MessageReportsQueue.tsx             bouton occupé, refus par code (chargement et décision)
+apps/admin-ui/src/lib/types.ts                                   targetMissing
+apps/auth-service/src/services/report.service.spec.ts            +2 tests
+apps/message-service/src/services/admin-report-review.spec.ts    3 tests (nouveau)
+apps/e2e/src/admin/adm-sig-signalements.spec.ts                  9 scénarios
+apps/*/openapi.json                                              régénérés (targetMissing)
+```
+
+## Ce que la recette a mesuré d'abord
+
+Fiche par fiche, sur le code du § 5.18 (corrections mises de côté, bundles auth-service et message-service rebâtis) :
+- trois `PATCH` simultanés d'une décision : `[200, 500, 500]` dans les deux files ;
+- un signalement OPEN sur un trajet qui n'existe plus : absent de `GET /admin/reports?status=OPEN` ;
+- un double clic sur « Traité » : deux `PATCH` au réseau ;
+- un compte créé le jour même : badge « Compte neuf » sur la carte ;
+- la Finance sur `/reports` : « Your admin profile does not allow this action. » puis « Chargement… » sans fin, deux fois.
+
+## Pourquoi un 500 sur une décision concurrente
+
+La décision s'écrit dans une transaction : `updateMany({ where: { id, status: "OPEN" } })` puis la ligne de journal. La
+garde conditionnelle est juste — elle garantit une seule décision. Mais MongoDB ne laisse pas deux transactions modifier
+le même document : la seconde est ANNULÉE avec « write conflict » (Prisma `P2034`) avant même d'avoir lu `count: 0`. Le
+middleware d'erreur ne connaît pas `P2034` → 500. `withWriteConflictRetry(fn)` rejoue la transaction sur ce seul code ;
+au second essai la première décision est validée, la garde lit `count !== 1` et lève `ConflictError`
+(`REPORT_ALREADY_REVIEWED`, 409). Toute autre erreur remonte sans rejeu (spec « une autre erreur n'est jamais rejouée »).
+
+```ts
+await withWriteConflictRetry(() => db.$transaction(async (tx) => {
+  const updated = await tx.report.updateMany({ where: { id: report.id, status: "OPEN" }, data: { status: input.decision } });
+  if (updated.count !== 1) throw new ConflictError("This report has already been reviewed.", { code: "REPORT_ALREADY_REVIEWED" });
+  await recordAdminAction(tx as never, { … });
+}));
+```
+
+## Pourquoi un signalement disparaissait
+
+`listReports` joignait chaque signalement à sa cible (trajets et membres lus en lot) et faisait `continue` si la cible
+manquait. Or la conservation purge des trajets (et un document membre peut manquer — l'effacement RGPD, lui, anonymise
+sans supprimer) : le
+signalement restait OPEN en base, hors de toute file. Désormais la carte est rendue avec `targetMissing: true`, un
+libellé explicite et `targetOwner: null` ; le compteur `total` et les onglets le comptent ; « Traité » / « Sans suite »
+le clôt (la décision ne lit pas la cible). L'écran n'affiche pas de lien vers une fiche qui répondrait 404.
+
+## Côté écran
+
+- `busy` (id de la carte en cours) : le handler sort si une décision est en vol, les deux boutons sont `disabled` — un
+  double clic natif n'envoie qu'une requête (React applique l'état avant le second clic, événement discret).
+- `reportRefusalMessage(e)` lit `details.code` (A146) : `REPORT_ALREADY_REVIEWED` et `REPORT_NOT_FOUND` → texte français +
+  `reload: true` ; `ADMIN_PERMISSION_DENIED` → « Ton profil ne traite pas les signalements. ». Le chargement de la file
+  l'utilise aussi et pose `failed` pour ne plus afficher « Chargement… » après un refus.
+- `isAlertTrustLevel(level)` : garde de type (`level is "WATCH" | "HIGH_RISK"`) — le badge d'une file n'affiche que ce qui
+  appelle la vigilance (D71 : un compte neuf a des plafonds, pas un soupçon).
+
+## Tests
+
+- auth-service **254** (+2) : cible disparue (trajet, membre) gardée et close ; conflit P2034 rejoué → 409, aucune ligne.
+- message-service **54** (+3) : P2034 puis garde → 409 ; P2034 puis voie libre → décision, une ligne ; autre erreur non
+  rejouée.
+- `apps/e2e` : **457 scénarios** (448 + 9). Voisins rejoués : ADM-CNV (5) et WEB-SIG (8) verts.
+- Typecheck auth-service, message-service, admin-ui ; cinq `openapi.json` régénérés.
