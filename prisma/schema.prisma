@@ -670,6 +670,12 @@ model TripDocument {
 // Agnostique au modèle de pricing : PER_CATEGORY (moteur actuel,
 // TripCategoryCondition forfaitaire) ou PER_KG (cible D13 post-refonte).
 // Un changement de moteur ne migre JAMAIS les bookings existants.
+// A172 — conditions d'annulation acceptées = conditions appliquées (information précontractuelle).
+type BookingCancellationTerms {
+  fullRefundUntilHours Int
+  lateRetentionPct     Int
+}
+
 type BookingPricingSnapshot {
   pricingModel PricingModel
 
@@ -780,6 +786,9 @@ model Booking {
   recipient BookingRecipientSnapshot
   pickupPlace   BookingPlaceSnapshot?
   deliveryPlace BookingPlaceSnapshot?
+  /// A172 — conditions d'annulation ANN-01 figées à la création (comme le prix) ; absent sur les réservations antérieures
+  /// → paramètres courants. Jamais réécrit.
+  cancellationTerms BookingCancellationTerms?
 
   // ─── Jalons (horodatage SERVEUR) + échéances pré-calculées ───
   requestedAt   DateTime      @default(now())

@@ -1,7 +1,7 @@
 /**
  * seed-settings.ts — remise à zéro des paramètres de la plateforme (C-PR8a, D62)
  * ==============================================================================
- *   npx tsx --env-file=.env packages/libs/prisma/scripts/seed-settings.ts           → supprime le document : les services reviennent aux défauts du catalogue
+ *   npx tsx --env-file=.env packages/libs/prisma/scripts/seed-settings.ts           → remet les valeurs aux défauts du catalogue, version + 1 (A175)
  *   npx tsx --env-file=.env packages/libs/prisma/scripts/seed-settings.ts --show    → affiche les valeurs en vigueur et celles qui s'écartent du défaut
  *
  * Le journal (AdminAction SETTINGS) n'est jamais touché : une remise à zéro par script n'est
@@ -32,8 +32,11 @@ async function main() {
     console.log("Aucun document à supprimer : les services sont déjà sur les défauts.");
     return;
   }
-  await prisma.platformSettings.delete({ where: { key: KEY } });
-  console.log(`Document supprimé (était en version ${row.version}) : les services reviennent aux défauts du catalogue dans les 30 s.`);
+  // A175 (recette 02-ADMIN § 5.21) — la version ne repart jamais à 0 : supprimer le document faisait renaître une « version 1 »
+  // déjà présente dans l'historique, et un écran ouvert avant le script écrasait sans conflit. Valeurs vides = défauts du catalogue.
+  const version = row.version + 1;
+  await prisma.platformSettings.update({ where: { key: KEY }, data: { values: {}, version, updatedByAdminId: null } });
+  console.log(`Valeurs remises aux défauts (version ${row.version} → ${version}) : les services les lisent dans les 30 s.`);
 }
 
 main()

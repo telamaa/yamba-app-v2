@@ -18,14 +18,15 @@ import {
   type ErasureBlockedResponse,
 } from "@packages/api-contracts";
 import { AuthError, ForbiddenError, NotFoundError, ValidationError } from "@packages/error-handler";
-import { recordAdminAction } from "@packages/admin-audit";
+import { recordAdminAction, recordAdminRead } from "@packages/admin-audit";
+import redis from "@packages/libs/redis";
 import type { AuthenticatedRequest } from "@packages/middleware/isAuthenticated";
 import { deleteImageKitFile } from "@packages/libs/imagekit";
 import { checkSudoOtpRestrictions, revokeRefreshJti, sendSudoOtp, trackSudoOtpRequests } from "../utils/auth.helper";
 import { requireSudo } from "../utils/sudo";
 import { sendAuthEmail } from "../emails/send-auth-email";
 import { getAuthEmails } from "../emails/auth-emails";
-import { ErasureBlockedError, makePrivacyService, type EraseResult, type PrivacyDb } from "../services/privacy.service";
+import { AccountNotFoundError, ErasureBlockedError, makePrivacyService, type EraseResult, type PrivacyDb } from "../services/privacy.service";
 import { recordCookiesConsent } from "../utils/consent/consent.helper";
 
 const SUPPORT_EMAIL = process.env.SUPPORT_EMAIL || "support@yamba.app";
@@ -110,6 +111,7 @@ export const eraseMyAccount = async (req: AuthenticatedRequest, res: Response, n
       await privacyService.eraseAccount({ userId: req.user.id, channel: "MEMBER", ...meta(req) });
     } catch (e) {
       if (e instanceof ErasureBlockedError) return blocked(res, e);
+      if (e instanceof AccountNotFoundError) throw new NotFoundError("User not found.", { code: "USER_NOT_FOUND" }); // ANO-ADM-58 : effacé entre-temps
       throw e;
     }
     res.clearCookie("access_token");
@@ -155,6 +157,7 @@ export const adminEraseUser = async (req: AuthenticatedRequest, res: Response, n
       await privacyService.eraseAccount({ userId: id.data, channel: "ADMIN", requestedByAdminId: req.user.id, reason: parsed.data.reason, ...meta(req) });
     } catch (e) {
       if (e instanceof ErasureBlockedError) return blocked(res, e);
+      if (e instanceof AccountNotFoundError) throw new NotFoundError("User not found.", { code: "USER_NOT_FOUND" }); // ANO-ADM-58 : effacé entre-temps
       throw e;
     }
     return res.status(200).json({ success: true, erased: true });
@@ -171,7 +174,11 @@ export const listDataRequests = async (req: AuthenticatedRequest, res: Response,
     const ids = [...new Set([...page.map((r) => r.userId), ...page.map((r) => r.requestedByAdminId).filter((x): x is string => !!x)])];
     const users = ids.length ? await prisma.user.findMany({ where: { id: { in: ids } }, select: { id: true, firstName: true, lastName: true, isDeleted: true } }) : [];
     const label = new Map(users.map((u) => [u.id, u.isDeleted ? "Membre supprimé" : `${u.firstName} ${u.lastName.charAt(0)}.`]));
-    await recordAdminAction(prisma, { adminUserId: req.user.id, action: "DATA_REQUESTS_VIEWED", targetType: "USER", targetId: null, after: { rows: page.length }, ...meta(req) });
+    // ANO-ADM-57 (recette 02-ADMIN § 5.21) — une ouverture du registre écrivait deux lignes (double lecture de l'écran) :
+    // la première page est une lecture d'écran coalescée (A168) ; « Charger la suite » (curseur) s'écrit toujours.
+    const viewed = { adminUserId: req.user.id, action: "DATA_REQUESTS_VIEWED", targetType: "USER", targetId: null, after: { rows: page.length }, ...meta(req) };
+    if (cursor) await recordAdminAction(prisma, viewed);
+    else await recordAdminRead(prisma, redis, viewed);
     const body: DataRequestsResponse = {
       items: page.map((r) => ({ id: r.id, userId: r.userId, userLabel: label.get(r.userId) ?? "Membre supprimé", type: r.type, channel: r.channel, status: r.status, refusalReasons: r.refusalReasons, requestedByAdmin: r.requestedByAdminId ? label.get(r.requestedByAdminId) ?? r.requestedByAdminId : null, reason: r.reason, requestedAt: r.requestedAt.toISOString(), completedAt: r.completedAt?.toISOString() ?? null })),
       nextCursor: rows.length > REQUESTS_PAGE ? page[page.length - 1].id : null,

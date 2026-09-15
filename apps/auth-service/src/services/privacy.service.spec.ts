@@ -1,5 +1,5 @@
 /** privacy.service.spec.ts — export et effacement (C-PR8b, D63) sur un faux Prisma en mémoire. */
-import { anonymizedUserData, erasedEmailFor, erasedSlugFor, ErasureBlockedError, makePrivacyService, type PrivacyDb } from "./privacy.service";
+import { AccountNotFoundError, anonymizedUserData, erasedEmailFor, erasedSlugFor, ErasureBlockedError, makePrivacyService, type PrivacyDb } from "./privacy.service";
 
 type Row = Record<string, unknown>;
 function fakeDb(seed: Partial<Record<keyof PrivacyDb, Row[]>> = {}) {
@@ -123,6 +123,35 @@ describe("eraseAccount (D63 4A)", () => {
   it("un compte déjà effacé ne s'efface pas deux fois", async () => {
     const db = fakeDb({ user: [{ ...member, isDeleted: true }] });
     await expect(makePrivacyService({ db }).eraseAccount({ userId: U, channel: "MEMBER" })).rejects.toThrow("ACCOUNT_NOT_FOUND");
+  });
+  it("ANO-ADM-58 — conflit d'écriture (P2034) puis le compte est déjà effacé par l'autre admin → AccountNotFoundError (404), rien en double", async () => {
+    const db = fakeDb({ user: [member] });
+    const transaction = db.$transaction;
+    let essais = 0;
+    db.$transaction = async (fn) => {
+      essais++;
+      if (essais === 1) {
+        db.tables.user[0].isDeleted = true; // l'effacement concurrent a gagné pendant ce premier essai
+        db.tables.erasedAccount.push({ userId: U });
+        throw Object.assign(new Error("Transaction failed due to a write conflict or a deadlock."), { code: "P2034" });
+      }
+      return transaction(fn);
+    };
+    const afterErase = jest.fn(async () => undefined);
+    await expect(makePrivacyService({ db, afterErase }).eraseAccount({ userId: U, channel: "ADMIN", requestedByAdminId: "bbbbbbbbbbbbbbbbbbbbbbbb", reason: "Demande reçue par email, identité vérifiée" })).rejects.toBeInstanceOf(AccountNotFoundError);
+    expect(essais).toBe(2);
+    expect(db.tables.erasedAccount).toHaveLength(1);
+    expect(db.tables.adminAction ?? []).toEqual([]);
+    expect(afterErase).not.toHaveBeenCalled();
+  });
+  it("ANO-ADM-58 — P2034 puis la voie est libre → l'effacement passe au réessai, une seule fois", async () => {
+    const db = fakeDb({ user: [member] });
+    const transaction = db.$transaction;
+    let essais = 0;
+    db.$transaction = async (fn) => (++essais === 1 ? Promise.reject(Object.assign(new Error("conflict"), { code: "P2034" })) : transaction(fn));
+    await expect(makePrivacyService({ db, clock: () => NOW }).eraseAccount({ userId: U, channel: "MEMBER" })).resolves.toMatchObject({ erased: true });
+    expect(db.tables.erasedAccount).toHaveLength(1);
+    expect(db.tables.dataRequest.filter((d) => d.status === "DONE")).toHaveLength(1);
   });
   it("anonymizedUserData : jamais null sur un unique nullable (email, slug)", () => {
     const d = anonymizedUserData(U, NOW);

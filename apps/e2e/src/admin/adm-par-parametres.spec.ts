@@ -17,6 +17,7 @@ import { test, expect, type NavigateurAdmin } from "../fixtures/yamba";
 import { JeuEssai } from "../fixtures/jeu-essai";
 import { adresseDeLApi, adresseDeLApiAdmin, adresseDuBackOffice } from "../fixtures/adresses";
 import { lireLeJournal } from "../pages/journal-admin";
+import { AssistantReservation } from "../pages/reservation";
 import { attendreLeChargement, debutDuScenario, lireCoteServeur, MOTIF_DE_RECETTE } from "../pages/ecran-admin";
 
 const api = () => adresseDeLApiAdmin();
@@ -28,10 +29,21 @@ type Reglages = { version: number; values: Record<string, number>; defaults: Rec
 
 const GROUPES = ["Prix et commission", "Garantie Yamba", "Annulation", "Notation", "Litiges", "Réputation", "Messagerie", "Alertes d'exploitation", "Documents", "Données personnelles", "Conservation", "Confiance (TrustScore interne)"];
 
-/** Geste de préparation de recette (cahier ADM-PAR-7) : supprime le document, les services reviennent aux défauts en 30 s. */
+/**
+ * Geste de préparation de recette (cahier ADM-PAR-7) : valeurs remises aux défauts, les services les relisent en 30 s.
+ * A175 (§ 5.21) — la version ne repart plus à 0 : `base` est la version laissée par le script, les fiches comptent à partir d'elle.
+ */
+let base = 0;
+/** La panne du repli sûr (ADM-PAR-7) et la création concurrente (ADM-PAR-8) : document supprimé, manœuvre base consignée. */
+const supprimerLeDocument = () => {
+  execFileSync("npx", ["tsx", "--env-file=.env", "-e", `import prisma from "./packages/libs/prisma"; (async () => { await prisma.platformSettings.deleteMany({ where: { key: "current" } }); process.exit(0); })();`], { cwd: RACINE, encoding: "utf-8", timeout: 120_000 });
+  process.stdout.write("   ↳ manœuvre en base : document des paramètres supprimé\n");
+};
 const remettreLaBaseAZero = () => {
   const sortie = execFileSync("npx", ["tsx", "--env-file=.env", "packages/libs/prisma/scripts/seed-settings.ts"], { cwd: RACINE, encoding: "utf-8", timeout: 120_000 });
-  process.stdout.write(`   ↳ seed-settings : ${sortie.trim().split("\n").pop()}\n`);
+  const derniere = sortie.trim().split("\n").pop() ?? "";
+  base = Number(/→ (\d+)\)/.exec(derniere)?.[1] ?? 0);
+  process.stdout.write(`   ↳ seed-settings : ${derniere} (base ${base})\n`);
 };
 const lire = async (ctx: Contexte): Promise<Reglages> => (await (await ctx.request.get(`${api()}/admin/settings`)).json()) as Reglages;
 const ecrire = (ctx: Contexte, changes: Record<string, number>, expectedVersion: number, reason = MOTIF_DE_RECETTE("ADM-PAR")) =>
@@ -68,7 +80,7 @@ test.describe("ADM-PAR — paramètres de la plateforme (cahier 02-ADMIN § 5.20
     await page.goto(`${bo()}/settings`, { waitUntil: "domcontentloaded" });
     await attendreLeChargement(page);
     /* 1. Barre d'état. */
-    await expect(page.getByText(/^Version\s*0$/)).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByText(new RegExp(`^Version\\s*${base}$`))).toBeVisible({ timeout: 60_000 });
     await expect(page.getByText("· toutes les valeurs sont celles par défaut")).toBeVisible();
     await expect(page.getByRole("button", { name: /^Tout réinitialiser/ }), "rien ne diffère : pas de bouton").toHaveCount(0);
     /* 2. Douze groupes, dans l'ordre, puis la classe B. */
@@ -144,7 +156,7 @@ test.describe("ADM-PAR — paramètres de la plateforme (cahier 02-ADMIN § 5.20
     await expect(enregistrer).toBeEnabled();
     /* 4. Enregistrer. */
     await enregistrer.click();
-    await expect(page.getByText(/^1 paramètre\(s\) modifié\(s\) — version 1, journalisé, super administrateurs prévenus\.$/)).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText(new RegExp(`^1 paramètre\\(s\\) modifié\\(s\\) — version ${base + 1}, journalisé, super administrateurs prévenus\\.$`))).toBeVisible({ timeout: 30_000 });
     const t0 = Date.now();
     /* 5. Effet < 30 s : l'API, puis le navigateur d'un visiteur du front (son cache HTTP compris). */
     await expect.poll(async () => (await prixServis(sup.contexte)).commissionPct, { timeout: 45_000, intervals: [1_000] }).toBe(15);
@@ -167,7 +179,7 @@ test.describe("ADM-PAR — paramètres de la plateforme (cahier 02-ADMIN § 5.20
     /* 7. Rechargement. */
     await page.reload({ waitUntil: "domcontentloaded" });
     await attendreLeChargement(page);
-    await expect(page.getByText(/^Version\s*1$/)).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByText(new RegExp(`^Version\\s*${base + 1}$`))).toBeVisible({ timeout: 60_000 });
     await expect(page.getByText(/^· dernière écriture le .+ par Sacha S\.$/)).toBeVisible();
     await expect(page.getByText("· 1 valeur(s) modifiée(s) par rapport au défaut")).toBeVisible();
     await expect(ligne(page, "Commission Yamba").getByText("modifiée", { exact: true })).toBeVisible();
@@ -185,8 +197,8 @@ test.describe("ADM-PAR — paramètres de la plateforme (cahier 02-ADMIN § 5.20
     const lignes = await lireLeJournal(sup.contexte.request, { from: debut, adminUserId: jeuEssai.admin("super").id });
     const ecritures = lignes.filter((l) => l.targetType === "SETTINGS");
     expect(ecritures.map((l) => `${l.action} ${l.targetId}`)).toEqual(["SETTING_CHANGED pricing.commissionPct"]);
-    expect(ecritures[0].before).toEqual({ key: "pricing.commissionPct", value: 12, version: 0 });
-    expect(ecritures[0].after).toEqual({ key: "pricing.commissionPct", value: 15, reason: motif, version: 1 });
+    expect(ecritures[0].before).toEqual({ key: "pricing.commissionPct", value: 12, version: base });
+    expect(ecritures[0].after).toEqual({ key: "pricing.commissionPct", value: 15, reason: motif, version: base + 1 });
   });
 
   test("ADM-PAR-3 · une modification de trois clés écrit trois lignes", async ({ navigateurAdmin, jeuEssai, mailpit }) => {
@@ -207,7 +219,7 @@ test.describe("ADM-PAR — paramètres de la plateforme (cahier 02-ADMIN § 5.20
     const motif = "Recette ADM-PAR-3 : trois seuils d'alerte relevés d'un cran.";
     await panneau.getByRole("textbox").fill(motif);
     await panneau.getByRole("button", { name: /^Enregistrer/ }).click();
-    await expect(page.getByText(/^3 paramètre\(s\) modifié\(s\) — version 1/)).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText(new RegExp(`^3 paramètre\\(s\\) modifié\\(s\\) — version ${base + 1}`))).toBeVisible({ timeout: 30_000 });
     /* /audit, filtre « Paramètre modifié ». */
     await sup.page.goto(`${bo()}/audit`, { waitUntil: "domcontentloaded" });
     await attendreLeChargement(sup.page);
@@ -216,7 +228,7 @@ test.describe("ADM-PAR — paramètres de la plateforme (cahier 02-ADMIN § 5.20
     const lignes = (await lireLeJournal(sup.contexte.request, { from: debut, action: "SETTING_CHANGED" }));
     expect(lignes.map((l) => l.targetId).sort()).toEqual(["alerts.emailsFailedWindowHours", "alerts.payoutFailedHours", "alerts.retentionHeldDays"]);
     expect(new Set(lignes.map((l) => (l.after as { reason: string }).reason))).toEqual(new Set([motif]));
-    expect(new Set(lignes.map((l) => (l.after as { version: number }).version))).toEqual(new Set([1]));
+    expect(new Set(lignes.map((l) => (l.after as { version: number }).version))).toEqual(new Set([base + 1]));
     /* L'email aux super administrateurs parle français, unités comprises. */
     await expect.poll(() => mailpit.compter({ pour: destinataire.email, sujet: /Paramètres de la plateforme modifiés/ }), { timeout: 45_000 }).toBe(avantCourriels + 1);
     const email = await mailpit.attendreEmail({ pour: destinataire.email, sujet: /Paramètres de la plateforme modifiés/ });
@@ -285,7 +297,7 @@ test.describe("ADM-PAR — paramètres de la plateforme (cahier 02-ADMIN § 5.20
     const pb = b.page.locator("section").filter({ has: b.page.getByRole("heading", { name: /^À valider — / }) });
     await pb.getByRole("textbox").fill("Recette ADM-PAR-5 : B enregistre en premier.");
     await pb.getByRole("button", { name: /^Enregistrer/ }).click();
-    await expect(b.page.getByText(/^1 paramètre\(s\) modifié\(s\) — version 1/)).toBeVisible({ timeout: 30_000 });
+    await expect(b.page.getByText(new RegExp(`^1 paramètre\\(s\\) modifié\\(s\\) — version ${base + 1}`))).toBeVisible({ timeout: 30_000 });
     /* 4. A enregistre à son tour. */
     const pa = a.page.locator("section").filter({ has: a.page.getByRole("heading", { name: /^À valider — / }) });
     await pa.getByRole("textbox").fill("Recette ADM-PAR-5 : A arrive trop tard.");
@@ -294,12 +306,12 @@ test.describe("ADM-PAR — paramètres de la plateforme (cahier 02-ADMIN § 5.20
     expect((await refus).status()).toBe(409);
     await expect(a.page.getByText("Les paramètres ont changé entre-temps : la page est rechargée, refais ta modification.")).toBeVisible({ timeout: 30_000 });
     await expect(a.page.getByRole("heading", { name: /^À valider — / }), "saisies perdues").toHaveCount(0);
-    await expect(a.page.getByText(/^Version\s*1$/), "page rechargée sur la version courante").toBeVisible({ timeout: 30_000 });
+    await expect(a.page.getByText(new RegExp(`^Version\\s*${base + 1}$`)), "page rechargée sur la version courante").toBeVisible({ timeout: 30_000 });
     await expect(ligne(a.page, "Relais en retard depuis")).toContainText("20 min");
     const lignes = await lireLeJournal(a.contexte.request, { from: debut, targetType: "SETTINGS" });
     expect(lignes.map((l) => `${l.action} ${l.targetId} ${l.admin}`)).toEqual([expect.stringMatching(/^SETTING_CHANGED alerts\.outboxLagMinutes /)]);
     expect(lignes).toHaveLength(1);
-    expect(lignes[0].after).toMatchObject({ value: 20, version: 1 });
+    expect(lignes[0].after).toMatchObject({ value: 20, version: base + 1 });
   });
 
   test("ADM-PAR-6 · remettre une clé par défaut, puis tout réinitialiser", async ({ navigateurAdmin, jeuEssai, mailpit }) => {
@@ -320,7 +332,7 @@ test.describe("ADM-PAR — paramètres de la plateforme (cahier 02-ADMIN § 5.20
     await expect(panneau).toContainText("Commission Yamba : 14 % → 12 %");
     await panneau.getByRole("textbox").fill("Recette ADM-PAR-6 : retour de la commission au défaut.");
     await panneau.getByRole("button", { name: /^Enregistrer/ }).click();
-    await expect(page.getByText(/^1 paramètre\(s\) modifié\(s\) — version 2/)).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText(new RegExp(`^1 paramètre\\(s\\) modifié\\(s\\) — version ${base + 2}`))).toBeVisible({ timeout: 30_000 });
     await expect.poll(() => mailpit.compter({ pour: destinataire.email, sujet: /Paramètres de la plateforme modifiés/ }), { timeout: 45_000 }).toBe(avantModif + 1);
     /* 2-4. Trois clés, « Tout réinitialiser ». */
     await poser(sup.contexte, { "rating.windowDays": 20, "alerts.outboxLagMinutes": 25, "documents.maxDocsPerTrip": 6 });
@@ -335,7 +347,7 @@ test.describe("ADM-PAR — paramètres de la plateforme (cahier 02-ADMIN § 5.20
     ]);
     await confirmation.getByRole("textbox").fill("Recette ADM-PAR-6 : remise à zéro complète.");
     await confirmation.getByRole("button", { name: "Confirmer la réinitialisation" }).click();
-    await expect(page.getByText(/^3 paramètre\(s\) remis par défaut — version 4, journalisé\.$/)).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText(new RegExp(`^3 paramètre\\(s\\) remis par défaut — version ${base + 4}, journalisé\\.$`))).toBeVisible({ timeout: 30_000 });
     /* 5. Email. */
     await expect.poll(() => mailpit.compter({ pour: destinataire.email, sujet: /Paramètres de la plateforme réinitialisés/ }), { timeout: 45_000 }).toBe(avantReset + 1);
     /* 6. Rejouer : rien à remettre. */
@@ -365,8 +377,8 @@ test.describe("ADM-PAR — paramètres de la plateforme (cahier 02-ADMIN § 5.20
     await poser(sup.contexte, { "pricing.commissionPct": 16 });
     await expect.poll(async () => (await prixServis(sup.contexte)).commissionPct, { timeout: 45_000, intervals: [1_000] }).toBe(16);
     const debut = await debutDuScenario();
-    /* 2. Suppression du document. */
-    remettreLaBaseAZero();
+    /* 2. Suppression du document (la panne simulée : le script de recette, lui, ne supprime plus — A175). */
+    supprimerLeDocument();
     const t0 = Date.now();
     /* 3. Retour aux défauts, sans erreur. */
     await expect.poll(async () => (await prixServis(sup.contexte)).commissionPct, { timeout: 45_000, intervals: [1_000] }).toBe(12);
@@ -397,6 +409,7 @@ test.describe("ADM-PAR — paramètres de la plateforme (cahier 02-ADMIN § 5.20
         ecrire(sup.contexte, { "alerts.retentionHeldDays": 8 + cran }, version),
       ])).map((r) => r.status()).sort();
     /* Document absent : trois créations concurrentes. */
+    supprimerLeDocument();
     const absent = await salve(0, 1);
     /* Document présent : trois mises à jour concurrentes. */
     const presente = await salve((await lire(sup.contexte)).version, 2);
@@ -493,5 +506,53 @@ test.describe("ADM-PAR — paramètres de la plateforme (cahier 02-ADMIN § 5.20
       await expect(privacy.page.getByText("Chargement…"), `${chemin} : pas de chargement sans fin`).toHaveCount(0);
       await expect(privacy.page.getByRole("link", { name: /Documentation des paramètres|Retour aux paramètres/ }), `${chemin} : pas de lien vers une page refusée`).toHaveCount(0);
     }
+  });
+
+  test("ADM-PAR-13 · les conditions d'annulation acceptées sont celles appliquées (ajoutée, A172)", async ({ navigateurAdmin, navigateurConnecte, jeuEssai }) => {
+    test.setTimeout(8 * 60_000);
+    new JeuEssai().rejouer();
+    const sup = await navigateurAdmin("super");
+    await expect.poll(async () => (await lire(sup.contexte)).values["cancellation.fullRefundUntilHours"], { timeout: 30_000 }).toBe(48);
+    /* Une vraie réservation, par l'écran : c'est le WRITER qui doit poser le snapshot (un seed qui le poserait ne prouverait rien). */
+    const expediteur = await navigateurConnecte("marieclaire");
+    await new AssistantReservation(expediteur.page).reserver(
+      jeuEssai.trajet("yul"),
+      { famille: "Vêtements & textile", taille: "S", poidsKg: "2", valeurEuros: "50", description: "Recette ADM-PAR-13" },
+      { prenom: "Étienne", nom: "Roy", indicatif: "+1", telephone: "5145551234" }
+    );
+    await expect.poll(() => expediteur.page.url(), { timeout: 90_000 }).toMatch(/\/bookings\/[0-9a-f]{24}$/);
+    const dealId = expediteur.page.url().split("/bookings/")[1];
+    const termes = () => lireCoteServeur<{ cancellationTerms: { fullRefundUntilHours: number; lateRetentionPct: number } | null; departureAt: string }>(`import prisma from "./packages/libs/prisma"; (async () => { const b = await prisma.booking.findUnique({ where: { id: "${dealId}" }, select: { cancellationTerms: true, trip: true } }); console.log("@@" + JSON.stringify({ cancellationTerms: b!.cancellationTerms ?? null, departureAt: (b!.trip as { departureAt: Date }).departureAt })); process.exit(0); })();`);
+    const avant = termes();
+    expect(avant.cancellationTerms, "figées à la création").toEqual({ fullRefundUntilHours: 48, lateRetentionPct: 50 });
+    /* Le barème change après la réservation. */
+    await poser(sup.contexte, { "cancellation.fullRefundUntilHours": 12, "cancellation.lateRetentionPct": 30 });
+    await new Promise((r) => setTimeout(r, 32_000)); // cache de 30 s du deal-service
+    expect(termes().cancellationTerms, "jamais réécrites").toEqual({ fullRefundUntilHours: 48, lateRetentionPct: 50 });
+    const vue = await expediteur.contexte.request.get(`${adresseDeLApi()}/deals/${dealId}`);
+    const apercu = ((await vue.json()) as { deal: { cancellationPreview: { retentionPct: number; fullRefundUntil: string } | null } }).deal.cancellationPreview;
+    constat(`aperçu servi après le changement : ${JSON.stringify(apercu)}`);
+    expect(apercu, "l'aperçu annonce les conditions de CETTE réservation").toMatchObject({ retentionPct: 50, fullRefundUntil: new Date(new Date(avant.departureAt).getTime() - 48 * 3_600_000).toISOString() });
+  });
+
+  test("ADM-PAR-14 · l'Exploitation : « Tout réinitialiser » dans sa portée, la portée avant les bornes (ajoutée, A173 · A174)", async ({ navigateurAdmin }) => {
+    test.setTimeout(4 * 60_000);
+    const sup = await navigateurAdmin("super");
+    const ops = await navigateurAdmin("exploitation");
+    await poser(sup.contexte, { "pricing.commissionPct": 14, "alerts.outboxLagMinutes": 30 });
+    /* A173 — reset global par OPS : sa clé seulement, la clé métier nommée et laissée. */
+    const r = await remettre(ops.contexte, { expectedVersion: (await lire(ops.contexte)).version });
+    expect(r.status(), await r.text()).toBe(200);
+    const corps = (await r.json()) as { changed: Array<{ key: string }>; skipped?: string[] };
+    expect(corps.changed.map((c) => c.key)).toEqual(["alerts.outboxLagMinutes"]);
+    expect(corps.skipped).toEqual(["pricing.commissionPct"]);
+    expect((await lire(sup.contexte)).values["pricing.commissionPct"], "la clé métier est intacte").toBe(14);
+    /* A174 — hors portée ET hors bornes : 403 sans les bornes. */
+    const refus = await ecrire(ops.contexte, { "pricing.commissionPct": 99 }, (await lire(ops.contexte)).version);
+    const texte = await refus.text();
+    constat(`OPS, clé métier hors bornes → ${refus.status()} ${texte}`);
+    expect(refus.status()).toBe(403);
+    expect(texte, "aucune borne divulguée").not.toMatch(/between|\b5\b.*\b20\b/);
+    await remettre(sup.contexte, { expectedVersion: (await lire(sup.contexte)).version });
   });
 });

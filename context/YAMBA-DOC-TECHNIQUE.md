@@ -9233,3 +9233,56 @@ absents : ici on ne FILTRE jamais sur `responseDueAt`, on le lit).
   par sa seule version, réutilisée après une remise à zéro du document.
 - `apps/e2e` : **471 scénarios** (457 + 12 ADM-PAR + 2 ADM-SIG).
 - Typecheck auth, deal, message, admin-ui, user-ui, harnais ; cinq `openapi.json` régénérés (`ReportDecision`).
+
+
+# Cahier 02-ADMIN, § 5.21 : données personnelles — une preuve par demande, un effacement par compte, des conditions acceptées qui tiennent
+
+Six scénarios ADM-RGP (1 à 4 du cahier ; 5 et 6 ajoutés), deux ADM-PAR ajoutés (13, 14), quatre anomalies closes
+(`ANO-ADM-57`, `58` majeures ; `59`, `60`), et les six arbitrages délégués du 15/09 sur les points ouverts du § 5.20
+(A172 → A175). Branche `chore/recette-admin-5-21`, empilée sur `chore/recette-admin-5-20`.
+
+## Ce qui a été corrigé, et pourquoi
+
+- **Registre RGPD journalisé une fois** (`apps/auth-service/src/controller/privacy.controller.ts`, `listDataRequests`) :
+  la première page passe par `recordAdminRead(prisma, redis, …)` (A168) ; une page suivante (curseur) reste écrite par
+  `recordAdminAction`. Test : `privacy-requests.controller.spec.ts` (le contrôleur est chargé par `require` APRÈS les
+  mocks : il construit son service au chargement, un `import` serait remonté avant les constantes des mocks).
+- **Effacement concurrent** (`apps/auth-service/src/services/privacy.service.ts`) : la transaction est enveloppée par
+  `withWriteConflictRetry` ; un compte absent ou déjà effacé lève `AccountNotFoundError`, que les deux contrôleurs
+  (membre, admin) traduisent en 404 `USER_NOT_FOUND`. Tests : conflit puis compte déjà effacé → 404, rien en double,
+  pas d'`afterErase` ; conflit puis voie libre → effacé une fois.
+- **Carte d'effacement** (`apps/admin-ui/src/components/UserFileView.tsx`) : l'issue (succès, ou « effacé par un autre
+  administrateur ») remonte dans la fiche via `onOutcome` — la carte est démontée quand le compte devient `isDeleted` ;
+  refus en français par statut ; rechargement sur 404.
+
+## A172 — les conditions d'annulation figées à la création
+
+- Schéma (`prisma/schema.prisma`) : type composite `BookingCancellationTerms { fullRefundUntilHours Int, lateRetentionPct
+  Int }`, champ **optionnel** `Booking.cancellationTerms` (les réservations existantes ne l'ont pas : c'est voulu, pas de
+  rattrapage).
+- Writer unique : `deal-request.service.ts` `createBooking` lit les paramètres UNE fois (`settingsNow`) pour le devis ET
+  pour `cancellationParamsFromSettings`, écrit `cancellationTerms` dans le même `booking.create`.
+- Lecture : `cancellationParamsForBooking(booking, courants)` (`booking-lifecycle.ts`) — snapshot complet sinon
+  courants ; utilisée par `cancel` (`deal-lifecycle.service.ts`) et `toCancellationPreview` (`booking-view.mapper.ts`) ;
+  `BOOKING_WRITE_SELECT` sélectionne le champ.
+- Tests : `settings-defaults.spec.ts` (règle pure), `booking-view.mapper.spec.ts` (aperçu figé / ancien),
+  `deal-lifecycle.service.spec.ts` (barème changé après création → snapshot appliqué ; sans snapshot → courants). Preuve
+  navigateur du writer : ADM-PAR-13.
+- Déploiement : `npx prisma generate` + `npx prisma db push` + rebâtir deal-service.
+
+## A173 · A174 · A175 — les paramètres
+
+- `platform-settings.service.ts` : `canWrite(actor, key)` factorisé ; `update` refuse les clés inconnues (400), puis la
+  PORTÉE (403 `ADMIN_ROLE_CHANGE_DENIED`, détails = le code seul), puis les bornes (400 avec la clé) ; `reset` sans liste
+  ne garde que les clés de la portée et renvoie `skipped` (contrat `SettingsWriteResponse.skipped`, optionnel ; aussi
+  dans les détails de `NOTHING_TO_RESET`). L'écran envoie toujours une liste explicite : inchangé.
+- `seed-settings.ts` : `update` du document avec `values: {}` et `version + 1` au lieu de `delete`. Le harnais ADM-PAR lit
+  la version laissée (`base`) ; PAR-7 (repli sûr) et PAR-8 (création concurrente) suppriment le document par manœuvre.
+- `settingsCoherenceIssues` : commentaire d'invariant défensif + test direct.
+
+## Chiffres
+
+- auth-service **270** (+7 : ANO-ADM-57 ×2, 58 ×2, A173, A174, invariant) ; deal-service **641** (+4, A172) ; message 57,
+  trip 293 inchangés.
+- `apps/e2e` : **479 scénarios** (471 + 6 ADM-RGP + 2 ADM-PAR).
+- Typecheck auth, deal, admin-ui, harnais ; cinq `openapi.json` régénérés (`SettingsWriteResponse.skipped`).
