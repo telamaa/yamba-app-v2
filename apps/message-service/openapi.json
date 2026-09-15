@@ -24485,6 +24485,10 @@
           "admin": {
             "type": "string"
           },
+          "adminUserId": {
+            "description": "ANO-ADM-68 — author id, so the screen filters on the server",
+            "$ref": "#/components/schemas/ObjectId"
+          },
           "action": {
             "type": "string"
           },
@@ -24532,6 +24536,7 @@
           "id",
           "at",
           "admin",
+          "adminUserId",
           "action",
           "targetType",
           "targetId",

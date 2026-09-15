@@ -9416,3 +9416,77 @@ proposés au § 5.22. Branche `chore/recette-admin-5-23`, empilée sur `chore/re
 - Typecheck auth, deal, message, trip, notification, gateway, admin-ui, harnais ; cinq `openapi.json` régénérés ;
   `YAMBA-PARAMETRES.md` régénéré (consommateur auth-service de `alerts.outboxLagMinutes`).
 - Déploiement : rebâtir auth-service, deal-service et api-gateway ; aucun changement de schéma Prisma.
+
+# Cahier 02-ADMIN, § 5.24 : journal d'audit — un filtre qui ment invalide la preuve de tout le cahier
+
+Sept scénarios ADM-JRN (1 à 4 du cahier ; 5 à 7 ajoutés), ADM-ETA-10 et ADM-MNT-7, 8 ajoutées (lots du § 5.23), quatre
+anomalies majeures et trois mineures closes (`ANO-ADM-68` à `74`), deux décisions inscrites au registre avant le code
+(A183, A184). Branche `chore/recette-admin-5-24`, empilée sur `chore/recette-admin-5-23`.
+
+## Ce qui a été corrigé, et pourquoi
+
+- **Auteur filtré côté serveur (ANO-ADM-68)** — « Filtrer sur cet auteur » écrivait le nom dans la recherche libre, qui ne
+  porte que sur les 50 lignes chargées : le geste ADM-JRN-3 « filtrer sur le Médiateur, dérouler » ne montrait jamais les
+  lignes au-delà de la première page. `listAdminAudit` (`apps/auth-service/src/controller/admin-auth.controller.ts`) sert
+  désormais `adminUserId` dans chaque ligne (`AdminAuditItemSchema`, `packages/libs/api-contracts/src/auth/member-auth.schema.ts`) ;
+  `AuditTable.tsx` pose le filtre serveur et affiche une pastille « Auteur : {nom} ✕ » (le filtre existait côté serveur
+  depuis A149, aucun écran ne s'en servait).
+- **Journées locales (ANO-ADM-69)** — le champ `<input type="date">` rend `2026-09-15` ; envoyé tel quel, le serveur le lit
+  `new Date("2026-09-15")` = minuit **UTC**. À Paris l'été, « du 15 au 15 » commençait à 02:00 et débordait sur le 16
+  jusqu'à 01:59. `localBound(day, end)` construit `new Date("2026-09-15T00:00:00.000")` (sans `Z` : heure locale) et envoie
+  `toISOString()` ; le serveur, qui accepte déjà un instant ISO, n'a pas changé.
+- **Catalogues fermés (A183, ANO-ADM-70, 71)** — `packages/libs/admin-audit/src/index.ts` exporte `ADMIN_TARGET_TYPES`
+  (`USER`, `BOOKING`, `TRIP`, `CONVERSATION`, `REPORT`, `SESSION`, `SETTINGS`) et type `AdminActionInput.action` /
+  `targetType` sur les deux catalogues (plus de `| (string & {})`). Le typage a débusqué deux écrivains qui élargissaient la
+  valeur en `string` (`privacy.controller.ts` : `as const` ; `admin-finance.service.ts` : paramètre `AdminActionType`).
+  L'écran : `ACTIONS` = toutes les clés de `ACTION_LABEL` triées par libellé (le select se construisait sur les lignes
+  chargées : un filtre posé cachait toutes les autres actions) ; `TARGET_TYPE_LABEL` en français (le select proposait
+  `DISPUTE`, `MAINTENANCE`, `EXPORT`, jamais écrits, et oubliait `CONVERSATION`). admin-ui n'importe pas `@packages/*` : les
+  listes sont des miroirs, et c'est le harnais (ADM-JRN-2) qui compare les deux côtés, plus la base (`groupBy`).
+- **Panne lisible (ANO-ADM-72)** — une lecture en échec laissait `items` vide et affichait « Aucune action journalisée. ».
+  État `error` + bloc `role="alert"` + « Réessayer » ; « Charger la suite » en échec ne jette plus une promesse rejetée.
+  Un compteur `seq` (`useRef`) ignore la réponse d'une lecture dépassée : taper vite dans un filtre ne laisse plus une
+  réponse ancienne écraser la dernière.
+- **Détail lisible (ANO-ADM-73)** — `auditDetail(after)` (`apps/admin-ui/src/lib/format.ts`) aplatit listes (`, `), objets
+  imbriqués et objets vides (« aucun ») ; utilisé par le journal ET les cartes « Actions admin sur ce compte / ce trajet »
+  (`UserFileView.tsx`, `TripFileView.tsx`), qui faisaient `JSON.stringify(a.after)`.
+- **Identifiant de cible non ObjectId (ANO-ADM-74)** — `buildAuditWhere` (`apps/auth-service/src/lib/admin-audit.query.ts`)
+  n'acceptait qu'un ObjectId : une clé de paramètre (`pricing.commissionPct`), `maintenance` ou l'identifiant d'une session
+  (32 hex) étaient IGNORÉS, et l'écran affichait le champ rempli au-dessus de toutes les lignes `SETTINGS`. Jeu de
+  caractères sûr `^[A-Za-z0-9._:-]{1,100}$` ; l'écran signale « Ignoré (format non reconnu) : … » pour tout champ rempli
+  que `appliedFilters` ne reprend pas. OpenAPI documente le motif.
+- **Index** — `@@index([ip, createdAt])` sur `AdminAction` (`prisma/schema.prisma`) : le filtre IP parcourait la collection.
+  `prisma db push` au déploiement.
+
+## Les lots du § 5.23 (A184)
+
+- **a, garde de session** — `AdminShell.tsx` : `ApiError.status === 401` → `/login` ; toute autre erreur → écran
+  « Back-office momentanément injoignable » + « Réessayer » (compteur `attempt` dans les dépendances de l'effet). Le
+  rafraîchissement d'`apiFetch` ne se déclenche que sur 401 : un 502 ne passe jamais par lui.
+- **b, rythme du bandeau** — `maintenancePollMs(state, now)` (`packages/libs/maintenance/index.ts`) : 15 s si active ou
+  annoncée, 60 s sinon. `MaintenanceBanner.tsx` (user-ui) sépare la lecture d'ouverture du minuteur, dont l'effet dépend de
+  `pollMs`. user-ui gagne l'alias `@packages/libs/maintenance` dans `paths` ET `include` de `tsconfig.json` (sinon TS6307).
+- **c, exemptions par segment** — `isExemptPath(path)` : `p === prefix || p.startsWith(prefix + "/")`, en minuscules.
+  Avant, `"/api/maintenance"` sans barre finale exemptait `/api/maintenanceX`.
+
+## Harnais
+
+- `adm-jrn-journal.spec.ts` : lit ce que l'écran demande (URL de la requête `/api/admin/audit`, `appliedFilters`) plutôt
+  que de supposer ; importe `ADMIN_ACTIONS` / `ADMIN_TARGET_TYPES` et `ACTION_LABEL` / `TARGET_TYPE_LABEL` pour comparer les
+  catalogues ; `alerte(page)` exclut l'annonceur de route de Next (`#__next-route-announcer__`, lui aussi `role="alert"`) ;
+  ADM-JRN-5 simule la panne par `page.route` (502 JSON).
+- `adm-eta-etat-services.spec.ts` : ETA-10 tue auth-service, navigue (« Mes sessions »), vérifie l'absence de `/login`,
+  relance en `finally`. `adm-mnt-maintenance.spec.ts` : MNT-7 horodate les requêtes `/api/maintenance` du navigateur
+  membre ; MNT-8 poste sur des chemins voisins des préfixes en lecture seule.
+
+## Vérifications
+
+- Tests : auth-service **296** (+3 : `admin-audit.query.spec.ts` 1, `maintenance-rules.spec.ts` 2), deal-service **644**,
+  message-service **57** (inchangés, typage seulement) ; harnais **506 scénarios** (496 + JRN 7, ETA-10, MNT-7, 8).
+- Contre-épreuve : écran et garde d'origine remis (admin-ui rechargé à chaud) → JRN-1, 2, 3, 5, 6, 7 rouges (JRN-4 ne
+  touche aucun code corrigé) ; `AdminShell`, bandeau et règle d'exemption d'origine (gateway rebâti) → ETA-10, MNT-7, 8
+  rouges ; `buildAuditWhere` d'origine (auth-service rebâti) → JRN-3 rouge (clé de paramètre ignorée).
+- Typecheck auth, deal, trip, message, notification, gateway, admin-ui, user-ui, harnais ; cinq `openapi.json`
+  régénérés.
+- Déploiement : `prisma generate` + `prisma db push` (index), rebâtir auth-service, deal-service (types seulement) et
+  api-gateway.

@@ -196,7 +196,7 @@ export const listDataRequests = async (req: AuthenticatedRequest, res: Response,
     const label = new Map(users.map((u) => [u.id, u.isDeleted ? "Membre supprimé" : `${u.firstName} ${u.lastName.charAt(0)}.`]));
     // ANO-ADM-57 (recette 02-ADMIN § 5.21) — une ouverture du registre écrivait deux lignes (double lecture de l'écran) :
     // la première page est une lecture d'écran coalescée (A168) ; « Charger la suite » (curseur) s'écrit toujours.
-    const viewed = { adminUserId: req.user.id, action: "DATA_REQUESTS_VIEWED", targetType: "USER", targetId: byUser, after: { rows: page.length }, ...meta(req) };
+    const viewed = { adminUserId: req.user.id, action: "DATA_REQUESTS_VIEWED" as const, targetType: "USER" as const, targetId: byUser, after: { rows: page.length }, ...meta(req) };
     if (cursor) await recordAdminAction(prisma, viewed);
     else await recordAdminRead(prisma, redis, viewed);
     const body: DataRequestsResponse = {

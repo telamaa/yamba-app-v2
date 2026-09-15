@@ -796,6 +796,19 @@ Ordre de demarrage : auth -> trip -> gateway.
   sur le Fake + manoeuvres base). AMELIORATIONS : carte qui nomme le fournisseur, aide FR par divergence, statuts FR,
   refus par code, journal « Rapprochement fournisseur ». PIEGE : la memoire du Fake survit au rejeu du jeu d'essai (une
   fiche constate l'etat initial, ne l'exige pas). Tests : deal 598, harnais 419. Reste : § 5.14 a 8.
+- 15/09 : **CAHIER 02-ADMIN — § 5.24 JOURNAL D'AUDIT (branche `chore/recette-admin-5-24`, empilee sur #324)** — 7
+  scenarios ADM-JRN (1 a 4 du cahier + JRN-5 panne, JRN-6 journees locales, JRN-7 pagination filtree) + ADM-ETA-10,
+  ADM-MNT-7, 8 (lots du § 5.23) ; JRN 14/14 sur deux passages, voisins ETA, MNT, USR, TRJ 34/35 au premier passage (seule
+  JRN-1 rouge : ANO-ADM-74, corrigee). CONTRE-EPREUVE : JRN-1, 2, 3, 5, 6, 7, ETA-10, MNT-7, 8 ROUGES. ANO-ADM-68 CLOSE
+  (majeure) : « Filtrer sur cet auteur » = recherche locale sur 50 lignes. ANO-ADM-69 CLOSE (majeure) : « Du / Au » lus en
+  UTC (journee de Paris decalee de 2 h). ANO-ADM-70 CLOSE (majeure) : « Type de cible » proposait DISPUTE, MAINTENANCE,
+  EXPORT jamais ecrits et oubliait CONVERSATION. ANO-ADM-74 CLOSE (majeure) : identifiant de cible non ObjectId (cle de
+  parametre, `maintenance`, session) ignore sans le dire. ANO-ADM-71, 72, 73 (mineures) : select « Action » reduit aux
+  lignes chargees, panne affichee « Aucune action journalisee. », detail en JSON brut (journal et cartes). DECISIONS : A183
+  (catalogues `ADMIN_ACTIONS` / `ADMIN_TARGET_TYPES` fermes et types, filtres = ceux du serveur, index `[ip, createdAt]`),
+  A184 (lots : `AdminShell` → /login sur 401 seulement, bandeau membre 15 s / 60 s, `isExemptPath` par segment). Schema :
+  un index (`prisma db push`). Tests : auth 296, deal 644, message 57, trip 293, notification 122, harnais 506. Reste :
+  § 5.25 a 8.
 - 15/09 : **CAHIER 02-ADMIN — § 5.23 MAINTENANCE (branche `chore/recette-admin-5-23`, empilee sur #323)** — 6 scenarios
   ADM-MNT (1 a 4 du cahier + MNT-5 salve d'enregistrements, MNT-6 date passee / saisie longue) + ADM-ETA-8, 9 et ADM-RGP-8
   (lots du § 5.22), RGP-2 realignee ; 10/10 verts, MNT deux fois (avec voisins ETA, RGP, ALR, WEB-MNT : 30/31, RGP-2
