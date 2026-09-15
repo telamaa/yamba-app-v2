@@ -46,6 +46,7 @@ export const ACTION_LABEL: Record<string, string> = {
   ADMIN_LOGOUT: "Déconnexion",
   ADMIN_TOTP_ENABLED: "2FA activée",
   ADMIN_BACKUP_CODE_USED: "Code de secours utilisé",
+  ADMIN_BACKUP_CODES_REGENERATED: "Codes de secours régénérés",
   DISPUTE_VIEWED: "Dossier consulté",
   DISPUTE_RESOLVED: "Litige tranché",
   RETENTION_ARBITRATED: "Retenue arbitrée",
@@ -55,6 +56,7 @@ export const ACTION_LABEL: Record<string, string> = {
   ADMIN_ROLE_CHANGED: "Profil admin modifié",
   ADMIN_REVOKED: "Accès admin retiré",
   ADMIN_SESSION_REVOKED: "Session révoquée",
+  ADMIN_SESSIONS_REVOKED: "Autres sessions révoquées",
   USER_VIEWED: "Fiche consultée",
   USER_SUSPENSION_PROPOSED: "Suspension proposée",
   USER_SUSPENDED: "Compte suspendu",
@@ -488,8 +490,8 @@ export function erasureBlockerLabel(blocker: string, count: number | undefined):
   }
 }
 
-/** A188 d (ANO-ADM-84) — « 2 code(s) » : pluriel accordé ; à zéro, le recours est dit (aucune régénération au back-office). */
+/** A188 d (ANO-ADM-84) — « 2 code(s) » : pluriel accordé. A190 a — le recours est la régénération depuis « Mes sessions ». */
 export function backupCodesWarning(n: number): string {
-  if (n <= 0) return "Tu n'as plus de code de secours : si tu perds ton application d'authentification, un super administrateur devra réinitialiser ta double authentification.";
-  return `Il te reste ${n} ${n === 1 ? "code" : "codes"} de secours.`;
+  if (n <= 0) return "Tu n'as plus de code de secours : régénère-les depuis « Mes sessions » avec un code de ton application d'authentification.";
+  return `Il te reste ${n} ${n === 1 ? "code" : "codes"} de secours — tu peux les régénérer depuis « Mes sessions ».`;
 }

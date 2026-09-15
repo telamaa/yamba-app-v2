@@ -3754,6 +3754,162 @@
             }
           }
         }
+      },
+      "delete": {
+        "security": [
+          {
+            "adminCookieAuth": []
+          }
+        ],
+        "x-permission": "(session)",
+        "tags": [
+          "admin-auth"
+        ],
+        "summary": "Revoke every other ADMIN session (the current one stays)",
+        "description": "One ADMIN_SESSIONS_REVOKED audit line with the count; none when nothing was revoked.",
+        "operationId": "revokeOtherAdminSessions",
+        "responses": {
+          "200": {
+            "description": "OtherSessionsRevoked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "revoked": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "revoked"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No ADMIN session: admin_access_token missing, expired or without amr pwd+totp (isAdminAuthenticated)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unhandled server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnhandledError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/me/backup-codes": {
+      "post": {
+        "security": [
+          {
+            "adminCookieAuth": []
+          }
+        ],
+        "x-permission": "(session)",
+        "tags": [
+          "admin-auth"
+        ],
+        "summary": "Regenerate my backup codes with a valid TOTP code",
+        "description": "Old codes are invalidated in the same write as the ADMIN_BACKUP_CODES_REGENERATED audit line; the new codes are returned once and never readable again. A backup code is refused.",
+        "operationId": "regenerateAdminBackupCodes",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "pattern": "^\\d{6}$"
+                  }
+                },
+                "required": [
+                  "code"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "BackupCodesRegenerated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "backupCodes": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "backupCodes"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request (ValidationError — details.errors per field when available)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No ADMIN session: admin_access_token missing, expired or without amr pwd+totp (isAdminAuthenticated)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden — details.code = SUDO_REQUIRED when the sudo window is closed (D65)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unhandled server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnhandledError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/admin/me/sessions/{jti}": {

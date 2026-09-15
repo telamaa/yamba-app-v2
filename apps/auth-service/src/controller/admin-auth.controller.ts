@@ -109,6 +109,19 @@ async function requirePreauth(req: Request) {
   return user;
 }
 
+/**
+ * Les revendications du jeton d'accès admin — une seule définition pour l'ouverture ET le renouvellement.
+ * A190 c (recette § 6) : le renouvellement ne remettait pas `adminRole` / `adminRoles` dans le jeton ; sans effet tant que
+ * le middleware relit la base, mais deux jetons d'une même session ne disaient pas la même chose.
+ */
+function adminAccessClaims(user: { id: string; roles: string[]; adminRole?: string | null; adminRoles?: string[] | null }, jti: string) {
+  return { id: user.id, jti, roles: user.roles, adm: true, amr: ["pwd", "totp"], adminRole: user.adminRole ?? null, adminRoles: adminRolesOf(user) };
+}
+
+/** A190 d — clé de rotation : l'ancien jti renouvelé pointe vers le nouveau pendant ROTATION_GRACE_SECONDS. */
+const ROTATION_GRACE_SECONDS = 30;
+const rotatedKey = (userId: string, jti: string) => `admin_rotated:${userId}:${jti}`;
+
 /** Ouvre la session admin : cookies + record Redis + JWT porteur de `amr: ["pwd","totp"]`. */
 async function issueAdminSession(req: Request, res: Response, user: { id: string; roles: string[] }): Promise<void> {
   const createdAt = Date.now();
@@ -117,7 +130,7 @@ async function issueAdminSession(req: Request, res: Response, user: { id: string
   if (ttl <= 0) throw new AuthError("Admin session could not be opened.", { code: "ADMIN_SESSION_FAILED" });
   const accessToken = jwt.sign(
     // ANO-ADM-04 — le jeton d'accès porte le jti de sa session : isAdminAuthenticated vérifie qu'elle existe encore.
-    { id: user.id, jti, roles: user.roles, adm: true, amr: ["pwd", "totp"], adminRole: (user as { adminRole?: string | null }).adminRole ?? null, adminRoles: adminRolesOf(user as { adminRole?: string | null; adminRoles?: string[] | null }) },
+    adminAccessClaims(user, jti),
     process.env.ACCESS_TOKEN_SECRET as string,
     { expiresIn: "15m" }
   );
@@ -261,29 +274,54 @@ export const adminRefresh = async (req: Request, res: Response, next: NextFuncti
       clearAdminCookies(res);
       return next(new AuthError("Admin refresh token invalid.", { code: "ADMIN_REFRESH_INVALID" }));
     }
-    const session = await getAdminSession(decoded.id, decoded.jti);
-    if (!session) {
-      clearAdminCookies(res);
-      return next(new AuthError("Admin session expired.", { code: "ADMIN_SESSION_EXPIRED" }));
-    }
     const user = await prisma.user.findUnique({ where: { id: decoded.id } });
     if (!user || user.isDeleted || !user.roles.includes("ADMIN") || !user.totpEnabledAt) {
       clearAdminCookies(res);
       return next(new ForbiddenError("Not an admin account.", { code: "NOT_AN_ADMIN" }));
     }
-    // Rotation : nouveau jti, MÊME createdAt (c'est lui qui borne la vie absolue).
     const now = Date.now();
-    const newJti = createRefreshJti();
-    // A188 a — l'appareil et l'IP d'OUVERTURE suivent la session (ceux d'une session d'avant la correction : ceux du renouvellement).
-    const ttl = await storeAdminSession(user.id, newJti, session.createdAt, now, session.device ? session : adminSessionClient(req));
-    await revokeAdminSession(user.id, decoded.jti);
-    if (ttl <= 0) {
-      clearAdminCookies(res);
-      return next(new AuthError("Admin session expired.", { code: "ADMIN_SESSION_EXPIRED" }));
+    // A190 d (recette § 6) — deux onglets qui renouvellent au même instant présentent le MÊME jeton. Avant : chacun créait
+    // une session, le navigateur n'en gardait qu'une, l'autre restait « fantôme » dans « Mes sessions » jusqu'à
+    // l'inactivité (45 min). Le renouvellement d'un jti est désormais RÉCLAMÉ par un SET NX atomique : un seul gagnant crée
+    // la session suivante ; le perdant reçoit, pendant la fenêtre de grâce, des jetons pour cette MÊME session.
+    const candidate = createRefreshJti();
+    const won = (await redis.set(rotatedKey(user.id, decoded.jti), candidate, "EX", ROTATION_GRACE_SECONDS, "NX")) === "OK";
+    let newJti: string;
+    let createdAt: number;
+    if (won) {
+      const session = await getAdminSession(user.id, decoded.jti);
+      if (!session) {
+        await redis.del(rotatedKey(user.id, decoded.jti));
+        clearAdminCookies(res);
+        return next(new AuthError("Admin session expired.", { code: "ADMIN_SESSION_EXPIRED" }));
+      }
+      newJti = candidate;
+      createdAt = session.createdAt;
+      // A188 a — l'appareil et l'IP d'OUVERTURE suivent la session (ceux d'une session d'avant la correction : ceux du renouvellement).
+      const ttl = await storeAdminSession(user.id, newJti, createdAt, now, session.device ? session : adminSessionClient(req));
+      await revokeAdminSession(user.id, decoded.jti);
+      if (ttl <= 0) {
+        clearAdminCookies(res);
+        return next(new AuthError("Admin session expired.", { code: "ADMIN_SESSION_EXPIRED" }));
+      }
+    } else {
+      // Le gagnant écrit sa session juste après sa réclamation : quelques allers-retours d'attente au plus.
+      const successor = await redis.get(rotatedKey(user.id, decoded.jti));
+      let suivante = successor ? await getAdminSession(user.id, successor) : null;
+      for (let i = 0; successor && !suivante && i < 10; i++) {
+        await new Promise((r) => setTimeout(r, 50));
+        suivante = await getAdminSession(user.id, successor);
+      }
+      if (!successor || !suivante) {
+        clearAdminCookies(res);
+        return next(new AuthError("Admin session expired.", { code: "ADMIN_SESSION_EXPIRED" }));
+      }
+      newJti = successor;
+      createdAt = suivante.createdAt;
     }
-    const accessToken = jwt.sign({ id: user.id, jti: newJti, roles: user.roles, adm: true, amr: ["pwd", "totp"] }, process.env.ACCESS_TOKEN_SECRET as string, { expiresIn: "15m" });
-    const lifetimeSeconds = Math.ceil(adminRemainingLifetimeMs(session.createdAt, loadAdminSessionPolicy(), now) / 1000);
-    const refreshToken = jwt.sign({ id: user.id, jti: newJti, adm: true, sca: session.createdAt } satisfies AdminRefreshPayload, process.env.REFRESH_TOKEN_SECRET as string, { expiresIn: lifetimeSeconds });
+    const accessToken = jwt.sign(adminAccessClaims(user, newJti), process.env.ACCESS_TOKEN_SECRET as string, { expiresIn: "15m" });
+    const lifetimeSeconds = Math.ceil(adminRemainingLifetimeMs(createdAt, loadAdminSessionPolicy(), now) / 1000);
+    const refreshToken = jwt.sign({ id: user.id, jti: newJti, adm: true, sca: createdAt } satisfies AdminRefreshPayload, process.env.REFRESH_TOKEN_SECRET as string, { expiresIn: lifetimeSeconds });
     setAdminSessionCookies(res, accessToken, refreshToken, lifetimeSeconds * 1000);
     return res.status(200).json({ ok: true });
   } catch (e) {
@@ -459,6 +497,63 @@ export const revokeAdminSessionById = async (req: AuthenticatedRequest, res: Res
     await recordAdminAction(prisma, { adminUserId: req.user.id, action: "ADMIN_SESSION_REVOKED", targetType: "SESSION", targetId: jti, ...clientMeta(req) });
     if (jti === currentJti(req)) clearAdminCookies(res);
     return res.status(200).json({ ok: true });
+  } catch (e) {
+    return next(e);
+  }
+};
+
+/**
+ * A190 b (recette § 6) — « Révoquer toutes mes autres sessions » : la session courante reste ouverte, les autres sont
+ * fermées d'un geste. UNE ligne de journal avec le nombre (rien si aucune autre session : pas de ligne pour un geste nul).
+ */
+export const revokeOtherAdminSessions = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    const mine = currentJti(req);
+    let cursor = "0";
+    const others: string[] = [];
+    do {
+      const [nextCursor, keys] = await redis.scan(cursor, "MATCH", `admin_jti:${req.user.id}:*`, "COUNT", 100);
+      cursor = nextCursor;
+      for (const key of keys) {
+        const jti = key.split(":").pop() as string;
+        if (jti !== mine) others.push(jti);
+      }
+    } while (cursor !== "0");
+    let revoked = 0;
+    for (const jti of others) if (await revokeAdminSession(req.user.id, jti)) revoked++;
+    if (revoked > 0) await recordAdminAction(prisma, { adminUserId: req.user.id, action: "ADMIN_SESSIONS_REVOKED", targetType: "SESSION", after: { count: revoked }, ...clientMeta(req) });
+    return res.status(200).json({ ok: true, revoked });
+  } catch (e) {
+    return next(e);
+  }
+};
+
+/**
+ * A190 a (recette § 6) — régénérer ses codes de secours depuis « Mes sessions », sur présentation d'un code TOTP valide
+ * (jamais un code de secours : on ne renouvelle pas la clé de secours avec la clé de secours). Les anciens codes sont
+ * invalidés dans la MÊME écriture que la ligne de journal ; les nouveaux ne sont montrés qu'une fois (jamais relus).
+ */
+export const regenerateAdminBackupCodes = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    const user = await prisma.user.findUnique({ where: { id: req.user.id } });
+    if (!user || !user.totpEnabledAt || !user.totpSecretEncrypted) return next(new ForbiddenError("Two-factor authentication is not enabled.", { code: "TOTP_NOT_ENABLED" }));
+    // Session ouverte : un mauvais code n'est pas une session invalide — 400/403, jamais 401 (le client relancerait un renouvellement).
+    if (await totpFailuresExceeded(user.id)) return next(new ForbiddenError("Too many attempts. Try again in 15 minutes.", { code: "TOO_MANY_ATTEMPTS" }));
+    const raw = String((req.body as { code?: string })?.code ?? "").replace(/\s+/g, "");
+    const secret = decryptTotpSecret(user.totpSecretEncrypted);
+    if (!secret) return next(new ForbiddenError("Stored secret unreadable.", { code: "TOTP_SECRET_UNREADABLE" }));
+    const verdict = /^\d{6}$/.test(raw) ? verifyTotp(secret, raw, { lastUsedStep: user.totpLastUsedStep }) : { ok: false as const };
+    if (!verdict.ok) {
+      await registerTotpFailure(user.id);
+      return next(new ValidationError("Invalid code.", { code: "OTP_INCORRECT" }));
+    }
+    await clearTotpFailures(user.id);
+    const backupCodes = generateBackupCodes();
+    await prisma.$transaction(async (tx) => {
+      await tx.user.update({ where: { id: user.id }, data: { totpLastUsedStep: verdict.step, totpBackupCodeHashes: backupCodes.map(hashBackupCode) } });
+      await recordAdminAction(tx, { adminUserId: user.id, action: "ADMIN_BACKUP_CODES_REGENERATED", targetType: "USER", targetId: user.id, before: { remaining: user.totpBackupCodeHashes.length }, after: { remaining: backupCodes.length }, ...clientMeta(req) });
+    });
+    return res.status(200).json({ backupCodes });
   } catch (e) {
     return next(e);
   }

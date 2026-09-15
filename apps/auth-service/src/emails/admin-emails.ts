@@ -20,7 +20,9 @@ export type AdminAccessGrantedParams = { firstName: string; invitedBy: string; r
 export type AdminLoginAlertParams = { firstName: string; at: string; ip: string; userAgent: string; sessionsUrl: string; supportEmail: string };
 export type AdminRolesChangedParams = { firstName: string; changedBy: string; before: string; after: string; supportEmail: string };
 export type AdminAccessRevokedParams = { firstName: string; revokedBy: string; supportEmail: string };
-export type AccountStatusParams = { firstName: string; reason: string; until: string | null; supportEmail: string };
+/** ANO-ADM-87 (recette § 6, ADM-E2E-2) — pas de champ `reason` : le motif saisi au back-office (souvent recopié de la proposition du
+ *  Support, parfois nourri des signalements) ne quitte JAMAIS le back-office. Le membre lit un motif générique et l'adresse de recours. */
+export type AccountStatusParams = { firstName: string; until: string | null; supportEmail: string };
 /** C-PR8a (D62 5A) — chaque modification de paramètre est annoncée à tous les SUPER_ADMIN. */
 /** `kind` (A181) : la transition choisit le sujet — lever une maintenance annoncée n'est pas une maintenance planifiée. */
 export type MaintenanceChangedParams = { firstName: string; byName: string; kind: "ENABLED" | "LIFTED" | "SCHEDULED" | "UNSCHEDULED" | "UPDATED"; enabled: boolean; scheduledAt: string | null; message: string; reason: string; statusUrl: string };
@@ -116,7 +118,7 @@ const fr: AdminEmailDictionary = {
       title: "Compte restreint",
       greeting: `Bonjour ${p.firstName},`,
       paragraphs: [
-        `Ton compte ne peut plus publier de trajet ni réserver d'envoi${p.until ? ` jusqu'au ${p.until}` : ", jusqu'à nouvel ordre"}. Motif : ${p.reason}`,
+        `Ton compte ne peut plus publier de trajet ni réserver d'envoi${p.until ? ` jusqu'au ${p.until}` : ", jusqu'à nouvel ordre"}, à la suite d'un manquement aux règles d'utilisation de Yamba constaté par notre équipe.`,
         "Tes deals en cours continuent normalement.",
       ],
       notice: { tone: "warning", text: `Pour contester, écris-nous à ${p.supportEmail}.` },
@@ -130,7 +132,7 @@ const fr: AdminEmailDictionary = {
       title: "Compte suspendu",
       greeting: `Bonjour ${p.firstName},`,
       paragraphs: [
-        `Ton compte est suspendu${p.until ? ` jusqu'au ${p.until}` : ", jusqu'à nouvel ordre"} : la connexion est refusée et tes trajets ne sont plus visibles. Motif : ${p.reason}`,
+        `Ton compte est suspendu${p.until ? ` jusqu'au ${p.until}` : ", jusqu'à nouvel ordre"} : la connexion est refusée et tes trajets ne sont plus visibles. Cette décision fait suite à un manquement aux règles d'utilisation de Yamba constaté par notre équipe.`,
         "Tes deals en cours sont pris en charge par notre équipe.",
       ],
       notice: { tone: "warning", text: `Pour contester, écris-nous à ${p.supportEmail}.` },
@@ -258,7 +260,7 @@ const en: AdminEmailDictionary = {
       preheader: "You can no longer publish or book for now.",
       title: "Account restricted",
       greeting: `Hi ${p.firstName},`,
-      paragraphs: [`Your account can no longer publish trips or book shipments${p.until ? ` until ${p.until}` : ", until further notice"}. Reason: ${p.reason}`, "Your ongoing deals continue normally."],
+      paragraphs: [`Your account can no longer publish trips or book shipments${p.until ? ` until ${p.until}` : ", until further notice"}, following a breach of Yamba's terms of use found by our team.`, "Your ongoing deals continue normally."],
       notice: { tone: "warning", text: `To contest, write to ${p.supportEmail}.` },
       reason: "You receive this email because a decision was made on your Yamba account.",
     },
@@ -269,7 +271,7 @@ const en: AdminEmailDictionary = {
       preheader: "Sign-in is refused during the suspension.",
       title: "Account suspended",
       greeting: `Hi ${p.firstName},`,
-      paragraphs: [`Your account is suspended${p.until ? ` until ${p.until}` : ", until further notice"}: sign-in is refused and your trips are hidden. Reason: ${p.reason}`, "Your ongoing deals are handled by our team."],
+      paragraphs: [`Your account is suspended${p.until ? ` until ${p.until}` : ", until further notice"}: sign-in is refused and your trips are hidden. This decision follows a breach of Yamba's terms of use found by our team.`, "Your ongoing deals are handled by our team."],
       notice: { tone: "warning", text: `To contest, write to ${p.supportEmail}.` },
       reason: "You receive this email because a decision was made on your Yamba account.",
     },

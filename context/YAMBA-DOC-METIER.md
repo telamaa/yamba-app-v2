@@ -6165,3 +6165,44 @@ d'email si les profils sont les mêmes dans un autre ordre, si le compte est sup
 **Tests d'acceptation.** ADM-SES-1 (cahier) et 2 à 5 (ajoutées) dans `adm-ses-mes-sessions.spec.ts` ; ADM-CPT-12 et 13
 dans `adm-cpt-comptes-admin.spec.ts` ; règles prouvées par `admin-auth-sessions.controller.spec.ts`,
 `admin-admins.controller.spec.ts`, `admin-accounts.rules.spec.ts` et `admin-emails.spec.ts` (auth-service).
+
+# Cahier 02-ADMIN, § 6 : cas de bout en bout
+
+**Le besoin.** Chaque écran du back-office a été vérifié seul au § 5. Un geste réel en traverse plusieurs : une médiation
+touche la file, le dossier, la conversation, l'argent, les emails des deux parties, la réputation interne, le rapport
+mensuel et le journal. Le § 6 vérifie que tous ces endroits racontent la même histoire, avec les vrais profils (le Support
+propose, le Médiateur décide, la Finance relit).
+
+**RG-ADM-E2E-01 — Le journal raconte l'histoire.** Filtré sur la cible (deal, membre, trajet, maintenance), il montre les
+gestes dans l'ordre, chacun avec son auteur. Une consultation d'une autre cible (la conversation d'un deal, une clé de
+paramètre) se lit sur SA cible.
+
+**RG-ADM-E2E-02 — Un email de sanction ne transporte jamais le motif interne (A191).** Le membre restreint ou suspendu lit
+un motif générique (« un manquement aux règles d'utilisation de Yamba constaté par notre équipe »), la date de fin s'il y en
+a une et l'adresse de recours. Le motif saisi au back-office — souvent repris de la proposition du Support et nourri des
+signalements — reste au journal et sur la fiche. Raison : ne pas exposer des notes internes ni permettre d'identifier un
+auteur de signalement.
+
+**RG-ADM-E2E-03 — Un deal sans échange n'est pas une erreur.** Si les deux parties n'ont jamais écrit, le back-office dit
+« Les deux parties n'ont échangé aucun message sur ce deal : il n'y a pas de fil à lire. ».
+
+**RG-ADM-SES-06 — Régénérer ses codes de secours (A190 a).** Depuis « Mes sessions », avec un code à six chiffres de
+l'application d'authentification (jamais un code de secours). Les anciens codes cessent de fonctionner à l'instant où les
+nouveaux sont créés ; les nouveaux ne sont montrés qu'une fois. Un mauvais code n'interrompt pas la session. Le geste est
+journalisé, sans jamais écrire un code. L'avertissement « Il te reste n codes de secours » renvoie à ce geste.
+(Remplace, pour le recours, la RG-ADM-SES-02 : il n'est plus nécessaire qu'un super administrateur réinitialise la double
+authentification.)
+
+**RG-ADM-SES-07 — Révoquer toutes mes autres sessions (A190 b).** Un geste ferme toutes les sessions sauf celle depuis
+laquelle on agit ; l'écran dit combien ont été fermées ; une ligne de journal avec le nombre. Le bouton n'existe que s'il y a
+une autre session.
+
+**RG-ADM-SES-08 — Deux onglets, une session (A190 d).** Quand deux onglets renouvellent la session au même instant, ils
+reçoivent la même session : « Mes sessions » ne montre jamais de session fantôme.
+
+**Tests d'acceptation.** ADM-E2E-1 à 4 (`adm-e2e-bout-en-bout-1-4.spec.ts`), ADM-E2E-5 à 8
+(`adm-e2e-bout-en-bout-5-8.spec.ts`), ADM-SES-6 et 7 (`adm-ses-mes-sessions.spec.ts`) ; règles prouvées par
+`admin-auth-sessions.controller.spec.ts` et `admin-emails.spec.ts` (auth-service).
+
+**Ce qui reste à trancher.** Une catégorie de motif de sanction en liste fermée, lue par le membre (exposé des motifs
+spécifique sans texte libre) — proposée, structurante.

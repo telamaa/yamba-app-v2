@@ -29,6 +29,8 @@ import {
   listAdminAudit, listAdminAuditAuthors, exportAdminAudit,
   listAdminSessions,
   revokeAdminSessionById,
+  revokeOtherAdminSessions,
+  regenerateAdminBackupCodes,
 } from "../controller/admin-auth.controller";
 
 const router = Router();
@@ -48,6 +50,8 @@ router.get("/admin/kpis", isAdminAuthenticated, requireAdminPermission("kpi.read
 router.get("/admin/pilotage/series", isAdminAuthenticated, requireAdminPermission("pilotage.read"), getPilotageSeries); // C-PR6a (D59)
 router.get("/admin/pilotage/corridors", isAdminAuthenticated, requireAdminPermission("pilotage.read"), getPilotageCorridors);
 router.get("/admin/pilotage/drilldown", isAdminAuthenticated, requireAdminPermission("pilotage.read"), getPilotageDrilldown); // C-PR6c (D60 3A)
+router.delete("/admin/me/sessions", isAdminAuthenticated, revokeOtherAdminSessions); // A190 b
+router.post("/admin/me/backup-codes", isAdminAuthenticated, regenerateAdminBackupCodes); // A190 a
 router.delete("/admin/me/sessions/:jti", isAdminAuthenticated, revokeAdminSessionById);
 router.get("/admin/audit", isAdminAuthenticated, requireAdminPermission("audit.read"), listAdminAudit);
 router.get("/admin/audit/authors", isAdminAuthenticated, requireAdminPermission("audit.read"), listAdminAuditAuthors); // A187 a

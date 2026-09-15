@@ -55,3 +55,22 @@ describe("A189 c — l'admin dont les accès changent est prévenu, sans porte d
     expect(getAdminEmails("fr").adminRolesChanged({ firstName: "Sami", changedBy: "Sacha S.", before: "Support", after: "Finance", supportEmail: "s@y.app" }).subject).toBe("Tes profils sur le back-office Yamba ont changé");
   });
 });
+
+describe("ANO-ADM-87 (recette § 6, ADM-E2E-2) — l'email de sanction ne transporte jamais le motif interne", () => {
+  const params = { firstName: "Marc", until: null, supportEmail: "support@yamba.app" };
+  it("français et anglais : motif générique et adresse de recours, pour la restriction comme pour la suspension", () => {
+    for (const locale of ["fr", "en"]) {
+      const d = getAdminEmails(locale);
+      for (const email of [d.accountRestricted(params), d.accountSuspended(params)]) {
+        const texte = JSON.stringify(email.content);
+        expect(texte).toMatch(locale === "fr" ? /manquement aux règles d'utilisation de Yamba/ : /breach of Yamba's terms of use/);
+        expect(texte).toContain("support@yamba.app");
+        expect(texte).not.toMatch(/Motif :|Reason:/);
+      }
+    }
+  });
+  it("le type refuse un motif : le passer est une erreur de compilation", () => {
+    // @ts-expect-error — `reason` n'existe plus dans AccountStatusParams
+    getAdminEmails("fr").accountRestricted({ ...params, reason: "Trois signalements d'Aminata" });
+  });
+});
