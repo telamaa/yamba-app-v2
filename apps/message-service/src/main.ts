@@ -20,7 +20,7 @@ import cookieParser = require("cookie-parser");
 import { randomUUID } from "crypto";
 import pino from "pino";
 import { pinoHttp } from "pino-http";
-import { errorMiddleware } from "@packages/error-handler/error-middleware";
+import { errorMiddleware, notFoundHandler } from "@packages/error-handler/error-middleware";
 import { KafkaEventPublisher } from "@packages/messaging";
 import messageRouter from "./routes/message.routes";
 import adminRouter from "./routes/admin.router";
@@ -54,6 +54,7 @@ app.get("/openapi.json", (_req, res) => {
 app.use("/messages", messageRouter);
 // F-PR3 (D61 7A) — lecture admin depuis un dossier, file des signalements (session admin seulement).
 app.use("/admin/conversations", adminRouter);
+app.use(notFoundHandler); // ANO-ADM-27 — route inconnue : 404 JSON ROUTE_NOT_FOUND, jamais la page HTML d'Express
 app.use(errorMiddleware);
 
 const port = Number(process.env.MESSAGE_SERVICE_PORT ?? 6005);

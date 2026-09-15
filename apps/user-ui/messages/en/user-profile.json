@@ -98,5 +98,6 @@
     },
     "report": "Report this review",
     "reportSubject": "Report a review (#{id})"
-  }
+  },
+  "hiddenBanner": "This page is hidden: only you can see it. Turn « Public profile » back on in your profile to make it visible to others."
 }

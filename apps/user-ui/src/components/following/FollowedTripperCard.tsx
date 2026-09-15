@@ -31,7 +31,12 @@ export default function FollowedTripperCard({ item }: Props) {
 
   const [confirmingUnfollow, setConfirmingUnfollow] = useState(false);
 
-  const { mutate: unfollow, isPending: isUnfollowing } = useUnfollowUser();
+  // ANO-WEB-31 — les toasts du désabonnement sont branchés sur le HOOK (la carte est démontée par
+  // le retrait optimiste avant la réponse : un callback passé à `mutate` ne serait jamais appelé).
+  const { mutate: unfollow, isPending: isUnfollowing } = useUnfollowUser({
+    onSuccess: () => toast.success(t("unfollowSuccess")),
+    onError: () => toast.error(t("unfollowError")),
+  });
   const { mutate: updatePrefs, isPending: isUpdating } =
     useUpdateFollowPreferences();
 
@@ -50,10 +55,7 @@ export default function FollowedTripperCard({ item }: Props) {
       return;
     }
 
-    unfollow(user.publicSlug, {
-      onSuccess: () => toast.success(t("unfollowSuccess")),
-      onError: () => toast.error(t("unfollowError")),
-    });
+    unfollow(user.publicSlug);
   };
 
   const handleToggleNotify = () => {

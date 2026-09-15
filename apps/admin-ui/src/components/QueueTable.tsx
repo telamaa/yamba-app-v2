@@ -31,7 +31,7 @@ export default function QueueTable() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [f]);
 
-  if (error) return <p className="mt-6 text-[13px] text-red-700">{error}</p>;
+  if (error) return <p className="mt-6 text-[13px] text-red-700">La file n&apos;a pas pu être chargée : {error}</p>;
 
   return (
     <div className="mt-5">
@@ -44,9 +44,11 @@ export default function QueueTable() {
         <span className="ml-auto"><ExportButton me={me} path="/admin/disputes/export" params={params()} /></span>
       </div>
       {!data && <p className="mt-4 text-[13px] text-slate-500">Chargement…</p>}
-      {data && data.items.length === 0 && <p className="mt-4 rounded-xl border border-dashed border-slate-300 p-6 text-center text-[13px] text-slate-500">Rien à arbitrer avec ces filtres.</p>}
+      {/* Les compteurs de la FILE ENTIÈRE restent visibles quand un filtre ne rend rien : « rien avec ces filtres » ne doit
+          jamais se lire « rien à arbitrer ». */}
+      {data && <p className="mt-3 text-[12.5px] text-slate-500">{data.items.length} affiché(s) · file entière : {data.counts.disputes} litige(s) · {data.counts.retentions} retenue(s)</p>}
+      {data && data.items.length === 0 && <p className="mt-2 rounded-xl border border-dashed border-slate-300 p-6 text-center text-[13px] text-slate-500">Rien à arbitrer avec ces filtres.</p>}
       {data && data.items.length > 0 && (<>
-      <p className="mt-3 text-[12.5px] text-slate-500">{data.items.length} affiché(s) · file entière : {data.counts.disputes} litige(s) · {data.counts.retentions} retenue(s)</p>
       <div className="mt-2 overflow-x-auto rounded-xl border border-slate-200 bg-white">
         <table className="w-full text-[13px]">
           <thead className="bg-slate-50 text-left text-[11px] uppercase tracking-wider text-slate-500">

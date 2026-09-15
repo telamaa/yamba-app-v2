@@ -46,6 +46,7 @@ const fr: TripEmailDictionary = {
       greeting: `Bonjour ${p.firstName},`,
       paragraphs: [`Ton trajet ${p.route} n'apparaît plus dans la recherche ni sur sa page publique : il fait l'objet d'un examen par notre équipe (informations du trajet, justificatifs ou signalement).`, "Les réservations déjà acceptées continuent normalement. Ce n'est pas une annulation, et le trajet peut être rétabli."],
       notice: { tone: "warning", text: `Pour en discuter, écris-nous à ${p.supportEmail}.` },
+      cta: { label: "Voir mon trajet", url: p.tripUrl }, // ANO-ADM-18 — le lien vers son trajet manquait (l'URL était calculée, jamais servie)
       reason: "Tu reçois cet email parce qu'une décision a été prise sur un de tes trajets Yamba.",
     },
   }),
@@ -94,6 +95,7 @@ const en: TripEmailDictionary = {
       greeting: `Hi ${p.firstName},`,
       paragraphs: [`Your trip ${p.route} no longer shows in search nor on its public page: it is under review by our team (trip details, documents or a report).`, "Bookings already accepted continue normally. This is not a cancellation, and the trip can be restored."],
       notice: { tone: "warning", text: `To discuss it, write to ${p.supportEmail}.` },
+      cta: { label: "View my trip", url: p.tripUrl },
       reason: "You receive this email because a decision was made on one of your Yamba trips.",
     },
   }),

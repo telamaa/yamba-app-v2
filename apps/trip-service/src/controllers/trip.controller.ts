@@ -34,6 +34,7 @@ import {
 } from "../services/pricing-gate";
 import { chunkUpdateData } from "../lib/mongo-update-chunks";
 import { publicTripWhere } from "../lib/public-visibility.rules";
+import { changedTicketFacts, tripTicketStatusFromDocuments } from "../lib/ticket-status.rules";
 import { computeComparablePriceCents, comparableParamsFromSettings, DEFAULT_COMPARABLE_PARAMS, type ComparableParams } from "../lib/comparable-price";
 import { platformSettings } from "@packages/libs/settings/default";
 
@@ -424,6 +425,23 @@ export const updateTrip = async (
       })) as typeof updated;
     }
 
+    // ANO-ADM-21 (A158, recette 02-ADMIN § 5.8) — la vérification d'un billet atteste des FAITS (date, villes) :
+    // les changer rouvre la vérification. Les billets vérifiés repassent en attente, le badge tombe, la file les reprend.
+    const factsChanged = changedTicketFacts(
+      { departureAt: trip.departureAt, originCity: trip.originCity, destinationCity: trip.destinationCity },
+      updateData
+    );
+    if (factsChanged.length > 0) {
+      const reopened = await prisma.tripDocument.updateMany({
+        where: { tripId: id, type: "TICKET_PROOF", status: "VERIFIED" },
+        data: { status: "PENDING", verifiedAt: null, reviewedByAdminId: null },
+      });
+      if (reopened.count > 0) {
+        await syncTripTicketStatus(id);
+        updated = (await prisma.trip.findUnique({ where: { id }, include: { documents: true } })) as typeof updated;
+      }
+    }
+
     if (publish === true && trip.status === "DRAFT") {
       triggerTripPublishedNotifications(updated);
     }
@@ -437,6 +455,13 @@ export const updateTrip = async (
     return next(error);
   }
 };
+
+/** ANO-ADM-19 — recalcule `ticketVerificationStatus` depuis les billets du trajet (source : `ticket-status.rules.ts`). */
+async function syncTripTicketStatus(tripId: string): Promise<void> {
+  const billets = await prisma.tripDocument.findMany({ where: { tripId, type: "TICKET_PROOF" }, select: { type: true, status: true } });
+  const synthese = tripTicketStatusFromDocuments(billets.map((b) => ({ type: String(b.type), status: String(b.status) })));
+  await prisma.trip.updateMany({ where: { id: tripId, NOT: { ticketVerificationStatus: synthese } }, data: { ticketVerificationStatus: synthese } });
+}
 
 // ─────────────────────────────────────────────
 // POST /api/trips/:id/documents
@@ -530,12 +555,9 @@ export const addTripDocuments = async (
 
     const hasTicket = newDocuments.some((d) => d.type === "TICKET_PROOF");
     // C-PR4 (D57 1A) — un billet rejeté peut être redéposé : le trajet repasse en attente de vérification.
-    if (hasTicket && (trip.ticketVerificationStatus === "NOT_SUBMITTED" || trip.ticketVerificationStatus === "REJECTED")) {
-      await prisma.trip.update({
-        where: { id },
-        data: { ticketVerificationStatus: "PENDING" },
-      });
-    }
+    // ANO-ADM-19 (recette 02-ADMIN § 5.8) — le statut est la synthèse des billets : un nouveau dépôt sur un trajet
+    // déjà vérifié le laisse vérifié, sur un trajet rejeté ou sans billet le passe en attente.
+    if (hasTicket) await syncTripTicketStatus(id);
 
     const updatedTrip = await prisma.trip.findUnique({
       where: { id },
@@ -599,15 +621,9 @@ export const removeTripDocument = async (
       }
     }
 
-    const remainingTickets = trip.documents.filter(
-      (d) => d.id !== documentId && d.type === "TICKET_PROOF"
-    );
-    if (doc.type === "TICKET_PROOF" && remainingTickets.length === 0) {
-      await prisma.trip.update({
-        where: { id },
-        data: { ticketVerificationStatus: "NOT_SUBMITTED" },
-      });
-    }
+    // ANO-ADM-19 — supprimer le billet vérifié retire le badge, même si d'autres billets (en attente, rejetés) restent :
+    // avant, le trajet ne revenait à « non soumis » que sans AUCUN billet, et gardait « vérifié » sinon.
+    if (doc.type === "TICKET_PROOF") await syncTripTicketStatus(id);
 
     return res.status(200).json({ success: true, message: "Document removed." });
   } catch (error) {

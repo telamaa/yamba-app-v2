@@ -11,6 +11,7 @@
 import { Check, Copy, Mail, MessageCircle, MessageSquare } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
+import { toast } from "sonner";
 import type { Booking } from "@/components/booking/booking-tracker/booking-tracker.types";
 
 type Props = {
@@ -24,6 +25,11 @@ export default function BookingShareCode({ booking, compact = false }: Props) {
 
   const code = booking.deliveryCode.code ?? "";
   const recipientFirstName = booking.recipient.firstName;
+  // ANO-WEB-56 (recette 5.17) : WhatsApp et SMS s'ouvraient sans destinataire (« wa.me/?text= »)
+  // alors que le numéro saisi à la réservation est servi à l'Expéditeur (D69) — même règle que
+  // la carte du lien de suivi. Sans numéro, le lien reste ouvert (l'utilisateur choisit le contact).
+  const phone = booking.recipient.phoneE164 ?? "";
+  const whatsappTarget = phone.replace(/[^\d]/g, "");
   const carrierFirstName = booking.carrier.firstName;
   const route = `${booking.trip.originCity} → ${booking.trip.destinationCity}`;
 
@@ -35,12 +41,12 @@ export default function BookingShareCode({ booking, compact = false }: Props) {
   });
 
   const handleWhatsApp = () => {
-    window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, "_blank");
+    window.open(`https://wa.me/${whatsappTarget}?text=${encodeURIComponent(message)}`, "_blank");
   };
 
   const handleSms = () => {
     // ?&body= fonctionne iOS + Android
-    window.location.href = `sms:?&body=${encodeURIComponent(message)}`;
+    window.location.href = `sms:${phone}?&body=${encodeURIComponent(message)}`;
   };
 
   const handleEmail = () => {
@@ -54,9 +60,10 @@ export default function BookingShareCode({ booking, compact = false }: Props) {
     try {
       await navigator.clipboard.writeText(message);
       setMessageCopied(true);
+      toast.success(t("pickedUp.share.messageCopied"), { duration: 2000 }); // ANO-WEB-55 : dit, pas seulement montré
       setTimeout(() => setMessageCopied(false), 2000);
     } catch {
-      // silencieux
+      toast.error(t("pickedUp.code.copyFailed")); // ANO-WEB-59 : un échec silencieux n'est pas un succès
     }
   };
 

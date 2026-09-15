@@ -20,6 +20,7 @@ export * from "./booking/booking.enums";
 export * from "./booking/booking.schema";
 export * from "./booking/booking-events.schema";
 export * from "./booking/booking-request.schema";
+export * from "./booking/booking-refunds"; // A166 / A167 — liste des remboursements, règle partagée
 export * from "./booking/booking-lifecycle.schema";
 export * from "./booking/booking-transport.schema";
 export * from "./booking/booking-settlement.schema";
