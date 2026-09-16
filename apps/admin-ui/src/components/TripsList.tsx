@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { apiFetch } from "@/lib/api";
-import { TICKET_STATUS_LABEL, dateTime } from "@/lib/format";
+import { TICKET_STATUS_LABEL, TRIP_STATUS_LABEL, dateTime } from "@/lib/format";
 import type { AdminMe, AdminTripSummary, AdminTripsResponse } from "@/lib/types";
 import ExportButton from "./ExportButton";
 
@@ -29,7 +29,9 @@ function toParams(f: Filters): URLSearchParams {
 
 export default function TripsList() {
   const sp = useSearchParams();
-  const [f, setF] = useState<Filters>({ q: "", status: sp.get("status") ?? "", hidden: sp.get("hidden") === "1", ticketPending: sp.get("ticketPending") === "1", hideProposed: sp.get("hideProposed") === "1", carrierId: sp.get("carrierId") ?? "", from: "", to: "", originCity: "", destinationCity: "", sort: "departureAt", dir: "desc" });
+  // Recette § 5.7 — tous les filtres textuels se lisent AUSSI dans l'URL (`q`, `originCity`, `destinationCity`) :
+  // un lien d'alerte, de fiche ou de discussion ouvre la liste déjà filtrée, comme les cases à cocher.
+  const [f, setF] = useState<Filters>({ q: sp.get("q") ?? "", status: sp.get("status") ?? "", hidden: sp.get("hidden") === "1", ticketPending: sp.get("ticketPending") === "1", hideProposed: sp.get("hideProposed") === "1", carrierId: sp.get("carrierId") ?? "", from: "", to: "", originCity: sp.get("originCity") ?? "", destinationCity: sp.get("destinationCity") ?? "", sort: "departureAt", dir: "desc" });
   const [items, setItems] = useState<AdminTripSummary[]>([]);
   const [total, setTotal] = useState(0);
   const [cursor, setCursor] = useState<string | null>(null);
@@ -54,7 +56,7 @@ export default function TripsList() {
         <input value={f.q} onChange={set("q")} placeholder="ville ou identifiant" className="w-48 rounded-lg border border-slate-300 px-3 py-1.5" />
         <input value={f.originCity} onChange={set("originCity")} placeholder="origine" className="w-32 rounded-lg border border-slate-300 px-3 py-1.5" />
         <input value={f.destinationCity} onChange={set("destinationCity")} placeholder="destination" className="w-32 rounded-lg border border-slate-300 px-3 py-1.5" />
-        <select value={f.status} onChange={set("status")} className="rounded-lg border border-slate-300 px-2 py-1.5">{STATUSES.map((s) => <option key={s} value={s}>{s || "tous statuts"}</option>)}</select>
+        <select value={f.status} onChange={set("status")} className="rounded-lg border border-slate-300 px-2 py-1.5">{STATUSES.map((s) => <option key={s} value={s}>{s ? TRIP_STATUS_LABEL[s] ?? s : "tous statuts"}</option>)}</select>
         <label className="flex items-center gap-1"><input type="checkbox" checked={f.hidden} onChange={set("hidden")} /> masqués</label>
         <label className="flex items-center gap-1"><input type="checkbox" checked={f.hideProposed} onChange={set("hideProposed")} /> masquage proposé</label>
         <label className="flex items-center gap-1"><input type="checkbox" checked={f.ticketPending} onChange={set("ticketPending")} /> billet à vérifier</label>
@@ -75,10 +77,10 @@ export default function TripsList() {
           <tbody>
             {items.map((t) => (
               <tr key={t.id} className="border-t border-slate-100 hover:bg-slate-50">
-                <td className="px-3 py-2"><Link href={`/trips/${t.id}`} className="font-semibold underline-offset-2 hover:underline">{t.originCity} → {t.destinationCity}</Link>{t.hidden && <span className="ml-2 rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-semibold text-red-700">masqué</span>}{t.hideProposed && <span className="ml-2 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-800">masquage proposé</span>}</td>
+                <td className="px-3 py-2"><Link href={`/trips/${t.id}`} className="font-semibold underline-offset-2 hover:underline">{t.originCity} → {t.destinationCity}</Link>{t.hidden && <span className="ml-2 rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-semibold text-red-700">masqué par Yamba</span>}{t.hideProposed && <span className="ml-2 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-800">masquage proposé</span>}</td>
                 <td className="px-3 py-2 whitespace-nowrap">{dateTime(t.departureAt)}</td>
                 <td className="px-3 py-2"><Link href={`/users/${t.carrier.id}`} className="underline-offset-2 hover:underline">{t.carrier.firstName} {t.carrier.lastName}</Link>{t.carrier.accountStatus !== "ACTIVE" && <span className="ml-1 text-[10px] text-red-700">{t.carrier.accountStatus}</span>}</td>
-                <td className="px-3 py-2 font-mono text-[11px]">{t.status}</td>
+                <td className="px-3 py-2 text-[12px]" title={t.status}>{TRIP_STATUS_LABEL[t.status] ?? t.status}</td>
                 <td className="px-3 py-2">{TICKET_STATUS_LABEL[t.ticketVerificationStatus] ?? t.ticketVerificationStatus}</td>
                 <td className="px-3 py-2 tabular-nums">{t.activeBookingsCount}</td>
               </tr>

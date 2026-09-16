@@ -7791,3 +7791,118 @@ Le nom vient de `Content-Disposition`, le nombre de lignes de `X-Row-Count`, la 
   étendu) ; auth-service 248.
 - `apps/e2e` : **378 scénarios** (374 + 4), les 4 verts deux fois de suite.
 - Typecheck auth, trip, deal, admin-ui (tsc) et harnais verts.
+
+
+---
+
+# Cahier 02-ADMIN, § 5.7 : les trajets — une regex qu'on n'avait pas écrite, un état que le temps change, deux clics en même temps
+
+*(PR `chore/recette-admin-5-7`, empilée sur #307, 14/09/2026.)*
+
+## Ce qui a été fait
+
+Sept scénarios (ADM-TRJ-1 à 5, plus deux fiches de preuve), quatre anomalies closes (`ANO-ADM-15` à `18`), un défaut de
+concurrence clos, une décision au registre (**A157**).
+
+```
+packages/libs/prisma/text-search.ts                         NOUVEAU — escapeRegex, containsText, equalsText
+apps/trip-service/src/lib/admin-trips.rules.ts              filtres échappés ; effectiveTicketStatus ; borne ticketPending
+apps/trip-service/src/controllers/trip-search.controller.ts recherche publique et facettes échappées
+apps/trip-service/src/controllers/admin-trips.controller.ts statut effectif ; masquer / rétablir / proposer conditionnels + réessai
+apps/trip-service/src/emails/admin-trip-emails.ts           bouton « Voir mon trajet » dans l'email de masquage
+apps/auth-service/src/controller/saved-route.controller.ts  contrôle de doublon des alertes route échappé
+apps/auth-service/src/lib/admin-users.query.ts              réexporte escapeRegex partagé
+apps/admin-ui/src/lib/format.ts                             libellés statut / mode / réservation / billet expiré
+apps/admin-ui/src/components/TripsList.tsx                  q et villes lus dans l'URL, statuts en français
+apps/admin-ui/src/components/TripFileView.tsx               carte Masquage : messages nommés, refus par code, conflit d'intérêts
+apps/trip-service/src/lib/text-search.spec.ts               NOUVEAU (5 tests) · admin-trips.rules.spec.ts (+3)
+apps/e2e/src/admin/adm-trj-trajets.spec.ts                  7 scénarios
+```
+
+## ANO-ADM-15 : Prisma n'échappe pas ce qu'il transforme en regex
+
+Le connecteur MongoDB de Prisma n'a pas d'opérateur « contient » natif : il construit un `$regex` avec la valeur telle
+quelle. Une sonde de sept requêtes l'a établi avant d'écrire la moindre ligne :
+
+```
+equals "(" insensible      → erreur « Kind: … Raw query failed »     (Mongo refuse la regex)
+equals "P.ris" insensible  → 20                                        (« . » = n'importe quel caractère)
+contains "."               → 41 sur 41
+contains "\\."             → 0                                         (échappé : pris à la lettre)
+```
+
+La recherche publique (`trip-search.controller.ts`) passait la saisie du champ « Départ » directement dans `contains` :
+un visiteur qui tapait « ( » recevait **500**, et ses facettes aussi. La même construction existait dans la liste admin
+des trajets, la file des billets (villes, par la relation) et le contrôle de doublon des alertes route (`equals`
+insensible = regex ancrée). Au § 5.3, auth-service avait déjà corrigé sa recherche d'utilisateurs avec une fonction
+locale ; elle devient le module partagé, sans aucune dépendance :
+
+```ts
+// packages/libs/prisma/text-search.ts
+export function escapeRegex(term: string): string {
+  return term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+export function containsText(term: string) { return { contains: escapeRegex(term), mode: "insensitive" as const }; }
+export function equalsText(term: string)   { return { equals: escapeRegex(term), mode: "insensitive" as const }; }
+```
+
+Il vit sous `packages/libs/prisma` parce que c'est un contrat **du connecteur Prisma-Mongo**, pas d'un domaine ; l'alias
+générique `@packages` des `webpack.config.js` le résout déjà, aucun alias à ajouter. Au-delà du 500, une regex fournie
+par un visiteur est une attaque par retour arrière catastrophique en puissance (`(a+)+$` sur une chaîne longue) : le test
+unitaire le prouve inerte une fois échappé.
+
+## ANO-ADM-16 : un état que le temps a changé se calcule à la lecture
+
+Un trajet porte `ticketVerificationStatus`, une pièce porte `status`. Quand la file des billets voit une pièce en attente
+d'un trajet déjà parti, elle la passe `EXPIRED` (8A) — mais personne ne réécrit le trajet. Résultat mesuré : 5 trajets
+partis depuis avril à juin, toutes pièces `EXPIRED`, toujours « à vérifier ». Plutôt qu'un cron ou qu'une écriture de
+plus dans la file, la lecture calcule l'état effectif, comme pour la sanction échue (A154) :
+
+```ts
+export function effectiveTicketStatus(trip, now) {
+  return trip.ticketVerificationStatus === "PENDING" && isTicketExpired(trip, now) ? "EXPIRED" : trip.ticketVerificationStatus;
+}
+// buildTripsWhere(q, now) — ticketPending=1 : départ >= maintenant, sans écraser une borne `from` plus tardive
+departure.gte = new Date(Math.max(departure.gte?.getTime() ?? 0, now.getTime()));
+```
+
+`buildTripsWhere` reçoit désormais `now` en paramètre (valeur par défaut `new Date()`) : la règle reste pure et testable
+à date fixe.
+
+## Masquer, rétablir, proposer : écrire sous condition
+
+La garde « déjà masqué ? » était une **lecture** avant l'écriture : deux administrateurs qui cliquent en même temps la
+passent tous les deux. Mesuré (fiche ADM-TRJ-4 bis, `Promise.all`) : un 200 et un **500** — MongoDB a rejeté la seconde
+transaction (P2034) ; sans ce rejet, on aurait eu deux lignes `TRIP_HIDDEN` et deux emails. Correction, dans les trois
+gestes :
+
+```ts
+await withWriteConflictRetry(() => prisma.$transaction(async (tx) => {
+  const r = await tx.trip.updateMany({ where: { id, ...notHiddenFilter() }, data: { hiddenByAdminAt: now, … } });
+  if (r.count !== 1) throw new ValidationError("This trip is already hidden.", { code: "TRIP_ALREADY_HIDDEN" });
+  await recordAdminAction(tx, { action: "TRIP_HIDDEN", … });
+}));
+```
+
+`updateMany` renvoie le nombre de documents modifiés : c'est lui qui dit si l'état attendu était encore vrai au moment
+de l'écriture. `notHiddenFilter()` couvre `null` ET champ absent (piège Mongo). `withWriteConflictRetry`
+(`packages/libs/prisma`, § 5.5) rejoue la transaction rejetée : au second essai, `count` vaut 0 et le perdant reçoit un
+400 lisible. Le même garde ferme **ANO-ADM-17** : proposer un masquage sur un trajet masqué est refusé, sinon la
+proposition, invisible pendant le masquage, ressurgissait au rétablissement. Une proposition qui en remplace une autre
+écrit l'ancienne en `before` au journal.
+
+## Carte « Masquage » : ce que l'écran dit après le geste
+
+- Le motif part **vide** : pré-rempli avec la proposition du Support, il était journalisé comme motif de rétablissement
+  par un Médiateur qui ne l'avait pas écrit.
+- Les messages nomment le geste et ses suites (« Trajet masqué : retiré de la recherche et de sa page publique, Voyageur
+  prévenu par email. 1 réservation(s) en cours continue(nt). ») ; les refus sont lus par `details.code` (A146) et, sur un
+  conflit, la fiche est rechargée.
+- Sur son propre trajet, la carte dit le conflit d'intérêts au lieu de « Ton profil ne propose ni n'exécute de masquage ».
+
+## Tests
+
+- trip-service **282** (+8 : `text-search.spec.ts` ×5 dont email de masquage FR/EN, `admin-trips.rules.spec.ts` ×3) ;
+  auth-service 248 (inchangé, sa suite `admin-users.query.spec.ts` passe sur la fonction partagée).
+- `apps/e2e` : **385 scénarios** (378 + 7), les 7 verts deux fois de suite.
+- Typecheck trip, auth (tsc), admin-ui, harnais verts ; contrats OpenAPI inchangés.

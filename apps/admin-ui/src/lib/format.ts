@@ -116,7 +116,13 @@ export const TICKET_REASON_LABEL: Record<string, string> = {
   NAME_MISMATCH: "Le nom ne correspond pas au compte",
   SUSPICIOUS: "Document non recevable",
 };
-export const TICKET_STATUS_LABEL: Record<string, string> = { NOT_SUBMITTED: "aucun billet", PENDING: "à vérifier", VERIFIED: "vérifié", REJECTED: "rejeté" };
+// ANO-ADM-16 — « expiré » : billet en attente d'un trajet déjà parti (le serveur le calcule, `effectiveTicketStatus`).
+export const TICKET_STATUS_LABEL: Record<string, string> = { NOT_SUBMITTED: "aucun billet", PENDING: "à vérifier", VERIFIED: "vérifié", REJECTED: "rejeté", EXPIRED: "expiré (trajet parti)" };
+/** Recette § 5.7 — statut et mode d'un trajet en français ; le code reste lisible au survol (`title`). */
+export const TRIP_STATUS_LABEL: Record<string, string> = { DRAFT: "Brouillon", PUBLISHED: "Publié", PAUSED: "En pause", COMPLETED: "Terminé", CANCELLED: "Annulé", ARCHIVED: "Archivé" };
+export const TRANSPORT_MODE_LABEL: Record<string, string> = { PLANE: "Avion", TRAIN: "Train", CAR: "Voiture" };
+/** Statuts d'une réservation, tels que l'admin les lit (9 statuts de la machine D37/D39/D55). */
+export const BOOKING_STATUS_LABEL: Record<string, string> = { PENDING: "En attente", ACCEPTED: "Acceptée", DECLINED: "Refusée", EXPIRED: "Expirée", CANCELLED: "Annulée", PICKED_UP: "Prise en charge", DELIVERED: "Livrée", COMPLETED: "Terminée", DISPUTED: "En litige" };
 
 export const STATUS_LABEL: Record<string, string> = { ACTIVE: "Actif", RESTRICTED: "Restreint", SUSPENDED: "Suspendu" };
 

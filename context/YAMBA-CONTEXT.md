@@ -697,6 +697,21 @@ Ordre de demarrage : auth -> trip -> gateway.
   l'ecran, compteur du motif, refus par code, `INVALID_QUERY` avec code sur l'arbitrage. A TRANCHER : motif de l'export
   nominatif dans l'URL (journaux techniques), export Finances sans plafond (§ 5.16), noms de fichiers en UTC.
   Tests : trip 274, deal 578, auth 248, harnais 378. Reste : § 5.7 a 8.
+- 14/09 : **CAHIER 02-ADMIN — § 5.7 TRAJETS : LISTE, FICHE, MASQUAGE (branche `chore/recette-admin-5-7`, empilee sur #307)**
+  — 7 scenarios CONFORMES (TRJ-1 a 5 + ANO-ADM-15 + TRJ-4 bis), joues deux fois verts (`adm-trj-trajets.spec.ts`) :
+  effet reel du masquage cote public (recherche, page publique 404) et membre (bandeau, TRIP_NOT_BOOKABLE, deal accepte
+  lisible), emails, journal. QUATRE ANOMALIES CLOSES : ANO-ADM-15 MAJEURE (Prisma+Mongo traduit contains/startsWith/
+  equals insensible en `$regex` SANS echapper : « ( » → 500 sur la recherche PUBLIQUE et ses facettes, « . » → 41/41,
+  « P.ris » = doublon d'alerte route → module partage `packages/libs/prisma/text-search.ts` `escapeRegex`/`containsText`/
+  `equalsText`, A157, branche dans admin-trips.rules, trip-search, saved-route ; auth `admin-users.query` le reexporte),
+  ANO-ADM-16 (billet « a verifier » sur 5 trajets partis → `effectiveTicketStatus` EXPIRED a la lecture + borne de
+  depart du filtre), ANO-ADM-17 (proposer sur un trajet masque accepte, ressurgissait au retablissement → 400),
+  ANO-ADM-18 (email de masquage sans lien vers le trajet). CONCURRENCE : deux « Masquer » simultanes → 200 + 500 P2034 →
+  `updateMany` garde par l'etat + `withWriteConflictRetry` (200 + 400, une ligne, un email). AMELIORATIONS FAITES : motif
+  vide au depart (le retablissement journalisait le motif de la proposition), messages nommes, refus par code, compteur
+  n/20, remplacement de proposition garde l'ancienne en `before`, « c'est ton propre trajet », statuts/mode/reservations
+  en francais, q et villes lus dans l'URL. A TRANCHER : accepter une demande PENDING sur un trajet masque ; recherche
+  insensible aux accents. Tests : trip 282, auth 248, harnais 385. Reste : § 5.8 a 8.
 - 13/09 : **DECISION : LE ROLE PREND LA MAJUSCULE** (branche `chore/recette-voyageur-majuscule`, empilee sur #299) —
   « Voyageur » / « Traveler » partout : 71 valeurs de messages, 33 textes du code, 1 email ; regle `role-majuscule` au
   lexique partage (CI + recette) ; 12 citations du harnais ; web-fav, web-rch, web-rsv-devis, web-lit verts.

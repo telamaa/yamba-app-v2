@@ -1,5 +1,5 @@
 import { AdminTripsQuerySchema, TicketQueueQuerySchema } from "@packages/api-contracts";
-import { TICKETS_CSV_COLUMNS, buildTicketsWhere, buildTripsOrderBy, buildTripsWhere, fileExtensionOf, isTicketExpired, notHiddenFilter, ticketReviewOutcome } from "./admin-trips.rules";
+import { TICKETS_CSV_COLUMNS, buildTicketsWhere, buildTripsOrderBy, buildTripsWhere, effectiveTicketStatus, fileExtensionOf, isTicketExpired, notHiddenFilter, ticketReviewOutcome } from "./admin-trips.rules";
 
 describe("admin-trips.rules (C-PR4, D57)", () => {
   it("ticketReviewOutcome : VERIFY → les deux statuts VERIFIED, sans motif", () => {
@@ -34,6 +34,35 @@ describe("admin-trips.rules (C-PR4, D57)", () => {
       expect(w.createdAt.lt.toISOString()).toBe("2026-09-01T10:00:00.000Z");
       expect(w.trip).toEqual({ is: { destinationCity: { contains: "Kinshasa", mode: "insensitive" } } });
       expect(buildTicketsWhere(TicketQueueQuerySchema.parse({}), now)).toEqual({ type: "TICKET_PROOF", status: "PENDING" });
+    });
+  });
+
+  describe("ANO-ADM-15 — un terme saisi est cherché à la lettre, jamais comme une regex", () => {
+    it("buildTripsWhere et buildTicketsWhere échappent le terme, les villes et les villes de la relation", () => {
+      const w = buildTripsWhere(AdminTripsQuerySchema.parse({ q: "Brazza(ville)", originCity: "P.ris", destinationCity: "a+b" })) as Record<string, unknown>;
+      expect(w.OR).toEqual([{ originCity: { contains: "Brazza\\(ville\\)", mode: "insensitive" } }, { destinationCity: { contains: "Brazza\\(ville\\)", mode: "insensitive" } }]);
+      expect(w.originCity).toEqual({ contains: "P\\.ris", mode: "insensitive" });
+      expect(w.destinationCity).toEqual({ contains: "a\\+b", mode: "insensitive" });
+      const t = buildTicketsWhere(TicketQueueQuerySchema.parse({ originCity: "(" }), new Date()) as { trip: unknown };
+      expect(t.trip).toEqual({ is: { originCity: { contains: "\\(", mode: "insensitive" } } });
+    });
+  });
+
+  describe("ANO-ADM-16 — « billet à vérifier » ne désigne qu'un trajet pas encore parti", () => {
+    const now = new Date("2026-09-14T10:00:00Z");
+    it("ticketPending=1 borne le départ à maintenant, sans écraser une borne plus tardive ni la borne haute", () => {
+      expect(buildTripsWhere(AdminTripsQuerySchema.parse({ ticketPending: "1" }), now)).toMatchObject({ ticketVerificationStatus: "PENDING", departureAt: { gte: now } });
+      const plusTard = buildTripsWhere(AdminTripsQuerySchema.parse({ ticketPending: "1", from: "2026-10-01T00:00:00Z", to: "2026-11-01T00:00:00Z" }), now);
+      expect(plusTard).toMatchObject({ departureAt: { gte: new Date("2026-10-01T00:00:00Z"), lt: new Date("2026-11-01T00:00:00Z") } });
+      const plusTot = buildTripsWhere(AdminTripsQuerySchema.parse({ ticketPending: "1", from: "2026-01-01T00:00:00Z" }), now);
+      expect(plusTot).toMatchObject({ departureAt: { gte: now } });
+      expect(buildTripsWhere(AdminTripsQuerySchema.parse({}), now)).not.toHaveProperty("departureAt");
+    });
+    it("effectiveTicketStatus : PENDING d'un trajet parti → EXPIRED ; le reste inchangé", () => {
+      expect(effectiveTicketStatus({ ticketVerificationStatus: "PENDING", departureAt: new Date("2026-06-26T08:00:00Z") }, now)).toBe("EXPIRED");
+      expect(effectiveTicketStatus({ ticketVerificationStatus: "PENDING", departureAt: new Date("2026-09-23T08:00:00Z") }, now)).toBe("PENDING");
+      expect(effectiveTicketStatus({ ticketVerificationStatus: "VERIFIED", departureAt: new Date("2026-06-26T08:00:00Z") }, now)).toBe("VERIFIED");
+      expect(effectiveTicketStatus({ ticketVerificationStatus: "PENDING", departureAt: null }, now)).toBe("PENDING");
     });
   });
 

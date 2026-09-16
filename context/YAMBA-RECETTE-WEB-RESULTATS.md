@@ -4821,6 +4821,91 @@ les deux fois.
 
 ---
 
+## Cahier 02-ADMIN — § 5.7 Trajets : liste, fiche et masquage · **CONFORME** (5 fiches + 2 ajoutées · 4 anomalies closes dont 1 publique · 1 défaut de concurrence clos · 5 écarts documentaires · 7 scénarios, 3 min 20)
+
+`apps/e2e/src/admin/adm-trj-trajets.spec.ts`. Le masquage agit **par lecture** (D57) : chaque fiche prouve l'écran
+(liste, fiche, carte Masquage), le serveur (journal, base, emails) et l'**effet réel côté public et côté membre**
+(recherche et page publique sans session, espace du Voyageur, réservation par appel direct). Le terrain a été **mesuré
+avant la première ligne** : recherche admin et publique avec « ( », « . », « Par.s » ; filtre « billet à vérifier » ;
+statuts des pièces. Tout masquage est levé en `finally`, le trajet posé pour TRJ-5 est supprimé. Jouée deux fois, verte
+les deux fois.
+
+| Fiche | Ce qui est éprouvé | Verdict · Preuve |
+|---|---|---|
+| ADM-TRJ-1 | La liste et ses filtres d'URL | **Conforme après correction** → `ANO-ADM-16` ; sous-titre exact ; « Brazzaville » dans le champ → chaque ligne porte la ville ; `status=PUBLISHED`, `hidden=1`, `ticketPending=1`, `hideProposed=1` **présélectionnent** le select et les trois cases ; `ticketPending=1` → **« 1 affiché(s) · 1 au total »**, le Paris → Brazzaville à J+10 (était **6** : 5 trajets partis aux pièces toutes `EXPIRED`), servis désormais « expiré (trajet parti) » ; depuis la fiche de Thomas, « Ouvrir dans Trajets (fiches, masquage) » → `/trips?carrierId=<id>`, pastille « un seul Voyageur · tous », lignes toutes à Thomas Nkounkou, « tous » retire le filtre ; colonnes « Corridor, Départ, Voyageur, Statut, Billet, Deals » ; pagination : 41 trajets, parcourus par pages de 10 sans doublon ni trou ; journal : aucune ligne de trajet |
+| ANO-ADM-15 | Un terme saisi n'est pas une regex (ajoutée) | **Conforme après correction** — recherche **publique** et facettes avec « ( », « [ », « (a+)+$ » → **200** (« ( » mesuré **500** avant correction) ; « . » → 0 et « Par.s » → 0 (étaient 10 et 8), contre-épreuve « Paris » → 8 ; admin `q=(` → 200, 0, « Aucun trajet. » à l'écran, `q=.` → 0 (était 41), contre-épreuve « Brazzaville » ; alerte route « Paris (Orly) » → 201 (était 500), « paris (orly) » reconnu doublon, « Paris .Orly. » n'est plus un doublon par regex ; alertes créées supprimées |
+| ADM-TRJ-2 | Ouvrir une fiche trajet | **Conforme** — « Paris → Brazzaville », « 24 sept. 2026, 01:57 · Avion · Publié » (codes `PLANE` / `PUBLISHED` au survol) ; cartes Trajet, Voyageur, **Documents (1)** (billet `PENDING`), **Réservations (5)** (Acceptée, Annulée, En attente, Expirée, Refusée, montants et net), Actions admin ; aucun lien « dossier » (aucun litige) ; « argent » → `/deals/<bzv-accepted>` ; journal `TRIP_VIEWED TRIP · id` puis `DEAL_MONEY_VIEWED BOOKING · id` |
+| ADM-TRJ-3 | Proposer un masquage (Support) | **Conforme** — texte d'explication exact ; pas de « Masquer » ; motif de 10 caractères → « Proposer » inactif, compteur « 10 / 20 » ; motif du cahier → « Masquage proposé : un Médiateur ou un super administrateur décidera. Le trajet reste visible d'ici là. », champ vidé ; après rechargement, bandeau ambre « Masquage proposé par … le … : Annonce suspecte… » ; `/trips?hideProposed=1` : badge « masquage proposé » ; tuile `hideProposals` = 1 ; **public inchangé** : dans la recherche, page publique 200, `hiddenByAdminAt` null ; journal `TRIP_HIDE_PROPOSED` `{ reason }`, sans « avant » |
+| ADM-TRJ-4 | Masquer et rétablir (Médiateur) | **Conforme après correction** → `ANO-ADM-17`, `ANO-ADM-18` ; bandeau de la proposition ; motif **vide** (ne reprend plus celui du Support) ; « 1 réservation(s) en cours sur ce trajet : elles continuent normalement. » ; « Masquer » → message nommé, badge « masqué par Yamba », bandeau « Masqué le … par … — motif : … », proposition disparue ; rejeu → **400** « This trip is already hidden. » `TRIP_ALREADY_HIDDEN` ; **proposer sur le trajet masqué → 400** (était 200), aucune proposition en base ; public : absent de la recherche, page publique **404** ; Thomas : « masqué par Yamba » dans son espace, statut **PUBLISHED** ; réserver → `TRIP_NOT_BOOKABLE` ; le deal accepté reste lisible par son Expéditrice (200) ; ✉ **un** email « Ton trajet Paris → Brazzaville est masqué » : examen générique, **aucun** motif interne, **bouton vers `/trips/<id>`** (absent avant), `support@yamba.app` ; « Rétablir » avec SON motif → de retour dans la recherche, page 200, **aucune proposition ne ressurgit** ; rejeu → **400** « This trip is not hidden. » ; ✉ « est de nouveau visible » ; journal `TRIP_HIDDEN` `{ reason: motif de masquage }`, `TRIP_UNHIDDEN` `{ reason: motif de rétablissement }` ; le refus du Support n'écrit rien |
+| ADM-TRJ-4 bis | Deux « Masquer » simultanés (ajoutée) | **Conforme après correction** — Médiateur et super administrateur en même temps : **200 et 400 `TRIP_ALREADY_HIDDEN`** (mesuré avant : 200 et **500**, conflit d'écriture P2034 au journal du service) ; **une** ligne `TRIP_HIDDEN`, **un** email |
+| ADM-TRJ-5 | Personne ne masque son propre trajet | **Conforme** — trajet publié posé en base pour le compte Médiateur (manœuvre consignée, supprimé) ; carte « Masquage » : « C'est ton propre trajet : aucune action de masquage n'est possible (conflit d'intérêts). », ni champ ni bouton ; `POST hide`, `POST hide/propose`, `DELETE hide` → **403** « You cannot act on your own trip. » `ADMIN_IS_OWNER` ; aucune ligne de masquage |
+
+### Anomalies
+
+- **ANO-ADM-15 (majeure, close)** — **un terme saisi partait brut dans une expression régulière MongoDB, jusque dans la
+  recherche publique.** Prisma traduit `contains`, `startsWith` et `equals` insensible en `$regex` sans échapper (mesuré
+  par une sonde en base : `equals "P.ris"` → 20 trajets « Paris », `contains "\\."` → 0). Effets : « ( » dans « Départ »
+  de la recherche du site ou de ses facettes → **500** pour un visiteur ; « . » → tous les trajets ; même défaut dans la
+  liste admin des trajets, la file des billets et le contrôle de doublon des alertes route ; une regex fournie par un
+  visiteur exposait aussi la base partagée au retour arrière catastrophique. Correction : `packages/libs/prisma/text-search.ts`
+  (`escapeRegex`, `containsText`, `equalsText`, A157), branché dans `apps/trip-service/src/lib/admin-trips.rules.ts`,
+  `apps/trip-service/src/controllers/trip-search.controller.ts`, `apps/auth-service/src/controller/saved-route.controller.ts` ;
+  `apps/auth-service/src/lib/admin-users.query.ts` réexporte la fonction partagée. Tests : `text-search.spec.ts` (nouveau),
+  `admin-trips.rules.spec.ts`.
+- **ANO-ADM-16 (mineure, close)** — **« billet à vérifier » listait des trajets partis depuis des mois.** La file des
+  billets expire les pièces d'un trajet parti (8A) sans toucher `Trip.ticketVerificationStatus`, resté `PENDING` :
+  `ticketPending=1` rendait 6 trajets au lieu d'1, et la colonne « Billet » disait « à vérifier » pour un billet que plus
+  personne ne peut vérifier. Correction : `effectiveTicketStatus` (servi `EXPIRED` à la lecture) et borne de départ du
+  filtre (`admin-trips.rules.ts`, `admin-trips.controller.ts`, libellé « expiré (trajet parti) » dans admin-ui).
+- **ANO-ADM-17 (mineure, close)** — **proposer de masquer un trajet déjà masqué était accepté**, la proposition restait
+  invisible puis **ressurgissait au rétablissement** comme une demande en cours. Correction : refus 400
+  `TRIP_ALREADY_HIDDEN`, écriture conditionnelle.
+- **ANO-ADM-18 (mineure, close)** — **l'email « trajet masqué » n'avait pas de lien vers le trajet** (le cahier l'exige ;
+  l'URL était calculée, jamais servie). Correction : bouton « Voir mon trajet » / « View my trip »
+  (`apps/trip-service/src/emails/admin-trip-emails.ts`).
+- **Concurrence (défaut clos)** — deux « Masquer » simultanés : **500** au perdant (P2034) et, sans le conflit, deux lignes
+  et deux emails. Correction : `updateMany` gardé par l'état + `withWriteConflictRetry` sur masquer, rétablir, proposer.
+
+### Écarts documentaires
+
+- « Fait. » remplacé partout par un message qui nomme le geste et ses suites.
+- En-tête et colonne « Statut » en français (« Avion · Publié »), codes au survol ; statuts des réservations en français.
+- Colonne « Billet » : « expiré (trajet parti) » s'ajoute (ANO-ADM-16).
+- TRJ-5 : la carte « Masquage » est **présente** (le cahier la veut absente) et dit le conflit d'intérêts, sans champ ni bouton.
+- TRJ-1 étape 6 : 41 trajets ≤ la page de 50 de l'écran, « Charger la suite » n'apparaît pas — pagination prouvée par l'API.
+
+### Défauts du harnais évités
+
+- `every` sur une liste vide est vrai : la première lecture de la liste filtrée « passait » avant la réponse. La sonde
+  exige une liste **non vide**.
+- Le format de date de l'admin est « 24 sept. 2026, 01:57 », pas « 24/09/2026 01:57 ».
+
+### Regard d'expert — produit ET test, une ligne par fiche
+
+- **TRJ-1** — *Faite* : `q`, `originCity`, `destinationCity` lus dans l'URL (un lien ouvre la liste filtrée) ; statut en
+  français dans le select et la colonne ; badge « masqué par Yamba » aussi dans la liste ; ANO-ADM-16. *Proposée* : écrire
+  les filtres DANS l'URL à chaque changement (liste partageable, retour arrière du navigateur) — petit ; recherche
+  insensible aux accents (« Brazzavillé ») — à trancher avec le § 5.3. *Test* : pagination parcourue entièrement par
+  l'API ; sonde « liste non vide ».
+- **ANO-ADM-15** — *Faite* : module partagé, quatre points branchés, test du retour arrière catastrophique. *Proposée* :
+  une règle de revue (ou un test qui lit les sources, comme au cahier API) refusant `contains:` sans `containsText` —
+  petit. *Test* : contre-épreuve positive systématique (« Paris », « Brazzaville », vrai doublon).
+- **TRJ-2** — *Faite* : mode, statut et statuts des réservations en français. *Proposée* : afficher la conversation du
+  deal et le numéro de litige cliquable depuis la ligne — petit. *Test* : l'ordre des lignes n'est pas supposé (statuts triés).
+- **TRJ-3** — *Faite* : message nommé, champ vidé, compteur « n / 20 », avertissement quand une proposition en remplace
+  une autre (l'ancienne reste au journal en `before`). *Proposée* : un retrait de proposition par son auteur — petit.
+  *Test* : « public inchangé » prouvé par trois voies (recherche, page publique, base).
+- **TRJ-4** — *Faite* : motif vide au départ (le rétablissement ne journalise plus le motif de masquage), « n réservation(s)
+  en cours continuent », refus 400 lus par leur code et fiche rechargée, ANO-ADM-17 et 18. *Proposée* : **à trancher** —
+  le Voyageur d'un trajet masqué peut-il encore accepter une demande `PENDING` déjà reçue ? (le cahier dit « réservations
+  en cours préservées » sans distinguer). *Test* : email vérifié sans motif interne ET avec le lien.
+- **TRJ-4 bis** — *Faite* : écriture conditionnelle + réessai. *Test* : `Promise.all` de deux profils réels, compte des
+  lignes et des emails.
+- **TRJ-5** — *Faite* : la carte dit « c'est ton trajet » au lieu de « ton profil ne propose ni n'exécute ». *Proposée* :
+  un compte admin qui est aussi Voyageur dans `seed-admins.ts` (déjà relevé au § 4.3) éviterait la manœuvre — moyen.
+
+---
+
 ## Observations (pas des anomalies, mais à savoir)
 
 - **`/become-yamber` reste « futur »** (commentaire du layout marketing) : la page de présentation

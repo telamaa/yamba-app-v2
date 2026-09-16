@@ -5051,3 +5051,67 @@ neutralisée ; les accents s'affichent (BOM UTF-8).
   service. Passer l'export en envoi de formulaire le garderait au seul journal d'audit.
 - **L'export Finances n'a pas de plafond de lignes** (§ 5.16).
 - **Noms de fichiers en UTC** : un export fait après minuit à Paris porte la date de la veille.
+
+
+---
+
+# Back-office — masquer un trajet sans l'annuler, et chercher sans casser la recherche (cahier 02-ADMIN § 5.7)
+
+*(PR `chore/recette-admin-5-7`, 14/09/2026 — ADM-TRJ-1 à 5.)*
+
+## Le besoin
+
+Une annonce suspecte doit pouvoir disparaître de la vitrine immédiatement, sans pénaliser les Expéditeurs qui ont déjà un
+deal en cours et sans que Yamba annule un trajet à la place de son Voyageur. Le Support signale, un Médiateur décide ; le
+Voyageur est prévenu sans que le motif interne lui soit dévoilé. Et partout où un membre ou un administrateur tape un
+texte, la recherche doit trouver ce texte — rien de plus, rien de moins, et jamais une erreur.
+
+## Les règles
+
+**RG-ADM-TRJ-01 — La liste des trajets s'ouvre filtrée par son adresse** : statut, masqués, billet à vérifier, masquage
+proposé, Voyageur, terme et villes.
+
+**RG-ADM-TRJ-02 — « Billet à vérifier » ne concerne qu'un trajet pas encore parti** ; le billet en attente d'un trajet
+parti se lit « expiré (trajet parti) ».
+
+**RG-ADM-TRJ-03 — Ouvrir la fiche d'un trajet est journalisé**, ouvrir sa fiche argent aussi.
+
+**RG-ADM-TRJ-04 — Le Support propose, il ne masque pas** : une proposition ne change rien pour le public ni pour le
+Voyageur ; elle apparaît à l'accueil (« Masquages proposés ») et dans la liste. Une nouvelle proposition remplace la
+précédente, qui reste au journal.
+
+**RG-ADM-TRJ-05 — Masquer retire le trajet de la recherche et de sa page publique et bloque les nouvelles réservations**
+(`TRIP_NOT_BOOKABLE`), sans changer son statut ; les deals en cours continuent ; le Voyageur garde son trajet avec un
+bandeau et reçoit un email générique avec un lien vers son trajet et l'adresse du support.
+
+**RG-ADM-TRJ-06 — On ne masque pas un trajet déjà masqué, on ne rétablit pas un trajet visible, on ne propose pas de
+masquer un trajet masqué** : refus explicites, rien n'est écrit. Deux administrateurs qui agissent en même temps
+obtiennent un succès et un refus — un seul journal, un seul email.
+
+**RG-ADM-TRJ-07 — Chaque geste porte son propre motif** (20 caractères au moins) : le rétablissement ne reprend jamais
+le motif du masquage ni de la proposition.
+
+**RG-ADM-TRJ-08 — Personne n'agit sur son propre trajet**, et l'écran dit pourquoi.
+
+**RG-ADM-TRJ-09 — Un texte cherché est cherché à la lettre** (recherche du site, liste admin, file des billets, alertes
+route) : « ( » ne provoque jamais d'erreur, « . » ne trouve pas tout.
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| TRJ-1 | Liste ouverte par chaque filtre d'adresse ; « billet à vérifier » | filtre présélectionné ; un seul trajet, à venir | oui (ANO-ADM-16 close) |
+| TRJ-1b | « ( », « . » dans la recherche du site, la liste admin, une alerte route | aucune erreur, recherche à la lettre | oui (ANO-ADM-15 close) |
+| TRJ-2 | Fiche du Paris → Brazzaville | cartes, 5 réservations, lien argent, deux lignes de journal | oui |
+| TRJ-3 | Le Support propose | trajet toujours public, proposition visible et comptée | oui |
+| TRJ-4 | Le Médiateur masque puis rétablit | recherche, page publique, réservation, email avec lien, statut inchangé, deux motifs distincts | oui (ANO-ADM-17, 18 closes) |
+| TRJ-4b | Deux masquages simultanés | un succès, un refus, une ligne, un email | oui |
+| TRJ-5 | Un administrateur face à son propre trajet | aucune action, refus 403 | oui |
+
+## Ce qui reste à trancher
+
+- **Une demande en attente sur un trajet masqué** : le Voyageur peut-il encore l'accepter ? Le cahier dit « réservations
+  en cours préservées » sans distinguer une demande d'un deal accepté.
+- **Recherche insensible aux accents** (« Brazzavillé », « Orleans ») — déjà relevé au § 5.3.
+- Le cahier est à mettre à jour : messages nommés au lieu de « Fait. », statuts en français, carte « Masquage » présente
+  sur son propre trajet, libellé « expiré (trajet parti) ».

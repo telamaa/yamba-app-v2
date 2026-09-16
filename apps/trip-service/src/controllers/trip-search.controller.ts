@@ -9,6 +9,7 @@ import { sortByPriceForWeight, totalForWeightCents, transportForWeightCents, wei
 import { placeSearchTerm } from "../lib/place-text";
 import { platformSettings } from "@packages/libs/settings/default";
 import prisma from "@packages/libs/prisma";
+import { containsText } from "@packages/libs/prisma/text-search";
 import { markFavorites } from "../services/trip-favorite.service";
 import { ValidationError } from "@packages/error-handler";
 import {
@@ -113,8 +114,9 @@ function buildBaseWhere(
   if (from) {
     andClauses.push({
       OR: [
-        { originCity: { contains: from, mode: "insensitive" } },
-        { originCountry: { contains: from, mode: "insensitive" } },
+        // ANO-ADM-15 — saisie d'un visiteur : « ( » faisait tomber la recherche (500), « . » rendait tout.
+        { originCity: containsText(from) },
+        { originCountry: containsText(from) },
       ],
     });
   }
@@ -123,8 +125,8 @@ function buildBaseWhere(
   if (to) {
     andClauses.push({
       OR: [
-        { destinationCity: { contains: to, mode: "insensitive" } },
-        { destinationCountry: { contains: to, mode: "insensitive" } },
+        { destinationCity: containsText(to) },
+        { destinationCountry: containsText(to) },
       ],
     });
   }
