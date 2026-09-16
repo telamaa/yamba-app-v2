@@ -6828,11 +6828,168 @@ légitime depuis ANO-ADM-74) ; NRG-1 (le cinquième écran est un texte de formu
 les valeurs PAR DÉFAUT des paramètres (`alerts.disputeUndecidedHours`, `alerts.payoutFailedHours`) et sont déjà
 présentés comme tels — rien à corriger de ce côté.
 
-**Reste à trancher par le fondateur (accumulé sur le cahier).** (a) journaliser un refus d'effacement RGPD ; (b) écran de
-réinitialisation de la 2FA d'un autre administrateur ; (c) ce que mesure « Versements en échec depuis plus de 48 h » ;
-(d) « Abandonner » un renversement sans événement ni message au Voyageur ; (e) billets servis par URL ImageKit publiques
-permanentes ; (f) catégorie de sanction sur un dossier de signalement déjà tranché.
-~~(g) passe « concurrence » sur les gestes MEMBRE (A192, cinq fichiers inventoriés)~~ — **FAITE** le 16/09 (A195, PR #332).
+**Reste à trancher par le fondateur — DOSSIER INSTRUIT le 17/09/2026.** Chaque point ci-dessous a été **vérifié dans le
+code** (pas déduit du cahier) : état réel, enjeu, options, recommandation et coût. Il ne manque que la décision.
+~~(g) passe « concurrence » sur les gestes MEMBRE (A192, cinq fichiers inventoriés)~~ — **FAITE** le 16/09 (A195, PR #332),
+prolongée le 17/09 par A196 (transitions du trajet) et A197 (D2 exécutable).
+
+---
+
+### (a) Journaliser un refus d'effacement RGPD
+
+**Aujourd'hui, vérifié** (`privacy.service.ts` ~l. 119) : un refus écrit une ligne `DataRequest` complète — `status:
+"REFUSED"`, `refusalReasons` (la liste fermée des bloqueurs), l'admin demandeur, le motif, l'IP, l'horodatage — puis lève
+`ErasureBlockedError`. Le **journal admin** (`AdminAction`), lui, ne reçoit rien.
+
+**L'enjeu.** Face à un régulateur, la question n'est pas « où est-ce écrit » mais « pouvez-vous prouver que la demande a
+été traitée dans les délais, et pourquoi elle a été refusée ». Le registre `DataRequest` répond aux deux, avec plus de
+détail que ne le ferait une ligne de journal. Le journal admin, lui, répond à une autre question — « qu'a fait cet
+opérateur ce jour-là » — et c'est celle que se pose un audit **interne**.
+
+| Option | Ce que ça apporte | Coût |
+|---|---|---|
+| **1. Statu quo** (registre seul) | la preuve réglementaire est déjà complète | nul |
+| **2. Ligne de journal en plus** (recommandée) | la chronologie d'un opérateur devient complète : on voit qu'il a *tenté*, pas seulement ce qui a abouti | ~0,5 j — une ligne `USER_ERASURE_REFUSED` dans la MÊME transaction que le `DataRequest`, + le libellé FR |
+| 3. Registre déplacé vers le journal | une seule vérité | à éviter : `refusalReasons` est typé et exporté, le journal est générique |
+
+**Ma recommandation : option 2.** C'est peu coûteux, et cela ferme une asymétrie gênante : aujourd'hui, un refus
+d'effacement est le SEUL geste admin sensible qui n'apparaît pas au journal. Un auditeur interne qui lit le journal d'un
+opérateur croit qu'il n'a rien tenté.
+
+---
+
+### (b) Écran de réinitialisation de la 2FA d'un autre administrateur
+
+**Aujourd'hui, vérifié** (`admin.router.ts` l. 72-76) : les seules routes sont lister, inviter, changer les profils,
+retirer, renvoyer l'invitation. **Aucune** route de réinitialisation TOTP d'un tiers. Depuis A190 a, un admin régénère
+**ses propres** codes de secours (`ADM-SES-2`) ; le détour « retirer / réinviter » ne sert donc plus que si l'admin a
+perdu **à la fois** son application et ses codes.
+
+**L'enjeu.** Le détour actuel fonctionne mais **brouille le journal** : une révocation pour perte d'application ressemble
+à une révocation pour faute (`ADMIN_REVOKED` puis `ADMIN_INVITED`). Sur un petit effectif, c'est gérable ; sur trente
+administrateurs, c'est une confusion par trimestre.
+
+| Option | Ce que ça apporte | Coût |
+|---|---|---|
+| **1. Statu quo** (recommandée pour l'instant) | aucun nouveau pouvoir dangereux à garder | nul |
+| 2. Bouton « Réinitialiser la 2FA » (SUPER_ADMIN, sudo + motif) | un geste clair, une ligne de journal claire | ~1 j + risque : c'est un **contournement de 2FA**, la cible la plus juteuse du back-office |
+| 3. Statu quo + une ligne de journal dédiée au motif « perte d'appareil » | lève la confusion sans créer le pouvoir | ~0,25 j |
+
+**Ma recommandation : 1 maintenant, 3 si la confusion se produit vraiment.** Le remède du 2 crée exactement le pouvoir
+qu'un attaquant cherche (réinitialiser la 2FA d'un super administrateur). Tant que l'effectif tient dans une page, le
+détour est le bon compromis — et il est désormais rare, puisque les codes de secours se régénèrent seuls.
+
+---
+
+### (c) Ce que mesure « Versements en échec depuis plus de 48 h »
+
+**Aujourd'hui, vérifié** (`ops-alerts.service.ts` l. 27) : la requête compte les deals `payoutStatus: "FAILED"` dont
+**`completedAt` ou `closedAt`** est antérieur à 48 h. Autrement dit : *le deal est fini depuis 48 h et l'argent n'est
+toujours pas parti.* Ce n'est **pas** « l'échec dure depuis 48 h » : un versement qui vient d'échouer pour la première
+fois, sur un deal terminé il y a trois jours, déclenche l'alerte immédiatement.
+
+**L'enjeu.** Le libellé dit autre chose que la requête. Un opérateur qui croit lire « ça échoue depuis 48 h » cherche une
+panne durable et trouve un incident de la minute — il perd sa confiance dans l'alerte.
+
+| Option | Ce que ça apporte | Coût |
+|---|---|---|
+| **1. Corriger le LIBELLÉ** (recommandée) : « Versements non partis 48 h après la fin du deal » | la mesure actuelle est la BONNE mesure (c'est l'argent dû au Voyageur qui est en retard, peu importe depuis quand ça échoue) ; seul le mot était faux | ~0,25 j (libellé + tooltip + cahier) |
+| 2. Mesurer depuis le premier échec | colle au libellé actuel | ~1 j **et un piège** : les rejeux sont espacés (`payoutNextRetryAt`), une mesure « depuis le dernier essai » repousserait l'alerte à chaque rejeu — il faudrait un champ `payoutFirstFailedAt` qui n'existe pas |
+| 3. Les deux mesures, deux alertes | exhaustif | ~1,5 j, et une alerte de plus à lire |
+
+**Ma recommandation : option 1.** La mesure existante est celle qui compte pour le métier (un Voyageur attend son argent),
+et le nom de la règle (`PAYOUT_FAILED_48H`) peut rester : c'est un identifiant, pas une phrase.
+
+---
+
+### (d) « Abandonner » un renversement sans événement ni message au Voyageur
+
+**Aujourd'hui, vérifié** (`admin-finance.service.ts` l. 391-401) : `WRITTEN_OFF` écrit
+`payoutReversalResolution` et **une ligne de journal** `PAYOUT_REVERSAL_RESOLVED` (avec l'issue, le motif et l'ancien
+transfert), dans la même transaction. Aucun événement outbox, **aucun email au Voyageur**.
+
+**L'enjeu.** C'est la seule décision d'argent qui ne dit rien à la personne concernée. Le Voyageur a vu passer un
+versement, puis son renversement ; la plateforme décide de ne pas le refaire — et il ne l'apprend jamais. Selon le motif
+réel (fraude soupçonnée, compte fermé, montant dérisoire), le silence est défendable… ou très mauvais.
+
+| Option | Ce que ça apporte | Coût |
+|---|---|---|
+| **1. Email au Voyageur, motif GÉNÉRIQUE + contact support** (recommandée) | la personne concernée sait ; le motif interne reste interne (même principe qu'A191 pour les sanctions) | ~0,5 j |
+| 2. Statu quo | rien à écrire | nul, mais c'est un angle mort assumé |
+| 3. Événement outbox + email | ouvre la porte aux relances et à l'analytique | ~1 j (nouvel `eventType` au contrat) |
+
+**Ma recommandation : option 1, sans événement.** Un email suffit : il n'y a pas d'autre consommateur à prévenir, et
+ajouter un type d'événement au contrat pour une décision rare est disproportionné. En revanche, le silence actuel ne
+tiendrait pas devant une réclamation.
+
+---
+
+### (e) Billets servis par des URL ImageKit publiques permanentes
+
+**Aujourd'hui, vérifié** : le client ImageKit partagé ne pose **aucune signature d'URL** (`packages/libs/imagekit`). Un
+billet d'avion (nom, numéro de vol, parfois numéro de réservation) est donc accessible à qui connaît l'URL, pour
+toujours — y compris après la suppression du trajet, tant que le fichier n'est pas effacé.
+
+**L'enjeu.** Une URL ImageKit n'est pas devinable (chemin aléatoire), donc le risque n'est pas l'énumération : c'est la
+**fuite par partage** (un lien recopié dans un message, un ticket de support, un journal) et l'absence de révocation.
+C'est de la donnée personnelle de transport.
+
+| Option | Ce que ça apporte | Coût |
+|---|---|---|
+| **1. URL signées à durée courte pour les seuls justificatifs** (recommandée) | le lien fuité expire ; les images publiques (avatars, photos de trajet) ne changent pas | ~1 j (ImageKit sait signer ; la vue admin demande l'URL au serveur au moment de l'ouvrir) |
+| 2. Tout signer | uniforme | casse le cache des images publiques, coût réseau et complexité pour un gain nul |
+| 3. Statu quo | rien | l'exposition dure aussi longtemps que le fichier |
+
+**Ma recommandation : option 1**, à programmer **avant l'ouverture publique**, pas avant la prochaine recette : c'est une
+vraie réduction d'exposition, mais aucun incident ne la rend urgente aujourd'hui.
+
+---
+
+### (f) Catégorie de sanction sur un dossier de signalement déjà tranché
+
+**Aujourd'hui, vérifié** (`report.service.ts` l. 159-163) : un dossier `REVIEWED` ne se re-tranche pas (409
+`REPORT_ALREADY_REVIEWED`). Quand le Support sanctionne ensuite le membre visé, il doit choisir une catégorie (A193) —
+et le **motif interne** du signalement n'est plus sous ses yeux : il rouvre le dossier pour le relire.
+
+**L'enjeu.** Purement ergonomique : quelques clics de plus, sur un geste rare. Aucun risque de données.
+
+| Option | Ce que ça apporte | Coût |
+|---|---|---|
+| **1. Reprendre le motif du signalement dans le formulaire de sanction** (recommandée) | le Support voit ce qu'il sanctionne, sans rouvrir | ~0,5 j |
+| 2. Pré-cocher la catégorie déduite du motif du signalement | encore plus rapide | ~0,75 j, **et un risque** : une catégorie pré-cochée est une catégorie acceptée sans réfléchir, alors qu'elle est communiquée au membre (A193) |
+| 3. Statu quo | rien | quelques clics |
+
+**Ma recommandation : option 1.** Montrer, oui ; pré-remplir une décision qui part au membre, non.
+
+---
+
+### (g) NOUVEAU — le doublon de signalement (trouvé pendant A195, laissé hors périmètre)
+
+**Aujourd'hui, vérifié** (`conversation.service.ts` l. ~381 et `report.service.ts` l. 57) : signaler lit « ai-je déjà
+signalé ? » puis crée. Deux clics simultanés créent **deux dossiers** dans la file de modération, et le compteur
+« prioritaire dès 3 ouverts sur une cible » s'en trouve gonflé.
+
+**Pourquoi ce n'était pas dans A195** : le remède évident — un index unique `(cible, signalant)` — serait **faux**. La
+règle d'auth-service porte sur les dossiers **OUVERTS** : un membre a le droit de re-signaler une cible dont le dossier a
+été clos. Un index unique simple l'interdirait.
+
+| Option | Ce que ça apporte | Coût |
+|---|---|---|
+| **1. Index unique PARTIEL Mongo** (`status: "OPEN"` seulement), posé par script | la garantie exacte de la règle métier, tenue par la base | ~0,5 j, mais **hors gestion Prisma** : index à créer et documenter à la main, à re-vérifier après chaque `db push` |
+| **2. Rendre le conflit détectable** (recommandée) : créer le signalement dans une transaction qui touche AUSSI le document visé | zéro schéma, zéro infrastructure, même patron qu'A195 (conflit matérialisé) | ~0,5 j |
+| 3. Clé d'idempotence Redis courte | simple | un second système de vérité pour une garde que la base peut tenir (alternative déjà écartée en A192) |
+| 4. Statu quo | rien | deux dossiers à fermer, un compteur de priorité faussé |
+
+**Ma recommandation : option 2**, et **pas en urgence** : la conséquence est un doublon dans une file, pas une perte
+d'argent ni de données. À faire quand on rouvrira la modération.
+
+---
+
+**Récapitulatif des recommandations** : (a) journaliser — **oui**, 0,5 j · (b) écran de réinitialisation 2FA — **non**,
+statu quo · (c) corriger le **libellé** — oui, 0,25 j · (d) email au Voyageur, motif générique — **oui**, 0,5 j ·
+(e) URL signées pour les justificatifs — **oui, avant l'ouverture publique**, 1 j · (f) montrer le motif, ne pas
+pré-cocher — oui, 0,5 j · (g) conflit matérialisé sur le signalement — oui, quand la modération rouvrira, 0,5 j.
+Total des « oui » immédiats : **environ 1,75 jour**.
 
 | Rôle | Nom | Date | Verdict global |
 |---|---|---|---|
