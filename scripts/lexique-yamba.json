@@ -20,6 +20,12 @@
       "raison": "vouvoiement (la plateforme tutoie)",
       "sauf": "rendez-vous|tous les deux|ensemble|vos deux|vos avis|vos profils|vous organiser|vous devez convenir",
       "_sauf": "« vous » PLURIEL : les deux membres ensemble (« vous aurez tous les deux noté ») ; « rendez-vous » est un nom commun."
+    },
+    {
+      "id": "role-majuscule",
+      "motif": "(?<![\\p{L}-])voyageu(r|rs|se|ses)(?![\\p{L}])",
+      "drapeaux": "u",
+      "raison": "le rôle prend la majuscule : « Voyageur » (décision du 13/09, recette 5.32 → chapitre 7)"
     }
   ],
   "en": [
@@ -34,6 +40,12 @@
       "motif": "\\b(insurance|insured|IPID)\\b",
       "drapeaux": "i",
       "raison": "« insurance » (no insurer contract: « Protection », « Yamba Guarantee »)"
+    },
+    {
+      "id": "role-majuscule",
+      "motif": "(?<![\\p{L}-])travelers?(?![\\p{L}])",
+      "drapeaux": "u",
+      "raison": "the role is capitalized: « Traveler » (decision of 13/09)"
     }
   ]
 }

@@ -3845,7 +3845,7 @@ dans son en-tête : les textes codés en dur dans les composants lui échappent.
 
 ### À trancher (produit)
 
-- **« expéditeurs » / « voyageurs » en minuscule** au sens générique (« Yamba connecte les expéditeurs aux
+- ~~**« expéditeurs » / « voyageurs » en minuscule**~~ → **tranché le 13/09 : « Voyageur » / « Traveler » partout, avec majuscule** — 71 valeurs de messages, 33 textes écrits dans le code, un email ; règle `role-majuscule` ajoutée au lexique partagé (CI + recette), contre-épreuve jouée ; 12 citations du harnais mises à jour ; web-fav, web-rch, web-rsv-devis, web-lit verts. *(Texte d'origine :)* « expéditeurs » / « voyageurs » en minuscule au sens générique (« Yamba connecte les expéditeurs aux
   voyageurs ») : laissés tels quels — le rôle prend la majuscule, la foule non. À acter.
 - **Des dizaines de textes encore écrits en dur** (`isFr ? … : …`, une douzaine de fichiers rien que pour ce chapitre) hors des fichiers de messages : corrigés ici, mais
   invisibles au garde-fou. Les migrer vers `messages/` est la seule protection durable — moyen.

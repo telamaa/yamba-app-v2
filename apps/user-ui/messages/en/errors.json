@@ -2,7 +2,7 @@
   "boundary": {
     "title": "This page could not be displayed",
     "message": "A technical incident occurred on our side. Nothing you did is lost: neither your account, nor your shipments, nor your trips.",
-    "booking": "No payment was made. Your card was not charged and no request was sent to the traveler.",
+    "booking": "No payment was made. Your card was not charged and no request was sent to the Traveler.",
     "outdated": "A new version of Yamba has just been released. Reload the page to get it.",
     "retry": "Try again",
     "reload": "Reload the page",

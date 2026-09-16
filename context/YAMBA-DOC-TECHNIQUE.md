@@ -91,3 +91,23 @@ compte du jeu d'essai qui aurait une fenêtre sudo ouverte l'effacerait pour de 
 Plateforme inchangée (**1000** + auth 230) : aucun code de service touché. `apps/e2e` : **332 scénarios** (321 + 11).
 web-mob 10/10 et web-msg 21/21 rejoués après l'extraction des gardes et l'assouplissement du page object. Typecheck
 user-ui et harnais verts.
+
+---
+
+# Décision du 13/09 : le rôle prend la majuscule — « Voyageur », « Traveler », partout
+
+*(PR `chore/recette-voyageur-majuscule`, 13/09/2026 — le point « à trancher » du chapitre 5.32.)*
+
+Le produit écrivait tantôt « Voyageur » (le rôle), tantôt « le voyageur » (souvent le même rôle) ; en anglais,
+« Traveler » et « the traveler ». Décision : **le rôle prend toujours la majuscule**, dans les deux langues.
+
+- **Messages** : 71 valeurs réécrites par une expression qui ne touche QUE la valeur (le texte après `"clé": `) —
+  aucune clé ne change, le miroir FR/EN reste parfait.
+- **Code** : 33 lignes, uniquement dans les littéraux de chaîne et le texte JSX ; les commentaires (`// le voyageur a
+  refusé`) ne sont pas du texte affiché et restent tels quels.
+- **Emails** : une phrase de l'email d'accueil anglais (auth-service).
+- **Garde** : règle `role-majuscule` dans `scripts/lexique-yamba.json`, avec des frontières Unicode
+  (`(?<![\p{L}-])voyageu(r|rs|se|ses)(?![\p{L}])`, drapeau `u`, SANS `i` : c'est la minuscule qui est refusée). Contre-épreuve :
+  « Lieu convenu avec le voyageur » réintroduit → refusé, clé nommée.
+- **Harnais** : 12 citations mises à jour (web-fav, web-rch, web-rsv-devis, web-lit).
+

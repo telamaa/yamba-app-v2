@@ -284,7 +284,7 @@
       "DAMAGED_short": "Colis ou contenu endommagé",
       "SIGNIFICANT_DELAY": "Délai significativement dépassé",
       "SIGNIFICANT_DELAY_short": "Délai significativement dépassé",
-      "RECIPIENT_ISSUE": "{recipientFirstName} a un autre problème avec le voyageur",
+      "RECIPIENT_ISSUE": "{recipientFirstName} a un autre problème avec le Voyageur",
       "RECIPIENT_ISSUE_short": "Autre problème avec {carrierFirstName}",
       "OTHER": "Autre problème",
       "OTHER_short": "Autre",

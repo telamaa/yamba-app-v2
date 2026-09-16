@@ -610,6 +610,9 @@ Ordre de demarrage : auth -> trip -> gateway.
   desktop du visiteur sans « Creer un compte » ni « Rechercher un trajet ». Piege de poste : la cle
   Google Maps n'accepte que `localhost` comme referent. Harnais : 32 scenarios verts. PR **#265**
   (empilee sur #264). Reste : 5.2 a 5.32, 02-ADMIN.
+- 13/09 : **DECISION : LE ROLE PREND LA MAJUSCULE** (branche `chore/recette-voyageur-majuscule`, empilee sur #299) —
+  « Voyageur » / « Traveler » partout : 71 valeurs de messages, 33 textes du code, 1 email ; regle `role-majuscule` au
+  lexique partage (CI + recette) ; 12 citations du harnais ; web-fav, web-rch, web-rsv-devis, web-lit verts.
 - 13/09 : **CHAPITRE 7 DU CAHIER 01-WEB — WEB-NRG, NON-REGRESSION (branche `chore/recette-web-7`, empilee sur #297)**
   — 12 fiches CONFORMES (3 apres correction), 11 scenarios NON sequentiels (`apps/e2e/src/chapitres/web-nrg.spec.ts`,
   NRG-6 et 12 partagent un releve console + textes). 3 ANOMALIES CLOSES. ANO-WEB-104 (MAJEURE) : « Voir mes

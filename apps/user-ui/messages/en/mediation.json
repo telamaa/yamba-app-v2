@@ -9,10 +9,10 @@
     "recourse": "Disagree? Request conventional mediation by email.",
     "recourseSubject": "Yamba — case {ticket} — conventional mediation request",
     "SHIPPER": {
-      "REJECTED": "Your report was not upheld: the traveler is paid in full.",
+      "REJECTED": "Your report was not upheld: the Traveler is paid in full.",
       "PARTIAL_REFUND": "Your report is partly upheld: partial refund.",
       "FULL_REFUND": "Your report is upheld: full refund.",
-      "COMPENSATE_CARRIER": "The cancellation retention goes to the traveler.",
+      "COMPENSATE_CARRIER": "The cancellation retention goes to the Traveler.",
       "RESTITUTE_SHIPPER": "The cancellation retention comes back to you."
     },
     "CARRIER": {
