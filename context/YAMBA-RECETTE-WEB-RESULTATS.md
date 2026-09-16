@@ -4519,6 +4519,75 @@ le suppose plus jeune qu'il n'est. Joué deux fois de suite, vert les deux fois.
 
 ---
 
+## Cahier 02-ADMIN — § 5.3 Utilisateurs : recherche et fiche · **CONFORME** (3 fiches, 1 après correction · 2 anomalies closes · 3 écarts documentaires · 3 scénarios, 40 s)
+
+`apps/e2e/src/admin/adm-usr-utilisateurs.spec.ts`. La recherche est lue deux fois (la ligne affichée et la réponse
+`GET /admin/users` de CET indice), la fiche trois fois (l'écran, `GET /admin/users/:id`, la base pour ce que l'API ne
+doit jamais servir), le journal par l'API de `/audit`. USR-3 tranche réellement YAM-2041 par un rejet (le Voyageur
+donne d'abord sa version : le litige n'est décidable qu'à sa réponse ou après 72 h) ; le jeu d'essai est rejoué avant et
+après. Joué deux fois de suite après les corrections, vert et identique les deux fois.
+
+| Fiche | Ce qui est éprouvé | Verdict · Preuve |
+|---|---|---|
+| ADM-USR-1 | Rechercher par tous les indices | **Conforme après correction** → `ANO-ADM-05` ; session Support ; sous-titre et placeholder exacts ; `aminata.shipper@seed.yamba.dev` → Aminata Diallo « via email » ; `Nkounkou` → Thomas Nkounkou « via name » ; `+33612345601` → Thomas Nkounkou « via phone » (**zéro résultat avant correction**) ; chaque fois « 1 affiché(s) · 1 au total » ; `YAM-2041` → Chinwe Eze **et** Thomas Nkounkou « via ticket », « 2 affiché(s) · 2 au total » ; identifiant Mongo du deal → les deux, « via dealId » ; `yam-2041` avec le filtre « Suspendu » posé → toujours les deux (aucun autre filtre appliqué) ; « réinitialiser » absent sans filtre, présent avec, vide la recherche et les filtres ; journal : aucune ligne |
+| ADM-USR-2 | Ouvrir une fiche membre | **Conforme** — session Médiateur, depuis `/users` ; en-tête « Thomas Nkounkou », « thomas.carrier@seed.yamba.dev · +33612345601 · fr », badge « Actif » ; cartes Compte · Voyageur · Expéditeur · Risque interne (D29 ②) — invisible du membre · Sanction · Trajets (3) · Deals (13) · Actions admin sur ce compte ; Compte : rôles, inscription, sessions, deals en cours ; Voyageur : Stripe **masqué** `acct_…xxxx`, « oui / oui » = base, niveau, avis, deals terminés, annulations tardives, litiges perdus ; Expéditeur : mêmes faits ; Risque : « Niveau · score n/100 », plafonds, « Ce mois », phrase exacte ; lien « Ouvrir dans Trajets (fiches, masquage) » → `/trips?carrierId=…` ; « dossier » sur le deal de YAM-2041, « argent » ; **jamais** l'identifiant Stripe complet ni l'empreinte d'un code de livraison (écran ET réponse API), aucune clé `password`, `totpSecret`, `deliveryCode`, `backupCode`, `refreshToken` dans la réponse ; après rechargement, la première action listée : « 13 sept. 2026, 23:17 · Nadia M. · Fiche consultée » ; journal : `USER_VIEWED USER · <Thomas>` à chaque ouverture (voir l'observation sur le double effet de développement) |
+| ADM-USR-3 | Le TrustScore reflète les faits | **Conforme après correction du jeu d'essai** → `ANO-ADM-06` ; compte neuf (inscrit le jour même) : « Compte neuf · score n/100 », « 300 € · 10 kg · 5 envois / mois (compte neuf) » ; Chinwe : deux lectures identiques (calcul à la lecture) ; litiges perdus **0** au départ ; version du Voyageur (201) puis rejet de YAM-2041 par le Médiateur ; « Litiges perdus (interne) » **0 → 1** à l'écran et à l'API ; facteur « litiges perdus » **+25** ; score = somme des facteurs bornée à 0..100 : **0 → 21** (Standard) ; journal : sur Chinwe, uniquement des `USER_VIEWED` |
+
+### Anomalies
+
+- **ANO-ADM-05 (majeure, close)** — **la recherche par téléphone ne trouvait personne, et la recherche libre n'était
+  pas échappée.** Sur MongoDB, Prisma traduit `contains` en `$regex` sans échapper le terme : dans `+33612345601`, le
+  `+` initial est un quantificateur → **zéro résultat** pour le format que le placeholder lui-même propose (`+33…`) ;
+  un `.` d'email valait « n'importe quel caractère » ; une parenthèse faisait échouer la requête. En plus, la recherche
+  poussée (`searchAdvanced`, celle qu'appelle l'écran) n'annonçait jamais « via phone » (email ou name seulement).
+  Correction (`apps/auth-service/src/lib/admin-users.query.ts`) : `escapeRegex` sur tout terme libre, `phoneNeedle`
+  (chiffres significatifs : sans `+`, sans `00`, sans `0` national — « +33 6 12 34 56 01 », « 0033… », « 06 12 34 56 01 »
+  trouvent « +33612345601 »), `matchedOnFor` partagé par les deux recherches (`admin-users.service.ts`). 3 tests
+  unitaires.
+- **ANO-ADM-06 (mineure, outillage, close)** — **le rejeu du jeu d'essai ne remettait pas à zéro les compteurs
+  internes du TrustScore.** `seed-deals.ts` recrée litiges et deals mais laissait `shipperDisputesLostCount`,
+  `shipperLateCancellationsCount` et leurs équivalents Voyageur (`carrierPage`) à leur valeur : mesuré 0 → 2 → 3 litiges
+  perdus pour Chinwe en trois passages, score 46 → 56 — un de plus et elle passait « À risque », plafonds CNF-06 compris,
+  faussant les chapitres suivants. Correction : remise à zéro dans les deux `upsert`. La fiche vérifie désormais le 0
+  de départ.
+
+### Écarts documentaires
+
+- **« Un compte admin de recette créé aujourd'hui »** (USR-3) : les comptes admin de recette datent du 11/06
+  (`seed-admins.ts` les met à jour sans les recréer) ; la fiche prend le dernier compte neuf des chapitres web.
+- **« Le score augmente de 25 points »** : c'est le **facteur** qui monte de 25 ; le score est la somme bornée à
+  0..100. Chinwe avait un crédit (−4 pour un deal terminé) masqué par le plancher : 0 → 21.
+- **Journal de USR-2** : le cahier attend une ligne par ouverture ; en développement, chaque ouverture en écrit **deux**
+  (React monte deux fois l'effet de chargement en mode strict, chaque `GET` journalise). En production : une.
+
+### Observations
+
+- Le 8ᵉ compte admin compté à l'accueil (§ 5.1) est `telamaa.root@gmail.com`, le compte réel du fondateur (créé le
+  28/03), pas un compte jetable oublié — la ligne « constat » du § 5.1 est à lire ainsi.
+- **Le même défaut qu'ANO-ADM-05 existe dans trip-service** : `admin-trips.rules.ts` (filtres ville et recherche de
+  `/trips` admin) et `trip-search.controller.ts` (recherche publique `from` / `to`) passent le terme brut à `contains`.
+  Une ville saisie avec une parenthèse (« Saint-Denis (Réunion) ») ou un point y est concernée. À traiter au § 5.7
+  (trajets) ou en micro-PR transverse : `escapeRegex` gagnerait à vivre dans `packages/`.
+
+### Regard d'expert — produit ET test, une ligne par fiche
+
+- **USR-1** — *Produit* : ANO-ADM-05 réglée. La colonne « Voyageur » affiche le code brut (`ACTIVE`, `NONE` → « — ») et
+  les rôles en anglais (`CARRIER · SHIPPER`) : libellés français comme le badge d'état — petit. La recherche n'accepte
+  pas un email partiel mal orthographié ni un nom sans accent (« Ines » vs « Inès ») : une colonne normalisée sans
+  diacritiques — moyen. *Test* : la frappe caractère par caractère (debounce 250 ms) n'est pas éprouvée : la fiche
+  attend la réponse de l'indice complet ; une réponse périmée affichée après la bonne serait invisible — petit, à
+  ajouter (taper vite deux indices).
+- **USR-2** — *Produit* : conforme. Chaque ouverture écrit une ligne ; un rechargement, un onglet de plus ou le double
+  effet de développement multiplient les lignes : dédoublonner `USER_VIEWED` (même admin, même cible, 5 minutes) côté
+  serveur garderait le journal lisible sans perdre la trace — **moyen, à trancher** (le journal est une pièce
+  d'audit). La carte Deals n'indique pas le statut en français ni le rôle en toutes lettres — petit. *Test* : l'absence
+  de secrets est vérifiée sur les valeurs réelles lues en base, pas sur des noms de champs seulement — rien à faire.
+- **USR-3** — *Produit* : conforme au code. Le score ne dit pas **pourquoi il est à 0** quand des facteurs se
+  compensent ; afficher « somme des facteurs : −4, bornée à 0 » éviterait la surprise de l'opérateur (et du cahier)
+  — petit. *Test* : ANO-ADM-06 est le vrai apport : un chapitre qui juge un score doit vérifier son point de départ.
+
+---
+
 ## Observations (pas des anomalies, mais à savoir)
 
 - **`/become-yamber` reste « futur »** (commentaire du layout marketing) : la page de présentation

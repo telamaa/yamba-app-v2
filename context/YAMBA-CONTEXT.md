@@ -646,6 +646,17 @@ Ordre de demarrage : auth -> trip -> gateway.
   infranchissables juste apres le seed ; DOC-METIER ALR01 perime sur le renversement. A TRANCHER : « Versements en echec
   depuis plus de 48 h » mesure l'age de la FIN DU DEAL, pas de l'echec (libelle ou requete) ; un seed « alertes vieillies ».
   Harnais 360. Reste : § 5.3 a 7.
+- 13/09 : **CAHIER 02-ADMIN — § 5.3 UTILISATEURS (branche `chore/recette-admin-5-3`, empilee sur #303)** — 3 fiches
+  CONFORMES (USR-1 et USR-3 apres correction), jouees deux fois identiques (`apps/e2e/src/admin/adm-usr-utilisateurs.spec.ts`).
+  ANO-ADM-05 (MAJEURE, close) : Prisma+Mongo `contains` = `$regex` NON echappe → `+33612345601` = 0 resultat, `a.b` = 52,
+  `(` = erreur 500 ; et `searchAdvanced` n'annoncait jamais « via phone » → `escapeRegex` / `phoneNeedle` / `matchedOnFor` /
+  `textSearchOr` dans `apps/auth-service/src/lib/admin-users.query.ts` (+3 tests, auth 238). ANO-ADM-06 (mineure,
+  outillage, close) : `seed-deals.ts` ne remettait pas a zero litiges perdus / annulations tardives (User + CarrierPage) →
+  Chinwe 0→2→3 litiges perdus, score vers « A risque ». MEME DEFAUT regex dans trip-service (`admin-trips.rules.ts`,
+  `trip-search.controller.ts`) : a traiter au § 5.7. PIEGE DE POSTE : sous `nx run-many serve`, la reconstruction
+  d'auth-service echoue (« Recursive task invocation ») et l'ANCIEN process repond 200 → auth-service tourne desormais en
+  bundle (`node --env-file=../../.env dist/main.js`). En dev, USER_VIEWED x2 par ouverture (React StrictMode). A
+  TRANCHER : dedoublonner USER_VIEWED, recherche sans accents, libelles FR des roles. Harnais 363. Reste : § 5.4 a 7.
 - 13/09 : **DECISION : LE ROLE PREND LA MAJUSCULE** (branche `chore/recette-voyageur-majuscule`, empilee sur #299) —
   « Voyageur » / « Traveler » partout : 71 valeurs de messages, 33 textes du code, 1 email ; regle `role-majuscule` au
   lexique partage (CI + recette) ; 12 citations du harnais ; web-fav, web-rch, web-rsv-devis, web-lit verts.

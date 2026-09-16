@@ -4840,3 +4840,54 @@ décidables, retenues ; les règles techniques et de liquidité mènent au pilot
 - Le cahier (§ 5.2) est à corriger : le versement du jeu d'essai franchit déjà le seuil par défaut.
 - Six règles ne sont pas observables juste après le seed (litige, renversement, événement parqué, relais en retard,
   emails en échec, absence de publication) : un jeu d'essai « vieilli » pour les alertes rendrait l'écran démontrable.
+
+
+---
+
+# Back-office — retrouver un membre à partir de n'importe quel indice, et tout savoir de lui sans rien de secret (cahier 02-ADMIN § 5.3)
+
+*(PR `chore/recette-admin-5-3`, 13/09/2026 — ADM-USR-1 à 3.)*
+
+## Le besoin
+
+Un membre écrit au support avec ce qu'il a sous la main : son email, son nom, son numéro, un numéro de dossier. Le
+support doit le retrouver en une saisie, savoir par quel indice, puis lire sur une seule fiche son activité, sa
+réputation et son niveau de risque — jamais un secret.
+
+## Les règles
+
+**RG-ADM-USR-01 — Un seul champ cherche par email, prénom, nom, téléphone, identifiant de deal ou ticket YAM**, et
+chaque résultat dit par quel indice il a été trouvé (email, nom, téléphone, deal, ticket).
+
+**RG-ADM-USR-02 — Un numéro se trouve quelle que soit sa saisie** : « +33 6 12 34 56 01 », « 0033612345601 »,
+« 06 12 34 56 01 » trouvent le même compte. Un caractère spécial dans la saisie est cherché tel quel, jamais
+interprété.
+
+**RG-ADM-USR-03 — Un identifiant de deal ou un ticket donne les deux parties**, Expéditeur et Voyageur, quels que soient
+les autres filtres.
+
+**RG-ADM-USR-04 — Chercher n'est pas journalisé ; ouvrir une fiche l'est**, et la consultation apparaît dans les actions
+admin de la fiche.
+
+**RG-ADM-USR-05 — La fiche ne montre jamais** mot de passe, secret de double authentification, code de livraison ni
+identifiant Stripe complet (masqué `acct_…xxxx`).
+
+**RG-ADM-USR-06 — Le niveau de risque se calcule à la lecture** à partir des faits (litiges perdus, annulations
+tardives, signalements, ancienneté, deals terminés, avis) ; il ne sanctionne rien. Un litige perdu pèse 25 points
+(plafond 60) ; le score est la somme des facteurs, bornée entre 0 et 100.
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| USR-1 | Email, nom, téléphone `+33…`, ticket, identifiant de deal | le bon compte, « via … », les deux parties pour un dossier, rien au journal | oui (ANO-ADM-05 close) |
+| USR-2 | Ouvrir la fiche d'un Voyageur | toutes les cartes, Stripe masqué, aucun secret à l'écran ni dans l'API, consultation listée et journalisée | oui |
+| USR-3 | Un compte neuf ; puis un litige rejeté contre l'Expéditeur | « Compte neuf » et ses plafonds ; litiges perdus +1, facteur +25, score recalculé | oui (ANO-ADM-06 close) |
+
+## Ce qui reste à trancher
+
+- **Une ligne de journal par consultation, ou par consultation « distincte »** : un rechargement ou un second onglet
+  écrit une ligne de plus. Dédoublonner (même admin, même membre, quelques minutes) rend le journal lisible ; ne pas le
+  faire garde la trace brute. C'est une décision d'audit.
+- La recherche ignore les accents (« Ines » ne trouve pas « Inès ») : à décider si le support doit pouvoir s'en passer.
+- Libellés français des rôles et des statuts Voyageur dans la liste et la fiche.

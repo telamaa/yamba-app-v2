@@ -295,7 +295,11 @@ async function main() {
       // `publicSlug` aussi à la mise à jour : les comptes du seed antérieurs au profil public
       // (`/u/[slug]`) restaient sans slug, et `/u/seed-thomas` répondait « Profil introuvable »
       // (recette WEB-E2E-1, étape 29).
-      update: { firstName: u.firstName, lastName: u.lastName, roles: u.roles, passwordHash: SEED_PASSWORD_HASH, createdAt: days(-90), publicSlug: `seed-${u.key}` },
+      // Recette 02-ADMIN § 5.3 (ADM-USR-3) : les compteurs INTERNES qui aggravent le TrustScore (D71) survivaient au
+      // rejeu — chaque litige tranché en recette ajoutait 25 points à Chinwe pour toujours (0 → 1 → 2 → 3 litiges perdus
+      // en trois passages) jusqu'à la faire passer « À risque », plafonds CNF-06 compris. Ils repartent de zéro, comme
+      // les litiges et les annulations qu'ils résument (wipe plus bas). Deals terminés et avis : non touchés.
+      update: { firstName: u.firstName, lastName: u.lastName, roles: u.roles, passwordHash: SEED_PASSWORD_HASH, createdAt: days(-90), publicSlug: `seed-${u.key}`, shipperDisputesLostCount: 0, shipperLateCancellationsCount: 0 },
       create: {
         firstName: u.firstName,
         lastName: u.lastName,
@@ -327,6 +331,8 @@ async function main() {
         stripeOnboardingComplete: true,
         stripeChargesEnabled: true,
         stripePayoutsEnabled: true,
+        disputesLostCount: 0, // ADM-USR-3 — même remise à zéro côté Voyageur (voir l'upsert des users)
+        lateCancellationsCount: 0,
       },
       create: {
         userId,
