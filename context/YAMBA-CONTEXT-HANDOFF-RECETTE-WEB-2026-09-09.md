@@ -3,6 +3,50 @@
 *Ce document sert à REPRENDRE le chantier après une pause. Il dit où en est la campagne, ce qui
 tourne sur le poste, ce qui reste à faire, et les pièges déjà payés qu'il ne faut pas repayer.*
 
+> ## ▶ 16/09/2026 — § 7 ET § 8 LIVRÉS — **FIN DU CAHIER 02-ADMIN**
+>
+> Branche `chore/recette-admin-7` empilée sur `chore/recette-admin-6` : 9 scénarios ADM-NRG
+> (`apps/e2e/src/admin/adm-nrg-non-regression.spec.ts`, ~3 min 30, `mode: "default"`), dont **NRG-8** (gestes simultanés :
+> l'engagement P2034 pris au § 5.19 est SOLDÉ — `admin-users` et `admin-auth` étaient les deux derniers) et **NRG-9** (la
+> catégorie de sanction en liste fermée proposée au § 6). Anomalies closes : **ANO-ADM-88** (le même code TOTP servait trois
+> fois), **89** (trois clics sur une sanction = 500 ou trois emails), **90** (`GET /auth/me` servait `suspensionReason`, le
+> motif INTERNE, au membre sanctionné), **91** (note du journal fausse), **92** (« 72 h » en dur). Décisions **A192**
+> (écriture conditionnelle + rejeu du conflit, partout — inventaire fait), **A193** (catégorie de sanction fermée,
+> `User.suspensionCategory` / `suspensionProposedCategory`, lecture tolérante `OTHER`), **A194** (une tuile qui compte n
+> objets mène à une liste qui montre ces n objets — filtre serveur `proposal=1`). **§ 8 consigné** dans
+> `YAMBA-RECETTE-WEB-RESULTATS.md` : tableau de suivi (31 chapitres, 196 scénarios du cahier, 211 au harnais), 92 anomalies
+> closes (5 bloquantes, 48 majeures, 38 mineures, 1 cosmétique, **aucune ouverte**), 12 critères de sortie — verdict
+> **conforme AVEC RÉSERVES DOCUMENTAIRES** (seule réserve : le cahier `docs/recette/RECETTE-02-ADMIN.md` décrit encore des
+> états d'avant correction). Chiffres : auth **356**, deal 644, message 57, trip 293, notification 122, harnais **543** ;
+> dernière anomalie ANO-ADM-92 ; dernier arbitrage A194 ; dernier chapitre d'apprentissage **186**. **SCHÉMA CHANGÉ** :
+> deux champs optionnels sur `User` (`suspensionCategory`, `suspensionProposedCategory`) — `prisma generate` requis,
+> `db push` non (aucun index).
+>
+> **CONTRE-ÉPREUVE** : les quatre fichiers corrigés (`admin-users.controller.ts`, `admin-auth.controller.ts`,
+> `admin-emails.ts`, `me-projection.ts`) remis dans leur état d'origine → **16 rouges sur 356** dans 5 suites ; remis :
+> 356/356. Voisins rejoués verts : ADM-ACC (3), ADM-JRN (7), ADM-MED (9), ADM-SNC (7 — SNC-1 et 2 réalignées sur
+> `after.category` et le nouveau bandeau de fiche), ADM-E2E-1 à 4, ADM-PRM, ADM-SIG, ADM-USR, WEB-CNX, WEB-RCH.
+>
+> **POSTE (16/09)** : Mac redémarré, tout relancé — Docker (`yamba-redpanda`, `yamba-mailpit` — Mailpit est publié sur
+> **8026**, pas 8025), auth/trip/deal/gateway/notification/message en **bundles détachés** `nohup node --env-file=../../.env
+> dist/main.js` (deal avec `STRIPE_SECRET_KEY=` vide), fronts en `nx dev`. Piège payé : `nx run-many --target=serve` a
+> refusé de démarrer (« workspace out of sync », même avec `--skip-sync`) — les bundles passent, eux. Second piège : un
+> front `next dev` annonce « Ready » AVANT de savoir répondre (première compilation) : précharger `/login` (admin) et
+> `/fr/login` (membre) avec un `curl` long avant de lancer le harnais.
+>
+> **PIÈGES DU CHAPITRE** : le menu latéral porte le même `href="/alerts"` que le résumé d'accueil → viser `main` ; un pas
+> TOTP qui vient de servir est brûlé (anti-rejeu) — enchaîner deux gestes TOTP demande d'attendre le pas SUIVANT ; depuis
+> ANO-ADM-74 un identifiant de cible COURT est une valeur légitime (clé de paramètre), seul un caractère interdit fait un
+> filtre « ignoré » ; le profil OPS ne voit pas les tuiles Finances (mesurer la ligne de flottaison avec le super
+> administrateur).
+>
+> **SUITE (rien n'est engagé, à décider par le fondateur)** : (1) mettre le cahier `RECETTE-02-ADMIN.md` à jour sur les
+> écarts documentaires relevés (critère 4) ; (2) arbitrages accumulés : journaliser un refus d'effacement RGPD, écran de
+> réinitialisation de la 2FA d'un autre admin, « Versements en échec depuis plus de 48 h », « Abandonner » un renversement,
+> billets servis par URL ImageKit publiques ; (3) **passe « concurrence » sur les gestes MEMBRE** (A192 : `auth.controller`,
+> `profile.controller`, `google-auth.service`, `conversation.service`, `conversation-retention.service`) ; (4) merger la
+> pile de PR dans l'ordre (#302 → … → `chore/recette-admin-7`).
+>
 > ## ▶ 15/09/2026 — § 6 LIVRÉ (cas de bout en bout)
 >
 > Branche `chore/recette-admin-6` empilée sur `chore/recette-admin-5-26` (#327) : 8 scénarios ADM-E2E en deux fichiers

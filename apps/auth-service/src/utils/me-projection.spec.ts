@@ -47,10 +47,11 @@ describe("ME_USER_SELECT — la réponse de /auth/me est une liste blanche, pas 
     expect(Object.keys(ME_USER_SELECT)).not.toContain("suspendedByAdminId");
   });
 
-  it("une sanction PRONONCÉE reste lisible par le membre qui la subit", () => {
+  it("une sanction PRONONCÉE reste lisible par le membre qui la subit — par sa catégorie, jamais le motif libre (ANO-ADM-90, A191, A193)", () => {
     expect(ME_USER_SELECT).toHaveProperty("suspendedAt");
-    expect(ME_USER_SELECT).toHaveProperty("suspensionReason");
+    expect(ME_USER_SELECT).toHaveProperty("suspensionCategory");
     expect(ME_USER_SELECT).toHaveProperty("suspensionUntil");
+    expect(ME_USER_SELECT).not.toHaveProperty("suspensionReason");
   });
 
   it("chaque exclusion porte sa raison, en clair", () => {

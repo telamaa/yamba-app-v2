@@ -127,6 +127,7 @@ export const AdminUsersQuerySchema = z
     accountStatus: AccountStatusSchema.optional(),
     carrierStatus: z.string().trim().max(40).optional(),
     stripeReady: z.enum(["1", "0"]).optional().meta({ description: "1 = compte Connect avec virements activés" }),
+    proposal: z.enum(["1"]).optional().meta({ description: "1 = a suspension proposal awaits a decision (A194, home tile « Sanctions proposées »)" }),
     createdFrom: z.string().datetime().optional(),
     createdTo: z.string().datetime().optional(),
     sort: z.enum(["createdAt", "lastName"]).default("createdAt"),
@@ -151,6 +152,18 @@ const DealLineSchema = z.object({
   requestedAt: z.string().datetime(),
 });
 
+/**
+ * A193 (recette 02-ADMIN § 7) — catégorie de motif d'une sanction, liste FERMÉE : elle part au membre (exposé des motifs,
+ * esprit DSA art. 17) dans sa langue ; le motif libre reste interne (A191). Un compte sanctionné avant A193 n'a pas de
+ * catégorie : il se lit `OTHER` (`sanctionCategoryOf`), jamais une erreur.
+ */
+export const SANCTION_CATEGORIES = ["SCAM_SUSPECTED", "PROHIBITED_CONTENT", "ABUSIVE_BEHAVIOUR", "REPEATED_DISPUTES", "IMPERSONATION", "OTHER"] as const;
+export const SanctionCategorySchema = z.enum(SANCTION_CATEGORIES).meta({ id: "SanctionCategory", description: "Closed list, sent to the member (statement of reasons); the free-text reason stays internal" });
+export type SanctionCategory = z.infer<typeof SanctionCategorySchema>;
+export function sanctionCategoryOf(raw: unknown): SanctionCategory {
+  return (SANCTION_CATEGORIES as readonly string[]).includes(raw as string) ? (raw as SanctionCategory) : "OTHER";
+}
+
 export const AdminUserFileSchema = z
   .object({
     id: ObjectIdSchema,
@@ -166,10 +179,10 @@ export const AdminUserFileSchema = z
     adminRoles: z.array(AdminRoleSchema),
     accountStatus: AccountStatusSchema,
     suspension: z
-      .object({ level: AccountStatusSchema, reason: z.string(), until: z.string().datetime().nullable(), at: z.string().datetime(), byAdmin: z.string() })
+      .object({ level: AccountStatusSchema, category: SanctionCategorySchema, reason: z.string(), until: z.string().datetime().nullable(), at: z.string().datetime(), byAdmin: z.string() })
       .nullable(),
     suspensionProposal: z
-      .object({ level: z.string(), reason: z.string(), byAdmin: z.string(), at: z.string().datetime() })
+      .object({ level: z.string(), category: SanctionCategorySchema, reason: z.string(), byAdmin: z.string(), at: z.string().datetime() })
       .nullable(),
     createdAt: z.string().datetime(),
     isDeleted: z.boolean(),
@@ -214,7 +227,8 @@ export type AdminUserFile = z.infer<typeof AdminUserFileSchema>;
 export const ProposeSuspensionRequestSchema = z
   .object({
     level: z.enum(["RESTRICTED", "SUSPENDED"]),
-    reason: z.string().trim().min(SUSPENSION_MIN_REASON_LENGTH).max(2000),
+    category: SanctionCategorySchema,
+    reason: z.string().trim().min(SUSPENSION_MIN_REASON_LENGTH).max(2000).meta({ description: "Internal reason — never sent to the member (A191)" }),
   })
   .meta({ id: "ProposeSuspensionRequest", description: "SUPPORT proposes; MEDIATOR / SUPER_ADMIN executes (D56 3A)" });
 export type ProposeSuspensionRequest = z.infer<typeof ProposeSuspensionRequestSchema>;
@@ -222,7 +236,8 @@ export type ProposeSuspensionRequest = z.infer<typeof ProposeSuspensionRequestSc
 export const ApplySuspensionRequestSchema = z
   .object({
     level: z.enum(["RESTRICTED", "SUSPENDED"]),
-    reason: z.string().trim().min(SUSPENSION_MIN_REASON_LENGTH).max(2000),
+    category: SanctionCategorySchema,
+    reason: z.string().trim().min(SUSPENSION_MIN_REASON_LENGTH).max(2000).meta({ description: "Internal reason — never sent to the member (A191)" }),
     until: z.string().datetime().optional().meta({ description: "Optional end; absent = until lifted" }),
   })
   .meta({ id: "ApplySuspensionRequest" });

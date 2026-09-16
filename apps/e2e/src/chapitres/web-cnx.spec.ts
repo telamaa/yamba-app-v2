@@ -107,9 +107,18 @@ const fenetreSessionExpiree = (page: Page) => page.getByRole("dialog", { name: "
  * navigation est côté client ; c'est la section qui arrive qui interroge l'API.
  */
 async function actionServeurSansRechargement(page: Page): Promise<void> {
+  // La fenêtre « session expirée » peut s'ouvrir AVANT le clic : une requête de fond (TanStack Query) découvre le 401 la
+  // première. L'action serveur a alors déjà eu lieu — et le voile du dialogue intercepte le clic, qui échouerait sans
+  // rien prouver. On ne clique donc que si la fenêtre n'est pas déjà là, et un clic intercepté est accepté si elle l'est.
+  const fenetre = fenetreSessionExpiree(page);
+  if (await fenetre.isVisible().catch(() => false)) return;
   const lien = page.getByRole("link", { name: /Mes favoris/ }).filter({ visible: true }).first();
   await expect(lien).toBeVisible({ timeout: 30_000 });
-  await lien.click();
+  try {
+    await lien.click({ timeout: 10_000 });
+  } catch (e) {
+    if (!(await fenetre.isVisible().catch(() => false))) throw e;
+  }
 }
 
 /* ══ ANO-WEB-01 (harnais, 09/09) ═════════════════════════════════════════════════════════════ */
@@ -592,7 +601,7 @@ test.describe("WEB-CNX — connexion, « Rester connecté », session, appareils
     // Le back-office : la médiation suspend (users.suspension.apply — MEDIATOR).
     const admin = await navigateurAdmin("mediateur");
     const motif = "Recette WEB-CNX-13 : suspension de contrôle du chapitre 5.3, levée par la même fiche.";
-    const suspension = await admin.contexte.request.post(`${apiAdmin}/admin/users/${idCible}/suspension`, { data: { level: "SUSPENDED", reason: motif } });
+    const suspension = await admin.contexte.request.post(`${apiAdmin}/admin/users/${idCible}/suspension`, { data: { level: "SUSPENDED", category: "OTHER", reason: motif } });
     expect(suspension.status(), `POST /admin/users/:id/suspension → ${await suspension.text()}`).toBe(200);
 
     try {

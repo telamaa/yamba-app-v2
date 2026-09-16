@@ -100,8 +100,12 @@ test.describe("ADM-SNC — sanctions (cahier 02-ADMIN § 5.4)", () => {
     const carte = carteSanction(page);
     /* 2. « Restreint (ni publier ni réserver) ». */
     await carte.getByLabel("Restreint (ni publier ni réserver)").check();
+    /* A193 (recette § 7) — sans catégorie, « Proposer » reste inactif même avec un motif valide ; la catégorie est ce que lit le membre. */
+    await carte.getByLabel("Motif interne (jamais envoyé au membre)").fill(MOTIF_PROPOSITION);
+    await expect(carte.getByRole("button", { name: "Proposer", exact: true }), "sans catégorie : inactif").toBeDisabled();
+    await carte.getByLabel("Catégorie envoyée au membre").selectOption("SCAM_SUSPECTED");
     /* 3. Motif trop court : « Proposer » inactif. */
-    const motif = carte.getByPlaceholder(/^Motif \(20 caractères au moins\)/);
+    const motif = carte.getByLabel("Motif interne (jamais envoyé au membre)");
     await motif.fill("trop court");
     await expect(carte.getByRole("button", { name: "Proposer", exact: true }), "motif < 20 : inactif").toBeDisabled();
     /* Bornes : 19 caractères inactif, 20 actif, et la saisie coupée à 2000. */
@@ -120,7 +124,7 @@ test.describe("ADM-SNC — sanctions (cahier 02-ADMIN § 5.4)", () => {
     await expect(carte.getByText("Proposition enregistrée (Restreint) : un Médiateur décide.", { exact: true }), "le message nomme le geste (était « Fait. »)").toBeVisible({ timeout: 30_000 });
     /* 7. Rechargée : le bandeau ambre. */
     await ouvrirFiche(page, pauline);
-    const bandeau = page.getByText(/^Proposition de .+ le .+ : Restreint — /);
+    const bandeau = page.getByText(/^Proposition de .+ le .+ : Restreint · [^—]+ — /);
     await expect(bandeau).toBeVisible({ timeout: 30_000 });
     await expect(bandeau).toContainText(MOTIF_PROPOSITION);
     test.info().annotations.push({ type: "constat", description: `bandeau : « ${(await bandeau.innerText()).trim()} »` });
@@ -144,7 +148,7 @@ test.describe("ADM-SNC — sanctions (cahier 02-ADMIN § 5.4)", () => {
     const lignes = (await lireLeJournal(lecteur.contexte.request, { from: debut, adminUserId: jeuEssai.admin("support").id })).filter((l) => l.action !== "USER_VIEWED");
     expect(resume(lignes), "une ligne").toEqual([`USER_SUSPENSION_PROPOSED USER · ${pauline}`]);
     expect(lignes[0].before ?? null, "avant : —").toBeNull();
-    expect(lignes[0].after).toEqual({ level: "RESTRICTED", reason: MOTIF_PROPOSITION });
+    expect(lignes[0].after, "A193 : la catégorie envoyée au membre est journalisée à côté du motif interne").toEqual({ level: "RESTRICTED", category: "SCAM_SUSPECTED", reason: MOTIF_PROPOSITION });
   });
 
   test("ADM-SNC-2 · appliquer la restriction (Médiateur)", async ({ navigateurAdmin, navigateurConnecte, jeuEssai, mailpit }) => {
@@ -159,9 +163,9 @@ test.describe("ADM-SNC — sanctions (cahier 02-ADMIN § 5.4)", () => {
     const { page } = med;
     /* 1. Le bandeau ambre de la proposition du Support. */
     await ouvrirFiche(page, pauline);
-    await expect(page.getByText(/^Proposition de .+ : Restreint — /)).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText(/^Proposition de .+ : Restreint · [^—]+ — /)).toBeVisible({ timeout: 30_000 });
     const carte = carteSanction(page);
-    const motif = carte.getByPlaceholder(/^Motif \(20 caractères au moins\)/);
+    const motif = carte.getByLabel("Motif interne (jamais envoyé au membre)");
     test.info().annotations.push({ type: "constat", description: `motif pré-rempli par la proposition : « ${await motif.inputValue()} » ; niveau coché : ${(await carte.getByLabel("Restreint (ni publier ni réserver)").isChecked()) ? "Restreint" : "Suspendu"}` });
     /* 2. Motif du Médiateur. */
     await motif.fill(MOTIF_APPLICATION);
@@ -183,7 +187,8 @@ test.describe("ADM-SNC — sanctions (cahier 02-ADMIN § 5.4)", () => {
     /* 5. Rechargée : plus d'ambre, le bandeau rouge, le badge « Restreint ». */
     await ouvrirFiche(page, pauline);
     await expect(page.getByText(/^Proposition de /), "la proposition a disparu").toHaveCount(0);
-    const rouge = page.getByText(/^Restreint depuis le .+ par .+, jusqu'au .+ — motif : /);
+    // A193 : le bandeau nomme les deux textes — la catégorie qui part au membre, puis le motif INTERNE.
+    const rouge = page.getByText(/^Restreint depuis le .+ par .+, jusqu'au .+ — catégorie envoyée au membre : .+ · motif interne : /);
     await expect(rouge).toBeVisible({ timeout: 30_000 });
     await expect(rouge).toContainText(MOTIF_APPLICATION);
     test.info().annotations.push({ type: "constat", description: `bandeau : « ${(await rouge.innerText()).trim()} »` });
@@ -221,7 +226,7 @@ test.describe("ADM-SNC — sanctions (cahier 02-ADMIN § 5.4)", () => {
     expect((lignes[0].after as { until: string }).until, "la date de fin au journal").toBe(base.suspensionUntil);
     /* Amélioration § 5.4 — une proposition d'ESCALADE (suspendre un compte déjà restreint) compte dans la tuile. */
     const support = await navigateurAdmin("support");
-    const escalade = await support.contexte.request.post(`${apiAdmin()}/admin/users/${pauline}/suspension/propose`, { data: { level: "SUSPENDED", reason: "Recette ADM-SNC-2 : proposition d'escalade sur un compte restreint." } });
+    const escalade = await support.contexte.request.post(`${apiAdmin()}/admin/users/${pauline}/suspension/propose`, { data: { level: "SUSPENDED", category: "OTHER", reason: "Recette ADM-SNC-2 : proposition d'escalade sur un compte restreint." } });
     expect(escalade.ok(), `proposition d'escalade : ${escalade.status()}`).toBe(true);
     expect((await kpis(sup.contexte)).suspensionProposals, "« Sanctions proposées » compte l'escalade (était ignorée : compte non ACTIVE)").toBe((apres.suspensionProposals ?? 0) + 1);
   });
@@ -280,7 +285,8 @@ test.describe("ADM-SNC — sanctions (cahier 02-ADMIN § 5.4)", () => {
     /* 2-3. Suspendu, motif, sans date → « Fait. », badge « Suspendu ». */
     const carte = carteSanction(page);
     await carte.getByLabel("Suspendu (connexion refusée)").check();
-    await carte.getByPlaceholder(/^Motif \(20 caractères au moins\)/).fill(MOTIF_SUSPENSION);
+    await carte.getByLabel("Catégorie envoyée au membre").selectOption("ABUSIVE_BEHAVIOUR"); // A193
+    await carte.getByLabel("Motif interne (jamais envoyé au membre)").fill(MOTIF_SUSPENSION);
     await carte.getByRole("button", { name: "Appliquer", exact: true }).click();
     await expect(carte.getByText("Sanction appliquée : Suspendu, sans date de fin. Le membre est prévenu par email.", { exact: true })).toBeVisible({ timeout: 30_000 });
     await ouvrirFiche(page, thomas);
@@ -313,7 +319,7 @@ test.describe("ADM-SNC — sanctions (cahier 02-ADMIN § 5.4)", () => {
     const lignes = (await lireLeJournal(lecteur.contexte.request, { from: debut, adminUserId: jeuEssai.admin("mediateur").id })).filter((l) => l.action !== "USER_VIEWED");
     expect(resume(lignes)).toEqual([`USER_SUSPENDED USER · ${thomas}`]);
     expect(lignes[0].before).toEqual({ accountStatus: "ACTIVE" });
-    expect(lignes[0].after).toEqual({ accountStatus: "SUSPENDED", reason: MOTIF_SUSPENSION, until: null });
+    expect(lignes[0].after).toEqual({ accountStatus: "SUSPENDED", category: "ABUSIVE_BEHAVIOUR", reason: MOTIF_SUSPENSION, until: null }); // A193
   });
 
   test("ANO-ADM-08 · le trajet d'un Voyageur suspendu n'est ni ouvert ni réservable par son lien", async ({ navigateurVisiteur, navigateurConnecte, jeuEssai }) => {
@@ -343,7 +349,7 @@ test.describe("ADM-SNC — sanctions (cahier 02-ADMIN § 5.4)", () => {
     /* 1. « Lever » sans motif : inactif. */
     await ouvrirFiche(page, thomas);
     const carte = carteSanction(page);
-    const motif = carte.getByPlaceholder(/^Motif \(20 caractères au moins\)/);
+    const motif = carte.getByLabel("Motif interne (jamais envoyé au membre)");
     await motif.fill("");
     await expect(carte.getByRole("button", { name: "Lever", exact: true }), "sans motif : inactif").toBeDisabled();
     /* 2. Motif → « Lever » → « Fait. ». */

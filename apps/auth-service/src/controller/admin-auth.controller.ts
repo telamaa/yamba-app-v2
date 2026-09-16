@@ -23,6 +23,7 @@ import prisma from "@packages/libs/prisma";
 import { adminRolesOf } from "../utils/admin-roles";
 import { AuthError, ForbiddenError, NotFoundError, ValidationError } from "@packages/error-handler";
 import { recordAdminAction } from "@packages/admin-audit";
+import { withWriteConflictRetry } from "@packages/libs/prisma/write-conflict-retry";
 import {
   consumeBackupCode,
   decryptTotpSecret,
@@ -92,6 +93,16 @@ type AdminRefreshPayload = { id: string; jti: string; adm: true; sca: number };
 function clientMeta(req: Request) {
   return { ip: req.ip ?? null, userAgent: req.headers["user-agent"] ?? null };
 }
+
+/**
+ * Recette 02-ADMIN § 7 (engagement du § 5.19, ANO-ADM-88) — les écritures TOTP étaient lues puis écrites sans garde :
+ * trois requêtes simultanées portant le MÊME code passaient toutes la vérification anti-rejeu (`totpLastUsedStep` lu avant),
+ * ouvraient trois sessions, et l'activation émettait trois jeux de codes de secours dont deux déjà invalides à l'affichage.
+ * Chaque écriture est désormais conditionnelle (la garde lit l'état DANS la transaction) et rejouée sur conflit d'écriture
+ * (P2034) : un seul gagnant, les autres lisent le même refus qu'un code rejoué.
+ */
+/** Le pas TOTP n'a pas encore servi : champ optionnel → `null` ET absent (piège Prisma+Mongo), ou strictement antérieur. */
+const unusedStepGuard = (step: number) => ({ OR: [{ totpLastUsedStep: null }, { totpLastUsedStep: { isSet: false } }, { totpLastUsedStep: { lt: step } }] });
 
 /** Lit et vérifie le cookie de pré-authentification ; charge l'utilisateur ADMIN. */
 async function requirePreauth(req: Request) {
@@ -194,14 +205,15 @@ export const adminTotpEnable = async (req: Request, res: Response, next: NextFun
     if (!verdict.ok) return next(new AuthError("Invalid code.", { code: "OTP_INCORRECT" }));
 
     const backupCodes = generateBackupCodes();
-    await prisma.$transaction(async (tx) => {
-      await tx.user.update({
-        where: { id: user.id },
+    await withWriteConflictRetry(() => prisma.$transaction(async (tx) => {
+      const written = await tx.user.updateMany({
+        where: { id: user.id, OR: [{ totpEnabledAt: null }, { totpEnabledAt: { isSet: false } }] },
         data: { totpEnabledAt: new Date(), totpLastUsedStep: verdict.step, totpBackupCodeHashes: backupCodes.map(hashBackupCode) },
       });
+      if (written.count !== 1) throw new ForbiddenError("Two-factor authentication is already enabled.", { code: "TOTP_ALREADY_ENABLED" });
       await recordAdminAction(tx, { adminUserId: user.id, action: "ADMIN_TOTP_ENABLED", targetType: "USER", targetId: user.id, ...clientMeta(req) });
       await recordAdminAction(tx, { adminUserId: user.id, action: "ADMIN_LOGIN", targetType: "SESSION", after: { method: "totp-setup" }, ...clientMeta(req) });
-    });
+    }));
     await issueAdminSession(req, res, user);
     await sendLoginAlert(req, user);
     return res.status(200).json({ ok: true, backupCodes });
@@ -228,10 +240,11 @@ export const adminTotpVerify = async (req: Request, res: Response, next: NextFun
         await registerTotpFailure(user.id);
         return next(new AuthError("Invalid code.", { code: "OTP_INCORRECT" }));
       }
-      await prisma.$transaction(async (tx) => {
-        await tx.user.update({ where: { id: user.id }, data: { totpLastUsedStep: verdict.step } });
+      await withWriteConflictRetry(() => prisma.$transaction(async (tx) => {
+        const written = await tx.user.updateMany({ where: { id: user.id, ...unusedStepGuard(verdict.step) }, data: { totpLastUsedStep: verdict.step } });
+        if (written.count !== 1) throw new AuthError("Invalid code.", { code: "OTP_INCORRECT" }); // rejeu simultané du même code
         await recordAdminAction(tx, { adminUserId: user.id, action: "ADMIN_LOGIN", targetType: "SESSION", after: { method: "totp" }, ...clientMeta(req) });
-      });
+      }));
     } else if (isBackupCodeFormat(raw)) {
       const remaining = consumeBackupCode(raw, user.totpBackupCodeHashes);
       if (!remaining) {
@@ -240,11 +253,14 @@ export const adminTotpVerify = async (req: Request, res: Response, next: NextFun
       }
       usedBackup = true;
       remainingBackupCodes = remaining.length;
-      await prisma.$transaction(async (tx) => {
-        await tx.user.update({ where: { id: user.id }, data: { totpBackupCodeHashes: remaining } });
+      await withWriteConflictRetry(() => prisma.$transaction(async (tx) => {
+        // Verrou optimiste : la liste restante est calculée sur la lecture ; deux codes (ou le même) consommés en même temps
+        // ne doivent ni servir deux fois ni ressusciter un code déjà utilisé.
+        const written = await tx.user.updateMany({ where: { id: user.id, updatedAt: user.updatedAt }, data: { totpBackupCodeHashes: remaining } });
+        if (written.count !== 1) throw new AuthError("Invalid code.", { code: "OTP_INCORRECT" });
         await recordAdminAction(tx, { adminUserId: user.id, action: "ADMIN_BACKUP_CODE_USED", targetType: "USER", targetId: user.id, after: { remaining: remaining.length }, ...clientMeta(req) });
         await recordAdminAction(tx, { adminUserId: user.id, action: "ADMIN_LOGIN", targetType: "SESSION", after: { method: "backup-code" }, ...clientMeta(req) });
-      });
+      }));
     } else {
       await registerTotpFailure(user.id);
       return next(new AuthError("Invalid code.", { code: "OTP_INCORRECT" }));
@@ -549,10 +565,11 @@ export const regenerateAdminBackupCodes = async (req: AuthenticatedRequest, res:
     }
     await clearTotpFailures(user.id);
     const backupCodes = generateBackupCodes();
-    await prisma.$transaction(async (tx) => {
-      await tx.user.update({ where: { id: user.id }, data: { totpLastUsedStep: verdict.step, totpBackupCodeHashes: backupCodes.map(hashBackupCode) } });
+    await withWriteConflictRetry(() => prisma.$transaction(async (tx) => {
+      const written = await tx.user.updateMany({ where: { id: user.id, ...unusedStepGuard(verdict.step) }, data: { totpLastUsedStep: verdict.step, totpBackupCodeHashes: backupCodes.map(hashBackupCode) } });
+      if (written.count !== 1) throw new ValidationError("Invalid code.", { code: "OTP_INCORRECT" }); // même code présenté deux fois en même temps
       await recordAdminAction(tx, { adminUserId: user.id, action: "ADMIN_BACKUP_CODES_REGENERATED", targetType: "USER", targetId: user.id, before: { remaining: user.totpBackupCodeHashes.length }, after: { remaining: backupCodes.length }, ...clientMeta(req) });
-    });
+    }));
     return res.status(200).json({ backupCodes });
   } catch (e) {
     return next(e);

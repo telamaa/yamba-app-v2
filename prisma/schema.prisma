@@ -50,11 +50,13 @@ model User {
   adminInvitedAt   DateTime?
   accountStatus    AccountStatus @default(ACTIVE) // ACTIVE | RESTRICTED (ni publier ni réserver) | SUSPENDED (connexion refusée)
   suspensionReason         String?
+  suspensionCategory       String?   // A193 — catégorie FERMÉE communiquée au membre (absente avant A193 → lue OTHER)
   suspensionUntil          DateTime?
   suspendedAt              DateTime?
   suspendedByAdminId       String?   @db.ObjectId
   suspensionProposedLevel  String?   // proposition SUPPORT en attente d'exécution (3A : deux clics)
   suspensionProposedReason String?
+  suspensionProposedCategory String? // A193
   suspensionProposedByAdminId String? @db.ObjectId
   suspensionProposedAt     DateTime?
 

@@ -333,6 +333,10 @@ function ManualRefundCard({ file, me, onDone }: { file: AdminDealMoneyFile; me: 
  * Recette § 5.12 — le bilan : où est chaque centime de ce deal, et ce qui attend encore un geste. Calculé par le serveur
  * (`moneyBalance`, règle pure) ; l'écran ne fait aucune addition. Une anomalie (argent sans destination) s'affiche en rouge.
  */
+/** Le solde plateforme lu dans le bon sens : positif = Yamba détient, négatif = Yamba a avancé (geste commercial, remboursement manuel). */
+export function platformHoldsRow(cents: number, cur: string): { k: string; v: string } {
+  return cents < 0 ? { k: "Avancé par Yamba", v: money(-cents, cur) } : { k: "Détenu par la plateforme", v: money(cents, cur) };
+}
 function BalanceCard({ file }: { file: AdminDealMoneyFile }) {
   const cur = file.pricing.currencyCode;
   const b = file.balance;
@@ -342,7 +346,8 @@ function BalanceCard({ file }: { file: AdminDealMoneyFile }) {
         <Row k="Débité chez l'Expéditeur" v={money(b.capturedCents, cur)} />
         <Row k="Remboursé à l'Expéditeur" v={money(b.refundedCents, cur)} />
         <Row k="Versé au Voyageur" v={money(b.paidOutCents, cur)} />
-        <Row k="Détenu par la plateforme" v={money(b.platformHoldsCents, cur)} />
+        {/* A193 b (recette § 7) — après un geste commercial, Yamba a mis de sa poche : « −0,80 € détenu » se lisait comme une dette ou une erreur. */}
+        <Row {...platformHoldsRow(b.platformHoldsCents, cur)} />
       </div>
       {b.pending.length === 0 ? (
         <p className="mt-2 rounded-lg bg-emerald-50 px-3 py-2 text-[12.5px] text-emerald-800">Soldé : plus rien n'attend de geste sur l'argent de ce deal.</p>

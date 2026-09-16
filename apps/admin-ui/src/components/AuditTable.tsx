@@ -160,7 +160,8 @@ export default function AuditTable() {
           {hasFilters && <button type="button" onClick={() => { setFilters(EMPTY); setAuthorName(""); setContains(""); }} className="rounded-lg border border-slate-300 bg-white px-2 py-1">Tout effacer</button>}
           {applied.length > 0 && <span>Filtres serveur : {applied.map((k) => AUDIT_FILTER_LABEL[k] ?? k).join(", ")}</span>}
           {!loading && ignored.length > 0 && <span className="font-medium text-amber-700">Ignoré (format non reconnu) : {ignored.join(", ")}</span>}
-          <span className="text-slate-400">La recherche « contient » ne porte que sur les lignes déjà chargées : le détail est du JSON, il ne s&apos;indexe pas.</span>
+          {/* ANO-ADM-91 (recette § 7, ADM-NRG-6) — la note disait « le détail est du JSON, il ne s'indexe pas » : faux depuis ANO-ADM-73 (détail lisible, cherché par « contient »). */}
+          <span className="text-slate-400">La recherche « contient » ne porte que sur les lignes déjà chargées, détail compris : pour chercher dans tout le journal, pose un filtre serveur.</span>
           <span className="ml-auto"><ExportButton me={me} path="/admin/audit/export" params={query(filters)} personal label="Exporter le journal filtré" /></span>
         </div>
       </div>
