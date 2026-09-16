@@ -69,13 +69,34 @@ export function financeQueueWhere(kind: FinanceQueueKind): Record<string, unknow
 export type FinanceQueueResponse = z.infer<typeof FinanceQueueResponseSchema>;
 
 export const MoneyTimelineKindSchema = z
-  .enum(["AUTHORIZED", "CAPTURED", "REFUNDED", "DISPUTED", "COMPLETED", "CANCELLED", "PAYOUT_SENT", "PAYOUT_FAILED", "PAYOUT_REVERSED", "REVERSAL_RESOLVED", "RETENTION", "RETENTION_DECIDED"])
+  .enum(["AUTHORIZED", "CAPTURED", "REFUNDED", "DISPUTED", "COMPLETED", "CANCELLED", "PAYOUT_SENT", "PAYOUT_FAILED", "PAYOUT_REVERSED", "REVERSAL_RESOLVED", "RETENTION", "RETENTION_DECIDED", "AUTHORIZATION_RELEASED"])
   .meta({ id: "MoneyTimelineKind" });
 export type MoneyTimelineKind = z.infer<typeof MoneyTimelineKindSchema>;
 export const MoneyTimelineEventSchema = z
   .object({ at: z.string().datetime(), kind: MoneyTimelineKindSchema, amountCents: z.number().int().nullable(), detail: z.string().nullable() })
   .meta({ id: "MoneyTimelineEvent" });
 export type MoneyTimelineEvent = z.infer<typeof MoneyTimelineEventSchema>;
+
+/** Recette 02-ADMIN § 5.12 — ce qui reste à faire avec l'argent d'un deal (une ligne par attente). */
+export const MoneyPendingKindSchema = z
+  .enum(["AUTHORIZATION_OPEN", "DEAL_IN_PROGRESS", "PAYOUT_DUE", "PAYOUT_FROZEN", "PAYOUT_FAILED", "REVERSAL_OPEN", "RETENTION_HELD", "REFUND_PROPOSED"])
+  .meta({ id: "MoneyPendingKind" });
+export type MoneyPendingKind = z.infer<typeof MoneyPendingKindSchema>;
+export const MoneyBalanceSchema = z
+  .object({
+    capturedCents: z.number().int().describe("débité chez l'Expéditeur (0 tant que rien n'est capturé)"),
+    refundedCents: z.number().int().describe("rendu à l'Expéditeur, tous remboursements cumulés"),
+    paidOutCents: z.number().int().describe("versé au Voyageur et non renversé"),
+    platformHoldsCents: z.number().int().describe("débité − remboursé − versé : ce que la plateforme détient pour ce deal"),
+    pending: z.array(z.object({ kind: MoneyPendingKindSchema, cents: z.number().int() })),
+    settled: z.boolean().describe("plus rien n'est en attente"),
+    anomaly: z
+      .enum(["UNALLOCATED_FUNDS", "OVERSPENT"])
+      .nullable()
+      .describe("deal clos, rien en attente, et la plateforme détient plus que sa commission (UNALLOCATED_FUNDS) ou a versé plus qu'elle n'a reçu (OVERSPENT)"),
+  })
+  .meta({ id: "MoneyBalance" });
+export type MoneyBalance = z.infer<typeof MoneyBalanceSchema>;
 
 export const AdminDealMoneyFileSchema = z
   .object({
@@ -130,6 +151,8 @@ export const AdminDealMoneyFileSchema = z
       closedBy: z.string().nullable(),
     }),
     timeline: z.array(MoneyTimelineEventSchema),
+    // Recette 02-ADMIN § 5.12 — le bilan de l'argent du deal, calculé par une règle pure (`moneyBalance`) : où est chaque centime.
+    balance: MoneyBalanceSchema,
     adminActions: z.array(z.object({ id: ObjectIdSchema, at: z.string().datetime(), admin: z.string(), action: z.string(), after: z.unknown().nullable() })),
     // C-PR5b (D58 3A-c) — remboursement manuel
     manualRefund: z.object({

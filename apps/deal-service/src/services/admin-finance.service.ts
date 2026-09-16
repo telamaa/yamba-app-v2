@@ -38,6 +38,7 @@ import {
   csvRowInRange,
   manualRefundBounds,
   maskAccountId,
+  moneyBalance,
   monthStartUtc,
   payoutFailureDetail,
   payoutFailureKind,
@@ -282,6 +283,7 @@ export function makeAdminFinanceService(provider: PaymentProvider, settlement: D
           closedBy: b.closedBy ?? null,
         },
         timeline: buildMoneyTimeline(b),
+        balance: moneyBalance(b),
         adminActions: actions.map((a) => ({ id: a.id, at: a.createdAt.toISOString(), admin: nameOf(a.adminUserId), action: a.action, after: a.after ?? null })),
         manualRefund: {
           maxRefundableCents: refundBounds.maxRefundableCents,

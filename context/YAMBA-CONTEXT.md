@@ -771,6 +771,19 @@ Ordre de demarrage : auth -> trip -> gateway.
   peut aboutir », refus en francais (« Ton profil ne donne pas acces aux finances. »), « Relancer » sans double envoi et
   message qui nomme le montant, `INVALID_QUEUE_KIND`, sous-titre exact. Tests : auth 249, deal 587, harnais 411.
   Reste : § 5.12 a 8.
+- 14/09 : **CAHIER 02-ADMIN — § 5.12 FICHE ARGENT D'UN DEAL (branche `chore/recette-admin-5-12`, empilee sur #312)** —
+  5 scenarios CONFORMES (ARG-1 fiche, ARG-2 chronologie, + ARG-3 invariants comptables sur les 23 deals avec
+  contre-epreuve, ARG-4 bilan et libelles, ARG-5 Support), joues contre le code non corrige (ARG-1 vert d'emblee), puis
+  verts trois fois (`adm-arg-fiche-argent.spec.ts`) ; ADM-RET et ADM-FIN rejouees (14/14). Terrain SONDE en base avant
+  la spec. ANO-ADM-29 CLOSE (majeure) : le Support (deals.history.read sans finances.read) ne voyait que « 403 : Your
+  admin profile… » sur /deals/:id → vue reduite « Chronologie du deal », lien du dossier qui dit ce qu'il ouvre.
+  ANO-ADM-30 CLOSE (jeu d'essai) : bzv-cancelled debite puis annule, jamais rembourse → seed rembourse. A162 : bilan de
+  l'argent serveur (`moneyBalance`, anomalie `UNALLOCATED_FUNDS` / `OVERSPENT`), `AUTHORIZATION_RELEASED` dans la
+  chronologie de l'argent. AMELIORATIONS : `redactContacts` (erreurs techniques de la chronologie sans adresse ni
+  numero), statut / modele / acteurs / etats de relais en francais, actions admin resumees en clair, erreurs nommees
+  (« Deal introuvable. »). PIEGE DE PILE : un `nx run-many --target=serve --all` (lance le 13/09 22:33) a repris le port
+  6003 avec le fournisseur STRIPE pendant le redemarrage du bundle FAKE → PAYMENT_STATE_CONFLICT au rejeu de RET-2 ;
+  verifier `lsof -iTCP:6003` + `ps` apres chaque relance. Tests : deal 595, harnais 416. Reste : § 5.13 a 8.
 - 13/09 : **DECISION : LE ROLE PREND LA MAJUSCULE** (branche `chore/recette-voyageur-majuscule`, empilee sur #299) —
   « Voyageur » / « Traveler » partout : 71 valeurs de messages, 33 textes du code, 1 email ; regle `role-majuscule` au
   lexique partage (CI + recette) ; 12 citations du harnais ; web-fav, web-rch, web-rsv-devis, web-lit verts.

@@ -5340,3 +5340,60 @@ code, jamais une page technique.
   deal — même question que l'alerte du § 5.2.
 - L'accueil du Support doit-il nommer les alertes d'argent qu'il ne peut pas traiter ?
 - Marquer « caduque » une proposition de remboursement devenue impossible.
+
+
+---
+
+# Back-office — la fiche argent : où est chaque centime d'un deal (cahier 02-ADMIN § 5.12)
+
+*(PR `chore/recette-admin-5-12`, 14/09/2026 — ADM-ARG-1 à 5.)*
+
+## Le besoin
+
+Quand un membre écrit « j'ai été débité et je n'ai rien reçu », ou quand la comptabilité rapproche un mois, Finance
+doit lire en une page ce qui a été débité, rendu, versé, ce que la plateforme détient pour ce deal, et ce qui attend
+encore un geste — sans additionner à la main, sans jamais voir ce qui ne la regarde pas (code de livraison, photos,
+coordonnées du destinataire). Le Support, qui ne lit pas l'argent, doit pouvoir lire ce qui est arrivé au deal.
+
+## Les règles
+
+**RG-ADM-ARG-01 — Le prix figé est immuable** : la fiche montre le montant payé, le net Voyageur, la commission et la
+prime tels qu'ils ont été figés à la réservation, et payé = net + commission + prime.
+
+**RG-ADM-ARG-02 — Le bilan de l'argent** : débité chez l'Expéditeur, remboursé à l'Expéditeur (cumul), versé au Voyageur,
+détenu par la plateforme (= débité − remboursé − versé), et la liste des attentes (empreinte en cours, deal en cours,
+versement dû, gelé, en échec, renversement à décider, retenue à arbitrer, remboursement proposé). « Soldé » quand plus
+rien n'attend.
+
+**RG-ADM-ARG-03 — Argent sans destination** : sur un deal clos où plus rien n'attend, si la plateforme détient plus que
+sa commission, la fiche l'affiche en rouge — l'argent d'un membre est bloqué sans raison. De même si elle a versé et
+remboursé plus qu'elle n'a reçu sans geste commercial. Un renversement abandonné par décision n'est pas une anomalie.
+
+**RG-ADM-ARG-04 — Ce qui ne sort jamais** : ni le code de livraison, ni les photos, ni les coordonnées du destinataire,
+ni à l'écran ni dans les réponses du serveur ; les erreurs techniques affichées masquent adresses et numéros.
+
+**RG-ADM-ARG-05 — Identifiants de paiement** : en clair sur la fiche argent (rapprochement comptable), le compte Stripe
+du Voyageur masqué partout.
+
+**RG-ADM-ARG-06 — La chronologie se lit sans l'argent** : le Support ouvre la chronologie du deal (événements et leur
+relais, actions admin, notifications, emails) sans accéder aux montants ; chaque consultation est journalisée, celle de
+l'argent à part.
+
+**RG-ADM-ARG-07 — Une empreinte jamais débitée est dite libérée** dans la chronologie de l'argent (refus, expiration,
+annulation avant acceptation).
+
+## Tests d'acceptation
+
+| # | Situation | Attendu | Vérifié |
+|---|---|---|---|
+| ARG-1 | Finance ouvre le deal en échec de versement | cartes, prix figé, motif, tentatives, compte masqué, aucun code | oui |
+| ARG-2 | Une annulation vient d'avoir lieu | chronologie avec événement publié, notification, email, sans donnée sensible | oui |
+| ARG-3 | Les 23 deals du jeu d'essai | aucun écart comptable ; un deal débité jamais remboursé est signalé | oui (contre-épreuve) |
+| ARG-4 | Deal en échec, deal versé, deal refusé | « En attente », « Soldé », « Empreinte libérée » | oui |
+| ARG-5 | Le Support suit le lien du dossier de médiation | la chronologie s'affiche, l'argent reste fermé | oui (ANO-ADM-29 close) |
+
+## Ce qui reste à trancher
+
+- Une file « Argent sans destination » dans Finances (et une alerte) à partir du bilan : une file de plus, mais le seul
+  moyen de voir ces deals sans ouvrir chaque fiche.
+- Lister chaque remboursement d'un deal (aujourd'hui le cumul et la date du dernier seulement).

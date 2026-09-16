@@ -8256,3 +8256,107 @@ Tant que `/admin/me` n'a pas répondu, la carte reste un lien (état d'avant, ja
   deal-service a expiré deux fois sous charge ; vert en isolé (même constat qu'au § 5.5).
 - `apps/e2e` : **411 scénarios** (406 + 5), 5/5 verts deux fois ; ADM-ALR et ADM-ACC rejouées (7/7).
 - Typecheck des cinq services, d'admin-ui et du harnais verts ; OpenAPI régénérés.
+
+
+---
+
+# Cahier 02-ADMIN, § 5.12 : la fiche argent — un bilan qui dit où est chaque centime
+
+*(PR `chore/recette-admin-5-12`, empilée sur #312, 14/09/2026.)*
+
+## Ce qui a été fait
+
+Deux fiches du cahier (ADM-ARG-1, 2) et trois ajoutées (ARG-3 invariants comptables, ARG-4 bilan et libellés, ARG-5
+le Support et la chronologie). Deux anomalies closes (`ANO-ADM-29`, `ANO-ADM-30`), neuf améliorations.
+
+```
+apps/deal-service/src/services/admin-finance.rules.ts        moneyBalance (règle pure) ; AUTHORIZATION_RELEASED dans la chronologie
+apps/deal-service/src/services/admin-finance.service.ts      la fiche sert `balance`
+apps/deal-service/src/services/admin-history.service.ts      redactContacts : erreurs techniques sans adresse ni numéro
+packages/libs/api-contracts/src/admin/admin-finances.schema.ts  MoneyBalanceSchema, MoneyPendingKind ; 5 openapi.json régénérés
+apps/admin-ui/src/components/DealMoneyView.tsx               carte Bilan ; vue réduite sur 403 (ANO-ADM-29) ; libellés ; erreurs nommées
+apps/admin-ui/src/components/DisputeFileView.tsx             le lien dit ce qu'il ouvre selon le profil
+apps/admin-ui/src/lib/format.ts + types.ts                   libellés (attentes, anomalies, acteurs, modèle, états), adminAfterSummary
+packages/libs/prisma/scripts/seed-deals.ts                   ANO-ADM-30 : un deal accepté puis annulé est remboursé
+apps/e2e/src/admin/adm-arg-fiche-argent.spec.ts              5 scénarios en série (jeu d'essai rejoué avant et après)
+```
+
+## Sonder le terrain avant d'écrire
+
+Un script de sonde (lu puis supprimé) a relevé, pour les 23 deals du jeu d'essai : prix figé (et `net + commission +
+prime = payé`), débit, remboursement, retenue, versement, transfert. Tout additionnait, sauf un fait : `bzv-cancelled`
+était **capturé** (accepté) puis **annulé**, sans aucun remboursement. Le produit rembourse en entier une annulation plus
+de 48 h avant le départ (`deal-lifecycle.service.ts`, `computeCancellationRefundCents`) : c'est le jeu d'essai qui mentait
+(`ANO-ADM-30`). La leçon technique n'est pas la correction du seed, c'est la question qu'elle pose : **qui aurait vu ce
+deal en production ?** Personne — aucune file ne montre un deal clos dont l'argent n'a pas de destination. D'où le bilan.
+
+## `moneyBalance` : une règle pure, testée cas par cas
+
+```ts
+export function moneyBalance(b: MoneyBalanceInput): MoneyBalance {
+  const capturedCents = b.capturedAt ? b.pricing.totalShipperCents : 0;
+  const refundedCents = b.refundAmountCents ?? 0;
+  const paidOutCents = b.payoutStatus === "SENT" ? (b.payoutAmountCents ?? 0) : 0;
+  const platformHoldsCents = capturedCents - refundedCents - paidOutCents;
+  // pending : AUTHORIZATION_OPEN, DEAL_IN_PROGRESS, PAYOUT_FROZEN, PAYOUT_DUE, PAYOUT_FAILED, REVERSAL_OPEN, RETENTION_HELD, REFUND_PROPOSED
+  …
+  if (settled && CLOSED.has(b.status)) {
+    const writtenOff = b.payoutStatus === "REVERSED" && b.payoutReversalResolution === "WRITTEN_OFF";
+    if (!writtenOff && platformHoldsCents > b.pricing.commissionCents) anomaly = "UNALLOCATED_FUNDS";
+    else if (platformHoldsCents < 0 && !(b.manualRefundCents ?? 0)) anomaly = "OVERSPENT";
+  }
+}
+```
+
+Pourquoi « plus que sa commission » et pas « différent de sa commission » ? Parce que plusieurs issues légitimes laissent
+à la plateforme **moins** que sa commission : une retenue compensée au prorata (la plateforme garde la part de commission
+de la retenue — 1,56 € au § 5.10), une retenue restituée (0), un geste commercial (négatif, expliqué par
+`manualRefundCents`). Seul le cas « la plateforme détient plus que ce qu'elle facture, et rien n'attend » est sans
+explication. Un renversement **abandonné** (`WRITTEN_OFF`) garde la part du Voyageur par décision tracée : exclu.
+L'écran n'additionne rien ; il affiche ce que le serveur calcule.
+
+## ANO-ADM-29 : une permission sans écran
+
+Les permissions sont justes (`deals.history.read` au Support, `finances.read` non) mais la seule carte qui sert la
+première vit sur une page qui charge d'abord la seconde. Plutôt que d'ouvrir `finances.read` (le Support lirait alors
+tout l'argent), l'écran traite le 403 comme une information :
+
+```tsx
+.catch((e) => {
+  if (e instanceof ApiError && e.status === 403) setDenied(true);          // vue réduite, pas une erreur
+  else if (e instanceof ApiError && e.status === 404) setError("Deal introuvable. …");
+  …
+});
+if (denied) { if (!me) return <Chargement/>; return can(me.adminRoles, "deals.history.read") ? <DealHistoryCard/> : <raison/>; }
+```
+
+On attend `/admin/me` avant de choisir le message : sans cela, la vue affichait un instant « ton profil n'ouvre rien »
+avant de se reprendre.
+
+## `redactContacts` : ce qu'une erreur technique révèle
+
+Une erreur SMTP typique est `550 5.1.1 <aminata.diallo@…>: mailbox unavailable`. La chronologie servait `lastError`
+tel quel à des profils qui n'ont pas la lecture des coordonnées. La fonction masque les adresses, puis les suites de
+chiffres **d'au moins neuf chiffres** — piège payé en écrivant le test : une première version à « 9 caractères chiffres,
+espaces, points » masquait `550 5.1.1`, le code SMTP lui-même.
+
+## Chronologie de l'argent : dire aussi ce qui n'a pas eu lieu
+
+`buildMoneyTimeline` ne pose qu'une ligne par fait écrit en base. Un deal refusé n'a qu'un fait : l'empreinte
+(`AUTHORIZED` à `requestedAt`) — sa chronologie se terminait sur « Empreinte posée 67,20 € », ce qu'un lecteur prend pour
+un débit. La libération de l'empreinte n'est pas un champ, mais elle se **déduit** sans ambiguïté : statut fermé
+(`DECLINED`, `EXPIRED`, `CANCELLED`) et jamais `capturedAt`. Nouveau fait `AUTHORIZATION_RELEASED` à `closedAt`, avec
+l'acteur en détail.
+
+## La contre-épreuve d'un invariant
+
+ARG-3 vérifie « aucune anomalie » sur les 23 deals. Vert, cela peut vouloir dire que le calcul est juste… ou qu'il ne
+lève jamais rien. La fiche remet donc le défaut d'origine en base (manœuvre consignée : `refundAmountCents: null` sur
+`bzv-cancelled`), exige `UNALLOCATED_FUNDS` à l'API et le message rouge à l'écran, et le jeu d'essai est rejoué en
+`afterAll`.
+
+## Tests
+
+- deal-service **595** (+8) : `moneyBalance` (6), `AUTHORIZATION_RELEASED` (1), `redactContacts` (1).
+- `apps/e2e` : **416 scénarios** (411 + 5), 5/5 verts deux fois ; ADM-RET et ADM-FIN rejouées.
+- Typecheck deal-service, admin-ui et harnais verts ; les cinq `openapi.json` régénérés (nouveau schéma `MoneyBalance`).
